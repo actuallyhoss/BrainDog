@@ -68,10 +68,13 @@ export function liveArrivals(ms = ARRIVED_MS) {
     );
   };
   return {
-    /** The keys of `list` still marked as arrived, noting the ones it draws now. Safe to call while drawing. */
-    see(list: string, keys: readonly string[]): ReadonlySet<string> {
+    /**
+     * The keys of `list` still marked as arrived, noting the ones it draws now. Safe to call while drawing. `answered`
+     * is the live read's word on this look (`arrivals` in `optimistic.ts`): true makes an empty look a baseline.
+     */
+    see(list: string, keys: readonly string[], answered?: boolean): ReadonlySet<string> {
       void beat;
-      const out = seen.see(list, keys);
+      const out = seen.see(list, keys, answered);
       later();
       return out;
     },

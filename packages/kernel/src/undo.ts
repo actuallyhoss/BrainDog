@@ -19,6 +19,16 @@
  *     and the plan says so rather than guessing
  *   - a message the undone writes queued and that has not gone yet is stopped; one already gone is named as gone.
  *
+ * AND A DECLARATION AN ACCEPTED CHANGE REPLACED GOES BACK TOO (batch 62). The table keeps every version, and nothing
+ * walked it: a decision that reworded a page or renamed a list had a plan with no step in it, which is why such a
+ * question was weighed hard to undo. The plan now holds one step for it, `declare`, and the undo installs the earlier
+ * version's body again AS A NEW VERSION, never by clearing `superseded_at`: history is appended to, so the table
+ * reads before, changed, and before again. It is left, with a sentence, when the earlier version cannot stand any
+ * more: somebody changed it again on top, it was taken out, the earlier body was erased, a list it reads is gone, or
+ * the list has a field since that the earlier version lacks and that holds answers now.
+ * Installing hashes, which is asynchronous, and the undo is one synchronous transaction, so it is two calls:
+ * `undoStaged` checks and hashes what would go back, and `undoApply` handed its answer writes it with the rest.
+ *
  * TWO STEPS AND A HASH, so a person sees what will happen before it does. `undoPlan` reads and writes nothing and
  * answers plain lines in names, never ids, with a hash of exactly what it would do. `undoApply` works the plan out
  * again inside one transaction and refuses when its hash is not the one the person saw (`PLAN_STALE`): something moved
@@ -39,7 +49,7 @@ import { no, ok } from '@braindog/ports';
 import { BACKFILL_ACTOR } from './backfill.ts';
 import { agentOf, kindOfEvent, shapeIn } from './change-kind.ts';
 import type { Json } from './coerce.ts';
-import { jcs } from './declare.ts';
+import { jcs, type Declaration } from './declare.ts';
 import type { Patch } from './index.ts';
 import type { KernelParts } from './parts.ts';
 import { reopenedTail } from './ingest.ts';
@@ -63,7 +73,7 @@ export type UndoScope = ({ batch: string } | { decision: string } | { run: strin
 export type UndoRow = { register: string; seq: number };
 
 /** What one step does, as a word a screen can pick an icon by. */
-export type UndoDo = 'remove' | 'restore' | 'delete' | 'set' | 'untag' | 'tag' | 'stop';
+export type UndoDo = 'remove' | 'restore' | 'delete' | 'set' | 'untag' | 'tag' | 'stop' | 'declare';
 
 /**
  * One thing the undo puts back, in names.
@@ -126,6 +136,18 @@ export type UndoParts = Pick<KernelParts, 'sql' | 'clock' | 'mint' | 'transactio
 
 /** Narrows what a person's plan may show: a list she cannot read is left out without a word. */
 export type UndoOptions = { reads?: (register: string) => boolean };
+
+/**
+ * Checks and hashes declarations now, and hands back their write for a transaction the caller owns: the kernel's
+ * `stageInstall`, which is every check an install runs and none of the writing.
+ */
+export type UndoStage = (batch: readonly Declaration[]) => Promise<Result<() => Result<unknown>>>;
+
+/**
+ * What `undoStaged` made ready, handed to `undoApply` as it is: for each question whose change goes back, the write of
+ * the earlier versions, or the refusal the checks gave, which the undo answers among `skipped` in its own words.
+ */
+export type UndoDeclared = { ready: Map<string, { write: () => Result<unknown> } | { refused: Result<never> }> };
 
 /* ── reading the log ─────────────────────────────────────────────────────── */
 
@@ -422,7 +444,26 @@ type Stop = { id: string; state: string; step: UndoStep };
  * `lines` are the ones the plan puts back from, only the row's under `scope.row`; `every` is every line of the scope's
  * batches, which the ladder reads for who made each.
  */
-type Worked = { plan: UndoPlan; work: Work[]; stops: Stop[]; keys: string[]; lines: Line[]; every: Line[]; decisions: string[] };
+type Worked = { plan: UndoPlan; work: Work[]; stops: Stop[]; declares: Declared[]; keys: string[]; lines: Line[]; every: Line[]; decisions: string[] };
+
+/** One declaration an accepted change replaced, and the earlier version the undo installs again as a new one. */
+type Declared = {
+  /** The question whose change this puts back: what was changed together goes back together. */
+  suggestion: string;
+  /** The batch the decision was written in, for the ladder's mark. */
+  key: string;
+  id: string;
+  kind: string;
+  pack: string | null;
+  /** The version the change installed, which must still be the live one. */
+  installed: number;
+  /** The version it replaced, and its body as the table holds it. */
+  prior: number;
+  body: string;
+  /** What its history line says, naming the question a person answered. */
+  note: string;
+  step: UndoStep;
+};
 
 /**
  * What undoing `scope` would do, in names, and the hash `undoApply` needs. Reads only.
@@ -790,9 +831,12 @@ function worked(sql: Sql, scope: UndoScope, opts: UndoOptions): Result<Worked> {
   const acted = new Set(work.map((w) => w.id));
   const stops = stopsOf(sql, lines, keys, (id) => byRow.has(id) && (acted.has(id) || !leftAlone.has(id)), skipped, only.value);
 
+  /* A DECLARATION IS NOBODY'S ONE ROW, so under `row` none goes back and none is spoken of. */
+  const declares = only.value === null ? declaredIn(sql, lines, opts, (title, why) => skip(undefined, title, why)) : [];
+
   /* THE ORDER IT IS WRITTEN IN, and so the order it is read in: rows back first, values next, removals last. */
   work.sort((a, b) => rank(a) - rank(b) || (a.remove && b.remove ? b.made - a.made : 0));
-  const steps = [...work.flatMap((w) => w.steps), ...stops.map((s) => s.step)];
+  const steps = [...work.flatMap((w) => w.steps), ...declares.map((d) => d.step), ...stops.map((s) => s.step)];
   const count = steps.length;
   /* ANY OF ITS BATCHES, since a run's own bookkeeping batches are never put back and so never marked. */
   /* UNDER `row`, ONLY WHEN AN UNDO HAS PUT THAT ROW BACK SINCE: another row's undo marks the batch too, and the mark
@@ -812,7 +856,8 @@ function worked(sql: Sql, scope: UndoScope, opts: UndoOptions): Result<Worked> {
           ? `Nothing can be put back. ${skipped.length === 1 ? 'One change is' : `${skipped.length} changes are`} left as ${skipped.length === 1 ? 'it is' : 'they are'}.`
           : got.value.empty
       : `Puts back ${count === 1 ? 'one change' : `${count} changes`}.${skipped.length > 0 ? ` Leaves ${skipped.length === 1 ? 'one as it is' : `${skipped.length} as they are`}.` : ''}`;
-  const again = count > 0 && skipped.length === 0 && answered(sql, lines).length > 0 ? [ASKED_AGAIN] : [];
+  /* A QUESTION WHOSE DECLARATION GOES BACK IS NOT ASKED AGAIN: it was drawn against a version that is history now. */
+  const again = count > 0 && skipped.length === 0 && declares.length === 0 && answered(sql, lines).length > 0 ? [ASKED_AGAIN] : [];
   const lineList = [...steps.map((s) => s.line), ...skipped.map((s) => s.line), ...again, ...(notes > 0 ? [notes === 1 ? 'The note stays.' : 'The notes stay.'] : [])];
   const hash = digest(
     jcs({
@@ -820,9 +865,199 @@ function worked(sql: Sql, scope: UndoScope, opts: UndoOptions): Result<Worked> {
       stops: stops.map((s) => [s.id, s.state]),
       skipped: skipped.map((s) => s.line),
       ...(only.value === null ? {} : { only: only.value }),
+      /* ONLY WHEN THERE IS ONE, so a plan with none has the hash it always had. */
+      ...(declares.length === 0 ? {} : { declares: declares.map((d) => [d.id, d.installed, d.prior]) }),
     } as unknown as Json),
   );
-  return ok({ plan: { say, lines: lineList, steps, skipped, notes, hash, already }, work, stops, keys, lines, every, decisions });
+  return ok({ plan: { say, lines: lineList, steps, skipped, notes, hash, already }, work, stops, declares, keys, lines, every, decisions });
+}
+
+/* ── a declaration a change replaced ─────────────────────────────────────── */
+
+/** How a put back's own history line begins, which is also how a plan knows a change went back already. */
+const DECLARED_BACK = 'Put back by an undo';
+
+/** What a person calls a kind of declaration, where it is not the kind's own word. */
+const KIND_WORD: Record<string, string> = { register: 'list', metric: 'figure', ingest: 'pattern' };
+
+type HeldDecl = { version: number; kind: string; pack: string | null; body: string; retired: number };
+const DECL = 'version, kind, pack_id AS pack, body, retired';
+
+/** A declaration's name as a person reads it: what its body calls it, or its id's own words. Never the id. */
+function declName(body: unknown, id: string): string {
+  const b = isMap(body) ? body : {};
+  const said = [b.name, b.title].find((v): v is string => typeof v === 'string' && v.trim() !== '');
+  return said ? clip(said.trim(), 80) : spaced(id.slice(id.indexOf('.') + 1));
+}
+
+/** A change to one field's type, which lands by rewriting the answers under it (`api/retype.ts`). */
+const retypes = (to: unknown): boolean => isMap(to) && ('retype' in to || 'narrow' in to) && !('add' in to) && !('retire' in to);
+
+/**
+ * The versions one accepted change installed, each with the version it replaced.
+ *
+ * FROM THE HISTORY LINE THE INSTALL WROTE, which names the question ("Proposed by Robin in SG4."), holds both
+ * versions, and covers every member of a bundle. An install signed by nobody writes no line, and then the body says
+ * it for a whole declaration: `from_version`, or the version whose body is `from`'s, and the next version after it,
+ * made no earlier than the decision and holding exactly what `to` said. Anything less sure is not a step.
+ */
+function replacedBy(sql: Sql, suggestion: string, body: Record<string, unknown>, decided: Line): { id: string; installed: number; prior: number }[] {
+  const said = sql.all<{ target: string; from_v: string | null; to_v: string | null }>(
+    "SELECT target, from_v, to_v FROM event WHERE kind = 'declare' AND target_kind = 'declaration' AND rowid > ? AND instr(coalesce(note, ''), ?) > 0 ORDER BY rowid",
+    decided.rowid,
+    ` in ${suggestion}.`,
+  );
+  /* A LINE WITH NO `from` IS A DECLARATION THAT WAS NEW: it replaced nothing, so there is no earlier one to put back. */
+  if (said.length > 0)
+    /* AND A LINE WHOSE TWO VERSIONS ARE ONE IS A RETIRE (`retire` in `index.ts`), which made no version to go back from. */
+    return said.flatMap((e) =>
+      e.from_v === null || e.to_v === null || e.from_v === e.to_v ? [] : [{ id: e.target.slice('declaration:'.length), installed: Number(e.to_v), prior: Number(e.from_v) }],
+    );
+  const id = body.declaration_id;
+  const to = body.to;
+  if (typeof id !== 'string' || !isMap(to) || to.id !== id || !isMap(to.body)) return [];
+  const from = body.from;
+  const prior =
+    typeof body.from_version === 'number'
+      ? body.from_version
+      : isMap(from) && isMap(from.body)
+        ? (sql.one<{ v: number | null }>('SELECT MAX(version) AS v FROM declaration WHERE id = ? AND body = ? AND superseded_at IS NOT NULL', id, jcs(from.body as Json))?.v ?? null)
+        : null;
+  if (prior === null) return [];
+  const next = sql.one<{ version: number; body: string }>(
+    'SELECT version, body FROM declaration WHERE id = ? AND version > ? AND created_at >= ? ORDER BY version LIMIT 1',
+    id,
+    prior,
+    decided.ts,
+  );
+  return next && next.body === jcs(to.body as Json) ? [{ id, installed: next.version, prior }] : [];
+}
+
+/** The name of a list a declaration reads that this record no longer holds, or `null` when every one is there. */
+function goneList(sql: Sql, kind: string, body: unknown): string | null {
+  if (kind === 'register' || !isMap(body)) return null;
+  const needs = [
+    ...(Array.isArray(body.requires) ? body.requires.filter((r): r is string => typeof r === 'string' && r.startsWith('register.')).map((r) => r.slice('register.'.length)) : []),
+    ...(typeof body.register === 'string' ? [body.register] : []),
+  ];
+  for (const r of new Set(needs)) {
+    const held = sql.one<{ body: string; live: number }>(
+      'SELECT body, (superseded_at IS NULL AND retired = 0) AS live FROM declaration WHERE id = ? ORDER BY version DESC LIMIT 1',
+      `register.${r}`,
+    );
+    if (held?.live === 1) continue;
+    return held ? declName(parse(held.body), `register.${r}`) : spaced(r);
+  }
+  return null;
+}
+
+/**
+ * The field of a list that the earlier version does not have and that holds answers now, as a person reads it, or
+ * `null`. Putting the list back would leave those answers with no field to show under, and nothing would say so.
+ */
+function filledSince(sql: Sql, was: unknown, now: unknown): string | null {
+  if (!isMap(was) || !isMap(now) || typeof now.id !== 'string') return null;
+  const ids = (body: Record<string, unknown>): FieldShape[] =>
+    (Array.isArray(body.fields) ? body.fields : []).filter((f): f is FieldShape => isMap(f) && typeof f.id === 'string' && /^[a-z][a-z0-9_]*$/.test(f.id));
+  const had = new Set(ids(was).map((f) => f.id));
+  for (const f of ids(now)) {
+    if (had.has(f.id) || f.retired === true) continue;
+    const filled = sql.one("SELECT 1 AS y FROM entry WHERE register = ? AND deleted_at IS NULL AND coalesce(json_type(fields, ?), 'null') <> 'null' LIMIT 1", now.id, `$.${f.id}`);
+    if (filled) return labelOf(f);
+  }
+  return null;
+}
+
+/**
+ * The declarations the scope's accepted changes replaced and that can go back, each as one step; one that cannot is
+ * handed to `skip` with why, in the order the checks are written: it is somebody else's now, it is gone, or there is
+ * no whole earlier version to install.
+ *
+ * NOTHING IS REWRITTEN. The step installs the earlier body as the next version, so the version the change made stays
+ * in the table, superseded, beside the one it replaced.
+ */
+function declaredIn(sql: Sql, lines: readonly Line[], opts: UndoOptions, skip: (title: string, why: string) => void): Declared[] {
+  const out: Declared[] = [];
+  const at = (id: string, version: number): HeldDecl | undefined => sql.one<HeldDecl>(`SELECT ${DECL} FROM declaration WHERE id = ? AND version = ?`, id, version);
+  for (const l of lines) {
+    if (l.kind !== 'resolve' || l.to_v !== 'addressed' || !l.target?.startsWith('suggestion:')) continue;
+    const suggestion = l.target.slice('suggestion:'.length);
+    const asked = sql.one<{ kind: string; body: string }>('SELECT body_kind AS kind, body FROM suggestion WHERE id = ?', suggestion);
+    const body = asked?.kind === 'change' ? parse(asked.body) : null;
+    if (!isMap(body)) continue;
+    const decision = lines.find((d) => d.kind === 'decide' && keyOf(d) === keyOf(l) && d.target?.startsWith('decision:'))?.target?.slice('decision:'.length);
+    const question = decision === undefined ? null : (sql.one<{ q: string | null }>('SELECT question AS q FROM decision WHERE id = ?', decision)?.q ?? null);
+    const note = question === null || question.trim() === '' ? `${DECLARED_BACK}.` : `${DECLARED_BACK} of the answer to "${clip(question.trim(), 160)}"`;
+
+    for (const c of replacedBy(sql, suggestion, body, l)) {
+      const target = `declaration:${c.id}`;
+      const live = sql.one<HeldDecl>(`SELECT ${DECL} FROM declaration WHERE id = ? AND superseded_at IS NULL ORDER BY version DESC LIMIT 1`, c.id);
+      if (!live || !at(c.id, c.installed)) continue;
+      const now = parse(live.body);
+      /* A LIST SHE CANNOT READ is left out without a word, as its rows are. */
+      if (opts.reads && live.kind === 'register' && !opts.reads(isMap(now) && typeof now.id === 'string' ? now.id : c.id.slice('register.'.length))) continue;
+      /* PUT BACK ALREADY: an undo's own line stands on the version this change installed. */
+      if (sql.one("SELECT 1 AS y FROM event WHERE kind = 'declare' AND target = ? AND from_v = ? AND note LIKE ? LIMIT 1", target, String(c.installed), `${DECLARED_BACK}%`)) continue;
+
+      const title = declName(now, c.id);
+      if (retypes(body.to)) {
+        skip(title, 'this changed what kind of answer one of its fields takes and rewrote the answers already there, which is not put back from here');
+        continue;
+      }
+      if (live.version !== c.installed) {
+        const by = sql.one<{ actor: string }>("SELECT actor FROM event WHERE kind = 'declare' AND target = ? AND to_v = ? ORDER BY rowid DESC LIMIT 1", target, String(live.version))?.actor;
+        skip(title, `${by ? `${whoIn(sql, by)} has changed it` : 'it has been changed'} again since, and putting this back would undo that as well`);
+        continue;
+      }
+      if (live.retired) {
+        skip(title, 'it has been taken out of this record since');
+        continue;
+      }
+      const prior = at(c.id, c.prior);
+      if (!prior) {
+        skip(title, 'the record no longer holds how it read before');
+        continue;
+      }
+      if (erasedOrWithheld(prior.body)) {
+        skip(title, 'part of how it read before has been erased or is withheld, so there is no whole copy to put back');
+        continue;
+      }
+      if (prior.retired) {
+        skip(title, 'it was out of use before this change, and taking it out again is not done from here');
+        continue;
+      }
+      const was = parse(prior.body);
+      const filled = prior.kind === 'register' ? filledSince(sql, was, now) : null;
+      if (filled !== null) {
+        skip(title, `putting it back would take ${named(filled)} off the list, and that holds answers now`);
+        continue;
+      }
+      const gone = goneList(sql, prior.kind, was);
+      if (gone !== null) {
+        skip(title, `the list it reads, ${named(gone)}, is no longer in this record`);
+        continue;
+      }
+      const word = KIND_WORD[live.kind] ?? live.kind;
+      const before = declName(was, c.id);
+      const line =
+        before === title
+          ? `Puts the ${word} ${named(title)} back to how it read before this change.`
+          : `Puts the ${word} ${named(title)} back to how it read before this change, as ${named(before)}.`;
+      out.push({
+        suggestion,
+        key: keyOf(l),
+        id: c.id,
+        kind: prior.kind,
+        pack: prior.pack,
+        installed: c.installed,
+        prior: c.prior,
+        body: prior.body,
+        note: clip(note, 280),
+        step: { do: 'declare', title, label: word, ...(before === title ? {} : { from: before, to: title }), line },
+      });
+    }
+  }
+  return out;
 }
 
 /** The note on what an undo writes, which is how a row says it was put back. */
@@ -903,12 +1138,46 @@ const WINDOW_MS = 5_000;
  * another still points at) is rolled back on its own and answered among `skipped` with the write path's sentence, so
  * one row that cannot go back does not hold back the rest the person agreed to.
  */
-export function undoApply(parts: UndoParts, scope: UndoScope, hash: string, actor: string, opts: UndoOptions = {}): Result<UndoApplied> {
+/** What changed together goes back together: the plan's declarations, by the question that changed them. */
+function byQuestion(declares: readonly Declared[]): Map<string, Declared[]> {
+  const out = new Map<string, Declared[]>();
+  for (const d of declares) out.set(d.suggestion, [...(out.get(d.suggestion) ?? []), d]);
+  return out;
+}
+
+/**
+ * Make ready the declarations an undo of `scope` would put back: each earlier body checked and hashed through `stage`
+ * against the record as it is now. Writes nothing. Its answer goes to `undoApply`, which writes inside its own
+ * transaction, so the declaration, the rows and the marks land together or not at all.
+ *
+ * A REFUSAL IS KEPT, NOT ANSWERED: the earlier version of a page may name a field that has gone since, and the undo
+ * then leaves that one with the check's own sentence and still puts back the rest the person agreed to.
+ */
+export async function undoStaged(sql: Sql, stage: UndoStage, scope: UndoScope, opts: UndoOptions = {}): Promise<Result<UndoDeclared>> {
+  const got = worked(sql, scope, opts);
+  if (!got.ok) return got;
+  const ready: UndoDeclared['ready'] = new Map();
+  for (const [suggestion, group] of byQuestion(got.value.declares)) {
+    const batch = group.map((d): Declaration => ({ id: d.id, kind: d.kind as Declaration['kind'], body: JSON.parse(d.body) as Declaration['body'], ...(d.pack === null ? {} : { pack: d.pack }) }));
+    const staged = await stage(batch);
+    ready.set(suggestion, staged.ok ? { write: staged.value } : { refused: staged as Result<never> });
+  }
+  return ok({ ready });
+}
+
+/** What a declaration step answers when `undoApply` was handed nothing made ready for it. */
+const NOT_READY = 'how it read before was not made ready to go back in, so ask for this undo again';
+
+/**
+ * `declared` IS `undoStaged`'S ANSWER FOR THIS SCOPE, and without it a declaration step is left with a sentence: the
+ * rows still go back.
+ */
+export function undoApply(parts: UndoParts, scope: UndoScope, hash: string, actor: string, opts: UndoOptions = {}, declared?: UndoDeclared): Result<UndoApplied> {
   const { sql } = parts;
   return attempt(sql, parts.transaction, () => {
     const got = worked(sql, scope, opts);
     if (!got.ok) return got;
-    const { plan, work, stops, keys, lines, every, decisions } = got.value;
+    const { plan, work, stops, declares, keys, lines, every, decisions } = got.value;
     if (typeof hash !== 'string' || hash !== plan.hash)
       return no<UndoApplied>('PLAN_STALE', 'Something changed since this undo was shown. Look at it again, then put it back.', { at: 'hash' });
 
@@ -949,6 +1218,48 @@ export function undoApply(parts: UndoParts, scope: UndoScope, hash: string, acto
       }
     }
 
+    /* ── the declarations, each question's together: the earlier bodies as new versions, and a history line each ── */
+    const declaredBack = new Set<string>();
+    for (const [suggestion, group] of byQuestion(declares)) {
+      const ready = declared?.ready.get(suggestion);
+      const wrote: Result<null> =
+        ready === undefined
+          ? no('PLAN_STALE', NOT_READY, { at: 'declared' })
+          : 'refused' in ready
+            ? ready.refused
+            : attempt(sql, parts.transaction, (): Result<null> => {
+                const put = ready.write();
+                if (!put.ok) return put as Result<never>;
+                for (const d of group) {
+                  /* WHAT IS LIVE NOW MUST BE A NEWER VERSION HOLDING THE EARLIER BODY, or the write was not this one's. */
+                  const live = sql.one<HeldDecl>(`SELECT ${DECL} FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0 ORDER BY version DESC LIMIT 1`, d.id);
+                  if (!live || live.version <= d.installed || live.body !== d.body) return no('PLAN_STALE', 'it did not go back to how it read before', { at: 'declared' });
+                  slashMayWrite(actor, 'declare', live);
+                  sql.exec(
+                    "INSERT INTO event (id, ts, actor, kind, target, target_kind, from_v, to_v, note, batch) VALUES (?, ?, ?, 'declare', ?, 'declaration', ?, ?, ?, ?)",
+                    parts.mint(),
+                    at,
+                    actor,
+                    `declaration:${d.id}`,
+                    String(d.installed),
+                    String(live.version),
+                    d.note,
+                    batch,
+                  );
+                }
+                return ok(null);
+              });
+      for (const d of group) {
+        if (wrote.ok) {
+          done.push(d.step);
+          declaredBack.add(d.key);
+        } else {
+          const why = refusalWords(sql, wrote, d.step.title);
+          skipped.push({ title: d.step.title, why, line: `Leaves ${named(d.step.title)} as it is: ${why}.` });
+        }
+      }
+    }
+
     for (const s of stops) {
       sql.exec("UPDATE outbox SET state = 'done', leased_until = NULL, payload = json_set(payload, '$.cancelled', ?) WHERE id = ? AND state IN ('pending','failed')", at, s.id);
       sql.exec("UPDATE schedule SET state = 'done' WHERE kind = 'retry' AND key = ? AND state IN ('pending','failed','paused')", `outbox:${s.id}`);
@@ -967,6 +1278,8 @@ export function undoApply(parts: UndoParts, scope: UndoScope, hash: string, acto
     }
     /* A stopped message belongs to the batches it was matched to; its batch is marked when nothing else of it was. Under
        `row`, that is the batches that wrote the row, not every one of a run's. */
+    /* A DECLARATION PUT BACK MARKS ITS DECISION'S BATCH, with the kinds its rows gave it and none of its own. */
+    for (const k of declaredBack) if (!kinds.has(k)) kinds.set(k, new Set());
     if (stops.length > 0 && kinds.size === 0) for (const k of scope.row === undefined ? keys : [...new Set(lines.map(keyOf))]) kinds.set(k, new Set());
     /* A SECOND UNDO OF THE SAME BATCH, putting back what the first left, adds its kinds to the mark the first made: the
        ladder reads one line per batch, and a kind put back later is as undone as one put back first. Who made it and
@@ -1018,7 +1331,9 @@ export function undoApply(parts: UndoParts, scope: UndoScope, hash: string, acto
     const asked = count > 0 ? answered(sql, every) : [];
     const { row: one, ...all } = scope;
     const rest = one === undefined || asked.length === 0 ? null : worked(sql, all as UndoScope, opts);
-    const whole = skipped.length === 0 && (rest === null || (rest.ok && rest.value.plan.steps.length === 0 && rest.value.plan.skipped.length === 0));
+    /* A QUESTION WHOSE DECLARATION WENT BACK READS UNDONE AND IS NOT ASKED AGAIN: it was drawn against a version that
+       is history now, so a yes to it could never land. */
+    const whole = declaredBack.size === 0 && skipped.length === 0 && (rest === null || (rest.ok && rest.value.plan.steps.length === 0 && rest.value.plan.skipped.length === 0));
     for (const q of asked) {
       if (!whole && q.as === 'undone') continue;
       if (whole) {

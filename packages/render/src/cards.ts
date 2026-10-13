@@ -145,7 +145,7 @@ const at = (n: number): string => String(Math.round(n * 100) / 100);
  * are spaces or semicolons between the numbers, a comma inside one groups its thousands (`1,200 3,400`) and a comma after
  * one is the list's; where there are none, the commas are the list's, and two together are a gap and never a zero.
  */
-function runTokens(value: string): string[] {
+export function runTokens(value: string): string[] {
   const run = value.trim().replace(/^\[(.*)\]$/su, '$1').trim();
   if (run === '') return [];
   if (/[\s;]/u.test(run))

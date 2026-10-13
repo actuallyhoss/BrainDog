@@ -1117,12 +1117,16 @@ function lookBody(decl: Declaration, installed?: Known): Refusal | null {
 /**
  * WHETHER A LOOK FITS A PAGE AS READ, for a writer holding the page whole (its adds laid in): the record before it
  * writes the model's look, and a host before it saves a pin. Every key it names is a key the page has; `hide` touches
- * no block that was refused or leads (`lead: true`, or the look's own lead); `next` names a row the page handed.
- * `null` when it fits.
+ * no block that was refused or leads (`lead: true`, or the look's own lead), nor, for a look that is not the owner's,
+ * a queue that holds a question (`applyLook` in `compose.ts` drops such a hide either way, and here the writer is
+ * told); `next` names a row the page handed. `null` when it fits.
+ *
+ * `by` IS WHOSE LOOK IT IS. A caller checking the owner's own pin passes `by: 'owner'`, and the record's writer of
+ * Slash's look passes `by: 'slash'`; a look that does not say is held as one that is not the owner's.
  */
 export function lookFault(
-  look: { lead?: unknown; order?: unknown; hide?: unknown; pinned?: unknown; next?: unknown },
-  blocks: readonly { key?: unknown; kind?: unknown; lead?: unknown; refusals?: readonly unknown[]; rows?: readonly { id?: unknown; register?: unknown; seq?: unknown; fields?: Record<string, unknown> }[]; queue?: readonly { id?: unknown }[] }[],
+  look: { by?: unknown; lead?: unknown; order?: unknown; hide?: unknown; pinned?: unknown; next?: unknown },
+  blocks: readonly { key?: unknown; kind?: unknown; source?: unknown; drawn?: unknown; lead?: unknown; refusals?: readonly unknown[]; rows?: readonly { id?: unknown; register?: unknown; seq?: unknown; fields?: Record<string, unknown> }[]; queue?: readonly { id?: unknown }[] }[],
 ): Refusal | null {
   const keys = keyedBlocks(blocks).map((b) => b.key);
   const has = new Set(keys);
@@ -1136,6 +1140,8 @@ export function lookFault(
     const b = blocks[keys.indexOf(key)]!;
     if ((b.refusals?.length ?? 0) > 0) return bad('DECLARATION_INVALID', `The look hides ${key}, which could not be drawn. A refused block stays, so the person sees what broke.`, `hide[${i}]`);
     if (b.lead === true) return bad('DECLARATION_INVALID', `The look hides ${key}, which leads the page. Take it out of hide.`, `hide[${i}]`);
+    if (look.by !== 'owner' && (b.kind === 'queue' || b.source === 'governance.open') && b.drawn !== false && (b.queue?.length ?? 0) > 0)
+      return bad('DECLARATION_INVALID', `The look hides ${key}, which holds questions waiting on the person. Take it out of hide.`, `hide[${i}]`);
   }
   const next = look.next as { row?: unknown } | undefined;
   if (next !== undefined && next !== null && typeof next.row === 'string') {

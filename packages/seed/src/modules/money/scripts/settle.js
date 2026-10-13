@@ -14,6 +14,10 @@
  * version the script read, so the gate refuses a pick whose line was edited since. Within 2% it is the same payment,
  * and what was expected stays as written.
  *
+ * A PAYMENT TAKEN BACK UNPAYS. Handed a payment that is void or pending, `settle` marks nothing paid, and a bill that
+ * payment names is counted again from its other payments: open, or part paid with what is left, and no day. A bill a
+ * person marked paid by hand, which holds no "Paid so far", is left as it is.
+ *
  * TWO CURRENCIES ARE NEVER ADDED OR COMPARED. A payment in another currency than the thing it pays changes nothing and
  * says so, as does money going the other way, and a thing already paid, cancelled or ended.
  *
@@ -68,6 +72,38 @@ export function settle(item, payment, opts) {
 
   const change = (fields) => ({ id: item.spoken, version: item.version, fields });
   const ask = (question, options) => ({ ask: { cause: `money.settle.${item.spoken}`, question, about: name, options } });
+
+  /* MONEY THAT HAS NOT MOVED PAYS NOTHING, AND MONEY TAKEN BACK UNPAYS. A payment that is pending or void marks nothing
+     paid, whoever hands it. One that names a bill has that bill counted again from its other payments (`opts.before`),
+     so a bill it had paid goes back to part paid with what is left, or to open with nothing in "Paid so far", and
+     loses its day. COUNTED, NOT SUBTRACTED: the sum written is what the other payments come to, so a second run finds
+     the bill as the first left it and writes nothing.
+
+     A BILL A PERSON MARKED PAID IS LEFT ALONE. Every close this script makes writes "Paid so far" with it, so a paid
+     bill with none was closed by hand, and no payment's status reopens it. */
+  if (p.state !== 'cleared') {
+    const why = p.state === 'void' ? 'was made void' : 'has not cleared';
+    const unpaid = { nothing: `The payment for ${name} ${why}, so nothing was marked paid.` };
+    if (item.list !== 'obligations' || p.settles !== item.id) return unpaid;
+    if (f.state !== 'open' && f.state !== 'part' && f.state !== 'paid') return { nothing: `${name} is not open, so the payment changed nothing.` };
+    const held = moneyOf(f.paid_so_far);
+    const counted = held && held.currency === due.currency ? held.amount : null;
+    if (f.state === 'paid' && counted === null) return { nothing: `${name} was marked paid by hand, so the payment that ${why} changed nothing.` };
+    /* WITH NO COUNT HANDED there is nothing to write the bill back to: what it holds may or may not have this payment in it. */
+    if (!opts || !Number.isSafeInteger(opts.before)) return unpaid;
+    const left = opts.before;
+    const sum = left === 0 ? null : { amount: left, currency: due.currency };
+    /* PAYMENTS THAT STILL REACH THE AMOUNT keep the bill as it is: this branch never closes one, and reopens none. */
+    const to = left === 0 ? 'open' : left < due.amount ? 'part' : f.state;
+    const fields = {};
+    if (to !== f.state) fields.state = to;
+    if (f.state === 'paid' && to !== 'paid') fields.settled = null;
+    if ((counted ?? 0) !== left) fields.paid_so_far = sum;
+    if (Object.keys(fields).length === 0) return unpaid;
+    if (left === 0) return { writes: [change(fields)], said: `${name} is open again, since its payment ${why}.` };
+    if (left < due.amount) return { writes: [change(fields)], said: `${name} is part paid, ${words(sum)} of ${words(due)}, since one of its payments ${why}.` };
+    return { writes: [change(fields)], said: `${name} still has ${words(sum)} paid, since one of its payments ${why}.` };
+  }
 
   if (item.list === 'obligations') {
     if (f.state !== 'open' && f.state !== 'part') return { nothing: `${name} is not open, so the payment changed nothing.` };
@@ -138,7 +174,9 @@ export function settle(item, payment, opts) {
  * A BILL'S "PAID SO FAR" IS COUNTED, NOT ADDED TO. Every payment that names the bill in "Settles" is read and summed,
  * this one left out and then put in, so a run started twice for one payment, or for a payment a person linked by hand
  * before the rule fired, writes the same sum and never the sum plus one more. ONLY MONEY THAT HAS CLEARED IS COUNTED:
- * a pending or void entry that names the bill has paid nothing yet.
+ * a pending or void entry that names the bill has paid nothing yet. That holds for the payment handed too: made void
+ * after it counted, it starts this run again (the rule fires on the status), and the same count without it is what
+ * the bill is written back to.
  */
 export default async function run(ctx) {
   const input = ctx.input && typeof ctx.input === 'object' ? ctx.input : {};

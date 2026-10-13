@@ -16,6 +16,8 @@ import assert from 'node:assert/strict';
 import { shippedVersion } from '@braindog/seed/packs/quiet';
 import { modulesFor, useCase } from '@braindog/seed/usecases';
 
+import { costOf } from '@braindog/kernel';
+
 import { createRecordApi, type CallContext } from '../src/index.ts';
 import { openSqlite } from '../../kernel/test/sqlite.ts';
 import { seedCatalogue } from '../../seed/src/usecases/catalogue.ts';
@@ -82,9 +84,12 @@ test('THE NIGHT PUTS THE UPDATE IN, KEEPS THE PAGE, AND ASKS ONE QUESTION that n
     api.kernel.question(open[0]!.id),
     `Solo founder ${shippedVersion(PACK)} adds the Late table and the title Today to your Overview page, which you changed. Your page is kept as you left it. Take the update's page, or keep yours.`,
   );
-  const body = JSON.parse(open[0]!.body) as { about: string; options: { id: string; label: string }[] };
+  const body = JSON.parse(open[0]!.body) as { about: string; options: { id: string; label: string; hard?: boolean }[] };
   assert.equal(body.about, `Solo founder ${shippedVersion(PACK)} adds to a page you changed`);
   assert.deepEqual(body.options.map((o) => [o.id, o.label]), [['keep', 'Keep my page'], ['take', "Take the update's page"]]);
+  /* TAKING IS NOT PUT BACK BY UNDO, and the option says so, so the question weighs hard to undo (audit 60, claim 1). */
+  assert.deepEqual(body.options.map((o) => o.hard === true), [false, true]);
+  assert.equal(costOf('options', body), 'undo');
   /* AND THE NIGHT'S LOG SAYS IT WAS ASKED. */
   const steps = (api.kernel.prefsOf('braindog:updates')['first-party'] as { steps: string[] }).steps;
   assert.ok(steps.includes(`Solo founder ${shippedVersion(PACK)} adds to a page you changed, and that is asked about on Decide.`), steps.join(' | '));

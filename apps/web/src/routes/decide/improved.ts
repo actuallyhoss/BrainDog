@@ -94,7 +94,7 @@ const READ_FIRST = new Set(['retires', 'moves', 'worth']);
  * on Add-ons, because there is no sheet here to show it.
  */
 export function readFirst(diffs: readonly unknown[], asks: readonly string[], nameOf: (id: string) => string): { read: boolean; sheet: Sheet | null } {
-  const sheet = sheetOf(diffs.length === 1 ? diffs[0] : [...diffs], nameOf);
+  const sheet = sheetOf(diffs.length === 1 ? diffs[0] : [...diffs], nameOf, (list, field) => REGISTERS[list]?.fields.find((f) => f.id === field)?.label ?? null);
   if (!sheet) return { read: true, sheet: null };
   const calls = sheet.parts.some((p) => p.calls.some((c) => c.change !== 'same'));
   const keeps = sheet.parts.some((p) => p.sections.some((s) => READ_FIRST.has(s.key)));

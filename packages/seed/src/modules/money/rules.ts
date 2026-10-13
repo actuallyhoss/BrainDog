@@ -1,6 +1,15 @@
-/** Money's rules, and the automations that act on an answer to one of them. */
+/**
+ * Money's rules, and the automations that act on an answer to one of them.
+ *
+ * CLOSING AN ACCOUNT IS WRITTEN HERE AND NOT SHIPPED YET (`CLOSE_ACCOUNT_AUTOMATIONS`, at the foot). An account closed
+ * with money on it drops that money out of Cash now without a word, and `scripts/close-account.js` is the question
+ * that stops it. Its script, the rule that starts it and the automation that acts on the answer are all here, in the
+ * form the record installs, and `money-close-account-wired.test.ts` installs them and measures how far they reach:
+ * closing an account starts the script, and there it stops, for the three reasons that list gives.
+ */
 
 import type { SeedRule } from '../base.ts';
+import { CLOSE_ACCOUNT_SCRIPT } from './scripts/close-account.js';
 import { LAST_DAY_SCRIPT } from './scripts/last-day.js';
 import { SETTLE_SCRIPT } from './scripts/settle.js';
 
@@ -214,10 +223,12 @@ export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
    * A RULE AND A SCRIPT, NOT A `set`, because the sum is over other entries and the grammar a rule fills a field with has
    * no arithmetic. Both halves arrive together, as Work's do: a rule whose script is missing fails every run it starts.
    *
-   * ON A WRITE TO "Settles" OR TO THE STATUS, AND ONLY FOR MONEY THAT HAS CLEARED. A pending entry has paid nothing yet
-   * and starts the script the day it clears; an edit to an entry's words starts nothing. No `once_per`, since an entry
-   * moved from one bill to another is a new thing to count, and a second run for the same entry writes nothing twice:
-   * the script counts, it does not add.
+   * ON A WRITE TO "Settles" OR TO THE STATUS, WHATEVER THE STATUS IS. Any status starts the script, and the script
+   * counts cleared money alone: a pending payment pays nothing, and a payment made void, or put back to pending, writes
+   * its bill back to what its other cleared payments come to. An edit to an entry's words starts nothing. No
+   * `once_per`, since a second run for the same entry writes nothing twice: the script counts, it does not add. THE
+   * BILL AN ENTRY LEFT IS NOT COUNTED AGAIN, since a trigger holds no previous value: an entry moved from one bill to
+   * another recounts the bill it moved to, and the one it left keeps its sum.
    *
    * BOTH THINGS ARE HANDED BY THEIR IDS, the only name a step can fill in: an entry holds the bill it settles as an id,
    * and nothing a run fills says a handle ("obligations#4").
@@ -231,8 +242,56 @@ export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
     name: 'Mark a bill paid by its payment',
     pack: 'money-core',
     on: { written: { register: 'transactions', op: ['create', 'update'], fields: ['settles', 'state'] } },
-    when: 'settles is set, state is cleared',
+    when: 'settles is set',
     steps: [{ script: { id: 'settle', as: 'settling', input: { payment: '{{trigger.entry}}', item: '{{trigger.row.settles}}' } } }],
   },
   SETTLE_SCRIPT,
+];
+
+/**
+ * CLOSING AN ACCOUNT THAT STILL HOLDS MONEY (REC-B15 step 3): the script, the rule that starts it when an account's
+ * status becomes Closed, and the automation that runs it again with the answer, so "Move it to Savings" writes the two
+ * legs of the move. Both halves and the script together, as `payment-settles` and `SETTLE_SCRIPT` arrive.
+ *
+ * HELD BESIDE `MONEY_AUTOMATIONS` AND IN NO PACK DOCUMENT, because today the chain stops after its first link, and a
+ * question whose answer to move does nothing is worse than no question: it would say "$1,200.00 goes to Savings as one
+ * move" and move nothing. Measured on a record with these three installed:
+ *   - THE SCRIPT IS STARTED AND READS NO ACCOUNT. A script step hands the row's `id`, `register` and `seq`, and fills
+ *     `input:` from the run alone, so `account: '{{id}}'` arrives as those braces. The script reads `input.account` as
+ *     "accounts#3" and nothing else, so it ends with "handed no account". It has to read the identity it is handed.
+ *   - AN ANSWER STARTS NOTHING. The record tells `onDecided` what a question is about only for one a rule opened or a
+ *     change proposes. A script's question arrives with no `about`, so `about: script.close_account` never matches, and
+ *     with no row, since the question names its account by name. With no `about` here the automation would start on
+ *     every decision in the record, so it names one and waits.
+ *   - WHAT THE ACCOUNT ROLLS TO CANNOT BE HANDED. A fill is always text and `holds` is a whole number, and nothing a
+ *     run fills is one account's rolled amount. So the question would be about the balance somebody typed.
+ * When the first two are mended these three join `MONEY_AUTOMATIONS` with a new version of the pack, and the third
+ * decides whether the amount asked about is the roll's or the typed one.
+ *
+ * ON A CHANGE OF STATUS ALONE (`op: update`, `fields: state`), so an edit to an account's name starts nothing and an
+ * account typed in already closed asks nothing. No `once_per`: an account reopened and closed again is asked about
+ * again, and a second run for the same closing joins the open question by its cause.
+ *
+ * THE ANSWER IS HANDED BY ITS WORDS AND THE DAY IT WAS GIVEN, and no `option:` narrows the trigger, since an answer to
+ * move is named after the account it moves to. The day is the decision's (`{{trigger.day}}`), which a retried run
+ * keeps, so the script finds its own leg on that day and writes no second pair. "Close it as it stands" runs too and
+ * changes nothing: the account is closed already.
+ */
+export const CLOSE_ACCOUNT_AUTOMATIONS: Record<string, unknown>[] = [
+  {
+    rule: 'account-closed',
+    name: 'Ask where a closed account\'s money goes',
+    pack: 'money-core',
+    on: { written: { register: 'accounts', op: ['update'], fields: ['state'] } },
+    when: 'state is closed',
+    steps: [{ script: { id: 'close_account', as: 'closing', input: {} } }],
+  },
+  {
+    rule: 'account-moved',
+    name: 'Move what a closed account holds',
+    pack: 'money-core',
+    on: { decided: { about: 'script.close_account' } },
+    steps: [{ script: { id: 'close_account', as: 'moving', input: { answer: '{{trigger.option}}', on: '{{trigger.day}}' } } }],
+  },
+  CLOSE_ACCOUNT_SCRIPT,
 ];

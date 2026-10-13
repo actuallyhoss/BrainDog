@@ -234,6 +234,10 @@ const SHAPES: Record<string, string> = {
      the line (Bake, and Nook as `String()` says an array); two are not a chart and Twice keeps its figure alone. */
   'cards whose trend the record filled':
     '```cards\ntitle | figure: Done | trend: By week\nBake | 12 | [3,null,5,4]\nNook |2 | 1,,2,2\nTwice | 3 | 1,,2\nQuiet | 0 | \n```',
+  /* A TREND AND NO FIGURE COLUMN. A run too short to draw prints its newest number as the card's figure (Twice, Once,
+     and Flat, whose one count among noughts is a single fact); Drawn keeps its line; a run with no number says nothing. */
+  'cards with a trend and no figure':
+    '```cards\ntitle | trend: By week\nDrawn | 1 2 3\nTwice | 1,,2\nOnce | 7\nFlat | 0 0 4\nGap | [null,5,null]\nQuiet | \nWords | soon\n```',
   /* A STAT'S FIGURE IS A HEADLINE, with no `.00` (`headlineFigure`), in a currency with a symbol and one without. */
   'a stat whose figures are headlines': '```stat\nCash now | GBP 33,850.00 | in 3 accounts · GBP 1,200.00 out\nIn Cairo | EGP 412,300.00 | \nSpent | GBP 12.50 | \nCame in | +EGP 850.00 | \n```',
   'sparklines, with one point and none':'```sparkline | Weekly\nCash | 18 20 19 24 | GBP 24.00 | good\nLonely | 7 | 7\nNone |  | \n```',
@@ -702,6 +706,19 @@ test('A CARD DRAWS A SMALL LINE FROM A TREND THE RECORD FILLED, named by its num
     const names = [...drawn.matchAll(/<svg aria-label="([^"]*)" class="cards-trend"/gu)].map((m) => m[1]);
     assert.deepEqual(names, ['By week: 3, no value, 5, 4', 'By week: 1, no value, 2, 2'], 'two points are not a chart, and an empty trend draws no line');
   }
+});
+
+test('A RUN TOO SHORT TO DRAW PRINTS ITS NEWEST NUMBER where the card has no figure column, in both drawers', () => {
+  const block = page(SHAPES['cards with a trend and no figure']!);
+  const figures = (drawn: string) => [...drawn.matchAll(/<span class="cards-figure"><span class="cards-value num">([^<]*)<\/span><span class="cards-label">([^<]*)<\/span><\/span>/gu)].map((m) => `${m[1]} ${m[2]}`);
+  for (const drawn of [toHTML([block]), render(Block, { props: { block } }).body].map(tree)) {
+    assert.deepEqual(figures(drawn), ['2 By week', '7 By week', '4 By week', '5 By week'], 'the newest known value, under the trend\'s name');
+    assert.equal([...drawn.matchAll(/class="cards-trend"/gu)].length, 1, 'and the run long enough is still the one line');
+    assert.equal([...drawn.matchAll(/<div class="cards-body">/gu)].length, 5, 'a card with no number in its run has no body');
+  }
+  /* WITH A FIGURE COLUMN THE CARD KEEPS ITS FIGURE ALONE, as batch 60 left it: Twice says 3, never 2. */
+  const beside = page(SHAPES['cards whose trend the record filled']!);
+  for (const drawn of [toHTML([beside]), render(Block, { props: { block: beside } }).body].map(tree)) assert.deepEqual(figures(drawn), ['12 Done', '2 Done', '3 Done', '0 Done']);
 });
 
 test('EVERY ROW CARRIES ITS KEY, and only the host\'s cursor marks one: the record\'s own key where it has one', () => {

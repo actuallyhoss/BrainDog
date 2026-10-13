@@ -498,9 +498,10 @@
   const groupTitle = (b: Band): string => (b === 'overdue' ? words.late : b === 'agent' ? words.withAgents : shape ? bandTitle(b, shape) : '');
   const groupMeta = (b: Band): string => (b === 'agent' ? words.agentsMeta : b === 'changed' ? words.changedMeta : '');
 
-  /* ROWS THAT ARRIVED WHILE YOU LOOKED, by whoever wrote them, tinted for a moment. The first answer is the baseline. */
+  /* ROWS THAT ARRIVED WHILE YOU LOOKED, by whoever wrote them, tinted for a moment. The first answer is the baseline,
+     and it is asked only once the record has answered, so an empty one is a baseline too and the first task tints. */
   const arrivals = liveArrivals();
-  const arrived = $derived(answer ? arrivals.see(TASKS, rows.filter((r) => r.seq > 0).map((r) => String(r.seq))) : new Set<string>());
+  const arrived = $derived(answer ? arrivals.see(TASKS, rows.filter((r) => r.seq > 0).map((r) => String(r.seq)), true) : new Set<string>());
 
   /* ── writing ────────────────────────────────────────────────────────────── */
 

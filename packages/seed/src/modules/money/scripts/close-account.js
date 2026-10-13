@@ -122,7 +122,8 @@ export function closeAccount(account, opts) {
 export default async function run(ctx) {
   const input = ctx.input && typeof ctx.input === 'object' ? ctx.input : {};
   const named = (spoken) => (typeof spoken === 'string' && /^accounts#\d+$/.test(spoken) ? spoken : null);
-  const at = named(input.account);
+  /* A RULE HANDS THE ACCOUNT AS ITS LIST AND ITS NUMBER (`{ id, register: 'accounts', seq }`), never as "accounts#3". */
+  const at = named(input.account) ?? (input.register === 'accounts' && Number.isSafeInteger(input.seq) ? `accounts#${input.seq}` : null);
   if (!at) {
     ctx.log('The script was handed no account, so nothing was closed.');
     return null;

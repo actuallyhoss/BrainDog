@@ -74,7 +74,7 @@ export const heldNone = (): Held => ({
 });
 
 /** Which rows of each list arrived since it was last drawn (`arrivals` in `lib/data/optimistic.ts`). */
-export type Seen = { see(list: string, keys: readonly string[]): ReadonlySet<string>; forget(): void };
+export type Seen = { see(list: string, keys: readonly string[], answered?: boolean): ReadonlySet<string>; forget(): void };
 
 export type WritesDeps = {
   /** The page's address now, which a hold is taken on and a late write is checked against. */

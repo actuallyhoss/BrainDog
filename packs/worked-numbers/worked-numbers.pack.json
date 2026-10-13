@@ -1,0 +1,206 @@
+{
+  "pack": "worked-numbers",
+  "version": "1.0.0",
+  "title": "Worked numbers",
+  "summary": "Numbers worked out from your other numbers every day: a change over a week, a ratio, a share, a sum or a difference, written beside the readings they came from.",
+  "changes": "The first version: say what a number is called, which measures it reads and how they are put together, and it is worked out once a day.",
+  "author": "BrainDog",
+  "license": "Apache-2.0",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {
+      "portfolio": "^1.0.0"
+    }
+  },
+  "extends": {
+    "register.datapoints": {
+      "values": {
+        "source": [
+          "worked"
+        ]
+      }
+    }
+  },
+  "declarations": [
+    {
+      "register": "recipes",
+      "name": "Worked numbers",
+      "one": "worked number",
+      "icon": "observe",
+      "holds": "a number worked out from other numbers: what it is called, the measures it reads and how they are put together",
+      "title": "name",
+      "mobile": [
+        "name",
+        "how",
+        "worked_at"
+      ],
+      "fields": [
+        {
+          "id": "name",
+          "label": "Measure it writes",
+          "type": "text",
+          "required": true,
+          "index": true,
+          "search": true
+        },
+        {
+          "id": "thing",
+          "label": "Project",
+          "type": "ref",
+          "to": "things",
+          "index": true
+        },
+        {
+          "id": "how",
+          "label": "How",
+          "type": "enum",
+          "values": [
+            "change",
+            "ratio",
+            "share",
+            "sum",
+            "difference"
+          ],
+          "labels": {
+            "change": "Change over time",
+            "ratio": "One over the other",
+            "share": "Share of the two together",
+            "sum": "The two added",
+            "difference": "One less the other"
+          }
+        },
+        {
+          "id": "of",
+          "label": "From",
+          "type": "text"
+        },
+        {
+          "id": "with",
+          "label": "And",
+          "type": "text"
+        },
+        {
+          "id": "over",
+          "label": "Looking back",
+          "type": "duration",
+          "default": 604800
+        },
+        {
+          "id": "per",
+          "label": "Said for each",
+          "type": "duration"
+        },
+        {
+          "id": "unit",
+          "label": "Unit",
+          "type": "text"
+        },
+        {
+          "id": "value",
+          "label": "Newest value",
+          "type": "decimal"
+        },
+        {
+          "id": "amount",
+          "label": "Newest amount",
+          "type": "money"
+        },
+        {
+          "id": "worked_at",
+          "label": "Worked out",
+          "type": "instant"
+        }
+      ]
+    },
+    {
+      "script": "worked-numbers",
+      "title": "Worked numbers, worked out",
+      "runs": {
+        "every": "1d"
+      },
+      "egress": [],
+      "keys": [],
+      "reads": [
+        "recipes",
+        "datapoints",
+        "things"
+      ],
+      "writes": [
+        "datapoints",
+        "recipes"
+      ],
+      "source": "/**\n * Worked numbers: a number worked out from other numbers, written into Numbers beside the ones it came from.\n *\n * THE RULE. A recipe names the measure it writes, the project it is about, and how it is worked:\n *   - `change`      (newest - earlier) x `per` / the real span between the two, where earlier is the newest reading\n *                   `over` or more before the newest one. A feed that reports every hour gives a span of exactly\n *                   `over`, so the change is the newest less the one `over` before it and nothing is scaled; a feed\n *                   that missed a day gives a longer span, and the change is scaled back to `per`.\n *   - `ratio`       a / b\n *   - `share`       a / (a + b)\n *   - `sum`         a + b\n *   - `difference`  a - b\n * where a is the newest reading of `of` and b the newest reading of `with`. `per` is `over` when the recipe names none.\n *\n * FOUR THINGS WRITE NOTHING AND SAY WHY IN THE LOG, because a nought written for \"could not tell\" is drawn as a\n * nought: a measure with no reading, an earlier reading more than twice `over` back (a fortnight's change is not a\n * week's, stretched), a divisor of nought, and two measures in two currencies. Money worked with a plain number as\n * though it were one is the same mistake and is refused beside it. One recipe that cannot be worked does not stop the\n * next.\n *\n * A NUMBER IS RENEWED WHEN A READING UNDER IT IS. Run every day over readings that stopped a month ago, the same\n * answer would be written every day with today's date, and a number nothing renews would look alive. So a recipe whose\n * readings are no newer than its last answer is left standing and the log says so.\n *\n * MONEY IS WHOLE MINOR UNITS AND A CURRENCY. A reading's `amount` is that already. An older reading is a number whose\n * unit is a currency's three capital letters, and it is turned by the digits table before anything is worked.\n */\n\nconst NUMBERS = 'datapoints';\nconst RECIPES = 'recipes';\nconst SOURCE = 'worked';\nconst WEEK = 7 * 86_400;\n\n/* WHAT EACH KIND IS CALLED IN A SENTENCE, and whether it reads a second measure. */\nconst KINDS = {\n  change: { said: 'a change', second: false },\n  ratio: { said: 'a ratio', second: true, mixed: 'divided' },\n  share: { said: 'a share', second: true, mixed: 'shared' },\n  sum: { said: 'a sum', second: true, mixed: 'added' },\n  difference: { said: 'a difference', second: true, mixed: 'taken from each other' },\n};\n\n/* THE RECORD ANSWERS ONE PAGE OF FIFTY, most recently written first, and `ctx.record.list` cannot ask for more. So a\n   reading is asked for one measure at a time, as the revenue bands ask (`packs/portfolio-bands/bands.js`), and by its\n   name whole: the measure, or the measure, a comma and the project, which is how a record names a reading when the\n   Dashboard draws one tile a name. AND A FULL PAGE IS ASKED PAST (`newest`), because most recently written is not\n   newest: a feed that catches up sends old readings after new ones, and fifty of those hide the newest. */\nconst PAGE = 50;\nconst ROUNDS = 40;\n\n/* ISO 4217'S MINOR DIGITS, where they are not two, as the bands hold them: the sandbox has no `Intl` to ask. */\nconst DIGITS = { BIF: 0, CLP: 0, DJF: 0, GNF: 0, ISK: 0, JPY: 0, KMF: 0, KRW: 0, PYG: 0, RWF: 0, UGX: 0, UYI: 0, VND: 0, VUV: 0, XAF: 0, XOF: 0, XPF: 0, BHD: 3, IQD: 3, JOD: 3, KWD: 3, LYD: 3, OMR: 3, TND: 3, CLF: 4, UYW: 4 };\nconst scale = (currency) => 10 ** (DIGITS[currency] ?? 2);\nconst CURRENCY = /^[A-Z]{3}$/;\n\n/* A DECIMAL HOLDS FIFTEEN SIGNIFICANT DIGITS and the record refuses a sixteenth, which a division makes at once. */\nconst tidy = (n) => Number(n.toPrecision(12));\n\nconst text = (v) => (typeof v === 'string' ? v.trim() : '');\nconst fold = (s) => s.toLowerCase();\n\n/** A length of time as a person says it: days from a day up, hours under it, minutes under an hour. */\nexport function lengthSaid(seconds) {\n  const [n, word] = seconds >= 86_400 ? [seconds / 86_400, 'day'] : seconds >= 3_600 ? [seconds / 3_600, 'hour'] : [seconds / 60, 'minute'];\n  const round = Math.round(n * 10) / 10;\n  return `${round} ${word}${round === 1 ? '' : 's'}`;\n}\n\n/**\n * A reading as a figure to work with: `n` in minor units and its `currency` when it is money, or `n` as it stands and\n * `currency: null`; `at` is when it was true, in milliseconds. `null` for a row that is not a reading: the seed's\n * example, one with no time, or one with neither an amount nor a number.\n */\nexport function figureOf(r) {\n  const at = Date.parse(text(r.fields.at));\n  if (!Number.isFinite(at) || r.fields.source === 'example') return null;\n  const a = r.fields.amount;\n  if (a !== null && typeof a === 'object' && Number.isInteger(a.amount) && CURRENCY.test(text(a.currency))) return { n: a.amount, currency: text(a.currency), unit: '', at };\n  if (typeof r.fields.value !== 'number' || !Number.isFinite(r.fields.value)) return null;\n  const unit = text(r.fields.unit);\n  return CURRENCY.test(unit) ? { n: Math.round(r.fields.value * scale(unit)), currency: unit, unit: '', at } : { n: r.fields.value, currency: null, unit, at };\n}\n\n/**\n * A recipe as the run reads it, or `{ why }` when it says too little to be worked. `names` answers the names a\n * measure's readings go by on the recipe's project.\n */\nexport function recipeOf(fields, names) {\n  const how = KINDS[fields.how];\n  if (how === undefined) return { why: 'it does not say how it is worked.' };\n  const of = text(fields.of);\n  const second = how.second ? text(fields.with) : '';\n  if (of === '') return { why: 'it names no measure to work from.' };\n  if (how.second && second === '') return { why: `${how.said} needs a second measure.` };\n  /* A RECIPE THAT WROTE THE MEASURE IT READS would read its own answer as the newest reading from the second day on. */\n  const reads = [...names(of), ...(how.second ? names(second) : [])].map(fold);\n  if (reads.includes(fold(text(fields.name)))) return { why: 'it would write the measure it reads.' };\n  const over = Number.isInteger(fields.over) ? fields.over : WEEK;\n  if (over <= 0) return { why: 'the time it looks back over is nothing.' };\n  const per = Number.isInteger(fields.per) && fields.per > 0 ? fields.per : over;\n  return { how: fields.how, of, with: second, over, per, unit: text(fields.unit) };\n}\n\n/**\n * What a recipe comes to from the figures it reads, or `{ why }` when it comes to nothing that should be written.\n * `a` is the newest of `of`, `b` the newest of `with`, and `earlier` the one a change is measured from. Pure, so the\n * arithmetic is one function a reader can check without the record around it.\n */\nexport function workedOf(recipe, { a, b, earlier }) {\n  const money = (n, currency, unit) => ({ amount: { amount: Math.round(n), currency }, unit });\n  const plain = (n, unit) => ({ value: tidy(n), unit });\n\n  if (recipe.how === 'change') {\n    if (a.currency !== earlier.currency) return { why: `${recipe.of} changed what it is counted in between its two readings.` };\n    const span = (a.at - earlier.at) / 1_000;\n    if (span > 2 * recipe.over)\n      return { why: `the reading of ${recipe.of} before its newest is ${lengthSaid(span)} older, which is more than twice the ${lengthSaid(recipe.over)} asked for.` };\n    const n = ((a.n - earlier.n) * recipe.per) / span;\n    return a.currency === null ? plain(n, recipe.unit || a.unit) : money(n, a.currency, recipe.unit);\n  }\n\n  if (a.currency !== null && b.currency !== null && a.currency !== b.currency)\n    return { why: `${recipe.of} is in ${a.currency} and ${recipe.with} is in ${b.currency}, and two currencies are never worked together.` };\n  const mixed = (a.currency === null) !== (b.currency === null);\n  const both = a.currency !== null && !mixed;\n\n  if (recipe.how === 'ratio') {\n    if (b.n === 0) return { why: `${recipe.with} is nought, and nothing is divided by nought.` };\n    /* MONEY OVER A COUNT IS MONEY, what one customer brings. Money over money is a plain number, and a count over\n       money is a count for each whole unit of it. */\n    if (a.currency !== null && b.currency === null) return money(a.n / b.n, a.currency, recipe.unit);\n    return plain(b.currency !== null && a.currency === null ? a.n / (b.n / scale(b.currency)) : a.n / b.n, recipe.unit);\n  }\n\n  if (mixed) {\n    const [is, not] = a.currency === null ? [recipe.with, recipe.of] : [recipe.of, recipe.with];\n    return { why: `${is} is money and ${not} is not, so the two cannot be ${KINDS[recipe.how].mixed}.` };\n  }\n  if (recipe.how === 'share') {\n    if (a.n + b.n === 0) return { why: `${recipe.of} and ${recipe.with} come to nought together, and nothing is divided by nought.` };\n    return plain(a.n / (a.n + b.n), recipe.unit);\n  }\n  const n = recipe.how === 'sum' ? a.n + b.n : a.n - b.n;\n  return both ? money(n, a.currency, recipe.unit) : plain(n, recipe.unit || (a.unit === b.unit ? a.unit : ''));\n}\n\nexport default async function run(ctx) {\n  const now = ctx.now();\n  const recipes = await ctx.record.list(RECIPES);\n  if (recipes.length >= PAGE) ctx.log(`The record answered a full page of ${PAGE} worked numbers and may hold more, so the rest were not worked out this time.`);\n\n  /* ONE ASKING A QUESTION, however many recipes read the same measure. */\n  const asked = new Map();\n  const ask = (register, where) => {\n    const key = `${register}|${JSON.stringify(where)}`;\n    if (!asked.has(key)) asked.set(key, ctx.record.list(register, where));\n    return asked.get(key);\n  };\n\n  /**\n   * The newest reading among those `filter` picks, on or before `bound` when there is one. A page that is not full\n   * held every such reading. A full one may not have, so the record is asked for anything newer than the best so far,\n   * until it answers nothing or a page that is not full.\n   */\n  const newest = async (filter, bound) => {\n    let best = null;\n    for (let round = 0; round < ROUNDS; round += 1) {\n      const where = { all: [...filter, ...(bound === undefined ? [] : [{ field: 'at', lte: new Date(bound).toISOString() }]), ...(best === null ? [] : [{ field: 'at', gt: new Date(best.at).toISOString() }])] };\n      const page = await ask(NUMBERS, where);\n      const before = best;\n      for (const r of page) {\n        const f = figureOf(r);\n        if (f !== null && (best === null || f.at > best.at)) best = f;\n      }\n      if (page.length < PAGE || best === before) return best;\n    }\n    return best;\n  };\n\n  /* IN THE ORDER THEY WERE MADE, so two runs over the same recipes write in the same order. */\n  for (const r of [...recipes].sort((x, y) => x.seq - y.seq)) {\n    const name = text(r.fields.name);\n    const thing = typeof r.fields.thing === 'string' && r.fields.thing !== '' ? r.fields.thing : null;\n    const project = thing === null ? '' : text((await ask('things', { field: 'id', is: thing }))[0]?.fields.name);\n    const names = (measure) => (project === '' ? [measure] : [measure, `${measure}, ${project}`]);\n    const on = thing === null ? '' : ` on ${project === '' ? 'its project' : project}`;\n    const not = (why) => ctx.log(`${name} was not worked out: ${why}`);\n\n    const recipe = recipeOf(r.fields, names);\n    if (recipe.why !== undefined) {\n      not(recipe.why);\n      continue;\n    }\n    /* THE READINGS OF ONE MEASURE ON THIS RECIPE'S PROJECT, or the ones with no project when it names none. */\n    const about = thing === null ? { field: 'thing', empty: true } : { field: 'thing', is: thing };\n    const readings = (measure) => [about, { any: names(measure).map((n) => ({ field: 'name', is: n })) }, { field: 'source', not: 'example' }];\n\n    const got = { a: await newest(readings(recipe.of)), b: null, earlier: null };\n    if (got.a === null) {\n      not(`${recipe.of} has no reading${on}.`);\n      continue;\n    }\n    if (recipe.how === 'change') {\n      got.earlier = await newest(readings(recipe.of), got.a.at - recipe.over * 1_000);\n      if (got.earlier === null) {\n        not(`${recipe.of} has no reading${on} from ${lengthSaid(recipe.over)} or more before its newest.`);\n        continue;\n      }\n    } else {\n      got.b = await newest(readings(recipe.with));\n      if (got.b === null) {\n        not(`${recipe.with} has no reading${on}.`);\n        continue;\n      }\n    }\n    const out = workedOf(recipe, got);\n    if (out.why !== undefined) {\n      not(out.why);\n      continue;\n    }\n    const last = await newest([about, { field: 'name', is: name }, { field: 'source', is: SOURCE }]);\n    if (last !== null && last.at >= Math.max(got.a.at, got.b?.at ?? 0)) {\n      ctx.log(`${name} stands as it was: no reading under it is newer than the last time it was worked out.`);\n      continue;\n    }\n\n    const figure = out.amount === undefined ? { value: out.value } : { amount: out.amount };\n    ctx.write(NUMBERS, { name, ...figure, ...(out.unit === '' ? {} : { unit: out.unit }), ...(thing === null ? {} : { thing }), at: now, source: SOURCE });\n    /* AND THE RECIPE IS TOLD WHAT IT CAME TO, so its page draws each one beside its newest value and when. */\n    ctx.update(`${RECIPES}#${r.seq}`, { ...figure, worked_at: now }, r.version);\n  }\n}\n"
+    },
+    {
+      "page": "worked",
+      "title": "Worked numbers",
+      "nav": {
+        "section": "Projects",
+        "order": 7
+      },
+      "icon": "observe",
+      "requires": [
+        "register.recipes",
+        "register.datapoints",
+        "register.things"
+      ],
+      "blocks": [
+        {
+          "kind": "table",
+          "heading": "Each one and what it last came to",
+          "span": 12,
+          "source": "register.recipes",
+          "columns": [
+            {
+              "field": "name",
+              "label": "Number"
+            },
+            {
+              "field": "thing",
+              "label": "Project"
+            },
+            {
+              "field": "how",
+              "label": "How"
+            },
+            {
+              "field": "of",
+              "label": "From"
+            },
+            {
+              "field": "with",
+              "label": "And"
+            },
+            {
+              "field": "value",
+              "label": "Newest value",
+              "align": "end"
+            },
+            {
+              "field": "amount",
+              "label": "Newest amount",
+              "align": "end"
+            },
+            {
+              "field": "unit",
+              "label": "Unit"
+            },
+            {
+              "field": "worked_at",
+              "label": "Worked out"
+            }
+          ],
+          "order": [
+            {
+              "field": "name",
+              "dir": "asc"
+            }
+          ],
+          "limit": 50,
+          "empty": "No number is worked out yet. Add one: say what it is called, which measures it reads and how they are put together, and it is worked out once a day."
+        }
+      ]
+    }
+  ]
+}

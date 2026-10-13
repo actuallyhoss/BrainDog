@@ -64,6 +64,8 @@ test('A WRITER HOLDING THE PAGE AS READ IS TOLD WHEN ITS LOOK DOES NOT FIT IT', 
   assert.equal(lookFault({ hide: ['broken'] }, read)?.at, 'hide[0]', 'a refused block stays');
   assert.equal(lookFault({ hide: ['klead'] }, read)?.at, 'hide[0]', 'the opening line stays');
   assert.equal(lookFault({ next: { row: 'tasks#5' } }, read)?.at, 'next.row', 'next names a row the page handed');
+  assert.equal(lookFault({ by: 'slash', hide: ['ask'] }, read)?.at, 'hide[0]', 'questions that wait stay');
+  assert.equal(lookFault({ by: 'owner', hide: ['ask'] }, read), null, 'his own look is his');
 });
 
 test("A BLOCK'S DECLARED KEY HAS ONE SHAPE, AND NO TWO BLOCKS OF A PAGE SHARE ONE", () => {

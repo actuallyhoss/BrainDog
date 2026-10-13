@@ -182,8 +182,14 @@ const isDiff = (v: unknown): v is Body & { pack: Record<string, unknown>; planHa
 const isShared = (v: unknown): v is Body & { usecase: Record<string, unknown>; packs: unknown[] } =>
   isMap(v) && isMap(v.usecase) && Array.isArray(v.packs);
 
+/**
+ * A field of a list by the label the record shows for it (`fieldOf('invoices', 'amount')` is "Total due"), or `null`
+ * when it holds none. The plan carries no labels of its own, so whoever draws the sheet hands them in.
+ */
+export type FieldName = (list: string, field: string) => string | null;
+
 /** The record's `Diff` for one pack, as one part and the lines that stop it. */
-function diffPart(d: Body, name: (id: string) => string): { part: Part; stops: string[]; title: string; summary: string; direction: string; version: string; installed: string | null } {
+function diffPart(d: Body, name: (id: string) => string, fieldOf?: FieldName): { part: Part; stops: string[]; title: string; summary: string; direction: string; version: string; installed: string | null } {
   const pack = isMap(d.pack) ? d.pack : {};
   const id = text(pack.id);
   const version = text(pack.version);
@@ -246,7 +252,11 @@ function diffPart(d: Body, name: (id: string) => string): { part: Part; stops: s
       ...section('worth', words.worth, worth),
     ],
     calls: list(d.calls_out).map((c) =>
-      callOf(c, c.change === 'changed' ? 'changed' : c.change === 'same' ? 'same' : 'new', typeof c.key_line === 'string' && c.key_line !== '' ? c.key_line : null, () => callsOutOf([c]).map(callLine)[0] || text(c.line) || text(c.ingest), { list: (id) => name(`register.${id}`) }),
+      callOf(c, c.change === 'changed' ? 'changed' : c.change === 'same' ? 'same' : 'new', typeof c.key_line === 'string' && c.key_line !== '' ? c.key_line : null, () => callsOutOf([c]).map(callLine)[0] || text(c.line) || text(c.ingest), {
+        list: (id) => name(`register.${id}`),
+        /* A FIELD BY ITS LABEL, as Decide says it. An empty label is no label, and the kernel then reads the id as words. */
+        field: (id, field) => fieldOf?.(id, field)?.trim() || null,
+      }),
     ),
   };
   return { part, stops, title, summary: text(pack.summary), direction, version, installed };
@@ -291,9 +301,10 @@ function callOutsOf(one: Body): CallOut[] {
 
 /**
  * The sheet for a plan, several plans, or `null` for an answer this build does not recognise. `nameOf` names a
- * declaration id (`register.money`, `page.home`) or a pack id as the reader knows it.
+ * declaration id (`register.money`, `page.home`) or a pack id as the reader knows it. `fieldOf` names a field of a list
+ * by its label, for the sentence that says what leaves with a call; without it a field is its id read as words.
  */
-export function sheetOf(diff: unknown, nameOf: (id: string) => string): Sheet | null {
+export function sheetOf(diff: unknown, nameOf: (id: string) => string, fieldOf?: FieldName): Sheet | null {
   const name = namer(nameOf);
   const plans = (Array.isArray(diff) ? diff : [diff]).filter((d): d is Body => isDiff(d) || isShared(d));
   if (plans.length === 0 || (Array.isArray(diff) && plans.length !== diff.length)) return null;
@@ -303,7 +314,7 @@ export function sheetOf(diff: unknown, nameOf: (id: string) => string): Sheet | 
   const heads: { title: string; summary: string; direction: string; version: string }[] = [];
   for (const plan of plans) {
     if (isDiff(plan)) {
-      const one = diffPart(plan, name);
+      const one = diffPart(plan, name, fieldOf);
       stops.push(...one.stops);
       parts.push(one.part);
       heads.push({ title: one.title, summary: one.summary, direction: one.direction, version: one.version });

@@ -1,0 +1,132 @@
+{
+  "format": 1,
+  "made_at": "2026-10-13T13:10:10.890Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "ahead": 2,
+          "back": 0,
+          "columns": [
+            {
+              "field": "what"
+            },
+            {
+              "field": "day"
+            }
+          ],
+          "empty": "No date falls this month or the next two. Add a date with its day, and it is put on the calendar.",
+          "heading": "On the calendar",
+          "kind": "calendar",
+          "source": "register.fixed_dates",
+          "span": 12,
+          "key": "k1hks4is",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "window": {
+            "from": "2026-10-01",
+            "to": "2026-12-31",
+            "today": "2026-10-13"
+          }
+        },
+        {
+          "columns": [
+            {
+              "field": "what",
+              "width": "minmax(18ch,2fr)"
+            },
+            {
+              "field": "day",
+              "label": "First day"
+            },
+            {
+              "field": "until"
+            },
+            {
+              "field": "kind"
+            }
+          ],
+          "empty": "No window is open or coming. A date with a last day is a window, such as a fair that runs four days.",
+          "heading": "Windows",
+          "kind": "table",
+          "limit": 50,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "day"
+            }
+          ],
+          "source": "register.fixed_dates",
+          "span": 12,
+          "where": "until after yesterday",
+          "key": "k1047gwr",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "columns": [
+            {
+              "field": "what",
+              "width": "minmax(18ch,2fr)"
+            },
+            {
+              "field": "day"
+            },
+            {
+              "field": "kind"
+            },
+            {
+              "field": "comes_round"
+            }
+          ],
+          "empty": "Nothing is coming. A date goes here with what it is and the day somebody else fixed.",
+          "heading": "What is coming",
+          "kind": "table",
+          "limit": 100,
+          "order": [
+            {
+              "dir": "asc",
+              "field": "day"
+            }
+          ],
+          "source": "register.fixed_dates",
+          "span": 12,
+          "where": "day after yesterday",
+          "key": "k0hf30hd",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        }
+      ],
+      "icon": "calendar",
+      "nav": {
+        "order": 35,
+        "section": "Work"
+      },
+      "pack": "fixed-dates",
+      "page": "dates",
+      "requires": [
+        "register.fixed_dates"
+      ],
+      "title": "Dates",
+      "read_at": "2026-10-13T13:10:10.890Z",
+      "zone": "UTC",
+      "look": {
+        "look": "dates",
+        "basis": "r00ae0tn",
+        "by": "rule",
+        "hide": [
+          "k1047gwr",
+          "k0hf30hd"
+        ]
+      },
+      "declared_version": 1
+    }
+  ]
+}

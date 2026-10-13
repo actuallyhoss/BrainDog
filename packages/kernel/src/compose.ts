@@ -438,8 +438,9 @@ function handlesOf(blocks: readonly BlockResult[]): Set<string> {
  *   moves, and an engine's look never moves a pinned block.
  * - LEAD goes first in the main column, under the page's opening line. Not when a pinned block stands between it and
  *   there: moving it up would push the pinned block down, so it stays where it is and is not answered as the lead.
- * - HIDE says `drawn: false`, as a `when:` that says no does. A pinned, refused or lead block is never hidden. A
- *   heading that is hidden hides the blocks under it, and is not hidden while one of them may not be.
+ * - HIDE says `drawn: false`, as a `when:` that says no does. A pinned, refused or lead block is never hidden, nor, by
+ *   a look that is not the person's own, the questions while any are waiting. A heading that is hidden hides the blocks
+ *   under it, and is not hidden while one of them may not be.
  * - NEXT is kept only when a block still drawn after the hide holds the row it names.
  *
  * Nothing is added and nothing is taken out of the list, so a host keyed by `key` sees the same blocks, moved.
@@ -494,8 +495,12 @@ export function applyLook(blocks: readonly BlockResult[], look: LookBody): { blo
     }
   }
 
-  /* HIDE. */
-  const fixed = (b: BlockResult): boolean => pins.has(keyOf(b)) || b.refusals.length > 0 || b.lead === true || keyOf(b) === lead;
+  /* HIDE. QUESTIONS THAT ARE WAITING ARE NEVER HIDDEN BY THE ENGINE. A look Slash stored is laid over the page as it reads
+     later, when a queue it saw empty may hold something for the reader: hidden, nobody is asked. So a queue that drew
+     anything stays, and so does the heading over it. An empty one may go, as the rules hide it. The person's own look
+     is his. */
+  const waiting = (b: BlockResult): boolean => look.by !== 'owner' && isQueue(b) && b.drawn !== false && !drewNothing(b);
+  const fixed = (b: BlockResult): boolean => pins.has(keyOf(b)) || b.refusals.length > 0 || b.lead === true || keyOf(b) === lead || waiting(b);
   const hide = new Set(unique(look.hide ?? []).filter((k) => at.has(k) && !fixed(blocks[at.get(k)!]!)));
   out.forEach((b, i) => {
     if (b.kind !== 'section' || !hide.has(keyOf(b))) return;

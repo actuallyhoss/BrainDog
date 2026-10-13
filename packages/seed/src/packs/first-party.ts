@@ -523,6 +523,9 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   pairs-fx-61); two figures over who made each Ledger entry, `filed-for-you-30d` and `filed-today`, read from
  *   `events.transactions` (filing-figures-61); and the Ledger tile on Money is drawn by any entry that is not void
  *   (ledger-gate-60-61).
+ * - money-core 3.17.0, still unreleased (commit 63423720, the deployed build, holds 3.16.0), takes batch 62's change
+ *   with no version of its own: a payment made void, or put back to pending, reopens the bill it had paid
+ *   (settle-reopen-62). `payment-settles` starts on any status and `settle` counts cleared money alone.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.17.0',

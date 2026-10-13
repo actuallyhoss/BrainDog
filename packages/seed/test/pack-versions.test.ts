@@ -1454,7 +1454,7 @@ const DECLARED: Record<string, Version> = {
       setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category setting.rest_days
       metric.filed-for-you-30d metric.filed-today
     `,
-    declares: '6f1143a556590586',
+    declares: '0696e982958e4019',
     history: [
       "`cash-cross-check` is declared (cash-check-52, REC-A17): Cash now worked out a second way, each cash account walked entry by entry from its newest statement, less Cash now, a currency at a time; no value while no balance is typed -> 73738171ae2405ba",
       'The Money page draws the check (cash-page-54, REC-A17): one tile, Cash now does not add up, while `cash-cross-check` is not nought, and one line while no balance is typed -> e4a453d69795fe22',
@@ -1465,6 +1465,7 @@ const DECLARED: Record<string, Version> = {
       "Folded into the unreleased 3.17.0 (ledger-tile-59, REC-B15; bad-phrase-59; integrate 59): the Ledger tile on Money, six newest entries open on the page before Heads up, drawn once `ledger-newest-days` has a value, and History gives up What moved, so the page still declares 24 blocks; the two late lines on Heads up say `{{bad:past their due date}}`, the same words in the danger colour; no id added or taken away -> 741a7d2695f49170",
       "Folded into the unreleased 3.17.0 (settle-rule-60, REC-B11; integrate 60): a payment marks the bill it pays. `script.settle` is registered and `rule.payment-settles` starts it when a Ledger entry that names a bill in Settles has cleared, handing both by their ids, which the script now reads as well as a handle; the sum counts cleared entries alone. A rule and a script added -> 037bb14f0cdae30f",
       "Folded into the unreleased 3.17.0 (ledger-gate-60-61, audit 59 claim 5; pairs-fx-61; filing-figures-61, REC-B20; integrate 61; commit 63423720, the deployed build, holds 3.16.0): the Ledger tile on Money is drawn by any entry that is not void and no longer waits on `ledger-newest-days`, and it says 'Nothing has moved yet.' where it leads a page; `transactions` pairs a move between two currencies at the rate of the day it left, within 2% (`pairs.across_currency`); `filed-for-you-30d` and `filed-today` are added, counts of the Ledger entries made by who made them, read from `events.transactions`; `metric.filed-for-you-30d` and `metric.filed-today` gained -> 6f1143a556590586",
+      "Folded into the unreleased 3.17.0 (settle-reopen-62, audit 60 claim 2; integrate 62; commit 63423720, the deployed build, holds 3.16.0): a payment made void, or put back to pending, reopens the bill it had paid. `rule.payment-settles` starts on any status (`when: settles is set`), and `script.settle` counts cleared money alone, holds a pending or void payment to paying nothing, and writes a bill back to open or part paid with what its other cleared payments come to; a bill marked paid by hand, with no Paid so far, is left. One rule's `when` and one script's source changed; no id added or taken away -> 0696e982958e4019",
     ],
   },
   'work@1.17.0': {

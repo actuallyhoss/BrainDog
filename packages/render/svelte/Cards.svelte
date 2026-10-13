@@ -34,7 +34,7 @@
   import { cellNamesNothing, glyphPath, glyphWaits } from '../src/inline.ts';
   import { hueOf } from '../src/cards.ts';
   import { pictureSrc } from '../src/gallery.ts';
-  import { hrefFor, written } from '../src/html.ts';
+  import { hrefFor, trendNewest, written } from '../src/html.ts';
   import { AMOUNT_SPACE } from '../src/money.ts';
   import Text from './Text.svelte';
 
@@ -159,6 +159,8 @@
       {@const end = coded ? coded.rest.search(/\s|$/u) : 0}
       <!-- A TREND IS DRAWN WITH ITS NAME AND ITS NEWEST VALUE, OR NOT AT ALL (`cardTrend`): a bare line said nothing. -->
       {@const t = L.trend >= 0 ? cardTrend(said(r, L.trend), label(L.trend)) : null}
+      <!-- A RUN TOO SHORT TO DRAW STILL SAYS ITS NEWEST NUMBER where the card has no figure of its own (`trendNewest`). -->
+      {@const newest = !t && L.figure < 0 && L.trend >= 0 ? trendNewest(said(r, L.trend), label(L.trend)) : null}
       {@const m = L.ring >= 0 ? ringOf(said(r, L.ring)) : null}
       {@const whoFace = L.who >= 0 ? initialOf(said(r, L.who)) : null}
       {@const whoMark = L.who >= 0 ? markFor(said(r, L.who)) : null}
@@ -197,7 +199,7 @@
         </div>
         <!-- The reply is the line under the head, and an empty one draws nothing, as in `toHTML`. -->
         {#if L.reply >= 0 && r.cells[L.reply]}<p class="cards-reply"><Text nodes={nodes(r, L.reply)} {opts} /></p>{/if}
-        {#if shows || t || (L.ring >= 0 && r.cells[L.ring])}
+        {#if shows || newest || t || (L.ring >= 0 && r.cells[L.ring])}
           <div class="cards-body">
             {#if shows}
               <span class="cards-figure"
@@ -211,6 +213,7 @@
                 >{@render labelled(L.figure)}</span
               >
             {/if}
+            {#if newest}<span class="cards-figure"><span class="cards-value num">{newest.last}</span><span class="cards-label">{newest.label}</span></span>{/if}
             {#if t}
               <!-- A word-sized line, so it is named by its numbers and is not a tab stop. -->
               <span class="cards-trended"><svg

@@ -322,6 +322,36 @@ function emptiest(register: string, f: { id: string; type: string; values?: read
   }
 }
 
+/** A required field a capture has to ask for: what a person calls it, and the kind of box it takes. */
+export type Asked = { id: string; label: string; type: string; to?: string };
+
+/** The types `emptiest` answers with nothing: no figure, today, no. A value of one of these was never said. */
+const EMPTIED: ReadonlySet<string> = new Set(['day', 'instant', 'money', 'int', 'decimal', 'bool']);
+
+/**
+ * WHAT ONE TYPED LINE LEAVES UNANSWERED, in the order the list declares it.
+ *
+ * `capturedFields` fills a required figure with nothing and a required day with today, and leaves out a row in
+ * another list because there is no emptiest one. On a list that needs all three that is a movement of nothing,
+ * today, into no account, and the record refuses it for the account. These are the fields a capture draws a box
+ * for instead: every required one that nothing answered.
+ *
+ * ANSWERED means the address pinned it, or the declaration holds its answer: an `enum` takes its default or its
+ * first value, which is one of a declared few and is said. A field somebody handed in on `captured` (a text, a
+ * row in another list) is answered too. The title is the line itself.
+ */
+export function askedOf(register: string, captured: Captured): Asked[] {
+  const decl = REGISTERS[register];
+  if (!decl) return [];
+  const asked: Asked[] = [];
+  for (const f of decl.fields) {
+    if (!f.required || f.id === decl.title) continue;
+    if (Object.hasOwn(captured.fields, f.id) && !EMPTIED.has(f.type)) continue;
+    asked.push({ id: f.id, label: labelOf(f), type: f.type, ...(f.type === 'ref' && f.to ? { to: f.to } : {}) });
+  }
+  return asked;
+}
+
 export type RowWriter = {
   create(register: string, fields: Fields, note?: string): Promise<Wrote>;
   update(register: string, seq: number, patch: Fields, version?: number): Promise<Wrote>;

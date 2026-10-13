@@ -123,6 +123,8 @@ Roughly from the simplest to the most involved, each with what it shows you how 
 | `standup` | One message every morning: what moved, what is blocked, and what agents finished. | A daily digest whose sections are left out when empty, so a quiet morning sends nothing. |
 | `week-in-money` | One message every Monday: cash now, what fell due each way, and what money arrived. | A weekly digest with a figure, and two sentences from Slash on top (`prose: slash`). |
 | `holdings` | What you hold rather than spend, with what each one cost and what they cost together. | Figures over a list, and a small script run by a rule and once a day. |
+| `dates` | The days somebody else fixed: a deadline, a window with a last day, and a date that comes round. | A script started by a rule on a daily clock, and a row moved by an update so its history keeps every turn. |
+| `worked-numbers` | Numbers worked out from your other numbers every day: a change over a week, a ratio, a share, a sum or a difference. | A daily script that reads another add-on's list and writes into it, with a value laid on that list by `extends`. |
 | `count-cash` | A count of a cash box or an account, kept as a balance check with the difference in the ledger. | A script started by an automation on each new row, writing into another add-on's lists. |
 | `portfolio-bands` | What your projects take a month now, and the room left next and later, drawn as one bar. | A daily script, with settings a person fills in on the add-on's page. |
 | `card-alerts` | A card alert, forwarded by mail or posted as a text message, read into Money as a transaction. | Doors that read a message into a list, one pattern for each wording. |

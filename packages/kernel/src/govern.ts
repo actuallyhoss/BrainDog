@@ -32,7 +32,7 @@ import { ACROSS, ANY_LIST, touches, type Resolve } from './reach.ts';
 import { egressChanged } from './script.ts';
 import { SLASH, slashMayWrite } from './slash.ts';
 import { causeFault, causeOf, canon, noop } from './cause.ts';
-import { costOf } from './weigh.ts';
+import { costOf, costRows, type Cost } from './weigh.ts';
 import { askOf, retypedBody, retypeShapeFault } from './api/retype.ts';
 import { configValue, readPackConfig } from './declare.ts';
 
@@ -245,7 +245,28 @@ export function listGovernance(
     ...params,
     limit,
   );
-  return ok(rows.map((r) => hydrate(register, r)));
+  const out = rows.map((r) => hydrate(register, r));
+  if (register !== 'suggestion') return ok(out);
+
+  /* WHAT EACH QUESTION COSTS TO GET WRONG, said by the record and never left to the reader. A body alone cannot say
+     which fields a list's history withholds, so a browser weighing the raw row called a patch of a hidden field a row
+     change while the card and the counts called it hard to undo. A decision or a prediction has nothing left to weigh. */
+  const withheld = costRows(deps.sql);
+  return ok(out.map((r) => ({ ...r, cost: costOfRow(deps.sql, r, withheld) })));
+}
+
+/**
+ * The band of one suggestion row, by the rule the queue's card reads it by (`index.ts`, `whole`): money is always hard
+ * to undo, a money field cleared included, which no body spells and so the ladder is asked; `costOf` says the rest.
+ */
+function costOfRow(sql: Sql, row: Record<string, unknown>, withheld: ReturnType<typeof costRows>): Cost {
+  const kind = String(row.body_kind ?? '');
+  const body = row.body;
+  if (kind === 'rowset' && body !== null && typeof body === 'object' && !Array.isArray(body)) {
+    const floors = kindsOfProposal(kind, body as Record<string, unknown>, recordReader(sql, String(row.opened_by ?? '')));
+    if (floors.some((k) => k.floor === 'money')) return 'undo';
+  }
+  return costOf(kind, body, withheld);
 }
 
 /**
@@ -847,6 +868,9 @@ function checkBody(deps: GovernDeps, kind: BodyKind, body: Record<string, unknow
         };
       if (o.shows !== undefined && showsOf(o.shows) === null)
         return { code: 'VALUE_MALFORMED', fix: `${o.id} shows ${JSON.stringify(o.shows)}. ${SHOWS_SAID}`, at: 'body.options' };
+      /* `hard` IS TRUE OR FALSE (`weigh.ts` reads only the boolean `true` as hard), so a "yes" is told and not read as easy. */
+      if (o.hard !== undefined && typeof o.hard !== 'boolean')
+        return { code: 'VALUE_MALFORMED', fix: `${o.id} says hard ${JSON.stringify(o.hard)}. It is true or false.`, at: 'body.options' };
     }
     for (const [n, o] of (options as Record<string, unknown>[]).entries()) {
       const bad = o.patches === undefined ? null : patchesFault(deps, o.patches, `body.options[${n}].patches`);

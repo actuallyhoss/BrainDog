@@ -255,7 +255,7 @@ import { entityLists, foldChain, foldEnd, foldedCarry, holderOf, keyedLists, mer
 import { builtInFigure, openSteps } from './built-in-figures.ts';
 import { beatRun, workingRuns } from './presence.ts';
 import { agentOf as ladderAgentOf, keysOfStamp, kindOfEvent, kindsOfProposal, madeByIn, personOf, recordReader, shapeIn, tokenOfRun } from './change-kind.ts';
-import { undoApply as applyUndo, undoPlan as planUndo, type UndoApplied, type UndoOptions, type UndoPlan, type UndoScope } from './undo.ts';
+import { undoApply as applyUndo, undoPlan as planUndo, undoStaged as stageUndo, type UndoApplied, type UndoDeclared, type UndoOptions, type UndoPlan, type UndoScope } from './undo.ts';
 import { understandBackfill, undoBackfill, type BackfillDeps, type BackfillOptions, type Backfilled } from './backfill.ts';
 import {
   FINISHED,
@@ -469,7 +469,7 @@ export {
 } from './change-kind.ts';
 /* UNDO ON THE SERVER (`undo.ts`) and THE WALK OVER WHAT THE RECORD ALREADY HOLDS (`backfill.ts`), each also a kernel
    method below (`undoPlan`, `undoApply`, `backfill`, `undoBackfill`), which hands them the record's own parts. */
-export { undoApply, undoPlan, type UndoApplied, type UndoDo, type UndoneMark, type UndoOptions, type UndoParts, type UndoPlan, type UndoRow, type UndoScope, type UndoSkip, type UndoStep } from './undo.ts';
+export { undoApply, undoPlan, undoStaged, type UndoApplied, type UndoDeclared, type UndoDo, type UndoneMark, type UndoOptions, type UndoParts, type UndoPlan, type UndoRow, type UndoScope, type UndoSkip, type UndoStage, type UndoStep } from './undo.ts';
 export {
   BACKFILL_ACTOR, BACKFILL_LIMIT, BACKFILL_SOURCE, PAYEE_SEEN, organisationsHolding, tidy as tidyPayee, understandBackfill, undoBackfill,
   type BackfillDeps, type BackfillOptions, type BackfillSuggestion, type Backfilled, type Named as BackfillNamed, type Slice as BackfillSlice, type SliceName as BackfillSliceName,
@@ -6741,7 +6741,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    *
    * AND A DECISION ON ANY OTHER QUESTION STARTS THE RULES WHOSE `decided` TRIGGER ADMITS IT (`flow.ts`'s `onDecided`), in
    * the same transaction, so a decision that rolls back starts nothing. `about` is the declaration that filed the
-   * question (`rule:<id>` opened it) or that a change proposes, and the run's row is the one the body's `about` names,
+   * question (`rule:<id>` or `script:<id>@v<n>` opened it) or that a change proposes, and the run's row is the one the body's `about` names,
    * as a rule's `suggest` writes it.
    */
   const answered = (id: string, verdict: Verdict, actor: string): void => {
@@ -6761,7 +6761,16 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       onDecided(flowDeps(), flows, {
         suggestion: id,
         option: { id: chosen, label: typeof label === 'string' ? label : chosen },
-        about: typeof parsed.declaration_id === 'string' ? parsed.declaration_id : row.opened_by.startsWith('rule:') ? `rule.${row.opened_by.slice('rule:'.length)}` : null,
+        /* A QUESTION A SCRIPT FILED IS ABOUT ITS SCRIPT (`script:close_account@v1` is `script.close_account`), as one a rule
+           opened is about its rule, so a `decided` trigger can name it. */
+        about:
+          typeof parsed.declaration_id === 'string'
+            ? parsed.declaration_id
+            : row.opened_by.startsWith('rule:')
+              ? `rule.${row.opened_by.slice('rule:'.length)}`
+              : row.opened_by.startsWith('script:')
+                ? `script.${row.opened_by.slice('script:'.length).replace(/@v\d+$/u, '')}`
+                : null,
         row: typeof parsed.about === 'string' ? get(parsed.about) : null,
         actor,
       });
@@ -10397,14 +10406,23 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     undoPlan: (scope: UndoScope, opts: UndoOptions = {}): Result<UndoPlan> => planUndo(sql, scope, opts),
 
     /**
+     * Make ready the declarations an undo of `scope` would put back (`undoStaged` in `undo.ts`): each earlier body
+     * checked and hashed through `stageInstall`, nothing written. Its answer is `undoApply`'s last argument, and the
+     * caller calls `reload()` after the transaction when anything was made ready, as after any staged write.
+     */
+    async undoStage(scope: UndoScope, opts: UndoOptions = {}): Promise<Result<UndoDeclared>> {
+      return stageUndo(sql, (batch) => this.stageInstall(batch), scope, opts);
+    },
+
+    /**
      * Put back what `undoPlan` showed, as `actor`, while `hash` is still what it would do. One transaction and one batch,
      * through the record's own write path, and the ladder told of every batch put back (`undone`). HERE AND NOT UNDER
      * `api/`, like `tryAutomation`: `parts` is read when this is called, after it is built.
      */
-    undoApply: (scope: UndoScope, hash: string, actor: string, opts: UndoOptions = {}): Result<UndoApplied> => {
+    undoApply: (scope: UndoScope, hash: string, actor: string, opts: UndoOptions = {}, declared?: UndoDeclared): Result<UndoApplied> => {
       const barred = schemaRefusal(state);
       if (barred) return barred;
-      return applyUndo(parts, scope, hash, actor, opts);
+      return applyUndo(parts, scope, hash, actor, opts, declared);
     },
 
     /**

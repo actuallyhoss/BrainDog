@@ -52,11 +52,12 @@ test('enough rows arriving at once is itself the event', () => {
   assert.equal(costOf('rowset', many), 'shape');
 });
 
-test('a declaration that replaces one is hard to undo until Put back can restore one: a new one is the shape', () => {
+test('a declaration that replaces one is the shape, as a new one is: Put back restores the one it replaced', () => {
   assert.equal(costOf('change', { declaration_id: 'page.work', to: { kind: 'page' } }), 'shape');
-  /* THE ONE IT REPLACES IS KEPT AS A PRIOR VERSION, AND NOTHING PUTS IT BACK: undo walks entry lines alone and no
-     write clears `superseded_at`. Batch 58 read this as 'shape'; batch 60 took that back on purpose. */
-  assert.equal(costOf('change', { declaration_id: 'page.work', to: { kind: 'page' }, from: { kind: 'page' } }), 'undo');
+  /* THE ONE IT REPLACES IS KEPT AS A PRIOR VERSION, AND PUT BACK INSTALLS IT AGAIN (batch 62, `undo.ts`). Batch 60
+     held this at 'undo' while a plan for it had no step. A retype with a `from` is the one change that stays. */
+  assert.equal(costOf('change', { declaration_id: 'page.work', to: { kind: 'page' }, from: { kind: 'page' } }), 'shape');
+  assert.equal(costOf('change', { declaration_id: 'register.tasks', to: { retype: { field: 'owner', type: 'ref' } }, from: { id: 'register.tasks' } }), 'undo');
 });
 
 test('turning a pack off is the dearest thing a pack proposal can ask for', () => {

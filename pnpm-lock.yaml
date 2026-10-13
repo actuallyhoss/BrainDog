@@ -400,6 +400,8 @@ importers:
 
   packs/count-cash: {}
 
+  packs/dates: {}
+
   packs/hello: {}
 
   packs/holdings: {}
@@ -429,6 +431,8 @@ importers:
   packs/stripe: {}
 
   packs/week-in-money: {}
+
+  packs/worked-numbers: {}
 
   tools/client-checks:
     devDependencies:

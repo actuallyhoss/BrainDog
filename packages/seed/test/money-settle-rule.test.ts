@@ -95,14 +95,24 @@ async function money() {
   return { k, paid, bill, turn, queued, log };
 }
 
+/** What a test reads of a bill: its status, "Paid so far" and "Paid on", an empty one as `null`. */
+const read = (k: Kernel, id: string) => {
+  const f = k.get(id)!.fields;
+  return [f.state, f.paid_so_far ?? null, f.settled ?? null];
+};
+
 const RULE = MONEY_AUTOMATIONS.find((a) => a.rule === 'payment-settles') as { on: Fields; when: string; steps: { script: { id: string; input: Fields } }[] } | undefined;
+
+/** The three tests at the foot of this file stand on the rule starting whatever a payment's status (`settles is set` alone, batch 62). */
+const WIDE = {};
 
 test('the script and the rule that starts it are Money\'s own, and go into its pack document together', () => {
   assert.ok(MONEY_AUTOMATIONS.includes(SETTLE_SCRIPT), 'the script is in no pack document');
   assert.ok(RULE, 'no rule starts the script');
   /* ONLY A WRITE TO "Settles" OR TO THE STATUS, so an edit to a payment's words starts nothing. */
   assert.deepEqual(RULE.on, { written: { register: 'transactions', op: ['create', 'update'], fields: ['settles', 'state'] } });
-  assert.equal(RULE.when, 'settles is set, state is cleared');
+  /* WHATEVER ITS STATUS (batch 62), so a payment made void starts the count that reopens its bill. */
+  assert.equal(RULE.when, 'settles is set');
   assert.equal(RULE.steps[0]!.script.id, SETTLE_SCRIPT.script);
   /* A BILL HAS NO NEXT DAY, so none is handed: `next` is a repeating line's, and nothing links a payment to one yet. */
   assert.deepEqual(Object.keys(RULE.steps[0]!.script.input), ['payment', 'item']);
@@ -135,10 +145,13 @@ test('money that has not cleared pays nothing, and pays the day it clears', asyn
   const theBill = m.bill();
   const pay = m.paid(150_000, '2026-09-28', { settles: theBill.id, state: 'pending' });
   await m.turn();
-  assert.deepEqual(m.queued(), []);
+  /* WHETHER THE RULE WAITS FOR THE MONEY OR THE SCRIPT DOES, the bill is what says nothing was paid. */
+  const waiting = m.k.get(theBill.id)!;
+  assert.deepEqual([waiting.fields.state, waiting.fields.paid_so_far, waiting.version], ['open', undefined, theBill.version], m.log.join(' '));
   value(m.k.update('transactions', pay.id, { state: 'cleared' }, OWNER));
-  await m.k.drain();
-  assert.equal(m.queued().length, 1);
+  await m.turn();
+  const f = m.k.get(theBill.id)!.fields;
+  assert.deepEqual([f.state, f.paid_so_far], ['part', gbp(150_000)], m.log.join(' '));
 });
 
 /**
@@ -175,4 +188,54 @@ test('a pending or void entry that names the same bill is not counted as paid', 
   await m.turn();
   const f = m.k.get(theBill.id)!.fields;
   assert.deepEqual([f.state, f.paid_so_far, f.settled], ['part', gbp(150_000), undefined], m.log.join(' '));
+});
+
+/**
+ * PAID IS WHAT A PAYMENT DID, SO A PAYMENT TAKEN BACK UNPAYS (batch 62). Measured before: a bill closed by one cleared
+ * payment stayed paid, with its day and its sum, after that payment was made void, because the rule started nothing
+ * for a void entry and the script changed nothing on a bill that was not open.
+ */
+test('a bill its one payment paid is open again when that payment is made void', WIDE, async () => {
+  const m = await money();
+  const theBill = m.bill();
+  const pay = m.paid(400_000, '2026-10-01', { settles: theBill.id });
+  await m.turn();
+  assert.deepEqual(read(m.k, theBill.id), ['paid', gbp(400_000), '2026-10-01'], m.log.join(' '));
+
+  value(m.k.update('transactions', pay.id, { state: 'void' }, OWNER));
+  await m.turn();
+  assert.deepEqual(read(m.k, theBill.id), ['open', null, null], m.log.join(' '));
+  assert.equal(m.log.at(-1), 'Studio rent is open again, since its payment was made void.');
+});
+
+test('a bill two payments paid reads the other payment\'s sum when one is made void', WIDE, async () => {
+  const m = await money();
+  const theBill = m.bill();
+  m.paid(150_000, '2026-09-28', { settles: theBill.id });
+  await m.turn();
+  const second = m.paid(250_000, '2026-10-02', { settles: theBill.id });
+  await m.turn();
+  assert.deepEqual(read(m.k, theBill.id), ['paid', gbp(400_000), '2026-10-02'], m.log.join(' '));
+
+  value(m.k.update('transactions', second.id, { state: 'void' }, OWNER));
+  await m.turn();
+  assert.deepEqual(read(m.k, theBill.id), ['part', gbp(150_000), null], m.log.join(' '));
+  assert.equal(m.log.at(-1), 'Studio rent is part paid, GBP 1,500 of GBP 4,000, since one of its payments was made void.');
+});
+
+test('started twice for one void payment, the script writes the bill once', WIDE, async () => {
+  const m = await money();
+  const theBill = m.bill();
+  const pay = m.paid(400_000, '2026-10-01', { settles: theBill.id });
+  await m.turn();
+  value(m.k.update('transactions', pay.id, { state: 'void' }, OWNER));
+  await m.turn();
+  const once = m.k.get(theBill.id)!.version;
+  /* A SECOND WRITE TO THE STATUS starts the rule again: pending is not cleared either, and the bill is as it was left. */
+  value(m.k.update('transactions', pay.id, { state: 'pending' }, OWNER));
+  await m.turn();
+  value(m.k.update('transactions', pay.id, { state: 'void' }, OWNER));
+  await m.turn();
+  assert.equal(m.k.get(theBill.id)!.version, once, m.log.join(' '));
+  assert.deepEqual(read(m.k, theBill.id), ['open', null, null]);
 });

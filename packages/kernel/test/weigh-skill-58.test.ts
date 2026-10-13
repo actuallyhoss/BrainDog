@@ -1,13 +1,15 @@
 /**
- * What is hard to undo, and what only looked it (batch 58, put right in batch 60).
+ * What is hard to undo, and what only looked it (batch 58, put right in batch 60, and a change lowered in batch 62).
  *
  * `costOf` gave `undo` to any rowset with an update in it, and every card's main button warned of it. The record keeps
  * the way back for that: an edit's history line holds what the row said before, and Put back writes it in again.
  *
- * Batch 58 lowered a replaced declaration too, on the grounds that the old version stays beside its successor. It
- * does stay, and Put back still cannot restore it: a plan for such a decision has no step in it, which the test near
- * the end of this file reads off `undoPlan` itself. So a `change` with a `from` under it is `undo` again until Put
- * back learns to, and so is an update to a field whose value the history withholds, which Put back says it has no
+ * Batch 58 lowered a replaced declaration too, on the grounds that the old version stays beside its successor, and
+ * batch 60 took that back, because a plan for such a decision had no step in it. SINCE BATCH 62 PUT BACK RESTORES A
+ * DECLARATION AN ACCEPTED CHANGE REPLACED (`undo.ts`, `declaredIn`): the plan holds a `declare` step, which the test
+ * near the end of this file reads off `undoPlan` itself, so a `change` with a `from` under it is `shape`. Only a
+ * retype or a narrowing with a `from` stays `undo`, because it rewrites the answers under the field and the undo
+ * leaves it. An update to a field whose value the history withholds is `undo` still, which Put back says it has no
  * copy of. A pack turned off and money moved are the band as they were.
  */
 
@@ -26,17 +28,18 @@ const SKILL_REWORDED = { declaration_id: 'skill.weekly_review', from: SKILL_BEFO
 
 const fee = { amount: 12_500, currency: 'EGP' };
 
-test('a skill’s wording changed is hard to undo while Put back cannot restore the version it replaces', () => {
-  assert.equal(costOf('change', SKILL_REWORDED), 'undo');
+test('a skill’s wording changed is put back by the undo, so it is the shape and not hard to undo', () => {
+  assert.equal(costOf('change', SKILL_REWORDED), 'shape');
   /* A NEW DECLARATION REPLACES NOTHING, so there is nothing to restore and it is the band it was. */
   assert.equal(costOf('change', { declaration_id: 'skill.weekly_review', to: SKILL_AFTER }), 'shape');
   assert.equal(costOf('change', { declaration_id: 'skill.weekly_review', to: SKILL_AFTER, from: null }), 'shape');
 });
 
-test('every shape a change takes over a declaration that exists is hard to undo, and the same shape over none is not', () => {
+test('only a retype or a narrowing over a declaration that exists is hard to undo, and the same shape over none is not', () => {
   const field = { id: 'owner', type: 'text', label: 'Owner' };
   for (const to of [{ add: { fields: [field] } }, { retire: { fields: ['owner'] } }, { retype: { field: 'owner', type: 'ref' } }, { narrow: { field: 'owner', required: true } }]) {
-    assert.equal(costOf('change', { declaration_id: 'register.tasks', from: { id: 'register.tasks' }, to }), 'undo', JSON.stringify(to));
+    const hard = 'retype' in to || 'narrow' in to;
+    assert.equal(costOf('change', { declaration_id: 'register.tasks', from: { id: 'register.tasks' }, to }), hard ? 'undo' : 'shape', JSON.stringify(to));
     assert.equal(costOf('change', { declaration_id: 'register.tasks', to }), 'shape', JSON.stringify(to));
   }
 });
@@ -125,7 +128,7 @@ test('the SQL says what the tests above say, read off the table and not off cost
   put('rowset', { register: 'tasks', rows: [{ at: 'tasks#3', version: 2, patch: { title: 'Call the bank' } }] });
   put('rowset', { register: 'bills', rows: [{ at: 'bills#2', version: 1, patch: { fee } }] });
   const said = sql.all<{ cost: string }>(`SELECT ${COST_SQL} AS cost FROM suggestion ORDER BY id`).map((r) => r.cost);
-  assert.deepEqual(said, ['undo', 'undo', 'rows', 'undo']);
+  assert.deepEqual(said, ['shape', 'undo', 'rows', 'undo']);
   sql.close();
 });
 
@@ -214,10 +217,10 @@ const KEYS: Declaration = {
   } as never,
 };
 
-type Plan = { say: string; lines: string[]; steps: unknown[]; skipped: { why: string }[] };
+type Plan = { say: string; lines: string[]; steps: { do?: string }[]; skipped: { why: string }[] };
 type Decided = { decision: string; install?: Declaration };
 
-test('PUT BACK ON A DECIDED CHANGE HAS NO STEP IN IT, which is why replacing a declaration is hard to undo', async () => {
+test('PUT BACK ON A DECIDED CHANGE HAS A STEP THAT RESTORES THE DECLARATION, which is why replacing one is the shape', async () => {
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));
   value(await k.install([NOTES]));
@@ -226,8 +229,8 @@ test('PUT BACK ON A DECIDED CHANGE HAS NO STEP IN IT, which is why replacing a d
 
   /* THE CARD AND THE COUNT BESIDE THE QUEUE BOTH SAY SO, from the body as the record stored it. */
   const stored = sql.one<{ body: string; cost: string }>(`SELECT body, ${COST_SQL} AS cost FROM suggestion WHERE id = ?`, asked.id)!;
-  assert.equal(stored.cost, 'undo');
-  assert.equal(costOf('change', JSON.parse(stored.body), costRows(sql)), 'undo');
+  assert.equal(stored.cost, 'shape');
+  assert.equal(costOf('change', JSON.parse(stored.body), costRows(sql)), 'shape');
 
   const done = value<Decided>(k.decide(asked.id, { decide: { option: 'accept', reason: 'yes' } }, 'p_owner'));
   /* THE DECISION HANDS THE DECLARATION BACK FOR ITS CALLER TO INSTALL, as the host does on a yes. */
@@ -239,10 +242,11 @@ test('PUT BACK ON A DECIDED CHANGE HAS NO STEP IN IT, which is why replacing a d
   const after = live();
   assert.deepEqual(after, [{ version: 1, name: 'Notes', superseded: 1 }, { version: 2, name: 'Jottings', superseded: 0 }], 'the old version is kept, and it is not the live one');
 
-  /* THE DAY THIS PLAN HOLDS A STEP THAT RESTORES VERSION 1, `costOf` AND `COST_SQL` GO BACK TO 'shape' FOR A CHANGE. */
+  /* THE PLAN HOLDS THE STEP THAT RESTORES VERSION 1 (batch 62). The day it does not, `costOf` and `COST_SQL` go back
+     to 'undo' for a change. */
   const plan = value<Plan>(k.undoPlan({ decision: done.decision }));
-  assert.deepEqual(plan.steps, [], 'nothing in the plan restores the declaration');
-  assert.deepEqual(plan.lines, []);
+  assert.deepEqual(plan.steps.map((s) => s.do), ['declare'], 'the plan restores the declaration');
+  assert.deepEqual(plan.lines, ['Puts the list "Jottings" back to how it read before this change, as "Notes".']);
   assert.deepEqual(live(), after, 'and planning it moved nothing');
   sql.close();
 });

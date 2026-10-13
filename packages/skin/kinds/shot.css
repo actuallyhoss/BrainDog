@@ -1,0 +1,34 @@
+/*
+ * Screenshot mode's plate: what a person's own words look like while the screen is being shown to someone else.
+ *
+ * Not a block kind, but it lives with the kind sheets because it paints over all of them. The app marks the element
+ * round each piece of text the record holds with `data-plated`; the words the product itself wrote carry no mark and
+ * stay legible. It keeps `blocks.css`'s one rule: no colour is written, every value is a role.
+ */
+
+@layer components {
+  /* ── the plate ──────────────────────────────────────────────────────────
+     THE BOX DOES NOT MOVE. The words are still laid out, only unpainted, so a plated screen has the same lines, the
+     same wraps and the same heights as the real one: nothing here pads, sizes or changes how the element is displayed.
+     The ink goes and an opaque bar in `--line` takes its place, which reads on the ground and on a tile in both themes.
+
+     `!important` ON THE TWO THAT HIDE, AND ONLY THOSE. A plate that loses to a more specific `color` shows the words it
+     was put there to cover, and a text shadow would draw them again under the bar. The corner and the figures are
+     ordinary declarations.
+
+     Tabular figures, so a plated number is as wide as it was and the column beside it does not shift when the mode
+     turns on. A plate that wraps gets its corners on every line.
+
+     The focus ring is not touched: a plated link or button still shows where the keyboard is. Nothing is written for
+     forced colours or for print either: the plate is the same rule there, and forced colours hand the palette back to
+     the system as everywhere else. */
+  [data-plated] {
+    background: var(--line) !important;
+    border-radius: var(--r-sm);
+    color: transparent !important;
+    text-shadow: none !important;
+    font-variant-numeric: tabular-nums;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+  }
+}

@@ -149,6 +149,16 @@ test('A NUMBER WITH A SERVICE SET IS DRAWN ON RENEWALS under Server and provider
   assert.equal(blocks[after + 1]?.heading, HEADING, 'it stands under what renews, above everything folded shut');
 });
 
+test('A NUMBER TYPED BY HAND, WITH NO SOURCE SAID, IS DRAWN: only the example is left out (audit 61, claim 5)', async () => {
+  const k = await founder();
+  const box = server(k, 'Build box');
+  /* `source is not example` over a reading that says no source at all, which is what a typed or imported one is. */
+  value(k.create('datapoints', { name: 'Disk used', value: 60, unit: '%', about_service: box, at: at(1) }, OWNER));
+  const block = numbersOn(k);
+  assert.ok(block, `a reading with no source drew no ${HEADING}`);
+  assert.deepEqual(block.latest?.map((l) => [l.measure, l.value]), [['Disk used', 60]]);
+});
+
 test('SIX AT MOST: eight measures about one server draw six', async () => {
   const k = await founder();
   const box = server(k, 'Build box');

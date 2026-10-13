@@ -563,6 +563,13 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
    *
    * THE FIVE `look.*` KEYS ARE NOT EXCUSED ANY MORE, and have their cases above.
    *
+   * `look.shot` IS EXCUSED BECAUSE NO SCREEN READS IT YET (batch 62). The record keeps screenshot mode's switch and
+   * sends it with boot (`packages/record/test/look-shot.test.ts`), and the web side is not built: `pref.ts` keeps no
+   * first-paint copy of it, Settings has no switch, and the plate (`apps/web/src/lib/shot/plate.ts`) is mounted
+   * nowhere, so two loads that differ only in this key draw the same page and a case here would be red for a reason
+   * that is not a fault. THE DAY `pref.ts` KEEPS ITS COPY, TAKE IT OUT OF HERE and give it a case with `record: true`
+   * beside `look.contrast`'s, measuring the plate on a row's own words.
+   *
    * `notify.muted` IS EXCUSED BECAUSE THE RECORD APPLIES IT, NOT THE PAGE. The record drops a muted rule's notes from what
    * it answers (`mutedFor`), reading the mutes it keeps, so what it changes is the record's answer and not a page load;
    * a case here would be asking the record's question of a screen. The test
@@ -574,7 +581,7 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
    * anybody from looking (`loop/research-audit-11-13.md`). Whether a muted note leaves Today is the record's to test, where
    * the activity block is built: `packages/record/test/activity-muted.test.ts`.
    */
-  const RECORD_EXCUSED = new Set(['nav.order', 'nav.hidden', 'notify.muted']);
+  const RECORD_EXCUSED = new Set(['nav.order', 'nav.hidden', 'notify.muted', 'look.shot']);
   const recordSrc = await readFile(join(root, 'packages', 'record', 'src', 'index.ts'), 'utf8').catch(() => '');
   const keysSaid = /export const PREF_KEYS = \[([^\]]*)\]/u.exec(recordSrc)?.[1];
   const RECORD_KEYS = keysSaid === undefined ? [] : [...keysSaid.matchAll(/'([^']+)'/gu)].map((m) => m[1]);

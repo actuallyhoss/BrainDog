@@ -177,6 +177,64 @@ test('a repeating line never moves back: a day that is not later than Next moves
   assert.deepEqual(changeTo(settle(rent(), payment(400_000), { next: null }), 'recurring#7'), { last_paid: '2026-10-01', last_amount: gbp(400_000) });
 });
 
+/**
+ * A PAYMENT TAKEN BACK UNPAYS (batch 62). `before` is what the bill's other cleared payments come to, as `run` counts
+ * it, and the bill is written back to that: counted, never subtracted.
+ */
+const voided = (amount: number, more: Fields = {}) => payment(amount, '2026-10-01', { settles: 'e_obligations_4', state: 'void', ...more });
+
+test('a void payment reopens the bill it had paid, with nothing in Paid so far and no day', () => {
+  const paidBill = bill({ state: 'paid', settled: '2026-10-01', paid_so_far: gbp(400_000) });
+  const out = settle(paidBill, voided(400_000), { before: 0 });
+  assert.deepEqual(changeTo(out, 'obligations#4'), { state: 'open', settled: null, paid_so_far: null });
+  assert.equal((out as { said: string }).said, 'Studio rent is open again, since its payment was made void.');
+  /* THE PAYMENT KEEPS ITS LINK, so the day it is cleared again it pays the same bill. */
+  assert.equal((out as { writes: unknown[] }).writes.length, 1);
+});
+
+test('a void payment leaves the bill part paid with what its other payments come to', () => {
+  const paidBill = bill({ state: 'paid', settled: '2026-10-02', paid_so_far: gbp(400_000) });
+  const out = settle(paidBill, voided(250_000), { before: 150_000 });
+  assert.deepEqual(changeTo(out, 'obligations#4'), { state: 'part', settled: null, paid_so_far: gbp(150_000) });
+  assert.equal((out as { said: string }).said, 'Studio rent is part paid, GBP 1,500 of GBP 4,000, since one of its payments was made void.');
+  /* A PART-PAID BILL LOSES THE SUM AND NOTHING ELSE: it had no day. */
+  assert.deepEqual(changeTo(settle(bill({ state: 'part', paid_so_far: gbp(300_000) }), voided(150_000), { before: 150_000 }), 'obligations#4'), { paid_so_far: gbp(150_000) });
+});
+
+test('a bill already written back is not written a second time', () => {
+  const said = { nothing: 'The payment for Studio rent was made void, so nothing was marked paid.' };
+  assert.deepEqual(settle(bill(), voided(400_000), { before: 0 }), said);
+  assert.deepEqual(settle(bill({ state: 'part', paid_so_far: gbp(150_000) }), voided(250_000), { before: 150_000 }), said);
+});
+
+test('a bill a person marked paid by hand is not reopened by a void payment', () => {
+  /* NO "PAID SO FAR" ON A PAID BILL: no run of this script closed it. */
+  assert.deepEqual(settle(bill({ state: 'paid', settled: '2026-10-01' }), voided(400_000), { before: 0 }), {
+    nothing: 'Studio rent was marked paid by hand, so the payment that was made void changed nothing.',
+  });
+  assert.deepEqual(settle(bill({ state: 'written_off', paid_so_far: gbp(400_000) }), voided(400_000), { before: 0 }), { nothing: 'Studio rent is not open, so the payment changed nothing.' });
+});
+
+test('money that has not cleared marks nothing paid, whichever list it is handed for', () => {
+  const pending = payment(400_000, '2026-10-01', { state: 'pending' });
+  const said = (name: string) => ({ nothing: `The payment for ${name} has not cleared, so nothing was marked paid.` });
+  /* NOT LINKED EITHER: a pending payment that names no bill is not given one. */
+  assert.deepEqual(settle(bill(), pending, { before: 0 }), said('Studio rent'));
+  assert.deepEqual(settle(part(), pending), said('Desk, part 2'));
+  assert.deepEqual(settle(rent(), pending, { next: '2026-11-01' }), said('Rent'));
+  /* A CLEARED PAYMENT THAT GOES BACK TO PENDING unpays as a void one does. */
+  const back = settle(bill({ state: 'paid', settled: '2026-10-01', paid_so_far: gbp(400_000) }), payment(400_000, '2026-10-01', { state: 'pending', settles: 'e_obligations_4' }), { before: 0 });
+  assert.equal((back as { said: string }).said, 'Studio rent is open again, since its payment has not cleared.');
+});
+
+test('a void payment whose bill the others still pay in full keeps it paid, and with no count handed writes nothing', () => {
+  const paidBill = bill({ state: 'paid', settled: '2026-10-02', paid_so_far: gbp(500_000) });
+  const out = settle(paidBill, voided(100_000), { before: 400_000 });
+  assert.deepEqual(changeTo(out, 'obligations#4'), { paid_so_far: gbp(400_000) });
+  assert.equal((out as { said: string }).said, 'Studio rent still has GBP 4,000 paid, since one of its payments was made void.');
+  assert.deepEqual(settle(paidBill, voided(100_000)), { nothing: 'The payment for Studio rent was made void, so nothing was marked paid.' });
+});
+
 /** The script's own text, run as a sandbox runs it: nothing but `ctx`. */
 async function ran(rows: ReturnType<typeof row>[], input: Fields) {
   const writes: { spoken: string; patch: unknown; version: number }[] = [];
@@ -224,6 +282,21 @@ test('run on a bill, the script counts every payment that names it, so a second 
   /* AGAIN, on a bill whose `paid_so_far` already holds both: the sum is the payments', not the field plus one more. */
   const again = await ran([bill({ state: 'part', paid_so_far: gbp(400_000) }), first, second], { payment: 'transactions#12', item: 'obligations#4' });
   assert.deepEqual((again.writes[0]!.patch as Fields).paid_so_far, gbp(400_000));
+});
+
+test('run on a void payment, the script counts the bill\'s other cleared payments and writes it back to that', async () => {
+  const paidBill = bill({ state: 'paid', settled: '2026-10-02', paid_so_far: gbp(400_000) });
+  const first = row('transactions', 11, { what: 'NORTHGATE ESTATES', direction: 'out', amount: gbp(150_000), on: '2026-09-28', state: 'cleared', settles: 'e_obligations_4' });
+  const second = payment(250_000, '2026-10-02', { settles: 'e_obligations_4', state: 'void' });
+  const { writes, log } = await ran([paidBill, first, second], { payment: 'transactions#12', item: 'obligations#4' });
+  assert.deepEqual(writes, [{ spoken: 'obligations#4', patch: { state: 'part', settled: null, paid_so_far: gbp(150_000) }, version: 3 }]);
+  assert.deepEqual(log, ['Studio rent is part paid, GBP 1,500 of GBP 4,000, since one of its payments was made void.']);
+  /* AGAIN, ON THE BILL AS THAT RUN LEFT IT: nothing. */
+  const again = await ran([bill({ state: 'part', paid_so_far: gbp(150_000) }), first, second], { payment: 'transactions#12', item: 'obligations#4' });
+  assert.deepEqual(again.writes, []);
+  /* A BILL CLOSED BY HAND is left, and the log says why. */
+  const byHand = await ran([bill({ state: 'paid', settled: '2026-10-01' }), second], { payment: 'transactions#12', item: 'obligations#4' });
+  assert.deepEqual([byHand.writes, byHand.log], [[], ['Studio rent was marked paid by hand, so the payment that was made void changed nothing.']]);
 });
 
 test('run on an amount that is off, the script writes nothing and hands back the one question', async () => {

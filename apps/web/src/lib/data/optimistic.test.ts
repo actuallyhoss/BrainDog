@@ -235,3 +235,43 @@ test('a list’s first look is its baseline, a row that arrives after it is mark
   assert.deepEqual([...a.see('ledger', ['1', '2', '3'])], [], 'a list filled after an empty first look is not a list of arrivals');
   assert.deepEqual([...a.see('ledger', ['4', '1', '2', '3'])], ['4']);
 });
+
+test('the first row into a list the record answered empty is marked, and a look drawn before the answer is no baseline', () => {
+  let t = 0;
+  const a = arrivals(() => t);
+  /* DRAWN BEFORE ITS LIVE ANSWER, with no rows: the answer that fills it is the baseline and marks nothing. */
+  assert.deepEqual([...a.see('ledger', [], false)], []);
+  assert.deepEqual([...a.see('ledger', ['1', '2'], true)], [], 'the answer after a blank first draw is not a list of arrivals');
+  t = 100;
+  assert.deepEqual([...a.see('ledger', ['3', '1', '2'], true)], ['3']);
+
+  /* ANSWERED EMPTY: the list is truly empty, so the first row to arrive in it is tinted. */
+  assert.deepEqual([...a.see('inbox', [], false)], []);
+  assert.deepEqual([...a.see('inbox', [], true)], []);
+  t = 200;
+  assert.deepEqual([...a.see('inbox', ['7'], true)], ['7'], 'the first row in an empty list is marked');
+  assert.deepEqual([...a.see('inbox', ['7'], true)], ['7'], 'drawn again, the mark stands and none is added');
+  assert.equal(a.next(), 1_600);
+
+  /* A LOOK BEFORE THE ANSWER LEAVES THE BASELINE ALONE: a block drawn blank while it is read again marks nothing after. */
+  assert.deepEqual([...a.see('ledger', [], false)], []);
+  assert.deepEqual([...a.see('ledger', ['3', '1', '2'], true)], ['3'], 'the same rows back are not arrivals, and the standing mark stays');
+  t = 300;
+  assert.deepEqual([...a.see('ledger', ['4', '3', '1', '2'], false)], ['3'], 'rows drawn before the answer are not marked');
+  assert.deepEqual([...a.see('ledger', ['4', '3', '1', '2'], true)], ['4', '3'], 'the answer marks them');
+
+  /* A list that emptied and was answered empty marks the row that comes back into it. */
+  assert.deepEqual([...a.see('ledger', [], true)], []);
+  t = 400;
+  assert.deepEqual([...a.see('ledger', ['5'], true)], ['5']);
+
+  /* A CALLER THAT CANNOT SAY keeps the old rule, even on a list once answered: an empty look is no baseline. */
+  assert.deepEqual([...a.see('inbox', [])], []);
+  t = 2_000;
+  assert.deepEqual([...a.see('inbox', ['8'])], [], 'no word from the live read, so the first row is not marked');
+
+  a.forget();
+  assert.deepEqual([...a.see('inbox', ['9'], true)], [], 'forgotten, an answered look is a baseline again');
+  assert.deepEqual([...a.see('inbox', [], true)], []);
+  assert.deepEqual([...a.see('inbox', ['9'], true)], ['9']);
+});

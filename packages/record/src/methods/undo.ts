@@ -92,12 +92,23 @@ export function methods(deps: RecordDeps) {
     const broken = kernel.refused();
     if (broken) return { ok: false, refusal: broken };
     if (walk !== null) return walkUndo(walk, args.hash, actorOf(ctx), opts.reads, one);
+    /* A DECLARATION AN ACCEPTED CHANGE REPLACED IS MADE READY FIRST AND WRITTEN SECOND (batch 62): checking and hashing
+       the earlier body is asynchronous and the undo is one synchronous transaction, so the kernel stages here and the
+       transaction below writes what was staged with the rows and the marks. */
+    const declared = await kernel.undoStage(scope, opts);
+    if (!declared.ok) return declared;
     /* THE LADDER DROPS INSIDE THE UNDO'S TRANSACTION: a throw in between takes the undo back with it. */
-    const out = kernel.transaction(() => {
-      const applied = kernel.undoApply(scope, args.hash as string, actorOf(ctx), opts);
-      if (applied.ok) for (const mark of applied.value.undone) if (mark.agent !== null) trust.drop(mark.agent, mark.kinds, 'undone');
-      return applied;
-    });
+    let out: Result<UndoApplied>;
+    try {
+      out = kernel.transaction(() => {
+        const applied = kernel.undoApply(scope, args.hash as string, actorOf(ctx), opts, declared.value);
+        if (applied.ok) for (const mark of applied.value.undone) if (mark.agent !== null) trust.drop(mark.agent, mark.kinds, 'undone');
+        return applied;
+      });
+    } finally {
+      /* The list cache is the table's again whether the undo landed or rolled back, as after any staged write. */
+      if (declared.value.ready.size > 0) kernel.reload();
+    }
     if (!out.ok) return out;
     const { undone: _marks, ...answer } = out.value;
     return tail({ ok: true, value: answer });

@@ -905,6 +905,7 @@ export const PREF_KEYS = [
   'look.density',
   'look.contrast',
   'look.accent',
+  'look.shot',
 ] as const;
 export type PrefKey = (typeof PREF_KEYS)[number];
 /**
@@ -919,6 +920,9 @@ export type PrefKey = (typeof PREF_KEYS)[number];
  * accent"): `look.scheme` light, dark or the device's own (absent is the device's own), `look.size` and `look.density` the
  * cookie's own words (`apps/web/src/lib/pref.ts`), `look.contrast` the high-contrast palette, and `look.accent` one of the
  * suggested accents by name, or `House`. The browser keeps a first-paint copy of each, written from these.
+ *
+ * `look.shot` IS SCREENSHOT MODE, ON OR OFF (batch 62): the person's own words are plated while the screen is shown to
+ * someone else. Kept and sent with boot like the five; no screen reads it yet, and the browser keeps no copy of it.
  */
 export type Prefs = {
   'nav.order'?: string[];
@@ -934,6 +938,7 @@ export type Prefs = {
   'look.density'?: LookDensity;
   'look.contrast'?: boolean;
   'look.accent'?: string;
+  'look.shot'?: boolean;
 };
 
 /** The words each `look.*` key takes. `look.accent` takes `LOOK_ACCENTS`, which follows the suggested accents. */
@@ -3311,7 +3316,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           about: aboutOf(q.about),
           options: [
             { id: 'keep', label: one ? 'Keep my page' : 'Keep my pages', because: `${one ? 'Your page stays' : 'Your pages stay'} as you left ${one ? 'it' : 'them'}, and what this version adds is not asked about again.` },
-            { id: 'take', label: one ? "Take the update's page" : "Take the update's pages", because: `${one ? 'Your page is' : 'Your pages are'} replaced by the update's, and your own arrangement of ${one ? 'it' : 'them'} is not put back by Undo.` },
+            { id: 'take', hard: true, label: one ? "Take the update's page" : "Take the update's pages", because: `${one ? 'Your page is' : 'Your pages are'} replaced by the update's, and your own arrangement of ${one ? 'it' : 'them'} is not put back by Undo.` },
           ],
         },
       },
@@ -9367,7 +9372,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * One thing this person arranged for themselves, one key of `PREF_KEYS` at a time: `nav.order`, the rail's order;
      * `nav.hidden`, the pages taken out of it; `nav.shape`, a rail, a bar or a menu; `pen.suggest`, whether the holding
      * pen offers anything; `pen.dismissed`, what it offered and they turned down; `home.page`, the page the app opens on;
-     * `nav.labels`, their own names for pages; `notify.muted`, the rules whose notices they do not want; the five `look.*`,
+     * `nav.labels`, their own names for pages; `notify.muted`, the rules whose notices they do not want; the five `look.*` and `look.shot`,
      * how the app looks to them. `null` takes a key away. `boot` answers them on `me.prefs`.
      *
      * A PERSON, NOT A TOKEN, and not an event, for the reasons a read mark is neither: it is about somebody's own
@@ -9427,8 +9432,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           });
         /* NEWEST LAST AND THE OLDEST LET GO, as `pen.dismissed` is, so the switch that mutes one more never stops working. */
         kept = [...new Set(value)].slice(-MUTED_MOST);
-      } else if (value !== null && key === 'look.contrast') {
-        if (typeof value !== 'boolean') return no('VALUE_MALFORMED', 'look.contrast is true or false, or null to take it away.', { at: 'value' });
+      } else if (value !== null && (key === 'look.contrast' || key === 'look.shot')) {
+        if (typeof value !== 'boolean') return no('VALUE_MALFORMED', `${key} is true or false, or null to take it away.`, { at: 'value' });
         kept = value;
       } else if (value !== null && (key === 'look.scheme' || key === 'look.size' || key === 'look.density' || key === 'look.accent')) {
         /* ONE CLOSED LIST EACH, and the refusal names every word it takes. */

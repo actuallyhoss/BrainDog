@@ -200,22 +200,35 @@ export const ARRIVED_MS = 1_500;
  *
  * `see` MAY BE CALLED WHILE A SCREEN DRAWS, and more than once for one answer: the same keys twice mark nothing new.
  * `next` says when the earliest mark runs out, so a screen can draw once more then and take the tint away.
+ *
+ * `answered` IS THE LIVE READ'S WORD ON THE LOOK, and it is what tells an empty list from one not read yet:
+ *   `false`  the block is drawn before its live answer is in. The look is no baseline and marks nothing, and what the
+ *            list held before it stands, so rows drawn again once the answer lands are not arrivals.
+ *   `true`   the record answered these rows. The look is a baseline even with no rows in it, so the first row to
+ *            arrive in a list that was truly empty is marked.
+ *   absent   the caller cannot say, and the first look that holds a row is the baseline (look-left-60).
  */
 export function arrivals(now: () => number = Date.now, ms = ARRIVED_MS) {
   const seen = new Map<string, Set<string>>();
   const until = new Map<string, number>();
+  /* The lists whose last look the record answered, so an empty one of them is a baseline and not a blank. */
+  const sure = new Set<string>();
   const at = (list: string, key: string) => `${list}\u0000${key}`;
   return {
     /** Notes the keys `list` draws now, and answers which of them are still marked as arrived. */
-    see(list: string, keys: readonly string[]): ReadonlySet<string> {
+    see(list: string, keys: readonly string[], answered?: boolean): ReadonlySet<string> {
       const t = now();
-      const was = seen.get(list);
-      /* A LOOK THAT DREW NOTHING IS NO BASELINE (look-left-60). A block is drawn once before its live answer is in, with
-         no rows, and the answer after it then marked every row on the page: Money's What moved stood lavender on load.
-         So the first look that holds a row is the baseline. The cost, said: the first row to arrive in a list that
-         was truly empty is not tinted. */
-      if (was && was.size > 0) for (const key of keys) if (!was.has(key)) until.set(at(list, key), t + ms);
-      seen.set(list, new Set(keys));
+      if (answered !== false) {
+        const was = seen.get(list);
+        /* A LOOK THAT DREW NOTHING IS NO BASELINE UNLESS THE RECORD SAID SO (look-left-60). A block is drawn once before
+           its live answer is in, with no rows, and the answer after it then marked every row on the page: Money's What
+           moved stood lavender on load. So an empty look counts only where it was answered empty (`sure`); a caller
+           that cannot say still pays the old cost, the first row into a truly empty list untinted. */
+        if (was && (was.size > 0 || sure.has(list))) for (const key of keys) if (!was.has(key)) until.set(at(list, key), t + ms);
+        seen.set(list, new Set(keys));
+        if (answered) sure.add(list);
+        else sure.delete(list);
+      }
       const out = new Set<string>();
       for (const key of keys) {
         const u = until.get(at(list, key));
@@ -239,6 +252,7 @@ export function arrivals(now: () => number = Date.now, ms = ARRIVED_MS) {
     forget(): void {
       seen.clear();
       until.clear();
+      sure.clear();
     },
   };
 }

@@ -33,11 +33,11 @@
  * The four, worst first — which is the order they are ranked in, and the order they are compared in.
  *
  * - `undo`  — accepting it is hard to take back, because Put back has nothing to go back to: it
- *             turns a pack off, it moves money, it replaces a declaration that exists, or it changes
- *             a value the history withholds. The other button tomorrow does not return the record
- *             to where it was.
+ *             turns a pack off, it moves money, it retypes a field that holds answers, it changes a
+ *             value the history withholds, or it offers an option its proposer marked hard. The
+ *             other button tomorrow does not return the record to where it was.
  * - `shape` — accepting it changes what everyone sees: a pack installed or turned on, a pack's
- *             settings, a page, a declaration that is new. Reversible, and not quietly: everyone
+ *             settings, a page, a declaration that is new or replaces one. Reversible, and not quietly: everyone
  *             who opens the record meets it.
  * - `rows`  — accepting it adds rows, changes or removes rows that exist, or adds a rule that will
  *             add them. Deletable, put back or restored, one at a time.
@@ -69,6 +69,11 @@ export const MANY_ROWS = 20;
 
 const obj = (v: unknown): Record<string, unknown> => (v !== null && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
 const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+/** A change that retypes or narrows a field and nothing else, as `govern.ts`'s `isRetype` reads one. */
+const retypes = (to: unknown): boolean => {
+  const t = obj(to);
+  return ('retype' in t || 'narrow' in t) && !('add' in t) && !('retire' in t);
+};
 
 /**
  * A `rowset`: every row that carries `at` is an update of a row that exists, and the rest are new.
@@ -124,16 +129,16 @@ export function costOf(bodyKind: string, body: unknown, rows?: CostRows): Cost {
   switch (bodyKind) {
     case 'rowset':
       return rowsetCost(b, rows);
-    /* A DECLARATION THAT EXISTS IS REPLACED, AND PUT BACK CANNOT RESTORE THE ONE IT REPLACES. The old version is kept:
-       the new one goes in beside it and the old is stamped `superseded_at` (`declare.ts`). But keeping it is not a way
-       back. Put back walks the lines the history holds about rows and nothing else (`undo.ts`), no line is written
-       for a declaration, and nothing clears `superseded_at`, so a plan for such a decision has no step in it. Batch
-       58 read "the old one is kept" as "it can be undone" and lowered this to `shape`; the card then promised a way
-       back the record does not have (audit 58, claim 2). `from` present is what says one is being replaced, and it
-       is `undo` again UNTIL PUT BACK CAN RESTORE A SUPERSEDED DECLARATION, which is the day this goes back to
-       `shape`. `test/weigh-skill-58.test.ts` holds the plan to having no step, so that day shows there first. */
+    /* A DECLARATION THAT EXISTS IS REPLACED, AND PUT BACK RESTORES THE ONE IT REPLACED (batch 62). The old version is
+       kept: the new one goes in beside it and the old is stamped `superseded_at` (`declare.ts`). Since batch 62 the
+       undo of such a decision has a step for it (`undo.ts`, `declaredIn`): the earlier body is installed again as a
+       new version, through the record's `undo`, which makes it ready first and writes it second. So a change is
+       `shape`, with a `from` or without one. Batches 58 to 61 held it at `undo` while a plan for it had no step
+       (audit 58, claim 2).
+       ONLY A RETYPE WITH A `from` STAYS `undo`: it rewrites the answers under the field, and `undo.ts` leaves it
+       with a sentence. `retypes` is `govern.ts`'s `isRetype`. */
     case 'change':
-      return b.from === undefined || b.from === null ? 'shape' : 'undo';
+      return b.from === undefined || b.from === null || !retypes(b.to) ? 'shape' : 'undo';
     /* `disable` TAKES A REGISTER OFF EVERY SCREEN IT IS ON. Install and enable add one. */
     case 'pack':
       return typeof b.disable === 'string' ? 'undo' : 'shape';
@@ -145,9 +150,14 @@ export function costOf(bodyKind: string, body: unknown, rows?: CostRows): Cost {
     case 'pattern':
       return 'rows';
     /* AN OPTION THAT WRITES (`patches`, govern-47) IS A ROWSET ON THE PICK, so it is weighed as rows; one that only says
-       a choice is a call. */
-    case 'options':
-      return arr(b.options).some((o) => Array.isArray(obj(o).patches)) ? 'rows' : 'call';
+       a choice is a call. AN OPTION ITS PROPOSER MARKED `hard: true` IS ONE THAT CANNOT BE TAKEN BACK ONCE PICKED, and
+       the question is weighed by its worst option, since any of them may be the one picked: one hard option makes the
+       whole question `undo`, above what its patches say (audit 60, claim 1). Only the boolean `true` marks it. */
+    case 'options': {
+      const options = arr(b.options).map(obj);
+      if (options.some((o) => o.hard === true)) return 'undo';
+      return options.some((o) => Array.isArray(o.patches)) ? 'rows' : 'call';
+    }
     default:
       return 'call';
   }
@@ -222,7 +232,7 @@ export const COST_SQL = `(CASE
       WHEN json_type(body, '$.rows') = 'array' AND (${MOVES_MONEY_SQL} OR ${PATCHES_WITHHELD_SQL}) THEN 'undo'
       WHEN COALESCE(json_array_length(body, '$.rows'), 0) >= ${MANY_ROWS} THEN 'shape'
       ELSE 'rows' END)
-    WHEN 'change' THEN (CASE WHEN COALESCE(json_type(body, '$.from'), 'null') = 'null' THEN 'shape' ELSE 'undo' END)
+    WHEN 'change' THEN (CASE WHEN COALESCE(json_type(body, '$.from'), 'null') = 'null' THEN 'shape' WHEN (json_type(body, '$.to.retype') IS NOT NULL OR json_type(body, '$.to.narrow') IS NOT NULL) AND json_type(body, '$.to.add') IS NULL AND json_type(body, '$.to.retire') IS NULL THEN 'undo' ELSE 'shape' END)
     WHEN 'pack' THEN (CASE WHEN json_type(body, '$.disable') = 'text' THEN 'undo' ELSE 'shape' END)
     WHEN 'settings' THEN 'shape'
     WHEN 'arrange' THEN (CASE
@@ -233,7 +243,10 @@ export const COST_SQL = `(CASE
         OR COALESCE(json_array_length(body, '$.rows'), 0) >= ${MANY_ROWS} THEN 'shape'
       ELSE 'rows' END)
     WHEN 'pattern' THEN 'rows'
-    WHEN 'options' THEN (CASE WHEN EXISTS (SELECT 1 FROM json_each(body, '$.options') o WHERE o.type = 'object' AND json_type(o.value, '$.patches') = 'array') THEN 'rows' ELSE 'call' END)
+    WHEN 'options' THEN (CASE
+      WHEN json_type(body, '$.options') = 'array' AND EXISTS (SELECT 1 FROM json_each(body, '$.options') o WHERE o.type = 'object' AND json_type(o.value, '$.hard') = 'true') THEN 'undo'
+      WHEN json_type(body, '$.options') = 'array' AND EXISTS (SELECT 1 FROM json_each(body, '$.options') o WHERE o.type = 'object' AND json_type(o.value, '$.patches') = 'array') THEN 'rows'
+      ELSE 'call' END)
     ELSE 'call' END)
   ELSE (CASE body_kind WHEN 'rowset' THEN 'rows' WHEN 'change' THEN 'shape' WHEN 'pack' THEN 'shape' WHEN 'settings' THEN 'shape'
     WHEN 'arrange' THEN 'rows' WHEN 'pattern' THEN 'rows' ELSE 'call' END)

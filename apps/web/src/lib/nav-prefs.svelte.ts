@@ -63,6 +63,7 @@ export type Prefs = {
   'look.size'?: 'sm' | 'base' | 'md';
   'look.density'?: 'compact' | 'comfortable' | 'roomy';
   'look.contrast'?: boolean;
+  'look.shot'?: boolean;
   'look.accent'?: string;
 };
 

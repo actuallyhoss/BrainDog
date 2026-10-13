@@ -23,6 +23,7 @@
   import IconWell from '../ui/IconWell.svelte';
   import type { IconName } from '../ui/icons.ts';
   import { sheetOf, words } from './plan.ts';
+  import { REGISTERS } from '../record/held.ts';
 
   let {
     diff,
@@ -45,7 +46,8 @@
     extra?: Snippet | undefined;
   } = $props();
 
-  const sheet = $derived(sheetOf(diff, nameOf));
+  /* A FIELD BY THE LABEL THE RECORD SHOWS, where the browser holds its list; `sheetOf` reads the id as words otherwise. */
+  const sheet = $derived(sheetOf(diff, nameOf, (list, field) => REGISTERS[list]?.fields.find((f) => f.id === field)?.label ?? null));
   const estimate = $derived(sheet ? estimateOf(sheet.callOuts, hosted) : null);
   const calls = $derived(sheet ? sheet.parts.flatMap((p) => p.calls.map((c) => ({ ...c, from: p.title }))) : []);
   const several = $derived((sheet?.parts.length ?? 0) > 1);

@@ -142,6 +142,20 @@ test('the declared page says the same sentence from a count, how many are hard t
   assert.deepEqual(sentenceOf(waiting, { options: [{ key: 'a', title: 'Per seat', body: '', recommended: true }] } as never, '', NOW), countSentence(2, 1, 'Per seat'));
 });
 
+/* WHAT IS HARD TO UNDO IS A COUNT, NEVER A PLACE (audit 60, claim 3): the queue ranks by how long a question has
+   waited before its band, so the hard one may be the fifth. "The first one is hard to undo." said it was the first. */
+test('the hard-to-undo clause names no place in the queue, whatever the counts', () => {
+  for (let n = 1; n <= 12; n += 1)
+    for (let hard = 1; hard <= n; hard += 1)
+      for (const late of [0, 1, n]) {
+        const text = countSentence(n, hard, 'Yes', 'Claude', late, LATE)?.text ?? '';
+        assert.match(text, /hard to undo\.$/u, `${n} waiting, ${hard} hard: ${text}`);
+        assert.doesNotMatch(text, /\b(first|second|last|next|top)\b/iu, `${n} waiting, ${hard} hard names a place: ${text}`);
+      }
+  assert.equal(countSentence(5, 1, 'Yes')?.text, 'Five questions wait on you. One of them is hard to undo.');
+  assert.equal(countSentence(5, 1, 'Yes', '', 2, LATE)?.text, 'Five questions wait on you, two of them for over two weeks. One is hard to undo.');
+});
+
 /* THE GATE SAYS NO TRIVIA UNDER ITS TITLE (DIRECTION §39): "Three options; Per product is suggested; opened 5 weeks ago"
    said what the tile under it already shows. Who asked and when is the tile's quiet first line instead. */
 test('the gate draws no sentence of counts under its title', () => {

@@ -26,7 +26,7 @@ import { kindSpec } from './kind-spec.ts';
 import { cellNamesNothing, inline, magnitudeOfCell, text as plain, type Inline, type InlineOptions } from './inline.ts';
 import { glyphPath } from './inline.ts';
 import { MISSING, barFigure, day, figureChars, headlineFigure, leadingCode, symbolFigure, symbolText, valueWord } from './format.ts';
-import { CARDS_NEXT, CARDS_NONE, cardsCount, FOLD_HIDE, FOLD_SHOW, RUN_OPEN, TREND, agentMarkFill, cardLayout, cardTrend, counted, type AgentMark, initialOf, isDimmed, isQuiet, markGlyphOf, markOf, ringDash, ringOf, runFaceOf, runMarkOf, trendOf, type RunCell, type RunFace } from './cards.ts';
+import { CARDS_NEXT, CARDS_NONE, cardsCount, FOLD_HIDE, FOLD_SHOW, RUN_OPEN, TREND, agentMarkFill, cardLayout, cardTrend, counted, type AgentMark, initialOf, isDimmed, isQuiet, markGlyphOf, markOf, ringDash, ringOf, runFaceOf, runMarkOf, runTokens, trendOf, type RunCell, type RunFace } from './cards.ts';
 import { FEED_EARLIER, feedBurst, feedCasedNodes, feedNew, feedPlan } from './feed.ts';
 import { FILTERS_ALL, filtersMore, filtersPlan, type Filter } from './filters.ts';
 import { QUEUE_DOES, QUEUE_REASONS, QUEUE_RECOMMENDED, fileSrc, queueMore, queuePlan, queueReasoned, queueSuggested, queueWays, type QueueShows } from './queue.ts';
@@ -945,6 +945,24 @@ function fitAttrs(value: string | null | undefined): string {
 const figureEnd = (rest: string): number => rest.search(/\s|$/u);
 
 /**
+ * The newest known value of a card's run, as its cell wrote it, for a run `cardTrend` draws no line through.
+ *
+ * TWO POINTS ARE NOT A CHART, AND THEY ARE STILL A NUMBER. A card with a trend column and no figure column showed
+ * nothing at all for a short run, so the newest count is printed as text with the trend's name. A gap is not a value,
+ * a run with no number in it says nothing, and neither does one with no name. One number alone is a run of one.
+ */
+export function trendNewest(value: string, label: string): { last: string; label: string } | null {
+  const name = label.trim();
+  if (!name) return null;
+  const known = (s: string): boolean => s.trim() !== '' && Number.isFinite(Number(s.replace(/−/gu, '-').replace(/,/gu, '')));
+  const run = trendOf(value)?.said.filter(known);
+  if (run?.length) return { last: run[run.length - 1]!, label: name };
+  /* ONE KNOWN POINT IS NO LINE TO `trendOf`, so the run is read here by the rule it reads one by (`runTokens`). */
+  const one = runTokens(value).filter(known);
+  return one.length ? { last: one[one.length - 1]!, label: name } : null;
+}
+
+/**
  * A stored amount as the one writer writes it for this page (`money.ts`), or `null` when the host has not said the
  * record's home currency or the cell is not one stored amount, and then the cell is drawn the way it always was.
  */
@@ -1071,7 +1089,13 @@ function cards(b: Block, o: RenderOptions & { runs?: readonly (RunCell | null)[]
                 : `<svg class="cards-ring-mark" viewBox="0 0 36 36" aria-hidden="true"><circle class="cards-ring-track" cx="18" cy="18" r="16" pathLength="100"></circle><circle class="cards-ring-fill" cx="18" cy="18" r="16" pathLength="100" stroke-dasharray="${ringDash(m)}" transform="rotate(-90 18 18)"></circle></svg>`
             }<span class="cards-value num">${drawn(r, L.ring)}</span>${labelled(L.ring)}</span>`
           : '';
-      const middle = figure || trend || ring ? `<div class="cards-body">${figure}${trend}${ring}</div>` : '';
+      /* A RUN TOO SHORT TO DRAW STILL SAYS ITS NEWEST NUMBER where the card has no figure of its own (`trendNewest`):
+         it is printed as the card's figure, under the trend's name, and `Cards.svelte` prints the same. */
+      const newest = !t && L.figure < 0 && L.trend >= 0 ? trendNewest(said(r, L.trend), label(L.trend)) : null;
+      const short = newest
+        ? `<span class="cards-figure"><span class="cards-value num">${escape(newest.last)}</span><span class="cards-label">${escape(newest.label)}</span></span>`
+        : '';
+      const middle = figure || short || trend || ring ? `<div class="cards-body">${figure}${short}${trend}${ring}</div>` : '';
       /* A FACT NOBODY WROTE IS NOT DRAWN, as in `Cards.svelte`, and a card with no fact written has no list. */
       const written = L.facts.filter((i) => r.cells[i]);
       const facts = written.length
