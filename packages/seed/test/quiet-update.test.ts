@@ -9,6 +9,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 
 import { handedOf, install, normalise, plan, type Diff, type Host, type Installed, type Pack } from '@braindog/declare';
@@ -538,6 +539,8 @@ const withoutLedgerTile = (doc: Body): Body => ({
   ),
 });
 const withoutCashStale = (doc: Body): Body => ({ ...doc, declarations: (doc.declarations as Body[]).filter((d) => d.rule !== 'cash-stale') });
+/** Work as 1.18.0 released it, the frozen document (`fixtures/released/`), which holds the follow-up script as it was. */
+const WORK_1_18 = JSON.parse(readFileSync(new URL('./fixtures/released/work-1.18.0.json', import.meta.url), 'utf8')) as Body;
 const LATEST: Record<string, { version: string; released: string; undo: (doc: Body) => Body }> = {
   /* AN ACCOUNT'S DIGITS SAID THE LAST FOUR. */
   'money-core': {
@@ -548,10 +551,15 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
       return {
       ...doc,
       /* AND THE SCRIPT THAT MARKS A BILL PAID, WITH THE RULE THAT STARTS IT (settle-rule-60), both newer than 3.13.0. */
-      declarations: (doc.declarations as Body[]).filter((d) => !SIGNS_ADDED.has(String(d.metric)) && !WEEK_IN.has(String(d.metric)) && d.script !== 'last_day' && d.script !== 'settle' && d.rule !== 'payment-settles').map((d) =>
+      /* AND BATCH 61'S THREE, folded into the same unreleased 3.17.0: the two figures over who filed the Ledger go
+         (filing-figures-61), and the Ledger pairs within one currency alone again (pairs-fx-61). The Ledger tile's own
+         gate went with the tile (`withoutLedgerTile`). */
+      declarations: (doc.declarations as Body[]).filter((d) => !SIGNS_ADDED.has(String(d.metric)) && !WEEK_IN.has(String(d.metric)) && d.script !== 'last_day' && d.script !== 'settle' && d.rule !== 'payment-settles' && d.metric !== 'filed-for-you-30d' && d.metric !== 'filed-today').map((d) =>
         d.register === 'accounts' && Array.isArray(d.fields)
           ? { ...d, fields: (d.fields as Body[]).map((f) => (f.id === 'last4' ? { ...f, label: 'Last four digits' } : f)) }
-          : d,
+          : d.register === 'transactions' && d.pairs !== undefined
+            ? { ...d, pairs: (({ across_currency: _fx, ...rest }) => rest)(d.pairs as Body) }
+            : d,
       ),
       };
     },
@@ -578,7 +586,23 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
     version: '1.16.0',
     released: 'b27c59050f32684d',
     undo: (raw) => {
-      const doc = { ...raw, declarations: (raw.declarations as Body[]).filter((d) => d.metric !== 'project-moved-7d' && d.metric !== 'project-last-worked') };
+      /* WORK 1.19.0'S THREADS AND FOLLOW-UPS COME OFF BEFORE THAT (W061, REC-C10): a thread's Status back to its four
+         values with no labels and no declared moves, the day it aims for gone, and the script that starts a follow-up
+         back to the title and source 1.18.0 released, read from its frozen document. */
+      const was = (WORK_1_18.declarations as Body[]).find((d) => d.script === 'start_with_parent')!;
+      const threads = (raw.declarations as Body[]).map((d) =>
+        d.register === 'tracks' && Array.isArray(d.fields)
+          ? {
+              ...d,
+              fields: (d.fields as Body[])
+                .filter((f) => f.id !== 'target')
+                .map((f) => (f.id === 'state' ? (({ labels: _labels, transitions: _moves, ...rest }) => ({ ...rest, values: ['open', 'holding', 'done', 'dropped'] }))(f) : f)),
+            }
+          : d.script === 'start_with_parent'
+            ? { ...d, title: was.title, source: was.source }
+            : d,
+      );
+      const doc = { ...raw, declarations: threads.filter((d) => d.metric !== 'project-moved-7d' && d.metric !== 'project-last-worked') };
       const linked = (doc.declarations as Body[]).some((d) => d.register === 'tasks' && (d.fields as Body[]).some((f) => f.id === 'thing'));
       return withPage(doc, 'work-board', (now) =>
         now.map((b) => (b.kind === 'board' ? { ...b, columns: [{ field: 'state' }, { field: 'what' }, ...(linked ? [{ field: 'thing' }] : [])] } : b)),
@@ -859,16 +883,18 @@ const dropAmount = (v: unknown): unknown =>
 /**
  * AND NUMBERS AS THEY WERE BEFORE FOUNDER 2.5.0: a reading's `value` required and no `amount`, so no Amount column on a
  * block or a table over them. Undone with the two changes before it, so the version before is still the one released.
+ * AND THE UNRELEASED 2.6.0'S SERVICE NUMBERS (estate-numbers-61) come off with them: the field `about_service`, the figure
+ * `service-numbers`, and the block laid on Renewals.
  */
 const numbersBefore = (doc: Body, id: string): Body =>
   id !== 'founder'
     ? doc
     : {
         ...doc,
-        ...(Array.isArray(doc.adds) ? { adds: (doc.adds as Body[]).filter((a) => (a.block as Body | undefined)?.key !== 'earning-silent') } : {}),
-        declarations: (doc.declarations as Body[]).filter((d) => d.metric !== 'project-numbers-7d' && d.metric !== 'projects-earning-silent').map((d) =>
+        ...(Array.isArray(doc.adds) ? { adds: (doc.adds as Body[]).filter((a) => (a.block as Body | undefined)?.key !== 'earning-silent' && (a.block as Body | undefined)?.heading !== 'Server and provider numbers') } : {}),
+        declarations: (doc.declarations as Body[]).filter((d) => d.metric !== 'project-numbers-7d' && d.metric !== 'projects-earning-silent' && d.metric !== 'service-numbers').map((d) =>
           d.register === 'datapoints'
-            ? { ...d, fields: (d.fields as Body[]).flatMap((f) => (f.id === 'amount' ? [] : f.id === 'value' ? [{ ...f, required: true }] : [f])) }
+            ? { ...d, fields: (d.fields as Body[]).flatMap((f) => (f.id === 'amount' || f.id === 'about_service' ? [] : f.id === 'value' ? [{ ...f, required: true }] : [f])) }
             : (dropAmount(d) as Body),
         ),
       };
@@ -902,7 +928,7 @@ test("A USE CASE'S UPDATE THAT FOLDS A CHART INTO A FIGURE LOSES NOTHING, and go
     const next = value<Pack>(await normalise(now, { kind: 'local' }));
     const diff = await plan(next, stateOf(k, sql));
     assert.deepEqual(losses(diff), [], `${id}: nothing would be lost`);
-    assert.deepEqual([diff.adds.length, diff.retires.length, diff.conflicts.length], [id === 'founder' ? 3 : 0, 0, 0], `${id}: only a page changed`);
+    assert.deepEqual([diff.adds.length, diff.retires.length, diff.conflicts.length], [id === 'founder' ? 4 : 0, 0, 0], `${id}: only a page changed, and the founder's figures since (service-numbers the fourth, estate-numbers-61)`);
     value(await install(next, diff, hostFor(k), diff.planHash));
     assert.equal(k.packs().find((p) => p.id === pack)?.version, u.version);
     const held = (k.declarations() as { id: string; body: unknown }[]).find((d) => d.id === 'page.project')!;

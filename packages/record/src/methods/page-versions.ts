@@ -1,0 +1,125 @@
+/**
+ * One page's versions: `pageVersions({ page })`, READ, writing nothing (PGS-A07 job 4).
+ *
+ * THE KERNEL KEEPS EVERY VERSION OF A DECLARATION AND NOTHING LISTED A PAGE'S. A new version is a new row beside the
+ * old one, which is stamped `superseded_at` (`kernel/src/declare.ts`), and the app's source view held only the body
+ * before the last Apply. This is the read its History is drawn from, as `automationVersions` is an automation's
+ * (`automations.ts`): newest first, each with its body, when it was applied and by whom.
+ *
+ * WHO IS A NAME, NEVER AN ID. The log's `declare` line says the actor by id, and a person reads "Ada", an agent by
+ * its kind, "Slash", "BrainDog" for the record's own work. These are the words Put back says a writer in
+ * (`whoOf` in `kernel/src/undo.ts`), which that file keeps to itself. A version no line was written for is an
+ * add-on's when one installed it, and nobody's otherwise.
+ *
+ * HELD AS `arrangement({ page })` IS: anyone who reads the record, and only a page they may open, by the rule of
+ * `seesPage` in `index.ts` asked of `readable`. A page made for each row of a list has no declaration of its own,
+ * so its versions are its template's. A page they may not open and a page that is not there are the same refusal,
+ * which names what was asked and the pages there are.
+ */
+
+import { slugify } from '@braindog/kernel';
+import type { Refusal, Result } from '@braindog/ports';
+import { ok } from '@braindog/ports';
+
+import type { CallContext } from '../index.ts';
+import type { RecordDeps } from './index.ts';
+
+type Body = Record<string, unknown>;
+
+/** One version of a page's declaration, as a person reads it in History. */
+export type PageVersion = {
+  version: number;
+  /** When it was applied. */
+  at: string;
+  /** The version the page draws from now. */
+  live: boolean;
+  /** Who applied it, by name, or `null` when the log holds no line for it and no add-on wrote it. */
+  by: string | null;
+  /** The declaration as it stood, which Put back applies again and Save writes to a file. */
+  body: Body;
+};
+
+/** What `pageVersions` answers: the page by its address and title, and its versions newest first. */
+export type PageVersions = { page: string; title: string; versions: PageVersion[] };
+
+/** How many versions one read answers, newest first, as `VERSIONS_SHOWN` bounds an automation's. */
+export const PAGE_VERSIONS_SHOWN = 50;
+
+/** A run's spoken id, `S42`, which signs a write an agent made inside a run. */
+const RUN = /^S[1-9][0-9]*$/u;
+
+export function methods(deps: RecordDeps) {
+  const { kernel, sql, guard, readable, no } = deps;
+
+  /** A key this call does not take, in the sentence `index.ts`'s `stray` uses. */
+  const stray = (args: Body, takes: readonly string[]): Refusal | null => {
+    const key = Object.keys(args).find((k) => !takes.includes(k));
+    return key === undefined ? null : { code: 'FIELD_UNKNOWN', fix: `${key} is not something this call takes. It takes ${takes.join(', ')}.`, at: key, allowed: [...takes] };
+  };
+
+  /** Whether the caller may open a page `kernel.pages()` lists: the rule of `seesPage` in `index.ts`. */
+  const opens = (ctx: CallContext, p: { registers: string[]; about: { register: string } | null }): boolean =>
+    (p.registers.length === 0 || p.registers.some((id) => readable(ctx, id) === null)) && (p.about === null || readable(ctx, p.about.register) === null);
+
+  /** Who an actor is, as a person reads it: a person by name, a run by its agent, and never an id. */
+  const whoOf = (actor: string): string => {
+    if (actor === 'slash') return 'Slash';
+    if (actor === 'system' || actor === 'rule:ladder' || actor === 'rule:additive' || actor === 'rule:update') return 'BrainDog';
+    if (actor.startsWith('rule:') || actor.startsWith('script:')) return 'A rule';
+    if (actor.startsWith('ingest:')) return 'An import';
+    const spaced = (kind: string): string => kind.replace(/[-_]+/gu, ' ').replace(/^./u, (c) => c.toUpperCase());
+    if (actor.startsWith('agent:')) return actor === 'agent:other' ? 'An agent' : spaced(actor.slice('agent:'.length));
+    if (RUN.test(actor)) {
+      const agent = sql.one<{ a: unknown }>("SELECT json_extract(fields, '$.agent') AS a FROM entry WHERE register = 'session' AND seq = ?", Number(actor.slice(1)))?.a;
+      return typeof agent === 'string' && agent !== '' && agent !== 'other' ? spaced(agent) : 'An agent';
+    }
+    return sql.one<{ name: string | null }>('SELECT name FROM person WHERE id = ?', actor)?.name?.trim() || 'Someone';
+  };
+
+  return {
+    /**
+     * `{ page }`, a page by its address (`plans`, or `page.plans`). Answers `{ page, title, versions }`, the versions
+     * newest first and at most `PAGE_VERSIONS_SHOWN` of them.
+     */
+    async pageVersions(args: { page?: unknown } | undefined, ctx: CallContext): Promise<Result<PageVersions>> {
+      const stop = guard(ctx, 'read');
+      if (stop) return { ok: false, refusal: stop };
+      const extra = stray((args ?? {}) as Body, ['page']);
+      if (extra) return { ok: false, refusal: extra };
+      const asked = args?.page;
+      if (typeof asked !== 'string' || asked === '') return no('REQUIRED_MISSING', 'A page is asked for by its address, such as studies.', { at: 'page' });
+      const slug = asked.startsWith('page.') ? asked.slice('page.'.length) : asked;
+      const pages = kernel.pages().filter((p) => opens(ctx, p));
+      const seen = pages.find((p) => p.slug === slug);
+      /* ITS DECLARATION BY ITS OWN NAME, AND ELSE BY THE ADDRESS THAT NAME MAKES: a page named `my_plans` is opened at
+         `my-plans`, which is what the app holds. A page made for a row reads its template's. */
+      const live = seen === undefined ? [] : kernel.declarations().filter((d) => d.kind === 'page');
+      const named = `page.${seen?.template ?? slug}`;
+      const id = (live.find((d) => d.id === named) ?? live.find((d) => slugify(d.id.slice('page.'.length)) === slug))?.id;
+      if (seen === undefined || id === undefined) {
+        const there = pages.map((p) => p.slug);
+        return no('PAGE_UNKNOWN', `There is no page called ${slug} that you can read. The pages are: ${there.length === 0 ? 'none' : there.slice(0, 20).join(', ')}.`, { at: 'page' });
+      }
+      const rows = sql.all<{ version: number; body: string; pack_id: string | null; created_at: string; superseded_at: string | null; retired: number }>(
+        "SELECT version, body, pack_id, created_at, superseded_at, retired FROM declaration WHERE id = ? AND kind = 'page' ORDER BY version DESC LIMIT ?",
+        id,
+        PAGE_VERSIONS_SHOWN,
+      );
+      const versions: PageVersion[] = rows.map((r) => {
+        const by = sql.one<{ actor: string }>(
+          "SELECT actor FROM event WHERE kind = 'declare' AND target = ? AND to_v = ? ORDER BY rowid DESC LIMIT 1",
+          `declaration:${id}`,
+          String(r.version),
+        );
+        return {
+          version: r.version,
+          at: r.created_at,
+          live: r.superseded_at === null && r.retired === 0,
+          by: by ? whoOf(by.actor) : r.pack_id === null ? null : 'An add-on',
+          body: JSON.parse(r.body) as Body,
+        };
+      });
+      return ok({ page: seen.slug, title: seen.title, versions });
+    },
+  };
+}

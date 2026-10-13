@@ -1174,6 +1174,20 @@
     font-weight: 500;
   }
 
+  /* A ROW NAMED IN A SENTENCE IS A SHORT LINK (`{{ref:tasks#3}}` drew 16x19 on a project page), and under a thumb its
+     target is the skin's 44 by 44, grown by a `::before` as `.tap` grows one (`a11y.css`). A mouse sees no change. */
+  @media (pointer: coarse) {
+    a:has(> .typed) {
+      position: relative;
+    }
+
+    a:has(> .typed)::before {
+      content: '';
+      position: absolute;
+      inset: min(0px, calc((100% - var(--tap)) / 2));
+    }
+  }
+
   /* A GLYPH NAMED AMONG WORDS (`{{icon:rocket}}`) is 1em, so it follows the type it sits in, in the words' colour.
      Only the drawn glyph takes room; the named, empty span a host with no art gets is nothing on the line. */
   svg.glyph-inline {

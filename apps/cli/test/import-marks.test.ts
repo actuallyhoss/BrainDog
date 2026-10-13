@@ -125,3 +125,52 @@ test('A LIST THAT NAMES NO PICTURE FIELD keeps a field called mark as it came', 
   assert.equal(report.pictures ?? 0, 0);
   assert.equal((await marks(kernel))['Kiln Works'], 'koala');
 });
+
+/**
+ * A PROJECT ALREADY HERE THAT WEARS A WORD NOTHING DRAWS IS REPAIRED BY THE NEXT IMPORT (REC-C17).
+ *
+ * The eleven projects were written before the import asked the question, so each holds the old tool's word, and
+ * leaving the word out of the patch left it on the project. The import now clears it, and says how many it cleared.
+ * The record is filled the old way first: every word answered as a picture, so it is carried as it stood.
+ */
+const asItCame = (): boolean => true;
+const THREE = [project('1', 'Kiln Works', 'koala'), project('2', 'Harbour Type', 'Rocket'), project('4', 'Lantern', 'star')];
+
+test('A WORD NOTHING DRAWS THAT IS ALREADY ON A PROJECT IS CLEARED, once, and the report says how many', async (t) => {
+  const kernel = await record(t);
+  const door = doorOf(kernel);
+  await applyPlan(planOf(THREE), door, { dryRun: false, isMark: asItCame });
+  assert.deepEqual(await marks(kernel), { 'Kiln Works': 'koala', 'Harbour Type': 'Rocket', Lantern: 'star' }, 'the record was not filled the old way');
+
+  const dry = await applyPlan(planOf(THREE), door, { dryRun: true, isMark: isMarkGlyph });
+  assert.equal(dry.repaired, 2);
+  assert.ok(said(dry, { dryRun: true, file: 'export.json' }).includes('2 pictures already here were not known, so each of those would be cleared and take one the way a new one does.'));
+  assert.equal((await marks(kernel))['Kiln Works'], 'koala', 'a dry run wrote');
+
+  const report = await applyPlan(planOf(THREE), door, { dryRun: false, isMark: isMarkGlyph });
+  assert.deepEqual(report.refused, [], 'a repair was refused');
+  assert.deepEqual(report.tally.things, { added: 0, updated: 2, unchanged: 1 });
+  const got = await marks(kernel);
+  assert.equal(got.Lantern, 'star', 'a picture the set draws was touched');
+  for (const name of ['Kiln Works', 'Harbour Type']) assert.ok(!isUnknownMark(got[name]), `${name} still wears ${String(got[name])}`);
+  assert.equal(report.repaired, 2);
+  const lines = said(report, { dryRun: false, file: 'export.json' });
+  assert.ok(lines.includes('2 pictures already here were not known, so each of those was cleared and takes one the way a new one does.'), lines.join(' | '));
+  assert.ok(!lines.some((l) => /koala|Rocket|things#/u.test(l)), `the report names a word or an id: ${lines.join(' | ')}`);
+
+  /* Repaired is repaired: the night after has nothing to clear and says nothing about clearing. */
+  const again = await applyPlan(planOf(THREE), door, { dryRun: false, isMark: isMarkGlyph });
+  assert.deepEqual(again.tally.things, { added: 0, updated: 0, unchanged: 3 });
+  assert.equal(again.repaired ?? 0, 0);
+  assert.ok(!said(again, { dryRun: false, file: 'export.json' }).some((l) => l.includes('cleared')));
+});
+
+test('ONE CLEARED IS SAID AS ONE, and a picture the export now names is set and not counted as cleared', async (t) => {
+  const kernel = await record(t);
+  const door = doorOf(kernel);
+  await applyPlan(planOf([project('1', 'Kiln Works', 'koala'), project('2', 'Harbour Type', 'Rocket')]), door, { dryRun: false, isMark: asItCame });
+  const report = await applyPlan(planOf([project('1', 'Kiln Works', 'koala'), project('2', 'Harbour Type', 'star')]), door, { dryRun: false, isMark: isMarkGlyph });
+  assert.equal(report.repaired, 1);
+  assert.equal((await marks(kernel))['Harbour Type'], 'star');
+  assert.ok(said(report, { dryRun: false, file: 'export.json' }).includes('One picture already here was not known, so it was cleared and takes one the way a new one does.'));
+});

@@ -37,8 +37,7 @@ import { parseArgs } from 'node:util';
 
 import { satisfies } from '@braindog/declare';
 import type { KnownKeys } from '@braindog/declare/catalogue';
-import { coerce, isPublicMail, looksLikeCredential, type FieldDecl } from '@braindog/kernel';
-import * as kernel from '@braindog/kernel';
+import { coerce, isMarkGlyph, isPublicMail, looksLikeCredential, type FieldDecl } from '@braindog/kernel';
 import { no, ok, refused, type Result } from '@braindog/ports';
 
 import { budgetOf, hostsPath, target, type Target } from './http.ts';
@@ -292,6 +291,11 @@ export type Report = {
    */
   pictures?: number;
   /**
+   * How many of those were on something already here that still wore a word the set does not draw, and had it cleared:
+   * see `unpictured` in `applyPlan`. A count and no names, as `pictures`. Absent when there were none.
+   */
+  repaired?: number;
+  /**
    * Each row written without a row it names, because the row named is one he deleted here (`deleted`): the task a new
    * export files under a project he threw away. Optional for the same reason.
    */
@@ -345,14 +349,9 @@ const TEXTS = new Set(['text', 'document']);
  * WHETHER A WORD NAMES A PICTURE THE SET DRAWS, as the kernel answers it (`isMarkGlyph` in `packages/kernel/src/marks.ts`):
  * its list and no copy of it here, so a glyph drawn tomorrow is a picture this import carries tomorrow.
  *
- * READ OFF THE KERNEL'S ENTRY BY NAME AND NOT IMPORTED BY NAME, because the entry does not hand it out yet and a named
- * import of something missing stops the whole command line from loading. `null` until it does, and then the import
- * leaves every picture as it came, which is what it did before. Once the entry exports it this is a named import.
+ * `null` is kept in the type for a build whose kernel has not got it, and then every picture is left as it came.
  */
-const KNOWN_MARK: ((name: unknown) => boolean) | null = (() => {
-  const is = (kernel as Record<string, unknown>)['isMarkGlyph'];
-  return typeof is === 'function' ? (is as (name: unknown) => boolean) : null;
-})();
+const KNOWN_MARK: ((name: unknown) => boolean) | null = isMarkGlyph;
 const unreachable = (r: Result<unknown>) => refused(r) && r.refusal.code === 'UNREACHABLE';
 
 /**
@@ -866,8 +865,15 @@ export async function applyPlan(
    *
    * AN EMPTY WORD IS NOTHING CHOSEN and is sent as it came. ONLY AGAINST A SCHEMA ANSWER THAT NAMES THE FIELD: a list
    * with no `identity` keeps a field called mark as any other text.
+   *
+   * AND ONE ALREADY HERE THAT WEARS A WORD THE SET DOES NOT DRAW HAS IT CLEARED. Leaving the word out of the patch left
+   * it on the eleven projects an earlier import wrote, so a second import repaired nothing. `unpictured` holds the
+   * picture field of each row whose word was left out, and the update below clears that field where the row still
+   * holds such a word (`markFrozen` takes the write: a word that draws nothing was never a choice). A picture the set
+   * draws is never touched, whoever chose it. `Report.repaired` counts the ones cleared.
    */
   const isMark = o.isMark ?? KNOWN_MARK;
+  const unpictured = new Map<string, string>();
   let pictures = 0;
   if (isMark !== null && marks.size > 0) {
     plan = {
@@ -877,6 +883,7 @@ export async function applyPlan(
         const word = field === undefined ? undefined : row.fields[field];
         if (field === undefined || typeof word !== 'string' || word.trim() === '' || isMark(word)) return row;
         pictures++;
+        unpictured.set(row.key, field);
         return { ...row, fields: Object.fromEntries(Object.entries(row.fields).filter(([f]) => f !== field)) };
       }),
     };
@@ -1449,6 +1456,11 @@ export async function applyPlan(
      * until the old tool moves the day it was set against.
      */
     if (Object.hasOwn(patch, 'by') || Object.hasOwn(patch, 'due')) for (const field of mine) if (Object.hasOwn(fields, field) && differs(field)) patch[field] = fields[field];
+    /* THE WORD AN EARLIER IMPORT LEFT ON IT, CLEARED: see `unpictured` above. Only a word that draws nothing. */
+    const picture = unpictured.get(row.key);
+    const wears = picture === undefined ? undefined : found.fields[picture];
+    const clears = picture !== undefined && isMark !== null && typeof wears === 'string' && wears.trim() !== '' && !isMark(wears);
+    if (clears) patch[picture] = null;
     if (Object.keys(patch).length === 0) {
       tally.unchanged++;
       report.outcomes[row.key] = 'unchanged';
@@ -1464,6 +1476,7 @@ export async function applyPlan(
         return;
       }
       tally.updated++;
+      if (clears) report.repaired = (report.repaired ?? 0) + 1;
       return;
     }
     const done = await door.update({ register: row.register, seq: found.seq as number, patch, version: found.version, note: `Imported again from ${words.source}.` });
@@ -1478,6 +1491,7 @@ export async function applyPlan(
     }
     existing.set(row.key, done.value as Row);
     tally.updated++;
+    if (clears) report.repaired = (report.repaired ?? 0) + 1;
   };
 
   /**
@@ -1924,6 +1938,13 @@ export function said(report: Report, o: { dryRun: boolean; file: string }): stri
       report.pictures === 1
         ? `One picture was not known, so it ${o.dryRun ? 'would be left out and take' : 'was left out and takes'} one the way a new one does.`
         : `${String(report.pictures)} pictures were not known, so each of those ${o.dryRun ? 'would be left out and take' : 'was left out and takes'} one the way a new one does.`,
+    );
+  /* AND THE ONES ALREADY HERE THAT WERE CLEARED, counted among those above: see `unpictured` in `applyPlan`. */
+  if ((report.repaired ?? 0) > 0)
+    lines.push(
+      report.repaired === 1
+        ? `One picture already here was not known, so it ${o.dryRun ? 'would be cleared and take' : 'was cleared and takes'} one the way a new one does.`
+        : `${String(report.repaired)} pictures already here were not known, so each of those ${o.dryRun ? 'would be cleared and take' : 'was cleared and takes'} one the way a new one does.`,
     );
   if (report.refused.length > 0) {
     /* A DRY RUN SENT NOTHING, so the record refused nothing yet: these are the rows the kernel's coercion says it will. */

@@ -145,6 +145,22 @@
 {/if}
 
 <style>
+  /* A HOLE THAT IS A BUTTON IS A 44px TARGET UNDER A THUMB, though it is a word in a sentence: "unknown" on a project
+     page measured 74x23. It is a button only where this file is mounted, which is why the rule is here and the skin's
+     `.hole` is left as a span's. `.tap`'s trick on both axes (`a11y.css`): an invisible box grown round the word, so
+     the sentence does not move and a mouse sees no change. */
+  @media (pointer: coarse) {
+    :global(button.hole) {
+      position: relative;
+    }
+
+    :global(button.hole)::before {
+      content: '';
+      position: absolute;
+      inset: min(0px, calc((100% - var(--tap)) / 2));
+    }
+  }
+
   .hole-form {
     display: grid;
     gap: var(--sp-3);

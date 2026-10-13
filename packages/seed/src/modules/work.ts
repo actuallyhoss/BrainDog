@@ -172,9 +172,33 @@ export const WORK_REGISTERS: Record<string, WorkRegister> = {
     pack: 'work',
     fields: [
       { id: 'name', type: 'text', required: true, search: true },
-      { id: 'state', label: 'Status', type: 'enum', values: ['open', 'holding', 'done', 'dropped'], index: true, required: true },
+      /* SIX STATES AND THE MOVES BETWEEN THEM, SINCE work 1.19.0. There were four and no declared moves, so a thread
+         was open the day it was thought of and an idea could be marked done in one step. An idea and a plan come
+         before the work, and the four stored values stay as they were. Every move not written here is refused with
+         the moves allowed (`TRANSITION_ILLEGAL`): nothing reaches done but work that was open, a thread held up goes
+         back to the plan or on, and what was finished or dropped comes back by being opened again. */
+      {
+        id: 'state',
+        label: 'Status',
+        type: 'enum',
+        values: ['idea', 'planned', 'open', 'holding', 'done', 'dropped'],
+        labels: { idea: 'Idea', planned: 'Planned', open: 'Open', holding: 'Holding', done: 'Done', dropped: 'Dropped' },
+        transitions: {
+          idea: { to: ['planned', 'open', 'dropped'] },
+          planned: { to: ['idea', 'open', 'holding', 'dropped'] },
+          open: { to: ['holding', 'done', 'dropped'] },
+          holding: { to: ['planned', 'open', 'dropped'] },
+          done: { to: ['open'] },
+          dropped: { to: ['idea', 'open'] },
+        },
+        index: true,
+        required: true,
+      },
       { id: 'thing', label: 'Project', type: 'ref', to: 'things', index: true },
       { id: 'opened', type: 'day', index: true },
+      /* THE DAY IT AIMS FOR, SINCE work 1.19.0, the one day a thread is ABOUT: a deadline, so a thread is in every
+         "Due this week" beside the tasks and the bills, and the record reminds on the day. Usually unset. */
+      { id: 'target', label: 'Aiming for', type: 'day', index: true, deadline: true, remind: ['0d'] },
       { id: 'note', type: 'document' },
     ],
   },
@@ -604,24 +628,28 @@ const CLOSE_FOLLOW_UPS = `export default async function run(ctx) {
 }`;
 
 /**
- * The script that starts a new follow-up where its parent is: a task created `Part of` another and on no project takes
- * the parent's project, and its thread when it names none.
+ * The script that starts a new follow-up where its parent is: a task created `Part of` another takes, one by one, each
+ * of the parent's project, thread, owner and agent that it left empty.
+ *
+ * EACH OF THE FOUR ON ITS OWN, SINCE work 1.19.0. Until then it copied the project and the thread and never who holds
+ * the work, so an agent that split its own task was on none of the steps, and it stopped altogether when the follow-up
+ * named a project, so that one took no thread either. What the follow-up says for itself is never written over.
  *
  * ONE LEVEL, AS `parent` HOLDS ONE. The copy is made once, at the create, and never again: moving the parent to another
  * project later does not move its steps, because by then somebody may have placed a step somewhere on purpose.
  *
- * `thing` MAY NOT BE A FIELD AT ALL. Work installs without Projects and leaves the field out (`LINKS` in
- * `packs/first-party.ts`), so the script copies only what the parent holds and the list declares; on such a record a
- * follow-up still takes its parent's thread.
+ * `thing` AND `owner` MAY NOT BE FIELDS AT ALL. Work installs without Projects and without People and leaves each
+ * field out (`LINKS` in `packs/first-party.ts`), so the script copies only what the parent holds and the list
+ * declares; on such a record a follow-up still takes its parent's thread and agent.
  */
 const START_WITH_PARENT = `export default async function run(ctx) {
   const task = await ctx.record.get(ctx.input.id);
-  if (!task || !task.fields.parent || task.fields.thing) return;
+  if (!task || !task.fields.parent) return;
   const parent = await ctx.record.get(task.fields.parent);
   if (!parent) return;
   const patch = {};
-  if (parent.fields.thing) patch.thing = parent.fields.thing;
-  if (!task.fields.track && parent.fields.track) patch.track = parent.fields.track;
+  for (const field of ['thing', 'track', 'owner', 'agent'])
+    if (!task.fields[field] && parent.fields[field]) patch[field] = parent.fields[field];
   if (Object.keys(patch).length > 0) ctx.update('tasks#' + task.seq, patch, task.version);
 }`;
 
@@ -670,7 +698,7 @@ export const WORK_AUTOMATIONS: Record<string, unknown>[] = [
     steps: [{ script: { id: 'start_with_parent', as: 'placing' } }],
   },
   workScript('close_follow_ups', 'Close the follow-ups of a finished task', CLOSE_FOLLOW_UPS),
-  workScript('start_with_parent', 'Start a follow-up in the project of its parent', START_WITH_PARENT),
+  workScript('start_with_parent', 'Start a follow-up where its parent is', START_WITH_PARENT),
 ];
 
 /* ── the pages ────────────────────────────────────────────────────────────── */

@@ -22,6 +22,7 @@
  * window, the columns and the order cannot drift; and because it is read from Money, an edit there moves this use
  * case's fingerprint, which `usecase-versions.test.ts` then asks a version for.
  */
+import { SERVICE_NUMBERS, SERVICE_NUMBERS_BACK, SERVICE_NUMBERS_SHOWN, SERVICE_NUMBERS_WHERE } from '../modules/estate.ts';
 import { DUE_THIS_WEEK } from '../modules/money.ts';
 import { DUE_WINDOW, LATE_MONEY, LATE_WINDOW } from '../modules/money/pages/shared.ts';
 import { projectTemplate } from '../modules/portfolio.ts';
@@ -335,7 +336,14 @@ export const FOUNDER = {
      where both said Overview under a rail item that said Today. Due this week starts today (`DUE_WINDOW`), and what is
      already late has its own table ahead of it, Late, oldest first, with its own count (`late-money`): a bill four days
      late was listed as due this week. Lapsing loses its Cost column, which was a dash on every line. A figure and a
-     block added, a window narrowed, a column and two words changed, so a minor step. 2.5.0 is live. */
+     block added, a window narrowed, a column and two words changed, so a minor step. 2.5.0 is live.
+
+     FOLDED INTO THE UNRELEASED 2.6.0, A SERVICE'S NUMBERS (REC-C12, batch 61; a builder wrote it as 2.7.0, and 2.6.0
+     was never deployed, so it is one version). Numbers gains `about_service`, a link to Services and never required, after its
+     organisation: a reading about a server had no project and nothing tying it to the service it was about. Those
+     readings are counted (`service-numbers`) and drawn on Estate's Renewals in a block this pack lays there, "Server
+     and provider numbers", six measures at most over ninety days, only while there is one. A field, a figure and a block
+     laid on another pack's page added, nothing taken away, so still the one minor step from 2.5.0. */
   version: '2.6.0',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
@@ -396,6 +404,11 @@ export const FOUNDER = {
           { id: 'unit', label: 'Unit', type: 'text' },
           { id: 'thing', label: 'Project', type: 'ref', to: 'things', index: true },
           { id: 'organisation', label: 'Organisation', type: 'ref', to: 'organisations', index: true },
+          /* THE SERVICE A READING IS ABOUT, SINCE 2.6.0 (REC-C12): how full a server's disk is has no project, and with
+             no field for the service it sat in Numbers tied to nothing. Never required: a project's number says none.
+             `about_service`, NOT `service`: a field id one add-on alone declares is a name the core may not spell
+             (`tools/gates/core-names.mjs`), and that word is in two dozen places of it already. */
+          { id: 'about_service', label: 'Service', type: 'ref', to: 'services', index: true },
           { id: 'at', label: 'When', type: 'instant', index: true },
           {
             id: 'source',
@@ -435,6 +448,9 @@ export const FOUNDER = {
       /* THE NUMBERS ONE PROJECT SENT THIS WEEK, SINCE 2.5.0 (REC-C16 part b), the example left out: the third thing a
          project page's Where it stands says while nobody has said, beside what changed and when it was last worked. */
       counted('project-numbers-7d', 'Numbers this week', 'register.datapoints', 'thing is {{it}}, at after -7d, source is not example'),
+      /* THE NUMBERS ABOUT A SERVICE, SINCE 2.6.0 (REC-C12), over the clauses and the ninety days of the block Renewals
+         draws them in (`SERVICE_NUMBERS` in `modules/estate.ts`), so that block is drawn only while it has one. */
+      counted(SERVICE_NUMBERS_SHOWN, 'Server and provider numbers', 'register.datapoints', `${SERVICE_NUMBERS_WHERE}, at after -${SERVICE_NUMBERS_BACK}d`),
       SILENT,
       {
         /* HOME, AS THIS USE CASE ANSWERS IT: the money across every organisation and
@@ -677,6 +693,9 @@ export const FOUNDER = {
           body: '{{projects-earning-silent.names}}: marked Earning, but no money in and no number sent in 90 days',
         },
       },
+      /* A SERVICE'S NUMBERS, ON RENEWALS, SINCE 2.6.0 (REC-C12): Estate's page, and this pack's list, so the block is
+         laid from here and said beside the page (`SERVICE_NUMBERS`). After the others, so they keep their places. */
+      SERVICE_NUMBERS,
     ],
   },
 };

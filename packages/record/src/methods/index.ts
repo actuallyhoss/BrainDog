@@ -42,7 +42,9 @@ import { methods as faults } from './faults.ts';
 import { methods as withdraw } from './withdraw.ts';
 import { methods as door } from './door.ts';
 import { methods as engine } from './engine.ts';
+import { methods as engineReadings } from './engine-readings.ts';
 import { methods as pagesCensus } from './pages-census.ts';
+import { methods as pageVersions } from './page-versions.ts';
 import { methods as capture } from './capture.ts';
 import { methods as shape } from './shape.ts';
 import { methods as countBy } from './count-by.ts';
@@ -109,6 +111,8 @@ export type RecordDeps = {
   host?: 'cloud' | 'self-host';
   /** Whether Slash's model answers (host `engine-health.ts`). Absent, `engineHealth` answers `null`. */
   engineHealth?: (() => Promise<import('./engine.ts').EngineHealthRead>) | undefined;
+  /** Slash's ledger, the mentions and the open questions since an instant (host). Absent, `engineReadings` answers `null`. */
+  engineLedger?: import('./engine-readings.ts').EngineLedgerRead | undefined;
   /** The host's own build and MIN_CLI (AGT-A02), which doorHealth answers and reads behind against. Absent, both are null. */
   doorBuild?: import('./door.ts').DoorBuild | (() => import('./door.ts').DoorBuild);
   /** The operator's cut-off (`TOKENS_VALID_FROM`, `53 §5.11`), so doorHealth counts no key or runner it ended. */
@@ -140,7 +144,9 @@ export function methods(deps: RecordDeps) {
     ...withdraw(deps),
     ...door(deps),
     ...engine(deps),
+    ...engineReadings(deps),
     ...pagesCensus(deps),
+    ...pageVersions(deps),
     ...capture(deps),
     ...shape(deps),
     ...countBy(deps),

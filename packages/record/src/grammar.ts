@@ -115,6 +115,7 @@ const PAGE = {
     },
   },
   to_change_one: 'Read arrangement with page for its declaration, change the body, and propose body_kind change with {"to": that declaration}.',
+  earlier_versions: 'Read pageVersions with page for what a page was before: each version newest first, with its declaration, when it was applied and by whom.',
   which_kind: 'grammar kinds says what each kind is for, its cells and its forms, and what to reach for; grammar kind/<name> says one kind whole',
 };
 

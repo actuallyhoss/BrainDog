@@ -96,6 +96,8 @@
       <section class="arr-part arr-calls" aria-label={copy.arrangeCalls}>
         <h3 class="arr-h arr-calls-h"><Icon name="globe" size="s" />{copy.arrangeCalls}</h3>
         <ul class="arr-lines">
+          <!-- WHAT LEAVES, a sentence a call: the key by its label, the host and how often. -->
+          {#each p.sends ?? [] as line, i (i)}<li class="arr-sends">{line}</li>{/each}
           {#each p.calls as call, i (i)}
             <li class="arr-call">
               {#if call.host}<span class="arr-host">{call.host}</span>{/if}
@@ -404,6 +406,11 @@
   }
 
   .arr-stop {
+    color: var(--ink);
+  }
+
+  /* WHAT LEAVES IS READ FIRST: a whole sentence in ink, above the calls it does not say. */
+  .arr-sends {
     color: var(--ink);
   }
 

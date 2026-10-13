@@ -383,11 +383,11 @@ function metricBody(decl: Declaration, installed?: Known): Refusal | null {
      register name is the commonest mistake and the evaluator reads it as none of them. */
   if (
     typeof body.source !== 'string' ||
-    (body.source !== WALK_SOURCE && body.source !== 'record.door' && !/^(?:register|series)\.[a-z][a-z0-9_-]*$/u.test(body.source))
+    (body.source !== WALK_SOURCE && body.source !== 'record.door' && !/^(?:register|series|events)\.[a-z][a-z0-9_-]*$/u.test(body.source))
   )
     return bad(
       'DECLARATION_INVALID',
-      `${id} reads ${JSON.stringify(body.source ?? null)}; a metric's source is register.<id>, series.<id>, ${WALK_SOURCE} or record.door.`,
+      `${id} reads ${JSON.stringify(body.source ?? null)}; a metric's source is register.<id>, series.<id>, events.<id>, ${WALK_SOURCE} or record.door.`,
       'source',
     );
 

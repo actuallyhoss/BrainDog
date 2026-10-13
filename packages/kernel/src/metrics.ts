@@ -25,7 +25,7 @@
 
 import type { Refusal, Result, Sql } from '@braindog/ports';
 import { fixOf, no, ok } from '@braindog/ports';
-import { KERNEL_FIELDS, compile, jsonPath, lookupRef, parseWhere, resolveDay, type Predicate, type Schema, type SentenceDeps } from '@braindog/where';
+import { KERNEL_FIELDS, compile, evaluate, jsonPath, lookupRef, parseWhere, resolveDay, type Predicate, type Schema, type SentenceDeps } from '@braindog/where';
 
 import { GROUP_CAP, bucketOf, bucketRun, bucketStart, isBucket, nextBucket, type Bucket } from './buckets.ts';
 import {
@@ -54,6 +54,7 @@ import {
   readSign,
   readVitals,
 } from './built-in-figures.ts';
+import { SESSION, SESSION_PREFIX } from './session.ts';
 import { RECORD_KEY_SCAN, readKeysInText } from './key-scan.ts';
 import { isCurrencyCode } from './coerce.ts';
 import type { Leg } from './forecast.ts';
@@ -98,6 +99,8 @@ export type MetricDecl = {
    * `register.<id>`, or `forecast.runway` for a figure over the cash walk ahead (`money-figures.ts`). A `series.<id>`
    * source reads `metric_point`, the line a figure's nights kept, and this build reads one thing of it: with
    * `value: { count: 'missing' }`, how many days of the window hold no point (`readSeriesGaps`).
+   * An `events.<list>` source reads the history for who made each entry of a list: with `value: { count: 'made' }`, how
+   * many were made in the window, in parts by who made them (`readMade`).
    */
   source: string;
   /**
@@ -1230,6 +1233,25 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
     return readSeriesGaps(sql, decl, ctx, shift!);
   }
 
+  /* A FIGURE OVER WHO MADE A LIST'S ENTRIES (REC-B20): `events.<list>` reads the history for who made each entry of one
+     list, and the one thing this build asks of it is how many were made in the window (`readMade`). Its `where` narrows by
+     who and by nothing else, because the entries' own fields are `register.<list>`'s to ask about. */
+  if (decl.source.startsWith('events.')) {
+    const list = decl.source.slice('events.'.length);
+    const value = decl.value as { count?: unknown };
+    if (keysOf(decl.value).join() !== 'count' || value.count !== 'made')
+      at('SOURCE_UNKNOWN', `${decl.source} is read only as { count: made }, how many of the list's entries were made in its window`, 'source');
+    if (list === '') at('SOURCE_UNKNOWN', 'events. names no list: write events.<list>', 'source');
+    else if (!ctx.schemaOf(list) || (ctx.reads !== undefined && !ctx.reads(list))) at('REGISTER_UNKNOWN', `there is no list called ${list}`, 'source');
+    if (decl.bucket !== undefined) at('DECLARATION_INVALID', `${decl.source} is one count over its window, with no line through time: leave bucket out`, 'bucket');
+    else if (decl.group_by !== undefined && decl.group_by !== 'by')
+      at('DECLARATION_INVALID', `${decl.source} is read in parts by who made each entry, and by nothing else: leave group_by out, or write by`, 'group_by');
+    const who = madeBy(decl.where, list, clockOf(ctx));
+    for (const r of who.bad) at(r.code, r.fix, 'where');
+    if (refusals.length) return { ok: false, refusal: refusals[0]! };
+    return readMade(sql, decl, ctx, shift!, list, who.predicate);
+  }
+
   /* CASH ROLLED FORWARD AND THE WALK AHEAD ARE READ IN THEIR OWN FILE (`money-figures.ts`), after the two keys every
      figure needs and before anything that assumes one aggregation over one list. */
   if (isRolled(decl.value) || isWalked(decl)) {
@@ -1248,7 +1270,7 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
   if (!register)
     at(
       'SOURCE_UNKNOWN',
-      `${decl.source} is not a source this build reads. It reads register.<list>, series.<figure>, or one of ${Object.keys(sourceReaders()).join(', ')}`,
+      `${decl.source} is not a source this build reads. It reads register.<list>, series.<figure>, events.<list>, or one of ${Object.keys(sourceReaders()).join(', ')}`,
       'source',
     );
   const schema = register ? ctx.schemaOf(register) : null;
@@ -2761,6 +2783,150 @@ function readSeriesGaps(sql: Sql, decl: MetricDecl, ctx: EvalContext, shift: num
   if (gaps <= 0 || noRate.length === 0) return said(gaps, days, why);
   const out = said(gaps, days, `${why}, ${noRate.length === gaps ? (gaps === 1 ? 'for' : 'each for') : `${noRate.length} of them for`} want of a rate`);
   return out.ok ? ok({ ...out.value, noRateDays: noRate }) : out;
+}
+
+/**
+ * WHO CAN MAKE AN ENTRY, as `events.<list>` sorts them and as its `where` names them (`by is not person`): a person, an
+ * agent's run, a door's pattern, a rule somebody declared, a script, and the record itself, which is its own mechanisms
+ * (`system`, and the kernel's own rules) and anything the history signs that is none of the others.
+ */
+export const MAKERS = ['person', 'agent', 'door', 'rule', 'script', 'record'] as const;
+export type Maker = (typeof MAKERS)[number];
+
+/** The kernel's own rules, which are the record acting and nobody's declared rule (`undo.ts` `whoOf` says the same three). */
+const OWN_RULES: ReadonlySet<string> = new Set(['rule:ladder', 'rule:additive', 'rule:update']);
+
+/** An id written with hyphens or underscores, as words: `tidy-ledger` is "Tidy ledger". */
+const idWords = (id: string): string => wordsOf(id.replace(/-/gu, '_'));
+
+/** What `by` may be asked about over `events.<list>`: one enum, the six makers. */
+const madeSchema = (list: string): Schema => ({ register: list, fields: { by: { type: 'enum', values: MAKERS } } });
+
+/**
+ * The `where` of a figure over `events.<list>`, as a predicate over `by`, with what is wrong with it.
+ *
+ * `by` AND NOTHING ELSE. The grammar grants every schema the record's own columns (`created_at`, `state`), and a clause
+ * on one would be compiled, never applied, and the figure would read as if it had been: so any other field is refused
+ * by name. The entries' own fields are a question for a figure over `register.<list>`.
+ */
+function madeBy(where: Predicate | string | undefined, list: string, nowMs: number): { predicate: Predicate | undefined; bad: Refusal[] } {
+  if (where === undefined) return { predicate: undefined, bad: [] };
+  const schema = madeSchema(list);
+  const parsed = typeof where === 'string' ? parseWhere(where, schema, { nowMs }) : { predicate: where, bad: [] as Refusal[] };
+  if (parsed.bad.length) return parsed;
+  const other = new Set<string>();
+  const walk = (node: unknown): void => {
+    if (node === null || typeof node !== 'object') return;
+    const n = node as Record<string, unknown>;
+    for (const q of ['all', 'any', 'none'] as const) if (Array.isArray(n[q])) return void (n[q] as unknown[]).forEach(walk);
+    if (typeof n.field !== 'string' || n.field !== 'by' || n.via !== undefined) other.add(typeof n.field === 'string' ? n.field : 'pointed');
+  };
+  walk(parsed.predicate);
+  if (other.size)
+    return {
+      predicate: undefined,
+      bad: [...other].map((field) => ({ code: 'FIELD_UNKNOWN', fix: `${field} is not asked of events.${list}, which narrows by who made an entry: by is ${MAKERS.join(', ')}`, at: 'where' })),
+    };
+  return { predicate: parsed.predicate, bad: compile(parsed.predicate, schema).bad };
+}
+
+/** Who one signature in the history is: the kind, the key its part is kept under, and what a person calls it. */
+type Made = { by: Maker; key: string; label: string };
+
+/**
+ * Who an actor in the history is, for a part of `events.<list>`.
+ *
+ * A NAME, NEVER A HANDLE, IN THE LABEL: a person by name, a run by its agent, a pattern by the add-on that brought it
+ * (so an add-on of twelve patterns is one part, "HSBC Egypt", and not twelve), a rule by the name it was declared with.
+ * The key keeps the handle, because a link and a filter are made from it. Every run of one agent is one part.
+ */
+function makerOf(sql: Sql, actor: string): Made {
+  const named = (id: string): { pack: string | null; name: string | null } => {
+    const row = sql.one<{ pack_id: string | null; name: unknown }>(
+      "SELECT pack_id, json_extract(body, '$.name') AS name FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0",
+      id,
+    );
+    return { pack: row?.pack_id ?? null, name: typeof row?.name === 'string' && row.name.trim() !== '' ? row.name.trim() : null };
+  };
+  if (actor.startsWith('p_')) {
+    const name = sql.one<{ name: string | null }>('SELECT name FROM person WHERE id = ?', actor)?.name?.trim();
+    return { by: 'person', key: `person:${actor}`, label: name || 'Someone' };
+  }
+  if (new RegExp(`^${SESSION_PREFIX}\\d+$`, 'u').test(actor) || actor.startsWith('agent:')) {
+    const agent = actor.startsWith('agent:')
+      ? actor.slice('agent:'.length)
+      : sql.one<{ a: unknown }>("SELECT json_extract(fields, '$.agent') AS a FROM entry WHERE register = ? AND seq = ?", SESSION, Number(actor.slice(SESSION_PREFIX.length)))?.a;
+    return typeof agent === 'string' && agent !== '' && agent !== 'other'
+      ? { by: 'agent', key: `agent:${agent}`, label: idWords(agent) }
+      : { by: 'agent', key: 'agent', label: 'An agent' };
+  }
+  if (actor.startsWith('ingest:')) {
+    const id = actor.slice('ingest:'.length);
+    const decl = named(`ingest.${id}`);
+    const pack = decl.pack === null ? null : sql.one<{ name: unknown }>("SELECT json_extract(manifest, '$.name') AS name FROM pack WHERE id = ?", decl.pack);
+    const addOn = typeof pack?.name === 'string' && pack.name.trim() !== '' ? pack.name.trim() : null;
+    return { by: 'door', key: `door:${decl.pack ?? id}`, label: addOn ?? (decl.pack === null ? (decl.name ?? idWords(id)) : idWords(decl.pack)) };
+  }
+  if (actor.startsWith('script:')) {
+    const bare = actor.slice('script:'.length).replace(/@v\d+$/u, '');
+    return { by: 'script', key: `script:${bare}`, label: idWords(bare) };
+  }
+  if (actor.startsWith('rule:') && !OWN_RULES.has(actor)) {
+    const id = actor.slice('rule:'.length);
+    return { by: 'rule', key: actor, label: named(`rule.${id}`).name ?? idWords(id) };
+  }
+  return { by: 'record', key: 'record', label: 'BrainDog' };
+}
+
+/**
+ * A figure over `events.<list>`: how many of the list's entries were made in the window, in parts by who made them.
+ *
+ * THE WINDOW IS WHOLE DAYS ENDING TODAY, in the record's zone (`clockOf`, `dayStartsAt`): `1d` is today so far and `30d`
+ * is today and the twenty-nine days before it. So "filed today" and the list beside it name the same day.
+ *
+ * AN ENTRY COUNTS ONCE, UNDER WHOEVER MADE IT. The walk is over the list's entries, one each, and the history is asked
+ * one thing of each: who signed its first `create`. An edit, a rule that set a field after, a delete and a restore make
+ * no entry and move none to another part. An entry deleted since is not in the list and is not counted.
+ *
+ * BOUNDED TO ONE LIST AND ITS WINDOW (REC-B20's risk): the entries are chosen by list and by when they were made before
+ * the history is opened, and it is opened by its index on the target, one entry at a time.
+ *
+ * `held` IS EVERY ENTRY MADE IN THE WINDOW, whoever made it, and `value` the ones the `where` kept. An entry whose
+ * making the history does not hold is in `held` and in no part: nobody can be named for it.
+ */
+function readMade(sql: Sql, decl: MetricDecl, ctx: EvalContext, shift: number, list: string, who: Predicate | undefined): Result<Reading> {
+  const days = Math.max(1, Math.round(shift / DAY));
+  const today = new Date(clockOf(ctx)).toISOString().slice(0, 10);
+  const first = new Date(Date.parse(`${today}T12:00:00Z`) - (days - 1) * DAY).toISOString().slice(0, 10);
+  const starts = (day: string): string => (ctx.tz === undefined ? `${day}T00:00:00.000Z` : dayStartsAt(day, ctx.tz));
+  const signed = sql.all<{ actor: string | null; n: number }>(
+    `SELECT (SELECT c.actor FROM event c WHERE c.target = 'entry:' || r.id AND c.kind = 'create' AND c.field IS NULL ORDER BY c.rowid LIMIT 1) AS actor,
+            COUNT(*) AS n
+       FROM entry r WHERE r.register = ? AND r.deleted_at IS NULL AND r.created_at >= ? AND r.created_at < ? GROUP BY 1`,
+    list,
+    starts(first),
+    starts(dayAfter(today)),
+  );
+  const schema = madeSchema(list);
+  const parts = new Map<string, Group>();
+  let held = 0;
+  for (const row of signed) {
+    const n = Number(row.n);
+    held += n;
+    if (row.actor === null) continue;
+    const made = makerOf(sql, row.actor);
+    if (who !== undefined && !evaluate(who, { by: made.by }, schema)) continue;
+    const part = parts.get(made.key) ?? { key: made.key, label: made.label, value: 0, rows: 0, state: 'full' as const };
+    parts.set(made.key, { ...part, value: (part.value ?? 0) + n, rows: part.rows + n });
+  }
+  const groups = [...parts.values()].sort(largestFirst);
+  const value = groups.reduce((sum, g) => sum + g.rows, 0);
+  const t = decl.target as { lte?: unknown; gte?: unknown } | undefined;
+  const met = typeof t?.lte === 'number' ? value <= t.lte : typeof t?.gte === 'number' ? value >= t.gte : null;
+  const name = sql.one<{ name: unknown }>("SELECT json_extract(body, '$.name') AS name FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0", `register.${list}`)?.name;
+  const why = `${typeof name === 'string' && name.trim() !== '' ? name.trim() : idWords(list)} entries made ${days === 1 ? 'today' : `in the last ${days} days`}`;
+  const more = Math.max(0, groups.length - GROUP_CAP);
+  return ok({ value, unit: null, rows: value, held, delta: null, why, met, refusals: [], groups: groups.slice(0, GROUP_CAP), ...(more > 0 ? { more } : {}) });
 }
 
 export function snapshot(

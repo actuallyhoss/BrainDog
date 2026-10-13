@@ -493,6 +493,93 @@ test('A REFUSAL IS READ THROUGH THE "-ING" OF A VERB: no more tracking of orders
   assert.ok(lit(propose('no invoices and taking orders', CAIRO), /^orders$/iu), '"and taking orders" is kept');
 });
 
+test('A WORD OF HAVING STOPPED REFUSES ONLY A THING THAT ENDS THE CLAUSE, and never one it is itself denied before', () => {
+  const lit = (p: ReturnType<typeof propose>, word: RegExp): boolean => p.heard.some((h) => word.test(h.phrase)) || p.places.some((x) => x.phrase !== null && word.test(x.phrase));
+  const shop = (p: ReturnType<typeof propose>): boolean => p.usecase === 'shop' || p.also.includes('shop') || p.places.some((x) => x.name === 'Orders');
+
+  /* THE TWO SENTENCES THE AUDIT OF BATCH 60 TYPED AS A STRANGER: both keep Orders. */
+  for (const s of ['I stopped keeping orders on paper and now track them here', 'I never stopped taking orders', 'I stopped guessing and started tracking orders']) {
+    const p = propose(s, CAIRO);
+    assert.ok(lit(p, /orders/iu) && shop(p), s);
+  }
+
+  /* WORDS AFTER THE THING SAY HOW IT WAS DONE, not that it is gone. */
+  for (const s of [
+    'I quit tracking orders in a notebook',
+    'I am done taking orders by phone, they come in here now',
+    'I finished keeping orders in a spreadsheet',
+    'I stopped using orders from the old till',
+  ]) {
+    assert.ok(lit(propose(s, CAIRO), /orders/iu), s);
+  }
+
+  /* STOPPING THAT IS DENIED IS NO STOPPING: never, not, haven't, didn't, won't, can't. */
+  for (const s of [
+    'I have never stopped taking orders',
+    "I haven't stopped taking orders",
+    'I am not done taking orders',
+    "I'm not yet done taking orders",
+    'I never really quit taking orders',
+    "I won't quit taking orders",
+    "I can't quit taking orders",
+  ]) {
+    assert.ok(lit(propose(s, CAIRO), /orders/iu), s);
+  }
+  assert.ok(shop(propose('I never stopped selling candles', CAIRO)), 'never stopped selling is a shop');
+  assert.ok(shop(propose('I stopped selling candles on paper and now sell them here', CAIRO)), 'stopped selling on paper is a shop');
+
+  /* A THING THAT ENDS THE CLAUSE IS STILL REFUSED: the end of what was said, a mark, a join, a word of when. */
+  for (const s of [
+    'I stopped taking orders',
+    'I stopped taking orders, I send invoices',
+    'I stopped taking orders.',
+    'I stopped taking orders and now I freelance',
+    'I stopped taking orders last year',
+    'I quit taking orders for good',
+    "I'm done taking orders anymore",
+    'I stopped taking orders two years ago',
+  ]) {
+    const p = propose(`I'm a freelance designer, ${s}`, CAIRO);
+    assert.ok(!lit(p, /orders/iu) && !shop(p), s);
+  }
+
+  /* THE CARRY HOLDS THE SAME RULE: a thing joined on is refused only where it ends the clause too. */
+  assert.ok(!lit(propose("I'm a student, I stopped taking orders or invoices", CAIRO), /invoices|orders/iu), 'both refused');
+  assert.ok(lit(propose("I'm a student, I stopped keeping orders or invoices on paper", CAIRO), /invoices/iu), 'the invoices kept on paper are kept');
+
+  /* A RUN JOINED ON ENDS WHERE ITS LAST THING DOES: both were kept on paper, so both are kept. */
+  const both = propose('I stopped keeping orders and invoices on paper', CAIRO);
+  assert.ok(lit(both, /orders/iu) && lit(both, /invoices/iu), 'orders and invoices on paper are both kept');
+
+  /* ANY MARK ENDS A CLAUSE, and so do the plain words of when. */
+  for (const s of [
+    'I stopped taking orders - too much work',
+    'I stopped taking orders (too many)',
+    'I stopped taking orders…',
+    'I stopped taking orders yesterday',
+    'I stopped taking orders recently',
+    'I stopped taking orders for now',
+    'I stopped taking orders in 2023',
+    'I stopped taking orders back in March',
+    'I stopped taking orders a long time ago',
+    'I stopped taking orders a few years ago',
+    'I stopped taking orders last summer',
+    'I stopped taking orders, and invoices too',
+    'I quit selling handmade soy candles',
+  ]) {
+    const p = propose(`I'm a freelance designer, ${s}`, CAIRO);
+    assert.ok(!lit(p, /orders|invoices|handmade/iu) && !shop(p), s);
+  }
+
+  /* A DENIAL REACHES ITS STOPPING OVER A FEW WORDS, never over a join or somebody new. */
+  for (const s of ["I'm not going to quit taking orders", "I don't want to quit taking orders", "I won't ever have to quit taking orders"]) {
+    assert.ok(lit(propose(s, CAIRO), /orders/iu), s);
+  }
+  for (const s of ["No, I'm done taking orders", "No I'm done taking orders", 'I have no staff so I stopped taking orders', 'Not a shop, I quit taking orders']) {
+    assert.ok(!lit(propose(`I'm a freelance designer. ${s}`, CAIRO), /orders/iu), s);
+  }
+});
+
 test("A SENTENCE THAT OPENS WITH A REFUSAL NAMES NOBODY: Don't need orders, I freelance as a designer", () => {
   const typed = "Don't need orders, I freelance as a designer";
   const p = propose(typed, CAIRO);

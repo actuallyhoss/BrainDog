@@ -1644,6 +1644,8 @@ export function createClient(options: ClientOptions) {
       call<Answer<'setAutomation'>>('setAutomation', args as Record<string, unknown>),
     /** Start a finished run again, as the rule is installed now and with the trigger the first run had. ADMIN. */
     retryRun: (args: { run: string }) => call<Answer<'retryRun'>>('retryRun', args as Record<string, unknown>),
+    /** One page's versions, newest first, each with its source, when it was applied and by whom. READ+. */
+    pageVersions: (args: { page: string }) => call<AnswerOr<'pageVersions', unknown>>('pageVersions', args as Record<string, unknown>),
     /** One automation's versions, newest first, each with its body, when and by whom it was installed. READ+. */
     automationVersions: (args: { rule: string }) =>
       call<Answer<'automationVersions'>>('automationVersions', args as Record<string, unknown>),

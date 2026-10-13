@@ -65,6 +65,7 @@ export type Drawable = {
   bars?: unknown;
   area?: unknown;
   panel?: unknown;
+  box?: unknown;
 };
 
 type Obj = Record<string, unknown>;
@@ -236,9 +237,13 @@ const held = (row: unknown, field: string): unknown => {
 
 /**
  * WHETHER EVERY CARD OF A CARDS BLOCK SAYS NOTHING: it read rows, and not one of them holds a value in any column the
- * block draws, so each card is a dash under the block's heading. "Where it stands" is titled by the health, and on a
- * project nobody had described it was a heading over a dash. ONE VALUE ON ONE ROW KEEPS THE BLOCK AND EVERY CARD IN IT,
- * so a card with a name is never left out: a service imported with no cost is still what the project runs on.
+ * block draws, so each card is a dash under the block's heading. ONE VALUE ON ONE ROW KEEPS THE BLOCK AND EVERY CARD IN
+ * IT, so a card with a name is never left out: a service imported with no cost is still what the project runs on.
+ *
+ * NOT WHAT TOOK THE DASH OFF "WHERE IT STANDS" (audit 59, claim 4). That block is titled by the health and draws only
+ * while its `when:` counts one of its four fields said, so on a project nobody had described it is already out with
+ * `why: 'when'`, and when it is drawn a card says something and this answers no. This catches the cards block that
+ * carries no such gate. The tile left standing over nothing on that page was the boxed section under it (`panelHeld`).
  */
 function cardsUnsaid(b: Drawable): boolean {
   const rows = matchedRows(b);
@@ -304,6 +309,15 @@ export function leadOf(blocks: readonly Drawable[]): number {
   return blocks.findIndex((b) => on(b) && !FRAME.has(b.kind) && !gone(b) && (!bare(b) || saysEmpty(b)));
 }
 
+/**
+ * WHETHER A SECTION'S HOST PANEL KEEPS IT ON THE PAGE WITH NOTHING UNDER IT. The key a row's numbers are sent with and a
+ * run's changes are always something to read. A project's scheduled actions are not: the host draws none for a project
+ * that has none, so a boxed section naming `actions` over blocks that all went was a tile holding only its heading
+ * ("More about Sketchpad"). The record cannot see the host's panel, so a host that knows the panel holds something says
+ * so by handing the section its `actions`, and the section stays.
+ */
+const panelHeld = (b: Drawable): boolean => typeof b.panel === 'string' && !(b.panel === 'actions' && b.box === true && none(b.actions));
+
 const areaOf = (b: Drawable): 'main' | 'rail' => (b.area === 'rail' ? 'rail' : 'main');
 
 /** The blocks a section heads: those after it in its own column, up to the next section there. */
@@ -329,7 +343,8 @@ function headed(blocks: readonly Drawable[], at: number): Drawable[] {
  *
  * A SECTION OVER NOTHING GOES WITH ITS BLOCKS: a heading whose every block in its column, up to the next section, is not
  * drawn heads nothing, a box included (the record's `emptyBoxesShut`, which this replaces). A section with no block
- * after it is the author's own divider, and one carrying a host panel holds that panel; both stay.
+ * after it is the author's own divider, and one carrying a host panel holds that panel; both stay. But a BOXED section
+ * whose panel is the row's scheduled actions is shut with its blocks (`panelHeld`).
  */
 export function emptyHidden<B extends Drawable>(blocks: readonly B[], own = false): B[] {
   const lead = leadOf(blocks);
@@ -344,7 +359,7 @@ export function emptyHidden<B extends Drawable>(blocks: readonly B[], own = fals
     if (first >= 0) out[first] = told(blocks[first]!);
   }
   out.forEach((b, n) => {
-    if (b.kind !== 'section' || !on(b) || says(b) || typeof b.panel === 'string') return;
+    if (b.kind !== 'section' || !on(b) || says(b) || panelHeld(b)) return;
     const under = headed(out, n);
     if (under.length > 0 && under.every((x) => !on(x))) out[n] = { ...b, drawn: false, why: 'empty' } as B;
   });

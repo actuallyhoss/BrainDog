@@ -89,7 +89,7 @@ test('THE LEAD SAYS HOW MANY ARE HARD TO UNDO AS A COUNT, and never that they co
     '12 questions wait on you, three of them for over two weeks. Four are hard to undo.',
     '"of them" is said twice in one sentence',
   );
-  assert.equal(countSentence(8, 1, undefined)?.text, 'Eight questions wait on you. The first one is hard to undo.');
+  assert.equal(countSentence(8, 1, undefined)?.text, 'Eight questions wait on you. One of them is hard to undo.');
   assert.equal(countSentence(2, 2, undefined)?.text, 'Two questions wait on you. Both are hard to undo.');
   assert.equal(countSentence(3, 3, undefined)?.text, 'Three questions wait on you. All of them are hard to undo.');
   assert.equal(countSentence(1, 1, undefined)?.text, 'One question waits on you. It is hard to undo.');

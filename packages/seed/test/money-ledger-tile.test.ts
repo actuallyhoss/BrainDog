@@ -4,8 +4,10 @@
  *
  * WHAT IS HELD HERE: the tile is on Money's page under the accounts and above the fold, it draws the six newest
  * entries of the Ledger newest first, every line is an entry of the Ledger a host can open, and a record whose Ledger
- * holds nothing draws no tile. The add is declared beside it and is NOT on the page yet, for the two reasons
- * `parts/ledger.ts` gives; the last test fails the day either reason is gone, so the box is not forgotten.
+ * holds nothing draws no tile. The tile is gated by its own entries (audit 59, claim 5): one that has not cleared
+ * draws it, a void one alone does not, and it carries its own empty line. The add is declared beside it and is NOT on
+ * the page yet, for the two reasons `parts/ledger.ts` gives; the last test fails the day either reason is gone, so the
+ * box is not forgotten.
  */
 
 import { test } from 'node:test';
@@ -72,6 +74,8 @@ test('A RECORD WHOSE LEDGER HOLDS NOTHING DRAWS NO LEDGER TILE, and draws it fro
   const k = await openRecord(openSqlite(), fixedClock(NOW));
   const installed = await k.install([...declarations(), ...pageDeclarations(), ...metricDeclarations()]);
   assert.ok(installed.ok, sayOf(installed));
+  /* A RECORD WITH NO ACCOUNT YET reads its line and the box to add one, and no tile saying nothing has moved. */
+  assert.equal(drawn(k).find((b) => b.heading === 'Ledger')?.drawn, false, 'a record with no account draws an empty Ledger');
   const account = k.create('accounts', { name: 'Current account', kind: 'bank', balance: { amount: 250_000, currency: 'GBP' }, as_of: day(0), liquid: true } as never, { actor: 'p_test' });
   assert.ok(account.ok, sayOf(account));
   const before = drawn(k).find((b) => b.heading === 'Ledger');
@@ -90,7 +94,45 @@ test('A RECORD WHOSE LEDGER HOLDS NOTHING DRAWS NO LEDGER TILE, and draws it fro
   assert.deepEqual((after?.rows ?? []).map((r) => r.fields.what), ['Rent']);
 });
 
-test('ADD A MOVEMENT IS DECLARED AND WAITS: one line cannot say an amount, an account and a day', () => {
+test('AN ENTRY THAT HAS NOT CLEARED DRAWS THE LEDGER, and a void one alone does not', async () => {
+  const k = await openRecord(openSqlite(), fixedClock(NOW));
+  const installed = await k.install([...declarations(), ...pageDeclarations(), ...metricDeclarations()]);
+  assert.ok(installed.ok, sayOf(installed));
+  const account = k.create('accounts', { name: 'Current account', kind: 'bank', balance: { amount: 250_000, currency: 'GBP' }, as_of: day(0), liquid: true } as never, { actor: 'p_test' });
+  assert.ok(account.ok, sayOf(account));
+  const move = (what: string, state: string) => {
+    const made = k.create(
+      'transactions',
+      { what, on: day(0), direction: 'out', amount: { amount: 4_500, currency: 'GBP' }, account: account.value.id, state } as never,
+      { actor: 'p_test' },
+    );
+    assert.ok(made.ok, sayOf(made));
+  };
+
+  /* A VOID ENTRY IS NOT ON THE LEDGER A PERSON READS, so a Ledger holding only one is still a Ledger holding nothing. */
+  move('Card charged twice', 'void');
+  const voided = drawn(k).find((b) => b.heading === 'Ledger');
+  assert.deepEqual(voided?.refusals, []);
+  assert.equal(voided?.drawn, false, 'a void entry alone draws the Ledger');
+
+  /* THE CARD PAYMENT OF THIS MORNING, which the bank has not cleared: he typed it, and it is on the page. The gate
+     was a figure that reads cleared entries alone, so the tile stayed away until the bank caught up. */
+  move('Coffee beans', 'pending');
+  const waiting = drawn(k).find((b) => b.heading === 'Ledger');
+  assert.notEqual(waiting?.drawn, false, 'an entry that has not cleared draws no Ledger');
+  assert.deepEqual((waiting?.rows ?? []).map((r) => r.fields.what), ['Coffee beans']);
+});
+
+test('THE LEDGER SAYS ITS OWN EMPTY LINE, and is gated by what it holds and by no figure', () => {
+  const tile = LEDGER[0] as { when?: unknown; where?: unknown; empty?: unknown };
+  assert.equal(tile.when, undefined, 'the Ledger waits on a figure again: a figure over cleared entries hides one that has not cleared');
+  assert.equal(tile.where, 'state is not void');
+  assert.equal(typeof tile.empty, 'string');
+  assert.ok(String(tile.empty).trim().length > 0 && tile.empty !== 'keep', 'the Ledger has no line to say when it holds nothing');
+  assert.ok(!/[\u2014\u2013]/u.test(String(tile.empty)), 'a dash in a line a person reads');
+});
+
+test('ADD A MOVEMENT IS DECLARED AND WAITS: one line cannot say an amount, an account and a day', async () => {
   assert.deepEqual(
     ADD_MOVEMENT.map((b) => [b.kind, b.heading, b.register]),
     [['capture', 'Add a movement', 'transactions']],
@@ -104,6 +146,14 @@ test('ADD A MOVEMENT IS DECLARED AND WAITS: one line cannot say an amount, an ac
   for (const id of ['what', 'on', 'amount', 'account']) assert.ok(required.has(id), `the Ledger does not require ${id}`);
   /* THE DAY THIS FAILS, PLACE IT: either the page has room, or the Ledger stopped requiring a link a line cannot give. */
   assert.equal(required.get('account'), 'ref');
+  /* AND THE RECORD SAYS SO ITSELF: what a host makes of a typed line, the words, today and an amount of nought, is
+     refused for the account it cannot give. A box on the page would be refused at every press, so it is not there. */
+  const k = await openRecord(openSqlite(), fixedClock(NOW));
+  const installed = await k.install([...declarations(), ...pageDeclarations(), ...metricDeclarations()]);
+  assert.ok(installed.ok, sayOf(installed));
+  const typed = k.create('transactions', { what: 'Coffee beans', on: day(0), direction: 'out', amount: { amount: 0, currency: 'GBP' }, state: 'cleared' } as never, { actor: 'p_test' });
+  assert.equal(typed.ok, false, 'the Ledger takes an entry with no account now: place ADD_MOVEMENT');
+  assert.match(sayOf(typed), /account/iu);
   assert.equal(declared.length, 24, 'Money has room now: place ADD_MOVEMENT under the Ledger once a capture can ask for an account');
   assert.ok(!declared.some((b) => b.kind === 'capture' && b.register === 'transactions'), 'Add a movement is on the page: say so here and in parts/ledger.ts');
 });

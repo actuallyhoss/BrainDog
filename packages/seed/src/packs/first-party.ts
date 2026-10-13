@@ -514,13 +514,22 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   play and read "0 of 11 projects in play say what they earned in a year" on a record that never meant to say. The
  *   words are the same. PORTFOLIO 1.16.0 IS RELEASED, so this is a version of its own. One `when` changed on the two
  *   keyed copies of a block that is there, nothing added or taken away, so a minor step.
+ * - work 1.19.0 (W061, REC-C10): a thread has six states and declared moves, a day it aims for, and a follow-up takes
+ *   its parent's project, thread, owner and agent one by one. WORK 1.18.0 IS RELEASED (commit 63423720), so this is a
+ *   version of its own. Two values, their labels and the moves on one field, one field added and one script's title
+ *   and source changed, nothing taken away, so a minor step.
+ * - money-core 3.17.0, still unreleased, takes three more things of batch 61 with no version of its own: the Ledger
+ *   pairs a move between two currencies at the rate of the day it left, within 2% (`pairs.across_currency`,
+ *   pairs-fx-61); two figures over who made each Ledger entry, `filed-for-you-30d` and `filed-today`, read from
+ *   `events.transactions` (filing-figures-61); and the Ledger tile on Money is drawn by any entry that is not void
+ *   (ledger-gate-60-61).
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.17.0',
   people: '3.3.0',
   'money-core': '3.17.0',
   estate: '2.2.0',
-  work: '1.18.0',
+  work: '1.19.0',
 };
 
 type Body = Record<string, unknown>;

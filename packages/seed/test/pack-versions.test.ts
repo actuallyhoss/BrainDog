@@ -1452,8 +1452,9 @@ const DECLARED: Record<string, Version> = {
       setting.home_currency setting.most_days_late setting.most_due_30d setting.most_leaving_30d setting.most_left_in_parts
       setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
       setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category setting.rest_days
+      metric.filed-for-you-30d metric.filed-today
     `,
-    declares: '037bb14f0cdae30f',
+    declares: '6f1143a556590586',
     history: [
       "`cash-cross-check` is declared (cash-check-52, REC-A17): Cash now worked out a second way, each cash account walked entry by entry from its newest statement, less Cash now, a currency at a time; no value while no balance is typed -> 73738171ae2405ba",
       'The Money page draws the check (cash-page-54, REC-A17): one tile, Cash now does not add up, while `cash-cross-check` is not nought, and one line while no balance is typed -> e4a453d69795fe22',
@@ -1463,6 +1464,7 @@ const DECLARED: Record<string, Version> = {
       "Folded into the unreleased 3.17.0 (seed-58, the look of 13 October, fault F; integrate 58): `page.money` gains a lead line for a record with two books or more, how many books and accounts the money is kept in, and loses the line for no balance typed, which was added in this same unreleased step, so the page still declares 24 blocks; no id added or taken away -> 24bb2fb8ce5c5a98",
       "Folded into the unreleased 3.17.0 (ledger-tile-59, REC-B15; bad-phrase-59; integrate 59): the Ledger tile on Money, six newest entries open on the page before Heads up, drawn once `ledger-newest-days` has a value, and History gives up What moved, so the page still declares 24 blocks; the two late lines on Heads up say `{{bad:past their due date}}`, the same words in the danger colour; no id added or taken away -> 741a7d2695f49170",
       "Folded into the unreleased 3.17.0 (settle-rule-60, REC-B11; integrate 60): a payment marks the bill it pays. `script.settle` is registered and `rule.payment-settles` starts it when a Ledger entry that names a bill in Settles has cleared, handing both by their ids, which the script now reads as well as a handle; the sum counts cleared entries alone. A rule and a script added -> 037bb14f0cdae30f",
+      "Folded into the unreleased 3.17.0 (ledger-gate-60-61, audit 59 claim 5; pairs-fx-61; filing-figures-61, REC-B20; integrate 61; commit 63423720, the deployed build, holds 3.16.0): the Ledger tile on Money is drawn by any entry that is not void and no longer waits on `ledger-newest-days`, and it says 'Nothing has moved yet.' where it leads a page; `transactions` pairs a move between two currencies at the rate of the day it left, within 2% (`pairs.across_currency`); `filed-for-you-30d` and `filed-today` are added, counts of the Ledger entries made by who made them, read from `events.transactions`; `metric.filed-for-you-30d` and `metric.filed-today` gained -> 6f1143a556590586",
     ],
   },
   'work@1.17.0': {
@@ -1559,6 +1561,24 @@ const DECLARED: Record<string, Version> = {
     history: [
       "`project-moved-7d` is added: the tasks on a project written in the last seven days, read off `updated_at`, which a project page's Where it stands draws while nobody has said where it stands -> 9f91f6c3ff95d69d",
       "`project-last-worked` is added: the days since a task on a project was last written, read off `updated_at`, which Where it stands draws as Last worked -> cf11d8e41eab6029",
+    ],
+  },
+  /* A THREAD PLANS, AND A FOLLOW-UP FOLLOWS (W061, REC-C10). 1.18.0 IS RELEASED (`fixtures/released/work-1.18.0.json`).
+     The ids are 1.18.0's: only `register.tracks` and `script.start_with_parent` changed. */
+  'work@1.19.0': {
+    holds: `
+      metric.open-tasks metric.project-dated metric.project-done-7d metric.project-done-by-week metric.project-due-soon
+      metric.project-held-up metric.project-in-review metric.project-last-worked metric.project-moved-7d metric.project-open metric.tasks-after-week-yours
+      metric.tasks-done-7d metric.tasks-done-7d-agents metric.tasks-done-by-week metric.tasks-due-7d
+      metric.tasks-due-by-week metric.tasks-late-yours metric.tasks-later metric.tasks-not-this-week
+      metric.tasks-overdue metric.tasks-today-yours metric.tasks-undated-yours metric.tasks-waiting
+      metric.tasks-this-week-yours
+      metric.tasks-week-yours metric.tasks-with-agents page.work page.work-board register.tasks register.tracks
+      register.updates rule.close_follow_ups rule.start_with_parent script.close_follow_ups script.start_with_parent
+    `,
+    declares: '8299f07c756e0e85',
+    history: [
+      "`register.tracks`: Status has six values (idea and planned before open) with their labels and the declared moves between them, and gains `target`, the day a thread aims for, a deadline reminded on the day; `script.start_with_parent` copies each of project, thread, owner and agent the follow-up left empty, and is titled Start a follow-up where its parent is; no id added or taken away -> 8299f07c756e0e85",
     ],
   },
 };

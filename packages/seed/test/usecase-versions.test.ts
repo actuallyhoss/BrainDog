@@ -1438,11 +1438,13 @@ const DECLARED: Record<string, Version> = {
       setting.voice_pen_waits setting.voice_right_now setting.voice_since_away setting.voice_working_now
       adds.page.relation.1 adds.page.relation.2 adds.page.relation.3 hands.register.organisations.people
       metric.project-numbers-7d metric.projects-earning-silent adds.page.portfolio.4
+      adds.page.estate.5 metric.service-numbers
     `,
-    declares: '11f22bd8f6e3f8d2',
+    declares: '8828553c41a19dd5',
     history: [
       "`setting.voice_home` and the title of `page.home-founder` say Today where both said Overview; `due-this-week` and Due this week start today; `late-money` is added with a Late table ahead of the week, oldest first; Lapsing loses its Cost column -> 1a6e6f8b5a7311cc",
       "Folded into the unreleased 2.6.0 (sketchpad-60; integrate 60): `page.project`'s Tools and servers reads the project's own tools alone (`kind is tool, scope is project`), so a project with none of its own draws no card where it listed everybody's -> 11f22bd8f6e3f8d2",
+      "Folded into the unreleased 2.6.0 (estate-numbers-61, REC-C12; integrate 61; a builder wrote it as 2.7.0, and 2.6.0 was never deployed: commit 63423720 holds 2.5.0): Numbers gains `about_service`, the figure `service-numbers` is added, and Server and provider numbers is laid on Renewals (the field is `about_service` and not the builder's `service`, a word the core-names gate would then refuse in two dozen places of the core); `adds.page.estate.5` and `metric.service-numbers` gained -> 8828553c41a19dd5",
     ],
   },
   'team@2.19.0': {
@@ -1466,8 +1468,33 @@ const DECLARED: Record<string, Version> = {
       "`page.agent-work`'s Working now reads the record's `sessions.working`, the runs heard from in the last fifteen minutes, where it read the Agents add-on's clause of today -> baca128c6d799cbb",
     ],
   },
-  /* WHERE A PROJECT STANDS IS SAID FROM WHAT HAPPENED ON IT (portfolio 1.16.0's template, batch 46). 2.19.0 IS RELEASED. */
+  /* WHERE A PROJECT STANDS IS SAID FROM WHAT HAPPENED ON IT (portfolio 1.16.0's template, batch 46). 2.19.0 IS RELEASED, AND SO IS THIS. */
   'team@2.20.0': {
+    holds: `
+      metric.tickets-blocked metric.tickets-done-by-agents metric.tickets-due-else metric.tickets-in-flight
+      metric.tickets-planned metric.tickets-taken page.agent-work page.cycles page.home-team page.project
+      register.cycle_days register.cycle_plan register.cycles setting.holds_people setting.holds_tasks
+      setting.label_cycle_days setting.label_cycle_plan setting.label_cycles setting.label_people
+      setting.label_people__role__collaborator setting.label_tasks setting.label_tasks__state__backlog
+      setting.label_tasks__state__doing setting.label_tasks__state__open setting.label_tasks__state__review
+      setting.label_things setting.label_tracks setting.label_updates setting.one_cycle_days setting.one_cycle_plan
+      setting.one_cycles setting.one_people setting.one_tasks setting.one_things setting.one_tracks setting.one_updates
+      setting.shared_version setting.speaks setting.voice_add_first setting.voice_coming_up setting.voice_fills_with
+      setting.voice_home setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you
+      setting.voice_no_questions setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting
+      setting.voice_overdue setting.voice_pen_waits setting.voice_right_now setting.voice_since_away
+      setting.voice_working_now
+    `,
+    declares: '358cad7996106324',
+    history: [
+      "`page.project` takes portfolio 1.16.0's Where it stands: the typed card only while `project-said` counts one, else a stat of `project-moved-7d` under the same heading -> 6810be8ff85d154d",
+      "`page.project`'s Where it stands takes Last worked (`project-last-worked`) -> 358cad7996106324",
+    ],
+  },
+  /* TOOLS AND SERVERS LISTS A PROJECT'S OWN (sketchpad-60). 2.20.0 IS RELEASED: commit 63423720, the deployed build,
+     holds it at 358cad7996106324. Batch 60 moved that entry in place; integrate 61 put it back and gave the change
+     this version. */
+  'team@2.21.0': {
     holds: `
       metric.tickets-blocked metric.tickets-done-by-agents metric.tickets-due-else metric.tickets-in-flight
       metric.tickets-planned metric.tickets-taken page.agent-work page.cycles page.home-team page.project
@@ -1485,9 +1512,7 @@ const DECLARED: Record<string, Version> = {
     `,
     declares: '11f9e7507ab3a446',
     history: [
-      "`page.project` takes portfolio 1.16.0's Where it stands: the typed card only while `project-said` counts one, else a stat of `project-moved-7d` under the same heading -> 6810be8ff85d154d",
-      "`page.project`'s Where it stands takes Last worked (`project-last-worked`) -> 358cad7996106324",
-      "Folded into 2.20.0, which is on `origin/master` and not live (2.19.0 is, by `team.ts`) (sketchpad-60; integrate 60): `page.project`'s Tools and servers reads the project's own tools alone (`kind is tool, scope is project`) -> 11f9e7507ab3a446",
+      "`page.project`'s Tools and servers reads the project's own tools alone (`kind is tool, scope is project`), where it listed everybody's (sketchpad-60, written into 2.20.0 by batch 60 and moved here by integrate 61) -> 11f9e7507ab3a446",
     ],
   },
   'business@1.6.0': {

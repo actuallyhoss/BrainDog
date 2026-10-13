@@ -115,8 +115,9 @@ export function closeAccount(account, opts) {
  * one question.
  *
  * A MOVE IS WRITTEN ONCE. Before the legs go in, the account's own movements between accounts are read, and one that
- * is this leg already (the description, the way, the amount) means an earlier run moved the money: this run writes
- * no second pair, and only closes the account if it is still open.
+ * is this leg already (a movement between accounts, the day, the description, the way, the amount) means an earlier
+ * run moved the money: this run writes no second pair, and only closes the account if it is still open. THE DAY IS
+ * PART OF IT, since "To Savings" for the same amount on another day is a move somebody made before, not this one.
  */
 export default async function run(ctx) {
   const input = ctx.input && typeof ctx.input === 'object' ? ctx.input : {};
@@ -169,7 +170,8 @@ export default async function run(ctx) {
     const mine = legs.find((l) => l.account === account.id);
     const moved = await ctx.record.list('transactions', { all: [{ field: 'account', is: account.id }, { field: 'transfer', is: true }] });
     const same = (m) => m && m.amount === mine.amount.amount && m.currency === mine.amount.currency;
-    if (moved.some((t) => t.fields.what === mine.what && t.fields.direction === mine.direction && t.fields.state !== 'void' && same(t.fields.amount))) legs = [];
+    const leg = (f) => f.transfer === true && f.on === mine.on && f.what === mine.what && f.direction === mine.direction && f.state !== 'void' && same(f.amount);
+    if (moved.some((t) => leg(t.fields))) legs = [];
   }
   if (legs.length === 0 && out.legs.length > 0 && out.writes.length === 0) {
     ctx.log(`${account.fields.name} was already moved and closed, so nothing changed.`);

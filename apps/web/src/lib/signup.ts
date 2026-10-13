@@ -299,8 +299,30 @@ export const SAID_MOST = 2000;
  * AND WITH THE BUILD'S OWN KEY (`key`), once a press has gone out: a reload between the call and its answer finds the
  * key here and presses under it again, so the record writes its entries once (audit 53, finding 2). This device's
  * only: it is never packed for the link, and one kept before there were keys reads back without it.
+ *
+ * AND WITH WHAT AN ANSWERED PRESS LEFT (`left`), which a reload sends in place of the whole build.
  */
-export type Draft = { said: string; currency: string | null; usecase: string | null; reply?: Reply | null; cut?: boolean; key?: string };
+export type Draft = { said: string; currency: string | null; usecase: string | null; reply?: Reply | null; cut?: boolean; key?: string; left?: Left };
+
+/**
+ * WHAT AN ANSWERED PRESS LEFT TO MAKE, kept beside the sentence with the new key its Try again goes out under (audit 59,
+ * claim 2): the sentence's entries the record did not write (`rows`), the use case's plan still to make (`plan`, left
+ * out when the press carried none), and whether the draft is on Decide already (`filed`).
+ *
+ * A RELOAD SENDS THIS, NOT THE WHOLE PLAN UNDER THE FIRST KEY. The record passes over only a key it holds, so what a
+ * Try again wrote under its own key is unknown to the first one, and the whole plan sent again would write those
+ * entries a second time. Sent as it was, under its own key and with `again`, a Try again that went in is passed over
+ * and one that did not is written once. This device's only, like the key.
+ */
+export type Left = { key: string; rows: unknown[]; plan?: unknown[]; filed?: boolean };
+
+/** What was left, read back off something kept, or `null` when it is not that. */
+function leftOf(v: unknown): Left | null {
+  if (!isObj(v)) return null;
+  const key = keyOf(v.key);
+  if (key === null || !Array.isArray(v.rows) || (v.plan !== undefined && !Array.isArray(v.plan))) return null;
+  return { key, rows: v.rows, ...(v.plan === undefined ? {} : { plan: v.plan }), ...(v.filed === true ? { filed: true } : {}) };
+}
 
 /** What a build's key looks like, as the page makes it (`first-run-` and a UUID): short, nothing a link could misread, and no
  * longer than the record takes (64, `packages/record/src/arrange.ts` `setup`), so a key kept here is never one refused there. */
@@ -367,7 +389,8 @@ function keptHere(storage: Pick<Storage, 'getItem' | 'removeItem'> | null | unde
     return null;
   }
   const key = keyOf(v.key);
-  return withReply({ said: v.said.slice(0, SAID_MOST), currency: str(v.currency), usecase: str(v.usecase), ...(key ? { key } : {}) }, v.reply);
+  const left = leftOf(v.left);
+  return withReply({ said: v.said.slice(0, SAID_MOST), currency: str(v.currency), usecase: str(v.usecase), ...(key ? { key } : {}), ...(left ? { left } : {}) }, v.reply);
 }
 
 /**
@@ -381,6 +404,8 @@ function keptHere(storage: Pick<Storage, 'getItem' | 'removeItem'> | null | unde
  * alone, and that one is the page's: a reload builds the whole plan from the sentence again, and under a key the record
  * never held it would write every entry a second time. Under the first it passes over what that press wrote. A new
  * sentence is kept without a key (`keepSaid`), and so its build keeps its own first one.
+ *
+ * WHAT THE TRY AGAIN ITSELF WRITES is kept apart, with its own key (`keepLeft`), and a reload sends that (`pressKept`).
  */
 export function keepKey(storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null | undefined, key: string, now: number = Date.now()): void {
   if (keyOf(key) === null || keptHere(storage, now) === null) return;
@@ -390,6 +415,46 @@ export function keepKey(storage: Pick<Storage, 'getItem' | 'setItem' | 'removeIt
   } catch {
     /* Storage off or full: a reload presses under a new key, which is what happened before there was this. */
   }
+}
+
+/**
+ * Put what an answered press left beside the sentence kept on this device, in place of what an earlier one left.
+ * Storage may be off or full, and then a reload presses under the first key as it did before there was this.
+ *
+ * NOTHING KEPT, NOTHING WRITTEN, and the sentence is no younger for it, as with `keepKey`. A new sentence is kept
+ * without it (`keepSaid`), and it goes with the sentence once the build is all in.
+ */
+export function keepLeft(storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null | undefined, left: Left, now: number = Date.now()): void {
+  const fit = leftOf(left);
+  if (fit === null || keptHere(storage, now) === null) return;
+  try {
+    const kept: unknown = JSON.parse(storage?.getItem(SAID_KEY) ?? 'null');
+    if (isObj(kept)) storage?.setItem(SAID_KEY, JSON.stringify({ ...kept, left: fit }));
+  } catch {
+    /* Storage off or full: the first key stays the one a reload presses under. */
+  }
+}
+
+/**
+ * THE PRESS A RELOAD SENDS, from the build read off the sentence again (`asked`) and what this device kept for it.
+ *
+ * AFTER AN ANSWERED PRESS (`left`): only what is still to make, under the key its Try again took, with `again`. A
+ * BUILD PRESSED FOR AND NOT ANSWERED (`key` alone): the whole of it under that key, with `again`. NEITHER: the build as
+ * it is, a first press.
+ */
+export function pressKept<A extends { proposal: object }>(asked: A, draft: Pick<Draft, 'key' | 'left'> | null): A {
+  const left = draft?.left;
+  if (left) {
+    return {
+      ...asked,
+      again: true,
+      key: left.key,
+      proposal: { ...asked.proposal, rows: left.rows },
+      ...(left.plan === undefined ? {} : { plan: left.plan }),
+      ...(left.filed ? { drafted: null } : {}),
+    };
+  }
+  return draft?.key ? { ...asked, key: draft.key, again: true } : asked;
 }
 
 /** A draft with its answer when one was kept, and without the key at all when none was. */

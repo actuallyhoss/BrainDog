@@ -54,6 +54,8 @@
   import Icon from '$lib/ui/Icon.svelte';
   import ReadState from '$lib/ui/ReadState.svelte';
   import PageBody from './PageBody.svelte';
+  import SourceHistory from './SourceHistory.svelte';
+  import { pageVersionsOf, type PageVersion } from './source-history.ts';
   import { words } from './words.ts';
 
   let {
@@ -104,6 +106,10 @@
   let fault = $state<{ fix: string; line: number | null } | null>(null);
   /** The write in flight, so a second press writes nothing and the pressed button says what it is doing. */
   let busy = $state<'apply' | 'back' | null>(null);
+  /** The versions the record keeps of this page, newest first, which History draws. None where the record lists none. */
+  let versions = $state<PageVersion[]>([]);
+  /** The version History is putting back now, which says so on its own button. */
+  let backing = $state<number | null>(null);
   let box = $state<HTMLTextAreaElement>();
 
   /** The file input the button presses. A browser opens its file window only from an input. */
@@ -126,8 +132,17 @@
       fault = null;
       opened = null;
       unopened = null;
+      void readVersions();
     });
   });
+
+  /* THE HISTORY IS READ WITH THE TEXT AND AGAIN AFTER EVERY WRITE, since each Apply and each Put back is a new version.
+     An answer for a page the view has since left is dropped. */
+  async function readVersions() {
+    const of = slug;
+    const got = await pageVersionsOf(apiBase(), of);
+    if (of === slug) versions = got;
+  }
 
   const changed = $derived(held !== null && text !== held.text);
   const list = $derived(held ? templateList(held.body) : null);
@@ -254,6 +269,7 @@
       held = { body: checked.body, version: out.version, text: typed };
       fault = null;
       toasts.push(sourceWords.applied, { intent: 'good', undo: () => void putBack() });
+      void readVersions();
       return;
     }
     point({ fix: out.fix, line: out.from === 'refused' ? lineOf(typed, out.at) : null });
@@ -274,9 +290,44 @@
       before = null;
       fault = null;
       toasts.push(sourceWords.putBackDone, { intent: 'good' });
+      void readVersions();
       return;
     }
     point({ fix: out.fix, line: null });
+  }
+
+  /* PUT BACK TO A VERSION HISTORY NAMES is the same write, with that version's own text: a new version that says what
+     the old one said, against the version the box was read at, so nothing in between is lost and a page changed
+     meanwhile is refused. What it replaced becomes what the button above puts back. */
+  async function putBackTo(version: number) {
+    const body = versions.find((v) => v.version === version)?.body as Body | undefined;
+    if (busy || !held || !body) return;
+    const was = held;
+    busy = 'back';
+    backing = version;
+    const out = await w().apply(body, was.version).catch(unreached);
+    busy = null;
+    backing = null;
+    if (out.from === 'written') {
+      const printed = dogText(body);
+      before = was.body;
+      held = { body, version: out.version, text: printed };
+      text = printed;
+      fault = null;
+      toasts.push(sourceWords.putBackDone, { intent: 'good' });
+      void readVersions();
+      return;
+    }
+    point({ fix: out.fix, line: null });
+  }
+
+  /** One version's text as a file, named as the declaration's own first line names it. */
+  function saveVersion(version: number) {
+    const body = versions.find((v) => v.version === version)?.body as Body | undefined;
+    if (!body) return;
+    const file = fileOf(body);
+    saveDog(file, dogText(body));
+    toasts.push(copy.exported(file), { intent: 'good' });
   }
 
   function discard() {
@@ -394,6 +445,9 @@
         {/if}
       </section>
     </div>
+    <!-- UNDER THE TEXT AND ITS PAGE: every version the record keeps, each with Put back and Save as a file. It draws
+         nothing where the record lists none. -->
+    <SourceHistory {versions} busy={busy === 'back' ? backing : null} disabled={busy !== null} onputback={(n) => void putBackTo(n)} onsave={saveVersion} />
   {:else if source.state !== 'ready'}
     <ReadState state={source.state} refusal={source.refusal} onretry={() => void source.reread()} />
   {/if}

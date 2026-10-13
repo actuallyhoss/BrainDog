@@ -401,7 +401,7 @@ export { SCHEDULE_KINDS, drainSchedule, retryFailed, retryHandler } from './sche
 export type { CreateRecordArgs, Provisioned, Purged, WrappedKey } from './provision.ts';
 export { GRANT_KINDS, spanMs } from './vault.ts';
 import { GROUP_CAP } from './buckets.ts';
-import { ratesFrom } from './fx.ts';
+import { RATE_STALE_DAYS, ratesFrom } from './fx.ts';
 import { MARK_IS_CONTROL, MARK_IS_CONTROL_SAYS, isControlMark, markFrozen } from './marks.ts';
 import { laidOf } from './pack-laid.ts';
 export { BUCKETS, GROUP_CAP, bucketOf, bucketRun, bucketStart, isBucket, nextBucket, shiftBucket } from './buckets.ts';
@@ -4099,6 +4099,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           ...(w.opId === undefined ? {} : { opId: w.opId }),
         });
         const paired = settlePairs(entry, null, decl, w.batch ?? batch, now) ? byId(entry.id, true) : null;
+        settleRated(register, [entry], w.batch ?? batch, now);
         const changed = Object.keys(merged);
         if (paired && decl.pairs && !changed.includes(decl.pairs.mark)) changed.push(decl.pairs.mark);
         return ok({ ...rules(paired ?? entry, register, w, batch, { op: 'create', changed }), batch: w.batch ?? batch });
@@ -4318,6 +4319,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         decl.pairs && (deleting || pairsReads(decl.pairs, decl.fields).some((key) => touched.includes(key))) && settlePairs(entry, current, decl, batch, now)
           ? byId(entry.id, true)
           : null;
+      settleRated(register, [current, entry], batch, now);
       const changed = touched.filter((key) => JSON.stringify(current.fields[key] ?? null) !== JSON.stringify(merged[key] ?? null));
       if (paired && decl.pairs && !changed.includes(decl.pairs.mark) && paired.fields[decl.pairs.mark] !== current.fields[decl.pairs.mark])
         changed.push(decl.pairs.mark);
@@ -5020,7 +5022,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
          `on` compares (`mirrors`), so a row whose size no other row shares, and which holds no `_pair`, answers `null`
          now as it did before. On five years of varied amounts this asked 5,112 rows of 10,000 and halved the pass; where
          every amount is shared it asks them all, and costs one read of the list. A declaration with no day to run a
-         window over pairs nothing, and only a row holding a `_pair` is asked, to take it back. */
+         window over pairs nothing, and only a row holding a `_pair` is asked, to take it back. A LEDGER THAT PAIRS ACROSS
+         CURRENCIES (`pairs.across_currency`, pairs-fx-61) ASKS EVERY ROW: the two legs of such a move are never one
+         size, so the shortcut would pass over every one of them. */
       const rows = sql.all<{ id: string; size: number | null; paired: number }>(
         `SELECT id, ${window?.size ?? 'NULL'} AS size, json_extract(fields, '$._pair') IS NOT NULL AS paired FROM entry
           WHERE register = ? AND deleted_at IS NULL ORDER BY ${window?.day ?? 'NULL'}, rowid`,
@@ -5041,7 +5045,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       if (index && window) sql.exec(`CREATE INDEX IF NOT EXISTS ${index} ON entry (register, ${window.size}, ${window.day}) WHERE deleted_at IS NULL`);
       try {
         for (const r of rows) {
-          if (pass.answered.has(r.id) || (!r.paired && (r.size === null || (alike.get(r.size) ?? 0) < 2))) continue;
+          if (pass.answered.has(r.id) || (!r.paired && p.pairs.across_currency === undefined && (r.size === null || (alike.get(r.size) ?? 0) < 2))) continue;
           for (const { leg, to } of settle(p, [r.id], pass)) writeLeg(p, leg, to, true, batch, now, note);
         }
       } finally {
@@ -5063,6 +5067,50 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     if (JSON.stringify(was ?? null) !== JSON.stringify(is ?? null))
       appendEvent({ ...said, field: p.pairs.mark, from: shown(p.register, p.pairs.mark, was) ?? null, to: shown(p.register, p.pairs.mark, is) ?? null });
     if ((leg.fields._pair ?? null) !== to) appendEvent({ ...said, field: '_pair', from: (leg.fields._pair as Json | undefined) ?? null, to });
+  }
+
+  /**
+   * A rate written, changed or deleted settles again every ledger that pairs across currencies (pairs-fx-61).
+   *
+   * TWO LEGS WRITTEN BEFORE THEIR DAY'S RATE ARRIVED STAYED COUNTED until one of them was written again: the pairing
+   * runs on a write to the ledger, and a rate is a row of another list. A record whose rates are fetched at night and
+   * whose bank alerts land by day met that on every move between two currencies.
+   *
+   * THE SEEDS ARE THE ROWS A RATE OF THAT DAY CAN SPEAK FOR: the earlier leg is converted at the rate on or before its
+   * own day and no older than `RATE_STALE_DAYS`, so a rate dated D reaches a leg dated D to D plus that many days, and
+   * `settle` walks from each to its partner. A rate taken away is the same question asked the other way, and a pair it
+   * alone held is taken back. Signed by the record and written as `settleRedeclared` writes a leg.
+   */
+  function settleRated(register: string, rows: readonly (Entry | null)[], batch: string, now: string): void {
+    const held = ratesRole(registers.values());
+    if (held === null || held.register !== register) return;
+    const days = new Set<string>();
+    for (const r of rows) {
+      const day = r?.fields[held.fields.as_of];
+      if (typeof day === 'string' && /^\d{4}-\d{2}-\d{2}/u.test(day)) days.add(day.slice(0, 10));
+    }
+    if (days.size === 0) return;
+    for (const [id, decl] of registers) {
+      if (decl.pairs?.across_currency === undefined) continue;
+      const p = pairingOf(id, decl, decl.pairs);
+      const window = windowSql(p);
+      if (window === null) continue;
+      const pass = passOf(p);
+      const note = `${decl.name} looked again at its moves between two currencies, since a rate changed.`;
+      for (const day of days) {
+        const last = new Date(Date.parse(`${day}T00:00:00Z`) + RATE_STALE_DAYS * 86_400_000).toISOString().slice(0, 10);
+        const near = sql.all<{ id: string }>(
+          `SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND substr(${window.day}, 1, 10) BETWEEN ? AND ? ORDER BY ${window.day}, rowid`,
+          id,
+          day,
+          last,
+        );
+        for (const r of near) {
+          if (pass.answered.has(r.id)) continue;
+          for (const { leg, to } of settle(p, [r.id], pass)) writeLeg(p, leg, to, true, batch, now, note);
+        }
+      }
+    }
   }
 
   /** The list whose rows carry identity keys, if `register` is one (`entities.ts`). */

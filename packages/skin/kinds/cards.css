@@ -64,6 +64,17 @@
     padding-block: var(--sp-2);
   }
 
+  /* AND UNDER A THUMB A NAME'S ROW IS STILL 44 TALL. The whole card is its title's target (`.cards-title a::before`
+     below), so a card at a row's air is a 36px target: "Studio current account" under Last confirmed on Money
+     measured 448x36. The card grows and the name sits in the middle of it; under a mouse nothing moves. AND ONE MORE
+     FOR THE HAIRLINE: the target is the card inside its border, so a 44px card was a 43px target, measured. */
+  @media (pointer: coarse) {
+    .cards-grid:not(:has(> .cards-item > :not(.cards-head))) > .cards-item {
+      justify-content: center;
+      min-block-size: calc(var(--tap) + 1px);
+    }
+  }
+
   .cards-item:has(.cards-title a):hover .cards-title {
     text-decoration: underline;
     text-decoration-color: var(--edge);

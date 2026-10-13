@@ -41,6 +41,8 @@ import type { Refusal, Sql } from '@braindog/ports';
 import { compile, evaluate, type Predicate, type Schema } from '@braindog/where';
 
 import { isCurrencyCode } from './coerce.ts';
+import { convertMinor, rateFor, rateIsStale, ratesFrom, type Rate } from './fx.ts';
+import { ratesRole, type RoleList } from './roles.ts';
 import { atMs, shiftFrom } from './schedule.ts';
 
 export type PairsDecl = {
@@ -58,11 +60,19 @@ export type PairsDecl = {
   mark: string;
   /** Which rows are money that moved: a row this does not match is nobody's partner. Absent is every row. */
   where?: Predicate;
+  /**
+   * A move between two currencies pairs too, the earlier leg at the rate of its own day, when the two amounts are
+   * within `tolerance` percent of each other. Absent, two currencies never pair.
+   */
+  across_currency?: { tolerance: number };
 };
 
 type FieldShape = { id: string; type: string; values?: unknown; of?: unknown; to?: unknown; default?: unknown; retired?: boolean };
 
-const PAIRS_KEYS = ['on', 'opposite', 'across', 'within', 'date', 'mark', 'where'] as const;
+const PAIRS_KEYS = ['on', 'opposite', 'across', 'within', 'date', 'mark', 'where', 'across_currency'] as const;
+/* THE MOST TWO LEGS OF ONE MOVE MAY DIFFER BY, in percent. A bank's own rate sits a point or two off the day's; past
+   this the rule would be matching sizes that only look alike. */
+const TOLERANCE_MOST = 10;
 const NUMERIC = new Set(['money', 'int', 'decimal']);
 /* THREE LETTERS ISO ASSIGNS, in either case, since a text field is not upper-cased on the way in as a money is. */
 const CODE = /^[A-Za-z]{3}$/;
@@ -176,7 +186,7 @@ export function pairsFault(id: string, fields: readonly FieldShape[], pairs: unk
   const said = pairs as Record<string, unknown>;
   for (const key of Object.keys(said))
     if (!(PAIRS_KEYS as readonly string[]).includes(key))
-      return bad('DECLARATION_INVALID', `${id}'s pairs has no key ${key}. It takes on, opposite, across, within, date, mark and where.`, `pairs.${key}`, PAIRS_KEYS);
+      return bad('DECLARATION_INVALID', `${id}'s pairs has no key ${key}. It takes on, opposite, across, within, date, mark, where and across_currency.`, `pairs.${key}`, PAIRS_KEYS);
 
   const live = fields.filter((f) => f.retired !== true);
   const field = (name: unknown) => (typeof name === 'string' ? live.find((f) => f.id === name) : undefined);
@@ -274,6 +284,31 @@ export function pairsFault(id: string, fields: readonly FieldShape[], pairs: unk
       );
     const refused = compile(said.where as Predicate, schemaOf(id, live)).bad[0];
     if (refused) return bad(refused.code, `${id}'s pairs.where: ${refused.fix}`, 'pairs.where', refused.allowed);
+  }
+
+  /* ── across_currency ── ONLY OVER A MONEY, WHICH HOLDS ITS OWN CURRENCY. A bare number says its currency in a field
+     `on` makes both rows hold alike, so that declaration has already said two currencies are never one move, and there
+     is no one value to convert. */
+  if (said.across_currency !== undefined) {
+    const ac = said.across_currency;
+    const shape = `${id}'s pairs.across_currency says how far apart the two amounts of one move may be in percent, at the rate of the day it left, as { tolerance: 2 }`;
+    if (ac === null || typeof ac !== 'object' || Array.isArray(ac)) return bad('DECLARATION_INVALID', `${shape}, and ${JSON.stringify(ac)} is not that.`, 'pairs.across_currency', ['tolerance']);
+    const extra = Object.keys(ac).find((key) => key !== 'tolerance');
+    if (extra !== undefined) return bad('DECLARATION_INVALID', `${shape}. It has no key ${extra}.`, `pairs.across_currency.${extra}`, ['tolerance']);
+    const tolerance = (ac as { tolerance?: unknown }).tolerance;
+    if (typeof tolerance !== 'number' || !Number.isFinite(tolerance) || tolerance <= 0 || tolerance > TOLERANCE_MOST)
+      return bad(
+        'DECLARATION_INVALID',
+        `${shape}. The tolerance is a number above 0 and at most ${TOLERANCE_MOST}, and ${JSON.stringify(tolerance)} is not.`,
+        'pairs.across_currency.tolerance',
+      );
+    if (sized.type !== 'money' || !entries.some((e) => e.abs))
+      return bad(
+        'DECLARATION_INVALID',
+        `${id}'s pairs.across_currency converts one amount into the other's currency, so on has to compare a money as abs(amount). ${sized.id} is a ${sized.type}${sized.type === 'money' ? ' that on does not name' : ', which holds no currency of its own'}.`,
+        'pairs.across_currency',
+        live.filter((f) => f.type === 'money').map((f) => f.id),
+      );
   }
   return null;
 }
@@ -729,6 +764,8 @@ function around(p: Pairing, leg: Leg, ledger: Ledger | null = null): { near: { l
  */
 type Ledger = {
   bySize: Map<number, { at: number; leg: Leg }[]>;
+  /** Every shaped row in day order, whatever its size: the window a move between two currencies is looked for in. */
+  all: { at: number; leg: Leg }[];
   shapes: Map<string, Shape | null>;
   can: Map<string, boolean>;
   waits: Map<string, boolean>;
@@ -737,6 +774,7 @@ type Ledger = {
 function ledgerOf(p: Pairing): Ledger {
   const bySize = new Map<number, { at: number; leg: Leg }[]>();
   const shapes = new Map<string, Shape | null>();
+  const all: { at: number; leg: Leg }[] = [];
   for (const r of p.sql.all<LegRow>(`SELECT ${LEG_COLUMNS} FROM entry WHERE register = ? AND deleted_at IS NULL ORDER BY rowid`, p.register)) {
     const leg = legOf(r);
     const shape = shapeOf(p, leg);
@@ -746,9 +784,11 @@ function ledgerOf(p: Pairing): Ledger {
     let group = bySize.get(shape.amount.size);
     if (group === undefined) bySize.set(shape.amount.size, (group = []));
     group.push({ at: shape.at, leg });
+    if (p.pairs.across_currency !== undefined) all.push({ at: shape.at, leg });
   }
   for (const group of bySize.values()) group.sort((a, b) => a.at - b.at);
-  return { bySize, shapes, can: new Map(), waits: new Map() };
+  all.sort((a, b) => a.at - b.at);
+  return { bySize, all, shapes, can: new Map(), waits: new Map() };
 }
 
 /** The legs of one size group whose day is between `lo` and `hi`, both included. */
@@ -814,8 +854,14 @@ function nearestOf(p: Pairing, leg: Leg, windows: Windows): Leg | null {
 }
 
 /** What `around` answered for each leg, by id, for as long as one question about the ledger lasts, and the list it reads. */
-type Windows = { seen: Map<string, ReturnType<typeof around>>; ledger: Ledger | null };
-const windowsOf = (ledger: Ledger | null = null): Windows => ({ seen: new Map(), ledger });
+type Windows = {
+  seen: Map<string, ReturnType<typeof around>>;
+  ledger: Ledger | null;
+  /** The same for a move between two currencies (`crossAround`), and the rates it converts by, read when first needed. */
+  crossed: Map<string, ReturnType<typeof around>>;
+  fx: { rates: readonly Rate[]; at: Map<string, number | null> } | null;
+};
+const windowsOf = (ledger: Ledger | null = null): Windows => ({ seen: new Map(), ledger, crossed: new Map(), fx: null });
 
 /**
  * `around`, asked once per leg for as long as the ledger does not change: one `partnerOf`, or one `settle`, which
@@ -1054,8 +1100,8 @@ export function partnerOf(p: Pairing, leg: Leg): string | null {
   return answerOf(p, leg, new Map(), windowsOf()).to;
 }
 
-/** `partnerOf`, with the legs of the set it read, and every answer that set gave kept in `known` for the next leg asked. */
-function answerOf(p: Pairing, leg: Leg, known: Map<string, string | null>, windows: Windows): { to: string | null; set: string[] } {
+/** A leg's partner of its own size and currency, with the legs of the set it read, and every answer that set gave kept in `known` for the next leg asked. */
+function sameOf(p: Pairing, leg: Leg, known: Map<string, string | null>, windows: Windows): { to: string | null; set: string[] } {
   if (known.has(leg.id)) return { to: known.get(leg.id)!, set: [] };
   if (leg.deleted_at !== null || !canPair(p, leg, windows.ledger)) return { to: null, set: [] };
   const { set, whole } = setOf(p, leg, windows);
@@ -1065,6 +1111,150 @@ function answerOf(p: Pairing, leg: Leg, known: Map<string, string | null>, windo
   }
   const near = nearestOf(p, leg, windows);
   return { to: near !== null && nearestOf(p, near, windows)?.id === leg.id ? near.id : null, set: [...set.keys()] };
+}
+
+/* ─────────────── a move between two currencies (`across_currency`) ─────────────── */
+
+/**
+ * The rate from one currency into another that is `day`'s own, or `null`: the newest on or before the day, and no
+ * older than `fx.ts` calls stale.
+ *
+ * A RATE FROM AFTER THE DAY IS A GUESS BACKWARDS, AND AN OLD ONE IS NOT THE DAY'S. A figure converts with either and
+ * says so beside the number; a pair says nothing beside it, it takes two rows out of Spent and Received, so it is made
+ * only on a rate that is the day's. With none, the two rows stay counted and nothing is asked.
+ *
+ * THE RATES ARE THE RECORD'S OWN, the rows of the list declaring `rates:` (`roles.ts`) read by `fx.ts`, once for as
+ * long as one question about the ledger lasts: nothing a pairing writes is a rate.
+ */
+function rateAt(p: Pairing, windows: Windows, from: string, to: string, day: string): number | null {
+  if (windows.fx === null) {
+    const lists = p.sql
+      .all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'register' AND superseded_at IS NULL AND retired = 0")
+      .map((r) => JSON.parse(r.body) as RoleList);
+    const held = ratesRole(lists);
+    const rows = held
+      ? p.sql.all<{ fields: string }>('SELECT fields FROM entry WHERE register = ? AND deleted_at IS NULL', held.register).map((r) => JSON.parse(r.fields) as Record<string, unknown>)
+      : [];
+    windows.fx = { rates: held ? ratesFrom(rows, held.fields) : [], at: new Map() };
+  }
+  const key = `${from}>${to}@${day}`;
+  let rate = windows.fx.at.get(key);
+  if (rate === undefined) {
+    const r = rateFor(windows.fx.rates, from, to, day);
+    windows.fx.at.set(key, (rate = r === null || r.forward || rateIsStale(r.as_of, day) ? null : r.rate));
+  }
+  return rate;
+}
+
+/**
+ * Whether two rows in two currencies are the two legs of one move by every part of the declaration but `where` and the
+ * pin: `mirrors`, with "the same amount" read as the earlier leg at the rate of its own day, within the tolerance.
+ *
+ * THE EARLIER LEG'S DAY, because that is the day the money was changed; on one day the lower currency code goes first,
+ * so the two legs give one answer whichever is asked. Every other `on` entry still has to agree as it does in one
+ * currency.
+ */
+function crossMirrors(p: Pairing, a: Leg, b: Leg, shape: (leg: Leg) => Shape | null, windows: Windows): boolean {
+  const said = p.pairs.across_currency;
+  const x = shape(a);
+  const y = shape(b);
+  if (said === undefined || x === null || y === null) return false;
+  const mine = x.amount.currency?.toUpperCase();
+  const theirs = y.amount.currency?.toUpperCase();
+  if (mine === undefined || theirs === undefined || mine === theirs) return false;
+  if (signOf(x.way) !== null ? signOf(y.way) !== -signOf(x.way)! : same(y.way, x.way)) return false;
+  if (same(x.across, y.across)) return false;
+  for (const entry of p.pairs.on) {
+    const e = entryOf(entry)!;
+    if (!e.abs && (b.fields[e.field] === undefined || !same(b.fields[e.field], a.fields[e.field]))) return false;
+  }
+  if (!inside(p.pairs.within, x.at, y.at) || !inside(p.pairs.within, y.at, x.at)) return false;
+  const [first, second] = x.at < y.at || (x.at === y.at && mine < theirs) ? [x, y] : [y, x];
+  const from = first.amount.currency!.toUpperCase();
+  const to = second.amount.currency!.toUpperCase();
+  const rate = rateAt(p, windows, from, to, first.day.slice(0, 10));
+  if (rate === null) return false;
+  return Math.abs(convertMinor(first.amount.size, from, to, rate) - second.amount.size) * 100 <= said.tolerance * second.amount.size;
+}
+
+/**
+ * `around` for a move between two currencies: the rows of another currency that could be `leg`'s other leg, and how
+ * near the nearest such row still `waiting` stands. Asked once per leg for as long as the ledger does not change.
+ *
+ * THE WINDOW IS EVERY ROW OF ANOTHER CURRENCY IN IT, since no one size finds the other leg; `crossMirrors` decides each.
+ */
+function crossAround(p: Pairing, leg: Leg, windows: Windows): ReturnType<typeof around> {
+  const seen = windows.crossed.get(leg.id);
+  if (seen !== undefined) return seen;
+  const out: ReturnType<typeof around> = { near: [], waitsAt: Infinity };
+  windows.crossed.set(leg.id, out);
+  const ledger = windows.ledger;
+  const window = windowSql(p);
+  const read = ledger === null ? (l: Leg) => shapeOf(p, l) : (l: Leg) => shapeIn(p, ledger, l);
+  const shape = read(leg);
+  if (window === null || shape === null || shape.amount.currency === null) return out;
+  const lo = shiftFrom(shape.at, `-${p.pairs.within}`);
+  const hi = shiftFrom(shape.at, `+${p.pairs.within}`);
+  if (lo === null || hi === null) return out;
+  let rows: Leg[];
+  if (ledger === null) {
+    const toDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+    rows = p.sql
+      .all<LegRow>(
+        `SELECT ${LEG_COLUMNS} FROM entry WHERE register = ? AND deleted_at IS NULL AND id <> ?
+           AND ${window.day} BETWEEN ? AND ? AND json_extract(fields, '$.${sizedField(p)}.currency') <> ?`,
+        p.register,
+        leg.id,
+        toDay(lo),
+        toDay(hi),
+        shape.amount.currency,
+      )
+      .map(legOf);
+  } else rows = inWindow(ledger.all, lo, hi).filter((other) => other.id !== leg.id);
+  for (const other of rows) {
+    if (!crossMirrors(p, leg, other, read, windows)) continue;
+    const gap = Math.abs(read(other)!.at - shape.at);
+    if (canPair(p, other, ledger)) out.near.push({ leg: other, gap });
+    else if (gap < out.waitsAt && waitsIn(p, other, ledger)) out.waitsAt = gap;
+  }
+  return out;
+}
+
+/**
+ * A leg's one nearest row of another currency, or `null`: none, two as near (a tie is not guessed), a row that may yet
+ * clear into its leg as near (`heldIn`), or a row of its own currency as near, paired or not.
+ *
+ * A ROW OF ITS OWN CURRENCY AS NEAR WINS, AND SO DOES ONE STILL PENDING. The same size in the same currency is the same
+ * money to the unit, where two currencies agree only within a tolerance, so where both stand as near the exact one is
+ * the leg, and if that one is tied or taken the money stays counted.
+ */
+function crossHeld(p: Pairing, leg: Leg, windows: Windows): Leg | null {
+  const w = crossAround(p, leg, windows);
+  const near = heldIn(w);
+  if (near === null) return null;
+  const gap = w.near.find((c) => c.leg === near)!.gap;
+  const own = windowOf(p, leg, windows);
+  return own.waitsAt <= gap || own.near.some((c) => c.gap <= gap) ? null : near;
+}
+
+/**
+ * The row of another currency this one is paired with, or `null`. Asked only of a leg with no partner in its own
+ * currency, and the other leg must have none either: a pair one currency makes is never undone for one two make.
+ * Mutual, as `partnerOf` is, so the answer is the same from either side.
+ */
+function crossOf(p: Pairing, leg: Leg, known: Map<string, string | null>, windows: Windows): string | null {
+  if (p.pairs.across_currency === undefined || leg.deleted_at !== null || !canPair(p, leg, windows.ledger)) return null;
+  const to = crossHeld(p, leg, windows);
+  if (to === null || sameOf(p, to, known, windows).to !== null) return null;
+  return crossHeld(p, to, windows)?.id === leg.id ? to.id : null;
+}
+
+/** `partnerOf`, with the legs of the set it read: a partner of its own currency first, and only then one of another. */
+function answerOf(p: Pairing, leg: Leg, known: Map<string, string | null>, windows: Windows): { to: string | null; set: string[] } {
+  const own = sameOf(p, leg, known, windows);
+  if (own.to !== null) return own;
+  const to = crossOf(p, leg, known, windows);
+  return to === null ? own : { to, set: own.set };
 }
 
 /* A BOUND ON ONE WRITE'S RESETTLING. The rows a write can move are its neighbours old and new, their partners and the
@@ -1170,5 +1360,9 @@ export function passOf(p: Pairing): Pass {
 
 /** The rows that could be `leg`'s partner, by id: `settle`'s seeds for a row as it was, or as it is. */
 export function neighboursOf(p: Pairing, leg: Leg): string[] {
-  return candidatesOf(p, leg).map((c) => c.leg.id);
+  const near = candidatesOf(p, leg);
+  /* AND THE ROWS OF ANOTHER CURRENCY IT COULD BE ONE MOVE WITH, where the list pairs those: a row leaving a window
+     frees the two it stood between as a third leg does in one currency. */
+  const cross = p.pairs.across_currency === undefined ? [] : crossAround(p, leg, windowsOf()).near;
+  return [...near, ...cross].map((c) => c.leg.id);
 }

@@ -211,6 +211,23 @@ test('run twice for one answer, the money is moved once', async () => {
   assert.deepEqual([done.out, done.added, done.updates], [null, [], []]);
 });
 
+test('a move to the same account for the same amount on another day is not this move, and both legs are still written', async () => {
+  const fields = { what: 'To Savings', on: '2026-10-02', direction: 'out', amount: usd(120_000), account: 'e_accounts_3', transfer: true, state: 'cleared' };
+  const before = { list: 'transactions', id: 'e_transactions_31', spoken: 'transactions#31', version: 1, fields };
+  const { out, added, updates, log } = await ran([...ACCOUNTS(), before], { account: 'accounts#3', answer: 'Move it to Savings', holds: 120_000 });
+  assert.deepEqual(added.map((a) => [a.fields.what, a.fields.on, a.fields.account]), [
+    ['To Savings', '2026-10-14', 'e_accounts_3'],
+    ['From HSBC (USD)', '2026-10-14', 'e_accounts_5'],
+  ]);
+  assert.deepEqual(updates, [{ spoken: 'accounts#3', patch: { state: 'closed' }, version: 3 }]);
+  assert.deepEqual(out, { closed: 'accounts#3', moved: 2 });
+  assert.deepEqual(log, ['$1,200.00 moved from HSBC (USD) to Savings, and HSBC (USD) is closed.']);
+  /* A PAYMENT THAT ONLY READS LIKE THE LEG, on the day itself, is no movement between accounts and stops nothing. */
+  const paid = { ...before, fields: { ...fields, on: '2026-10-14', transfer: false } };
+  const beside = await ran([...ACCOUNTS(), paid], { account: 'accounts#3', answer: 'Move it to Savings', holds: 120_000 });
+  assert.equal(beside.added.length, 2);
+});
+
 test('run with one account named to take the money, only that one is offered, and a day handed is the day', async () => {
   const wise = inList('accounts', account(8, 'Wise', usd(10)));
   const { out } = await ran([...ACCOUNTS(), wise], { account: 'accounts#3', to: 'accounts#8', on: '2026-10-20' });

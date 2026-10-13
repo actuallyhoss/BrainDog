@@ -265,6 +265,9 @@ test('EVERY DECLARED METRIC READS THE SAME IN SQL AND IN TYPESCRIPT', async () =
     /* NOR OF A FIGURE OVER A KEPT LINE (`series.<figure>`, money-core 3.16.0's `nights-missed-30d`): it counts the days its
        line has no point, which `kernel/test/metrics-series-gaps.test.ts` holds. */
     if (decl.source.startsWith('series.')) continue;
+    /* NOR OF A FIGURE OVER WHO MADE A LIST'S ENTRIES (`events.<list>`, money-core 3.17.0's `filed-today`): it counts the
+       history, not the rows, and its `where` reads who, which is no field of the list. `money-in-view.test.ts` holds it. */
+    if (decl.source.startsWith('events.')) continue;
     /* NOR OF A ROLLED FIGURE THAT READS AN AGE (`rolled.read`, money-core 3.16.0's `statement-oldest-days`): it answers how
        old the balances are, not what they hold, which `kernel/test/money-figures-ages.test.ts` holds. */
     if ((decl.value as { rolled?: { read?: unknown } }).rolled?.read !== undefined) continue;

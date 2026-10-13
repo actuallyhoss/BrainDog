@@ -66,6 +66,7 @@
     hold,
     keepCode,
     keepKey,
+    keepLeft,
     keepPlan,
     keepSaid,
     madeFor,
@@ -73,6 +74,7 @@
     openOwned,
     planKept,
     planOf,
+    pressKept,
     recordNames,
     saidForLink,
     saidFromLink,
@@ -759,8 +761,10 @@
     const one = caseOf(asked.usecase);
     stage = words.makingParts([...(one ? [one.title] : []), ...asked.modules.map(moduleName)].slice(0, 4));
     /* A BUILD THIS DEVICE ALREADY PRESSED FOR (a reload mid-press): the same key, sent with `again`, so the record
-       writes only what it does not hold yet and nothing a second time. */
-    await write(name, draft?.key ? { ...asked, key: draft.key, again: true } : asked);
+       writes only what it does not hold yet and nothing a second time. AFTER A PRESS THAT ANSWERED IN PART, only what
+       it left, under its Try again's own key (`pressKept`): the whole plan under the first key would write a second
+       time whatever a Try again had put in under its own. */
+    await write(name, pressKept(asked, draft));
   }
 
   /**
@@ -819,11 +823,16 @@
        here but may have gone in there is sent under the same key, so it is not written twice; one that answered hands
        back the entries it did not write, which go under a new key, over the rail order this press already wrote
        (`pressAgain`). */
-    again = { name, asked: pressAgain(asked, out) };
-    /* THE KEY KEPT BESIDE THE SENTENCE STAYS THE FIRST ONE. An answered press hands back a new key for what is left,
-       and that one is this page's alone, now and when Try again sends it (`keepKey` keeps the first): a reload builds
-       the whole plan from the kept sentence again, and under a key the record never held it would write every entry a
-       second time. Under the first key the record passes over what that press wrote, so a reload writes nothing twice. */
+    const next = pressAgain(asked, out);
+    again = { name, asked: next };
+    /* AN ANSWERED PRESS HANDS BACK A NEW KEY FOR WHAT IS LEFT, AND BOTH ARE KEPT BESIDE THE SENTENCE (`keepLeft`), so a
+       reload sends what Try again would have: only what is left, under that key, with `again`. A Try again that went
+       in before the reload is passed over, and nothing is written twice (audit 59, claim 2). The first key stays
+       where it is (`keepKey`) and is what a reload uses when this cannot be kept. A press nobody answered keeps its
+       key and what it asked for, so there is nothing new to keep. */
+    if (out !== null && !out.unheard) {
+      keepLeft(localStore(), { key: next.key!, rows: [...next.proposal.rows], ...(next.plan === undefined ? {} : { plan: [...next.plan] }), ...(next.drafted === null ? { filed: true } : {}) });
+    }
     /* THE PART-MADE STATE IS THE CALL'S OWN ANSWER: what it said it could not make, and why, and nothing guessed. */
     missed = out === null ? [] : out.failed;
     watched = null;

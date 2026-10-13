@@ -22,7 +22,7 @@ test('THE FOUR HEADERS OF 7 OCTOBER: the calm line and the four working are refu
       ['nothing', 0, 57],
     ],
   );
-  assert.deepEqual(headlineAgrees('Twenty-five questions wait on you. The first one is hard to undo.', HIS), []);
+  assert.deepEqual(headlineAgrees('Twenty-five questions wait on you. One of them is hard to undo.', HIS), []);
   assert.deepEqual(headlineAgrees('Twenty-five questions wait on you.', { ...HIS, questions: 5 }).map((d) => [d.wrote, d.is]), [[25, 5]]);
   assert.deepEqual(headlineAgrees('25 questions wait on you, ten of them for over two weeks.', HIS), []);
   assert.deepEqual(headlineAgrees('1 agent working now', HIS), []);

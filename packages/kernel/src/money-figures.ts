@@ -863,6 +863,9 @@ export function figureLists(
     const of = figure?.(decl.source.slice('series.'.length)) ?? null;
     return of === null || of.source.startsWith('series.') ? ['*'] : figureLists(of, figure, pointsAt);
   }
+  /* WHO MADE A LIST'S ENTRIES (`events.<list>`, events-source-61) IS READ BY WHOEVER READS THAT LIST. The reader
+     itself refuses when the list is denied; this names it so a page is not drawn the figure for such a member. */
+  if (decl.source.startsWith('events.')) return [decl.source.slice('events.'.length)];
   const out = new Set<string>();
   const add = (d: Pick<MetricDecl, 'source' | 'value' | 'legs'>) => {
     if (d.source.startsWith('register.')) out.add(d.source.slice('register.'.length));

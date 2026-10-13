@@ -102,7 +102,7 @@ export const suggestedOf = (q: Pick<Question, 'options'> | undefined): string | 
 /**
  * THE SENTENCE UNDER THE TITLE, and the phrase in it that needs him.
  *
- * "Eight questions wait on you. The first one is hard to undo." How many wait, and then the one thing worth knowing
+ * "Eight questions wait on you. One of them is hard to undo." How many wait, and then the one thing worth knowing
  * before reading them: which are hard to undo, or else what the first suggests, with who asked it when that is known.
  * RED IS ONLY FOR WHAT IS LATE, a question that has waited past the record's `lateDays` ("two of them for over two weeks"); a count is
  * never the trouble, and the queue keeps no quota to be over. The queue ranks by wait, then band: the hard ones need not lead.
@@ -142,7 +142,7 @@ export function countSentence(
   const overdue =
     stale === 0 ? '' : stale === n ? (n === 1 ? past : `all of them ${past}`) : `${numberWord(stale)} of them ${past}`;
   /* HOW MANY, THEN WHERE: "The first ten are hard to undo" read as a rank, not a count, so the count is said as one
-     ("Ten of them are hard to undo."); one is still "the first one", and all is "all of them". IT DOES NOT SAY THEY COME
+     ("Ten of them are hard to undo."); one is "one of them" (it was "the first one", which named a place in the queue: audit 60, claim 3), and all is "all of them". IT DOES NOT SAY THEY COME
      FIRST (audit 58, claim 3): the queue ranks by how long a question can wait before its band (`WAIT_RANK_SQL`, then
      `BAND_RANK_SQL`, in the kernel), so a hard one opened today sits behind an older easy one.
      "Of them" is said once a sentence: after "three of them for over two weeks" it is "Four are hard to undo". */
@@ -155,7 +155,7 @@ export function countSentence(
         : hard === n
           ? ` ${n === 2 ? 'Both' : 'All of them'} are hard to undo.`
           : hard === 1
-            ? ' The first one is hard to undo.'
+            ? ` One${overdue.includes('of them') ? '' : ' of them'} is hard to undo.`
             : ` ${capital(numberWord(hard))}${overdue.includes('of them') ? '' : ' of them'} are hard to undo.`
       : option
         ? who

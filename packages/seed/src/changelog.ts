@@ -112,7 +112,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   'money-core': [
     {
       version: '3.17.0',
-      notes: 'Money works out your cash a second way, entry by entry from the last statement, so a cash figure that is wrong can be caught. If the two ever disagree, Money says so in one red tile under Cash ahead. Filing rules are a list of their own: a text, how it matches, which way the money goes and the category it files under, and the Ledger says which rule filed an entry. An account can be closed, and a closed account is left out of today\'s cash. A payment an instalment names cannot be deleted. With more than one book, Money opens on how many books and accounts your money is kept in. The six newest Ledger entries stand open on Money in a tile of their own, each opening its entry, and are no longer folded under History. On Heads up, lateness is in the danger colour and the words stay. A payment marks the bill it pays: once a Ledger entry that names a bill has cleared, the bill is part paid with the sum so far, or paid with the day.',
+      notes: 'Money works out your cash a second way, entry by entry from the last statement, so a cash figure that is wrong can be caught. If the two ever disagree, Money says so in one red tile under Cash ahead. Filing rules are a list of their own: a text, how it matches, which way the money goes and the category it files under, and the Ledger says which rule filed an entry. An account can be closed, and a closed account is left out of today\'s cash. A payment an instalment names cannot be deleted. With more than one book, Money opens on how many books and accounts your money is kept in. The six newest Ledger entries stand open on Money in a tile of their own, each opening its entry, and are no longer folded under History. On Heads up, lateness is in the danger colour and the words stay. A payment marks the bill it pays: once a Ledger entry that names a bill has cleared, the bill is part paid with the sum so far, or paid with the day. Money sent from one account to another in a different currency is counted as one move, not as spending and income, when the two amounts agree within 2% at the rate of the day it left. The Ledger tile shows as soon as an entry is written, cleared or not.',
     },
     {
       version: '3.16.0',
@@ -201,6 +201,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '1.3.0', notes: 'Services says who a row is with, where it said a registrar.' },
   ],
   work: [
+    {
+      version: '1.19.0',
+      notes: "A thread can be an idea or planned before it is open, and moves only where it makes sense: an idea cannot be marked done in one step. A thread can say the day it aims for, and shows in Due this week. A follow-up takes its task's project, thread, owner and agent where it names none.",
+    },
     {
       version: '1.18.0',
       notes: 'Counts the tasks on a project that changed this week, so a project page can say whether it is moving before anybody describes it. It also says how many days since a task on a project was last written, as Last worked under Where it stands.',

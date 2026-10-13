@@ -15,8 +15,14 @@ export const LEDGER: Record<string, unknown>[] = [
 
        HEADED BY THE LIST'S OWN NAME, so the word a person looks for is the word on the page and on the rail.
 
-       NOT DRAWN ON A LEDGER THAT HOLDS NOTHING: `ledger-newest-days` has no value until one entry has cleared, so a
-       fresh record reads no empty tile. A void entry is left out, as it is from every figure of the Ledger. */
+       GATED BY WHAT IT HOLDS, AND BY NO FIGURE (audit 59, claim 5). It waited on `ledger-newest-days`, a figure that
+       reads cleared entries alone, so a card payment typed this morning and not yet cleared was on the Ledger and not
+       on the page. Now the tile's own entries decide: any entry that is not void draws it, and a void one is left
+       out, as it is from every figure of the Ledger. A Ledger holding nothing is still not drawn, because a page
+       being read leaves out a tile with nothing in it (`emptyHidden` in `packages/kernel/src/drawn.ts`).
+
+       ITS OWN EMPTY LINE, for the one place that rule lets a tile say it: where the Ledger is the first thing a page
+       has to say. */
     kind: 'timeline',
     heading: 'Ledger',
     icon: 'receipt',
@@ -26,7 +32,7 @@ export const LEDGER: Record<string, unknown>[] = [
     columns: MOVED_COLUMNS,
     order: [{ field: 'on', dir: 'desc' }],
     limit: LEDGER_LINES,
-    when: { metric: 'ledger-newest-days', empty: false },
+    empty: 'Nothing has moved yet.',
   },
 ];
 
@@ -40,6 +46,11 @@ export const LEDGER: Record<string, unknown>[] = [
  *   The Ledger requires an amount, a day and an account besides. A host fills the day with today and the amount with
  *   nought, and has no account to give, because an account is a link (`capturedFields` in the app's
  *   `rows-write.ts`), so the record would refuse every entry typed here.
+ *
+ * STILL WAITING AFTER BATCH 61, AND ON PURPOSE. The box can be placed from this file, after the tile in `LEDGER`, and
+ * `parts/history.ts` could give up a block for it. Neither was done: a box the record refuses at every press is a
+ * control that cannot act, and History's heading or its one chart is too much to pay for that. The first reason has to
+ * go first, in the app and the drawer.
  *
  * `test/money-ledger-tile.test.ts` goes red the day either changes. Until then a movement is added on the Ledger.
  */

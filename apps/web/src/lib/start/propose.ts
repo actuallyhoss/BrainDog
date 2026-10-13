@@ -268,23 +268,51 @@ const WHOLE: readonly Whole[] = [
  * "no more tracking of orders", "no more chasing invoices", "no need of orders". And a word of having stopped
  * (`STOPPED`) refuses only straight before one of those, "I am done taking orders", so "I have done orders for years"
  * and "done for today, I take orders" keep theirs. It is no word of refusal on its own and opens no name.
+ *
+ * AND IT REFUSES ONLY A THING THAT ENDS THE CLAUSE (`ENDS`): the end of what was said, a mark, a join, or a word of when
+ * ("last year", "for good"). Words after the thing say how it was done, so "I stopped keeping orders on paper and now
+ * track them here" keeps its orders. Stopping that is itself denied (`UNDENIED`) is no stopping: "I never stopped
+ * taking orders", "I am not done taking orders", "I won't quit taking orders".
  */
 const REFUSES = "no|not|never|without|zero|don['’]?t|do\\s+not|doesn['’]?t|does\\s+not|haven['’]?t|hasn['’]?t|hadn['’]?t";
 /* `send` and its ending apart: the whole word is a field an add-on declares, and the core spells none (the core-names gate). */
 const DOING = `tracking(?:\\s+of)?|taking|send${'ing'}|chasing|using|keeping|selling`;
 const DOES = `to|have|take|get|do|sell|keep|need(?:\\s+of)?|want|track(?:\\s+of)?|run|own|send|use|chase|${DOING}`;
-const STOPPED = `(?:done|finished|stopped|quit)(?:\\s+with)?(?=\\s+(?:${DOING})\\s)`;
+/* The words that deny a stopping: those of refusal, and the ones only a verb takes. At most three words between, none
+   of them a join or somebody new, so "I won't ever have to quit" is denied and "No, I'm done" and "no staff so I quit" are not. */
+const DENIES = `${REFUSES}|didn['’]?t|did\\s+not|won['’]?t|will\\s+not|can['’]?t|cannot|wouldn['’]?t|isn['’]?t|aren['’]?t|wasn['’]?t`;
+const UNDENIED = `(?<!(?:^|[^\\p{L}\\p{N}'’])(?:${DENIES})\\s+(?:(?!(?:(?:i|we|you|they|he|she|it)(?:['’]\\p{L}+)?|and|or|nor|but|so|because|since|then|now)(?![\\p{L}\\p{N}'’]))[\\p{L}'’]+\\s+){0,3})`;
+const HALTED = `${UNDENIED}(?:done|finished|stopped|quit)(?:\\s+with)?`;
+const STOPPED = `${HALTED}(?=\\s+(?:${DOING})\\s)`;
 const NOT = new RegExp(
-  `(?:^|[^\\p{L}\\p{N}])(?:${REFUSES}|${STOPPED})\\s+(?:(?:any|more|longer|ever|had|got|${DOES}|a|an|the)\\s+){0,5}(?:(?:${[...PLAIN].join('|')})\\s+)*$`,
+  `(?:^|[^\\p{L}\\p{N}])(?:${REFUSES})\\s+(?:(?:any|more|longer|ever|had|got|${DOES}|a|an|the)\\s+){0,5}(?:(?:${[...PLAIN].join('|')})\\s+)*$`,
   'iu',
 );
+const NOT_STOPPED = new RegExp(`(?:^|[^\\p{L}\\p{N}])${STOPPED}\\s+(?:(?:any|more|longer|ever|had|got|${DOES}|a|an|the)\\s+){0,5}(?:(?:${[...PLAIN].join('|')})\\s+)*$`, 'iu');
 /* The thing heard can be the verb itself: "I am done selling" is no shop, as "no more selling" already is none. */
-const STOPPED_BEFORE = /(?:^|[^\p{L}\p{N}])(?:done|finished|stopped|quit)(?:\s+with)?\s+$/iu;
+const STOPPED_BEFORE = new RegExp(`(?:^|[^\\p{L}\\p{N}])${HALTED}\\s+$`, 'iu');
 const IS_DOING = new RegExp(`^(?:${DOING})(?![\\p{L}\\p{N}])`, 'iu');
+/* What may follow a thing somebody stopped: nothing, a mark of any kind, a join, with at most a word of when before it. */
+const SPAN = 'years?|months?|weeks?|days?';
+const MONTH = 'january|february|march|april|may|june|july|august|september|october|november|december';
+const WHEN = [
+  'anymore|any\\s+more|any\\s+longer|altogether|entirely|completely|at\\s+all|too|either|as\\s+well',
+  'for\\s+good|for\\s+now|now|already|today|yesterday|recently|lately',
+  '(?:last|this)\\s+(?:year|month|week|spring|summer|autumn|fall|winter)',
+  `(?:back\\s+)?in\\s+(?:\\d{4}|${MONTH})`,
+  `(?:(?:a\\s+)?(?:few|couple\\s+of|long)\\s+|[\\p{L}\\p{N}]+\\s+)?(?:${SPAN}|while|time)\\s+ago`,
+].join('|');
+const CLAUSE_END = `(?:\\s+(?:${WHEN}))?\\s*(?:$|[^\\p{L}\\p{N}\\s]|(?:and|or|nor|but|so|because|since)(?![\\p{L}\\p{N}]))`;
+const ENDS = new RegExp(`^${CLAUSE_END}`, 'iu');
+/* After the verb itself, what was sold or kept comes first: "done selling candles", never "selling candles on paper". */
+/* A thing joined straight on with "and", "or" or "nor": the run ends where its last thing does. */
+const RUN_ON = /^\s+(?:and|or|nor)\s+(?:(?:any|a|an|the|my|our)\s+)?/iu;
+const ENDS_DOING = new RegExp(`^(?:\\s+(?!(?:on|in|by|from|at|with|via|over|through|to|for|into|and|or|nor|but)(?![\\p{L}\\p{N}]))[\\p{L}\\p{N}'’-]+){0,3}${CLAUSE_END}`, 'iu');
 /* A name never opens with a word of refusal: "Don't need orders, I freelance" names nobody (`who`). */
 const OPENS_REFUSING = new RegExp(`^(?:${REFUSES})(?![\\p{L}\\p{N}'’])`, 'iu');
 
 type Said = { at: number; text: string };
+type Refusal = 'refused' | 'stopped' | null;
 
 /*
  * WHAT JOINS THE NEXT THING TO THE ONE BEFORE: a comma, "and", "or", "nor", then at most a small word and words of size.
@@ -319,28 +347,48 @@ function refusedIn(said: string, known: readonly Said[] = []): (span: Said) => b
     return span ? [span] : [];
   });
   const whole = (at: number, to: number): [number, number] => wholes.find(([a, b]) => at >= a && to <= b) ?? [at, to];
-  const not = (from: number): boolean => NOT.test(said.slice(0, from)) || (STOPPED_BEFORE.test(said.slice(0, from)) && IS_DOING.test(said.slice(from)));
-  const refused = (from: number, to: number): boolean => {
-    if (not(from)) return true;
+  /* Whether a thing ends its clause. In "stopped keeping orders and invoices on paper" the run ends at "invoices", which does not. */
+  const ends = (to: number): boolean => {
+    const after = said.slice(to);
+    if (!ENDS.test(after)) return false;
+    const next = to + (RUN_ON.exec(after)?.[0].length ?? 0);
+    const joined = next > to ? known.find((k) => k.at === next) : undefined;
+    return joined ? ends(joined.at + joined.text.length) : true;
+  };
+  /* How a thing was refused: by a word of refusal, or by a word of having stopped, which holds only at a clause's end. */
+  const not = (from: number, to: number): Refusal => {
+    const before = said.slice(0, from);
+    if (NOT.test(before)) return 'refused';
+    /* A word of size is said before its thing ("done selling handmade candles"), so it ends as the verb does. */
+    if (NOT_STOPPED.test(before)) return (PLAIN.has(said.slice(from, to).toLowerCase()) ? ENDS_DOING.test(said.slice(to)) : ends(to)) ? 'stopped' : null;
+    const doing = STOPPED_BEFORE.test(before) ? IS_DOING.exec(said.slice(from)) : null;
+    return doing && ENDS_DOING.test(said.slice(from + doing[0].length)) ? 'stopped' : null;
+  };
+  const refused = (from: number, to: number): Refusal => {
+    const own = not(from, to);
+    if (own) return own;
     const before = said.slice(0, from);
     const join = JOINED.exec(before);
-    if (!join) return false;
+    if (!join) return null;
     let word = (join[1] ?? join[2])?.toLowerCase();
     if (word === undefined) {
       word = AND_OR.exec(said.slice(to))?.[1]?.toLowerCase();
-      if (word === undefined) return false;
+      if (word === undefined) return null;
     }
-    if (word === 'and' && (join[3] !== undefined || !MANY.test(said.slice(from, to)) || /ss$/iu.test(said.slice(from, to)))) return false;
+    if (word === 'and' && (join[3] !== undefined || !MANY.test(said.slice(from, to)) || /ss$/iu.test(said.slice(from, to)))) return null;
     /* THE THING BEFORE THE JOIN: a phrase heard that ends there, or failing one the single word that does. */
     const end = join.index;
     const last = /[\p{L}\p{N}'’-]+$/u.exec(before.slice(0, end));
     const starts = new Set(known.filter((k) => k.at + k.text.length === end).map((k) => k.at));
     if (last) starts.add(last.index);
-    return [...starts].some((at) => at < from && refused(whole(at, end)[0], end));
+    const carried = [...starts].flatMap((at) => (at < from ? [refused(whole(at, end)[0], end)] : []));
+    if (carried.includes('refused')) return 'refused';
+    /* A stopping carried to a thing joined on holds the same rule: that thing ends the clause too. */
+    return carried.includes('stopped') && ENDS.test(said.slice(to)) ? 'stopped' : null;
   };
   return (span) => {
     const [from, to] = whole(span.at, span.at + span.text.length);
-    return not(span.at) || refused(from, to);
+    return (not(span.at, to) ?? refused(from, to)) !== null;
   };
 }
 

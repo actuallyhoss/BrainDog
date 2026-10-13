@@ -284,6 +284,8 @@ const CORE_ROUTES: readonly Route[] = [
     takes: { id: 'text' } },
   { name: 'arrangement', group: 'READ+', writes: false, what: 'How this BrainDog is arranged and what may be proposed about it: packs, the catalogue, voice and pages; one page declaration; or a grammar.',
     takes: { page: 'text', grammar: 'text' } },
+  { name: 'pageVersions', group: 'READ+', writes: false, what: "One page's versions, newest first, each with its source, when it was applied and by whom.",
+    takes: { page: 'text' } },
   { name: 'exportUseCase', group: 'READ+', writes: false, what: "This BrainDog's arrangement as a use-case file: modules, its own lists and pages, voice and labels, and only the example rows named.",
     takes: { usecase: 'text', title: 'text', summary: 'text', version: 'text', audience: 'text', author: 'text', examples: 'json', step: 'text', nav: 'json', signals: 'json', skills: 'json' } },
   { name: 'actions', group: 'READ+', writes: false, what: "Every scheduled action: what it calls, how often, whether it is paused and why, and this month's runs." },
@@ -612,6 +614,8 @@ export type RecordSurface = {
   archiveArrival(args: never, ctx: never): Promise<Result<unknown>>;
   packConfig(args: never, ctx: never): Promise<Result<unknown>>;
   arrangement(args: never, ctx: never): Promise<Result<unknown>>;
+  /** OPTIONAL as `pagesCensus` is: the route lands with the record's method, and an older record answers it is not in this build. */
+  pageVersions?(args: never, ctx: never): Promise<Result<unknown>>;
   slash(args: never, ctx: never): Promise<Result<unknown>>;
   slashPropose(args: never, ctx: never): Promise<Result<unknown>>;
   slashDaily(args: never, ctx: never): Promise<Result<unknown>>;
@@ -736,6 +740,10 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     archiveArrival: (a, ctx) => api.archiveArrival(a as never, ctx as never),
     packConfig: (a, ctx) => api.packConfig(a as never, ctx as never),
     arrangement: (a, ctx) => api.arrangement(a as never, ctx as never),
+    pageVersions: async (a, ctx) =>
+      api.pageVersions
+        ? api.pageVersions(a as never, ctx as never)
+        : { ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: "This BrainDog cannot list a page's versions yet, so nothing was read." } },
     slash: (a, ctx) => api.slash(a as never, ctx as never),
     slashPropose: (a, ctx) => api.slashPropose(a as never, ctx as never),
     slashDaily: (a, ctx) => api.slashDaily(a as never, ctx as never),

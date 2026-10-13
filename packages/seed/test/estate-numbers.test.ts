@@ -1,0 +1,183 @@
+/**
+ * A service's numbers, on Renewals: "Server and provider numbers" (REC-C12 steps 2 and 3).
+ *
+ * WHY THIS FILE EXISTS. An imported record held seventeen readings about two servers and the providers behind them, how
+ * full a disk was and what a provider had billed so far, and each sat in Numbers with no project and nothing saying
+ * which service it was about. Numbers had no field for one, so the readings were on no page: not on a project's, since
+ * they had no project, and not on Renewals, which read Services and nothing else.
+ *
+ * FOUR THINGS ARE HELD HERE. Numbers has a Service, a link to Services, after its Organisation and never required. A
+ * number with a service set is drawn on Renewals under "Server and provider numbers", six at most. A record with no
+ * such number is drawn no block. And Renewals stays Estate's own page: the block is laid on it by the pack that
+ * declares Numbers, so Estate still goes in on a record that holds no Numbers.
+ */
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+import { handedOf, install, normalise, plan, type Host, type Installed, type Pack } from '@braindog/declare';
+import { openRecord, type Kernel } from '@braindog/kernel';
+import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.ts';
+
+import { NOW, firstPartyManifest } from '../src/index.ts';
+import { ESTATE_PAGES, SERVICE_NUMBERS } from '../src/modules/estate.ts';
+import { modulesFor, useCase, useCaseDocument } from '../src/usecases/index.ts';
+import { carriedDocument, dayOf, moduleDocument } from '../src/usecases/install.ts';
+
+const TODAY = dayOf(NOW);
+const OWNER = { actor: 'p_1' };
+const HEADING = 'Server and provider numbers';
+/** The most blocks a page holds (`BLOCK_CEILING` in `packages/kernel/src/declare.ts`). */
+const CEILING = 24;
+
+const value = <T>(r: unknown): T => {
+  const x = r as { ok: boolean; value: T; refusal?: { code: string; fix: string; at?: string } };
+  assert.ok(x.ok, x.ok ? '' : `${x.refusal?.code} at ${x.refusal?.at}: ${x.refusal?.fix}`);
+  return x.value;
+};
+
+const hostFor = (k: Kernel): Host => ({
+  count: (register) => k.count(register),
+  stage: (batch) => k.stageInstall(batch as never),
+  transaction: (fn) => k.transaction(fn),
+  reload: () => k.reload(),
+  retire: (ids) => k.retire(ids),
+  seed: (register, fields) => k.create(register, { ...fields, tags: ['example'] }, { actor: 'p_seed', cascade: false }) as never,
+  remember: (row) => k.rememberPack(row),
+  forget: (id) => k.forgetPack(id),
+  claimed: (pack) => k.packClaims(pack),
+});
+
+const sqlOf = new WeakMap<Kernel, NodeSql>();
+
+async function opened(): Promise<Kernel> {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  sqlOf.set(k, sql);
+  return k;
+}
+
+const stateOf = (k: Kernel): Installed => ({
+  format: 1,
+  primitives: 1,
+  record_version: k.version(),
+  packs: k.packs(),
+  declarations: k.declarations() as Installed['declarations'],
+  rows: k.census(),
+  config: k.packSettings(),
+  handed: handedOf((sqlOf.get(k)?.all<{ manifest: string }>('SELECT manifest FROM pack') ?? []).map((r) => r.manifest)),
+});
+
+const held = (k: Kernel): string[] => (k.declarations() as { id: string; kind: string }[]).filter((d) => d.kind === 'register').map((d) => d.id.slice('register.'.length));
+
+async function put(k: Kernel, doc: unknown): Promise<void> {
+  const pack = value<Pack>(await normalise(doc, { kind: 'local' }));
+  const diff = await plan(pack, stateOf(k));
+  value(await install(pack, diff, hostFor(k), diff.planHash));
+}
+
+/** A founder record made the way onboarding makes one, with no example rows: its modules in order, then its own pack. */
+async function founder(): Promise<Kernel> {
+  const k = await opened();
+  const u = useCase('founder')!;
+  for (const m of modulesFor(u, ['people'])) {
+    if (m === 'agents') continue;
+    const holds = new Set([...held(k), ...firstPartyManifest(m as never).provides.flatMap((p) => (p.startsWith('register.') ? [p.slice(9)] : []))]);
+    await put(k, moduleDocument(u, m, { today: TODAY, holds, examples: false }));
+  }
+  await put(k, carriedDocument(u, TODAY, null, { examples: false }));
+  return k;
+}
+
+/** The same record before the use case's own pack is in: Estate and the other modules, and no Numbers. */
+async function modulesOnly(): Promise<Kernel> {
+  const k = await opened();
+  const u = useCase('founder')!;
+  for (const m of modulesFor(u, ['people'])) {
+    if (m === 'agents') continue;
+    const holds = new Set([...held(k), ...firstPartyManifest(m as never).provides.flatMap((p) => (p.startsWith('register.') ? [p.slice(9)] : []))]);
+    await put(k, moduleDocument(u, m, { today: TODAY, holds, examples: false }));
+  }
+  return k;
+}
+
+type Field = { id: string; label?: string; type: string; to?: string; required?: boolean };
+type Line = { name: string; now: (number | null)[] };
+type Latest = { measure: string; value: number };
+type Drawn = { kind: string; heading?: string; drawn?: boolean; limit?: number; measures?: Line[]; latest?: Latest[]; refusals?: { code: string; fix: string }[] };
+
+/** Every block of Renewals, none of them refused. */
+function renewals(k: Kernel): Drawn[] {
+  const blocks = value<{ blocks: Drawn[] }>(k.page('estate')).blocks;
+  const refused = blocks.filter((b) => (b.refusals ?? []).length > 0).map((b) => `${b.heading}: ${b.refusals!.map((r) => `${r.code} ${r.fix}`).join(', ')}`);
+  assert.deepEqual(refused, [], 'Renewals refused a block');
+  return blocks;
+}
+
+/** The block, when Renewals draws it: absent and switched off both read as not drawn. */
+const numbersOn = (k: Kernel): Drawn | undefined => renewals(k).find((b) => b.heading === HEADING && b.drawn !== false);
+
+const DAY = 86_400_000;
+const at = (daysAgo: number): string => new Date(NOW - daysAgo * DAY).toISOString();
+
+const server = (k: Kernel, name: string): string =>
+  value<{ id: string }>(k.create('services', { name, provider: 'Fenwick Cloud', kind: 'server', cycle: 'monthly', state: 'live' }, OWNER)).id;
+
+test('NUMBERS HAS A SERVICE, a link to Services after its Organisation, and a number need not say one', () => {
+  const doc = useCaseDocument('founder', TODAY) as { declarations: { register?: string; fields?: Field[] }[] };
+  const fields = doc.declarations.find((d) => d.register === 'datapoints' && Array.isArray(d.fields))!.fields!;
+  const service = fields.find((f) => f.id === 'about_service');
+  assert.ok(service, `Numbers holds ${fields.map((f) => f.id).join(', ')} and no service`);
+  assert.deepEqual([service.label, service.type, service.to], ['Service', 'ref', 'services']);
+  assert.notEqual(service.required, true, 'a number about a project says no service');
+  assert.equal(fields[fields.indexOf(service) - 1]?.id, 'organisation', 'Service comes after Organisation');
+});
+
+test('A NUMBER WITH A SERVICE SET IS DRAWN ON RENEWALS under Server and provider numbers, as a line once it is read twice', async () => {
+  const k = await founder();
+  const box = server(k, 'Build box');
+  for (let d = 0; d < 5; d += 1) value(k.create('datapoints', { name: 'Disk used', value: 60 + d, unit: '%', about_service: box, source: 'polled', at: at(d) }, OWNER));
+  value(k.create('datapoints', { name: 'Memory used', value: 41, unit: '%', about_service: box, source: 'polled', at: at(1) }, OWNER));
+  const block = numbersOn(k);
+  assert.ok(block, `Renewals draws ${renewals(k).filter((b) => b.drawn !== false).map((b) => b.heading ?? b.kind).join(', ')} and no ${HEADING}`);
+  assert.equal(block.kind, 'lines');
+  assert.deepEqual(block.measures?.map((m) => m.name), ['Disk used'], 'the measure read five times is a line');
+  assert.equal(block.measures?.[0]?.now.at(-1), 60, "today's reading ends the line");
+  assert.deepEqual(block.latest?.map((l) => [l.measure, l.value]), [['Memory used', 41]], 'the measure read once is said as a number');
+  const blocks = renewals(k);
+  const after = blocks.findIndex((b) => b.heading === 'Next ninety days');
+  assert.equal(blocks[after + 1]?.heading, HEADING, 'it stands under what renews, above everything folded shut');
+});
+
+test('SIX AT MOST: eight measures about one server draw six', async () => {
+  const k = await founder();
+  const box = server(k, 'Build box');
+  for (let n = 0; n < 8; n += 1) value(k.create('datapoints', { name: `Measure ${n + 1}`, value: n, about_service: box, source: 'polled', at: at(n) }, OWNER));
+  const block = numbersOn(k);
+  assert.ok(block, `no ${HEADING}`);
+  assert.equal(block.latest?.length, 6);
+  assert.ok((block.measures?.length ?? 0) <= 6);
+});
+
+test('A RECORD WITH NO NUMBER ABOUT A SERVICE DRAWS NO BLOCK, whatever its projects report and whatever the example says', async () => {
+  const k = await founder();
+  assert.equal(numbersOn(k), undefined, 'a fresh record draws it');
+  const box = server(k, 'Build box');
+  const project = value<{ id: string }>(k.create('things', { name: 'Harbour app', lane: 'building' }, OWNER));
+  value(k.create('datapoints', { name: 'Sign-ups', value: 12, thing: project.id, source: 'reported', at: at(1) }, OWNER));
+  assert.equal(numbersOn(k), undefined, "a project's number drew it");
+  value(k.create('datapoints', { name: 'Disk used', value: 60, unit: '%', about_service: box, source: 'example', at: at(1) }, OWNER));
+  assert.equal(numbersOn(k), undefined, 'an example drew it');
+});
+
+test('RENEWALS IS STILL ESTATE\'S OWN PAGE: it reads on a record with no Numbers, gave up no block, and stays under the ceiling', async () => {
+  const k = await modulesOnly();
+  assert.ok(!held(k).includes('datapoints'), 'this record holds no Numbers');
+  assert.equal(renewals(k).some((b) => b.heading === HEADING), false);
+  const own = ESTATE_PAGES.estate!.blocks as { heading?: string }[];
+  assert.equal(own.length, 10, 'Renewals holds the ten blocks it held');
+  assert.ok(own.length + 1 <= CEILING, `Renewals with the block laid on it is ${own.length + 1} blocks, over ${CEILING}`);
+  assert.equal(SERVICE_NUMBERS.page, 'page.estate');
+  assert.equal(SERVICE_NUMBERS.block.heading, HEADING);
+  assert.equal(SERVICE_NUMBERS.block.limit, 6);
+});

@@ -100,8 +100,12 @@ export const TEAM = {
      live.
      2.20.0: the project page it embeds takes portfolio 1.16.0's Where it stands (the typed card only while
      `project-said` counts one, else a stat of `project-moved-7d` under the same heading), and Where it stands takes Last
-     worked (`project-last-worked`). 2.19.0 is live. */
-  version: '2.20.0',
+     worked (`project-last-worked`). 2.19.0 is live.
+     2.21.0: the project page it embeds lists a project's own tools alone under Tools and servers (`kind is tool, scope
+     is project`, sketchpad-60), where it listed everybody's. Batch 60 wrote this into 2.20.0, which commit 63423720
+     had already deployed, so it is a version of its own. One `where` narrowed on a block that is there, nothing added
+     or taken away, so a minor step. 2.20.0 IS LIVE. */
+  version: '2.21.0',
   title: 'Team board',
   summary: 'Tickets with an owner and a status, the cycle each is in, and the work your agents took on.',
   author: 'BrainDog',

@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { arrivalOf, keepKey, keepSaid, SAID_KEY, SAID_LINK_BYTES, SAID_LINK_MOST, saidForLink, saidFromLink, saidKept, startSignup, type Draft, type Io } from './signup.ts';
+import { arrivalOf, keepKey, keepLeft, keepSaid, pressKept, SAID_KEY, SAID_LINK_BYTES, SAID_LINK_MOST, saidForLink, saidFromLink, saidKept, startSignup, type Draft, type Io } from './signup.ts';
 
 const MARIAM = "I'm Mariam. I run a small candle shop in Alexandria and freelance as a designer.";
 const TOKEN = 'v'.repeat(20) + '_-' + 'K'.repeat(21);
@@ -197,6 +197,89 @@ test('A RELOAD AFTER A PRESS THAT ANSWERED IN PART builds under the first key, s
   keepSaid(desk, null);
   keepKey(desk, 'first-run-five', 10000);
   assert.equal(desk.map.has(SAID_KEY), false);
+});
+
+/** A record as `setup` keeps its word: a key it holds is passed over, and any other writes every entry it is sent. */
+function record() {
+  const held = new Set<string>();
+  const written: string[] = [];
+  /** One press. `refuse` names the entries this press does not write, which it hands back as left. */
+  const setup = (press: { key?: string; again?: boolean; proposal: { rows: unknown[] } }, refuse: readonly string[] = []): string[] => {
+    if (press.key === undefined || held.has(press.key)) return [];
+    held.add(press.key);
+    const rows = press.proposal.rows as string[];
+    written.push(...rows.filter((r) => !refuse.includes(r)));
+    return rows.filter((r) => refuse.includes(r));
+  };
+  return { written, setup };
+}
+
+test('PARTIAL, TRY AGAIN GOES IN, RELOAD: nothing is written twice (audit 59, claim 2)', () => {
+  const desk = storage();
+  const rec = record();
+  /* THE BUILD AS THE SENTENCE READS, the same on every load of the page. */
+  const built = { proposal: { rows: ['a task', 'an order', 'a person'], modules: ['tasks'] } };
+  keepSaid(desk, { said: MARIAM, currency: 'EGP', usecase: 'shop' }, 1000);
+  /* THE FIRST PRESS, answered in part: one entry in, two handed back for a new key. */
+  keepKey(desk, 'first-run-one', 2000);
+  const left = rec.setup({ ...built, key: 'first-run-one' }, ['an order', 'a person']);
+  assert.deepEqual(rec.written, ['a task']);
+  keepLeft(desk, { key: 'first-run-two', rows: left }, 3000);
+  /* TRY AGAIN GOES IN under the new key, and the tab is reloaded before its answer is acted on. */
+  keepKey(desk, 'first-run-two', 3500);
+  rec.setup({ ...built, again: true, key: 'first-run-two', proposal: { ...built.proposal, rows: left } });
+  assert.deepEqual(rec.written, ['a task', 'an order', 'a person']);
+  /* THE RELOAD: the sentence, its first key and what was left, read off the device as `build` reads them. */
+  const reloaded = saidKept(desk, 4000, null);
+  assert.equal(reloaded?.key, 'first-run-one', 'the first key stays');
+  assert.deepEqual(reloaded?.left, { key: 'first-run-two', rows: ['an order', 'a person'] });
+  const press = pressKept(built, reloaded);
+  assert.deepEqual(press, { proposal: { rows: ['an order', 'a person'], modules: ['tasks'] }, again: true, key: 'first-run-two' });
+  rec.setup(press);
+  assert.deepEqual(rec.written, ['a task', 'an order', 'a person'], 'the reload wrote nothing a second time');
+  /* THE FAULT THIS HOLDS OFF: the whole plan again under a key the record never held for the Try again's entries. */
+  const old = record();
+  old.setup({ ...built, key: 'k1' }, ['an order', 'a person']);
+  old.setup({ ...built, key: 'k2', proposal: { ...built.proposal, rows: left } });
+  old.setup({ ...built, key: 'k3' });
+  assert.equal(old.written.filter((r) => r === 'an order').length, 2, 'which is what doubled before');
+  /* AND A TRY AGAIN THAT NEVER REACHED THE RECORD is written by the reload, once. */
+  const lost = record();
+  lost.setup({ ...built, key: 'first-run-one' }, ['an order', 'a person']);
+  lost.setup(press);
+  lost.setup(pressKept(built, saidKept(desk, 5000, null)));
+  assert.deepEqual(lost.written, ['a task', 'an order', 'a person']);
+});
+
+test('WHAT IS LEFT IS KEPT WITH ITS PLAN AND GOES WITH THE SENTENCE, and a first press is sent as it is', () => {
+  const desk = storage();
+  const built = { proposal: { rows: ['a'] }, drafted: { lists: 1 } as object | null, plan: ['p1', 'p2'] as unknown[] };
+  /* NOTHING KEPT: the build as it is. A KEY ALONE (a reload before any answer): the whole of it under that key. */
+  assert.equal(pressKept(built, null), built);
+  assert.deepEqual(pressKept(built, { key: 'first-run-one' }), { ...built, key: 'first-run-one', again: true });
+  /* NO SENTENCE, NOTHING WRITTEN, as with the key. */
+  keepLeft(desk, { key: 'first-run-two', rows: [] }, 1);
+  assert.equal(desk.map.has(SAID_KEY), false);
+  keepSaid(desk, { said: MARIAM, currency: null, usecase: 'shop' }, 1000);
+  keepKey(desk, 'first-run-one', 2000);
+  /* THE PLAN STILL TO MAKE (none of it, here) AND A DRAFT ALREADY ON DECIDE ride with what is left. */
+  keepLeft(desk, { key: 'first-run-two', rows: [], plan: [], filed: true }, 3000);
+  assert.equal(JSON.parse(desk.map.get(SAID_KEY)!).at, 1000, 'the sentence is no younger for it');
+  assert.deepEqual(pressKept(built, saidKept(desk, 4000, null)), { proposal: { rows: [] }, drafted: null, plan: [], again: true, key: 'first-run-two' });
+  /* A LATER PARTIAL ANSWER TAKES ITS PLACE, and one that is not a key or not entries is not kept. */
+  keepLeft(desk, { key: 'first-run-three', rows: ['b'] }, 5000);
+  keepLeft(desk, { key: 'not a key', rows: ['c'] }, 5500);
+  keepLeft(desk, { key: 'first-run-four', rows: 'c' as unknown as unknown[] }, 5600);
+  assert.deepEqual(saidKept(desk, 6000, null)?.left, { key: 'first-run-three', rows: ['b'] });
+  /* IT NEVER RIDES IN THE LINK, and a new sentence or a build all in leaves none behind. */
+  assert.equal(saidForLink({ ...saidKept(desk, 6000, null)! })?.includes('first-run'), false);
+  keepSaid(desk, { said: `${MARIAM} And candles.`, currency: null, usecase: 'shop' }, 7000);
+  assert.equal(saidKept(desk, 7000, null)?.left, undefined);
+  keepLeft(desk, { key: 'first-run-five', rows: ['d'] }, 7500);
+  keepSaid(desk, null);
+  assert.equal(saidKept(desk, 8000, null), null);
+  const blocked = { getItem: () => { throw new Error('off'); }, setItem: () => { throw new Error('off'); }, removeItem: () => {} };
+  assert.doesNotThrow(() => keepLeft(blocked, { key: 'first-run-one', rows: [] }));
 });
 
 test('THE KEY NEVER RIDES IN THE LINK: it is this device\'s handle on its own press', () => {

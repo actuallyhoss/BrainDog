@@ -74,17 +74,22 @@ const LAID: Record<string, Laid> = {
       'Projects names the earning projects gone silent, a line with no heading of its own after In play (stands-50) -> 092fe0f5bb736b52',
     ],
   },
-  /* 2.6.0 LAYS NOTHING NEW: its changes are on its own Home (Today by name, Late, the week from today, no Cost). */
+  /* 2.6.0, STILL UNRELEASED, LAYS ONE BLOCK MORE (estate-numbers-61, folded in by integrate 61): Server and provider
+     numbers on Estate's Renewals. Its other changes are on its own Home (Today by name, Late, the week from today). */
   'founder@2.6.0': {
     lays: [
       'adds page.relation after People: Numbers, 30 days',
       'adds page.relation after People: Latest numbers',
       'adds page.relation after People: Send numbers here',
       'adds page.portfolio after In play: ',
+      'adds page.estate after Next ninety days: Server and provider numbers',
       'hands register.organisations to people',
     ],
-    declares: '092fe0f5bb736b52',
-    history: ['2.6.0 lays what 2.5.0 laid, word for word -> 092fe0f5bb736b52'],
+    declares: 'b7473e7c534ee516',
+    history: [
+      '2.6.0 lays what 2.5.0 laid, word for word -> 092fe0f5bb736b52',
+      'Folded into the unreleased 2.6.0 (estate-numbers-61, REC-C12; integrate 61): it lays Server and provider numbers on Renewals after Next ninety days -> b7473e7c534ee516',
+    ],
   },
 };
 

@@ -25,7 +25,7 @@ test('the count is said in words, then what is hard to undo or what the first su
 
   /* NO AIM, NO QUOTA: eight is a count, and nothing in it is red until something is late. */
   const eight = sentenceOf([{ band: 'undo' }, {}, {}, {}, {}, {}, {}, {}], { options: [opt('Yes'), opt('No')] }, '', NOW);
-  assert.deepEqual(eight, { text: 'Eight questions wait on you. The first one is hard to undo.', needs: '' });
+  assert.deepEqual(eight, { text: 'Eight questions wait on you. One of them is hard to undo.', needs: '' });
 
   const stale = sentenceOf([{ opened: daysAgo(20) }, { opened: daysAgo(16) }, { opened: daysAgo(1) }], { options: [opt('Yes', true)] }, '', NOW, LATE);
   assert.deepEqual(stale, { text: 'Three questions wait on you, two of them for over two weeks. “Yes” is suggested for the first.', needs: 'two of them for over two weeks' });

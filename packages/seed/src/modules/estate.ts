@@ -520,3 +520,38 @@ export const ESTATE_PAGES: Record<string, SeedPage> = {
     ],
   },
 };
+
+/**
+ * A SERVICE'S NUMBERS, ON RENEWALS, SINCE founder 2.6.0 (REC-C12): how full a server's disk is and what a provider has
+ * billed so far are readings about a service and about no project, and they were on no page. A line for each measure
+ * read twice in the ninety days, each one read once as its latest figure, six at most, the example left out.
+ *
+ * LAID ON THE PAGE AND NOT ONE OF ITS OWN BLOCKS, because a page requires every list its blocks read and Numbers is
+ * the pack's that declares it (`usecases/founder.ts`): written among the blocks above, Estate would no longer go in on
+ * a record that holds no Numbers. So the block is said here, beside the page it stands on, and that pack lays it
+ * (`adds`) under what renews and above everything folded shut. Renewals keeps its own ten blocks, eleven with this one.
+ *
+ * `SERVICE_NUMBERS_WHERE` IS THE BLOCK'S OWN CLAUSES, for the figure that hides it: the pack counts the same readings
+ * over the same ninety days, so the heading is never drawn over nothing.
+ */
+export const SERVICE_NUMBERS_BACK = 90;
+export const SERVICE_NUMBERS_WHERE = 'about_service is set, source is not example';
+export const SERVICE_NUMBERS_SHOWN = 'service-numbers';
+export const SERVICE_NUMBERS = {
+  page: 'page.estate',
+  after: 'Next ninety days',
+  block: {
+    kind: 'lines',
+    heading: 'Server and provider numbers',
+    icon: 'chart-line',
+    span: 12,
+    source: 'register.datapoints',
+    /* When, the value, the measure, its unit and the reading as money, as every block over Numbers names them, and the
+       service sixth, the field the lines are to be told apart by once the record groups by a sixth. */
+    columns: [{ field: 'at' }, { field: 'value' }, { field: 'name' }, { field: 'unit' }, { field: 'amount' }, { field: 'about_service' }],
+    where: SERVICE_NUMBERS_WHERE,
+    back: SERVICE_NUMBERS_BACK,
+    limit: 6,
+    when: { metric: SERVICE_NUMBERS_SHOWN, gt: 0 },
+  },
+} as const;

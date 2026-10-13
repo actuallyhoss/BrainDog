@@ -17,7 +17,7 @@
  * own name for it when the screen has one, and every sentence is `copy.ts`'s.
  */
 import type { createClient } from '@braindog/client';
-import { arrangePartsOf } from '@braindog/kernel';
+import { arrangePartsOf, doesOf } from '@braindog/kernel';
 import { moduleName, ruleName } from '@braindog/seed/usecases/names';
 
 import { copy } from '../../../lib/copy.ts';
@@ -56,7 +56,8 @@ export type Part =
   | { part: 'changes'; lists: { name: string; changes: Change[] }[]; count: number }
   | { part: 'starts'; feeds: Call[] }
   | { part: 'choices'; choices: Choice[] }
-  | { part: 'calls'; calls: Call[] }
+  /* `sends` IS WHAT LEAVES, one sentence a call: the key by its label, the host and how often, as the kernel says it. */
+  | { part: 'calls'; calls: Call[]; sends?: string[] }
   | { part: 'packs'; lines: string[] }
   | { part: 'appears'; appears: Appears[]; examples: number }
   | { part: 'words'; lines: string[] }
@@ -618,6 +619,26 @@ export function stopping(arranged: Arranged | null, parts: readonly string[] | u
 export const asksTwice = (arranged: Arranged | null, parts: readonly string[] | undefined): boolean => stopping(arranged, parts).length > 0;
 
 /**
+ * What an arrangement sends out, one sentence a call, and the hosts those sentences name.
+ *
+ * THE KERNEL'S OWN SENTENCE, `doesOf('install', body)`, read a call at a time so the sheet can list them: "Sends your
+ * key 'stripe' to api.stripe.com every hour." It is the line the queue's card says, so the two cannot drift. A call
+ * that is as it was says nothing, and neither does a body that files no `calls_out`.
+ */
+function sendsOf(body: Row, ctx: Context): { lines: string[]; hosts: Set<string> } {
+  const lines: string[] = [];
+  const hosts = new Set<string>();
+  const names = { list: (id: string) => ctx.names?.[`register.${id}`] ?? ctx.lists?.get(id) ?? null };
+  for (const call of Array.isArray(body.calls_out) ? body.calls_out : []) {
+    const line = doesOf('install', { calls_out: [call] }, names);
+    if (line === '') continue;
+    if (isRow(call) && text(call.host)) hosts.add(text(call.host));
+    if (!lines.includes(line)) lines.push(line);
+  }
+  return { lines, hosts };
+}
+
+/**
  * A `pack`, `settings` or `arrange` body as the story Decide draws, or `null` for every other kind.
  */
 export function arrangedOf(kind: string, body: Row, screen: Context = {}): Arranged | null {
@@ -652,8 +673,11 @@ export function arrangedOf(kind: string, body: Row, screen: Context = {}): Arran
   if (feeds.length) parts.push({ part: 'starts', feeds });
   const choices = choicesOf(body);
   if (choices.length) parts.push({ part: 'choices', choices });
-  const calls = allCalls.filter((c) => c.every === '');
-  if (calls.length) parts.push({ part: 'calls', calls });
+  /* WHAT LEAVES WITH EACH CALL, from the `calls_out` the record files beside `approve`. A call's own line never says its
+     key, so an add-on that sends one out had no sentence of it here. A call a sentence says is not drawn again. */
+  const sent = sendsOf(body, ctx);
+  const calls = allCalls.filter((c) => c.every === '' && !sent.hosts.has(c.host));
+  if (calls.length || sent.lines.length) parts.push({ part: 'calls', calls, ...(sent.lines.length ? { sends: sent.lines } : {}) });
 
   const packLines: string[] = [];
   /* AN UPDATE IS SAID AS ONE, with the versions, and never as an install. */

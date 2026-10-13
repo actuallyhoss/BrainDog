@@ -192,3 +192,50 @@ test('A BLOCK WRITTEN OUT IN THE PAGE HOLDS WHAT ITS AUTHOR WROTE, and one with 
   const lead = { ...block({ kind: 'note' }), body: 'Lead' } as BlockResult;
   assert.deepEqual(whys(markDrawn([lead, written, bareRing])), ['drawn', 'drawn', 'empty']);
 });
+
+/* THE SKETCHPAD SHAPE (audit 59, claim 4): the project page of an imported project nobody has described. "Where it
+   stands" is two blocks under one heading, each behind a `when:` (`packages/seed/src/modules/portfolio.ts`): the cards
+   while one of the four fields is said, the figures while none is. Under them, the boxed section "More about
+   Sketchpad" names the host's `actions` panel over what the project runs on. */
+const sketchpad = (over: { said?: boolean; panel?: string; box?: boolean; note?: boolean; actions?: unknown[] } = {}): BlockResult[] => {
+  const said = over.said ?? false;
+  const fields = said ? { name: 'Sketchpad', health: 'at_risk' } : { name: 'Sketchpad', health: null, progress: null, aim: null, agent: null };
+  const more = { ...block({ kind: 'section', heading: 'More about Sketchpad', box: over.box ?? true, panel: over.panel ?? 'actions' }), ...(over.actions ? { actions: over.actions } : {}) };
+  return [
+    block({ kind: 'table', heading: 'The plan', rows: [row({ title: 'Ship it' })], matched: 1 }),
+    cards([row(fields)], { area: 'rail', drawn: said }),
+    { ...block({ kind: 'stat', heading: 'Where it stands', area: 'rail', drawn: !said }), readings: [{ label: 'Worked on this week', reading: { value: 2, held: 3 } }] } as unknown as BlockResult,
+    more as BlockResult,
+    block({ kind: 'feed', heading: 'What changed' }),
+    ...(over.note ? [block({ kind: 'note', heading: 'Notes', empty: 'Nothing is written about Sketchpad yet.' })] : []),
+    cards([], { heading: 'Keys', columns: [{ field: 'name', as: 'title' }] }),
+    cards([], { heading: 'Tools and servers', columns: [{ field: 'name', as: 'title' }] }),
+  ];
+};
+
+test('WHERE IT STANDS ON SKETCHPAD IS OUT BY ITS WHEN, never by the cards rule, and its figures are drawn in its place', () => {
+  const page = markDrawn(sketchpad());
+  assert.deepEqual(whys(page).slice(0, 3), ['drawn', 'when', 'drawn']);
+  /* THE CARDS RULE WOULD HAVE CALLED IT UNSAID, and is never asked: the block's own gate reads the same four fields. */
+  assert.equal(unsaid({ ...sketchpad()[1]!, drawn: true }), true);
+  /* ONCE ONE OF THE FOUR IS SAID the gate opens, the card says it, and the rule answers no. */
+  const told = markDrawn(sketchpad({ said: true }));
+  assert.deepEqual(whys(told).slice(0, 3), ['drawn', 'drawn', 'when']);
+  assert.equal(unsaid(sketchpad({ said: true })[1]!), false);
+});
+
+test('A BOXED ACTIONS SECTION IS SHUT WHEN EVERY BLOCK UNDER IT IS GONE, the tile that stood over nothing on Sketchpad', () => {
+  assert.deepEqual(whys(markDrawn(sketchpad())).slice(3), ['empty', 'empty', 'empty', 'empty']);
+  /* ONE BLOCK UNDER IT DRAWN KEEPS IT: a sentence is never called empty, so the seed's Notes holds the tile open. */
+  assert.deepEqual(whys(markDrawn(sketchpad({ note: true }))).slice(3), ['drawn', 'empty', 'drawn', 'empty', 'empty']);
+  /* A HOST THAT SAYS THE PANEL HOLDS SOMETHING keeps it, since the scheduled actions are drawn under its heading. */
+  assert.equal(whys(markDrawn(sketchpad({ actions: [{ name: 'Nightly import' }] })))[3], 'drawn');
+  /* THE OTHER PANELS ALWAYS HOLD SOMETHING, and a heading with no box is not a tile: each stays, as before. */
+  assert.equal(whys(markDrawn(sketchpad({ panel: 'reporting' })))[3], 'drawn');
+  assert.equal(whys(markDrawn(sketchpad({ panel: 'run' })))[3], 'drawn');
+  assert.equal(whys(markDrawn(sketchpad({ box: false })))[3], 'drawn');
+  /* WITH NO BLOCK AFTER IT AT ALL it is the author's own divider, and stays. */
+  assert.equal(whys(markDrawn(sketchpad().slice(0, 4)))[3], 'drawn');
+  /* AND ARRANGING DRAWS IT AGAIN, with every block under it. */
+  assert.deepEqual(whys(arranged(markDrawn(sketchpad()))).slice(3), ['drawn', 'drawn', 'drawn', 'drawn']);
+});

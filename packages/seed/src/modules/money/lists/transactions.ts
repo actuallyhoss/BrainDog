@@ -95,15 +95,20 @@ export const TRANSACTIONS_REGISTER: MoneyRegister = {
    * days apart, the card on that ledger is paid off with the card's leg a day before the bank's, and a window short
    * enough to part the rent and the client would lose that move and any sent before a weekend.
    *
-   * WHAT CANNOT PAIR: a move between currencies, the most common one on that ledger (dollars out of one account and
-   * another currency into a second). `abs(amount)` compares the currency as well as the size, and
-   * nothing in `pairs:` can say "the same value at the day's rate", so both legs are counted until a person marks them.
+   * A MOVE BETWEEN TWO CURRENCIES PAIRS TOO, SINCE money-core 3.17.0 (`across_currency`, pairs-fx-61), the most common
+   * move on that ledger: dollars out of one account and another currency into a second. The earlier leg is converted at
+   * the rate of its own day and the two pair when they are within 2% of each other, since a bank's own rate is never
+   * the day's. A partner of the same currency is always tried first.
+   *
+   * WHAT STILL CANNOT PAIR: such a move on a day the record holds no rate for (none on or before the day, or one more
+   * than a week old). Both legs are counted until the rate arrives, which settles them again, or a person marks them.
    */
   pairs: {
     on: ['abs(amount)'],
     opposite: 'direction',
     across: 'account',
     within: '4d',
+    across_currency: { tolerance: 2 },
     mark: 'transfer',
     where: {
       all: [
