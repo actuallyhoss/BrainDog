@@ -230,7 +230,7 @@ test('A PAGE WITH NO FILTERS ANSWERS NONE, and a lone block read is never narrow
 
 const OPTIONS = { options: [{ id: 'raise', label: 'Raise it', because: 'Covers the overrun' }, { id: 'leave', label: 'Leave it', because: 'Keeps the quote' }] };
 
-test('A QUEUE READS LEAD, and only its first question carries what was proposed and what accepting does', async () => {
+test('A QUEUE READS LEAD, and its first question carries what was proposed and what accepting does', async () => {
   const { k, sql } = await record();
   value(k.propose({ question: 'Raise the retainer?', body_kind: 'options', body: OPTIONS }, 'slash'));
   value(k.propose({ question: 'Add the two jobs?', body_kind: 'rowset', body: { register: 'tasks', rows: [{ what: 'Glaze test' }, { what: 'Kiln wash' }] } }, 'slash'));
@@ -242,6 +242,18 @@ test('A QUEUE READS LEAD, and only its first question carries what was proposed 
   assert.equal(led.queue?.[0]?.does, 'Adds 2 to Tasks.');
   assert.equal(led.queue?.[1]?.does, undefined);
   assert.equal(led.queue?.[1]?.body_kind, undefined);
+
+  /* A CHANGE TO WHAT A LIST HOLDS KEEPS ITS LINE BELOW THE LEAD, read against what the entry holds; no other kind does. */
+  value(k.propose({ question: 'Change the state of Order clay?', body_kind: 'rowset', body: { register: 'tasks', rows: [{ at: 'tasks#2', version: 1, patch: { state: 'done' } }] } }, 'slash'));
+  const three = k.block({ kind: 'queue', source: 'governance.open', lead: true } as PageBlock).queue ?? [];
+  assert.deepEqual(
+    three.map((q) => [q.kind, q.does, q.body_kind]),
+    [
+      ['rowset', 'Adds 2 to Tasks.', 'rowset'],
+      ['rowset', 'Changes State from doing to done in Tasks.', undefined],
+      ['options', undefined, undefined],
+    ],
+  );
 
   const plain = k.block({ kind: 'queue', source: 'governance.open' } as PageBlock);
   assert.ok((plain.queue ?? []).every((q) => q.does === undefined && q.body_kind === undefined), 'a queue with no lead carries none');
@@ -261,9 +273,9 @@ test('WHAT ACCEPTING DOES IS ONE LINE IN THE PERSON’S OWN NAMES, read off the 
   const names = { list: (id: string) => (id === 'tasks' ? 'Tasks' : null), pack: (id: string) => (id === 'money' ? 'Money' : null) };
   assert.equal(doesOf('options', OPTIONS, names), 'Records your choice and changes nothing else.');
   assert.equal(doesOf('rowset', { register: 'tasks', rows: [{ at: 'tasks#1', fields: {} }, { what: 'x' }] }, names), 'Changes 1 in Tasks and adds 1.');
-  /* THE ROWS IT CHANGES BY NAME, where the record can name every one; one it cannot keeps the count for all of them. */
+  /* A QUESTION ABOUT ONE LIST NEVER NAMES THE ENTRIES, since the question above the line already does; the count is kept. */
   const titled = { ...names, list: (id: string) => (id === 'things' ? 'Projects' : null), row: (at: string) => ({ 'things#1': 'Kiln', 'things#3': 'Portage' })[at] ?? null };
-  assert.equal(doesOf('rowset', { register: 'things', rows: [{ at: 'things#1', patch: {} }, { at: 'things#3', patch: {} }] }, titled), 'Changes Kiln and Portage in Projects.');
+  assert.equal(doesOf('rowset', { register: 'things', rows: [{ at: 'things#1', patch: {} }, { at: 'things#3', patch: {} }] }, titled), 'Changes 2 in Projects.');
   assert.equal(doesOf('rowset', { register: 'things', rows: [{ at: 'things#1', patch: {} }, { at: 'things#9', patch: {} }] }, titled), 'Changes 2 in Projects.');
   assert.equal(doesOf('pack', { disable: 'money' }, names), 'Turns off Money.');
   assert.equal(doesOf('pack', { install: 'usecase-student' }, names), 'Adds Usecase student.');

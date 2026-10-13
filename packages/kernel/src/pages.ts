@@ -542,7 +542,8 @@ export type QueueQuestion = {
   list?: string | null;
   /**
    * On a queue's lead question (`lead: true`): what was proposed, the body's kind, and what accepting it does, one
-   * short line read off the body (`does.ts`), so the first question is drawn whole with the change under it.
+   * short line read off the body (`does.ts`), so the first question is drawn whole with the change under it. A change
+   * to what a list holds keeps `does` below the lead too (`sources/governance.ts` `ledBy`).
    */
   body_kind?: string;
   does?: string;

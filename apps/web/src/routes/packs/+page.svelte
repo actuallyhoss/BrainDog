@@ -422,13 +422,16 @@
         diff: plans.map(({ p }) => marked(diffOf(p), all, plans.map((x) => x.u))),
         then: async () => {
           let done = 0;
+          /* A RUN THAT STOPPED SHORT ENDS ON WHAT STOPPED IT, never on good news: a refusal, or a plan that asks again. */
+          let whole = false;
           const passed: string[] = [];
-          for (const { u, p } of plans) {
+          for (const [i, { u, p }] of plans.entries()) {
             const fresh = done === 0 ? { ok: true as const, planned: p } : await planOf(u);
             if (!fresh.ok) {
               said = { ...said, [u.key]: { fix: fresh.fix, code: fresh.code } };
               break;
             }
+            whole = i === plans.length - 1;
             if (done > 0 && landed(fresh.planned)) {
               passed.push(u.title);
               continue;
@@ -437,12 +440,16 @@
             if (asks.some((line) => !shown.has(line))) {
               const again = fresh.planned;
               sheet = { diff: diffOf(again), then: () => installOne(again, u.title, u).then(reread) };
+              whole = false;
               break;
             }
-            if (!(await installOne(fresh.planned, u.title, u))) break;
+            if (!(await installOne(fresh.planned, u.title, u))) {
+              whole = false;
+              break;
+            }
             done += 1;
           }
-          const ended = words.updatedAll(done, passed);
+          const ended = whole ? words.updatedAll(done, passed) : null;
           if (ended) toasts.push(ended, { intent: 'good' });
           await reread();
         },

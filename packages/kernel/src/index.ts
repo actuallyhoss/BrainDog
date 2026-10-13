@@ -5963,12 +5963,27 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const hard = optionCost(one, withheld) === 'undo';
       return [{ key: one.id, label: one.label, because: typeof one.because === 'string' ? one.because : '', recommended: one.recommended === true, ...(shows ? { shows } : {}), ...(hard ? { hard: true as const } : {}) }];
     });
+    const specOf = (list: string, field: string) => registers.get(list)?.fields.find((f) => f.id === field);
     const does = doesOf(kind, body, {
       list: (id) => registers.get(id)?.name ?? null,
       pack: packName,
       row: titleOfRow,
       /* A FIELD BY THE LABEL THE RECORD SHOWS, so what leaves with a call reads "Due on" from the list and not from its id. */
-      field: (list, field) => registers.get(list)?.fields.find((f) => f.id === field)?.label ?? null,
+      field: (list, field) => specOf(list, field)?.label ?? null,
+      /* WHAT THE ENTRY HOLDS NOW, for the line of what a change changes, and never a secret or a file (`does.ts`). */
+      before: (at, field) => {
+        const row = get(at, { includeDeleted: true });
+        const spec = row ? specOf(row.register, field) : undefined;
+        const type = spec?.type === 'list' ? spec.of : spec?.type;
+        return !row || !spec || type === 'secret' || type === 'file' ? undefined : (row.fields[field] ?? null);
+      },
+      /* A LINK BY THE TITLE OF WHAT IT POINTS AT and a choice by its label, as `cardFacts` reads them; a link that names nothing is not said. */
+      value: (list, field, raw) => {
+        const spec = specOf(list, field);
+        const type = spec?.type === 'list' ? spec.of : spec?.type;
+        const one = (v: unknown): unknown => (v === null || v === '' ? null : type === 'ref' ? (typeof v === 'string' ? (titleOfRow(v) ?? undefined) : undefined) : type === 'enum' && typeof v === 'string' ? (spec?.labels?.[v] ?? v) : v);
+        return Array.isArray(raw) ? raw.map(one) : one(raw);
+      },
     });
     /* THE NAMES A MERGE QUESTION IS ABOUT, each checked on the way out as an option is: a handle, a name, and at most a
        few words of where they were seen. */

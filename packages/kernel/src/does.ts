@@ -13,6 +13,8 @@
  * and a line that throws is a queue that will not draw. A body it cannot read says nothing rather than something wrong.
  */
 
+import { moneyText } from './ingest.ts';
+
 const obj = (v: unknown): Record<string, unknown> => (v !== null && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
 const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 
@@ -25,6 +27,17 @@ export type DoesNames = {
   pack?: (id: string) => string | null;
   row?: (at: string) => string | null;
   field?: (list: string, field: string) => string | null;
+  /**
+   * What the entry at `at` holds in `field` now, as the record keeps it, and `null` when it holds nothing there.
+   * `undefined` is "never say this one": a secret, a file, or an entry or a field the record does not hold. Without it
+   * a change names its fields and says no value, so a line is never made of a value nobody checked may be said.
+   */
+  before?: (at: string, field: string) => unknown;
+  /**
+   * A value of `field` as a person reads it: a link by the title of what it points at, a choice by its label, and
+   * `undefined` for one that cannot be said. Without it a value is said as it is held.
+   */
+  value?: (list: string, field: string, raw: unknown) => unknown;
 };
 
 /** An id read as words: `usecase-student` is "Usecase student". */
@@ -57,17 +70,18 @@ function declarationName(decl: Record<string, unknown>, names: DoesNames): strin
 }
 
 /**
- * "adds 3 to Tasks", "changes Kiln and Portage in Projects and adds 2", for the rows a rowset or an arrangement writes.
+ * "adds 3 to Tasks", "changes Kiln and Portage in Projects and adds 2", for the rows an arrangement writes across its
+ * lists. A question about one list's entries says what each patch changes instead (`changesSaid`).
  *
  * THE ROWS IT CHANGES BY NAME, where every one of them has a title the record can find: Decide's lead card read "Changes
  * 2 in Projects." over a question that was about Kiln and Portage. A row it cannot name keeps the count, so the line
  * never names some and counts the rest as if that were all.
  */
-function rowsSaid(rows: readonly unknown[], names: DoesNames, register?: string): string[] {
+function rowsSaid(rows: readonly unknown[], names: DoesNames): string[] {
   const by = new Map<string, { adds: number; changes: number; named: (string | null)[] }>();
   for (const r of rows) {
     const row = obj(r);
-    const list = register ?? (typeof row.register === 'string' ? row.register : '');
+    const list = typeof row.register === 'string' ? row.register : '';
     const n = by.get(list) ?? { adds: 0, changes: 0, named: [] };
     if (typeof row.at === 'string') {
       n.changes += 1;
@@ -83,6 +97,148 @@ function rowsSaid(rows: readonly unknown[], names: DoesNames, register?: string)
     if (n.adds === 0) return `changes ${changed} in ${name}`;
     return `changes ${changed} in ${name} and adds ${n.adds}`;
   });
+}
+
+/** A text longer than this, or one of several lines, is said as what it gains and loses and never quoted. */
+const SHORT = 80;
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+/** Where an entry is (`things#3`) or a bare id: a handle, which a line never says. */
+const HANDLE = /^[\w.-]+#\d+$|^[0-9A-HJKMNP-TV-Z]{26}$/u;
+
+/**
+ * One short value as a person reads it, `null` for none, and `undefined` for one a line cannot say: a handle, a path or
+ * an address, a text too long to quote, or a shape it does not know. Money is said in its own currency, a day as a day.
+ */
+function shortSaid(v: unknown): string | null | undefined {
+  if (v === null || v === '') return null;
+  if (typeof v === 'boolean') return v ? 'yes' : 'no';
+  if (typeof v === 'number') return Number.isFinite(v) ? String(v) : undefined;
+  if (typeof v === 'string') {
+    const text = v.trim();
+    if (text === '') return null;
+    const day = /^(\d{4})-(\d{2})-(\d{2})(?:T[\d:.]+(?:Z|[+-]\d{2}:\d{2})?)?$/u.exec(text);
+    if (day && MONTH_NAMES[Number(day[2]) - 1] !== undefined) return `${Number(day[3])} ${MONTH_NAMES[Number(day[2]) - 1]!} ${day[1]!}`;
+    return text.length > SHORT || /[\n/\\]/u.test(text) || HANDLE.test(text) ? undefined : text;
+  }
+  const money = obj(v);
+  if (Number.isInteger(money.amount) && typeof money.currency === 'string' && /^[A-Za-z]{3}$/u.test(money.currency)) return moneyText(money.amount as number, money.currency);
+  return undefined;
+}
+
+/** How many of `now` were not in `was`, and how many of `was` are gone, each counted as often as it appears. */
+function gained(was: readonly string[], now: readonly string[]): { adds: number; removes: number } {
+  const left = new Map<string, number>();
+  for (const w of was) left.set(w, (left.get(w) ?? 0) + 1);
+  let adds = 0;
+  for (const n of now) {
+    const have = left.get(n) ?? 0;
+    if (have > 0) left.set(n, have - 1);
+    else adds += 1;
+  }
+  return { adds, removes: [...left.values()].reduce((sum, n) => sum + n, 0) };
+}
+
+/** "adds 2 lines to Text and removes 1", "removes 1 from The plan", or `null` when nothing is gained or lost. */
+function gainSaid(label: string, was: readonly string[], now: readonly string[], unit: string): string | null {
+  const { adds, removes } = gained(was, now);
+  const of = (n: number): string => (unit === '' ? String(n) : `${n} ${unit}${n === 1 ? '' : 's'}`);
+  if (adds > 0) return `adds ${of(adds)} to ${label}${removes > 0 ? ` and removes ${removes}` : ''}`;
+  return removes > 0 ? `removes ${of(removes)} from ${label}` : null;
+}
+
+/** The lines of a text, without the space that trails each or the empty ones that end it. */
+const linesOf = (text: string): string[] => {
+  const lines = text.split(/\r?\n/u).map((l) => l.trimEnd());
+  while (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
+  return lines;
+};
+const isLong = (v: unknown): v is string => typeof v === 'string' && (v.length > SHORT || v.includes('\n'));
+
+/**
+ * What one field of a patch does, as a clause: "changes Stage from Building to Live", "sets Stage to Live", "clears
+ * Stage", "adds 2 lines to Text and removes 1". `null` when the line can name the field and nothing more, because
+ * either value is one it cannot say or the two read alike.
+ */
+function fieldSaid(label: string, was: unknown, now: unknown): string | null {
+  if (was === undefined || now === undefined || was === now) return null;
+  if (Array.isArray(was) || Array.isArray(now)) {
+    const each = (v: unknown): (string | null | undefined)[] => (Array.isArray(v) ? v : v === null || v === '' ? [] : [v]).map(shortSaid);
+    const [a, b] = [each(was), each(now)];
+    return a.includes(undefined) || b.includes(undefined) ? null : gainSaid(label, a.map(String), b.map(String), '');
+  }
+  if (isLong(was) || isLong(now)) {
+    if (typeof now !== 'string' && now !== null) return null;
+    if (typeof was !== 'string' && was !== null) return null;
+    const [a, b] = [linesOf(was ?? ''), linesOf(now ?? '')];
+    if (b.length === 0) return `clears ${label}`;
+    return a.length <= 1 && b.length <= 1 ? `${a.length === 0 ? 'writes' : 'rewrites'} ${label}` : gainSaid(label, a, b, 'line');
+  }
+  const [a, b] = [shortSaid(was), shortSaid(now)];
+  if (a === undefined || b === undefined || a === b) return null;
+  if (b === null) return `clears ${label}`;
+  return a === null ? `sets ${label} to ${b}` : `changes ${label} from ${a} to ${b}`;
+}
+
+/** A patch says this many fields in full; the rest are named after them, so the line stays one line. */
+const IN_FULL = 3;
+const count = (n: number): string => (n === 1 ? 'one' : String(n));
+
+/**
+ * "Changes Stage from Building to Live in Projects.", what the entries a question writes to one list gain, lose and
+ * become, read off each patch and what the entry holds now (`DoesNames.before`).
+ *
+ * THE CHANGE, NEVER THE ENTRY. The question above the line already names it ("Change Kiln?"), and the line under it
+ * read "Changes Kiln in Projects.", which said the entry twice and the change not at all. A field is said by the label
+ * the record shows; a short value from what it was to what it becomes; a long text and a field that holds several by
+ * how many they gain and lose; and a value that may not be said, or that the record was not asked for, by its field alone.
+ *
+ * SEVERAL ENTRIES SAY WHAT THEY SHARE: "sets Stage to Live on 3" where each is given the same value, and "changes Stage
+ * on 3" where they are not, since a value from one of them would read as the value of all. A delete and a bring back
+ * are their own words, and an entry added keeps "adds 2".
+ */
+function changesSaid(rows: readonly unknown[], names: DoesNames, list: string): string {
+  const name = list === '' ? 'your things' : (names.list?.(list) ?? spoken(list));
+  const label = (field: string): string => names.field?.(list, field) ?? spoken(field);
+  const read = (field: string, raw: unknown): unknown => (raw === undefined || names.value === undefined ? raw : names.value(list, field, raw));
+  let adds = 0;
+  let deletes = 0;
+  let restores = 0;
+  const patched: { at: string; patch: Record<string, unknown> }[] = [];
+  for (const r of rows) {
+    const row = obj(r);
+    if (typeof row.at !== 'string') adds += 1;
+    else if (!Object.hasOwn(obj(row.patch), 'deleted_at')) patched.push({ at: row.at, patch: obj(row.patch) });
+    else if (obj(row.patch).deleted_at === null) restores += 1;
+    else deletes += 1;
+  }
+  const fields = [...new Set(patched.flatMap((p) => Object.keys(p.patch)))];
+  const full: string[] = [];
+  const bare: string[] = [];
+  for (const field of fields) {
+    /* WHAT EACH ENTRY WOULD HOLD, and what it holds now: one entry says both, several say only a value they all take. */
+    const was = patched.map((p) => (Object.hasOwn(p.patch, field) ? read(field, names.before?.(p.at, field)) : undefined));
+    const now = patched.map((p) => read(field, p.patch[field]));
+    const shared = !was.includes(undefined) && !now.includes(undefined) && now.every((v) => JSON.stringify(v) === JSON.stringify(now[0]));
+    const emptied = now[0] === null || now[0] === '';
+    const together = !shared || isLong(now[0]) || Array.isArray(now[0]) ? null : emptied ? `clears ${label(field)}` : fieldSaid(label(field), null, now[0]);
+    const said = full.length >= IN_FULL ? null : patched.length === 1 ? fieldSaid(label(field), was[0], now[0]) : together;
+    /* A FIELD IT CANNOT SAY MORE OF IS STILL NAMED, once, after the ones said in full: the patch sends it. */
+    if (said !== null) full.push(said);
+    else if (!bare.includes(label(field))) bare.push(label(field));
+  }
+  const parts: { whole: string; short: string }[] = [];
+  if (patched.length > 0) {
+    const clauses = [...full, ...(bare.length ? [`changes ${joined(bare)}`] : [])];
+    const on = patched.length === 1 ? '' : ` on ${patched.length}`;
+    const what = clauses.length ? `${clauses.join(', ')}${on}` : `changes ${patched.length}`;
+    parts.push({ whole: `${what} in ${name}`, short: what });
+  }
+  if (deletes > 0) parts.push({ whole: `deletes ${count(deletes)} from ${name}`, short: `deletes ${count(deletes)}` });
+  if (restores > 0) parts.push({ whole: `brings ${count(restores)} back to ${name}`, short: `brings ${count(restores)} back` });
+  if (adds > 0) parts.push({ whole: `adds ${adds} to ${name}`, short: `adds ${adds}` });
+  const [head, ...rest] = parts;
+  if (head === undefined) return '';
+  return rest.length === 0 ? head.whole : `${head.whole}${rest.length === 1 ? ' and ' : ', '}${listed(rest.map((p) => p.short))}`;
 }
 
 /** The packs an arrangement or a pack proposal turns on, off or adds, each a clause. */
@@ -187,9 +343,8 @@ export function doesOf(kind: string, body: unknown, names: DoesNames = {}): stri
     case 'options':
       return 'Records your choice and changes nothing else.';
     case 'rowset': {
-      const register = typeof b.register === 'string' ? b.register : '';
-      const said = rowsSaid(arr(b.rows), names, register);
-      return said.length ? `${capital(said.join(', '))}.` : '';
+      const said = changesSaid(arr(b.rows), names, typeof b.register === 'string' ? b.register : '');
+      return said === '' ? '' : `${capital(said)}.`;
     }
     case 'change': {
       const to = obj(b.to);

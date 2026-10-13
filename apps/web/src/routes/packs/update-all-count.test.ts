@@ -59,3 +59,11 @@ test('the run hands the count and the names to the words, and no longer says the
   assert.match(PAGE, /words\.updatedAll\(done, passed\)/u, 'the run does not ask the words for its last line');
   assert.doesNotMatch(PAGE, /if \(done > 1\) toasts\.push\(words\.updated\(done\)/u, 'the old count-only line is still there');
 });
+
+test('a run that stopped short says no good news: a refusal or a plan that asks again is the last word', () => {
+  assert.match(PAGE, /const ended = whole \? words\.updatedAll\(done, passed\) : null;/u, 'the last line is said after a run that broke');
+  /* Whole only once the last update is reached, and not when it then asks again or is refused. */
+  assert.match(PAGE, /whole = i === plans\.length - 1;/u);
+  assert.equal(PAGE.match(/whole = false;\s*break;/gu)?.length, 2);
+  assert.ok(PAGE.indexOf('if (!fresh.ok) {') < PAGE.indexOf('whole = i === plans.length - 1;'), 'a refused plan is counted as reached');
+});

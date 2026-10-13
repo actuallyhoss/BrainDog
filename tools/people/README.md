@@ -64,6 +64,9 @@ note said Node 24 reads only 42 checks and leaves with 1 and 8 not seen; that di
 `first-screen-drawn.test.mjs` walks Mariam, Sam, Nour and Layla and fails if any of them has a place in the first rail
 with nothing to show, or if the command would leave with anything but 0.
 
+A green walk with no `--base` is a fresh self-host only: its mail is a stub and its clock is the walk's own, so it
+says nothing of the hosted sign-up. No test in the repository passes the hosted path, and the line below is run by hand.
+
 After a deploy, on the hosted service:
 
 ```sh

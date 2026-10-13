@@ -250,13 +250,16 @@
    * pure arrow. A place is Work or a section, first seven or under More, told by its key: a place somebody renamed or
    * that moved between the two has not come. The rail holds those and the three it always draws (`railOf`), so a
    * place is whatever is none of the three. The first draw in a tab says nothing, and neither does a place the person
-   * brought back from hidden themselves. A screen with no rail and a record that refused are no draw at all, so the
-   * rail that follows them is a first one. Three places in one draw are one sentence.
+   * brought back from hidden themselves. THAT IS READ FROM EVERY ADDRESS THE PLACE ANSWERS TO (`near`), not only the
+   * one its row opens: a section opens on its Overview, so when its second page is brought back in the draw its
+   * Overview first has something to show, the page that was hidden is not the row's own and the address alone
+   * missed it. `near` holds the row's own address too, and only pages drawn now, so a page still hidden silences nothing. A
+   * screen with no rail and a record that refused are no draw at all, so the rail that follows them is a first one.
+   * Three places in one draw are one sentence.
    */
-  const arrivedIn = (was: { keys: ReadonlySet<string>; hidden: readonly string[] } | null, now: readonly { key: string; href: string; label: string }[]): string[] =>
+  const arrivedIn = (was: { keys: ReadonlySet<string>; hidden: readonly string[] } | null, now: readonly { key: string; label: string; near: readonly string[] }[]): string[] =>
     now
-      .filter((i) => i.key !== 'today' && i.key !== 'decide' && i.key !== 'activity')
-      .filter((i) => was !== null && !was.keys.has(i.key) && !was.hidden.includes(i.href))
+      .filter((i) => was !== null && !['today', 'decide', 'activity'].includes(i.key) && !was.keys.has(i.key) && !i.near.some((h) => was.hidden.includes(h)))
       .map((i) => i.label);
   let drawn: { keys: ReadonlySet<string>; hidden: readonly string[] } | null = null;
   $effect(() => {

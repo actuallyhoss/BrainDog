@@ -5579,7 +5579,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     if (Object.hasOwn(patch, 'deleted_at')) return patch.deleted_at === null ? `Bring back ${named}?` : `Delete ${named} from ${list}?`;
     const state = decl?.state;
     if (state !== undefined && typeof patch[state] === 'string' && Object.keys(patch).length === 1) return `Mark ${named} ${String(patch[state]).replace(/[_-]+/gu, ' ')}?`;
-    return `Change ${named}?`;
+    /* A CHANGE SAYS WHAT IT CHANGES: "Change the cost and due date of Ship?". Each field by the name a person reads, in
+       the order sent; a field the list does not hold is left out, and with none to say the question stays as short as it was. */
+    const labels = Object.keys(patch).flatMap((id) => {
+      const spec = decl?.fields.find((f) => f.id === id);
+      if (spec === undefined) return [];
+      const said = scrubbed(typeof spec.label === 'string' && spec.label.trim() !== '' ? spec.label.trim() : id.replace(/[_-]+/gu, ' ').trim());
+      /* Lower case inside the sentence, unless the name is spelled in capitals ("URL"). */
+      return said === null || said === undefined || said === '' ? [] : [/^\p{Lu}\p{Ll}/u.test(said) ? said[0]!.toLowerCase() + said.slice(1) : said];
+    });
+    if (labels.length === 0) return `Change ${named}?`;
+    const said = labels.length > 3 ? [...labels.slice(0, 2), `${labels.length - 2} more`] : labels;
+    return `Change the ${new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(said)} of ${named}?`;
   };
 
   /**

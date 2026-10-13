@@ -98,7 +98,7 @@ export type Card = {
   when: string;
   /** When a question put off comes back, and why, or `null`. */
   later: string | null;
-  /** What accepting the lead does, in one line, or empty; an arrangement's own summary on every card that is one. */
+  /** What accepting does, in one line, or empty: on the lead, on every card that changes what a list holds, and where a change was left out of `lines`; an arrangement's own summary on every card that is one. */
   does: string;
   /** How many things a joined question changes, or 0. */
   joined: number;
@@ -241,10 +241,21 @@ export function shiftsOf(q: QueueQuestion, home?: string | null): Shift[] {
  * and no line.
  */
 export function shiftLinesOf(q: QueueQuestion, home?: string | null): ShiftLine[] {
+  return shiftsRead(q, home).lines;
+}
+
+/**
+ * THE LINES, AND WHETHER ONE WAS LEFT OUT. A change whose value is an id, a handle or a path is no line (`valueSaid`),
+ * and a long text nearly always holds a path, so the card would say nothing of the one thing it changes. `left` says
+ * so, and the card says the record's own line of the change in its place (`cardOf`).
+ */
+function shiftsRead(q: QueueQuestion, home?: string | null): { lines: ShiftLine[]; left: boolean } {
   const out: ShiftLine[] = [];
+  let left = false;
   const push = (label: unknown, before: unknown, after: unknown) => {
     const b = valueSaid(before, home);
     const a = valueSaid(after, home);
+    if (a === null || b === null) left = true;
     if (a === null || b === null || a === b) return;
     const what = fieldSaid(label);
     const said = emptyValue(before) ? (what ? cardWords.setTo(a) : cardWords.adds(a)) : emptyValue(after) ? cardWords.removes(b) : null;
@@ -267,7 +278,7 @@ export function shiftLinesOf(q: QueueQuestion, home?: string | null): ShiftLine[
       for (const k of new Set([...Object.keys(b), ...Object.keys(a)])) push(k, b[k], a[k]);
     } else if (before !== undefined || after !== undefined) push('', before, after);
   }
-  return out.slice(0, 3);
+  return { lines: out.slice(0, 3), left };
 }
 
 /**
@@ -346,7 +357,15 @@ export function cardOf(q: QueueQuestion, ctx: CardContext): Card {
   const merge = queueMergeOf(q, plain.map((w) => w.key));
   const filed = typeof q.body_kind === 'string' ? q.body_kind : q.kind;
   const arranged = arrangementOf(q, filed, ctx.body);
-  const does = arranged !== '' ? arranged : ctx.lead && typeof q.does === 'string' ? spoken(saidOf(q.does)) : '';
+  const read = shiftsRead(q, ctx.home);
+  /* THE RECORD'S LINE OF WHAT ACCEPTING CHANGES, ON EVERY CARD THAT CHANGES WHAT A LIST HOLDS, the lead's or not: it
+     says which fields move and by how much, and a card further down the queue said nothing under "What it changes".
+     Any other kind keeps it for the lead, unless a change was left out of the lines above, where it is all there is. */
+  const says = ctx.lead === true || filed === 'rowset' || read.left;
+  /* SAID WHOLE WHERE THERE IS NOTHING TO TAKE OUT, as an arrangement's summary is (`arrangementOf`): a line that ends on
+     a field's own name ("Changes Due on.") lost its last word to `spoken`, which reads it as a word left hanging. */
+  const line = says && typeof q.does === 'string' ? saidOf(q.does) : '';
+  const does = arranged !== '' ? arranged : spoken(`${line} ·`) === line ? line : spoken(line);
   const cost = typeof q.cost === 'string' ? q.cost : '';
   return {
     id: q.id,
@@ -362,8 +381,8 @@ export function cardOf(q: QueueQuestion, ctx: CardContext): Card {
     band: cost && cost !== 'call' ? queueCost(cost) : '',
     moves,
     money: said === '' ? '' : cardWords.moves(said),
-    shifts: shiftsOf(q, ctx.home),
-    lines: shiftLinesOf(q, ctx.home),
+    shifts: read.lines.map(({ what, before, after }) => ({ what, before, after })),
+    lines: read.lines,
     ways,
     enter: acceptKey({ options: keyed.options, band: cost }, moves.length > 0),
     decline: declineKey(keyed),

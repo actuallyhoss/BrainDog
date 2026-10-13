@@ -89,15 +89,20 @@ function familyOf<Q extends QueueQuestion>(q: Q): Q {
 }
 
 /**
- * A queue's questions with only the lead's carrying what was proposed and what accepting does.
+ * A queue's questions with the lead's carrying what was proposed and what accepting does.
  *
  * THE LEAD IS DRAWN WHOLE AND THE REST ARE ONE LINE EACH, so the line saying what a yes changes travels on the first
- * question alone: a queue of twenty is not twenty paragraphs nobody reads. Without `lead: true` none carries it.
+ * question: a queue of twenty is not twenty paragraphs nobody reads. Without `lead: true` none carries it.
+ *
+ * A CHANGE TO WHAT A LIST HOLDS KEEPS ITS LINE BELOW THE LEAD TOO. Its card says the line wherever it stands (the web's
+ * `cardOf`), since it is the one place a change the card cannot draw from and to is said at all, and a card handed no
+ * line said nothing of it. It is one sentence, and no other kind carries one down the queue.
  */
 function ledBy(block: PageBlock, questions: readonly QueueQuestion[]): QueueQuestion[] {
   return questions.map((q, at) => {
     const { body_kind, does, ...rest } = q;
-    if (block.lead !== true || at > 0) return rest;
+    if (block.lead !== true) return rest;
+    if (at > 0) return q.kind === 'rowset' && does ? { ...rest, does } : rest;
     return { ...rest, body_kind: body_kind ?? q.kind, ...(does ? { does } : {}) };
   });
 }

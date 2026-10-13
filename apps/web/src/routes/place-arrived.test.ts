@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url';
 
 import { copy } from '../lib/copy.ts';
 
-type Item = { key: string; href: string; label: string };
+type Item = { key: string; href: string; label: string; near: readonly string[] };
 type Drawn = { keys: ReadonlySet<string>; hidden: readonly string[] };
 type ArrivedIn = (was: Drawn | null, now: readonly Item[]) => string[];
 
@@ -34,7 +34,11 @@ function ruleOf(): ArrivedIn {
   return new Function(`${plain}\nreturn arrivedIn;`)() as ArrivedIn;
 }
 
-const item = (key: string, label: string): Item => ({ key, href: `/${label.toLowerCase()}`, label });
+/* A place as `flatNav` makes it: it opens on `href`, and `near` is every address it answers to, its own first. */
+const item = (key: string, label: string, also: readonly string[] = []): Item => {
+  const href = `/${label.toLowerCase()}`;
+  return { key, href, label, near: [href, ...also] };
+};
 const TODAY = item('today', 'Today');
 const DECIDE = item('decide', 'Decide');
 const ACTIVITY = item('activity', 'Activity');
@@ -78,6 +82,29 @@ test('Today, Decide and Activity are never said to have come', () => {
 test('a place the person just brought back from hidden is not news to them', () => {
   const arrivedIn = ruleOf();
   assert.deepEqual(arrivedIn(drawn([TODAY, DECIDE], [MONEY.href]), [TODAY, DECIDE, MONEY]), []);
+});
+
+test('nor is a section whose hidden page is not the one its row opens', () => {
+  const arrivedIn = ruleOf();
+  /* Money opens on its Overview and holds Accounts too. Accounts was the hidden one, brought back in this draw. */
+  const money = item('section:money', 'Money', ['/p/accounts']);
+  assert.deepEqual(arrivedIn(drawn([TODAY, DECIDE], ['/p/accounts']), [TODAY, DECIDE, money]), []);
+  /* By the row's own address still, when that is the one that was hidden. */
+  assert.deepEqual(arrivedIn(drawn([TODAY, DECIDE], [money.href]), [TODAY, DECIDE, money]), []);
+  /* And only that section: one that came in the same draw with nothing of its own hidden is still news. */
+  assert.deepEqual(arrivedIn(drawn([TODAY, DECIDE], ['/p/accounts']), [TODAY, DECIDE, money, PEOPLE]), ['People']);
+});
+
+test('a page hidden somewhere else silences nothing', () => {
+  const arrivedIn = ruleOf();
+  /* Something of People's is hidden and stays so. Money, with its first account typed, is still said. */
+  const money = item('section:money', 'Money', ['/p/accounts']);
+  assert.deepEqual(arrivedIn(drawn([TODAY, DECIDE], ['/p/team']), [TODAY, DECIDE, money]), ['Money']);
+});
+
+test('the shell hands the rule the rail as it is drawn, addresses and all', () => {
+  /* `near` is `railOf`'s, so the rule reads the places and More straight off the rail and nothing is built for it. */
+  assert.match(code, /const now = \[\.\.\.rail\.places, \.\.\.rail\.more\];\s+const names = arrivedIn\(drawn, now\);/u);
 });
 
 test('the words: one sentence, the place by its name', () => {

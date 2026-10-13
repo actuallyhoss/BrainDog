@@ -926,8 +926,8 @@ function queueRows(block: BlockResult): string[] {
          "A rule: chase late payments", "Slash", never `rule:cash-stale`. This fence is handed no reader, so a person
          who asked is Someone on this record here; the card names them from the shell's people. */
       ['q', q.id, proposer(q.who).name, since(q.at, at), q.question, q.why, q.cost ?? ''].map(escapeCell).join(' | '),
-      /* WHAT ACCEPTING IT CHANGES, a line a row, which the record writes only on a lead queue's first question
-         (`does` in `kernel/src/pages.ts`). A string or a list of them, said in the reader's money and with no citation. */
+      /* WHAT ACCEPTING IT CHANGES, a line a row, which the record writes on a lead queue's first question and on
+         each change to what a list holds below it (`ledBy` in `kernel/src/sources/governance.ts`). A string or a list of them, said in the reader's money and with no citation. */
       ...[(q as { does?: unknown }).does]
         .flat()
         .filter((line): line is string => typeof line === 'string' && line.trim() !== '')

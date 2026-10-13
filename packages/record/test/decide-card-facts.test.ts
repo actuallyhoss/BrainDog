@@ -64,7 +64,7 @@ test('A QUESTION READ BY ITS ID SAYS WHO ASKED FROM WHICH APP, WHAT MONEY MOVES 
   /* MONEY IS ON THE FLOOR, SO THE AGENT'S CHANGE IS FILED AS A QUESTION. */
   const asked = value<Asked>(await api.update({ register: 'tasks', seq: ship.seq!, patch: { cost: { amount: 1_250, currency: 'GBP' }, state: 'done' } }, agent));
   const row = value<Facts & { question: string }>(await api.governance({ register: 'suggestion', id: asked.asked.id }, owner));
-  assert.equal(row.question, 'Change Ship?');
+  assert.equal(row.question, 'Change the cost and state of Ship?');
   assert.match(row.run?.id ?? '', /^S\d+$/u);
   assert.ok(typeof row.run?.app === 'string' && row.run.app !== '' && !row.run.app.includes('-'), row.run?.app);
   assert.deepEqual(row.money, [{ amount: 1_250, currency: 'GBP' }]);
