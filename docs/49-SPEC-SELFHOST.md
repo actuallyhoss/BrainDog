@@ -717,6 +717,11 @@ applies, or a refusal.
    anywhere in its tree is refused, *"… a script may not ask what a secret field holds."* Until
    `7adc7d0c` this host handed a script no reads at all, so `reads: ["clients"]` ran on the Cloud and was refused
    here.
+
+   **`ctx.today()`** answers the record's local day as `YYYY-MM-DD`, a string and never a `Date`. QuickJS in this
+   build has no `Intl`, so the day is worked out on the host by `dayIn(now, tz)` and handed in on `meta.today`
+   (`scriptMeta`, the function the Worker calls too); with no zone, or a zone the host does not know, it is the UTC
+   day.
 7. **`ctx.write(register, fields)` and `ctx.update(spoken, patch, version?)`** queue; nothing is applied during the
    run. `write` checks the register against `writes:` and the count against `limits.writes` as it is called. An
    update with no version is written without comparing; a version given that is not a whole number throws in the

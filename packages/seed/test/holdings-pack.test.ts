@@ -19,6 +19,10 @@
  * THE FILE IS 1.3.0 NOW: 1.2.0 gave `holdings-value` `sellable: true`, then the catalogue generator raised it
  * again to 1.3.0 once the add-on carried its own `title` and its cost script opened with a comment saying what it
  * does (`from-packs.mjs`'s own `changes` line on the file says so); nothing the pack writes moved with either step.
+ *
+ * AND 1.4.0 SINCE BATCH 64, the next version after the released 1.3.0, which is frozen in `fixtures/released/` and is
+ * not touched: a holding has a price ("Worth each now"), the day it was priced and what it is worth now, the value
+ * reads in no currency named by the file, and two figures count the holdings that stand at what they cost.
  */
 
 import { test } from 'node:test';
@@ -53,8 +57,8 @@ async function on180(rows: number = HELD_AT_1_8_0.length) {
 /** money-core as a record on 1.8.0 was offered it from 2.0.0 until 2.4.0 stopped handing: today's, with the `hands` it shipped. */
 const shippedUpdate = () => handingAsShipped(firstPartyDocument('money-core'));
 
-/** What the file adds beside the list since 1.1.0: a rule and the script it starts, three figures and a page. */
-const BESIDE = ['metric.holdings-costed', 'metric.holdings-count', 'metric.holdings-value', 'page.holdings', 'rule.holdings_cost', 'script.holdings_cost'];
+/** What the file adds beside the list since 1.1.0: a rule and the script it starts, three figures and a page; two more figures since 1.4.0. */
+const BESIDE = ['metric.holdings-at-cost', 'metric.holdings-costed', 'metric.holdings-count', 'metric.holdings-unpriced', 'metric.holdings-value', 'page.holdings', 'rule.holdings_cost', 'script.holdings_cost'];
 
 /** What a row is and what happened to it, as bytes, so "untouched" is a comparison and not a reading. */
 const snapshot = (k: Kernel, ids: readonly string[]): string[] => ids.map((id) => JSON.stringify([k.get(id), k.history(id)]));
@@ -62,16 +66,17 @@ const snapshot = (k: Kernel, ids: readonly string[]): string[] => ids.map((id) =
 test('THE PACK DECLARES ONE LIST, UNDER ITS OWN NAME, AND NO GOLD: four kinds, commodity among them', async () => {
   const doc = holdingsFile() as unknown as Doc;
   assert.equal(doc.pack, 'holdings');
-  assert.equal(doc.version, '1.3.0');
+  assert.equal(doc.version, '1.4.0');
   const lists = doc.declarations.filter((d) => typeof d.register === 'string');
   assert.deepEqual(lists.map((d) => [d.register, d.pack]), [['holdings', 'holdings']]);
   const kind = (lists[0]!.fields as Field[]).find((f) => f.id === 'kind')!;
   assert.deepEqual(kind.values, ['certificate', 'policy', 'commodity', 'other']);
   assert.doesNotMatch(JSON.stringify(doc), /gold/iu, 'the pack still ships the word');
-  /* THE LIST IS THE ONE 1.0.0 DECLARED, WHICH A RECORD ON money-core 2.0.0 WAS FIRST OFFERED, with `cost` after `unit_cost`. */
+  /* THE LIST IS THE ONE 1.0.0 DECLARED, WHICH A RECORD ON money-core 2.0.0 WAS FIRST OFFERED, with `cost` after `unit_cost`
+     and, since 1.4.0, the price, its day and the worth after `cost`. */
   assert.deepEqual(
     (lists[0]!.fields as Field[]).map((f) => f.id),
-    (holdings100().declarations[0]!.fields as Field[]).map((f) => f.id).flatMap((id) => (id === 'unit_cost' ? ['unit_cost', 'cost'] : [id])),
+    (holdings100().declarations[0]!.fields as Field[]).map((f) => f.id).flatMap((id) => (id === 'unit_cost' ? ['unit_cost', 'cost', 'price', 'priced_on', 'value'] : [id])),
   );
   const pack = value<Pack>(await normalise(doc, { kind: 'local' }));
   assert.deepEqual([...pack.manifest.provides].sort(), ['register.holdings', ...BESIDE].sort());
@@ -98,7 +103,7 @@ test('A RECORD ON 1.8.0 HOLDING ROWS UPDATES TO 2.0.0 AND TAKES THE PACK, every 
   assert.deepEqual(snapshot(k, ids), before, 'a row, its id or its history moved');
   assert.equal(k.count('holdings'), 14);
   const packs = k.packs().filter((p) => p.id === 'holdings' || p.id === 'money-core').map((p) => [p.id, p.version]);
-  assert.deepEqual(packs, [['holdings', '1.3.0'], ['money-core', FIRST_PARTY_VERSIONS['money-core']]]);
+  assert.deepEqual(packs, [['holdings', '1.4.0'], ['money-core', FIRST_PARTY_VERSIONS['money-core']]]);
 
   /* AND THE RECORD GOES ON TAKING BOTH WORDS: its own for the next lot, and the pack's for anything new. */
   assert.ok(k.create('holdings', { kind: 'gold', label: 'Gold 21c', qty: 1, unit_cost: { amount: 480_000, currency: 'EGP' } } as never, { actor: 'p_1' }).ok);

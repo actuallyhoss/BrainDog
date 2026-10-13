@@ -178,7 +178,7 @@ export function pageWrites(deps: WritesDeps) {
     const seen = deps.arrivals;
     if (!seen) return segment;
     const key = (row: Row): string | null => (row.ref ? `${row.ref.register}#${row.ref.seq}` : null);
-    const on = seen.see(listOf(at, block), segment.rows.flatMap((r) => key(r) ?? []));
+    const on = seen.see(listOf(at, block), segment.rows.flatMap((r) => key(r) ?? []), answered(block));
     if (on.size === 0) return segment;
     return { ...segment, rows: segment.rows.map((r) => (on.has(key(r) ?? '') ? { ...r, arrived: true } : r)) };
   }
@@ -187,9 +187,22 @@ export function pageWrites(deps: WritesDeps) {
   function arrivedTable(at: number, rows: readonly TableRow[], block?: LiveBlock): TableRow[] {
     const seen = deps.arrivals;
     if (!seen) return [...rows];
-    const on = seen.see(listOf(at, block), rows.map((r) => r.key));
+    const on = seen.see(listOf(at, block), rows.map((r) => r.key), answered(block));
     return on.size === 0 ? [...rows] : rows.map((r) => (on.has(r.key) ? { ...r, arrived: true } : r));
   }
+
+  /**
+   * WHETHER WHAT A BLOCK DRAWS NOW IS THE RECORD'S ANSWER, which is what lets an empty look be a baseline (`arrivals` in
+   * `lib/data/optimistic.ts`), so the first row into a list that was truly empty is marked.
+   *
+   * A PAGE IS ONE READ: every block of it comes back in one answer under one clock (`Opened` in `page-live.ts`), so the
+   * page's clock says it for all of them, and none answers after another. The block's own answer is still asked, because
+   * four blocks hold no rows without the record having said their list is empty: one it refused, one this build cannot
+   * draw, one it left out, and one added while arranging over a list the page does not read yet (`added` in
+   * `Arrange.svelte`, which has no read time). Their look marks nothing and is no baseline.
+   */
+  const answered = (block?: LiveBlock): boolean =>
+    deps.now() !== null && !(block && (block.drawn === false || block.cannot !== undefined || (block.refusals?.length ?? 0) > 0 || block.stale_at === ''));
 
   /* WHICH LIST A BLOCK IS, for what arrived in it: the page, the place and what the block reads, so a block added in
      arrange mode at a place another block held is a new list with a baseline of its own, not a list of new rows. */

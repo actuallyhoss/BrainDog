@@ -16,7 +16,7 @@ import assert from 'node:assert/strict';
 import { shippedVersion } from '@braindog/seed/packs/quiet';
 import { modulesFor, useCase } from '@braindog/seed/usecases';
 
-import { costOf } from '@braindog/kernel';
+import { costOf, pickCost } from '@braindog/kernel';
 
 import { createRecordApi, type CallContext } from '../src/index.ts';
 import { openSqlite } from '../../kernel/test/sqlite.ts';
@@ -87,9 +87,12 @@ test('THE NIGHT PUTS THE UPDATE IN, KEEPS THE PAGE, AND ASKS ONE QUESTION that n
   const body = JSON.parse(open[0]!.body) as { about: string; options: { id: string; label: string; hard?: boolean }[] };
   assert.equal(body.about, `Solo founder ${shippedVersion(PACK)} adds to a page you changed`);
   assert.deepEqual(body.options.map((o) => [o.id, o.label]), [['keep', 'Keep my page'], ['take', "Take the update's page"]]);
-  /* TAKING IS NOT PUT BACK BY UNDO, and the option says so, so the question weighs hard to undo (audit 60, claim 1). */
+  /* TAKING IS NOT PUT BACK BY UNDO, and the option says so (audit 60, claim 1). IT IS TAKING THAT IS HARD, NOT THE
+     QUESTION (audit 62, claim 6): keeping changes nothing, so the question weighs as a call and each pick by its own. */
   assert.deepEqual(body.options.map((o) => o.hard === true), [false, true]);
-  assert.equal(costOf('options', body), 'undo');
+  assert.equal(costOf('options', body), 'call');
+  assert.equal(pickCost('options', body, 'take'), 'undo');
+  assert.equal(pickCost('options', body, 'keep'), 'call');
   /* AND THE NIGHT'S LOG SAYS IT WAS ASKED. */
   const steps = (api.kernel.prefsOf('braindog:updates')['first-party'] as { steps: string[] }).steps;
   assert.ok(steps.includes(`Solo founder ${shippedVersion(PACK)} adds to a page you changed, and that is asked about on Decide.`), steps.join(' | '));

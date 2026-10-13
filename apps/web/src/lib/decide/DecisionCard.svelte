@@ -73,7 +73,7 @@
   import type { Press } from '../../routes/decide/merge.ts';
   import { hold, type Held } from '../../routes/decide/press.ts';
   import MergeCard from '../../routes/decide/MergeCard.svelte';
-  import { answeredLine, cardOf, cardWords, inlineOf, pressOf, pressSaid, pressTail, primaryOf, saysChanges, startsOn } from './card.ts';
+  import { answeredLine, cardOf, cardWords, inlineOf, pressOf, pressSaid, primaryOf, saysChanges, startsOn, wayTail } from './card.ts';
   import { footprint, settle } from './settle.ts';
 
   let {
@@ -606,7 +606,7 @@
                 aria-pressed={phase === 'asking' ? chosen?.key === way.key : undefined}
                 onclick={() => press(way)}
                 >{#if keys && i < 9}<span class="queue-key dc-key" aria-hidden="true">{i + 1}</span>{/if}<span dir="auto"
-                  ><span class="dc-btn-name">{way.label}</span>{way.key === primary ? pressTail(card) : ''}</span
+                  ><span class="dc-btn-name">{way.label}</span>{wayTail(card, way, primary)}</span
                 >{#if way.recommended}<span class="dc-sr">{queueWords.suggestedSaid}</span>{/if}</button
               >
             {/each}
@@ -621,7 +621,7 @@
               data-decide
               data-enter={card.enter !== null && selected !== null ? '' : undefined}
               aria-disabled={selected === null}
-              onclick={commit}>{pressSaid(card, queueWords.decide)}</button
+              onclick={commit}>{pressSaid(card, queueWords.decide, card.ways.find((w) => w.key === selected))}</button
             >
           {/if}
           {#if notNow}<a class="dc-btn dc-later" data-weight="bare" href={at(`${card.href}?defer`)}>{queueWords.notNow}</a>{/if}

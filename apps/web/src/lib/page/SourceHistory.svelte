@@ -64,6 +64,10 @@
               <span class="history-state">{line.state}</span>
             {/if}
           </p>
+          <!-- A VERSION THE RECORD CUT FOR THIS READER says so in one line, and offers no Put back (`versionLines`). -->
+          {#if line.cut}
+            <p class="history-cut">{line.cut}</p>
+          {/if}
           <div class="history-verbs">
             {#if line.putBack}
               <Button weight="quiet" size="sm" disabled={waits} aria-label={line.putBack} onclick={() => onputback(line.version)}>
@@ -147,6 +151,16 @@
   /* SAID IN WORDS, AND QUIET: which line is the page now is a fact, not a warning, so it takes no colour. */
   .history-state {
     color: var(--ink2);
+  }
+
+  /* UNDER THE LINE IT IS ABOUT, across the tile's width, after the name and the verbs. */
+  .history-cut {
+    order: 1;
+    flex-basis: 100%;
+    margin: 0;
+    max-inline-size: var(--measure);
+    color: var(--ink2);
+    font-size: var(--t-base);
   }
 
   .history-verbs {

@@ -169,8 +169,12 @@ export type Manifest = {
   adds?: PageAddition[];
 };
 
-/** What one pack lays on one list another pack owns: optional fields after the list's own, values after a closed list's own. */
-export type Extension = { fields?: Record<string, Json>[]; values?: Record<string, string[]> };
+/**
+ * What one pack lays on one list another pack owns: optional fields after the list's own, values after a closed list's
+ * own, and for those values the words a person reads them by (`labels.<field>.<value>`), as a field's own `labels` has
+ * them.
+ */
+export type Extension = { fields?: Record<string, Json>[]; values?: Record<string, string[]>; labels?: Record<string, Record<string, string>> };
 
 /**
  * One block a pack adds to another pack's page: the page's declaration id, the block as a page's own would say it, and
@@ -469,8 +473,9 @@ export type Diff = {
    * What this pack lays on each list it `extends`: `adds` names what is new to the list (`domain`, or `role.family` for a
    * value) and each field this pack laid before and now lays in another shape, and `body` is the live list with those
    * laid on it, as JCS text, absent when the list has them all already. `refusal` is why `install` will not lay them,
-   * which is only ever the list's own shape: a field id it has in another shape that is not this pack's alone, or a
-   * value for a field that is not a closed list or not there.
+   * which is only ever the list's own shape: a field id it has in another shape that is not this pack's alone, a
+   * value for a field that is not a closed list or not there, or a label for a value the list declares itself or that
+   * reads by other words already. A label laid on a value that had none is named in `adds` as the value is.
    *
    * `install` STAGES `body` WITH NO PACK, as it stages a rebased list, so the kernel is handed an ordinary register body
    * and the list reads as the record's own from then on. The owning pack's next update keeps the additions through
@@ -1186,8 +1191,11 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
   return ok({ manifest, declarations, seeds, canonical, checksum: await digest(canonical), source });
 }
 
-/** The keys an extension may carry, which are `addTo`'s less `register`, the key it sits under. */
-const EXTENSION_KEYS = ['fields', 'values'];
+/**
+ * The keys an extension may carry, which are `addTo`'s less `register`, the key it sits under, and `labels`, which names
+ * the values it lays: without it a laid value reads as its bare id (`worked`, where the page should say Worked out).
+ */
+const EXTENSION_KEYS = ['fields', 'values', 'labels'];
 
 /** A field key that asks every writer for a value, which a list with rows under it cannot be given by a stranger's pack. */
 const DEMANDS = ['required', 'required_when'];
@@ -1211,7 +1219,7 @@ function readExtends(pack: string, raw: unknown, declared: ReadonlySet<string>):
     if (!isObject(body)) return malformed(`${at} is { fields: [...], values: { <field>: [...] } }.`, at);
     const stray = Object.keys(body).find((k) => !EXTENSION_KEYS.includes(k));
     if (stray !== undefined)
-      return malformed(`An extension lays fields and values, and nothing else, so ${stray} is not one of them. To take something away or change its type, the list's own pack has to.`, `${at}.${stray}`);
+      return malformed(`An extension lays fields, values and labels for those values, and nothing else, so ${stray} is not one of them. To take something away or change its type, the list's own pack has to.`, `${at}.${stray}`);
     const wrong = credential(body) ?? credentialValue(body);
     if (wrong) return no('SECRET_IN_PACK', `${at} carries what looks like a credential at ${wrong}, and a pack is a file people share.`, { at: `${at}.${wrong}` });
     const painted = colour(body);
@@ -1242,6 +1250,26 @@ function readExtends(pack: string, raw: unknown, declared: ReadonlySet<string>):
         return malformed(`${at}.values is { <field>: [<value>, ...] }, the values to add to each closed list.`, `${at}.values`);
       const values = Object.fromEntries(Object.entries(body.values as Record<string, string[]>).filter(([, v]) => v.length > 0));
       if (Object.keys(values).length > 0) one.values = values;
+    }
+    if (body.labels !== undefined) {
+      /* ONLY FOR A VALUE THIS PACK LAYS HERE. A label for any other value is a pack renaming what the list's own pack
+         named, and a field laid under `fields` says its labels in itself, so here they would be said twice. */
+      if (!isObject(body.labels)) return malformed(`${at}.labels is { <field>: { <value>: <label> } }, the words each value this pack lays is read by.`, `${at}.labels`);
+      const labels: Record<string, Record<string, string>> = {};
+      for (const [field, said] of Object.entries(body.labels)) {
+        const here = `${at}.labels.${field}`;
+        if (!isObject(said)) return malformed(`${here} is { <value>: <label> }, one label for each value this pack lays on ${field}.`, here);
+        if (one.fields?.some((f) => f.id === field)) return malformed(`${pack} lays ${field} itself, so the labels for its values go in the field, under its own labels.`, here);
+        /* `hasOwn`, because a field called `constructor` would otherwise find the object's own and throw below. */
+        const laid = one.values !== undefined && Object.hasOwn(one.values, field) ? one.values[field] : undefined;
+        if (laid === undefined) return malformed(`${pack} lays no values on ${field}, so it has none to label. Name them under values first.`, here);
+        for (const [value, label] of Object.entries(said)) {
+          if (!laid.includes(value)) return malformed(`${pack} does not lay ${value} on ${field}, and a pack labels only the values it lays.`, `${here}.${value}`);
+          if (typeof label !== 'string' || label.trim() === '') return malformed(`The label for ${value} is the words a person reads it by, as text.`, `${here}.${value}`);
+        }
+        if (Object.keys(said).length > 0) labels[field] = said as Record<string, string>;
+      }
+      if (Object.keys(labels).length > 0) one.labels = labels;
     }
     if (one.fields === undefined && one.values === undefined) return malformed(`${at} lays nothing: name fields to add, values to add to a closed list, or both.`, at);
     out[list] = one;
@@ -1349,8 +1377,11 @@ function addedTo(pack: string, add: PageAddition, host: { kind: DeclKind; body: 
  * does not declare (`laidBy`). Such a field in another shape is the pack's next version of its own field, and it takes
  * the field's place, so rows written under it keep their order and their values. Any other field under the same id is
  * still two fields sharing one.
+ *
+ * `own` IS THE LIST AS ITS OWN PACK LAST WROTE IT (`ownBody`), or nothing when the record cannot say. It tells a value
+ * the list declares from one a pack laid on it, which the live body cannot: both sit in the one `values`.
  */
-function extended(pack: string, id: string, live: string, ext: Extension, mine: ReadonlySet<string> = new Set()): Diff['extends'][number] {
+function extended(pack: string, id: string, live: string, ext: Extension, mine: ReadonlySet<string> = new Set(), own: unknown = null): Diff['extends'][number] {
   const list = id.slice('register.'.length);
   const at = `extends.${id}`;
   let was: Record<string, Json>;
@@ -1395,6 +1426,28 @@ function extended(pack: string, id: string, live: string, ext: Extension, mine: 
     held.values = [...values, ...fresh];
     adds.push(...fresh.map((v) => `${field}.${v}`));
   }
+  /* A LABEL GOES ON A VALUE THIS PACK LAID AND NOBODY HAS NAMED. `readExtends` let it through only beside its value, so
+     the field is here and closed. A value the list's own pack declares is that pack's to name, and a label laid on it
+     would turn its next update from an addition carried (`rebased`) into an edit kept. A value that reads by other
+     words already has its label, whoever gave it. A label for a value laid bare before is said in `adds` as the value
+     is, because without a line there the body would not be staged and the label would never land. */
+  for (const [field, said] of Object.entries(ext.labels ?? {})) {
+    const held = fields.find((h) => h.id === field);
+    if (held === undefined) continue;
+    const labels: Record<string, Json> = isObject(held.labels) ? { ...held.labels } : {};
+    const theirs = listOf(fieldsOf(own).get(field), 'values');
+    for (const [value, label] of Object.entries(said)) {
+      if (labels[value] === label) continue;
+      const here = `${at}.labels.${field}.${value}`;
+      if (theirs.includes(value))
+        return { id, adds: [], refusal: { code: 'PROVIDES_CONFLICT', fix: `${value} is one of ${list}'s own values for ${field}, and ${pack} labels only the values it lays. To change how ${value} reads, the list's own pack has to.`, at: here } };
+      if (Object.hasOwn(labels, value))
+        return { id, adds: [], refusal: { code: 'PROVIDES_CONFLICT', fix: `${value} on ${list} reads as ${String(labels[value])} already, and ${pack} would have it read as ${label}. One value has one label, so ${pack} has to keep the one it has or lay a value of its own.`, at: here } };
+      labels[value] = label;
+      if (!adds.includes(`${field}.${value}`)) adds.push(`${field}.${value}`);
+    }
+    if (Object.keys(labels).length > 0) held.labels = labels;
+  }
   if (adds.length === 0) return { id, adds };
   const body = canonicalise({ ...was, fields });
   return body === null ? { id, adds: [], refusal: { code: 'PACK_MALFORMED', fix: `${list} with ${pack}'s additions cannot be written down.`, at } } : { id, adds, body };
@@ -1426,6 +1479,21 @@ function laidBy(installed: Installed, pack: string, id: string, live: { pack_id:
       return new Set();
     }
   return new Set(laid.filter((field) => !others.has(field) && !own.has(field)));
+}
+
+/**
+ * The list `id` as its own pack last wrote it, by `laidBy`'s rule: the live body while the list is still under a pack,
+ * and the body it was detached from once something was laid on it. `null` for a list with no pack and nothing detached,
+ * which is the record's own and has no pack to ask, and for a body that does not read.
+ */
+function ownBody(installed: Installed, id: string, live: { pack_id: string | null; body: string }): unknown {
+  const from = live.pack_id !== null ? live.body : installed.detached?.[id]?.body;
+  if (from === undefined) return null;
+  try {
+    return JSON.parse(from);
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -1942,7 +2010,7 @@ export async function plan(given: Pack, installed: Installed, options: PlanOptio
   /* A LIST THE RECORD LACKS HAS NOTHING TO LAY ON, and `unresolved` names it with the module that declares it. */
   const extensions: Diff['extends'] = Object.entries(pack.manifest.extends ?? {}).flatMap(([id, ext]) => {
     const held = live.get(id);
-    return held === undefined || held.kind !== 'register' ? [] : [extended(mine, id, held.body, ext, laidBy(installed, mine, id, held))];
+    return held === undefined || held.kind !== 'register' ? [] : [extended(mine, id, held.body, ext, laidBy(installed, mine, id, held), ownBody(installed, id, held))];
   });
   /* AND A PAGE THE RECORD LACKS HAS NOWHERE TO DRAW WHAT IS ADDED TO IT, which `addedTo` marks unresolved. */
   const pageAdds = pack.manifest.adds?.map((a) => addedTo(mine, a, live.get(a.page)));

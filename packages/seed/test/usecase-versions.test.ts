@@ -1440,11 +1440,12 @@ const DECLARED: Record<string, Version> = {
       metric.project-numbers-7d metric.projects-earning-silent adds.page.portfolio.4
       adds.page.estate.5 metric.service-numbers
     `,
-    declares: '8828553c41a19dd5',
+    declares: 'f9fa3e40e32ae41d',
     history: [
       "`setting.voice_home` and the title of `page.home-founder` say Today where both said Overview; `due-this-week` and Due this week start today; `late-money` is added with a Late table ahead of the week, oldest first; Lapsing loses its Cost column -> 1a6e6f8b5a7311cc",
       "Folded into the unreleased 2.6.0 (sketchpad-60; integrate 60): `page.project`'s Tools and servers reads the project's own tools alone (`kind is tool, scope is project`), so a project with none of its own draws no card where it listed everybody's -> 11f22bd8f6e3f8d2",
       "Folded into the unreleased 2.6.0 (estate-numbers-61, REC-C12; integrate 61; a builder wrote it as 2.7.0, and 2.6.0 was never deployed: commit 63423720 holds 2.5.0): Numbers gains `about_service`, the figure `service-numbers` is added, and Server and provider numbers is laid on Renewals (the field is `about_service` and not the builder's `service`, a word the core-names gate would then refuse in two dozen places of the core); `adds.page.estate.5` and `metric.service-numbers` gained -> 8828553c41a19dd5",
+      "Folded into the unreleased 2.6.0 (founder-numbers-edge-64, audit 61 claim 5; integrate 64; commit 63423720 still holds 2.5.0): `metric.service-numbers` and the block it switches on end their ninety days today (`at before tomorrow`), so a reading dated after today is neither counted nor drawn -> f9fa3e40e32ae41d",
     ],
   },
   'team@2.19.0': {

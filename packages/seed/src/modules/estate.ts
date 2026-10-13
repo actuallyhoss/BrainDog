@@ -533,9 +533,15 @@ export const ESTATE_PAGES: Record<string, SeedPage> = {
  *
  * `SERVICE_NUMBERS_WHERE` IS THE BLOCK'S OWN CLAUSES, for the figure that hides it: the pack counts the same readings
  * over the same ninety days, so the heading is never drawn over nothing.
+ *
+ * THE NINETY DAYS END TODAY, AND THE CLAUSES SAY SO (`SERVICE_NUMBERS_UNTIL`, audit 61 claim 5). `back:` draws the
+ * ninety days up to today and the figure said only where they start, so a reading dated tomorrow, which an import or a
+ * mistyped year writes, was counted and not drawn: the heading stood over nothing, and beside a real reading it was the
+ * measure's latest figure. Said once here, it is in the block's clauses and in the figure's, which reads them.
  */
 export const SERVICE_NUMBERS_BACK = 90;
-export const SERVICE_NUMBERS_WHERE = 'about_service is set, source is not example';
+export const SERVICE_NUMBERS_UNTIL = 'at before tomorrow';
+export const SERVICE_NUMBERS_WHERE = `about_service is set, source is not example, ${SERVICE_NUMBERS_UNTIL}`;
 export const SERVICE_NUMBERS_SHOWN = 'service-numbers';
 export const SERVICE_NUMBERS = {
   page: 'page.estate',

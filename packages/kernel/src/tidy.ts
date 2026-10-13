@@ -20,7 +20,7 @@ import type { Sql } from '@braindog/ports';
 
 import { causeFault } from './cause.ts';
 import { EXPIRE_MS } from './handoff.ts';
-import { ABANDON_MS } from './presence.ts';
+import { ABANDON_MS, unheardRuns } from './presence.ts';
 import { SWEPT_NOTE, SWEPT_STEP_NOTE } from './schedule.ts';
 import { SESSION } from './session.ts';
 
@@ -85,7 +85,6 @@ export const finderOf = (id: string): Finder | undefined => registry.get(id);
 
 /* ── this part's finders ────────────────────────────────────────────────── */
 
-const heard = (t: string): string => `coalesce(json_extract(${t}.fields, '$.last_seen'), ${t}.updated_at)`;
 /** When a step was left, as `handoff.ts` reads it: `next_at`, else when the run was last heard from, else its last change. */
 const leftAt = (t: string): string =>
   `coalesce(json_extract(${t}.fields, '$.next_at'), json_extract(${t}.fields, '$.last_seen'), ${t}.updated_at)`;
@@ -100,12 +99,8 @@ const repo = (t: string): string => `coalesce(json_extract(${t}.fields, '$.repo'
 const runsStopped: Finder = {
   id: 'runs-stopped',
   find(sql, nowMs) {
-    const stale = count(
-      sql,
-      `SELECT COUNT(*) AS n FROM entry e WHERE e.register = ? AND e.deleted_at IS NULL AND e.state IN ('active', 'idle') AND ${heard('e')} < ?`,
-      SESSION,
-      iso(nowMs - ABANDON_MS),
-    );
+    /* COUNTED BY THE ONE CLOCK (`presence.ts` `unheardRuns`), which is the only file that compares a run's last seen with the time. */
+    const stale = unheardRuns(sql, nowMs, ABANDON_MS, ['active', 'idle']);
     const did = count(
       sql,
       "SELECT COUNT(*) AS n FROM event WHERE kind = 'state' AND actor = 'system' AND note IN (?, ?) AND ts > ? AND ts <= ?",
@@ -126,13 +121,7 @@ const runsStopped: Finder = {
 const runsEmpty: Finder = {
   id: 'runs-empty',
   find(sql, nowMs) {
-    const stale = count(
-      sql,
-      `SELECT COUNT(*) AS n FROM entry e WHERE e.register = ? AND e.deleted_at IS NULL AND e.state IN ('done', 'abandoned')
-         AND json_extract(e.fields, '$.wrote') = 0 AND ${heard('e')} < ?`,
-      SESSION,
-      iso(nowMs - EMPTY_RUN_MS),
-    );
+    const stale = unheardRuns(sql, nowMs, EMPTY_RUN_MS, ['done', 'abandoned'], "json_extract(fields, '$.wrote') = 0");
     if (stale === 0) return { stale, did: 0, ask: null };
     const runs = many(stale, 'run');
     return {

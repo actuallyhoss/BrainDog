@@ -31,4 +31,63 @@
     -webkit-box-decoration-break: clone;
     box-decoration-break: clone;
   }
+
+  /* ── a field ────────────────────────────────────────────────────────────
+     A field carries the mark itself, and the rule above already gives it the `--line` ground and clears its ink. That
+     is not enough for three things a field paints with another colour than its own `color`: a value the browser filled
+     in (it is painted with the text fill colour, which a browser sets by itself), the placeholder, and the pickers of a
+     date or a time. So the fill colour goes too, here and on the placeholder.
+
+     A tick box and a radio hold no words and are never marked; they are left out by name all the same, so a mark that
+     reached one would not blank its tick.
+
+     The caret keeps an ink role: with the ink clear it would be clear too, and a person typing into a plated field
+     still has to see where the next letter goes. It says how long the value is and nothing else.
+
+     WHAT NO STYLESHEET REACHES: the open list of a native `select` is drawn by the system, not the page. Closed, the
+     chosen value is plated; open, its choices are legible. */
+  :is(input:not([type='checkbox'], [type='radio']), textarea, select)[data-plated] {
+    -webkit-text-fill-color: transparent !important;
+    caret-color: var(--ink);
+  }
+
+  :is(input, textarea)[data-plated]::placeholder {
+    color: transparent !important;
+    -webkit-text-fill-color: transparent !important;
+    text-shadow: none !important;
+  }
+
+  /* ── selected text ──────────────────────────────────────────────────────
+     Dragging over a plate must not ink it again. `base.css` gives a selection its ground and leaves the ink alone, but
+     a browser that has its own selection ink, or a sheet that one day writes one, would draw the words back. The
+     ground stays, so a person still sees what they selected. This covers a field's typed value as well. */
+  [data-plated]::selection {
+    color: transparent !important;
+    -webkit-text-fill-color: transparent !important;
+    text-shadow: none !important;
+  }
+
+  /* ── a picture, a canvas, a video ───────────────────────────────────────
+     Clear ink hides nothing here: these paint pixels, not text. THE BOX STILL DOES NOT MOVE, so what is drawn is pushed
+     out of its own box instead: the element keeps its width, its height, its corner and its place in the line, and all
+     that is left to see is the `--line` ground the rule above put under it. The offset is a length on purpose, and a
+     positive one: a percentage places a picture inside its box, and a negative length would let a picture wider than
+     the offset show its far edge. No blur: a blur still shows a face from across the room.
+
+     `object-fit: none` comes with it: at the default `fill` a picture is stretched to the box and a position moves
+     nothing.
+
+     A video's controls are the browser's own and stay, so it can still be stopped. */
+  :is(img, canvas, video)[data-plated] {
+    object-fit: none !important;
+    object-position: 100000px 100000px !important;
+  }
+
+  /* ── a chart ────────────────────────────────────────────────────────────
+     An `svg` that is one picture with a sentence. Nothing in it is replaced content, so there is nothing to push out:
+     every mark, label and figure inside is left laid out and not painted, and the `svg` itself keeps its box and shows
+     the ground. `!important`, because one mark asking to be seen again would be a figure on the screen. */
+  svg[role='img'][data-plated] * {
+    visibility: hidden !important;
+  }
 }

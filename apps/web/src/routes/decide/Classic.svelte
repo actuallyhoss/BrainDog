@@ -323,8 +323,12 @@
   const decidedShown = $derived(allDecided ? DECIDED.slice(0, DOM_CAP) : DECIDED.slice(0, DECIDED_FIRST));
 
   /** What a question takes without a choice: its suggested option, or accepting a change. */
-  const approveKey = (q: Question): string | null =>
-    q.options.find((o) => o.recommended)?.key ?? (q.options.some((o) => o.key === 'accept') ? 'accept' : null);
+  const approveKey = (q: Question): string | null => {
+    const suggested = q.options.find((o) => o.recommended);
+    /* A SUGGESTED ANSWER THAT IS ITSELF HARD TO UNDO IS NOBODY'S TO TAKE WITHOUT CHOOSING IT, alone or in a batch. */
+    if (suggested?.hard === true) return null;
+    return suggested?.key ?? (q.options.some((o) => o.key === 'accept') ? 'accept' : null);
+  };
 
   /** What `decide` refused on each card, in the record's own sentence, and the card being sent. */
   let fixes = $state(new Map<string, string>());
@@ -537,7 +541,9 @@
       const option = q.options[n - 1];
       if (option) {
         e.preventDefault();
-        void take(q, option.key);
+        /* A NUMBER NEVER GIVES AN ANSWER THAT CANNOT BE TAKEN BACK: it opens the question, where Decide says so. */
+        if (option.hard === true) void goto(at(`/decide/${q.id}`));
+        else void take(q, option.key);
       }
       return;
     }

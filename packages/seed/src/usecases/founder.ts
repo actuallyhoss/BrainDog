@@ -449,7 +449,9 @@ export const FOUNDER = {
          project page's Where it stands says while nobody has said, beside what changed and when it was last worked. */
       counted('project-numbers-7d', 'Numbers this week', 'register.datapoints', 'thing is {{it}}, at after -7d, source is not example'),
       /* THE NUMBERS ABOUT A SERVICE, SINCE 2.6.0 (REC-C12), over the clauses and the ninety days of the block Renewals
-         draws them in (`SERVICE_NUMBERS` in `modules/estate.ts`), so that block is drawn only while it has one. */
+         draws them in (`SERVICE_NUMBERS` in `modules/estate.ts`), so that block is drawn only while it has one. The
+         clauses end the ninety days today (`SERVICE_NUMBERS_UNTIL`), and this says where they start: a reading dated
+         after today is neither counted nor drawn (audit 61, claim 5). */
       counted(SERVICE_NUMBERS_SHOWN, 'Server and provider numbers', 'register.datapoints', `${SERVICE_NUMBERS_WHERE}, at after -${SERVICE_NUMBERS_BACK}d`),
       SILENT,
       {

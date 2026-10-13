@@ -514,7 +514,11 @@ export type Question = {
   rank: number;
   opened: string;
   entity?: string;
-  options: readonly { key: string; title: string; body: string; recommended?: boolean }[];
+  /**
+   * `hard` IS SET ON AN OPTION THAT CANNOT BE TAKEN BACK ONCE PICKED (the kernel's `optionCost`, the record's
+   * `option_costs`). It is the option that is hard and not the question: its own button says so, and no key gives it.
+   */
+  options: readonly { key: string; title: string; body: string; recommended?: boolean; hard?: boolean }[];
   /** Why it is being asked: the reasoning whoever opened it wrote down with it. Absent when they wrote none. */
   context?: string;
   /** Set once, with a mandatory reason, and then the row is immutable. */

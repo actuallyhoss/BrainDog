@@ -316,6 +316,16 @@ test('A QUESTION CARRIES THE REASONING IT WAS OPENED WITH, and one opened with n
   const asked = questionOf({ id: 'SG4', body_kind: 'options', body: { options: [{ id: 'a', label: 'Ship it' }], context: '  Two clients asked for it this week.  ' }, opened_at: '' }, 'Ship dark mode?', 1);
   assert.equal(asked.context, 'Two clients asked for it this week.');
   assert.equal('context' in questionOf({ id: 'SG5', body_kind: 'options', body: { options: [], context: '   ' }, opened_at: '' }, 'Q', 2), false);
+
+  /* AN OPTION THAT CANNOT BE TAKEN BACK IS MARKED, AND THE QUESTION IS NOT (batch 64): by the record's own word
+     (`option_costs`), and by the option's `hard` where a record sends none. Either saying hard is hard. */
+  const body = { options: [{ id: 'keep', label: 'Keep my page' }, { id: 'take', label: 'Take the update’s page', hard: true }] };
+  const weighed = questionOf({ id: 'SG6', body_kind: 'options', body, opened_at: '', cost: 'call', option_costs: [{ id: 'keep', cost: 'call' }, { id: 'take', cost: 'undo' }] }, 'Q', 3);
+  assert.equal(weighed.band, 'call');
+  assert.deepEqual(weighed.options.map((o) => [o.key, o.hard ?? false]), [['keep', false], ['take', true]]);
+  assert.deepEqual(questionOf({ id: 'SG6', body_kind: 'options', body, opened_at: '' }, 'Q', 3).options.map((o) => o.hard ?? false), [false, true], 'a record that sends no option_costs');
+  const sentOnly = { options: [{ id: 'keep', label: 'Keep' }, { id: 'take', label: 'Take' }] };
+  assert.deepEqual(questionOf({ id: 'SG6', body_kind: 'options', body: sentOnly, opened_at: '', option_costs: [{ id: 'take', cost: 'undo' }] }, 'Q', 3).options.map((o) => o.hard ?? false), [false, true]);
 });
 
 /** A record of `n` rows that pages as the record does: newest first, `limit` at a time, after the id in `cursor`. */

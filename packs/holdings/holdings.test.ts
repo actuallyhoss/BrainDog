@@ -36,8 +36,10 @@
  * this figure when probed: it resolves the register and the figure from the build's own seed tables,
  * and a pack's list is in neither.
  *
- * WHAT IT IS NOT, said here because the tile cannot say it at length: a valuation. What gold or a policy is worth today
- * is a rate away, and a rate is `fx`'s or a person's script's. This is what was paid.
+ * WHAT IT WAS NOT UNTIL 1.4.0, AND IS NOW ONLY AS FAR AS SOMEBODY SAYS: a valuation. A holding has a `price`, "Worth
+ * each now", and the day it was priced, typed by a person or written by an agent, a feed or a script they add. None
+ * ships here. The script writes `value`, the count times the price, or what the holding cost when it has no price, and
+ * the figure adds up `value` and says how many of the holdings stand at what they cost.
  *
  * RED FIRST, MEASURED. With no file, seven of the eight failed ENOENT, and the eighth is the one that
  * holds a record with every first-party pack to having no `holdings` list, no `holdings-value` figure and no Holdings
@@ -52,7 +54,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 
 import { readPackFile } from '../../packages/declare/src/catalogue.ts';
 import { scriptReads, scriptRunner } from '../../packages/host/src/script.ts';
@@ -134,15 +136,22 @@ test('THE FILE DECLARES THE LIST 1.0.0 DID, with `cost` added, and a version abo
   const built = v100();
   assert.equal(doc.pack, 'holdings');
   /* 1.2.0 adds one key: `holdings-value` is `sellable`, so a forecast's sell control offers it. 1.3.0
-     adds a title, a `changes` line and a comment at the top of the script, and nothing a record reads differently. */
-  assert.equal(doc.version, '1.3.0');
+     adds a title, a `changes` line and a comment at the top of the script, and nothing a record reads differently. 1.4.0
+     adds a price, the day it was priced and what the holding is worth, two counts, and takes the currency out of the format. */
+  assert.equal(doc.version, '1.4.0');
   assert.equal(doc.declarations.find((d) => d.metric === 'holdings-value')?.sellable, true);
   assert.equal(built.version, '1.0.0', 'the frozen 1.0.0 moved, so this file has to say what it now is beside it');
   assert.deepEqual(doc.requires, built.requires);
   const list = doc.declarations.find((d) => d.register === 'holdings')!;
   const fields = list.fields as Body[];
-  /* BYTE FOR BYTE IN MEANING, BUT FOR THE ONE FIELD 1.1.0 ADDS. */
-  assert.deepEqual({ ...list, fields: fields.filter((f) => f.id !== 'cost') }, built.declarations[0]);
+  /* BYTE FOR BYTE IN MEANING, BUT FOR THE ONE FIELD 1.1.0 ADDS AND THE THREE 1.4.0 ADDS. */
+  const ADDED = ['cost', 'price', 'priced_on', 'value'];
+  assert.deepEqual({ ...list, fields: fields.filter((f) => !ADDED.includes(f.id as string)) }, built.declarations[0]);
+  assert.deepEqual(fields.filter((f) => ADDED.includes(f.id as string)).slice(1), [
+    { id: 'price', label: 'Worth each now', type: 'money' },
+    { id: 'priced_on', label: 'Priced on', type: 'day' },
+    { id: 'value', label: 'Worth now', type: 'money' },
+  ]);
   assert.deepEqual(fields.find((f) => f.id === 'cost'), { id: 'cost', label: 'What it cost', type: 'money' });
   assert.doesNotMatch(JSON.stringify(doc), /gold/iu, 'the pack ships the word it left Money to stop shipping');
 });
@@ -161,16 +170,16 @@ test('THE SCRIPT IN THE FILE IS cost.js, byte for byte, and it can reach nothing
   assert.deepEqual([script.egress, script.keys, script.reads, script.writes], [[], [], ['holdings'], ['holdings']]);
 });
 
-test('INSTALLED FROM THE FILE: one list, one rule, one script, three figures and a page, and nothing refused', async () => {
+test('INSTALLED FROM THE FILE: one list, one rule, one script, five figures and a page, and nothing refused', async () => {
   const { api, close } = await money();
   const diff = await planOf(api, file());
   assert.deepEqual(diff.conflicts, []);
   assert.deepEqual(
     diff.adds.map((a) => a.id).sort(),
-    ['metric.holdings-costed', 'metric.holdings-count', 'metric.holdings-value', 'page.holdings', 'register.holdings', 'rule.holdings_cost', 'script.holdings_cost'],
+    ['metric.holdings-at-cost', 'metric.holdings-costed', 'metric.holdings-count', 'metric.holdings-unpriced', 'metric.holdings-value', 'page.holdings', 'register.holdings', 'rule.holdings_cost', 'script.holdings_cost'],
   );
   said(await put(api, file()));
-  assert.equal(api.kernel.packs().find((p) => p.id === 'holdings')?.version, '1.3.0');
+  assert.equal(api.kernel.packs().find((p) => p.id === 'holdings')?.version, '1.4.0');
   close();
 });
 
@@ -226,7 +235,8 @@ test('THE HOLDINGS PAGE DRAWS THE FIGURE AND EVERY ROW, with nothing refused', a
   );
   assert.equal(page.title, 'Holdings');
   for (const b of page.blocks) assert.deepEqual(b.refusals, [], `${b.heading} was refused`);
-  const tile = page.blocks.find((b) => b.heading === 'What you hold')!;
+  /* THE PAGE DECLARES THE TILE TWICE, once with the note and once without, and draws the one whose `when` holds. */
+  const tile = page.blocks.find((b) => b.heading === 'What you hold' && (b as { why?: string }).why !== 'when')!;
   assert.equal(tile.values?.['holdings-count'], 3);
   const value = tile.readings?.find((r) => r.metric === 'holdings-value')?.reading;
   assert.equal(value?.rows, 3);
@@ -241,8 +251,10 @@ test('THE HOLDINGS PAGE DRAWS THE FIGURE AND EVERY ROW, with nothing refused', a
 /** The tile's reading of `holdings-value` and the counts its note names, read the way the page reads them. */
 async function tile(api: Api): Promise<{ rows: number; held: number | undefined; parts: [string, number][]; values: Body }> {
   type Reading = { metric: string; reading: { rows: number; held?: number; value: number | null; unit?: string | null; parts?: Money[] } };
-  const page = said<{ blocks: { heading: string; values?: Body; readings?: Reading[] }[] }>(await api.page({ slug: 'holdings' }, owner));
-  const block = page.blocks.find((b) => b.heading === 'What you hold')!;
+  const page = said<{ blocks: { heading: string; why?: string; values?: Body; readings?: Reading[] }[] }>(await api.page({ slug: 'holdings' }, owner));
+  /* THE ONE OF THE TWO TILES WHOSE `when` HOLDS. With nothing worked out yet it is still marked not drawn, as `unsaid`,
+     and it keeps its reading, which is what the first test below reads. */
+  const block = page.blocks.find((b) => b.heading === 'What you hold' && b.why !== 'when')!;
   const r = block.readings!.find((x) => x.metric === 'holdings-value')!.reading;
   const parts = r.parts ?? (r.value !== null && r.unit ? [{ currency: r.unit, amount: r.value }] : []);
   return { rows: r.rows, held: r.held, parts: parts.map((p) => [p.currency, p.amount] as [string, number]).sort(), values: block.values ?? {} };
@@ -254,7 +266,7 @@ async function upgraded(rows: readonly Body[] = HELD): Promise<{ api: Api; clock
   said(await put(api, v100()));
   const ids = rows.map((row) => hold(api, row));
   said(await put(api, file()));
-  assert.equal(api.kernel.packs().find((p) => p.id === 'holdings')?.version, '1.3.0');
+  assert.equal(api.kernel.packs().find((p) => p.id === 'holdings')?.version, '1.4.0');
   return { api, clock, ids, close };
 }
 
@@ -285,20 +297,21 @@ test('UNTIL A HOLDING IS COSTED THE FIGURE LEAVES IT OUT AND SAYS SO, and never 
      a value of 0, under a note that said the 0 was what 3 holdings cost. */
   const before = await tile(api);
   assert.deepEqual([before.rows, before.held, before.parts], [0, 3, []]);
-  assert.deepEqual([before.values['holdings-costed'], before.values['holdings-count']], [0, 3]);
+  /* THE NOTE COUNTS ONLY HOLDINGS THE SUM COVERS, so with none worked out yet it says none of the three, not all of them. */
+  assert.deepEqual([before.values['holdings-at-cost'], before.values['holdings-count']], [0, 3]);
 
   /* ONE ROW EDITED IS ONE ROW COSTED BY THE RULE, and the note counts it as one of three rather than the sum as all. */
   said(api.kernel.update('holdings', ids[0]!, { qty: 3 } as never, { actor: 'p_1' }));
   await settle(api);
   const one = await tile(api);
   assert.deepEqual([one.rows, one.parts], [1, [['EUR', 120_000]]]);
-  assert.deepEqual([one.values['holdings-costed'], one.values['holdings-count']], [1, 3]);
+  assert.deepEqual([one.values['holdings-at-cost'], one.values['holdings-count']], [1, 3]);
 
   clock.advance(SPREAD_MS + 1);
   await settle(api);
   const all = await tile(api);
   assert.deepEqual([all.rows, all.parts], [3, [['EUR', 620_000], ['USD', 54_000]]]);
-  assert.deepEqual([all.values['holdings-costed'], all.values['holdings-count']], [3, 3]);
+  assert.deepEqual([all.values['holdings-at-cost'], all.values['holdings-count']], [3, 3]);
   close();
 });
 
@@ -368,5 +381,126 @@ test('HALF A UNIT IS A HOLDING AND A NEGATIVE COUNT IS NOT, and the card keeps t
 
 test('THE SAME FILE PASSES AS AN ADD-ON SOMEBODY OPENS FROM DISK', async () => {
   const opened = said<{ pack: { manifest: { pack: string; version: string } } }>(await readPackFile(readFileSync(PACK_FILE, 'utf8')));
-  assert.deepEqual([opened.pack.manifest.pack, opened.pack.manifest.version], ['holdings', '1.3.0']);
+  assert.deepEqual([opened.pack.manifest.pack, opened.pack.manifest.version], ['holdings', '1.4.0']);
+});
+
+/* ── 1.4.0: what a holding is worth now, and a format that names nobody's currency (REC-B17 steps 1 and 2) ─────────── */
+
+/**
+ * RED FIRST, MEASURED AGAINST 1.3.0. The five tests below were written before the file moved and all five failed: the
+ * format said `money.GBP`, a holding had no `value` so the tile's sum was over `cost`, a `price` was refused as a field
+ * the list does not have, and no figure counted the holdings still standing at what they cost.
+ */
+
+/**
+ * The tile that is drawn, of the two the page declares: its amounts, and its note with the figures it names filled in.
+ *
+ * TWO TILES BECAUSE A NOTE CANNOT BE CONDITIONAL AND A BLOCK CAN. The one with "at what they cost" is drawn while any
+ * holding has no price (`holdings-unpriced` above nothing), and the one with no note once every holding has one. The
+ * test is on `price is empty` and not on the note's own count, because that count asks for `value is set`, which no row
+ * has said until the script has run, and a `when` over a figure nobody has said holds for neither tile.
+ */
+async function worth(api: Api): Promise<{ parts: [string, number][]; note: string; tiles: number }> {
+  type Cell = { metric: string; note?: string; reading: { value: number | null; unit?: string | null; parts?: Money[] } };
+  const page = said<{ blocks: { heading: string; why?: string; values?: Body; readings?: Cell[] }[] }>(await api.page({ slug: 'holdings' }, owner));
+  const tiles = page.blocks.filter((b) => b.heading === 'What you hold' && b.why !== 'when');
+  const block = tiles[0]!;
+  const cell = block.readings!.find((x) => x.metric === 'holdings-value')!;
+  const r = cell.reading;
+  const parts = r.parts ?? (r.value !== null && r.unit ? [{ currency: r.unit, amount: r.value }] : []);
+  const note = (cell.note ?? '').replace(/\{\{([a-z-]+)\}\}/gu, (_, id: string) => String((block.values ?? {})[id]));
+  return { parts: parts.map((p) => [p.currency, p.amount] as [string, number]).sort(), note, tiles: tiles.length };
+}
+
+/** A record whose home currency is the Egyptian pound, with this file on it. */
+async function inPounds(): Promise<{ api: Api; clock: ReturnType<typeof fixedClock>; close: () => void }> {
+  const made = await money();
+  said(made.api.kernel.setPackConfig('money-core', { home_currency: 'EGP' }, { actor: 'p_1' }));
+  said(await put(made.api, file()));
+  return made;
+}
+
+const egp = (amount: number): Money => ({ amount, currency: 'EGP' });
+
+test('NO FILE OF THIS ADD-ON NAMES A CURRENCY IN A FORMAT, so the value reads in the money somebody chose', () => {
+  const dir = new URL('./', import.meta.url);
+  for (const name of readdirSync(dir)) {
+    if (!/\.(?:json|js)$/u.test(name)) continue;
+    assert.doesNotMatch(readFileSync(new URL(name, dir), 'utf8'), /money\.[A-Z]{3}/u, `${name} names a currency in a format`);
+  }
+  assert.equal(file().declarations.find((d) => d.metric === 'holdings-value')?.format, 'money');
+});
+
+test('TEN BOUGHT AT 3,000 EACH READ 30,000 AT WHAT THEY COST, and a price of 4,100 makes it 41,000 and the note goes', async () => {
+  const { api, close } = await inPounds();
+  const id = hold(api, { label: 'Silver, ten grams', kind: 'commodity', qty: 10, unit_cost: egp(300_000), acquired_on: '2026-02-01' });
+  await settle(api);
+  const bought = await worth(api);
+  assert.deepEqual(bought.parts, [['EGP', 3_000_000]]);
+  assert.equal(bought.note, '1 of 1 at what they cost');
+  assert.equal(bought.tiles, 1, 'the tile was drawn twice');
+
+  said(api.kernel.update('holdings', id, { price: egp(410_000), priced_on: '2026-09-24' } as never, { actor: 'p_1' }));
+  await settle(api);
+  const priced = await worth(api);
+  assert.deepEqual(priced.parts, [['EGP', 4_100_000]]);
+  assert.equal(priced.note, '', 'a holding with a price was still said to stand at what it cost');
+  assert.equal(priced.tiles, 1, 'the tile was drawn twice');
+  /* WHAT WAS PAID IS KEPT BESIDE WHAT IT IS WORTH: a price writes `value` and leaves `cost` as it was. */
+  const row = api.kernel.get(id)!.fields;
+  assert.deepEqual([row.cost, row.value], [egp(3_000_000), egp(4_100_000)]);
+  close();
+});
+
+test('THE FIGURE SAYS HOW MANY STAND AT WHAT THEY COST: 3 of 5, with two of them priced', async () => {
+  const { api, close } = await inPounds();
+  const ids = [1, 2, 3, 4, 5].map((n) => hold(api, { label: `Lot ${n}`, kind: 'commodity', qty: n, unit_cost: egp(100_000) }));
+  await settle(api);
+  assert.equal((await worth(api)).note, '5 of 5 at what they cost');
+  for (const id of ids.slice(0, 2)) said(api.kernel.update('holdings', id, { price: egp(150_000), priced_on: '2026-09-20' } as never, { actor: 'p_1' }));
+  await settle(api);
+  const read = await worth(api);
+  assert.equal(read.note, '3 of 5 at what they cost');
+  /* ONE AND TWO AT 1,500 EACH, THREE, FOUR AND FIVE AT THE 1,000 EACH THEY COST: 4,500 and 12,000. */
+  assert.deepEqual(read.parts, [['EGP', 450_000 + 1_200_000]]);
+  close();
+});
+
+test('A PRICE TAKEN AWAY PUTS THE HOLDING BACK AT WHAT IT COST, and a count that moves moves the worth with it', async () => {
+  const { api, close } = await inPounds();
+  const id = hold(api, { label: 'Silver, ten grams', kind: 'commodity', qty: 10, unit_cost: egp(300_000), price: egp(410_000), priced_on: '2026-09-24' });
+  await settle(api);
+  const value = (): unknown => api.kernel.get(id)!.fields.value;
+  assert.deepEqual(value(), egp(4_100_000), 'a holding written with its price was valued at what it cost');
+  said(api.kernel.update('holdings', id, { qty: 4 } as never, { actor: 'p_1' }));
+  await settle(api);
+  assert.deepEqual([api.kernel.get(id)!.fields.cost, value()], [egp(1_200_000), egp(1_640_000)]);
+  said(api.kernel.update('holdings', id, { price: null } as never, { actor: 'p_1' }));
+  await settle(api);
+  assert.deepEqual(value(), egp(1_200_000));
+  assert.equal((await worth(api)).note, '1 of 1 at what they cost');
+  close();
+});
+
+test('A RECORD ON 1.3.0 UPDATES TO THIS FILE AND EVERY COSTED HOLDING GAINS ITS WORTH, with nobody writing a row again', async () => {
+  const released = JSON.parse(readFileSync(new URL('../../packages/seed/test/fixtures/released/holdings-1.3.0.json', import.meta.url), 'utf8')) as Body;
+  assert.equal(released.version, '1.3.0');
+  const { api, clock, close } = await money();
+  said(await put(api, released));
+  const ids = HELD.map((row) => hold(api, row));
+  await settle(api);
+  assert.deepEqual(ids.map((id) => api.kernel.get(id)!.fields.value), [undefined, undefined, undefined]);
+  said(await put(api, file()));
+  /* THE SWEEP ASKS FOR ROWS WITH NO `value`, not rows with no `cost`: every row 1.3.0 costed has a cost and no worth. */
+  clock.advance(SPREAD_MS + 1);
+  await settle(api);
+  assert.deepEqual(ids.map((id) => api.kernel.get(id)!.fields.value), [
+    { amount: 100_000, currency: 'EUR' },
+    { amount: 500_000, currency: 'EUR' },
+    { amount: 54_000, currency: 'USD' },
+  ]);
+  const read = await worth(api);
+  assert.deepEqual(read.parts, [['EUR', 600_000], ['USD', 54_000]]);
+  assert.equal(read.note, '3 of 3 at what they cost');
+  close();
 });

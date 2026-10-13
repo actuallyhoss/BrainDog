@@ -108,6 +108,11 @@ test('a held answer waits on the window’s timers, called as the window’s, as
 
 test('a hard question keeps its suggestion and loses only Enter (audit 19 M10)', () => {
   assert.equal(acceptKey({ ...options('per seat'), band: 'undo' }), null, 'no key answers what is hard to undo');
+  /* NOR AN ANSWER THAT IS ITSELF THE HARD ONE, on a question whose band is only a call (batch 64): suggested, it loses
+     Enter; a safe suggestion beside it keeps Enter. */
+  const kept = (rec: string) => ({ options: [{ key: 'keep', recommended: rec === 'keep' }, { key: 'take', recommended: rec === 'take', hard: true }], band: 'call' });
+  assert.equal(acceptKey(kept('take')), null, 'Enter gives a suggested answer that cannot be taken back');
+  assert.equal(acceptKey(kept('keep')), 'keep');
   assert.equal(acceptKey(options('per seat'), true), null, 'no key answers what moves money');
   assert.equal(acceptKey({ ...options('per seat'), band: 'rows' }), 'per seat', 'a band that only adds still lets Enter give the suggestion');
   assert.doesNotMatch(readFileSync(new URL('./press.ts', import.meta.url), 'utf8'), /suggestionShown/u, 'nothing hides the suggestion any more');

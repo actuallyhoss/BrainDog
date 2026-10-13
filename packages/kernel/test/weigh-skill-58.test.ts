@@ -108,6 +108,7 @@ test('COST_SQL and costOf give one band for each of these, so the count beside t
   const sql = openSqlite();
   sql.exec('CREATE TABLE suggestion (body_kind TEXT, body TEXT)');
   sql.exec('CREATE TABLE declaration (id TEXT, version INTEGER, kind TEXT, body TEXT, retired INTEGER, superseded_at TEXT)');
+  sql.exec('CREATE TABLE entry (id TEXT PRIMARY KEY, register TEXT, seq INTEGER, fields TEXT, deleted_at TEXT, UNIQUE (register, seq))');
   for (const [kind, body] of CASES) {
     sql.exec('DELETE FROM suggestion');
     sql.exec('INSERT INTO suggestion (body_kind, body) VALUES (?, ?)', kind, JSON.stringify(body));
@@ -122,6 +123,7 @@ test('the SQL says what the tests above say, read off the table and not off cost
   const sql = openSqlite();
   sql.exec('CREATE TABLE suggestion (id INTEGER PRIMARY KEY, body_kind TEXT, body TEXT)');
   sql.exec('CREATE TABLE declaration (id TEXT, version INTEGER, kind TEXT, body TEXT, retired INTEGER, superseded_at TEXT)');
+  sql.exec('CREATE TABLE entry (id TEXT PRIMARY KEY, register TEXT, seq INTEGER, fields TEXT, deleted_at TEXT, UNIQUE (register, seq))');
   const put = (kind: string, body: unknown) => sql.exec('INSERT INTO suggestion (body_kind, body) VALUES (?, ?)', kind, JSON.stringify(body));
   put('change', SKILL_REWORDED);
   put('pack', { disable: 'money' });
@@ -160,6 +162,7 @@ test('a row changed in a field the history withholds is hard to undo, and COST_S
   const sql = openSqlite();
   sql.exec('CREATE TABLE suggestion (body_kind TEXT, body TEXT)');
   sql.exec('CREATE TABLE declaration (id TEXT, version INTEGER, kind TEXT, body TEXT, retired INTEGER, superseded_at TEXT)');
+  sql.exec('CREATE TABLE entry (id TEXT PRIMARY KEY, register TEXT, seq INTEGER, fields TEXT, deleted_at TEXT, UNIQUE (register, seq))');
   /* VERSION 1 TYPED `pin` SECRET AND VERSION 2 DROPPED IT: the rows written under version 1 hold it still. */
   sql.exec("INSERT INTO declaration VALUES ('register.keys', 1, 'register', ?, 0, '2026-10-01T00:00:00.000Z')", keysList([{ id: 'name', type: 'text' }, { id: 'pin', type: 'secret' }]));
   sql.exec(

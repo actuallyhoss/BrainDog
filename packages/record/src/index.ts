@@ -5705,6 +5705,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       runs: ctx !== null && readable(ctx, SESSION) ? [] : activeRuns(),
       /* THE QUEUE'S OWN RULE FOR A WITHHELD FIELD (`BAND_SQL`), so `waits.hard` and the queue's count are one number. */
       withheld: costRows(sql).withheld,
+      held: costRows(sql).held,
     });
   };
 

@@ -311,6 +311,27 @@ test('run on a void payment, the script counts the bill\'s other cleared payment
   assert.deepEqual([byHand.writes, byHand.log], [[], ['Studio rent was marked paid by hand, so the payment that was made void changed nothing.']]);
 });
 
+/* AUDIT 62, CLAIM 1, AS THE RULE RUNS IT: the count comes from the Ledger here, not from the test. A bill of 1,000 with
+   500 typed in "Paid so far" and no payment behind it, then a payment logged against it that has not moved. */
+test('run on a new pending or void payment, the script leaves a Paid so far somebody typed and says so', async () => {
+  const half = bill({ amount: gbp(100_000), state: 'part', paid_so_far: gbp(50_000) });
+  for (const [state, why] of [['pending', 'has not cleared'], ['void', 'was made void']] as const) {
+    const fresh = payment(30_000, '2026-10-01', { settles: 'e_obligations_4', state });
+    const { out, writes, log } = await ran([half, fresh], { payment: 'transactions#12', item: 'obligations#4' });
+    assert.deepEqual([out, writes], [null, []]);
+    assert.deepEqual(log, [`Studio rent has a Paid so far that somebody typed, so the payment that ${why} changed nothing.`]);
+  }
+  /* A CLEARED PAYMENT BESIDE IT changes nothing: 200 cleared, and 200 with the 300 pending, are neither the 600 held, so the 600 was typed... */
+  const cleared = row('transactions', 11, { what: 'NORTHGATE', direction: 'out', amount: gbp(20_000), on: '2026-09-20', settles: 'e_obligations_4', state: 'cleared' });
+  const typed = bill({ amount: gbp(100_000), state: 'part', paid_so_far: gbp(60_000) });
+  const beside = await ran([typed, cleared, payment(30_000, '2026-10-01', { settles: 'e_obligations_4', state: 'pending' })], { payment: 'transactions#12', item: 'obligations#4' });
+  assert.deepEqual([beside.writes, beside.log], [[], ['Studio rent has a Paid so far that somebody typed, so the payment that has not cleared changed nothing.']]);
+  /* ...and a pending payment in another currency is still refused before the sum is looked at. */
+  const euro = row('transactions', 12, { what: 'NORTHGATE', direction: 'out', amount: { amount: 30_000, currency: 'EUR' }, on: '2026-10-01', settles: 'e_obligations_4', state: 'pending' });
+  const other = await ran([half, euro], { payment: 'transactions#12', item: 'obligations#4' });
+  assert.deepEqual([other.writes, other.log], [[], ['Studio rent is in GBP and the payment is in EUR, so nothing was marked paid.']]);
+});
+
 test('run on an amount that is off, the script writes nothing and hands back the one question', async () => {
   const { out, writes } = await ran([rent(), payment(420_000)], { payment: 'transactions#12', item: 'recurring#7', next: '2026-11-01' });
   assert.deepEqual(writes, []);

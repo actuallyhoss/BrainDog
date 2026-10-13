@@ -11,8 +11,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import type { UndoPlan } from '@braindog/kernel';
+import { no } from '@braindog/ports';
 
-import { createRecordApi, type CallContext } from '../src/index.ts';
+import { allows, createRecordApi, type CallContext } from '../src/index.ts';
+import { methods } from '../src/methods/undo.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 const NOW = Date.UTC(2026, 9, 13, 9);
@@ -140,5 +142,60 @@ test('NO TOKEN AND NO MEMBER BELOW OWNER PUTS A DECLARATION BACK, not even to lo
   }
   assert.equal(empty(), 'No projects yet. Add the first one.', 'nothing was put back');
   assert.equal(versions('page.work').length, 2, 'no version was installed');
+  sql.close();
+});
+
+/* AND THE STEP REFUSES IT ITSELF, WHATEVER THE DOOR LETS IN (audit 62, claim 8, the part batch 63 left). The test above
+   holds the door. This one takes the door away: the method file is built with a guard that admits everybody, as it
+   would be the day undo is opened to an agent for its own run, and over the record's own ladder. A put back that
+   installs an earlier page is still the owner's alone, for the look and for the press, and a put back of plain writes
+   goes through the same widened door, so what refuses is the declaration and nothing else. */
+test('WITH THE DOOR WIDE OPEN, A DECLARATION STILL GOES BACK ONLY FOR THE OWNER SIGNED IN, and a plain write goes back for the rest', async () => {
+  const { sql, api, versions, empty, decided } = await record();
+  const decision = await decided('Say what to do on an empty Work page?', BEFORE, AFTER);
+  const plan = value<UndoPlan>(await api.undo({ decision, dry: true }, owner));
+
+  const open = methods({
+    kernel: api.kernel,
+    sql,
+    admin: () => null,
+    guard: (ctx: CallContext, need: Parameters<typeof allows>[1]) => allows(ctx, need),
+    readable: () => null,
+    tail: async <T>(out: T) => out,
+    no,
+    clock: fixedClock(NOW),
+  } as never);
+  type Out = { ok: boolean; value?: UndoPlan & { put?: number }; refusal?: { code: string; fix: string } };
+  const undo = (args: unknown, ctx: CallContext) => open.undo(args as never, ctx) as Promise<Out>;
+
+  const agent: CallContext = { principal: { kind: 'token', id: 't_1', scope: 'write', person: 'p_1', level: 'owner' } };
+  const member: CallContext = { principal: { kind: 'person', id: 'p_2', level: 'decide' }, credentialed: true };
+  for (const [who, ctx, code] of [['the owner’s own token', agent, 'NEEDS_BROWSER_SESSION'], ['a member below owner', member, 'LEVEL_REQUIRED']] as const) {
+    for (const args of [{ decision, dry: true }, { decision, hash: plan.hash }]) {
+      const out = await undo(args, ctx);
+      assert.equal(out.ok, false, `${who} put a declaration back, or was shown how`);
+      assert.equal(out.refusal?.code, code, `${who}: ${JSON.stringify(out.refusal)}`);
+      assert.match(out.refusal!.fix, /only the owner decides that, signed in/u, 'the refusal says who may');
+      /* A token is sent to the app, and somebody already in it is told who to ask. */
+      assert.match(out.refusal!.fix, ctx === agent ? /Open it from the app\.$/u : /Ask the owner to put it back\.$/u);
+      assert.doesNotMatch(out.refusal!.fix, /page\.work|[0-9A-HJKMNP-TV-Z]{26}|—/u, 'in names, with no id');
+    }
+  }
+  assert.equal(empty(), 'No projects yet. Add the first one.', 'nothing was put back');
+  assert.equal(versions('page.work').length, 2, 'no version was installed');
+
+  /* The same token through the same door, on a change that holds no declaration: it is the step that refuses. */
+  const made = value<{ id: string; batch: string }>(api.kernel.create('things', { name: 'Kitchen' }, { actor: 'p_1' }));
+  const rows = await undo({ batch: made.batch, dry: true }, agent);
+  assert.ok(rows.ok, JSON.stringify(rows.refusal));
+  assert.ok(rows.value!.steps.length > 0 && rows.value!.steps.every((s) => s.do !== 'declare'), rows.value!.lines.join(' / '));
+  const back = await undo({ batch: made.batch, hash: rows.value!.hash }, agent);
+  assert.ok(back.ok, JSON.stringify(back.refusal));
+  assert.equal(back.value!.put, 1);
+
+  /* And the owner, signed in, is refused nothing by it. */
+  const done = await undo({ decision, hash: plan.hash }, owner);
+  assert.ok(done.ok, JSON.stringify(done.refusal));
+  assert.equal(empty(), 'Nothing here yet.', 'the page reads as before');
   sql.close();
 });

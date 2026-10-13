@@ -19,6 +19,11 @@
         "source": [
           "worked"
         ]
+      },
+      "labels": {
+        "source": {
+          "worked": "Worked out"
+        }
       }
     }
   },

@@ -32,7 +32,7 @@ import { ACROSS, ANY_LIST, touches, type Resolve } from './reach.ts';
 import { egressChanged } from './script.ts';
 import { SLASH, slashMayWrite } from './slash.ts';
 import { causeFault, causeOf, canon, noop } from './cause.ts';
-import { costOf, costRows, type Cost } from './weigh.ts';
+import { costOf, costRows, optionCosts, pickCost, type Cost } from './weigh.ts';
 import { askOf, retypedBody, retypeShapeFault } from './api/retype.ts';
 import { configValue, readPackConfig } from './declare.ts';
 
@@ -252,7 +252,9 @@ export function listGovernance(
      which fields a list's history withholds, so a browser weighing the raw row called a patch of a hidden field a row
      change while the card and the counts called it hard to undo. A decision or a prediction has nothing left to weigh. */
   const withheld = costRows(deps.sql);
-  return ok(out.map((r) => ({ ...r, cost: costOfRow(deps.sql, r, withheld) })));
+  /* AND WHAT EACH OPTION COSTS TO HAVE PICKED (`option_costs`, by the option's id), on a question of options: one hard
+     option no longer makes the question `undo`, so the reader marks the option that is hard and words only that press. */
+  return ok(out.map((r) => ({ ...r, cost: costOfRow(deps.sql, r, withheld), ...(r.body_kind === 'options' ? { option_costs: optionCosts(r.body) } : {}) })));
 }
 
 /**
@@ -2530,7 +2532,9 @@ export function pressedOnly(reason: string): boolean {
  */
 function oneAnswer(deps: GovernDeps, id: string, bodyKind: BodyKind, raw: string, option: string): string | null {
   const body = parse(raw);
-  if (!body || costOf(bodyKind, body) !== 'call') return null;
+  /* AND THE OPTION PICKED IS WEIGHED TOO (`pickCost`). A hard option beside a safe one leaves the question `call`
+     since batch 64, and picking the hard one is still an answer that owes its reason. */
+  if (!body || costOf(bodyKind, body) !== 'call' || pickCost(bodyKind, body, option) !== 'call') return null;
   /* AN OPTION THAT WRITES CHANGES SOMETHING ELSE, so the one-press sentence would not be true of it. */
   if (listOf(body.options).some((o) => isMap(o) && o.patches !== undefined)) return null;
   const by = deps.sql.one<{ by: string }>('SELECT opened_by AS by FROM suggestion WHERE id = ?', id)?.by ?? '';

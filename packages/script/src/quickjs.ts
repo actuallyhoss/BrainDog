@@ -43,6 +43,7 @@ import {
   HEAP_BYTES,
   isRefusal,
   LOG_BYTES,
+  scriptMeta,
   WITH_CONFIG,
   type CtxHost,
   type HostRequest,
@@ -426,7 +427,7 @@ export async function runInQuickJs(decl: ScriptDecl, host: CtxHost): Promise<Scr
         handle.dispose();
       }
       const build = vm.unwrapResult(vm.callFunction(prelude, vm.undefined, hostObj));
-      const meta = intoVm(parse, { input: host.input, now: host.now(), tz: host.tz });
+      const meta = intoVm(parse, scriptMeta({ input: host.input, now: host.now(), tz: host.tz }));
       const built = vm.unwrapResult(vm.callFunction(build, vm.undefined, meta));
       /* `ctx.config`, PUT ON BY THE SAME TEXT THE CLOUD'S LOADED MODULE USES (`WITH_CONFIG`), frozen inside the VM. */
       const withConfig = vm.unwrapResult(vm.evalCode(WITH_CONFIG, 'config.js'));

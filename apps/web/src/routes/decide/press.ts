@@ -92,19 +92,22 @@ export function hold(send: () => void, ms = HOLD_MS, clock: Clock = WINDOW_CLOCK
 export const HARD_TO_UNDO = 'undo';
 
 /** A question as these rules read it: its answers by key, the suggested one marked, and its band. */
-type Keyed = { options: readonly { key: string; recommended?: boolean | undefined }[] };
+type Keyed = { options: readonly { key: string; recommended?: boolean | undefined; hard?: boolean | undefined }[] };
 type Asked = Keyed & Partial<Pick<Question, 'band'>>;
 
 /**
  * THE ANSWER ENTER GIVES: the suggested one where it is drawn, else Accept on a question that has it, else none.
  *
- * NONE ON A QUESTION THAT IS HARD TO UNDO, AND NONE WHERE MONEY MOVES. One key that does something the other button
+ * NONE ON A QUESTION THAT IS HARD TO UNDO, NONE FOR AN OPTION THAT IS, AND NONE WHERE MONEY MOVES. One key that does something the other button
  * cannot take back, or that writes an amount the reader has not read, is the shortcut this product does not offer:
  * such a question is answered by a press on its own button, which names the amount.
  */
 export function acceptKey(q: Asked, moves = false): string | null {
   if (q.band === HARD_TO_UNDO || moves) return null;
   const suggested = q.options.find((o) => o.recommended === true);
+  /* NOR A SUGGESTED ANSWER THAT IS ITSELF THE HARD ONE. Since batch 64 one hard option beside a safe one leaves the
+     question's band alone, so the option is asked: a key gives no answer that cannot be taken back. */
+  if (suggested?.hard === true) return null;
   if (suggested) return suggested.key;
   return twoWords(q) ? 'accept' : null;
 }

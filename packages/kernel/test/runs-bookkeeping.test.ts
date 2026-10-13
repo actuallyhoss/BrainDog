@@ -144,3 +144,20 @@ test('A MOMENT AN AGENT FILLS FOR THE FIRST TIME IS A CHANGE, as "Sent" filled a
   assert.equal(k.bookkeeping({ ...shape, from: iso(clock.now() - 24 * HOUR) }), true, 'a stamp over an earlier one was read as news');
   sql.close();
 });
+
+test('A FEED LINE A RUN SIGNED SAYS WHO THAT RUN IS, on a live record: its agent and its app, and nothing new on a person’s line', async () => {
+  const { k } = await record();
+  value(k.create('tools', { name: 'By hand' }, { actor: 'p_owner' }));
+  value(k.create('tools', { name: 'By a run' }, as({ client_id: 'claude-code', agent: 'claude' } as SessionHints)));
+  const out = k.block({ kind: 'feed', source: 'activity', empty: 'Nothing yet.' }) as { feed?: (Feed & { who?: string | null; run_by?: { run: string; agent: string; client: string | null; parent: string | null } | null })[] };
+  const rows = out.feed ?? [];
+  const signed = rows.filter((r) => r.run_by !== undefined);
+  assert.ok(signed.length > 0, 'no line of the feed says its run: runOf is not wired into the page reads');
+  for (const r of signed) {
+    assert.equal(r.run_by?.run, 'S1');
+    assert.equal(typeof r.run_by?.agent, 'string');
+    assert.notEqual(r.run_by?.agent, '');
+  }
+  /* A LINE A PERSON WROTE CARRIES NO `run_by` AT ALL, not a null. */
+  assert.ok(rows.some((r) => !('run_by' in r)), 'every line carries run_by, a person’s included');
+});

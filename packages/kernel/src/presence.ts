@@ -170,6 +170,26 @@ export function workingRuns(sql: Sql, nowMs: number): WorkingRun[] {
 }
 
 /**
+ * How many runs in one of `states` were last heard from more than `olderMs` ago, for a reader that counts what has gone
+ * quiet (the tidy's finders, `tidy.ts`): the runs the sweep is about to write off, and the ended ones nobody has heard
+ * from in a month. `also` is one more SQL condition on the row, with no parameter of its own.
+ *
+ * HEARD IS `last_seen`, ELSE THE ROW'S LAST CHANGE, which is how the sweep reads it (`schedule.ts`), so what this counts
+ * as about to be written off is what the next tick writes off. The comparison with the clock is made here, in the one
+ * file that may make it (the `one-clock` gate).
+ */
+export function unheardRuns(sql: Sql, nowMs: number, olderMs: number, states: readonly string[], also = ''): number {
+  const before = new Date(nowMs - olderMs).toISOString();
+  const row = sql.one<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM entry WHERE register = '${RUNS}' AND deleted_at IS NULL AND state IN (SELECT value FROM json_each(?))
+       ${also === '' ? '' : `AND ${also} `}AND coalesce(json_extract(fields, '$.last_seen'), updated_at) < ?`,
+    JSON.stringify(states),
+    before,
+  );
+  return row?.n ?? 0;
+}
+
+/**
  * The runs still open, active or idle, heard from inside `STALE_MS`: what an agent starting here is told is around it.
  * A run silent longer is no company, whatever its state says, so a briefing names no dead run, and a run carried in this
  * morning that was last seen in September is not one either.

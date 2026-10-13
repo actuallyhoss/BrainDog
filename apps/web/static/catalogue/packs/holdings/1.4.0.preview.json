@@ -1,0 +1,123 @@
+{
+  "format": 1,
+  "made_at": "2026-10-13T14:02:01.215Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "cells": [
+            {
+              "label": "Holdings value",
+              "metric": "holdings-value",
+              "note": "{{holdings-at-cost}} of {{holdings-count}} at what they cost"
+            }
+          ],
+          "heading": "What you hold",
+          "kind": "stat",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "gt": 0,
+            "metric": "holdings-unpriced"
+          },
+          "key": "k1x4zwfp",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "cells": [
+            {
+              "label": "Holdings value",
+              "metric": "holdings-value"
+            }
+          ],
+          "heading": "What you hold",
+          "kind": "stat",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "is": 0,
+            "metric": "holdings-unpriced"
+          },
+          "key": "k1x4zwfp-2",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "readings": []
+        },
+        {
+          "columns": [
+            {
+              "field": "label",
+              "width": "minmax(18ch,2fr)"
+            },
+            {
+              "field": "kind"
+            },
+            {
+              "field": "qty"
+            },
+            {
+              "field": "unit_cost"
+            },
+            {
+              "field": "price"
+            },
+            {
+              "field": "value"
+            },
+            {
+              "field": "acquired_on"
+            },
+            {
+              "field": "matures_on"
+            }
+          ],
+          "empty": "Nothing held yet. A certificate, a policy or a lot of a commodity goes here with what it cost, and what it is worth now when you know.",
+          "heading": "Everything you hold",
+          "kind": "table",
+          "limit": 100,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "acquired_on"
+            }
+          ],
+          "source": "register.holdings",
+          "span": 12,
+          "key": "k00991of",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        }
+      ],
+      "icon": "money",
+      "nav": {
+        "order": 30,
+        "section": "Money"
+      },
+      "pack": "holdings",
+      "page": "holdings",
+      "requires": [
+        "register.holdings"
+      ],
+      "title": "Holdings",
+      "read_at": "2026-10-13T14:02:01.215Z",
+      "zone": "UTC",
+      "look": {
+        "look": "holdings",
+        "basis": "r050pqmr",
+        "by": "rule",
+        "hide": [
+          "k00991of"
+        ]
+      },
+      "declared_version": 1
+    }
+  ]
+}

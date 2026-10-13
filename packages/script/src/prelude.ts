@@ -25,6 +25,11 @@
  * `null` crossed as that `0`, and a typo crossed as the same `NaN` as no version at all. A version given that is not a whole number now stops the run here,
  * where the sentence can name the call that was wrong. This is a courtesy to the author and not a
  * check: a script that goes around it can only choose not to compare, which it may do anyway.
+ *
+ * `ctx.today()` IS THE RECORD'S OWN DAY, HANDED IN. The sandbox has no `Intl`, so it cannot turn the instant and the
+ * zone's name into a local day: the host does (`dayIn` in `index.ts`) and hands it over as `meta.today`. It is a
+ * string, `YYYY-MM-DD`, and never a `Date`. From a host that hands none, or anything that is not a day, it is the
+ * first ten characters of the instant, the UTC day, which is what a script could read before this.
  */
 export const PRELUDE = `(function (host) {
   'use strict';
@@ -56,11 +61,14 @@ export const PRELUDE = `(function (host) {
   };
   const words = (parts) =>
     parts.map((p) => (typeof p === 'string' ? p : stringify(p))).join(' ');
+  const isDay = (v) => typeof v === 'string' && /^\\d{4}-\\d{2}-\\d{2}$/.test(v);
   return function build(meta) {
+    const today = isDay(meta.today) ? meta.today : String(meta.now).slice(0, 10);
     return freeze({
       input: meta.input,
       tz: meta.tz,
       now: () => meta.now,
+      today: () => today,
       fetch: (url, init) =>
         host.fetch(stringify({ url: String(url), init: init === undefined ? null : init })).then(response),
       write: (register, fields) => {

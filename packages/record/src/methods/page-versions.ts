@@ -15,6 +15,17 @@
  * `seesPage` in `index.ts` asked of `readable`. A page made for each row of a list has no declaration of its own,
  * so its versions are its template's. A page they may not open and a page that is not there are the same refusal,
  * which names what was asked and the pages there are.
+ *
+ * AND EACH VERSION IS CUT TO THE LISTS ITS READER MAY READ (audit 61, claim 7). `opens` asks about the lists the page
+ * reads TODAY, and an older version may have read others: a Desk that once drew Salaries handed that block's source to
+ * somebody invited to Notes alone. So a block over a list the caller may not read is left out of the version, and so
+ * is a block whose words name that list, and `cut` says how many were left out. It says a count and never which
+ * lists. A cut version is not the page as it stood, so a host does not offer to put it back: applying it would take
+ * those blocks away from everybody.
+ *
+ * A BODY BEGINS WITH ITS KIND. The kernel stores a declaration with its keys in order of spelling, `blocks` first,
+ * and `setDeclaration` reads the kind off the first key, so a version handed back as stored was refused when Put back
+ * applied it. Each body is answered `page` first.
  */
 
 import { slugify } from '@braindog/kernel';
@@ -35,8 +46,13 @@ export type PageVersion = {
   live: boolean;
   /** Who applied it, by name, or `null` when the log holds no line for it and no add-on wrote it. */
   by: string | null;
-  /** The declaration as it stood, which Put back applies again and Save writes to a file. */
+  /** The declaration as it stood, `page` first, which Put back applies again and Save writes to a file. */
   body: Body;
+  /**
+   * How many blocks were left out because they read or name a list this reader may not read. Absent when the version
+   * is whole. A version that says it is not what the page held, and is not put back.
+   */
+  cut?: number;
 };
 
 /** What `pageVersions` answers: the page by its address and title, and its versions newest first. */
@@ -48,8 +64,38 @@ export const PAGE_VERSIONS_SHOWN = 50;
 /** A run's spoken id, `S42`, which signs a write an agent made inside a run. */
 const RUN = /^S[1-9][0-9]*$/u;
 
+/** A list as a declaration's text says it, `register.bills`, and a row of one by its spoken id, `bills#4`. */
+const NAMED = /register\.([A-Za-z0-9_-]+)/gu;
+const SPOKEN = /(?<![A-Za-z0-9_-])([A-Za-z][A-Za-z0-9_-]*)#[0-9]+/gu;
+
+/** A declaration's keys with its kind first, as `setDeclaration` reads one. */
+const kindFirst = (body: Body): Body => {
+  const { page, title, ...rest } = body;
+  return { ...(page === undefined ? {} : { page }), ...(title === undefined ? {} : { title }), ...rest };
+};
+
+/** Every piece of text a block or a key holds, but a block's `kind`, which is a word of the language and not the author's. */
+const wordsOf = (node: unknown, key?: string): string[] =>
+  typeof node === 'string'
+    ? key === 'kind'
+      ? []
+      : [node]
+    : Array.isArray(node)
+      ? node.flatMap((n) => wordsOf(n))
+      : node !== null && typeof node === 'object'
+        ? Object.entries(node).flatMap(([k, v]) => wordsOf(v, k))
+        : [];
+
+/** The value of every `register:` key under a node: an inputs block's list, and each leg of a cash walk. */
+const keyed = (node: unknown): string[] =>
+  Array.isArray(node)
+    ? node.flatMap(keyed)
+    : node !== null && typeof node === 'object'
+      ? Object.entries(node).flatMap(([k, v]) => (k === 'register' && typeof v === 'string' ? [v] : keyed(v)))
+      : [];
+
 export function methods(deps: RecordDeps) {
-  const { kernel, sql, guard, readable, no } = deps;
+  const { kernel, sql, guard, readable, no, readsEveryList } = deps;
 
   /** A key this call does not take, in the sentence `index.ts`'s `stray` uses. */
   const stray = (args: Body, takes: readonly string[]): Refusal | null => {
@@ -76,10 +122,68 @@ export function methods(deps: RecordDeps) {
     return sql.one<{ name: string | null }>('SELECT name FROM person WHERE id = ?', actor)?.name?.trim() || 'Someone';
   };
 
+  /**
+   * What cuts a version for this caller: its body `page` first, less every block over a list they may not read, and
+   * how many things were left out.
+   *
+   * THE LISTS A VERSION NAMES ARE ASKED OF `readable`, ONE AT A TIME, AS `opens` ASKS THE PAGE'S. They are the ones the
+   * kernel reads off each block (`blockRegisters`: a source, a figure's lists, a walk's legs, the steps under a card),
+   * and the ones the text says outright, `register.bills`, a `register:` key, a row's spoken id. A list since taken
+   * out is asked the same way, so a version over one is cut for whoever was never let read it.
+   *
+   * THEN THE WORDS. A note beside the table that says "Raise the salaries in May" names the list as surely as the
+   * table's source did, so a block whose text says a hidden list's id or its name as a word goes with it. A block's
+   * `kind` is not text. What reads across the record (`*`) is not asked: its source names no list.
+   *
+   * SOMEBODY WHO READS EVERY LIST IS ASKED NOTHING and given each version whole.
+   */
+  const cutFor = (ctx: CallContext): ((stored: Body, titleNow: string) => { body: Body; cut: number }) => {
+    if (readsEveryList?.(ctx) === true) return (stored) => ({ body: kindFirst(stored), cut: 0 });
+    const lists = kernel.registers();
+    const asked = new Map<string, boolean>();
+    const hiddenList = (list: string): boolean => {
+      let said = asked.get(list);
+      if (said === undefined) asked.set(list, (said = list !== '*' && list !== '' && readable(ctx, list) !== null));
+      return said;
+    };
+    /* A block is JSON somebody wrote in an older language, so one the kernel cannot walk names what its text names. */
+    const reads = (block: unknown): string[] => {
+      try {
+        return block !== null && typeof block === 'object' ? kernel.blockRegisters(block as Parameters<typeof kernel.blockRegisters>[0]) : [];
+      } catch {
+        return [];
+      }
+    };
+    const said = (node: unknown): string[] => {
+      const text = wordsOf(node).join('\n');
+      return [...[...text.matchAll(NAMED)].map((m) => m[1]!), ...[...text.matchAll(SPOKEN)].map((m) => m[1]!).filter((id) => lists.has(id)), ...keyed(node)];
+    };
+    return (stored, titleNow) => {
+      const { blocks: held, page, title, ...rest } = stored;
+      const blocks: unknown[] = Array.isArray(held) ? held : [];
+      const read = blocks.map(reads);
+      const hidden = [...new Set([...read.flat(), ...said(blocks), ...said(rest)])].filter(hiddenList);
+      if (hidden.length === 0) return { body: kindFirst(stored), cut: 0 };
+      const words = hidden.flatMap((id) => [id, lists.get(id)?.name ?? '']).filter((w) => w.trim() !== '');
+      const names = new RegExp(`(?<![\\p{L}\\p{N}])(?:${words.map((w) => w.trim().replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')).join('|')})(?![\\p{L}\\p{N}])`, 'iu');
+      const says = (node: unknown, key?: string): boolean => wordsOf(node, key).some((text) => names.test(text));
+      /* A SETTING OF THE PAGE THAT NAMES ONE GOES TOO, and a page made for each row of a hidden list (`for:`) was about
+         that list in every block, so none of them is kept. */
+      const settings = Object.entries(rest).filter(([key, value]) => !says(value, key));
+      const forHidden = rest.for !== undefined && !settings.some(([key]) => key === 'for');
+      const kept = forHidden ? [] : blocks.filter((block, i) => !read[i]!.some((list) => hidden.includes(list)) && !says(block));
+      /* AND A TITLE THAT SAYS ONE IS ANSWERED AS THE PAGE IS TITLED NOW, which `pages` already shows this caller. */
+      const retitled = says(title);
+      const cut = blocks.length - kept.length + (Object.keys(rest).length - settings.length) + (retitled ? 1 : 0);
+      return { body: { ...(page === undefined ? {} : { page }), ...(title === undefined ? {} : { title: retitled ? titleNow : title }), ...Object.fromEntries(settings), blocks: kept }, cut };
+    };
+  };
+
   return {
     /**
      * `{ page }`, a page by its address (`plans`, or `page.plans`). Answers `{ page, title, versions }`, the versions
-     * newest first and at most `PAGE_VERSIONS_SHOWN` of them.
+     * newest first and at most `PAGE_VERSIONS_SHOWN` of them, each cut to the lists the caller may read and saying
+     * `cut` when anything was left out.
      */
     async pageVersions(args: { page?: unknown } | undefined, ctx: CallContext): Promise<Result<PageVersions>> {
       const stop = guard(ctx, 'read');
@@ -105,18 +209,21 @@ export function methods(deps: RecordDeps) {
         id,
         PAGE_VERSIONS_SHOWN,
       );
+      const cutTo = cutFor(ctx);
       const versions: PageVersion[] = rows.map((r) => {
         const by = sql.one<{ actor: string }>(
           "SELECT actor FROM event WHERE kind = 'declare' AND target = ? AND to_v = ? ORDER BY rowid DESC LIMIT 1",
           `declaration:${id}`,
           String(r.version),
         );
+        const shown = cutTo(JSON.parse(r.body) as Body, seen.title);
         return {
           version: r.version,
           at: r.created_at,
           live: r.superseded_at === null && r.retired === 0,
           by: by ? whoOf(by.actor) : r.pack_id === null ? null : 'An add-on',
-          body: JSON.parse(r.body) as Body,
+          body: shown.body,
+          ...(shown.cut === 0 ? {} : { cut: shown.cut }),
         };
       });
       return ok({ page: seen.slug, title: seen.title, versions });

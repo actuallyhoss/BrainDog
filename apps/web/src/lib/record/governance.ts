@@ -16,7 +16,7 @@ import { money } from 'braindog-render';
    `governance.open`: it reads `governance` raw and builds its own `Question`, so a band computed only
    inside the kernel's page source would never reach this screen, and two rankings of one queue that
    disagreed would be worse than no ranking at all. */
-import { COSTS, costOf, costRank } from '@braindog/kernel';
+import { COSTS, costOf, costRank, optionCost } from '@braindog/kernel';
 
 import { copy } from '../copy.ts';
 import { citedWords, figuresIn } from '../cite.ts';
@@ -135,6 +135,11 @@ export function questionOf(row: Row, asked: string | undefined, rank: number): Q
   const body = isRow(row.body) ? row.body : {};
   const figures = figuresIn(body);
   const said = (v: unknown): string => moneyInText(citedWords(text(v), figures));
+  /* WHICH OPTIONS ARE HARD TO TAKE BACK, by the record's own word where it sends one (`option_costs`, by the option's
+     id), and weighed here from the option as the kernel weighs it where it does not. Either saying hard is hard: a
+     build that disagrees with the record errs towards the care. */
+  const sent = Array.isArray(row.option_costs) ? row.option_costs.filter(isRow) : [];
+  const hardOption = (o: Row): boolean => optionCost(o) === 'undo' || sent.some((c) => c.id === o.id && c.cost === 'undo');
   const options =
     row.body_kind === 'options' && Array.isArray(body.options)
       ? body.options.filter((o): o is Row => isRow(o) && typeof o.id === 'string').map((o) => ({
@@ -142,6 +147,7 @@ export function questionOf(row: Row, asked: string | undefined, rank: number): Q
           title: said(o.label) || String(o.id),
           body: said(o.because),
           ...(o.recommended === true ? { recommended: true } : {}),
+          ...(hardOption(o) ? { hard: true } : {}),
         }))
       : [
           { key: 'accept', title: copy.acceptIt, body: '' },

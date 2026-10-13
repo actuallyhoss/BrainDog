@@ -258,7 +258,7 @@ export function filedCard(p: SlashProposal, asked: string, now: number): QueueQu
           if (typeof o !== 'object' || o === null) return [];
           const r = o as Record<string, unknown>;
           if (typeof r.id !== 'string' || r.id === '') return [];
-          return [{ key: r.id, label: typeof r.label === 'string' ? r.label : r.id, because: typeof r.because === 'string' ? r.because : '', recommended: r.recommended === true }];
+          return [{ key: r.id, label: typeof r.label === 'string' ? r.label : r.id, because: typeof r.because === 'string' ? r.because : '', recommended: r.recommended === true, ...(r.hard === true ? { hard: true as const } : {}) }];
         })
       : [];
   if (p.body_kind === 'options' && options.length === 0) return null;

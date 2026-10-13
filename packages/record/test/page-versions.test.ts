@@ -108,3 +108,123 @@ test('AN UNKNOWN PAGE IS REFUSED BY THE NAME ASKED, and so is a call that names 
   assert.equal(!extra.ok && extra.refusal.code, 'FIELD_UNKNOWN');
   sql.close();
 });
+
+/* ── a version is cut to the lists its reader may read (audit 61, claim 7) ── */
+
+const list = (id: string, name: string) => ({ register: id, name, title: 'name', fields: [{ id: 'name', type: 'text' }] });
+const over = (...blocks: Record<string, unknown>[]) => ({ page: 'desk', title: 'Desk', blocks });
+const table = (id: string) => ({ kind: 'table', source: `register.${id}` });
+/** Somebody invited to Notes alone. */
+const noteReader: CallContext = { principal: { kind: 'person', id: 'p_3', level: 'read' }, registers: ['notes'] };
+
+/** A Desk page that read Notes and Salaries, then Notes alone: its older version names a list its newer one does not. */
+async function desk() {
+  const made = await record();
+  for (const l of [list('notes', 'Notes'), list('salaries', 'Salaries')]) {
+    const out = await made.api.setDeclaration({ body: l }, ada);
+    assert.ok(out.ok, JSON.stringify(out));
+  }
+  const first = await made.api.setDeclaration({ body: over(table('notes'), table('salaries'), { kind: 'note', body: 'Raise the salaries in May.' }, { kind: 'note', body: 'hello' }) }, ada);
+  assert.ok(first.ok, JSON.stringify(first));
+  const second = await made.api.setDeclaration({ body: over(table('notes'), { kind: 'note', body: 'hello' }), version: 1 }, ada);
+  assert.ok(second.ok, JSON.stringify(second));
+  return made;
+}
+
+test('AN OLDER VERSION IS CUT TO THE LISTS ITS READER MAY READ, said as a count, and nothing left names the others', async () => {
+  const { sql, read } = await desk();
+
+  const out = await listed(read, { page: 'desk' }, noteReader);
+  assert.deepEqual(out.versions.map((v) => v.version), [2, 1]);
+  const [now, older] = out.versions as [PageVersion, PageVersion];
+  /* Today's version reads Notes alone, so it is whole and says no cut. */
+  assert.equal(now.cut, undefined);
+  assert.equal((now.body.blocks as unknown[]).length, 2);
+  /* The older one loses the table over Salaries and the note that names them, and says two were left out. */
+  assert.equal(older.cut, 2);
+  assert.deepEqual(older.body.blocks, [table('notes'), { kind: 'note', body: 'hello' }]);
+  assert.doesNotMatch(JSON.stringify(out), /salar/i, 'the answer names a list its reader may not read');
+  sql.close();
+});
+
+test('SOMEBODY WHO READS EVERY LIST IS GIVEN EACH VERSION WHOLE, with no cut said', async () => {
+  const { sql, read } = await desk();
+
+  const out = await listed(read, { page: 'desk' }, reader);
+  const older = out.versions[1]!;
+  assert.equal(older.cut, undefined);
+  assert.equal((older.body.blocks as unknown[]).length, 4);
+  assert.match(JSON.stringify(older.body), /register\.salaries/);
+  assert.ok(out.versions.every((v) => v.cut === undefined));
+  sql.close();
+});
+
+test('A VERSION OVER A LIST SINCE TAKEN OUT is whole for who reads everything and cut for who does not', async () => {
+  const { api, sql, read } = await desk();
+  const gone = await api.retireDeclaration({ id: 'register.salaries' }, ada);
+  assert.ok(gone.ok, JSON.stringify(gone));
+  assert.equal(api.kernel.register('salaries'), undefined);
+
+  const whole = (await listed(read, { page: 'desk' }, ada)).versions[1]!;
+  assert.equal(whole.cut, undefined);
+  assert.equal((whole.body.blocks as unknown[]).length, 4);
+  const cut = await listed(read, { page: 'desk' }, noteReader);
+  assert.equal(cut.versions[1]!.cut, 2);
+  assert.doesNotMatch(JSON.stringify(cut), /salar/i);
+  sql.close();
+});
+
+test('A VERSION MADE FOR EACH ROW OF A HIDDEN LIST keeps none of its blocks, and one that names a row of it loses that block', async () => {
+  const { api, sql, read } = await desk();
+  const about = { ...over({ kind: 'note', body: '{{name}}' }, table('notes')), for: { register: 'salaries' }, requires: ['register.salaries', 'register.notes'] };
+  const templated = await api.setDeclaration({ body: about, version: 2 }, ada);
+  assert.ok(templated.ok, JSON.stringify(templated));
+  const spoken = await api.setDeclaration({ body: over(table('notes'), { kind: 'note', body: 'Ask about salaries#1 first.' }), version: 3 }, ada);
+  assert.ok(spoken.ok, JSON.stringify(spoken));
+
+  const out = await listed(read, { page: 'desk' }, noteReader);
+  const [four, three] = out.versions as [PageVersion, PageVersion];
+  assert.equal(four.cut, 1);
+  assert.deepEqual(four.body.blocks, [table('notes')]);
+  assert.deepEqual(three.body.blocks, []);
+  assert.equal(three.body.for, undefined);
+  assert.equal(three.body.requires, undefined);
+  assert.equal(three.cut, 4);
+  assert.doesNotMatch(JSON.stringify(out), /salar/i);
+  sql.close();
+});
+
+test('PUT BACK APPLIES A VERSION AS IT WAS ANSWERED, and against a page changed meanwhile it is refused by name', async () => {
+  const { api, sql, read } = await record();
+  assert.ok((await api.setDeclaration({ body: body('a') }, ada)).ok);
+  assert.ok((await api.setDeclaration({ body: body('a', 'b'), version: 1 }, ada)).ok);
+  /* Ada opens the source view at version 2 and reads History. Bo applies version 3 before she presses Put back. */
+  const held = await listed(read, { page: 'plans' }, ada);
+  for (const v of held.versions) assert.equal(Object.keys(v.body)[0], 'page', 'a body does not begin with its kind, so applying it is refused');
+  assert.ok((await api.setDeclaration({ body: body('c'), version: 2 }, bo)).ok);
+
+  /* Put back is `apply(thatVersion.body, the version the box was read at)` (`SourceView.svelte` `putBackTo`). */
+  const back = (await api.setDeclaration({ body: held.versions[1]!.body, version: held.versions[0]!.version }, ada)) as {
+    ok: boolean;
+    conflict?: { version: number; current: { body: { page?: string; title?: string; blocks: { body: string }[] } } };
+  };
+  assert.ok(!back.ok, 'a put back over a page changed meanwhile was written');
+  /* Refused as a conflict that names the page and hands back what it holds now, at the version it holds it. */
+  assert.ok(back.conflict, JSON.stringify(back));
+  assert.equal(back.conflict.version, 3);
+  assert.equal(back.conflict.current.body.page, 'plans');
+  assert.equal(back.conflict.current.body.title, 'Plans');
+  assert.deepEqual(back.conflict.current.body.blocks.map((b) => b.body), ['c']);
+
+  const after = await listed(read, { page: 'plans' }, ada);
+  assert.deepEqual(after.versions.map((v) => v.version), [3, 2, 1]);
+  assert.deepEqual((after.versions[0]!.body.blocks as { body: string }[]).map((b) => b.body), ['c']);
+
+  /* And against the version the page is at now, the same body is written: version 4 says what version 1 said. */
+  const again = await api.setDeclaration({ body: after.versions[2]!.body, version: 3 }, ada);
+  assert.ok(again.ok, JSON.stringify(again));
+  const last = await listed(read, { page: 'plans' }, ada);
+  assert.deepEqual(last.versions.map((v) => v.version), [4, 3, 2, 1]);
+  assert.deepEqual(last.versions[0]!.body, last.versions[3]!.body);
+  sql.close();
+});

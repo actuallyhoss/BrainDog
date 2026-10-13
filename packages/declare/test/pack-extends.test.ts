@@ -291,3 +291,119 @@ test('the same People again changes nothing, with the value it keeps still kept'
   assert.ok(listOf(api, 'people').body.fields.find((f) => f.id === 'role')!.values!.includes('registrar'));
   close();
 });
+
+/* ── a label for a value a pack lays ── */
+
+/** `household` laying `family` on People's role, with `labels` beside it when there are any. */
+const household = (version = '1.0.0', labels?: unknown, values: Record<string, string[]> = { role: ['family'] }) => ({
+  ...domains(version, true, { 'register.people': { values, ...(labels === undefined ? {} : { labels }) } }),
+  pack: 'household',
+});
+const roleOf = (api: Api): Field => listOf(api, 'people').body.fields.find((f) => f.id === 'role')!;
+const labelsOf = (api: Api): Record<string, string> => (roleOf(api).labels ?? {}) as Record<string, string>;
+const read = async (doc: unknown): Promise<Record<string, unknown>> =>
+  said<{ manifest: { extends: Record<string, Record<string, unknown>> } }>(await normalise(doc)).manifest.extends['register.people']!;
+
+test('a label for a laid value is read, and a pack without labels reads as it did', async () => {
+  assert.deepEqual(await read(household('1.0.0', { role: { family: 'Family' } })), { values: { role: ['family'] }, labels: { role: { family: 'Family' } } });
+  assert.deepEqual(await read(household()), { values: { role: ['family'] } });
+  /* A LABEL FOR NOTHING IS NO KEY, as a field with no values is none. */
+  assert.deepEqual(await read(household('1.0.0', { role: {} })), { values: { role: ['family'] } });
+});
+
+test('the label is laid with its value, and the value reads by it', async () => {
+  const { api, close } = await recordOf();
+  const before = labelsOf(api);
+  const diff = await planOf(api, household('1.0.0', { role: { family: 'Family' } }));
+  assert.deepEqual(diff.extends.map((e) => [e.id, e.adds]), [['register.people', ['role.family']]]);
+  said(await put(api, household('1.0.0', { role: { family: 'Family' } })));
+  assert.deepEqual(labelsOf(api), { ...before, family: 'Family' });
+  assert.deepEqual(roleOf(api).values!.slice(-2), ['other', 'family']);
+  close();
+});
+
+test("a pack's next version labels the value its first one laid bare, and the same again changes nothing", async () => {
+  const { api, close } = await recordOf();
+  said(await put(api, household()));
+  assert.equal(labelsOf(api).family, undefined);
+  const labelled = household('1.0.1', { role: { family: 'Family' } });
+  const diff = await planOf(api, labelled);
+  assert.deepEqual(diff.extends.map((e) => [e.id, e.adds]), [['register.people', ['role.family']]]);
+  said(await put(api, labelled));
+  assert.equal(labelsOf(api).family, 'Family');
+  assert.equal(roleOf(api).values!.filter((v) => v === 'family').length, 1);
+  const again = await planOf(api, labelled);
+  assert.deepEqual(again.extends.map((e) => [e.id, e.adds, e.body]), [['register.people', [], undefined]]);
+  close();
+});
+
+test("People's next version keeps the label a pack laid, with the value it names", async () => {
+  const { api, close } = await recordOf();
+  said(await put(api, household('1.0.0', { role: { family: 'Family' } })));
+  said(await put(api, peopleAt('2.0.0')));
+  assert.ok(roleOf(api).values!.includes('family'));
+  assert.equal(labelsOf(api).family, 'Family');
+  close();
+});
+
+test('a label is refused by name when it is for a value the pack does not lay, or is not text', async () => {
+  const at = 'extends.register.people.labels';
+  const shape = refusal(await normalise(household('1.0.0', ['Family'])));
+  assert.deepEqual([shape.code, shape.at], ['PACK_MALFORMED', at]);
+  const inner = refusal(await normalise(household('1.0.0', { role: 'Family' })));
+  assert.deepEqual([inner.code, inner.at], ['PACK_MALFORMED', `${at}.role`]);
+  /* A FIELD THE PACK GIVES NO VALUE TO, and a value it does not lay on a field it does. */
+  const field = refusal(await normalise(household('1.0.0', { kin: { family: 'Family' } })));
+  assert.deepEqual([field.code, field.at], ['PACK_MALFORMED', `${at}.kin`]);
+  assert.match(field.fix, /kin/u);
+  const value = refusal(await normalise(household('1.0.0', { role: { friend: 'Friend' } })));
+  assert.deepEqual([value.code, value.at], ['PACK_MALFORMED', `${at}.role.friend`]);
+  assert.match(value.fix, /friend/u);
+  for (const label of [7, '', '   ', null, ['Family']]) {
+    const r = refusal(await normalise(household('1.0.0', { role: { family: label } })));
+    assert.deepEqual([r.code, r.at], ['PACK_MALFORMED', `${at}.role.family`], JSON.stringify(label));
+  }
+  /* A FIELD NAMED AS SOMETHING EVERY OBJECT HAS is refused as any other the pack gives no value to, and does not throw. */
+  for (const name of ['constructor', 'toString', '__proto__']) {
+    const r = refusal(await normalise(household('1.0.0', JSON.parse(`{"${name}":{"family":"Family"}}`))));
+    assert.deepEqual([r.code, r.at], ['PACK_MALFORMED', `${at}.${name}`], name);
+  }
+});
+
+test('a value named as something every object has takes its label as any other does', async () => {
+  const { api, close } = await recordOf();
+  said(await put(api, household('1.0.0', { role: { constructor: 'Builder' } }, { role: ['constructor'] })));
+  assert.equal(labelsOf(api).constructor, 'Builder');
+  close();
+});
+
+test('a label for a value of a field the pack lays itself is refused, because that field says its own labels', async () => {
+  const kin = { id: 'kin', type: 'enum', values: ['near', 'far'], labels: { near: 'Near' } };
+  const r = refusal(await normalise(domains('1.0.0', true, { 'register.people': { fields: [kin], labels: { kin: { far: 'Far' } } } })));
+  assert.deepEqual([r.code, r.at], ['PACK_MALFORMED', 'extends.register.people.labels.kin']);
+});
+
+test('a label that carries a credential or a colour is refused as any other part of an extension is', async () => {
+  const secret = refusal(await normalise(household('1.0.0', { role: { family: 'sk_live_' + 'a'.repeat(30) } })));
+  assert.equal(secret.code, 'SECRET_IN_PACK');
+  assert.match(secret.at!, /^extends\.register\.people\.labels/u);
+  const painted = refusal(await normalise(household('1.0.0', { role: { family: '#ff0000' } })));
+  assert.equal(painted.code, 'COLOUR_OUTSIDE_THEME');
+  assert.match(painted.at!, /^extends\.register\.people\.labels/u);
+});
+
+test("a label is not laid over the list's own value, nor over a label the value has already", async () => {
+  const { api, close } = await recordOf();
+  /* `other` IS PEOPLE'S OWN ROLE: naming it is People's to do, and a label laid on it would make People's next update
+     an edit to keep and not an addition to carry. */
+  const own = refusal(await put(api, household('1.0.0', { role: { other: 'Somebody else' } }, { role: ['other'] })));
+  assert.deepEqual([own.code, own.at], ['PROVIDES_CONFLICT', 'extends.register.people.labels.role.other']);
+  assert.match(own.fix, /other/u);
+  said(await put(api, household('1.0.0', { role: { family: 'Family' } })));
+  const second = { ...household('1.0.0', { role: { family: 'Relatives' } }), pack: 'kinfolk' };
+  const taken = refusal(await put(api, second));
+  assert.deepEqual([taken.code, taken.at], ['PROVIDES_CONFLICT', 'extends.register.people.labels.role.family']);
+  assert.match(taken.fix, /Family/u);
+  assert.equal(labelsOf(api).family, 'Family');
+  close();
+});

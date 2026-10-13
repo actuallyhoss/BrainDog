@@ -20,7 +20,7 @@ import { openRecord, type Kernel } from '@braindog/kernel';
 import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.ts';
 
 import { NOW, firstPartyManifest } from '../src/index.ts';
-import { ESTATE_PAGES, SERVICE_NUMBERS } from '../src/modules/estate.ts';
+import { ESTATE_PAGES, SERVICE_NUMBERS, SERVICE_NUMBERS_SHOWN } from '../src/modules/estate.ts';
 import { modulesFor, useCase, useCaseDocument } from '../src/usecases/index.ts';
 import { carriedDocument, dayOf, moduleDocument } from '../src/usecases/install.ts';
 
@@ -120,6 +120,15 @@ const numbersOn = (k: Kernel): Drawn | undefined => renewals(k).find((b) => b.he
 const DAY = 86_400_000;
 const at = (daysAgo: number): string => new Date(NOW - daysAgo * DAY).toISOString();
 
+/** What the figure that switches the block on counts (`service-numbers`, said by the founder pack). */
+const counted = (k: Kernel): number | null => value<{ value: number | null }>(k.metric(k.metricDecl(SERVICE_NUMBERS_SHOWN)!)).value;
+
+/** What the block holds once drawn: every measure it draws as a line, then every one it says as a number. */
+const shown = (k: Kernel): string[] => {
+  const block = numbersOn(k);
+  return [...(block?.measures ?? []).map((m) => m.name), ...(block?.latest ?? []).map((l) => l.measure)];
+};
+
 const server = (k: Kernel, name: string): string =>
   value<{ id: string }>(k.create('services', { name, provider: 'Fenwick Cloud', kind: 'server', cycle: 'monthly', state: 'live' }, OWNER)).id;
 
@@ -157,6 +166,46 @@ test('A NUMBER TYPED BY HAND, WITH NO SOURCE SAID, IS DRAWN: only the example is
   const block = numbersOn(k);
   assert.ok(block, `a reading with no source drew no ${HEADING}`);
   assert.deepEqual(block.latest?.map((l) => [l.measure, l.value]), [['Disk used', 60]]);
+});
+
+test('A NUMBER WITH NO SOURCE COUNTS AS WELL AS DRAWS: the figure and the block read the same readings (audit 61, claim 5)', async () => {
+  const k = await founder();
+  const box = server(k, 'Build box');
+  assert.equal(counted(k), 0, 'a record with no reading counts some');
+  value(k.create('datapoints', { name: 'Disk used', value: 60, unit: '%', about_service: box, at: at(1) }, OWNER));
+  assert.equal(counted(k), 1, 'a reading that says no source is not counted');
+  assert.deepEqual(shown(k), ['Disk used']);
+});
+
+test('A NUMBER DATED AFTER TODAY NEITHER COUNTS NOR DRAWS THE HEADING: nothing is headed over no reading (audit 61, claim 5)', async () => {
+  const k = await founder();
+  const box = server(k, 'Build box');
+  /* What an import or a mistyped year writes: a reading the block's ninety days never reach, tomorrow's and next year's. */
+  value(k.create('datapoints', { name: 'Disk used', value: 60, unit: '%', about_service: box, source: 'polled', at: at(-1) }, OWNER));
+  value(k.create('datapoints', { name: 'Billed so far', value: 12, about_service: box, source: 'polled', at: at(-400) }, OWNER));
+  assert.equal(counted(k), 0, 'a reading dated after today is counted');
+  assert.equal(numbersOn(k), undefined, `${HEADING} stands over no reading`);
+  /* AND IT IS NOT A MEASURE'S LATEST FIGURE: read yesterday and dated again tomorrow, the number said is yesterday's. */
+  value(k.create('datapoints', { name: 'Disk used', value: 55, unit: '%', about_service: box, source: 'polled', at: at(1) }, OWNER));
+  assert.equal(counted(k), 1);
+  assert.deepEqual(numbersOn(k)?.latest?.map((l) => [l.measure, l.value]), [['Disk used', 55]]);
+});
+
+test('NINETY DAYS, AND THE SAME NINETY FOR BOTH: a reading 91 days old is out, and each day inside counts exactly when it draws', async () => {
+  const k = await founder();
+  const box = server(k, 'Build box');
+  value(k.create('datapoints', { name: 'Disk used', value: 60, unit: '%', about_service: box, source: 'polled', at: at(91) }, OWNER));
+  assert.equal(counted(k), 0, 'a reading 91 days old is counted');
+  assert.equal(numbersOn(k), undefined, `${HEADING} stands over a reading 91 days old`);
+  /* The two edges of the window, one record each, so neither answers for the other. */
+  for (const days of [90, 89, 0]) {
+    const one = await founder();
+    value(one.create('datapoints', { name: 'Disk used', value: 60, unit: '%', about_service: server(one, 'Build box'), source: 'polled', at: at(days) }, OWNER));
+    assert.equal(counted(one) === 1, shown(one).length === 1, `a reading ${days} days old: counted ${counted(one)}, drawn ${shown(one).length}`);
+  }
+  const edge = await founder();
+  value(edge.create('datapoints', { name: 'Disk used', value: 60, unit: '%', about_service: server(edge, 'Build box'), source: 'polled', at: at(89) }, OWNER));
+  assert.deepEqual(shown(edge), ['Disk used'], 'the ninetieth day back, today being the first, is in');
 });
 
 test('SIX AT MOST: eight measures about one server draw six', async () => {

@@ -1,9 +1,9 @@
 {
   "pack": "holdings",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "title": "Holdings",
-  "summary": "What you hold rather than spend: certificates, policies and commodities, with what each one cost, and what they cost together.",
-  "changes": "Nothing it writes changed. The add-on has a title of its own, its script opens with a comment saying what it does, and each version says what it changed in a line like this one.",
+  "summary": "What you hold rather than spend: certificates, policies and commodities, with what each one cost, what each is worth now when you have a price for it, and what they come to together.",
+  "changes": "A holding can have a price, \"Worth each now\", and the day it was priced. Holdings value adds up what each is worth at its price, or what it cost when it has none, and says how many stand at what they cost. The value reads in your home currency, or the one your holdings are in.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": {
@@ -69,6 +69,21 @@
           "type": "money"
         },
         {
+          "id": "price",
+          "label": "Worth each now",
+          "type": "money"
+        },
+        {
+          "id": "priced_on",
+          "label": "Priced on",
+          "type": "day"
+        },
+        {
+          "id": "value",
+          "label": "Worth now",
+          "type": "money"
+        },
+        {
           "id": "acquired_on",
           "type": "day",
           "index": true
@@ -101,7 +116,8 @@
           ],
           "fields": [
             "qty",
-            "unit_cost"
+            "unit_cost",
+            "price"
           ]
         }
       },
@@ -116,7 +132,7 @@
     },
     {
       "script": "holdings_cost",
-      "title": "Work out what a holding cost, how many times what one cost: when either is written, and once a day for any holding still without one",
+      "title": "Work out what a holding cost and what it is worth, how many times what one cost and how many times its price: when any of them is written, and once a day for any holding still without a worth",
       "pack": "holdings",
       "runs": {
         "rule": true,
@@ -130,18 +146,18 @@
       "writes": [
         "holdings"
       ],
-      "source": "/**\n * What each holding cost: its quantity times what one unit cost, written into `cost` in the unit cost's currency.\n *\n * STARTED WITH A ROW'S ID when its quantity or unit cost changes, it costs that row. Started with no id, once a day,\n * it costs every holding whose `cost` is still empty, so rows written before the add-on was installed are costed too.\n * A row missing either number, or already holding the same cost, is left as it is.\n */\nexport default async function run(ctx) {\n  const id = ctx.input && ctx.input.id;\n  const rows = id ? [await ctx.record.get(id)] : await ctx.record.list('holdings', { field: 'cost', empty: true });\n  for (const row of rows) {\n    if (!row) continue;\n    const qty = row.fields.qty;\n    const each = row.fields.unit_cost;\n    if (typeof qty !== 'number' || !each || typeof each.amount !== 'number' || typeof each.currency !== 'string') continue;\n    const cost = { amount: Math.round(qty * each.amount), currency: each.currency };\n    const had = row.fields.cost;\n    if (had && had.amount === cost.amount && had.currency === cost.currency) continue;\n    ctx.update('holdings#' + row.seq, { cost }, row.version);\n  }\n}\n"
+      "source": "/**\n * What each holding cost and what it is worth: its quantity times what one unit cost, written into `cost`, and its\n * quantity times what one is worth now, written into `value`. A holding nobody has priced is worth what it cost.\n *\n * STARTED WITH A ROW'S ID when its quantity, unit cost or price changes, it works that row out. Started with no id,\n * once a day, it works out every holding whose `value` is still empty, so rows written before the add-on was installed,\n * and rows an earlier version costed and never valued, are done too. A row missing its quantity or its unit cost, or\n * already holding the same two amounts, is left as it is. Each amount is in the currency of the number it came from.\n */\nexport default async function run(ctx) {\n  const id = ctx.input && ctx.input.id;\n  const rows = id ? [await ctx.record.get(id)] : await ctx.record.list('holdings', { field: 'value', empty: true });\n  const amount = (m) => m && typeof m.amount === 'number' && typeof m.currency === 'string';\n  const same = (a, b) => amount(a) && a.amount === b.amount && a.currency === b.currency;\n  for (const row of rows) {\n    if (!row) continue;\n    const qty = row.fields.qty;\n    const each = row.fields.unit_cost;\n    const now = row.fields.price;\n    if (typeof qty !== 'number' || !amount(each)) continue;\n    const cost = { amount: Math.round(qty * each.amount), currency: each.currency };\n    const value = amount(now) ? { amount: Math.round(qty * now.amount), currency: now.currency } : cost;\n    const next = {};\n    if (!same(row.fields.cost, cost)) next.cost = cost;\n    if (!same(row.fields.value, value)) next.value = value;\n    if (!('cost' in next) && !('value' in next)) continue;\n    ctx.update('holdings#' + row.seq, next, row.version);\n  }\n}\n"
     },
     {
       "metric": "holdings-value",
       "name": "Holdings value",
       "pack": "holdings",
       "source": "register.holdings",
-      "where": "cost is set",
+      "where": "value is set",
       "value": {
-        "sum": "cost"
+        "sum": "value"
       },
-      "format": "money.GBP",
+      "format": "money",
       "target": {
         "gte": 0
       },
@@ -181,6 +197,38 @@
       "compare": "none"
     },
     {
+      "metric": "holdings-at-cost",
+      "name": "Holdings at what they cost",
+      "pack": "holdings",
+      "source": "register.holdings",
+      "where": "value is set, price is empty",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "holdings-unpriced",
+      "name": "Holdings with no price",
+      "pack": "holdings",
+      "source": "register.holdings",
+      "where": "price is empty",
+      "value": {
+        "count": "id"
+      },
+      "format": "int",
+      "target": {
+        "gte": 0
+      },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
       "page": "holdings",
       "title": "Holdings",
       "pack": "holdings",
@@ -202,9 +250,29 @@
             {
               "metric": "holdings-value",
               "label": "Holdings value",
-              "note": "what was paid for {{holdings-costed}} of {{holdings-count}} holding(s), one amount per currency"
+              "note": "{{holdings-at-cost}} of {{holdings-count}} at what they cost"
             }
-          ]
+          ],
+          "when": {
+            "metric": "holdings-unpriced",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "stat",
+          "lead": true,
+          "heading": "What you hold",
+          "span": 12,
+          "cells": [
+            {
+              "metric": "holdings-value",
+              "label": "Holdings value"
+            }
+          ],
+          "when": {
+            "metric": "holdings-unpriced",
+            "is": 0
+          }
         },
         {
           "kind": "table",
@@ -226,7 +294,10 @@
               "field": "unit_cost"
             },
             {
-              "field": "cost"
+              "field": "price"
+            },
+            {
+              "field": "value"
             },
             {
               "field": "acquired_on"
@@ -242,7 +313,7 @@
             }
           ],
           "limit": 100,
-          "empty": "Nothing held yet. A certificate, a policy or a lot of a commodity goes here with what it cost."
+          "empty": "Nothing held yet. A certificate, a policy or a lot of a commodity goes here with what it cost, and what it is worth now when you know."
         }
       ]
     }

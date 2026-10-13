@@ -335,7 +335,7 @@ export function cardOf(q: QueueQuestion, ctx: CardContext): Card {
   const by = askerOf(q, ctx.me ?? null, ctx.names ?? new Map());
   const moves = movesOf(field(q, 'money'));
   const plain = waysOf(q);
-  const keyed = { options: plain.map((w) => ({ key: w.key, recommended: w.recommended })) };
+  const keyed = { options: plain.map((w) => ({ key: w.key, recommended: w.recommended, hard: w.hard })) };
   const said = moves.length === 0 ? '' : ctx.home === undefined ? amountSaid(moves) : amountSaid(moves, ctx.home);
   /* THE AMOUNT IN THE RECORD'S OWN CURRENCY, which `labelOf` reads from the shell: here it is the host's, when handed. */
   const labelled = (w: Way): string =>
@@ -376,18 +376,29 @@ export function cardOf(q: QueueQuestion, ctx: CardContext): Card {
  * WHETHER AN ANSWER IS HARD TO TAKE BACK: the record's band is `undo` and nothing else. The band is the record's to
  * give (the kernel's `weigh`), and a change the record keeps a prior version of comes as `shape`, so the care is said
  * on the few cards that need it and keeps its weight. No kind, no word of the question and no missing band reads as hard.
+ *
+ * OR THE ANSWER ITSELF IS ONE THE RECORD MARKED HARD (`way.hard`, the kernel's `optionCost`). Since batch 64 one hard
+ * option beside a safe one leaves the question's band alone ("Keep my page" beside "Take the update's page"), so the
+ * care is asked of the answer being given: handed a way, this reads it too.
  */
-export const hardOf = (card: Pick<Card, 'cost'>): boolean => card.cost === 'undo';
+export const hardOf = (card: Pick<Card, 'cost'>, way?: Pick<Way, 'hard'> | null): boolean => card.cost === 'undo' || way?.hard === true;
 
 /**
  * WHAT A BUTTON THAT ANSWERS SAYS, with the care a hard answer asks for in its own words (DIRECTION §39): "Decide, can’t
  * be undone easily", "Accept £12.98, can’t be undone easily". Every other band leaves the words as they are; the band
  * still ranks the card and still takes Enter away (`acceptKey`), it is only not drawn as a chip.
  */
-export const pressSaid = (card: Pick<Card, 'cost'>, label: string): string => (hardOf(card) ? queueWords.hard(label) : label);
+export const pressSaid = (card: Pick<Card, 'cost'>, label: string, way?: Pick<Way, 'hard'> | null): string => (hardOf(card, way) ? queueWords.hard(label) : label);
 
 /** The words a hard answer's button adds after its name (", can’t be undone easily"), or nothing, so the name stays its own. */
 export const pressTail = (card: Pick<Card, 'cost'>): string => (hardOf(card) ? queueWords.hardTail : '');
+
+/**
+ * THE SAME TAIL FOR ONE BUTTON OF A ROW OF ANSWERS: on the filled one where the whole question is hard to undo, as it
+ * always was, and on any answer that is itself the hard one, wherever it stands in the row.
+ */
+export const wayTail = (card: Pick<Card, 'cost'>, way: Pick<Way, 'key' | 'hard'>, primary: string | null): string =>
+  way.hard || (way.key === primary && hardOf(card)) ? queueWords.hardTail : '';
 
 /**
  * WHETHER "WHAT IT CHANGES" HAS A LINE UNDER IT: what accepting does, the money it writes, or a change from what to
@@ -427,7 +438,8 @@ export function inlineOf(card: Pick<Card, 'ways' | 'decline' | 'merge'>, compact
 }
 
 /**
- * WHETHER ONE PRESS ON A CHOICE DECIDES, in the form's list: two or three answers, none of them hard to undo, whether or
+ * WHETHER ONE PRESS ON A CHOICE DECIDES, in the form's list: two or three answers, none of them hard to undo (the
+ * question's band, or any one answer's own mark), whether or
  * not each carries a line of what it does. The line is read on the choice itself, and the answer is held six seconds
  * for its Undo like every other, so choosing first and pressing Decide after was a second press that guarded nothing.
  * The ring and Decide stay where a press should be two: an answer that is hard to undo, and a fourth answer, which is a
@@ -435,6 +447,9 @@ export function inlineOf(card: Pick<Card, 'ways' | 'decline' | 'merge'>, compact
  */
 export function pressOf(card: Pick<Card, 'ways' | 'decline' | 'merge' | 'cost'>): boolean {
   if (card.merge !== null || card.decline !== null || card.cost === 'undo') return false;
+  /* NOR WHERE ONE OF THE ANSWERS IS ITSELF HARD TO UNDO: the question's band no longer rises for it, and a press on it
+     must still be two, so the whole list keeps its ring and Decide, which says the care when that answer is chosen. */
+  if (card.ways.some((w) => w.hard)) return false;
   return card.ways.length >= 2 && card.ways.length <= INLINE_MOST;
 }
 
@@ -471,7 +486,7 @@ type Classic = {
   band?: string | undefined;
   opened: string;
   context?: string | undefined;
-  options: readonly { key: string; title: string; body: string; recommended?: boolean | undefined }[];
+  options: readonly { key: string; title: string; body: string; recommended?: boolean | undefined; hard?: boolean | undefined }[];
 };
 
 /**
@@ -489,6 +504,6 @@ export function queueOf(q: Classic, about?: { kind?: string | undefined; by?: st
     question: q.title,
     why: q.context ?? '',
     cost: (q.band ?? 'call') as QueueQuestion['cost'],
-    options: two ? [] : q.options.map((o) => ({ key: o.key, label: o.title, because: o.body, recommended: o.recommended === true })),
+    options: two ? [] : q.options.map((o) => ({ key: o.key, label: o.title, because: o.body, recommended: o.recommended === true, ...(o.hard === true ? { hard: true as const } : {}) })),
   };
 }

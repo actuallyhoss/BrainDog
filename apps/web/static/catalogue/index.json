@@ -430,9 +430,9 @@
       "versions": [
         {
           "version": "1.0.0",
-          "checksum": "cd752025d8af4ed9b464f174ab08188707ccb1418d0778aad080d08d809c72b1",
-          "bytes": 9411,
-          "published_at": "2026-10-13T13:10:10.890Z",
+          "checksum": "883598b117710680e3c7e1e53ed7f613c5c90b737a8f0bf88065d8d67c92cab7",
+          "bytes": 11173,
+          "published_at": "2026-10-13T14:19:15.958Z",
           "bump": null,
           "reach": {
             "modules": [],
@@ -511,12 +511,38 @@
       "kind": "pack",
       "id": "holdings",
       "title": "Holdings",
-      "summary": "What you hold rather than spend: certificates, policies and commodities, with what each one cost, and what they cost together.",
+      "summary": "What you hold rather than spend: certificates, policies and commodities, with what each one cost, what each is worth now when you have a price for it, and what they come to together.",
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.3.0",
+      "latest": "1.4.0",
       "versions": [
+        {
+          "version": "1.4.0",
+          "checksum": "b26272cfeb1bd114c2e1e98b9970f325b9aee09843e60be75110c398a1eea203",
+          "bytes": 9325,
+          "published_at": "2026-10-13T14:02:01.215Z",
+          "bump": "minor",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Holdings"
+            ],
+            "pages": [
+              "Holdings"
+            ],
+            "rules": [
+              "holdings_cost"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "A holding can have a price, \"Worth each now\", and the day it was priced. Holdings value adds up what each is worth at its price, or what it cost when it has none, and says how many stand at what they cost. The value reads in your home currency, or the one your holdings are in.",
+          "preview": true
+        },
         {
           "version": "1.3.0",
           "checksum": "3e2967a9c15644173364b927ad186d97c1a13bdc34f8be5eecfbdc1728075247",
@@ -1981,9 +2007,9 @@
       "versions": [
         {
           "version": "1.0.0",
-          "checksum": "6902fe8f1b16c2ee1b3f8ff1657885c962a0b661e65e5f7b36139b9bfd8ef4c8",
-          "bytes": 18170,
-          "published_at": "2026-10-13T13:10:10.890Z",
+          "checksum": "bb1a7944bc65e44450949d019c36f0ecd02a85281971dd9c77d410e5d8c70932",
+          "bytes": 18260,
+          "published_at": "2026-10-13T14:02:01.215Z",
           "bump": null,
           "reach": {
             "modules": [

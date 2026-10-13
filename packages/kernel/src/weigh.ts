@@ -33,9 +33,10 @@
  * The four, worst first — which is the order they are ranked in, and the order they are compared in.
  *
  * - `undo`  — accepting it is hard to take back, because Put back has nothing to go back to: it
- *             turns a pack off, it moves money, it retypes a field that holds answers, it changes a
- *             value the history withholds, or it offers an option its proposer marked hard. The
- *             other button tomorrow does not return the record to where it was.
+ *             turns a pack off, it moves money, it retypes a field that holds answers, it adds a
+ *             field to a list that holds rows, it changes a value the history withholds, or every
+ *             option it offers is one its proposer marked hard. The other button tomorrow does not
+ *             return the record to where it was.
  * - `shape` — accepting it changes what everyone sees: a pack installed or turned on, a pack's
  *             settings, a page, a declaration that is new or replaces one. Reversible, and not quietly: everyone
  *             who opens the record meets it.
@@ -135,10 +136,15 @@ export function costOf(bodyKind: string, body: unknown, rows?: CostRows): Cost {
        new version, through the record's `undo`, which makes it ready first and writes it second. So a change is
        `shape`, with a `from` or without one. Batches 58 to 61 held it at `undo` while a plan for it had no step
        (audit 58, claim 2).
-       ONLY A RETYPE WITH A `from` STAYS `undo`: it rewrites the answers under the field, and `undo.ts` leaves it
-       with a sentence. `retypes` is `govern.ts`'s `isRetype`. */
+       A RETYPE WITH A `from` STAYS `undo`: it rewrites the answers under the field, and `undo.ts` leaves it
+       with a sentence. `retypes` is `govern.ts`'s `isRetype`.
+       AND SO DOES A FIELD ADDED TO A LIST THAT HOLDS ROWS (audit 62, claim 5). Put back takes the field off again only
+       until somebody fills it; after that it leaves the step and says the field holds answers now (`undo.ts`,
+       `filledSince`), and on a list in use that is the common case, so the question says so before the press and not
+       after. A list with no row yet has nothing to fill, and stays `shape`. */
     case 'change':
-      return b.from === undefined || b.from === null || !retypes(b.to) ? 'shape' : 'undo';
+      if (b.from !== undefined && b.from !== null && retypes(b.to)) return 'undo';
+      return addsToHeld(b, rows) ? 'undo' : 'shape';
     /* `disable` TAKES A REGISTER OFF EVERY SCREEN IT IS ON. Install and enable add one. */
     case 'pack':
       return typeof b.disable === 'string' ? 'undo' : 'shape';
@@ -150,17 +156,46 @@ export function costOf(bodyKind: string, body: unknown, rows?: CostRows): Cost {
     case 'pattern':
       return 'rows';
     /* AN OPTION THAT WRITES (`patches`, govern-47) IS A ROWSET ON THE PICK, so it is weighed as rows; one that only says
-       a choice is a call. AN OPTION ITS PROPOSER MARKED `hard: true` IS ONE THAT CANNOT BE TAKEN BACK ONCE PICKED, and
-       the question is weighed by its worst option, since any of them may be the one picked: one hard option makes the
-       whole question `undo`, above what its patches say (audit 60, claim 1). Only the boolean `true` marks it. */
+       a choice is a call. AN OPTION ITS PROPOSER MARKED `hard: true` IS ONE THAT CANNOT BE TAKEN BACK ONCE PICKED, AND IT
+       IS THAT OPTION THAT IS HARD, NOT THE QUESTION (audit 62, claim 6). Batches 60 to 63 weighed the question by its
+       worst option, so a pack update that offered "Keep my pages" beside "Take the update's page" was counted and
+       ranked as the worst kind, and keeping was worded as hard. `optionCost` and `pickCost` say each option's own band.
+       THE QUESTION IS `undo` ONLY WHEN NO PICK AVOIDS IT: every option it offers is marked. Otherwise it is weighed by
+       what the options that can be taken back would do. Only the boolean `true` marks an option. */
     case 'options': {
-      const options = arr(b.options).map(obj);
-      if (options.some((o) => o.hard === true)) return 'undo';
-      return options.some((o) => Array.isArray(o.patches)) ? 'rows' : 'call';
+      const offered = arr(b.options);
+      if (offered.length > 0 && offered.every((o) => optionCost(o) === 'undo')) return 'undo';
+      return offered.some((o) => optionCost(o) === 'rows') ? 'rows' : 'call';
     }
     default:
       return 'call';
   }
+}
+
+/**
+ * What it would cost to have picked this one option of an `options` question, which is the band its own line on the
+ * card wears: `undo` when its proposer marked it `hard: true`, `rows` when it writes on the pick, and `call` when it
+ * only says a choice. Hard stands above what its patches say. Lenient as `costOf` is: what is not an option is `call`.
+ */
+export function optionCost(option: unknown): Cost {
+  const o = obj(option);
+  if (o.hard === true) return 'undo';
+  return Array.isArray(o.patches) ? 'rows' : 'call';
+}
+
+/** Every option an `options` question offers, by its id, with its own band, in the order they are offered. */
+export function optionCosts(body: unknown): { id: string; cost: Cost }[] {
+  return arr(obj(body).options).flatMap((o) => (typeof obj(o).id === 'string' ? [{ id: obj(o).id as string, cost: optionCost(o) }] : []));
+}
+
+/**
+ * What it would cost to have given this answer to this question, for the words beside the press: of an `options`
+ * question it is the picked option's own band, and of any other kind it is the question's band for `accept`. An answer
+ * that writes nothing (`reject`, or an option the question does not offer) is `call`.
+ */
+export function pickCost(bodyKind: string, body: unknown, option: string, rows?: CostRows): Cost {
+  if (bodyKind !== 'options') return option === 'accept' ? costOf(bodyKind, body, rows) : 'call';
+  return optionCosts(body).find((o) => o.id === option)?.cost ?? 'call';
 }
 
 /**
@@ -174,8 +209,11 @@ const MOVES_MONEY_SQL = `EXISTS (SELECT 1 FROM json_each(body, '$.rows') AS r, j
     WHERE f.type = 'object' AND json_type(f.value, '$.amount') = 'integer' AND json_type(f.value, '$.currency') = 'text'
       AND json_extract(f.value, '$.currency') GLOB '[A-Z][A-Z][A-Z]' AND length(json_extract(f.value, '$.currency')) = 3)`;
 
-/** What `costOf` reads of the record: the fields of a list whose values the history withholds. */
-export type CostRows = { withheld: (register: string) => readonly string[] };
+/**
+ * What `costOf` reads of the record: the fields of a list whose values the history withholds, and whether a list
+ * holds a row. `held` may be left out, by a caller written before it: a change is then weighed by its body alone.
+ */
+export type CostRows = { withheld: (register: string) => readonly string[]; held?: ((register: string) => boolean) | undefined };
 
 /**
  * The fields of the list named by `register` (an SQL expression) that the history withholds: typed `secret` or `money`,
@@ -192,8 +230,45 @@ const withheldIdsSql = (register: string): string =>
 
 /** `CostRows` over the record, through the very SQL `COST_SQL` reads, so the two cannot drift apart. */
 export function costRows(sql: WaitSql): CostRows {
-  return { withheld: (register) => sql.all<{ id: string }>(withheldIdsSql('?'), register).map((r) => r.id) };
+  return {
+    withheld: (register) => sql.all<{ id: string }>(withheldIdsSql('?'), register).map((r) => r.id),
+    held: (register) => sql.all(`SELECT 1 AS y WHERE ${heldRowSql('?')}`, register).length > 0,
+  };
 }
+
+/** Whether the list named by `register` (an SQL expression) holds a row that is not removed. `costRows` and `COST_SQL` both read through it. */
+const heldRowSql = (register: string): string => `EXISTS (SELECT 1 FROM entry e WHERE e.register = ${register} AND e.deleted_at IS NULL)`;
+
+/**
+ * The list a change adds fields to, or `null` when it adds none: `to.add.fields` with a field in it, on the list
+ * `to.add.register` names or else the one the change is filed under, as `govern.ts`'s `listNamed` reads it. Values
+ * added to a closed list are not a field, and are not read here.
+ */
+function addsTo(body: Record<string, unknown>): string | null {
+  const add = obj(obj(body.to).add);
+  if (arr(add.fields).length === 0) return null;
+  const filed = typeof body.declaration_id === 'string' && body.declaration_id.startsWith('register.') ? body.declaration_id : undefined;
+  const list = add.register ?? filed;
+  if (typeof list !== 'string') return null;
+  return list.startsWith('register.') ? list.slice('register.'.length) : list;
+}
+
+/** This change adds a field to a list that holds rows, so Put back takes it off only until somebody fills it. */
+function addsToHeld(body: Record<string, unknown>, rows?: CostRows): boolean {
+  if (rows?.held === undefined) return false;
+  const list = addsTo(body);
+  return list !== null && rows.held(list);
+}
+
+/** `addsTo` as SQL over a `suggestion` row: the list's name, or NULL. */
+const ADDS_TO_SQL = `(SELECT CASE WHEN substr(l.n, 1, 9) = 'register.' THEN substr(l.n, 10) ELSE l.n END FROM (SELECT CASE
+      WHEN COALESCE(json_array_length(body, '$.to.add.fields'), 0) = 0 THEN NULL
+      WHEN json_type(body, '$.to.add.register') = 'text' THEN json_extract(body, '$.to.add.register')
+      WHEN COALESCE(json_type(body, '$.to.add.register'), 'null') = 'null' AND json_type(body, '$.declaration_id') = 'text'
+        AND substr(json_extract(body, '$.declaration_id'), 1, 9) = 'register.' THEN json_extract(body, '$.declaration_id') END AS n) AS l)`;
+
+/** `addsToHeld` as SQL over a `suggestion` row. */
+const ADDS_TO_HELD_SQL = heldRowSql(ADDS_TO_SQL);
 
 /** An update in this rowset patches a field whose value the history withholds, so Put back cannot write it in again. */
 function patchesWithheld(body: Record<string, unknown>, rows?: CostRows): boolean {
@@ -232,7 +307,11 @@ export const COST_SQL = `(CASE
       WHEN json_type(body, '$.rows') = 'array' AND (${MOVES_MONEY_SQL} OR ${PATCHES_WITHHELD_SQL}) THEN 'undo'
       WHEN COALESCE(json_array_length(body, '$.rows'), 0) >= ${MANY_ROWS} THEN 'shape'
       ELSE 'rows' END)
-    WHEN 'change' THEN (CASE WHEN COALESCE(json_type(body, '$.from'), 'null') = 'null' THEN 'shape' WHEN (json_type(body, '$.to.retype') IS NOT NULL OR json_type(body, '$.to.narrow') IS NOT NULL) AND json_type(body, '$.to.add') IS NULL AND json_type(body, '$.to.retire') IS NULL THEN 'undo' ELSE 'shape' END)
+    WHEN 'change' THEN (CASE
+      WHEN COALESCE(json_type(body, '$.from'), 'null') <> 'null' AND (json_type(body, '$.to.retype') IS NOT NULL OR json_type(body, '$.to.narrow') IS NOT NULL)
+        AND json_type(body, '$.to.add') IS NULL AND json_type(body, '$.to.retire') IS NULL THEN 'undo'
+      WHEN ${ADDS_TO_HELD_SQL} THEN 'undo'
+      ELSE 'shape' END)
     WHEN 'pack' THEN (CASE WHEN json_type(body, '$.disable') = 'text' THEN 'undo' ELSE 'shape' END)
     WHEN 'settings' THEN 'shape'
     WHEN 'arrange' THEN (CASE
@@ -244,8 +323,10 @@ export const COST_SQL = `(CASE
       ELSE 'rows' END)
     WHEN 'pattern' THEN 'rows'
     WHEN 'options' THEN (CASE
-      WHEN json_type(body, '$.options') = 'array' AND EXISTS (SELECT 1 FROM json_each(body, '$.options') o WHERE o.type = 'object' AND json_type(o.value, '$.hard') = 'true') THEN 'undo'
-      WHEN json_type(body, '$.options') = 'array' AND EXISTS (SELECT 1 FROM json_each(body, '$.options') o WHERE o.type = 'object' AND json_type(o.value, '$.patches') = 'array') THEN 'rows'
+      WHEN json_type(body, '$.options') = 'array' AND json_array_length(body, '$.options') > 0
+        AND NOT EXISTS (SELECT 1 FROM json_each(body, '$.options') o WHERE o.type <> 'object' OR COALESCE(json_type(o.value, '$.hard'), '') <> 'true') THEN 'undo'
+      WHEN json_type(body, '$.options') = 'array' AND EXISTS (SELECT 1 FROM json_each(body, '$.options') o WHERE o.type = 'object'
+        AND COALESCE(json_type(o.value, '$.hard'), '') <> 'true' AND json_type(o.value, '$.patches') = 'array') THEN 'rows'
       ELSE 'call' END)
     ELSE 'call' END)
   ELSE (CASE body_kind WHEN 'rowset' THEN 'rows' WHEN 'change' THEN 'shape' WHEN 'pack' THEN 'shape' WHEN 'settings' THEN 'shape'

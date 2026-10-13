@@ -300,8 +300,11 @@
      the old one said, against the version the box was read at, so nothing in between is lost and a page changed
      meanwhile is refused. What it replaced becomes what the button above puts back. */
   async function putBackTo(version: number) {
-    const body = versions.find((v) => v.version === version)?.body as Body | undefined;
-    if (busy || !held || !body) return;
+    const picked = versions.find((v) => v.version === version);
+    const body = picked?.body as Body | undefined;
+    /* A VERSION THE RECORD CUT FOR THIS READER IS NEVER APPLIED: its body lacks the blocks over lists they may not open,
+       and writing it would take those off the page for everybody. The History offers no Put back on it either. */
+    if (busy || !held || !body || (picked?.cut ?? 0) > 0) return;
     const was = held;
     busy = 'back';
     backing = version;

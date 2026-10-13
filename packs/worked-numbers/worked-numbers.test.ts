@@ -173,7 +173,7 @@ test('the file reads clean as an add-on somebody opens from disk: the list of re
   const doc = template();
   assert.equal(doc.version, '1.0.0');
   /* THE ONE VALUE IT LAYS ON A LIST IT DOES NOT OWN: `worked`, after the Source's own. */
-  assert.deepEqual(doc.extends, { 'register.datapoints': { values: { source: ['worked'] } } });
+  assert.deepEqual(doc.extends, { 'register.datapoints': { values: { source: ['worked'] }, labels: { source: { worked: 'Worked out' } } } });
   const list = doc.declarations.find((d) => d.register === 'recipes') as { name: string; fields: Field[] };
   assert.equal(list.name, 'Worked numbers');
   const fields = new Map(list.fields.map((f) => [f.id, f]));
@@ -436,6 +436,9 @@ test('THE WHOLE PATH ON A SELF-HOST: installed beside a founder’s lists, a rea
     assert.equal(sources().includes('worked'), false, 'Numbers has the value already');
     await put(template());
     assert.equal(sources().at(-1), 'worked', 'the value was not laid after the Source’s own');
+    /* AND IT READS BY ITS OWN WORDS, beside the labels the list's own values had, none of them moved. */
+    const labels = (JSON.parse(api.kernel.declarations().find((d) => d.id === 'register.datapoints')!.body) as { fields: (Field & { labels?: Record<string, string> })[] }).fields.find((f) => f.id === 'source')!.labels;
+    assert.deepEqual(labels, { reported: 'Reported', polled: 'Polled', typed: 'Typed', example: 'Example', worked: 'Worked out' });
 
     /* A READING AN HOUR FOR EIGHT DAYS, each with its own time, the last an hour before the run. ON THE MACHINE'S
        CLOCK, because the self-host stamps a run with it, and a change is refused once its earlier reading is more

@@ -5,6 +5,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import { historyWords, versionLines, versionsOf, type PageVersion } from './source-history.ts';
 
@@ -119,4 +120,31 @@ test('WHAT THE RECORD’S OWN READ ANSWERS IS DRAWN AS IT IS: names it wrote out
   );
   assert.equal(lines[1]?.putBack, 'Put the page back as an agent left it 1d ago');
   assert.equal(lines[2]?.save, 'Save the page as an add-on left it 3d ago as a file');
+});
+
+test('A VERSION THE RECORD CUT FOR ITS READER SAYS SO AND OFFERS NO PUT BACK, and one answered whole is as before', () => {
+  const body = { page: 'money', title: 'Money', blocks: [] };
+  const read = versionsOf({
+    versions: [
+      { version: 3, at: '2026-10-13T10:00:00Z', live: true, by: 'Ada', body },
+      { version: 2, at: '2026-10-12T12:00:00Z', live: false, by: 'Ada', body, cut: 2 },
+      { version: 1, at: '2026-10-10T09:00:00Z', live: false, by: 'Ada', body, cut: 0 },
+    ],
+  });
+  /* THE COUNT IS CARRIED ONLY WHERE SOMETHING WAS LEFT OUT: nought, or a word in its place, is a version answered whole. */
+  assert.deepEqual(read.map((v) => v.cut), [undefined, 2, undefined]);
+  assert.equal(versionsOf([{ version: 1, at: '2026-10-10T09:00:00Z', cut: 'some' }])[0]?.cut, undefined);
+
+  const lines = versionLines(read, NOW, 'Ada');
+  assert.deepEqual(lines.map((l) => l.cut), [null, historyWords.cut, null]);
+  assert.equal(lines[1]?.putBack, null, 'a cut version is offered to put back, which would take the left-out blocks from everybody');
+  assert.equal(lines[2]?.putBack, 'Put the page back as you left it 3d ago');
+  /* THE LINE NAMES NO LIST, a count or an id: the reader may not see which lists they are. */
+  assert.doesNotMatch(historyWords.cut, /\d|—/u);
+
+  /* AND THE WRITE ITSELF IS HELD, whatever the tile drew: the page's source view applies no cut body. */
+  const view = readFileSync(new URL('./SourceView.svelte', import.meta.url), 'utf8');
+  assert.match(view, /if \(busy \|\| !held \|\| !body \|\| \(picked\?\.cut \?\? 0\) > 0\) return;/u);
+  const tile = readFileSync(new URL('./SourceHistory.svelte', import.meta.url), 'utf8');
+  assert.match(tile, /\{#if line\.cut\}\s*<p class="history-cut">\{line\.cut\}<\/p>/u);
 });

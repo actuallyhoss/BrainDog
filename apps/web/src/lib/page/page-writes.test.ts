@@ -36,8 +36,11 @@ const settle = async () => {
 
 let bases = 0;
 
-/** A page with one checklist over `tasks`, its writes, and a `fetch` whose `/api/update` answers when the test says. */
-function page(kind: 'todo' | 'board' = 'todo') {
+/**
+ * A page with one checklist over `tasks`, its writes, and a `fetch` whose `/api/update` answers when the test says.
+ * `live.now` is the clock of the live answer the page is drawn from, `null` while none is in.
+ */
+function page(kind: 'todo' | 'board' = 'todo', live: { now: number | null } = { now: Date.parse('2026-09-29T10:00:00Z') }) {
   const base = `https://page-writes-${++bases}.test`;
   const rows: Row[] =
     kind === 'todo'
@@ -77,7 +80,7 @@ function page(kind: 'todo' | 'board' = 'todo') {
   let t = 0;
   const writes = pageWrites({
     slug: () => 'work',
-    now: () => Date.parse('2026-09-29T10:00:00Z'),
+    now: () => live.now,
     blocks: () => [block],
     base: () => base,
     reread: async () => void rereads++,
@@ -166,4 +169,56 @@ test('a row the block did not draw last time is marked as arrived, and only for 
   assert.deepEqual(p.drawn().rows.map((r) => Boolean(r.arrived)), [true, false, false]);
   p.clock(2_000);
   assert.equal(p.drawn().rows.some((r) => r.arrived), false);
+});
+
+const AGENT: Row = { cells: ['From an agent'], done: false, ref: { register: 'tasks', seq: 9, version: 1 } };
+
+test('the first row into a list the record answered empty is marked as arrived', () => {
+  const p = page();
+  (p.block.rows as Row[]).length = 0;
+  assert.deepEqual(p.drawn().rows, [], 'the list was answered empty');
+  (p.block.rows as Row[]).push(AGENT);
+  p.clock(100);
+  assert.deepEqual(p.drawn().rows.map((r) => Boolean(r.arrived)), [true], 'the first row into an empty list came in unmarked');
+  p.clock(2_000);
+  assert.equal(p.drawn().rows.some((r) => r.arrived), false);
+});
+
+test('a look before the live answer is in is no baseline, so the answer marks nothing', () => {
+  const live: { now: number | null } = { now: null };
+  const p = page('todo', live);
+  const answered = (p.block.rows as Row[]).splice(0);
+  assert.deepEqual(p.drawn().rows, [], 'nothing is drawn before the answer');
+  live.now = Date.parse('2026-09-29T10:00:00Z');
+  (p.block.rows as Row[]).push(...answered);
+  p.clock(100);
+  assert.equal(p.drawn().rows.some((r) => r.arrived), false, 'the rows the answer brought were marked as arrived');
+  (p.block.rows as Row[]).unshift(AGENT);
+  p.clock(200);
+  assert.deepEqual(p.drawn().rows.map((r) => Boolean(r.arrived)), [true, false, false], 'the answer was not taken as the baseline');
+});
+
+test('a block the record refused or this build cannot draw is no baseline either', () => {
+  for (const unread of [{ refusals: ['You cannot read tasks.'] }, { cannot: 'Not drawn yet.' }, { drawn: false }, { stale_at: '' }]) {
+    const p = page();
+    const answered = (p.block.rows as Row[]).splice(0);
+    const said = Object.keys(unread)[0]!;
+    assert.deepEqual(p.writes.keptSegment(0, p.block, { ...p.block, ...unread } as LiveBlock).rows, []);
+    (p.block.rows as Row[]).push(...answered);
+    p.clock(100);
+    assert.equal(p.drawn().rows.some((r) => r.arrived), false, `${said}: its first rows were marked as arrived`);
+  }
+});
+
+test('a table answered empty marks its first row, and one drawn before the answer marks none', () => {
+  const live: { now: number | null } = { now: null };
+  const p = page('todo', live);
+  const table = { ...p.block, kind: 'table' } as unknown as LiveBlock;
+  const row = { key: 'tasks#1', cells: [] } as unknown as Parameters<typeof p.writes.arrivedTable>[1][number];
+  assert.deepEqual(p.writes.arrivedTable(3, [], table), []);
+  live.now = Date.parse('2026-09-29T10:00:00Z');
+  assert.equal(p.writes.arrivedTable(3, [row], table).some((r) => r.arrived), false, 'the answer itself was marked');
+  assert.deepEqual(p.writes.arrivedTable(4, [], table), []);
+  p.clock(100);
+  assert.deepEqual(p.writes.arrivedTable(4, [row], table).map((r) => Boolean(r.arrived)), [true]);
 });

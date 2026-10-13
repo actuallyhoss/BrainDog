@@ -17,9 +17,9 @@
  * them ahead. The first test under "The page" holds that refusal, so the day lanes take days this file goes red and
  * the table of windows becomes the strip.
  *
- * AND THE DAY IS THE UTC DAY. A script is handed the zone's name and the instant and has no means to turn them into a
- * local day, so `roll.js` reads the day off the instant. Right for a record a few hours ahead of UTC, and a row moves
- * some hours late for a record behind it. The fix is the shell's: the local day in a script's context.
+ * AND THE DAY IS THE RECORD'S OWN. `roll.js` read the UTC day off the instant until a script could ask for the local
+ * one; it asks `ctx.today()` now (`packages/script`, batch 64), and the test under "The script" holds a record ahead
+ * of UTC and one behind it.
  *
  * RED FIRST, MEASURED: with no `roll.js` and no `dates.pack.json` this file failed at its first read, ENOENT, before a
  * single test ran. With both and a script that writes nothing, six of the eighteen failed: the four on where a turn
@@ -225,6 +225,18 @@ const writesOf = (a: ScriptAnswer): ScriptWrite[] => {
   return a.writes;
 };
 
+test('TODAY IS THE DAY WHERE THE RECORD IS: a weekly date moves at the record\'s own midnight, not at UTC\'s', async () => {
+  const row = (day: string): Row => ({ id: '01K5DATE000000000000000001', register: 'fixed_dates', seq: 7, fields: { title: 'Bins', day, comes_round: 'weekly' }, version: 3 });
+  const at = (now: string, tz: string, day: string): CtxHost => ({ ...hostOf('2026-03-10', [row(day)]), now: () => now, tz });
+  /* 22:30 UTC ON THE 10TH IS ALREADY THE 11TH IN CAIRO, so the 10th has passed there and the date moves on a week. */
+  const ahead = writesOf(await runInQuickJs(decl(), at('2026-03-10T22:30:00.000Z', 'Africa/Cairo', '2026-03-10'))) as unknown as { patch: Record<string, Json> }[];
+  assert.deepEqual(ahead.map((w) => w.patch.day), ['2026-03-17']);
+  /* THE SAME INSTANT IN UTC IS STILL THE 10TH, the date's own day, and nothing moves. */
+  assert.deepEqual(writesOf(await runInQuickJs(decl(), at('2026-03-10T22:30:00.000Z', 'UTC', '2026-03-10'))), []);
+  /* 01:00 UTC ON THE 11TH IS STILL THE 10TH IN NEW YORK, so a date on the 10th is not behind today there yet. */
+  assert.deepEqual(writesOf(await runInQuickJs(decl(), at('2026-03-11T01:00:00.000Z', 'America/New_York', '2026-03-10'))), []);
+});
+
 /** Where one row is moved to on a given day: its new day and last day, or `null` when the script leaves it alone. */
 async function rolled(today: string, fields: Record<string, Json>): Promise<[Json, Json] | null> {
   const writes = writesOf(await runInQuickJs(decl(), hostOf(today, [{ id: '01K5DATE000000000000000001', register: 'fixed_dates', seq: 7, fields, version: 3 }])));
@@ -264,6 +276,72 @@ test('A MONTH TOO SHORT FOR THE DAY TAKES ITS LAST DAY, and 29 February is the 2
   assert.deepEqual(await day('2026-04-05', '2026-01-31', 'monthly'), ['2026-04-30', null]);
   assert.deepEqual(await day('2025-01-10', '2024-02-29', 'yearly'), ['2025-02-28', null]);
   assert.deepEqual(await day('2027-06-01', '2024-02-29', 'yearly'), ['2028-02-29', null]);
+});
+
+/** One row taken through several days' runs, each run's move written onto it as the record would: its day and the day it repeats from, after each. */
+async function walked(fields: Record<string, Json>, todays: string[]): Promise<[Json, Json][]> {
+  const row: Row = { id: '01K5DATE000000000000000001', register: 'fixed_dates', seq: 7, fields: { ...fields }, version: 3 };
+  const out: [Json, Json][] = [];
+  for (const today of todays) {
+    for (const w of writesOf(await runInQuickJs(decl(), hostOf(today, [row]))) as unknown as { patch: Record<string, Json> }[]) {
+      for (const [k, v] of Object.entries(w.patch)) {
+        if (v === null) delete row.fields[k];
+        else row.fields[k] = v;
+      }
+    }
+    out.push([row.fields.day ?? null, row.fields.repeats_from ?? null]);
+  }
+  return out;
+}
+
+test('THE 31ST COMES BACK AFTER A SHORT MONTH: a monthly date keeps the day it was written with and is counted from it', async () => {
+  /* JANUARY'S 31ST, RUN THE DAY AFTER EACH TURN: February cuts it to the 28th, and March has it on the 31st again. */
+  assert.deepEqual(await walked({ what: 'Card bill', day: '2026-01-31', comes_round: 'monthly' }, ['2026-02-01', '2026-03-01', '2026-04-01', '2026-05-01', '2026-06-01']), [
+    ['2026-02-28', '2026-01-31'],
+    ['2026-03-31', '2026-01-31'],
+    ['2026-04-30', '2026-01-31'],
+    ['2026-05-31', '2026-01-31'],
+    ['2026-06-30', '2026-01-31'],
+  ]);
+  /* THE 30TH AND THE 29TH ARE CUT IN FEBRUARY TOO, and each comes back to its own day and not to the 31st. */
+  assert.deepEqual(await walked({ what: 'Payroll', day: '2026-01-30', comes_round: 'monthly' }, ['2026-02-01', '2026-03-01']), [
+    ['2026-02-28', '2026-01-30'],
+    ['2026-03-30', '2026-01-30'],
+  ]);
+  /* MANY TURNS MISSED AT ONCE, AND STILL THE 31ST: found on 28 February with months gone by, it lands on July's. */
+  assert.deepEqual(await walked({ what: 'Card bill', day: '2026-02-28', repeats_from: '2026-01-31', comes_round: 'monthly' }, ['2026-07-04']), [['2026-07-31', '2026-01-31']]);
+  /* A WINDOW KEEPS ITS LENGTH AS ITS FIRST DAY COMES BACK. */
+  const row = { what: 'Close', day: '2026-02-28', until: '2026-03-02', repeats_from: '2026-01-31', comes_round: 'monthly' };
+  assert.deepEqual(await rolled('2026-03-05', row), ['2026-03-31', '2026-04-02']);
+});
+
+test('29 FEBRUARY COMES BACK IN THE NEXT LEAP YEAR, standing on the 28th in the years between', async () => {
+  assert.deepEqual(await walked({ what: 'Leap day', day: '2024-02-29', comes_round: 'yearly' }, ['2024-03-01', '2025-03-01', '2026-03-01', '2027-03-01']), [
+    ['2025-02-28', '2024-02-29'],
+    ['2026-02-28', '2024-02-29'],
+    ['2027-02-28', '2024-02-29'],
+    ['2028-02-29', '2024-02-29'],
+  ]);
+});
+
+test('A DAY NO MONTH CUTS SHORT KEEPS NOTHING, and a day somebody moved off its turn is the one counted from', async () => {
+  /* THE 12TH IS IN EVERY MONTH, so there is nothing to keep and the row says nothing more than its day. */
+  assert.deepEqual(await walked({ what: 'Rent', day: '2026-01-12', comes_round: 'monthly' }, ['2026-01-13', '2026-02-13']), [
+    ['2026-02-12', null],
+    ['2026-03-12', null],
+  ]);
+  /* MOVED BY HAND TO THE 15TH: that is the day now, and the 31st it once kept is taken off. */
+  assert.deepEqual(await walked({ what: 'Card bill', day: '2026-03-15', repeats_from: '2026-01-31', comes_round: 'monthly' }, ['2026-03-16']), [['2026-04-15', null]]);
+  /* MOVED BY HAND TO ANOTHER DAY PAST THE 28TH: the 30th is kept from here on, in place of the 31st. */
+  assert.deepEqual(await walked({ what: 'Card bill', day: '2026-01-30', repeats_from: '2025-12-31', comes_round: 'monthly' }, ['2026-02-01', '2026-03-01']), [
+    ['2026-02-28', '2026-01-30'],
+    ['2026-03-30', '2026-01-30'],
+  ]);
+  /* A YEARLY DATE MOVED TO ANOTHER MONTH IS COUNTED FROM THERE, though its day of the month is the same. */
+  assert.deepEqual(await walked({ what: 'Review', day: '2026-05-28', repeats_from: '2024-02-29', comes_round: 'yearly' }, ['2026-06-01']), [['2027-05-28', null]]);
+  /* CHANGED TO A REPEAT THAT KEEPS NO DAY OF THE MONTH: the kept day goes, and the week is seven days on. */
+  assert.deepEqual(await walked({ what: 'Call', day: '2026-02-28', repeats_from: '2026-01-31', comes_round: 'weekly' }, ['2026-03-01']), [['2026-03-07', null]]);
+  assert.deepEqual(await walked({ what: 'Close', day: '2026-02-28', repeats_from: '2026-01-31', comes_round: 'month_end' }, ['2026-03-01']), [['2026-03-31', null]]);
 });
 
 test('FIRST DAY OF EACH MONTH IS THE 1ST, AND LAST DAY OF EACH MONTH IS THE 28TH, 29TH, 30TH OR 31ST', async () => {
@@ -355,6 +433,32 @@ test('THE DAILY RULE ROLLS WHAT HAS PASSED AND NOTHING ELSE, and a row keeps eve
   assert.deepEqual(span(api, close_), ['2026-04-30', null]);
   assert.deepEqual(span(api, ahead), ['2026-04-02', null]);
   assert.deepEqual(turns(api, rent), ['2026-03-01', '2026-04-01', '2026-05-01']);
+  close();
+});
+
+test('ON A RECORD: the rule keeps the 31st through a short month, and takes the kept day off a date moved by hand', async () => {
+  /* THE LAST DAY OF JANUARY, so the first run, on 1 February, has a short month straight ahead. */
+  const { api, clock, close } = await record(Date.UTC(2026, 0, 31, 9));
+  said(await put(api, file()));
+  const bill = add(api, { what: 'Card bill', day: '2026-01-31', comes_round: 'monthly' });
+  const moved = add(api, { what: 'Insurance', day: '2026-01-15', repeats_from: '2025-12-31', comes_round: 'monthly' });
+  const kept = (id: string): unknown[] => [got(api, id).fields.day, got(api, id).fields.repeats_from ?? null];
+
+  clock.advance(DAY_MS + 1);
+  await settle(api, clock);
+  assert.deepEqual(kept(bill), ['2026-02-28', '2026-01-31']);
+  assert.deepEqual(kept(moved), ['2026-02-15', null], 'a day moved by hand still carries the day it once kept');
+
+  clock.set(Date.UTC(2026, 2, 1, 9));
+  await settle(api, clock);
+  assert.deepEqual(kept(bill), ['2026-03-31', '2026-01-31'], 'the 31st did not come back after February');
+  clock.set(Date.UTC(2026, 3, 1, 9));
+  await settle(api, clock);
+  assert.deepEqual(kept(bill), ['2026-04-30', '2026-01-31']);
+  clock.set(Date.UTC(2026, 4, 1, 9));
+  await settle(api, clock);
+  assert.deepEqual(kept(bill), ['2026-05-31', '2026-01-31']);
+  assert.deepEqual(turns(api, bill), ['2026-01-31', '2026-02-28', '2026-03-31', '2026-04-30', '2026-05-31']);
   close();
 });
 

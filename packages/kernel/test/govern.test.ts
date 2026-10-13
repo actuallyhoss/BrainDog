@@ -232,6 +232,48 @@ test('THE SAME LIGHT QUESTION, OPENED BY A PERSON, IS ONE PRESS TOO, and is not 
   sql.close();
 });
 
+/** A pack update's question as the record files it: keeping changes nothing, and taking cannot be put back. */
+const keepOrTake = {
+  question: 'Take the update’s page, or keep yours?',
+  body_kind: 'options' as const,
+  body: {
+    options: [
+      { id: 'keep', label: 'Keep my page', because: 'nothing changes' },
+      { id: 'take', label: 'Take the update’s page', because: 'it is the newer one', hard: true },
+    ],
+  },
+};
+
+test('ONE HARD OPTION BESIDE A SAFE ONE: the question is a call, the hard option says so on its own line, and picking it is never the light press', async () => {
+  const { k, sql } = await record();
+  const reasonOf = (decision: string) => sql.one<{ reason: string }>('SELECT reason FROM decision WHERE id = ?', decision)?.reason;
+
+  /* THE LIST SAYS THE QUESTION'S BAND AND EACH OPTION'S OWN, by the option's id. */
+  const asked = value<{ id: string }>(k.propose(keepOrTake, 'slash'));
+  const row = value<Record<string, unknown>[]>(k.governance('suggestion')).find((r) => r.id === asked.id)!;
+  assert.equal(row.cost, 'call');
+  assert.deepEqual(row.option_costs, [{ id: 'keep', cost: 'call' }, { id: 'take', cost: 'undo' }]);
+  /* A question that is not one of options says no option's band. */
+  const other = value<{ id: string }>(k.propose(rowset([{ what: 'x', state: 'open' }]), 'p_1'));
+  assert.equal('option_costs' in value<Record<string, unknown>[]>(k.governance('suggestion')).find((r) => r.id === other.id)!, false);
+
+  /* THE QUEUE MARKS THE ONE OPTION, and the safe one carries no mark at all. */
+  const drawn = k.block({ kind: 'queue', source: 'governance.open', empty: 'Nothing.' }) as { queue?: { id: string; cost: string; options: { key: string; hard?: true }[] }[] };
+  const card = drawn.queue?.find((q) => q.id === asked.id);
+  assert.equal(card?.cost, 'call');
+  assert.deepEqual(card?.options.map((o) => [o.key, o.hard ?? false]), [['keep', false], ['take', true]]);
+
+  /* THE SAFE PICK IS THE LIGHT PRESS A RULE'S OR SLASH'S QUESTION ALLOWS, for the option's own reason. */
+  const kept = value<{ decision: string }>(k.decide(asked.id, { decide: { option: 'keep', reason: '' } }, 'p_2'));
+  assert.equal(reasonOf(kept.decision), "Answered in one press, for the option's own reason: nothing changes");
+
+  /* THE HARD PICK IS NOT: nobody gave a reason, and the record does not lend it the option's, nor say it changed nothing else. */
+  const again = value<{ id: string }>(k.propose({ ...keepOrTake, question: 'And this one?' }, 'slash'));
+  const took = value<{ decision: string }>(k.decide(again.id, { decide: { option: 'take', reason: '' } }, 'p_2'));
+  assert.equal(reasonOf(took.decision), 'Answered in one press, with no reason given.');
+  sql.close();
+});
+
 test('ALL THE ROWS OR NONE: a rowset with one bad row writes nothing at all', async () => {
   // Half a rowset accepted is a decision whose answer is not true of the record.
   const { k, sql } = await record();

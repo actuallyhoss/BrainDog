@@ -296,8 +296,11 @@
   let chosenKey = $state<string | null>(null);
   const startKey = $derived(question && !two && !merge ? acceptKey(question, moves.length > 0) : null);
   const selectedKey = $derived(chosenKey ?? startKey);
-  /* A BUTTON WHOSE ANSWER IS HARD TO TAKE BACK SAYS SO IN ITS WORDS, never in a chip beside it. */
-  const pressSaid = (label: string): string => (question?.band === 'undo' ? queueWords.hard(label) : label);
+  /* A BUTTON WHOSE ANSWER IS HARD TO TAKE BACK SAYS SO IN ITS WORDS, never in a chip beside it. THE QUESTION'S BAND SAYS
+     IT OF EVERY ANSWER, AND AN OPTION'S OWN MARK OF THAT ONE (`hard`, the record's `option_costs`): "Keep my page"
+     beside "Take the update's page" is a call, and only taking is worded as hard. */
+  const hardOption = (key: string | null): boolean => key !== null && question?.options.find((o) => o.key === key)?.hard === true;
+  const pressSaid = (label: string, key: string | null = null): string => (question?.band === 'undo' || hardOption(key) ? queueWords.hard(label) : label);
 
   /* WHO ASKED AND WHEN, the quiet line over the answers, by the name every screen gives them, never a handle. */
   const asker = $derived(about?.by ? proposer(about.by, String(page.data.me?.person ?? '') || null, new Map(Object.entries((page.data.names ?? {}) as Record<string, string>))) : null);
@@ -1018,7 +1021,7 @@
                 aria-describedby={answerable ? undefined : 'cannot-decide'}
                 onclick={() => choose(option.key)}
               >
-                {option.key === 'accept' ? pressSaid(labelOf(option, q, moves)) : labelOf(option, q, moves)}{#if marked}<span class="dc-sr">, {gate.suggested}</span>{/if}
+                {option.key === 'accept' ? pressSaid(labelOf(option, q, moves)) : hardOption(option.key) ? queueWords.hard(labelOf(option, q, moves)) : labelOf(option, q, moves)}{#if marked}<span class="dc-sr">, {gate.suggested}</span>{/if}
               </button>
             {/snippet}
 
@@ -1096,7 +1099,7 @@
                       aria-disabled={selectedKey === null}
                       disabled={!answerable || holding !== null || sending !== null}
                       aria-describedby={answerable ? undefined : 'cannot-decide'}
-                      onclick={commit}>{pressSaid(gate.decide)}</button
+                      onclick={commit}>{pressSaid(gate.decide, selectedKey)}</button
                     >
                   {/if}
                   {@render later()}

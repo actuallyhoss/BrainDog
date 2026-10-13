@@ -29,6 +29,12 @@ export type PageVersion = {
   live?: boolean | undefined;
   /** The text itself as the record holds it, which Save writes and Put back applies. This file never reads it. */
   body?: Record<string, unknown> | undefined;
+  /**
+   * How many parts of this version the record left out because they use a list this reader may not open (`pageVersions`
+   * cuts every version to its reader). Absent on a version answered whole. A CUT VERSION IS NEVER PUT BACK: its body is
+   * the part this reader may see, and applying it would take the left-out blocks off the page for everybody.
+   */
+  cut?: number | undefined;
 };
 
 export type VersionLine = {
@@ -38,8 +44,13 @@ export type VersionLine = {
   said: string;
   /** "On the page now" for the version the page is drawn from, `null` for every earlier one. */
   state: string | null;
-  /** What Put back does on this line, for a screen reader; `null` on the page as it is now, which has nothing to put back. */
+  /**
+   * What Put back does on this line, for a screen reader; `null` on the page as it is now, which has nothing to put
+   * back, and on a version the record cut for this reader, which is not theirs to put back.
+   */
   putBack: string | null;
+  /** The one line under a version the record cut for this reader, `null` on one answered whole. */
+  cut: string | null;
   /** What Save as a file saves on this line, for a screen reader. */
   save: string;
 };
@@ -60,6 +71,8 @@ export const historyWords = {
   saveThe: (left: string) => `Save the page as ${left} as a file`,
   saveNow: 'Save the page as it is now as a file',
   left: (who: string, when: string | null) => `${who} left it${when === null ? '' : ` ${when}`}`,
+  /** Under a version the record cut to what this reader may open. It names no list: the reader may not see which. */
+  cut: 'Some of this version is left out because it uses lists you cannot open, so it cannot be put back from here.',
   you: 'you',
 } as const;
 
@@ -75,7 +88,7 @@ export function versionsOf(answer: unknown): PageVersion[] {
   for (const v of list) {
     if (!isObject(v) || typeof v.version !== 'number' || !Number.isFinite(v.version) || typeof v.at !== 'string') continue;
     const signed = typeof v.by === 'string' ? v.by : typeof v.who === 'string' ? v.who : null;
-    out.push({ version: v.version, at: v.at, by: signed, ...(typeof v.live === 'boolean' ? { live: v.live } : {}), ...(isObject(v.body) ? { body: v.body } : {}) });
+    out.push({ version: v.version, at: v.at, by: signed, ...(typeof v.live === 'boolean' ? { live: v.live } : {}), ...(isObject(v.body) ? { body: v.body } : {}), ...(typeof v.cut === 'number' && v.cut > 0 ? { cut: v.cut } : {}) });
   }
   return out;
 }
@@ -116,12 +129,14 @@ export function versionLines(
     /* A TIME THAT DOES NOT READ IS LEFT OUT: `since` hands back what it could not parse, and that is not for a person. */
     const when = Number.isFinite(Date.parse(v.at)) ? since(v.at, now) : null;
     const current = v.version === live;
+    const cut = typeof v.cut === 'number' && v.cut > 0;
     const left = historyWords.left(who.kind === 'you' ? historyWords.you : midSentence(who.name), when);
     return {
       version: v.version,
       said: when === null ? who.name : historyWords.said(who.name, when),
       state: current ? historyWords.now : null,
-      putBack: current ? null : historyWords.putBackThe(left),
+      putBack: current || cut ? null : historyWords.putBackThe(left),
+      cut: cut ? historyWords.cut : null,
       save: current ? historyWords.saveNow : historyWords.saveThe(left),
     };
   });

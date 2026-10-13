@@ -85,10 +85,11 @@ const LAID: Record<string, Laid> = {
       'adds page.estate after Next ninety days: Server and provider numbers',
       'hands register.organisations to people',
     ],
-    declares: 'b7473e7c534ee516',
+    declares: 'c448e3ee3c366703',
     history: [
       '2.6.0 lays what 2.5.0 laid, word for word -> 092fe0f5bb736b52',
       'Folded into the unreleased 2.6.0 (estate-numbers-61, REC-C12; integrate 61): it lays Server and provider numbers on Renewals after Next ninety days -> b7473e7c534ee516',
+      'Folded into the unreleased 2.6.0 (founder-numbers-edge-64, audit 61 claim 5; integrate 64): Server and provider numbers reads no reading dated after today (`at before tomorrow` in its clauses); the list of what is laid is unchanged -> c448e3ee3c366703',
     ],
   },
 };

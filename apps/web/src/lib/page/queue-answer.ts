@@ -115,7 +115,8 @@ export function visualOf(shows: unknown): Visual | null {
 }
 
 /** One way to answer, in the words a reader sees, with what it is where it says. */
-export type Way = { key: string; label: string; because: string; recommended: boolean; shows: Visual | null };
+/** `hard` is an answer that cannot be taken back once picked (the record's mark on the option): said on its own button, given to no key. */
+export type Way = { key: string; label: string; because: string; recommended: boolean; shows: Visual | null; hard: boolean };
 
 /**
  * The ways to answer a question, in the record's order.
@@ -132,8 +133,8 @@ export type Way = { key: string; label: string; because: string; recommended: bo
 export function waysOf(q: Pick<QueueQuestion, 'options'>): Way[] {
   if (q.options.length === 0)
     return [
-      { key: 'accept', label: copy.acceptIt, because: '', recommended: false, shows: null },
-      { key: 'reject', label: copy.rejectIt, because: '', recommended: false, shows: null },
+      { key: 'accept', label: copy.acceptIt, because: '', recommended: false, shows: null, hard: false },
+      { key: 'reject', label: copy.rejectIt, because: '', recommended: false, shows: null, hard: false },
     ];
   return q.options.map((o, i) => ({
     key: o.key,
@@ -141,6 +142,7 @@ export function waysOf(q: Pick<QueueQuestion, 'options'>): Way[] {
     because: spoken(saidOf(o.because)),
     recommended: o.recommended,
     shows: visualOf(o.shows),
+    hard: o.hard === true,
   }));
 }
 

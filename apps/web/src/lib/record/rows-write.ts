@@ -325,8 +325,33 @@ function emptiest(register: string, f: { id: string; type: string; values?: read
 /** A required field a capture has to ask for: what a person calls it, and the kind of box it takes. */
 export type Asked = { id: string; label: string; type: string; to?: string };
 
-/** The types `emptiest` answers with nothing: no figure, today, no. A value of one of these was never said. */
-const EMPTIED: ReadonlySet<string> = new Set(['day', 'instant', 'money', 'int', 'decimal', 'bool']);
+/** A figure or a yes that is not the nothing `emptiest` writes: somebody put it there, whatever `filled` still says. */
+function figured(value: Fields[string] | undefined): boolean {
+  if (typeof value === 'number') return value !== 0;
+  if (typeof value === 'boolean') return value;
+  if (value !== null && typeof value === 'object' && 'amount' in value) return value.amount !== 0;
+  return false;
+}
+
+/**
+ * The required fields `capturedFields` filled on the reader's behalf and nobody has answered since, read off
+ * `filled`: each sentence opens with its field's label, and `captureRow` drops the sentence of a field the typed
+ * line answered. Two labels that open alike ("Date", "Date due") go to the longer one.
+ */
+function filledFor(decl: RegisterDecl, filled: readonly string[]): Set<string> {
+  const out = new Set<string>();
+  for (const sentence of filled) {
+    let best: { id: string; length: number } | null = null;
+    for (const f of decl.fields) {
+      if (!f.required || f.id === decl.title) continue;
+      const label = labelOf(f).toLowerCase();
+      if (sentence !== label && !sentence.startsWith(`${label} `)) continue;
+      if (!best || label.length > best.length) best = { id: f.id, length: label.length };
+    }
+    if (best) out.add(best.id);
+  }
+  return out;
+}
 
 /**
  * WHAT ONE TYPED LINE LEAVES UNANSWERED, in the order the list declares it.
@@ -336,17 +361,28 @@ const EMPTIED: ReadonlySet<string> = new Set(['day', 'instant', 'money', 'int', 
  * today, into no account, and the record refuses it for the account. These are the fields a capture draws a box
  * for instead: every required one that nothing answered.
  *
- * ANSWERED means the address pinned it, or the declaration holds its answer: an `enum` takes its default or its
- * first value, which is one of a declared few and is said. A field somebody handed in on `captured` (a text, a
- * row in another list) is answered too. The title is the line itself.
+ * ANSWERED means somebody said it. A field on `captured` that `filled` does not name was pinned by the address,
+ * read off the typed line or handed in by whoever built the capture, and that holds for a figure and a day as it
+ * does for a text: a line typed "tomorrow" is not asked its day again. A figure that is not nothing is answered
+ * whatever `filled` says, for a caller that wrote over the fill and left the sentence standing.
+ *
+ * THE DECLARATION ANSWERS ONLY WHAT IT DECLARES. An `enum` with a declared default is answered, and so is the
+ * list's state, because a new one starts in its first state. Any other `enum` was filled with whichever value is
+ * written first, and which way money moved is not a thing to pick for somebody: it is asked. The title is the
+ * line itself.
  */
 export function askedOf(register: string, captured: Captured): Asked[] {
   const decl = REGISTERS[register];
   if (!decl) return [];
+  const filled = filledFor(decl, captured.filled);
   const asked: Asked[] = [];
   for (const f of decl.fields) {
     if (!f.required || f.id === decl.title) continue;
-    if (Object.hasOwn(captured.fields, f.id) && !EMPTIED.has(f.type)) continue;
+    if (Object.hasOwn(captured.fields, f.id)) {
+      if (!filled.has(f.id) || figured(captured.fields[f.id])) continue;
+      const declared = typeof f.default === 'string' && f.values?.includes(f.default);
+      if (f.type === 'enum' && (declared || f.id === decl.state)) continue;
+    }
     asked.push({ id: f.id, label: labelOf(f), type: f.type, ...(f.type === 'ref' && f.to ? { to: f.to } : {}) });
   }
   return asked;

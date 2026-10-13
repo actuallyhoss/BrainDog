@@ -46,6 +46,7 @@ import {
   isRefusal,
   LOG_BYTES,
   PRELUDE,
+  scriptMeta,
   WITH_CONFIG,
   type HostResponse,
   type Json,
@@ -591,7 +592,9 @@ export async function runScript(wiring: ScriptWiring, s: Scripted): Promise<Scri
     const entry = worker.getEntrypoint(undefined, { props: { run } }) as unknown as { run(meta: Json): Promise<Handed> };
     /* `config` IS THE OWNING PACK'S SETTINGS, read by `prepareScript` at the lease, and the loaded module's
        `withConfig` freezes it onto `ctx` with the self-host's own text. */
-    const meta: Json = { input: (input ?? null) as Json, now: new Date(started).toISOString(), tz: record.tz, config: config ?? {} };
+    /* THE DAY IS HANDED IN BESIDE THE INSTANT (`scriptMeta`), as the self-host hands it: `ctx.today()` is the record's
+       own day on both hosts, worked out here because the sandbox has no zone table. */
+    const meta: Json = { ...scriptMeta({ input: (input ?? null) as Json, now: new Date(started).toISOString(), tz: record.tz }), config: config ?? {} };
 
     /* THE DEADLINE IS RACED, NOT ASKED OF THE SANDBOX. A script awaiting a slow provider is not spending CPU, so
        `cpuMs` never ends it; this does, and the run is closed below so whatever it asks for afterwards is refused. */

@@ -64,13 +64,31 @@ const rowOf = (v: unknown): UndoRow | null => {
 const same = (a: unknown, b: unknown): boolean => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
 export function methods(deps: RecordDeps) {
-  const { kernel, sql, admin, readable, tail, no, clock } = deps;
+  const { kernel, sql, admin, guard, readable, tail, no, clock } = deps;
   const trust = ladder({ sql, kernel, now: () => clock.now() });
   /** A batch for one row put back, minted on the record's clock as the record mints every other. */
   const mint = ulids(() => clock.now());
 
   /** Who signs an undo: the person in the browser. */
   const actorOf = (ctx: CallContext): string => (ctx.principal.kind === 'token' ? ctx.principal.person : ctx.principal.id);
+
+  /**
+   * Why this caller may not put a declaration back, or `null` when they may: the one who decides what the record is, an
+   * owner signed in, and no token whoever holds it.
+   *
+   * ASKED AT THE STEP AND NOT ONLY AT THE DOOR (audit 62, claim 8). Both methods below are behind `admin`, which refuses
+   * the same callers today, so this is asked twice for them. It is asked here as well because a put back that installs
+   * an earlier page, rule or list is a decision about the record, and the day a door is opened to somebody else (an
+   * agent taking back its own run, say) the rows may go back and this still may not. It reads the caller itself and
+   * the ladder, never the door's guard, so widening the door does not widen this.
+   */
+  const decides = (ctx: CallContext): ReturnType<typeof guard> => {
+    const sentence = 'This would put a page, a rule or a list back to how it read before, and only the owner decides that, signed in.';
+    if (ctx.principal.kind === 'token') return { code: 'NEEDS_BROWSER_SESSION', fix: `${sentence} Open it from the app.`, at: 'principal' };
+    /* Somebody signed in below owner is in the app already, so they are told who to ask and not where to go. */
+    const stop = guard(ctx, 'owner');
+    return stop === null ? null : { ...stop, fix: `${sentence} Ask the owner to put it back.` };
+  };
 
   /**
    * The plan, or the undo applied, for one scope. Shared by both methods, which differ only in what they name.
@@ -86,6 +104,14 @@ export function methods(deps: RecordDeps) {
     const only = walk === null || row === undefined ? null : walkRow(walk, row, opts.reads);
     if (only !== null && !only.ok) return only;
     const one = only === null ? null : only.value;
+    /* A DECLARATION GOES BACK ONLY FOR WHOEVER DECIDES, the look and the press alike, and the whole undo is refused
+       rather than done in part: the plan's hash is of everything it shows, so there is no half of it to apply. The
+       walk writes rows and never a declaration, and a caller who decides is not asked for a second plan. */
+    const stop = walk === null ? decides(ctx) : null;
+    if (stop !== null) {
+      const plan = kernel.undoPlan(scope, opts);
+      if (plan.ok && plan.value.steps.some((s) => s.do === 'declare')) return { ok: false, refusal: stop };
+    }
     if (args.dry === true) return walk === null ? kernel.undoPlan(scope, opts) : ok(walkPlan(walk, opts.reads, one));
     if (!said(args.hash))
       return no('REQUIRED_MISSING', 'Undo shows what it will put back before it does. Ask with dry first, then send the hash it answers.', { at: 'hash' });

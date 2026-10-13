@@ -12,3 +12,14 @@
  */
 declare const __BRAINDOG_ENV__: string;
 declare const __BRAINDOG_FLAGS__: string;
+
+/**
+ * The product's own words, made at build time out of the copy files by the `braindog:own-words` plugin of
+ * `vite.config.ts` (`src/lib/shot/own-words.ts`). Screenshot mode hands the set to `src/lib/shot/plate.ts`, which
+ * plates every text not in it. About 39 KB of source, so whoever mounts the mode imports it only when the mode goes
+ * on (`await import('virtual:own-words')`), which keeps it out of the entry.
+ */
+declare module 'virtual:own-words' {
+  const own: ReadonlySet<string>;
+  export default own;
+}

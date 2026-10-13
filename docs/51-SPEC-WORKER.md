@@ -781,6 +781,10 @@ three refusals) is the same code on both hosts and is written there once.*
    refuses a `list` outside `reads:` and a `get` from a script that reads nothing, and answers the rest with
    `scriptReads`, the self-host's function: the record's own reads as the script's actor, `reads:` as the ceiling,
    secret fields taken off and a filter on one refused.
+
+   **`ctx.today()`** answers the record's local day as `YYYY-MM-DD`, a string and never a `Date`. It is worked out
+   here, on the host, by `dayIn(now, tz)` and handed in on `meta.today` (`scriptMeta`, the function the self-host
+   calls too); with no zone, or a zone the host does not know, it is the UTC day.
 7. **The answer.** The loaded module collects writes and the log and hands them back; nothing in it is a check,
    because it runs where the script can reach it. `checkWrites` checks them again here (a list; no more than
    `limits.writes`; a create into a register in `writes:`; an update whose version is a whole number or none, none

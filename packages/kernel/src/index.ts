@@ -147,7 +147,7 @@ import { createRecord, purge, recordIdentity, type CreateRecordArgs, type Provis
 import { dayIn, stampFinished } from './finished.ts';
 import type { StepsDecl } from './steps.ts';
 import { isMechanism, loadLeg, markPinned, neighboursOf, pairsReads, passOf, settle, windowSql, PAIRS_ACTOR, type Leg as PairLeg, type PairsDecl, type Pairing } from './pairs.ts';
-import { COST_SQL, COSTS, WAIT_RANK_SQL, WAIT_SQL, costOf, costRank, costRows, waitParams, waitRank, type Cost } from './weigh.ts';
+import { COST_SQL, COSTS, WAIT_RANK_SQL, WAIT_SQL, costOf, costRank, costRows, optionCost, waitParams, waitRank, type Cost } from './weigh.ts';
 import { recheck } from './cause.ts';
 import { evaluateMetric, predicateOf, readDeclaredSigns, scorePrediction, snapshot, unaggregatableIn, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import { STALE_DAYS, readBlock, readPage, registersOf, registersOfBlock, resolvePages, staleAt, type ActivityEvent, type BlockResult, type ListsBeside, type PageBlock, type PageDecl, type PageDeps, type LastChange, type PageResult, type QueueCandidate, type QueueQuestion, type QuestionFacts } from './pages.ts';
@@ -414,7 +414,7 @@ export { stepsPercent, tallySteps, type StepsDecl } from './steps.ts';
 /* THE COST BAND, exported because `/decide` computes it in the browser off the same raw rows: it
    reads `governance` directly rather than through `governance.open`, and two rankings of one queue
    that disagreed would be worse than no ranking at all. */
-export { COSTS, MANY_ROWS, WAITS, WAIT_RANK_SQL, WAIT_SQL, costOf, costRank, costRows, waitOf, waitParams, waitRank, waitRows, worseCost, type Cost, type CostRows, type Wait } from './weigh.ts';
+export { COSTS, MANY_ROWS, WAITS, WAIT_RANK_SQL, WAIT_SQL, costOf, costRank, costRows, optionCost, optionCosts, pickCost, waitOf, waitParams, waitRank, waitRows, worseCost, type Cost, type CostRows, type Wait } from './weigh.ts';
 export { AGGREGATIONS, bucketState, deltaFrom, evaluateMetric, fxOfPair, largestFirst, meets, rateUnit, scorePrediction, snapshot, targetCurrency, targetFor, targetInto, targetOf, windowMs } from './metrics.ts';
 export { clockOf, isMoneyFormat, verdictOf } from './metrics.ts';
 export { readDeclaredSigns, vitalOf } from './metrics.ts';
@@ -5906,7 +5906,10 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       /* WHAT THE OPTION IS, checked again on the way out: a body filed before `showsOf` existed holds whatever it was
          sent, and a swatch is the one colour from data a drawer puts on a screen. */
       const shows = showsOf(one.shows);
-      return [{ key: one.id, label: one.label, because: typeof one.because === 'string' ? one.because : '', recommended: one.recommended === true, ...(shows ? { shows } : {}) }];
+      /* AN OPTION ITS PROPOSER MARKED HARD SAYS SO ON ITS OWN LINE (`weigh.ts` `optionCost`): the question's band no
+         longer rises for one hard option beside a safe one, so the drawer marks the option and keeps a key off it. */
+      const hard = optionCost(one) === 'undo';
+      return [{ key: one.id, label: one.label, because: typeof one.because === 'string' ? one.because : '', recommended: one.recommended === true, ...(shows ? { shows } : {}), ...(hard ? { hard: true as const } : {}) }];
     });
     const does = doesOf(kind, body, {
       list: (id) => registers.get(id)?.name ?? null,
@@ -6202,6 +6205,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       }
       return out;
     },
+    /* A RUN BY ITS HANDLE, ended or removed included, so a feed line a run signed says who that run is (`run_by` in
+       `pages.ts`: its agent, the app it ran in and the run it helps). A handle that is no run's reads nothing. */
+    runOf: (run) => (isRunName(run) ? bySeq(SESSION, Number(run.slice((registers.get(SESSION)?.seq_prefix ?? 'S').length)), true) : null),
     /* THE RUNS NOT FINISHED, the most recently heard from first. The block applies its own `where` and `limit`. */
     /* TWO RUNS SEEN IN THE SAME INSTANT COME THE OLDER FIRST (`id`), said in the query: left to the plan, the order of a
        tie moved when migration 39 gave the list a new index to walk. */

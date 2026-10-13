@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 
 import type { QueueQuestion } from '@braindog/kernel';
 
-import { answeredLine, askerOf, byWords, cardOf, inlineOf, movesOf, nameOrNull, pressOf, pressSaid, pressTail, primaryOf, shiftsOf, spoken, startsOn } from './card.ts';
+import { answeredLine, askerOf, byWords, cardOf, hardOf, inlineOf, movesOf, nameOrNull, pressOf, pressSaid, pressTail, primaryOf, queueOf, shiftsOf, spoken, startsOn, wayTail } from './card.ts';
 
 const now = Date.parse('2026-10-06T09:00:00Z');
 
@@ -248,10 +248,53 @@ test('A CHOICE IS CHOSEN AND DECIDE GIVES IT; a number key and Enter on a choice
   assert.match(card, /if \(e\.key === 'Enter'\) \{\n\s+e\.preventDefault\(\);\n\s+e\.stopPropagation\(\);\n\s+if \(chooses\) selectWay\(way\);\n\s+press\(way\);/u);
   /* DECIDE CARRIES THE KEY'S MARK ONLY ON A CARD THAT COSTS NOTHING, with an answer chosen. */
   assert.match(card, /data-enter=\{card\.enter !== null && selected !== null \? '' : undefined\}/u);
-  assert.match(card, /onclick=\{commit\}>\{pressSaid\(card, queueWords\.decide\)\}/u, 'Decide does not say the care a hard answer asks for');
+  assert.match(card, /onclick=\{commit\}>\{pressSaid\(card, queueWords\.decide, card\.ways\.find\(\(w\) => w\.key === selected\)\)\}/u, 'Decide does not say the care a hard answer asks for');
   /* NO CHIP SAYS THE BAND: it is kept for the keys and the ranking, hidden, and said in the button. */
   assert.match(card, /<span class="queue-cost" data-cost=\{card\.cost\} hidden>/u);
   assert.match(card, /import '\.\/form\.css';/u, 'the card draws its choices its own way again');
+});
+
+test('ONE HARD ANSWER BESIDE A SAFE ONE: the question is a call, and only the hard answer is worded, held from the keys and from one press', () => {
+  /* THE PACK UPDATE'S QUESTION, as the record sends it since batch 64: band `call`, and `hard` on taking alone. */
+  const kept = (rec: 'keep' | 'take' | null, because = ''): QueueQuestion =>
+    ask({
+      options: [
+        { key: 'keep', label: 'Keep my page', because, recommended: rec === 'keep' },
+        { key: 'take', label: 'Take the update’s page', because, recommended: rec === 'take', hard: true },
+      ],
+    });
+  const card = cardOf(kept('keep'), { now });
+  assert.deepEqual(card.ways.map((w) => [w.key, w.hard]), [['keep', false], ['take', true]]);
+  const [keep, take] = card.ways as [(typeof card.ways)[number], (typeof card.ways)[number]];
+
+  /* THE QUESTION IS NOT HARD, SO KEEPING IS NOT WORDED AS HARD; taking is, on its own button and on Decide once chosen. */
+  assert.equal(hardOf(card), false);
+  assert.equal(hardOf(card, keep), false);
+  assert.equal(hardOf(card, take), true);
+  assert.equal(pressSaid(card, 'Decide', keep), 'Decide');
+  assert.equal(pressSaid(card, 'Decide', take), 'Decide, can’t be undone easily');
+  assert.equal(pressSaid(card, 'Decide', undefined), 'Decide', 'with nothing chosen Decide says nothing it does not know');
+  assert.equal(wayTail(card, keep, primaryOf(card)), '', 'the filled safe answer was worded as hard');
+  assert.equal(wayTail(card, take, primaryOf(card)), ', can’t be undone easily', 'the hard answer says nothing on its own button');
+  /* A QUESTION HARD AS A WHOLE STILL SAYS IT ON THE FILLED BUTTON, as it always did, and not on the others. */
+  const whole = cardOf(ask({ cost: 'undo', options: [{ key: 'a', label: 'A', because: '', recommended: true }, { key: 'b', label: 'B', because: '', recommended: false }] }), { now });
+  assert.deepEqual(whole.ways.map((w) => wayTail(whole, w, primaryOf(whole))), [', can’t be undone easily', '']);
+
+  /* ENTER GIVES THE SAFE SUGGESTION, AND NEVER A SUGGESTION THAT IS THE HARD ONE; nor does the form start chosen on it. */
+  assert.equal(card.enter, 'keep');
+  assert.equal(cardOf(kept('take'), { now }).enter, null, 'Enter gives an answer that cannot be taken back');
+  assert.equal(startsOn(cardOf(kept('take', 'what it does'), { now })), null, 'the form starts chosen on the hard answer');
+
+  /* ONE PRESS ON A CHOICE NEVER DECIDES WHERE ONE OF THE CHOICES IS HARD: the list keeps its ring and Decide. */
+  assert.equal(pressOf(cardOf(kept('keep', 'what it does'), { now })), false);
+  assert.equal(pressOf(cardOf(ask({ options: [{ key: 'keep', label: 'Keep', because: 'x', recommended: true }, { key: 'take', label: 'Take', because: 'y', recommended: false }] }), { now })), true, 'two safe answers lost their one press');
+
+  /* DECIDE'S OWN SCREEN HANDS THE MARK ON (`queueOf`), so its card reads the same. */
+  const classic = queueOf({ id: 'SG7', title: 'Q', band: 'call', opened: '', options: [{ key: 'keep', title: 'Keep', body: '' }, { key: 'take', title: 'Take', body: '', hard: true }] });
+  assert.deepEqual(classic.options.map((o) => o.hard ?? false), [false, true]);
+
+  /* AND THE CARD DRAWS IT THROUGH THOSE: the tail on each button by its own way. */
+  assert.match(src('./DecisionCard.svelte'), /<span class="dc-btn-name">\{way\.label\}<\/span>\{wayTail\(card, way, primary\)\}/u);
 });
 
 test('TWO OR THREE ANSWERS THAT ARE ONLY THEIR NAMES ARE A ROW OF BUTTONS, the suggested or the first filled', () => {

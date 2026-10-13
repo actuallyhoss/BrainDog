@@ -144,6 +144,10 @@ export interface CtxHost {
    * (`packages/script/test/clock.test.ts`).
    */
   clock?(): number;
+  /**
+   * The record's zone by name. `ctx.tz` is this, and `ctx.today()` is the day it is there at `now` (`dayIn`), worked
+   * out on the host because the sandbox cannot.
+   */
   tz: string;
   /** A door's body and headers, a rule's copied fields, or `null` on a schedule. */
   input: Json;
@@ -153,6 +157,54 @@ export interface CtxHost {
    */
   config?: Json;
 }
+
+/**
+ * The day it is in `tz` at `instant`, as `YYYY-MM-DD`: what `ctx.today()` answers.
+ *
+ * WORKED OUT ON THE HOST, BECAUSE THE SANDBOX CANNOT. QuickJS in this build has no `Intl`, so a script handed the
+ * instant and the zone's name could only read the UTC day, and a date that rolls once a day moved some hours early or
+ * late on a record far from UTC. Node and the Cloud's Worker both have `Intl`, so one sum here speaks for both hosts.
+ *
+ * A STRING AND NEVER A `Date`: a day has no hour, and a `Date` made from one is midnight UTC, which is the day before
+ * for anyone behind it. No zone, or a name the host does not know, is read as UTC and never thrown: a schedule should
+ * not stop because a record's zone was mistyped. An instant that is no instant answers its own first ten characters.
+ */
+export function dayIn(instant: string, tz: string | null | undefined): string {
+  const utc = (): string => {
+    const at = new Date(instant);
+    return Number.isNaN(at.getTime()) ? String(instant).slice(0, 10) : at.toISOString().slice(0, 10);
+  };
+  if (typeof tz !== 'string' || tz === '') return utc();
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      calendar: 'gregory',
+      numberingSystem: 'latn',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(new Date(instant));
+    const of = (type: string): string => parts.find((p) => p.type === type)?.value ?? '';
+    const day = `${of('year').padStart(4, '0')}-${of('month')}-${of('day')}`;
+    return /^\d{4}-\d{2}-\d{2}$/u.test(day) ? day : utc();
+  } catch {
+    return utc();
+  }
+}
+
+/** What both hosts hand the prelude's `build`: the run's input, its instant, the record's zone, and the day there. */
+export type ScriptMeta = { input: Json; now: string; tz: string; today: string };
+
+/**
+ * `meta` for a run, with the record's local day beside the instant it was read from. ONE FUNCTION FOR BOTH HOSTS, so
+ * the self-host and the Cloud cannot disagree on what day it is. A host adds what else it hands over (`config`).
+ */
+export const scriptMeta = (run: { input: Json; now: string; tz: string }): ScriptMeta => ({
+  input: run.input,
+  now: run.now,
+  tz: run.tz,
+  today: dayIn(run.now, run.tz),
+});
 
 /**
  * The function that puts `config` on the `ctx` the prelude built, frozen all the way down, run inside the sandbox.

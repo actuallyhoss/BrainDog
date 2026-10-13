@@ -1,9 +1,13 @@
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig, type Plugin } from 'vite';
 
 import { ENVIRONMENTS } from '@braindog/theme';
+
+import { ownWordsOf } from './src/lib/shot/own-words.ts';
 
 /**
  * WHICH DEPLOYMENT THIS BUILD IS FOR — `BRAINDOG_ENV`, and `src/lib/env.ts` has described this
@@ -117,8 +121,39 @@ function resolveDependencies(file: string, deps: string[], { hostId, hostType }:
  */
 const PROXY = { '/api': API, '/auth': API, '/account': API, '/app/catalogue': API, '^/app/[a-z][a-z0-9-]{0,30}[a-z0-9]/api/': API };
 
+/**
+ * `virtual:own-words` IS THE SET OF TEXTS THE COPY FILES TYPE WHOLE, which is what screenshot mode needs
+ * to tell the product's words from a record's (`src/lib/shot/plate.ts` plates every text not in it).
+ *
+ * THE FILES ARE READ AS TEXT AND NEVER RUN (`ownWordsOf`, `src/lib/shot/own-words.ts`): a sentence inside
+ * a function is in no value an import could give. Every `.ts` file under `src/lib/copy` is read, folders
+ * and all. A test file is left out, because its fixtures are made-up record words and must stay plated.
+ *
+ * THE DEFAULT EXPORT IS A `Set<string>`, built when the module is first imported, in sorted order so two
+ * builds of the same copy are the same bytes. Each file is watched, so under `vite dev` a reworded
+ * sentence is an own word on the next load.
+ */
+const COPY = fileURLToPath(new URL('./src/lib/copy', import.meta.url));
+const OWN_WORDS = 'virtual:own-words';
+const copyFiles = (dir: string): string[] =>
+  readdirSync(dir, { withFileTypes: true })
+    .flatMap((at) => (at.isDirectory() ? copyFiles(join(dir, at.name)) : [join(dir, at.name)]))
+    .filter((file) => file.endsWith('.ts') && !file.endsWith('.test.ts') && !file.endsWith('.d.ts'))
+    .sort();
+const ownWordsPlugin: Plugin = {
+  name: 'braindog:own-words',
+  resolveId: (id) => (id === OWN_WORDS ? `\0${OWN_WORDS}` : null),
+  load(id) {
+    if (id !== `\0${OWN_WORDS}`) return null;
+    const files = copyFiles(COPY);
+    for (const file of files) this.addWatchFile(file);
+    const own = [...ownWordsOf(files.map((file) => readFileSync(file, 'utf8')))].sort();
+    return `export default new Set(${JSON.stringify(own)});`;
+  },
+};
+
 export default defineConfig({
-  plugins: [sveltekit(), entryGraphPlugin],
+  plugins: [sveltekit(), entryGraphPlugin, ownWordsPlugin],
   define: { __BRAINDOG_ENV__: JSON.stringify(ENV) },
   resolve: { alias: [{ find: '@braindog/skin/house.css', replacement: PALETTE }] },
   /* `/app/catalogue` AND NOT `/catalogue`: the app is served under `/app` (`svelte.config.js`) and asks for the catalogue

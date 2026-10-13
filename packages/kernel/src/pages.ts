@@ -445,6 +445,16 @@ export type BlockResult = PageBlock & {
 export { FEED_BY };
 export type FeedBy = (typeof FEED_BY)[number];
 
+/**
+ * Who a run is, beside a line that run signed: its handle (`S42`), the kind of agent it is (`claude`, and `other` where
+ * it said none and its app names none), the app it ran in as the run holds it (`claude-code`), and the run it helps.
+ *
+ * SO NO LINE IS A BARE HANDLE. A run signs the log with its handle, and a host that was handed `S42` alone could only
+ * say "An agent", so every run on Activity sat in one lane (H.296). `agent` is always said, and a host names the run
+ * by it and by `client`, and a helper by its `parent`.
+ */
+export type RunBy = { run: string; agent: string; client: string | null; parent: string | null };
+
 /** One row of a feed. `who`, `kind` and `target` are `null` on the row that folds a group's rows past `first:`. */
 export type FeedRow = {
   by: FeedBy;
@@ -468,6 +478,11 @@ export type FeedRow = {
    * payments is one line naming six, not six lines (`feedRows`). Absent from a row that is one target's.
    */
   things?: string[];
+  /**
+   * On a row a run signed, who that run is, or `null` for a run the record does not hold. `run_by` and not `by`, which
+   * is the kind of actor a feed groups by. Absent from a row no run signed, and where the host reads no runs (`runOf`).
+   */
+  run_by?: RunBy | null;
 };
 
 /** One way to answer a question, as a queue draws it. `because` is the reason its author gave for it. */
@@ -475,7 +490,11 @@ export type FeedRow = {
  * `shows` is what the option IS, drawn beside its label: its colours, a figure, or a file the record holds. It is the
  * option's content and never a colour the page is drawn in (`govern.ts` `showsOf`).
  */
-export type QueueOption = { key: string; label: string; because: string; recommended: boolean; shows?: Shows };
+/**
+ * `hard` is set, and only ever `true`, on an option that cannot be taken back once picked (`weigh.ts` `optionCost`). It
+ * is the option that is hard and not the question, so a drawer says it on that option and gives it to no key.
+ */
+export type QueueOption = { key: string; label: string; because: string; recommended: boolean; shows?: Shows; hard?: true };
 
 /**
  * One open question, as the `governance.open` source reads it.
@@ -705,6 +724,11 @@ export type PageDeps = {
   lastChanges?: (ids: readonly string[]) => ReadonlyMap<string, LastChange>;
   /** The newest `limit` events, newest first, and the reader's read mark. */
   activity?: (limit: number) => { events: ActivityEvent[]; seen: string | null };
+  /**
+   * The run a handle names (`S42`), in any state, or `null` where the record holds none: what a feed's `run_by` is read
+   * from. `readPage` asks it once a run for a page, however many lines and blocks that run signed.
+   */
+  runOf?: (run: string) => Entry | null;
   /** Every run of the kernel's `session` register not in one of its `done` states, the most recently seen first. */
   sessionsLive?: () => Entry[];
   /**
@@ -1298,7 +1322,9 @@ export function railRoom(): (about: { register: string; section: string } | null
  * how many open rows hold each. A field the page does not filter on is not applied, and a value the field cannot hold
  * is answered as no choice, so an address kept from before a page changed still opens it.
  */
-export function readPage(deps: PageDeps, slug: string, filter?: Readonly<Record<string, string>>): Result<PageResult> {
+export function readPage(host: PageDeps, slug: string, filter?: Readonly<Record<string, string>>): Result<PageResult> {
+  /* A RUN IS READ ONCE FOR THE PAGE (`runsOnce`), whichever of its blocks names it first. */
+  const deps = runsOnce(host);
   const every = resolvePages(deps);
   const found = every.find((p) => p.slug === slug);
   /* THE SLUGS OFFERED ARE THE PAGES SOMEBODY WROTE, AND NEVER THE ONES A TEMPLATE MADE OUT OF ROWS. A page per row is
@@ -2037,7 +2063,7 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
      pinned to Home, which a `stat` names no cells for, and what falls due, which is one answer whatever draws it. Each
      says why in its own file. */
   const early = sourceModule(block.source);
-  if (early?.first) return early.read(deps, block, base, also, SOURCE_KIT);
+  if (early?.first) return early.read(deps, block, base, also, sourceKit(deps));
 
   /* A REGISTERED KIND READS ITSELF, AND IT IS ASKED BEFORE ANY ARM BELOW (`kinds/index.ts`). What every block shares is
      already done by here: the keys nobody reads, `when:` and the page's `{{path}}` values. So a kind module is only the
@@ -2113,7 +2139,7 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
      over several lists, the record's events, its runs or its questions, rather than a query against one list. What every
      block shares is already done by here, and a registered kind was asked first, above. */
   const computed = sourceModule(block.source);
-  if (computed) return computed.read(deps, block, base, also, SOURCE_KIT);
+  if (computed) return computed.read(deps, block, base, also, sourceKit(deps));
   /* A BAR OR A SPLIT OVER A GROUPED FIGURE draws the figure's parts, so a part may be a monthly share of a yearly
      cost, which a sum over the rows cannot be. The host adds what no part holds as its `unset:` row. */
   if (block.source.startsWith('metric.')) return metricBlock(deps, block, block.source.slice('metric.'.length), base, also);
@@ -3553,6 +3579,34 @@ export function byOf(actor: string): FeedBy {
   return 'you';
 }
 
+/** What reads a run by its handle, `PageDeps.runOf`. */
+type RunReader = NonNullable<PageDeps['runOf']>;
+
+/** A field of a run's row as words, or `null` where it holds none. */
+const saidText = (v: Json | undefined): string | null => (typeof v === 'string' && v !== '' ? v : null);
+
+/** Who the run `run` is, from its own row: `agentOf` reads the kind of agent from its app where the run said none. */
+function runByOf(run: string, entry: Entry | null): RunBy | null {
+  if (!entry) return null;
+  const agent = saidText(entry.fields.agent);
+  const client = saidText(entry.fields.client);
+  const kind = agentOf({ ...(agent === null ? {} : { agent }), ...(client === null ? {} : { client }) }).agent;
+  return { run, agent: kind === undefined || kind === '' ? 'other' : kind, client, parent: saidText(entry.fields.parent) };
+}
+
+/**
+ * What a row by `who` says of its run: `run_by` where `who` is a run's handle, and nothing where it is anybody else or
+ * the host reads no runs. EACH RUN IS READ ONCE, since a run that worked for an hour signed most of the feed.
+ */
+function runsBy(runOf: RunReader | undefined): (who: string | null) => { run_by?: RunBy | null } {
+  const read = new Map<string, RunBy | null>();
+  return (who) => {
+    if (!runOf || who === null || !/^S\d+$/.test(who)) return {};
+    if (!read.has(who)) read.set(who, runByOf(who, runOf(who)));
+    return { run_by: read.get(who) ?? null };
+  };
+}
+
 /** Whether a rule's line may take `e` in as one more row: the same rule, the same kind of write, no words of its own. */
 const foldsInto = (last: FeedRow, e: ActivityEvent): boolean =>
   last.by === 'rule' &&
@@ -3576,8 +3630,9 @@ const foldsInto = (last: FeedRow, e: ActivityEvent): boolean =>
  * only where neither line wrote words of its own: a note a rule wrote is that row's, and a person's or an agent's
  * edits to different rows are different work.
  */
-export function feedRows(events: readonly ActivityEvent[], first?: number): FeedRow[] {
+export function feedRows(events: readonly ActivityEvent[], first?: number, runOf?: RunReader): FeedRow[] {
   const bursts: FeedRow[] = [];
+  const runBy = runsBy(runOf);
   /* THE ROWS EACH FOLDED LINE NAMES, by target, so a row the rule wrote twice is named once. */
   const named = new Map<FeedRow, Set<string | null>>();
   for (const e of events) {
@@ -3602,6 +3657,7 @@ export function feedRows(events: readonly ActivityEvent[], first?: number): Feed
         at: e.ts,
         ...(e.thing === undefined ? {} : { thing: e.thing }),
         ...(e.rows === undefined ? {} : { rows: e.rows }),
+        ...runBy(e.actor),
       });
   }
   if (first === undefined) return bursts;
@@ -3626,13 +3682,16 @@ export function feedRows(events: readonly ActivityEvent[], first?: number): Feed
  * An agent's events, newest first, as rows grouped by WHO did them: a burst is one row with a count, and past
  * `first` rows one agent's remainder is one row that keeps its name, so no count is lost and no agent's work is
  * folded into another's.
+ *
+ * A RUN'S ROWS SAY WHO THE RUN IS (`run_by`), and so does the row that folds its remainder, which keeps its name.
  */
-export function agentRows(events: readonly ActivityEvent[], first?: number): FeedRow[] {
+export function agentRows(events: readonly ActivityEvent[], first?: number, runOf?: RunReader): FeedRow[] {
   const bursts: FeedRow[] = [];
+  const runBy = runsBy(runOf);
   for (const e of events) {
     const last = bursts.at(-1);
     if (last && last.who === e.actor && last.kind === e.kind && last.target === e.target) last.count += 1;
-    else bursts.push({ by: byOf(e.actor), who: e.actor, count: 1, kind: e.kind, target: e.target, note: e.note, at: e.ts, thing: e.thing ?? null });
+    else bursts.push({ by: byOf(e.actor), who: e.actor, count: 1, kind: e.kind, target: e.target, note: e.note, at: e.ts, thing: e.thing ?? null, ...runBy(e.actor) });
   }
   if (first === undefined) return bursts;
   const cap = Math.min(50, Math.max(1, Math.floor(first)));
@@ -3647,7 +3706,7 @@ export function agentRows(events: readonly ActivityEvent[], first?: number): Fee
     else {
       const folded = rest.get(who);
       if (folded) folded.count += row.count;
-      else rest.set(who, { by: row.by, who: row.who, count: row.count, kind: null, target: null, note: null, at: row.at, thing: null });
+      else rest.set(who, { by: row.by, who: row.who, count: row.count, kind: null, target: null, note: null, at: row.at, thing: null, ...runBy(row.who) });
     }
   }
   return [...kept, ...rest.values()];
@@ -4877,3 +4936,30 @@ const SOURCE_KIT = {
   fxOf,
 };
 export type SourceKit = typeof SOURCE_KIT;
+
+/**
+ * The kit a source is handed on this read: the one kit, and where the host reads runs (`runOf`) a feed's two row makers
+ * with that read in hand, so every line a run signed says who the run is (`run_by`) without a source asking for it.
+ */
+function sourceKit(deps: PageDeps): SourceKit {
+  const runOf = deps.runOf;
+  if (!runOf) return SOURCE_KIT;
+  return { ...SOURCE_KIT, feedRows: (events, first) => feedRows(events, first, runOf), agentRows: (events, first) => agentRows(events, first, runOf) };
+}
+
+/**
+ * `deps` with each run read once: `runOf` kept for the length of one page, so two feeds on a page, and every line of
+ * each, ask the record for a run one time between them. A host that reads no runs is handed back as it came.
+ */
+function runsOnce(deps: PageDeps): PageDeps {
+  const runOf = deps.runOf;
+  if (!runOf) return deps;
+  const read = new Map<string, Entry | null>();
+  return {
+    ...deps,
+    runOf: (run) => {
+      if (!read.has(run)) read.set(run, runOf(run));
+      return read.get(run) ?? null;
+    },
+  };
+}
