@@ -838,11 +838,21 @@ export function layoutOf(b: Boot, implied: Implied | undefined = IMPLIED.get(b))
 
      A PAGE THAT READS SEVERAL LISTS ARRIVES WITH NO `list` (Services reads its numbers and the open questions too), so
      it is judged by the list its section is named as, which is the reading the first-screen check (rail-has-rows)
-     makes. A page in a section no list is named as is never judged. */
+     makes. A page in a section no list is named as is never judged.
+
+     AND A PAGE THAT SAYS EVERY LIST IT READS (`lists`) IS JUDGED BY THOSE AND BY NOTHING ELSE. The section's name was a
+     guess: Work reads tasks and milestones and no list is called Work, so it sat in a fresh rail with nothing in it.
+     It waits while every one of its lists is empty, and comes with the first row in any. A list this caller was sent
+     no count for is not held against the page, since nothing says it is empty. A page that says it reads none is never
+     judged, and a host that sends no `lists` reads as before. */
   const rows = new Map(b.registers.map((r) => [r.id, r.count]));
   const named = new Map(b.registers.map((r) => [r.name.trim().toLowerCase(), r.id]));
   const waiting = (p: NonNullable<Boot['pages']>[number]) => {
     if (!p.nav || p.nav.section === copy.viewsSection) return false;
+    const said = p.lists;
+    if (Array.isArray(said)) {
+      return said.length > 0 && said.every((l) => typeof l === 'string' && !theirs.has(l) && rows.get(l) === 0);
+    }
     const list = typeof p.list === 'string' ? p.list : named.get(p.nav.section.trim().toLowerCase());
     return list !== undefined && !theirs.has(list) && rows.get(list) === 0;
   };

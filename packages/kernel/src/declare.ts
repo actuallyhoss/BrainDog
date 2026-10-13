@@ -608,6 +608,13 @@ function metricBody(decl: Declaration, installed?: Known): Refusal | null {
           : `${id} adds up movements, and only the days until zero and the day of it walk from an opening.`,
         'opening',
       );
+    /* THE ONE HOLE A FIGURE'S PARAMETER FILLS IS `{{it}}`. `book-cash:{{name}}` installed, and nothing fills a row's
+       field into a figure, so every read was refused "ask for it by name", which is not the fault. A page's own
+       opening is filled from its row and is checked where a page is. */
+    const from = typeof opening?.metric === 'string' ? opening.metric : '';
+    const stray = from.includes(':') ? /\{\{(?!it\}\})\w+\}\}/u.exec(from.slice(from.indexOf(':') + 1))?.[0] : undefined;
+    if (stray !== undefined)
+      return bad('DECLARATION_INVALID', `${id} opens from a figure read about ${stray}, and a figure's own parameter is spelled {{it}}. Write opening: { metric: ${metricNamed(from)}:{{it}} }.`, 'opening');
     /* THE DAY IS HELD AS A NUMBER OF DAYS SINCE 1970, so drawn as anything but a day it is a count near twenty thousand
        beside a heading about money, and a count or an amount drawn as a day is a date in 1970. */
     if ((v.walk === 'zero_on') !== (body.format === 'day'))

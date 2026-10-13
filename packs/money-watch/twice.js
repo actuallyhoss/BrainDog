@@ -85,10 +85,16 @@ const dayText = (day) => `${Number(day.slice(8, 10))} ${MONTHS[Number(day.slice(
 
 /** Words before `CARD` that make it a thing bought, not the card that paid: a gift card is the payee's own words. */
 const BOUGHT = /^(?:gift|sim|greeting|phone|calling|scratch|top-?up|post)$/i;
-/** The card that paid, written before the shop: `HSBC CARD 7731`, `CARD XX7731`. Its number may be masked. */
-const CARD_LEAD = /^((?:[\p{L}-]+\s+){0,2})card\s+(?:no\.?\s*)?[x*#.-]*\d{3,}\s+/iu;
+/**
+ * The card that paid, written before the shop: `HSBC CARD 7731`, `CARD XX7731`, `CARD 1234 5678`. Its number may be
+ * masked and may come in groups, and every group goes with it, or the last one would lead the shop's name.
+ */
+const CARD_LEAD = /^((?:[\p{L}-]+\s+){0,2})card\s+(?:no\.?\s*)?(?:(?:[x*#]{4}[\s-]+)*[x*#.-]*\d{3,}\s+)+/iu;
 /** The terminal it was paid at, written before the shop: `POS 55`. One digit is left, since it may be the shop's (7 Eleven). */
 const TERMINAL_LEAD = /^(?:[Pp][Oo][Ss]\s+\d{2,}\s+|POS\s+)/;
+
+/** Whether a word ends the name: a branch, a day or a reference holds three digits or more. A shorter number may be the shop's own (Studio 54 Cafe). */
+const endsName = (w) => (w.match(/\d/g) ?? []).length >= 3;
 
 /** The bank's words without the card and the terminal they lead with, which name neither shop nor payee. */
 function shopWords(text) {
@@ -105,14 +111,15 @@ function shopWords(text) {
 
 /**
  * A payee from the bank's words: `GEIDEA*CHILLOUT 0418 CAIRO` reads Chillout, `NETFLIX.COM` reads Netflix, and
- * `HSBC CARD 7731 POS 55 KFC` reads Kfc, so two shops paid with one card are two payees.
+ * `HSBC CARD 7731 POS 55 KFC` reads Kfc, so two shops paid with one card are two payees. `Studio 54 Cafe` keeps its
+ * number, so it is not the payee Studio.
  */
 function fromWords(text) {
   const said = shopWords(text);
   const words = (said.includes('*') ? said.slice(said.indexOf('*') + 1) : said).split(/\s+/).filter(Boolean);
   const kept = [];
   for (const w of words) {
-    if (/\d/.test(w) && kept.length > 0) break;
+    if (endsName(w) && kept.length > 0) break;
     kept.push(w);
   }
   let cut = kept.join(' ').replace(/\.(?:com|net|org|io|co|app|eg)\b.*$/i, '').replace(/^[\s,;:._\-/]+|[\s,;:._\-/]+$/g, '');

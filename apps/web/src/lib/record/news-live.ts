@@ -1,8 +1,9 @@
 /**
  * Home's read mark and History's log against the record; and one figure as a tile, which the palette draws.
  *
- * A ROUTE-ONLY MODULE, loaded by the two screens that read it, like `page-live.ts`: the client carries the route table
- * as a value.
+ * A ROUTE-ONLY MODULE, loaded by the screens that read it, like `page-live.ts`: the client carries the route table
+ * as a value. Home imports `markAll` with the screen, not when the reader leaves, so the mark can be sent from a
+ * closing tab.
  *
  * EVERY REFUSAL IS THE RECORD'S OWN SENTENCE. `UNREACHABLE` and `UNAUTHORIZED` with no slug used to draw the sample's
  * figures, feed and log; there is no sample now. A live answer is drawn from the answer and nothing else.
@@ -115,6 +116,10 @@ export function tileOf(id: string, r: Reading | null): Metric {
 /**
  * Mark everything up to `upTo` read, and drop the shell's kept answer, whose feed it was. `upTo` is the record's cursor
  * for the newest line: a rowid for the owner, `e.<id>` for a member held to named lists, handed back as it came.
+ *
+ * THE REQUEST IS MADE BEFORE THIS FIRST WAITS: nothing is awaited between the call and the client's fetch, so a screen
+ * that calls it as it is left (`pagehide`) has sent the mark in that turn. Keep it so: an `await` above `markRead`
+ * loses the mark of a closing tab.
  */
 export async function markAll(base: string, upTo: Cursor | null, io?: Fetch): Promise<boolean> {
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });

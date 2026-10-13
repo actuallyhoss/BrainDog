@@ -115,15 +115,32 @@ const listsIn = (blocks) => [
 ];
 
 /**
- * WHAT STANDS BEHIND EACH ROW OF THE RAIL, keyed by where the row goes as the markup writes it: for a list, itself and
- * how much it holds; for a page, every list its drawn blocks read and how much each holds (a page that reads no list
- * has `{}` behind it, and nothing to be empty). `rail-has-rows` holds the drawn rows against this, so a place is judged
- * on the first minute too, when no list of its name is in the rail. A page or a list the host would not read is left
- * out, and the check says it was not seen.
+ * The lists one page stands on, as the shell reads them to decide whether the page is in the rail (`waiting` in
+ * `lib/record/boot-live.ts`): the ids the record's own answer says the page reads (`lists` on its entry in `boot`),
+ * kept to the lists this reader was sent. The record leaves out a list a pack fills on the first day, so rows nobody
+ * wrote never count as the person's own, and so they are not counted here either. `null` where the record said
+ * nothing of the page's lists (an older host), which is read from the drawn page instead.
  */
-async function behindOf({ t, base }, shell, root) {
+export const saidLists = (page, held) => (Array.isArray(page?.lists) ? [...new Set(page.lists.filter((id) => typeof id === 'string' && held.has(id)))] : null);
+
+/**
+ * WHAT STANDS BEHIND EACH ROW OF THE RAIL, keyed by where the row goes as the markup writes it: for a list, itself and
+ * how much it holds; for a page, every list it reads and how much each holds (a page that reads no list has `{}`
+ * behind it, and nothing to be empty). `rail-has-rows` holds the drawn rows against this, so a place is judged on the
+ * first minute too, when no list of its name is in the rail.
+ *
+ * A PAGE'S LISTS ARE THE ONES THE SHELL COUNTS (`saidLists`), each with the count `boot` sent, so the check and the rail
+ * read one answer and cannot disagree about a page: Money over seven empty lists and one a pack filled is empty to
+ * both. Only where the record says nothing of a page's lists is the page drawn and its blocks read, as before; there a
+ * page or a list the host would not read is left out, and the check says it was not seen.
+ */
+async function behindOf({ t, base, boot }, shell, root) {
   const client = t.client(base);
   const named = new Map((shell.lists ?? []).map((l) => [l.id, l.name]));
+  /* THE COUNTS `boot` SENT, which hold every list the reader has, empty or not; the rail's own (`index.registers`) are
+     only the lists it draws. */
+  const sent = new Map((boot?.registers ?? []).map((r) => [r.id, r]));
+  const said = new Map((boot?.pages ?? []).map((p) => [p.slug, saidLists(p, sent)]));
   const held = new Map((shell.index.registers ?? []).map((r) => [r.id, r.count]));
   const holds = async (id) => {
     if (!held.has(id)) {
@@ -137,6 +154,11 @@ async function behindOf({ t, base }, shell, root) {
   for (const n of shell.nav ?? []) {
     const slug = /^\/p\/([^/?#]+)$/u.exec(n.href ?? '')?.[1];
     if (slug === undefined) continue;
+    const lists = said.get(slug);
+    if (lists) {
+      out[`${root}${n.href}`] = Object.fromEntries(lists.map((id) => [sent.get(id).name ?? named.get(id) ?? 'a list with no name', sent.get(id).count]));
+      continue;
+    }
     const page = await client.page(slug);
     if (!page.ok) continue;
     const reads = {};

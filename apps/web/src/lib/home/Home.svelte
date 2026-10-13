@@ -38,6 +38,7 @@
   import HeadCapture from '$lib/home/HeadCapture.svelte';
   import { listen } from '$lib/page/listen.svelte.ts';
   import { readMarkOf, stampOf } from '$lib/page/read-mark.ts';
+  import { markAll } from '$lib/record/news-live.ts';
   import { holdsOf, voiceOf } from '$lib/page/home-arrange.ts';
   import {
     FIRST_TODAY_MOST,
@@ -405,11 +406,15 @@
    *
    * THE RECORD IS NAMED WHEN THE SCREEN OPENS. By the time it ends the address is already the next screen's, and that
    * may be another record's.
+   *
+   * `markAll` IS HERE BEFORE THE READER LEAVES, imported with the screen. It used to be fetched inside the leave, and a
+   * closing tab does not wait for a module: the request was never made, so what was new stayed new at the next visit.
+   * Now the leave reaches the record in the same turn, and the client asks that the request outlive the page.
    */
   const feeds = $derived((live?.page.blocks ?? []).some((b) => b.kind === 'feed' && b.source === 'activity'));
   $effect(() => {
     const base = apiBase();
-    const stamp = stampOf((upTo) => import('$lib/record/news-live.ts').then((m) => m.markAll(base, upTo)));
+    const stamp = stampOf((upTo) => markAll(base, upTo));
     const leave = () => {
       if (data.refused || !feeds) return;
       const upTo = news ? readMarkOf(news.upTo ?? data.upTo, news.unseen, news.held) : readMarkOf(data.upTo, data.upTo === null ? 0 : 1);

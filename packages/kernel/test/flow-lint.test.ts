@@ -150,6 +150,12 @@ test('A CREATE ON A TRIGGER WITH NO ROW FILLS NOTHING FROM ONE, refused at insta
   assert.equal(validateDeclaration(words), null, JSON.stringify(validateDeclaration(words)));
   const onRow = rule({ rule: 'on_row', on: { written: { register: 'obligations', op: ['create'] } }, once_per: ['entry'], steps: [{ create: { register: 'obligations', fields: { what: 'Rent', party: 'for {{party}}' }, bound: 1 } }] });
   assert.equal(validateDeclaration(onRow), null, JSON.stringify(validateDeclaration(onRow)));
+
+  /* ONE MONEY FIELD LESS ANOTHER IS TWO FIELDS OF THE ROW, and the lint's copy of the pattern did not see the spelling
+     at all, so this installed on a button. A second field after a form that does not subtract is the words typed. */
+  const less = (text: string) => validateDeclaration(rule({ rule: 'less', on: { manual: true }, steps: [{ set_var: { name: 'n', to: 'x' } }, { create: { register: 'obligations', fields: { what: text }, bound: 1 } }] }));
+  assert.match(less('Left {{short:amount-paid}}')?.fix ?? '', /from \{\{short:amount-paid\}\}, a field of the row that started it/u);
+  assert.equal(less('Left {{on:amount-paid}}'), null);
 });
 
 test('A METRIC TRIGGER NAMES A METRIC THAT IS THERE', async () => {

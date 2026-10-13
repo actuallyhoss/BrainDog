@@ -22,7 +22,7 @@ import { sayOf } from '@braindog/ports';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 import { firstPartyDocument } from '../src/index.ts';
-import { CHASE_DRAFT, CHASE_DRAFT_FIELD, CHASE_DRAFT_STEP, MONEY_AUTOMATIONS } from '../src/modules/money/rules.ts';
+import { CHASE_DRAFT, CHASE_DRAFT_FIELD, CHASE_DRAFT_LEFT, CHASE_DRAFT_STEPS, MONEY_AUTOMATIONS } from '../src/modules/money/rules.ts';
 
 type Fields = Record<string, unknown>;
 type Question = { id: string; opened_by?: string; body?: { about?: string; options?: { id: string; label: string }[] } };
@@ -32,6 +32,9 @@ const NOW = Date.UTC(2026, 10, 10, 12);
 const DUE = '2026-10-30';
 const egp = (minor: number) => ({ amount: minor, currency: 'EGP' });
 const DRAFT = 'The invoice for EGP 12,000 was due on 30 Oct. Could you tell me when it will be paid?';
+/** What a part-paid invoice is chased with: EGP 4,500 of the 12,000 is in, so the draft names the 7,500 left. */
+const DRAFT_LEFT = 'The invoice for EGP 12,000 was due on 30 Oct, and EGP 7,500 of it is still to pay. Could you tell me when the rest will be paid?';
+const PART = { state: 'part', paid_so_far: egp(450_000) };
 
 type Decl = { register?: string; rule?: string; fields?: { id: string }[]; steps?: unknown[] };
 const declared = (doc: unknown): Decl[] => (doc as { declarations: Decl[] }).declarations;
@@ -39,13 +42,13 @@ const invoices = (doc: unknown): Decl => declared(doc).find((d) => d.register ==
 const chasing = (doc: unknown): Decl => declared(doc).find((d) => d.rule === 'invoice-chased')!;
 const holdsDraft = (doc: unknown): boolean => invoices(doc).fields!.some((f) => f.id === CHASE_DRAFT_FIELD.id);
 
-/** Money's document with "Draft to send" and the step that writes it, laid on only where Money does not ship them. */
+/** Money's document with "Draft to send" and the steps that write it, laid on only where Money does not ship them. */
 const withDraft = (doc: unknown): unknown => {
   if (holdsDraft(doc)) return doc;
   const copy = structuredClone(doc);
   const fields = invoices(copy).fields!;
   fields.splice(fields.findIndex((f) => f.id === 'chased') + 1, 0, { ...CHASE_DRAFT_FIELD });
-  chasing(copy).steps!.push(structuredClone(CHASE_DRAFT_STEP));
+  chasing(copy).steps!.push(...structuredClone(CHASE_DRAFT_STEPS));
   return copy;
 };
 
@@ -183,9 +186,47 @@ test('a second chase with the draft cleared writes it again from the new due day
   m.sql.close();
 });
 
+test('a part-paid invoice is chased for what is left of it, in the same breath as the whole', async () => {
+  const m = await money();
+  const part = m.invoice(PART);
+  assert.equal(fillTemplate(CHASE_DRAFT_LEFT, part, NOW), DRAFT_LEFT);
+  const chased = await m.chase(part);
+  assert.equal(chased.fields.chase_draft, DRAFT_LEFT);
+  assert.equal(chased.fields.chased, '2026-11-10');
+  m.sql.close();
+});
+
+test('an invoice nothing is paid on keeps the draft it has always had, beside a part-paid one', async () => {
+  const m = await money();
+  const open = m.invoice();
+  await m.chase(m.invoice({ what: 'Poster run', ...PART }));
+  assert.equal((await m.chase(open)).fields.chase_draft, DRAFT);
+  m.sql.close();
+});
+
+test('a part-paid invoice that does not say what was paid is chased for the whole, never for a hole', async () => {
+  const m = await money();
+  const draft = (await m.chase(m.invoice({ state: 'part' }))).fields.chase_draft;
+  assert.equal(draft, DRAFT);
+  m.sql.close();
+});
+
+test('a draft somebody changed on a part-paid invoice is kept, and a cleared one is written from what is left now', async () => {
+  const m = await money();
+  const part = m.invoice(PART);
+  await m.chase(part);
+  const mine = 'Hello Layla, thank you for the first payment. Could you send the rest this week?';
+  value(m.k.update('obligations', part.id, { chase_draft: mine, due: '2026-10-31' }, OWNER));
+  assert.equal((await m.chase(part)).fields.chase_draft, mine, 'the second chase wrote over the words somebody chose');
+  /* MORE CAME IN AND THE DRAFT WAS CLEARED: the next chase counts from what is paid by then. */
+  value(m.k.update('obligations', part.id, { chase_draft: null, due: '2026-11-01', paid_so_far: egp(900_000) }, OWNER));
+  assert.equal((await m.chase(part)).fields.chase_draft, DRAFT_LEFT.replace('30 Oct', '1 Nov').replace('EGP 7,500', 'EGP 3,000'));
+  m.sql.close();
+});
+
 test('Money as it ships declares "Draft to send" and its rule writes it', () => {
   const doc = firstPartyDocument('money-core', { seeds: [] });
   assert.ok(holdsDraft(doc), 'Bills and invoices has no chase_draft');
-  assert.deepEqual(chasing(doc).steps!.at(-1), CHASE_DRAFT_STEP);
+  assert.deepEqual(chasing(doc).steps!.slice(-CHASE_DRAFT_STEPS.length), CHASE_DRAFT_STEPS);
   assert.equal(withDraft(doc), doc, 'the test still lays the draft on a document that ships it');
 });

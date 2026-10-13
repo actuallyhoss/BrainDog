@@ -187,20 +187,43 @@ export const CHASE_DRAFT = 'The invoice for {{short:amount}} was due on {{on:due
 export const CHASE_DRAFT_FIELD = { id: 'chase_draft', label: 'Draft to send', type: 'text' } as const;
 
 /**
+ * WHAT IT DRAFTS ON AN INVOICE PAID IN PART: the same sentence, and what is still to pay beside the whole
+ * (`{{short:amount-paid_so_far}}`, the form that takes one money from another). `invoice-late` asks about a part-paid
+ * invoice too, and the whole amount alone asked somebody for money they had already sent.
+ */
+export const CHASE_DRAFT_LEFT =
+  'The invoice for {{short:amount}} was due on {{on:due}}, and {{short:amount-paid_so_far}} of it is still to pay. Could you tell me when the rest will be paid?';
+
+/** An invoice the left-to-pay draft can be written for: paid in part, and saying how much. */
+const PART_PAID = [{ field: 'state', is: 'part' }, { field: 'paid_so_far', present: true }] as const;
+
+/**
  * The step that writes the draft, and only where there is none.
  *
  * THE CONDITION IS A TREE, NOT THE SENTENCE `chase_draft is empty`. A rule started by an answer names no list, so the
  * install reads a sentence in an `if` against the run's answers alone and refuses a field of the invoice
  * (`unreadIf` in `packages/kernel/src/index.ts`); a tree is left to the run, which holds the invoice.
+ *
+ * AND ONLY ON AN INVOICE THE STEP BELOW DOES NOT WRITE FOR, said in the condition and not left to the order of the
+ * steps. A part-paid invoice with no "Paid so far" has nothing to take away, so it is chased for the whole.
  */
 export const CHASE_DRAFT_STEP = {
-  if: { field: CHASE_DRAFT_FIELD.id, empty: true },
+  if: { all: [{ field: CHASE_DRAFT_FIELD.id, empty: true }, { none: [{ all: PART_PAID }] }] },
   then: [{ set: { field: CHASE_DRAFT_FIELD.id, to: CHASE_DRAFT } }],
 } as const;
 
+/** The step for an invoice paid in part: what is left, and again only where there is no draft. */
+export const CHASE_DRAFT_LEFT_STEP = {
+  if: { all: [{ field: CHASE_DRAFT_FIELD.id, empty: true }, ...PART_PAID] },
+  then: [{ set: { field: CHASE_DRAFT_FIELD.id, to: CHASE_DRAFT_LEFT } }],
+} as const;
+
+/** Both, as `invoice-chased` takes them. At most one writes: their conditions never hold together. */
+export const CHASE_DRAFT_STEPS = [CHASE_DRAFT_LEFT_STEP, CHASE_DRAFT_STEP] as const;
+
 /**
  * WHETHER BILLS AND INVOICES DECLARES THE FIELD, which it does since money-core 3.17.0. A step that writes a field its
- * list does not hold stops the whole add-on from installing, so the step goes only where the field does.
+ * list does not hold stops the whole add-on from installing, so the steps go only where the field does.
  */
 const DRAFT_DECLARED = OBLIGATIONS_REGISTER.fields.some((f) => f.id === CHASE_DRAFT_FIELD.id);
 
@@ -232,8 +255,9 @@ export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
       /* AND A MESSAGE READY TO SEND (REC-B22 step 1), in "Draft to send": the invoice's own amount and due day in one
          plain sentence, in the two forms a template writes a message in (`{{short:amount}}`, `{{on:due}}`). It names
          nobody, so it reads whole on an invoice with no person on it. WRITTEN ONLY WHERE THERE IS NONE: an invoice
-         asked about again (a new due day) keeps the words somebody changed. */
-      ...(DRAFT_DECLARED ? [CHASE_DRAFT_STEP] : []),
+         asked about again (a new due day) keeps the words somebody changed. AN INVOICE PAID IN PART is drafted for
+         what is left of it (`CHASE_DRAFT_LEFT`), since money-core's next version. */
+      ...(DRAFT_DECLARED ? CHASE_DRAFT_STEPS : []),
     ],
   },
   {

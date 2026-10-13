@@ -27,7 +27,10 @@ here for one person, Mariam. The other seven people of USE-B01 and their nightly
   names the unit that turns each one green (no-count, nothing-before-press, no-example, team-no-task: USE-B07;
   people-only-them: USE-B06; rail-has-rows: USE-B02; no-tour: USE-B01). A snapshot may also hold `behind` (what each
   rail row stands on, keyed by the row's href) and `signs` (how many vital signs read red, null with no page for
-  them). With no screen file it draws its own: the web's rail and Today rendered for the server from a first-run walk
+  them). Where the screens are drawn here, a page's `behind` is the lists the record says it reads (`lists` on the
+  page in `boot`, the answer the rail itself is built from), so the check and the rail cannot disagree, and a list a
+  pack fills on the first day is never counted as the person's own. A host that sends no `lists` is read from the
+  drawn page, as before. With no screen file it draws its own: the web's rail and Today rendered for the server from a first-run walk
   (expect/draw.mjs, markup.mjs, screens.mjs), three screens a moment (1440 Today, 1440 list, 390 Today over the tab
   bar), judged by the seven and by pages-line (PGS-C30), signs-line (PRF-A05) and own-lines-you (USE-B06: Today never
   calls the owner "Someone on this record" where nobody else writes on it). A check answers green, red, not seen (it
@@ -54,6 +57,12 @@ node --test tools/people/expect/first-screen-drawn.test.mjs
 node --test tools/people/expect/first-screen-teeth.test.mjs
 node --test tools/people/test/read-set.test.mjs
 ```
+
+`first-screen.mjs` draws its screens under the Mac's default Node 26 as well. Measured on 13 October with both: 62
+checks as Mariam and as Sam, none of them not seen, and the same answer under Node 26.10 and Node 24.13. An earlier
+note said Node 24 reads only 42 checks and leaves with 1 and 8 not seen; that did not happen here on either Node.
+`first-screen-drawn.test.mjs` walks Mariam, Sam, Nour and Layla and fails if any of them has a place in the first rail
+with nothing to show, or if the command would leave with anything but 0.
 
 After a deploy, on the hosted service:
 

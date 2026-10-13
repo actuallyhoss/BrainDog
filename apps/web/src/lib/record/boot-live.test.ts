@@ -373,6 +373,52 @@ test('A PLACE OVER SEVERAL LISTS IS JUDGED BY THE LIST ITS SECTION IS NAMED AS: 
   assert.ok(at(1).includes('/p/ledger'));
 });
 
+test('A PLACE THAT SAYS ITS LISTS IS JUDGED BY ALL OF THEM: off the rail while every one is empty, on it at the first row in any', () => {
+  /* Sam's Work reads tasks and milestones, and `boot` now says both (`lists`), so no section name is guessed at. */
+  const work = { slug: 'work', title: 'Work', nav: { section: 'Work', order: 10 }, icon: null, list: null, lists: ['tasks', 'milestones'] };
+  /* Reads no list of its own, and says so: never judged, though a list is named as its section and holds nothing. */
+  const people = { slug: 'team', title: 'People', nav: { section: 'People', order: 20 }, icon: null, list: null, lists: [] };
+  const view = { slug: 'tasks-mine', title: 'Mine', nav: { section: 'Views', order: 900 }, icon: null, list: 'tasks', lists: ['tasks'] };
+  const loose = { slug: 'notes', title: 'Notes', nav: { section: 'Notes', order: 30 }, icon: null, list: null };
+  const at = (tasks: number, milestones: number, over: Record<string, unknown> = {}) =>
+    layoutOf({
+      ...BOOT,
+      registers: [
+        { id: 'tasks', name: 'Tasks', count: tasks },
+        { id: 'milestones', name: 'Milestones', count: milestones },
+        { id: 'contacts', name: 'People', count: 0 },
+      ],
+      pages: [work, people, view, loose],
+      ...over,
+    } as never).nav.map((n) => n.href);
+  assert.deepEqual(at(0, 0), ['/p/team', '/p/tasks-mine', '/p/notes'], 'a place whose lists all hold nothing is in the rail');
+  assert.ok(at(0, 1).includes('/p/work'), 'the place did not come with the first row in its second list');
+  assert.ok(at(1, 0).includes('/p/work'));
+
+  /* `lists` WINS OVER `list` AND OVER THE SECTION'S NAME: one list is empty and the page reads a second that is not. */
+  const one = { ...work, list: 'tasks', nav: { section: 'Tasks', order: 10 } };
+  assert.ok(layoutOf({ ...BOOT, registers: [{ id: 'tasks', name: 'Tasks', count: 0 }, { id: 'milestones', name: 'Milestones', count: 2 }], pages: [one] } as never).nav.some((n) => n.href === '/p/work'));
+  /* A list the caller was not sent is not counted against the page: nothing says it is empty. */
+  assert.ok(layoutOf({ ...BOOT, registers: [{ id: 'tasks', name: 'Tasks', count: 0 }], pages: [{ ...work, lists: ['tasks', 'hidden'] }] } as never).nav.some((n) => n.href === '/p/work'));
+
+  /* A COLLEAGUE'S OWN LIST KEEPS ITS PAGE AT NO ROWS, as it keeps the list (`theirs`). */
+  const theirs = layoutOf({
+    registers: [{ id: 'tasks', name: 'Tasks', count: 0 }, { id: 'milestones', name: 'Milestones', count: 0 }],
+    me: { kind: 'person', person: 'p_9', name: null, level: null },
+    pages: [work],
+    now: '2026-09-22T09:00:00.000Z',
+  } as never);
+  assert.deepEqual(theirs.nav.map((n) => n.href), ['/p/work']);
+
+  /* A HOST THAT SENDS NO `lists` READS AS BEFORE: the one list, else the list its section is named as. */
+  const old = [{ slug: 'work', title: 'Work', nav: { section: 'Tasks', order: 10 }, icon: null, list: null }, { slug: 'ms', title: 'Milestones', nav: { section: 'Plan', order: 20 }, icon: null, list: 'milestones' }];
+  const before = (tasks: number, milestones: number) =>
+    layoutOf({ ...BOOT, registers: [{ id: 'tasks', name: 'Tasks', count: tasks }, { id: 'milestones', name: 'Milestones', count: milestones }], pages: old } as never).nav.map((n) => n.href);
+  assert.deepEqual(before(0, 0), []);
+  assert.deepEqual(before(1, 0), ['/p/work']);
+  assert.deepEqual(before(0, 1), ['/p/ms']);
+});
+
 test('AN IMPORT IS ONE LINE OF THE FEED with its counts and a link to that day in the log, and a few writes by hand keep their own lines', () => {
   const at = (s: number) => new Date(Date.parse('2026-09-15T09:00:00.000Z') - s * 1000).toISOString();
   /* Newest first: eight questions, then fifty-two rows, a second apart, by the reader on an open self-host. */

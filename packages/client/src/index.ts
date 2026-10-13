@@ -136,6 +136,8 @@ export type Boot = {
     nav: { section: string; order: number; tabs?: true } | null;
     icon: string | null;
     list?: string | null;
+    /** Every list the page reads that this caller reads too; never the whole record, and never a list holding only what an add-on planted. Absent from a host older than this. */
+    lists?: string[];
     /**
      * `updated_at`, when that row last changed, picks the rail's five. `hue` is the row's frozen colour, the whole degree
      * its list's `identity.accent` holds, `null` for a row that holds none and absent where the list names no accent.

@@ -71,6 +71,21 @@ test('A SET FROM A RUN PATH THAT REACHES NOTHING LEAVES THE FIELD EMPTY', async 
   sql.close();
 });
 
+test('ONE FIELD LESS ANOTHER WITH NOTHING IN THE FIRST LEAVES THE FIELD EMPTY, and a form that does not subtract is words', async () => {
+  /* `flow.ts`'s copy of the row's pattern did not see `{{short:a-b}}`, so the text read as words and the dash the fill
+     writes for the empty first field was kept as the whole value. `{{on:a-b}}` is left as typed by the fill, so it is. */
+  const { k, sql } = await record(
+    rule({ rule: 'less', on: onCreate, steps: [{ set: { field: 'memo', to: '{{short:note-due}}' } }] }),
+    rule({ rule: 'typed', on: onCreate, steps: [{ set: { field: 'note', to: '{{on:due-memo}}' } }] }),
+  );
+  const row = made(k, { what: 'Rent' });
+  await k.drain();
+  const { memo, note } = fieldsOf(k, row.id);
+  assert.equal(memo ?? null, null, `the memo was written as ${JSON.stringify(memo)}`);
+  assert.equal(note, '{{on:due-memo}}');
+  sql.close();
+});
+
 test("A SET FROM THE ROW'S OWN EMPTY FIELD LEAVES THE FIELD EMPTY, and so does one of holes and spaces alone", async () => {
   const { k, sql } = await record(
     rule({ rule: 'own', on: onCreate, steps: [{ set: { field: 'memo', to: '{{note}}' } }] }),

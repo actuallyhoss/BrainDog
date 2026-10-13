@@ -66,12 +66,14 @@ const MANY: Row[] = [...FIVE, ...Array.from({ length: 115 }, (_, i) => row(i + 6
  * `today` IS THE DAY ON THE RECORD'S OWN CLOCK, which `<field> before today` is read against as the record reads it, in
  * its zone, and `<field> after today` the same way. `today: null` is a host that refuses the sentence, `deaf: true` one
  * that answers every key whatever it was asked, and `half: true` one that reads `before` and refuses `after`.
+ * `<field> after -3d` is read three days back from that day. `mute: true` is a host that takes any `after` and answers
+ * no key to it, and `plain: true` one that reads `today` and refuses a count of days.
  */
 async function host(
   t: { after: (fn: () => Promise<void>) => void },
   rows: Row[],
   refusal?: { code: string; fix: string } | null,
-  clock: { today: string | null; deaf?: boolean; half?: boolean } = { today: '2026-10-13' },
+  clock: { today: string | null; deaf?: boolean; half?: boolean; mute?: boolean; plain?: boolean } = { today: '2026-10-13' },
 ) {
   const seen: { method: string; register: string | null; limit: string | null; cursor: string | null; where: string | null; headers: Record<string, unknown> }[] = [];
   const server = createServer((req, res) => {
@@ -82,14 +84,16 @@ async function host(
       const register = url.searchParams.get('register');
       const where = url.searchParams.get('where');
       seen.push({ method, register, limit: url.searchParams.get('limit'), cursor: url.searchParams.get('cursor'), where, headers: req.headers });
-      const asked = where === null ? null : (clock.half === true ? /^(\w+) (before) today$/u : /^(\w+) (before|after) today$/u).exec(where);
-      const today = clock.today;
+      const reads = clock.half === true ? /^(\w+) (before) (today)$/u : clock.plain === true ? /^(\w+) (before|after) (today)$/u : /^(\w+) (before|after) (today|-3d)$/u;
+      const asked = where === null ? null : reads.exec(where);
+      const today = clock.today === null || asked?.[3] !== '-3d' ? clock.today : new Date(Date.parse(clock.today) - 3 * 86_400_000).toISOString().slice(0, 10);
+      const none = clock.mute === true && asked?.[2] === 'after';
       const unread = where !== null && clock.deaf !== true && (asked === null || today === null);
       let value: unknown = null;
       if (method === 'schema') value = register === 'credentials' ? KEYS_LIST : { id: 'things', title: 'name', fields: [{ id: 'name', type: 'text' }] };
       if (method === 'list') {
         const held = register === 'credentials' ? rows : PROJECTS;
-        const all = asked && today !== null && clock.deaf !== true ? held.filter((r) => typeof r.fields[asked[1]!] === 'string' && (asked[2] === 'before' ? (r.fields[asked[1]!] as string) < today : (r.fields[asked[1]!] as string) > today)) : held;
+        const all = asked && today !== null && clock.deaf !== true ? held.filter((r) => !none && typeof r.fields[asked[1]!] === 'string' && (asked[2] === 'before' ? (r.fields[asked[1]!] as string) < today : (r.fields[asked[1]!] as string) > today)) : held;
         const from = Number(url.searchParams.get('cursor') ?? '0');
         const limit = Number(url.searchParams.get('limit') ?? '50');
         value = { rows: all.slice(from, from + limit), matched: all.length, cursor: from + limit < all.length ? String(from + limit) : null };
@@ -403,7 +407,7 @@ test('A RECORD WHOSE ONLY DATED KEY ENDED YESTERDAY IS BELIEVED, and the sentenc
   assert.deepEqual(one.lines.map((l) => l.split(' · ').at(-1)), ['expired 12 October 2026', 'no expiry day']);
   assert.deepEqual((one.answered[0]!.value as { keys: KeyRead[] }).keys.map((k) => k.expired), [true, false]);
   assert.deepEqual(one.said, ['2 keys: 2 kept elsewhere.'], 'nothing is said of the clock when the record answered');
-  assert.deepEqual(honest.seen.filter((s) => s.where !== null).map((s) => s.where), ['expires before today', 'expires after today']);
+  assert.deepEqual(honest.seen.filter((s) => s.where !== null).map((s) => s.where), ['expires before today', 'expires after today', 'expires after -3d']);
   for (const s of honest.seen) assert.equal(s.headers['x-braindog-session'], undefined);
 
   /* A record that reads `before` and refuses `after` has not shown it reads its filters, and neither has one whose
@@ -422,6 +426,47 @@ test('A RECORD WHOSE ONLY DATED KEY ENDED YESTERDAY IS BELIEVED, and the sentenc
   assert.equal(await keys(['list'], three), 0, three.said.join('\n'));
   assert.deepEqual(old.seen.filter((s) => s.where !== null).map((s) => s.where), ['expires before today']);
   assert.deepEqual(three.said, ['1 key: 1 kept elsewhere.']);
+});
+
+/* RED BEFORE (audit 74, claim 8; seen red against the file as batch 76 left it): the opposite question's true answer
+   is no key at all, and no key at all is also what a host gives that takes `after` and reads nothing by it. So an
+   empty answer is not believed by itself. The record is asked for the keys whose day is after three days ago, which
+   holds the near key in every zone on earth, and is believed only when that answer does hold it. */
+test('AN EMPTY ANSWER TO THE OPPOSITE QUESTION IS NOT BELIEVED BY ITSELF: the record must also name the near key when asked for it', async (t) => {
+  const zone = process.env.TZ;
+  t.after(() => void (zone === undefined ? delete process.env.TZ : (process.env.TZ = zone)));
+  process.env.TZ = 'UTC';
+  const unsaid = 'Your record did not say which keys are past their day, so each is judged by the date on this machine.';
+  /* 22:30 UTC on the 13th, a record that calls the 13th past: true in Cairo, where it is the 14th, and false here. */
+  const late = Date.parse('2026-10-13T22:30:00Z');
+  const rows = [row(1, { label: 'Ends on the 13th', opens: 'A service', expires: '2026-10-13' }), row(2, { label: 'No day', opens: 'A service' })];
+
+  /* A host that answers no key to any `after`, and one that reads `today` and refuses a count of days: neither has
+     shown it reads the sentence, so the keys print by this machine's day, with the sentence. */
+  for (const clock of [{ today: '2026-10-14', mute: true }, { today: '2026-10-14', plain: true }]) {
+    const h = await host(t, rows, null, clock);
+    const one = { ...io(h.base), now: () => late };
+    assert.equal(await keys(['list', '--json'], one), 0, one.said.join('\n'));
+    assert.deepEqual(one.lines.map((l) => l.split(' · ').at(-1)), ['expires 13 October 2026', 'no expiry day'], JSON.stringify(clock));
+    assert.deepEqual((one.answered[0]!.value as { keys: KeyRead[] }).keys.map((k) => k.expired), [false, false]);
+    assert.deepEqual(one.said, [unsaid, '2 keys: 2 kept elsewhere.'], JSON.stringify(clock));
+    assert.deepEqual(h.seen.filter((s) => s.where !== null).map((s) => s.where), ['expires before today', 'expires after today', 'expires after -3d']);
+    for (const s of h.seen) assert.equal(s.headers['x-braindog-session'], undefined);
+  }
+
+  /* The record that reads all three is believed, and nothing is said of the clock. */
+  const honest = await host(t, rows, null, { today: '2026-10-14' });
+  const two = { ...io(honest.base), now: () => late };
+  assert.equal(await keys(['list'], two), 0, two.said.join('\n'));
+  assert.deepEqual(two.lines.map((l) => l.split(' · ').at(-1)), ['expired 13 October 2026', 'no expiry day']);
+  assert.deepEqual(two.said, ['2 keys: 2 kept elsewhere.']);
+
+  /* A host that fails the opposite question is asked nothing more. */
+  const deaf = await host(t, [rows[0]!], null, { today: '2026-10-14', deaf: true });
+  const three = { ...io(deaf.base), now: () => late };
+  assert.equal(await keys(['list'], three), 0, three.said.join('\n'));
+  assert.deepEqual(three.said, [unsaid, '1 key: 1 kept elsewhere.']);
+  assert.deepEqual(deaf.seen.filter((s) => s.where !== null).map((s) => s.where), ['expires before today', 'expires after today']);
 });
 
 /* RED BEFORE BATCH 70 (seen red against the file as batch 69 left it): today is this machine's day, and the two above

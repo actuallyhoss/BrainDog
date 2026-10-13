@@ -213,7 +213,7 @@ const UNSAID = 'Your record did not say which keys are past their day, so each i
  * day, and a record whose only dated key ended yesterday was told it had not answered when it had. `near` marks that
  * one case and the caller puts the opposite question to the record.
  */
-function pastOf(asked: Result<unknown[]>, held: readonly unknown[], expires: string, now: number): { ids: Set<string>; near: boolean } | null {
+function pastOf(asked: Result<unknown[]>, held: readonly unknown[], expires: string, now: number): { ids: Set<string>; near: string[] } | null {
   if (!asked.ok) return null;
   const ceiling = new Date(now + DAY_MS).toISOString().slice(0, 10);
   const floor = new Date(now - DAY_MS).toISOString().slice(0, 10);
@@ -226,7 +226,9 @@ function pastOf(asked: Result<unknown[]>, held: readonly unknown[], expires: str
     ids.add(r.id);
   }
   const dated = held.filter((r) => isObject(r) && typeof r.id === 'string' && dayIn(r) !== '');
-  return { ids, near: dated.length > 0 && dated.every((r) => ids.has((r as { id: string }).id)) && dated.some((r) => !(dayIn(r) < floor)) };
+  /* `near` IS THE KEYS TO ASK ABOUT: the ones whose day is not yet past everywhere, when the answer held every dated key. */
+  const close = dated.filter((r) => !(dayIn(r) < floor)).map((r) => (r as { id: string }).id);
+  return { ids, near: dated.every((r) => ids.has((r as { id: string }).id)) ? close : [] };
 }
 
 /** A key's day as the record holds it, `2026-10-13`, or "" for a key with none. */
@@ -240,11 +242,35 @@ const dayBy =
  * No key is both before today and after it. A host that answers every key whatever it is asked gives the same keys
  * twice, and one that cannot read the sentence refuses it; a record that reads its filters gives none of the keys it
  * called past, and no key without a day. Only that last one is believed.
+ *
+ * AND NO KEY AT ALL IS NOT BELIEVED BY ITSELF. The question is put only when every dated key was called past, so the
+ * true answer to it is always empty, and empty is also what a host gives that takes `after` and reads nothing by it.
+ * No dated key was left out of the first answer to show the filter was read. So the record is asked once more, for an
+ * answer that is not empty: the keys whose day is after three days ago (`RECENT`). No zone is more than a day from
+ * UTC, so every near key is among them wherever the record's clock is, and the record is believed when its answer
+ * holds each of them and no key without a day. A host that refuses the count of days is left to this machine's date.
  */
 function heard(after: Result<unknown[]>, past: ReadonlySet<string>, expires: string): boolean {
   if (!after.ok) return false;
   const dayIn = dayBy(expires);
   return after.value.every((r) => isObject(r) && typeof r.id === 'string' && !past.has(r.id) && dayIn(r) !== '');
+}
+
+const RECENT = 'after -3d';
+
+async function answered(client: Reader, said: { ids: ReadonlySet<string>; near: readonly string[] }, expires: string): Promise<boolean> {
+  const after = await readAll(client, KEYS, `${expires} after today`);
+  if (!heard(after, said.ids, expires)) return false;
+  if (after.ok && after.value.length > 0) return true;
+  const recent = await readAll(client, KEYS, `${expires} ${RECENT}`);
+  if (!recent.ok) return false;
+  const dayIn = dayBy(expires);
+  const got = new Set<string>();
+  for (const r of recent.value) {
+    if (!isObject(r) || typeof r.id !== 'string' || dayIn(r) === '') return false;
+    got.add(r.id);
+  }
+  return said.near.every((id) => got.has(id));
 }
 
 /** The sentence for a record that will not answer, by why. */
@@ -332,9 +358,9 @@ async function read(host: string | undefined, wanted: string | undefined, everyw
     where = names.get([...ids][0]!) ?? SOME_PROJECT;
   }
 
-  /* THE SECOND QUESTION IS PUT ONLY WHEN THE FIRST ANSWER COULD BE EITHER, so a record that plainly answered is read once. */
+  /* THE SECOND QUESTION, AND THE THIRD BEHIND IT, ARE PUT ONLY WHEN THE FIRST ANSWER COULD BE EITHER, so a record that plainly answered is read once. */
   const said = pastOf(late, held.value, shape.expires, now);
-  const past: Past | null = said === null ? null : !said.near || heard(await readAll(client, KEYS, `${shape.expires} after today`), said.ids, shape.expires) ? said.ids : null;
+  const past: Past | null = said === null ? null : said.near.length === 0 || (await answered(client, said, shape.expires)) ? said.ids : null;
   const keys = printable(readKeys(rows, names, past ?? dayHere(now), shape));
   sinks.answer?.({ value: { keys } });
   for (const k of keys) sinks.out(keyLine(k));

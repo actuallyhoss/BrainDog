@@ -982,9 +982,9 @@ export type FillBy = { sealed?: ReadonlySet<string>; each?: readonly string[]; r
 /**
  * Every spelling a text can be filled from, in one pattern: the run's `{{vars.x}}` and `{{trigger.row.pin}}`
  * (`flow-lint.ts`'s `RUN_PATH`), a figure's `{{metric.total}}` (`figure.ts`), a create's `{{each.0}}`, and the row's
- * `{{field}}` and `{{kind:field}}`.
+ * `{{field}}`, `{{kind:field}}` and `{{kind:field-other}}`, one money field less another (`moneyLess`).
  */
-const SPELLED = new RegExp(`${RUN_PATH.source}|${FIGURE.source}|\\{\\{each\\.(\\d)\\}\\}|\\{\\{(\\w+)(?::(\\w+))?\\}\\}`, 'g');
+const SPELLED = new RegExp(`${RUN_PATH.source}|${FIGURE.source}|\\{\\{each\\.(\\d)\\}\\}|\\{\\{(\\w+)(?::(\\w+)(?:-(\\w+))?)?\\}\\}`, 'g');
 
 /** Whether a field holds anything a fill would write as more than the dash: an empty list holds nothing either. */
 export const present = (value: unknown): boolean => value !== null && value !== undefined && value !== '' && !(Array.isArray(value) && value.length === 0);
@@ -1007,7 +1007,7 @@ export const present = (value: unknown): boolean => value !== null && value !== 
 export function filling(template: unknown, row: Entry, nowMs: number, by: FillBy = {}): { text: string; secret: string | null } {
   if (typeof template !== 'string') return { text: wordsOf(template), secret: null };
   let secret: string | null = null;
-  const text = template.replace(SPELLED, (whole: string, runHead?: string, runPath?: string, figHead?: string, figId?: string, each?: string, head?: string, tail?: string) => {
+  const text = template.replace(SPELLED, (whole: string, runHead?: string, runPath?: string, figHead?: string, figId?: string, each?: string, head?: string, tail?: string, less?: string) => {
     /* A FIGURE IS THE RUN'S TO READ, and the inline pass has no run, so there the braces stay as typed and the lint
        refuses them (`figure.ts`): a figure read inside a write would be read over the row that write is still making. */
     if (runHead !== undefined || figHead !== undefined) {
@@ -1020,9 +1020,13 @@ export function filling(template: unknown, row: Entry, nowMs: number, by: FillBy
       if (by.each === undefined) return whole;
       return by.each[Number(each)] ?? '';
     }
+    /* ONLY A MONEY FORM SUBTRACTS. `{{on:due-paid}}` was left as typed before a second field could be spelled, and it
+       still is: a day less a field is no sentence, and a form nobody declared has no rule for two fields. */
+    if (less !== undefined && head !== 'short' && head !== 'money') return whole;
     const field = tail ?? head!;
     if (head !== 'id' && by.sealed?.has(field) === true && present(row.fields[field])) secret ??= whole;
-    return rowValue(head!, tail, row, nowMs);
+    if (less !== undefined && by.sealed?.has(less) === true && present(row.fields[less])) secret ??= whole;
+    return rowValue(head!, tail, row, nowMs, less);
   });
   return { text, secret };
 }
@@ -1073,13 +1077,14 @@ export function sealedOf(sql: Sql, register: string): Set<string> {
  */
 const sealedKept = new WeakMap<Sql, Map<string, { key: string; sealed: ReadonlySet<string> }>>();
 
-/** One `{{field}}` or `{{kind:field}}` of the row, as `fill` writes it. */
-function rowValue(head: string, tail: string | undefined, row: Entry, nowMs: number): string {
+/** One `{{field}}`, `{{kind:field}}` or `{{kind:field-other}}` of the row, as `fill` writes it. */
+function rowValue(head: string, tail: string | undefined, row: Entry, nowMs: number, less?: string): string {
   if (head === 'id') return row.seq === null ? row.id : `${row.register}#${row.seq}`;
   const field = tail ?? head;
   const kind = tail ? head : null;
-  const value = row.fields[field];
-  if (value === null || value === undefined || value === '') return '—';
+  const held = row.fields[field];
+  if (held === null || held === undefined || held === '') return '—';
+  const value = less === undefined ? held : moneyLess(held, row.fields[less]);
 
   if (kind === 'money' || (!kind && isMoney(value)))
     /* THE CURRENCY'S OWN DECIMALS. It was `amount / 100` to two places for every code, so JPY 129,900
@@ -1116,6 +1121,27 @@ function rowValue(head: string, tail: string | undefined, row: Entry, nowMs: num
  * draws figures, which is why `moneyText` lives in `ingest.ts` beside the exponent table it reads.
  */
 const moneyWords = (m: { amount: number; currency: string }): string => moneyText(m.amount, m.currency);
+
+/**
+ * `{{short:amount-paid_so_far}}`, what is left of one money field when another is taken from it: EGP 12,000 with
+ * EGP 4,500 paid is `EGP 7,500`. The template names both fields and the kernel names neither.
+ *
+ * WHAT WAS WRONG. A template could write a field and could not subtract one, so a drafted chase named the whole amount
+ * of an invoice part of which had been paid: true as a sentence, and not the sum anybody is owed.
+ *
+ * THE FIRST FIELD AS IT STANDS WHERE THE SUM CANNOT BE SAID: two currencies, which are never subtracted; a second field
+ * that holds nothing, or no money; and more taken than there was, since a message never asks for an amount under
+ * nought. The form then writes what it writes of the first field alone, the sentence the template had before.
+ *
+ * WHOLE MINOR UNITS AND A CODE ON BOTH SIDES, OR NO SUM. `isMoney` asks only that the two keys are there, so a second
+ * field of `{ amount: 100, currency: null }` threw out of the fill and `{ amount: 'abc' }` wrote `EGP NaN`.
+ */
+function moneyLess(value: unknown, taken: unknown): unknown {
+  const sound = (m: unknown): m is { amount: number; currency: string } => isMoney(m) && Number.isSafeInteger(m.amount) && typeof m.currency === 'string';
+  if (!sound(value) || !sound(taken) || value.currency.toUpperCase() !== taken.currency.toUpperCase()) return value;
+  const amount = value.amount - taken.amount;
+  return amount < 0 ? value : { amount, currency: value.currency };
+}
 
 /**
  * The currencies a message writes by a sign, each sign one currency's alone: a bare `$` is the US dollar's and every

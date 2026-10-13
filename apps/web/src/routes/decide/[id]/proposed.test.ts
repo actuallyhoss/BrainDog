@@ -405,3 +405,64 @@ test('THE WHOLE CHANGE IS DRAWN AS IT WOULD STAND, beside the page as it is, and
   const older = (async () => reply(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'There is no method called previewChange.' } })) as unknown as Fetch;
   assert.deepEqual(await previewOf(change, BASE, older), { from: 'none' });
 });
+
+/* THE OTHER TWO WAYS INTO `liveOf`: the whole change (both sides of it), and a boot that cannot be read. */
+const FEED_ME = 'p_01M45MN5M03SECPTPXD5P98F44';
+const FEED_ADA = 'p_01M45MN5M03SECPTPXD5P98F45';
+const feedBlock = (at: string) => ({
+  kind: 'feed', source: 'activity', rows: [], matched: 2, refusals: [],
+  feed: [
+    { by: 'you', who: FEED_ME, count: 1, kind: 'create', target: 'people#2', note: null, at, thing: 'Nadia' },
+    { by: 'you', who: FEED_ADA, count: 1, kind: 'create', target: 'people#3', note: null, at, thing: 'Omar' },
+  ],
+});
+const FEED_BOOT = { registers: [], pages: [], record: { slug: 'the-studio', name: 'The Studio', locale: 'en', currency: 'GBP' }, me: { kind: 'person', person: FEED_ME, name: 'Mariam', level: 'owner' }, names: { [FEED_ME]: 'Mariam', [FEED_ADA]: 'Ada Lovelace' } };
+
+test('A FEED IN A WHOLE CHANGE NAMES ITS READER AS You on the page as it would stand and on the page as it is, with boot asked once', async () => {
+  const at = new Date().toISOString();
+  const asked: string[] = [];
+  const io = (async (url: string | URL | Request) => {
+    const method = new URL(String(url)).pathname.slice('/api/'.length);
+    asked.push(method);
+    if (method === 'boot') return reply(200, { ok: true, value: FEED_BOOT });
+    if (method === 'previewChange')
+      return reply(200, { ok: true, value: { pages: [{ id: 'page.today', slug: 'today', title: 'Today', nav: null, layout: null, icon: null, about: null, blocks: [feedBlock(at)], was: [feedBlock(at)] }] } });
+    return reply(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'No such method.' } });
+  }) as Fetch;
+  forget();
+  const out = await previewOf({ to: { declarations: [{ id: 'page.today', kind: 'page', body: { page: 'today', title: 'Today', blocks: [{ kind: 'feed', source: 'activity' }] } }] } }, BASE, io);
+  forget();
+  assert.equal(out.from, 'live');
+  if (out.from !== 'live') return;
+  const [today] = out.pages;
+  assert.deepEqual(today?.got.page.blocks[0]?.rows.map((r) => r.cells[1]), ['You', 'Ada Lovelace']);
+  assert.deepEqual(today?.was?.[0]?.rows.map((r) => r.cells[1]), ['You', 'Ada Lovelace']);
+  assert.equal(asked.filter((m) => m === 'boot').length, 1);
+});
+
+test('A BOOT THAT CANNOT BE READ LEAVES THE FEED DRAWN, with no id in it, and a page with no feed asks for no boot', async () => {
+  const at = new Date(CLOCK).toISOString();
+  const asked: string[] = [];
+  const io = (blocks: unknown[]) =>
+    (async (url: string | URL | Request) => {
+      const method = new URL(String(url)).pathname.slice('/api/'.length);
+      asked.push(method);
+      if (method === 'boot') throw new Error('offline');
+      if (method === 'previewPage') return reply(200, { ok: true, value: { read_at: at, blocks } });
+      return reply(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'No such method.' } });
+    }) as Fetch;
+  forget();
+  const drawn = await drawnOf({ page: 'today', title: 'Today', blocks: [{ kind: 'feed', source: 'activity' }] }, BASE, io([feedBlock(at)]));
+  forget();
+  assert.equal(drawn.from, 'live');
+  if (drawn.from !== 'live') return;
+  const who = drawn.blocks[0]?.rows.map((r) => String(r.cells[1])) ?? [];
+  assert.equal(who.length, 2);
+  for (const cell of who) assert.doesNotMatch(cell, /p_01M45|^You$/u);
+  /* NO FEED, NO BOOT: the reader is only asked for when a block would name somebody. */
+  asked.length = 0;
+  const plain = await drawnOf(PAGE, BASE, io([{ kind: 'table', heading: 'Being built', rows: [], matched: 0, refusals: [] }]));
+  forget();
+  assert.equal(plain.from, 'live');
+  assert.deepEqual(asked.filter((m) => m === 'boot'), []);
+});

@@ -434,4 +434,7 @@ export const shell = {
      Shortcut posts to goes on answering. */
   arrangeMoving: 'Moves',
   arrangeMovesTo: (name: string, pack: string) => `${name} moves to ${pack}, which is not installed; it keeps working until you remove it.`,
+  /* A PLACE THE RAIL DID NOT HOLD AT ITS LAST DRAW, named once in a toast (`routes/+layout.svelte`): a page stays off the
+     rail until one of its lists holds something, so the first thing typed can bring a place nobody saw arrive. */
+  placeArrived: (names: readonly string[]) => `${list([...names])} ${names.length === 1 ? 'is' : 'are'} in your rail now.`,
 } as const;

@@ -1087,3 +1087,65 @@ test('A NEVER THAT THE CLAUSE TAKES BACK REFUSES NOTHING: "I never ran a shop be
   assert.ok(!has(propose('We never run out of products', CAIRO), 'Products'), 'We never run out of products');
   assert.ok(has(propose('I sell products and never ran out of them', CAIRO), 'Products'), 'I sell products and never ran out of them');
 });
+
+test('A NEVER IS TAKEN BACK BY A FIRST ONE BEING OPENED: "I never ran a shop but I am opening one next month", "I never ran a shop before. This is my first one."', () => {
+  const lit = (p: ReturnType<typeof propose>, word: RegExp): boolean => p.heard.some((h) => word.test(h.phrase)) || p.places.some((x) => x.phrase !== null && word.test(x.phrase));
+  const has = (p: ReturnType<typeof propose>, name: string): boolean => p.places.some((x) => x.name === name);
+  const both = (s: string): string[] => [s, `I'm a freelance designer. ${s}`];
+
+  /* THE TWO SENTENCES LEFT OPEN BY BATCH 75, word for word, bare and after another sentence. */
+  for (const typed of both('I never ran a shop but I am opening one next month')) assert.ok(lit(propose(typed, CAIRO), /shop/iu), typed);
+  for (const typed of both('I never ran a shop before. This is my first one.')) assert.ok(lit(propose(typed, CAIRO), /shop/iu), typed);
+
+  /* WHOEVER SPEAKS IS OPENING ONE: said of now, with the word that points back. */
+  for (const s of [
+    'I never ran a shop but I am opening one',
+    "I never ran a shop before, but I'm opening one",
+    'We never owned a shop and we are finally opening one in May',
+    'I never ran a shop but I am about to open one',
+    'I never ran a shop before; I am just starting one',
+    "I never ran a shop. I'm setting one up",
+    'I never ran a shop but I am setting up one now',
+    'We never had a shop until now, but we are launching one',
+    'I never took orders before but I am starting to take them',
+    'I always wanted a shop and I am finally opening one',
+  ]) {
+    assert.ok(lit(propose(s, CAIRO), /shop|orders/iu), s);
+  }
+  /* A FIRST ONE IS ONE: "this is my first", after the clause and as a sentence of its own. */
+  for (const s of [
+    'I never ran a shop before, this is my first one',
+    'I never ran a shop. This is my first.',
+    "We never ran a shop before. It's our first one.",
+    'I never ran a shop before and this is my very first one',
+    'I never owned a shop, this will be my first one',
+    'I never took orders before. These are my first ones.',
+  ]) {
+    assert.ok(lit(propose(s, CAIRO), /shop|orders/iu), s);
+  }
+  /* AND WHAT TAKES NOTHING BACK: a refusal, somebody else, a thought of opening, another first thing. */
+  for (const s of [
+    'I never ran a shop and I am not opening one',
+    "I never ran a shop, I'm not opening one",
+    'I never ran a shop but my brother is opening one',
+    'I never ran a shop but they are opening one',
+    'I never ran a shop but I am thinking of opening one',
+    'I never ran a shop but I am opening a studio',
+    'I never ran a shop but I am opening up about it',
+    'I never ran a shop. This is not my first one.',
+    'I never ran a shop. This is her first one.',
+    'I never ran a shop before. This is my first time here.',
+    'I never ran a shop, this is my first job',
+  ]) {
+    const p = propose(s, CAIRO);
+    assert.ok(!lit(p, /shop/iu) && p.usecase !== 'shop', s);
+  }
+  /* WHAT BATCH 75 RULED STANDS: a shop only wanted is not had, and what never ran out is not said to be kept. */
+  for (const s of ['I never ran a shop but I want to start', 'I never ran a shop', 'I hope to open a shop one day']) {
+    const p = propose(s, CAIRO);
+    assert.ok(!lit(p, /shop/iu) && p.usecase !== 'shop', s);
+  }
+  for (const typed of both('I never ran out of products')) assert.ok(!has(propose(typed, CAIRO), 'Products'), typed);
+  assert.ok(!has(propose('We never run out of products', CAIRO), 'Products'), 'We never run out of products');
+  assert.ok(has(propose('I sell products and never ran out of them', CAIRO), 'Products'), 'I sell products and never ran out of them');
+});

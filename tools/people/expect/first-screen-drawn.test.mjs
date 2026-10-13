@@ -1,6 +1,7 @@
 /**
- * The first screens as drawn (audit 71, finding 8): the markup reader, the two checks that read the shell, and one walk
- * as Mariam whose rail and Today are rendered from the web's own parts and judged. Run it alone:
+ * The first screens as drawn (audit 71, finding 8): the markup reader, the two checks that read the shell, one walk as
+ * Mariam whose rail and Today are rendered from the web's own parts and judged, and four people's walks held to a rail
+ * with no empty place in it (USE-B02). Run it alone:
  * `node --test tools/people/expect/first-screen-drawn.test.mjs`.
  */
 
@@ -11,6 +12,7 @@ import { readFileSync } from 'node:fs';
 import { DRAWN_UNITS, SIGNS, checkDrawn, drawnScreen, drawnScreens, firstScreen, report } from './first-screen.mjs';
 import { readMarkup } from './markup.mjs';
 import { markupOf } from './draw.mjs';
+import { saidLists } from './screens.mjs';
 import { pageWords } from '../../../apps/web/src/lib/record/page-new.ts';
 import { signsLine } from '../../../apps/web/src/lib/home/default-home.ts';
 
@@ -162,3 +164,37 @@ test('Mariam: the rail and Today are drawn at both moments, every check that rea
   assert.match(lines.at(-1), /^62 checks: \d+ green, \d+ red, 0 not seen, \d+ that do not apply\. Exit code [01]\.$/u, lines.join('\n'));
   assert.equal(code, lines.some((l) => /: red\./u.test(l)) ? 1 : 0);
 });
+
+/* ── the rail's rows, read as the shell reads them (USE-B02) ──────────────────────────────────────────── */
+
+test('a page stands on the lists the record says it reads, and on none a pack filled', () => {
+  const held = new Map([['accounts', {}], ['obligations', {}]]);
+  /* The record leaves a list its packs fill on day 0 out of `lists`, so Categories is never counted as hers. */
+  assert.deepEqual(saidLists({ slug: 'money', lists: ['accounts', 'obligations', 'accounts'] }, held), ['accounts', 'obligations']);
+  /* A list this reader was not sent is not hers to be judged by, and a page that reads none has nothing to be empty. */
+  assert.deepEqual(saidLists({ slug: 'money', lists: ['accounts', 'payroll', 7] }, held), ['accounts']);
+  assert.deepEqual(saidLists({ slug: 'notes', lists: [] }, held), []);
+  /* A host that says nothing of a page's lists is read from the drawn page, as before. */
+  assert.equal(saidLists({ slug: 'money', list: 'accounts' }, held), null);
+  assert.equal(saidLists(undefined, held), null);
+});
+
+const PEOPLE = ['mariam', 'sam', 'nour', 'layla'];
+
+for (const who of PEOPLE) {
+  test(`${who}: no place is in the first rail with nothing to show, and the command would leave with 0`, { timeout: 180_000 }, async () => {
+    const person = who === 'mariam' ? MARIAM : JSON.parse(readFileSync(new URL(`../${who}.json`, import.meta.url), 'utf8'));
+    const { screens, why } = await drawnScreens(person);
+    assert.equal(why, null);
+    const drawn = screens.filter((s) => s.words !== true);
+    assert.equal(drawn.length, 6, 'three screens at each of two moments');
+    for (const s of drawn) {
+      const rows = firstScreen['rail-has-rows'](s);
+      assert.equal(rows.pass, true, `${s.path} at ${s.width}, ${s.moment}: ${rows.saw}`);
+    }
+    const { lines, code } = report(screens, person);
+    assert.deepEqual(lines.filter((l) => /rail-has-rows: (?:red|not seen)/u.test(l)), []);
+    assert.match(lines.at(-1), /^62 checks: \d+ green, 0 red, 0 not seen, \d+ that do not apply\. Exit code 0\.$/u, lines.filter((l) => /: red\./u.test(l)).join('\n'));
+    assert.equal(code, 0);
+  });
+}

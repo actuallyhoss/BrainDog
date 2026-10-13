@@ -59,7 +59,7 @@
   import Preview from '../Preview.svelte';
   import { browserStore, catalogueText, keepFirstKey, readHostCatalogue, signedWords, trustForEntry, trustWords } from '../catalogue.ts';
   import { FIXABLE, hasTheme, stageFix } from '$lib/theme/staged.ts';
-  import { askOnDecide, diffOf, install, notOwner, planFor, sheetWords, turnOn, waitsOf, type OfferClient, type Planned } from './offer.ts';
+  import { askOnDecide, diffOf, install, notOwner, planFor, sheetWords, turnOn, waitingOf, waitsOf, type OfferClient, type Planned } from './offer.ts';
 
   const KINDS: readonly ListingKind[] = ['module', 'usecase', 'pack'];
   const kind = $derived<ListingKind>(KINDS.find((k) => k === page.url.searchParams.get('kind')) ?? 'usecase');
@@ -294,7 +294,10 @@
         return;
       }
       if (action.kind !== 'install' && action.kind !== 'update') return;
-      const out = await planFor(client, listing, file, states, copy.writeRaced);
+      /* WHAT ELSE WAITS IS READ ONLY FOR A PLAN THAT HAS SOMETHING TO WAIT FOR (`offer.ts` `afterOthers`): an update
+         another one hands something to goes in after it, on the one sheet, instead of a stop nobody can clear here. */
+      const held = states;
+      const out = await planFor(client, listing, file, held, copy.writeRaced, () => waitingOf(fetch, kennel, held));
       if (out.ok) planned = out.planned;
       else refused = out;
     } finally {

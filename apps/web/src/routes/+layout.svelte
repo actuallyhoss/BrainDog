@@ -241,6 +241,31 @@
    */
   const rail = $derived(railOf(flat, said('decide')));
   const tabs = $derived(tabsOf(rail.places));
+
+  /**
+   * A PLACE THAT COMES INTO THE RAIL IS SAID ONCE (USE-B02): a place is drawn when it has something to show, so the day
+   * the first account is typed Money appears, and one toast says "Money is in your rail now." No badge and no count.
+   *
+   * `arrivedIn` IS THE WHOLE RULE, and `place-arrived.test.ts` cuts it out of this file and runs it, so it stays one
+   * pure arrow. A place is Work or a section, first seven or under More, told by its key: a place somebody renamed or
+   * that moved between the two has not come. The rail holds those and the three it always draws (`railOf`), so a
+   * place is whatever is none of the three. The first draw in a tab says nothing, and neither does a place the person
+   * brought back from hidden themselves. A screen with no rail and a record that refused are no draw at all, so the
+   * rail that follows them is a first one. Three places in one draw are one sentence.
+   */
+  const arrivedIn = (was: { keys: ReadonlySet<string>; hidden: readonly string[] } | null, now: readonly { key: string; href: string; label: string }[]): string[] =>
+    now
+      .filter((i) => i.key !== 'today' && i.key !== 'decide' && i.key !== 'activity')
+      .filter((i) => was !== null && !was.keys.has(i.key) && !was.hidden.includes(i.href))
+      .map((i) => i.label);
+  let drawn: { keys: ReadonlySet<string>; hidden: readonly string[] } | null = null;
+  $effect(() => {
+    if (bare || data.refused) return void (drawn = null);
+    const now = [...rail.places, ...rail.more];
+    const names = arrivedIn(drawn, now);
+    drawn = { keys: new Set(now.map((i) => i.key)), hidden: [...navPrefs.hidden] };
+    if (names.length > 0) toasts.push(copy.placeArrived(names));
+  });
   /* WHAT THE TOP BAR SAYS IS UNDER MORE: the sections and pages that are not rows, and the lists. */
   const behind = $derived(flat.more.length + flat.pages.length + moreLists.length);
   /* THE PERSON READING, by the name the record told them, for the top bar's face. */

@@ -55,6 +55,7 @@
   import { arranged, emptyHidden } from './home.ts';
   import { leadIndex } from './lead.ts';
   import { stampOf } from './read-mark.ts';
+  import { markAll } from '$lib/record/news-live.ts';
   import type { Cursor } from '@braindog/client';
   import { asksActions, judgedWith, readHeld } from './panels.ts';
   import type { ActionRow } from '$lib/record/actions.ts';
@@ -287,7 +288,9 @@
   $effect(() => {
     void slug;
     const base = untrack(() => apiBase());
-    const stamp = stampOf((upTo) => import('$lib/record/news-live.ts').then((m) => m.markAll(base, upTo)));
+    /* `markAll` IS HERE BEFORE THE READER LEAVES, imported with the screen as Home's is: fetched inside the leave, a
+       closing tab was gone before the module came and the mark was never sent. */
+    const stamp = stampOf((upTo) => markAll(base, upTo));
     let drew: { upTo: Cursor | null } | null = null;
     /* Its own effect, so the feed arriving does not end the visit and send the mark early. */
     $effect(() => {

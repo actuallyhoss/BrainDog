@@ -20,6 +20,7 @@
   import { forget } from '$lib/record/boot-live.ts';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import Segmented from '$lib/ui/Segmented.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { drawn as drawnNow, drawSaved } from './draw.ts';
   import {
@@ -287,11 +288,11 @@
               {#if picked === role}
                 <div class="role-controls">
                   <p class="look-editing">{scheme === 'dark' ? copy.lookEditingDark(nameOf(role)) : copy.lookEditingLight(nameOf(role))}</p>
-                  <div class="segmented" role="group" aria-label={nameOf(role)}>
+                  <Segmented role="group" aria-label={nameOf(role)}>
                     {#each [['nudge', copy.lookNudge], ['pick', copy.lookPick], ['enter', copy.lookEnter]] as const as [m, label]}
                       <button type="button" class="segment" aria-pressed={how === m} data-on={how === m ? '' : undefined} onclick={() => (how = m)}>{label}</button>
                     {/each}
-                  </div>
+                  </Segmented>
 
                   {#if how === 'nudge'}
                     <div class="nudges" role="group" aria-label={copy.lookNudge}>
@@ -358,18 +359,18 @@
         </ul>
 
         <h3 class="look-title">{copy.lookCorners}</h3>
-        <div class="segmented" role="group" aria-label={copy.lookCorners}>
+        <Segmented role="group" aria-label={copy.lookCorners}>
           {#each [['square', copy.lookSquare], ['soft', copy.lookSoft], ['round', copy.lookRound]] as const as [c, label]}
             <button type="button" class="segment" aria-pressed={draft.corners === c} data-on={draft.corners === c ? '' : undefined} onclick={() => setCorners(c)}>{label}</button>
           {/each}
-        </div>
+        </Segmented>
 
         <h3 class="look-title">{copy.lookDensity}</h3>
-        <div class="segmented" role="group" aria-label={copy.lookDensity}>
+        <Segmented role="group" aria-label={copy.lookDensity}>
           {#each [['compact', copy.densityCompact], ['comfortable', copy.densityComfortable], ['roomy', copy.densityRoomy]] as const as [d, label]}
             <button type="button" class="segment" aria-pressed={draft.density === d} data-on={draft.density === d ? '' : undefined} onclick={() => setDensity(d)}>{label}</button>
           {/each}
-        </div>
+        </Segmented>
 
         <h3 class="look-title">{copy.lookGate}</h3>
         {#if shown.length === 0 && refused.length === 0}
@@ -425,11 +426,11 @@
         </button>
         <div id="look-specimen" class="specimen-wrap" data-folded={foldOpen ? undefined : ''}>
           <h3 class="look-title">{copy.lookSpecimen}</h3>
-          <div class="segmented" role="group" aria-label={copy.lookSpecimen}>
+          <Segmented role="group" aria-label={copy.lookSpecimen}>
             {#each [['light', copy.lookInLight], ['dark', copy.lookInDark]] as const as [s, label]}
               <button type="button" class="segment" aria-pressed={scheme === s} data-on={scheme === s ? '' : undefined} onclick={() => (scheme = s)}>{label}</button>
             {/each}
-          </div>
+          </Segmented>
           <Specimen {palette} {draft} />
         </div>
       </div>

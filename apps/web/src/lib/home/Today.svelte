@@ -56,6 +56,7 @@
   import Question from './Question.svelte';
   import { waitsNow } from './waits.svelte.ts';
   import type { DayRow, DueRow, TaskRow, TodayRead } from '$lib/record/today-live.ts';
+  import { markAll } from '$lib/record/news-live.ts';
   import { drew } from '../ui/screen.svelte.ts';
   import { run } from '$lib/data/optimistic.svelte.ts';
   import { may } from '$lib/record/may.ts';
@@ -262,7 +263,8 @@
     if (stamped || data.refused || held === null) return;
     stamped = true;
     const upTo = held.upTo;
-    void import('$lib/record/news-live.ts').then((m) => m.markAll(apiBase(), upTo)).catch(() => {});
+    /* Imported with the screen, never inside the leave: a closing tab does not wait for a module. */
+    void markAll(apiBase(), upTo).catch(() => {});
   }
   $effect(() => {
     const leave = () => stamp();

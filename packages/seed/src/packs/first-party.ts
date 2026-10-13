@@ -593,6 +593,10 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   until on a book's What is due (book-lasts-until-76, REC-A09 step 2); and Money's seeds carry a starter set of
  *   eight categories, in and out, in place of one of the sample's (ruling 341, money-starter-categories-76), which no
  *   fingerprint reads and only a record installing Money afresh is given. One id added, none taken away.
+ *   And batch 77's, in the same unreleased step: `invoice-chased` holds two draft steps whose conditions never hold
+ *   together, so an invoice paid in part that says what was paid is drafted for what is left of it
+ *   (`{{short:amount-paid_so_far}}`) and every other invoice keeps its sentence (chase-part-paid-77, REC-B22). No id
+ *   added or taken away.
  * - people 3.4.0: the People page says how many people may be on the record twice (people-held-twice-69), one note under
  *   its two lead notes, from the built-in figure held-twice and drawn only above nought. 3.3.0 is released (commit
  *   63423720 holds it), so a version of its own. A note added, nothing taken away, so a minor step that reaches a record

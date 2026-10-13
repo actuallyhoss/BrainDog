@@ -1631,10 +1631,12 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         return examples.has(idOf(raw) ?? '');
       };
       const onlyLinked = events.slice(1).every((e) => (e.kind === 'edit' || e.kind === 'link') && linkedTo(e.to_v));
-      const named = sql
-        .all<{ id: string }>('SELECT id FROM entry WHERE deleted_at IS NULL AND id <> ? AND instr(fields, ?) > 0', id, id)
-        .some((r) => !examples.has(r.id));
-      const row = arrived && onlyLinked && !named ? byId(id) : null;
+      /* ASKED LAST, AND ONLY OF A ROW THE LOG HAS NOT ALREADY CALLED TOUCHED: it looks through every row of the record. */
+      const named = () =>
+        sql
+          .all<{ id: string }>('SELECT id FROM entry WHERE deleted_at IS NULL AND id <> ? AND instr(fields, ?) > 0', id, id)
+          .some((r) => !examples.has(r.id));
+      const row = arrived && onlyLinked && !named() ? byId(id) : null;
       if (row) untouched.push(row);
       else touched++;
     }

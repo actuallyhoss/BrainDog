@@ -26,6 +26,11 @@
  * with that card was the one payee "Hsbc Card". The lead is cut and each shop is its own payee. 1.1.0 is published,
  * so this is a version above it and that file is not touched.
  *
+ * 1.3.0, AND WHY (audit of batch 75, claim 7). The name still stopped at the first word holding a digit, so
+ * `Studio 54 Cafe` read "Studio" and two shops that start alike were one payee, and `CARD 1234 5678 NETFLIX` read
+ * "5678 Netflix". A word ends the name only when it holds three digits or more, and every group of the card's number
+ * goes with the card. 1.2.0 is published, so this is a version above it.
+ *
  * RED FIRST, MEASURED: with no `twice.js` and no `money-watch.pack.json` this file failed at its first read, ENOENT,
  * before a single test ran.
  */
@@ -102,7 +107,7 @@ test('THE ADD-ON CARRIES twice.js AND repeats.js BYTE FOR BYTE, needs Money, cal
   assert.ok(file.ok, fixOf(file));
   assert.equal(file.value.pack.manifest.pack, 'money-watch');
   /* ABOVE 1.1.0, which the catalogue holds and which is never changed in place. */
-  assert.equal((PACK as { version?: string }).version, '1.2.0');
+  assert.equal((PACK as { version?: string }).version, '1.3.0');
   /* NO EM DASH AND NO ID IN A WORD A PERSON READS. */
   assert.equal(/—/.test(TEXT), false, 'an em dash in the add-on');
 });
@@ -472,6 +477,47 @@ test('LOOKS LIKE IT REPEATS READS THE SHOP TOO: three shops a month apart on one
     for (const on of ['2026-08-12', '2026-09-12', '2026-10-12']) await paid('HSBC CARD 7731 POS 88 NETFLIX', on, 21_900);
     await r.nextDay();
     assert.deepEqual(r.open().map((q) => q.question), ['Add Netflix to Repeating, E£219 around the 12th?']);
+  } finally {
+    await r.close();
+  }
+});
+
+test('A SHORT NUMBER IN A SHOP\'S NAME IS THE SHOP\'S: Studio 54 Cafe and Studio 54 Bar are two payees, and a card number in groups names no shop', async () => {
+  /* RED FIRST, MEASURED on the published 1.2.0 (its `fromWords`, read out of the catalogue's file): `Studio 54 Cafe`
+     and `Studio 54 Bar` both read { key: 'words:studio', name: 'Studio' }, so the two at E£120 on one day were one
+     charge made twice, and `CARD 1234 5678 NETFLIX` read "5678 Netflix". */
+  const r = await fresh();
+  try {
+    const paid = (words: string, on: string, amount: number) => r.charge(words, on, amount, { counterparty_text: words });
+    await paid('Studio 54 Cafe', '2026-10-05', 12_000);
+    await paid('Studio 54 Bar', '2026-10-05', 12_000);
+    assert.deepEqual(r.open(), [], 'two shops that start alike are not one charge made twice');
+    await paid('Studio 54 Cafe', '2026-10-06', 12_000);
+    assert.deepEqual(r.open().map((q) => q.question), ['Studio 54 Cafe E£120 on 5 Oct and again on 6 Oct. Both real?']);
+    /* EVERY GROUP OF THE CARD'S NUMBER GOES WITH THE CARD, masked or not, so one shop is one payee however it was led into. */
+    await paid('CARD 1234 5678 NETFLIX', '2026-10-08', 21_900);
+    await paid('CARD XXXX XXXX XXXX 7731 NETFLIX', '2026-10-08', 21_900);
+    assert.deepEqual(r.flags().map((f) => f.payee).sort(), ['Netflix', 'Studio 54 Cafe']);
+    /* A LONGER NUMBER STILL ENDS THE NAME: a branch and a day are not the shop. */
+    await paid('GEIDEA*CHILLOUT 0418 CAIRO EG', '2026-10-10', 9_000);
+    await paid('GEIDEA*CHILLOUT 12/10 CAIRO EG', '2026-10-10', 9_000);
+    assert.deepEqual(r.flags().map((f) => f.payee).sort(), ['Chillout', 'Netflix', 'Studio 54 Cafe']);
+  } finally {
+    await r.close();
+  }
+});
+
+test('LOOKS LIKE IT REPEATS KEEPS THE SHORT NUMBER TOO: two shops that start alike are no offer, and the one that repeats is offered by its whole name', async () => {
+  /* RED FIRST, MEASURED as above: on 1.2.0 the three shops below were the one payee "Studio". */
+  const r = await fresh();
+  try {
+    const paid = (words: string, on: string, amount: number) => r.charge(words, on, amount, { counterparty_text: words });
+    await paid('Studio 54 Bar', '2026-08-10', 30_000);
+    await paid('Studio 21 Gym', '2026-09-10', 30_000);
+    await paid('Studio 7 Dance', '2026-10-10', 30_000);
+    for (const on of ['2026-08-12', '2026-09-12', '2026-10-12']) await paid('Studio 54 Cafe', on, 21_900);
+    await r.nextDay();
+    assert.deepEqual(r.open().map((q) => q.question), ['Add Studio 54 Cafe to Repeating, E£219 around the 12th?']);
   } finally {
     await r.close();
   }

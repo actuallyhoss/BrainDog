@@ -290,13 +290,24 @@ const RUN_FILLED = /\{\{\s*(?:vars|trigger)\.[A-Za-z0-9_.]+\s*\}\}/;
 export const RUN_PATH = /\{\{\s*(vars|trigger)\.([A-Za-z0-9_.]+)\s*\}\}/g;
 
 /**
- * The row's own `{{field}}` and `{{kind:field}}`, as `rules.ts`'s `fill` reads them.
+ * The row's own `{{field}}`, `{{kind:field}}` and `{{kind:field-other}}`, as `rules.ts`'s `fill` reads them.
  *
  * A COPY, AND THE ONE PLACE THE TWO CAN DRIFT. `fill` writes its pattern inline and exports none, and it is the
  * pass's own file, so the lint holds this beside it and `flow-waits.test.ts` holds the pair to agreeing on every
  * spelling the question test names. Whoever next edits `fill` should import this instead.
+ *
+ * IT DID DRIFT ONCE. `fill` learned one money field less another (`{{short:amount-paid}}`) and this copy did not, so
+ * the spelling matched nothing here: a sealed field on either side of the minus installed and was caught only at the
+ * fill, and a create on a clock that copied the sum from a row it does not have installed too.
  */
-const ROW_FILL = /\{\{(\w+)(?::(\w+))?\}\}/g;
+const ROW_FILL = /\{\{(\w+)(?::(\w+)(?:-(\w+))?)?\}\}/g;
+
+/**
+ * Whether a match of the row's pattern is one `fill` leaves as typed: a second field after any form but the two that
+ * subtract. `{{on:due-paid}}` is the words written, so it names no field of the row. The row's three groups are read
+ * from the end of the match, since `flow.ts`'s `SPELLING` holds them last, after the run's and the figure's.
+ */
+export const asTyped = (m: RegExpMatchArray): boolean => m[m.length - 1] !== undefined && m[m.length - 3] !== 'short' && m[m.length - 3] !== 'money';
 
 /**
  * What a `create` would fill from a row, said of a run that has none, or `null`: `each:`, or a row's `{{field}}` in one
@@ -319,7 +330,7 @@ export function rowlessCreate(id: string, spec: { register?: unknown; each?: unk
     };
   if (!isObject(spec.fields)) return null;
   for (const [field, template] of Object.entries(spec.fields)) {
-    const spelled = typeof template === 'string' ? (template.match(ROW_FILL)?.[0] ?? null) : null;
+    const spelled = typeof template === 'string' ? ([...template.matchAll(ROW_FILL)].find((m) => !asTyped(m))?.[0] ?? null) : null;
     if (spelled !== null)
       return {
         fix: `${id} fills ${field} of the ${String(spec.register)} row it creates from ${spelled}, a field of the row that started it, and ${run} has no row. Write the words themselves, or start the rule from writes to the list whose row it means.`,
@@ -346,9 +357,12 @@ export function rowlessCreate(id: string, spec: { register?: unknown; each?: unk
  */
 function hiddenIn(question: string, hidden: ReadonlyMap<string, string>, rowFill = true, runFill = true): { field: string; type: string; spelled: string } | null {
   if (rowFill) for (const m of question.matchAll(ROW_FILL)) {
-    const field = m[2] ?? m[1]!;
-    const type = hidden.get(field);
-    if (type !== undefined) return { field, type, spelled: m[0] };
+    if (asTyped(m)) continue;
+    /* BOTH SIDES OF THE MINUS ARE READ BY THE FILL, so each is a field the question would carry off. */
+    for (const field of m[3] === undefined ? [m[2] ?? m[1]!] : [m[2]!, m[3]]) {
+      const type = hidden.get(field);
+      if (type !== undefined) return { field, type, spelled: m[0] };
+    }
   }
   if (runFill) for (const m of question.matchAll(RUN_PATH)) {
     if (m[1] !== 'trigger') continue;

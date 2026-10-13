@@ -68,7 +68,7 @@ import { dayIn } from './finished.ts';
 import { liveTarget } from './declare.ts';
 import { localParts, nextOccurrence } from './digest.ts';
 import { senderOf } from './ingest.ts';
-import { RELATIVE_DAY, RUN_PATH, RUNS_PER_DAY_CEILING, passFilled, pathOf, sealedAs, triggerOf } from './flow-lint.ts';
+import { RELATIVE_DAY, RUN_PATH, RUNS_PER_DAY_CEILING, asTyped, passFilled, pathOf, sealedAs, triggerOf } from './flow-lint.ts';
 import type { Entry } from './index.ts';
 import { instant } from './migrate.ts';
 import { evaluateMetric, predicateOf, type EvalContext, type MetricDecl } from './metrics.ts';
@@ -2504,9 +2504,10 @@ const hole = (at: unknown): boolean => at === undefined || at === null || at ===
 
 /**
  * Every spelling a text a run writes can hold, in the pass's order (`rules.ts`'s `SPELLED`): a run path (groups 1 and
- * 2), a figure (3 and 4), a create's tuple, and the row's `{{field}}` or `{{kind:field}}` (5 and 6).
+ * 2), a figure (3 and 4), a create's tuple, and the row's `{{field}}`, `{{kind:field}}` or `{{kind:field-other}}`
+ * (5, 6 and 7), the last being one money field less another.
  */
-const SPELLING = new RegExp(`${RUN_PATH.source}|${FIGURE.source}|\\{\\{each\\.\\d\\}\\}|\\{\\{(\\w+)(?::(\\w+))?\\}\\}`, 'g');
+const SPELLING = new RegExp(`${RUN_PATH.source}|${FIGURE.source}|\\{\\{each\\.\\d\\}\\}|\\{\\{(\\w+)(?::(\\w+)(?:-(\\w+))?)?\\}\\}`, 'g');
 
 /**
  * Whether `text` is spellings that each reach nothing and white space between them, so that filling it would write
@@ -2533,6 +2534,10 @@ function nothingIn(text: string, scope: Record<string, unknown>, row: Entry | nu
       continue;
     }
     const head = m[5];
+    /* A SECOND FIELD AFTER A FORM THAT DOES NOT SUBTRACT IS WORDS, left as typed by the pass (`flow-lint.ts`'s
+       `asTyped`), so the text holds something. Where the form subtracts, nothing in the first field writes the dash
+       whatever the second holds, which is the question asked of field 6 below. */
+    if (m[7] !== undefined && asTyped(m)) return false;
     if (head === undefined || head === 'id' || row === null || !hole(row.fields[m[6] ?? head])) return false;
   }
   return spelled && text.replace(SPELLING, '').trim() === '';

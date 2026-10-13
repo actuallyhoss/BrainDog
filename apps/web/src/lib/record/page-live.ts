@@ -23,7 +23,8 @@ import { COSTS, isBucket, isQuiet, type Bars, type FxRead, type MeasureSeries, t
 import { MISSING, UNNAMED, integer, money, quantity, since, day as fmtDay, type Resolve } from 'braindog-render';
 
 import { copy } from '../copy.ts';
-import type { ActionRow, Outcome } from './actions.ts';
+import { ratesPreset } from './action-draft.ts';
+import { live as actionsOf, type ActionRow, type Outcome } from './actions.ts';
 import {
   agentsTable,
   columnHeading,
@@ -85,12 +86,41 @@ export const liveWords = {
  * already filled in (`routes/packs/[id]` offers the same address from Money's settings).
  */
 export const footWords = {
-  ratesStale: (day: string): string =>
-    `Figures on this page are converted at rates as of ${day}, which are out of date. [Keep rates current](${RATES_PRESET})`,
+  /**
+   * `way` IS WHAT THE RECORD ALREADY HAS (audit 74, claim 2). `none`: no action fetches rates, so the new one is offered.
+   * `held`: one does, paused or failing or merely late, and the way on is that action; offering the preset again was a
+   * second copy to a person who needed the first mended. `unread`: the actions could not be read, so nothing is offered,
+   * because a link chosen at a guess is the fault this fixes.
+   */
+  ratesStale: (day: string, way: RatesWay): string => {
+    const said = `Figures on this page are converted at rates as of ${day}, which are out of date.`;
+    if (way === 'none') return `${said} [Keep rates current](${RATES_PRESET})`;
+    return way === 'held' ? `${said} [Open the action that fetches them](${RATES_HELD})` : said;
+  },
 } as const;
+
+/** What a record has for keeping its rates current, as the foot reads it. */
+export type RatesWay = 'none' | 'held' | 'unread';
 
 /** The rates action, filled in and waiting for a yes. Record-relative: the renderer's `href` puts the record in front. */
 const RATES_PRESET = '/automations?new=action&preset=rates';
+
+/** Where a scheduled action is listed with its state and its way back on. An action has no address of its own. */
+const RATES_HELD = '/automations?tab=scheduled';
+
+/**
+ * THE RATES ACTION A RECORD HOLDS, or `null`: the one filed under the name the sheet's own preset files it under.
+ *
+ * ASKED OF `ratesPreset` AND WRITTEN NOWHERE ELSE, so the day the add-on's file is filed under another name this follows
+ * it. The name does not move with the currencies (one address, one action, `ratesSpecFor`), so any two of them ask it.
+ * An action somebody drafted by hand under a name of their own is not known for a rates action here: the record's
+ * answer carries an action's name and not the list it writes.
+ */
+export function ratesActionOf<A extends { ingest: string }>(actions: readonly A[]): A | null {
+  RATES_INGEST ??= ratesPreset({ currencies: ['USD', 'EUR'], home: 'USD' })?.filled?.ingest ?? null;
+  return RATES_INGEST === null ? null : (actions.find((a) => a.ingest === RATES_INGEST) ?? null);
+}
+let RATES_INGEST: string | null | undefined;
 
 /** A refusal as the record sends one, and only the keys read here. */
 type Said = { code: string; fix: string };
@@ -276,6 +306,12 @@ export type LiveBlock = BlockResult & {
    * where the row names no run the page could read. Handed to the renderer as its `runs`, as a block of runs is.
    */
   runFaces?: (RunCell | null)[];
+  /**
+   * SET ON A BLOCK THE READER ADDED AND THE PAGE NEVER DECLARED (the foot, `footed`). Arrange and Change this page save
+   * against the count of declared blocks, and the record refuses a save whose count is off; whoever hands blocks to
+   * either leaves these out, and nothing offers to move, change or pin one.
+   */
+  synthetic?: true;
 };
 
 /** The mark and hue of the project a row applies to, as the kernel answers them beside `scopes` (`scope_marks`). */
@@ -1909,15 +1945,24 @@ const heldOf = (listed: unknown): { address: string; title?: string }[] =>
  * THE DAY NAMED IS THE OLDEST, because that is the figure furthest from true. A block that is not drawn, or that drew
  * no tiles, asks for nothing; so does a figure still in parts, whose own sentence is about a rate that is missing and
  * stays under it. With nothing out of date the blocks come back as they were handed in.
+ *
+ * THE FOOT IS MARKED `synthetic`, AS NO BLOCK OF THE DECLARATION, and `actions` is the record's scheduled actions, which
+ * choose the way on it offers (`footWords.ratesStale`); `null` where they could not be read.
  */
-export function footed(answered: readonly Answered[], drawn: LiveBlock[], now: number): LiveBlock[] {
+export function footed(answered: readonly Answered[], drawn: LiveBlock[], now: number, actions: readonly { ingest: string }[] | null): LiveBlock[] {
+  const oldest = oldestStale(answered, drawn);
+  if (oldest === null) return drawn;
+  const way: RatesWay = actions === null ? 'unread' : ratesActionOf(actions) ? 'held' : 'none';
+  const foot = { kind: 'note', key: 'rates-out-of-date', span: 12, body: footWords.ratesStale(fmtDay(oldest), way), rows: [], matched: 0, refusals: [] };
+  return [...drawn, { ...blockOf(foot as unknown as Answered, new Map(), now), synthetic: true }];
+}
+
+/** The oldest day a drawn tile was converted at out of date rates, or `null` where the page has no foot to say. */
+function oldestStale(answered: readonly Answered[], drawn: readonly LiveBlock[]): string | null {
   const days = answered.flatMap((b, i) =>
     drawn[i]?.metrics && drawn[i]!.drawn !== false ? (b.readings ?? []).flatMap((c) => (staleRead(c.reading) ? [c.reading.fx.asOf] : [])) : [],
   );
-  if (days.length === 0) return drawn;
-  const oldest = days.reduce((a, b) => (b < a ? b : a));
-  const foot = { kind: 'note', key: 'rates-out-of-date', span: 12, body: footWords.ratesStale(fmtDay(oldest)), rows: [], matched: 0, refusals: [] };
-  return [...drawn, blockOf(foot as unknown as Answered, new Map(), now)];
+  return days.length === 0 ? null : days.reduce((a, b) => (b < a ? b : a));
 }
 
 /**
@@ -2093,20 +2138,24 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
           if (row && isObject(row.fields)) runs.set(handle, { ...row.fields, ...(typeof row.state === 'string' ? { state: row.state } : {}) });
         }),
       );
+      const drawn = blocks.map((b, i) => {
+        const block = blockOf(b, refs, now, me, names, runs);
+        const lent = linked.get(i);
+        return lent && !block.cannot ? { ...block, linked: lent } : block;
+      });
+      /* THE ACTIONS ARE READ ONLY FOR A PAGE WITH A FOOT TO SAY, which is one read on the few pages with rates out of
+         date and none on the rest. A read the record refuses is `null`, and the foot then offers nothing. */
+      let held: ActionRow[] | null = [];
+      if (oldestStale(blocks, drawn) !== null) {
+        const got = await actionsOf(io ?? ((url, init) => fetch(url, init)), base).actions();
+        held = got.ok && Array.isArray(got.value) ? got.value : null;
+      }
       return {
         from: 'live',
         now,
         page: {
           page: identity ? { ...page, identity } : page,
-          blocks: footed(
-            blocks,
-            blocks.map((b, i) => {
-              const drawn = blockOf(b, refs, now, me, names, runs);
-              const held = linked.get(i);
-              return held && !drawn.cannot ? { ...drawn, linked: held } : drawn;
-            }),
-            now,
-          ),
+          blocks: footed(blocks, drawn, now, held),
         },
       };
     },

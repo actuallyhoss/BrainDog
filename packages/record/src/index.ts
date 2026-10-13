@@ -1033,6 +1033,13 @@ export type Boot = {
     icon: string | null;
     list: string | null;
     /**
+     * Every list the page reads that this caller reads too, in the order the page reads them, so the rail can hold a
+     * place back until one of them has something in it. Never the name for a read across the whole record, and never
+     * a list holding only what an add-on planted and nobody has touched (a starter set), whose count is not the
+     * person's own. `list` beside it is the one list a page draws, planted or not.
+     */
+    lists: string[];
+    /**
      * `updated_at` is when that row last changed, so the rail can draw the rows touched last while tabs keep their order.
      * `hue` is the row's own frozen colour, the whole degree its list's `identity.accent` field holds, so a project's
      * entry in the rail wears the mark its rows wear: `null` when the row holds none, and no key at all when its list
@@ -6922,6 +6929,24 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
+   * HOW MANY UNTOUCHED PLANTED ROWS EACH LIST HOLDS, counted once per state of the record and kept until a write moves
+   * it. The kernel reads the log for every planted row and looks through every row for one that names it, which on a
+   * record of twenty thousand rows with a starter set of eight was 39 of `boot`'s 52 milliseconds, on every screen. The
+   * key is the last event and the last row, both read off an index.
+   */
+  let plantedAt: string | null = null;
+  let plantedHeld: Record<string, number> = {};
+  const plantedRows = (): Record<string, number> => {
+    const at = sql.one<{ e: number | null; r: number | null }>('SELECT (SELECT max(rowid) FROM event) AS e, (SELECT max(rowid) FROM entry) AS r');
+    const key = `${at?.e ?? 0}:${at?.r ?? 0}`;
+    if (key !== plantedAt) {
+      plantedHeld = kernel.examples().registers;
+      plantedAt = key;
+    }
+    return plantedHeld;
+  };
+
+  /**
    * THE HUE A PAGE'S ROW WEARS, read off the field its list names as `identity.accent`, a whole degree or nothing as
    * `markOf` reads it for a row's chip. Only a list that names an accent is read, one row per page made from it, and
    * only a page the caller may open is asked about, so it says nothing of a row she could not read. Made per read, so a
@@ -6966,6 +6991,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const voiced = speaker === null ? null : `home-${speaker.replace(/^usecase-/u, '')}`;
     const home = voiced !== null && opens.some((page) => page.slug === voiced) ? voiced : opens.some((page) => page.slug === 'home') ? 'home' : null;
     const { accentOf, hueOf } = pageHues();
+    /* A LIST THAT HOLDS ONLY WHAT AN ADD-ON PLANTED IS NOT YET THE PERSON'S, so no page is said to read it: a starter set
+       nobody has touched would otherwise bring its place into the rail on the first day. One row of their own, or one
+       planted row they changed, and it is theirs. Asked of the whole list, as the planted rows are counted. */
+    const planted = plantedRows();
+    const theirs = (id: string): boolean => planted[id] === undefined || planted[id] < kernel.count(id);
     return {
       record: identity ? { slug: identity.slug, name: identity.name, locale: identity.locale, ...drawn } : null,
       ...drawn,
@@ -6989,6 +7019,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           nav: page.nav,
           icon: page.icon,
           list: page.registers.length === 1 && /^[a-z]/u.test(page.registers[0]!) && !readable(ctx, page.registers[0]!) ? page.registers[0]! : null,
+          /* EVERY LIST IT READS, held to what this caller reads, for a rail that waits on them (`Boot.pages`). */
+          lists: [...new Set(page.registers)].filter((id) => /^[a-z]/u.test(id) && !readable(ctx, id) && theirs(id)),
           /* AND WHICH ROW IT GREW OUT OF, the key the rail's cap is written against (`railRoom`). This
              map copied four keys and dropped the kernel's fifth, so on a large record 72 of 72 rail pages arrived with no
              `about` and the shell drew one entry per project, service and skill where the sample, which has the key,

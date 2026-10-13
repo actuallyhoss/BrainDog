@@ -38,4 +38,12 @@ they read the name, so each shop is its own payee. A one digit number after POS 
 own (7 Eleven), and a card that was bought (`GIFT CARD 1234`) is left as written. A line already in Money watch under
 a card's name stays as it is and matches no shop: "Both real" said about it quiets nothing, and a shop is asked about
 once more.
+1.3.0 keeps a short number that is part of a shop's name. The name stopped at the first word holding a digit, so
+`Studio 54 Cafe` read "Studio": two shops that start alike were one payee, and a question could name the wrong shop.
+A word now ends the name only when it holds three digits or more (a branch, a day, a reference), so `Studio 54 Cafe`
+is its own payee and `CHILLOUT 0418 CAIRO` is still Chillout. A card number written in groups (`CARD 1234 5678
+NETFLIX`, or masked, `CARD XXXX XXXX XXXX 7731`) is cut whole, where the second group led the name as "5678 Netflix".
+A line already in Money watch under the shorter name stays as it is and matches no shop: "Both real" said about
+Studio quiets nothing about Studio 54 Cafe, which is asked about once more. A branch number of one or two digits
+(`KFC 12 CAIRO`) now stays in the name with the words after it, so two branches are two payees.
 After an edit to a script, copy its text into the matching `source` in `money-watch.pack.json`.

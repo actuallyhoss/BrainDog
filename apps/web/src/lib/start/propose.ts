@@ -303,8 +303,9 @@ const WHOLE: readonly Whole[] = [
  *
  * A NEVER THAT THE CLAUSE TAKES BACK REFUSES NOTHING (`TAKEN_BACK`): "I never ran a shop before but I just opened
  * one" and "My wife never ran the shop, I do" are somebody with a shop, and "I never kept track of orders, I want to
- * start" is somebody with orders. AND WHAT NEVER RAN OUT WAS NEVER SAID TO BE KEPT (`RAN_OUT`): "I never ran out of
- * products" asks for no Products.
+ * start" is somebody with orders. SO IS ONE BEING OPENED, AND A FIRST ONE (`OPENS_NOW`, `FIRST_ONE`): "I never ran a
+ * shop but I am opening one next month", "I never ran a shop before. This is my first one." AND WHAT NEVER RAN OUT
+ * WAS NEVER SAID TO BE KEPT (`RAN_OUT`): "I never ran out of products" asks for no Products.
  */
 const REFUSES = "no|not|never|without|zero|don['’]?t|do\\s+not|doesn['’]?t|does\\s+not|haven['’]?t|hasn['’]?t|hadn['’]?t";
 /* `send` and its ending apart: the whole word is a field an add-on declares, and the core spells none (the core-names gate). */
@@ -434,7 +435,17 @@ const DOES_NOW = `(?:now\\s+)?${ME}\\s+(?:(?:now|finally|just)\\s+)?do(?![\\p{L}
 const WILL_START = `(?:${ME}\\s+)?(?:now\\s+)?(?:want|need|plan|intend|mean|(?:would\\s+)?(?:like|love)|(?:am\\s+|are\\s+)?(?:about|going|ready))\\s+to\\s+(?:start|begin)(?:\\s+(?:(?:${DOING})\\s+)?(?:${POINTS}))?`;
 const BEFORE_NOW = `(?:\\s+(?:before|yet|until\\s+now|till\\s+now|up\\s+to\\s+now|so\\s+far|myself|in\\s+my\\s+life|${WHEN})){0,2}`;
 const THEN = '(?:\\s*[,;.]\\s*(?:(?:and|but|so)\\s+)?|\\s+(?:and|but|so)\\s+)';
-const TAKEN_BACK = new RegExp(`^${BEFORE_NOW}${THEN}(?:${HAS_NOW}|${DOES_NOW}${CLAUSE_END})`, 'iu');
+/* AND WHOEVER IS OPENING ONE HAS ONE, as whoever just opened one does: "but I am opening one next month", "I'm setting
+   one up", "we are about to open one". Said of now by "I" or "we" with the word that points back, never a thought of it
+   ("I am thinking of opening one"), a refusal ("I am not opening one") or another thing ("I am opening a studio"). */
+const SET_UP = `(?:up\\s+(?:${POINTS})|(?:${POINTS})\\s+up)`;
+const OPENING = `(?:opening|starting|launching)(?:\\s+to\\s+(?:take|keep|track|have|run|use))?\\s+(?:${POINTS})|setting\\s+${SET_UP}`;
+const ABOUT_TO = `about\\s+to\\s+(?:(?:open|start|launch)\\s+(?:${POINTS})|set\\s+${SET_UP})`;
+const OPENS_NOW = `${ME}\\s+(?:(?:am|are)\\s+)?(?:(?:now|finally|just|already)\\s+)?(?:${OPENING}|${ABOUT_TO})(?![\\p{L}\\p{N}'’])`;
+/* A FIRST ONE IS ONE: "This is my first one.", "it's our first", "these are my first ones". Only the speaker's own, and
+   only where it ends its clause, so "this is my first time here" and "this is her first one" take nothing back. */
+const FIRST_ONE = `(?:(?:this|it|that)(?:\\s+is|['’]s|\\s+will\\s+be)|(?:these|they)\\s+are|they['’]re)\\s+(?:my|our)\\s+(?:very\\s+)?first(?:\\s+ones?)?(?:\\s+ever)?`;
+const TAKEN_BACK = new RegExp(`^${BEFORE_NOW}${THEN}(?:${HAS_NOW}|${OPENS_NOW}|(?:${DOES_NOW}|${FIRST_ONE})${CLAUSE_END})`, 'iu');
 /* Wanting to start takes back only what there is more than one of: orders are started in here, a shop is not. */
 const STARTED_HERE = new RegExp(`^${BEFORE_NOW}${THEN}${WILL_START}${CLAUSE_END}`, 'iu');
 /* Where one thing wished for would be, which ends the wish as a word of when does: "I wish I had a shop in Cairo",

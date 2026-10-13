@@ -13,16 +13,23 @@
  *
  * WHAT WAITS IS SAID AS SENTENCES ON THE SHEET (`waitsOf`): the parts the plan left out until the record holds a list.
  * What it sends is the plan sheet's own calls group (`$lib/market/plan.ts`).
+ *
+ * AN UPDATE THAT WAITS ON ANOTHER IS AN ORDER, NOT A DEAD END (`afterOthers`, `$lib/market/update-order.ts`). When the
+ * record would refuse this plan over something another waiting update hands to it, that update's plan is read too and
+ * both are on the one sheet, this one said as going in after it; Approve puts the holder in, plans this again and
+ * installs that (`installInTurn`), as "Update all" on Add-ons does.
  */
 
 import type { createClient } from '@braindog/client';
-import type { CatalogueEntry } from '@braindog/declare/catalogue';
+import type { CatalogueEntry, CatalogueIndex } from '@braindog/declare/catalogue';
 
 import type { Listing } from '../../../../lib/market/listing.ts';
+import { holderFirst, marked, type Waiting } from '../../../../lib/market/update-order.ts';
 import { words } from '../../../../lib/market/words.ts';
 import { packDocument, relabelDocument, type PackState } from '../../../../lib/record/packs.ts';
 import { afterInstall, installShared, keepVoice, planShared, speakingStates, switchTo, voiceQuestion, type SharedPlan } from '../../sharing.ts';
-import { askForVersion } from '../catalogue.ts';
+import { firstPartyUpdates, inTurn, landed } from '../../../decide/improved.ts';
+import { askForVersion, updatesFor } from '../catalogue.ts';
 
 type Wire<T> = { ok: true; value: T } | { ok: false; refusal?: { code?: string; fix?: string } };
 
@@ -31,8 +38,21 @@ export type OfferClient = ReturnType<typeof createClient>;
 
 /** A plan read and on the sheet: an add-on's or a module's `Diff`, or a use case's pack-by-pack plan. */
 export type Planned =
-  | { kind: 'pack'; doc: Record<string, unknown>; diff: unknown; planHash: string; approve: string[] }
+  | { kind: 'pack'; doc: Record<string, unknown>; diff: unknown; planHash: string; approve: string[]; after?: After }
   | { kind: 'usecase'; plan: SharedPlan };
+
+/** An update that waits, and where its file is from: the one planned, or another it may go in after. */
+export type Offered = Waiting & { source: Listing['source'] };
+
+/** One update of a run, with the plan the sheet showed for it. */
+export type Turn = { of: Offered; planned: Planned };
+
+/**
+ * What a plan that waits on other updates carries beside the record's own `diff`: the updates that go in first, each
+ * with its plan, and what the sheet draws (`shown`), their plans and then this one with each wait marked. `first` is
+ * empty when the holder is named as a step to take and not taken along.
+ */
+export type After = { self: Offered; first: readonly Turn[]; shown: unknown };
 
 export type Refused = { ok: false; fix: string; code: string | null };
 
@@ -40,7 +60,10 @@ const isMap = (v: unknown): v is Record<string, unknown> => typeof v === 'object
 const refusedOf = (r: Wire<unknown>, fallback: string): Refused => (r.ok ? { ok: false, fix: fallback, code: null } : { ok: false, fix: r.refusal?.fix ?? fallback, code: r.refusal?.code ?? null });
 
 /** What the plan sheet draws: the record's `Diff`, or the use case's plan whole. */
-export const diffOf = (p: Planned): unknown => (p.kind === 'pack' ? p.diff : p.plan);
+export const diffOf = (p: Planned): unknown => (p.kind === 'pack' ? (p.after?.shown ?? p.diff) : p.plan);
+
+/** What is said when the plan read again, once the one before it is in, asks for something the sheet did not show. */
+export const turnWords = { unread: 'The first update is in. This one now asks for something its plan did not show, so read its plan again.' } as const;
 
 /** The words over what waits on the sheet, kept with the market's other words. */
 export const sheetWords = { waits: words.waits, waitsNote: words.waitsNote } as const;
@@ -87,10 +110,12 @@ export function waitsOf(p: Planned, nameOf: (id: string) => string): string[] {
  */
 export async function planFor(
   client: OfferClient,
-  listing: Pick<Listing, 'kind' | 'id' | 'source'>,
+  listing: Pick<Listing, 'kind' | 'id' | 'source'> & { title?: string },
   file: { doc: Record<string, unknown> | null; text: string | null },
   states: readonly PackState[],
   fallback: string,
+  /** What else waits, asked for only when this plan has something to wait for. Left out, the plan is the record's as it stands. */
+  waiting?: () => Promise<readonly Offered[]>,
 ): Promise<{ ok: true; planned: Planned } | Refused> {
   if (listing.kind === 'usecase') {
     if (file.text === null) return { ok: false, fix: fallback, code: null };
@@ -107,7 +132,89 @@ export async function planFor(
   const planHash = typeof diff?.planHash === 'string' ? diff.planHash : '';
   if (!diff || planHash === '') return { ok: false, fix: fallback, code: null };
   const approve = Array.isArray(diff.approve) ? diff.approve.filter((l): l is string => typeof l === 'string') : [];
-  return { ok: true, planned: { kind: 'pack', doc, diff, planHash, approve } };
+  const own: Planned = { kind: 'pack', doc, diff, planHash, approve };
+  if (!waiting || !Array.isArray(diff.conflicts) || diff.conflicts.length === 0) return { ok: true, planned: own };
+  const self: Offered = { key: `${listing.kind}:${listing.id}`, kind: listing.kind, id: listing.id, title: listing.title ?? '', source: listing.source, file };
+  return { ok: true, planned: await afterOthers(own, self, await waiting(), (u) => planFor(client, u, u.file, states, fallback)) };
+}
+
+/**
+ * A plan beside the updates it goes in after. A conflict is waited out only when the pack that holds the thing has an
+ * update waiting whose document hands it to this one (`holderFirst`); that update is planned, and the two are one
+ * sheet with the wait said under Worth knowing and stopping nothing (`marked`). A plan with no such conflict comes
+ * back as it was.
+ *
+ * ONLY AN UPDATE THIS BUILD SHIPS IS TAKEN ALONG. A Kennel version is signed, and its key is read on its own page, so
+ * it is named as the step to take first. So is a holder whose plan cannot be read. A holder that itself waits on a
+ * third is planned as the record says it, and its own stop then shows.
+ */
+export async function afterOthers(own: Planned, self: Offered, waiting: readonly Offered[], plan: (u: Offered) => Promise<{ ok: true; planned: Planned } | Refused>): Promise<Planned> {
+  if (own.kind !== 'pack') return own;
+  const others = waiting.filter((o) => o.key !== self.key);
+  if (!holderFirst(own.diff, others)) return own;
+  const first: Turn[] = [];
+  let rest = others.filter((o) => o.source === 'bundled');
+  for (let holder = holderFirst(own.diff, rest); holder; holder = holderFirst(own.diff, rest)) {
+    const taken = holder;
+    rest = rest.filter((o) => o !== taken);
+    const out = await plan(taken);
+    if (out.ok) first.push({ of: taken, planned: out.planned });
+  }
+  const mine = marked(own.diff, others, first.map((t) => t.of));
+  return { ...own, after: { self, first, shown: first.length > 0 ? [...first.map((t) => diffOf(t.planned)), mine] : mine } };
+}
+
+/**
+ * Every update that waits on this record, as Add-ons' Updates tab reads them: the ones this build ships
+ * (`firstPartyUpdates`) and the Kennel's, a Kennel version standing in for a built-in of the same name. A Kennel that
+ * cannot be read leaves the built-in ones.
+ */
+export async function waitingOf(fetcher: typeof fetch, index: CatalogueIndex | null, states: readonly PackState[]): Promise<Offered[]> {
+  const bundled = firstPartyUpdates(states).map((u): Offered => ({ key: u.key, kind: u.kind, id: u.id, title: u.title, source: 'bundled', file: u.file }));
+  if (!index) return bundled;
+  try {
+    const out = await updatesFor(fetcher, index, states);
+    const far = out.updates.map((u): Offered => ({ key: `${u.entry.kind}:${u.entry.id}`, kind: u.entry.kind, id: u.entry.id, title: u.entry.title, source: 'kennel', file: { doc: u.file.kind === 'pack' ? u.file.file.doc : null, text: u.text } }));
+    const taken = new Set(far.map((u) => u.key));
+    return [...bundled.filter((u) => !taken.has(u.key)), ...far];
+  } catch {
+    return bundled;
+  }
+}
+
+const asksOf = (p: Planned): readonly string[] => (p.kind === 'pack' ? p.approve : p.plan.approve);
+
+/**
+ * Install a plan and the updates it goes in after, in turn (`improved.ts` `inTurn`): each holder, then this one
+ * planned again, because the holder moved the record and only now does this plan read clean. One the holder already
+ * brought in is passed over, and one that now asks for a line nobody was shown stops there. A plan that waits on
+ * nothing is installed as it is. `by` is the record's own plan and install; a test hands in names.
+ */
+export async function installInTurn(
+  planned: Planned,
+  by: { replan: (u: Offered) => Promise<{ ok: true; planned: Planned } | Refused>; install: (p: Planned) => Promise<{ ok: true; nav: string[] | null } | Refused> },
+): Promise<{ ok: true; nav: string[] | null } | Refused> {
+  if (planned.kind !== 'pack' || !planned.after || planned.after.first.length === 0) return by.install(planned);
+  const { after, ...own } = planned;
+  let nav: string[] | null = null;
+  let code: string | null = null;
+  const out = await inTurn<Offered, Planned>([...after.first.map((t) => ({ u: t.of, p: t.planned })), { u: after.self, p: own }], {
+    replan: async (u) => {
+      const fresh = await by.replan(u);
+      if (!fresh.ok) code = fresh.code;
+      return fresh;
+    },
+    asksOf,
+    landed: (p) => landed(diffOf(p)),
+    install: async (p) => {
+      const went = await by.install(p);
+      if (went.ok) nav = went.nav ?? nav;
+      else code = went.code;
+      return went;
+    },
+    unread: turnWords.unread,
+  });
+  return out.fix === '' ? { ok: true, nav } : { ok: false, fix: out.fix, code };
 }
 
 /**
@@ -121,6 +228,9 @@ export async function install(
   arrangement: readonly string[],
   fallback: string,
 ): Promise<{ ok: true; nav: string[] | null } | Refused> {
+  if (planned.kind === 'pack' && planned.after && planned.after.first.length > 0) {
+    return installInTurn(planned, { replan: (u) => planFor(client, u, u.file, states, fallback), install: (p) => install(client, p, states, arrangement, fallback) });
+  }
   if (planned.kind === 'pack') {
     const out = await client.installPack({ doc: planned.doc, source: { kind: 'local' }, planHash: planned.planHash, ...(planned.approve.length > 0 ? { approve: planned.approve } : {}) });
     return out.ok ? { ok: true, nav: null } : refusedOf(out, fallback);

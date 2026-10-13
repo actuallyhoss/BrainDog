@@ -390,6 +390,16 @@ test("THE LINT'S COPY OF THE ROW'S PATTERN REFUSES EVERY SPELLING rules.ts's fil
     const code = codeOf((await k.install([asks(`Rate ${spelled}?`)])) as Result<unknown>);
     if (leaks) assert.equal(code, 'DECLARATION_INVALID', `${spelled} is filled as "${fill(`Rate ${spelled}?`, row, NOW)}" and installed`);
   }
+  /* ONE MONEY FIELD LESS ANOTHER READS BOTH, so a secret on either side of the minus is refused at install as the fill
+     counts it (`filling`'s `secret`). A second field after a form that does not subtract is left as typed, and installs. */
+  const { filling } = await import('../src/rules.ts');
+  for (const spelled of ['{{short:pin-what}}', '{{short:what-pin}}', '{{money:what-pin}}', '{{on:what-pin}}', '{{text:pin-what}}']) {
+    const counted = filling(`Rate ${spelled}?`, row, NOW, { sealed: new Set(['pin']) }).secret !== null;
+    const code = codeOf((await k.install([asks(`Rate ${spelled}?`)])) as Result<unknown>);
+    assert.equal(code, counted ? 'DECLARATION_INVALID' : null, `${spelled}: the fill ${counted ? 'counts' : 'does not count'} a secret in it`);
+  }
+  assert.equal(filling('{{on:what-pin}}', row, NOW, { sealed: new Set(['pin']) }).secret, null);
+  assert.notEqual(filling('{{short:what-pin}}', row, NOW, { sealed: new Set(['pin']) }).secret, null);
   sql.close();
 });
 

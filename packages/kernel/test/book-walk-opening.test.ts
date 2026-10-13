@@ -131,6 +131,11 @@ test('A WALK STILL NAMES A FIGURE THAT IS THERE AND IS NOT ITSELF A WALK, with a
   /* And what is no id is no opening: a colon with nothing after it, nothing before it, or no figure at all. */
   for (const metricId of ['book-cash:', ':{{it}}', '{{it}}', 'Book Cash:{{it}}', ''])
     assert.equal((await refused('malformed', { metric: metricId })).code, 'DECLARATION_INVALID', JSON.stringify(metricId));
+  /* And the one hole a figure's parameter fills is {{it}}: a row's field is filled into a page, never into a figure, so
+     this installed and was refused on every read with "ask for it by name". */
+  const stray = await refused('from-a-field', { metric: 'book-cash:{{name}}' });
+  assert.deepEqual([stray.code, stray.at], ['DECLARATION_INVALID', 'opening']);
+  assert.match(stray.fix, /read about \{\{name\}\}.*book-cash:\{\{it\}\}/);
 });
 
 test('THE READER REFUSES THE SAME THREE, for a figure handed to it without an install', async () => {

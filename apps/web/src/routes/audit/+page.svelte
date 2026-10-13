@@ -49,7 +49,7 @@
      `undefined.word`. `isEventKind` is the kernel's own guard, beside the list. */
   import { isEventKind } from '@braindog/kernel';
   import type { AuditEvent, EventKind } from '$lib/record/schema.ts';
-  import type { LogRead } from '$lib/record/news-live.ts';
+  import { markAll, type LogRead } from '$lib/record/news-live.ts';
   import type { Cursor } from '@braindog/client';
   import { onMount, tick, untrack } from 'svelte';
 
@@ -292,7 +292,8 @@
    */
   onMount(() => {
     const base = apiBase();
-    const stamp = markStamp((upTo) => import('$lib/record/news-live.ts').then((m) => m.markAll(base, upTo)));
+    /* Imported with the screen, never inside the leave: a closing tab does not wait for a module. */
+    const stamp = markStamp((upTo) => markAll(base, upTo));
     const leave = () => {
       if (!route.data.live) return;
       const held = (live?.events ?? []).reduce((top, e) => Math.max(top, e.seq), 0);
