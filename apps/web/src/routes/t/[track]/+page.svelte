@@ -56,6 +56,7 @@
   import { actor } from '$lib/record/names.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
+  import Segmented from '$lib/ui/Segmented.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import Swimlanes from '$lib/viz/Swimlanes.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
@@ -301,11 +302,11 @@
           <div class="c-line">
             <div class="c-health">
               <p class="field-label" id="update-health">{healthField ? labelOf(healthField) : trackWords.health}</p>
-              <div class="segmented" role="group" aria-labelledby="update-health">
+              <Segmented role="group" aria-labelledby="update-health">
                 {#each healthChoices(REGISTERS.updates) as [v, said] (v)}
                   <button type="button" class="segment" aria-pressed={draftHealth === v} data-on={draftHealth === v ? '' : undefined} onclick={() => (draftHealth = v)}>{said}</button>
                 {/each}
-              </div>
+              </Segmented>
             </div>
             <Button type="submit" weight="primary" kbd="⌘↵" disabled={posting || draft.trim() === ''}>
               {posting ? copy.writeMarkSaving : copy.post}

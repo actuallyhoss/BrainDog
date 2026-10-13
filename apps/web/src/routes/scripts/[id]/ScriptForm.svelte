@@ -22,6 +22,7 @@
   import { faultsOf, idFrom, indent, sendDraft, tryDraft, words, type Door, type Draft, type Tried } from '$lib/record/script-draft.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import Button from '$lib/ui/Button.svelte';
+  import Segmented from '$lib/ui/Segmented.svelte';
   import Section from '$lib/ui/Section.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
@@ -160,25 +161,25 @@
       <fieldset class="item" aria-describedby={faultAt('starts') ? 'script-starts-fault' : undefined}>
         <legend class="label">{words.starts}</legend>
         <p class="sub" id="script-every">{words.every}</p>
-        <div class="segmented" role="group" aria-labelledby="script-every">
+        <Segmented role="group" aria-labelledby="script-every">
           <button type="button" class="segment" aria-pressed={draft.every === ''} data-on={draft.every === '' ? '' : undefined} onclick={() => (draft.every = '')}>{words.everyNone}</button>
           {#each everyChoices as e (e)}
             <button type="button" class="segment" aria-pressed={draft.every === e} data-on={draft.every === e ? '' : undefined} onclick={() => (draft.every = e)}>
               {words.everyAs[e] ?? words.everyOther(e)}
             </button>
           {/each}
-        </div>
+        </Segmented>
 
         {#if doorChoices !== null && doorChoices.length > 0}
           <p class="sub" id="script-door">{words.door}</p>
-          <div class="segmented" role="group" aria-labelledby="script-door">
+          <Segmented role="group" aria-labelledby="script-door">
             <button type="button" class="segment" aria-pressed={draft.door === ''} data-on={draft.door === '' ? '' : undefined} onclick={() => (draft.door = '')}>{words.doorNone}</button>
             {#each doorChoices as d (d.id)}
               <button type="button" class="segment" aria-pressed={draft.door === d.id} data-on={draft.door === d.id ? '' : undefined} title={d.description || undefined} onclick={() => (draft.door = d.id)}>
                 {humanize(d.id)}
               </button>
             {/each}
-          </div>
+          </Segmented>
         {:else if doorChoices === null}
           <label class="sub" for="script-door-typed">{words.doorTyped}</label>
           <div class="field">

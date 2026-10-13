@@ -23,7 +23,9 @@
  * - `repeating-overdue`, how many live repeating lines have a "Next" more than three days gone. `settle` moves "Next"
  *   when a payment is matched to the line, and until this nothing said when one was not. In the same unreleased 3.17.0
  *   (repeating-sign-fix-69, audit 67 claim 1) it counts only a line a payment was matched to before, so a line just
- *   added is not judged by a day nothing could have moved.
+ *   added is not judged by a day nothing could have moved. And it is named for that, "Matched repeating lines past
+ *   their day" (repeating-sign-72, audit 69 finding 5): a line nothing was matched to is not counted, so its nought is
+ *   no word on those.
  */
 
 import type { SeedMetric } from '../../base.ts';
@@ -139,12 +141,21 @@ export const SIGNS_FIGURES: Record<string, SeedMetric> = {
    * mark cannot be taken off in its place, since a figure with no target is refused. So a line never matched whose
    * money truly stopped is not counted here; the question on its day asks about it (`rules.ts`, "Did it go through?").
    *
+   * SO THE NAME SAYS MATCHED LINES, AND NOUGHT IS NOT "NOTHING STOPPED" (repeating-sign-72, audit 69 finding 5). A line
+   * Money watch wrote (`packs/money-watch/repeats.js`, `add`) has no "Last paid", and the one thing that writes one is
+   * `settle` (`scripts/settle.js`), which nobody runs by itself. On a record where no payment was ever matched to a
+   * line, every line is left out and this reads 0 whatever stopped: it is blind there, not clean. Under its first
+   * name, which said repeating lines and nothing of matched, that 0 read as every line watched, which it never was. It
+   * counts the matched lines and is named for them; the id, the `where` and the value are as they were, so nothing
+   * that reads it moves. (The first name is spelled in the test alone, which holds that the seed never writes it.)
+   * A page that draws it says matched too, and never offers it as a watch on every repeating line.
+   *
    * A paused or ended line is not waiting for anything and is left out. A COUNT, NEVER A SUM, so no two currencies meet
    * in it. None is the mark; a record with no repeating lines has none stuck.
    */
   'repeating-overdue': {
     metric: 'repeating-overdue',
-    name: 'Repeating lines past their day',
+    name: 'Matched repeating lines past their day',
     source: 'register.recurring',
     where: 'state is live, next_due before -3d, last_paid is set',
     value: { count: 'id' },

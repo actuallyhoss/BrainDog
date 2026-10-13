@@ -121,6 +121,14 @@ function cellOf(blocks: Block[], id: string): Cell {
 const read = (blocks: Block[], id: string): Reading => cellOf(blocks, id).reading!;
 /** The sentence a plan with parts is led by, with the plan's name filled in and every figure of it still to be written. */
 const sentenceOf = (name: string): string => `{{plan-parts-paid:${name}}} of {{plan-parts:${name}}} paid. {{plan-left:${name}}} left, the last part on {{plan-last-due:${name}}}.`;
+/** The sentence a plan with every part paid is led by: the same count, nothing left in words, and the day it ended. */
+const paidUpOf = (name: string): string => `{{plan-parts-paid:${name}}} of {{plan-parts:${name}}} paid, and nothing is left. The last part was on {{plan-last-due:${name}}}.`;
+/** The lead as a person reads it: every figure in braces written as the record answered it, a day as its count of days. */
+const wordsOf = (lead: Block): string =>
+  lead.body!.replace(/\{\{([^{}]+)\}\}/g, (whole, key: string) => {
+    const v = lead.values?.[key];
+    return v === undefined ? whole : typeof v === 'object' && v !== null ? `${(v as Money).currency} ${(v as Money).amount}` : String(v);
+  });
 /** The block that leads the page, which is one block and no more. */
 function leadOf(blocks: Block[]): Block {
   const lead = drawn(blocks).filter((b) => b.lead === true);
@@ -151,7 +159,7 @@ test('the page is one page a plan, under Money, and needs the list of plans', ()
 });
 
 test('every figure of one plan is read once a plan, by the name its parts share', () => {
-  assert.deepEqual(Object.keys(PLAN_FIGURES), ['plan-parts-paid', 'plan-parts', 'plan-paid', 'plan-left', 'plan-next-due', 'plan-last-due']);
+  assert.deepEqual(Object.keys(PLAN_FIGURES), ['plan-parts-paid', 'plan-parts', 'plan-paid', 'plan-left', 'plan-parts-open', 'plan-share-left', 'plan-next-due', 'plan-last-due']);
   for (const [id, f] of Object.entries(PLAN_FIGURES)) {
     assert.equal(f.metric, id);
     assert.equal(f.source, 'register.installments');
@@ -307,12 +315,56 @@ test('a plan with parts is led by one sentence, and a plan all paid says no next
 
   const desk = pageOf(k, 'Desk');
   assert.equal(drawn(desk).some((b) => b.heading === 'Next part'), false, 'nothing is next once every part is paid');
-  assert.equal(leadOf(desk).body, sentenceOf('Desk'));
-  /* ALL PAID READS 2 OF 2 AND 0 LEFT: no part is open, so nothing is added up and the nought has no currency to be
-     written in. The sentence still ends on the day the plan ended. */
+  /* ALL PAID IS LED BY ITS OWN SENTENCE, which asks for no amount left: no part is open, so nothing would be added up
+     and the nought would have no currency to be written in. It still ends on the day the plan ended. */
+  assert.equal(leadOf(desk).body, paidUpOf('Desk'));
+  assert.deepEqual(Object.keys(leadOf(desk).values ?? {}).sort(), ['plan-last-due:Desk', 'plan-parts-paid:Desk', 'plan-parts:Desk']);
   assert.deepEqual([said(desk, 'plan-parts-paid'), said(desk, 'plan-parts'), read(desk, 'plan-paid').value], [2, 2, 2 * PART]);
-  assert.equal(said(desk, 'plan-left'), 0);
   assert.equal(dayOf(said(desk, 'plan-last-due')), daysOf(due(2)));
+});
+
+test('the lead is one of three sentences, by whether the plan has a part and whether one is open', async () => {
+  const k = await moneyCore();
+  write(k, 'Flat', SIX);
+  write(k, 'Desk', ['paid', 'paid']);
+  write(k, 'Car', ['open', 'open', 'open']);
+  write(k, 'Boat', ['paid', 'cancelled']);
+  value(k.create('plans', { name: 'Shed' }, OWNER));
+  /* A day in the words, as the record answers it here and as it will once it answers a day as a day. */
+  const day = (blocks: Block[]): string => String(said(blocks, 'plan-last-due'));
+
+  /* A PART STILL OPEN: what is left is an amount in the parts' own currency, and the day is the day it will end. */
+  const flat = pageOf(k, 'Flat');
+  assert.equal(wordsOf(leadOf(flat)), `2 of 6 paid. EGP ${4 * PART} left, the last part on ${day(flat)}.`);
+  /* NONE PAID YET IS STILL A PLAN WITH A PART OPEN, and reads the same sentence from nought. */
+  const car = pageOf(k, 'Car');
+  assert.equal(leadOf(car).body, sentenceOf('Car'));
+  assert.equal(wordsOf(leadOf(car)), `0 of 3 paid. EGP ${3 * PART} left, the last part on ${day(car)}.`);
+
+  /* EVERY PART PAID: nothing is left, in words, and no nought stands where an amount would. */
+  const desk = pageOf(k, 'Desk');
+  assert.equal(wordsOf(leadOf(desk)), `2 of 2 paid, and nothing is left. The last part was on ${day(desk)}.`);
+  assert.doesNotMatch(wordsOf(leadOf(desk)), /\b0 left\b|\{\{/);
+  /* A CANCELLED PART IS IN NEITHER SIDE HERE TOO: one paid and one cancelled is a plan all paid, of one part. */
+  const boat = pageOf(k, 'Boat');
+  assert.equal(wordsOf(leadOf(boat)), `1 of 1 paid, and nothing is left. The last part was on ${day(boat)}.`);
+  assert.equal(dayOf(said(boat, 'plan-last-due')), daysOf(due(1)));
+
+  /* AND NO PART AT ALL IS NEITHER: one sentence that says so, never "nothing is left" about a plan nobody has filled. */
+  const shed = leadOf(pageOf(k, 'Shed'));
+  assert.match(shed.body!, /^No part of Shed is on Instalments yet\./);
+});
+
+test('the two figures the lead waits on tell a plan all paid from a plan with a part open and from one with none', async () => {
+  const k = await moneyCore();
+  write(k, 'Flat', SIX);
+  write(k, 'Desk', ['paid', 'paid']);
+  const of = (id: string, name: string): Reading => value<Reading>(k.metric({ ...PLAN_FIGURES[id], where: String(PLAN_FIGURES[id]!.where).replace('{{it}}', name) } as never));
+
+  assert.deepEqual([of('plan-parts-open', 'Flat').value, of('plan-parts-open', 'Desk').value, of('plan-parts-open', 'Shed').value], [4, 0, 0]);
+  /* FOUR OF SIX EQUAL PARTS ARE OPEN, so two thirds of the money is; nought once all is paid; and no value with no part. */
+  assert.ok(Math.abs(of('plan-share-left', 'Flat').value! - 4 / 6) < 1e-9);
+  assert.deepEqual([of('plan-share-left', 'Desk').value, of('plan-share-left', 'Shed').value], [0, null]);
 });
 
 test('nothing a person reads on the page is an id, a dash or a word about the list', () => {

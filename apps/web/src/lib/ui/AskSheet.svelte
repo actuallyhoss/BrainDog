@@ -16,6 +16,7 @@
 <script lang="ts">
   import Sheet from './Sheet.svelte';
   import Button from './Button.svelte';
+  import Segmented from './Segmented.svelte';
   import { apiBase } from '../at.ts';
   import { ASK_MOST, askWords, askYourself, fileOf, type AskOption, type AskShows } from '../record/decide-write.ts';
 
@@ -201,13 +202,13 @@
           <textarea id="ask-because-{n}" class="ask-text" rows="2" spellcheck="true" bind:value={d.because}></textarea>
 
           <p class="ask-label" id="ask-shows-{n}">{words.shows}</p>
-          <div class="segmented" role="group" aria-labelledby="ask-shows-{n}">
+          <Segmented role="group" aria-labelledby="ask-shows-{n}">
             {#each KINDS as k (k)}
               <button type="button" class="segment" aria-pressed={d.kind === k} data-on={d.kind === k ? '' : undefined} onclick={() => pickKind(i, k)}>
                 {words.kinds[k]}
               </button>
             {/each}
-          </div>
+          </Segmented>
 
           {#if d.kind === 'swatch'}
             <div class="ask-swatches">

@@ -36,6 +36,7 @@
   import { read, type Result } from '$lib/data/read.svelte.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
+  import Segmented from '$lib/ui/Segmented.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
   import type { IconName } from '$lib/ui/icons.ts';
@@ -196,7 +197,7 @@
   <!-- THE SWITCHER IS THE TOOLBAR'S GLASS SEGMENTED CONTROL: the month before, this one, the month after, each by its
        name, and neither past the year the ledger keeps or ahead of this month. Links, so Back is the month before. -->
   {#if view}
-    <nav class="segmented months" aria-label={words.months}>
+    <Segmented tag="nav" class="months" aria-label={words.months}>
       {#if beside.earlier}
         <a class="segment month" href={at(`/usage?month=${beside.earlier}`)} aria-label={words.monthIn(monthWords(beside.earlier))}>{monthWords(beside.earlier)}</a>
       {/if}
@@ -204,7 +205,7 @@
       {#if beside.later}
         <a class="segment month" href={at(`/usage?month=${beside.later}`)} aria-label={words.monthIn(monthWords(beside.later))}>{monthWords(beside.later)}</a>
       {/if}
-    </nav>
+    </Segmented>
   {/if}
 {/snippet}
 
@@ -376,7 +377,7 @@
 
   /* THE SWITCHER, in the toolbar. The chosen month is the white pill (`controls.css`); a link is a segment like any
      other, and never underlined. */
-  .months .month {
+  :global(.months) .month {
     display: inline-flex;
     align-items: center;
     text-decoration: none;

@@ -65,6 +65,7 @@
   import { builderPath } from '$lib/pattern/draft.ts';
   import { words as patternWords } from '$lib/pattern/words.ts';
   import Section from '$lib/ui/Section.svelte';
+  import Segmented from '$lib/ui/Segmented.svelte';
   import Face from '$lib/ui/Face.svelte';
   import { actor, listName } from '$lib/record/names.ts';
   import type { Pattern, Series, SettledItem, Tally } from './series.ts';
@@ -588,7 +589,7 @@
     <!-- FILED AND UNFILED AS ONE SERIES, three states of the same arrivals, so what was filed stays where it can be
          seen and put back rather than vanishing from the screen it left. The chosen one is the white pill. -->
     {#if !never}
-    <div class="segmented series" role="group" aria-label={words.series}>
+    <Segmented class="series" role="group" aria-label={words.series}>
       {#each segments as s (s.v)}
         <button
           type="button"
@@ -598,7 +599,7 @@
           onclick={() => show(s.v)}
         >{s.label}{#if s.n}<span class="segment-n num">{s.n}</span>{/if}</button>
       {/each}
-    </div>
+    </Segmented>
     {/if}
     {#if view === 'waiting' && INBOX.length > 0}
       <!-- WHERE A FILING GOES, AND SELECTING, ONLY WHILE SOMETHING WAITS: over an empty inbox both are controls for
@@ -1019,9 +1020,10 @@
     }
   }
 
-  /* GLASS NEVER HOLDS GLASS: once the title row is the compact glass bar, the pills in it drop their own. */
+  /* GLASS NEVER HOLDS GLASS: once the title row is the compact glass bar, the pills in it drop their own. The series
+     is the part's element (`Segmented`), not this file's, so its rule is global or it reaches nothing. */
   :global(.head[data-under]) .file-into[data-where='bar'],
-  :global(.head[data-under]) .series {
+  :global(.head[data-under] .series) {
     background: transparent;
     backdrop-filter: none;
     box-shadow: none;
@@ -1029,7 +1031,7 @@
 
   @supports (-webkit-backdrop-filter: none) {
     :global(.head[data-under]) .file-into[data-where='bar'],
-    :global(.head[data-under]) .series {
+    :global(.head[data-under] .series) {
       -webkit-backdrop-filter: none;
     }
   }

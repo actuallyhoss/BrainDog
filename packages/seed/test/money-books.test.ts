@@ -299,6 +299,43 @@ test('what an account already held is counted in one question, and picking File 
   r.sql.close();
 });
 
+test('what no longer stands is not counted and not filed: a void entry, an ended line, a cancelled or paid part', async () => {
+  const r = await money();
+  const acme = r.made('books', { name: 'Acme' }).id;
+  const account = r.made('accounts', { name: 'Acme current', kind: 'bank', liquid: true, balance: gbp(1_000_000), as_of: '2026-10-01' }).id;
+  const stands = [r.made('transactions', entry(account)), r.made('recurring', repeat(account)), r.made('installments', part(account))];
+  const gone = [
+    r.made('transactions', entry(account, { what: 'CEDAR LANE BAKERY', state: 'void' })),
+    r.made('recurring', repeat(account, { what: 'Old desk hire', state: 'ended' })),
+    r.made('installments', part(account, { what: 'Laptop, part 3', state: 'cancelled' })),
+    r.made('installments', part(account, { what: 'Laptop, part 1', state: 'paid' })),
+  ];
+  await r.turn();
+  value(r.k.update('accounts', account, { book: acme }, OWNER));
+  await r.night();
+  const q = r.asked('open')[0]!;
+  /* THE NUMBER THE BOOK FIGURES SAY (`figures/books.ts`): not void, not ended, open. */
+  assert.equal(r.said(q.id).replace(/^"|"$/gu, ''), '1 Ledger entry, 1 repeating line and 1 instalment are in no book, and their account is in one. File each in its account\'s book?');
+  const file = q.body!.options!.find((o) => o.label === 'File them')!;
+  assert.equal(file.patches?.length, 3);
+  value(r.k.decide(q.id, { decide: { option: file.id, reason: 'They are the company\'s.' } }, 'p_1'));
+  for (const e of stands) assert.equal(r.bookOf(e.id), acme, `${e.register} was not filed`);
+  for (const e of gone) assert.equal(r.bookOf(e.id), null, `${e.register} that no longer stands was filed`);
+  r.sql.close();
+});
+
+test('an account that holds only what no longer stands is asked nothing', async () => {
+  const r = await money();
+  const acme = r.made('books', { name: 'Acme' }).id;
+  const account = r.made('accounts', { name: 'Acme current', kind: 'bank', liquid: true, balance: gbp(1_000), as_of: '2026-10-01' }).id;
+  r.made('transactions', entry(account, { state: 'void' }));
+  await r.turn();
+  value(r.k.update('accounts', account, { book: acme }, OWNER));
+  await r.night();
+  assert.deepEqual(r.asked('open'), []);
+  r.sql.close();
+});
+
 test('Leave them is remembered: the next night asks nothing, and nothing is filed', async () => {
   const r = await money();
   const acme = r.made('books', { name: 'Acme' }).id;

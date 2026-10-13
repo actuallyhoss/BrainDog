@@ -13,10 +13,17 @@
  *
  * RED FIRST: with `last_paid is set` out of the figure's `where`, the first test fails on the sentence and the Money
  * watch test counts 1.
+ *
+ * AND ITS NAME SAYS SO (repeating-sign-72, audit 69 finding 5). Money watch writes its lines with no "Last paid" and
+ * only `settle` writes one, so on a record nobody runs `settle` on the sign reads 0 whatever stopped. Under the name
+ * "Repeating lines past their day" a reader took that 0 as every line watched. The name now says matched lines, and
+ * nothing in the seed keeps the old one. RED FIRST: under the old name the two tests of the name fail.
  */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readdirSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 import { install, normalise, plan, type Host, type Installed, type Pack } from '@braindog/declare';
 import { openRecord, type Entry, type Kernel } from '@braindog/kernel';
@@ -89,6 +96,42 @@ test('MONEY DECLARES THE SIGN FOR A STUCK REPEATING LINE, and the record install
 
   const k = await moneyCore();
   assert.ok(k.declarations().find((d) => d.id === 'metric.repeating-overdue'), 'money-core installed without repeating-overdue');
+});
+
+/** The name the sign had while it read as a watch on every line. */
+const OLD_NAME = 'Repeating lines past their day';
+
+test('THE NAME SAYS IT COUNTS MATCHED LINES, so nought is not read as every repeating line watched', async () => {
+  const sign = METRICS['repeating-overdue'];
+  assert.ok(sign, 'Money does not declare repeating-overdue');
+  assert.equal(sign.name, 'Matched repeating lines past their day');
+  assert.match(sign.name, /^Matched /, 'the first word a reader meets is the limit on what is counted');
+
+  /* The name is what the record holds, so what a page or an agent is shown. */
+  const k = await moneyCore();
+  const held = JSON.parse(k.declarations().find((d) => d.id === 'metric.repeating-overdue')!.body) as { name?: string };
+  assert.equal(held.name, sign.name, 'the record installed another name than Money declares');
+
+  /* And the number under it is what the name says: a line Money watch wrote, never matched, is not in it. */
+  line(k, 'Netflix', -40, { note: 'Added by Money watch from three payments about a month apart.' });
+  paid(k, 'Rent', -4, -34);
+  assert.equal(stuck(k).value, 1, 'the matched line alone');
+});
+
+test('NOTHING IN THE SEED KEEPS THE OLD NAME, which promised a watch on every repeating line', () => {
+  const root = fileURLToPath(new URL('../src/', import.meta.url));
+  const hits: string[] = [];
+  for (const entry of readdirSync(root, { recursive: true, withFileTypes: true })) {
+    if (!entry.isFile() || !/\.(ts|js|json|md)$/.test(entry.name)) continue;
+    const file = `${entry.parentPath}/${entry.name}`;
+    readFileSync(file, 'utf8')
+      .split('\n')
+      .forEach((text, i) => {
+        /* Case matters: the new name holds the old one's words after "Matched", with a small r. */
+        if (text.includes(OLD_NAME)) hits.push(`${file.slice(root.length)}:${i + 1}`);
+      });
+  }
+  assert.deepEqual(hits, [], 'the old name is still written here');
 });
 
 test('A LINE PAID BEFORE WHOSE NEXT IS FOUR DAYS GONE COUNTS, and one three days gone does not yet', async () => {

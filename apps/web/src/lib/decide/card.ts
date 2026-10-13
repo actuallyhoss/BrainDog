@@ -27,7 +27,7 @@ import { money, queueCost, since } from 'braindog-render';
 
 import { moneyInText } from '../record/money.ts';
 import type { ActorKind } from '../record/names.ts';
-import { changesSomething, laterLine, proposer, queueMergeOf, queueWords, saidOf, waysOf, type Way } from '../page/queue-answer.ts';
+import { changesSomething, laterLine, proposer, queueMergeOf, queueWords, saidOf, waysOf, type FileAt, type Way } from '../page/queue-answer.ts';
 import type { Merge } from '../../routes/decide/merge.ts';
 import { copy } from '../copy.ts';
 import { nameWords } from '../record/names.ts';
@@ -141,6 +141,8 @@ export type CardContext = {
   home?: string | null;
   /** The body of a `pack`, `settings` or `arrange` proposal, where the host holds it; the question's `arranged` otherwise. */
   body?: Record<string, unknown> | null;
+  /** The page's way to a file it holds, so an option that is a picture carries its address (`waysOf`); none without it. */
+  file?: FileAt | undefined;
 };
 
 const ULID = /[0-9A-HJKMNP-TV-Z]{26}/u;
@@ -334,7 +336,7 @@ function arrangementOf(q: QueueQuestion, kind: string, body: unknown): string {
 export function cardOf(q: QueueQuestion, ctx: CardContext): Card {
   const by = askerOf(q, ctx.me ?? null, ctx.names ?? new Map());
   const moves = movesOf(field(q, 'money'));
-  const plain = waysOf(q);
+  const plain = waysOf(q, ctx.file);
   const keyed = { options: plain.map((w) => ({ key: w.key, recommended: w.recommended, hard: w.hard })) };
   const said = moves.length === 0 ? '' : ctx.home === undefined ? amountSaid(moves) : amountSaid(moves, ctx.home);
   /* THE AMOUNT IN THE RECORD'S OWN CURRENCY, which `labelOf` reads from the shell: here it is the host's, when handed. */

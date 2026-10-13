@@ -360,3 +360,18 @@ test('A WALK THAT NEVER WENT UNDER READS THE SAME ON TODAY AND ON A PAGE: the da
   assert.equal(none.tone, 'warn');
   assert.equal(tileOf('runs-out-on', { ...walked, refusals: ['x'] }).value, MISSING, 'a refused figure is not money that lasts');
 });
+
+test('A BEYOND THAT IS NOT A DAY AND A WHOLE COUNT IS NOT TRUSTED ON TODAY EITHER: the dash and the warning, as a page draws it', () => {
+  const walked = { value: null, unit: null, rows: 3, held: 3, met: null, refusals: [] };
+  for (const beyond of [null, 'soon', { day: 20271007, days: 365 }, { day: '2027-10-07', days: 1.5 }, { day: 'next year', days: 365 }, { day: '2027-13-45', days: 365 }, { day: '2027-10-07' }]) {
+    const home = tileOf('runs-out-on', { ...walked, beyond });
+    const page = pageTile({ metric: 'runs-out-on', reading: { ...walked, beyond } } as never);
+    assert.equal(home.value, MISSING, JSON.stringify(beyond));
+    assert.equal(home.tone, 'warn', JSON.stringify(beyond));
+    assert.deepEqual([home.value, home.tone, home.note], [page.value, page.tone, page.note], JSON.stringify(beyond));
+  }
+  /* AND A FIGURE WITH A VALUE IS DRAWN AS IT WAS, beyond or not. */
+  const counted = tileOf('tasks-done-7d', { value: 4, unit: null, rows: 4, held: 9, met: null, refusals: [], beyond: { day: '2027-10-07', days: 365 } });
+  assert.notEqual(counted.value, copy.lastsPast('7 Oct 2027'));
+  assert.notEqual(counted.value, MISSING);
+});

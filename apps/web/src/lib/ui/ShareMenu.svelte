@@ -30,6 +30,7 @@
   import { linkOf, openLink, daysSaid, SHARE_DAYS, SHARE_DAYS_DEFAULT, words } from '../record/share-write.ts';
   import Button from './Button.svelte';
   import Icon from './Icon.svelte';
+  import Segmented from './Segmented.svelte';
   import Sheet from './Sheet.svelte';
   import { toasts } from './toast.svelte.ts';
 
@@ -207,13 +208,13 @@
       <Button weight="bare" onclick={() => (made = null)}>{words.shareAnother}</Button>
     {:else}
       <p class="share-hint">{words.shareLead}</p>
-      <div class="segmented" role="group" aria-label={words.shareDays}>
+      <Segmented role="group" aria-label={words.shareDays}>
         {#each SHARE_DAYS as n (n)}
           <button type="button" class="segment" data-on={days === n ? '' : undefined} aria-pressed={days === n ? 'true' : 'false'} onclick={() => (days = n)}
             >{daysSaid(n)}</button
           >
         {/each}
-      </div>
+      </Segmented>
       {#if refused}<p class="refused" role="alert">{refused}</p>{/if}
       <div class="share-actions">
         <Button weight="primary" disabled={busy} aria-busy={busy ? 'true' : undefined} onclick={() => void make()}>

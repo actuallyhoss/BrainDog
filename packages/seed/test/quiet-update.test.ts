@@ -607,6 +607,13 @@ const BOOK_FIGURES_71: ReadonlySet<string> = new Set(['book-in-month', 'book-out
 const BOOK_RULES_71: ReadonlySet<string> = new Set(['entry-takes-book', 'repeat-takes-book', 'part-takes-book']);
 const withoutBookFill = (doc: Body): Body =>
   withPage(doc, 'money-book', (now) => now.filter((b) => b.heading !== 'This month'), (d) => !BOOK_FIGURES_71.has(String(d.metric)) && !BOOK_RULES_71.has(String(d.rule)) && d.script !== 'book_from_account');
+/**
+ * AND BATCH 72'S (plan-lead-all-paid-72), folded into the same unreleased step: the two figures the plan page's lead
+ * sentences wait on go. The page itself, with its second lead sentence, goes with every plan (`withoutPlans`), since
+ * 3.13.0 held no plan at all, so no lead is put back by hand.
+ */
+const PLAN_LEAD_72: ReadonlySet<string> = new Set(['plan-parts-open', 'plan-share-left']);
+const withoutPlanLeads = (doc: Body): Body => ({ ...doc, declarations: (doc.declarations as Body[]).filter((d) => !PLAN_LEAD_72.has(String(d.metric))) });
 /** Batch 63's four figures of this month's spending against last (spend-figures-63), new in the unreleased money-core 3.17.0. */
 const SPEND_VS_LAST: ReadonlySet<string> = new Set(['spent-last-month', 'spent-by-category-last-month', 'spent-by-category-to-date-last-month', 'spent-vs-last-month']);
 const LATEST: Record<string, { version: string; released: string; undo: (doc: Body) => Body }> = {
@@ -615,7 +622,7 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
     version: '3.13.0',
     released: '2e09983b40aba73e',
     undo: (raw) => {
-      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(raw)))))))))));
+      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(withoutPlanLeads(raw))))))))))));
       return {
       ...doc,
       /* AND THE SCRIPT THAT MARKS A BILL PAID, WITH THE RULE THAT STARTS IT (settle-rule-60), both newer than 3.13.0. */
@@ -881,6 +888,9 @@ const projectBefore = (doc: Body, id: string): Body =>
       if (b.kind === 'roadmap') return [DONE_BY_WEEK, b];
       /* TOOLS AND SERVERS LISTED EVERYBODY'S TOOLS until batch 60 (sketchpad-60), where it now reads the project's own. */
       if (b.heading === 'Tools and servers') return [{ ...b, where: 'kind is tool' }];
+      /* KEYS AND SKILLS LISTED EVERYBODY'S until batch 72 (project-own-cards-72, PGS-C31), as Tools and servers had. */
+      if (b.heading === 'Keys' && b.source === 'runs_on') return [{ ...b, where: 'kind is key' }];
+      if (b.heading === 'Skills' && b.source === 'runs_on') return [{ ...b, where: 'kind is skill' }];
       if (b.heading !== 'At a glance') return [b];
       const cells = (b.cells as Body[]).flatMap((c) => (c.metric !== 'project-done-7d:{{name}}' ? [c] : id === 'founder' ? [] : [(({ trend: _trend, ...cell }) => cell)(c)]));
       return [{ ...b, cells }];

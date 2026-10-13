@@ -217,7 +217,10 @@ function figureFaults(f: Figure, said: Read, alone: Alone, bare: Read | undefine
     Object.fromEntries(Object.entries(alone).map(([code, reads]) => [code, pick(reads.get(f.metric))?.value ?? 0]));
   if (!isMoney(f)) {
     const out: string[] = [];
-    if (said.parts !== undefined || (said.unit !== null && /^[A-Z]{3}$/.test(said.unit))) out.push(`${f.metric} is not money and answers in ${said.unit ?? 'parts'}`);
+    /* A SHARE OF TWO SUMS OF MONEY ANSWERS ONCE A CURRENCY BY THE KERNEL'S OWN RULE (metrics.ts, "A HALF IN PARTS ... IS
+       THE FIGURE ONCE PER CURRENCY"), so its parts are no fault: money-core 3.17.0's `plan-share-left` is the first. */
+    const share = /"ratio"/.test(JSON.stringify(f.value ?? null));
+    if ((said.parts !== undefined && !share) || (said.unit !== null && /^[A-Z]{3}$/.test(said.unit))) out.push(`${f.metric} is not money and answers in ${said.unit ?? 'parts'}`);
     /* A RUNWAY ADDS THE CURRENCIES UP BEFORE IT COUNTS DAYS, so it may only answer once every one of them can be. */
     if (readsMoney(f)) {
       const all = Object.keys(alone).every((c) => stands.home !== null && worth(stands, c) !== null);

@@ -64,6 +64,7 @@
   import { CapLine } from 'braindog-render/svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
+  import Segmented from '$lib/ui/Segmented.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
   import Icon from '$lib/ui/Icon.svelte';
@@ -635,7 +636,7 @@
 <PageHead icon="decide" title={said('decide')} sentence={sentence?.text} needs={sentence?.needs || undefined}>
   {#snippet actions()}
     {#if from === 'live' && (open.length > 1 || selecting)}
-      <div class="segmented" role="group" aria-label={copy.decideGroup}>
+      <Segmented class="group-by" role="group" aria-label={copy.decideGroup}>
         <button
           type="button"
           class="segment"
@@ -650,7 +651,7 @@
           data-on={grouping === 'about' ? '' : undefined}
           onclick={() => groupBy('about')}>{copy.decideGroupList}</button
         >
-      </div>
+      </Segmented>
       <Button
         weight="glass"
         aria-pressed={selecting}
@@ -1660,14 +1661,14 @@
   }
 
   /* THE COMPACT BAR IS GLASS ALREADY, and glass never holds glass: the segmented track drops its own there. */
-  :global(.head[data-under]) .segmented {
+  :global(.head[data-under] .segmented.group-by) {
     background: transparent;
     box-shadow: none;
     backdrop-filter: none;
   }
 
   @supports (-webkit-backdrop-filter: none) {
-    :global(.head[data-under]) .segmented {
+    :global(.head[data-under] .segmented.group-by) {
       -webkit-backdrop-filter: none;
     }
   }
@@ -1686,7 +1687,7 @@
       padding: var(--sp-4) var(--gutter) var(--sp-8);
     }
 
-    .segmented {
+    :global(.segmented.group-by) {
       display: none;
     }
 

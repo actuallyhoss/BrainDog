@@ -62,6 +62,8 @@ test("Today's line on the vital signs is drawn where the record has the Health p
   const holds = holdsOf({ lists: [{ id: 'tasks', name: 'Tasks' }], pages: ['money', 'health'], me: owner }, {});
   assert.equal(holds.health, true);
   assert.equal(holdsOf({ lists: [], pages: ['money'], me: owner }, {}).health, undefined, 'no Health page, no line that links to it');
+  const member = { level: 'member', owner: false, person: 'p_2', lists: null } as never;
+  assert.equal(holdsOf({ lists: [], pages: ['money', 'health'], me: member }, {}).health, undefined, 'a member is not told the count of vital signs');
   const signs = (body: Awaited<ReturnType<typeof previewedBody>>) => (body?.blocks ?? []).filter((b) => b.kind === 'note' && String((b as { body?: unknown }).body).includes('(/p/health)'));
   assert.equal(signs(await previewedBody('today', holds)).length, 2, 'one note for one red sign, one for several');
   assert.equal(signs(await previewedBody('today', { tasks: true, adds: true, money: true })).length, 0);

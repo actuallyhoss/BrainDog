@@ -493,7 +493,9 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   alone. A rule and a script added inside the unreleased step, so no version of its own.
  *   One more sign of life (repeating-overdue-67, REC-B11 step 8): `repeating-overdue`, how many live repeating lines
  *   have a Next more than three days gone, with nought the target. Only a line a payment was matched to before is
- *   counted (repeating-sign-fix-69): `last_paid is set`. A figure added inside the unreleased step.
+ *   counted (repeating-sign-fix-69): `last_paid is set`. And named for it, Matched repeating lines past their day
+ *   (repeating-sign-72, audit 69 finding 5), so nought is no word on a line nothing was matched to. A figure added
+ *   inside the unreleased step.
  *   A name beside the bank's words (payee-field-68, REC-B16 step 2): the Ledger gains `payee`, Paid to or from,
  *   searchable and not indexed, and `counterparty_text` is labelled As the bank wrote it.
  * - portfolio 1.16.0 and work 1.18.0 (batch 46, REC-C08's remainder and REC-C16): a project others point at stays. Projects
@@ -567,6 +569,9 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   no version of its own (REC-A09 steps 1 to 3): three rules and `script.book_from_account` file a Ledger entry, a
  *   repeating line or an instalment in its account's book (book-fill-71); seven figures say one book's month and what
  *   is filed in no book (book-figures-71); and the book page gained This month, a row of the three (book-page-71).
+ *   And batch 72's (plan-lead-all-paid-72), in the same unreleased step: two figures of one plan, `plan-parts-open` and
+ *   `plan-share-left`, and the plan page's second lead sentence, for a plan with every part paid. And the nightly
+ *   count of `script.book_from_account` is of what still stands, as the page counts it (audit 71 finding 1).
  * - people 3.4.0: the People page says how many people may be on the record twice (people-held-twice-69), one note under
  *   its two lead notes, from the built-in figure held-twice and drawn only above nought. 3.3.0 is released (commit
  *   63423720 holds it), so a version of its own. A note added, nothing taken away, so a minor step that reaches a record

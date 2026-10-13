@@ -8,6 +8,16 @@ const PARTS = 'plan is {{name}}';
 /** Drawn only while the plan has a part that stands, so no tile says nought of nought. */
 const HAS_PARTS = { metric: 'plan-parts:{{name}}', gte: 1 };
 
+/** Drawn only while a part is still open: the sentence about what is left has something left to say. */
+const HAS_OPEN = { metric: 'plan-parts-open:{{name}}', gte: 1 };
+
+/**
+ * Drawn only once the plan has parts and none of them is open. One figure says both, the share of the plan's money
+ * still open (`plan-share-left` in `figures/plans.ts`): nought when every part is paid, and no value at all, which
+ * meets no test, on a plan with no part.
+ */
+const ALL_PAID = { metric: 'plan-share-left:{{name}}', lte: 0 };
+
 /**
  * ONE PAGE A PLAN, UNDER MONEY, SINCE REC-B12 (jobs 3 and 4): "instalment plan's own page" (the owner). A TEMPLATE, as
  * a book's page is (`book.ts`): one declaration, one page for each plan, every `{{name}}` filled from it. A record
@@ -20,8 +30,11 @@ const HAS_PARTS = { metric: 'plan-parts:{{name}}', gte: 1 };
  *
  * EVERY FIGURE IS COUNTED FROM THE PARTS (`figures/plans.ts`), so the page cannot disagree with Instalments, and a
  * cancelled part is in neither side. A tile is drawn only while its figures have something to say: a plan with no
- * part reads one sentence, and a plan all paid has no next part to show. THE LEAD SENTENCE WAITS FOR A PART TOO
- * (`HAS_PARTS`): a figure of a plan that holds no value is not answered at all, so its braces would be left showing.
+ * part reads one sentence, and a plan all paid has no next part to show. THE LEAD SENTENCE WAITS FOR A PART TOO: a
+ * figure of a plan that holds no value is not answered at all, so its braces would be left showing.
+ *
+ * THREE LEAD SENTENCES AND ONE DRAWN, SINCE BATCH 72: no part yet, a part still open (`HAS_OPEN`), and every part paid
+ * (`ALL_PAID`), which reads "2 of 2 paid, and nothing is left. The last part was on 1 Feb 2027." and never "0 left".
  */
 export const MONEY_PLAN_PAGE: SeedPage = {
   page: 'money-plan',
@@ -46,8 +59,17 @@ export const MONEY_PLAN_PAGE: SeedPage = {
       kind: 'note',
       lead: true,
       span: 12,
-      when: HAS_PARTS,
+      when: HAS_OPEN,
       body: '{{plan-parts-paid:{{name}}}} of {{plan-parts:{{name}}}} paid. {{plan-left:{{name}}}} left, the last part on {{plan-last-due:{{name}}}}.',
+    },
+    {
+      /* A PLAN ALL PAID, SINCE BATCH 72: it read "2 of 2 paid. 0 left", a nought with no currency to be written in,
+         because no open part is added up. It says nothing is left in words, and the day it ended as a day gone. */
+      kind: 'note',
+      lead: true,
+      span: 12,
+      when: ALL_PAID,
+      body: '{{plan-parts-paid:{{name}}}} of {{plan-parts:{{name}}}} paid, and nothing is left. The last part was on {{plan-last-due:{{name}}}}.',
     },
     {
       /* ONE TRACK, THE PARTS PAID AGAINST EVERY PART THAT STANDS, read off the list's own status; Money's

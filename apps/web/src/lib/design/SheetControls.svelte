@@ -30,6 +30,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Count from '$lib/ui/Count.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import Segmented from '$lib/ui/Segmented.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import Toasts from '$lib/ui/Toasts.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
@@ -151,13 +152,13 @@
   <Tile title={words.segmented}>
     {#each SEGMENTS as n (n)}
       <figure class="cell cell-start">
-        <div class="segmented" role="group" aria-label={words.choices(n)}>
+        <Segmented role="group" aria-label={words.choices(n)}>
           {#each words.segments.slice(0, n) as label, i (label)}
             <button type="button" class="segment" aria-pressed={picked[n] === i} data-on={picked[n] === i ? '' : undefined} onclick={() => (picked[n] = i)}
               >{label}</button
             >
           {/each}
-        </div>
+        </Segmented>
         <figcaption class="said">{words.choices(n)}</figcaption>
       </figure>
     {/each}

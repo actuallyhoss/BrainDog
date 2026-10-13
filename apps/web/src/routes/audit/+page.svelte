@@ -50,7 +50,7 @@
   import type { AuditEvent, EventKind } from '$lib/record/schema.ts';
   import type { LogRead } from '$lib/record/news-live.ts';
   import type { Cursor } from '@braindog/client';
-  import { tick, untrack } from 'svelte';
+  import { onMount, tick, untrack } from 'svelte';
 
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
   /* WHO, IN WORDS. This screen's three person-shaped slots (the actor on a line, the `by` filter, and
@@ -99,6 +99,8 @@
   /* A FIELD PUT ON OR TAKEN OFF A LIST, IN WORDS, from the same helper Home's feed says it with. STATIC, and the lead's
      `readUnseen` with it: one module both imported and imported lazily is neither split nor shared, only warned about. */
   import { declaredOf, readUnseen } from '$lib/record/history-live.ts';
+  /* WHEN THE READER'S MARK MOVES: stamped as they leave, with the newest line this page held (`read-mark.ts`). */
+  import { readMarkOf, seenAfter, stampOf as markStamp } from './read-mark.ts';
 
   /**
    * What an event kind is called, and what it looks like — all forty of them.
@@ -259,7 +261,7 @@
    * A SENTENCE, NOT THE SCREEN. The log below is what Activity is for, so a refusal here draws no sentence and settles
    * nothing: the call closes as answered, and the log's own read is the one that says the record could not be reached.
    */
-  let unseen = $state<{ actors: string[]; capped: boolean; byWho: ByWho | null } | null>(null);
+  let unseen = $state<{ actors: string[]; capped: boolean; byWho: ByWho | null; upTo?: Cursor | null } | null>(null);
   $effect(() => {
     if (!route.data.live) return;
     const at = untrack(opened);
@@ -267,12 +269,42 @@
       .then((out) => {
         /* AND THE RECORD'S OWN COUNT OF WHO, when the read carries it (`byWho`, SHL-A21): `byWhoOf` takes nothing that is
            not a count, so a read older than it is counted here as before. */
-        if (out.from === 'live') unseen = { actors: out.actors, capped: out.capped, byWho: byWhoOf((out as { byWho?: unknown }).byWho) };
+        if (out.from === 'live') unseen = { actors: out.actors, capped: out.capped, byWho: byWhoOf((out as { byWho?: unknown }).byWho), upTo: out.upTo };
       })
       .catch(() => undefined)
       .finally(() => closed(true, at));
   });
   const lead = $derived(unseen ? awaySaid(unseen.actors, me, names, unseen.capped, unseen.byWho) : undefined);
+
+  /**
+   * THE MARK IS STAMPED WHEN THE READER LEAVES, as Home stamps it, and only when the sentence above said something was
+   * new: `pagehide` covers a closed tab, and the screen's end covers leaving for another. Without it the mark moved only
+   * on a home that draws a feed of the log, and this screen said the same lines were new every time it was opened.
+   *
+   * WITH THE NEWEST LINE THIS PAGE HELD, not the shell's cursor alone, which is as old as the tab (`readMarkOf`). A mark
+   * that did not land leaves the record's where it was, so the same lines come back rather than being lost. One that
+   * landed empties the sentence, for a tab that is hidden and then shown again.
+   *
+   * THE RECORD IS NAMED WHEN THE SCREEN OPENS. By the time it ends the address is already the next screen's, and that
+   * may be another record's.
+   */
+  onMount(() => {
+    const base = apiBase();
+    const stamp = markStamp((upTo) => import('$lib/record/news-live.ts').then((m) => m.markAll(base, upTo)));
+    const leave = () => {
+      if (!route.data.live) return;
+      const held = (live?.events ?? []).reduce((top, e) => Math.max(top, e.seq), 0);
+      const upTo = readMarkOf(unseen?.upTo ?? route.data.upTo, unseen ? unseen.actors.length : null, held);
+      void stamp.leave(upTo).then((landed) => {
+        if (landed) unseen = seenAfter();
+      });
+    };
+    addEventListener('pagehide', leave);
+    return () => {
+      removeEventListener('pagehide', leave);
+      leave();
+    };
+  });
 
   /**
    * THE PAGE BELOW, WHEN ASKED FOR. A log longer than one page says so with a control instead of stopping at two hundred

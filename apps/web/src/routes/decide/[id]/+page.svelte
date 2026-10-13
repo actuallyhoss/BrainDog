@@ -62,7 +62,7 @@
   import { COMMENT_MOST, sayComment } from '$lib/record/comments.ts';
   import { everyGovernance, plainOf, readOne, type One } from '$lib/record/governance.ts';
   import { answerQuestion, parkQuestion, type Written } from '$lib/record/decide-write.ts';
-  import { proposer, queueMergeOf, queueWords, visualOf, type Visual } from '$lib/page/queue-answer.ts';
+  import { proposer, queueMergeOf, queueWords, type FileAt } from '$lib/page/queue-answer.ts';
   import '$lib/decide/form.css';
   import { cardWords, spoken } from '$lib/decide/card.ts';
   import { mayAnswer, whyNotAnswering } from '../answering.ts';
@@ -71,6 +71,7 @@
   import MergeCard from '../MergeCard.svelte';
   import { nextOpen, stillWaiting, words as onwardWords } from './onward.ts';
   import { sideOf, words as sideWords } from './side.ts';
+  import { readFiles, visualsOf } from './option-visual.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
   import { hostedHere } from '../../settings/billing.ts';
   import { goto, invalidateAll } from '$app/navigation';
@@ -120,6 +121,7 @@
     closed(out.from !== 'refused', at);
     keysHeld = undefined;
     if (live?.about && isArranging(live.about.kind)) void readHeld();
+    void readPictures(id);
   }
 
   /**
@@ -186,20 +188,23 @@
   const about = $derived(from === 'live' ? live?.about : undefined);
 
   /* WHAT EACH OPTION IS, drawn inside its own card as the queue's tile draws it. It is read from the body the question
-     was filed with, because the question's words carry none, and through `visualOf`, which holds a swatch to the
-     renderer's own spelling before it reaches a style. A file is left out here for the reason the tile leaves it out:
-     only a page's renderer is handed the address a file is served at. */
-  const visuals = $derived.by(() => {
-    const offered = about?.kind === 'options' && Array.isArray(about.body.options) ? (about.body.options as unknown[]) : [];
-    const out = new Map<string, Visual>();
-    for (const o of offered) {
-      if (o === null || typeof o !== 'object') continue;
-      const { id, shows } = o as { id?: unknown; shows?: unknown };
-      const seen = typeof id === 'string' ? visualOf(shows) : null;
-      if (seen !== null && typeof id === 'string') out.set(id, seen);
-    }
-    return out;
-  });
+     was filed with, because the question's words carry none, and through `visualsOf`, which holds a swatch to the
+     renderer's own spelling before it reaches a style.
+
+     A PICTURE IS SERVED BY THE RECORD THE PAGE IS ON. The queue's tile is handed its way to a file by the page that drew
+     it; this page has no block, so it asks the record for the entry a picture option names (`readFiles`) and places the
+     address under this record. Until that answers, and for a reader the record will not show the entry to, the option
+     reads by its name. */
+  const offered = $derived(about?.kind === 'options' ? about.body.options : undefined);
+  let optionFile = $state.raw<FileAt | undefined>(undefined);
+  const visuals = $derived(visualsOf(offered, optionFile));
+  async function readPictures(id: string) {
+    if (!client) return;
+    const file = await readFiles(client.get, offered, (path) => at(path));
+    /* KEPT ACROSS A RE-READ, so a picture does not blink out while the question is read again: it is the same record,
+       and an entry's file is the same file whichever question names it. An answer for a question already left is dropped. */
+    if (String(page.params.id) === id) optionFile = file;
+  }
   const lists = $derived(
     new Map<string, string>(((page.data.lists ?? page.data.index?.registers ?? []) as { id: string; name: string }[]).map((l) => [l.id, l.name])),
   );
@@ -1064,6 +1069,11 @@
                             </span>
                           {:else if shows && 'figure' in shows}
                             <span class="card-visual" data-shows="figure"><span class="card-figure num">{shows.figure}</span></span>
+                          {:else if shows && 'file' in shows}
+                            <!-- A PICTURE SAYS WHICH OPTION IT IS, in the option's own name, for a reader who cannot see it. -->
+                            <span class="card-visual" data-shows="file"
+                              ><img class="card-file" src={shows.file.src} alt={labelOf(option, question, moves)} loading="lazy" decoding="async" /></span
+                            >
                           {/if}
                           <button
                             type="button"
@@ -1547,6 +1557,17 @@
     background: var(--swatch);
     border: 1px solid var(--line);
     forced-color-adjust: none;
+  }
+
+  /* A PICTURE AT THE BAND'S HEIGHT AND NO TALLER THAN A SMALL TILE, cut to its box and never stretched, on the field's
+     colour while it loads. */
+  .card-file {
+    display: block;
+    max-inline-size: 100%;
+    block-size: 6rem;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    background: var(--field);
   }
 
   .card-figure {

@@ -1944,7 +1944,7 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
       if (!Array.isArray(columns) || columns.length === 0 || columns.length > COLUMN_CEILING)
         return bad('DECLARATION_INVALID', `${id}.${at} draws one to ${COLUMN_CEILING} columns.`, at);
       const roles = new Map<string, number>();
-      for (const column of columns as { field?: unknown; as?: unknown; metric?: unknown }[]) {
+      for (const column of columns as { field?: unknown; or?: unknown; as?: unknown; metric?: unknown }[]) {
         /* A CARD'S TREND MAY NAME A FIGURE IN PLACE OF A FIELD, grouped by a date bucket and read once a card with
            `{{field}}` in its id filled from the card's row (`pages.ts` `trendsOf`). Nothing else draws a figure in a
            column, so a `metric:` anywhere else would install and draw nothing. */
@@ -1953,6 +1953,8 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
             return bad('DECLARATION_INVALID', `${id}.${at} gives a column a metric:, which only a card's trend reads: { metric, as: trend } on a cards block.`, at);
           if (column.field !== undefined)
             return bad('DECLARATION_INVALID', `${id}.${at} gives a column both a field and a metric. A trend column names the figure alone.`, at);
+          if (column.or !== undefined)
+            return bad('DECLARATION_INVALID', `${id}.${at} gives a trend column an or:, which is a second field to read. A trend column names the figure alone.`, at);
           if (typeof column.metric !== 'string' || !METRIC_ID.test(metricNamed(column.metric)))
             return bad('DECLARATION_INVALID', `${id}.${at}'s trend names a figure by its id, with {{field}} after a colon for a figure of each card, as project-done-by-week:{{name}}.`, at);
           const n = (roles.get('trend') ?? 0) + 1;
@@ -1962,6 +1964,10 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
         }
         if (typeof column?.field !== 'string' || column.field === '')
           return bad('DECLARATION_INVALID', `${id}.${at} names ${JSON.stringify(column?.field ?? null)} as a column, and a column names a field.`, at);
+        /* `or:` IS A SECOND FIELD, read where the first holds nothing (`pages.ts`), so it is a name as `field` is. Whether
+           the list declares it is the read's to say, where the list is in hand. */
+        if (column.or !== undefined && (typeof column.or !== 'string' || column.or === ''))
+          return bad('DECLARATION_INVALID', `${id}.${at} names ${JSON.stringify(column.or ?? null)} as a column, and a column names a field.`, at);
         /* `as` IS A COLUMN'S ROLE ON A CARD, and only a `cards` block reads it. On any other kind it
            would install and draw nothing different, so it is refused there. */
         if (column.as === undefined) continue;

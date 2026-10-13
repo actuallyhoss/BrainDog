@@ -13,7 +13,7 @@
  * says it the way a person does, "£2,400.00" in the home currency and "$4,800.00 USD" in any other.
  */
 
-import { createClient, type ClientOptions } from '@braindog/client';
+import { createClient, type ClientOptions, type Cursor } from '@braindog/client';
 
 import { display, labelOf } from './api.ts';
 import { REGISTERS } from './held.ts';
@@ -156,14 +156,17 @@ export async function readHistory(base: string, register: string, seq: number, i
  * stamps on leaving, newest first and at most one page of them (`sinceCapped` says there are more). Reading it moves
  * nothing; only `markRead` does, so History asking does not take Home's news away.
  *
+ * AND `upTo`, THE RECORD'S OWN CURSOR FOR THESE LINES, as fresh as this read, which Activity stamps with on leaving: the
+ * shell's is as old as the tab, and it is the only one a member held to named lists may send back.
+ *
  * ONLY THE SIGNATURES, because the lead line counts who and says nothing of what: the lines themselves are the log
  * below it, which `readLog` reads.
  */
-export type Unseen = { from: 'live'; actors: string[]; capped: boolean; byWho?: unknown } | { from: 'refused'; fix: string };
+export type Unseen = { from: 'live'; actors: string[]; capped: boolean; upTo: Cursor | null; byWho?: unknown } | { from: 'refused'; fix: string };
 
 export async function readUnseen(base: string, io?: Fetch): Promise<Unseen> {
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });
   const out = await client.whatsNew();
-  if (out.ok) return { from: 'live', actors: out.value.events.map((e) => e.actor), capped: out.value.sinceCapped, ...(out.value.byWho === undefined ? {} : { byWho: out.value.byWho }) };
+  if (out.ok) return { from: 'live', actors: out.value.events.map((e) => e.actor), capped: out.value.sinceCapped, upTo: out.value.upTo, ...(out.value.byWho === undefined ? {} : { byWho: out.value.byWho }) };
   return { from: 'refused', fix: 'refusal' in out ? out.refusal.fix : 'The record changed while it was being read.' };
 }

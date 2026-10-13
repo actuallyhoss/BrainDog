@@ -711,11 +711,14 @@ const runLink = (said: string | null, value: unknown): string | null => {
 /**
  * `types` IS WHAT THE BLOCK ANSWERED for columns no list declares (a computed source's, `BlockResult.types`), which
  * `display` falls back to. A column typed as a run links to the run.
+ *
+ * A COLUMN'S `or` IS THE FIELD READ WHEN ITS OWN HOLDS NOTHING, and it is read as itself: its own type, its own casing.
+ * A ledger's "paid to" was an empty cell on every line a bank named nobody on, beside a description that said what it was.
  */
 export function toRows(
   register: string,
   entries: Entry[],
-  columns: Column[],
+  columns: readonly (Column & { or?: string | undefined })[],
   now: number = Date.now(),
   names?: Names,
   types?: Readonly<Record<string, string>>,
@@ -723,19 +726,25 @@ export function toRows(
   /* AN ENUM IN SENTENCE CASE, as the register's own grid draws it. The list says "Owed by me" through
      a first-letter rule on its own markup; a page block or a backlink table drawing the same row said
      "owed by me", so one row read two ways a click apart. */
-  const enums = new Set(columns.filter((c) => decl(register, c.field)?.type === 'enum').map((c) => c.field));
+  const read = columns.flatMap((c) => (c.or === undefined ? [c.field] : [c.field, c.or]));
+  const enums = new Set(read.filter((field) => decl(register, field)?.type === 'enum'));
   const cased = (field: string, text: string | null): string | null => (enums.has(field) && text ? text.charAt(0).toUpperCase() + text.slice(1) : text);
-  return entries.map((e) => ({
-    key: `${register}#${e.seq}`,
-    href: `/r/${register}/${e.seq}`,
-    tone: toneOf(register, e, now),
-    cells: columns.map((c) => {
-      if (c.field === 'seq') return `#${e.seq}`;
-      const typed = types?.[c.field];
-      const said = cased(c.field, display(register, c.field, e.fields[c.field], now, names, typed));
-      return typed === 'run' && !decl(register, c.field) ? runLink(said, e.fields[c.field]) : said;
-    }),
-  }));
+  return entries.map((e) => {
+    const cell = (field: string): string | null => {
+      const typed = types?.[field];
+      const said = cased(field, display(register, field, e.fields[field], now, names, typed));
+      return typed === 'run' && !decl(register, field) ? runLink(said, e.fields[field]) : said;
+    };
+    return {
+      key: `${register}#${e.seq}`,
+      href: `/r/${register}/${e.seq}`,
+      tone: toneOf(register, e, now),
+      cells: columns.map((c) => {
+        if (c.field === 'seq') return `#${e.seq}`;
+        return cell(c.field) ?? (c.or === undefined ? null : cell(c.or));
+      }),
+    };
+  });
 }
 
 /**

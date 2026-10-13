@@ -1347,20 +1347,24 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
            NO BLOCK HERE NAMES `kind is action`: the scheduled actions are the panel the section above draws, with
            Resume and Pause, so a card for each as well would say every action twice.
 
-           EACH CARD SAYS WHERE IT APPLIES AND WHO USED IT LAST. `scope` is the chip, the project's mark or the globe
-           for everywhere, and the kernel answers the project's own first and the global ones after them.
+           EACH CARD SAYS WHERE IT APPLIES AND WHO USED IT LAST. `scope` is the chip, the project's mark, and it is
+           the project's on every card here: the kernel answers the project's own first and the ones that apply
+           everywhere after them, and all three blocks ask for `scope is project` (PGS-C31). A key or a skill that
+           applies everywhere is in its own list, which Agents stands over, said once; under every project it was the
+           same three of everybody's, and a record with many keys offered all of them on each.
            `used_by` is the run that last opened a key or called a tool, `S47`, which the card draws as that run's face,
            and `used_at` when anybody last did; a skill has no use the record counts, so it names neither.
 
            THREE OF EACH SINCE work 1.15.0, and none that says it is empty: a project with no key, tool or skill of
-           its own draws none of the three, where the rail said three sentences of nothing. */
+           its own draws none of the three, where the rail said three sentences of nothing and then, until each was
+           narrowed, three of everybody's. */
         kind: 'cards',
         heading: 'Keys',
         icon: 'key',
         span: 6,
         source: 'runs_on',
         about: '{{spoken}}',
-        where: 'kind is key',
+        where: 'kind is key, scope is project',
         columns: [
           { field: 'name', as: 'title' },
           { field: 'scope', label: 'Applies to', as: 'scope' },
@@ -1397,7 +1401,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         span: 6,
         source: 'runs_on',
         about: '{{spoken}}',
-        where: 'kind is skill',
+        where: 'kind is skill, scope is project',
         columns: [
           { field: 'name', as: 'title' },
           { field: 'scope', label: 'Applies to', as: 'scope' },

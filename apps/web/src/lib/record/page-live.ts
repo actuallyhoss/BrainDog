@@ -1351,12 +1351,23 @@ export function blockOf(
      `label | value | target`, the rows a progress is written in by hand. Money's Instalments is the one: the parts paid
      by plan against the parts in all by plan. A part the first figure does not hold has nothing counted, and reads nought.
      Six tracks, the most the tile ever drew, and the count of all of them is kept so the page can say what it left out.
+
+     THE PLANS STILL BEING PAID COME FIRST, each kind in the order the record sent it. The six were the first six the
+     record named, so a seventh plan with parts left to pay stood behind six that were paid off and the tile, which is
+     drawn only while something is left to pay, could show nothing that was. A plan whose parts are all counted, or that
+     has none to count, goes after every plan that has some left.
+
+     AND WHAT WAS LEFT OUT IS EVERY PLAN NOT DRAWN, the ones past the record's own cap on a figure's parts among them
+     (`more` on the second figure, which is the one that names every plan): `total` less `shown` is what the page says.
      A figure that was refused, or that came with no parts at all, falls through to the tiles below, which say why. */
   if (kind === 'progress' && b.cells?.length === 2 && readings?.length === 2 && readings.every((c) => Array.isArray(c.reading?.groups))) {
     const [first, second] = readings.map((c) => c.reading!.groups!);
     const done = new Map(first!.map((g) => [String(g.key), typeof g.value === 'number' ? g.value : 0]));
-    const tracks = second!.map((g) => ({ cells: [labelled(g) ?? String(g.key), String(done.get(String(g.key)) ?? 0), String(typeof g.value === 'number' ? g.value : 0)] }));
-    return { ...shell, authored: tracks.slice(0, 6), shown: Math.min(tracks.length, 6), total: tracks.length };
+    const plans = second!.map((g) => ({ name: labelled(g) ?? String(g.key), paid: done.get(String(g.key)) ?? 0, parts: typeof g.value === 'number' ? g.value : 0 }));
+    const open = (p: (typeof plans)[number]): boolean => p.paid < p.parts;
+    const tracks = [...plans.filter(open), ...plans.filter((p) => !open(p))].slice(0, 6).map((p) => ({ cells: [p.name, String(p.paid), String(p.parts)] }));
+    const past = readings[1]!.reading!.more;
+    return { ...shell, authored: tracks, shown: tracks.length, total: plans.length + (typeof past === 'number' && past > 0 ? past : 0) };
   }
   /* A STAT OVER A REGISTER AND NO FIGURES draws a tile a measure from the rows (`measures.ts`), as the kernel answers it. */
   if (b.cells || (kind === 'stat' && !registerOf(b))) return { ...shell, metrics: (readings ?? []).map((cell) => tileOf(cell, values, b.tone === 'bad' ? 'bad' : 'warn')) };

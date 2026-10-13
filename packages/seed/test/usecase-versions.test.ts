@@ -1440,7 +1440,7 @@ const DECLARED: Record<string, Version> = {
       metric.project-numbers-7d metric.projects-earning-silent adds.page.portfolio.4
       adds.page.estate.5 metric.service-numbers
     `,
-    declares: 'b7181eced6b7c8f8',
+    declares: '63df5982b0d1f484',
     history: [
       "`setting.voice_home` and the title of `page.home-founder` say Today where both said Overview; `due-this-week` and Due this week start today; `late-money` is added with a Late table ahead of the week, oldest first; Lapsing loses its Cost column -> 1a6e6f8b5a7311cc",
       "Folded into the unreleased 2.6.0 (sketchpad-60; integrate 60): `page.project`'s Tools and servers reads the project's own tools alone (`kind is tool, scope is project`), so a project with none of its own draws no card where it listed everybody's -> 11f22bd8f6e3f8d2",
@@ -1448,6 +1448,7 @@ const DECLARED: Record<string, Version> = {
       "Folded into the unreleased 2.6.0 (founder-numbers-edge-64, audit 61 claim 5; integrate 64; commit 63423720 still holds 2.5.0): `metric.service-numbers` and the block it switches on end their ninety days today (`at before tomorrow`), so a reading dated after today is neither counted nor drawn -> f9fa3e40e32ae41d",
       "Folded into the unreleased 2.6.0 (founder-bound-66; integrate 66; commit 63423720 still holds 2.5.0): `metric.datapoints-7d`, `metric.datapoints-30d`, `metric.datapoints-reported` and `metric.project-numbers-7d` end today (`at before tomorrow`), so a reading dated after today is not a number reported -> 9c75914a4b35aa6a",
       "Folded into the unreleased 2.6.0 (founder-runway-words-68; integrate 68; commit 63423720 still holds 2.5.0): `metric.datapoints-held` and the dashboard's Latest numbers end today (`at before tomorrow`) -> b7181eced6b7c8f8",
+      "Folded into the unreleased 2.6.0 (project-own-cards-72, PGS-C31; integrate 72; commit 63423720 still holds 2.5.0): `page.project`'s Keys and Skills read the project's own alone (`kind is key, scope is project`, `kind is skill, scope is project`), so a project with none of its own draws neither card where each listed everybody's -> 63df5982b0d1f484",
     ],
   },
   'team@2.19.0': {
@@ -1513,9 +1514,10 @@ const DECLARED: Record<string, Version> = {
       setting.voice_overdue setting.voice_pen_waits setting.voice_right_now setting.voice_since_away
       setting.voice_working_now
     `,
-    declares: '11f9e7507ab3a446',
+    declares: '2cb324c057827f0d',
     history: [
       "`page.project`'s Tools and servers reads the project's own tools alone (`kind is tool, scope is project`), where it listed everybody's (sketchpad-60, written into 2.20.0 by batch 60 and moved here by integrate 61) -> 11f9e7507ab3a446",
+      "Folded into the unreleased 2.21.0 (project-own-cards-72, PGS-C31; integrate 72; commit 63423720 still holds 2.20.0): `page.project`'s Keys and Skills read the project's own alone (`kind is key, scope is project`, `kind is skill, scope is project`), where each listed everybody's -> 2cb324c057827f0d",
     ],
   },
   'business@1.6.0': {

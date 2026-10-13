@@ -30,6 +30,7 @@
   import DayBox from './DayBox.svelte';
   import FileField from './FileField.svelte';
   import Icon from './Icon.svelte';
+  import Segmented from './Segmented.svelte';
   import { fileOf, isFile } from '../record/field-draft.ts';
 
   /**
@@ -397,7 +398,7 @@
           stop rather than one tab stop and a confirm. Nothing here is destructive and every value
           is one press from every other, so there is nothing to protect a reader from.
         -->
-        <div class="segmented" role="radiogroup" aria-labelledby={labelId(f)}>
+        <Segmented role="radiogroup" aria-labelledby={labelId(f)}>
           {#each offered(f) as move, i}
             {@const value = move.value}
             <button
@@ -424,7 +425,7 @@
               {valueSaid(f, value)}{#if word(move)}<span class="move-word">{word(move)}</span>{/if}
             </button>
           {/each}
-        </div>
+        </Segmented>
       {:else if f.type === 'enum'}
         <select class="row-input" id={id(f)} required={f.required} bind:value={typed[f.id]}>
           {#each offered(f) as move}

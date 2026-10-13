@@ -69,7 +69,7 @@ test('the page keeps the gates\' hooks and the untrusted-text rule', () => {
   assert.match(page, /<CapLine shown=\{[^}]+\} total=\{[^}]+\} \/>/u);
   assert.match(page, /<p class="raw">\{item\.body\}<\/p>/u);
   assert.doesNotMatch(page.replace(/<!--[\s\S]*?-->/gu, ''), /\{@html/u);
-  for (const hook of ['id="arrival-{item.id}"', 'class="line line-tall"', 'class="pick', 'role="checkbox"', 'aria-checked=', 'data-picking=', 'aria-label={copy.inboxSelected(picked.size)}', 'class="segmented series"'])
+  for (const hook of ['id="arrival-{item.id}"', 'class="line line-tall"', 'class="pick', 'role="checkbox"', 'aria-checked=', 'data-picking=', 'aria-label={copy.inboxSelected(picked.size)}', '<Segmented class="series"'])
     assert.ok(page.includes(hook), `the page lost ${hook}`);
   assert.doesNotMatch(page, /\bNOW\b|INBOX as SAMPLE|\bSOURCES\b|from === 'sample'|notWritten|copy\.makeRule|copy\.notThisOne/u);
 });

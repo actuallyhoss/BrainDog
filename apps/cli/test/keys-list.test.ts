@@ -386,6 +386,53 @@ test('ONE KEY WHOSE DAY IS TODAY, ON A HOST THAT ANSWERS EVERY KEY, IS NOT CALLE
   assert.equal(two.said[0], unsaid);
 });
 
+/* RED BEFORE BATCH 70 (seen red against the file as batch 69 left it): today is this machine's day, and the two above
+   keep the machine on UTC, where that day and the UTC date are one. West of UTC in the evening they are not: the UTC
+   date is already tomorrow, and a rule that believed every day before the UTC date would call today's key expired. */
+test('A KEY WHOSE DAY IS TODAY ON THIS MACHINE IS NOT CALLED EXPIRED BY A HOST THAT IGNORES THE FILTER, after the UTC date has moved on', async (t) => {
+  const zone = process.env.TZ;
+  t.after(() => void (zone === undefined ? delete process.env.TZ : (process.env.TZ = zone)));
+  process.env.TZ = 'America/Los_Angeles';
+  const evening = Date.parse('2026-10-14T01:30:00Z');
+  assert.equal(dayHere(evening), '2026-10-13');
+  const unsaid = 'Your record did not say which keys are past their day, so each is judged by the date on this machine.';
+  const rows = [row(1, { label: 'Ends today', opens: 'A service', expires: '2026-10-13' }), row(2, { label: 'Ended yesterday', opens: 'A service', expires: '2026-10-12' })];
+
+  const deaf = await host(t, rows, null, { today: '2026-10-14', deaf: true });
+  const one = { ...io(deaf.base), now: () => evening };
+  assert.equal(await keys(['list', '--json'], one), 0, one.said.join('\n'));
+  assert.deepEqual(one.lines.map((l) => l.split(' · ').at(-1)), ['expired 12 October 2026', 'expires 13 October 2026']);
+  assert.deepEqual((one.answered[0]!.value as { keys: KeyRead[] }).keys.map((k) => k.expired), [true, false]);
+  assert.deepEqual(one.said, [unsaid, '2 keys: 2 kept elsewhere.']);
+});
+
+/* THE ANSWER IS READ AGAINST EVERY KEY THE RECORD HOLDS, NOT THE ONES KEPT FOR PRINTING. Read against one project's
+   keys, a host that ignores the filter would be believed wherever that project's days are long past, and the sentence
+   would come and go with the project asked for. */
+test('A HOST THAT IGNORES THE FILTER IS NOT BELIEVED FOR ONE PROJECT’S KEYS EITHER, whichever project is asked for', async (t) => {
+  const zone = process.env.TZ;
+  t.after(() => void (zone === undefined ? delete process.env.TZ : (process.env.TZ = zone)));
+  process.env.TZ = 'UTC';
+  const unsaid = 'Your record did not say which keys are past their day, so each is judged by the date on this machine.';
+  const rows = [row(1, { label: 'Ends today', opens: 'A service', project: BAKE, expires: '2026-10-13' }), row(2, { label: 'Ended on the 1st', opens: 'A service', project: LANTERN, expires: '2026-10-01' })];
+
+  const deaf = await host(t, rows, null, { today: '2026-10-14', deaf: true });
+  for (const [project, last] of [['crumb.gg', 'expires 13 October 2026'], ['lanternfish', 'expired 1 October 2026']] as const) {
+    const one = io(deaf.base);
+    assert.equal(await keys(['list', '--project', project], one), 0, one.said.join('\n'));
+    assert.deepEqual(one.lines.map((l) => l.split(' · ').at(-1)), [last]);
+    assert.equal(one.said[0], unsaid, project);
+    assert.equal(one.said.length, 2);
+  }
+
+  /* The same keys on a record that does read the filter: only the key of the 1st is in its answer, so it is believed. */
+  const honest = await host(t, rows, null, { today: '2026-10-13' });
+  const two = io(honest.base);
+  assert.equal(await keys(['list', '--project', 'crumb.gg'], two), 0, two.said.join('\n'));
+  assert.deepEqual(two.lines.map((l) => l.split(' · ').at(-1)), ['expires 13 October 2026']);
+  assert.equal(two.said.length, 1, 'nothing is said of the clock when the record answered');
+});
+
 /* RED BEFORE: a value in code marks kept its mark, so the question was asked of "`sk-live-..." and a short one passed;
    and a character nobody sees inside a value hid its shape from the question, then was taken out for printing, which
    put the value on the line whole. */

@@ -38,7 +38,7 @@ test('the controls sheet draws three weights by two sizes by five states, with a
 
 test('the controls sheet draws a segmented control at 2, 3 and 5, a switch, the four fields and the count', () => {
   assert.match(controls, /const SEGMENTS = \[2, 3, 5\] as const/u);
-  assert.match(controls, /class="segmented"[\s\S]*class="segment"/u);
+  assert.match(controls, /<Segmented role="group"[\s\S]*class="segment"/u);
   assert.match(controls, /class="switch"[\s\S]*role="switch"[\s\S]*class="switch-track"/u);
   assert.deepEqual(listOf(controls, 'FIELDS'), ['rest', 'focus', 'error', 'empty']);
   assert.match(controls, /aria-invalid=\{f === 'error'/u, 'the field in error is told to the reader as invalid');

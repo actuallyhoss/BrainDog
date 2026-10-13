@@ -40,6 +40,7 @@
   import { methods, passkeySignIn, support } from '$lib/auth.ts';
   import Sheet from '$lib/ui/Sheet.svelte';
   import Button from '$lib/ui/Button.svelte';
+  import Segmented from '$lib/ui/Segmented.svelte';
 
   let {
     open,
@@ -162,13 +163,13 @@
       {#if !isDoor}
         <div class="part">
           <span class="label" id="new-action-channel">{w.channel}</span>
-          <div class="segmented" role="group" aria-labelledby="new-action-channel">
+          <Segmented role="group" aria-labelledby="new-action-channel">
             {#each CHANNELS as c (c)}
               <button type="button" class="segment" aria-pressed={draft.channel === c} data-on={draft.channel === c ? '' : undefined} onclick={() => (draft.channel = c)}>
                 {w.channels[c]}
               </button>
             {/each}
-          </div>
+          </Segmented>
           <span class="help">{w.channelHelp[draft.channel]}</span>
         </div>
 

@@ -51,12 +51,18 @@ export function bookFromAccount(rows, inBook) {
  *
  * "FILE THEM" CARRIES AT MOST 900 CHANGES, under the 1,000 a declaration may ask for. Past that the answer says so, and
  * the cause carries the count, so what is left is a new question the night after the first is answered.
+ *
+ * THE COUNT IS OF WHAT STILL STANDS, AS THE PAGE COUNTS IT (`figures/books.ts`, the figures of what is in no book): a
+ * Ledger entry that is not void, a repeating line that has not ended, an instalment still open. So the question and
+ * the page say one number, and "File them" writes nothing onto a void entry, an ended line or a cancelled part
+ * (audit 71 finding 1). A thing handed by a rule or by name is filed whatever its status: somebody wrote it just now.
  */
 export default async function run(ctx) {
   const PAGE = 50;
   const MOST = 900;
   /* THE LISTS THAT HOLD AN ACCOUNT, and what one thing on each is called. Bills and invoices holds none. */
   const LISTS = ['transactions', 'recurring', 'installments'];
+  const STANDS = { transactions: (s) => s !== 'void', recurring: (s) => s !== 'ended', installments: (s) => s === 'open' };
   const CALLED = { transactions: ['Ledger entry', 'Ledger entries'], recurring: ['repeating line', 'repeating lines'], installments: ['instalment', 'instalments'] };
   const input = ctx.input && typeof ctx.input === 'object' ? ctx.input : {};
   const held = (v) => typeof v === 'string' && v !== '';
@@ -110,7 +116,7 @@ export default async function run(ctx) {
   const on = new Set();
   for (const list of LISTS)
     for (const a of accounts) {
-      const rows = await every(list, { all: [{ field: 'account', is: a.id }, { field: 'book', empty: true }] });
+      const rows = (await every(list, { all: [{ field: 'account', is: a.id }, { field: 'book', empty: true }] })).filter((r) => STANDS[list](r.fields.state));
       if (rows.length > 0) on.add(a);
       found.push(...rows);
     }

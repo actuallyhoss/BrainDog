@@ -43,6 +43,7 @@
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
+  import Segmented from '$lib/ui/Segmented.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
   import ShareMenu from '$lib/ui/ShareMenu.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
@@ -601,7 +602,7 @@
     <h2 class="preview-title" id="{pre}title">{live.page.page.title}</h2>
     {#if was}
       <div class="compare" data-showing={showing}>
-        <div class="segmented compare-switch" role="group" aria-label={words.compare}>
+        <Segmented class="compare-switch" role="group" aria-label={words.compare}>
           <button
             type="button"
             class="segment"
@@ -616,7 +617,7 @@
             aria-pressed={showing === 'after'}
             onclick={() => (showing = 'after')}>{words.after}</button
           >
-        </div>
+        </Segmented>
         <div class="compare-side" data-side="was" role="group" aria-label={words.now}>
           <p class="compare-name" aria-hidden="true">{words.now}</p>
           <PageBody mode="preview" page={live.page.page} blocks={was} now={live.now} writes={null} ids="{pre}was-" level={3} />
@@ -744,7 +745,8 @@
     min-inline-size: 0;
   }
 
-  .compare-switch {
+  /* The switch's track is `Segmented`'s own element, so its rules reach it by the name this screen gave it. */
+  .compare :global(.compare-switch) {
     justify-self: start;
   }
 
@@ -779,7 +781,7 @@
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .compare-switch {
+    .compare :global(.compare-switch) {
       display: none;
     }
   }

@@ -16,6 +16,9 @@ const COUNTED = `state is not cancelled, ${OF_PLAN}`;
 const PAID = `state is paid, ${OF_PLAN}`;
 const STILL_OPEN = `state is open, ${OF_PLAN}`;
 
+/** A part's amount counted once while the part is open and not at all once it is paid: the factor `plan-share-left` reads by. */
+const STANDS_OPEN = { open: 1, paid: 0, cancelled: 0 };
+
 /** What every figure here shares: nothing is compared with a month ago, because a plan only ever runs down. */
 const ONCE = { window: '30d', compare: 'none' } as const;
 
@@ -72,6 +75,36 @@ export const PLAN_FIGURES: Record<string, SeedMetric> = {
     where: STILL_OPEN,
     value: { sum: 'amount' },
     format: MONEY,
+    target: { gte: 0 },
+    ...ONCE,
+  },
+
+  /* HOW MANY PARTS ARE STILL OPEN, SINCE BATCH 72: what the lead sentence about what is left waits for
+     (`pages/plan.ts`). `plan-left` cannot be asked that, because open parts added up to nought and no open part at
+     all are the same nought to a test. */
+  'plan-parts-open': {
+    metric: 'plan-parts-open',
+    name: 'Parts still open on one plan',
+    source: 'register.installments',
+    where: STILL_OPEN,
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    ...ONCE,
+  },
+
+  /* THE SHARE OF THE PLAN'S MONEY STILL OPEN, SINCE BATCH 72, AND IT IS WHAT TELLS A PLAN ALL PAID FROM A PLAN WITH NO
+     PART. A block waits on one figure, and every count of open parts is nought for both. This one is the open parts'
+     amounts over every standing part's, each part's amount taken once or not at all by its own status (`STANDS_OPEN`),
+     so a plan all paid reads nought and a plan with no part reads no value at all, there being nothing to divide by. */
+  'plan-share-left': {
+    metric: 'plan-share-left',
+    name: 'Share of one plan left to pay',
+    source: 'register.installments',
+    where: COUNTED,
+    value: { ratio: { of: { sum: { product: ['amount', { lookup: 'stands_open', by: 'state' }] } }, per: { sum: 'amount' } } },
+    lookups: { stands_open: STANDS_OPEN },
+    format: 'pct',
     target: { gte: 0 },
     ...ONCE,
   },

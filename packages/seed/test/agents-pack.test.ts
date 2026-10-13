@@ -424,7 +424,7 @@ test('TWO SKILLS OF ONE NAME ARE TWO PAGES A READER CAN TELL APART: the global o
   sql.close();
 });
 
-test('A PROJECT PAGE SAYS WHAT IT RUNS ON: its own keys, tools and skills, then the ones from everywhere', async () => {
+test('A PROJECT PAGE SAYS WHAT IT RUNS ON: its own keys, tools and skills, and none of the ones from everywhere', async () => {
   const { k, sql } = await seeded();
   const blocks = opened(k, 'kiln');
   /* UNDER MORE ABOUT KILN SINCE work 1.15.0, one tile with its history, notes and money, where it was a folded Runs on. */
@@ -437,14 +437,14 @@ test('A PROJECT PAGE SAYS WHAT IT RUNS ON: its own keys, tools and skills, then 
   const skills = said('Skills', 'name');
   assert.ok(skills.includes('review-pr @ Kiln') && !skills.includes('review-pr @ everywhere'), skills.join(', '));
   assert.ok(!skills.some((s) => s.startsWith('chase-invoice')), 'a retired skill is listed');
-  /* THREE OF EACH ON THE PAGE SINCE work 1.15.0, a part of More about Kiln, the project's own first: the ones from
-     everywhere come after them, read here with room for all of them. */
+  /* THREE OF EACH ON THE PAGE SINCE work 1.15.0, a part of More about Kiln, AND THE PROJECT'S OWN ALONE SINCE BATCH 72
+     (project-own-cards-72, PGS-C31): the ones from everywhere followed them here until then, the same three under
+     every project. Read again with room for all of them, none from everywhere comes. */
   const keys = said('Keys', 'name');
   const everywhere = (key: string): boolean => key.endsWith('@ everywhere');
-  const first = keys.findIndex(everywhere);
-  assert.ok(keys.length > 0 && (first < 0 || keys.slice(first).every(everywhere)), keys.join(', '));
+  assert.ok(keys.length > 0 && !keys.some(everywhere), keys.join(', '));
   const all = k.block({ ...(headed(blocks, 'Keys') as unknown as Record<string, unknown>), limit: 20, rows: undefined, matched: undefined, scopes: undefined } as never);
-  assert.ok(all.rows.some((r, i) => r.fields.name === 'Nordhaven API' && (all.scopes?.[i] ?? 'everywhere') === 'everywhere'), 'the keys from everywhere are not read after the project’s own');
+  assert.ok(all.rows.length > 0 && all.rows.every((_r, i) => (all.scopes?.[i] ?? 'everywhere') !== 'everywhere'), 'a key from everywhere is read under the project’s own');
   assert.ok(said('Tools and servers', 'name').includes('fenwick @ Kiln'));
   sql.close();
 });

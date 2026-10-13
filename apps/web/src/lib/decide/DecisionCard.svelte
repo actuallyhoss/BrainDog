@@ -65,7 +65,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Face from '$lib/ui/Face.svelte';
   import Icon from '$lib/ui/Icon.svelte';
-  import { QUEUE_FILE, queueWords, waysOf, type FileAt, type Way } from '$lib/page/queue-answer.ts';
+  import { QUEUE_FILE, queueWords, type FileAt, type Way } from '$lib/page/queue-answer.ts';
   import LeadPreview from '$lib/page/LeadPreview.svelte';
   import type { Picked } from '$lib/page/picked.svelte.ts';
   import { words as pageWords } from '$lib/page/words.ts';
@@ -129,17 +129,10 @@
      host that holds none: the card keeps no address of its own. */
   const fileAt = getContext<FileAt | undefined>(QUEUE_FILE);
 
-  const said = $derived(cardOf(question, { me: me?.person ?? null, names, now: Date.now(), lead }));
-  /* AN OPTION THAT IS A PICTURE (his D28.33, "each option shown as what it is"): `cardOf` is handed no way to a file and
-     leaves it out, so the same options are read once more with the page's (`waysOf`, which keeps an address of another
-     host off the card) and only a picture is taken from that reading. Before `inlineOf`, so answers that are pictures
-     are the form's choices and not a row of bare buttons. */
-  const pictures = $derived(
-    new Map(fileAt ? waysOf(question, fileAt).flatMap((w) => (w.shows && 'file' in w.shows ? [[w.key, w.shows] as const] : [])) : []),
-  );
-  const card = $derived(
-    pictures.size === 0 ? said : { ...said, ways: said.ways.map((w) => ({ ...w, shows: w.shows ?? pictures.get(w.key) ?? null })) },
-  );
+  /* AN OPTION THAT IS A PICTURE (his D28.33, "each option shown as what it is") carries its address from `cardOf`, which
+     reads the options once with the page's way to a file (`waysOf` keeps an address of another host off the card).
+     Before `inlineOf`, so answers that are pictures are the form's choices and not a row of bare buttons. */
+  const card = $derived(cardOf(question, { me: me?.person ?? null, names, now: Date.now(), lead, file: fileAt }));
   const from = $derived([card.by.app, card.by.run].filter((s): s is string => s !== null));
   /* THE ANSWERS AS A ROW OF BUTTONS, one press each (`inlineOf`), or the form's list to choose from and Decide. */
   const inline = $derived(inlineOf(card, compact));

@@ -77,7 +77,11 @@ export type PageBlock = {
    * from each card's row (`project-done-by-week:{{name}}`), read once a card and answered as `trends`. Such a column
    * names no field, so its `field` is absent whatever this type says of the rest.
    */
-  columns?: { field: string; metric?: string; label?: string; as?: string; sign?: { field: string; minus: string } }[];
+  /**
+   * `or:` names a second field of the same list, read where `field` holds nothing: a bank line's clean name, or the
+   * words the bank wrote where nobody was matched to it. The entry carries both and the host falls back.
+   */
+  columns?: { field: string; or?: string; metric?: string; label?: string; as?: string; sign?: { field: string; minus: string } }[];
   /** A `stat`'s figures. `trend: 12w` draws how the figure moved over that window, from its daily series. */
   cells?: { metric: string; label?: string; trend?: string; note?: string }[];
   /**
@@ -2329,7 +2333,8 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
      such thing" — and the difference is whether anybody investigates. */
   const unknown = (block.columns ?? [])
     .filter((c) => !(block.kind === 'cards' && (c.as === 'next' || c.metric !== undefined)))
-    .map((c) => c.field)
+    /* A COLUMN'S SECOND FIELD (`or:`) IS CHECKED AS ITS FIRST IS, or the fallback would be a blank nobody looks into. */
+    .flatMap((c) => (c.or === undefined ? [c.field] : [c.field, c.or]))
     .filter((f) => f !== 'seq' && f !== CHANGED && !Object.hasOwn(schema.fields, f));
   /* A CARD'S NEXT STEP IS A FIELD OF THE STEPS LIST, not of the list the cards are over, so it is checked there. */
   const nextFault = nextColumnFault(deps, block, register);
