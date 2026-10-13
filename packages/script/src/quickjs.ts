@@ -384,6 +384,21 @@ export async function runInQuickJs(decl: ScriptDecl, host: CtxHost): Promise<Scr
       const get = host.get.bind(host);
       return deferred(async () => JSON.stringify(await get(id, decl.reads)));
     },
+
+    /* `ctx.fold`, ONLY FROM A HOST THAT HANDS ONE, so the prelude finds no function here and builds no `ctx.fold`
+       otherwise. NO `reads` CHECK: it reads nothing of the record, a text in and a key out. Charged like every call,
+       and how many a run may make is the host's to hold (`scriptFold`), since the work is done on its side. */
+    ...(host.fold === undefined
+      ? {}
+      : {
+          fold: (said: QuickJSHandle) => {
+            charge();
+            const words = text(said);
+            charge();
+            const fold = host.fold!.bind(host);
+            return deferred(async () => JSON.stringify(await fold(words)));
+          },
+        }),
   };
 
   /** Json into the interpreter, through the interpreter's own `JSON.parse`, read before the script runs. */

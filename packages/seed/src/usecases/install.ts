@@ -21,6 +21,7 @@
 
 import { AGENTS_PACK, agentsPackDocument } from '../packs/agents.ts';
 import { FIRST_PARTY, firstPartyDocument, firstPartyManifest, type FirstPartyId } from '../packs/first-party.ts';
+import { CATEGORIES_REGISTER, STARTER_CATEGORIES } from '../modules/money/lists/categories.ts';
 import { dated, dayOf } from './dates.ts';
 import { BUSINESS_EXAMPLES, BUSINESS_NAMES } from './business.ts';
 import { FOUNDER_EXAMPLES, FOUNDER_NAMES } from './founder.ts';
@@ -40,6 +41,38 @@ type Body = Record<string, unknown>;
  * of anybody's record, and a person's Home is drawn from what they write.
  */
 const MODULE_EXAMPLES: Readonly<Record<string, readonly Body[]>> = { business: BUSINESS_EXAMPLES, founder: FOUNDER_EXAMPLES, team: TEAM_EXAMPLES };
+
+/**
+ * WHAT A LIST STARTS WITH THAT IS THE PERSON'S FROM THE FIRST DAY, by list (ruling 341). Not an example: nobody's
+ * demonstration, no use case's, and never in `MODULE_EXAMPLES`. A set here carries no `tags`, so a row of it is told
+ * from an example by what it is and not by a mark, and whoever writes it writes it as a person's own entry.
+ */
+const STARTERS: Readonly<Record<string, readonly Readonly<Body>[]>> = { [CATEGORIES_REGISTER.id]: STARTER_CATEGORIES };
+
+const saidAs = (name: unknown): string => String(name ?? '').trim().toLowerCase();
+
+/**
+ * Whether a row is one of its list's starter set as it ships: by its name, and carrying no `example` tag. An example
+ * that happens to share a starter's name stays an example.
+ */
+export function isStarter(register: string, fields: Readonly<Body>): boolean {
+  const tags = Array.isArray(fields.tags) ? fields.tags.map(String) : [];
+  return !tags.includes(EXAMPLE_TAG) && (STARTERS[register] ?? []).some((row) => saidAs(row.name) === saidAs(fields.name));
+}
+
+const startersIn = (lists: Iterable<string>): { register: string; fields: Body }[] =>
+  [...lists].flatMap((register) => (STARTERS[register] ?? []).map((row) => ({ register, fields: { ...row } })));
+
+/**
+ * THE STARTER ROWS A MODULE BRINGS, for whoever writes them once the module is in: each a list and its fields, with no
+ * tag on it. `[]` for a module that brings none and for an id that is not a module. An install plants every one of a
+ * document's `seeds` as an example, so a path that installs through one writes these itself, as it writes a person's
+ * own entries, and only into a list that holds nothing yet.
+ */
+export function starterRows(id: string): { register: string; fields: Body }[] {
+  const declared = ((firstPartyDocument(id, { seeds: [] })?.declarations ?? []) as Body[]).flatMap((d) => (typeof d.register === 'string' ? [d.register] : []));
+  return startersIn(declared);
+}
 
 /**
  * The targets each use case gives the modules' figures, by metric. A figure not listed keeps the module's own. IN NO
@@ -160,6 +193,13 @@ export type ModuleOptions = {
    * case. Left out, the module carries none, and the first run never passes it.
    */
   examples?: boolean;
+  /**
+   * `true` for a document that carries the module's starter rows (`starterRows`) in its `seeds`, asked for examples or
+   * not. FOR AN INSTALL THAT PLANTS THEM UNTAGGED: the record's own plants every seed tagged `example`, which would
+   * count a person's categories as examples and offer to clear them, so nothing passes this until its host tells a
+   * starter from an example (`isStarter`). Left out, the document carries none and `starterRows` is how they go in.
+   */
+  starters?: boolean;
 };
 
 /**
@@ -178,8 +218,13 @@ export function moduleDocument(u: UseCase | null, id: string, options: ModuleOpt
   if (!bare) return null;
   const mine = new Set(((bare.declarations ?? []) as Body[]).flatMap((d) => (typeof d.register === 'string' ? [d.register] : [])));
   /* `undefined` IS THE MODULE'S OWN ROWS to `firstPartyDocument`, so it is asked for only when examples are. */
-  const seeds =
+  const examples =
     options.examples !== true ? [] : u === null ? undefined : (MODULE_EXAMPLES[u.usecase] ?? []).filter((s) => mine.has(String(s.register)));
+  /* THE STARTER SET GOES WITH THEM WHEN IT IS ASKED FOR, and never beside examples of the same list: the module's own
+     rows already hold it, and a use case's examples for that list with eight more would pass what a pack may seed one
+     list with. A preview that draws a use case's categories draws those. */
+  const seeds =
+    examples === undefined || options.starters !== true ? examples : [...examples, ...startersIn(mine).filter((s) => !examples.some((e) => e.register === s.register))];
   const doc = firstPartyDocument(id, { ...(options.holds === undefined ? {} : { holds: options.holds }), ...(seeds === undefined ? {} : { seeds }) });
   if (!doc) return null;
   const targets = u === null ? {} : (MODULE_TARGETS[u.usecase] ?? {});
@@ -279,15 +324,18 @@ export const forms = (u: UseCase): boolean => Object.hasOwn(FORMS, u.usecase);
  * `personal.ts`). `examples: true` carries them for a preview or a test,
  * and a formed plan still wins over them, because it is what the person asked for.
  */
-export function carriedDocument(u: UseCase, today: string, said?: string | null, options: { examples?: boolean } = {}): Body | null {
+export function carriedDocument(u: UseCase, today: string, said?: string | null, options: { examples?: boolean; starters?: boolean } = {}): Body | null {
   const formed = formedFor(u, said);
   if (!formed) {
     const doc = useCaseDocument(u.usecase, today);
-    return doc && options.examples !== true ? withoutRows(doc) : doc;
+    return doc && options.examples !== true ? withoutRows(doc, options) : doc;
   }
   const doc = useCaseDocument(u.usecase, '1970-01-01');
   if (!doc) return null;
-  return dated({ ...doc, seeds: formedSeeds(formed.seeds) }, today);
+  /* A STARTER SET THE PACK CARRIES STAYS BESIDE THE PLAN, as it ships and never tagged `formed`: it is no part of what
+     the sentence asked for, and it is nobody's example either. */
+  const starters = options.starters === true ? starterSeedsOf(doc) : [];
+  return dated({ ...doc, seeds: [...formedSeeds(formed.seeds), ...starters] }, today);
 }
 
 /**
@@ -305,10 +353,18 @@ export function plantedRows(u: UseCase, today: string, said?: string | null): { 
   return { rows, links: formedFor(u, said)?.links };
 }
 
-/** A use case's pack with no rows of its own, for a record that asks a model for its plan first. */
-export function withoutRows(doc: Body): Body {
+/** The rows among a document's `seeds` that are a starter set's (`isStarter`), as the document carries them. */
+const starterSeedsOf = (doc: Body): Body[] =>
+  (Array.isArray(doc.seeds) ? (doc.seeds as Body[]) : []).filter((s) => typeof s.register === 'string' && isStarter(s.register, (s.fields ?? {}) as Body));
+
+/**
+ * A use case's pack with no rows of its own, for a record that asks a model for its plan first. `starters: true` keeps
+ * the starter rows it carries and drops every example, for an install that plants them untagged (`ModuleOptions`).
+ */
+export function withoutRows(doc: Body, options: { starters?: boolean } = {}): Body {
   const { seeds: _seeds, ...rest } = doc;
-  return rest;
+  const kept = options.starters === true ? starterSeedsOf(doc) : [];
+  return kept.length > 0 ? { ...rest, seeds: kept } : rest;
 }
 
 /** The tag the install path puts on every row a pack seeds. */

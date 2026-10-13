@@ -995,7 +995,13 @@ const measuresFor = (block: BlockResult) =>
  */
 type Charted = { currency: string | null; block: BlockResult }[];
 
-function charted(block: BlockResult): { charts: Charted; converted: string | null; note?: string | null } | null {
+/**
+ * `stale` IS SAID BESIDE THE DAY, where a list's own money was converted here: the day alone could not say its rates were
+ * out of date, so a bar or a split over a list's entries could never ask a page for its foot (rates-foot-note-80).
+ */
+type Split = { charts: Charted; converted: string | null; stale?: boolean; note?: string | null };
+
+function charted(block: BlockResult): Split | null {
   /* A CASH WALK THE RECORD COULD NOT ADD UP, one walk a currency, each with its own table. A `table` over the walk is
      one table a currency too, each cut to `limit:` as the one walk's is, rather than the first currency's alone. */
   if (block.walks && block.walks.length > 0) {
@@ -1087,7 +1093,7 @@ function charted(block: BlockResult): { charts: Charted; converted: string | nul
         const r = rateFor(fx.rates as Rate[], c, home, dayOf(e))!;
         return { ...e, fields: { ...e.fields, [of]: intoHome((v as { amount: number }).amount, c, home, r.rate) } };
       });
-      return { charts: [{ currency: null, block: { ...block, matched, fx: undefined } }], converted: got.asOf };
+      return { charts: [{ currency: null, block: { ...block, matched, fx: undefined } }], converted: got.asOf, stale: got.stale };
     }
   }
   return {
@@ -1114,7 +1120,7 @@ export function walkTables(block: BlockResult): { said: ReturnType<typeof parse>
 }
 
 /** A bar over a list of links whose linked money is in more than one currency: converted, or one bar chart a currency. */
-function linkedCharted(block: BlockResult, of: string): { charts: Charted; converted: string | null } | null {
+function linkedCharted(block: BlockResult, of: string): Split | null {
   const linked = block.linked ?? {};
   const named = new Set(block.matched.flatMap((e) => (Array.isArray(e.fields[of]) ? (e.fields[of] as unknown[]).map(String) : [])));
   const held = [...named].flatMap((id) => {
@@ -1133,7 +1139,7 @@ function linkedCharted(block: BlockResult, of: string): { charts: Charted; conve
       const into = Object.fromEntries(
         held.map((h) => [h.id, h.currency === home ? linked[h.id] : intoHome(h.amount, h.currency, home, rateFor(fx.rates as Rate[], h.currency, home, today)!.rate)]),
       );
-      return { charts: [{ currency: null, block: { ...block, linked: { ...linked, ...into }, fx: undefined } }], converted: got.asOf };
+      return { charts: [{ currency: null, block: { ...block, linked: { ...linked, ...into }, fx: undefined } }], converted: got.asOf, stale: got.stale };
     }
   }
   return {

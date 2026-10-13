@@ -701,6 +701,9 @@ const withoutBatch77 = (doc: Body): Body => ({
  * search for what a payment paid goes whole: its script, the rule that starts it and the rule that marks an
  * instalment paid by the payment it names (match-payment-78, REC-B11 step 3). `repeating-overdue`, whose `where` and
  * count batch 78 changed, is dropped whole with the other signs (`SIGNS_ADDED`).
+ *
+ * AND BATCH 80'S SECOND STEP OF THAT RULE, with the script it starts (repeating-settle-79-80): the rule goes whole
+ * already, so the script that marks a repeating line paid is the one thing more to drop.
  */
 const BEYOND = (c: unknown): boolean => (c as Body | undefined)?.metric === 'runway-days' && typeof (c as Body).beyond === 'boolean';
 const withoutBatch78 = (doc: Body): Body => {
@@ -712,7 +715,7 @@ const withoutBatch78 = (doc: Body): Body => {
   };
   const money = withPage(doc, 'money', (now) => now.flatMap(lasts));
   const book = withPage(money, 'money-book', (now) => now.filter((b) => !(b.kind === 'note' && (b.when as Body | undefined)?.metric === 'book-lasts-until:{{name}}')));
-  return { ...book, declarations: (book.declarations as Body[]).filter((d) => d.script !== 'match_payment' && d.rule !== 'payment-matches' && d.rule !== 'instalment-settles') };
+  return { ...book, declarations: (book.declarations as Body[]).filter((d) => d.script !== 'match_payment' && d.script !== 'settle_matched_line' && d.rule !== 'payment-matches' && d.rule !== 'instalment-settles') };
 };
 /** Batch 63's four figures of this month's spending against last (spend-figures-63), new in the unreleased money-core 3.17.0. */
 const SPEND_VS_LAST: ReadonlySet<string> = new Set(['spent-last-month', 'spent-by-category-last-month', 'spent-by-category-to-date-last-month', 'spent-vs-last-month']);

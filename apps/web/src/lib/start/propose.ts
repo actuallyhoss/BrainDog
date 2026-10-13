@@ -306,6 +306,12 @@ const WHOLE: readonly Whole[] = [
  * start" is somebody with orders. SO IS ONE BEING OPENED, AND A FIRST ONE (`OPENS_NOW`, `FIRST_ONE`): "I never ran a
  * shop but I am opening one next month", "I never ran a shop before. This is my first one." AND WHAT NEVER RAN OUT
  * WAS NEVER SAID TO BE KEPT (`RAN_OUT`): "I never ran out of products" asks for no Products.
+ *
+ * AND FIVE MORE WAYS A THING IS NOT HAD OR IS: never used or sent ("I never used invoices", `DID_IT`); one thing
+ * somebody would love to have ("I would love to have a shop", `WOULD_LOVE`); one somebody of theirs sold ("My partner
+ * sold the stall", `THEIRS`); one had before ("I had a shop", `HAD_ONCE`); and whoever speaks with somebody else
+ * takes a never back as "I" does ("my friend and I are opening one", `ME`). MORE OF A THING IS A THING HAD ("I wish I
+ * had more clients"), and somebody else carrying on takes nothing up ("They still do").
  */
 const REFUSES = "no|not|never|without|zero|don['’]?t|do\\s+not|doesn['’]?t|does\\s+not|haven['’]?t|hasn['’]?t|hadn['’]?t";
 /* `send` and its ending apart: the whole word is a field an add-on declares, and the core spells none (the core-names gate). */
@@ -324,8 +330,9 @@ const UNTHOUGHT = `(?<!(?:^|[^\\p{L}\\p{N}'’])(?:${DENIES})\\s+${SMALL}(?:${TH
 const HALTED = `${UNDENIED}${UNTHOUGHT}(?:done|finished|stopped|quit)(?:\\s+with)?`;
 const STOPPED = `${HALTED}(?=\\s+(?:${DOING})\\s)`;
 /* The same verbs said of before, so a thing never done is refused as one not done is: "I never ran a shop", "we never
-   took orders". Never "sold", "closed" or "lost": whoever never sold a stall still has it. */
-const DID_IT = 'ran|took|taken|kept|owned|opened|started|tracked|chased|needed|wanted|did';
+   took orders", "I never used invoices". Never "sold", "closed" or "lost": whoever never sold a stall still has it, and
+   never "used to", which is what was done before ("I never used to chase people"). */
+const DID_IT = 'ran|took|taken|kept|owned|opened|started|tracked|chased|needed|wanted|did|sent|used(?!\\s+to(?![\\p{L}\\p{N}]))';
 /* "ran out of" is read through as a verb is, so a thing that never ran out is not taken for a thing somebody keeps. */
 const RAN_OUT = '(?:ran|run|running)\\s+out\\s+of';
 const NOT = new RegExp(
@@ -377,12 +384,15 @@ const ENDED = new RegExp(
 const ENDED_ITSELF = new RegExp(`(?:^|[^\\p{L}\\p{N}])(?:when|after|once|since|as)\\s+(?:(?:the|${OWN})\\s+)?(?:(?:${PAST})\\s+)*(?:(?:${[...PLAIN].join('|')})\\s+)*$`, 'iu');
 /* A thing somebody sold is gone with no "when" before it: "I sold the stall", "we have sold our old shop". Never one
    that is denied ("I never sold the stall") or only supposed ("if I sold the stall", "I wish I had sold it"), and never what is sold day to
-   day, which is many ("I sold my products"). What follows is the clause's end, or who it went to and for what. */
+   day, which is many ("I sold my products"). What follows is the clause's end, or who it went to and for what.
+   SOMEBODY OF THEIRS WHO SOLD IT ENDED IT THE SAME WAY (`THEIRS`): "My partner sold the stall", "our landlord sold the shop". */
+const THEIRS = "(?:my|our)\\s+(?:[\\p{L}'’-]+\\s+)?[\\p{L}'’-]+";
 const SOLD = new RegExp(
-  `(?<!(?:^|[^\\p{L}\\p{N}])(?:if|unless|whether|wish|wished|wishes)\\s+)(?<![\\p{L}\\p{N}'’])${SOMEBODY}\\s+(?:(?:have|has|had|just|now|since|already)\\s+){0,2}${UNDENIED}sold(?:\\s+(?:off|up))?\\s+(?:(?:the|a|an|${OWN})\\s+)?(?:(?:${PAST})\\s+)*(?:(?:${[...PLAIN].join('|')})\\s+)*$`,
+  `(?<!(?:^|[^\\p{L}\\p{N}])(?:if|unless|whether|wish|wished|wishes)\\s+)(?<![\\p{L}\\p{N}'’])(?:${SOMEBODY}|${THEIRS})\\s+(?:(?:have|has|had|just|now|since|already)\\s+){0,2}${UNDENIED}sold(?:\\s+(?:off|up))?\\s+(?:(?:the|a|an|${OWN})\\s+)?(?:(?:${PAST})\\s+)*(?:(?:${[...PLAIN].join('|')})\\s+)*$`,
   'iu',
 );
-const SOLD_TO = /^\s+(?:to|for)(?![\p{L}\p{N}])/iu;
+/* Never to whoever speaks, whose it then is: "My partner sold the stall to me". */
+const SOLD_TO = /^\s+(?:to(?!\s+(?:me|us)(?![\p{L}\p{N}]))|for)(?![\p{L}\p{N}])/iu;
 /* A THING ONLY WISHED FOR IS NOT HAD: "I wish I had a shop", "I hope to open a shop one day", "if only I took orders",
    "I dream of opening a shop", "I always wanted a shop". The wish comes before the thing with only somebody and words
    of having or starting between (`GETS`), then "a", "any", "some" or "my own". So what is wished ABOUT a thing somebody
@@ -392,6 +402,20 @@ const WISHES = 'wish(?:es|ed|ing)?|hop(?:e|es|ed|ing)|if\\s+only|dream(?:s|ed|t|
 const GETS = 'to|have|had|having|own|owned|owning|run|ran|running|open|opened|opening|start|started|starting|get|got|getting|take|took|taking|could|would|can|will|might|someday|one\\s+day|soon|still|ever|just|be\\s+able';
 const WISHED = new RegExp(
   `(?:^|[^\\p{L}\\p{N}'’])(?:${WISHES})\\s+(?:that\\s+)?(?:${SOMEBODY}\\s+)?(?:(?:${GETS})\\s+){0,5}(?:(?:a|an|any|some|(?:${OWN})\\s+own)\\s+)?(?:(?:${[...PLAIN].join('|')})\\s+)*$`,
+  'iu',
+);
+/* ONE THING SOMEBODY WOULD LOVE OR LIKE TO HAVE IS NOT HAD EITHER: "I would love to have a shop", "I'd like a shop one
+   day". Read as a wish is, and only of one thing: what there is more than one of is started in here, so "I would like
+   to take orders" keeps its orders, as "I want to start" does (`STARTED_HERE`). */
+const WOULD_LOVE = new RegExp(
+  `(?:(?:^|[^\\p{L}\\p{N}'’])would|(?<=[\\p{L}])['’]d)\\s+(?:(?:really|so|dearly|just)\\s+)?(?:love|like)\\s+(?:(?:${GETS})\\s+){0,5}(?:(?:a|an|any|some|(?:${OWN})\\s+own)\\s+)?(?:(?:${[...PLAIN].join('|')})\\s+)*$`,
+  'iu',
+);
+/* AND ONE THING HAD BEFORE IS NOT HAD NOW: "I had a shop", "we once had a small stall". Said by "I" or "we" of one
+   thing, never of one had ever since ("I've had a shop for years"), which is no bare "I had", and never after "when",
+   which `ENDED` reads and holds to the clause's end ("When I had the stall for a year I hired help"). */
+const HAD_ONCE = new RegExp(
+  `(?<!(?:^|[^\\p{L}\\p{N}])(?:when|after|once|since|while|as|if)\\s+)(?<![\\p{L}\\p{N}'’])(?:i|we)\\s+(?:(?:once|then|also|previously|formerly)\\s+)?had\\s+(?:(?:a|an|the|${OWN})\\s+)(?:(?:${PAST})\\s+)*(?:(?:${[...PLAIN].join('|')})\\s+)*$`,
   'iu',
 );
 /* A thing still to be opened or started is not had, whatever is said after it: "I hope to open a shop in Cairo". */
@@ -426,8 +450,10 @@ const STILL_DOES = new RegExp(
 /* A REFUSAL TAKEN BACK after its clause: at most two words of before ("before", "until now"), a mark or a join, then
    whoever speaks has one now ("but I just opened one", "and now I have one"), does it ("I do", "but now I do"), or
    wants to start ("I want to start", "I would like to start tracking them"). Only "I" and "we" take it back, never
-   somebody else, and never a refusal ("I do not want one") or another thing ("I do the design", "I want to start a blog"). */
-const ME = "(?:i|we)(?:['’]\\p{L}+)?";
+   somebody else, and never a refusal ("I do not want one") or another thing ("I do the design", "I want to start a blog").
+   WHOEVER SPEAKS WITH SOMEBODY ELSE STILL SPEAKS: "my friend and I are opening one", "Sara and I do". Only where "I"
+   is the one named last, so "my friend and his wife are opening one" takes nothing back. */
+const ME = "(?:(?:(?:(?:my|our)\\s+(?:[\\p{L}'’-]+\\s+){1,2}|[\\p{L}'’-]+\\s+)and\\s+i)|i|we)(?:['’]\\p{L}+)?";
 const POINTS = 'one|it|them|those|mine|ours';
 const JUST = '(?:(?:just|now|finally|recently|today|since|have|has)\\s+){0,3}';
 const HAS_NOW = `${JUST}(?:${ME}\\s+)?${JUST}(?:have|own|run|keep|take|opened|started|got|bought|set\\s+up|took\\s+over)\\s+(?:${POINTS})(?![\\p{L}\\p{N}'’])`;
@@ -451,6 +477,9 @@ const STARTED_HERE = new RegExp(`^${BEFORE_NOW}${THEN}${WILL_START}${CLAUSE_END}
 /* Where one thing wished for would be, which ends the wish as a word of when does: "I wish I had a shop in Cairo",
    "by the sea". Never of many, which are had and hoped to be somewhere: "I hope to get orders in on time". */
 const SOMEWHERE = new RegExp(`^\\s+(?:in|near|by|at)(?:\\s+(?!(?:and|or|nor|but|so|because|since)(?![\\p{L}\\p{N}]))[\\p{L}\\p{N}'’-]+){1,3}${CLAUSE_END}`, 'iu');
+/* What may follow one had before, and end the clause: how long, or until when ("for ten years", "until last year").
+   Never what was done to it ("I had the stall repainted") or what went on then ("for a year I hired help"). */
+const HAD_UNTIL = new RegExp(`^\\s+(?:until|till|before|for|back\\s+in|up\\s+to)(?:\\s+(?!(?:and|or|nor|but|so|because|since)(?![\\p{L}\\p{N}]))[\\p{L}\\p{N}'’-]+){1,3}${CLAUSE_END}`, 'iu');
 const ENDS = new RegExp(`^${CLAUSE_END}`, 'iu');
 const ITSELF_ENDED = new RegExp(`^\\s+(?:(?:was|got)\\s+)?(?:closed|shut|sold)(?:\\s+(?:down|up))?${CLAUSE_END}`, 'iu');
 /* After the verb itself, what was sold or kept comes first: "done selling candles", never "selling candles on paper". */
@@ -465,6 +494,8 @@ const WAS_FROM = new RegExp(`${WAS}$`, 'iu');
 const ENDS_DOING = new RegExp(`^(?:\\s+(?!(?:on|in|by|from|at|with|via|over|through|to|for|into|and|or|nor|but)(?![\\p{L}\\p{N}]))[\\p{L}\\p{N}'’-]+){0,3}${CLAUSE_END}`, 'iu');
 /* A name never opens with a word of refusal: "Don't need orders, I freelance" names nobody (`who`). */
 const OPENS_REFUSING = new RegExp(`^(?:${REFUSES})(?![\\p{L}\\p{N}'’])`, 'iu');
+/* Nor is a word of when a name: "Once I had the stall, orders poured in" is read whole, with its "once". */
+const OPENS_WHEN = /^(?:when|once|after|since|while|if|as)$/iu;
 
 type Said = { at: number; text: string };
 type Refusal = 'refused' | 'stopped' | null;
@@ -554,8 +585,11 @@ function refusedIn(said: string, known: readonly Said[] = []): (span: Said) => b
     if (NOT.test(before)) return back(from, to) ? null : 'refused';
     /* A thing only wished or hoped for is refused as one said not to be had is, where it ends the clause: "We hope to
        have invoices sorted" is somebody with invoices. One still to be started is refused wherever it sits. */
-    if (WISHED.test(before) && !HAD_ANYWAY.test(said.slice(to)) && !back(from, to) && (TO_START.test(before) || STARTS.test(said.slice(from, to)) || closes(from, to) || (!many(from, to) && SOMEWHERE.test(said.slice(to))))) return 'refused';
+    if ((WISHED.test(before) || (!many(from, to) && WOULD_LOVE.test(before))) && !HAD_ANYWAY.test(said.slice(to)) && !back(from, to) && (TO_START.test(before) || STARTS.test(said.slice(from, to)) || closes(from, to) || (!many(from, to) && SOMEWHERE.test(said.slice(to))))) return 'refused';
     if (ENDED.test(before)) return ends(to) ? 'stopped' : null;
+    /* One thing had before, wherever it was and until whenever, unless it is still had or had again. */
+    const after = said.slice(to);
+    if (HAD_ONCE.test(before) && !many(from, to) && (ends(to) || SOMEWHERE.test(after) || HAD_UNTIL.test(after)) && !again(from, to) && !back(from, to)) return 'stopped';
     if (ENDED_ITSELF.test(before) && ITSELF_ENDED.test(said.slice(to))) return 'stopped';
     /* One thing sold, and nothing takes it up again: whoever sold a stall does not run it. */
     const one = said.slice(from, to);
@@ -609,7 +643,7 @@ function refusedIn(said: string, known: readonly Said[] = []): (span: Said) => b
  */
 function who(sentence: string): { name: string | null; bio: string; shift: number } {
   const h = hear(sentence);
-  if (h.name === null || !OPENS_REFUSING.test(h.name)) return { ...h, shift: 0 };
+  if (h.name === null || !(OPENS_REFUSING.test(h.name) || OPENS_WHEN.test(h.name))) return { ...h, shift: 0 };
   const line = sentence.replace(/\s+/gu, ' ').trim();
   return { name: null, bio: line, shift: h.bio.length - line.length };
 }

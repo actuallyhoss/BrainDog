@@ -64,8 +64,11 @@ note said Node 24 reads only 42 checks and leaves with 1 and 8 not seen; that di
 `first-screen-drawn.test.mjs` walks Mariam, Sam, Nour and Layla and fails if any of them has a place in the first rail
 with nothing to show, or if the command would leave with anything but 0.
 
-A green walk with no `--base` is a fresh self-host only: its mail is a stub and its clock is the walk's own, so it
-says nothing of the hosted sign-up. No test in the repository passes the hosted path, and the line below is run by hand.
+A green walk with no `--base` is a fresh self-host, with step 4 walked on the hosted service's own code run in one
+process: its mail is a stub, sign-up is open, there is no bot check and the clock is the walk's own. Step 4's line says
+so ("on the hosted service run in one process, its mail a stub"). It says nothing of the deployed sign-up: a stranger's
+real mail, DNS and the bot check are not walked. No test in the repository passes the deployed path, and the line below
+is run by hand.
 
 After a deploy, on the hosted service:
 

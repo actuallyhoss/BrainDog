@@ -109,18 +109,25 @@ const RATES_PRESET = '/automations?new=action&preset=rates';
 const RATES_HELD = '/automations?tab=scheduled';
 
 /**
- * THE RATES ACTION A RECORD HOLDS, or `null`: the one filed under the name the sheet's own preset files it under.
+ * THE RATES ACTION A RECORD HOLDS, or `null`: the one filed under the name the sheet's own preset files it under, and
+ * failing that one that writes the list the preset writes.
  *
- * ASKED OF `ratesPreset` AND WRITTEN NOWHERE ELSE, so the day the add-on's file is filed under another name this follows
- * it. The name does not move with the currencies (one address, one action, `ratesSpecFor`), so any two of them ask it.
- * An action somebody drafted by hand under a name of their own is not known for a rates action here: the record's
- * answer carries an action's name and not the list it writes.
+ * BOTH ARE ASKED OF `ratesPreset` AND WRITTEN NOWHERE ELSE, so the day the add-on's file is filed under another name, or
+ * keeps its rates in another list, this follows it. Neither moves with the currencies (one address, one action,
+ * `ratesSpecFor`), so any two of them ask it.
+ *
+ * AN ACTION DRAFTED BY HAND IS KNOWN BY WHAT IT DOES (audit 77, claim 6): under a name of its own it read as no rates
+ * action at all, and the foot offered a second copy beside the one already fetching. `writes` is the list an action
+ * files what it fetched in, as the record answers it beside the name; an answer without it is found by name alone, as
+ * before. The preset's own comes first where both are held, since that is the one the sheet opens again.
  */
-export function ratesActionOf<A extends { ingest: string }>(actions: readonly A[]): A | null {
-  RATES_INGEST ??= ratesPreset({ currencies: ['USD', 'EUR'], home: 'USD' })?.filled?.ingest ?? null;
-  return RATES_INGEST === null ? null : (actions.find((a) => a.ingest === RATES_INGEST) ?? null);
+export function ratesActionOf<A extends { ingest: string; writes?: string | null }>(actions: readonly A[]): A | null {
+  RATES_FILED ??= ratesPreset({ currencies: ['USD', 'EUR'], home: 'USD' })?.filled ?? null;
+  const filed = RATES_FILED;
+  if (filed === null) return null;
+  return actions.find((a) => a.ingest === filed.ingest) ?? (filed.register === '' ? null : (actions.find((a) => a.writes === filed.register) ?? null));
 }
-let RATES_INGEST: string | null | undefined;
+let RATES_FILED: { ingest: string; register: string } | null | undefined;
 
 /** A refusal as the record sends one, and only the keys read here. */
 type Said = { code: string; fix: string };
@@ -216,6 +223,11 @@ type Answered = {
   refusals?: Said[];
   drawn?: boolean;
   values?: Record<string, unknown>;
+  /**
+   * HOW EACH `{{path}}` THAT IS A FIGURE WAS CONVERTED, by the path, as a figure's `fx` says it of a tile. `values` holds
+   * the amount alone, so a sentence could not know its rates were out of date; narrowed by `staleSaid`, never trusted.
+   */
+  values_fx?: unknown;
   /** A lead note's line as the model wrote it overnight, sent only while the figures it was written from still hold. */
   said?: unknown;
   [key: string]: unknown;
@@ -1939,17 +1951,17 @@ const heldOf = (listed: unknown): { address: string; title?: string }[] =>
     : [];
 
 /**
- * A PAGE'S BLOCKS WITH ITS FOOT UNDER THEM: one note, and only when a tile above it was converted at rates that are out
- * of date. `answered` and `drawn` are the same blocks, as the record sent them and as `blockOf` drew them.
+ * A PAGE'S BLOCKS WITH ITS FOOT UNDER THEM: one note, and only when a figure above it was converted at rates that are
+ * out of date. `answered` and `drawn` are the same blocks, as the record sent them and as `blockOf` drew them.
  *
  * THE DAY NAMED IS THE OLDEST, because that is the figure furthest from true. A block that is not drawn, or that drew
- * no tiles, asks for nothing; so does a figure still in parts, whose own sentence is about a rate that is missing and
+ * no figure, asks for nothing; so does a figure still in parts, whose own sentence is about a rate that is missing and
  * stays under it. With nothing out of date the blocks come back as they were handed in.
  *
  * THE FOOT IS MARKED `synthetic`, AS NO BLOCK OF THE DECLARATION, and `actions` is the record's scheduled actions, which
  * choose the way on it offers (`footWords.ratesStale`); `null` where they could not be read.
  */
-export function footed(answered: readonly Answered[], drawn: LiveBlock[], now: number, actions: readonly { ingest: string }[] | null): LiveBlock[] {
+export function footed(answered: readonly Answered[], drawn: LiveBlock[], now: number, actions: readonly { ingest: string; writes?: string | null }[] | null): LiveBlock[] {
   const oldest = oldestStale(answered, drawn);
   if (oldest === null) return drawn;
   const way: RatesWay = actions === null ? 'unread' : ratesActionOf(actions) ? 'held' : 'none';
@@ -1957,12 +1969,35 @@ export function footed(answered: readonly Answered[], drawn: LiveBlock[], now: n
   return [...drawn, { ...blockOf(foot as unknown as Answered, new Map(), now), synthetic: true }];
 }
 
-/** The oldest day a drawn tile was converted at out of date rates, or `null` where the page has no foot to say. */
+/**
+ * The oldest day a drawn figure was converted at out of date rates, or `null` where the page has no foot to say.
+ *
+ * EVERY PLACE A PAGE DRAWS A CONVERTED FIGURE ASKS (audit 77, claim 6), where only tiles did: a bar or a split over a
+ * figure is that figure in its parts (`parts`), and a sentence with a figure in it says the same amount in words
+ * (`staleSaid`). A block this build could not draw says no figure, so it asks nothing.
+ */
 function oldestStale(answered: readonly Answered[], drawn: readonly LiveBlock[]): string | null {
-  const days = answered.flatMap((b, i) =>
-    drawn[i]?.metrics && drawn[i]!.drawn !== false ? (b.readings ?? []).flatMap((c) => (staleRead(c.reading) ? [c.reading.fx.asOf] : [])) : [],
-  );
+  const days = answered.flatMap((b, i) => {
+    const d = drawn[i];
+    if (!d || d.drawn === false || d.cannot !== undefined) return [];
+    const read = d.metrics || d.parts ? (b.readings ?? []).flatMap((c) => (staleRead(c.reading) ? [c.reading.fx.asOf] : [])) : [];
+    return [...read, ...staleSaid(b)];
+  });
   return days.length === 0 ? null : days.reduce((a, b) => (b < a ? b : a));
+}
+
+/**
+ * The days a block's `{{path}}` figures were converted at out of date rates (`values_fx`), each for a path the block
+ * holds a value for. A record on an older kernel sends none, and its sentences ask for nothing, as before.
+ */
+function staleSaid(b: Answered): string[] {
+  const how = b.values_fx;
+  if (!isObject(how) || !b.values) return [];
+  return Object.keys(how).flatMap((path) => {
+    const fx = how[path];
+    const said = Object.hasOwn(b.values!, path) && isObject(fx) && fx.stale === true && typeof fx.asOf === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(fx.asOf);
+    return said ? [(fx as { asOf: string }).asOf] : [];
+  });
 }
 
 /**

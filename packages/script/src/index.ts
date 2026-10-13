@@ -131,6 +131,11 @@ export interface CtxHost {
    * cannot tell which register a `get` is for. It refuses a `get` from a script that reads nothing.
    */
   get?(spoken: string, reads: readonly string[]): Promise<Json>;
+  /**
+   * `ctx.fold`: a payee as a bank wrote it, to the kernel's key for it, or `null` (`scriptFold` in
+   * `@braindog/host/script`). Absent, the script is handed no `ctx.fold`.
+   */
+  fold?(text: string): Promise<string | null>;
   /** The run's instant, from the host clock. The sandbox's own `Date` is not what a row is stamped with. */
   now(): string;
   /**

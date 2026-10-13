@@ -102,12 +102,21 @@ function rowsSaid(rows: readonly unknown[], names: DoesNames): string[] {
 /** A text longer than this, or one of several lines, is said as what it gains and loses and never quoted. */
 const SHORT = 80;
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-/** Where an entry is (`things#3`) or a bare id: a handle, which a line never says. */
-const HANDLE = /^[\w.-]+#\d+$|^[0-9A-HJKMNP-TV-Z]{26}$/u;
+/**
+ * Where an entry is (`things#3`), anywhere in a text ("Fix tasks#8"), or a bare id: a handle, which a line never says.
+ * It was held to the whole text, so a title that named an entry in passing was quoted with its handle (audit 79, claim 1).
+ */
+const HANDLE = /[\w.-]+#\d+|^[0-9A-HJKMNP-TV-Z]{26}$/u;
+/** A text that holds an address somebody is written to, or that is a host's name and nothing else. */
+const ADDRESS = /@|^(?:[a-z0-9-]+\.)+[a-z]{2,}$/iu;
 
 /**
  * One short value as a person reads it, `null` for none, and `undefined` for one a line cannot say: a handle, a path or
  * an address, a text too long to quote, or a shape it does not know. Money is said in its own currency, a day as a day.
+ *
+ * A DAY WITH A TIME IS NOT SAID (audit 79, claim 2). An instant's day is whichever one the reader's zone puts it in,
+ * and nothing here knows the zone: 22:30 in UTC on the 13th is the 14th in Cairo, and the calendar day cut off the
+ * front said the 13th. So only a value held as a day is said as one, and the field of an instant is named alone.
  */
 function shortSaid(v: unknown): string | null | undefined {
   if (v === null || v === '') return null;
@@ -116,9 +125,10 @@ function shortSaid(v: unknown): string | null | undefined {
   if (typeof v === 'string') {
     const text = v.trim();
     if (text === '') return null;
-    const day = /^(\d{4})-(\d{2})-(\d{2})(?:T[\d:.]+(?:Z|[+-]\d{2}:\d{2})?)?$/u.exec(text);
+    const day = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(text);
     if (day && MONTH_NAMES[Number(day[2]) - 1] !== undefined) return `${Number(day[3])} ${MONTH_NAMES[Number(day[2]) - 1]!} ${day[1]!}`;
-    return text.length > SHORT || /[\n/\\]/u.test(text) || HANDLE.test(text) ? undefined : text;
+    if (/^\d{4}-\d{2}-\d{2}T[\d:.]+(?:Z|[+-]\d{2}:\d{2})?$/u.test(text)) return undefined;
+    return text.length > SHORT || /[\n/\\]/u.test(text) || HANDLE.test(text) || ADDRESS.test(text) ? undefined : text;
   }
   const money = obj(v);
   if (Number.isInteger(money.amount) && typeof money.currency === 'string' && /^[A-Za-z]{3}$/u.test(money.currency)) return moneyText(money.amount as number, money.currency);
@@ -215,13 +225,18 @@ function changesSaid(rows: readonly unknown[], names: DoesNames, list: string): 
   const full: string[] = [];
   const bare: string[] = [];
   for (const field of fields) {
-    /* WHAT EACH ENTRY WOULD HOLD, and what it holds now: one entry says both, several say only a value they all take. */
-    const was = patched.map((p) => (Object.hasOwn(p.patch, field) ? read(field, names.before?.(p.at, field)) : undefined));
+    /* WHAT EACH ENTRY WOULD HOLD, and what it holds now: one entry says both, several say only a value they all take.
+       ONE ENTRY IS READ, WHICHEVER IT IS (audit 79, claim 3). What several entries held is never said, so reading it of
+       each was a read for every entry and field on every draw of the queue: 2,500 for one question changing five
+       fields of 500 entries. The one thing those reads decided is whether the field may be valued at all, a secret or
+       a file, and that is the list's to say and the same for every entry of it, so the first is asked for all. */
+    const sent = patched.every((p) => Object.hasOwn(p.patch, field));
+    const was = sent ? read(field, names.before?.(patched[0]!.at, field)) : undefined;
     const now = patched.map((p) => read(field, p.patch[field]));
-    const shared = !was.includes(undefined) && !now.includes(undefined) && now.every((v) => JSON.stringify(v) === JSON.stringify(now[0]));
+    const shared = was !== undefined && !now.includes(undefined) && now.every((v) => JSON.stringify(v) === JSON.stringify(now[0]));
     const emptied = now[0] === null || now[0] === '';
     const together = !shared || isLong(now[0]) || Array.isArray(now[0]) ? null : emptied ? `clears ${label(field)}` : fieldSaid(label(field), null, now[0]);
-    const said = full.length >= IN_FULL ? null : patched.length === 1 ? fieldSaid(label(field), was[0], now[0]) : together;
+    const said = full.length >= IN_FULL ? null : patched.length === 1 ? fieldSaid(label(field), was, now[0]) : together;
     /* A FIELD IT CANNOT SAY MORE OF IS STILL NAMED, once, after the ones said in full: the patch sends it. */
     if (said !== null) full.push(said);
     else if (!bare.includes(label(field))) bare.push(label(field));

@@ -13,9 +13,9 @@ import { OBLIGATIONS_REGISTER } from './lists/obligations.ts';
 import { BOOK_FROM_ACCOUNT_SCRIPT } from './scripts/book-from-account.js';
 import { CLOSE_ACCOUNT_SCRIPT } from './scripts/close-account.js';
 import { LAST_DAY_SCRIPT } from './scripts/last-day.js';
-import { MATCH_PAYMENT_SCRIPT } from './scripts/match-payment.js';
+import matchRun, { MATCH_PAYMENT_SCRIPT, matchPayment } from './scripts/match-payment.js';
 import { PLANS_FROM_NAMES_SCRIPT } from './scripts/plans-from-names.js';
-import { SETTLE_SCRIPT } from './scripts/settle.js';
+import settleRun, { SETTLE_SCRIPT, settle } from './scripts/settle.js';
 
 /**
  * WHICH FILING RULES MAY FILE AN ENTRY, as `link.to.where` over `filing_rules`, filled from the entry being filed: the
@@ -229,6 +229,54 @@ export const CHASE_DRAFT_STEPS = [CHASE_DRAFT_LEFT_STEP, CHASE_DRAFT_STEP] as co
 const DRAFT_DECLARED = OBLIGATIONS_REGISTER.fields.some((f) => f.id === CHASE_DRAFT_FIELD.id);
 
 /**
+ * THE SECOND STEP OF `payment-matches` (repeating-settle-79-80): the repeating line a payment paid is marked paid, so
+ * "Last paid" and "Last amount" are written by the payment and by no hand.
+ *
+ * IT FINDS THE LINE AGAIN, BECAUSE NO STEP CAN BE HANDED IT. Measured in the kernel's flow: a `script` step puts the
+ * id of the job it queued under its `as` name and never what the script answered, and a step's `input` is text alone.
+ * So this script is the two texts Money already ships, run one after the other in one sandbox: `match_payment`'s own
+ * search, with its writes and its words held back so it changes and says nothing a second time, and then `settle`'s own
+ * run for the line it found. No decision is written here, only the order of the two.
+ *
+ * ONLY A REPEATING LINE, AND ONLY THE ONE THE MATCH LINKS BY ITSELF. A bill or an instalment is marked by the link the
+ * first step writes (`payment-settles`, `instalment-settles`), so this step ends without a word for them, whichever of
+ * the two steps a host runs first. Several things that fit is still the first step's to ask or to leave.
+ *
+ * "NEXT" IS NOT MOVED, AND THE RUN SAYS SO. The day it moves to is the walk's arithmetic (`cycleOn` in
+ * `scripts/settle.js`), which a sandbox does not hold and a rule's grammar cannot work out, so `settle` is handed
+ * `next: null`: the payment is kept on the line and its day stays for a person, or for `recurring-missed`, to move.
+ * `settle` says that case as "has no later day", which is true of a line past its end and not of this one, so the
+ * sentence is ended here with what happened.
+ *
+ * A PAYMENT A LITTLE OFF THE LINE'S AMOUNT IS `settle`'S OWN QUESTION ("Change the line?"), handed on as it is: both
+ * of its answers carry the change, so picking one writes it.
+ */
+export const SETTLE_LINE_SCRIPT = {
+  script: 'settle_matched_line',
+  title: 'Mark a repeating line paid by its payment',
+  pack: 'money-core',
+  runs: { rule: true },
+  egress: [],
+  keys: [],
+  reads: ['obligations', 'installments', 'recurring', 'transactions'],
+  writes: ['recurring'],
+  source: `${matchPayment.toString()}
+${settle.toString()}
+const find = ${matchRun.toString()};
+const mark = ${settleRun.toString()};
+export default async function run(ctx) {
+  const input = ctx.input && typeof ctx.input === 'object' ? ctx.input : {};
+  const over = (more) => Object.create(ctx, Object.fromEntries(Object.entries(more).map(([name, value]) => [name, { value }])));
+  const found = await find(over({ input: { payment: input.payment, asks: 'linked' }, update: () => {}, log: () => {} }));
+  if (!found || found.ask || found.list !== 'recurring') return null;
+  const said = [];
+  const done = await mark(over({ input: { payment: input.payment, item: found.matched, next: null }, log: (...words) => void said.push(words.join(' ')) }));
+  for (const line of said) ctx.log(line.replace(', and has no later day.', '. Its Next stays where it is, for you to move.'));
+  return done;
+}`,
+};
+
+/**
  * WHAT HAPPENS WHEN A PERSON ANSWERS ONE OF MONEY'S QUESTIONS, SINCE money-core 3.1.0: automations started by a
  * decision in Decide (`on: decided`, `packages/kernel/src/flow.ts`'s `onDecided`), in the pack document's own form.
  *
@@ -294,8 +342,8 @@ export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
    * and nothing a run fills says a handle ("obligations#4").
    *
    * NO `next`, BECAUSE A BILL HAS NONE. It is the day a repeating line moves to, and nothing links a payment to a
-   * repeating line or an instalment yet: "Settles" points at Bills alone. So "Paid by", "Last paid" and "Last amount"
-   * are still filled by nobody, and when a link to a repeating line lands its rule hands `next` from the walk.
+   * repeating line: "Settles" points at Bills alone. An instalment's "Paid by" and a line's "Last paid" and "Last
+   * amount" are written by `payment-matches` and the rules round it, below, and no rule can hand `next` from the walk.
    */
   {
     rule: 'payment-settles',
@@ -321,10 +369,12 @@ export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
    * and a payment that clears later is looked for the day it clears. No `once_per`: a second run for an entry already
    * linked finds the link and looks no further, and a question asked again joins the one open by its cause.
    *
-   * A REPEATING LINE IS FOUND AND NOT YET MARKED. It holds no link, so the script writes nothing for it and says the
-   * line in its run; the step that would run `settle` with the line and its next day needs a step to read the answer
-   * of the one before it, which is not measured, and an answer picked on Decide starts nothing while a script's
-   * question reaches `onDecided` with no `about` (see `CLOSE_ACCOUNT_AUTOMATIONS` below). Both wait.
+   * A REPEATING LINE IS MARKED BY THE SECOND STEP (repeating-settle-79-80). It holds no link, so the first script
+   * writes nothing for it and says the line in its run, and `SETTLE_LINE_SCRIPT` above finds it again and runs
+   * `settle` for it: "Last paid" and "Last amount" are the payment's. A step cannot read the answer of the one before
+   * it (measured, said above the script), which is why the second finds the line itself. An answer picked on Decide
+   * still starts nothing while a script's question reaches `onDecided` with no `about` (see
+   * `CLOSE_ACCOUNT_AUTOMATIONS` below), and that waits.
    *
    * SO NO QUESTION IS ASKED WHILE ONE OF ITS ANSWERS WOULD BE A REPEATING LINE (`asks: 'linked'`). Measured: an answer
    * that names a bill or an instalment writes its link and the thing is marked paid, and one that names a repeating
@@ -337,9 +387,13 @@ export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
     pack: 'money-core',
     on: { written: { register: 'transactions', op: ['create', 'update'], fields: ['state', 'settles'] } },
     when: 'state is cleared, settles is empty',
-    steps: [{ script: { id: 'match_payment', as: 'matching', input: { payment: '{{trigger.entry}}', asks: 'linked' } } }],
+    steps: [
+      { script: { id: 'match_payment', as: 'matching', input: { payment: '{{trigger.entry}}', asks: 'linked' } } },
+      { script: { id: SETTLE_LINE_SCRIPT.script, as: 'marking', input: { payment: '{{trigger.entry}}' } } },
+    ],
   },
   MATCH_PAYMENT_SCRIPT,
+  SETTLE_LINE_SCRIPT,
   {
     rule: 'instalment-settles',
     name: 'Mark an instalment paid by its payment',

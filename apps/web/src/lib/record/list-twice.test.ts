@@ -138,4 +138,8 @@ test('the list screen reads the word, asks once, and draws the line with its way
   assert.match(route, /twiceWords\.none/, 'an empty answer says nothing');
   /* The word leaves the address and nothing else does. */
   assert.match(route, /p\.delete\(TWICE\)/);
+  /* A view has no word for it, so nothing is saved while it narrows the list, and Save view is not drawn beside a chip. */
+  assert.match(route, /if \(twice\) \{\s*toasts\.push\(twiceWords\.unsaved/, 'a view is saved without the word');
+  assert.match(route, /savable=\{twice === null\}/, 'Save view is drawn while the word narrows the list');
+  assert.ok(twiceWords.unsaved.includes(twiceWords.clear), 'the sentence names a button the line does not have');
 });

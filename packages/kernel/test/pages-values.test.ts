@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { openRecord, type Declaration, type Kernel } from '../src/index.ts';
+import { jcs, openRecord, type Declaration, type Kernel } from '../src/index.ts';
 import { pathsOf, type PageBlock } from '../src/pages.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
@@ -146,5 +146,79 @@ test('A TEMPLATE FILLS FROM THE ROW’S OWN FIELDS, and says which row its page 
   assert.ok(out.ok, JSON.stringify(out));
   assert.deepEqual((out.value as { param?: unknown }).param, { register: 'things', seq: 1, title: 'Kiln' });
   assert.equal(blocksOf(out)[0]?.heading, '{{constructor}} of Kiln', 'a name the row does not own was filled from the prototype');
+  sql.close();
+});
+
+/* ── how a figure in a sentence was converted (rates-foot-note-80) ───────────────────────────────── */
+
+const FX: Declaration = {
+  id: 'register.fx',
+  kind: 'register',
+  body: {
+    id: 'fx',
+    name: 'Rates',
+    title: 'currency',
+    fields: [
+      { id: 'currency', type: 'text', required: true },
+      { id: 'base', type: 'text', required: true },
+      { id: 'rate', type: 'decimal', required: true },
+      { id: 'as_of', type: 'day', index: true, required: true },
+    ],
+  } as never,
+};
+
+const OWED: Declaration = {
+  id: 'metric.owed',
+  kind: 'metric',
+  body: { metric: 'owed', name: 'Owed', source: 'register.obligations', where: 'state is open', value: { sum: 'amount' }, format: 'money', target: { lte: 99_999_999 }, window: '30d' } as never,
+};
+
+const SENTENCE = pageOf({ kind: 'note', body: 'You owe {{owed}} over {{open-count}} bills.' });
+
+/** The record above with a home currency of pounds and, when `dollars`, an open bill in dollars beside the rent. */
+async function abroad(dollars: boolean, rateDay?: string): Promise<{ k: Kernel; sql: NodeSql }> {
+  const { k, sql } = await record(FX, OWED, SENTENCE);
+  k.rememberPack({ id: 'money-core', version: '1.0.0', source: 'local', ref: null, manifest: jcs({ pack: 'money-core', version: '1.0.0', config: { home_currency: { type: 'text' } } }), checksum: 'not-a-real-checksum' });
+  assert.ok(k.setPackConfig('money-core', { home_currency: 'GBP' }, { actor: 'p_1' }).ok);
+  if (dollars) assert.ok(k.create('obligations', { what: 'Hosting', amount: { amount: 10_000, currency: 'USD' }, due: '2026-09-20', state: 'open' }, { actor: 'p_1' }).ok);
+  if (rateDay !== undefined) assert.ok(k.create('fx', { currency: 'USD', base: 'GBP', rate: 0.5, as_of: rateDay }, { actor: 'p_1' }).ok);
+  return { k, sql };
+}
+
+test('A FIGURE IN A SENTENCE SAYS HOW IT WAS CONVERTED, beside its amount: the day of its oldest rate, and whether that is out of date', async () => {
+  const old = await abroad(true, '2026-08-01');
+  const [stale] = blocksOf(old.k.page('desk'));
+  assert.deepEqual(stale?.values, { owed: gbp(125_000), 'open-count': 2 });
+  const how = stale?.values_fx as Record<string, { asOf: string | null; stale: boolean; into: string | null; missing: string[] }>;
+  /* ONLY THE PATH THAT WAS CONVERTED, by the path as written. A count used no rate, so it says nothing. */
+  assert.deepEqual(Object.keys(how), ['owed']);
+  assert.deepEqual([how.owed!.asOf, how.owed!.stale, how.owed!.into, how.owed!.missing], ['2026-08-01', true, 'GBP', []]);
+  old.sql.close();
+
+  const fresh = await abroad(true, '2026-09-14');
+  const [live] = blocksOf(fresh.k.page('desk'));
+  const now = live?.values_fx as Record<string, { asOf: string | null; stale: boolean }>;
+  assert.deepEqual([now.owed!.asOf, now.owed!.stale], ['2026-09-14', false]);
+  fresh.sql.close();
+});
+
+test('NOTHING IS SAID OF A FIGURE NO RATE WENT INTO: one currency, a figure left in parts, or a record with no home currency', async () => {
+  /* EVERY AMOUNT ALREADY IN POUNDS: the sum used no rate, so it has no day to be out of date at. */
+  const home = await abroad(false, '2026-08-01');
+  const [plain] = blocksOf(home.k.page('desk'));
+  assert.deepEqual(plain?.values, { owed: gbp(120_000), 'open-count': 1 });
+  assert.equal(plain?.values_fx, undefined);
+  home.sql.close();
+
+  /* NO RATE FOR THE DOLLARS: the figure is each of its amounts, and a figure in parts is never said as converted. */
+  const none = await abroad(true);
+  const [parts] = blocksOf(none.k.page('desk'));
+  assert.ok(Array.isArray(parts?.values && (parts.values as Record<string, unknown>).owed), JSON.stringify(parts?.values));
+  assert.equal(parts?.values_fx, undefined);
+  none.sql.close();
+
+  /* AND THE RECORD AT THE TOP OF THIS FILE, with no home currency, sends none on any block. */
+  const { k, sql } = await record(pageOf({ kind: 'note', body: 'Rent is {{obligations#1.amount}} of {{open-count}}.' }));
+  assert.equal(blocksOf(k.page('desk'))[0]?.values_fx, undefined);
   sql.close();
 });

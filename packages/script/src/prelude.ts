@@ -81,6 +81,7 @@ export const PRELUDE = `(function (host) {
       log: (...parts) => {
         host.log(words(parts));
       },
+      ...(typeof host.fold === 'function' ? { fold: (text) => host.fold(String(text)).then(parse) } : {}),
       record: freeze({
         list: (register, where, options) =>
           host

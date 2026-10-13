@@ -518,11 +518,16 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
            link used to open everyone in order of name and tell the reader to look for the same person listed twice,
            since a list's address narrowed by a field's value, a search and an order, and "held twice" is a pair the
            kernel works out and no value a field holds. The list takes the word `twice` in its address now and asks
-           the record for those people itself, so the note says "See them" and the looking is the record's. */
+           the record for those people itself, so the note says "See them" and the looking is the record's.
+
+           THE NUMBER IS HOW MANY TOO MANY, AND SAYS SO (audit 78, claim 1). The figure counts the ones that would go
+           if each pair were one person, and the link shows every one of each pair, so "twice: 1" stood over a list of
+           two and "twice: 2" over three of one name. The figure is the kernel's and stays as it is; the words now say
+           what it counts, so a list longer than the number is what the line promised. */
         kind: 'note',
         span: 12,
         when: { metric: 'held-twice', gt: 0 },
-        body: 'People who may be on this record twice: {{held-twice}}. [See them](/r/people?twice=1).',
+        body: 'Some people may be on this record twice. Too many: {{held-twice}}. [See them](/r/people?twice=1).',
       },
       {
         /* CARDS, with a face for each person, rather than a table of four columns read

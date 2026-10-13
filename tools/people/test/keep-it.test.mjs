@@ -120,7 +120,7 @@ test('a trace is found plain, encoded or packed, and a sentence that only shares
 test('first-run\'s step 4 takes this walk only where it said "not walked"', () => {
   const selfHost = { id: 'keep', pass: null, saw: 'sign-up not walked: self-host; opened through the owner door, built orders, in EGP' };
   const hosted = { id: 'keep', pass: true, saw: `the mailed link carried her sentence; ${PASSKEY}` };
-  assert.deepEqual(joined(selfHost, hosted), { id: 'keep', pass: true, saw: `on the hosted service, ${hosted.saw}; on the self-host, built orders, in EGP` });
+  assert.deepEqual(joined(selfHost, hosted), { id: 'keep', pass: true, saw: `on the hosted service run in one process, its mail a stub, ${hosted.saw}; on the self-host, built orders, in EGP` });
   assert.equal(joined(selfHost, { ...hosted, pass: false }).pass, false);
   const red = { id: 'keep', pass: false, saw: 'no orders on the record' };
   assert.equal(joined(red, hosted), red);

@@ -37,6 +37,7 @@ ctx.record.get(id) | read one row | by its id, as items#12, only from lists in r
 ctx.write(list, fields) | add a row | only lists in writes
 ctx.update(id, patch, version) | change a row | with the version it was read at, or none to write without comparing
 ctx.fetch(url, { key }) | call out | only to an origin in egress, with a key named in keys
+ctx.fold(text) | match a payee | a payee as a bank wrote it, as the name under it, or null; 1,000 a run and no more
 ctx.log(...) | say what happened | kept with the run, for the owner to read
 ```
 

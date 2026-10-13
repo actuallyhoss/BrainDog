@@ -270,11 +270,14 @@ export async function keepIt(person, { title = person.expect?.heard?.title ?? pe
  * `first-run.mjs`'s step 4 with this walk laid in: on a host that has no sign-up its line is "not walked: self-host"
  * (`kept.pass === null`), and the hosted service's walk answers in its place, the self-host's build said after it.
  * A line already green or red is left as it is.
+ *
+ * THE LINE SAYS WHAT WAS WALKED: the Worker in this process with a stub for mail, sign-up open and no bot check. It read
+ * "on the hosted service", which a reader took for the deployed one, where real mail, DNS and the bot check stand.
  */
 export function joined(kept, hosted) {
   if (kept.pass !== null) return kept;
   const built = kept.saw.replace(/^sign-up not walked: self-host; opened through the owner door, /u, '');
-  return { id: 'keep', pass: hosted.pass, saw: `on the hosted service, ${hosted.saw}; on the self-host, ${built}` };
+  return { id: 'keep', pass: hosted.pass, saw: `on the hosted service run in one process, its mail a stub, ${hosted.saw}; on the self-host, ${built}` };
 }
 
 /**

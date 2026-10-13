@@ -1376,6 +1376,12 @@ export type ActionRow = {
   host: string | null;
   every: string;
   key: string | null;
+  /**
+   * The list the action files what it fetched in (`writes.register`), or `null` when it files nothing. OPTIONAL IN THE
+   * TYPE ONLY, as `project_row` is; `listActions` always answers it. A reader finds a hand-drafted action by what it
+   * writes where its name is not the one a preset would have given it.
+   */
+  writes?: string | null;
   state: 'pending' | 'firing' | 'paused' | 'done';
   /** When it runs next, while it is pending or firing. A paused or finished action has none. */
   next: string | null;
@@ -1519,6 +1525,7 @@ export function listActions(sql: Sql, nowMs: number): ActionRow[] {
         host: address && originOf(address) ? new URL(address).host : null,
         every: decl.every ?? '',
         key: decl.grant === undefined || decl.grant === '' ? null : (keyNamed(sql, decl.grant)?.label ?? decl.grant),
+        writes: typeof decl.writes?.register === 'string' && decl.writes.register !== '' ? decl.writes.register : null,
         state,
         next: row && (state === 'pending' || state === 'firing') ? row.due_at : null,
         last,

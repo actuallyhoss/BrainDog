@@ -164,6 +164,9 @@
   /** Something narrows the list: a chip, or the word. The search box is asked beside it where it matters. */
   const narrowed = $derived(filters.length > 0 || twice !== null);
   const clearTwice = () => setParam((p) => p.delete(TWICE));
+  /* A VIEW KEEPS CHIPS, A SEARCH AND AN ORDER, AND HAS NO WORD FOR THE PEOPLE HELD TWICE. Saved from this list it would
+     open on everyone the chips let through, under a title that never said so. So nothing is saved while the word narrows
+     the list, and this says why, naming the button that leads out (`twiceWords.unsaved`). */
 
   /* The columns actually drawn: the register's projection minus whatever the reader has hidden. */
   let createOpen = $state(false);
@@ -2264,6 +2267,11 @@
 
   async function saveView() {
     if (!decl || saving) return;
+    /* THE WORD FIRST: "filter or search first" would be the wrong advice, since a chip beside the word saves no more. */
+    if (twice) {
+      toasts.push(twiceWords.unsaved, { intent: 'warn' });
+      return;
+    }
     if (filters.length === 0 && q === '') {
       toasts.push(copy.viewNeedsFilter, { intent: 'warn' });
       return;
@@ -2570,6 +2578,7 @@
           name={decl.name}
           {q}
           filtered={q !== '' || filters.length > 0}
+          savable={twice === null}
           {enums}
           {listed}
           {facets}

@@ -40,7 +40,7 @@ import { fill } from './fill.ts';
 import type { Json } from './coerce.ts';
 import { across, dayFieldOf as datedBy, isAtLeast, partsOf, type Amount, type Part, type Rate } from './fx.ts';
 import type { Entry } from './index.ts';
-import { predicateOf, windowMs, wordsOf, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
+import { predicateOf, windowMs, wordsOf, type EvalContext, type FxRead, type MetricDecl, type Reading } from './metrics.ts';
 import { HORIZON_CAP, runway, type Horizon, type Leg, type Only, type Runway } from './forecast.ts';
 import { beyondOf, figureLists, isRolled, pointedIn, type PointsAt, type Rolled } from './money-figures.ts';
 import { withAdds, type PageAddition } from './page-adds.ts';
@@ -441,6 +441,12 @@ export type BlockResult = PageBlock & {
    * holds a value for, by the path as written. A path it holds nothing for is absent, and draws `—`.
    */
   values?: Record<string, Json>;
+  /**
+   * HOW A `{{path}}` THAT IS A FIGURE WAS CONVERTED, by the path as written: the figure's own `fx`, for a figure that
+   * is one amount (never one in parts) worked out with a rate. `values` holds the amount alone, so without this a
+   * sentence could not know its rates are out of date, where a tile's figure says it. Absent when no path was converted.
+   */
+  values_fx?: Record<string, FxRead>;
   /**
    * Every `{{path}}` of the block that names nothing the record has: no figure, list, row, field or value of a list's
    * state. A host draws each as the author wrote it, marked, and leaves it out of a chip, a tile or a bar, where a path
@@ -2072,8 +2078,9 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
 
   /* THE PAGE'S LIVE FIGURES ARE THE RECORD'S TO SAY, so the host does not answer them from a copy of
      its own. Only for a block that draws: a figure in a block that is not on the page is not read. */
-  const { values, unnamed } = valuesOf(deps, block);
+  const { values, values_fx, unnamed } = valuesOf(deps, block);
   if (values) base.values = values;
+  if (values_fx) base.values_fx = values_fx;
   if (unnamed) base.unnamed = unnamed;
 
   /* THE PAGE WORDS THE INSTALL CHECKS ARE CHECKED AGAIN HERE, for a page installed under an earlier build, in the
@@ -4342,7 +4349,7 @@ function figure(v: Json | undefined): Json | undefined {
  * stored field, a count `list` already returns. A field is read from the row's OWN properties and only
  * when the register declares it, so `tasks#1.constructor` is nothing rather than the prototype.
  */
-function valueAt(deps: PageDeps, path: string): Json | undefined {
+function valueAt(deps: PageDeps, path: string, how?: { fx?: FxRead }): Json | undefined {
   const here = deps.here;
   const parsed = pathOf(path, here ? deps.schemaOf(here.register)?.fields : undefined);
   if (!parsed) return undefined;
@@ -4387,6 +4394,8 @@ function valueAt(deps: PageDeps, path: string): Json | undefined {
     /* A FIGURE THAT IS A DAY (the latest `due`) is held as whole days since 1970, and a sentence says the day: the
        ISO day goes out, which a host writes as it writes any other day. */
     if (decl?.format === 'day') return new Date(read.value.value * 86_400_000).toISOString().slice(0, 10);
+    /* AND HOW ONE AMOUNT WAS CONVERTED, for a caller that asks (`values_fx`): only where a rate was used. */
+    if (how && read.value.fx?.asOf) how.fx = read.value.fx;
     return read.value.unit ? { amount: read.value.value, currency: read.value.unit } : read.value.value;
   }
   const schema = deps.schemaOf(said.register);
@@ -4573,15 +4582,19 @@ function rowNamed(deps: PageDeps, row: Entry | undefined, read: BlockResult): Bl
  * this the two answered the same, so 48 paths on the owner's record drew a dash for a typo. Only a path with no value is
  * asked whether it names anything, so a block whose paths all hold values costs no read more than it did.
  */
-function valuesOf(deps: PageDeps, block: PageBlock): { values?: Record<string, Json>; unnamed?: string[] } {
+function valuesOf(deps: PageDeps, block: PageBlock): { values?: Record<string, Json>; values_fx?: Record<string, FxRead>; unnamed?: string[] } {
   const out: Record<string, Json> = {};
+  const fx: Record<string, FxRead> = {};
   const unnamed: string[] = [];
   for (const path of pathsOf(block, (id) => figureNamed(deps, id))) {
-    const v = valueAt(deps, path);
+    const how: { fx?: FxRead } = {};
+    const v = valueAt(deps, path, how);
     if (v !== undefined) out[path] = v;
     else if (!namedAt(deps, path)) unnamed.push(path);
+    /* A FIGURE'S CONVERSION GOES OUT BESIDE ITS AMOUNT (rates-foot-note-80), so a sentence can say its rates are old. */
+    if (v !== undefined && how.fx) fx[path] = how.fx;
   }
-  return { ...(Object.keys(out).length ? { values: out } : {}), ...(unnamed.length ? { unnamed } : {}) };
+  return { ...(Object.keys(out).length ? { values: out } : {}), ...(Object.keys(fx).length ? { values_fx: fx } : {}), ...(unnamed.length ? { unnamed } : {}) };
 }
 
 /** A figure by its id, declared or built in, as `registersOf` finds one. */

@@ -128,6 +128,77 @@ test('where the actions could not be read, the foot says its sentence and offers
   assert.equal(foot.synthetic, true);
 });
 
+/* A FIGURE IS OUT OF DATE WHEREVER IT IS DRAWN (audit 77, claim 6): only tiles asked for the foot, so a page whose one
+   converted figure was a bar, a split or a sentence said nothing at all about the rates under it. */
+const charted = (kind: 'bar' | 'split', r: unknown) =>
+  ({ kind, heading: 'Owed by client', source: 'metric.overdue', readings: [{ metric: 'overdue', reading: r }], rows: [], matched: 2, refusals: [] }) as never;
+
+const GROUPS = [
+  { key: 'kiln', label: 'Kiln', value: 3000000 },
+  { key: 'oak', label: 'Oak', value: 1200000 },
+];
+
+/** A note with one figure in its sentence, and how the record says that figure was converted. */
+const note = (how: unknown) =>
+  ({ kind: 'note', body: 'You are owed {{overdue}}.', values: { overdue: { amount: 4200000, currency: 'EGP' } }, ...(how === undefined ? {} : { values_fx: how }), rows: [], matched: 0, refusals: [] }) as never;
+
+test('a bar and a split over a figure converted at out of date rates ask for the foot', () => {
+  for (const kind of ['bar', 'split'] as const) {
+    const out = page(charted(kind, reading({ fx: fx(), groups: GROUPS })));
+    assert.equal(out.length, 2, kind);
+    assert.ok(out[0]!.parts, 'drawn as its parts, and no tile');
+    assert.equal(out[0]!.metrics, undefined);
+    assert.equal(out[1]!.body, footWords.ratesStale('28 Sep 2026', 'none'));
+    assert.equal(out[1]!.synthetic, true);
+
+    assert.equal(page(charted(kind, reading({ fx: fx({ stale: false }), groups: GROUPS }))).length, 1, 'current rates ask nothing');
+    assert.equal(page(charted(kind, null)).length, 1, 'and neither does a figure the record could not read');
+  }
+});
+
+test('a note whose figure was converted at out of date rates asks for the foot', () => {
+  const out = page(note({ overdue: fx() }));
+  assert.equal(out.length, 2);
+  assert.equal(out[0]!.kind, 'note');
+  assert.equal(out[1]!.body, footWords.ratesStale('28 Sep 2026', 'none'));
+
+  assert.equal(page(note(undefined)).length, 1, 'a record that says nothing of the rates asks nothing');
+  assert.equal(page(note({ overdue: fx({ stale: false }) })).length, 1);
+  /* NARROWED, NEVER TRUSTED: a day that is no day, a path the note does not hold, and a shape that is no map. */
+  assert.equal(page(note({ overdue: fx({ asOf: 'last week' }) })).length, 1);
+  assert.equal(page(note({ 'cash-now': fx() })).length, 1);
+  assert.equal(page(note([fx()])).length, 1);
+  /* A note that is not drawn says no figure, so it has none out of date. */
+  assert.equal(page({ ...(note({ overdue: fx() }) as object), drawn: false } as never).length, 1);
+});
+
+test('the foot names the oldest day across tiles, bars and notes, and is said once', () => {
+  const out = page(
+    tiles(reading({ fx: fx({ asOf: '2026-09-28' }) })),
+    charted('bar', reading({ fx: fx({ asOf: '2026-09-11' }), groups: GROUPS })),
+    note({ overdue: fx({ asOf: '2026-09-20' }) }),
+  );
+  assert.equal(out.length, 4);
+  assert.equal(out[3]!.body, footWords.ratesStale('11 Sep 2026', 'none'));
+});
+
+/* AN ACTION SOMEBODY DRAFTED BY HAND IS A RATES ACTION BY WHAT IT DOES: it writes the list the preset writes. Found by
+   its filing name alone it read as none, and the foot offered a second copy beside the one already fetching. */
+test('a rates action drafted by hand under a name of its own is known by the list it writes', () => {
+  const list = ratesPreset({ currencies: ['USD', 'EGP'], home: 'EGP' })!.filled!.register;
+  assert.notEqual(list, '');
+  const mine = { ingest: 'rates_by_hand', writes: list };
+  assert.equal(ratesActionOf([{ ingest: 'site-stats', writes: 'readings' }, mine]), mine);
+  assert.equal(ratesActionOf([{ ingest: 'site-stats', writes: 'readings' }, { ingest: 'older', writes: null }]), null);
+  assert.equal(ratesActionOf([{ ingest: 'nameless', writes: '' }]), null, 'an action that writes no list is not one');
+  /* The preset's own, when both are held, since that is the one the sheet would open again. */
+  assert.equal(ratesActionOf([mine, { ingest: RATES }])?.ingest, RATES);
+
+  const body = pageWith([mine], tiles(reading({ fx: fx() })))[1]!.body ?? '';
+  assert.equal(body, footWords.ratesStale('28 Sep 2026', 'held'));
+  assert.doesNotMatch(body, /Keep rates current|rates_by_hand/u);
+});
+
 /* THE READER ASKS FOR THE ACTIONS ONLY WHEN IT HAS A FOOT TO SAY, so a page with current rates costs no second read. */
 const BASE = 'http://record.test';
 const json = (status: number, body: unknown): Response => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -164,6 +235,11 @@ test('the reader looks for a rates action when rates are out of date, and only t
 
   const refused = host(stale, json(403, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'This key cannot read that.' } }));
   assert.equal((await read(refused.io)).at(-1)!.body, footWords.ratesStale('28 Sep 2026', 'unread'));
+
+  /* A BAR ALONE IS ENOUGH TO ASK, and an action drafted by hand answers it. */
+  const byHand = host([charted('bar', reading({ fx: fx(), groups: GROUPS }))], json(200, { ok: true, value: [{ ingest: 'rates_by_hand', writes: ratesPreset({ currencies: ['USD', 'EGP'], home: 'EGP' })!.filled!.register, channel: 'poll', state: 'pending' }] }));
+  assert.equal((await read(byHand.io)).at(-1)!.body, footWords.ratesStale('28 Sep 2026', 'held'));
+  assert.equal(byHand.sent.filter((m) => m === 'actions').length, 1);
 
   const current = host([tiles(reading({ fx: fx({ stale: false }) }))], json(200, { ok: true, value: [] }));
   const plain = await read(current.io);

@@ -437,6 +437,9 @@ test('THE LIST SAYS WHY AN ACTION IS PAUSED, counts a held run in the month, and
   const rows = k.actions();
   assert.deepEqual(rows.map((r) => r.ingest), ['balance', 'ping']);
   const [balance, ping] = rows as [ActionRow, ActionRow];
+  /* THE LIST AN ACTION FILES IN IS SAID, and `null` for one that files nothing (rates-foot-note-80): a reader finds a
+     hand-drafted action by what it writes where its name is its author's own. */
+  assert.deepEqual([balance.writes, ping.writes], ['notes', null]);
 
   assert.deepEqual(
     { channel: balance.channel, project: balance.project, host: balance.host, every: balance.every, key: balance.key, state: balance.state, next: balance.next },

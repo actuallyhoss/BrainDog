@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 
 import { installFault, normalise, plan, type Installed, type Pack } from '@braindog/declare';
 import { declarations, firstPartyDocument, REGISTERS } from '@braindog/seed';
+import { moduleDocument } from '@braindog/seed/usecases/install';
 
 import { createRecordApi, type Boot, type CallContext } from '../src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
@@ -157,6 +158,12 @@ test('ruling 341: Money seeds a starter set of categories, in and out', () => {
   const seeds = ((firstPartyDocument('money-core') as { seeds?: { register: string; fields: { direction?: string } }[] }).seeds ?? []).filter((s) => s.register === 'categories');
   assert.ok(seeds.length >= 6, `Money seeds ${seeds.length} categories, the sample studio's, and not a starter set`);
   assert.ok(seeds.some((s) => s.fields.direction === 'in') && seeds.some((s) => s.fields.direction === 'out'));
+  /* AND THE SET ITSELF, asked for by name with no example beside it (`starters: true`): eight, both ways, none tagged.
+     No caller that installs asks for it yet: the record's host would plant each as an example. */
+  const set = ((moduleDocument(null, 'money-core', { today: '2026-10-09', starters: true }) as { seeds?: { register: string; fields: { direction?: string; tags?: string[] } }[] }).seeds ?? []);
+  assert.equal(set.length, 8);
+  assert.ok(set.every((s) => s.register === 'categories' && !(s.fields.tags ?? []).includes('example')));
+  assert.ok(set.some((s) => s.fields.direction === 'in') && set.some((s) => s.fields.direction === 'out'));
 });
 
 /* ── 439 · names through a list that meets people ───────────────────────── */

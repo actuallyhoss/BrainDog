@@ -1149,3 +1149,102 @@ test('A NEVER IS TAKEN BACK BY A FIRST ONE BEING OPENED: "I never ran a shop but
   assert.ok(!has(propose('We never run out of products', CAIRO), 'Products'), 'We never run out of products');
   assert.ok(has(propose('I sell products and never ran out of them', CAIRO), 'Products'), 'I sell products and never ran out of them');
 });
+
+test('WHAT WAS LEFT OPEN SINCE BATCH 69, each sentence word for word: "I never used invoices", "I would love to have a shop", "My partner sold the stall", "I had a shop", "my friend and I are opening one"', () => {
+  const lit = (p: ReturnType<typeof propose>, word: RegExp): boolean => p.heard.some((h) => word.test(h.phrase)) || p.places.some((x) => x.phrase !== null && word.test(x.phrase));
+  const both = (s: string): string[] => [s, `I'm a freelance designer. ${s}`];
+  const none = (s: string, word: RegExp): void => {
+    for (const typed of both(s)) assert.ok(!lit(propose(typed, CAIRO), word), typed);
+  };
+  const kept = (s: string, word: RegExp): void => {
+    for (const typed of both(s)) assert.ok(lit(propose(typed, CAIRO), word), typed);
+  };
+
+  /* MORE OF A THING IS A THING HAD: the wish is for more of them, and whoever wishes it has some. */
+  kept('I wish I had more clients', /clients/iu);
+  kept('I wish I had more orders', /orders/iu);
+  kept('I hope to get more clients', /clients/iu);
+  none('I wish I had clients', /clients/iu);
+
+  /* A NEW SHOP HOPED FOR IS NOT HAD, and another one is: "new" says nothing of a first, "another" and "second" do. */
+  none('I hope to open a new shop', /shop/iu);
+  none('I hope to open a new shop next year', /shop/iu);
+  kept('I hope to open another shop', /shop/iu);
+  kept('I hope to open a second shop', /shop/iu);
+  kept('I hope to open one more shop', /shop/iu);
+  kept('I run a shop and hope to open a new shop', /shop/iu);
+
+  /* A THING NEVER USED OR SENT IS NOT KEPT, and "used to" is still what was done before. */
+  none('I never used invoices', /invoices/iu);
+  none('We have never used invoices', /invoices/iu);
+  none('I never sent invoices', /invoices/iu);
+  none("I haven't used invoices", /invoices/iu);
+  kept('I never used paper, I send invoices', /invoices/iu);
+  kept('I am used to taking orders', /orders/iu);
+  kept('I never used to chase people, now I send invoices', /invoices/iu);
+
+  /* ONE THING SOMEBODY WOULD LOVE TO HAVE IS NOT HAD. What there is more than one of is started in here, so it is kept. */
+  none('I would love to have a shop', /shop/iu);
+  none("I'd like a shop one day", /shop/iu);
+  none('I would love a shop', /shop/iu);
+  none('We would really like to open a small shop', /shop/iu);
+  none("I'd love to have my own shop in Cairo", /shop/iu);
+  kept('I would love to have a shop here', /shop/iu);
+  kept('I would like to take orders', /orders/iu);
+  kept('I would love to track orders', /orders/iu);
+  kept('I would like my shop to be tidy', /shop/iu);
+  kept('I would love to have a shop and now I have one', /shop/iu);
+  kept("I'd like to grow my shop", /shop/iu);
+
+  /* A STALL SOMEBODY OF THEIRS SOLD IS GONE, as one they sold themselves is. Never one sold to them. */
+  none('My partner sold the stall', /stall/iu);
+  none('Our landlord sold the shop last year', /shop/iu);
+  none('My business partner has sold our stall', /stall/iu);
+  none('My partner sold the stall to a friend', /stall/iu);
+  kept('My partner never sold the stall', /stall/iu);
+  kept('My partner sold the stall to me', /stall/iu);
+  kept('They sold the shop to us', /shop/iu);
+  kept('I wish my partner had sold the stall', /stall/iu);
+  kept('My partner sold candles at the stall', /stall/iu);
+
+  /* A SHOP HAD BEFORE IS NOT HAD NOW: "I had a shop". Never one had ever since, one still had, or many of a thing. */
+  none('I had a shop', /shop/iu);
+  none('We had a small shop in Cairo', /shop/iu);
+  none('I once had a stall', /stall/iu);
+  none('I had a shop until last year', /shop/iu);
+  kept("I've had a shop for years", /shop/iu);
+  kept('I have had a shop since 2019', /shop/iu);
+  kept('I had a shop and still do', /shop/iu);
+  kept('I had a shop before, and now I have one', /shop/iu);
+  kept('I had orders coming in all week', /orders/iu);
+  kept('I had a good year at my shop', /shop/iu);
+  kept('I had the stall repainted', /stall/iu);
+  kept('I had the stall for a year I hired help', /stall/iu);
+  /* A WORD OF WHEN IS NO NAME, so what it opens is read with it and nobody is called "Once". */
+  for (const s of ['Once I had the stall, orders poured in', 'When I had the stall, I took orders']) {
+    assert.ok(!propose(s, CAIRO).heard.some((h) => /^(?:once|when)$/iu.test(h.phrase)), s);
+  }
+  assert.ok(lit(propose('Once I had the stall, orders poured in', CAIRO), /stall/iu));
+  assert.ok(propose('Mariam, I run a shop', CAIRO).heard.some((h) => h.phrase === 'Mariam'));
+
+  /* "THEY STILL DO" TAKES NOTHING UP, as ruled in batch 73: only whoever speaks carries on. */
+  none('I used to take orders. They still do', /orders/iu);
+  none('I used to take orders and my sister still does', /orders/iu);
+  kept('I used to take orders. I still do.', /orders/iu);
+
+  /* WHOEVER SPEAKS WITH SOMEBODY ELSE STILL SPEAKS: "my friend and I", the sentence of the audit of batch 77. */
+  kept('I never ran a shop but my friend and I are opening one', /shop/iu);
+  kept('I have never ran a shop and my friend and I are opening one', /shop/iu);
+  kept('I never ran a shop before, but my wife and I just opened one', /shop/iu);
+  kept('My brother never ran the shop, my sister and I do', /shop/iu);
+  kept('I never ran a shop. Sara and I are setting one up', /shop/iu);
+  kept('I never kept track of orders, my partner and I want to start', /orders/iu);
+  /* And three that take nothing back: a refusal, nobody who speaks, a thought of it. */
+  none('I never ran a shop and my friend and I are not opening one', /shop/iu);
+  none('I never ran a shop but my friend and his wife are opening one', /shop/iu);
+  none('I never ran a shop but my friend and I are thinking of opening one', /shop/iu);
+  none('I never ran a shop but my friend and I want to start', /shop/iu);
+
+  /* WHAT NEVER RAN OUT STAYS AS RULED: it asks for no Products. */
+  for (const typed of both('I never ran out of products')) assert.ok(!propose(typed, CAIRO).places.some((x) => x.name === 'Products'), typed);
+});

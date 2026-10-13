@@ -536,6 +536,8 @@ export type ActionRow = {
   host: string | null;
   every: string;
   key: string | null;
+  /** The list the action files what it fetched in, or `null` when it files nothing. Absent from an older record. */
+  writes?: string | null;
   state: 'pending' | 'firing' | 'paused' | 'done';
   /** When it runs next, while it is pending or firing. */
   next: string | null;

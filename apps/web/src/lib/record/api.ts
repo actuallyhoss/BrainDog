@@ -894,6 +894,8 @@ export const twiceWords = {
   showing: 'Showing the people who may be on this record twice',
   clear: 'Show everyone',
   none: 'Nobody is on this record twice.',
+  /** Why nothing is saved while the word narrows the list: a view has no place for it. It names `clear`. */
+  unsaved: 'A view cannot keep the people who may be on this record twice. Choose Show everyone first.',
 } as const;
 
 /**

@@ -65,7 +65,46 @@ test('a field that was empty is set, and one emptied is cleared', () => {
 
 test('a day is said as a day, never as the record keeps it', () => {
   const body = one('tasks', 'tasks#4', { due: '2026-10-20' });
-  assert.equal(doesOf('rowset', body, names({ 'tasks#4.due': '2026-10-13T09:00:00.000Z' })), 'Changes Due on from 13 October 2026 to 20 October 2026 in Tasks.');
+  assert.equal(doesOf('rowset', body, names({ 'tasks#4.due': '2026-10-13' })), 'Changes Due on from 13 October 2026 to 20 October 2026 in Tasks.');
+});
+
+/* AUDIT 79, CLAIM 2. The day was cut off the front of an instant, which is its day in UTC: 22:30 on the 13th there is
+   the 14th in Cairo, and the line said the 13th. Nothing here knows the reader's zone, so no day is said. */
+test('an instant is not said as a day: its day depends on where the reader is, so its field is named and no more', () => {
+  const moved = one('tasks', 'tasks#4', { due: '2026-10-13T22:30:00.000Z' });
+  assert.equal(doesOf('rowset', moved, names({ 'tasks#4.due': '2026-10-13T06:00:00.000Z' })), 'Changes Due on in Tasks.');
+  assert.equal(doesOf('rowset', moved, names({ 'tasks#4.due': '2026-10-13' })), 'Changes Due on in Tasks.');
+  assert.equal(doesOf('rowset', one('tasks', 'tasks#4', { due: '2026-10-20T09:00:00+03:00' }), names()), 'Changes Due on in Tasks.');
+});
+
+/* AUDIT 79, CLAIM 1. Only a text that was a handle whole was held back, so an address, a handle inside a title and a
+   bare host were each quoted to the person, and to an agent reading the queue. */
+test('an address, a handle inside a text and a bare host are never quoted: the field is named and no more', () => {
+  const said = (now: string, was: string | null = null) => doesOf('rowset', one('tasks', 'tasks#4', { stage: now }), names(was === null ? {} : { 'tasks#4.stage': was }));
+  assert.equal(said('a@b.com', 'old@x.com'), 'Changes Stage in Tasks.');
+  assert.equal(said('Fix tasks#8'), 'Changes Stage in Tasks.');
+  assert.equal(said('example.com'), 'Changes Stage in Tasks.');
+  assert.equal(said('api.example.co.uk', 'Live'), 'Changes Stage in Tasks.');
+  /* AND WORDS THAT ONLY LOOK NEAR ONE ARE STILL SAID: a figure with a point, a sentence with a full stop, a number sign. */
+  assert.equal(said('Version 1.25', 'Version 1.24'), 'Changes Stage from Version 1.24 to Version 1.25 in Tasks.');
+  assert.equal(said('Done. Ship it', 'Draft'), 'Changes Stage from Draft to Done. Ship it in Tasks.');
+  assert.equal(said('Number 8', 'Number 7'), 'Changes Stage from Number 7 to Number 8 in Tasks.');
+});
+
+/* AUDIT 79, CLAIM 3. What several entries held is never said, and it was read of every one of them for every field. */
+test('several entries are not each read for what they held: one is asked whether the field may be valued, and that is all', () => {
+  let reads = 0;
+  const counted = names({}, { before: (_at, field) => ((reads += 1), field === 'token' ? undefined : 'Raw') });
+  const rows = (patch: Record<string, unknown>) => ({ register: 'things', rows: Array.from({ length: 500 }, (_, i) => ({ at: `things#${i + 1}`, patch })) });
+  assert.equal(doesOf('rowset', rows({ stage: 'Live', folder: 'North' }), counted), 'Sets Stage to Live, sets Folder to North on 500 in Projects.');
+  assert.equal(reads, 2);
+  /* A SECRET IS STILL NEVER VALUED over several entries: the one asked says so for all of them. */
+  assert.equal(doesOf('rowset', { register: 'vault', rows: [1, 2].map((n) => ({ at: `vault#${n}`, patch: { token: 'sk_live_9f2c' } })) }, counted), 'Changes Token on 2 in Keys.');
+  /* AND AN ENTRY THAT IS NOT SENT THE FIELD stops the value being said for all, with no read at all. */
+  reads = 0;
+  const mixed = { register: 'things', rows: [{ at: 'things#1', patch: { stage: 'Live' } }, { at: 'things#3', patch: { folder: 'North' } }] };
+  assert.equal(doesOf('rowset', mixed, counted), 'Changes Stage and Folder on 2 in Projects.');
+  assert.equal(reads, 0);
 });
 
 test('a field that holds several says how many it gains and loses', () => {

@@ -39,7 +39,7 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
 
 import type { ActionRequest, Execute } from '@braindog/host/actions';
-import { keyRefused, slashDeclared, type ScriptGrant, type ScriptReads } from '@braindog/host/script';
+import { keyRefused, scriptFold, slashDeclared, type ScriptFold, type ScriptGrant, type ScriptReads } from '@braindog/host/script';
 import type { ScriptAnswer, Scripted } from '@braindog/kernel';
 import {
   checkDecl,
@@ -103,6 +103,8 @@ export type ScriptCall =
   /** `options` is `ctx.record.list`'s third argument as the script wrote it, or `null`: `scriptReads` reads it. */
   | { op: 'list'; register: string; where: Json; options: Json }
   | { op: 'get'; spoken: string }
+  /** `ctx.fold`: a payee as a bank wrote it, answered with the kernel's key for it by the run's own `scriptFold`. */
+  | { op: 'fold'; text: string }
   /**
    * The CPU time the platform says a run spent, from `ScriptTail` and never from the sandbox: the two doors the script
    * can reach build their calls with an `op` of their own, so nothing the script writes can send this one.
@@ -178,6 +180,13 @@ export class ScriptRecord extends WorkerEntrypoint<Wired, Linked> {
     if ('error' in reply) throw new Error(reply.error);
     return JSON.stringify(reply.ok);
   }
+
+  /** `ctx.fold`, answered in the record's object, where the run's count of them is kept. */
+  async fold(run: string, text: string): Promise<string> {
+    const reply = await home(this.env, this.ctx.props).script(run, { op: 'fold', text });
+    if ('error' in reply) throw new Error(reply.error);
+    return JSON.stringify(reply.ok);
+  }
 }
 
 /** What the tail is handed: the object, as the two doors are, and the one run its Worker was loaded for. */
@@ -217,6 +226,8 @@ type Turn = {
   send: Execute;
   grant: (label: string) => ScriptGrant | null;
   read: ScriptReads | undefined;
+  /** `ctx.fold` for this run and no other: `scriptFold` counts what one run asks, as the self-host's runner does. */
+  fold: ScriptFold;
   fetches: number;
   bytes: number;
   stop: ScriptRefusal | null;
@@ -247,9 +258,9 @@ export class ScriptRuns {
     return this.#turns.size;
   }
 
-  open(turn: Omit<Turn, 'fetches' | 'bytes' | 'stop'>): string {
+  open(turn: Omit<Turn, 'fold' | 'fetches' | 'bytes' | 'stop'>): string {
     const id = crypto.randomUUID();
-    this.#turns.set(id, { ...turn, fetches: 0, bytes: 0, stop: null });
+    this.#turns.set(id, { ...turn, fold: scriptFold(turn.decl.id), fetches: 0, bytes: 0, stop: null });
     this.#cpu.set(id, { ms: null, wake: null });
     return id;
   }
@@ -319,6 +330,15 @@ export class ScriptRuns {
       if (decl.reads.length === 0 || turn.read === undefined)
         return refuse({ code: 'FORBIDDEN', why: `${decl.id} read ${call.spoken} and declares no reads.` });
       return { ok: await turn.read.get(call.spoken) };
+    }
+    if (call.op === 'fold') {
+      /* NO `reads` CHECK, as in `runInQuickJs`: it reads nothing of the record. A run that asks past the host's count
+         is answered with a failed call the script may catch, and no rule is broken, as on the self-host. */
+      try {
+        return { ok: await turn.fold(call.text) };
+      } catch (e) {
+        return { error: e instanceof Error ? e.message : String(e) };
+      }
     }
 
     let url: URL;
@@ -436,6 +456,7 @@ export default class extends WorkerEntrypoint {
       log: (words) => { lines.push(words); },
       list: (register, where, options) => record.list(run, register, where, options),
       get: (spoken) => record.get(run, spoken),
+      fold: (text) => record.fold(run, text),
     };
     if (typeof source.default !== 'function') return { invalid: true, log: '' };
     const ctx = withConfig(prelude(host)(meta), meta.config);

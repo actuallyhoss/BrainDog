@@ -60,6 +60,7 @@
     name,
     q,
     filtered,
+    savable = true,
     enums,
     listed,
     facets,
@@ -77,6 +78,8 @@
     q: string;
     /** A search or a filter is on. */
     filtered: boolean;
+    /** Whether what narrows the list is something a view can keep. Save view is drawn only when it is; Clear stays. */
+    savable?: boolean;
     /** Every declared enum field a reader can sift on. */
     enums: readonly FieldDecl[];
     listed: readonly Listed[];
@@ -294,7 +297,7 @@
   <!-- SAVE AS A VIEW, only while a filter or a search is on (`ViewsMenu` says why). It ends the
        bar, because it is about the list as a whole. On a phone with filters it lives in the filter
        sheet instead, beside Clear, for the reason Clear does. -->
-  {#if filtered && !sheeted}
+  {#if filtered && savable && !sheeted}
     <span class="bar-save"><ViewsMenu {saveView} /></span>
   {/if}
 </div>
@@ -353,6 +356,8 @@
       <Button weight="primary" onclick={() => (filterOpen = false)}><Icon name="check" size="s" />{copy.done}</Button>
       {#if filtered}
         <Button weight="bare" href="/r/{register}"><Icon name="close" size="s" />{copy.clearFilters}</Button>
+      {/if}
+      {#if filtered && savable}
         <!-- The sheet closes first so the toast and the page it opens are not behind it, and the builder's rows reach
              the address before the view is saved from it. -->
         <ViewsMenu

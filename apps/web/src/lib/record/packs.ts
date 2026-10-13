@@ -135,7 +135,7 @@ export type Offer = { id: string; doc: Record<string, unknown>; plan: Plan; call
  * FOR THE RECORD IT GOES INTO, WHEN THE SCREEN KNOWS WHICH PACKS THAT RECORD HOLDS. People sent whole pointed at
  * Projects, so installing People alone was refused on a record without them; a link to a list the record will not
  * hold is left out, the way onboarding leaves it out (`install.ts` `moduleDocument`). And it carries no example rows
- * (`moduleDocument`): a module added here never writes rows nobody typed.
+ * (`moduleDocument`), only the starting set a module gives every record: a module added here never writes a sample's rows.
  */
 export async function packDocument(id: string, installed?: readonly PackState[], usecase?: string): Promise<Record<string, unknown> | null> {
   const seed = await import('@braindog/seed/packs');
@@ -150,9 +150,10 @@ export async function packDocument(id: string, installed?: readonly PackState[],
   /* THE USE CASE BEING INSTALLED, WHEN ONE IS, so a module it brings carries its targets and words: Personal
      installed from browse on an empty record was given Money with a business's sums and "Money in arrives late by". */
   const u = (usecase === undefined ? undefined : useCase(usecase)) ?? (speaking === undefined ? undefined : useCase(speaking));
-  const doc = u ? moduleDocument(u, id, { today: dayOf(Date.now()), holds }) : seed.firstPartyDocument(id, { holds, seeds: [] });
-  if (doc && Array.isArray(doc.seeds) && doc.seeds.length === 0) delete doc.seeds;
-  return doc;
+  /* THE ROWS ARE `moduleDocument`'S TO CHOOSE, WITH A USE CASE OR WITHOUT ONE. This asked for the module with `seeds: []`
+     when no use case spoke, and so dropped the starting set a module plants on every record along with the examples: a
+     module turned on from here arrived with a list its first entry had nowhere to go in. */
+  return moduleDocument(u ?? null, id, { today: dayOf(Date.now()), holds });
 }
 
 /**
@@ -183,9 +184,10 @@ export async function relabelDocument(id: string, installed: readonly PackState[
   const u = useCase(usecase);
   if (!u || !relabels(u, id)) return null;
   const holds = installed.filter((p) => p.disabled_at === null).flatMap((p) => p.registers);
-  const doc = moduleDocument(u, id, { today: dayOf(Date.now()), holds });
-  if (doc) delete doc.seeds;
-  return doc;
+  /* WHAT `moduleDocument` CARRIES STAYS IN: no examples, and the module's starting set. Deleting `seeds` here made the
+     update a different document from the one a first install sends, and an install plants only into a list it adds
+     (`seedsFor`), so a list this record already holds is written nothing. */
+  return moduleDocument(u, id, { today: dayOf(Date.now()), holds });
 }
 
 /**

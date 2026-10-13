@@ -26,7 +26,7 @@
  * NO `node:` IMPORT, and only types from `@braindog/script`, so the Worker can build its runner here too.
  */
 
-import { ACTION_MAX_BYTES, ACTION_TIMEOUT_MS, grantChosen, hostOpened, type ActionRequest, type Entry, type ScriptRunner, type Scripted } from '@braindog/kernel';
+import { ACTION_MAX_BYTES, ACTION_TIMEOUT_MS, bankKey, grantChosen, hostOpened, type ActionRequest, type Entry, type ScriptRunner, type Scripted } from '@braindog/kernel';
 import { fixOf } from '@braindog/ports';
 import type { CallContext, RecordApi } from '@braindog/record';
 import type { CtxHost, HostRequest, HostResponse, Json, ScriptAnswer, ScriptDecl, ScriptRefusal } from '@braindog/script';
@@ -195,6 +195,39 @@ export function grantNamed(grants: () => ReturnType<RecordApi['kernel']['grants'
   };
 }
 
+/** The longest text `ctx.fold` folds, in characters, and the most it answers in one run. */
+export const FOLD_CHARS = 512;
+export const FOLD_CALLS = 1000;
+
+/** `ctx.fold` for one run: a payee as a bank wrote it, to the key the kernel files that payee under, or `null`. */
+export type ScriptFold = (text: string) => Promise<string | null>;
+
+/**
+ * The fold a script's `ctx.fold` is built from, on either host: the kernel's own `bankKey`, and nothing beside it.
+ *
+ * THE KERNEL'S, BECAUSE A SANDBOX RUNS ITS SCRIPT'S TEXT ALONE. Folding a bank's spelling of a payee (the processor's
+ * prefix, the place and the reference numbers cut) is tables the kernel holds, and a script that compared names without
+ * them compared letters and digits: a payment the bank wrote with its processor and its city never met the bill that
+ * names the payee plainly. A second copy of the tables in a script would be a second idea of who a payee is, so the
+ * host answers with the one the record's own identities are keyed by.
+ *
+ * IT READS NOTHING AND WRITES NOTHING: a text in, a key out, the same on every record. So it needs no `reads`, no
+ * actor and no approval, and a script is handed it whatever it declares.
+ *
+ * THE HOST'S WORK IS NOT ON THE SANDBOX'S METER, so it is held here. A text longer than `FOLD_CHARS` answers `null`,
+ * which a script reads as no payee: that can miss a match and cannot make one, where folding the first part of it
+ * could cut a different word than the kernel would. A run that asks more than `FOLD_CALLS` times is refused the rest
+ * as a rejected promise, as a refused fetch is. One counter a run, so `scriptFold` is called once for each.
+ */
+export function scriptFold(script: string): ScriptFold {
+  let asked = 0;
+  return async (text) => {
+    asked += 1;
+    if (asked > FOLD_CALLS) throw new Error(`${script} asked for more than ${FOLD_CALLS} payee keys in one run, so no more were answered.`);
+    return typeof text !== 'string' || text.length > FOLD_CHARS ? null : bankKey(text);
+  };
+}
+
 /**
  * Why a script may not send `grant` to `at`, or `null` when it may. The refusal is `FORBIDDEN` and is a rule broken, so
  * it refuses the whole run on both hosts, as a key the script does not declare does.
@@ -288,6 +321,18 @@ export function scriptRunner<P extends object | undefined = undefined>(options: 
 
     const { decl } = scripted;
     const reads = options.reads?.(s);
+    /* `fold` IS HANDED BESIDE THE REST, to every script whatever it declares: one `scriptFold` a run, so the count
+       it keeps is this run's. The Worker hands the same one from its own turn (`apps/worker/src/script.ts`). */
+    const host: CtxHost = {
+      fetch,
+      ...(reads === undefined ? {} : { list: reads.list, get: reads.get }),
+      fold: scriptFold(scripted.script),
+      now: () => new Date(now()).toISOString(),
+      tz: scripted.record.tz,
+      input: (scripted.input ?? null) as Json,
+      /* The owning pack's settings, which `prepareScript` read when the run was leased; `{}` for a script no pack owns. */
+      config: (scripted.config ?? {}) as Json,
+    };
     const answer = await options.run(
       {
         id: scripted.script,
@@ -299,15 +344,7 @@ export function scriptRunner<P extends object | undefined = undefined>(options: 
         ...(decl.limits === undefined ? {} : { limits: decl.limits }),
         source: decl.source,
       },
-      {
-        fetch,
-        ...(reads === undefined ? {} : { list: reads.list, get: reads.get }),
-        now: () => new Date(now()).toISOString(),
-        tz: scripted.record.tz,
-        input: (scripted.input ?? null) as Json,
-        /* The owning pack's settings, which `prepareScript` read when the run was leased; `{}` for a script no pack owns. */
-        config: (scripted.config ?? {}) as Json,
-      },
+      host,
     );
     return kept.stop === null ? answer : { refused: kept.stop, log: answer.log, usage: answer.usage };
   };

@@ -56,6 +56,8 @@ export type ActionRow = {
   /** The row `project` names, found by the record: its id, its spoken id and its title. Absent from an older host. */
   project_row?: { id: string; spoken: string; title: string | null } | null;
   host: string | null;
+  /** The list it files what it fetched in, or `null` when it files in none. Absent from an older host. */
+  writes?: string | null;
   every: string;
   key: string | null;
   state: 'pending' | 'firing' | 'paused' | 'done';
