@@ -227,6 +227,18 @@ test('money that has not cleared marks nothing paid, whichever list it is handed
   assert.equal((back as { said: string }).said, 'Studio rent is open again, since its payment has not cleared.');
 });
 
+/* AUDIT 62, CLAIM 1, measured red before the guard: a bill part paid at 500 of 1,000 by hand, and a new pending payment
+   naming it, came back `{ state: open, paid_so_far: null }` and "is open again". */
+test('a Paid so far somebody typed is not wiped by a pending or void payment that paid none of it', () => {
+  const half = bill({ amount: gbp(100_000), state: 'part', paid_so_far: gbp(50_000) });
+  for (const state of ['pending', 'void']) {
+    const out = settle(half, payment(30_000, '2026-10-01', { settles: 'e_obligations_4', state }), { before: 0 });
+    assert.deepEqual(out, { nothing: `Studio rent has a Paid so far that somebody typed, so the payment that ${state === 'void' ? 'was made void' : 'has not cleared'} changed nothing.` });
+  }
+  /* AND A SUM THIS PAYMENT IS IN still goes back: 500 held, 300 from this one, 200 from the others. */
+  assert.deepEqual(changeTo(settle(half, payment(30_000, '2026-10-01', { settles: 'e_obligations_4', state: 'void' }), { before: 20_000 }), 'obligations#4'), { paid_so_far: gbp(20_000) });
+});
+
 test('a void payment whose bill the others still pay in full keeps it paid, and with no count handed writes nothing', () => {
   const paidBill = bill({ state: 'paid', settled: '2026-10-02', paid_so_far: gbp(500_000) });
   const out = settle(paidBill, voided(100_000), { before: 400_000 });

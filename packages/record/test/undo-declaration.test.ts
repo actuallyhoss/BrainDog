@@ -119,3 +119,26 @@ test('A STALE HASH PUTS NOTHING BACK, declaration or row', async () => {
   assert.equal(versions('page.work').length, 2);
   sql.close();
 });
+
+/* WHO MAY PUT A DECLARATION BACK (audit 62, claim 8). `undo` is the record's ADMIN guard before it reads anything: a
+   token is refused whatever its level, the owner's own agent included, and so is a person below owner. So no agent and
+   no colleague can install an earlier page, rule or list through Put back; nothing but the guard holds that, and this
+   holds the guard, for the look and for the press alike. */
+test('NO TOKEN AND NO MEMBER BELOW OWNER PUTS A DECLARATION BACK, not even to look at the plan', async () => {
+  const { sql, api, versions, empty, decided } = await record();
+  const decision = await decided('Say what to do on an empty Work page?', BEFORE, AFTER);
+  const plan = value<UndoPlan>(await api.undo({ decision, dry: true }, owner));
+
+  const agent: CallContext = { principal: { kind: 'token', id: 't_1', scope: 'write', person: 'p_1', level: 'owner' } };
+  const member: CallContext = { principal: { kind: 'person', id: 'p_2', level: 'write' }, credentialed: true };
+  for (const [who, ctx] of [['the owner’s own token', agent], ['a member below owner', member]] as const) {
+    for (const args of [{ decision, dry: true }, { decision, hash: plan.hash }]) {
+      const out = (await api.undo(args, ctx)) as { ok: boolean; refusal?: { code: string } };
+      assert.equal(out.ok, false, `${who} was let through undo`);
+      assert.match(out.refusal?.code ?? '', /^(NEEDS_BROWSER_SESSION|LEVEL_REQUIRED)$/u, `${who}: ${JSON.stringify(out.refusal)}`);
+    }
+  }
+  assert.equal(empty(), 'No projects yet. Add the first one.', 'nothing was put back');
+  assert.equal(versions('page.work').length, 2, 'no version was installed');
+  sql.close();
+});

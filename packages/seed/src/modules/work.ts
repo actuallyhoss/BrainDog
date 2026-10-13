@@ -175,8 +175,10 @@ export const WORK_REGISTERS: Record<string, WorkRegister> = {
       /* SIX STATES AND THE MOVES BETWEEN THEM, SINCE work 1.19.0. There were four and no declared moves, so a thread
          was open the day it was thought of and an idea could be marked done in one step. An idea and a plan come
          before the work, and the four stored values stay as they were. Every move not written here is refused with
-         the moves allowed (`TRANSITION_ILLEGAL`): nothing reaches done but work that was open, a thread held up goes
-         back to the plan or on, and what was finished or dropped comes back by being opened again. */
+         the moves allowed (`TRANSITION_ILLEGAL`): nothing reaches done but work that was open or held up, a thread held
+         up goes back to the plan or on, and what was finished or dropped comes back by being opened again.
+         HOLDING GOES TO DONE: a thread waiting on somebody else is often finished by them, and the first cut made a
+         person open it for a moment to close it, and refused an agent that closed one. */
       {
         id: 'state',
         label: 'Status',
@@ -187,7 +189,7 @@ export const WORK_REGISTERS: Record<string, WorkRegister> = {
           idea: { to: ['planned', 'open', 'dropped'] },
           planned: { to: ['idea', 'open', 'holding', 'dropped'] },
           open: { to: ['holding', 'done', 'dropped'] },
-          holding: { to: ['planned', 'open', 'dropped'] },
+          holding: { to: ['planned', 'open', 'done', 'dropped'] },
           done: { to: ['open'] },
           dropped: { to: ['idea', 'open'] },
         },
@@ -629,18 +631,23 @@ const CLOSE_FOLLOW_UPS = `export default async function run(ctx) {
 
 /**
  * The script that starts a new follow-up where its parent is: a task created `Part of` another takes, one by one, each
- * of the parent's project, thread, owner and agent that it left empty.
+ * of the parent's project, thread and owner that it left empty.
  *
- * EACH OF THE FOUR ON ITS OWN, SINCE work 1.19.0. Until then it copied the project and the thread and never who holds
- * the work, so an agent that split its own task was on none of the steps, and it stopped altogether when the follow-up
- * named a project, so that one took no thread either. What the follow-up says for itself is never written over.
+ * EACH OF THE THREE ON ITS OWN, SINCE work 1.19.0. Until then it copied the project and the thread and never whose the
+ * work is, and it stopped altogether when the follow-up named a project, so that one took no thread either. What the
+ * follow-up says for itself is never written over.
+ *
+ * NEVER THE AGENT. The first cut of 1.19.0 copied it too, so a step a person added under a task an agent holds was
+ * handed to that agent without anybody saying so, and giving work to an agent is a person's call. A script is handed
+ * the task and not who wrote it, so it cannot tell a person's follow-up from an agent's, and it gives no step to
+ * anybody: an agent that splits its own task names itself on each step, as it names itself on the task.
  *
  * ONE LEVEL, AS `parent` HOLDS ONE. The copy is made once, at the create, and never again: moving the parent to another
  * project later does not move its steps, because by then somebody may have placed a step somewhere on purpose.
  *
  * `thing` AND `owner` MAY NOT BE FIELDS AT ALL. Work installs without Projects and without People and leaves each
  * field out (`LINKS` in `packs/first-party.ts`), so the script copies only what the parent holds and the list
- * declares; on such a record a follow-up still takes its parent's thread and agent.
+ * declares; on such a record a follow-up still takes its parent's thread.
  */
 const START_WITH_PARENT = `export default async function run(ctx) {
   const task = await ctx.record.get(ctx.input.id);
@@ -648,7 +655,7 @@ const START_WITH_PARENT = `export default async function run(ctx) {
   const parent = await ctx.record.get(task.fields.parent);
   if (!parent) return;
   const patch = {};
-  for (const field of ['thing', 'track', 'owner', 'agent'])
+  for (const field of ['thing', 'track', 'owner'])
     if (!task.fields[field] && parent.fields[field]) patch[field] = parent.fields[field];
   if (Object.keys(patch).length > 0) ctx.update('tasks#' + task.seq, patch, task.version);
 }`;

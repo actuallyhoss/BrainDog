@@ -14,7 +14,7 @@ import { FLOW_FIGURES } from './flow.ts';
 import { INSTALMENTS_FIGURES } from './instalments.ts';
 import { RUNWAY_FIGURES } from './runway.ts';
 import { SIGNS_FIGURES } from './signs.ts';
-import { SPENDING_FIGURES } from './spending.ts';
+import { SPEND_VS_LAST_FIGURES, SPENDING_FIGURES } from './spending.ts';
 
 const DECLARED_METRICS: Record<string, SeedMetric> = {
   ...CASH_FIGURES,
@@ -44,6 +44,13 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
   /* WHO FILED THE LEDGER, SINCE money-core 3.17.0 (REC-B20 job 2, filing-figures-61): two counts of the entries made, by
      who made them, read from the Ledger's own history. LAST, so every figure above keeps its place in the document. */
   ...FILING_FIGURES,
+
+  /* ── this month against last ─────────────────────────────────────────────
+     Where the money went last month, and this month so far against it, by category (REC-B19 job 2, spend-figures-63).
+     They read the Ledger as `SPENDING_FIGURES` does and are NOT spread with it: LAST, so every figure above keeps its
+     place in the document. */
+
+  ...SPEND_VS_LAST_FIGURES,
 };
 
 /* EACH FIGURE WHOSE TARGET A PERSON CHANGES LATER NAMES ITS SETTING (`MONEY_TARGET_SETTINGS`), wherever Money is declared. */

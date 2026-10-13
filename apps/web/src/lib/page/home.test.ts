@@ -335,7 +335,7 @@ const SLOT = readFileSync(new URL('./BlockSlot.svelte', import.meta.url), 'utf8'
 const CARD = readFileSync(new URL('./QueueAnswer.svelte', import.meta.url), 'utf8');
 
 test('A HOME DRAWS ITS BLOCKS THROUGH THE EMPTY RULE AND WALKS ROWS, and a page at its own address still walks blocks', () => {
-  assert.match(BODY, /const quiet = \$derived\(emptyHidden\(blocks, mode === 'page'\)\);/, 'a page at its own address keeps one sentence where it would say nothing');
+  assert.match(BODY, /const quiet = \$derived\(judgedWith\(blocks, held, \(bs\) => emptyHidden\(bs, mode === 'page'\)\)\);/, 'a page at its own address keeps one sentence where it would say nothing');
   assert.match(BODY, /const drawable = \$derived\(mode === 'preview' \|\| arranging \? arranged\(blocks\) : quiet\);/, 'every page being read hides its empty blocks; authoring draws them all, the record\'s marks undone');
   assert.match(BODY, /if \(mode === 'home'\) return homeKey\(e\);/);
   for (const key of ["case 'j':", "case 'k':", "case 'x':", "case 'Enter':", "case 'n':", 'optionOf(e.key)'])

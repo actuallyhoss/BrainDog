@@ -580,6 +580,63 @@ test('A WORD OF HAVING STOPPED REFUSES ONLY A THING THAT ENDS THE CLAUSE, and ne
   }
 });
 
+test('WHAT THE AUDIT OF BATCH 61 TYPED AS A STRANGER: used to, no longer, my old things, a run decided whole, a denial through a word of thinking', () => {
+  const lit = (p: ReturnType<typeof propose>, word: RegExp): boolean => p.heard.some((h) => word.test(h.phrase)) || p.places.some((x) => x.phrase !== null && word.test(x.phrase));
+  const shop = (p: ReturnType<typeof propose>): boolean => p.usecase === 'shop' || p.also.includes('shop') || p.places.some((x) => x.name === 'Orders' || x.name === 'Products');
+
+  /* THE FOUR SENTENCES THAT OFFERED WHAT WAS STOPPED, word for word: no Orders, no Products, no shop. */
+  for (const s of ['I stopped taking orders and invoices are all I do', 'I stopped selling my old products', 'I used to take orders but I stopped', 'I stopped taking orders from my old shop']) {
+    const p = propose(s, CAIRO);
+    assert.ok(!lit(p, /orders|products|shop/iu) && !shop(p), s);
+  }
+  /* AND THE ONE THAT LOST WHAT WAS NEVER STOPPED. */
+  const denied = propose('I do not think I have stopped taking orders', CAIRO);
+  assert.ok(lit(denied, /orders/iu) && shop(denied), 'a stopping somebody does not think happened is no stopping');
+
+  /* A RUN JOINED BY "AND" IS DECIDED WHOLE: the invoices that open a clause of their own are kept, the orders are not. */
+  for (const s of ['I stopped taking orders and invoices are all I do', 'I stopped taking orders and invoices now go by email']) {
+    const p = propose(s, CAIRO);
+    assert.ok(lit(p, /invoices/iu) && p.modules.includes('money-core'), `${s}: the invoices are kept`);
+  }
+  assert.ok(!lit(propose('I stopped taking orders and invoices', CAIRO), /orders|invoices/iu), 'a run that ends the clause is stopped whole');
+  const paper = propose('I stopped keeping orders and invoices on paper', CAIRO);
+  assert.ok(lit(paper, /orders/iu) && lit(paper, /invoices/iu), 'a run kept on paper is kept whole');
+
+  /* "USED TO" AND "NO LONGER" HOLD ONLY AT THE CLAUSE'S END, as stopping does. */
+  for (const s of ['I used to sell candles', 'We used to run a small shop', 'I used to have a shop but now I send invoices', 'I never used to take orders', 'I no longer take orders', 'I no longer sell candles', 'We no longer take orders or invoices']) {
+    const p = propose(`I'm a freelance designer. ${s}`, CAIRO);
+    assert.ok(!lit(p, /orders|shop|sell/iu) && !shop(p), s);
+  }
+  for (const s of ['I used to take orders on paper, now I want them here', 'I no longer keep orders on paper', 'I can no longer keep orders in a notebook', 'I am used to taking orders', 'I got so used to orders', 'I no longer want to lose my orders']) {
+    assert.ok(lit(propose(s, CAIRO), /orders/iu), s);
+  }
+
+  /* A THING OF ONE'S OWN FROM BEFORE IS THE THING, and old things are still things where nothing was stopped. */
+  for (const s of ['I stopped selling my products', 'I quit selling our former products', 'I stopped selling candles and my old products', 'I stopped taking orders at our former stall']) {
+    const p = propose(`I'm a freelance designer. ${s}`, CAIRO);
+    assert.ok(!lit(p, /orders|products|stall/iu) && !shop(p), s);
+  }
+  assert.ok(lit(propose('I want to import my old orders', CAIRO), /orders/iu), 'old orders to bring in are orders');
+  /* Where it came from is how it was done unless it is one's own and from before, and a thing heard. */
+  for (const s of ['I stopped using orders from the old till', 'I stopped taking orders from my shop', 'I stopped keeping orders in my old notebook']) {
+    assert.ok(lit(propose(s, CAIRO), /orders/iu), s);
+  }
+
+  /* A DENIAL REACHES PAST SOMEBODY NEW ONLY THROUGH A WORD OF THINKING OR SAYING. */
+  for (const s of [
+    'I do not think I ever stopped taking orders',
+    "I don't think we quit taking orders",
+    'I never said I stopped taking orders',
+    'It is not true that I have stopped taking orders',
+    "I'm not sure I stopped taking orders",
+  ]) {
+    assert.ok(lit(propose(s, CAIRO), /orders/iu), s);
+  }
+  for (const s of ['I think I stopped taking orders', "I don't think so, I stopped taking orders", 'Not that I mind, I stopped taking orders']) {
+    assert.ok(!lit(propose(`I'm a freelance designer. ${s}`, CAIRO), /orders/iu), s);
+  }
+});
+
 test("A SENTENCE THAT OPENS WITH A REFUSAL NAMES NOBODY: Don't need orders, I freelance as a designer", () => {
   const typed = "Don't need orders, I freelance as a designer";
   const p = propose(typed, CAIRO);

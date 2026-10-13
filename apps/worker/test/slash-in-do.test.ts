@@ -217,3 +217,15 @@ test('ON HIS OWN KEY STATUS SAYS SO: the source, the provider, and a count with 
   assert.ok(asks.ok, JSON.stringify(asks));
   assert.ok(asks.value.asks.some((a) => a.question === 'What is still open?'), JSON.stringify(asks.value));
 });
+
+/* THE OBJECT HANDS THE RECORD ITS OWN SLASH LEDGER (ENG-B01, `engineLedgerRead` in `src/index.ts`), so after the asks
+   above `engineReadings` answers a value and counts them. Before the wiring it answered `null` on every record. The read
+   runs on the object's own storage, where a pragma is refused, so this is also the only place that read is run for real. */
+test('engineReadings ANSWERS A VALUE ON THE OBJECT after Slash was asked, not null', async () => {
+  const readings = await owner().engineReadings();
+  assert.ok(readings.ok, JSON.stringify(readings));
+  assert.notEqual(readings.value, null, 'the object handed the record no ledger, so engineReadings answered null');
+  const asked = readings.value!.asks.find((a) => a.purpose === 'ask');
+  assert.ok(asked, `no ask was counted: ${JSON.stringify(readings.value)}`);
+  assert.ok(asked.asked.day >= 1 && asked.answered >= 1, JSON.stringify(asked));
+});

@@ -118,6 +118,11 @@ export function closeAccount(account, opts) {
  * is this leg already (a movement between accounts, the day, the description, the way, the amount) means an earlier
  * run moved the money: this run writes no second pair, and only closes the account if it is still open. THE DAY IS
  * PART OF IT, since "To Savings" for the same amount on another day is a move somebody made before, not this one.
+ *
+ * EXCEPT ON A SHUT ACCOUNT WITH NO DAY HANDED. The day is then today's, and a run started again tomorrow would look
+ * for its leg on a day it was never written on and move the money twice. So there the leg is read without its day: the
+ * same move out of an account already closed is this move, whenever it was made, and the run changes nothing. A day
+ * handed (the decision's, which a retried run keeps) stays part of it.
  */
 export default async function run(ctx) {
   const input = ctx.input && typeof ctx.input === 'object' ? ctx.input : {};
@@ -152,7 +157,8 @@ export default async function run(ctx) {
       return now.toISOString().slice(0, 10);
     }
   };
-  const on = typeof input.on === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input.on) ? input.on : today();
+  const handed = typeof input.on === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input.on);
+  const on = handed ? input.on : today();
 
   const opts = { on, others: others.map((o) => ({ id: o.id, fields: o.fields })) };
   if (Number.isSafeInteger(input.holds)) opts.holds = input.holds;
@@ -171,7 +177,9 @@ export default async function run(ctx) {
     const mine = legs.find((l) => l.account === account.id);
     const moved = await ctx.record.list('transactions', { all: [{ field: 'account', is: account.id }, { field: 'transfer', is: true }] });
     const same = (m) => m && m.amount === mine.amount.amount && m.currency === mine.amount.currency;
-    const leg = (f) => f.transfer === true && f.on === mine.on && f.what === mine.what && f.direction === mine.direction && f.state !== 'void' && same(f.amount);
+    /* TODAY IS NO DAY TO LOOK ON once the account is shut: a run started again tomorrow reads another one. */
+    const anyDay = account.fields.state === 'closed' && !handed;
+    const leg = (f) => f.transfer === true && (anyDay || f.on === mine.on) && f.what === mine.what && f.direction === mine.direction && f.state !== 'void' && same(f.amount);
     if (moved.some((t) => leg(t.fields))) legs = [];
   }
   if (legs.length === 0 && out.legs.length > 0 && out.writes.length === 0) {

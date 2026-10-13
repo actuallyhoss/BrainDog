@@ -310,13 +310,17 @@ export function leadOf(blocks: readonly Drawable[]): number {
 }
 
 /**
- * WHETHER A SECTION'S HOST PANEL KEEPS IT ON THE PAGE WITH NOTHING UNDER IT. The key a row's numbers are sent with and a
- * run's changes are always something to read. A project's scheduled actions are not: the host draws none for a project
- * that has none, so a boxed section naming `actions` over blocks that all went was a tile holding only its heading
- * ("More about Sketchpad"). The record cannot see the host's panel, so a host that knows the panel holds something says
- * so by handing the section its `actions`, and the section stays.
+ * WHETHER A SECTION'S HOST PANEL KEEPS IT ON THE PAGE WITH NOTHING UNDER IT. IT DOES, UNLESS THE RECORD CAN SEE THE
+ * PANEL HOLDS NOTHING. The key a row's numbers are sent with and a run's changes are always something to read. A
+ * project's scheduled actions may be none, and the host draws nothing for none, so a boxed section naming `actions`
+ * over blocks that all went was a tile holding only its heading ("More about Sketchpad").
+ *
+ * KEPT BY DEFAULT (audit 61, claim 1). The record cannot see the host's panel, and a section handed no `actions` is one
+ * nobody counted for: shutting it took the heading off a project with one scheduled action and nothing else under the
+ * box, which is worse than a heading over nothing. Only a section handed its `actions` as a list of none is shut.
  */
-const panelHeld = (b: Drawable): boolean => typeof b.panel === 'string' && !(b.panel === 'actions' && b.box === true && none(b.actions));
+const seesNoActions = (b: Drawable): boolean => Array.isArray(b.actions) && b.actions.length === 0;
+const panelHeld = (b: Drawable): boolean => typeof b.panel === 'string' && !(b.panel === 'actions' && b.box === true && seesNoActions(b));
 
 const areaOf = (b: Drawable): 'main' | 'rail' => (b.area === 'rail' ? 'rail' : 'main');
 
@@ -344,7 +348,7 @@ function headed(blocks: readonly Drawable[], at: number): Drawable[] {
  * A SECTION OVER NOTHING GOES WITH ITS BLOCKS: a heading whose every block in its column, up to the next section, is not
  * drawn heads nothing, a box included (the record's `emptyBoxesShut`, which this replaces). A section with no block
  * after it is the author's own divider, and one carrying a host panel holds that panel; both stay. But a BOXED section
- * whose panel is the row's scheduled actions is shut with its blocks (`panelHeld`).
+ * whose panel is the row's scheduled actions, counted and found to be none, is shut with its blocks (`panelHeld`).
  */
 export function emptyHidden<B extends Drawable>(blocks: readonly B[], own = false): B[] {
   const lead = leadOf(blocks);

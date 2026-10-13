@@ -135,7 +135,7 @@ const matches = (fields: Fields, where: unknown): boolean => {
   if (w.all) return w.all.every((x) => matches(fields, x));
   return 'not' in w ? fields[w.field!] !== w.not : fields[w.field!] === w.is;
 };
-async function ran(rows: Held[], input: Fields) {
+async function ran(rows: Held[], input: Fields, at = '2026-10-13T22:30:00.000Z') {
   const updates: { spoken: string; patch: unknown; version: number }[] = [];
   const added: { list: string; fields: Fields }[] = [];
   const log: string[] = [];
@@ -144,7 +144,7 @@ async function ran(rows: Held[], input: Fields) {
     input,
     tz: 'Africa/Cairo',
     /* 23:30 IN LONDON IS ALREADY THE 14TH IN CAIRO, so a day read off the instant alone would be a day early. */
-    now: () => '2026-10-13T22:30:00.000Z',
+    now: () => at,
     record: {
       get: async (spoken: string) => {
         const found = rows.find((r) => r.spoken === spoken);
@@ -226,6 +226,39 @@ test('a move to the same account for the same amount on another day is not this 
   const paid = { ...before, fields: { ...fields, on: '2026-10-14', transfer: false } };
   const beside = await ran([...ACCOUNTS(), paid], { account: 'accounts#3', answer: 'Move it to Savings', holds: 120_000 });
   assert.equal(beside.added.length, 2);
+});
+
+test('run again the next day, a move out of an account already closed writes no second pair', async () => {
+  const leg = { what: 'To Savings', on: '2026-10-14', direction: 'out', amount: usd(120_000), account: 'e_accounts_3', transfer: true, state: 'cleared' };
+  const moved = { list: 'transactions', id: 'e_transactions_40', spoken: 'transactions#40', version: 1, fields: leg };
+  const shut = () => [inList('accounts', hsbc({ state: 'closed' })), inList('accounts', savings())];
+  const input = { account: 'accounts#3', answer: 'Move it to Savings', holds: 120_000 };
+  /* THE 15TH IN CAIRO, and no day handed: the leg of the 14th is still this move. */
+  const next = await ran([...shut(), moved], input, '2026-10-14T22:30:00.000Z');
+  assert.deepEqual([next.out, next.added, next.updates], [null, [], []]);
+  assert.deepEqual(next.log, ['HSBC (USD) was already moved and closed, so nothing changed.']);
+  /* A LEG STRUCK OUT moved nothing, so the money still goes. */
+  const struck = await ran([...shut(), { ...moved, fields: { ...leg, state: 'void' } }], input, '2026-10-14T22:30:00.000Z');
+  assert.equal(struck.added.length, 2);
+});
+
+test('closed first and never moved, the answer still writes both legs, and the account is not closed again', async () => {
+  const shut = () => [inList('accounts', hsbc({ state: 'closed' })), inList('accounts', savings())];
+  const { out, added, updates, log } = await ran(shut(), { account: 'accounts#3', answer: 'Move it to Savings', holds: 120_000 });
+  assert.deepEqual(added.map((a) => [a.fields.what, a.fields.on, a.fields.account]), [
+    ['To Savings', '2026-10-14', 'e_accounts_3'],
+    ['From HSBC (USD)', '2026-10-14', 'e_accounts_5'],
+  ]);
+  assert.deepEqual([out, updates], [{ closed: 'accounts#3', moved: 2 }, []]);
+  assert.deepEqual(log, ['$1,200.00 moved from HSBC (USD) to Savings, and HSBC (USD) is closed.']);
+  /* A DAY HANDED IS THE SAME ON EVERY RETRY, so it stays part of the leg: the same transfer made by hand on the 2nd is
+     a move somebody made before, and one on the day handed is this one. */
+  const fields = { what: 'To Savings', on: '2026-10-02', direction: 'out', amount: usd(120_000), account: 'e_accounts_3', transfer: true, state: 'cleared' };
+  const before = { list: 'transactions', id: 'e_transactions_31', spoken: 'transactions#31', version: 1, fields };
+  const decided = { account: 'accounts#3', answer: 'Move it to Savings', holds: 120_000, on: '2026-10-14' };
+  assert.equal((await ran([...shut(), before], decided)).added.length, 2);
+  const retried = await ran([...shut(), before, { ...before, fields: { ...fields, on: '2026-10-14' } }], decided, '2026-10-16T09:00:00.000Z');
+  assert.deepEqual([retried.out, retried.added, retried.updates], [null, [], []]);
 });
 
 test('run with one account named to take the money, only that one is offered, and a day handed is the day', async () => {

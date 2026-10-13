@@ -79,3 +79,89 @@ export const SPENDING_FIGURES: Record<string, SeedMetric> = {
     compare: 'none',
   },
 };
+
+/**
+ * THIS MONTH AGAINST LAST, BY WHAT IT WAS FOR (REC-B19 job 2). Spread LAST in `figures/index.ts`, so every figure a
+ * record already holds keeps its place in the document.
+ *
+ * THREE WINDOWS, IN THE GRAMMAR'S OWN DAY WORDS. `bom-1m` is the first day of last month and `bom` the first of this
+ * one, so `on at least bom-1m, on before bom` is the whole of last calendar month whatever its length. `-1m` is today's
+ * day number a month back, clamped to the last day that month has: on the 18th it is the 18th, and on 31 October it is
+ * 30 September, so last month to date never runs into this month.
+ *
+ * TO DATE IS WHAT A CHANGE IS MEASURED AGAINST, AND THE WHOLE MONTH IS WHAT A PERSON IS TOLD. In the first week of a
+ * month every category reads far below the whole of last month, which looks like good news and is the calendar.
+ *
+ * NO CEILING, SO THE TARGET IS THE ONE EVERY SUM OF PAYMENTS MEETS, as `out-due-by-month` says it: a ceiling is a sum in
+ * a currency a pack cannot know, and the one a person sets for a category is `spent-by-category-month`'s.
+ *
+ * `compare: none` ON ALL OF THEM: each is one half of a comparison already, and a second one moved by a window would
+ * be a third month nobody asked about.
+ */
+const LEDGER_OUT = 'state is cleared, transfer is false, direction is out';
+
+export const SPEND_VS_LAST_FIGURES: Record<string, SeedMetric> = {
+  'spent-last-month': {
+    metric: 'spent-last-month',
+    name: 'Spent last month',
+    source: 'register.transactions',
+    where: `${LEDGER_OUT}, on at least bom-1m, on before bom`,
+    value: { sum: 'amount' },
+    format: MONEY,
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  'spent-by-category-last-month': {
+    metric: 'spent-by-category-last-month',
+    name: 'Spent last month, by category',
+    source: 'register.transactions',
+    where: `${LEDGER_OUT}, on at least bom-1m, on before bom`,
+    value: { sum: 'amount' },
+    group_by: 'category',
+    format: MONEY,
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  'spent-by-category-to-date-last-month': {
+    metric: 'spent-by-category-to-date-last-month',
+    name: 'Spent last month to this day, by category',
+    source: 'register.transactions',
+    where: `${LEDGER_OUT}, on at least bom-1m, on at most -1m`,
+    value: { sum: 'amount' },
+    group_by: 'category',
+    format: MONEY,
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  /**
+   * THIS MONTH SO FAR LESS LAST MONTH TO THE SAME DAY, ONE ANSWER A CATEGORY. One sentence, `on at least bom`, read
+   * twice: now, and with the clock a month back and the window ended on that day (`before: month_ago`), which is the
+   * same entries `spent-by-category-to-date-last-month` adds up. A category spent on in one month only counts the other
+   * as nought.
+   *
+   * A CATEGORY'S CHANGE IS SAID ONLY WHERE THE RECORD LETS IT BE: each part carries its two halves, and a `delta` that
+   * is `null` with a `why` when either month is empty or one has under half the other's entries. A page marks the
+   * category that moved most among the parts that have a `delta`, and never one that has none.
+   *
+   * THE TARGET IS NO MORE THAN LAST MONTH TO THIS DAY, which is the only bound a difference of two months has that
+   * names no currency.
+   */
+  'spent-vs-last-month': {
+    metric: 'spent-vs-last-month',
+    name: 'Spent this month against last, by category',
+    source: 'register.transactions',
+    where: `${LEDGER_OUT}, on at least bom`,
+    value: { diff: { of: { sum: 'amount' }, per: { sum: 'amount' }, before: 'month_ago' } },
+    group_by: 'category',
+    format: MONEY,
+    target: { lte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+};

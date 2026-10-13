@@ -78,6 +78,9 @@ export const MET_CAP = 20;
 /** The most doubtful pairs one night's `infer.resolve` job asks a model about. */
 export const RESOLVE_PAIRS_NIGHT = 20;
 
+/** How many pairs of one name the nightly pass asks about with no model (`askPlainPairs`). */
+export const PLAIN_PAIRS_NIGHT = 5;
+
 /** The longest a source may be in a met line, a mention or a question: a phrase, never a mail's subject line in full. */
 export const SOURCE_MOST = 80;
 
@@ -195,6 +198,11 @@ export type PeopleDeps = {
    * names an organisation asked about from its people's addresses when the remote's owner and the domain agree.
    */
   remote?: () => string | null;
+  /**
+   * The address the record's own person signs in with, or `null`. When more than one row is marked as him, the one
+   * holding it is the one kept. Left out, the one holding any address is.
+   */
+  ownAddress?: () => string | null;
 };
 
 /** Where a part lives in a row's JSON, for a bound `json_extract` path. */
@@ -1680,15 +1688,30 @@ function evidence(deps: Pick<PeopleDeps, 'titleOf'>, list: DeclaredList<MeetsFie
 const listed = (names: readonly string[]): string => (names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`);
 
 /**
+ * Which of a cluster is kept, oldest first as given: the record's own person always, then the older (`order`).
+ *
+ * MORE THAN ONE MARKED AS HIM: the one holding the address he signs in with, since that is the row the record marked
+ * for a reason and the one every later sign-in lands on; else the oldest that holds any address; else the oldest.
+ */
+function keptOf(deps: Pick<PeopleDeps, 'ownAddress'>, list: DeclaredList<MeetsFields>, sorted: readonly Row[]): Row {
+  const self = list.fields.self;
+  const own = self === undefined ? [] : sorted.filter((r) => r.fields[self] === true);
+  if (own.length < 2) return sorted.reduce((k, r) => order(list, k, r)[0], sorted[0]!);
+  const mails = (r: Row): string[] => keysOfRow(list, r).filter((k) => kindOfKey(k) === 'email');
+  const signIn = keyOf('email', deps.ownAddress?.() ?? '');
+  return (signIn === null ? undefined : own.find((r) => mails(r).includes(signIn))) ?? own.find((r) => mails(r).length > 0) ?? own[0]!;
+}
+
+/**
  * What a question about a cluster writes when accepted, and what its card reads: every other folded into the one kept
  * (the record's own person, else the oldest), carrying what they hold, and each of them by name and where seen.
  *
  * THE FOLDS COME FIRST IN THE BODY, the kept row last, so an address moving to the kept row is free by the time it
  * arrives (the email field is unique among live rows).
  */
-function clusterBody(deps: Pick<PeopleDeps, 'nameOf' | 'titleOf' | 'nowMs'>, list: DeclaredList<MeetsFields>, rows: readonly Row[]): { body: Record<string, unknown>; sorted: Row[]; keep: Row; folds: Row[] } | null {
+function clusterBody(deps: Pick<PeopleDeps, 'nameOf' | 'titleOf' | 'nowMs' | 'ownAddress'>, list: DeclaredList<MeetsFields>, rows: readonly Row[]): { body: Record<string, unknown>; sorted: Row[]; keep: Row; folds: Row[] } | null {
   const sorted = [...rows].sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0));
-  const keep = sorted.reduce((k, r) => order(list, k, r)[0], sorted[0]!);
+  const keep = keptOf(deps, list, sorted);
   const folds = sorted.filter((r) => r.id !== keep.id);
   if (folds.length === 0) return null;
   const keepName = deps.nameOf(keep.id);
@@ -1747,13 +1770,22 @@ function selfRows(deps: Pick<PeopleDeps, 'sql'>, list: DeclaredList<MeetsFields>
  *
  * A ROW NO MEETING EVER TOUCHES IS FOUND HERE: the second "Kas" he typed is never met by any key, so a question that
  * waited for a meeting of it would never come.
+ *
+ * MORE THAN ONE ROW MARKED AS HIM is the same question about those rows, "Are Kas and Kas both you?", keeping the one
+ * that holds the address he signs in with (`keptOf`). The mark is the record's or his own, so no name is compared and
+ * nothing else is searched until they are one.
  */
 function askSelf(deps: PeopleDeps, list: DeclaredList<MeetsFields>): Result<string | null> {
   const self = list.fields.self;
   if (self === undefined) return ok(null);
-  const own = selfRows(deps, list);
-  /* TWO ROWS MARKED AS HIM IS NOT A QUESTION THIS CAN WORD: which is him is his to say first. */
-  if (own.length !== 1) return ok(null);
+  const marked = selfRows(deps, list);
+  const own = marked.filter((r) => deps.othersRow?.(r.id) !== true);
+  if (own.length > 1) {
+    const kept = keptOf(deps, list, own);
+    return askAsOne(deps, list, kept, own.filter((r) => r.id !== kept.id && !refused(deps, list, kept, r)).slice(0, CLUSTER_MOST - 1));
+  }
+  /* A ROW ANOTHER MEMBER MARKED IS NOT HIS TO FOLD, and with it there, which is him is theirs and his to say first. */
+  if (marked.length !== 1 || own.length !== 1) return ok(null);
   const me = own[0]!;
   const names = new Set(namesOf(list, me));
   const handles = stemsOf(list, me);
@@ -1767,6 +1799,11 @@ function askSelf(deps: PeopleDeps, list: DeclaredList<MeetsFields>): Result<stri
         !refused(deps, list, me, r),
     )
     .slice(0, CLUSTER_MOST - 1);
+  return askAsOne(deps, list, me, near);
+}
+
+/** Ask whether these are all the record's own person, once: a question waiting on all of them is the answer. */
+function askAsOne(deps: PeopleDeps, list: DeclaredList<MeetsFields>, me: Row, near: readonly Row[]): Result<string | null> {
   if (near.length === 0) return ok(null);
   const ids = [me.id, ...near.map((r) => r.id)];
   const waiting = openAsked(deps, list).filter((q) => q.offer === null && q.members.some((m) => ids.includes(m.id)));
@@ -1780,7 +1817,7 @@ function askSelf(deps: PeopleDeps, list: DeclaredList<MeetsFields>): Result<stri
  * THE SWEEP FOR THE OWNER HELD TWICE, for a caller that has just marked his row and met nobody (DIRECTION §38): the
  * question every meeting asks (`askSelf`), "Are Kas and Karim Assaf both you?", asked now. The record calls it right
  * after a row is marked by a write of its own; a mark accepted on Decide runs it already (`joinOrganisation`). Asks
- * nothing while no row or more than one is marked, never twice, and never about a pair he answered. Answers the question
+ * nothing while no row is marked, never twice, and never about a pair he answered. Answers the question
  * it opened or joined, or `null`.
  */
 export function askOwnRows(deps: PeopleDeps): Result<string | null> {
@@ -1887,8 +1924,9 @@ const rewrite = (deps: Pick<PeopleDeps, 'sql'>, id: string, body: Record<string,
 /**
  * Ask about a cluster once: when a question already waits on any of them, the others join it, and nobody he said is
  * somebody else; otherwise a new one. Answers the question's id, or `null` when nobody new joined one already open.
+ * `may` says who else may be taken in beside the ones asked about: everybody like them, unless the caller is stricter.
  */
-function askOrExtend(deps: PeopleDeps, list: DeclaredList<MeetsFields>, asked: readonly Row[], confidence?: number): Result<string | null> {
+function askOrExtend(deps: PeopleDeps, list: DeclaredList<MeetsFields>, asked: readonly Row[], confidence?: number, may: (r: Row) => boolean = () => true): Result<string | null> {
   /* THE CLUSTER, NOT THE PAIR: whoever is like one of them is asked about in the same question. The owner typed in twice
      ("Kas", and his own row "Kas") is never met again by any key, so asked only about the newcomer, his second row would
      stay apart for good, and two questions about one person go stale on each other's answer. */
@@ -1896,7 +1934,7 @@ function askOrExtend(deps: PeopleDeps, list: DeclaredList<MeetsFields>, asked: r
   for (const r of asked)
     for (const near of candidates(deps, list, r)) {
       if (rows.length >= CLUSTER_MOST) break;
-      if (rows.some((x) => x.id === near.id) || deps.othersRow?.(near.id) === true) continue;
+      if (rows.some((x) => x.id === near.id) || deps.othersRow?.(near.id) === true || !may(near)) continue;
       if (rows.some((x) => refused(deps, list, x, near, false))) continue;
       rows.push(near);
     }
@@ -2039,6 +2077,117 @@ function refused(deps: Pick<PeopleDeps, 'sql' | 'nameOf'>, list: Keyed, a: Row, 
     `entry:${b.id}`,
     a.id,
   ) !== undefined;
+}
+
+/* ── held twice, asked with no model ─────────────────────────────────── */
+
+/**
+ * The plain pairs: two live people whose names are equal once folded ("Mariam" and "mariam", "Salma Aziz" and
+ * "salma-aziz"), where at most one of them holds any address, handle or key. Oldest first.
+ *
+ * NEVER a row another member made, never one only an arrival vouches for (a forged sender is nobody's evidence, H1),
+ * never two rows both marked as the record's own person (`askSelf` asks that), and never a pair he answered or undid.
+ * `open` true leaves out a pair a question already waits on as well.
+ */
+function plainPairs(deps: Pick<PeopleDeps, 'sql' | 'nameOf' | 'othersRow'>, list: DeclaredList<MeetsFields>, open: boolean): [Row, Row][] {
+  const self = list.fields.self;
+  const people = deps.sql
+    .all<{ id: string; seq: number | null; version: number; fields: string }>(
+      `SELECT id, seq, version, fields FROM entry WHERE ${LIVE} ORDER BY seq DESC LIMIT 2000`,
+      ...live(list.register, list.fields.merged_into),
+    )
+    .map(hydrate)
+    .reverse();
+  const byName = new Map<string, Row[]>();
+  for (const row of people) {
+    const name = folded(nameOfRow(list, row));
+    if (name !== '') byName.set(name, [...(byName.get(name) ?? []), row]);
+  }
+  const pairs: [Row, Row][] = [];
+  for (const held of byName.values()) {
+    if (held.length < 2) continue;
+    /* ONLY SOMEBODY WHO MAY BE ASKED ABOUT, read once a row: what vouches for one is a read of the log. */
+    const rows = held.filter((r) => deps.othersRow?.(r.id) !== true && vouched(deps, list, r)).slice(0, CLUSTER_MOST);
+    const keyed = new Set(rows.filter((r) => keysOfRow(list, r).length > 0).map((r) => r.id));
+    for (let i = 0; i < rows.length; i++)
+      for (let j = i + 1; j < rows.length; j++) {
+        const [a, b] = [rows[i]!, rows[j]!];
+        if (keyed.has(a.id) && keyed.has(b.id)) continue;
+        if (self !== undefined && a.fields[self] === true && b.fields[self] === true) continue;
+        if (!refused(deps, list, a, b, open)) pairs.push([a, b]);
+      }
+  }
+  return pairs;
+}
+
+/**
+ * THE PLAINEST CASE NEEDS NO MODEL: two people of one name, one of them holding nothing, are asked about as one
+ * question a pair, `max` pairs a night ("likely duplicates are offered as a merge"). Nothing is folded: his answer on
+ * Decide does that, and Undo takes it back. A pair is asked once, and one a question already names is not asked again.
+ * Answers the questions it opened or added somebody to.
+ *
+ * THE RISK IS TWO REAL PEOPLE WHO SHARE A NAME, and it is his no that says so: only when one row holds no key at all,
+ * a few a night, and never again once he has answered.
+ */
+export function askPlainPairs(deps: PeopleDeps, list: DeclaredList<MeetsFields>, max = PLAIN_PAIRS_NIGHT): Result<string[]> {
+  const ids: string[] = [];
+  let asked = 0;
+  for (const [a, b] of plainPairs(deps, list, true)) {
+    if (asked >= max) break;
+    /* A QUESTION OPENED A MOMENT AGO took in whoever else goes by the name, so three rows of one name are one question. */
+    if (asked > 0 && refused(deps, list, a, b)) continue;
+    /* WHOEVER ELSE IS TAKEN IN IS VOUCHED FOR TOO: no model and no meeting stands behind this question, only the name. */
+    const q = askOrExtend(deps, list, [a, b], undefined, (r) => vouched(deps, list, r));
+    if (!q.ok) return q as Result<never>;
+    if (q.value === null) continue;
+    asked++;
+    if (!ids.includes(q.value)) ids.push(q.value);
+  }
+  return ok(ids);
+}
+
+/**
+ * THE NIGHTLY PASS FOR SOMEBODY HELD TWICE, before any model is asked: the record's own person first (`askSelf`), then
+ * the plain pairs. Run before `resolveJob`, whatever it asks about is a pair that job leaves alone, so the plain cases
+ * never wait on a model that may not answer. Answers the questions opened or added to tonight.
+ */
+export function askTwice(deps: PeopleDeps, max = PLAIN_PAIRS_NIGHT): Result<string[]> {
+  const list = deps.list;
+  if (!list) return ok([]);
+  const own = askSelf(deps, list);
+  if (!own.ok) return own as Result<never>;
+  const pairs = askPlainPairs(deps, list, max);
+  if (!pairs.ok) return pairs;
+  return ok([...new Set([...(own.value === null ? [] : [own.value]), ...pairs.value])]);
+}
+
+/**
+ * How many people the record holds more than once, as far as the plain rules can tell: the rows that would go if every
+ * plain pair he has not answered were one person (three rows of one name are two), and each row marked as the record's
+ * own person beyond the first. A row is counted once: his two rows and a third of his name are two, not three. What the
+ * `people-twice` figure counts; nought on a record with no people list.
+ */
+export function peopleTwice(deps: Pick<PeopleDeps, 'sql' | 'list' | 'nameOf' | 'othersRow'>): number {
+  const list = deps.list;
+  if (!list) return 0;
+  /* EACH ROW POINTS AT THE OLDEST IT IS PAIRED WITH, so a group of pairs counts one fewer than its rows. */
+  const head = new Map<string, string>();
+  const find = (id: string): string => {
+    let at = id;
+    while (head.get(at) !== undefined && head.get(at) !== at) at = head.get(at)!;
+    return at;
+  };
+  let surplus = 0;
+  const join = (a: string, b: string): void => {
+    const [x, y] = [find(a), find(b)];
+    if (x === y) return;
+    head.set(y, x);
+    surplus++;
+  };
+  const own = selfRows(deps, list).filter((r) => deps.othersRow?.(r.id) !== true);
+  for (const r of own.slice(1)) join(own[0]!.id, r.id);
+  for (const [a, b] of plainPairs(deps, list, false)) join(a.id, b.id);
+  return surplus;
 }
 
 /* ── the nightly question to a model ─────────────────────────────────── */

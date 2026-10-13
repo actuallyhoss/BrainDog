@@ -273,6 +273,11 @@ const WHOLE: readonly Whole[] = [
  * ("last year", "for good"). Words after the thing say how it was done, so "I stopped keeping orders on paper and now
  * track them here" keeps its orders. Stopping that is itself denied (`UNDENIED`) is no stopping: "I never stopped
  * taking orders", "I am not done taking orders", "I won't quit taking orders".
+ *
+ * "NO LONGER" AND "USED TO" ARE WORDS OF HAVING STOPPED TOO (`NO_LONGER`, `USED_TO`), held to the same clause's end:
+ * "I used to take orders but I stopped" has no orders, and "I no longer keep orders on paper" still has them. A thing
+ * of one's own from before ("my old products", "our former shop") is the thing (`OWNED`), and where a stopped thing
+ * came from is gone with it when it is said that way: "I stopped taking orders from my old shop" (`WAS_AT`).
  */
 const REFUSES = "no|not|never|without|zero|don['’]?t|do\\s+not|doesn['’]?t|does\\s+not|haven['’]?t|hasn['’]?t|hadn['’]?t";
 /* `send` and its ending apart: the whole word is a field an add-on declares, and the core spells none (the core-names gate). */
@@ -281,17 +286,35 @@ const DOES = `to|have|take|get|do|sell|keep|need(?:\\s+of)?|want|track(?:\\s+of)
 /* The words that deny a stopping: those of refusal, and the ones only a verb takes. At most three words between, none
    of them a join or somebody new, so "I won't ever have to quit" is denied and "No, I'm done" and "no staff so I quit" are not. */
 const DENIES = `${REFUSES}|didn['’]?t|did\\s+not|won['’]?t|will\\s+not|can['’]?t|cannot|wouldn['’]?t|isn['’]?t|aren['’]?t|wasn['’]?t`;
-const UNDENIED = `(?<!(?:^|[^\\p{L}\\p{N}'’])(?:${DENIES})\\s+(?:(?!(?:(?:i|we|you|they|he|she|it)(?:['’]\\p{L}+)?|and|or|nor|but|so|because|since|then|now)(?![\\p{L}\\p{N}'’]))[\\p{L}'’]+\\s+){0,3})`;
-const HALTED = `${UNDENIED}(?:done|finished|stopped|quit)(?:\\s+with)?`;
+const SOMEBODY = "(?:i|we|you|they|he|she|it)(?:['’]\\p{L}+)?";
+const UNDENIED = `(?<!(?:^|[^\\p{L}\\p{N}'’])(?:${DENIES})\\s+(?:(?!(?:${SOMEBODY}|and|or|nor|but|so|because|since|then|now)(?![\\p{L}\\p{N}'’]))[\\p{L}'’]+\\s+){0,3})`;
+/* A denial reaches past somebody new only through a word of thinking or saying: "I do not think I have stopped",
+   "I never said we quit", "it is not true that I am done". Two small words at most on either side of who stopped. */
+const THINKS = 'think|believe|reckon|suppose|guess|feel|say|said|mean|meant|imagine|expect|sure|certain|convinced|true|that|as\\s+if|like';
+const SMALL = "(?:(?:have|has|had|ever|really|actually|quite|yet|am|is|are|was|were|will|would|['’]ve|['’]m|even|just)\\s+){0,2}";
+const UNTHOUGHT = `(?<!(?:^|[^\\p{L}\\p{N}'’])(?:${DENIES})\\s+${SMALL}(?:${THINKS})\\s+(?:that\\s+)?${SOMEBODY}\\s+${SMALL})`;
+const HALTED = `${UNDENIED}${UNTHOUGHT}(?:done|finished|stopped|quit)(?:\\s+with)?`;
 const STOPPED = `${HALTED}(?=\\s+(?:${DOING})\\s)`;
 const NOT = new RegExp(
   `(?:^|[^\\p{L}\\p{N}])(?:${REFUSES})\\s+(?:(?:any|more|longer|ever|had|got|${DOES}|a|an|the)\\s+){0,5}(?:(?:${[...PLAIN].join('|')})\\s+)*$`,
   'iu',
 );
-const NOT_STOPPED = new RegExp(`(?:^|[^\\p{L}\\p{N}])${STOPPED}\\s+(?:(?:any|more|longer|ever|had|got|${DOES}|a|an|the)\\s+){0,5}(?:(?:${[...PLAIN].join('|')})\\s+)*$`, 'iu');
+/* A thing of one's own, and one from before: "my products", "my old products", "the former shop". */
+const OWN = 'my|our|your|their|his|her|its';
+const PAST = 'old|former|previous|earlier|last|original|first';
+const OWNED = `(?:(?:${OWN})\\s+)?(?:(?:${PAST})\\s+)*`;
+const THING = `(?:(?:any|more|longer|ever|had|got|${DOES}|a|an|the)\\s+){0,5}${OWNED}(?:(?:${[...PLAIN].join('|')})\\s+)*$`;
+const NOT_STOPPED = new RegExp(`(?:^|[^\\p{L}\\p{N}])${STOPPED}\\s+${THING}`, 'iu');
+/* "no longer", and "used to" before a verb: never "I am used to taking orders", which is somebody who takes them. */
+const NO_LONGER = new RegExp(`(?:^|[^\\p{L}\\p{N}])no\\s+longer\\s+${THING}`, 'iu');
+const USED_TO = new RegExp(
+  `(?<!(?:am|is|are|was|were|be|been|being|get|gets|got|getting|['’]m|['’]re|['’]s)\\s+(?:(?:so|very|quite|now|well|all|really)\\s+)?)(?<![\\p{L}\\p{N}])used\\s+to\\s+(?!(?:${DOING})\\s)${THING}`,
+  'iu',
+);
 /* The thing heard can be the verb itself: "I am done selling" is no shop, as "no more selling" already is none. */
 const STOPPED_BEFORE = new RegExp(`(?:^|[^\\p{L}\\p{N}])${HALTED}\\s+$`, 'iu');
 const IS_DOING = new RegExp(`^(?:${DOING})(?![\\p{L}\\p{N}])`, 'iu');
+const IS_DONE = new RegExp(`^(?:${DOES})$`, 'iu');
 /* What may follow a thing somebody stopped: nothing, a mark of any kind, a join, with at most a word of when before it. */
 const SPAN = 'years?|months?|weeks?|days?';
 const MONTH = 'january|february|march|april|may|june|july|august|september|october|november|december';
@@ -306,7 +329,13 @@ const CLAUSE_END = `(?:\\s+(?:${WHEN}))?\\s*(?:$|[^\\p{L}\\p{N}\\s]|(?:and|or|no
 const ENDS = new RegExp(`^${CLAUSE_END}`, 'iu');
 /* After the verb itself, what was sold or kept comes first: "done selling candles", never "selling candles on paper". */
 /* A thing joined straight on with "and", "or" or "nor": the run ends where its last thing does. */
-const RUN_ON = /^\s+(?:and|or|nor)\s+(?:(?:any|a|an|the|my|our)\s+)?/iu;
+const RUN_ON = new RegExp(`^\\s+(?:and|or|nor)\\s+(?:(?:any|a|an|the|${OWN})\\s+)?(?:(?:${PAST})\\s+)*`, 'iu');
+/* A thing joined on that opens a clause of its own, by the verb after it: "orders and invoices are all I do". */
+const OPENS_CLAUSE = /^\s+(?:(?:still|now|only|just|always|also|really|alone)\s+)*(?:are|is|were|was|will|would|can|could|should|must|have|has|had|do|does|did|go|goes|come|comes|came|keep|keeps|kept|stay|stays|take|takes|took|make|makes|made|get|gets|got|pay|pays|paid|remain|remains|suit|suits|work|works)(?![\p{L}\p{N}])/iu;
+/* Where a stopped thing came from, said as a place of one's own from before: "from my old shop", "at our former stall". */
+const WAS = `\\s+(?:from|at|in|for|of|through|via)\\s+(?:${OWN})\\s+(?:(?:${PAST})\\s+)+(?:(?:${[...PLAIN].join('|')})\\s+)*`;
+const WAS_AT = new RegExp(`^${WAS}`, 'iu');
+const WAS_FROM = new RegExp(`${WAS}$`, 'iu');
 const ENDS_DOING = new RegExp(`^(?:\\s+(?!(?:on|in|by|from|at|with|via|over|through|to|for|into|and|or|nor|but)(?![\\p{L}\\p{N}]))[\\p{L}\\p{N}'’-]+){0,3}${CLAUSE_END}`, 'iu');
 /* A name never opens with a word of refusal: "Don't need orders, I freelance" names nobody (`who`). */
 const OPENS_REFUSING = new RegExp(`^(?:${REFUSES})(?![\\p{L}\\p{N}'’])`, 'iu');
@@ -320,7 +349,7 @@ type Refusal = 'refused' | 'stopped' | null;
  * group is the verbs of having and doing said after the join ("or take orders"), which only "or" and "nor" carry past.
  */
 const JOINED = new RegExp(
-  `(?:\\s*,\\s*(?:(and|or|nor)\\s+)?|\\s+(and|or|nor)\\s+)((?:(?:${DOES})\\s+){1,4})?(?:(?:any|a|an|the|my|our)\\s+)?(?:(?:${[...PLAIN].join('|')})\\s+)*$`,
+  `(?:\\s*,\\s*(?:(and|or|nor)\\s+)?|\\s+(and|or|nor)\\s+)((?:(?:${DOES})\\s+){1,4})?(?:(?:any|a|an|the|${OWN})\\s+)?(?:(?:${PAST})\\s+)*(?:(?:${[...PLAIN].join('|')})\\s+)*$`,
   'iu',
 );
 const AND_OR = /^(?:\s*,\s*(?!(?:and|or|nor)\s)[\p{L}\p{N}'’-]+(?:\s+(?!(?:and|or|nor)\s)[\p{L}\p{N}'’-]+){0,2})*\s*,?\s*(and|or|nor)\s/iu;
@@ -350,14 +379,29 @@ function refusedIn(said: string, known: readonly Said[] = []): (span: Said) => b
   /* Whether a thing ends its clause. In "stopped keeping orders and invoices on paper" the run ends at "invoices", which does not. */
   const ends = (to: number): boolean => {
     const after = said.slice(to);
+    /* A place of one's own from before, after the thing, is gone with it where it ends the clause in its turn. */
+    const was = to + (WAS_AT.exec(after)?.[0].length ?? 0);
+    const place = was > to ? known.find((k) => k.at === was) : undefined;
+    if (place) return ends(place.at + place.text.length);
     if (!ENDS.test(after)) return false;
     const next = to + (RUN_ON.exec(after)?.[0].length ?? 0);
     const joined = next > to ? known.find((k) => k.at === next) : undefined;
-    return joined ? ends(joined.at + joined.text.length) : true;
+    if (!joined) return true;
+    /* THE RUN IS DECIDED WHOLE: it ends where its last thing does, and a last thing that opens a clause of its own
+       ("orders and invoices are all I do") leaves the first one ending its clause at the join. */
+    const end = joined.at + joined.text.length;
+    return ends(end) || OPENS_CLAUSE.test(said.slice(end));
+  };
+  /* A word heard that is how a thing is done or how big it is ("sell", "handmade") ends as the verb does. */
+  const closes = (from: number, to: number): boolean => {
+    const word = said.slice(from, to).toLowerCase();
+    return PLAIN.has(word) || IS_DONE.test(word) ? ENDS_DOING.test(said.slice(to)) : ends(to);
   };
   /* How a thing was refused: by a word of refusal, or by a word of having stopped, which holds only at a clause's end. */
   const not = (from: number, to: number): Refusal => {
     const before = said.slice(0, from);
+    /* "no longer" and "used to" are read before the bare "no": they hold only at the clause's end, as stopping does. */
+    if (NO_LONGER.test(before) || USED_TO.test(before)) return closes(from, to) ? 'stopped' : null;
     if (NOT.test(before)) return 'refused';
     /* A word of size is said before its thing ("done selling handmade candles"), so it ends as the verb does. */
     if (NOT_STOPPED.test(before)) return (PLAIN.has(said.slice(from, to).toLowerCase()) ? ENDS_DOING.test(said.slice(to)) : ends(to)) ? 'stopped' : null;
@@ -368,6 +412,13 @@ function refusedIn(said: string, known: readonly Said[] = []): (span: Said) => b
     const own = not(from, to);
     if (own) return own;
     const before = said.slice(0, from);
+    /* THE PLACE A STOPPED THING CAME FROM, one's own and from before, is stopped with it: "orders from my old shop". */
+    const was = WAS_FROM.exec(before);
+    if (was) {
+      const thing = /[\p{L}\p{N}'’-]+$/u.exec(before.slice(0, was.index));
+      const at = [...known.filter((k) => k.at + k.text.length === was.index).map((k) => k.at), ...(thing ? [thing.index] : [])];
+      if (at.some((a) => not(a, was.index) === 'stopped')) return 'stopped';
+    }
     const join = JOINED.exec(before);
     if (!join) return null;
     let word = (join[1] ?? join[2])?.toLowerCase();

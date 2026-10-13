@@ -1031,6 +1031,31 @@ export type EngineHealth = {
 };
 
 /**
+ * `engineReadings`'s answer (ENG-B01), `packages/record/src/engine-readings.ts` read through the record: what the
+ * model was asked, purpose by purpose, and what the record still does not understand.
+ *
+ * `asked` counts the asks that reached a model in the last day, week and month. `answered`, `kept` and `refused` are
+ * the last day's: the model spoke, the engine used the answer, the check refused it or the month was spent. `owed` is
+ * what still waits, `oldest_owed` when the oldest of it was written, `last_error` the newest ask that got no readable
+ * answer. `unattached` is the mentions that point at nothing in the record, `open_by_cause` the open questions by cause.
+ * WRITTEN HERE UNTIL THE RECORD NAMES IT, as `AnswerOr` reads it: the record's own declaration wins once it exists.
+ */
+export type AskReading = {
+  purpose: string;
+  asked: { day: number; week: number; month: number };
+  answered: number;
+  kept: number;
+  refused: number;
+  owed: number;
+  oldest_owed: string | null;
+  last_error: { at: string; code: string } | null;
+};
+export type EngineReadings = {
+  asks: AskReading[];
+  understanding: { unattached: number; open_by_cause: Record<string, number> };
+};
+
+/**
  * `trust`'s answer (ENG-A12): each connected agent by name, and for each kind of change the rung it stands on (Ask, Do
  * and tell, Do quietly), since when, whether it was lifted there, and when and why it was put back to Ask. See
  * `Standing` in `packages/record/src/ladder.ts`.
@@ -1702,6 +1727,9 @@ export function createClient(options: ClientOptions) {
     /* WHETHER THE ENGINE'S MODEL ANSWERS (ENG-A02), at read level, so a read token, the command line and the daily
        vital-sign read can ask. `null` from a host that hands the record no engine. */
     engineHealth: () => call<AnswerOr<'engineHealth', EngineHealth | null>>('engineHealth'),
+    /* WHAT THE MODEL WAS ASKED AND WHAT THE RECORD STILL DOES NOT UNDERSTAND (ENG-B01), at read level as `engineHealth`
+       is, so the command line and an agent can read the counts. `null` from a host that hands the record no ledger. */
+    engineReadings: () => call<AnswerOr<'engineReadings', EngineReadings | null>>('engineReadings'),
     /** The one switch for Slash's background reading: with nothing, the state as it stands. An owner's in a browser. */
     slashReads: (on?: boolean) => call<SlashReads>('slashReads', on === undefined ? {} : { on }),
     /* THE DOOR'S HEALTH (AGT-A02). ADMIN, so a browser session at owner: every connection, its app, build and last tool

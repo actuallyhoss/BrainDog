@@ -8,7 +8,12 @@
  * the earlier leg at the rate of its own day, within the tolerance the list declares.
  *
  * THE SIDE A MISTAKE FALLS ON IS THE COUNTED ONE. No rate for the day, a rate too old to be the day's, a third leg as
- * near, a pending row that may be the real leg: each leaves both rows counted, and nothing is asked of anybody.
+ * near, a pending row that may be the real leg: each leaves both rows counted.
+ *
+ * AND A NEAR MATCH IS NOT PROOF (audit of batch 61, claim 2). Within 2% at the day's rate, two unrelated rows paired
+ * in silence. So the pair is made only on a rate no more than two days old AND where each row is the other's one
+ * candidate; anything else is a question for a person (`crossAsks`), with the rate's age in it, and their answer
+ * comes back as `Pairing.ruled`.
  *
  * OFF UNLESS THE LIST SAYS SO, so no ledger that installed before this moves.
  */
@@ -17,7 +22,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { openRecord, type Declaration, type Entry, type Kernel } from '../src/index.ts';
-import { loadLeg, neighboursOf, partnerOf, passOf, settle, type PairsDecl, type Pairing } from '../src/pairs.ts';
+import { crossAsks, crossKey, loadLeg, neighboursOf, newestRate, partnerOf, passOf, settle, ASK_RATE_DAYS, PAIR_RATE_DAYS, type PairsDecl, type Pairing } from '../src/pairs.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 23, 12);
@@ -111,6 +116,13 @@ const SENT = usd(100_000);
 const LANDED = egp(4_800_000); // 1.04% under
 const TOO_FEW = egp(4_700_000); // 3.19% under
 
+/** The ledger's pairing as the kernel builds it, with what a person answered about two rows, if anything. */
+const pairingOf = (sql: NodeSql, ruled?: ReadonlyMap<string, boolean>): Pairing => {
+  const body = LEDGER(ACROSS).body as unknown as { pairs: PairsDecl; fields: Pairing['fields']; state: string; done: string[] };
+  return { sql, register: 'ledger', pairs: body.pairs, fields: body.fields, state: body.state, done: body.done, ...(ruled ? { ruled } : {}) };
+};
+const answers = (got: { leg: { id: string }; to: string | null }[]) => got.filter((g) => g.to !== null).map((g) => [g.leg.id, g.to]).sort();
+
 test('THE DECLARATION: across_currency installs over a money amount, and is refused with no money in `on` or a tolerance that is not one', async () => {
   const k = await openRecord(openSqlite(), fixedClock(NOW));
   assert.ok((await k.install([LEDGER()])).ok);
@@ -182,16 +194,17 @@ test('THE RATE IS THE EARLIER LEG’S DAY’S: a move that agrees at the day it 
 });
 
 test('NO RATE FOR THE DAY: they do not pair, and nothing is asked of anybody', async () => {
-  for (const rates of [[], [[DAY(3), 48.5]], [[DAY(-9), 48.5]]] as [string, number][][]) {
+  for (const rates of [[], [[DAY(3), 48.5]], [[DAY(-(ASK_RATE_DAYS + 1)), 48.5]]] as [string, number][][]) {
     const { k, sql } = await record(ACROSS, rates);
     const before = sql.one<{ n: number }>('SELECT count(*) AS n FROM entry')!.n;
     const out = leg(k, 'TRANSFER TO EGP', 0, 'out', SENT, 'usd-current');
     const back = leg(k, 'TRANSFER FROM USD', 1, 'in', LANDED, 'egp-current');
-    /* NONE AT ALL, ONE ONLY AFTER THE DAY, AND ONE NINE DAYS OLD: a later rate is a guess backwards, and a rate past
-       the week `fx.ts` calls stale is not the day's. */
+    /* NONE AT ALL, ONE ONLY AFTER THE DAY, AND ONE MORE THAN A MONTH OLD: a later rate is a guess backwards, and one
+       that old says too little about the day even to ask on. */
     apart(k, [out, back], `rates ${JSON.stringify(rates)}`);
     assert.equal(sql.one<{ n: number }>('SELECT count(*) AS n FROM entry')!.n, before + 2, 'something was written beside the two legs');
     assert.equal(sql.one<{ n: number }>("SELECT count(*) AS n FROM event WHERE field IN ('moved', '_pair')")!.n, 0);
+    assert.deepEqual(crossAsks(pairingOf(sql), [out.id, back.id]), [], `rates ${JSON.stringify(rates)}`);
     sql.close();
   }
 });
@@ -365,5 +378,79 @@ test('TWO MOVES OF ONE SIZE INSIDE ONE WINDOW ARE NOT GUESSED: the middle legs e
     leg(k, 'TRANSFER FROM USD', 3, 'in', egp(4_810_000), 'egp-current'),
   ];
   apart(k, rows, 'one of two equally near moves was guessed');
+  sql.close();
+});
+
+test('A COINCIDENCE BESIDE A REAL MOVE IS A QUESTION, NOT A PAIR: a second row that fits leaves all three counted, and the answer decides', async () => {
+  const { k, sql } = await record();
+  /* A REAL MOVE, AND A CLIENT'S POUNDS A DAY LATER THAT HAPPEN TO SIT WITHIN 2% OF THE SAME DOLLARS. The nearest won
+     before, so which of the two receipts dropped out of Received was a matter of which day it landed. */
+  const out = leg(k, 'TRANSFER TO EGP', 0, 'out', SENT, 'usd-current');
+  const back = leg(k, 'TRANSFER FROM USD', 1, 'in', LANDED, 'egp-current');
+  const client = leg(k, 'DEPOSIT', 2, 'in', egp(4_830_000), 'egp-savings');
+  apart(k, [out, back, client], 'a row with two candidates was paired in silence');
+
+  const asks = crossAsks(pairingOf(sql), [out.id, back.id, client.id]);
+  assert.deepEqual(asks.map((a) => a.key).sort(), [crossKey(out.id, back.id), crossKey(out.id, client.id)].sort(), 'one question for each two rows, however many seeds led to it');
+  for (const a of asks) {
+    assert.deepEqual(a.why, ['not_only']);
+    assert.equal(a.first.id, out.id, 'the leg that went first is the one the rate converts');
+    assert.deepEqual([a.from, a.to, a.rate, a.rate_as_of, a.rate_days, a.converted], ['USD', 'EGP', 48.5, DAY(0), 0, 4_850_000]);
+  }
+
+  /* YES TO THE REAL ONE pairs it, and the client's pounds stay counted with nothing left to ask. */
+  const every = [out.id, back.id, client.id];
+  const yes = pairingOf(sql, new Map([[crossKey(out.id, back.id), true]]));
+  assert.deepEqual(answers(settle(yes, every)), [[out.id, back.id], [back.id, out.id]].sort());
+  assert.deepEqual(crossAsks(yes, every), []);
+  /* NO TO THE COINCIDENCE takes it out of the way for good, and the move is then the one candidate it always was. */
+  const no = pairingOf(sql, new Map([[crossKey(out.id, client.id), false]]));
+  assert.deepEqual(answers(settle(no, every)), [[out.id, back.id], [back.id, out.id]].sort());
+  assert.deepEqual(crossAsks(no, every), []);
+  /* NO TO BOTH leaves all three counted and asks nothing again. */
+  const neither = pairingOf(sql, new Map([[crossKey(out.id, client.id), false], [crossKey(out.id, back.id), false]]));
+  assert.deepEqual(answers(settle(neither, every)), []);
+  assert.deepEqual(crossAsks(neither, every), []);
+  sql.close();
+});
+
+test('A ROW WITH A PARTNER OF ITS OWN CURRENCY IS NOBODY\u2019S RIVAL: the pounds still pair with the one dollar leg left', async () => {
+  const { k, sql } = await record();
+  /* THE DOLLARS OUT OF ONE ACCOUNT INTO ANOTHER ARE A PAIR TO THE CENT, so that out is nobody's rival for the pounds. */
+  const moved = [leg(k, 'TO SAVINGS', 0, 'out', SENT, 'usd-current'), leg(k, 'FROM CURRENT', 0, 'in', SENT, 'usd-savings')];
+  const out = leg(k, 'TRANSFER TO EGP', 1, 'out', SENT, 'usd-savings');
+  const back = leg(k, 'TRANSFER FROM USD', 2, 'in', LANDED, 'egp-current');
+  paired(k, moved[0]!, moved[1]!, 'the move in one currency');
+  paired(k, out, back, 'a taken row stood in the way of the one candidate left');
+  sql.close();
+});
+
+test('A RATE OLDER THAN TWO DAYS IS A QUESTION WITH ITS AGE IN IT: two days pairs, three asks, and past a month nothing is asked', async () => {
+  for (const [old, pairs] of [[0, true], [PAIR_RATE_DAYS, true], [PAIR_RATE_DAYS + 1, false], [15, false], [ASK_RATE_DAYS, false]] as [number, boolean][]) {
+    const { k, sql } = await record(ACROSS, [[DAY(-old), 48.5]]);
+    const out = leg(k, 'TRANSFER TO EGP', 0, 'out', SENT, 'usd-current');
+    const back = leg(k, 'TRANSFER FROM USD', 1, 'in', LANDED, 'egp-current');
+    const asks = crossAsks(pairingOf(sql), [out.id, back.id]);
+    if (pairs) {
+      paired(k, out, back, `a rate ${old} days old`);
+      assert.deepEqual(asks, [], `a rate ${old} days old`);
+    } else {
+      /* THE ONE CANDIDATE, WITHIN THE TOLERANCE, AND STILL NOT TAKEN ON ITS OWN WORD: 15 days is the owner's record on
+         the day of the audit, one rate from September 28th read on October 13th. */
+      apart(k, [out, back], `a rate ${old} days old`);
+      assert.equal(asks.length, 1, `a rate ${old} days old`);
+      const a = asks[0]!;
+      assert.deepEqual([a.key, a.first.id, a.second.id, a.why], [crossKey(out.id, back.id), out.id, back.id, ['rate_old']]);
+      assert.deepEqual([a.rate_as_of, a.rate_days, a.converted], [DAY(-old), old, 4_850_000]);
+      /* AND THE PERSON'S YES IS ENOUGH, whatever the rate's age. */
+      const yes = pairingOf(sql, new Map([[a.key, true]]));
+      assert.deepEqual(answers(settle(yes, [out.id, back.id])), [[out.id, back.id], [back.id, out.id]].sort());
+    }
+    /* THE VITAL SIGN'S LINE: how old the newest rate is, read on the day the money left. */
+    assert.deepEqual(newestRate(sql, DAY(0)), { as_of: DAY(-old), days: old });
+    sql.close();
+  }
+  const { sql } = await record(ACROSS, []);
+  assert.equal(newestRate(sql, DAY(0)), null, 'no rate at all');
   sql.close();
 });

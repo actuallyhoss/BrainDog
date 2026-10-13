@@ -4,7 +4,8 @@
  * example rows, and a bank add-on's pattern beside it.
  *
  * "Agents do the legwork in view" (DIRECTION, D2.17): who wrote a row has always been in the history and no figure read
- * it. `filed-for-you-30d` counts what anything but a person made in 30 days, and `filed-today` says today's by who.
+ * it. `filed-for-you-30d` counts what an agent, a bank add-on or a rule made in 30 days, and `filed-today` says today's
+ * by who. An import files nothing for anybody: it copies what another tool already held (audit 61, claim 8).
  *
  * THE FIGURES ARE READ FROM `FILING_FIGURES`, NOT FROM `METRICS`: the group is declared in its own file and joins Money
  * with the version that spreads it into `figures/index.ts`.
@@ -35,6 +36,21 @@ const run = (client_id: string): WriteContext => ({
   principal: { kind: 'token', token: 't_1' },
   session: { client_id, agent: 'claude', client: 'claude-code', repo: 'kiln' },
 });
+
+/** A rule somebody declared, a script, and the record's own mechanism, as each signs what it makes. */
+const RULE = { actor: 'rule:repeat_rent' };
+const SCRIPT = { actor: 'script:tidy-ledger@v2' };
+const RECORD = { actor: 'system' };
+
+/**
+ * `braindog import`, as it signs: a run of its own, by no agent anybody named, under a client id that says import
+ * (`apps/cli/src/import.ts`, the headers in `importCommand`).
+ */
+const IMPORT: WriteContext = {
+  actor: 'agent:other',
+  principal: { kind: 'token', token: 't_1' },
+  session: { client_id: 'braindog-import-0f3c', agent: 'other', client: 'braindog-cli' },
+};
 
 const value = <T>(r: unknown): T => {
   const x = r as { ok: boolean; value: T; refusal?: { code: string; fix: string; at?: string } };
@@ -129,7 +145,7 @@ test('MONEY DECLARES WHO FILED ITS LEDGER, two counts of what was made that add 
     assert.equal(figure.pack, 'money-core', `${id} names its home: its source names no list the split reads`);
     assert.doesNotMatch(figure.name, /—|row|entity/u);
   }
-  assert.equal(FILING_FIGURES['filed-for-you-30d']!.where, 'by is not person');
+  assert.equal(FILING_FIGURES['filed-for-you-30d']!.where, 'by is agent or door or rule', 'the three that do legwork, named, and nobody else');
   assert.equal(FILING_FIGURES['filed-for-you-30d']!.window, '30d');
   assert.equal(FILING_FIGURES['filed-today']!.where, undefined, 'today is everybody, said by who');
   assert.equal(FILING_FIGURES['filed-today']!.window, '1d');
@@ -182,4 +198,50 @@ test('A LEDGER ONLY A PERSON KEEPS READS NOUGHT FILED FOR THEM, and is told so w
   assert.equal(typed.value, 0);
   assert.notEqual(typed.met, false, 'typing your own Ledger misses no mark');
   assert.deepEqual(said(read(l.k, 'filed-today').groups), [['person:p_1', 'Mara', 1]]);
+});
+
+test('FILED FOR YOU IS AN AGENT, A BANK ADD-ON OR A RULE: a script and the record itself file nothing for anybody', async () => {
+  const l = await ledger();
+  l.file('Rent, from the repeating line', RULE, 3);
+  l.file('Moved by the tidy script', SCRIPT, 2);
+  l.file('Carried by the record', RECORD, 1);
+  l.file('Card at the grocer', DOOR);
+  l.file('Filed from an arrival', run('c1'));
+
+  const got = read(l.k, 'filed-for-you-30d');
+  assert.equal(got.value, 3, 'the rule, the bank add-on and the agent; the script and the record are not legwork done for a person');
+  assert.deepEqual(
+    said(got.groups).sort((a, b) => String(a[0]).localeCompare(String(b[0]))),
+    [
+      ['agent:claude', 'Claude', 1],
+      ['door:bank-harbour', 'Harbour Bank', 1],
+      ['rule:repeat_rent', 'Repeat rent', 1],
+    ],
+  );
+  assert.equal(got.held, 5, 'all five were made in the window, and two are kept out by who made them');
+});
+
+test('A RECORD BROUGHT IN FROM A FILE FILED NOTHING FOR ANYBODY: what the record signs itself is in no part', async () => {
+  const l = await ledger();
+  for (let i = 0; i < 6; i++) l.file(`Brought in, line ${i + 1}`, RECORD);
+  l.file('Card at the grocer', DOOR);
+
+  const got = read(l.k, 'filed-for-you-30d');
+  assert.equal(got.value, 1, 'six lines copied in today are not six filed for you');
+  assert.deepEqual(said(got.groups), [['door:bank-harbour', 'Harbour Bank', 1]]);
+});
+
+/**
+ * `braindog import` writes over the API as a run of its own, so the history holds it as a run. The kernel sorts that run
+ * apart (`packages/kernel/src/metrics.ts` `makerOf`: no agent named, and a client id that says import), as the maker
+ * `import`, which `by is agent or door or rule` does not keep.
+ */
+test('AN IMPORT FILED NOTHING FOR ANYBODY: 200 lines copied from another tool are not legwork', async () => {
+  const l = await ledger();
+  for (let i = 0; i < 4; i++) l.file(`Imported, line ${i + 1}`, IMPORT);
+  l.file('Filed from an arrival', run('c1'));
+
+  const got = read(l.k, 'filed-for-you-30d');
+  assert.equal(got.value, 1, 'the agent that filed an arrival, and none of what the import copied');
+  assert.deepEqual(said(got.groups), [['agent:claude', 'Claude', 1]]);
 });

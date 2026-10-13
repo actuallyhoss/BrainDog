@@ -39,6 +39,7 @@ export { serveSlash, servesSlash, slashAskDoor, slashReply, type SlashAskDoor, t
 export { slashRecordMeter, type SlashLedgerDeps, type SlashRecordMeter } from './slash-ask.ts';
 /* THE ENGINE'S HEALTH, for the same reason: both hosts build the read and hand it to the record (ENG-A02). */
 export { engineHealthRead, type EngineFacts, type EngineHealth, type EngineHealthDeps, type EngineHealthFns, type EngineHealthRead, type EngineSaid } from './engine-health.ts';
+export { engineLedgerRead, type EngineLedger, type EngineLedgerCall, type EngineLedgerDeps } from './engine-ledger.ts';
 /* `/in/*` IS NOT IN `ROUTES` AND BELONGS HERE ANYWAY. The table below is the record's methods, every one
    of them behind the auth gate at `/api/<name>`; an arrival is above that gate by design (`33 §4`), takes
    no principal, and answers 202 rather than a `Result`. It is exported from this file for the same reason

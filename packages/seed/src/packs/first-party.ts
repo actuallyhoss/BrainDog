@@ -515,7 +515,8 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   words are the same. PORTFOLIO 1.16.0 IS RELEASED, so this is a version of its own. One `when` changed on the two
  *   keyed copies of a block that is there, nothing added or taken away, so a minor step.
  * - work 1.19.0 (W061, REC-C10): a thread has six states and declared moves, a day it aims for, and a follow-up takes
- *   its parent's project, thread, owner and agent one by one. WORK 1.18.0 IS RELEASED (commit 63423720), so this is a
+ *   its parent's project, thread and owner one by one (never the agent), and a thread that is holding may be marked
+ *   done (work-moves-62-63, batch 63, inside the unreleased step). WORK 1.18.0 IS RELEASED (commit 63423720), so this is a
  *   version of its own. Two values, their labels and the moves on one field, one field added and one script's title
  *   and source changed, nothing taken away, so a minor step.
  * - money-core 3.17.0, still unreleased, takes three more things of batch 61 with no version of its own: the Ledger
@@ -526,6 +527,14 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  * - money-core 3.17.0, still unreleased (commit 63423720, the deployed build, holds 3.16.0), takes batch 62's change
  *   with no version of its own: a payment made void, or put back to pending, reopens the bill it had paid
  *   (settle-reopen-62). `payment-settles` starts on any status and `settle` counts cleared money alone.
+ * - money-core 3.17.0, still unreleased (commit 63423720, the deployed build, holds 3.16.0), takes batch 63's changes
+ *   with no version of its own, pinned once (`2c10a714a36d7c85`): four figures of this month's spending against last,
+ *   `spent-last-month`, `spent-by-category-last-month`, `spent-by-category-to-date-last-month` and
+ *   `spent-vs-last-month`, a difference by category against the month before (spend-figures-63, REC-B19 job 2); the
+ *   Ledger tile reads `filed-today` and `filed-for-you-30d` in its written line (ledger-by-63, REC-B20 job 3), which
+ *   no host draws yet; `filed-for-you-30d` counts what an agent, a bank add-on or a rule made, where it counted
+ *   anything but a person (filing-figures-draw-62-63); and `settle` leaves a Paid so far somebody typed when a pending
+ *   or void payment paid none of it (audit 62, claim 1).
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.17.0',

@@ -53,6 +53,8 @@
   import { areaOf, headCaptureAt, layoutOf } from './layout.ts';
   import { arranged, emptyHidden } from './home.ts';
   import { leadIndex } from './lead.ts';
+  import { asksActions, judgedWith, readHeld } from './panels.ts';
+  import type { ActionRow } from '$lib/record/actions.ts';
   import SourceView from './SourceView.svelte';
   import { heldNone, pageWrites, type Held } from './page-writes.ts';
   import { liveArrivals } from '$lib/data/optimistic.svelte.ts';
@@ -111,6 +113,30 @@
 
   /* A PAGE IS THE RECORD'S BLOCKS AND NOTHING ELSE; a record that does not answer is its refusal, drawn below. */
   const live = $derived(got?.from === 'live' ? got : null);
+
+  /* ── what the actions panel holds ──────────────────────────────────────────
+     A PART WITH SOMETHING IN IT MUST NOT VANISH (DIRECTION §35, §37). A boxed section whose panel is the project's
+     scheduled actions is judged with its blocks, and the panel reads its actions only once it is drawn, so the page
+     counts them first (`panels.ts`): ONE READ A PAGE, for the row it is drawn for, and only where a section waits on
+     it. `null` until the read is back, and for good where nothing asks or the record refused. Read again for another
+     row, never for the same page read again after a write. */
+  const about = $derived(mode === 'page' ? (live?.page.page.param ?? null) : null);
+  const spoken = $derived(about ? `${about.register}#${about.seq}` : null);
+  const asks = $derived(spoken !== null && asksActions(live?.page.blocks ?? []));
+  let tally = $state.raw<{ of: string; rows: ActionRow[] | null } | null>(null);
+  $effect(() => {
+    const of = asks ? spoken : null;
+    if (of === null) return;
+    /* BY THE ROW AND WHETHER ANYTHING ASKS, and by nothing else: the page read again is a new answer naming the same row. */
+    untrack(() => {
+      if (!live || !about) return;
+      void readHeld((url, init) => fetch(url, init), apiBase(), live.page.blocks, { spoken: of, title: about.title }).then((rows) => {
+        tally = { of, rows };
+      });
+    });
+  });
+  /** The count for the row this page is drawn for, and not the one a page left behind while its own is read. */
+  const counted = $derived(tally !== null && tally.of === spoken ? tally.rows : null);
 
   /* ── the writes ────────────────────────────────────────────────────────────
      ONE OBJECT FOR THE WHOLE PAGE, handed to every block, and none at all on a preview, which is what makes a preview
@@ -227,7 +253,7 @@
    * ate the top fifth of every page. Not while arranging, where every block is a list item with a bar of its own. The
    * blocks are read as the body draws them, so a block it hides for holding nothing does not stand first.
    */
-  const led = $derived(!!live && !arranging && !showSource && leadIndex(emptyHidden(live.page.blocks)) >= 0);
+  const led = $derived(!!live && !arranging && !showSource && leadIndex(judgedWith(live.page.blocks, counted, (bs) => emptyHidden(bs))) >= 0);
 
   /**
    * WHETHER THE PAGE SAYS WHAT IT IS ITSELF: a drawn `note lead` anywhere among its blocks. Such a page does not get the
@@ -235,7 +261,7 @@
    * between the name and the page's own sentence and said less than it. Read whether or not the page opens on it, so the
    * line does not come back while arranging or reading the source.
    */
-  const headlined = $derived(!!live && emptyHidden(live.page.blocks).some((b) => b.drawn && b.kind === 'note' && b.lead === true));
+  const headlined = $derived(!!live && judgedWith(live.page.blocks, counted, (bs) => emptyHidden(bs)).some((b) => b.drawn && b.kind === 'note' && b.lead === true));
 
   /* ── arranging a home ──────────────────────────────────────────────────────
      TODAY AND DECIDE ARRANGE THEIR BODY, NOT WHAT THEIR SCREEN DREW (`home-arrange.ts`): the mode reads the body again,
@@ -307,7 +333,7 @@
   const headLine = $derived.by((): { at: number; block: LiveBlock } | null => {
     if (!hosting || !live) return null;
     const layout = layoutOf(live.page.page);
-    const main = emptyHidden(all, true)
+    const main = judgedWith(all, counted, (bs) => emptyHidden(bs, true))
       .map((block, at) => ({ block, at }))
       .filter((x) => areaOf(x.block, layout) === 'main');
     const hit = main[headCaptureAt(main.map((x) => x.block))];
@@ -495,6 +521,7 @@
       mode="page"
       page={live.page.page}
       blocks={all}
+      held={counted}
       now={live.now}
       {writes}
       {arrangement}

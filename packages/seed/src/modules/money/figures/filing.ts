@@ -22,15 +22,22 @@ import type { SeedMetric } from '../../base.ts';
 
 export const FILING_FIGURES: Record<string, SeedMetric> = {
   /**
-   * HOW MANY LEDGER ENTRIES ANYTHING BUT A PERSON MADE IN 30 DAYS: an agent, a bank add-on's pattern, a rule, a script
-   * or the record. `by is not person` is the one thing this source narrows by. Its parts say which of them, by name.
+   * HOW MANY LEDGER ENTRIES WERE FILED FOR A PERSON IN 30 DAYS: by an agent, a bank add-on's pattern or a rule somebody
+   * declared. Its parts say which of them, by name.
+   *
+   * THE THREE ARE NAMED, NOT "anything but a person" (audit 61, claim 8). The record's own hand and a script are not
+   * legwork done for anybody, and a record brought in from a file is signed by the record: read as `by is not person`,
+   * the day of an import said every line it copied had been filed for you.
+   *
+   * WHAT THIS CANNOT YET LEAVE OUT is `braindog import`, which writes as a run of its own and so reads as an agent. The
+   * source narrows by `by` alone, and telling that run apart is the kernel's (`makerOf`).
    */
   'filed-for-you-30d': {
     metric: 'filed-for-you-30d',
     pack: 'money-core',
     name: 'Filed for you, 30 days',
     source: 'events.transactions',
-    where: 'by is not person',
+    where: 'by is agent or door or rule',
     value: { count: 'made' },
     format: 'int',
     target: { gte: 0 },

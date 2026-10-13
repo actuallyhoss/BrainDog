@@ -28,6 +28,7 @@ const SKIP = new Set(['docs', 'loop', 'negative']);
 //   any generated sheet    earns it by carrying the generator's header, not by being listed here
 //   tools/gates            this file has to know what a colour looks like
 //   any *.test.ts          a test asserts on values, which is the point of a test
+//   the site's shot test   the same, in the one `.test.mjs` that asserts on colours, by its name
 //
 // `--brand` lives in app.css and is caught deliberately: see the exemption note below.
 const EXEMPT = [
@@ -65,6 +66,17 @@ const EXEMPT = [
    * once for a person to look at, and it has no theme to read because it is not the app.
    */
   /^apps\/web\/scripts\//,
+  /**
+   * THE TEST OF THE SITE'S SHOT TOOLING, for the reason `*.test.ts` is exempt above: it asserts on
+   * values. `shot.mjs` reads the live site's colours and holds them to bounds, so its test has to
+   * write down a red that is in bounds, a blue that is not, and the `rgb()` a browser reports.
+   *
+   * BY NAME, not `apps/site/scripts/` and not every `*.test.mjs`. The folder also holds the scripts
+   * that draw the site's share card and its icons, and a colour written into one of those IS a
+   * colour the site paints. The ending covers every Node test in the repository, most of which have
+   * no business with a colour, so a literal in one of them is still worth a look.
+   */
+  /^apps\/site\/scripts\/shots\.test\.mjs$/,
 ];
 
 /**
@@ -144,6 +156,36 @@ const LITERAL_NAMED = new RegExp(String.raw`\b${COLOUR_PROP}\s*:[^;{}]*\b(?:${NA
 const ALLOWED_LINES = [/^\s*--brand:\s*#[0-9a-fA-F]{6};\s*$/, /^\s*@property\s+--[a-z0-9-]+\s*\{/];
 
 /**
+ * AND FIVE MORE, EACH NAMED WITH THE ONE FILE IT LIVES IN. The two above are shapes a stylesheet is
+ * entitled to anywhere; these are not, so the same line in any other file is still a finding.
+ *
+ *   shot.mjs, four lines   the stylesheet of the contact sheet: `body`, `section`, `img` and `.red`.
+ *                          The sheet is a page written to disk once for a person to look over the
+ *                          screenshots. It is not the site, it loads no theme and no visitor is
+ *                          served it, which is the reason `apps/web/scripts/` is exempt above. The
+ *                          four selectors are named, so a fifth rule with a colour in it is caught,
+ *                          and so is a colour anywhere else in the script.
+ *   live-bounds.json, one  the `colours` list: the reds and the ink the LIVE site is held to. It is
+ *                          the expected half of a comparison, a value asserted on, and nothing
+ *                          paints with it. Only that key: another colour in the file is caught.
+ */
+const HEX = String.raw`#[0-9a-fA-F]{6}`;
+const ALLOWED_IN = [
+  {
+    file: 'apps/site/scripts/shot.mjs',
+    lines: [
+      new RegExp(String.raw`^\s*body \{[^{}#]*\bbackground: ${HEX}; color: ${HEX};[^{}#]*\}\s*$`),
+      new RegExp(String.raw`^\s*(?:section|img) \{[^{}#]*\bbackground: ${HEX};[^{}#]*\}\s*$`),
+      new RegExp(String.raw`^\s*\.red \{ color: ${HEX}; \}\s*$`),
+    ],
+  },
+  {
+    file: 'apps/site/scripts/live-bounds.json',
+    lines: [new RegExp(String.raw`^\s*"colours": \["${HEX}"(?:, "${HEX}")*\],?\s*$`)],
+  },
+];
+
+/**
  * Comments are blanked, not skipped. `#125` and `#b-4` are spoken ids and anchors that a comment is
  * entitled to mention, and `#125` is three hex digits as far as a regex is concerned.
  */
@@ -218,6 +260,7 @@ export default async function colourGrep(root = process.cwd()) {
     for (const [i, line] of lines.entries()) {
       if (!LITERAL_ANY.test(line) && !(isCss && (LITERAL_CSS.test(line) || LITERAL_NAMED.test(line)))) continue;
       if (ALLOWED_LINES.some((r) => r.test(line))) continue;
+      if (ALLOWED_IN.some((a) => a.file === rel && a.lines.some((r) => r.test(line)))) continue;
       findings.push({ where: `${rel}:${i + 1}`, text: line.trim().slice(0, C.excerptChars) });
     }
   }

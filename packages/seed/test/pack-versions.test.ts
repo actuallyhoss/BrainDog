@@ -1453,8 +1453,9 @@ const DECLARED: Record<string, Version> = {
       setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
       setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category setting.rest_days
       metric.filed-for-you-30d metric.filed-today
+      metric.spent-last-month metric.spent-by-category-last-month metric.spent-by-category-to-date-last-month metric.spent-vs-last-month
     `,
-    declares: '0696e982958e4019',
+    declares: '2c10a714a36d7c85',
     history: [
       "`cash-cross-check` is declared (cash-check-52, REC-A17): Cash now worked out a second way, each cash account walked entry by entry from its newest statement, less Cash now, a currency at a time; no value while no balance is typed -> 73738171ae2405ba",
       'The Money page draws the check (cash-page-54, REC-A17): one tile, Cash now does not add up, while `cash-cross-check` is not nought, and one line while no balance is typed -> e4a453d69795fe22',
@@ -1466,6 +1467,7 @@ const DECLARED: Record<string, Version> = {
       "Folded into the unreleased 3.17.0 (settle-rule-60, REC-B11; integrate 60): a payment marks the bill it pays. `script.settle` is registered and `rule.payment-settles` starts it when a Ledger entry that names a bill in Settles has cleared, handing both by their ids, which the script now reads as well as a handle; the sum counts cleared entries alone. A rule and a script added -> 037bb14f0cdae30f",
       "Folded into the unreleased 3.17.0 (ledger-gate-60-61, audit 59 claim 5; pairs-fx-61; filing-figures-61, REC-B20; integrate 61; commit 63423720, the deployed build, holds 3.16.0): the Ledger tile on Money is drawn by any entry that is not void and no longer waits on `ledger-newest-days`, and it says 'Nothing has moved yet.' where it leads a page; `transactions` pairs a move between two currencies at the rate of the day it left, within 2% (`pairs.across_currency`); `filed-for-you-30d` and `filed-today` are added, counts of the Ledger entries made by who made them, read from `events.transactions`; `metric.filed-for-you-30d` and `metric.filed-today` gained -> 6f1143a556590586",
       "Folded into the unreleased 3.17.0 (settle-reopen-62, audit 60 claim 2; integrate 62; commit 63423720, the deployed build, holds 3.16.0): a payment made void, or put back to pending, reopens the bill it had paid. `rule.payment-settles` starts on any status (`when: settles is set`), and `script.settle` counts cleared money alone, holds a pending or void payment to paying nothing, and writes a bill back to open or part paid with what its other cleared payments come to; a bill marked paid by hand, with no Paid so far, is left. One rule's `when` and one script's source changed; no id added or taken away -> 0696e982958e4019",
+      "Folded into the unreleased 3.17.0 (batch 63, integrate 63; commit 63423720, the deployed build, holds 3.16.0), one fingerprint for five changes: four figures of this month's spending against last, `metric.spent-last-month`, `metric.spent-by-category-last-month`, `metric.spent-by-category-to-date-last-month` and `metric.spent-vs-last-month`, a difference by category against the month before (spend-figures-63, REC-B19 job 2); the Ledger tile reads filed-today and filed-for-you-30d in its written line, a `body` on one block of `page.money` (ledger-by-63, REC-B20 job 3); `metric.filed-for-you-30d` counts an agent, a bank add-on or a rule, not anything but a person, one `where` changed (filing-figures-draw-62-63, audit 61 claim 8); and `script.settle` leaves a Paid so far somebody typed when a pending or void payment paid none of it (audit 62 claim 1); four ids added, none taken away -> 2c10a714a36d7c85",
     ],
   },
   'work@1.17.0': {
@@ -1577,9 +1579,10 @@ const DECLARED: Record<string, Version> = {
       metric.tasks-week-yours metric.tasks-with-agents page.work page.work-board register.tasks register.tracks
       register.updates rule.close_follow_ups rule.start_with_parent script.close_follow_ups script.start_with_parent
     `,
-    declares: '8299f07c756e0e85',
+    declares: '424cfe3512924e3b',
     history: [
       "`register.tracks`: Status has six values (idea and planned before open) with their labels and the declared moves between them, and gains `target`, the day a thread aims for, a deadline reminded on the day; `script.start_with_parent` copies each of project, thread, owner and agent the follow-up left empty, and is titled Start a follow-up where its parent is; no id added or taken away -> 8299f07c756e0e85",
+      "Inside the unreleased 1.19.0 (work-moves-62-63, audit 61 claim 6; integrate 63; commit 63423720, the deployed build, holds 1.18.0): on `register.tracks` holding leads to done, and `script.start_with_parent` no longer copies the agent; no id added or taken away -> 424cfe3512924e3b",
     ],
   },
 };

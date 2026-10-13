@@ -419,6 +419,9 @@ export { AGGREGATIONS, bucketState, deltaFrom, evaluateMetric, fxOfPair, largest
 export { clockOf, isMoneyFormat, verdictOf } from './metrics.ts';
 export { readDeclaredSigns, vitalOf } from './metrics.ts';
 export { farRates, pointSaid, RATE_QUIET_DAYS } from './metrics.ts';
+/* A DIFFERENCE AGAINST THE WINDOW BEFORE (`diff.before`), for the seed and the browser's reader: the clock moved back a month, the gate a change passes, and the words a declaration may say. */
+export { BEFORE, comparisonOf, monthBefore } from './metrics.ts';
+export type { Before, Halves } from './metrics.ts';
 export { SESSIONS_WORKING, readRunsWorking } from './built-in-figures.ts';
 export { HANDOFFS_OPEN, openSteps, readHandoffsOpen, type OpenStep } from './built-in-figures.ts';
 export { KEYS_IN_TEXT, RECORD_KEY_SCAN, keysInText, placeOf, readKeysInText, scanKeys, type KeyFinding, type KeyScan } from './key-scan.ts';

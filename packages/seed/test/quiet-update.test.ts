@@ -541,6 +541,8 @@ const withoutLedgerTile = (doc: Body): Body => ({
 const withoutCashStale = (doc: Body): Body => ({ ...doc, declarations: (doc.declarations as Body[]).filter((d) => d.rule !== 'cash-stale') });
 /** Work as 1.18.0 released it, the frozen document (`fixtures/released/`), which holds the follow-up script as it was. */
 const WORK_1_18 = JSON.parse(readFileSync(new URL('./fixtures/released/work-1.18.0.json', import.meta.url), 'utf8')) as Body;
+/** Batch 63's four figures of this month's spending against last (spend-figures-63), new in the unreleased money-core 3.17.0. */
+const SPEND_VS_LAST: ReadonlySet<string> = new Set(['spent-last-month', 'spent-by-category-last-month', 'spent-by-category-to-date-last-month', 'spent-vs-last-month']);
 const LATEST: Record<string, { version: string; released: string; undo: (doc: Body) => Body }> = {
   /* AN ACCOUNT'S DIGITS SAID THE LAST FOUR. */
   'money-core': {
@@ -554,7 +556,10 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
       /* AND BATCH 61'S THREE, folded into the same unreleased 3.17.0: the two figures over who filed the Ledger go
          (filing-figures-61), and the Ledger pairs within one currency alone again (pairs-fx-61). The Ledger tile's own
          gate went with the tile (`withoutLedgerTile`). */
-      declarations: (doc.declarations as Body[]).filter((d) => !SIGNS_ADDED.has(String(d.metric)) && !WEEK_IN.has(String(d.metric)) && d.script !== 'last_day' && d.script !== 'settle' && d.rule !== 'payment-settles' && d.metric !== 'filed-for-you-30d' && d.metric !== 'filed-today').map((d) =>
+      /* AND BATCH 63'S, folded into the same unreleased 3.17.0: the four figures of this month's spending against last go
+         (spend-figures-63). The Ledger tile's written line went with the tile, the narrowed `filed-for-you-30d` with the
+         figure, and the guard on a typed Paid so far with `settle`, each dropped whole above. */
+      declarations: (doc.declarations as Body[]).filter((d) => !SIGNS_ADDED.has(String(d.metric)) && !WEEK_IN.has(String(d.metric)) && d.script !== 'last_day' && d.script !== 'settle' && d.rule !== 'payment-settles' && d.metric !== 'filed-for-you-30d' && d.metric !== 'filed-today' && !SPEND_VS_LAST.has(String(d.metric))).map((d) =>
         d.register === 'accounts' && Array.isArray(d.fields)
           ? { ...d, fields: (d.fields as Body[]).map((f) => (f.id === 'last4' ? { ...f, label: 'Last four digits' } : f)) }
           : d.register === 'transactions' && d.pairs !== undefined

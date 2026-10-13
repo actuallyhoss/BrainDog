@@ -274,6 +274,10 @@ test('EVERY DECLARED METRIC READS THE SAME IN SQL AND IN TYPESCRIPT', async () =
     /* NOR OF A CROSS-CHECK (`crosscheck`, money-core 3.17.0's `cash-cross-check`): it is the difference between a figure
        and the entries walked again, which `kernel/test/cash-cross-figure.test.ts` and `cash-cross-check.test.ts` hold. */
     if ((decl.value as { crosscheck?: unknown }).crosscheck !== undefined) continue;
+    /* NOR OF A DIFFERENCE AGAINST THE WINDOW BEFORE (`diff.before`, `spent-vs-last-month`): its second half is read with the
+       clock moved back, which this walk does not do. `money-spend-vs-last.test.ts` and
+       `kernel/test/metrics-diff-grouped.test.ts` hold it. */
+    if ((decl.value as { diff?: { before?: unknown } }).diff?.before !== undefined) continue;
     /* A FIGURE READ ONCE PER BOOK has no book to be read about: the sample keeps none (money-core 3.1.0's `books`). */
     if (JSON.stringify(decl).includes('book is {{it}}')) continue;
     const params = JSON.stringify(decl).includes('{{it}}') ? THINGS.map((t) => String(t.name)) : [null];

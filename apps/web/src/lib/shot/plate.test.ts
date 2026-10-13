@@ -304,3 +304,15 @@ test('with no observer to ask, watch still plates once and still stops clean', (
   stop();
   assert.deepEqual(marks(f.frame), []);
 });
+
+/* AUDIT 62, CLAIM 3. The copy files hold the empty string, so the set of the product's own words will hold it too, and a
+   picture with no alt, or none said, then read as an own word and was left for anyone to see. Red before the fix. */
+test('a picture with no words is plated even when the own words hold the empty string', () => {
+  const own: ReadonlySet<string> = new Set([...OWN, '']);
+  const face = el('img', { src: '/f/1', alt: '' });
+  const spaced = el('img', { src: '/f/2', alt: '  ' });
+  const bare = el('img', { src: '/f/3' });
+  const logo = el('img', { src: '/mark.svg', alt: 'Money' });
+  plate(root(el('main', {}, face, spaced, bare, logo)), own);
+  assert.deepEqual([face, spaced, bare, logo].map(marked), [true, true, true, false]);
+});

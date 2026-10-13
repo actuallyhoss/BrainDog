@@ -68,8 +68,12 @@ function sealed(el: Element, tag: string, own: ReadonlySet<string>): boolean {
     if (WORDLESS.has(type)) return false;
     return PRESSED.has(type) ? reads(el.getAttribute('value'), own) : true;
   }
-  /* A picture reads only when its words do. One with no words is plated: it may be a face. */
-  if (tag === 'img') return !own.has((el.getAttribute('alt') ?? '').trim());
+  /* A picture reads only when its words do. One with no words is plated: it may be a face. AND NO WORDS IS NEVER AN OWN
+     WORD, even when the set holds the empty string, which the copy files do (audit 62, claim 3). */
+  if (tag === 'img') {
+    const alt = (el.getAttribute('alt') ?? '').trim();
+    return alt === '' || !own.has(alt);
+  }
   if (tag === 'svg' && el.getAttribute('role') === 'img') return reads(el.getAttribute('aria-label'), own);
   return false;
 }

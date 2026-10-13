@@ -132,6 +132,16 @@ language, and a language in YAML is the failure this whole platform is built to 
 it *not* a metric over a metric: it is two columns of one aggregate query, and it costs the same
 scan. A combinator whose operands had different predicates would be a join, and a join is refused.
 
+*(As built, October 13th 2026.)* **A `diff` may be grouped by one field, and may be read against the window before.**
+With `group_by` on the figure (or on both halves, naming the same field) each part answers `of` less `per` over its own
+entries; two fields are refused by name, and a grouped `ratio` is still not read. `diff: { of, per, before }`, where
+`before` is `previous`, `month_ago` or `year_ago`, reads the second half over the SAME predicate against a moved clock
+(now less the window, the same day number last month, or last year) and ended at that clock's day, so `on at least bom`
+with `month_ago` is last month up to today's day number. It is still one `source` and one `where`: the clock moves, the
+predicate does not, so it is not a join. Such a reading carries its two halves, and each part's change passes the
+comparison gate of §2.4 on its own: a part with too few entries in either window says no change and why. A difference
+against the window before is grouped by a field only, never cut by date.
+
 **2 · The unit algebra is checked at install, and this is where it earns its keep.** A ratio is not
 type-free, and getting it wrong is how a dashboard states a confident wrong number:
 

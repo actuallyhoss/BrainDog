@@ -20,7 +20,7 @@
 
 import { DurableObject } from 'cloudflare:workers';
 
-import { engineHealthRead, handlersFor, hintsOf, httpStatus, serveApi, serveIngest, serveSlash, servesSlash, withSession, type EngineHealthRead, type SessionHints, type SlashAskDoor, type VaultGrantSeen } from '@braindog/host';
+import { engineHealthRead, engineLedgerRead, handlersFor, hintsOf, httpStatus, serveApi, serveIngest, serveSlash, servesSlash, withSession, type EngineHealthRead, type SessionHints, type SlashAskDoor, type VaultGrantSeen } from '@braindog/host';
 import { deriveSessionKey, relyingParty, serveAccount, serveAuth, type DeviceDoor, type EmailDoor, type InviteDoor, type Provisioned } from '@braindog/host/auth';
 /* SIGN-UP: its three routes are answered in `signIn()` before `serveAuth`. */
 import { clearCookie, cookieMode, mirrorEverywhere, readSid, renameAsked, renamedName, sameKey, sameOrigin, sessionCookie } from '@braindog/host/auth';
@@ -771,6 +771,17 @@ export class Record$ extends DurableObject<Env> {
       grants: () => api.kernel.grants(),
     });
     this.#engineHealth = engineHealth;
+    /* AND WHAT THAT LEDGER HOLDS, for the record's `engineReadings` (ENG-B01): the same storage again, so the calls it
+       counts are the ones the health above was read from, beside the questions still open, each by its cause. Handed
+       whether or not a model is set, since the open questions are the record's own. No mention is handed yet: nothing
+       reads which of them are attached, so that count stays 0. */
+    const engineLedger = engineLedgerRead({
+      sql,
+      questions: () => {
+        const open = api.kernel.openSuggestions();
+        return open.ok ? open.value : [];
+      },
+    });
     /* THE RECORD'S COPIES, IN THE BUCKET THE NIGHT WRITES TO (`copies.ts`). Taken, listed and gone back to from inside
        this object, because `onNextSessionRestoreBookmark` is this storage's and nothing outside the object can call it.
        No `BLOBS` and there is no port, so the record answers `NOT_IN_THIS_BUILD` as it always did. */
@@ -824,6 +835,8 @@ export class Record$ extends DurableObject<Env> {
         slashMeter: workerSlashMeter(this.env, () => api, { sql, clock: { now: () => Date.now() } }),
         /* AND WHETHER THAT MODEL ANSWERS, for a read token, the command line and the daily vital sign (`engineHealth`). */
         engineHealth,
+        /* AND WHAT IT WAS ASKED AND ANSWERED THIS MONTH, with what the record still does not understand (`engineReadings`). */
+        engineLedger,
         /* WHAT THIS DEPLOYMENT CAN ACTUALLY DELIVER, so the doorbell rings for work somebody can
            do. A kind with no deliverer sits `pending` for ever — which is honest — and without
            this every write afterwards rang the queue about it. `notify.push` is among them only where both VAPID halves

@@ -509,7 +509,7 @@ test('ONE WHO GOES BY THE OWNER’S OTHER NAME IS ASKED ABOUT AS HIM, and what h
   sql.close();
 });
 
-test('THE OWNER’S NAME IN A MAIL IS NOBODY’S EVIDENCE, a no is never asked again, and two rows marked as him ask nothing', async () => {
+test('THE OWNER’S NAME IN A MAIL IS NOBODY’S EVIDENCE, a no is never asked again, and two rows marked as him are one question', async () => {
   const { k, sql } = await record();
   value(k.create('people', { name: 'Kas', email: 'kas@kas.example', self: true }, OWNER));
   /* Mail only: a stranger signing as Kas is not asked about as the owner. */
@@ -529,7 +529,8 @@ test('THE OWNER’S NAME IN A MAIL IS NOBODY’S EVIDENCE, a no is never asked a
   value(two.k.create('people', { name: 'Kas', email: 'kas@kas.example', self: true }, OWNER));
   value(two.k.create('people', { name: 'Kas', email: 'kas@other.example', self: true }, OWNER));
   value(two.k.meet({ name: 'Ada Lovelace', email: 'ada@example.com', where: 'commit 1 in braindog' }, AGENT));
-  assert.deepEqual(open(two.sql), []);
+  assert.equal(open(two.sql).length, 1);
+  assert.match(two.k.question(open(two.sql)[0]!) ?? '', /both you\?/u);
   two.sql.close();
 });
 

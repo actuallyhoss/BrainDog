@@ -19,7 +19,7 @@ import { env } from 'node:process';
 
 import {
   grantAad, grantKey, openSealed,
-  engineHealthRead, handlersFor, hintsOf, httpStatus, serveApi, serveIngest, serveKeys, serveSlash, serveVault, servesKeys, servesSlash, servesVault, sessionOf, slashRecordMeter, withSession,
+  engineHealthRead, engineLedgerRead, handlersFor, hintsOf, httpStatus, serveApi, serveIngest, serveKeys, serveSlash, serveVault, servesKeys, servesSlash, servesVault, sessionOf, slashRecordMeter, withSession,
   type Handler, type IngestDoor, type KeysDoor, type SlashAskDoor, type VaultDoor,
 } from '@braindog/host';
 import {
@@ -1348,6 +1348,17 @@ export async function start(options: {
     load: () => import('@braindog/slash'),
     grants: () => api.kernel.grants(),
   });
+  /* AND WHAT THAT LEDGER HOLDS, for the record's `engineReadings` (ENG-B01), as the Worker hands it: the same Slash
+     SQLite, so the calls it counts are the ones the health above was read from, beside the questions still open, each
+     by its cause. Handed whether or not a model is set, since the open questions are the record's own. No mention is
+     handed yet: nothing reads which of them are attached, so that count stays 0. */
+  const engineLedger = engineLedgerRead({
+    sql: slashSql,
+    questions: () => {
+      const open = api.kernel.openSuggestions();
+      return open.ok ? open.value : [];
+    },
+  });
 
   /**
    * Drain everything due, then re-arm.
@@ -1681,6 +1692,7 @@ export async function start(options: {
     slashModel,
     slashMeter,
     engineHealth,
+    engineLedger,
     /* NEWER VERSIONS IN THIS HOST'S CATALOGUE AND THE KENNEL, for Slash to ask about on Decide, and the whole of both for
        the arranger: the folder first, then the public Kennel (`kennel.ts` `kennelReader`), so an add-on published only
        to the Kennel installs by its id here as on the Cloud. With BRAINDOG_KENNEL=off, the folder alone. */

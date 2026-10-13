@@ -224,18 +224,32 @@ test('WHERE IT STANDS ON SKETCHPAD IS OUT BY ITS WHEN, never by the cards rule, 
   assert.equal(unsaid(sketchpad({ said: true })[1]!), false);
 });
 
-test('A BOXED ACTIONS SECTION IS SHUT WHEN EVERY BLOCK UNDER IT IS GONE, the tile that stood over nothing on Sketchpad', () => {
-  assert.deepEqual(whys(markDrawn(sketchpad())).slice(3), ['empty', 'empty', 'empty', 'empty']);
+/* What the record hands the section once it has counted the project's scheduled actions and found none. */
+const COUNTED_NONE = { actions: [] };
+
+test('A BOXED ACTIONS SECTION IS SHUT WHEN THE RECORD SEES NO SCHEDULED ACTION and every block under it is gone', () => {
+  assert.deepEqual(whys(markDrawn(sketchpad(COUNTED_NONE))).slice(3), ['empty', 'empty', 'empty', 'empty']);
   /* ONE BLOCK UNDER IT DRAWN KEEPS IT: a sentence is never called empty, so the seed's Notes holds the tile open. */
-  assert.deepEqual(whys(markDrawn(sketchpad({ note: true }))).slice(3), ['drawn', 'empty', 'drawn', 'empty', 'empty']);
-  /* A HOST THAT SAYS THE PANEL HOLDS SOMETHING keeps it, since the scheduled actions are drawn under its heading. */
-  assert.equal(whys(markDrawn(sketchpad({ actions: [{ name: 'Nightly import' }] })))[3], 'drawn');
+  assert.deepEqual(whys(markDrawn(sketchpad({ ...COUNTED_NONE, note: true }))).slice(3), ['drawn', 'empty', 'drawn', 'empty', 'empty']);
   /* THE OTHER PANELS ALWAYS HOLD SOMETHING, and a heading with no box is not a tile: each stays, as before. */
-  assert.equal(whys(markDrawn(sketchpad({ panel: 'reporting' })))[3], 'drawn');
-  assert.equal(whys(markDrawn(sketchpad({ panel: 'run' })))[3], 'drawn');
-  assert.equal(whys(markDrawn(sketchpad({ box: false })))[3], 'drawn');
+  assert.equal(whys(markDrawn(sketchpad({ ...COUNTED_NONE, panel: 'reporting' })))[3], 'drawn');
+  assert.equal(whys(markDrawn(sketchpad({ ...COUNTED_NONE, panel: 'run' })))[3], 'drawn');
+  assert.equal(whys(markDrawn(sketchpad({ ...COUNTED_NONE, box: false })))[3], 'drawn');
   /* WITH NO BLOCK AFTER IT AT ALL it is the author's own divider, and stays. */
-  assert.equal(whys(markDrawn(sketchpad().slice(0, 4)))[3], 'drawn');
+  assert.equal(whys(markDrawn(sketchpad(COUNTED_NONE).slice(0, 4)))[3], 'drawn');
   /* AND ARRANGING DRAWS IT AGAIN, with every block under it. */
-  assert.deepEqual(whys(arranged(markDrawn(sketchpad()))).slice(3), ['drawn', 'drawn', 'drawn', 'drawn']);
+  assert.deepEqual(whys(arranged(markDrawn(sketchpad(COUNTED_NONE)))).slice(3), ['drawn', 'drawn', 'drawn', 'drawn']);
+});
+
+test('A BOXED ACTIONS SECTION IS KEPT BY DEFAULT: a project with one scheduled action and no other block keeps its heading', () => {
+  /* NOBODY COUNTED (audit 61, claim 1): no host hands the section its actions, so the record cannot say the panel is
+     empty, and the heading the host draws "Nightly import" under stays though every block under it went. */
+  const uncounted = markDrawn(sketchpad());
+  assert.deepEqual(whys(uncounted).slice(3), ['drawn', 'empty', 'empty', 'empty']);
+  assert.equal(whyOf(uncounted[3]!), undefined);
+  /* COUNTED, AND ONE IS THERE: the same, said rather than assumed. */
+  assert.deepEqual(whys(markDrawn(sketchpad({ actions: [{ name: 'Nightly import' }] }))).slice(3), ['drawn', 'empty', 'empty', 'empty']);
+  /* WHAT IS HANDED AND IS NO LIST IS NOT A COUNT OF NONE, so it shuts nothing. */
+  const odd = sketchpad().map((b, n) => (n === 3 ? ({ ...b, actions: null } as unknown as BlockResult) : b));
+  assert.equal(whys(markDrawn(odd))[3], 'drawn');
 });

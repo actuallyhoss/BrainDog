@@ -44,12 +44,14 @@
   import { blockKeys, recomposer, rewritten } from './recompose.ts';
   import { lookOrder, nextOf, placedOf, repeatsFirst } from './look.ts';
   import { asksAside } from './asks.ts';
+  import { judgedWith } from './panels.ts';
   import NextStep from './NextStep.svelte';
 
   let {
     mode,
     page,
     blocks,
+    held = null,
     now,
     writes,
     arrangement = null,
@@ -75,6 +77,11 @@
     page: LivePageDecl;
     /** Every block the page draws, declared then added, each at the index its slot keeps. */
     blocks: readonly LiveBlock[];
+    /**
+     * The scheduled actions the page's panel would draw, counted by the page before it is judged (`panels.ts`,
+     * `PageView.svelte`): a list, of none where the project has none, or `null` where nobody counted.
+     */
+    held?: readonly unknown[] | null;
     now: number;
     /** The page's writes, or `null` where the page is inert. */
     writes: Writes | null;
@@ -128,8 +135,12 @@
    * A PAGE AT ITS OWN ADDRESS IS NEVER EMPTIED BY THIS: one whose every block would go keeps the first, which says its
    * one sentence, and still offers the first row, rather than drawing a title over nothing. It kept every block, so an
    * empty Work was a wall of tiles each saying it held nothing.
+   *
+   * A BOXED SECTION WHOSE PANEL IS THE PROJECT'S SCHEDULED ACTIONS IS JUDGED WITH THEIR COUNT (`panels.ts` `judgedWith`),
+   * because the panel reads its actions only once it is drawn: with some it stays over blocks that all went, and with
+   * none it goes with them.
    */
-  const quiet = $derived(emptyHidden(blocks, mode === 'page'));
+  const quiet = $derived(judgedWith(blocks, held, (bs) => emptyHidden(bs, mode === 'page')));
   const drawable = $derived(mode === 'preview' || arranging ? arranged(blocks) : quiet);
   /* AND THE LINE THE HEADER HOLDS IS NOT A TILE AS WELL (`captured`): not drawn here, and still at its place, so every
      write finds its block. Never while authoring, where it is a block like any other. */

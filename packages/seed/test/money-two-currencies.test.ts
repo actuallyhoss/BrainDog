@@ -101,6 +101,9 @@ function write(k: Kernel, side: Side, kiln: { book: string; thing: string; categ
   make('accounts', { name: `Deposit in ${side.word}`, kind: 'bank', balance: at(5_000), as_of: day(-1), liquid: false, arrives: day(10) });
   make('transactions', { what: `Paid in ${side.word}`, on: day(-2), direction: 'out', amount: at(1_000), account: cash.id, state: 'cleared', thing: kiln.thing });
   make('transactions', { what: `Software in ${side.word}`, on: day(-1), direction: 'out', amount: at(700), account: cash.id, state: 'cleared', category: kiln.category });
+  /* AND ONE LAST MONTH, on a day number this month has reached, for the figures of last month and of last month to this day
+     (money-core 3.17.0, spend-figures-63). Thirty-three days back, so no thirty-day figure reads it. */
+  make('transactions', { what: `Software last month in ${side.word}`, on: day(-33), direction: 'out', amount: at(600), account: cash.id, state: 'cleared', category: kiln.category });
   make('transactions', { what: `Received in ${side.word}`, on: day(-1), direction: 'in', amount: at(2_500), account: cash.id, state: 'cleared', thing: kiln.thing });
   make('obligations', { what: `Bill in ${side.word}`, direction: 'owed_by_me', amount: at(2_000), due: day(5), state: 'open' });
   make('obligations', { what: `Late bill in ${side.word}`, direction: 'owed_by_me', amount: at(3_000), due: day(-5), state: 'open' });

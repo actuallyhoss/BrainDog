@@ -41,7 +41,7 @@ import type { Refusal, Sql } from '@braindog/ports';
 import { compile, evaluate, type Predicate, type Schema } from '@braindog/where';
 
 import { isCurrencyCode } from './coerce.ts';
-import { convertMinor, rateFor, rateIsStale, ratesFrom, type Rate } from './fx.ts';
+import { convertMinor, rateFor, ratesFrom, type Rate } from './fx.ts';
 import { ratesRole, type RoleList } from './roles.ts';
 import { atMs, shiftFrom } from './schedule.ts';
 
@@ -62,7 +62,9 @@ export type PairsDecl = {
   where?: Predicate;
   /**
    * A move between two currencies pairs too, the earlier leg at the rate of its own day, when the two amounts are
-   * within `tolerance` percent of each other. Absent, two currencies never pair.
+   * within `tolerance` percent of each other. Absent, two currencies never pair. Only on a rate no more than two days
+   * older than that day, and only where each row is the other's one candidate: anything else is a question for a
+   * person (`crossAsks`), never a pair.
    */
   across_currency?: { tolerance: number };
 };
@@ -365,8 +367,20 @@ export type Leg = {
  * in the first attempt at a pending half, the kernel built its `Pairing` without them, and every refused row was taken
  * for one that may clear: a client's cleared 20,000.00 that names its party held a split move back, and Spent and
  * Received each read 40,000.00 high. Required, a caller that leaves them out does not compile.
+ *
+ * `ruled` IS WHAT A PERSON ANSWERED ABOUT TWO ROWS IN TWO CURRENCIES, by `crossKey`: `true` makes them one move
+ * whatever the rate's age and whoever else stands near, `false` takes each out of the other's candidates for good.
+ * Left out, nobody has answered anything, and a doubtful match waits as a question (`crossAsks`).
  */
-export type Pairing = { sql: Sql; register: string; pairs: PairsDecl; fields: readonly FieldShape[]; state: string | undefined; done: readonly string[] | undefined };
+export type Pairing = {
+  sql: Sql;
+  register: string;
+  pairs: PairsDecl;
+  fields: readonly FieldShape[];
+  state: string | undefined;
+  done: readonly string[] | undefined;
+  ruled?: ReadonlyMap<string, boolean>;
+};
 
 const LEG_COLUMNS = 'id, seq, version, created_at, updated_at, deleted_at, fields';
 type LegRow = Omit<Leg, 'fields'> & { fields: string };
@@ -859,7 +873,7 @@ type Windows = {
   ledger: Ledger | null;
   /** The same for a move between two currencies (`crossAround`), and the rates it converts by, read when first needed. */
   crossed: Map<string, ReturnType<typeof around>>;
-  fx: { rates: readonly Rate[]; at: Map<string, number | null> } | null;
+  fx: { rates: readonly Rate[]; at: Map<string, Held | null> } | null;
 };
 const windowsOf = (ledger: Ledger | null = null): Windows => ({ seen: new Map(), ledger, crossed: new Map(), fx: null });
 
@@ -1115,53 +1129,98 @@ function sameOf(p: Pairing, leg: Leg, known: Map<string, string | null>, windows
 
 /* ─────────────── a move between two currencies (`across_currency`) ─────────────── */
 
+/* HOW OLD A RATE MAY BE, in days before the earlier leg's day. A PAIR SAYS NOTHING BESIDE IT: it takes two rows out of
+   Spent and Received, so it is made in silence only on a rate that is the day's or one of the two before it (a weekend
+   has no rate of its own). Older than that the two rows are a question a person answers, with the rate's age said in
+   it, and older than a month the rate says too little about the day to ask on: the rows stay counted. `fx.ts` lets a
+   FIGURE convert on a rate up to a week old because it says so beside the number; a pair has nowhere to say it. */
+export const PAIR_RATE_DAYS = 2;
+export const ASK_RATE_DAYS = 31;
+
+/** A rate as a pairing holds it: the number, the day it is of, and how many days before the leg's day that is. */
+type Held = { rate: number; as_of: string; days: number };
+
 /**
- * The rate from one currency into another that is `day`'s own, or `null`: the newest on or before the day, and no
- * older than `fx.ts` calls stale.
- *
- * A RATE FROM AFTER THE DAY IS A GUESS BACKWARDS, AND AN OLD ONE IS NOT THE DAY'S. A figure converts with either and
- * says so beside the number; a pair says nothing beside it, it takes two rows out of Spent and Received, so it is made
- * only on a rate that is the day's. With none, the two rows stay counted and nothing is asked.
- *
- * THE RATES ARE THE RECORD'S OWN, the rows of the list declaring `rates:` (`roles.ts`) read by `fx.ts`, once for as
- * long as one question about the ledger lasts: nothing a pairing writes is a rate.
+ * The record's own rates: the rows of the list declaring `rates:` (`roles.ts`), read by `fx.ts`. Nothing a pairing
+ * writes is a rate.
  */
-function rateAt(p: Pairing, windows: Windows, from: string, to: string, day: string): number | null {
-  if (windows.fx === null) {
-    const lists = p.sql
-      .all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'register' AND superseded_at IS NULL AND retired = 0")
-      .map((r) => JSON.parse(r.body) as RoleList);
-    const held = ratesRole(lists);
-    const rows = held
-      ? p.sql.all<{ fields: string }>('SELECT fields FROM entry WHERE register = ? AND deleted_at IS NULL', held.register).map((r) => JSON.parse(r.fields) as Record<string, unknown>)
-      : [];
-    windows.fx = { rates: held ? ratesFrom(rows, held.fields) : [], at: new Map() };
-  }
+function ratesOf(sql: Sql): Rate[] {
+  const lists = sql
+    .all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'register' AND superseded_at IS NULL AND retired = 0")
+    .map((r) => JSON.parse(r.body) as RoleList);
+  const held = ratesRole(lists);
+  if (!held) return [];
+  const rows = sql.all<{ fields: string }>('SELECT fields FROM entry WHERE register = ? AND deleted_at IS NULL', held.register).map((r) => JSON.parse(r.fields) as Record<string, unknown>);
+  return ratesFrom(rows, held.fields);
+}
+
+const daysBetween = (from: string, to: string): number => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS);
+
+/**
+ * How old the newest rate in the record is on `today` (`YYYY-MM-DD`), or `null` with none: the line a vital sign says,
+ * and the reason two currencies stopped pairing in silence when it passes `PAIR_RATE_DAYS`.
+ */
+export function newestRate(sql: Sql, today: string): { as_of: string; days: number } | null {
+  let newest: string | null = null;
+  for (const r of ratesOf(sql)) if (r.as_of <= today && (newest === null || r.as_of > newest)) newest = r.as_of;
+  return newest === null ? null : { as_of: newest, days: daysBetween(newest, today) };
+}
+
+/**
+ * The rate from one currency into another to read `day` by, or `null`: the newest on or before the day, with its age,
+ * and none older than `ASK_RATE_DAYS`.
+ *
+ * A RATE FROM AFTER THE DAY IS A GUESS BACKWARDS and is never used. One older than `PAIR_RATE_DAYS` still finds the
+ * rows that could be one move, and `crossDoubt` then makes them a question, never a pair.
+ *
+ * READ ONCE for as long as one question about the ledger lasts.
+ */
+function rateAt(p: Pairing, windows: Windows, from: string, to: string, day: string): Held | null {
+  if (windows.fx === null) windows.fx = { rates: ratesOf(p.sql), at: new Map() };
   const key = `${from}>${to}@${day}`;
-  let rate = windows.fx.at.get(key);
-  if (rate === undefined) {
+  let held = windows.fx.at.get(key);
+  if (held === undefined) {
     const r = rateFor(windows.fx.rates, from, to, day);
-    windows.fx.at.set(key, (rate = r === null || r.forward || rateIsStale(r.as_of, day) ? null : r.rate));
+    const days = r === null ? 0 : daysBetween(r.as_of, day);
+    windows.fx.at.set(key, (held = r === null || r.forward || days > ASK_RATE_DAYS ? null : { rate: r.rate, as_of: r.as_of, days }));
   }
-  return rate;
+  return held;
+}
+
+/** Two rows' handle for what a person answered about them (`Pairing.ruled`), the same from either side. */
+export const crossKey = (a: string, b: string): string => (a < b ? `${a}+${b}` : `${b}+${a}`);
+
+/**
+ * Two rows in two currencies read as one move: which leg went first, the currencies, and the rate of the earlier leg's
+ * day. `null` when they hold one currency, or no rate reads that day.
+ *
+ * THE EARLIER LEG'S DAY, because that is the day the money was changed; on one day the lower currency code goes first,
+ * so the two legs give one answer whichever is asked.
+ */
+function crossRead(p: Pairing, x: Shape, y: Shape, windows: Windows): { first: Shape; second: Shape; from: string; to: string; held: Held } | null {
+  const mine = x.amount.currency?.toUpperCase();
+  const theirs = y.amount.currency?.toUpperCase();
+  if (mine === undefined || theirs === undefined || mine === theirs) return null;
+  const [first, second] = x.at < y.at || (x.at === y.at && mine < theirs) ? [x, y] : [y, x];
+  const from = first.amount.currency!.toUpperCase();
+  const to = second.amount.currency!.toUpperCase();
+  const held = rateAt(p, windows, from, to, first.day.slice(0, 10));
+  return held === null ? null : { first, second, from, to, held };
 }
 
 /**
  * Whether two rows in two currencies are the two legs of one move by every part of the declaration but `where` and the
  * pin: `mirrors`, with "the same amount" read as the earlier leg at the rate of its own day, within the tolerance.
+ * Every other `on` entry still has to agree as it does in one currency.
  *
- * THE EARLIER LEG'S DAY, because that is the day the money was changed; on one day the lower currency code goes first,
- * so the two legs give one answer whichever is asked. Every other `on` entry still has to agree as it does in one
- * currency.
+ * TWO ROWS A PERSON SAID ARE NOT ONE MOVE NEVER ARE (`Pairing.ruled`), so neither stands in the other's way again.
  */
 function crossMirrors(p: Pairing, a: Leg, b: Leg, shape: (leg: Leg) => Shape | null, windows: Windows): boolean {
   const said = p.pairs.across_currency;
   const x = shape(a);
   const y = shape(b);
   if (said === undefined || x === null || y === null) return false;
-  const mine = x.amount.currency?.toUpperCase();
-  const theirs = y.amount.currency?.toUpperCase();
-  if (mine === undefined || theirs === undefined || mine === theirs) return false;
+  if (p.ruled?.get(crossKey(a.id, b.id)) === false) return false;
   if (signOf(x.way) !== null ? signOf(y.way) !== -signOf(x.way)! : same(y.way, x.way)) return false;
   if (same(x.across, y.across)) return false;
   for (const entry of p.pairs.on) {
@@ -1169,12 +1228,9 @@ function crossMirrors(p: Pairing, a: Leg, b: Leg, shape: (leg: Leg) => Shape | n
     if (!e.abs && (b.fields[e.field] === undefined || !same(b.fields[e.field], a.fields[e.field]))) return false;
   }
   if (!inside(p.pairs.within, x.at, y.at) || !inside(p.pairs.within, y.at, x.at)) return false;
-  const [first, second] = x.at < y.at || (x.at === y.at && mine < theirs) ? [x, y] : [y, x];
-  const from = first.amount.currency!.toUpperCase();
-  const to = second.amount.currency!.toUpperCase();
-  const rate = rateAt(p, windows, from, to, first.day.slice(0, 10));
-  if (rate === null) return false;
-  return Math.abs(convertMinor(first.amount.size, from, to, rate) - second.amount.size) * 100 <= said.tolerance * second.amount.size;
+  const read = crossRead(p, x, y, windows);
+  if (read === null) return false;
+  return Math.abs(convertMinor(read.first.amount.size, read.from, read.to, read.held.rate) - read.second.amount.size) * 100 <= said.tolerance * read.second.amount.size;
 }
 
 /**
@@ -1237,16 +1293,59 @@ function crossHeld(p: Pairing, leg: Leg, windows: Windows): Leg | null {
   return own.waitsAt <= gap || own.near.some((c) => c.gap <= gap) ? null : near;
 }
 
+/** The one row of another currency a person said is `leg`'s other leg (`Pairing.ruled`), or `null`: none, or two. */
+function saidOf(p: Pairing, leg: Leg, windows: Windows): Leg | null {
+  if (p.ruled === undefined) return null;
+  const yes = crossAround(p, leg, windows).near.filter((c) => p.ruled!.get(crossKey(leg.id, c.leg.id)) === true);
+  return yes.length === 1 ? yes[0]!.leg : null;
+}
+
+/** Why two rows in two currencies are a question and not a pair. */
+export type CrossWhy = 'rate_old' | 'not_only';
+
+/** Whether `leg` has one row of another currency it could be one move with, and no more: none pending, none besides. */
+function onlyOne(p: Pairing, leg: Leg, known: Map<string, string | null>, windows: Windows): boolean {
+  const w = crossAround(p, leg, windows);
+  /* A ROW WITH A PARTNER OF ITS OWN CURRENCY IS TAKEN, to the unit, and is nobody's rival here. */
+  return w.waitsAt === Infinity && w.near.filter((c) => sameOf(p, c.leg, known, windows).to === null).length === 1;
+}
+
+/**
+ * What stands between two rows in two currencies and a pair made in silence, or nothing.
+ *
+ * WITHIN 2% AT THE DAY'S RATE IS NOT PROOF. Measured by the audit of batch 61: a purchase in dollars and a receipt in
+ * pounds, unrelated, in two accounts inside four days and within the tolerance, paired and both dropped out of Spent
+ * and Received with nothing said. One currency agrees to the unit; two agree only nearly, so a near match is taken on
+ * its own word only when the rate is the day's (`PAIR_RATE_DAYS`) AND each row is the other's one candidate. A second
+ * row that fits either leg, cleared or still pending, or an older rate, makes it a question (`crossAsks`).
+ */
+function crossDoubt(p: Pairing, a: Leg, b: Leg, known: Map<string, string | null>, windows: Windows): CrossWhy[] {
+  const ledger = windows.ledger;
+  const x = ledger === null ? shapeOf(p, a) : shapeIn(p, ledger, a);
+  const y = ledger === null ? shapeOf(p, b) : shapeIn(p, ledger, b);
+  const read = x === null || y === null ? null : crossRead(p, x, y, windows);
+  const why: CrossWhy[] = [];
+  if (read === null || read.held.days > PAIR_RATE_DAYS) why.push('rate_old');
+  if (!onlyOne(p, a, known, windows) || !onlyOne(p, b, known, windows)) why.push('not_only');
+  return why;
+}
+
 /**
  * The row of another currency this one is paired with, or `null`. Asked only of a leg with no partner in its own
  * currency, and the other leg must have none either: a pair one currency makes is never undone for one two make.
  * Mutual, as `partnerOf` is, so the answer is the same from either side.
+ *
+ * A PERSON'S ANSWER COMES FIRST: two rows they said are one move pair whatever else is true of them, while they still
+ * mirror each other. Without one, the nearest row pairs only where nothing is in doubt (`crossDoubt`).
  */
 function crossOf(p: Pairing, leg: Leg, known: Map<string, string | null>, windows: Windows): string | null {
   if (p.pairs.across_currency === undefined || leg.deleted_at !== null || !canPair(p, leg, windows.ledger)) return null;
+  const said = saidOf(p, leg, windows);
+  if (said !== null) return sameOf(p, said, known, windows).to === null && saidOf(p, said, windows)?.id === leg.id ? said.id : null;
   const to = crossHeld(p, leg, windows);
-  if (to === null || sameOf(p, to, known, windows).to !== null) return null;
-  return crossHeld(p, to, windows)?.id === leg.id ? to.id : null;
+  if (to === null || saidOf(p, to, windows) !== null || sameOf(p, to, known, windows).to !== null) return null;
+  if (crossHeld(p, to, windows)?.id !== leg.id) return null;
+  return crossDoubt(p, leg, to, known, windows).length === 0 ? to.id : null;
 }
 
 /** `partnerOf`, with the legs of the set it read: a partner of its own currency first, and only then one of another. */
@@ -1356,6 +1455,76 @@ export function passOf(p: Pairing): Pass {
   const reads = [...p.pairs.on.map((x) => entryOf(x)?.field ?? x), p.pairs.opposite, p.pairs.across, ...(date === null ? [] : [date]), ...readBy(p.pairs.where)];
   if (reads.includes(p.pairs.mark)) return { answered: new Set() };
   return { answered: new Set(), known: new Map(), windows: windowsOf(ledgerOf(p)) };
+}
+
+/**
+ * Two rows in two currencies that could be one move and were not paired: the question a person answers.
+ *
+ * `first` IS THE LEG THAT WENT FIRST, the one the rate converts; `converted` is its amount in `to`'s minor units at
+ * `rate`, which is of `rate_as_of`, `rate_days` days before the leg's own day. `key` goes back into `Pairing.ruled`
+ * with the answer.
+ */
+export type CrossAsk = {
+  key: string;
+  first: Leg;
+  second: Leg;
+  from: string;
+  to: string;
+  rate: number;
+  rate_as_of: string;
+  rate_days: number;
+  converted: number;
+  why: readonly CrossWhy[];
+};
+
+/**
+ * The questions `seeds` leave open: for each seed with no partner, every row of another currency it could be one move
+ * with that has none either. One per two rows, whichever of them was the seed. Called beside `settle`, with its seeds
+ * and its pass.
+ *
+ * A QUESTION, NOT A WRITE. `settle` leaves both rows counted; what this returns is for the caller to put to a person,
+ * and their answer comes back as `Pairing.ruled`. A question that is no longer returned for its rows has gone: one of
+ * them paired, left the window, was pinned or deleted.
+ *
+ * `why` IS NEVER EMPTY. Where neither the rate nor a second candidate is in doubt, a row of the leg's own currency
+ * stands as near (`crossHeld`), and that is another candidate.
+ */
+export function crossAsks(p: Pairing, seeds: readonly string[], pass?: Pass): CrossAsk[] {
+  if (p.pairs.across_currency === undefined) return [];
+  const known = pass?.known ?? new Map<string, string | null>();
+  const windows = pass?.windows ?? windowsOf();
+  const ledger = windows.ledger;
+  const shape = (l: Leg): Shape | null => (ledger === null ? shapeOf(p, l) : shapeIn(p, ledger, l));
+  const free = (l: Leg): boolean => answerOf(p, l, known, windows).to === null;
+  const out = new Map<string, CrossAsk>();
+  for (const id of new Set(seeds)) {
+    const leg = loadLeg(p, id);
+    if (!leg || leg.deleted_at !== null || !canPair(p, leg, ledger) || !free(leg)) continue;
+    const x = shape(leg);
+    if (x === null) continue;
+    for (const { leg: other } of crossAround(p, leg, windows).near) {
+      const key = crossKey(leg.id, other.id);
+      if (out.has(key) || p.ruled?.has(key) || !free(other)) continue;
+      const y = shape(other);
+      const read = y === null ? null : crossRead(p, x, y, windows);
+      if (read === null) continue;
+      const why = crossDoubt(p, leg, other, known, windows);
+      const [first, second] = read.first === x ? [leg, other] : [other, leg];
+      out.set(key, {
+        key,
+        first,
+        second,
+        from: read.from,
+        to: read.to,
+        rate: read.held.rate,
+        rate_as_of: read.held.as_of,
+        rate_days: read.held.days,
+        converted: convertMinor(read.first.amount.size, read.from, read.to, read.held.rate),
+        why: why.length > 0 ? why : ['not_only'],
+      });
+    }
+  }
+  return [...out.values()];
 }
 
 /** The rows that could be `leg`'s partner, by id: `settle`'s seeds for a row as it was, or as it is. */

@@ -100,8 +100,11 @@ export const TRANSACTIONS_REGISTER: MoneyRegister = {
    * the rate of its own day and the two pair when they are within 2% of each other, since a bank's own rate is never
    * the day's. A partner of the same currency is always tried first.
    *
-   * WHAT STILL CANNOT PAIR: such a move on a day the record holds no rate for (none on or before the day, or one more
-   * than a week old). Both legs are counted until the rate arrives, which settles them again, or a person marks them.
+   * IT PAIRS ON ITS OWN ONLY ON A FRESH RATE AND WITH NO RIVAL (pairs-fx-guard-62-63): a rate at most two days older than
+   * the day the money left, and each row the other's one candidate. Otherwise both legs stay counted, and the kernel
+   * says which two rows a person should be asked about, with the rate's age (`crossAsks` in `packages/kernel/src/pairs.ts`).
+   * NOBODY IS ASKED YET: the record does not file that question until it is wired, so until then a doubtful match is
+   * counted twice until a person marks it. Past a month old, or with no rate, nothing pairs and nothing is to be asked.
    */
   pairs: {
     on: ['abs(amount)'],
