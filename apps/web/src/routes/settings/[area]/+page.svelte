@@ -65,6 +65,7 @@
   import Agents from './areas/Agents.svelte';
   import Ingest from './areas/Ingest.svelte';
   import Keyboard from './areas/Keyboard.svelte';
+  import Look from './areas/Look.svelte';
   import Navigation from './areas/Navigation.svelte';
   import Pages from './areas/Pages.svelte';
   import Notifications from './areas/Notifications.svelte';
@@ -460,6 +461,8 @@
       <Appearance {shell} {area} />
     {:else if area === 'keyboard'}
       <Keyboard {shell} {area} />
+    {:else if area === 'look'}
+      <Look {shell} {area} />
     {:else if area === 'navigation'}
       <Navigation {shell} {area} />
     {:else if area === 'pages'}

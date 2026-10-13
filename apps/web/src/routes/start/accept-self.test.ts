@@ -3,6 +3,11 @@
  * person the sentence named (or the name they answered, or the one in their address), with the address they signed in
  * with, and marks that entry as them (People's `self`): the first entry in their People, before any client.
  *
+ * TWO HALVES. First the body the press sends (`bodyOf`): who the person is goes to the record as `me`, and the record
+ * decides where it is kept (`setup`, USE-B04). Then the script the press used to be, which a host a release behind
+ * still gets (`oldScript`): its fake client has no `setup`, which is how `accept` is told to run it. That half is
+ * deleted with the script.
+ *
  * A FAKE RECORD, NOT A SOCKET: the client is the handful of calls `accept` makes, each answered as the record answers it
  * for a record that already holds People, so the test is only about who is met and how.
  */
@@ -11,7 +16,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { propose } from '../../lib/start/propose.ts';
-import { accept, type Accepting } from './accept.ts';
+import { accept, bodyOf, rowsFor, type Accepting } from './accept.ts';
 
 type Call = { name: string; args: unknown };
 
@@ -99,4 +104,57 @@ test('THE PERSON IS PEOPLE’S FIRST ENTRY, before any client the sentence named
   const client1 = calls.findIndex((c) => c.name === 'create' && (c.args as { register?: string }).register === 'people');
   assert.ok(meet >= 0, 'the person was not met');
   assert.ok(client1 > meet, 'a client went into People before the person, or was not written');
+});
+
+/* ── the body the press sends ──────────────────────────────────────────── */
+
+test('THE BODY SAYS WHO THE PERSON IS: the name typed, the address signed in with, and the words after the name', () => {
+  assert.deepEqual(bodyOf(asked("Sami, I'm a student", 'sami@example.com')).me, { name: 'Sami', email: 'sami@example.com', note: "I'm a student" });
+  assert.equal(bodyOf(asked("I'm a student", 'sami@example.com')).me?.name, 'Sami', 'no name heard, so the one in the address');
+  const a = asked("I'm a student", 'sami.k@example.com');
+  assert.equal(bodyOf({ ...a, proposal: { ...a.proposal, answers: { name: 'Layla' } } }).me?.name, 'Layla', 'the name answered comes before the address');
+  assert.equal(bodyOf(asked("I'm a student", null)).me, undefined, 'nobody is named with no name and no address');
+});
+
+test('THE BODY ASKS FOR THE LISTS KEPT, THE CURRENCY BY ITS KEY, AND THE PERSON’S OWN WORDS, and rewrites no declaration', () => {
+  const a = asked("I'm Sam, I run Kiln and we bill Fenwick £2,000 a month on the 1st", 'sam@example.com');
+  const body = bodyOf({ ...a, modules: ['people', 'money-core'], currency: 'GBP', proposal: { ...a.proposal, names: { things: 'Shops' } } });
+  assert.deepEqual(body.packs, { install: ['people', 'money-core'] });
+  assert.deepEqual(body.settings, [{ values: { home_currency: 'GBP' } }]);
+  assert.deepEqual(body.names, { things: 'Shops' });
+  assert.equal(body.again, undefined);
+  assert.equal(bodyOf({ ...a, again: true }).again, true);
+  assert.doesNotMatch(JSON.stringify(body), /"declarations"|"doc"/u, 'the body carries a document, which is the record’s to choose');
+});
+
+test('AN INVOICE POINTS AT THE CLIENT THE SENTENCE NAMED, by the client’s place among the entries', () => {
+  const a = asked("I'm Sam, I run Kiln and we bill Fenwick £2,000 a month on the 1st", 'sam@example.com');
+  const all = { ...a, modules: ['portfolio', 'people', 'money-core'] };
+  const { rows, left } = rowsFor(all);
+  assert.deepEqual(left, []);
+  const linked = rows.filter((r) => r.links?.party !== undefined);
+  assert.ok(linked.length > 0, 'no entry points at the client');
+  for (const r of linked) {
+    const to = r.links?.party ?? -1;
+    assert.equal(rows[to]?.register, 'people');
+    assert.ok(to < rows.indexOf(r), 'an entry points at one after it, which the record refuses');
+  }
+  /* WITH ENTRIES BEFORE THESE (a guide's plan), every place moves by that many. */
+  assert.deepEqual(rowsFor(all, 3).rows.flatMap((r) => (r.links ? [r.links.party] : [])), linked.map((r) => (r.links?.party ?? 0) + 3));
+});
+
+test('AN ENTRY FOR A LIST THE PRESS DOES NOT MAKE IS LEFT WITH THE PERSON, never sent to be refused with the rest', () => {
+  const a = asked("I'm Sam, I run Kiln and we bill Fenwick £2,000 a month on the 1st", 'sam@example.com');
+  const { rows, left } = rowsFor({ ...a, modules: ['people'] });
+  assert.ok(rows.every((r) => r.register === 'people'));
+  assert.ok(left.length > 0 && left.every((r) => r.register !== 'people'));
+  assert.equal(rows.length + left.length, a.proposal.rows.length);
+});
+
+test('THE PRESS IS ONE CALL: setup, and nothing else of the record’s', async () => {
+  const calls: string[] = [];
+  const client = { setup: async () => (calls.push('setup'), { ok: true, value: { done: ['people', 'me'], failed: [] } }) };
+  const out = await accept(client as unknown as Parameters<typeof accept>[0], asked("Sami, I'm a student", 'sami@example.com'));
+  assert.deepEqual(calls, ['setup']);
+  assert.deepEqual(out, { failed: [], left: [], nav: null, filed: false, refused: [] });
 });

@@ -16,7 +16,7 @@ import { compile, compileModule } from 'svelte/compiler';
 import { render } from 'svelte/server';
 import type { Component } from 'svelte';
 
-import { HEAT_NONE, HEAT_PEOPLE_MOST, HEAT_WEEKS, heatPeoplePlan, heatPlan } from './heat.ts';
+import { HEAT_NONE, HEAT_PEOPLE_MOST, HEAT_SHARE, HEAT_SHARE_HEAD, HEAT_SHARE_LINE, HEAT_WEEKS, heatPeoplePlan, heatPlan } from './heat.ts';
 import { KINDS } from './kinds.ts';
 import { parse, type Block as BlockSegment } from './parse.ts';
 import { toHTML } from './html.ts';
@@ -150,6 +150,8 @@ const SHAPES: Record<string, string> = {
   'counted days, a zero, a day with no value, and today': '```heat | Done\n2026-09-14 | 3\n2026-09-14 | 1\n2026-09-16 | 0\n2026-09-21\n2026-09-22 | 2\n```',
   'a row that does not read and one before the weeks drawn': '```heat\n2026-08-03 | 5\nsoon | 1\n2025-01-06 | 3\n```',
   'nothing in view': '```heat | Done\n2025-01-06 | 3\n```',
+  /* A BLOCK WITH `of:`: each day against its own whole, one of them nought of it, and a bare count that has no whole. */
+  'each day a share of its whole': '```heat | Done on the day\n2026-09-14 | 3 of 12\n2026-09-16 | 0 of 4\n2026-09-21 | 2 of 2\n2026-09-22 | 5\n```',
   /* PEOPLE'S "IN TOUCH": the page reader writes each day as `day()` does, and one column, so every row is one. */
   'days as the page reader writes them, one a person': '```heat | In touch, 12 weeks\n2 Sep 2026\n1 Sep 2026\n27 Jul 2026\n28 Aug 2026\n```',
   'the who form, a line a person': '```heat who | In touch, 12 weeks\n2 Sep 2026 | S. Marchetti\n1 Sep 2026 | J. Okonkwo\n12 Aug 2026 | S. Marchetti\n27 Jul 2026 | Ravensworth Ltd\nsoon | Pell & Vine\n2025-01-06 | Nordhaven\n```',
@@ -245,4 +247,49 @@ test('THE PEOPLE FORM DRAWS THE LATEST FEW AND COUNTS THE REST, and two month na
   const ticks = heatPeoplePlan([{ day: '2026-10-05', who: 'Ann' }], '2026-10-05').ticks;
   assert.deepEqual(ticks.map((t) => t.week), [1, 6, 10]);
   assert.ok(ticks.every((t, i) => i === 0 || t.week - ticks[i - 1]!.week > 1));
+});
+
+/* ── a block with `of:`: each day against its own whole ──────────────────── */
+
+test("WITH `of`, A DAY IS WASHED BY ITS SHARE OF THAT DAY'S WHOLE, and the grid says so in those words", () => {
+  const p = heatPlan(
+    [
+      { day: '2026-09-14', value: '3 of 12' },
+      { day: '2026-09-14', value: '3 of 12' },
+      { day: '2026-09-15', value: '1 of 40' },
+      { day: '2026-09-16', value: '0 of 4' },
+      { day: '2026-09-21', value: '2 of 2' },
+      { day: '2026-09-17', value: '0 of 0' },
+      { day: '2026-09-22', value: '5' },
+      { day: '2026-09-18', value: '9 of 3' },
+    ],
+    TODAY,
+  );
+  const at = (d: string) => p.cells.find((c) => c.day === d)!;
+  assert.equal(p.share, true);
+  assert.deepEqual([at('2026-09-14').wash, at('2026-09-14').count], [1, '6 of 24'], 'two rows on one day are added, part and whole');
+  assert.deepEqual([at('2026-09-15').wash, at('2026-09-15').count], [1, '1 of 40'], 'one of forty is not washed as none');
+  assert.deepEqual([at('2026-09-16').wash, at('2026-09-16').count], [0, '0 of 4'], 'none of a day that held four is a counted zero');
+  assert.deepEqual([at('2026-09-21').wash, at('2026-09-21').count], [4, '2 of 2'], 'a day wholly of them is full, however small');
+  assert.deepEqual([at('2026-09-17').wash, at('2026-09-17').count], [null, null], 'a day whose whole is nothing is a gap');
+  assert.deepEqual(p.skipped, [6, 7], 'a count with no whole, and more than the whole, do not read on a share');
+  assert.equal(HEAT_SHARE, "share of that day's whole");
+  assert.equal(p.name, "12 weeks to 22 Sep 2026, 4 days counted, each by its share of that day's whole, the fullest 21 Sep 2026 with 2 of 2.");
+
+  const html = toHTML(parse(SHAPES['each day a share of its whole']!), { now: NOW });
+  assert.match(html, /<span class="heat-day" data-wash="1" title="14 Sep 2026: 3 of 12"><\/span>/u);
+  assert.match(html, /<span class="heat-day" data-wash="4" title="21 Sep 2026: 2 of 2"><\/span>/u);
+  assert.match(html, new RegExp(`<p class="heat-share">${HEAT_SHARE_LINE.replace("'", '&#39;').replace('.', '\\.')}</p>`, 'u'));
+  assert.match(html, new RegExp(`<th scope="col">${HEAT_SHARE_HEAD.replace("'", '&#39;')}</th>`, 'u'));
+  assert.match(html, /<td class="num">3 of 12<\/td>/u);
+  assert.match(html, /heat-skipped/u);
+});
+
+test('AND WITHOUT `of` NOTHING SAYS SHARE: the wash is the busiest day\'s, as it was', () => {
+  const p = heatPlan([{ day: '2026-09-14', value: '3' }, { day: '2026-09-21', value: '2' }], TODAY);
+  assert.equal(p.share, undefined);
+  assert.deepEqual(p.cells.filter((c) => c.count !== null).map((c) => [c.wash, c.count]), [[4, '3'], [3, '2']]);
+  const html = toHTML(parse(SHAPES['counted days, a zero, a day with no value, and today']!), { now: NOW });
+  assert.doesNotMatch(html, /heat-share|share of/u);
+  assert.match(html, /<th scope="col">Value<\/th>/u);
 });

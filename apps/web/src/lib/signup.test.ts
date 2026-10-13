@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { arrivalOf, keepSaid, SAID_KEY, SAID_LINK_MOST, saidForLink, saidFromLink, saidKept, startSignup, type Draft, type Io } from './signup.ts';
+import { arrivalOf, keepSaid, SAID_KEY, SAID_LINK_BYTES, SAID_LINK_MOST, saidForLink, saidFromLink, saidKept, startSignup, type Draft, type Io } from './signup.ts';
 
 const MARIAM = "I'm Mariam. I run a small candle shop in Alexandria and freelance as a designer.";
 const TOKEN = 'v'.repeat(20) + '_-' + 'K'.repeat(21);
@@ -60,6 +60,24 @@ test('A LONG SENTENCE IS SHORTENED AT A WORD to the link\'s 1,000 characters, an
   const wide = saidForLink({ said: '\u{1F56F}'.repeat(600), currency: null, usecase: null });
   assert.ok(wide !== null);
   assert.doesNotThrow(() => encodeURIComponent(wide));
+});
+
+test('ARABIC IS SHORTENED BY THE BYTES THE LINK WRITES, well inside the 1,000 characters, and says it was cut', () => {
+  assert.equal(SAID_LINK_BYTES, 2000);
+  /* SIX BYTES A LETTER IN A LINK: 600 characters packed, and more than 3,000 bytes written. */
+  const arabic = Array.from({ length: 100 }, () => '\u0634\u0645\u0648\u0639').join(' ');
+  assert.ok(JSON.stringify({ said: arabic }).length <= SAID_LINK_MOST, 'the characters alone would fit');
+  const packed = saidForLink({ said: arabic, currency: 'EGP', usecase: null });
+  assert.ok(packed !== null && packed.length <= SAID_LINK_MOST && encodeURIComponent(packed).length <= SAID_LINK_BYTES);
+  const back = saidFromLink(packed);
+  assert.equal(back?.cut, true, 'the pack says it carries only the start');
+  assert.equal(back?.currency, 'EGP', 'its answer kept');
+  assert.ok(arabic.startsWith(back?.said ?? 'x'));
+  assert.match(back?.said ?? '', /\u0639$/u, 'cut between words');
+  /* THE HOST'S OWN CUT IS READ TOO, and a sentence that fits whole says nothing of a cut. */
+  assert.equal(saidFromLink(JSON.stringify({ said: 'I sell', cut: true }))?.cut, true);
+  const whole = saidFromLink(saidForLink({ said: MARIAM, currency: null, usecase: null }));
+  assert.equal(whole !== null && 'cut' in whole, false);
 });
 
 test('A SENTENCE WITH A WEB OR EMAIL ADDRESS STAYS ON THIS DEVICE, since the host would refuse it in a letter', () => {

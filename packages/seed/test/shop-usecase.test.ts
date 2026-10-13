@@ -129,7 +129,7 @@ test('THE LEAD SAYS THE MONTH, THE WEEK AND WHO STILL OWES, and the owed clause 
   const body = (SHOP.pack.declarations as { page?: string; blocks?: { kind: string; body?: string }[] }[]).find((d) => d.page === 'orders')!.blocks!.find((b) => b.kind === 'note')!.body;
   assert.equal(
     body,
-    '{{orders-30d}} order(s) this month, {{orders-due-7d}} to ship this week, {{orders-late}} late, {{orders-owed-other}} not paid in full, and {{orders-owed-named.first_who}} still owes {{orders-owed-named.first_total}}',
+    '{{orders-30d}} order(s) this month, {{orders-due-7d}} to ship this week, {{orders-late}} late, {{orders-owed-other}} not paid in full, and {{orders-owed-named.first_who}} still owes {{orders-owed-named.first_total}}, with {{orders-owed-named.more}} more order(s) not paid at all',
   );
   /* EVERY HOLE NAMES SOMETHING: a typo would be printed as the author's words, never dropped as a nought. */
   assert.deepEqual(lineOf(k).unnamed ?? [], []);
@@ -245,6 +245,29 @@ test('AN UNPAID ORDER WITH NOBODY ON IT, OR NO DAY, IS COUNTED and never drops t
   assert.equal(both.values?.['orders-owed-other'], 2);
   /* EVERY ONE OF THE THREE IS IN THE TILE, whichever clause said it. */
   assert.equal(tile(k, 'Owed to you')?.length, 3);
+  sql.close();
+});
+
+test('TWO PEOPLE OWE ON THREE ORDERS, and the line names the oldest and counts the other two', async () => {
+  const { k, sql } = await made(['shop'], false);
+  const salma = value<{ id: string }>(k.create('people', { name: 'Salma' }, { actor: 'p_owner' })).id;
+  const dalia = value<{ id: string }>(k.create('people', { name: 'Dalia' }, { actor: 'p_owner' })).id;
+  value(k.create('orders', { what: '6 amber jars', who: salma, due: daysOn(2), total: EGP(135_000) }, { actor: 'p_owner' }));
+  assert.equal(lineOf(k).values?.['orders-owed-named.more'], 0, 'one order owed, and the line counted another');
+
+  value(k.create('orders', { what: '4 amber jars', who: salma, due: daysOn(9), total: EGP(60_000) }, { actor: 'p_owner' }));
+  value(k.create('orders', { what: 'Tea lights', who: dalia, due: daysOn(4), total: EGP(40_000) }, { actor: 'p_owner' }));
+  /* PART PAID: counted as not paid in full, never as not paid at all. */
+  value(k.create('orders', { what: 'A gift box', who: dalia, due: daysOn(5), total: EGP(40_000), paid: EGP(10_000) }, { actor: 'p_owner' }));
+  const line = lineOf(k);
+  assert.equal(line.values?.['orders-owed-named.first_who'], 'Salma');
+  assert.deepEqual(line.values?.['orders-owed-named.first_total'], EGP(135_000));
+  assert.equal(line.values?.['orders-owed-named.more'], 2);
+  assert.equal(line.values?.['orders-owed-other'], 1);
+  assert.deepEqual(line.unnamed ?? [], []);
+  assert.deepEqual(line.refusals ?? [], []);
+  /* EVERY ORDER OWED IS SAID ONCE: the one named, the others not paid at all, and the one part paid. */
+  assert.equal(1 + 2 + 1, tile(k, 'Owed to you')?.length);
   sql.close();
 });
 

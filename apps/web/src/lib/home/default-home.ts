@@ -175,7 +175,11 @@ export function weekOf(decls: readonly WeekDecl[], people: string | null): Week 
   return { due: { register: due.id, name: due.name, one: due.one, day: day.id, who: who.id, what: due.title, open, paid: paid?.id ?? null } };
 }
 
-/** What falls due from today through the week and is not done. Not the late ones: the shop's own figure counts those apart (shop 1.1.0). */
+/**
+ * What falls due from today through the seven days after and is not done: the days the shop's own figure counts
+ * (`orders-due-7d`, shop 1.1.0), so the tile and the Orders page say one number. NEVER THE LATE ONES: those are Late's,
+ * and the line's own clause (`weekLate`).
+ */
 const dueWhere = (w: Week): string => `${w.due.open ? `${w.due.open}, ` : ''}${w.due.day} after -1d, ${w.due.day} before +8d`;
 
 /* ── the week's money ──────────────────────────────────────────────────── */
@@ -194,7 +198,13 @@ export const OWED = 'owed-to-you';
 
 /** The money tile's own words, Home's and no other screen's. */
 export const MONEY_WEEK = 'Money this week';
-export const IN = 'In';
+/**
+ * EACH FIGURE OF WHAT CAME IN BY ITS OWN NAME, never two cells both reading "In": what was marked paid, and what the
+ * ledger says came in. A payment kept as a paid invoice and then met again in the bank's text is counted by one of the
+ * two (`WEEK_IN`); two names say that the two cells are two different things, where "In EGP 900, In EGP 900" read as
+ * the same money twice.
+ */
+export const WEEK_IN_SAID: Record<(typeof WEEK_IN)[number], string> = { 'settled-in-7d': 'Paid', 'received-7d': 'Came in' };
 export const OWED_TO_YOU = 'Owed to you';
 
 /** Any figure at all: a `when:` that asks only that the record has the figure (`home-arrange.ts` `whileHeld`). */
@@ -203,13 +213,13 @@ const ANY = -Number.MAX_SAFE_INTEGER;
 /**
  * THE WEEK'S MONEY TILE, drawn only where the record has Money's week figures: a record on an older Money, or with none,
  * reads no tile rather than three that cannot be read. A cell that reads nothing is left out by Home (`weekMoneyDrawn`),
- * so a week with nothing paid never says "In 0".
+ * so a week with nothing paid never says "Paid 0".
  */
 export const weekMoney = (): PageBlock => ({
   kind: 'stat',
   heading: MONEY_WEEK,
   icon: 'wallet',
-  cells: [...WEEK_IN.map((metric) => ({ metric, label: IN })), { metric: OWED, label: OWED_TO_YOU }],
+  cells: [...WEEK_IN.map((metric) => ({ metric, label: WEEK_IN_SAID[metric] })), { metric: OWED, label: OWED_TO_YOU }],
   when: { metric: WEEK_IN[0], gte: ANY },
 });
 
@@ -625,7 +635,8 @@ export function homeDrawn(
   for (const [n, b] of out.entries())
     if (b.drawn && !says(b) && isDue(b) && b.kind === 'timeline' && aligned(b) && !(b as WithRows).homeRows)
       out[n] = { ...b, homeRows: { kind: 'days', days: dayGroups(b, today) } } as WithRows;
-  const house = sentenceFrom(shaped, today, waits ?? null);
+  /* THE WEEK'S LATE ONES ARE THE WEEK'S TO SAY, by their own name: the house line counts what is late without them. */
+  const house = sentenceFrom(week ? shaped.map((b) => lessWeekLate(b, week, today)) : shaped, today, waits ?? null);
   return { blocks: out, lead, capture, sentence: week ? weekSentence(shaped, today, week, house) : house, slash };
 }
 
@@ -677,7 +688,7 @@ const spokenOf = (value: string): string => andOf(value.split(/\s*·\s*/u).map((
 
 /**
  * THE WEEK'S MONEY TILE AS HOME DRAWS IT: a cell that reads nought is left out, so a week with nothing paid never says
- * "In 0" and nothing owed is not a figure, and a tile left with none is not drawn. Every other figure is as it came.
+ * "Paid 0" and nothing owed is not a figure, and a tile left with none is not drawn. Every other figure is as it came.
  */
 function weekMoneyDrawn(b: LiveBlock): LiveBlock {
   const metrics = (b.metrics ?? []).filter((m) => !(([...WEEK_IN, OWED] as string[]).includes(m.id) && nought(m.value)));
@@ -686,17 +697,23 @@ function weekMoneyDrawn(b: LiveBlock): LiveBlock {
 }
 
 /**
- * WHAT CAME IN, AS THE LINE SAYS IT, read off the tile so the two cannot disagree. One In figure is said by who paid
+ * WHAT CAME IN, AS THE LINE SAYS IT, read off the tile so the two cannot disagree. One figure is said by who paid
  * where exactly one entry due this week was paid that very amount ("Nadia paid EGP 900."), else as the amount
- * ("EGP 900 came in this week."). Both halves are said side by side, never added: they are two figures.
+ * ("EGP 900 came in this week."). Both are said side by side, each by the tile's own name for it and never added
+ * ("EGP 900 was paid, and EGP 150 came in this week."): they are two figures, and two amounts under one verb read
+ * as the same money twice.
  */
 function weekInSaid(blocks: readonly LiveBlock[], due: LiveBlock | undefined, w: Week): string | null {
   const tile = blocks.find((b) => b.drawn && !says(b) && isWeekMoney(b));
   const came = (tile?.metrics ?? []).filter((m) => (WEEK_IN as readonly string[]).includes(m.id) && !nought(m.value) && m.value !== MISSING);
   if (came.length === 0) return null;
-  const said = andOf(came.map((m) => spokenOf(m.value)));
+  if (came.length === 2) {
+    const [settled, received] = WEEK_IN.map((id) => came.find((m) => m.id === id)!.value);
+    return `${spokenOf(settled!)} ${settled!.includes('·') ? 'were' : 'was'} paid, and ${spokenOf(received!)} came in this week.`;
+  }
+  const said = spokenOf(came[0]!.value);
   const paid = w.due.paid;
-  if (came.length === 1 && paid !== null && due && aligned(due)) {
+  if (paid !== null && due && aligned(due)) {
     const at = due.entries.flatMap((e, n) => {
       const p = (e.fields as Record<string, unknown>)[paid];
       return isMoney(p) && money(p.amount, p.currency) === came[0]!.value ? [n] : [];
@@ -709,10 +726,30 @@ function weekInSaid(blocks: readonly LiveBlock[], due: LiveBlock | undefined, w:
 }
 
 /**
- * THE WEEK'S LINE, counted from what the two blocks drew: "One order is due Friday. Nadia paid EGP 900." What is late
- * leads, in red with its word. What came in is read off the money tile (`weekInSaid`): by who paid where that is plain,
- * else as the amounts, side by side, never added. Something else waiting (a question) is still said after it, as the
- * house line says it. With nothing due and nothing in, the house line stands.
+ * THE WEEK'S LIST'S LATE ONES, WHERE LATE DREW THEM: the places in a block over what fell due of the entries that are
+ * the week's list's and past their day. The tile counts from today (`dueWhere`), so an order past its day is in Late and
+ * nowhere else, named there by its list and number.
+ */
+function weekLate(b: LiveBlock, w: Week, today: string): number[] {
+  if (!b.drawn || says(b) || !isDue(b) || !aligned(b)) return [];
+  return where(b, (f) => typeof f.row === 'string' && f.row.startsWith(`${w.due.register}#`) && (dueDay(f) ?? today) < today);
+}
+
+/** A block over what fell due without the week's late ones, for the house line to count: the week's line says those. */
+function lessWeekLate(b: LiveBlock, w: Week, today: string): LiveBlock {
+  const mine = weekLate(b, w, today);
+  if (mine.length === 0) return b;
+  return pick(b, b.entries.flatMap((_, n) => (mine.includes(n) ? [] : [n])), undefined, b.total - mine.length);
+}
+
+/**
+ * THE WEEK'S LINE, counted from what the blocks drew: "One order is due Friday. Nadia paid EGP 900." What is late
+ * leads, in red with its word, AND IS ITS OWN COUNT: "One order is late. Two more are due this week, the first today."
+ * The late ones are read off Late (`weekLate`) and the rest off the tile, which starts today, so the tile's number is
+ * the one the list's own page says and the two never differ by what is late. What came in is read off the money tile
+ * (`weekInSaid`): by who paid where that is plain, else as the amounts, side by side, never added. Something else
+ * waiting (a question, a bill past its day) is still said after it, as the house line says it. With nothing due,
+ * nothing late and nothing in, the house line stands.
  */
 function weekSentence(blocks: readonly LiveBlock[], today: string, w: Week, house: Sentence | null): Sentence | null {
   const parts: string[] = [];
@@ -720,17 +757,20 @@ function weekSentence(blocks: readonly LiveBlock[], today: string, w: Week, hous
   const due = blocks.find((b) => b.drawn && !says(b) && isWeekDue(b, w));
   const days = (due?.entries ?? []).map((e) => (e.fields as Record<string, unknown>)[w.due.day]).filter((d): d is string => typeof d === 'string' && DAY.test(d)).map((d) => d.slice(0, 10)).sort();
   const total = due ? Math.max(due.total, due.entries.length) : 0;
-  if (total > 0) {
+  /* A HOME KEPT FROM AN OLDER TODAY still reads the late ones into its tile: they are late there too, and not this week's. */
+  const inTile = days.filter((d) => d < today).length;
+  const late = inTile + blocks.reduce((n, b) => n + weekLate(b, w, today).length, 0);
+  const rest = total - inTile;
+  if (late > 0 || rest > 0) {
     const one = w.due.one.toLowerCase();
     const many = w.due.name.toLowerCase();
-    const late = days.filter((d) => d < today).length;
     const next = days.find((d) => d >= today);
     if (late > 0) {
       needs = late === 1 ? `One ${one} is late` : `${opening(late)} ${many} are late`;
-      const rest = total - late;
-      parts.push(`${needs}.${rest === 0 ? '' : rest === 1 ? ' One more is due this week.' : ` ${opening(rest)} more are due this week.`}`);
-    } else if (total === 1) parts.push(`One ${one} is due${next ? ` ${dueNamed(next, today)}` : ' this week'}.`);
-    else parts.push(`${opening(total)} ${many} are due this week${next ? `, the first ${dueNamed(next, today)}` : ''}.`);
+      const more = rest === 0 ? '' : rest === 1 ? ` One more is due${next ? ` ${dueNamed(next, today)}` : ' this week'}.` : ` ${opening(rest)} more are due this week${next ? `, the first ${dueNamed(next, today)}` : ''}.`;
+      parts.push(`${needs}.${more}`);
+    } else if (rest === 1) parts.push(`One ${one} is due${next ? ` ${dueNamed(next, today)}` : ' this week'}.`);
+    else parts.push(`${opening(rest)} ${many} are due this week${next ? `, the first ${dueNamed(next, today)}` : ''}.`);
   }
   const came = weekInSaid(blocks, due, w);
   if (came) parts.push(came);

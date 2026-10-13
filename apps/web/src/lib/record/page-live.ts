@@ -158,6 +158,8 @@ type Answered = {
   authored?: unknown;
   rows?: Row[];
   matched?: number;
+  /** A sum kind's whole, added up by the record over every row the block admits; read through `wholeOf`. */
+  wholeRead?: unknown;
   readings?: { metric: string; label?: unknown; reading: Reading | null; refusal?: Said; trend?: unknown; note?: unknown }[];
   scopes?: (string | null)[];
   rings?: (number | null)[];
@@ -380,6 +382,90 @@ function partName(g: { key: string; label?: unknown }, target: string | null, re
 
 /** A string the record did not have to check, or nothing. */
 const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
+
+/**
+ * ONE LINE OF A WHOLE: a label as the list stores it, what every row under it adds to, the currency when that is
+ * money, and for a heat set against another whole (`of:`) that day's whole.
+ */
+type WholeLine = { label: string | number | boolean | null; value: number; currency?: string; of?: number };
+
+/**
+ * A SUM KIND'S WHOLE AS THE RECORD ANSWERS IT (`wholeRead`: `{ rows, total, of? }`), narrowed, or `null`.
+ *
+ * ALL OF IT READS OR NONE OF IT DOES. A line whose sum is not a number, or whose currency is not a word, is not left
+ * out and the rest drawn: the bars would add to less than the list and nothing on screen would say so.
+ */
+function wholeOf(v: unknown): WholeLine[] | null {
+  const rows = v !== null && typeof v === 'object' ? (v as { rows?: unknown }).rows : undefined;
+  if (!Array.isArray(rows)) return null;
+  /* AND THE LABELS PAST THE KERNEL'S CAP ARE PART OF THE WHOLE (`rest`, `WHOLE_PARTS` in `kernel/src/pages.ts`): two
+     hundred labels drawn and the smallest hundred left out add to less than the list with nothing saying so, so a
+     whole that holds a `rest` is not drawn from its lines at all (audit 53, finding 4). */
+  const past = (v as { rest?: unknown }).rest;
+  if (past !== undefined && past !== null) return null;
+  const lines: WholeLine[] = [];
+  for (const r of rows) {
+    if (r === null || typeof r !== 'object') return null;
+    const { label = null, value, currency: named, unit, parts, of } = r as Record<string, unknown>;
+    if (label !== null && typeof label !== 'string' && typeof label !== 'number' && typeof label !== 'boolean') return null;
+    if (of !== undefined && of !== null && !(typeof of === 'number' && Number.isFinite(of) && of >= 0)) return null;
+    /* THE KERNEL NAMES THE CURRENCY `unit`, and a label in currencies it could not add answers `parts`, one amount a currency. */
+    const currency = named ?? (typeof unit === 'string' && /^[A-Z]{3}$/.test(unit) ? unit : undefined);
+    if (currency !== undefined && currency !== null && typeof currency !== 'string') return null;
+    const at = typeof of === 'number' ? { of } : {};
+    if (value === null && Array.isArray(parts) && parts.length > 0) {
+      for (const p of parts) {
+        const { amount, currency: c } = (p ?? {}) as Record<string, unknown>;
+        if (typeof amount !== 'number' || !Number.isFinite(amount) || typeof c !== 'string') return null;
+        lines.push({ label, value: amount, currency: c, ...at });
+      }
+      continue;
+    }
+    if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+    lines.push({ label, value, ...(typeof currency === 'string' ? { currency } : {}), ...at });
+  }
+  return lines;
+}
+
+/** The column a heat's share is written in when the block declares only its day: no list's field, so it is said as written. */
+const WHOLE_SHARE = 'share of whole';
+
+/** How many rows a counted whole is laid out as at most; past it the block says it cannot be drawn. */
+const WHOLE_COUNTED_MOST = 250_000;
+
+/**
+ * THE WHOLE'S LINES AS ROWS THE BLOCK'S OWN DRAWER ADDS UP, or `null` where they cannot stand in for the rows.
+ *
+ * A LINE IS A ROW HOLDING THE TWO COLUMNS THE BLOCK DECLARES, its label and its sum, so the drawer that groups and
+ * adds the rows (`blocks.ts`) adds one row a label and arrives at the record's own figure. Money keeps its currency,
+ * and a label in two currencies is two lines, which the drawer already refuses to add together.
+ * A BLOCK THAT COUNTS (chips, or one with no second column) IS HANDED ITS COUNT AS THAT MANY ROWS, the one row
+ * repeated, because its drawer counts rows and a line counted once would say every label holds one.
+ * A HEAT'S SHARE IS WRITTEN IN ITS VALUE, `3 of 12`, which is how the renderer reads a day set against its whole
+ * (`render/src/heat.ts`), in the block's second column or, where it declares only its day, in `WHOLE_SHARE`.
+ * A LINE IS NO ROW OF THE LIST, so it carries no number: nothing drawn from it opens a row (`withRefs`).
+ * A THIRD COLUMN IS NOT IN THE LINES: a progress drawn against each row's target has no target to read here.
+ */
+function wholeRows(kind: string, columns: readonly { field?: unknown }[], lines: readonly WholeLine[]): Row[] | null {
+  const [by, of] = columns.map((c) => (typeof c.field === 'string' ? c.field : ''));
+  if (!by || columns.length > 2) return null;
+  const shares = kind === 'heat' && lines.some((l) => l.of !== undefined);
+  const counts = kind === 'chips' || (!of && !shares);
+  if (shares && lines.some((l) => l.of === undefined)) return null;
+  const rows: Row[] = [];
+  for (const l of lines) {
+    const row = (fields: Record<string, unknown>): Row => ({ id: '', seq: null, fields, version: 0, created_at: '' });
+    if (!counts) {
+      const sum = shares ? `${l.value} of ${l.of}` : l.currency ? { amount: l.value, currency: l.currency } : l.value;
+      rows.push(row({ [by]: l.label, [of || WHOLE_SHARE]: sum }));
+      continue;
+    }
+    if (!Number.isInteger(l.value) || l.value < 0 || rows.length + l.value > WHOLE_COUNTED_MOST) return null;
+    const one = row({ [by]: l.label });
+    for (let i = 0; i < l.value; i++) rows.push(one);
+  }
+  return rows;
+}
 
 /** A block's `fold:` as the app reads it: `true`, or a whole number of cards above nought. Anything else is no fold. */
 const foldOf = (v: unknown): boolean | number | undefined => (typeof v === 'boolean' || (typeof v === 'number' && Number.isInteger(v) && v > 0) ? v : undefined);
@@ -980,8 +1066,10 @@ export function blockOf(
     tone,
     fold,
     icon,
-    rows: got = [],
+    rows: sent = [],
     matched = 0,
+    /* THE WHOLE A SUM KIND ADDS UP, taken by name and narrowed by `wholeOf` below, so none rides through `rest` unread. */
+    wholeRead: summed,
     readings,
     scopes,
     /* EACH ROW'S PROJECT MARK, taken by name so it reaches the page narrowed on `scopeCells` and never raw through `rest`. */
@@ -1029,6 +1117,8 @@ export function blockOf(
     groups: groupNames,
     ...rest
   } = b;
+  /* THE ROWS THE BLOCK IS DRAWN FROM: the ones sent, or for a sum kind short of its match the whole's lines (below). */
+  let got = sent;
 
   /* NARROWED ONCE, HERE, because the record does not check any of these and the app's type says it
      does. A key that is not what it claims to be is left off the block rather than put on it: the
@@ -1375,13 +1465,26 @@ export function blockOf(
       return { ...shell, register, measures, ...(latest.length > 0 ? { readOnce: latest } : {}), shown: drawn, total: drawn };
     }
   }
-  /* A SUM OVER THE FIRST PAGE IS A WRONG NUMBER, so a kind that adds up draws only the whole answer.
-     THE KERNEL REFUSES THIS NOW, at `packages/kernel/src/pages.ts`, and a refused block returned
-     above with the record's own sentence rather than this line, so on a current record the guard
-     below will not fire. It is kept because the record is a different deployment from this app: a
-     record on an older kernel still answers 200 rows of 301 with an empty `refusals`, which is the
-     case this guard was written for and the one it is still the only protection against. */
-  if (SUMS.has(kind) && got.length < matched) return cannot;
+  /* A SUM OVER THE FIRST PAGE IS A WRONG NUMBER, so a kind that adds up draws only the whole answer, AND THE RECORD
+     SENDS THE WHOLE NOW: `wholeRead`, one line a label with what every row under it adds to (`wholeRows`). His Ledger
+     holds 217 rows and its bar by month was refused past 200; it is drawn from those lines, so its bars add to the
+     list's own total however many rows came back beside them. The rows themselves are read while they are all there,
+     because they hold every column and the lines hold two. A heat set against another whole (`of:`) reads the lines
+     either way: only they say each day's whole.
+     A RECORD THAT SENDS NO WHOLE STILL IS NOT ADDED UP FROM A SLICE. The record is a different deployment from this
+     app, and one on an older kernel answers 200 rows of 301 with nothing beside them: that says it cannot be drawn. */
+  let columns = shell.columns;
+  if (SUMS.has(kind)) {
+    const lines = wholeOf(summed);
+    const shares = kind === 'heat' && lines !== null && lines.some((l) => l.of !== undefined);
+    if (sent.length < matched || shares) {
+      const whole = lines === null ? null : wholeRows(kind, b.columns ?? [], lines);
+      if (whole === null) return cannot;
+      got = whole;
+      /* A HEAT THAT DECLARES ONLY ITS DAY HAS NOWHERE TO SAY A SHARE, so the share is its second column here. */
+      if (shares && shell.columns.length === 1) columns = [...shell.columns, { ...shell.columns[0]!, field: WHOLE_SHARE, label: WHOLE_SHARE }];
+    }
+  }
   /* AND WHETHER THE BLOCK IS DRAWING A SLICE IS THE OTHER QUESTION, which is `REDUCES` and not
      `SUMS`: a section adds nothing up and is still never showing a page of its answer, because the
      count it draws is `total`. One variable answered both here and the section half was wrong.
@@ -1412,7 +1515,7 @@ export function blockOf(
      field, so the ring reads as a typed one does; the row itself is not changed. */
   const ring = kind === 'cards' ? b.columns?.find((c) => c.as === 'ring')?.field : undefined;
   const drawnEntries = ring && Array.isArray(rings) ? entries.map((e, n) => (typeof rings[n] === 'number' ? { ...e, fields: { ...e.fields, [ring]: rings[n] } } : e)) : entries;
-  const rows = toRows(register, drawnEntries, shell.columns, now, namesOf(refs));
+  const rows = toRows(register, drawnEntries, columns, now, namesOf(refs));
   /* WHO CHANGED EACH ROW LAST, named by the kernel on `changes`, and each money column's sign. */
   markColumns(register, b.columns, entries, rows, (_e, n) => changeOf(changed, n));
   /* WHETHER AN AGENT IS ON EACH ROW, which the record works out from the row's history and its live
@@ -1472,6 +1575,7 @@ export function blockOf(
   const open = short && typeof openSteps === 'number' && Number.isInteger(openSteps) && openSteps >= 0 ? { open: openSteps } : {};
   return {
     ...shell,
+    ...(columns === shell.columns ? {} : { columns }),
     register,
     entries,
     matched: entries,

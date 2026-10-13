@@ -1,17 +1,17 @@
 /**
  * The `Inference` port: the one seam a model call crosses, and the only one.
  *
- * NOT EXPORTED FROM THE BARREL BY THIS FILE. `src/index.ts` is being written by somebody else as
- * this lands, so the `export * from './inference.ts';` line is the caller's to add, in the same
- * commit that takes this file. Two agents editing one barrel is how a declaration gets merged twice
- * without a word, which this package has already paid for once (see `Scheduler` in `index.ts`).
+ * EXPORTED FROM THE BARREL, BY ONE LINE AT THE FOOT OF `src/index.ts`. It was not for a while: this
+ * file landed while somebody else was writing the barrel, and two agents editing one barrel is how
+ * a declaration gets merged twice without a word, which this package has already paid for once
+ * (see `Scheduler` in `index.ts`). `test/inference-barrel.test.ts` holds the line now.
  *
  * A PLAIN `export *`, NEVER `export type *`, and this paragraph said the wrong one until it was
  * tried. `export type *` is what the two neighbours want and it is why the wrong form reads
  * natural here: `auth.ts` is types only, and the barrel already takes `http.ts` as a type-only line
- * plus a separate `export { HTTP_FAULTS, httpFault }` for its two values. This file ships five
- * values of its own — `INFERENCE_CODES`, `modelMissing`, `schemaFailed`, `budgetSpent` and
- * `isInferenceRefusal` — and `export type *` erases every one of them. Measured
+ * plus a separate `export { HTTP_FAULTS, httpFault }` for its two values. This file ships six
+ * values of its own (`INFERENCE_CODES`, `modelMissing`, `schemaFailed`, `budgetSpent`,
+ * `isInferenceRefusal` and `inferenceDetail`) and `export type *` erases every one of them. Measured
  * against a copy of this package's `src/` with that exact line appended: `tsc` answers TS1362,
  * *"'modelMissing' cannot be used as a value because it was exported using 'export type'"*, three
  * times, and Node answers `SyntaxError: The requested module './index.ts' does not provide an
@@ -214,7 +214,7 @@ export type InferenceCode = (typeof INFERENCE_CODES)[number];
  *
  * The type is what stops the drift a constant was going to prevent: a fourth code does not compile.
  */
-const refuse = <T>(code: InferenceCode, fix: string, at: string): Result<T> => no<T>(code, fix, { at });
+const refuse = <T>(code: InferenceCode, fix: string, at: string, more: Carried = {}): Result<T> => no<T>(code, fix, { at, ...more });
 
 /**
  * The ways a model can fail to be there, as a closed list.
@@ -227,17 +227,55 @@ const refuse = <T>(code: InferenceCode, fix: string, at: string): Result<T> => n
 export type Missing = 'no adapter on this host' | 'the provider did not answer' | 'the provider does not serve it';
 
 /**
+ * What a refusal of this port says to the code that decides what to try next.
+ *
+ * FOR A ROUTER, NOT FOR A PERSON. A host that tries its models in order has to tell "not served"
+ * (mark it down and move on) from "no answer" (count it and move on), and it has to know which of
+ * its candidates said so. Reading that back out of `fix` would make a sentence into an interface,
+ * and the first edit to the sentence would change what the router does.
+ *
+ * `why` is the closed vocabulary above. `raw` is the provider's own words, already scrubbed and cut
+ * by the adapter that caught them, for the operator's log alone. `candidate` is the router's own
+ * name for what it asked, which may be more than the model: one model behind two providers is two
+ * candidates.
+ *
+ * ALL THREE ARE OPTIONAL AND ABSENT RATHER THAN EMPTY, so a refusal raised before any of this
+ * existed reads as `{}` and not as three blanks somebody has to test for.
+ */
+export type InferenceDetail = { why?: Missing; raw?: string; candidate?: string };
+
+/**
+ * How those three ride a `Refusal`, which this file may not widen.
+ *
+ * `Refusal` IS NOT CHANGED, AND `detail` KEEPS ITS NAME AND ITS MEANING. `raw` travels as `detail`,
+ * the field `index.ts` already has for *"the technical reason, kept apart from `fix`"* and the one
+ * the Worker's adapter already writes the provider's words to, so nothing that reads a refusal
+ * today reads a different thing tomorrow and there is still exactly one place those words sit.
+ * `why` and `candidate` ride beside it as two more optional fields, on the refusals this file
+ * builds and on no other: widening `Refusal` for them would widen it for every refusal in the tree.
+ *
+ * Read them back with `inferenceDetail`, never by reaching for the fields.
+ */
+type Carried = { why?: Missing; candidate?: string; detail?: string };
+
+const carried = (why: Missing | null, raw: string, candidate: string): Carried => ({
+  ...(why === null ? {} : { why }),
+  ...(raw === '' ? {} : { detail: raw }),
+  ...(candidate === '' ? {} : { candidate }),
+});
+
+/**
  * No model answered for this call.
  *
- * `why` rides the sentence rather than a field because `Refusal` has no room for one: its shape is
- * `code`, `fix`, `at`, `allowed` and `retry_after`, and widening it for this would widen it for
- * every refusal in the tree.
+ * `why` RIDES THE SENTENCE AND THE REFUSAL BOTH: the sentence for whoever reads it, the field for
+ * the router (`InferenceDetail`). `raw` never reaches the sentence, because the sentence is shown.
  */
-export const modelMissing = <T>(model: string, why: Missing): Result<T> =>
+export const modelMissing = <T>(model: string, why: Missing, raw = '', candidate = ''): Result<T> =>
   refuse<T>(
     'NOT_IN_THIS_BUILD',
     `No model answered for '${model}': ${why}. The repair is a deploy of a host that serves it, not an edit.`,
     'model',
+    carried(why, raw, candidate),
   );
 
 /**
@@ -247,11 +285,12 @@ export const modelMissing = <T>(model: string, why: Missing): Result<T> =>
  * digest: a retry bills twice for one payload, so the job ends here. A fix line reading "try again"
  * would invite the second bill from whoever is holding the failure.
  */
-export const schemaFailed = <T>(model: string, why: string): Result<T> =>
+export const schemaFailed = <T>(model: string, why: string, candidate = ''): Result<T> =>
   refuse<T>(
     'PROPOSAL_SCHEMA',
     `The answer from '${model}' is not the JSON this call pinned: ${why}. It is not filed and not retried, because a second call bills twice for one payload.`,
     'schema',
+    carried(null, '', candidate),
   );
 
 /**
@@ -261,11 +300,12 @@ export const schemaFailed = <T>(model: string, why: string): Result<T> =>
  * reader has to see how far over the call was to choose between raising the ceiling and sending
  * fewer rows, and the two repairs are not interchangeable.
  */
-export const budgetSpent = <T>(neurons: number, cap: number): Result<T> =>
+export const budgetSpent = <T>(neurons: number, cap: number, candidate = ''): Result<T> =>
   refuse<T>(
     'SLASH_BUDGET_SPENT',
     `This call would spend about ${neurons} neurons and its ceiling is ${cap}. Raise the ceiling for this job, or send fewer rows.`,
     'budget',
+    carried(null, '', candidate),
   );
 
 /**
@@ -278,3 +318,27 @@ export const budgetSpent = <T>(neurons: number, cap: number): Result<T> =>
  */
 export const isInferenceRefusal = (r: Refusal): boolean =>
   (INFERENCE_CODES as readonly string[]).includes(r.code);
+
+const MISSING: readonly string[] = ['no adapter on this host', 'the provider did not answer', 'the provider does not serve it'] satisfies readonly Missing[];
+
+/**
+ * What a refusal carries for a router: `why`, `raw` and `candidate`, each only where it was said.
+ *
+ * A REFUSAL NO MODEL CALL COULD HAVE RAISED READS AS `{}`, whatever its `detail` holds, because
+ * `detail` is every refusal's field and only on one of this port's three codes is it a provider's
+ * words. The limit of that is `isInferenceRefusal`'s own: two of the three codes are raised
+ * elsewhere too, so a caller reads this off the answer of a model call and not off any refusal it
+ * happens to hold.
+ *
+ * EVERY FIELD IS CHECKED RATHER THAN CAST. A refusal reaches a router across an RPC boundary, and
+ * a `why` that is not one of the three is dropped rather than handed on as if it were.
+ */
+export const inferenceDetail = (r: Refusal): InferenceDetail => {
+  if (!isInferenceRefusal(r)) return {};
+  const { why, candidate } = r as Refusal & { why?: unknown; candidate?: unknown };
+  return {
+    ...(typeof why === 'string' && MISSING.includes(why) ? { why: why as Missing } : {}),
+    ...(typeof r.detail === 'string' && r.detail !== '' ? { raw: r.detail } : {}),
+    ...(typeof candidate === 'string' && candidate !== '' ? { candidate } : {}),
+  };
+};

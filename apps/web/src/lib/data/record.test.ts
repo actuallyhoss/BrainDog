@@ -48,7 +48,7 @@ registerHooks({
 
 /* AFTER THE HOOK, AND THAT IS WHY IT IS DYNAMIC. A static import is evaluated before this file's body
    runs, so the module would load before the hook that makes it loadable was registered. */
-const { countsOf, open, read } = await import('./record.ts');
+const { countsOf, open, read, tally } = await import('./record.ts');
 const screen = await import('../ui/screen.svelte.ts');
 
 const BASE = 'http://record.test';
@@ -497,6 +497,24 @@ test('any other refusal is the record’s answer about the question, and is not 
   const out = await countsOf(no, async () => ((singly += 1), { ok: true, value: 1 }), 'obligations', undefined, 'state', STATES);
   assert.equal(refused(out, 'the counts').code, 'FORBIDDEN');
   assert.equal(singly, 0);
+});
+
+test('A REFUSED COUNT IS NOT A COUNT OF NOUGHT: the screen is handed no numbers for that field, and the refusal to say why', async () => {
+  const no: Counter = async () => ({ ok: false, refusal: { code: 'FORBIDDEN', fix: 'You cannot read this list.' } });
+  const one = async (): Promise<Said<number>> => ({ ok: true, value: 1 });
+  const refusedOne = await countsOf(no, one, 'obligations', undefined, 'state', STATES);
+  /* A FIELD NOTHING HOLDS, counted whole: four noughts, each of them the record's word. */
+  const empty = await countsOf(async () => counted([]), one, 'obligations', undefined, 'direction', ['owed_to_me', 'i_owe']);
+
+  const out = tally([['state', refusedOne], ['direction', empty]]);
+  assert.equal(out.counts.has('state'), false, 'a refused field was handed to the pills, which print 0 for it');
+  assert.equal(out.withheld?.code, 'FORBIDDEN');
+  assert.deepEqual([...(out.counts.get('direction') ?? [])], [['owed_to_me', 0], ['i_owe', 0]]);
+
+  /* AND A LIST COUNTED WHOLE WITHHOLDS NOTHING, so its noughts are drawn with no line under them. */
+  const whole = tally([['direction', empty]]);
+  assert.equal(whole.withheld, null);
+  assert.equal(whole.counts.size, 1);
 });
 
 /** The host of this file, with `countBy` beside it. */

@@ -1,0 +1,8 @@
+{
+  "gate": "core-names",
+  "rule": "a real leak beside a word the kernel declares and a class name",
+  "expect": "spelled in the core",
+  "findings": 2,
+  "total": 2,
+  "why": "TWO, both in `seeded-leak.ts`: `list === 'tasks'`, a list no kernel word excuses, and `db.register.lines`, a kernel word that is still a list where it is addressed. The decoys are what the gate learnt to leave: `kind === 'lines'` in `decoy.ts`, the block kind this tree's own `packages/kernel/src/declare.ts` declares in `BLOCK_KINDS`, and in `Decoy.svelte` a class, an id, a role and a style rule that happen to be called `tasks`. A gate that excused every string once it knew one kernel word, or every attribute of a page, would pass this tree."
+}

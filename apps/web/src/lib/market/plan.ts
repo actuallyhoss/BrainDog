@@ -15,6 +15,8 @@
  * PURE AND NODE-LOADABLE, so a test can read a plan without a browser: relative `.ts` imports only.
  */
 
+import { doesOf } from '@braindog/kernel';
+
 import { callLine, callsOutOf, type CallOut } from '../record/actions.ts';
 
 type Body = Record<string, unknown>;
@@ -106,7 +108,11 @@ export type SectionKey =
 
 export type Section = { key: SectionKey; title: string; rows: Row[] };
 
-/** One calls-out line, the record's own sentence where it wrote one, and whether it is new to this record. */
+/**
+ * One calls-out line and whether it is new to this record. A call the install would arm is said as the kernel says it on
+ * Decide (`doesOf`, kind `install`): "Sends your key 'stripe' to api.stripe.com every hour." One the record already runs
+ * unchanged keeps the record's own line, since `doesOf` leaves it out.
+ */
 export type Call = { line: string; note: string | null; change: 'new' | 'changed' | 'same' };
 
 /** One pack's part of the plan. A single add-on is one part; a use case is one part per pack, in the order they go in. */
@@ -208,7 +214,7 @@ function diffPart(d: Body, name: (id: string) => string): { part: Part; stops: s
       ...section('worth', words.worth, worth),
     ],
     calls: list(d.calls_out).map((c) => ({
-      line: text(c.line) || callsOutOf([c]).map(callLine)[0] || text(c.ingest),
+      line: doesOf('install', { calls_out: [c] }) || text(c.line) || callsOutOf([c]).map(callLine)[0] || text(c.ingest),
       note: typeof c.key_line === 'string' && c.key_line !== '' ? c.key_line : null,
       change: c.change === 'changed' ? 'changed' : c.change === 'same' ? 'same' : 'new',
     })),
@@ -239,7 +245,11 @@ function sharedParts(plan: Body, name: (id: string) => string): { parts: Part[];
         ...section('moves', words.moves, list(p.hands).map((h) => row(text(h.name), words.movesTo(text(h.to))))),
         ...section('examples', words.examples, examples === 0 ? [] : [row(words.examplesLine(examples))]),
       ],
-      calls: (Array.isArray(p.calls) ? (p.calls as CallOut[]) : []).map((c) => ({ line: callLine(c), note: c.note ?? null, change: 'new' as const })),
+      calls: (Array.isArray(p.calls) ? (p.calls as CallOut[]) : []).map((c) => ({
+        line: doesOf('install', { calls_out: [{ host: c.host, every: c.every, key: c.key, trigger: c.trigger ?? 'schedule', per_day: c.perDay ?? null }] }) || callLine(c),
+        note: c.note ?? null,
+        change: 'new' as const,
+      })),
     };
   });
   return { parts: [...turnsOn, ...parts], stops };

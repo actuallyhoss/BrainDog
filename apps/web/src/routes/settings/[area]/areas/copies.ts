@@ -73,7 +73,7 @@ export function exportLine(facts: CopyFacts, now: number): string {
 }
 
 /**
- * THIS HOST'S LAST RESTORE TEST (LCH-C04 job 4), from `GET /account/drill`: `{ at, pass, records }`, or `{ at: null }`
+ * THIS HOST'S LAST RESTORE TEST (LCH-C04 job 4), from `GET /account/drill`: `{ at, pass, record_copies, directory_only }`, or `{ at: null }`
  * before the first. A FACT ABOUT THE HOST AND NOT THE RECORD (the scope's critic): only the operator holds the key that
  * opens the copies, so every record on the host reads the same line, and nothing here is drawn for one record alone.
  */
@@ -89,10 +89,13 @@ export function drillOf(value: unknown): DrillFacts | null {
   if (v.at === null) return { at: null };
   const at = instant(v.at);
   if (at === null || typeof v.pass !== 'boolean') return null;
-  const counted = typeof v.records === 'number' && Number.isInteger(v.records) && v.records >= 0;
+  /* THE DOOR SAYS `record_copies` (drill-note-53-54): the records whose copy the drill opened. `records` is read where
+     that is absent, for a host still on the build before the name moved; the two never mean different things here. */
+  const said = v.record_copies ?? v.records;
+  const counted = typeof said === 'number' && Number.isInteger(said) && said >= 0;
   // A pass with no count is not the door's shape: zero now reads "no record's copy was tried", which nobody said.
   if (v.pass && !counted) return null;
-  return { at, pass: v.pass, records: counted ? (v.records as number) : 0 };
+  return { at, pass: v.pass, records: counted ? (said as number) : 0 };
 }
 
 /**

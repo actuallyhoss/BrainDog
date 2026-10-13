@@ -656,14 +656,19 @@ export function leadOf(template: string, read: (path: string) => string | null |
     const v = read(path);
     return v === UNNAMED ? '' : (v ?? null);
   };
-  const kept = template.split(/,\s+/u).filter((clause) => {
+  const stands = (clause: string): boolean => {
     const holes = [...clause.matchAll(HOLE)].map((m) => m[1]!);
     if (holes.length === 0) return true;
     if (holes.some((h) => read(h) === UNNAMED)) return true;
     const figures = holes.map((h) => said(h));
     if (figures.some((f) => f === null)) return false;
     return figures.some((f) => f !== null && !nought(f));
-  });
+  };
+  /* A CLAUSE THAT OPENS ON "with" LEANS ON THE ONE BEFORE IT, and goes when that one goes: "and Salma still owes EGP
+     1,350, with 2 more orders not paid at all" read ", with 2 more orders not paid at all" after nobody, one order
+     short, for a reader who may see Orders and not People (shop-owed-53-54's checker). */
+  let before = true;
+  const kept = template.split(/,\s+/u).filter((clause) => (before = stands(clause) && (before || !/^with\b/iu.test(clause))));
   const one = (count: string): boolean => count.trim() === '1';
   return kept
     .join(', ')

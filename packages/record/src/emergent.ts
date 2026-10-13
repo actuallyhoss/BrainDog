@@ -294,27 +294,27 @@ export function penRanked(deps: PenDeps): PenItem[] {
   return rank(deps, one).slice(0, PEN_MOST);
 }
 
-/** How far back "looking at it" reaches, in days: today and the day before, since a day here is a UTC day and a person's evening crosses it. */
-const LOOKING_DAYS = 2;
+/** How far back "opened lately" looks, in days: a week, counted from today, so a Monday does not forget a Sunday. */
+const OPENED_DAYS = 7;
 
 /**
  * The holding pen `boot` answers: the best `PEN_SHOWN` of `penRanked`, one a list, and after them the offer of every
- * list the person opened in the last day, in the same rank. The rest wait their turn.
+ * list the person opened in the last `OPENED_DAYS` days, in the same rank. The rest wait their turn.
  *
  * WHY THE OPENED ONES ARE NOT CUT (batch 52, finding 4): Slash yields every list `penRanked` holds, shown or waiting
  * (`pageSpokenFor`), so a list ranked fourth had its page asked for nowhere: not on Decide, and not on its own screen
  * while the person stood on it. What Slash leaves to the pen for a list the person has open, the pen now shows. The
  * most this adds is what `penRanked` holds, `PEN_MOST`, and with no `use` it adds nothing.
+ *
+ * ONE WINDOW FOR SHOWN AND RANKED (batch 53, finding 3): "opened" is `OPENED_DAYS` here as it is in `rank`. It was two
+ * days here, so a list opened three to seven days ago ranked as opened, was yielded by Slash, and was shown nowhere.
  */
 export function penFor(deps: PenDeps): PenItem[] {
   const ranked = penRanked(deps);
   if (!deps.use || ranked.length <= PEN_SHOWN) return ranked.slice(0, PEN_SHOWN);
-  const looking = openedSince(deps, ranked.slice(PEN_SHOWN).map((i) => i.register), LOOKING_DAYS);
+  const looking = openedSince(deps, ranked.slice(PEN_SHOWN).map((i) => i.register), OPENED_DAYS);
   return ranked.filter((item, at) => at < PEN_SHOWN || looking.has(item.register));
 }
-
-/** How far back "opened lately" looks, in days: a week, counted from today, so a Monday does not forget a Sunday. */
-const OPENED_DAYS = 7;
 
 /**
  * Which of `lists` the record's people opened in the last `days` days, today among them.
@@ -712,14 +712,21 @@ const mondayOf = (day: string): string => {
  * clock, so a page kept today still reads this week next month. `where` has no word for the end of a week, so late in
  * a week the page reaches a few days into the next.
  */
-const thisWeek = (field: string): Json => ({ all: [{ field, gte: 'bow' }, { field, lt: '+7d' }] });
+const thisWeek = (field: string, unfinished: Json | null = null): Json => ({
+  all: [{ field, gte: 'bow' }, { field, lt: '+7d' }, ...(unfinished ? [unfinished] : [])],
+});
 /**
  * This week on `field` exactly, Monday to Sunday of `today`, which is what the offer counts and says. Counted with the
  * page's own words, a Sunday's "4 due this week" was four due in the week after it.
+ *
+ * `unfinished` NARROWS BOTH TO WHAT IS STILL TO DO (batch 53, finding 1): on a Thursday "4 due this week" counted the
+ * orders sent on Monday, beside a line on the same screen that did not. A finished entry is not due.
  */
-const weekOf = (field: string, today: string): Json => {
+const weekOf = (field: string, today: string, unfinished: Json | null = null): Json => {
   const monday = mondayOf(today);
-  return { all: [{ field, gte: monday }, { field, lte: dayOf(Date.parse(`${monday}T12:00:00Z`) + 6 * DAY_MS) }] };
+  return {
+    all: [{ field, gte: monday }, { field, lte: dayOf(Date.parse(`${monday}T12:00:00Z`) + 6 * DAY_MS) }, ...(unfinished ? [unfinished] : [])],
+  };
 };
 
 /**
@@ -746,9 +753,40 @@ function weeksRead(sql: Sql, list: string, slugs: readonly string[], since: stri
   return new Set(days.map((d) => mondayOf(d.day))).size;
 }
 
-/** Whether `page` already reads `list` by the week: a calendar of it, a figure or a chart of it by week, or this week. */
-const byWeek = (page: HeldPage, list: string): boolean =>
-  page.blocks.some((b) => listOf(b) === list && (b.kind === 'calendar' || b.bucket === 'week' || JSON.stringify(b.where ?? null).includes('"bow"')));
+/** The furthest ahead a "before +N" clause reaches and is still a week's reading: a fortnight. Past it is the month's. */
+const AHEAD_DAYS_MOST = 14;
+const aheadDays = (n: string, unit: string): number => Number(n) * (unit.toLowerCase() === 'w' ? 7 : 1);
+/** `<day> before +Nd`, as a page's sentence writes it (`where/src/sentence.ts`), with an `is` or without. */
+const AHEAD_SAID = /(?:^|[\s,])([\p{L}\p{N}_]+)\s+(?:is\s+)?before\s+\+(\d{1,4})([dw])(?=[\s,]|$)/giu;
+const AHEAD_WORD = /^\+(\d{1,4})([dw])$/iu;
+
+/**
+ * Whether `where` holds one of `days` to the days just ahead: `due before +8d` in a sentence, or `{field, lt: '+7d'}`
+ * in a tree, at any depth. That is a page reading the list by the week in other words (batch 53, finding 1): the shop's
+ * Due this week says no `bow`, so a shop that had the table was offered a page of the same table.
+ */
+function daysAhead(where: Json | undefined, days: ReadonlySet<string>): boolean {
+  if (typeof where === 'string') {
+    return [...where.matchAll(AHEAD_SAID)].some((m) => days.has(m[1]!) && aheadDays(m[2]!, m[3]!) <= AHEAD_DAYS_MOST);
+  }
+  if (Array.isArray(where)) return where.some((w) => daysAhead(w, days));
+  if (where === null || typeof where !== 'object') return false;
+  const word = [where.lt, where.lte].find((w): w is string => typeof w === 'string');
+  const m = word === undefined ? null : AHEAD_WORD.exec(word);
+  if (m && typeof where.field === 'string' && days.has(where.field) && aheadDays(m[1]!, m[2]!) <= AHEAD_DAYS_MOST) return true;
+  return Object.values(where).some((w) => daysAhead(w, days));
+}
+
+/**
+ * Whether `page` already reads `list` by the week: a calendar of it, a figure or a chart of it by week, this week, or
+ * the days just ahead on one of the list's `days`.
+ */
+const byWeek = (page: HeldPage, list: string, days: ReadonlySet<string>): boolean =>
+  page.blocks.some(
+    (b) =>
+      listOf(b) === list &&
+      (b.kind === 'calendar' || b.bucket === 'week' || JSON.stringify(b.where ?? null).includes('"bow"') || daysAhead(b.where, days)),
+  );
 
 /**
  * What is running low beside `list`: the first other list its pack installed that holds things on hand, its fewest
@@ -818,21 +856,24 @@ function weeksOffered(deps: PenDeps): PenItem[] {
       days.find((f) => f.deadline === true) ?? days.find((f) => (f as { index?: boolean }).index === true || f.unique === true) ?? days[0];
     const shown = live.filter((f) => !NOT_A_COLUMN.has(f.type)).slice(0, PEN_COLUMNS_MOST);
     const slug = [`${id}-week`, `${id}-this-week`].find((s) => !taken.has(s));
-    if (!day || shown.length === 0 || slug === undefined || held.some((p) => byWeek(p, id))) continue;
+    if (!day || shown.length === 0 || slug === undefined || held.some((p) => byWeek(p, id, new Set(days.map((f) => f.id))))) continue;
 
-    const got = kernel.list({ register: id, where: weekOf(day.id, dayOf(use.nowMs)) as Where, limit: 1 });
+    /* AN EMPTY SUM IS ONLY OWED ON A LIST THAT SAYS WHEN AN ENTRY IS FINISHED: a renewal with no cost written is not owed,
+       an order neither paid nor marked paid is. So Owed asks for a due day, a done state, and a sum that may be empty. */
+    const due = day.deadline === true;
+    const finished = decl.state !== undefined && (decl.done?.length ?? 0) > 0 ? { field: decl.state, not_in: [...decl.done!] } : null;
+    /* WHAT IS DUE IS WHAT IS NOT FINISHED, in the count said and in the table drawn. A day that is not a due day keeps
+       every entry: an order made on Monday and sent is still one of this week's. */
+    const toDo = due ? finished : null;
+    const got = kernel.list({ register: id, where: weekOf(day.id, dayOf(use.nowMs), toDo) as Where, limit: 1 });
     const n = got.ok ? got.value.matched : 0;
     const drawnBy = pages.filter((p) => p.registers.includes(id));
     if (n < PEN_WEEK_FEWEST || weeksRead(use.sql, id, drawnBy.map((p) => p.slug), since) < PEN_WEEKS_READ) continue;
 
-    const due = day.deadline === true;
     const source = `register.${id}`;
     const columns = shown.map((f) => ({ field: f.id, label: fit(labelOf(f), LABEL_BYTES) ?? f.id }));
     const order = [{ field: day.id, dir: 'asc' }];
     const cells = figuresByList(declared, new Set([id])).get(id) ?? [];
-    /* AN EMPTY SUM IS ONLY OWED ON A LIST THAT SAYS WHEN AN ENTRY IS FINISHED: a renewal with no cost written is not owed,
-       an order neither paid nor marked paid is. So Owed asks for a due day, a done state, and a sum that may be empty. */
-    const finished = decl.state !== undefined && (decl.done?.length ?? 0) > 0 ? { field: decl.state, not_in: [...decl.done!] } : null;
     const money = due && finished ? live.find((f) => f.type === 'money' && f.required !== true) : undefined;
     const low = lowBeside(deps, id, packOf);
     const blocks: Json[] = [
@@ -841,7 +882,7 @@ function weeksOffered(deps: PenDeps): PenItem[] {
         kind: 'table',
         heading: fit(due ? 'Due this week' : `${decl.name} this week`, HEADING_BYTES) ?? 'This week',
         source,
-        where: thisWeek(day.id),
+        where: thisWeek(day.id, toDo),
         columns,
         order,
         limit: PEN_ROWS_DRAWN,

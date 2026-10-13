@@ -47,6 +47,10 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
   guide: [{ version: '1.6.1', notes: NAMED('Steps') }],
   shop: [
     {
+      version: '1.2.0',
+      notes: 'The Orders line now counts every other order nobody has paid anything on, beside the one it names. It used to name the oldest and leave the rest out.',
+    },
+    {
       version: '1.1.0',
       notes: 'This week now starts today, and an order past its day is counted as late on its own. An order with a deposit stays in Owed to you, and the Orders line names whoever has owed longest.',
     },

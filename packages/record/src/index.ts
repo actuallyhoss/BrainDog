@@ -139,7 +139,7 @@ import {
 import { parseWhere, type Predicate } from '@braindog/where';
 import type { Json as JsonValue } from '@braindog/kernel';
 
-import { arranger, carryUpdate, forgetHeld, installHeld, planAgain, speakingNow, writeVoice, type CatalogueEntry, type CatalogueShelf } from './arrange.ts';
+import { arranger, carryUpdate, forgetHeld, installHeld, planAgain, speakingNow, writeVoice, type CatalogueEntry, type CatalogueShelf, type SetupAnswer } from './arrange.ts';
 import { LATE_DAYS, isWorking, presenceOf, waiting as waitingOf, type Presence, type WaitingNow } from './waiting.ts';
 import { useCases, type ExportArgs } from './usecase.ts';
 import { catalogueDrafts, describedPresses, drawnVersions, FORM_SAID_MOST, formedRows, fromModel, growsDrafts, noticeUsage, pageShowsAgents, readUsage, SLASH_ASKED_MOST, SLASH_OPEN_CAP, stableKey, type CatalogueOffer, type Offered, type SlashDraft, type SlashModel } from './slash.ts';
@@ -212,6 +212,8 @@ import { byWhoOf, passesOf, passFolder, passKept, type ByWho, type UpdatePass } 
 import { docValues } from './row-values.ts';
 
 export type { CatalogueEntry, FigureTest, Grows, RowIo } from './arrange.ts';
+/* WHAT `setup` ANSWERS (USE-B04), for the host's table of calls, the client and the first run's screen. */
+export type { SetupAnswer, SetupPart } from './arrange.ts';
 export { formedRows, fromModel, growsDrafts, noticeUsage, readUsage, FORM_SAID_MOST, SLASH_ASKED_MOST, SLASH_OPEN_CAP, type CatalogueOffer, type FormField, type FormList, type FormSpec, type NextSpec, type Noticed, type SlashDraft, type SlashFormInput, type SlashModel, type SlashModelInput, type Usage } from './slash.ts';
 export type { ExportArgs, PlannedPack } from './usecase.ts';
 export type { Automation, AutomationRow, AutomationRun, Said as AutomationSaid, ScriptRow } from './automations.ts';
@@ -1043,7 +1045,7 @@ export type Boot = {
   counts: { decide: number; inbox: number | null; decided: number; arrived: number | null };
   /**
    * The holding pen: what this record would add if somebody asked, ranked, one offer a list, the best `PEN_SHOWN` and any
-   * list opened in the last day (`penRanked` holds the rest) (`emergent.ts`). Placed by nobody: each item carries the whole declaration accepting it would write.
+   * list opened in the last seven days (`penRanked` holds the rest) (`emergent.ts`). Placed by nobody: each item carries the whole declaration accepting it would write.
    *
    * THE OWNER'S AND A WHOLE-RECORD READER'S, and empty for anybody else, because an item is a page over a list and a
    * reader held to some lists is not offered the rest. Empty too when the person turned `pen.suggest` off, and an item
@@ -2479,8 +2481,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       kernel.create(register, { ...fields, tags: exampleTag(fields) }, {
         actor: actorOf(ctx),
         cascade: false,
+        /* THE ADD-ON'S OWN WRITE, which is what a list's `once` reads (SHL-A09). A create is never narrowed by it. */
+        pack: true,
         ...(note === undefined ? {} : { note }),
       } as never),
+    /* THE RECORD'S OWN CLOCK, so a seed's `{ day }` counts from the day this record reads and not the machine's. */
+    today: () => new Date(clock.now()).toISOString().slice(0, 10),
     remember: (row) => kernel.rememberPack({ ...row, by: actorOf(ctx) }),
     /* AND ITS FILE, kept while a part of it waited (`installHeld`), goes with it. */
     forget: (id) => {
@@ -2532,7 +2538,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     /* A PEN THE OWNER TURNED OFF HOLDS NOTHING (`pen.suggest`, as `boot` reads it), so Slash asks on Decide instead. */
     const penOn = ownerId !== null && ownerPrefs['pen.suggest'] !== false;
     usage.pen = {
-      held: penOn ? penRanked({ kernel, reads: () => true, pages: kernel.pages(), dismissed: new Set(gone), use: { sql, nowMs: clock.now() } }).map((i) => i.id) : [],
+      /* ONLY FOR SOMEONE WHO IS SHOWN A PEN: `boot` shows it to a reader of every list and nobody else, so for a member
+         held to some lists Slash yields nothing, or it kept back offers that were shown nowhere (pen-window-53-54). */
+      held: penOn && !partial ? penRanked({ kernel, reads: () => true, pages: kernel.pages(), dismissed: new Set(gone), use: { sql, nowMs: clock.now() } }).map((i) => i.id) : [],
       dismissed: gone,
     };
     const busy = usage.agents.length > 0;
@@ -4439,10 +4447,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * Every other answer key may be worked out from a read that is not the block's own rows (a figure in `cells`, the
    * words a heading was filled with, a line's buckets), which the kernel still makes over the whole list, so a block
    * holding one is held whole.
+   *
+   * `wholeRead` IS HER ROWS ADDED UP (PGS-B05), since the block is drawn again over exactly them, EXCEPT where the
+   * whole is read past them: a heat's `of:` and a block with `inherit: true` (`wholePast` in `ownRows`).
    */
   const ROW_SAFE: ReadonlySet<string> = new Set([
     'rows', 'matched', 'refusals', 'drawn', 'seen', 'types', 'home', 'fills', 'window', 'fx', 'next', 'open',
     'scopes', 'scope_marks', 'rings', 'nexts', 'trends', 'done_now', 'short_now', 'changes', 'working_now', 'quiet', 'files',
+    'wholeRead',
   ]);
 
   /** Whether an answer key holds anything: an empty list, an empty map, nought and `false` say nothing of a row. */
@@ -4495,7 +4507,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const mine = new Set(seqs);
     const rows = (Array.isArray(again.rows) ? again.rows : []) as Block['rows'];
     if (rows.some((row) => row.register === list && (row.seq === null || !mine.has(row.seq)))) return shellOf(b, PART, false);
-    for (const key of ANSWER_KEYS) if (!ROW_SAFE.has(key) && saysSome(again[key])) return shellOf(b, PART, false);
+    /* A WHOLE READ PAST HER ROWS: a heat's `of:` is each day's whole list, and `inherit: true` adds the rows above. */
+    const wholePast = written.of !== undefined || written.inherit === true;
+    for (const key of ANSWER_KEYS) if ((!ROW_SAFE.has(key) || (key === 'wholeRead' && wholePast)) && saysSome(again[key])) return shellOf(b, PART, false);
     const out: Record<string, unknown> = { ...again, ...page };
     if (written.where === undefined) delete out.where;
     else out.where = written.where;
@@ -10087,6 +10101,38 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       return tail(
         kernel.disablePack(args.id, { ...(also === undefined ? {} : { alsoDisable: also as string[] }), actor: actorOf(ctx) }),
       );
+    },
+
+    /**
+     * Set this record up in one call (USE-B04): `{ usecase?, alongside?, packs?, settings?, voice?, names?, me?, rows?,
+     * pages?, declarations?, again?, key? }`, an arrangement as `propose` takes one, with the owner themselves (`me`) and
+     * what they call their lists (`names`). Answers `{ done, failed: [{ part, label, why }], skipped? }` (`SetupAnswer`).
+     *
+     * THE FIRST RUN'S PRESS, MOVED OFF THE BROWSER. It was a script of a dozen calls in a tab, and a closed tab left the
+     * record part made. Here it is one call the record finishes by itself: read whole first, so a body that is wrong
+     * writes nothing, then applied piece by piece, where a part that is refused keeps the parts before it and is named
+     * in `failed` (`arrange.ts` `setup`).
+     *
+     * A BROWSER SESSION AND AN OWNER, as `installPack` is, and for its reason: this installs add-ons, and no token of
+     * any scope does that. It is also the only door that reads `me`, since who a record belongs to is its owner's to say.
+     *
+     * ON A RECORD ALREADY SET UP IT IS REFUSED UNLESS `again` IS TRUE, which writes only what is missing.
+     */
+    async setup(args: Record<string, unknown> | undefined, ctx: CallContext): Promise<Result<SetupAnswer>> {
+      const stop = admin(ctx, 'set this record up');
+      if (stop) return { ok: false, refusal: stop };
+      if (args === null || typeof args !== 'object' || Array.isArray(args))
+        return no('VALUE_MALFORMED', 'Send what to set up, such as {"usecase":"<id from offer>","me":{"name":"<what to call you>"}}.', { at: 'body' });
+      const broken = kernel.refused();
+      if (broken) return { ok: false, refusal: broken };
+      const out = await arrangement.setup(args, actorOf(ctx));
+      /* WITH PEOPLE OFF THE NAME WENT TO THE ACCOUNT, and the Directory follows where this host keeps it beside the
+         record, as a rename's does (`methods/person-name.ts`). */
+      if (out.ok && out.value.done.me?.includes('account') && deps.directory) {
+        const kept = kernel.members().find((m) => m.person_id === actorOf(ctx))?.name;
+        if (typeof kept === 'string' && kept !== '') deps.directory.renamePerson(actorOf(ctx), kept);
+      }
+      return tail(out);
     },
 
     /** Turn a disabled pack back on, over the rows it kept. A pack it leans on that is still off is named. */

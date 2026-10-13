@@ -258,3 +258,5 @@ export {
 } from './format.ts';
 /* The page lint (PRF-A04): what a drawn page prints that a person should never read. The host draws its pages and runs it. */
 export { LINT_RULES, lintHtml, lintPage, lintPart, lintText, type LintFinding, type LintPage, type LintPart, type LintRule } from './lint.ts';
+/* The look sheets (EXP-C05): fixed specimens of every chart form, the plan and the parts, drawn on one fixed day. */
+export { FAILED_RUN, SHEET_DAY, SHEET_FORMS, SHEET_KINDS, SHEET_NOW, SHEET_POINTS, SHEET_STALE_STEPS, SHEET_STATES, SPECIMEN, chartSpecimen, chartSpecimens, partSpecimens, planSpecimen, planSpecimens, sheetKey, specimenFor, specimenSegments, specimenStale, type SheetAge, type SheetForm, type SheetKind, type SheetState, type Specimen } from './sheet.ts';

@@ -49,7 +49,7 @@ import { FORECAST_BALANCE, FORECAST_MOVE, FORECAST_NONE, FORECAST_NUMBERS, FOREC
 import { DIFF_GLYPHS, DIFF_WORDS, diffFolded, diffPlan, type DiffLine } from './diff.ts';
 import { ROADMAP_LEGEND, ROADMAP_NONE, ROADMAP_TODAY, roadmapAxis, roadmapFlip, roadmapLegend, roadmapLines, roadmapPlan, roadmapRow, roadmapSentence, roadmapShare, roadmapSkipped, roadmapToday } from './roadmap.ts';
 import { RING_NONE, RING_OF, RING_PAINT, RING_STEP_OPACITY, ringPlan } from './ring.ts';
-import { HEAT_DAY, HEAT_NONE, HEAT_VALUE, heatLines, heatMissed, heatOutside, heatPeopleMore, heatPeoplePlan, heatPersonSaid, heatPlan, heatSkipped, heatTitle, heatWeekTitle } from './heat.ts';
+import { HEAT_DAY, HEAT_NONE, HEAT_SHARE_HEAD, HEAT_SHARE_LINE, HEAT_VALUE, heatLines, heatMissed, heatOutside, heatPeopleMore, heatPeoplePlan, heatPersonSaid, heatPlan, heatSkipped, heatTitle, heatWeekTitle } from './heat.ts';
 import { CALENDAR_NONE, WEEKDAYS, calendarMore, calendarPlan, calendarSkipped } from './calendar.ts';
 import { LANES_NONE, LANES_NOW, lanesOutside, lanesPlan, lanesSentence, lanesSkipped } from './lanes.ts';
 import { LINKS_NONE, linkPlan } from './links.ts';
@@ -1654,16 +1654,18 @@ function heat(b: Block, o: RenderOptions): string {
       }></span>`;
     })
     .join('');
+  /* A BLOCK WITH `of:` SAYS WHAT ITS WASH IS, under the grid: there a full cell is a day wholly of them, not the busiest. */
+  const share = plan.share ? `<p class="heat-share">${escape(HEAT_SHARE_LINE)}</p>` : '';
   /* A FOLD, NOT A TABLE STANDING OPEN, since a day's count was only in `title`, which a finger cannot hover
      (`pages.md` §2.5 rank 11). `lines-numbers` and `lines-toggle` are the classes the `lines` block's own fold
      already carries and `packages/skin/blocks-charts.css` already styles, reused rather than repeated under a
      `heat-` name; the table inside keeps `heat-table`, its own. */
-  const table = `<details class="lines-numbers"><summary class="lines-toggle">${LINES_NUMBERS}</summary><table class="heat-table"><thead><tr>${[HEAT_DAY, HEAT_VALUE]
+  const table = `<details class="lines-numbers"><summary class="lines-toggle">${LINES_NUMBERS}</summary><table class="heat-table"><thead><tr>${[HEAT_DAY, plan.share ? HEAT_SHARE_HEAD : HEAT_VALUE]
     .map((h) => `<th scope="col">${escape(h)}</th>`)
     .join('')}</tr></thead><tbody>${heatLines(plan)
     .map((l) => `<tr><th scope="row">${escape(l.day)}</th><td class="num">${escape(l.count)}</td></tr>`)
     .join('')}</tbody></table></details>`;
-  return `<div class="heat" style="--weeks:${plan.weeks}"><div class="heat-grid" role="img" aria-label="${escape(plan.name)}">${cells}</div>${table}${skipped}${outside}</div>`;
+  return `<div class="heat" style="--weeks:${plan.weeks}"><div class="heat-grid" role="img" aria-label="${escape(plan.name)}">${cells}</div>${share}${table}${skipped}${outside}</div>`;
 }
 
 /**

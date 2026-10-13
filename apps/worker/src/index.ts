@@ -3896,7 +3896,7 @@ const DRILL = /^\/+account\/+drill\/*$/;
 /**
  * `/account/ops/drill`: the restore drill's counts (LCH-C04 job 3, `restore-drill.mjs --report`). `POST { at, pass, copies,
  * rows, lists, people, records }`, read by `readDrill` and kept as the host's last drill in the Directory. When
- * `OPS_RECORD` names the operator's record it also takes the note `drill <date> · pass · <n> records`, as the walk's
+ * `OPS_RECORD` names the operator's record it also takes the note `drill <date> · pass · <n> records` (`· directory only` where no record's copy was opened), as the walk's
  * summary does; a note that could not be written is a line, and the drill is still kept.
  *
  * Guarded as `/account/ops/restore-point` is: 404 with no `PROVISION_KEY`, 401 on a wrong key or none, a session cookie
@@ -3941,7 +3941,7 @@ async function opsDrill(request: Request, env: Env): Promise<Response> {
 }
 
 /**
- * `GET /account/drill`: the host's last restore drill for anyone signed in, `{ at, pass, records }` or `{ at: null }`
+ * `GET /account/drill`: the host's last restore drill for anyone signed in, `{ at, pass, record_copies, directory_only }` or `{ at: null }`
  * before the first. THE SAME ANSWER FOR EVERY PERSON, because it is a fact about the host and never about one record
  * (the scope's critic), and it holds counts only. Without sign-in on this host, or without a session, it is 401.
  */

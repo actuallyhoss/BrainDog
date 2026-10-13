@@ -19,8 +19,8 @@
 
 import type { Refusal, Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
-import { conflictFault, installFault, installOrder, labelsOf, laterVersion, packIdOf, plan, plannedState, readShared, install, stagedBatch, uninstall, unresolvedFault, SPEAKS, VOICE_KEYS, speakingPack, voiceOf as voiceIn, voiceSetting, voiceWrites, type Diff, type Host, type Installed, type Pack, type VoiceKey } from '@braindog/declare';
-import { KEYS_REACH_ALL, approvalLines, configReads, configValue, egressChanged, egressOf, ulids, type ConfigDecl, type Declaration, type Json, type Kernel, type PlannedRecord } from '@braindog/kernel';
+import { conflictFault, installFault, installOrder, labelsOf, laterVersion, packIdOf, plan, plannedState, readShared, install, labelSetting, stagedBatch, uninstall, unresolvedFault, SPEAKS, VOICE_KEYS, speakingPack, voiceOf as voiceIn, voiceSetting, voiceWrites, type Diff, type Host, type Installed, type Pack, type VoiceKey } from '@braindog/declare';
+import { KEYS_REACH_ALL, approvalLines, configReads, configValue, egressChanged, egressOf, personNameOf, ulids, type ConfigDecl, type Declaration, type Json, type Kernel, type PlannedRecord } from '@braindog/kernel';
 import type { FormSpec, NextSpec } from './slash.ts';
 import { normaliseChecked } from './theme-check.ts';
 import { retireMarks, takersFor } from './arrange-retires.ts';
@@ -294,6 +294,26 @@ export type ArrangeDeps = {
 /** What a proposal found in the host's whole catalogue: each document by pack id, the modules under it, and its entry. */
 type Shelving = { docs: Map<string, Body>; sent: Map<string, readonly string[]>; found: Map<string, ShelfEntry> };
 const shelving = (): Shelving => ({ docs: new Map(), sent: new Map(), found: new Map() });
+
+/**
+ * One part of a setup that was not written: the part by the id an arrangement gives it (`install:money`, `rows`, `me`),
+ * the words a person reads for it, and the one sentence that says why.
+ */
+export type SetupPart = { part: string; label?: string; why: string };
+
+/**
+ * What `setup` answers. `done` is what landed, as an accepted arrangement says it: the add-ons `installed`, `enabled`
+ * and `disabled`, the `settings` by add-on, the `pages` and `declarations`, `me` (the owner's own entry as it is spoken,
+ * or `account` where People is off and the name is kept on the account), and the `rows` written. `failed` is each part
+ * that was refused, with everything before it kept. `skipped` is what had nowhere to go and was passed over: a setting
+ * no add-on keeps, a name with no use case to keep it, entries an earlier press already wrote.
+ */
+export type SetupAnswer = { done: Record<string, string[]>; failed: SetupPart[]; skipped?: SetupPart[] };
+
+/** Where a setup keeps the handles of the presses whose entries it wrote, under a name no person holds. */
+const SETUP_HOLDER = 'braindog:setup';
+const SETUP_KEYS = 'rows';
+const SETUP_KEYS_KEPT = 200;
 
 /** A use case's pack starts with this, by `declare`'s own convention. */
 const USE_CASE = packIdOf('');
@@ -946,6 +966,122 @@ export function arranger(d: ArrangeDeps) {
     return pack;
   }
 
+  /**
+   * Who is asking. `own` is the owner setting up their own record (`setup`): only then is `me` read, and a name or a
+   * setting with nowhere to go is said and passed over where a proposal is refused, since the person at the first run
+   * cannot know which add-on keeps a currency. `order` is every add-on of the setup this piece is one part of, so a
+   * module installed on its own still goes in for the use case after it (`useCaseFor`).
+   */
+  type Own = { own?: boolean | undefined; order?: readonly string[] | undefined };
+  /** A part that was not written, and the one sentence that says why. */
+  type Passed = { part: string; label?: string; why: string };
+
+  /**
+   * THE SETTINGS OF AN ARRANGEMENT, EACH UNDER THE ADD-ON THAT KEEPS IT (USE-B04). Three ways in: `{ pack, values }` as
+   * ever; `{ values }` alone, where each key goes to the add-on that declares it, one this installs before one already
+   * on, which is the loop the first run ran in the browser for `home_currency`; and `names`, a list's own word
+   * (`{"projects":"Shops"}`, and `"projects:one"` for one of them), kept as the label of the use case that will speak.
+   * No declaration is rewritten for a name: the list keeps the name its add-on gave it and the label is what is drawn.
+   */
+  async function placedSettings(
+    body: Body,
+    install: readonly string[],
+    lead: string | null,
+    docs: ReadonlyMap<string, Body>,
+    by: Own,
+  ): Promise<Result<{ settings: { raw: Body; at: string }[]; words: Record<string, string>; skipped: Passed[] }>> {
+    const settings: { raw: Body; at: string }[] = [];
+    const skipped: Passed[] = [];
+    const words: Record<string, string> = {};
+    const sent: unknown[] = Array.isArray(body.settings) ? body.settings : [];
+    const bare = sent.some((raw) => isMap(raw) && typeof raw.pack !== 'string' && isMap(raw.values));
+    if (!bare && body.names === undefined) {
+      for (const [i, raw] of sent.entries()) if (isMap(raw)) settings.push({ raw, at: `body.settings[${i}]` });
+      return ok({ settings, words, skipped });
+    }
+    /* WHAT EACH ADD-ON DECLARES: one this installs by its document, one that is on by the record. */
+    const coming = new Map<string, Record<string, ConfigDecl>>();
+    for (const id of install) {
+      const read = await packOf(id, docs, heldBy(d.installed()), useCaseFor(install, id));
+      if (read.ok) coming.set(id, read.value.manifest.config ?? {});
+    }
+    const live = (id: string): Record<string, ConfigDecl> | null => {
+      const read = kernel.packConfig(id);
+      return read.ok ? (read.value.config as Record<string, ConfigDecl>) : null;
+    };
+    const keeperOf = (key: string): string | null =>
+      install.find((id) => Object.hasOwn(coming.get(id) ?? {}, key)) ??
+      states().find((s) => s.disabled_at === null && !install.includes(s.id) && Object.hasOwn(live(s.id) ?? {}, key))?.id ??
+      null;
+    for (const [i, raw] of sent.entries()) {
+      if (!isMap(raw)) continue;
+      const at = `body.settings[${i}]`;
+      if (typeof raw.pack === 'string' || !isMap(raw.values)) {
+        settings.push({ raw, at });
+        continue;
+      }
+      const byPack = new Map<string, Body>();
+      for (const [key, value] of Object.entries(raw.values)) {
+        const keeper = keeperOf(key);
+        if (keeper !== null) byPack.set(keeper, { ...(byPack.get(keeper) ?? {}), [key]: value });
+        else if (by.own === true) skipped.push({ part: `setting:${key}`, why: `No add-on here keeps a setting called ${key}, so it was not set.` });
+        else return refuse('FIELD_UNKNOWN', `No add-on that is on or in this arrangement has a setting called ${key}. Name its add-on as pack, or leave it out.`, `${at}.values.${key}`);
+      }
+      for (const [pack, values] of byPack) settings.push({ raw: { pack, values }, at });
+    }
+    if (body.names === undefined) return ok({ settings, words, skipped });
+    if (!isMap(body.names)) return refuse('VALUE_MALFORMED', 'names is a map of a list to the word you call it, such as {"projects":"Shops"}.', 'body.names');
+    /* THE USE CASE THAT WILL SPEAK, by the rule `namesFor` names the rail by: the one this sets up, else the one speaking. */
+    const speaker = lead ?? speakerNow() ?? install.find((id) => id.startsWith(USE_CASE)) ?? null;
+    const config = speaker === null ? null : (coming.get(speaker) ?? live(speaker));
+    const values: Body = {};
+    for (const [list, said] of Object.entries(body.names)) {
+      const at = `body.names.${list}`;
+      const word = typeof said === 'string' ? said.trim() : '';
+      if (word === '') return refuse('VALUE_MALFORMED', 'A name is a word or a few, such as "Shops".', at);
+      const setting = /^[a-z][a-z0-9_]*(:(one|holds))?$/u.test(list) ? labelSetting(list) : null;
+      if (speaker !== null && config !== null && setting !== null && Object.hasOwn(config, setting)) {
+        values[setting] = word;
+        if (!list.includes(':')) words[list] = word;
+        continue;
+      }
+      const why =
+        speaker === null
+          ? `A list's own name is kept by the use case this BrainDog speaks in, and none is on, so ${word} was not kept.`
+          : `${titleOf(speaker)} keeps no name for a list called ${list}, so ${word} was not kept.`;
+      if (by.own === true) skipped.push({ part: `name:${list}`, why });
+      else
+        return refuse(
+          speaker === null ? 'REQUIRED_MISSING' : 'FIELD_UNKNOWN',
+          speaker === null
+            ? "A list's own name is kept by the use case this BrainDog speaks in, and none is on. Name one as usecase in the same arrangement."
+            : `${titleOf(speaker)} keeps no name for a list called ${list}. Name one of its own lists, or leave it out.`,
+          at,
+        );
+    }
+    if (speaker !== null && Object.keys(values).length > 0) settings.push({ raw: { pack: speaker, values }, at: 'body.names' });
+    return ok({ settings, words, skipped });
+  }
+
+  /**
+   * `me`, THE PERSON WHOSE RECORD THIS IS (USE-B04): `{ name, email?, note? }`, the name by the rule a rename keeps
+   * (`personNameOf`). ONLY THE OWNER'S OWN SETUP SAYS IT. A proposal that carried it would have an agent say who the
+   * owner is, and marking a row as them folds their commits and mail into it, so it is refused there.
+   */
+  function meOf(raw: unknown, by: Own): Result<Body | null> {
+    if (raw === undefined || raw === null) return ok(null);
+    if (by.own !== true)
+      return refuse('FORBIDDEN', 'me says who this BrainDog belongs to, and only its owner setting it up says that. Leave it out; to add somebody, meet them.', 'body.me');
+    if (!isMap(raw)) return refuse('VALUE_MALFORMED', 'me is {"name":"<what to call you>"}, with your email and a note about you when you have them.', 'body.me');
+    const name = personNameOf(raw.name);
+    if (!name.ok) return { ok: false, refusal: { ...(name as { refusal: Refusal }).refusal, at: 'body.me.name' } };
+    for (const key of ['email', 'note'] as const)
+      if (raw[key] !== undefined && raw[key] !== null && typeof raw[key] !== 'string') return refuse('VALUE_MALFORMED', `${key} takes a line of text.`, `body.me.${key}`);
+    const email = typeof raw.email === 'string' ? raw.email.trim() : '';
+    const note = typeof raw.note === 'string' ? raw.note.trim() : '';
+    return ok({ name: name.value, ...(email === '' ? {} : { email }), ...(note === '' ? {} : { note }) });
+  }
+
   /** One settings change, checked against the pack's declared settings, with the values it replaces. */
   function settingsOf(raw: Body, at: string, pending: ReadonlyMap<string, Record<string, ConfigDecl>>): Result<Body> {
     const pack = String(raw.pack);
@@ -981,10 +1117,12 @@ export function arranger(d: ArrangeDeps) {
   }
 
   /** `{"voice":{"home":"Today"}}` as the settings of the use case's pack: the one being installed, or the one on. */
-  function voiceOf(raw: unknown, at: string, installing: readonly string[]): Result<Body> {
+  function voiceOf(raw: unknown, at: string, installing: readonly string[], lead: string | null = null): Result<Body> {
     if (!isMap(raw) || Object.keys(raw).length === 0)
       return refuse('VALUE_MALFORMED', `voice is a map of voice keys to short lines, such as {"home":"Today"}. The keys are: ${VOICE_KEYS.join(', ')}.`, at);
-    const pack = [...installing].reverse().find((id) => id.startsWith(USE_CASE)) ?? useCaseOn();
+    /* THE USE CASE THE ARRANGEMENT SETS THE RECORD UP FOR, where it names one: with others beside it, the last one in the
+       order is one of those, and the voice sent was written to a use case that does not speak. */
+    const pack = lead ?? [...installing].reverse().find((id) => id.startsWith(USE_CASE)) ?? useCaseOn();
     if (!pack)
       return refuse(
         'REQUIRED_MISSING',
@@ -1113,7 +1251,7 @@ export function arranger(d: ArrangeDeps) {
    * ONLY THE KEYS A PROPOSER MAY WRITE ARE READ. Everything the owner is shown about the consequences is
    * this function's, so a proposer cannot describe a pack as friendlier than it is.
    */
-  async function prepare(kind: 'pack' | 'settings' | 'arrange', body: Body): Promise<Result<Body>> {
+  async function prepare(kind: 'pack' | 'settings' | 'arrange', body: Body, by: Own = {}): Promise<Result<Body>> {
     if (kind === 'settings') {
       if (body.voice !== undefined) {
         const said = voiceOf(body.voice, 'body.voice', []);
@@ -1273,12 +1411,16 @@ export function arranger(d: ArrangeDeps) {
     }
     /* THE SETTINGS SENT FOR AN ADD-ON IT INSTALLS FILL THAT INSTALL (`declare` `plan`), checked below as any setting is. */
     const given = new Map<string, Body>();
-    for (const raw of Array.isArray(body.settings) ? body.settings : [])
-      if (isMap(raw) && typeof raw.pack === 'string' && isMap(raw.values) && order.value.install.includes(raw.pack))
-        given.set(raw.pack, { ...(given.get(raw.pack) ?? {}), ...raw.values });
+    /* EVERY SETTING SENT, EACH UNDER THE ADD-ON THAT KEEPS IT: a setting named by its key alone and a list's own word
+       (`names`) are placed here, before the plan, so one for an add-on this installs fills that install like any other. */
+    const placed = await placedSettings(body, order.value.install, lead, sh.docs, by);
+    if (!placed.ok) return placed;
+    const sentSettings = placed.value.settings;
+    for (const { raw } of sentSettings)
+      if (typeof raw.pack === 'string' && isMap(raw.values) && order.value.install.includes(raw.pack)) given.set(raw.pack, { ...(given.get(raw.pack) ?? {}), ...raw.values });
     /* THE VOICE TOO, when it is the voice of a use case this installs: `apply` fills the install with every setting filed for
        it, and the voice is filed as one, so the plan the owner is shown is the plan that runs. Checked below as any setting. */
-    const voiced = body.voice === undefined ? null : voiceOf(body.voice, 'body.voice', order.value.install);
+    const voiced = body.voice === undefined ? null : voiceOf(body.voice, 'body.voice', order.value.install, lead);
     if (voiced?.ok && typeof voiced.value.pack === 'string' && isMap(voiced.value.values) && order.value.install.includes(voiced.value.pack))
       given.set(voiced.value.pack, { ...(given.get(voiced.value.pack) ?? {}), ...voiced.value.values });
     const planned = await planAll(order.value.install, sh.docs, given);
@@ -1313,9 +1455,8 @@ export function arranger(d: ArrangeDeps) {
     if (unfit) return { ok: false, refusal: { ...unfit, at: `body.pages${unfit.at ? `: ${unfit.at}` : ''}` } };
 
     const settings: Body[] = [];
-    for (const [i, raw] of (Array.isArray(body.settings) ? body.settings : []).entries()) {
-      if (!isMap(raw)) continue;
-      const one = settingsOf(raw, `body.settings[${i}]`, planned.value.config);
+    for (const { raw, at } of sentSettings) {
+      const one = settingsOf(raw, at, planned.value.config);
       if (!one.ok) return one;
       settings.push(one.value);
     }
@@ -1337,7 +1478,7 @@ export function arranger(d: ArrangeDeps) {
       heard.push(...(one.value.calls.get(pack)?.out ?? []).map((c) => ({ ...c, part: `setting:${pack}` })));
     }
     if (body.voice !== undefined) {
-      const said = voiceOf(body.voice, 'body.voice', order.value.install);
+      const said = voiceOf(body.voice, 'body.voice', order.value.install, lead);
       if (!said.ok) return said;
       const one = settingsOf(said.value, 'body.voice', planned.value.config);
       if (!one.ok) return one;
@@ -1355,6 +1496,10 @@ export function arranger(d: ArrangeDeps) {
     if (!choices.ok) return choices;
 
     const names = namesFor(planned.value, lead ?? speakerNow() ?? order.value.install.find((id) => id.startsWith(USE_CASE)) ?? null);
+    /* A LIST THIS NAMES IS SAID BY THAT WORD on Decide and in each part's label, as the rail will say it. */
+    for (const [list, word] of Object.entries(placed.value.words)) names[`register.${list}`] = word;
+    const me = meOf(body.me, by);
+    if (!me.ok) return me;
     const approve = [...new Set([...planned.value.approve, ...enable.flatMap((id) => kernel.callsWhenEnabled(id)), ...calls, ...[...declared.value.lines.values()].flat()])];
     for (const id of planned.value.order) lines.set(`install:${id}`, planned.value.calls.get(id)?.approve ?? []);
     for (const id of enable) lines.set(`enable:${id}`, kernel.callsWhenEnabled(id));
@@ -1390,7 +1535,9 @@ export function arranger(d: ArrangeDeps) {
       ...(needs.length === 0 ? {} : { needs }),
       ...(pages.length === 0 ? {} : { pages }),
       ...(settings.length === 0 ? {} : { settings }),
+      ...(me.value === null ? {} : { me: me.value }),
       ...(rows.length === 0 ? {} : { rows }),
+      ...(placed.value.skipped.length === 0 ? {} : { skipped: placed.value.skipped }),
       ...(declared.value.filed.length === 0 ? {} : { declarations: declared.value.filed }),
       ...(listedCalls.length === 0 ? {} : { calls: listedCalls }),
       ...(parts.length === 0 ? {} : { parts }),
@@ -1583,19 +1730,66 @@ export function arranger(d: ArrangeDeps) {
    * question with what was already done in its sentence.
    */
   /** The catalogue entry's own step after its pack is in. A throw or a refusal in it leaves the install as it is. */
+  /**
+   * THE OWNER, WRITTEN INTO THEIR OWN RECORD (USE-B04), by the rules the first run kept in the browser. With a list that
+   * plays `meets` on, they are met as anybody is, at their own keyboard; the row is marked as them only when this call
+   * made it or found it by their address, never on a name alone, which may be somebody else of that name. A name with no
+   * address is only a mention to `meet`, and a People list without the parts `meet` writes refuses it, so they are
+   * written as a plain entry instead. WITH PEOPLE OFF THE NAME IS KEPT ON THEIR ACCOUNT AND IN NO LIST: nobody is put
+   * back into a list its owner switched off. Answers where they are: the entry as it is spoken, or `account`.
+   */
+  function meetOwner(me: Body, actor: string): Result<string> {
+    const name = String(me.name);
+    const email = typeof me.email === 'string' ? me.email : null;
+    const note = typeof me.note === 'string' ? me.note : null;
+    const meets = kernel.meetsList();
+    if (meets === null) {
+      const kept = kernel.renamePerson(actor, name);
+      return kept.ok ? ok('account') : (kept as Result<never>);
+    }
+    const parts = meets.fields as Record<string, string | undefined>;
+    const fields = new Set((kernel.register(meets.register)?.fields ?? []).filter((f) => f.retired !== true).map((f) => f.id));
+    const self = parts.self !== undefined && fields.has(parts.self) ? parts.self : null;
+    const by = { actor, note: 'Added when this BrainDog was set up.' };
+    const met = kernel.meet({ name, ...(email === null ? {} : { email }), where: 'onboarding' }, { actor, principal: { kind: 'person' } });
+    const row = met.ok ? met.value.row : null;
+    if (met.ok && row !== null) {
+      const theirs = met.value.created || met.value.matched_by === 'key';
+      const patch: Body = { ...(met.value.created && note !== null && fields.has('note') ? { note } : {}), ...(theirs && self !== null ? { [self]: true } : {}) };
+      /* A LIST OLDER THAN A PART REFUSES IT, and the row stays an ordinary person. */
+      if (Object.keys(patch).length > 0) kernel.update(meets.register, row.id, patch as never, by);
+      if (theirs && self !== null) kernel.askOwnRows?.(actor);
+      return ok(kernel.nameOf(row.id) ?? row.name);
+    }
+    /* ALREADY THERE BY THIS NAME AND MARKED AS THEM, which a second press finds: nothing is written twice. */
+    const nameField = parts.name ?? 'name';
+    if (self !== null) {
+      const held = kernel.list({ register: meets.register, limit: 500 });
+      const mine = held.ok ? held.value.rows.find((r) => r.fields[self] === true && r.fields[nameField] === name) : undefined;
+      if (mine) return ok(kernel.nameOf(mine.id) ?? name);
+    }
+    const plain: Body = { [nameField]: name, ...(email !== null && parts.email !== undefined ? { [parts.email]: email } : {}), ...(note !== null && fields.has('note') ? { note } : {}) };
+    let put = self === null ? null : kernel.create(meets.register, { ...plain, [self]: true } as never, by);
+    if (put === null || !put.ok) put = kernel.create(meets.register, plain as never, by);
+    if (!put.ok) return 'refusal' in put ? { ok: false, refusal: { ...put.refusal, at: 'body.me' } } : refuse('VERSION_STALE', 'The record moved while you were being added. Press it again.', 'body.me');
+    if (self !== null) kernel.askOwnRows?.(actor);
+    return ok(`${meets.register}#${put.value.seq}`);
+  }
+
   async function afterInstall(id: string, actor: string): Promise<void> {
     const step = entryOf(id)?.afterInstall;
     if (!step) return;
     await step(rowIo(kernel, actor)).catch(() => undefined);
   }
 
-  async function apply(kind: 'pack' | 'settings' | 'arrange', body: Body, actor: string): Promise<Result<Body>> {
-    const done: { installed: string[]; enabled: string[]; disabled: string[]; pages: string[]; settings: string[]; rows: string[]; declarations: string[] } = {
+  async function apply(kind: 'pack' | 'settings' | 'arrange', body: Body, actor: string, by: Own = {}): Promise<Result<Body>> {
+    const done: { installed: string[]; enabled: string[]; disabled: string[]; pages: string[]; settings: string[]; me: string[]; rows: string[]; declarations: string[] } = {
       installed: [],
       enabled: [],
       disabled: [],
       pages: [],
       settings: [],
+      me: [],
       rows: [],
       declarations: [],
     };
@@ -1626,6 +1820,8 @@ export function arranger(d: ArrangeDeps) {
     };
 
     const packs = (isMap(body.packs) ? body.packs : {}) as { install?: string[]; enable?: string[]; disable?: string[] };
+    /* EVERY ADD-ON OF THE SETUP THIS IS ONE PIECE OF, so a module goes in for the use case after it as the plan read it. */
+    const whole = by.order ?? packs.install ?? [];
     const settings: Body[] = kind === 'settings' ? [body] : Array.isArray(body.settings) ? (body.settings as Body[]) : [];
     const enable = kind === 'pack' && typeof body.enable === 'string' ? [body.enable] : (packs.enable ?? []);
     const disable = kind === 'pack' && typeof body.disable === 'string' ? [body.disable] : (packs.disable ?? []);
@@ -1694,7 +1890,7 @@ export function arranger(d: ArrangeDeps) {
     /* AN ADD-ON INSTALLED OVER ITSELF AGAIN, with the settings in hand: how a replan is taken back. */
     const again = async (id: string, values: Body): Promise<boolean> => {
       const state = d.installed();
-      const pack = await packOf(id, docs, heldBy(state), useCaseFor(packs.install ?? [], id));
+      const pack = await packOf(id, docs, heldBy(state), useCaseFor(whole, id));
       if (!pack.ok) return false;
       const diff = await plan(pack.value, state, { settings: values });
       return (await installHeld(kernel, pack.value, diff, d.host(actor), diff.planHash, diff.approve)).ok;
@@ -1722,7 +1918,7 @@ export function arranger(d: ArrangeDeps) {
         continue;
       }
       const state = d.installed();
-      const pack = await packOf(id, docs, heldBy(state), useCaseFor(packs.install ?? [], id));
+      const pack = await packOf(id, docs, heldBy(state), useCaseFor(whole, id));
       if (!pack.ok) return stopped(pack);
       const diff = await plan(pack.value, state, { settings: given.get(id) });
       const unshown = diff.approve.filter((line) => !approved.includes(line));
@@ -1812,6 +2008,14 @@ export function arranger(d: ArrangeDeps) {
       done.settings.push(String(s.pack));
       undo.push({ said: String(s.pack), back: async () => kernel.setPackConfig(String(s.pack), before, { actor }).ok });
     }
+    /* THE OWNER THEMSELVES (`meetOwner`), after the add-ons, so the list that plays `meets` is the one this press leaves,
+       and before the entries, so they are the first person in it. Not taken back: a person met is kept, and said so. */
+    if (kind === 'arrange' && by.own === true && isMap(body.me)) {
+      const met = meetOwner(body.me, actor);
+      if (!met.ok) return stopped(met);
+      done.me.push(met.value);
+      undo.push({ said: met.value === 'account' ? 'your name on your account' : 'you in your own list', back: async () => false });
+    }
     /* THE ROWS, ALL OR NONE, in order, each written as the owner who accepted, with a link set to the row it points at. */
     if (rows.length > 0) {
       const wrote = writeRows(rows, actor);
@@ -1821,6 +2025,120 @@ export function arranger(d: ArrangeDeps) {
     /* AND WHAT WAITED FOR ANY OF IT LANDS (`planAgain`). Last, so nothing after it can stop and take the press back. */
     if (done.installed.length + done.enabled.length + done.declarations.length > 0) await planAgain({ kernel, installed: d.installed, host: d.host(actor) });
     return ok(Object.fromEntries(Object.entries(done).filter(([, v]) => v.length > 0)));
+  }
+
+  /**
+   * A RECORD SET UP IN ONE CALL (USE-B04): what the first run asks for, read as an arrangement and applied here, by the
+   * owner and signed by them. The press was a script in the browser, and a closed tab left the record part made.
+   *
+   * READ WHOLE, APPLIED PIECE BY PIECE. `prepare` checks all of it against the record as its add-ons leave it, and a
+   * refusal there writes nothing. Then each add-on, each turn on or off, each add-on's settings, the declarations, each
+   * page, the owner themselves and the entries is one `apply`, all or none within itself. A PIECE THAT IS REFUSED KEEPS
+   * THE ONES BEFORE IT AND SAYS SO: an arrangement accepted on Decide takes everything back, because its question
+   * reopens holding all of it, and a first run has no question to reopen, so two add-ons in and a third refused is two
+   * add-ons the person has, with the third named in `failed` beside why.
+   *
+   * ON A RECORD THAT HOLDS ADD-ONS ALREADY IT IS REFUSED, UNLESS `again` IS TRUE, and then it writes only what is
+   * missing: an add-on that is on is passed over (`apply`), the owner is found by their address or their mark and not
+   * added twice, and the entries of a press that says its `key` are written once however often it is sent.
+   */
+  async function setup(raw: Body, actor: string): Promise<Result<SetupAnswer>> {
+    const { again, key, ...asked } = raw;
+    if (again !== undefined && typeof again !== 'boolean') return refuse('VALUE_MALFORMED', 'again is true to add only what is missing, or left out.', 'again');
+    if (key !== undefined && (typeof key !== 'string' || !/^[A-Za-z0-9_.:-]{1,64}$/u.test(key)))
+      return refuse('VALUE_MALFORMED', 'key is a short handle of your own for this press, such as first-run or import-3, so its entries are written once.', 'key');
+    const here = states();
+    if (again !== true && here.length > 0)
+      return refuse(
+        'TRANSITION_ILLEGAL',
+        `This BrainDog is set up already: it holds ${listed(here.map((s) => titleOf(s.id)))}. Send again as true to add only what is missing.`,
+        'again',
+      );
+    const prepared = await prepare('arrange', asked, { own: true });
+    if (!prepared.ok) return prepared;
+    const p = prepared.value;
+    const packs = (isMap(p.packs) ? p.packs : {}) as { install?: string[]; enable?: string[]; disable?: string[] };
+    const order = packs.install ?? [];
+    const maps = (x: unknown): Body[] => (Array.isArray(x) ? x.filter(isMap) : []);
+    const steps = maps(p.plan);
+    const settings = maps(p.settings);
+    const labels = new Map(maps(p.parts).map((x) => [String(x.id), String(x.label)]));
+    const named = (isMap(p.names) ? p.names : {}) as Record<string, unknown>;
+    const approve = p.approve ?? [];
+    const done: Record<string, string[]> = {};
+    const failed: SetupPart[] = [];
+    const skipped: SetupPart[] = maps(p.skipped).map((x) => ({ part: String(x.part), why: String(x.why) }));
+    /** One piece, applied: what it did joins `done`, and a refusal joins `failed` under the piece's own words. */
+    const piece = async (part: string, label: string, body: Body): Promise<boolean> => {
+      const out = await apply('arrange', { ...body, approve }, actor, { own: true, order });
+      if (!out.ok) {
+        failed.push({ part, label, why: (out as { refusal: Refusal }).refusal.fix });
+        return false;
+      }
+      for (const [k, ids] of Object.entries(out.value)) if (Array.isArray(ids)) done[k] = [...new Set([...(done[k] ?? []), ...ids.map(String)])];
+      return true;
+    };
+    const lead = typeof p.usecase === 'string' ? { usecase: p.usecase } : {};
+    for (const id of order) {
+      const mine = { ...lead, packs: { install: [id] }, plan: steps.filter((s) => s.pack === id && s.replan !== true), settings: settings.filter((s) => s.pack === id) };
+      await piece(`install:${id}`, labels.get(`install:${id}`) ?? `Add ${titleOf(id)}`, mine);
+    }
+    for (const id of packs.enable ?? []) await piece(`enable:${id}`, labels.get(`enable:${id}`) ?? `Turn on ${titleOf(id)}`, { ...lead, packs: { enable: [id] } });
+    for (const id of packs.disable ?? []) await piece(`disable:${id}`, labels.get(`disable:${id}`) ?? `Turn off ${titleOf(id)}`, { packs: { disable: [id] } });
+    /* THE SETTINGS OF AN ADD-ON THIS DID NOT INSTALL, with the step that plans it again where a declaration reads one. */
+    for (const pack of new Set(settings.map((s) => String(s.pack)))) {
+      if (order.includes(pack)) continue;
+      const mine = { settings: settings.filter((s) => s.pack === pack), plan: steps.filter((s) => s.pack === pack && s.replan === true) };
+      await piece(`setting:${pack}`, labels.get(`setting:${pack}`) ?? `Settings of ${titleOf(pack)}`, mine);
+    }
+    const declarations = maps(p.declarations);
+    if (declarations.length > 0) await piece('declarations', 'What it declares', { declarations });
+    for (const page of maps(p.pages)) {
+      const id = `page:${String(page.id).replace(/^page\./u, '')}`;
+      await piece(id, labels.get(id) ?? 'A page', { pages: [page] });
+    }
+    if (isMap(p.me)) await piece('me', 'You', { me: p.me });
+    await setupRows(maps(p.rows), { again: again === true, key: typeof key === 'string' ? key : null, named, labels, piece, failed, skipped });
+    return ok({ done, failed, ...(skipped.length === 0 ? {} : { skipped }) });
+  }
+
+  /**
+   * THE ENTRIES OF A SETUP. One for a list that is not here, because its add-on was refused, is left out and said, and
+   * the rest are written, all or none: an invoice whose client was not written is written with no one on it, as the
+   * first run always did. A press that says its `key` writes its entries once: a second one with `again` passes them over.
+   */
+  async function setupRows(
+    rows: readonly Body[],
+    o: { again: boolean; key: string | null; named: Record<string, unknown>; labels: ReadonlyMap<string, string>; piece: (part: string, label: string, body: Body) => Promise<boolean>; failed: SetupPart[]; skipped: SetupPart[] },
+  ): Promise<void> {
+    if (rows.length === 0) return;
+    const wrote = kernel.prefsOf(SETUP_HOLDER)[SETUP_KEYS];
+    const keys = Array.isArray(wrote) ? wrote.filter((k): k is string => typeof k === 'string') : [];
+    if (o.again && o.key !== null && keys.includes(o.key)) {
+      o.skipped.push({ part: 'rows', label: 'Your entries', why: 'These entries were written by an earlier press, so they were not written again.' });
+      return;
+    }
+    const kept: Body[] = [];
+    const place = new Map<number, number>();
+    const lost = new Map<string, number>();
+    for (const [i, r] of rows.entries()) {
+      const register = String(r.register);
+      if (kernel.register(register) === undefined) {
+        lost.set(register, (lost.get(register) ?? 0) + 1);
+        continue;
+      }
+      const { links: sent, ...row } = r;
+      const links = Object.fromEntries(Object.entries(isMap(sent) ? sent : {}).flatMap(([field, to]) => (place.has(Number(to)) ? [[field, place.get(Number(to))!]] : [])));
+      place.set(i, kept.length);
+      kept.push({ ...row, ...(Object.keys(links).length === 0 ? {} : { links }) });
+    }
+    for (const [register, n] of lost) {
+      const list = typeof o.named[`register.${register}`] === 'string' ? String(o.named[`register.${register}`]) : register;
+      o.failed.push({ part: `rows:${register}`, label: o.labels.get(`rows:${register}`) ?? `Additions to ${list}`, why: `${list} is not here, so ${n === 1 ? 'its entry was' : `its ${n} entries were`} not written.` });
+    }
+    if (kept.length === 0) return;
+    const landed = await o.piece('rows', 'Your entries', { rows: kept });
+    if (landed && o.key !== null) kernel.setPref(SETUP_HOLDER, SETUP_KEYS, [...keys.filter((k) => k !== o.key), o.key].slice(-SETUP_KEYS_KEPT));
   }
 
   function writeRows(rows: readonly Body[], actor: string): Result<string[]> {
@@ -1873,5 +2191,5 @@ export function arranger(d: ArrangeDeps) {
     return ok(made.map((m) => m.spoken));
   }
 
-  return { overview, declaration, prepare, apply };
+  return { overview, declaration, prepare, apply, setup };
 }

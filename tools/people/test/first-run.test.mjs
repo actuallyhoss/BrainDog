@@ -142,15 +142,15 @@ test('5. TELL IT ONE REAL THING: green on three entries added as one and one Und
   assert.match(expect.tell({ ...good, refused: 'CAPTURE_REFUSED: no' }, MARIAM).saw, /the press was refused: CAPTURE_REFUSED/u);
 });
 
-test('6. HER FIRST TODAY: green on the card gone and In EGP 900; red on the tile missing, in minor units, or the card still up', () => {
+test('6. HER FIRST TODAY: green on the card gone and Paid EGP 900; red on the tile missing, in minor units, or the card still up', () => {
   const source = [{ kind: 'source', source: { name: "Your bank's texts" } }];
-  const today = { ok: true, tellShown: false, steps: source, hiddenSteps: [], lists: ['orders', 'people'], offers: [], money: [['In', 'EGP 900.00']], line: 'EGP 900 came in this week.' };
+  const today = { ok: true, tellShown: false, steps: source, hiddenSteps: [], lists: ['orders', 'people'], offers: [], money: [['Paid', 'EGP 900.00']], line: 'EGP 900 came in this week.' };
   const green = expect.today(today, MARIAM);
   assert.equal(green.pass, true, green.saw);
-  assert.match(green.saw, /the money tile reads "In EGP 900"/u);
+  assert.match(green.saw, /the money tile reads "Paid EGP 900"/u);
 
-  assert.match(expect.today({ ...today, money: null }, MARIAM).saw, /no Money this week tile, so no "In EGP 900"/u);
-  assert.match(expect.today({ ...today, money: [['In', 'EGP 90000']] }, MARIAM).saw, /the money tile reads "In EGP 90000", not "In EGP 900"/u);
+  assert.match(expect.today({ ...today, money: null }, MARIAM).saw, /no Money this week tile, so no "Paid EGP 900"/u);
+  assert.match(expect.today({ ...today, money: [['Paid', 'EGP 90000']] }, MARIAM).saw, /the money tile reads "Paid EGP 90000", not "Paid EGP 900"/u);
   /* THE LEDGER'S MONEY IN, which never sees a paid item: the tile drawn over nothing. */
   assert.match(expect.today({ ...today, money: [] }, MARIAM).saw, /the money tile reads nothing/u);
 
@@ -192,6 +192,23 @@ test('MARIAM ON A FRESH SELF-HOST: the seven steps, and the first red one fails 
   }
   console.log(lines.join('\n'));
   assert.deepEqual(results.map((r) => r.id), STEPS.map((s) => s.id), 'the walk did not say all seven steps');
+  const red = results.find((r) => r.pass === false);
+  assert.equal(red, undefined, red ? lineOf(red) : '');
+});
+
+test('MARIAM WITH TWO PEOPLE OWING: the same seven steps, and Orders counts the two other orders nobody has paid on', async () => {
+  const TWO = JSON.parse(readFileSync(new URL('../mariam-two-debtors.json', import.meta.url), 'utf8'));
+  assert.deepEqual(checkPerson(TWO), []);
+  assert.notEqual(TWO.slug, MARIAM.slug);
+  assert.notEqual(TWO.email, MARIAM.email);
+  assert.match(TWO.expect.offer.lead.says, /Salma still owes EGP 1,350, with 2 more orders not paid at all$/u);
+  const host = await selfHost(TWO);
+  let results;
+  try {
+    results = await walk(TWO, host, () => {});
+  } finally {
+    await host.close();
+  }
   const red = results.find((r) => r.pass === false);
   assert.equal(red, undefined, red ? lineOf(red) : '');
 });

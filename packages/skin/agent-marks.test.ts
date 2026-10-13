@@ -128,3 +128,17 @@ test('isMarked and markedOf agree', () => {
     assert.ok(said !== null && isMarked(said));
   }
 });
+
+/** The alias table a file declares, as its words and the agents they name. */
+const aliasesIn = (path: string): Record<string, string> => {
+  const body = /const ALIASES\b[^=]*=\s*\{([^}]*)\}/u.exec(source(path))?.[1] ?? '';
+  return Object.fromEntries([...body.matchAll(/^\s*(?:'([^']+)'|([a-z][a-z0-9]*)):\s*'([a-z]+)',?\s*$/gmu)].map((m) => [m[1] ?? m[2], m[3]]));
+};
+
+test('the skin and the app know the same agents by the same other words', () => {
+  const skin = aliasesIn('./agent-marks.ts');
+  const app = aliasesIn('../../apps/web/src/lib/ui/face.ts');
+  assert.ok(Object.keys(app).length > 0, 'face.ts declares its aliases');
+  assert.deepEqual(Object.entries(skin).sort(), Object.entries(app).sort());
+  for (const [word, kind] of Object.entries(app)) assert.equal(markedOf(word), kind, word);
+});

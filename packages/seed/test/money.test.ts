@@ -692,6 +692,10 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
     'Runs out',
     'Accounts',
     'Waiting on you',
+    /* THE CHECK, DRAWN SINCE cash-page-54 (REC-A17): one tile while the two ways of adding cash up disagree, and one
+       line while no balance is typed. */
+    'Cash now does not add up',
+    undefined,
     /* ONE TILE OF THREE LINES, SINCE money-core 3.5.0: an old balance, money late coming in and money late going out,
        each a note with no heading of its own under one boxed section. */
     'Heads up',
@@ -934,7 +938,7 @@ test('THE ACCOUNTS ADD UP TO CASH NOW, the calendar is the next thirty days, and
  * box to add the first account, which is the one thing to do. Waiting on you is drawn only while something is asked
  * (`questions-open`), so a record nobody has asked anything of draws no band saying so.
  */
-test('A BLOCK WITH NOTHING TO SAY IS NOT DRAWN, so a fresh record reads its line and the box to add an account', async () => {
+test('A BLOCK WITH NOTHING TO SAY IS NOT DRAWN, so a fresh record reads its line, the box to add an account and that no balance is typed', async () => {
   const k = await openRecord(openSqlite(), { now: () => NOW });
   for (const id of ['portfolio', 'people', 'money-core']) assert.ok((await put(k, document(id))).ok, id);
   const out = k.page('money');
@@ -943,7 +947,7 @@ test('A BLOCK WITH NOTHING TO SAY IS NOT DRAWN, so a fresh record reads its line
   for (const b of blocks) assert.deepEqual(b.refusals, [], `${String(b.heading)} is refused`);
   assert.deepEqual(
     blocks.filter((b) => b.drawn !== false).map((b) => b.heading),
-    [undefined, 'Add an account'],
+    [undefined, 'Add an account', undefined],
   );
 });
 

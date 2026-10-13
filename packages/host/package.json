@@ -8,6 +8,7 @@
     "./actions": "./src/actions.ts",
     "./auth": "./src/auth.ts",
     "./connector": "./src/connector.ts",
+    "./infer": "./src/infer.ts",
     "./limits": "./src/limits.ts",
     "./model-jobs": "./src/model-jobs.ts",
     "./oauth": "./src/oauth.ts",

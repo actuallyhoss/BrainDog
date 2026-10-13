@@ -14,7 +14,7 @@ import { readFileSync } from 'node:fs';
 import { useCase } from '@braindog/seed/usecases';
 import { moduleDocument } from '@braindog/seed/usecases/install';
 
-import { DEFAULT_HOME, FIRST_TODAY_MOST, MONEY_WEEK, TELL_LINE, amountSpoken, drawsAny, homeDrawn, todayHome, weekOf, type WeekDecl } from './default-home.ts';
+import { DEFAULT_HOME, FIRST_TODAY_MOST, MONEY_WEEK, TELL_LINE, WEEK_IN_SAID, amountSpoken, drawsAny, homeDrawn, todayHome, weekOf, type WeekDecl } from './default-home.ts';
 import { addedByHand, showTell, wantMore } from './first-today.ts';
 import { playedBy } from '../start/parts.ts';
 import type { LiveBlock } from '../record/page-live.ts';
@@ -78,7 +78,7 @@ function answer(b: PageBlock, rows: { fields: Raw; cells: string[] }[] = []): Li
 /** A tile of figures as the record answers it, each figure as the reader wrote it ("EGP 900.00"). */
 const tile = (b: PageBlock, cells: Record<string, string>): LiveBlock => ({
   ...answer(b),
-  metrics: Object.entries(cells).map(([id, value]) => ({ id, label: id === 'owed-to-you' ? 'Owed to you' : 'In', value, note: '' })),
+  metrics: Object.entries(cells).map(([id, value]) => ({ id, label: id === 'owed-to-you' ? 'Owed to you' : (WEEK_IN_SAID as Record<string, string>)[id]!, value, note: '' })),
 });
 
 const HOME = new URL('./Home.svelte', import.meta.url);
@@ -179,9 +179,9 @@ test('AFTER A CAPTURE OF THREE ENTRIES the line and the first two blocks read th
     drawn.blocks.filter((b) => b.drawn).map((b) => b.heading),
     ['Orders due this week', MONEY_WEEK],
   );
-  /* THE TILE READS "In EGP 900" and nothing else: a nought is no figure. */
+  /* THE TILE READS "Paid EGP 900" and nothing else: a nought is no figure. */
   const money = drawn.blocks.find((b) => b.heading === MONEY_WEEK)!;
-  assert.deepEqual(money.metrics?.map((m) => [m.label, m.value]), [['In', 'EGP 900.00']]);
+  assert.deepEqual(money.metrics?.map((m) => [m.label, m.value]), [['Paid', 'EGP 900.00']]);
   /* WITHOUT THE WEEK, as on a page the record declares, the house line stands. */
   assert.notEqual(homeDrawn(live, NOW, undefined, undefined, null).sentence?.text, drawn.sentence?.text);
 });
@@ -197,30 +197,38 @@ test('ON A SHOP THAT KEEPS ITS BOOKS the line reads the tile: one payment by who
   assert.equal(lineOf({ 'received-7d': 'EGP 900.00' }, [order]), 'One order is due Friday. Nadia paid EGP 900.');
   assert.equal(lineOf({ 'received-7d': 'EGP 1,200.50' }, [order]), 'One order is due Friday. EGP 1,200.50 came in this week.');
   assert.equal(lineOf({ 'received-7d': 'EGP 900.00' }), 'EGP 900 came in this week.');
-  /* TWO CURRENCIES, AND THE TWO FIGURES, are said side by side and never added. */
+  /* TWO CURRENCIES, AND THE TWO FIGURES, are said side by side and never added, each figure by the tile's name for it. */
   assert.equal(lineOf({ 'received-7d': 'EGP 900.00 · USD 40.00' }), 'EGP 900 and USD 40 came in this week.');
-  assert.equal(lineOf({ 'settled-in-7d': 'EGP 900.00', 'received-7d': 'EGP 150.00' }, [order]), 'One order is due Friday. EGP 900 and EGP 150 came in this week.');
+  assert.equal(lineOf({ 'settled-in-7d': 'EGP 900.00', 'received-7d': 'EGP 150.00' }, [order]), 'One order is due Friday. EGP 900 was paid, and EGP 150 came in this week.');
   /* NOTHING IN: the house line stands, with no "0 came in". */
   assert.doesNotMatch(lineOf({ 'settled-in-7d': 'EGP 0.00', 'received-7d': '0' }) ?? '', /came in|paid/u);
   assert.equal(amountSpoken(90_000, 'EGP'), 'EGP 900');
   assert.equal(amountSpoken(1_500, 'JPY'), 'JPY 1,500');
 });
 
-test('A LATE ORDER IS SAID FIRST, in red with its word, and drawn once: in what is due, never again under Late', () => {
+test('A LATE ORDER IS SAID FIRST, in red with its word, as its own count, and drawn once: under Late, never in what is due this week', () => {
   const week = weekOf(SHOP, people)!;
   const body = todayHome({ tasks: false, adds: false, money: false, week });
   const late = { ...NADIA, due: '2026-10-05', paid: undefined };
   const due = { ...NADIA, what: '2 cedar candles' };
   const live = body.blocks.map((b, n) => {
-    if (n === 1) return answer(b, [{ fields: late, cells: ['Nadia', '3 vanilla jars', 'Yesterday'] }, { fields: due, cells: ['Nadia', '2 cedar candles', 'Fri'] }]);
-    /* THE RECORD'S DEADLINES NAME THE SAME ORDER BY ITS LIST AND NUMBER. */
+    /* THE TILE COUNTS FROM TODAY (`due after -1d`), so the record answers it with the one not yet past its day. */
+    if (n === 1) return { ...answer(b, [{ fields: due, cells: ['Nadia', '2 cedar candles', 'Fri'] }]), entries: [{ seq: 2, fields: due, version: 1, created: '', by: '' }] } as LiveBlock;
+    /* THE RECORD'S DEADLINES NAME THE LATE ORDER BY ITS LIST AND NUMBER, and Late draws it. */
     if (b.source === 'deadlines' && b.where === 'day before today') return answer(b, [{ fields: { row: 'orders#1', title: '3 vanilla jars', day: '2026-10-05' }, cells: ['3 vanilla jars', '', ''] }]);
     return answer(b);
   });
   const drawn = homeDrawn(live, NOW, undefined, undefined, null, week);
-  assert.deepEqual(drawn.sentence, { text: 'One order is late. One more is due this week.', needs: 'One order is late' });
+  assert.match(String(body.blocks[1]!.where), /due after -1d, due before \+8d$/u);
+  assert.deepEqual(drawn.sentence, { text: 'One order is late. One more is due Friday.', needs: 'One order is late' });
   assert.ok(drawn.sentence!.text.includes(drawn.sentence!.needs), 'the red phrase is in the line, with its word');
-  assert.deepEqual(drawn.blocks.filter((b) => b.drawn).map((b) => b.heading), ['Orders due this week']);
+  assert.doesNotMatch(drawn.sentence!.text, /thing/u, 'and it is said once: the house line does not count it again');
+  assert.deepEqual(drawn.blocks.filter((b) => b.drawn).map((b) => [b.heading, b.entries.length]), [['Orders due this week', 1], ['Late', 1]]);
+  /* A HOME KEPT FROM AN OLDER TODAY, whose tile still reads the late one, says the same line and draws it once. */
+  const older = live.map((b, n) => (n === 1 ? answer(b, [{ fields: late, cells: ['Nadia', '3 vanilla jars', 'Yesterday'] }, { fields: due, cells: ['Nadia', '2 cedar candles', 'Fri'] }]) : b));
+  const kept = homeDrawn(older, NOW, undefined, undefined, null, week);
+  assert.deepEqual(kept.sentence, drawn.sentence);
+  assert.deepEqual(kept.blocks.filter((b) => b.drawn).map((b) => b.heading), ['Orders due this week']);
 });
 
 /* ── Hide, and a record that is not a first one ────────────────────────── */

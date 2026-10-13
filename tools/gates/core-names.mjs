@@ -3,8 +3,8 @@
  *
  *   node tools/gates/core-names.mjs [root]
  *
- * THE OWNER'S WORDS: "nothing in `packages/` or `apps/` names his bank, his Shortcut or Sam Brain" (D29.52), and the
- * unit is SHL-A01 in `loop/scope/area-shell-a.md`.
+ * THE DIRECTION'S WORDS (D29.52): nothing in `packages/` or `apps/` names one person's bank, their Shortcut or the
+ * tools of their own record. The unit is SHL-A01 in `loop/scope/area-shell-a.md`.
  *
  * IT READS THE NAMES, NOT A LIST OF WORDS. `shell-words` holds a list somebody wrote, and a list somebody wrote knows
  * the add-ons of the day it was written: it has `gold` and `mercury`, and nothing for the list an add-on declared last
@@ -37,6 +37,22 @@
  * not one add-on's. THE UNIT NAMES THE SIGN THAT THE RULES HAVE FAILED, OVER 300 HITS, AND THE TREE IS PAST IT: both
  * rules are on, and field ids are still about a third of what the held list holds, `status` first. The unit gives no
  * third rule, so none is made up here; the count is said in the green line every run.
+ *
+ * A WORD THE KERNEL ITSELF DECLARES IS NOT A USE CASE'S NAME (`kernelWords`). An add-on calls a list `lines` and a
+ * field `progress`, and the kernel has drawn a block of kind `lines` and one of kind `progress` since before either
+ * add-on was written: `kind === 'progress'` in the renderer names the kernel's block and nobody's field. So the words
+ * of the kernel's own grammar are read off the kernel, never listed here: every word in a list the grammar's files
+ * declare under a name in capitals (`BLOCK_KINDS`, `FIELD_TYPES`, `REGISTER_KEYS`, `ANSWER_KEYS` and their kind), and
+ * each kind a money value is answered as (`kind: 'parts'` in `fx.ts`). A string that spells one of those is not a
+ * finding. WHAT FOLLOWS `register.` STILL IS, whatever the word: `register.lines` addresses a list, and no block kind
+ * is addressed that way. The price is said plainly: an add-on or a list whose id is also a kernel word (`roadmap`,
+ * `stripe`, `fx`) is seen only where it is addressed, since a bare `'roadmap'` cannot be told from the block kind.
+ *
+ * A CLASS NAME IS NOT A REFERENCE. In a `.svelte` file the style block and the fixed value of `class`, `id`, `for`,
+ * `role` and the three `aria-` attributes that point at an id are the page's own markup: a tile with `class="work"`
+ * branches on nothing, and `role="status"` is the browser's word. Any other attribute is still read: `data-list="tasks"`
+ * and `href="/r/tasks"` are how a page would name a list. AN IMPORT IS STILL READ, because `from '../work/list.ts'` is
+ * exactly how the core wires in one add-on by name.
  *
  * THE HELD LIST IS A FILE, `core-names.held.json`, one entry a line: the path, the name, why, and the unit that takes
  * it out. It was generated once, from this gate's own reading on 13 October, and this gate cannot write it. An entry
@@ -178,6 +194,33 @@ export function collect(root) {
   return { names, files };
 }
 
+/** Where the kernel writes its grammar: the lists a declaration is checked against, and the kinds a money value is answered as. */
+const GRAMMAR = ['packages/kernel/src/declare.ts', 'packages/kernel/src/block-keys.ts', 'packages/kernel/src/coerce.ts'];
+const VALUE_KINDS = ['packages/kernel/src/fx.ts'];
+
+/**
+ * THE WORDS THE KERNEL DECLARES FOR ITSELF, folded, read off its own source under one root. From a grammar file,
+ * every one-word string in a list or a set a module-level constant in capitals is given (`const BLOCK_KINDS = [`,
+ * `export const FIELD_TYPES = [`, `new Set([`), nested lists and spreads included, to the bracket that closes it. From
+ * a value file, each `kind: '<word>'` a type or an answer says. A tree with no kernel declares none, so a planted tree
+ * is read exactly as before.
+ */
+export function kernelWords(root) {
+  const words = new Set();
+  const textOf = (path) => (existsSync(join(root, path)) ? uncomment(readFileSync(join(root, path), 'utf8')) : '');
+  for (const path of GRAMMAR) {
+    const text = textOf(path);
+    for (const m of text.matchAll(/^(?:export )?const [A-Z][A-Z0-9_]*\b[^=\n]*=\s*(?:new Set(?:<[^>\n]*>)?\(\s*)?\[/gm)) {
+      let i = m.index + m[0].length;
+      const from = i;
+      for (let depth = 1; i < text.length && depth > 0; i++) depth += text[i] === '[' ? 1 : text[i] === ']' ? -1 : 0;
+      for (const q of text.slice(from, i).matchAll(/'([A-Za-z][A-Za-z0-9_-]*)'/g)) words.add(fold(q[1]));
+    }
+  }
+  for (const path of VALUE_KINDS) for (const q of textOf(path).matchAll(/\bkind: '([a-z][a-z0-9_-]*)'/g)) words.add(fold(q[1]));
+  return words;
+}
+
 /** The files a core package ships, as `shell-words` reads them: `src` and what sits beside it, without tests. */
 const READ = { packages: ['src', 'grammars', 'svelte'], apps: ['src', 'scripts'] };
 const SOURCE = /\.(ts|mts|js|mjs|svelte)$/;
@@ -234,24 +277,42 @@ export function namesIn(token, names) {
 /** What follows `register.` is a list's id as it is addressed, read anywhere in code. */
 const ADDRESSED = /\bregister\.([A-Za-z][A-Za-z0-9_-]*)/g;
 
+/** The same text with a stretch of it blanked, its length and its line breaks kept, so every place after it stands where it stood. */
+const blank = (s) => s.replace(/[^\n]/g, ' ');
+
+/** A `.svelte` file's style block, and the fixed value of an attribute that names a class or an id and never a list. */
+const STYLE = /<style\b[^>]*>[\s\S]*?<\/style>/g;
+const MARKUP_OWN = /\b(class|id|for|role|aria-labelledby|aria-describedby|aria-controls)=(["'])([^"'\n{}]*)\2/g;
+
+/** One file's source with what is no reference blanked: in markup, the comments, the style block and the page's own class and id names. */
+export function unnamed(source, markup = false) {
+  if (!markup) return source;
+  return source
+    .replace(/<!--[\s\S]*?-->/g, blank)
+    .replace(STYLE, blank)
+    .replace(MARKUP_OWN, (m, attr, q, value) => `${attr}=${q}${blank(value)}${q}`);
+}
+
 /**
  * Every place one file's text spells a name: the line, the name's folded form and the token that carried it. A
- * `.svelte` file's HTML comments are blanked first, as `shell-words` does and for its reason. A string with a space
- * in it is a sentence and is not read, for the header's reason; `register.<id>` is read there all the same, and a
- * name that follows `register.` inside a string that was read is one place, not two.
+ * `.svelte` file's HTML comments are blanked first, as `shell-words` does and for its reason, and with them what
+ * `unnamed` blanks. A string with a space in it is a sentence and is not read, for the header's reason;
+ * `register.<id>` is read there all the same, and a name that follows `register.` inside a string that was read is
+ * one place, not two. `own` is the kernel's own words (`kernelWords`): a string that spells one is not a place, and
+ * one that follows `register.` still is.
  */
-export function hitsIn(source, names, markup = false) {
+export function hitsIn(source, names, markup = false, own = new Set()) {
   const literals = [];
-  const text = uncomment(markup ? source.replace(/<!--[\s\S]*?-->/g, (m) => m.replace(/[^\n]/g, ' ')) : source, literals);
+  const text = uncomment(unnamed(source, markup), literals);
   const places = new Map();
   const put = (at, key, token) => places.set(`${at} ${key}`, { at, key, token });
   const ids = literals.filter(([from, to]) => !/\s/.test(text.slice(from, to)));
   for (const [from, to] of ids)
-    for (const m of text.slice(from, to).matchAll(TOKEN)) for (const key of namesIn(m[0], names)) put(from + m.index, key, m[0]);
+    for (const m of text.slice(from, to).matchAll(TOKEN)) for (const key of namesIn(m[0], names)) if (!own.has(key)) put(from + m.index, key, m[0]);
   for (const m of text.matchAll(ADDRESSED)) {
     const key = fold(m[1]);
     const inString = ids.some(([from, to]) => m.index >= from && m.index < to);
-    if (names.has(key) && !inString) put(m.index, key, m[0]);
+    if (names.has(key) && (!inString || own.has(key))) put(m.index, key, m[0]);
   }
   const hits = [...places.values()].sort((a, b) => a.at - b.at);
   let line = 1;
@@ -270,12 +331,13 @@ export function hitsIn(source, names, markup = false) {
 export function read(root) {
   const { names, files: declared } = collect(root);
   const sources = sourcesOf(root);
+  const own = kernelWords(root);
   const hits = [];
   for (const path of sources) {
     const text = readFileSync(join(root, path), 'utf8');
-    for (const h of hitsIn(text, names, path.endsWith('.svelte'))) hits.push({ path, line: h.line, key: h.key, token: h.token });
+    for (const h of hitsIn(text, names, path.endsWith('.svelte'), own)) hits.push({ path, line: h.line, key: h.key, token: h.token });
   }
-  return { names, declared, sources, hits };
+  return { names, declared, sources, hits, own };
 }
 
 /** Where a root keeps its held list. A planted tree has its own or none, so the tree's own list never excuses it. */

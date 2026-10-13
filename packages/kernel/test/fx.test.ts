@@ -8,7 +8,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { across, barsOf, convertMinor, dayFieldOf, homeFrom, jcs, openRecord, rateFor, ratesFrom, type MetricDecl, type Declaration, type Kernel, type Rate, type Reading } from '../src/index.ts';
+import { across, barsOf, convertMinor, dayFieldOf, homeFrom, isAtLeast, jcs, openRecord, rateFor, ratesFrom, type MetricDecl, type Declaration, type Kernel, type Rate, type Reading } from '../src/index.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 17, 12);
@@ -45,7 +45,7 @@ test('MINOR UNITS ROUND ONCE, HALF AWAY FROM ZERO, in each currency’s own expo
   assert.equal(convertMinor(4_200, 'USD', 'USD', 99), 4_200);
 });
 
-test('ACROSS: one currency is one amount, every rate converts, and one missing rate is the parts with that pair named', () => {
+test('ACROSS: one currency is one amount, every rate converts, and with nothing converted it is the parts with each pair named', () => {
   const amounts = [
     { currency: 'EGP', amount: 5_000_000, day: '2026-09-10' },
     { currency: 'USD', amount: 340_000, day: '2026-09-10' },
@@ -64,18 +64,96 @@ test('ACROSS: one currency is one amount, every rate converts, and one missing r
     forward: false,
     stale: true,
   });
-  assert.deepEqual(across([...amounts, { currency: 'GBP', amount: 100, day: null }], 'EGP', RATES, '2026-09-17'), {
+  /* ONE MISSING RATE AND NOTHING ADDED UP IN: no amount is in dollars and none reaches them, so there is no total to
+     be at least anything, and the answer is one amount a currency with the pair named. */
+  assert.deepEqual(across([amounts[0]!, { currency: 'GBP', amount: 100, day: null }], 'USD', RATES.slice(0, 0), '2026-09-17'), {
     kind: 'parts',
     parts: [
       { currency: 'EGP', amount: 5_000_000 },
       { currency: 'GBP', amount: 100 },
-      { currency: 'USD', amount: 350_050 },
     ],
-    missing: ['GBP to EGP'],
+    missing: ['EGP to USD', 'GBP to USD'],
   });
   /* NO CURRENCY CHOSEN TO ADD UP IN is the parts with nothing named, because no rate would do. */
   assert.deepEqual(across(amounts, 'EGP', RATES, '2026-09-17', false), { kind: 'parts', parts: [{ currency: 'EGP', amount: 5_000_000 }, { currency: 'USD', amount: 350_050 }], missing: [] });
   assert.deepEqual(across(amounts, null, RATES, '2026-09-17'), { kind: 'parts', parts: [{ currency: 'EGP', amount: 5_000_000 }, { currency: 'USD', amount: 350_050 }], missing: [] });
+});
+
+test('A SUM WITH ONE RATE MISSING CONVERTS WHAT IT CAN AND LISTS THE REST, and is at least that much', () => {
+  const amounts = [
+    { currency: 'EGP', amount: 5_000_000, day: '2026-09-10' },
+    { currency: 'USD', amount: 340_000, day: '2026-09-10' },
+    { currency: 'AED', amount: 120_000, day: '2026-09-12' },
+    { currency: 'AED', amount: 0, day: '2026-09-16' },
+  ];
+  /* The pounds as they are, the dollars at 48, and the dirhams left out and listed: one part a currency. */
+  const out = across(amounts, 'EGP', RATES, '2026-09-17');
+  assert.deepEqual(out, {
+    kind: 'atleast',
+    currency: 'EGP',
+    amount: 5_000_000 + 16_320_000,
+    asOf: '2026-09-01',
+    forward: false,
+    stale: true,
+    left: [{ currency: 'AED', amount: 120_000 }],
+    missing: ['AED'],
+  });
+  assert.equal(isAtLeast(out), true);
+
+  /* TWO CURRENCIES LEFT OUT are two parts in code order, and a rate standing in from a later day is still said. */
+  const two = across([...amounts.slice(1), { currency: 'GBP', amount: 100, day: null }, { currency: 'USD', amount: 100, day: '2026-08-01' }], 'EGP', RATES, '2026-09-02');
+  assert.deepEqual(two, {
+    kind: 'atleast',
+    currency: 'EGP',
+    amount: 16_320_000 + 4_800,
+    asOf: '2026-09-01',
+    forward: true,
+    stale: false,
+    left: [{ currency: 'AED', amount: 120_000 }, { currency: 'GBP', amount: 100 }],
+    missing: ['AED', 'GBP'],
+  });
+
+  /* ONLY THE HOME CURRENCY ADDED AND NO RATE AT ALL is still at least the home amounts, with no rate to date it. */
+  assert.deepEqual(across(amounts, 'EGP', [], '2026-09-17'), {
+    kind: 'atleast',
+    currency: 'EGP',
+    amount: 5_000_000,
+    asOf: '',
+    forward: false,
+    stale: false,
+    left: [{ currency: 'AED', amount: 120_000 }, { currency: 'USD', amount: 340_000 }],
+    missing: ['AED', 'USD'],
+  });
+
+  /* A SUBTRACTION LEFT OUT IS NOT A LOWER BOUND. One dirham amount under nought, even where the dirhams together are
+     over it, and the whole figure is one amount a currency with the pair named, as it always was. */
+  const owed = across([...amounts, { currency: 'AED', amount: -500, day: '2026-09-14' }], 'EGP', RATES, '2026-09-17');
+  assert.deepEqual(owed, {
+    kind: 'parts',
+    parts: [
+      { currency: 'AED', amount: 119_500 },
+      { currency: 'EGP', amount: 5_000_000 },
+      { currency: 'USD', amount: 340_000 },
+    ],
+    missing: ['AED to EGP'],
+  });
+  assert.equal(isAtLeast(owed), false);
+
+  /* AN AVERAGE, A LEAST AND A MOST ARE NEVER AT LEAST: leaving an amount out can move any of them either way. */
+  for (const kind of ['avg', 'min', 'max'] as const) {
+    const reduced = across(amounts, 'EGP', RATES, '2026-09-17', true, kind);
+    assert.equal(reduced.kind, 'parts', kind);
+    assert.deepEqual(reduced.kind === 'parts' ? reduced.missing : null, ['AED to EGP'], kind);
+  }
+
+  /* NO CURRENCY CHOSEN TO ADD UP IN is never at least either: nothing was converted. */
+  assert.equal(across(amounts, 'EGP', RATES, '2026-09-17', false).kind, 'parts');
+  assert.equal(across(amounts, null, RATES, '2026-09-17').kind, 'parts');
+
+  /* NOTHING MISSING IS CONVERTED, exactly as before. */
+  const whole = across(amounts.slice(0, 2), 'EGP', RATES, '2026-09-17');
+  assert.deepEqual(whole, { kind: 'converted', currency: 'EGP', amount: 5_000_000 + 16_320_000, asOf: '2026-09-01', forward: false, stale: true });
+  assert.equal(isAtLeast(whole), false);
 });
 
 test('A RATE ROW THAT IS NOT WHOLE IS NOT A RATE, and a home currency is a code or nothing', () => {
@@ -183,9 +261,19 @@ test('A FOUNDER’S CASH IN EGP AND USD: parts with no home currency, parts nami
   assert.deepEqual(bare.fx, { into: null, home: null, asOf: null, forward: false, stale: false, missing: [] });
 
   assert.ok(k.setPackConfig('money-core', { home_currency: 'EGP' }, { actor: 'p_1' }).ok);
+  /* AT LEAST: the pounds are added, the dollars no rate reaches are listed beside them, and no `value` is said, so
+     nothing draws the lower bound as the total. */
   const home = read(k, CASH);
-  assert.deepEqual(home.fx?.missing, ['USD to EGP']);
+  assert.equal(home.atLeast, true);
+  assert.deepEqual(home.noRate, [{ currency: 'USD', amount: 350_050 }]);
+  assert.deepEqual(home.parts, [
+    { currency: 'EGP', amount: 5_200_000 },
+    { currency: 'USD', amount: 350_050 },
+  ]);
+  assert.deepEqual(home.fx, { into: 'EGP', home: 'EGP', asOf: null, forward: false, stale: false, missing: ['USD to EGP'] });
   assert.equal(home.value, null);
+  assert.equal(home.unit, null);
+  assert.equal(home.delta, null);
 
   for (const r of [
     { currency: 'USD', base: 'EGP', rate: 48, as_of: '2026-09-01' },
@@ -346,7 +434,16 @@ test('A RATIO AND A DIFF ACROSS CURRENCIES are one per currency with no rate, an
   ]);
 
   assert.ok(k.setPackConfig('money-core', { home_currency: 'EGP' }, { actor: 'p_1' }).ok);
-  assert.deepEqual(read(k, spread).fx?.missing, ['USD to EGP'], 'still one per currency, and the rate it lacks named');
+  /* A HALF IS NEVER AT LEAST: a bound less a bound is a bound on nothing, so the diff stays one per currency. */
+  const lacking = read(k, spread);
+  assert.deepEqual(lacking.fx?.missing, ['USD to EGP'], 'still one per currency, and the rate it lacks named');
+  assert.equal(lacking.atLeast, undefined);
+  assert.equal(lacking.noRate, undefined);
+  assert.deepEqual(lacking.parts, apart.parts);
+  /* THE SUM ON ITS OWN IS: the pounds, then the dollars no rate reaches. */
+  const sum = read(k, CASH);
+  assert.equal(sum.atLeast, true);
+  assert.deepEqual(sum.noRate, [{ currency: 'USD', amount: 350_050 }]);
   for (const r of [
     { currency: 'USD', base: 'EGP', rate: 48, as_of: '2026-09-01' },
     { currency: 'USD', base: 'EGP', rate: 50, as_of: '2026-09-15' },

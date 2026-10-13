@@ -180,10 +180,12 @@ test('WHAT SLASH YIELDS FOR AN OPENED LIST IS SHOWN: a list ranked past PEN_SHOW
   assert.deepEqual(shown.filter((id) => !held().includes(id)), [], 'the pen shows an offer Slash does not yield');
   assert.ok(held().includes('page:easels') && !shown.includes('page:easels'), 'a list nobody opened was shown past the best ones');
 
-  /* THE DAY AFTER IT IS STILL SHOWN, and the day after that it waits its turn again. */
+  /* THE DAY AFTER IT IS STILL SHOWN, six days on it still is, and seven days on it waits its turn again. */
   clock.set(clock.now() + DAY);
   assert.ok((await penOf(api)).includes('page:tasks'), 'a list opened yesterday lost its offer at midnight');
+  clock.set(clock.now() + 5 * DAY);
+  assert.ok((await penOf(api)).includes('page:tasks'), 'a list opened six days ago lost its offer inside the week');
   clock.set(clock.now() + DAY);
-  assert.equal((await penOf(api)).length, PEN_SHOWN, 'a list opened two days ago still stood past the shown ones');
+  assert.equal((await penOf(api)).length, PEN_SHOWN, 'a list opened seven days ago still stood past the shown ones');
   sql.close();
 });

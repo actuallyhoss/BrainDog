@@ -626,17 +626,31 @@ export const deadKeys = (paths, sources) => {
   return paths.filter((path) => !read.has(path));
 };
 
-function budgetsAreRead() {
-  /* `layout/` TOO: a gate split by rule keeps its parts one level down (PRF-B04 job 8), and a part that reads a budget
+/**
+ * EVERY GATE FILE, AND EVERY PART OF ONE, by the walk the ledger already makes (`gateFiles`): this directory and each
+ * folder of parts one level down, less the planted trees and the tests. `layout/` was spelt here twice, so the next
+ * gate split by rule would have had its parts read by the ledger and by neither check below, and a part that exited 0
+ * early or was the only reader of a budget would have gone unseen. Names come back as they are said in a finding:
+ * `keys.mjs`, `layout/sweep.mjs`.
+ *
+ * ASKED FOR WHEN IT IS NEEDED, NOT AT THE TOP. `ledger.mjs` reads TypeScript, and a file that imports this one for
+ * `readCases` or `deadKeys` should not have to load a compiler to do it.
+ */
+async function gateParts() {
+  const { gateFiles } = await import('./ledger.mjs');
+  const root = join(here, '..', '..');
+  return gateFiles(root).map((f) => ({ name: f.slice('tools/gates/'.length), at: join(root, f) }));
+}
+
+function budgetsAreRead(parts) {
+  /* THE PARTS TOO: a gate split by rule keeps its parts one level down (PRF-B04 job 8), and a part that reads a budget
      reads it for the gate. */
-  const dirs = [here, join(here, 'layout'), join(here, '..', 'look')];
-  const sources = dirs
-    .filter((d) => existsSync(d))
-    .flatMap((d) =>
-      readdirSync(d)
-        .filter((f) => f.endsWith('.mjs') && f !== 'lib.mjs' && f !== 'self-test.mjs')
-        .map((f) => readFileSync(join(d, f), 'utf8')),
-    );
+  const NOT_READERS = new Set(['lib.mjs', 'self-test.mjs']);
+  const look = join(here, '..', 'look');
+  const sources = [
+    ...parts.filter(({ name }) => !NOT_READERS.has(name)).map(({ at }) => at),
+    ...(existsSync(look) ? readdirSync(look).filter((f) => f.endsWith('.mjs')).map((f) => join(look, f)) : []),
+  ].map((at) => readFileSync(at, 'utf8'));
 
   const dead = deadKeys(keyPaths(), sources);
   if (dead.length) {
@@ -684,7 +698,7 @@ function budgetsAreRead() {
  * 0" rather than writing the call. The grep reads comments too, on purpose: a directory where the
  * forbidden line can hide inside a block comment is a directory where the rule is advisory.
  */
-function noSilentPass() {
+function noSilentPass(parts) {
   const EXIT_ZERO = [/process\.exit\(\s*0\s*\)/u, /process\.exitCode\s*=\s*0\b/u];
 
   /* THE TWO RUNNERS ARE NOT GATES, which is the exemption `run.mjs` makes by the same two names. An
@@ -696,13 +710,8 @@ function noSilentPass() {
      `packages/skin/scripts/theme.mjs --check`, so a rule that read only this directory would leave
      the single gate outside it uncovered, which is the shape of hole this file exists to close. */
   const FILES = [
-    ...readdirSync(here)
-      .filter((f) => f.endsWith('.mjs') && !RUNNERS.has(f))
-      .map((f) => ({ name: f, at: join(here, f) })),
-    /* AND A GATE'S PARTS, one level down (`layout/`, PRF-B04 job 8), held to the same rule as the gate they came out of. */
-    ...readdirSync(join(here, 'layout'))
-      .filter((f) => f.endsWith('.mjs'))
-      .map((f) => ({ name: `layout/${f}`, at: join(here, 'layout', f) })),
+    /* A GATE'S PARTS WITH IT, one level down (PRF-B04 job 8), held to the same rule as the gate they came out of. */
+    ...parts.filter(({ name }) => !RUNNERS.has(name)),
     { name: 'packages/skin/scripts/theme.mjs', at: join(here, '..', '..', 'packages', 'skin', 'scripts', 'theme.mjs') },
   ];
 
@@ -747,8 +756,9 @@ async function main() {
   for (const gate of WALKED) await walkRules(gate);
   everyGateHasACase(registered, cases);
 
-  budgetsAreRead();
-  noSilentPass();
+  const parts = await gateParts();
+  budgetsAreRead(parts);
+  noSilentPass(parts);
 
   /**
    * AND THE ANSWER IS ONE CLAIM, so it may not be made from part of the evidence.

@@ -135,6 +135,11 @@ export const lists = {
      what it always carries is the search box and Display; the pills come from the declared enums a
      reader can sift on, so a list that declares none simply has none. A line announcing that is the
      interface explaining itself, which is the rule at the top of `copy.ts`. */
+  /* THE FILTERS WITH NO NUMBERS ON THEM, said in one line under the bar. The record would not count the list for this
+     person (`countsWithheld`) or the count did not come back (`countsUnread`); either way the pills print no figure,
+     since a 0 over a list that opens full is a count nobody can trust. The filters themselves still work. */
+  countsWithheld: 'The counts on these filters are not shown to you. The filters still work.',
+  countsUnread: 'The counts on these filters could not be read just now. The filters still work.',
   /**
    * WHAT THE SEARCH BOX READS, SAID WHERE A SEARCH HAS FOUND NOTHING, because that is where somebody
    * is when it matters. It was also said under the bar on every visit, which is a screen explaining

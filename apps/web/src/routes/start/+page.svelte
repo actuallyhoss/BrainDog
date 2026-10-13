@@ -71,7 +71,7 @@
   import Section from '$lib/ui/Section.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import { PEOPLE, withChip } from '$lib/who.ts';
-  import { accept, type NotMade } from './accept.ts';
+  import { accept, pressKey, type NotMade } from './accept.ts';
   import {
     added,
     browserCurrencyEnv,
@@ -79,14 +79,20 @@
     currencyChoices,
     iconOfBecame,
     joinTurns,
+    making,
+    makingStates,
     marksIn,
     missingIn,
     partsOf,
     statusOf,
     stepsOf,
+    watchHeld,
     words,
     zoneCurrency,
     type CurrencyEnv,
+    type Held,
+    type MakingPart,
+    type Refused,
     type Part as PartOf,
     type Said,
   } from './building.ts';
@@ -99,6 +105,7 @@
   import NoRecord from './NoRecord.svelte';
   import Frame from './Frame.svelte';
   import Made from './Made.svelte';
+  import Making from './Making.svelte';
 
   /**
    * A COLLEAGUE WHO HOLDS LISTS AND NOT THE RECORD IS NEVER ASKED TO SET ONE UP. A record's shape is its owner's, and
@@ -552,8 +559,9 @@
   });
   const allParts = $derived([...caseParts, ...moduleParts]);
   const steps = $derived(stepsOf(allParts));
-  const onCount = $derived(allParts.filter((p) => p.on).length);
-  const status = $derived(proposal ? statusOf(onCount, waitingOn) : null);
+  /** Whether anything is on at all: a yes or a no, never how many. */
+  const anyOn = $derived(steps.length > 0);
+  const status = $derived(proposal ? statusOf(waitingOn, !anyOn) : null);
 
   /**
    * WHAT THE LAST THING SAID ADDED TAKES THE ARRIVAL TINT for a second and a half: a part that came on
@@ -578,6 +586,20 @@
   /* ── the accept ─────────────────────────────────────────────────────────── */
 
   let busy = $state(false);
+  /**
+   * THE RECORD BEING MADE, WATCHED (`Making.svelte`): the parts that were on when the press landed, what the record holds
+   * of them, read every 400 ms while `setup` runs, and the call's own answer once it is back. `null` before a press, and
+   * again once the person goes back from a press that left something not made.
+   */
+  let watched = $state.raw<{ parts: MakingPart[]; held: readonly Held[]; answer: readonly Refused[] | null } | null>(null);
+  /** Whether a press has come back already, so the next one asks the record only for what is missing. */
+  let pressed = false;
+  /**
+   * THE HANDLE OF A PRESS THAT NEVER CAME BACK, and the entries it carried. Pressed again with the same entries, it is
+   * sent under the same handle and with `again`, so a call that went in and lost its answer writes nothing twice. A
+   * press that answers clears it, and other entries are another press.
+   */
+  let unanswered: { key: string; rows: string } | null = null;
   /** What could not be made, `null` until a press has come back with something refused. */
   let failed = $state<NotMade[] | null>(null);
   const nothing = $derived(u === null && modules.length === 0 && using === null && !(file !== null && mapping !== null));
@@ -601,10 +623,33 @@
     };
     busy = true;
     failed = null;
+    /* THE SAME TILES THE BUILD WAS DRAWN IN, now each saying where it is. Read from the record, never timed. */
+    const tiles = steps.map((p): MakingPart => ({ id: p.id, name: p.name, icon: p.icon, why: p.why }));
+    watched = { parts: tiles, held: [], answer: null };
+    const client = createClient({ base: apiBase() });
+    const stop = watchHeld(
+      async () => {
+        const read = await client.packs();
+        return read.ok ? (read.value as readonly Held[]) : null;
+      },
+      (held) => {
+        if (watched && watched.answer === null) watched = { ...watched, held };
+      },
+    );
     try {
-      const client = createClient({ base: apiBase() });
       const signed = await methods();
-      const out = await accept(client, { ...asked, email: signed.ok ? (signed.value.me?.email ?? null) : null });
+      const rows = JSON.stringify(asked.proposal.rows);
+      const resent = unanswered !== null && unanswered.rows === rows;
+      if (!resent) unanswered = { key: pressKey(), rows };
+      const out = await accept(client, { ...asked, key: unanswered!.key, again: alreadyMade || pressed || resent, email: signed.ok ? (signed.value.me?.email ?? null) : null });
+      if (!out.unheard) unanswered = null;
+      stop();
+      pressed = true;
+      /* WHAT THE RECORD REFUSED STAYS ON ITS TILE, in the record's own sentence, until the person goes back. A press
+         that failed some other way (a draft, a file, the whole call) has no tile to say it on, so it is said in the
+         conversation as it always was. */
+      const refused = out.refused ?? [];
+      watched = refused.length > 0 ? { parts: tiles, held: watched?.held ?? [], answer: refused } : null;
       if (out.nav) pref.write({ nav: out.nav });
       /* THE SHELL READS THE RECORD AGAIN, so the rail shows the new pages and speaks in the new voice. */
       (await import('$lib/record/boot-live.ts')).forget();
@@ -620,7 +665,11 @@
       /* A DRAFT ON DECIDE IS NOT FILED TWICE: kept, or waiting there, the next press leaves it where it is. */
       if (out.filed && draft === asked.drafted) draft = null;
       failed = out.failed;
+    } catch (e) {
+      watched = null;
+      throw e;
     } finally {
+      stop();
       busy = false;
     }
   }
@@ -720,6 +769,17 @@
       </section>
     {:else if made}
       <Made modules={madeModules} />
+    {:else if watched}
+      <!-- AFTER THE PRESS: the record being made, tile by tile. Today opens when the call answers; where the record
+           refused a part, its tile says why and the way back is one button. -->
+      <div class="watched">
+        <Making parts={watched.parts} states={makingStates(watched.parts, watched.held, watched.answer)} />
+        {#if watched.answer}
+          <div class="actions">
+            <Button weight="primary" onclick={() => (watched = null)}>{making.back}</Button>
+          </div>
+        {/if}
+      </div>
     {:else}
       {#if alreadyMade}
         <section class="again" aria-labelledby="again-h">
@@ -936,19 +996,14 @@
 
         <!-- ── THE BUILD ─────────────────────────────────────────────────── -->
         <div class="build">
-          <Tile icon="home" title={waitingOn || onCount === 0 || proposal === null ? words.building : words.ready}>
-            <!-- EVERY PART IT CAN MAKE, EACH LIGHTING UP AS IT IS HEARD: its own glyph in an ink well once on, red while
-                 it waits on an answer, and the ground's quiet well while off. Read aloud once, as one sentence. -->
-            <p class="sr">
-              {words.progress(
-                steps.order.filter((p) => p.on && p.state !== 'waiting').map((p) => p.name),
-                steps.order.find((p) => p.state === 'waiting')?.name ?? null,
-              )}
-            </p>
+          <Tile icon="home" title={waitingOn || !anyOn || proposal === null ? words.building : words.ready}>
+            <!-- ONLY THE PARTS THAT ARE ON, IN THE ORDER THEY WERE HEARD: each its own glyph in an ink well, red while
+                 it waits on an answer. A part left off is not drawn here, so nothing reads as a step behind and there
+                 is nothing to count (USE-B07). The sentence under them says the same aloud, once. -->
             <ol class="lights" aria-hidden="true">
-              {#each steps.order as p (p.id)}
+              {#each steps as p (p.id)}
                 <li class="light" data-state={p.state} data-arrived={fresh.has(`part:${p.id}`) ? '' : undefined}>
-                  <IconWell name={p.icon} tone={p.state === 'waiting' ? 'danger' : p.on ? 'ink' : undefined} />
+                  <IconWell name={p.icon} tone={p.state === 'waiting' ? 'danger' : 'ink'} />
                   <span class="light-name">{p.name}</span>
                 </li>
               {/each}
@@ -972,9 +1027,9 @@
               </ul>
             {/if}
             <p class="reading">
-              {#if onCount === 0 && !steps.current}{words.lightsUp}{:else}{words.onReading(
-                  steps.order.filter((p) => p.on && p.state !== 'waiting').map((p) => p.name),
-                  steps.order.find((p) => p.state === 'waiting')?.name ?? null,
+              {#if anyOn}{words.onReading(
+                  steps.filter((p) => p.state !== 'waiting').map((p) => p.name),
+                  steps.find((p) => p.state === 'waiting')?.name ?? null,
                 )}{/if}
               {words.nothingSaved}
             </p>
@@ -1047,6 +1102,14 @@
   .alone {
     justify-self: start;
     inline-size: min(40rem, 100%);
+  }
+
+  /* THE RECORD BEING MADE takes the whole width of the frame, its tiles as many across as fit. */
+  .watched {
+    display: grid;
+    align-content: start;
+    gap: var(--sp-5);
+    min-inline-size: 0;
   }
 
   /* ── the title row ─────────────────────────────────────────────────────── */
@@ -1635,11 +1698,6 @@
 
   .light[data-state='waiting'] .light-name {
     color: var(--danger-text);
-  }
-
-  .light[data-state='off'] .light-name {
-    color: var(--dim);
-    font-weight: 400;
   }
 
   /* WHAT IT HEARD SO FAR, one phrase to a line, each with the glyph of what it became. */

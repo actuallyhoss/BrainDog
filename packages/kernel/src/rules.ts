@@ -25,7 +25,7 @@
 
 import type { Refusal, Result, Sql } from '@braindog/ports';
 import { ok, refused } from '@braindog/ports';
-import { jsonPath, compile, type Predicate, type Schema } from '@braindog/where';
+import { jsonPath, compile, isColumn, QUANTIFIERS, type Compiled, type Predicate, type Schema } from '@braindog/where';
 
 import type { Entry } from './index.ts';
 import { moneyText } from './ingest.ts';
@@ -36,15 +36,32 @@ import { spanMs } from './vault.ts';
 import { evaluateMetric, predicateOf, type Aggregation, type EvalContext, type MetricDecl } from './metrics.ts';
 import { isMoneyFormat } from './metrics.ts';
 import { RUN_PATH, inlineFault, rowlessCreate } from './flow-lint.ts';
+import { linkFault, whereFields } from './rule-link.ts';
+
+export { linkFault };
 import { FIGURE } from './figure.ts';
 import { observe } from './observe.ts';
+
+/**
+ * Where a `link` looks: the list, the field its rows are found by, and the text to find.
+ *
+ * `where` FILTERS THE ROWS THAT MAY BE FOUND, on every rung and before ties are counted. It is a filter over the
+ * LINKED list, written as a filter object, and a text in it is filled from the row being linked, so
+ * `{ field: direction, in: ['{{direction}}', either] }` asks for a category that goes the way this row goes. A value
+ * the row does not hold is left out of an `in`, and a test on it alone is true of no row (of every row, for `not`).
+ *
+ * `take` NAMES A FIELD OF THE ROW FOUND, and what that field holds is linked in the row's place: a filing rule is
+ * found by its text and the ledger row is given the rule's category. A row found that holds nothing there links
+ * nothing.
+ */
+export type LinkTo = { register: string; by: string; value: string; where?: Predicate; take?: string };
 
 export type RuleAction =
   | { tag: string }
   | { untag: string }
   | { set: { field: string; to: string } }
   | { move: string }
-  | { link: { field: string; to: { register: string; by: string; value: string } } }
+  | { link: { field: string; to: LinkTo } }
   | { note: string }
   | { notify: { say: string; tone?: string; urgent?: boolean } }
   /**
@@ -452,7 +469,15 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
            (`linkOf`), the one read the dry run below makes too, so what it previews is what this links. */
         const value = said(action.link.to.value, `then[${i}].link.to.value`, 'the value it links by');
         if (value === null) continue;
-        const found = linkOf(deps, action.link.to, value);
+        /* A FILTER OR A `take` OVER A FIELD THE LINKED LIST DOES NOT HAVE LINKS NOTHING AND SAYS SO, for a rule stored
+           before anything refused it. Unfiltered, it would file under the very rows the rule ruled out. */
+        const fault = linkFault(deps.schemaOf, { rule: rule.rule, then: [action] });
+        if (fault) {
+          undone((fault.at ?? 'then[0]').replace('then[0]', `then[${i}]`), 'DECLARATION_INVALID', fault.fix.replace('then[0]', `then[${i}]`));
+          continue;
+        }
+        const run = fired.run ? { run: fired.run } : {};
+        const found = linkOf(deps, linkTo(action.link.to, fired.entry, (text) => filling(text, fired.entry, deps.nowMs, run).text), value);
         if ('id' in found) {
           patch[action.link.field] = found.id;
           did.push(`link ${action.link.field}`);
@@ -606,8 +631,15 @@ const asList = (value: unknown): string[] => (Array.isArray(value) ? value.map(S
 
 /* ── the row a `link` names ──────────────────────────────────────────────── */
 
-/** The rungs a `link` climbs, in order: the whole value, how it starts, anywhere in it. */
-type LinkRung = 'exact' | 'starts' | 'contains';
+/** The rungs a `link` climbs, in order: the whole value, how it starts, anywhere in it, a pattern it fits. */
+type LinkRung = 'exact' | 'starts' | 'contains' | 'pattern';
+
+/** The lower rungs by the number the ladder's SQL orders them on. */
+const RUNGS: Record<number, LinkRung> = { 2: 'starts', 3: 'contains', 4: 'pattern' };
+
+/** The most characters of a pattern, and the most characters of the text one is tried against. */
+const PATTERN_MAX = 120;
+const PATTERN_READS = 512;
 
 /** The row a `link` found and the rung it was found on, or the sentence saying why it links nothing. */
 type Linked = { id: string; rung: LinkRung } | { none: string };
@@ -622,7 +654,7 @@ type Linked = { id: string; rung: LinkRung } | { none: string };
 const LADDER_ROWS = 500;
 
 /** What the dry run adds after `link <field>`, by the rung the row was found on. The whole value adds nothing. */
-const RUNG_SAID: Record<LinkRung, string> = { exact: '', starts: ', matched by how it starts', contains: ', matched anywhere in it' };
+const RUNG_SAID: Record<LinkRung, string> = { exact: '', starts: ', matched by how it starts', contains: ', matched anywhere in it', pattern: ', matched by a pattern' };
 
 /**
  * The one row whose `by` field names `value`, by the ladder: the whole value, then how it starts, then anywhere in it.
@@ -643,15 +675,63 @@ const RUNG_SAID: Record<LinkRung, string> = { exact: '', starts: ', matched by h
  * because SQLite's `lower()` can fold more than ASCII where a build carries ICU, and the record runs on more than one
  * build (`node:sqlite` and the Durable Object).
  * Lengths are counted in characters, as SQLite's `length()` orders them.
+ *
+ * A PATTERN IS THE LAST RUNG. A row that says `pattern` holds a regular expression in `by`, read without regard to
+ * case and tried against the first 512 characters of the value, so `TALABAT|TLBT` files both spellings of one shop.
+ * The longest pattern wins and two of one length tie, as on the rungs above. One that is not safe to run is never run
+ * (`linkPatternFault`).
+ *
+ * `where` AND `take` ARE `LinkTo`'s, and say there what they do.
  */
-function linkOf(deps: Pick<RulesDeps, 'sql' | 'schemaOf'>, to: { register: string; by: string }, value: string): Linked {
+function linkOf(deps: Pick<RulesDeps, 'sql' | 'schemaOf' | 'ctx'>, to: Pick<LinkTo, 'register' | 'by' | 'where' | 'take'>, value: string): Linked {
+  /* THE FILTER IS COMPILED ONCE AND ASKED ON EVERY RUNG, in the SQL that reads the candidates, so a row it leaves out
+     is never counted: it cannot win, and it cannot make a tie with the one row that passes. A filter that cannot be
+     read links nothing, since the other direction is a link the rule's author ruled out. */
+  let only: Only | null = null;
+  if (to.where !== undefined) {
+    const schema = deps.schemaOf(to.register);
+    const said = schema === null ? null : predicateOf(to.where, schema, deps.ctx);
+    const w = said === null || said.bad.length ? null : compile(said.predicate, schema!);
+    if (w === null || w.bad.length) return { none: "this link's where cannot be read" };
+    only = { sql: w.sql, params: w.params };
+  }
+  const found = climb(deps, to, value, only);
+  /* WHY, WHEN THE FILTER IS WHY. A preview that said "nothing bears that name" of a category that plainly does would
+     send somebody to retype the name. The ladder is climbed again without the filter only when it found nothing. */
+  if ('none' in found && found.none === NOTHING && only !== null) {
+    const without = climb(deps, to, value, null);
+    if (!('none' in without) || without.none !== NOTHING) {
+      const fields: string[] = [];
+      whereFields(to.where, fields);
+      return { none: `what bears that name is left out by this link's where${fields.length ? ` (${fields.join(', ')})` : ''}` };
+    }
+  }
+  if ('none' in found || to.take === undefined) return found;
+  const taken = deps.sql.one<{ said: unknown }>(`SELECT json_extract(fields, '${jsonPath(to.take)}') AS said FROM entry WHERE id = ?`, found.id)?.said;
+  if (typeof taken !== 'string' || taken === '') return { none: `the one found has no ${to.take}` };
+  /* WHAT IS TAKEN IS A ROW THAT IS STILL THERE. The ladder reads live rows only, and a deleted category reached
+     through a filing rule that still points at it would file under something nobody can open. */
+  if (!deps.sql.one<{ x: number }>('SELECT 1 AS x FROM entry WHERE id = ? AND deleted_at IS NULL', taken)) return { none: `the ${to.take} of the one found is gone` };
+  return { id: taken, rung: found.rung };
+}
+
+/** A compiled `link.to.where`: the clause and what fills it. */
+type Only = Pick<Compiled, 'sql' | 'params'>;
+
+const NOTHING = 'nothing bears that name';
+
+/** The ladder itself, over the rows `only` lets through, or over every live row of the list. */
+function climb(deps: Pick<RulesDeps, 'sql' | 'schemaOf'>, to: Pick<LinkTo, 'register' | 'by'>, value: string, only: Only | null): Linked {
   /* `by` IS A FIELD ID FROM A DECLARATION, and it was inlined into the path with no grammar check (see the note on
      `jsonPath`). A rule can arrive in a pack, so it goes through `jsonPath` here, in the one place both readers call. */
   const by = jsonPath(to.by);
+  const and = only === null ? '' : ` AND (${only.sql})`;
+  const filled = only === null ? [] : only.params;
   const whole = deps.sql.all<{ id: string }>(
-    `SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, '${by}') = ? LIMIT 2`,
+    `SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, '${by}') = ?${and} LIMIT 2`,
     to.register,
     value,
+    ...filled,
   );
   if (whole.length === 1) return { id: whole[0]!.id, rung: 'exact' };
   if (whole.length > 1) return { none: 'two rows bear that name' };
@@ -660,31 +740,190 @@ function linkOf(deps: Pick<RulesDeps, 'sql' | 'schemaOf'>, to: { register: strin
      `jsonPath` takes it. */
   const how = `${to.by}_by`;
   const schema = deps.schemaOf(to.register);
-  if (schema === null || !Object.hasOwn(schema.fields, how)) return { none: 'nothing bears that name' };
+  if (schema === null || !Object.hasOwn(schema.fields, how)) return { none: NOTHING };
   const rows = deps.sql.all<{ id: string; rung: number; said: string }>(
     `SELECT id, rung, said FROM (
-       SELECT id, CASE json_extract(fields, '${jsonPath(how)}') WHEN 'starts' THEN 2 WHEN 'contains' THEN 3 END AS rung,
+       SELECT id, CASE json_extract(fields, '${jsonPath(how)}') WHEN 'starts' THEN 2 WHEN 'contains' THEN 3 WHEN 'pattern' THEN 4 END AS rung,
               json_extract(fields, '${by}') AS said
-       FROM entry WHERE register = ? AND deleted_at IS NULL AND json_type(fields, '${by}') = 'text'
+       FROM entry WHERE register = ? AND deleted_at IS NULL AND json_type(fields, '${by}') = 'text'${and}
      ) WHERE rung IS NOT NULL AND said <> '' ORDER BY rung, length(said) DESC, id LIMIT ?`,
     to.register,
+    ...filled,
     LADDER_ROWS,
   );
   const folded = fold(value);
+  const head = [...value].slice(0, PATTERN_READS).join('');
   let won: { id: string; rung: number; long: number } | null = null;
+  let unsafe = false;
   for (const row of rows) {
-    const said = fold(row.said);
-    if (!(row.rung === 2 ? folded.startsWith(said) : folded.includes(said))) continue;
+    if (won !== null && won.rung !== row.rung) break;
+    if (row.rung === 4) {
+      /* A PATTERN STORED PAST THE CHECK IS NEVER RUN: one that can take for ever would take the write with it. */
+      if (linkPatternFault(row.said) !== null) {
+        unsafe = true;
+        continue;
+      }
+      if (!new RegExp(row.said, 'i').test(head)) continue;
+    } else if (!(row.rung === 2 ? folded.startsWith(fold(row.said)) : folded.includes(fold(row.said)))) continue;
     const long = [...row.said].length;
     if (won === null) {
       won = { id: row.id, rung: row.rung, long };
       continue;
     }
-    if (won.rung === row.rung && won.long === long) return { none: 'two rows match it equally well' };
+    if (won.long === long) return { none: 'two rows match it equally well' };
     break;
   }
-  if (won === null) return { none: 'nothing bears that name' };
-  return { id: won.id, rung: won.rung === 2 ? 'starts' : 'contains' };
+  if (won === null) return { none: unsafe ? 'a pattern that might match it is not safe to run, so it was not tried' : NOTHING };
+  return { id: won.id, rung: RUNGS[won.rung]! };
+}
+
+/** A text that is one `{{field}}` and nothing else, which is how a filter asks for what the row itself holds. */
+const WHOLE_FIELD = /^\{\{(\w+)\}\}$/;
+
+/**
+ * A `link.to.where` with its texts filled from the row being linked.
+ *
+ * A VALUE THE ROW DOES NOT HOLD IS NOT COMPARED AS A DASH. `fill` writes a missing value as a dash, which is right in
+ * a sentence and wrong in a filter: `direction` has no value called that, so the whole filter would be refused and a
+ * row with no direction could never be filed under a category that takes either. So it is dropped from a list of
+ * values, and a test on it alone is true of no row, or of every row where the test is `not`.
+ */
+function whereFor(node: unknown, row: Entry, text: (template: string) => string): unknown {
+  if (Array.isArray(node)) return node.map((child) => whereFor(child, row, text));
+  if (node === null || typeof node !== 'object') return node;
+  const said = node as Record<string, unknown>;
+  if (typeof said.field !== 'string') return Object.fromEntries(Object.entries(said).map(([key, value]) => [key, whereFor(value, row, text)]));
+  const absent = (value: unknown): boolean => {
+    const name = typeof value === 'string' ? WHOLE_FIELD.exec(value)?.[1] : undefined;
+    return name !== undefined && name !== 'id' && !present(row.fields[name]);
+  };
+  const filled = (value: unknown): unknown => (typeof value === 'string' ? text(value) : value);
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(said)) {
+    if (key === 'field' || key === 'via') out[key] = value;
+    else if (Array.isArray(value)) {
+      const kept = value.filter((member) => !absent(member)).map(filled);
+      if (value.length > 0 && kept.length === 0) return key === 'not_in' ? { all: [] } : { any: [] };
+      out[key] = kept;
+    } else if (absent(value)) return key === 'not' ? { all: [] } : { any: [] };
+    else out[key] = filled(value);
+  }
+  return out;
+}
+
+/** `link.to` as `linkOf` reads it for one row: the filter filled from that row, the rest as declared. */
+function linkTo(to: LinkTo, row: Entry, text: (template: string) => string): Pick<LinkTo, 'register' | 'by' | 'where' | 'take'> {
+  return to.where === undefined ? to : { ...to, where: whereFor(to.where, row, text) as Predicate };
+}
+
+/** A repeat at `i` of `src`: how many characters it is, whether it can go round more than once, and whether it has a
+ *  choice of how often. `?` chooses and goes round once; `{3}` goes round and does not choose. */
+function repeatAt(src: string, i: number): { long: number; many: boolean; choice: 'none' | 'once' | 'wide' } {
+  const c = src[i];
+  let said: { long: number; many: boolean; choice: 'none' | 'once' | 'wide' } = { long: 0, many: false, choice: 'none' };
+  if (c === '*' || c === '+') said = { long: 1, many: true, choice: 'wide' };
+  else if (c === '?') said = { long: 1, many: false, choice: 'once' };
+  else {
+    const braces = c === '{' ? /^\{(\d+)(?:(,)(\d*))?\}/.exec(src.slice(i)) : null;
+    if (braces === null) return said;
+    const least = Number(braces[1]);
+    const most = braces[2] === undefined ? least : braces[3] === '' ? Infinity : Number(braces[3]);
+    said = { long: braces[0].length, many: most > 1, choice: most <= least ? 'none' : most <= 1 ? 'once' : 'wide' };
+  }
+  /* A `?` after a repeat makes it take as little as it can. It is not a second repeat. */
+  if (src[i + said.long] === '?') said.long += 1;
+  return said;
+}
+
+/** What one open repeat such as `.*` costs, and the most a pattern may spend. A `?`, or a `|` inside brackets, costs 1. */
+const WIDE_COST = 5;
+const PATTERN_BUDGET = 12;
+
+/**
+ * The shape that makes a pattern unsafe to run, or `null`.
+ *
+ * `nested` REPEATS A GROUP THAT HOLDS A REPEAT, as `(a+)+` and `(\w*\s?)*` do, and `choice` repeats one that holds an
+ * either-or or an optional part, as `(a|aa)+` and `(a?a)+` do. Each can be read a number of ways that doubles with
+ * every character, so one long text never finishes.
+ *
+ * `much` IS TOO MANY REPEATS AND CHOICES IN A ROW. `.*.*.*x` nests nothing and still took twenty seconds on 512
+ * characters, since each open repeat multiplies the work by the length of the text. Two are let through, with two
+ * optional parts beside them, which is a fifth of a second at worst.
+ */
+function unsafeShape(src: string): 'nested' | 'choice' | 'much' | null {
+  /* One entry an open group: what inside it, at any depth, repeats or chooses. */
+  const open: { repeats: boolean; chooses: boolean }[] = [];
+  let closed: { repeats: boolean; chooses: boolean } | null = null;
+  let spent = 0;
+  for (let i = 0; i < src.length; ) {
+    const c = src[i]!;
+    const group = closed;
+    closed = null;
+    const top = open[open.length - 1];
+    if (c === '\\') i += 2;
+    else if (c === '[') {
+      for (i += 1; i < src.length && src[i] !== ']'; i += src[i] === '\\' ? 2 : 1);
+      i += 1;
+    } else if (c === '(') {
+      open.push({ repeats: false, chooses: false });
+      /* `(?:`, `(?=`, `(?<name>`: the `?` says what kind of group it is and repeats nothing. */
+      i += src[i + 1] === '?' ? 2 : 1;
+    } else if (c === ')') {
+      closed = open.pop() ?? null;
+      if (closed && top && open.length > 0) {
+        const outer = open[open.length - 1]!;
+        outer.repeats ||= closed.repeats;
+        outer.chooses ||= closed.chooses;
+      }
+      i += 1;
+    } else if (c === '|') {
+      if (top) {
+        top.chooses = true;
+        spent += 1;
+      }
+      i += 1;
+    } else {
+      const repeat = repeatAt(src, i);
+      if (repeat.many && group?.repeats) return 'nested';
+      if (repeat.many && group?.chooses) return 'choice';
+      if (repeat.choice === 'wide') spent += WIDE_COST;
+      if (repeat.choice === 'once') spent += 1;
+      if (top && repeat.long > 0) {
+        if (repeat.many) top.repeats = true;
+        else if (repeat.choice === 'once') top.chooses = true;
+      }
+      i += Math.max(1, repeat.long);
+    }
+  }
+  return spent > PATTERN_BUDGET ? 'much' : null;
+}
+
+const UNSAFE: Record<'nested' | 'choice' | 'much', string> = {
+  nested: 'repeats a group that already holds a repeat, such as (a+)+, which can take for ever on one long text',
+  choice: 'repeats a group that holds an either-or or an optional part, such as (a|ab)+, which can take for ever on one long text',
+  much: 'has too many repeats and choices to be sure it finishes on a long text, such as .*.*.*: two of * and + is the most',
+};
+
+/**
+ * Why a `pattern` may not be kept or run, in words that follow "the pattern", or `null` for one that may.
+ *
+ * A PATTERN IS RUN INSIDE A WRITE, on a text a bank wrote, so one that can take for ever takes the write with it. It is
+ * refused when it is longer than 120 characters, when it does not compile, and when its shape is one `unsafeShape`
+ * names: a repeated group that holds a repeat or a choice, or too many repeats in a row. `linkOf` asks this of every
+ * pattern before it runs one, so a pattern stored past the write is never tried.
+ *
+ * Exported for whatever writes the row that holds one, so it is refused where it is typed.
+ */
+export function linkPatternFault(pattern: string): string | null {
+  const long = [...pattern].length;
+  if (long > PATTERN_MAX) return `is ${long} characters, and a pattern is at most ${PATTERN_MAX}`;
+  try {
+    new RegExp(pattern, 'i');
+  } catch (err) {
+    return `cannot be read as a pattern: ${err instanceof Error ? err.message.replace(/^Invalid regular expression: /, '') : 'it does not compile'}`;
+  }
+  const shape = unsafeShape(pattern);
+  return shape === null ? null : UNSAFE[shape];
 }
 
 /* ── the sentence a rule writes ──────────────────────────────────────────── */
@@ -1284,6 +1523,10 @@ export function dryRun(deps: RulesDeps, candidate: RuleDecl, limit = PREVIEW, re
      notify.say: true were previewed as "note 5" and "notify true" for bodies install refuses. */
   const linted = inlineFault(`rule.${candidate.rule}`, candidate as FlowDecl);
   if (linted) return { ok: false, refusal: linted };
+  /* AND A LINK'S FILTER IS ASKED OF THE LIST IT FILTERS, so a field that list does not have is said here and not
+     previewed as "nothing bears that name" on every row. */
+  const unlinked = linkFault(deps.schemaOf, candidate);
+  if (unlinked) return { ok: false, refusal: unlinked };
 
   /* The candidate takes its place among the others by the same ordering the pass uses — replacing a
      rule of its own name, because previewing a CHANGE to a live rule is the common case. */
@@ -1395,7 +1638,7 @@ function describe(deps: RulesDeps, rule: RuleDecl, entry: Entry): string[] {
       /* THE SAME READ AS THE PASS ITSELF (`linkOf`), so a rung the pass would climb is one the preview climbs. An exact
          link reads as it always has; a link found further down says how, since that is what a person checks before
          turning a `starts` or `contains` category on. */
-      const found = linkOf(deps, a.link.to, fill(a.link.to.value, entry, deps.nowMs));
+      const found = linkOf(deps, linkTo(a.link.to, entry, (text) => fill(text, entry, deps.nowMs)), fill(a.link.to.value, entry, deps.nowMs));
       out.push('id' in found ? `link ${a.link.field}${RUNG_SAID[found.rung]}` : `link ${a.link.field}: ${found.none}`);
     }
   }

@@ -235,7 +235,7 @@
           >
             <span class="mi-tick">{#if on}<Icon name="check" size="s" />{/if}</span>
             <span class="mi-name">{valueSaid(f, value)}</span>
-            <span class="segment-n">{facets.get(f.id)?.get(value) ?? 0}</span>
+            {#if facets.has(f.id)}<span class="segment-n">{facets.get(f.id)?.get(value) ?? 0}</span>{/if}
           </button>
         {/each}
       </Menu>
@@ -258,7 +258,7 @@
             onclick={() => toggleFilter(f.id, value)}
           >
             <span class="segment-word">{valueSaid(f, value)}</span>
-            <span class="segment-n">{facets.get(f.id)?.get(value) ?? 0}</span>
+            {#if facets.has(f.id)}<span class="segment-n">{facets.get(f.id)?.get(value) ?? 0}</span>{/if}
           </button>
         {/each}
       </div>
@@ -324,7 +324,7 @@
               >
                 <span class="filter-box" aria-hidden="true">{on ? '✓' : ''}</span>
                 {valueSaid(f, value)}
-                <span class="filter-n">{facets.get(f.id)?.get(value) ?? 0}</span>
+                {#if facets.has(f.id)}<span class="filter-n">{facets.get(f.id)?.get(value) ?? 0}</span>{/if}
               </button>
             {/each}
           </div>

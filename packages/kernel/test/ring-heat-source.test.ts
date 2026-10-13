@@ -18,8 +18,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { openRecord, type Declaration, type Kernel } from '../src/index.ts';
+import { ANSWER_KEYS, openRecord, type Declaration, type Kernel } from '../src/index.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
+
+/* `wholeRead` IS HANDED ONLY WHERE `ANSWER_KEYS` LISTS IT (`handsWhole` in `pages.ts`; `sums-whole.test.ts` holds the gate).
+   `block-keys.ts` is not this job's file, so until it lists the key the heat tests below list it themselves. */
+if (!ANSWER_KEYS.includes('wholeRead')) (ANSWER_KEYS as string[]).push('wholeRead');
 
 const NOW = Date.UTC(2026, 8, 9, 12);
 const day = (offset: number) => new Date(NOW + offset * 86_400_000).toISOString().slice(0, 10);
@@ -90,19 +94,96 @@ test('A HEAT OVER SIXTY DAYS READS SIXTY ROWS, and it read fifty and drew ten bu
   sql.close();
 });
 
-test('AND A HEAT PAST ONE READ IS REFUSED in the sentence every kind that adds up gets', async () => {
-  /* 201 IS THE FIRST COUNT PAST THE 200 A BLOCK THAT ADDS UP READS, so this is the edge and not a big number. */
+type Whole = { rows: { label: unknown; who?: unknown; rows: number; value: number | null; of?: number | null }[]; total: number | null; of?: number | null; outside?: number };
+const wholeOf = (b: Answered): Whole => {
+  const w = (b as { wholeRead?: Whole }).wholeRead;
+  assert.ok(w, 'the heat answered no wholeRead');
+  return w;
+};
+
+test('AND A HEAT PAST 200 ROWS IS ADDED UP WHOLE, a day a part, where it was refused at its 201st row', async () => {
+  /* 201 WAS THE FIRST COUNT PAST THE 200 A BLOCK THAT ADDS UP READ, and the block answered `OUT_OF_BOUNDS` (PGS-B05). */
   const { k, sql } = await record(
     pageOf(HEAT),
-    Array.from({ length: 201 }, (_, n) => ({ what: `Row ${n}`, on: day(-(n % 80)), hours: 1, state: 'done' })),
+    Array.from({ length: 201 }, (_, n) => ({ what: `Row ${n}`, on: day(-(n % 67)), hours: 1, state: 'done' })),
   );
   const heat = first(k);
-  const said = heat.refusals ?? [];
-  assert.equal(said.length, 1, `a heat over 201 rows drew ${(heat.rows ?? []).length} rows and refused nothing`);
-  assert.equal(said[0]?.code, 'OUT_OF_BOUNDS');
-  assert.match(String(said[0]?.fix), /201/u);
-  assert.match(String(said[0]?.fix), /200/u);
-  assert.equal((heat.rows ?? []).length, 0, 'the block refused and handed back rows to add up anyway');
+  assert.deepEqual(heat.refusals, []);
+  assert.equal(heat.matched, 201);
+  const w = wholeOf(heat);
+  assert.equal(w.total, 201);
+  assert.equal(w.rows.length, 67, 'one part a day');
+  assert.equal(w.rows.reduce((a, r) => a + (r.value ?? 0), 0), 201);
+  assert.deepEqual(w.rows[0], { label: day(-66), rows: 3, value: 3 });
+  assert.equal(w.outside, 0);
+  sql.close();
+});
+
+test('a day outside the twelve weeks is counted and said, never placed, and a heat with no value column counts rows', async () => {
+  const { k, sql } = await record(pageOf({ ...HEAT, columns: [{ field: 'on' }] }), [
+    { what: 'Today', on: day(0), state: 'done' },
+    { what: 'Today too', on: day(0), state: 'open' },
+    { what: 'Last year', on: day(-400), state: 'done' },
+    { what: 'Tomorrow', on: day(1), state: 'open' },
+    { what: 'No day', state: 'open' },
+  ]);
+  const w = wholeOf(first(k));
+  assert.deepEqual(w.rows, [{ label: day(0), rows: 2, value: 2 }]);
+  assert.equal(w.total, 5, 'the total is of every row the where admits');
+  assert.equal(w.outside, 3);
+  sql.close();
+});
+
+/* A HEAT'S `of:` (D25.32): each day's wash is the share of that day's whole that the `where` admits. */
+const SHARED = [
+  { what: 'A', on: day(0), hours: 2, state: 'done' },
+  { what: 'B', on: day(0), hours: 2, state: 'done' },
+  { what: 'C', on: day(0), hours: 1, state: 'done' },
+  { what: 'D', on: day(0), hours: 1, state: 'done' },
+  { what: 'E', on: day(-1), hours: 2, state: 'done' },
+  { what: 'F', on: day(-1), hours: 3, state: 'done' },
+  /* OUTSIDE THE WHOLE, so it is in neither the part nor the whole though the `where` alone admits it. */
+  { what: 'G', on: day(-1), hours: 2, state: 'open' },
+];
+const TWOS = { field: 'hours', is: 2 };
+
+test('A HEAT WITH AN OF: SAYS EACH DAY AS A SHARE OF THAT DAY\'S WHOLE, the part inside the whole', async () => {
+  const { k, sql } = await record(pageOf(HEAT), SHARED);
+  const heat = k.block({ ...HEAT, where: TWOS, of: 'state is done' } as never) as Answered;
+  assert.deepEqual(heat.refusals, []);
+  const w = wholeOf(heat);
+  assert.deepEqual(w.rows, [
+    { label: day(-1), rows: 1, value: 2, of: 5 },
+    { label: day(0), rows: 2, value: 4, of: 6 },
+  ]);
+  assert.equal(w.total, 6);
+  assert.equal(w.of, 11);
+  /* WITH NO `of:` THERE IS NO SHARE TO SAY, and the open row the where admits is counted. */
+  const plain = wholeOf(k.block({ ...HEAT, where: TWOS } as never) as Answered);
+  assert.deepEqual(plain.rows, [
+    { label: day(-1), rows: 2, value: 4 },
+    { label: day(0), rows: 2, value: 4 },
+  ]);
+  assert.equal(plain.of, undefined);
+  sql.close();
+});
+
+test('a heat that counts rows shares by rows, and an of: that is not a sentence or names no field is refused at of:', async () => {
+  const { k, sql } = await record(pageOf(HEAT), SHARED);
+  const counted = wholeOf(k.block({ ...HEAT, columns: [{ field: 'on' }], where: TWOS, of: 'state is done' } as never) as Answered);
+  assert.deepEqual(counted.rows, [
+    { label: day(-1), rows: 1, value: 1, of: 2 },
+    { label: day(0), rows: 2, value: 2, of: 4 },
+  ]);
+  const number = k.block({ ...HEAT, of: 5 } as never) as Answered;
+  assert.equal(number.refusals?.[0]?.code, 'VALUE_MALFORMED', JSON.stringify(number.refusals));
+  assert.equal(number.refusals?.[0]?.at, 'of');
+  const unknown = k.block({ ...HEAT, of: 'colour is red' } as never) as Answered;
+  assert.equal(unknown.refusals?.[0]?.at, 'of', JSON.stringify(unknown.refusals));
+  /* AND A HEAT AN AUTHOR WROTE OUT HAS NO LIST TO BE A SHARE OF. */
+  const authored = k.block({ kind: 'heat', heading: 'Hours', of: 'state is done' } as never) as Answered;
+  assert.equal(authored.refusals?.[0]?.at, 'of', JSON.stringify(authored.refusals));
+  assert.match(String(authored.refusals?.[0]?.fix), /this heat is not over a list/u);
   sql.close();
 });
 
@@ -390,5 +471,31 @@ test('A RING THAT INHERITS IS SET AGAINST ITS PROJECT\'S ROWS AND THE ONES THAT 
   assert.equal(unscoped?.refusals?.[0]?.code, 'FIELD_UNKNOWN', JSON.stringify(unscoped?.refusals));
   assert.equal(unscoped?.refusals?.[0]?.at, 'inherit');
   assert.deepEqual(unscoped?.rows ?? [], []);
+  sql.close();
+});
+
+test('CHIPS THAT INHERIT COUNT THEIR PROJECT\'S ROWS AND THE ONES THAT APPLY EVERYWHERE, as the list beside them reads', async () => {
+  /* THE SAME RECORD AS THE RING ABOVE: Kiln's 4 jobs and the 2 global ones are 6, 3 of them done; Portage's 10 are not Kiln's. */
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  const installed = await k.install([PROJECTS, JOBS]);
+  assert.ok(installed.ok, JSON.stringify(installed));
+  assert.ok(k.create('things', { name: 'Kiln' }, { actor: 'p_1' }).ok);
+  assert.ok(k.create('things', { name: 'Portage' }, { actor: 'p_1' }).ok);
+  const add = (n: number, done: number, project?: string) => {
+    for (let i = 0; i < n; i++)
+      assert.ok(k.create('jobs', { what: `${project ?? 'Global'} ${i}`, state: i < done ? 'done' : 'open', ...(project ? { project } : {}) }, { actor: 'p_1' }).ok);
+  };
+  add(4, 2, 'things#1');
+  add(10, 5, 'things#2');
+  add(2, 1);
+  const b = k.block({ kind: 'chips', source: 'register.jobs', where: 'project is Kiln', inherit: true, columns: [{ field: 'state' }] } as never) as Answered & {
+    matched?: number;
+    wholeRead?: { rows: { label: unknown; rows: number; value: number | null }[]; total: number | null };
+  };
+  assert.deepEqual(b.refusals, []);
+  assert.equal(b.matched, 6);
+  assert.equal(b.wholeRead?.total, 6);
+  assert.deepEqual(b.wholeRead?.rows.map((r) => [r.label, r.value]).sort(), [['done', 3], ['open', 3]]);
   sql.close();
 });

@@ -46,6 +46,7 @@ import { methods as pagesCensus } from './pages-census.ts';
 import { methods as capture } from './capture.ts';
 import { methods as shape } from './shape.ts';
 import { methods as countBy } from './count-by.ts';
+import { methods as trust } from './trust.ts';
 /* END METHODS */
 
 /**
@@ -143,6 +144,7 @@ export function methods(deps: RecordDeps) {
     ...capture(deps),
     ...shape(deps),
     ...countBy(deps),
+    ...trust(deps),
     /* END METHODS */
   };
 }

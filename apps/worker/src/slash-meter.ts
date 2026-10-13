@@ -53,13 +53,43 @@ function meterBuilder(env: SlashEnv, api: () => RecordApi, deps: SlashEngineDeps
 }
 
 /**
- * THE PRESS AND THE FIRST PLAN ONLY, AND NO BACKGROUND ASK. `slashRecordMeter`'s `background` counts the month's own
- * allowance and not the operator's ceiling, so handed to the record it let the daily look reach the binding at a
- * ceiling of 0 (`test/slash-ceiling-all.test.ts`). The record reads a meter without it as "the look asks nothing".
+ * The day the month `ms` falls in resets, and the refusal a background ask is turned away with at the operator's ceiling:
+ * the ceiling's own sentence (`operatorCeiling`), ended with what waits.
+ */
+const ceilingSpent = (ms: number, waits: string): { ok: false; refusal: { code: string; fix: string } } => {
+  const at = new Date(ms);
+  const resets = new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth() + 1, 1)).toISOString().slice(0, 10);
+  return { ok: false, refusal: { code: 'SLASH_BUDGET_SPENT', fix: `Slash has asked this host's model as often as one record may in a month, so ${waits} until ${resets}.` } };
+};
+
+/** What waits while the ceiling holds, by what the background ask was for: the end of the sentence a person reads. */
+const WAITS = {
+  look: 'its daily look keeps to its own rules',
+  skill: 'no skill is drafted',
+  headline: 'each page keeps its own line',
+} as const;
+
+/**
+ * THE PRESS, THE FIRST PLAN, AND THE RECORD'S OWN BACKGROUND ASKS: the daily look's draft, a skill's next version and the
+ * pages' headlines, each one ask of the background's month (`slashRecordMeter.background`) and never one of his.
+ *
+ * AND UNDER THE OPERATOR'S CEILING FIRST, which that `background` does not read: it counts the month's own allowance, so
+ * handed to the record bare it let the daily look reach the binding at a ceiling of 0 (`test/slash-ceiling-all.test.ts`),
+ * and for that the meter once had no `background` at all and the record answered that this host could not count one, on
+ * every Cloud record. Where the ceiling has turned the month's calls on the included model away, nothing is held and
+ * nothing is asked, as `workerUnderstandLedger` does for its own kind. On his own key there is no ceiling of the
+ * operator's, and only the share binds. A call it lets through is still held to the worst ask the ceiling counts it at (`slash.ts` `recordAskMost`).
  */
 export function workerSlashMeter(env: SlashEnv, api: () => RecordApi, deps: SlashEngineDeps): SlashMeter {
   const built = meterBuilder(env, api, deps);
-  return { hold: async (kind) => (await built()).hold(kind) };
+  return {
+    hold: async (kind) => (await built()).hold(kind),
+    background: async (kind = 'skill') => {
+      const meter = await built();
+      if (await includedCeilingReached(env, deps)) return ceilingSpent(deps.clock.now(), WAITS[kind] ?? WAITS.skill);
+      return meter.background(kind);
+    },
+  };
 }
 
 /**
@@ -75,17 +105,7 @@ export function workerUnderstandLedger(env: SlashEnv, api: () => RecordApi, deps
   return {
     background: async (kind) => {
       const meter = await built();
-      if (await includedCeilingReached(env, deps)) {
-        const at = new Date(deps.clock.now());
-        const resets = new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth() + 1, 1)).toISOString().slice(0, 10);
-        return {
-          ok: false,
-          refusal: {
-            code: 'SLASH_BUDGET_SPENT',
-            fix: `Slash has asked this host's model as often as one record may in a month, so the doubtful names wait until ${resets}.`,
-          },
-        };
-      }
+      if (await includedCeilingReached(env, deps)) return ceilingSpent(deps.clock.now(), 'the doubtful names wait');
       return meter.background(kind);
     },
   };

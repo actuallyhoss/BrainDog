@@ -33,6 +33,7 @@ import { ROUTES as withdraw } from './withdraw.ts';
 import { ROUTES as door } from './door.ts';
 import { ROUTES as engine } from './engine.ts';
 import { ROUTES as capture } from './capture.ts';
+import { ROUTES as trust } from './trust.ts';
 /* END ROUTES */
 
 export const EXTRA_ROUTES: readonly Route[] = [
@@ -57,5 +58,6 @@ export const EXTRA_ROUTES: readonly Route[] = [
   ...door,
   ...engine,
   ...capture,
+  ...trust,
   /* END ROUTES */
 ];

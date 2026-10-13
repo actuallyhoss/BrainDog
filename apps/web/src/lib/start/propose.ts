@@ -255,30 +255,66 @@ const WHOLE: readonly Whole[] = [
 /* ── what the person said they do not have ──────────────────────────── */
 
 /*
- * A THING SAID NOT TO BE HAD: "no orders", "not a shop", "without invoices", "I don't take orders". The word of refusal
- * comes straight before the phrase, with at most two small words between, and then only words that say how big a place is
- * (`PLAIN`), so "no late orders" and "I don't want to lose my orders" are still orders.
+ * A THING SAID NOT TO BE HAD: "no orders", "not a shop", "without invoices", "I don't take orders", "I never had
+ * orders", "I no longer take any orders", "I haven't got invoices". The word of refusal comes straight before the phrase,
+ * with at most three small words between, and then only words that say how big a place is (`PLAIN`), so "no late
+ * orders" and "I don't want to lose my orders" are still orders.
  */
 const NOT = new RegExp(
-  `(?:^|[^\\p{L}\\p{N}])(?:no|not|never|without|zero|don['’]?t|do\\s+not|doesn['’]?t|does\\s+not)\\s+(?:(?:any|more|have|take|get|do|sell|keep|need|want|track|run|own|a|an|the)\\s+){0,2}(?:(?:${[...PLAIN].join('|')})\\s+)*$`,
+  `(?:^|[^\\p{L}\\p{N}])(?:no|not|never|without|zero|don['’]?t|do\\s+not|doesn['’]?t|does\\s+not|haven['’]?t|hasn['’]?t|hadn['’]?t)\\s+(?:(?:any|more|longer|ever|have|had|got|take|get|do|sell|keep|need|want|track|run|own|a|an|the)\\s+){0,3}(?:(?:${[...PLAIN].join('|')})\\s+)*$`,
   'iu',
 );
 
 type Said = { at: number; text: string };
 
+/*
+ * WHAT JOINS THE NEXT THING TO THE ONE BEFORE: a comma, "and", "or", "nor", then at most a small word and words of size.
+ * `AND_OR` is the "and" or "or" a run of commas ends in, looked for after a thing that follows a bare comma.
+ */
+const JOINED = new RegExp(`(?:\\s*,\\s*(?:(and|or|nor)\\s+)?|\\s+(and|or|nor)\\s+)(?:(?:any|a|an|the|my|our)\\s+)?(?:(?:${[...PLAIN].join('|')})\\s+)*$`, 'iu');
+const AND_OR = /^(?:\s*,\s*(?!(?:and|or|nor)\s)[\p{L}\p{N}'’-]+(?:\s+(?!(?:and|or|nor)\s)[\p{L}\p{N}'’-]+){0,2})*\s*,?\s*(and|or|nor)\s/iu;
+/* More than one of a thing, as far as its last letters say: "invoices" and "taxes", never "business". */
+const MANY = /[\p{L}]s$/iu;
+
 /**
  * WHETHER A PHRASE WAS REFUSED where it sits in what was said: "freelance designer, no orders" offered Orders and
  * Products, because the word was heard and the "no" before it was not. A phrase lit whole (`WHOLE`) is refused from
  * where the whole of it starts, so "I don't run a small shop" refuses the shop.
+ *
+ * THE REFUSAL IS CARRIED TO WHAT IS JOINED STRAIGHT ON: "no orders or invoices" is no Invoices either, and so is every
+ * thing in "no orders, invoices or products". "or" always carries. "and" carries to a thing there is more than one of,
+ * so "I don't take orders and invoices" refuses both and "not a shop and freelance as a designer" keeps the
+ * freelancing. A bare comma carries only inside a run that ends in "and" or "or", read as that word, so "no shop,
+ * freelance designer" keeps the designer. Words between ("no orders, I send invoices") end the carry. `known` is every
+ * phrase heard, so the thing before the join is found whole ("no study sessions or courses").
  */
-function refusedIn(said: string): (span: Said) => boolean {
+function refusedIn(said: string, known: readonly Said[] = []): (span: Said) => boolean {
   const wholes = WHOLE.flatMap((w) => {
     const span = w.re.exec(said)?.indices?.[w.group];
     return span ? [span] : [];
   });
+  const whole = (at: number, to: number): [number, number] => wholes.find(([a, b]) => at >= a && to <= b) ?? [at, to];
+  const refused = (from: number, to: number): boolean => {
+    if (NOT.test(said.slice(0, from))) return true;
+    const before = said.slice(0, from);
+    const join = JOINED.exec(before);
+    if (!join) return false;
+    let word = (join[1] ?? join[2])?.toLowerCase();
+    if (word === undefined) {
+      word = AND_OR.exec(said.slice(to))?.[1]?.toLowerCase();
+      if (word === undefined) return false;
+    }
+    if (word === 'and' && (!MANY.test(said.slice(from, to)) || /ss$/iu.test(said.slice(from, to)))) return false;
+    /* THE THING BEFORE THE JOIN: a phrase heard that ends there, or failing one the single word that does. */
+    const end = join.index;
+    const last = /[\p{L}\p{N}'’-]+$/u.exec(before.slice(0, end));
+    const starts = new Set(known.filter((k) => k.at + k.text.length === end).map((k) => k.at));
+    if (last) starts.add(last.index);
+    return [...starts].some((at) => at < from && refused(whole(at, end)[0], end));
+  };
   return (span) => {
-    const from = wholes.find(([a, b]) => span.at >= a && span.at + span.text.length <= b)?.[0] ?? span.at;
-    return NOT.test(said.slice(0, span.at)) || NOT.test(said.slice(0, from));
+    const [from, to] = whole(span.at, span.at + span.text.length);
+    return NOT.test(said.slice(0, span.at)) || refused(from, to);
   };
 }
 
@@ -438,9 +474,11 @@ export function propose(sentence: string, ctx: ProposeContext): Proposal {
   /* THE CATALOGUE'S SIGNALS: the bundled modules' own, and those of any other pack the caller can offer. */
   const offers = [...BUNDLED, ...(ctx.catalogue ?? []).filter((o) => !BUNDLED.some((b) => b.id === o.id))];
   /* WHAT THE PERSON SAID THEY DO NOT HAVE IS NOT HEARD, by the modules or by the use cases: "no orders" is no Orders. */
-  const no = refusedIn(said);
-  const read = unrefused(shape(said, today ?? undefined, offers), no);
-  const arranged = unrefusedCases(arrangeTurns(null, said), no);
+  const all = shape(said, today ?? undefined, offers);
+  const turns = arrangeTurns(null, said);
+  const no = refusedIn(said, [...all.heard, ...all.packs.flatMap((p) => p.why), ...turns.ranked.flatMap((r) => r.why)]);
+  const read = unrefused(all, no);
+  const arranged = unrefusedCases(turns, no);
   const u = read.declined === 'language' ? null : arranged.pick;
   const beside = u ? alongside(arranged, u) : [];
   const modules = modulesOf(read, said, who.name !== null, u, beside, offers);

@@ -1513,6 +1513,18 @@ const DECLARED: Record<string, Version> = {
       "This week starts today (`orders-due-7d`) and late is its own figure and tile (`orders-late`); a part-paid order is owed (`orders-owed`); the line names the oldest order nothing was paid on and counts the rest (`orders-owed-named`, `orders-owed-other`, shop-sentence-52) -> 4fae7db21e74ee81",
     ],
   },
+  'shop@1.2.0': {
+    holds: `
+      metric.orders-30d metric.orders-due-7d metric.orders-late metric.orders-owed metric.orders-owed-named metric.orders-owed-other
+      page.orders register.orders register.products setting.label_orders
+      setting.label_people setting.label_products setting.one_orders setting.one_people setting.one_products
+      setting.shared_version setting.speaks setting.voice_coming_up setting.voice_fills_with setting.voice_nothing_due
+    `,
+    declares: '4b43574d8fd8259f',
+    history: [
+      'The Orders line counts every other order nothing was paid on beside the one it names (`orders-owed-named.more` in `page.orders`, shop-owed-53-54) -> 4b43574d8fd8259f',
+    ],
+  },
 };
 
 /** The shortest a reason may be. The value it justifies is sixteen characters, and a reason has to be worth more room than that. */

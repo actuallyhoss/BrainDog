@@ -462,7 +462,8 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   kernel walks each cash account entry by entry from its newest statement, apart from the roll, and the figure is the
  *   difference a currency at a time: nought, or the figure on Money is wrong. With no balance typed it has no value.
  *   MONEY-CORE 3.16.0 IS RELEASED (`test/fixtures/released/money-core-3.16.0.json`), so this is a version of its own. One
- *   figure added, nothing taken away or retyped, so a minor step that reaches a record on its own. No page draws it yet.
+ *   figure added, nothing taken away or retyped, so a minor step that reaches a record on its own. The Money page draws it (cash-page-54): one tile under the walk while it is not nought, and one line while no
+ *   balance is typed.
  * - portfolio 1.16.0 and work 1.18.0 (batch 46, REC-C08's remainder and REC-C16): a project others point at stays. Projects
  *   declares `delete: refuse_while_referenced`, as Accounts does, so a project a task, a bill, a service or a person names
  *   is not deleted out from under them, and the refusal names the lists and how many. Under What each one earns, one

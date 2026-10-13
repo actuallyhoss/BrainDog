@@ -68,7 +68,7 @@ test('READ AFTER WRITE: the host keeps the last drill, the ops record takes its 
 
   const res = await post(c, { ...BODY, records: null });
   assert.equal(res.status, 200, await res.clone().text());
-  const said = { at: AT, pass: true, records: 2, directory_only: false };
+  const said = { at: AT, pass: true, record_copies: 2, directory_only: false };
   assert.deepEqual(await res.json(), { ok: true, value: said });
   assert.deepEqual(await (await c.ask('/account/drill', { cookie })).json(), { ok: true, value: said });
 
@@ -78,7 +78,7 @@ test('READ AFTER WRITE: the host keeps the last drill, the ops record takes its 
   /* A LATER, FAILED DRILL REPLACES IT: the host keeps the last, not a history. */
   const failed = await post(c, { ...BODY, pass: false });
   assert.equal(failed.status, 200);
-  assert.deepEqual(await (await c.ask('/account/drill', { cookie })).json(), { ok: true, value: { at: AT, pass: false, records: 2, directory_only: false } });
+  assert.deepEqual(await (await c.ask('/account/drill', { cookie })).json(), { ok: true, value: { at: AT, pass: false, record_copies: 2, directory_only: false } });
 });
 
 test('readDrill: counts only, records null when the Directory was not opened, and the note in the walk\'s form', () => {
@@ -90,24 +90,26 @@ test('readDrill: counts only, records null when the Directory was not opened, an
   /* THE DIRECTORY ALONE (`--directory`, no `--record`) is a drill that opened a copy, so it may pass with no record's. */
   const directoryOnly = readDrill({ at: AT, pass: true, copies: 0, rows: 0, lists: 0, people: 0, records: 7 });
   assert.ok(directoryOnly.ok, directoryOnly.ok ? '' : directoryOnly.fix);
-  assert.equal(drillNote(directoryOnly.value), `drill ${AT.slice(0, 10)} · pass · 0 records`);
+  assert.equal(drillNote(directoryOnly.value), `drill ${AT.slice(0, 10)} · pass · directory only`);
+  /* AND A FAILED ONE SAYS SO TOO, never `0 records`: it opened the Directory's copy and no record's. */
+  assert.equal(drillNote({ ...directoryOnly.value, pass: false }), `drill ${AT.slice(0, 10)} · fail · directory only`);
 });
 
 test('THE DIRECTORY ALONE is said in a field of its own, never left to a zero', async () => {
   const read = readDrill({ at: AT, pass: true, copies: 0, rows: 0, lists: 0, people: 0, records: 7 });
   assert.ok(read.ok);
   assert.equal(directoryOnly(read.value), true);
-  assert.deepEqual(drillAnswer(read.value), { at: AT, pass: true, records: 0, directory_only: true });
+  assert.deepEqual(drillAnswer(read.value), { at: AT, pass: true, record_copies: 0, directory_only: true });
   /* A record's copy opened beside the Directory's is not the Directory alone, and neither is a failed drill that opened nothing. */
-  assert.deepEqual(drillAnswer({ ...read.value, copies: 2 }), { at: AT, pass: true, records: 2, directory_only: false });
-  assert.deepEqual(drillAnswer({ ...read.value, pass: false, records: null }), { at: AT, pass: false, records: 0, directory_only: false });
+  assert.deepEqual(drillAnswer({ ...read.value, copies: 2 }), { at: AT, pass: true, record_copies: 2, directory_only: false });
+  assert.deepEqual(drillAnswer({ ...read.value, pass: false, records: null }), { at: AT, pass: false, record_copies: 0, directory_only: false });
   assert.deepEqual(drillAnswer(null), { at: null });
 
   /* THROUGH THE DOOR: the post's answer and the signed-in read both carry it. */
   const c = await cloud({ PROVISION_KEY: OPERATOR });
   await c.provision(OPS, 'ops', 'ada@example.test');
   const cookie = await c.signIn('ada@example.test');
-  const want = { ok: true, value: { at: AT, pass: true, records: 0, directory_only: true } };
+  const want = { ok: true, value: { at: AT, pass: true, record_copies: 0, directory_only: true } };
   assert.deepEqual(await (await post(c, { ...BODY, copies: 0 })).json(), want);
   assert.deepEqual(await (await c.ask('/account/drill', { cookie })).json(), want);
 });
@@ -131,7 +133,7 @@ test('THROUGH THE DOOR, AN OLDER DRILL IS IGNORED: the newest stays, the answer 
   const c = await cloud({ PROVISION_KEY: OPERATOR, OPS_RECORD: OPS });
   await c.provision(OPS, 'ops', 'ada@example.test');
   const cookie = await c.signIn('ada@example.test');
-  const kept = { at: AT, pass: true, records: 2, directory_only: false };
+  const kept = { at: AT, pass: true, record_copies: 2, directory_only: false };
   assert.equal((await post(c, { ...BODY, records: null })).status, 200);
 
   const older = new Date(Date.parse(AT) - 24 * 3_600_000).toISOString();

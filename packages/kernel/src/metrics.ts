@@ -56,7 +56,7 @@ import { RECORD_KEY_SCAN, readKeysInText } from './key-scan.ts';
 import { isCurrencyCode } from './coerce.ts';
 import type { Leg } from './forecast.ts';
 import type { VitalSign } from './signs.ts';
-import { across, convertMinor, dayFieldOf, pairParts, rateFor, rateIsStale, type Part, type Rate, type Reduce } from './fx.ts';
+import { across, convertMinor, dayFieldOf, isAtLeast, pairParts, partsOf, rateFor, rateIsStale, type Across as Added, type Amount, type Part, type Rate, type Reduce } from './fx.ts';
 /* THE TWO FIGURES THAT ARE NOT A SUM OVER ONE LIST, read in their own file, which imports this one back (it says why that is safe). */
 import { isCrosscheck, isRolled, isWalked, readCrosscheck, readRolled, readWalk } from './money-figures.ts';
 
@@ -338,6 +338,14 @@ export type Reading = {
   parts?: Part[];
   /** Present when the rows were in a currency other than the one the figure is added up in: converted, or in `parts`. */
   fx?: FxRead;
+  /**
+   * A SUM THAT CONVERTED WHAT IT COULD AND LEFT THE REST OUT (`fx.ts` `atleast`, REC-B05). `parts[0]` is then the least
+   * the whole can be, in `fx.into`, and `noRate` is what no rate reached, one amount a currency, each more than nought;
+   * `parts` is the two together and `fx.missing` names each pair. `value` STAYS `null`: a lower bound in `value` is
+   * drawn as the total by every reader that has not learnt the mark, and no reader has yet. Absent on every other figure.
+   */
+  atLeast?: true;
+  noRate?: Part[];
   /**
    * A MONEY FIGURE CONVERTED OUT OF THE CURRENCY IT DECLARES HAS ITS TARGET CONVERTED TOO, at the latest rate from that
    * currency into this one, and `met` is read against it. Absent when there is no such rate, and then `met` is `null`.
@@ -784,7 +792,34 @@ export type EvalContext = {
 };
 
 /** What a money sum needs to add across currencies: the currency, the rates, today, and the field that dates a row. */
-type Across = { into: string | null; home: string | null; rates: readonly Rate[]; today: string; day: string | null };
+type Across = { into: string | null; home: string | null; rates: readonly Rate[]; today: string; day: string | null; halves?: true };
+
+/** What a reading says of a sum added up across currencies, before its rows and its verdict (`across` in `fx.ts`). */
+export type AcrossSaid = Pick<Reading, 'value' | 'unit' | 'parts' | 'fx' | 'atLeast' | 'noRate'>;
+
+/**
+ * One answer of `across` as a reading says it, the one place both the declared figures and the rolled ones read it.
+ *
+ * AN AT-LEAST SUM IS SAID IN PARTS, THE CONVERTED AMOUNT FIRST AND WHAT NO RATE REACHED AFTER IT, with `atLeast` and
+ * `noRate` beside them. It is never a `value`, so nothing compares it, holds it to a target, subtracts it or draws it
+ * as a plain total. `whole` false is a half of a ratio or a diff, or any reader that cannot say a bound: it gets one
+ * amount a currency, unconverted, as before `atleast` existed. A part left out at exactly nought is not listed, and a
+ * sum with nothing else left out is simply converted.
+ */
+export function acrossSaid(said: Added, amounts: readonly Amount[], into: string | null, home: string | null, whole = true): AcrossSaid {
+  if (said.kind === 'one') return { value: said.amount, unit: said.currency };
+  const dated = said.kind === 'parts' ? null : { into, home, asOf: said.asOf || null, forward: said.forward, stale: said.stale };
+  if (said.kind === 'converted') return { value: said.amount, unit: said.currency, fx: { ...dated!, asOf: said.asOf, missing: [] } };
+  if (isAtLeast(said)) {
+    const left = said.left.filter((p) => p.amount !== 0);
+    if (left.length === 0) return { value: said.amount, unit: said.currency, fx: { ...dated!, missing: [] } };
+    const missing = said.missing.map((c) => `${c} to ${said.currency}`).sort();
+    if (whole && left.length > 0)
+      return { value: null, unit: null, parts: [{ currency: said.currency, amount: said.amount }, ...left], atLeast: true, noRate: left, fx: { ...dated!, missing } };
+    return { value: null, unit: null, parts: partsOf(amounts), fx: { into, home, asOf: null, forward: false, stale: false, missing } };
+  }
+  return { value: null, unit: null, parts: said.parts, fx: { into, home, asOf: null, forward: false, stale: false, missing: said.missing } };
+}
 
 /**
  * The predicate a declaration meant, whichever form it wrote it in.
@@ -1866,8 +1901,9 @@ function read(
        checker which half of the union it is holding, and a boolean does not carry that. */
     const ratio = 'ratio' in decl.value;
     const pair = 'ratio' in decl.value ? decl.value.ratio : decl.value.diff;
-    const of = one(sql, schema, pair.of, where, params, lookups, fx);
-    const per = one(sql, schema, pair.per, where, params, lookups, fx);
+    const half: Across | undefined = fx ? { ...fx, halves: true } : undefined;
+    const of = one(sql, schema, pair.of, where, params, lookups, half);
+    const per = one(sql, schema, pair.per, where, params, lookups, half);
     if (!of.ok) return of;
     if (!per.ok) return per;
     /* A HALF IN PARTS, OR TWO HALVES IN TWO CURRENCIES, IS THE FIGURE ONCE PER CURRENCY: each half read again over the rows
@@ -2174,10 +2210,9 @@ function aggregate(
       /* CONVERTED WHEN SOMEBODY CHOSE THE CURRENCY TO ADD UP IN: the record's home currency, or the one a row the figure
          is about says it is kept in (`groupNames`, `scopeCurrency`). `into` is one of the two or it is `null`. */
       const said = across(amounts, fx.into, fx.rates, fx.today, fx.into !== null, kind as Reduce);
-      if (said.kind === 'one') return ok({ value: said.amount, unit: said.currency, rows, refusals: [] });
-      if (said.kind === 'converted')
-        return ok({ value: said.amount, unit: said.currency, rows, refusals: [], fx: { into: fx.into, home: fx.home, asOf: said.asOf, forward: said.forward, stale: said.stale, missing: [] } });
-      return ok({ value: null, unit: null, rows, refusals: [], parts: said.parts, fx: { into: fx.into, home: fx.home, asOf: null, forward: false, stale: false, missing: said.missing } });
+      /* ONE, CONVERTED, AT LEAST OR IN PARTS (`acrossSaid`). A half of a ratio or a diff is never at least: a bound
+         less a bound, or over one, is a bound on nothing. */
+      return ok({ ...acrossSaid(said, amounts, fx.into, fx.home, fx.halves !== true), rows, refusals: [] });
     }
     /* AND A QUANTITY SAYS SO IN ITS OWN CODE. `04 §5` gives the unit case its own row, *"a
        `quantity` aggregation across units"*, with its own sentence: *"sums consumption across m,

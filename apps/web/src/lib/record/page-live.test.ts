@@ -1382,3 +1382,89 @@ test('THE DAY THE MONEY RUNS OUT IS SAID AS A DAY, in the red only on a tile its
     else delete METRICS['runs-out-on'];
   }
 });
+
+/** The rows of the first block a drawn answer makes, cell by cell. */
+const drawnCells = (block: ReturnType<typeof blockOf>): string[][] =>
+  toSegments(block).flatMap((s) => (s.type === 'block' ? s.rows.map((r) => r.cells) : []));
+
+/** The pence a drawn money cell says: `£1,234.50` and `GBP 1,234.50` are both 123450. */
+const pence = (cell: string): number => Math.round(Number(cell.replace(/[^0-9.]/g, '')) * 100);
+
+test('A BAR OVER MORE THAN THE RECORD HANDS BACK IS DRAWN FROM THE WHOLE, and its bars add to the total', () => {
+  /**
+   * HIS LEDGER HOLDS 217 AND A BAR OVER IT WAS REFUSED, because a sum over the first 200 is a wrong number and the
+   * record said so in place of drawing one. The record now adds the whole list up itself and answers it beside the
+   * rows as `wholeRead`: one line a label with what it adds to, and the total. Three hundred here, two hundred of
+   * them sent, and the bars are the three hundred's.
+   */
+  const whole = {
+    rows: [
+      { label: 'client_work', value: 9_000_000, currency: 'GBP' },
+      { label: 'tax', value: 2_500_050, currency: 'GBP' },
+      { label: 'software', value: 499_950, currency: 'GBP' },
+    ],
+    total: 12_000_000,
+  };
+  const sent = Array.from({ length: 200 }, (_, n) => row(n + 1, { ...obligation, category: 'client_work', amount: { amount: 100, currency: 'GBP' } }));
+  const bar = { kind: 'bar', source: 'register.obligations', columns: [{ field: 'category' }, { field: 'amount' }], rows: sent, matched: 300, refusals: [], wholeRead: whole };
+  const drawn = blockOf(bar as never, new Map(), AT);
+  assert.equal(drawn.cannot, undefined, 'a bar the record added up whole was refused');
+  assert.equal(drawn.total, 300);
+  assert.equal(drawn.shown, 300, 'a bar over the whole list drew a slice line');
+  const cells = drawnCells(drawn);
+  assert.equal(cells.length, 3, 'a label the whole holds drew no bar');
+  assert.equal(cells.reduce((n, c) => n + pence(c[1]!), 0), whole.total, 'the bars do not add to the total');
+
+  /* THE ROWS THEMSELVES WHEN THEY ARE ALL THERE: the whole is read only where the rows fall short of it. */
+  const all = blockOf({ ...bar, rows: sent.slice(0, 3), matched: 3 } as never, new Map(), AT);
+  assert.equal(drawnCells(all).reduce((n, c) => n + pence(c[1]!), 0), 300);
+
+  /* AND A RECORD THAT SENDS NO WHOLE, OR ONE THAT DOES NOT READ, IS STILL NOT ADDED UP FROM A SLICE. */
+  const { wholeRead: _none, ...short } = bar;
+  assert.equal(blockOf(short as never, new Map(), AT).cannot, liveWords.cannot);
+  /* AND ONE THAT LEFT LABELS OUT PAST THE CAP (`rest`) IS NOT DRAWN AS IF ITS LINES WERE THE WHOLE LIST. */
+  const capped = { rows: [{ label: 'tax', value: 12 }], total: 40, rest: { labels: 101, rows: 140, value: 28 } };
+  for (const bad of ['all', { rows: 'many' }, { rows: [{ label: 'tax', value: '12' }] }, { rows: [{ label: 'tax', value: 1, currency: 7 }] }, capped])
+    assert.equal(blockOf({ ...bar, wholeRead: bad } as never, new Map(), AT).cannot, liveWords.cannot, JSON.stringify(bad));
+});
+
+test("THE KERNEL'S OWN WHOLE (`unit`, `rows`, and `parts` for money it could not add) IS READ AS IT IS SENT", () => {
+  const sent = Array.from({ length: 200 }, (_, n) => row(n + 1, { ...obligation, category: 'a', amount: { amount: 100, currency: 'GBP' } }));
+  const whole = {
+    rows: [
+      { label: 'a', rows: 250, value: 50_000, unit: 'GBP' },
+      { label: 'b', rows: 50, value: null, parts: [{ currency: 'GBP', amount: 1_000 }, { currency: 'USD', amount: 2_000 }] },
+    ],
+    total: null,
+  };
+  const bar = { kind: 'bar', source: 'register.obligations', columns: [{ field: 'category' }, { field: 'amount' }], rows: sent, matched: 300, refusals: [], wholeRead: whole };
+  const drawn = blockOf(bar as never, new Map(), AT);
+  assert.equal(drawn.cannot, undefined);
+  assert.equal(drawnCells(drawn).length, 3, 'a label in two currencies is a line a currency');
+});
+
+test("A HEAT SET AGAINST ANOTHER WHOLE WRITES EACH DAY AS ITS SHARE, and a block that counts is handed its count", () => {
+  /* `of:` ON A HEAT: the record answers each day with what the block's `where` admits and that day's whole, and the
+     day is written `3 of 12`, which is how the renderer reads a share. The lines are read even when every row came
+     back, because only they say the whole. No line opens a row: it is a day's sum and no row of the list. */
+  const days = { rows: [{ label: '2026-09-14', value: 3, of: 12 }, { label: '2026-09-10', value: 0, of: 4 }], total: 3, of: 16 };
+  const heat = { kind: 'heat', source: 'register.tasks', columns: [{ field: 'by' }, { field: 'effort' }], rows: [], matched: 3, refusals: [], wholeRead: days };
+  const drawn = blockOf(heat as never, new Map(), AT);
+  assert.equal(drawn.cannot, undefined);
+  assert.deepEqual(drawnCells(drawn), [['14 Sep 2026', '3 of 12'], ['10 Sep 2026', '0 of 4']]);
+  assert.ok(toSegments(drawn).every((s) => s.type !== 'block' || s.rows.every((r) => r.ref === undefined)), 'a day of the whole opens a row');
+  /* AND ONE THAT DECLARES ONLY ITS DAY still says the share, in a second column of its own. */
+  const lone = blockOf({ ...heat, columns: [{ field: 'by' }] } as never, new Map(), AT);
+  assert.deepEqual(drawnCells(lone)[0], ['14 Sep 2026', '3 of 12']);
+  /* A DAY WITH NO WHOLE AMONG DAYS THAT HAVE ONE IS NOT GUESSED AT. */
+  assert.equal(blockOf({ ...heat, wholeRead: { rows: [...days.rows, { label: '2026-09-11', value: 1 }] } } as never, new Map(), AT).cannot, liveWords.cannot);
+
+  /* CHIPS COUNT ROWS, so a label's count is that many rows of it and never one. */
+  const chips = { kind: 'chips', source: 'register.tasks', columns: [{ field: 'state' }], rows: [], matched: 300, refusals: [], wholeRead: { rows: [{ label: 'review', value: 290 }, { label: 'done', value: 10 }], total: 300 } };
+  assert.deepEqual(drawnCells(blockOf(chips as never, new Map(), AT)).map((c) => c[1]), ['290', '10']);
+  assert.equal(blockOf({ ...chips, wholeRead: { rows: [{ label: 'review', value: 2.5 }] } } as never, new Map(), AT).cannot, liveWords.cannot);
+
+  /* AND A THIRD COLUMN IS NOT IN THE LINES: a progress against each row's target is not drawn from two of its three. */
+  const tracks = { kind: 'progress', source: 'register.tasks', columns: [{ field: 'what' }, { field: 'effort' }, { field: 'effort' }], rows: [], matched: 300, refusals: [], wholeRead: { rows: [{ label: 'a', value: 1 }] } };
+  assert.equal(blockOf(tracks as never, new Map(), AT).cannot, liveWords.cannot);
+});

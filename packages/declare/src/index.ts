@@ -26,7 +26,7 @@
 import type { Conflict, Refusal, Result } from '@braindog/ports';
 import { no, ok, refused } from '@braindog/ports';
 import { credentialKey as credential, credentialValue, NESTED_MOST, nestedPast } from './credentials.ts';
-import { FIRST_PARTY_LISTS } from './usecase.ts';
+import { FIRST_PARTY_LISTS, readChanges, type ListWords } from './usecase.ts';
 import { cardsFault } from './cards.ts';
 import { addressFault } from './address.ts';
 export { addressFault, addressFaults, listingFault } from './address.ts';
@@ -49,7 +49,7 @@ export type { Egress };
 export { SHARED_MOST_BYTES, SHARED_SUFFIX, exampleFields, exportUseCase, kindUnknownSentence, laterVersion, nextVersion, readShared, sharedFileName, unfilled, type ExportParts, type Shared, type VersionStep } from './shared.ts';
 export { looksLikeCredential } from './credentials.ts';
 export { CARDS_FOLD, CARDS_FOLD_MOST, cardsFault } from './cards.ts';
-export { AUDIENCES, FIRST_PARTY_LISTS, LABEL_KEY, MODULES, MODULE_LISTS, MODULE_WORDS, SHARED_VERSION, SPEAKS, VOICE_KEYS, VOICE_TAB_CHARS, VOICE_TAB_KEYS, labelKeyOf, labelSetting, labelsOf, speakingPack, voiceWhenAdding, voiceWrites, normaliseUseCase, packIdOf, useCasePack, voiceOf, voiceSetting, type Audience, type ExampleLink, type ModuleId, type SpeakingState, type UseCase, type VoiceKey } from './usecase.ts';
+export { AUDIENCES, FIRST_PARTY_LISTS, LABEL_KEY, MODULES, MODULE_LISTS, MODULE_WORDS, SHARED_VERSION, SPEAKS, VOICE_KEYS, VOICE_TAB_CHARS, VOICE_TAB_KEYS, labelKeyOf, labelSetting, labelsOf, overHidden, overSettings, speakingPack, voiceWhenAdding, voiceWrites, normaliseUseCase, packIdOf, useCasePack, voiceOf, voiceSetting, wordsOf, type AddonWords, type Audience, type ExampleLink, type ListWords, type ModuleId, type Over, type SpeakingState, type UseCase, type VoiceKey } from './usecase.ts';
 
 /* ── the grammars, and they are `34-GRAMMARS` §4's ───────────────────────── */
 
@@ -82,7 +82,11 @@ export const PACK_SOURCES = ['kennel', 'url', 'git', 'paste', 'local'] as const;
 export type PackSource = { kind: (typeof PACK_SOURCES)[number]; ref?: string };
 
 export type PackDeclaration = { kind: DeclKind; id: string; body: Record<string, Json>; canonical: string };
-export type Seed = { register: string; fields: Record<string, Json>; note?: string };
+/**
+ * One example row. `key` is the name the file gives it so another seed can point at it with `{ ref: '<key>' }`; it is
+ * the file's own word and never reaches the row. A field may hold `{ day: '+3' }`, a day counted from install day.
+ */
+export type Seed = { register: string; fields: Record<string, Json>; note?: string; key?: string };
 
 export type Manifest = {
   pack: string;
@@ -107,6 +111,20 @@ export type Manifest = {
    * declaration when the pack is planned and installed. `readConfig` in the kernel checks the map.
    */
   config?: Record<string, ConfigDecl>;
+  /**
+   * What a person calls each list this pack declares, many and one, by list id: `{ things: { name: 'Projects', one:
+   * 'project' } }` (SHL-A09). Absent when it says none.
+   *
+   * THE WORDS A RENAME STARTS FROM, SAID BY THE PACK THAT OWNS THE LIST. They were a table in code for the six modules,
+   * so a stranger's add-on could not offer its lists for renaming at all. Only the lists a person would rename are
+   * here: a list the pack keeps for its own sums is left out, and gets no box on the words screen.
+   */
+  words?: Record<string, ListWords>;
+  /**
+   * What this version changed, in its author's words, at most `CHANGES_MOST` characters. Absent when the file says none.
+   * Kept out of the checksum, as `title` is: a note about the pack is not the pack.
+   */
+  changes?: string;
   /**
    * The declarations this version stops declaring and gives to another pack, by id: `{ 'register.holdings': 'holdings' }`.
    * Absent when it hands nothing.
@@ -596,6 +614,11 @@ export type Host = {
   retire: (ids: readonly string[], by?: { actor: string; suggestion?: string }) => Result<unknown>;
   seed: (register: string, fields: Record<string, Json>, note: string | undefined) => Result<unknown>;
   /**
+   * Install day as the record's own clock reads it, YYYY-MM-DD: what a seed's `{ day: '+3' }` counts from. OPTIONAL, so
+   * every host written before a seed could say a day keeps compiling; without it the day is today in UTC.
+   */
+  today?: () => string;
+  /**
    * The `pack` row, and the ids it claims — read on uninstall. `approved` is the calls-out lines the owner approved
    * with this install, word for word, when it asked for any.
    */
@@ -695,6 +718,9 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
      money default is minor units and a currency here exactly as it is in a row. */
   const settings = readConfig(doc.config);
   if (!settings.ok) return settings as Result<Pack>;
+  /* WHAT THIS VERSION CHANGED, read where the file is read (SHL-A09), so the note is on the manifest a record keeps. */
+  const changes = readChanges(doc.changes);
+  if (!changes.ok) return changes as Result<Pack>;
   const manifest: Manifest = {
     pack: id,
     version,
@@ -711,6 +737,7 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
     ...(typeof doc.title === 'string' && doc.title.trim() !== '' ? { title: doc.title.trim().replace(/\s+/g, ' ') } : {}),
     /* ONLY WHEN THERE ARE SETTINGS, so a pack written before `config:` existed keeps its checksum. */
     ...(Object.keys(settings.value).length > 0 ? { config: settings.value } : {}),
+    ...(changes.value === null ? {} : { changes: changes.value }),
   };
 
   /* A PACK WHOSE ONLY CONTENT IS `extends` OR `adds` CHANGES SOMETHING, so it has no declarations to list and is not
@@ -801,6 +828,23 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
     const items = list === null ? undefined : body[list];
     if (list !== null && items !== undefined && (!Array.isArray(items) || items.some((item) => !isObject(item))))
       return malformed(`${declId} writes its ${list} as something other than a list of objects.`, `${declId}.${list}`);
+
+    /* `once` NAMES THE FIELDS AN UPDATE NEVER PATCHES ON A ROW THAT ALREADY HOLDS THEM (SHL-A09), and only a list has
+       fields to name. It is held to the list's own fields here, where the file is read, so a field the list does not
+       have is refused by its name before anything is planned. It stays on the declaration, which is where the update
+       path reads it. */
+    if (body.once !== undefined) {
+      const at = `${declId}.once`;
+      const called = typeof body.name === 'string' && body.name.trim() !== '' ? body.name : name;
+      if (kind !== 'register') return malformed(`Only a list says which of its fields are written once, and ${called} is a ${kind}.`, at);
+      const once = body.once;
+      if (!Array.isArray(once) || once.length === 0 || once.some((f) => typeof f !== 'string') || new Set(once).size !== once.length)
+        return malformed(`${called} says the fields written once as a list of field ids, each said one time, such as once: [opened].`, at);
+      const own = listOf(body, 'fields').map((f) => (isObject(f) ? String(f.id ?? '') : ''));
+      const stranger = (once as string[]).find((f) => !own.includes(f));
+      if (stranger !== undefined)
+        return no<Pack>('FIELD_UNKNOWN', `${called} has no field called ${stranger}, so it cannot be written once. Its fields are ${own.join(', ')}.`, { at, allowed: own });
+    }
 
     /* A REGISTER SAYS `id` ONCE IT IS STORED, and every other kind keeps its own word. That is the
        kernel's convention and it is a good one — a page carrying its own name twice would have a
@@ -923,6 +967,23 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
   }
 
   const registers = new Map(declarations.filter((d) => d.kind === 'register').map((d) => [d.body.id as string, d.body]));
+  /* `words` IS WHAT A PERSON CALLS EACH OF ITS LISTS, MANY AND ONE, and only its own: a pack that could name another's
+     list would rename it for everybody who holds both. Both words are said, because the screen that renames a list
+     shows both boxes and each starts from the pack's own word. Kept in the manifest and so in the checksum. */
+  if (doc.words !== undefined) {
+    if (!isObject(doc.words)) return malformed('`words` says what a person calls each list, like things: { name: Projects, one: project }.', 'words');
+    const words: Record<string, ListWords> = {};
+    for (const [list, said] of Object.entries(doc.words)) {
+      const at = `words.${list}`;
+      if (!registers.has(list))
+        return no<Pack>('FIELD_UNKNOWN', `${id} gives words to ${list}, which it does not declare. A pack names its own lists.`, { at, allowed: [...registers.keys()] });
+      const word = (v: unknown): v is string => typeof v === 'string' && v.trim() !== '' && !/[\r\n]/u.test(v) && new TextEncoder().encode(v).length <= 80;
+      if (!isObject(said) || Object.keys(said).some((k) => k !== 'name' && k !== 'one') || !word(said.name) || !word(said.one))
+        return no<Pack>('VALUE_MALFORMED', `${at} says what many are called and what one is called, each a word or a few: { name: Projects, one: project }.`, { at });
+      words[list] = { name: said.name.trim(), one: said.one.trim() };
+    }
+    if (Object.keys(words).length > 0) manifest.words = words;
+  }
   /* A CARDS BLOCK'S `group` IS A REF ON THE LIST IT READS, asked here of the lists this pack declares (`cards.ts`). */
   for (const d of declarations) {
     const grouped = d.kind === 'page' ? cardsFault(d.id, d.body, registers) : null;
@@ -932,6 +993,13 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
   /* A FEW EXAMPLES PER LIST, NOT ONE. A guide opens on the six stages a project passes and a board on more than one
      ticket, so one row per list made a use case open half told. The ceiling keeps an example set an example. */
   const seeded = new Map<string, number>();
+  /* Each seed's key with the list it is in, and each ref with where it stands and the list its field points at. */
+  const seedKeys = new Map<string, string>();
+  const seedRefs: { at: string; named: string; key: string; to: string }[] = [];
+  const nameOfList = (list: string): string => {
+    const name = registers.get(list)?.name;
+    return typeof name === 'string' && name !== '' ? name : list;
+  };
   /* A MAPPING IS THE NATURAL YAML MISTAKE, and treating it as no seeds at all meant an install that
      quietly planted nothing while the plan reported `seeds: 0` and looked correct. */
   if (doc.seeds !== undefined && !Array.isArray(doc.seeds))
@@ -984,12 +1052,57 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
       if (inNote) return inNote;
     }
 
+    /* ITS KEY IS THE FILE'S OWN NAME FOR THE ROW, said once, so a ref to it means one row. */
+    if (seed.key !== undefined) {
+      if (typeof seed.key !== 'string' || !NAME.test(seed.key))
+        return malformed(`An example row's key is a short name in lower case, such as key: first-visit.`, `seeds.${seed.register}.key`);
+      if (seedKeys.has(seed.key)) return malformed(`Two example rows are both called ${seed.key}, and a key names one row.`, `seeds.${seed.register}.key`);
+      seedKeys.set(seed.key, seed.register);
+    }
+    /* A DAY FROM INSTALL DAY AND A REF TO ANOTHER SEED, each held to the field it stands in (`SEED_DAY`). A field that
+       holds a document may hold any object, so it is left as written. */
+    const typed = new Map(listOf(registers.get(seed.register), 'fields').flatMap((f) => (isObject(f) && typeof f.id === 'string' ? [[f.id, f] as const] : [])));
+    for (const [field, held] of Object.entries(seed.fields)) {
+      const decl = typed.get(field);
+      const at = `seeds.${seed.register}.${field}`;
+      const named = typeof decl?.label === 'string' && decl.label !== '' ? decl.label : field;
+      for (const { value, listed } of seedValues(held)) {
+        const type = listed ? decl?.of : decl?.type;
+        const day = soleKey(value, 'day') ? value.day : undefined;
+        const ref = soleKey(value, 'ref') ? value.ref : undefined;
+        if (type === 'document' || (day === undefined && ref === undefined)) continue;
+        if (day !== undefined) {
+          if (type !== 'day') return no<Pack>('VALUE_MALFORMED', `${named} does not hold a day, so an example row cannot count one for it.`, { at });
+          if (typeof day !== 'string' || !SEED_DAY.test(day))
+            return no<Pack>('VALUE_MALFORMED', `${named} counts its day from install day as a sign and a number, such as day: "+3" or day: "-1".`, { at });
+          continue;
+        }
+        if (type !== 'ref' || typeof decl?.to !== 'string')
+          return no<Pack>('VALUE_MALFORMED', `${named} does not point at a row, so an example row cannot link through it.`, { at });
+        if (typeof ref !== 'string') return no<Pack>('VALUE_MALFORMED', `${named} links to another example row by its key, such as ref: first-visit.`, { at });
+        seedRefs.push({ at, named, key: ref, to: decl.to });
+      }
+    }
+
     seeds.push({
       register: seed.register,
       fields: seed.fields,
       ...(typeof seed.note === 'string' ? { note: seed.note } : {}),
+      ...(typeof seed.key === 'string' ? { key: seed.key } : {}),
     });
   }
+  /* EVERY REF NAMES A ROW OF THIS FILE, IN THE LIST ITS FIELD POINTS AT. Checked once all the seeds are read, because a
+     row may point at one written further down the file. */
+  for (const ref of seedRefs) {
+    const list = seedKeys.get(ref.key);
+    if (list === undefined)
+      return no<Pack>('FIELD_UNKNOWN', `${ref.named} links to an example row called ${ref.key}, and no example row in this file has that key.`, { at: ref.at, allowed: [...seedKeys.keys()] });
+    if (list !== ref.to)
+      return no<Pack>('VALUE_MALFORMED', `${ref.named} points at ${nameOfList(ref.to)}, and the example row called ${ref.key} is in ${nameOfList(list)}.`, { at: ref.at });
+  }
+  /* AND NO TWO POINT AT EACH OTHER: each row is written once, in its final state, so one of the two has to come first. */
+  if (seedOrder(seeds) === null)
+    return malformed('Two example rows point at each other, so neither can be written first. Take one of the two links out.', 'seeds');
 
   /**
    * `provides` IS DERIVED, AND A WRITTEN-OUT ONE HAS TO AGREE WITH THE DERIVATION.
@@ -1032,7 +1145,7 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
      already in it — hashing both would let one pack have two checksums for one file. `title` IS OMITTED because it is
      how a person reads the pack's name and not what the pack does, and keeping it out leaves every pack installed
      before the title was kept with the checksum it has, rather than showing each titled one as changed. */
-  const { provides: _provides, title: _title, ...hashed } = manifest;
+  const { provides: _provides, title: _title, changes: _changes, ...hashed } = manifest;
   const canonical = canonicalise({ manifest: hashed, declarations: declarations.map((d) => d.body), seeds });
   if (canonical === null) return malformed('This pack holds something the record cannot write down.');
   return ok({ manifest, declarations, seeds, canonical, checksum: await digest(canonical), source });
@@ -1878,6 +1991,73 @@ export async function plan(given: Pack, installed: Installed, options: PlanOptio
 function seedsFor(pack: Pack, adds: readonly { id: string; handed?: true }[]): Seed[] {
   const added = new Set(adds.filter((a) => a.handed === undefined).map((a) => a.id));
   return pack.seeds.filter((s) => added.has(`register.${s.register}`));
+}
+
+/**
+ * WHAT A SEED SAYS INSTEAD OF A VALUE (SHL-A09): `{ day: '+3' }`, a day counted from install day, and `{ ref: 'yard' }`,
+ * the row another seed of this file made, by that seed's `key`. Each stands where the value would, alone in its object,
+ * as a field's value or as one entry of a list.
+ *
+ * BOTH WERE CODE AFTER THE INSTALL: a function that moved example days on to today and one that linked example rows by
+ * their titles. Said in the file, every row is written once with its day and its link already in it.
+ */
+const SEED_DAY = /^[+-]\d{1,4}$/;
+const soleKey = (v: unknown, key: string): v is Record<string, Json> => isObject(v) && Object.keys(v).length === 1 && Object.hasOwn(v, key);
+/** Each value a seed's field holds, with whether it stood inside a list: where a day or a ref may stand. */
+const seedValues = (value: Json): { value: Json; listed: boolean }[] =>
+  Array.isArray(value) ? value.map((v) => ({ value: v, listed: true })) : [{ value, listed: false }];
+/** The keys of the other seeds this one points at, each once. */
+const seedPoints = (seed: Seed): string[] => [
+  ...new Set(
+    Object.values(seed.fields)
+      .flatMap(seedValues)
+      .flatMap((v) => (soleKey(v.value, 'ref') && typeof v.value.ref === 'string' ? [v.value.ref] : [])),
+  ),
+];
+
+/**
+ * The seeds in the order they are written: a row another points at before the row that points at it, and otherwise as
+ * the file says them. `null` when two point at each other, which no order can write in one go.
+ *
+ * A KEY NO SEED HERE CARRIES IS NOT WAITED FOR. `normalise` refuses a ref to a key the file does not have, so here that
+ * is a seed of a list this install does not plant (the record already holds it), and the row is written without the link.
+ */
+function seedOrder<S extends Seed>(seeds: readonly S[]): S[] | null {
+  const keyed = new Set(seeds.flatMap((s) => (s.key === undefined ? [] : [s.key])));
+  const written = new Set<string>();
+  const out: S[] = [];
+  let left = [...seeds];
+  while (left.length > 0) {
+    const ready = left.filter((s) => seedPoints(s).every((k) => !keyed.has(k) || written.has(k)));
+    if (ready.length === 0) return null;
+    for (const s of ready) {
+      out.push(s);
+      if (s.key !== undefined) written.add(s.key);
+    }
+    left = left.filter((s) => !ready.includes(s));
+  }
+  return out;
+}
+
+/** The day `by` days on from `today`, both as YYYY-MM-DD, counted in UTC so no clock change moves it. */
+const dayFrom = (today: string, by: number): string => new Date(Date.parse(`${today}T00:00:00Z`) + by * 86_400_000).toISOString().slice(0, 10);
+
+/**
+ * A seed's fields as the row is written: each day counted from `today`, each ref the id of the row that seed made. A
+ * ref to a row this install did not write is left out, field or list entry, so the row never points at nothing.
+ */
+function seedFields(seed: Seed, today: string, made: ReadonlyMap<string, string>): Record<string, Json> {
+  const one = (v: Json): Json | undefined => {
+    if (soleKey(v, 'day') && typeof v.day === 'string' && SEED_DAY.test(v.day)) return dayFrom(today, Number(v.day));
+    if (soleKey(v, 'ref') && typeof v.ref === 'string') return made.get(v.ref);
+    return v;
+  };
+  const out: Record<string, Json> = {};
+  for (const [field, value] of Object.entries(seed.fields)) {
+    const filled = Array.isArray(value) ? value.flatMap((v) => one(v) ?? []) : one(value);
+    if (filled !== undefined) out[field] = filled;
+  }
+  return out;
 }
 
 /* ── settings, and the lists a pack points at ────────────────────────────── */
@@ -3380,7 +3560,11 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
      to plant the examples a second time beside the first ones; counted before anything is written. */
   /* PLANTED FROM THE FILLED PACK, because `plan` counted its seeds off the filled one too: planting
      from `pack` here wrote the example rows with their placeholders still in them. */
-  const planted = seedsFor(filled, diff.adds).filter((seed) => host.count(seed.register) === 0);
+  /* WRITTEN IN THE ORDER THEIR LINKS NEED (`seedOrder`), which `normalise` has already shown exists for the whole file,
+     so it exists for any part of it. */
+  const unordered = seedsFor(filled, diff.adds).filter((seed) => host.count(seed.register) === 0);
+  const planted = seedOrder(unordered) ?? unordered;
+  const today = host.today?.() ?? new Date().toISOString().slice(0, 10);
   try {
     return host.transaction((): Result<Applied> => {
       const put = staged.value();
@@ -3397,9 +3581,14 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
 
       /* THE SEEDS GO THROUGH THE WRITE PATH, so a seed the register would refuse is refused here
          rather than becoming a row nothing else in the product could have made. */
+      /* AND EACH IS WRITTEN ONCE, IN ITS FINAL STATE: its days counted from install day and its links already the ids
+         of the rows written before it (`seedFields`), so nothing has to move a row after. */
+      const made = new Map<string, string>();
       for (const seed of planted) {
-        const made = host.seed(seed.register, seed.fields, seed.note);
-        if (!made.ok) throw new Rolled(made);
+        const row = host.seed(seed.register, seedFields(seed, today, made), seed.note);
+        if (!row.ok) throw new Rolled(row);
+        const id = isObject(row.value) ? row.value.id : undefined;
+        if (seed.key !== undefined && typeof id === 'string') made.set(seed.key, id);
       }
 
       host.remember({

@@ -91,14 +91,29 @@
   import Icon from '$lib/ui/Icon.svelte';
   import { drew } from '$lib/ui/screen.svelte.ts';
   import { withChip } from '$lib/who.ts';
-  import { browserCurrencyEnv, casePart, partsOf, passkeyOffered, zoneCurrency, type CurrencyEnv } from '../start/building.ts';
+  import {
+    browserCurrencyEnv,
+    casePart,
+    makingStates,
+    partIcon,
+    partsOf,
+    passkeyOffered,
+    stepsOf,
+    watchHeld,
+    zoneCurrency,
+    type CurrencyEnv,
+    type Held as HeldPart,
+    type MakingPart,
+    type Refused,
+  } from '../start/building.ts';
   import { caseOf, keepsCurrency } from '../start/preview.ts';
   import Building from '../start/Building.svelte';
   import Currency from '../start/Currency.svelte';
   import Frame from '../start/Frame.svelte';
+  import Making from '../start/Making.svelte';
   import NoRecord from '../start/NoRecord.svelte';
   import PasskeyFirst from '../start/PasskeyFirst.svelte';
-  import type { Accepting } from '../start/accept.ts';
+  import type { Accepting, NotMade } from '../start/accept.ts';
   import { accepting, nameSent, picked, replyOf, settle, titleSent } from './build.ts';
   import NameField from './NameField.svelte';
   import { words } from './words.ts';
@@ -648,8 +663,34 @@
 
   /** The line under "Making your BrainDog": which stage it is at. */
   let stage = $state('');
-  /** What could not be written into the new record, said in the person's words. */
-  let missed = $state.raw<string[]>([]);
+  /** What the call said it could not make: each part in the person's words, with the record's own sentence for why. */
+  let missed = $state.raw<NotMade[]>([]);
+  /**
+   * THE RECORD BEING MADE, WATCHED (`../start/Making.svelte`, as `/start` mounts it): the parts this press writes, what
+   * the new record holds of them, read every 400 ms while `setup` runs, and the call's own answer once it is back.
+   * `null` until a build is being written, so making the record itself is still the title and its one line.
+   */
+  let watched = $state.raw<{ parts: MakingPart[]; held: readonly HeldPart[]; answer: readonly Refused[] | null } | null>(null);
+
+  /**
+   * THE TILES OF THIS PRESS: what `asked` writes and nothing else, drawn as the build drew them (their name, glyph and
+   * the phrase that turned each on) and in the order heard. A part the screen never drew, since the sentence came off a
+   * link and was read here only to be built, is named from the catalogue.
+   */
+  function tilesOf(asked: Accepting): MakingPart[] {
+    const cases = [asked.usecase, ...asked.also].filter((id): id is string => id !== null);
+    const ids = new Set([...cases.map((id) => `usecase-${id}`), ...asked.modules]);
+    const drawn = stepsOf(parts)
+      .filter((p) => ids.has(p.id))
+      .map((p): MakingPart => ({ id: p.id, name: p.name, icon: p.icon, why: p.why }));
+    const rest: MakingPart[] = [];
+    for (const id of cases) {
+      const one = caseOf(id);
+      if (one && !drawn.some((p) => p.id === `usecase-${id}`)) rest.push({ id: `usecase-${id}`, name: one.title, icon: 'home' });
+    }
+    for (const id of asked.modules) if (!drawn.some((p) => p.id === id)) rest.push({ id, name: moduleName(id), icon: partIcon(id) });
+    return [...drawn, ...rest];
+  }
   let madeAt = $state('');
   /**
    * The press that did not finish, to make again from here: the record by its name, and what is still to write. `null`
@@ -720,17 +761,41 @@
   }
 
   /**
-   * ONE PRESS OF `/start`'s `accept()` AGAINST THE NEW RECORD, and what it came back with.
+   * ONE CALL TO THE RECORD'S OWN `setup` AGAINST THE NEW RECORD (USE-B04), and what it came back with. It goes through
+   * `/start`'s `accept()`, which hands `bodyOf(asked)` to `client.setup`, so a closed tab no longer leaves the record
+   * part made: the record carries the call through by itself.
+   *
+   * WATCHED WHILE IT RUNS: what the record holds is read every 400 ms and drawn tile by tile (`Making.svelte`).
    *
    * THE WORDS ARE FORGOTTEN ONLY WHEN ALL OF IT WENT IN. A press that did not answer, or that missed something, keeps the
-   * sentence and offers Try again, which writes only what is still missing (`left`), as a second press on `/start` does.
+   * sentence and offers Try again, which is sent with `again`, so the record writes only what is still missing.
    */
-  async function write(name: string, asked: Accepting): Promise<void> {
+  async function write(name: string, given: Accepting): Promise<void> {
     step = 'making';
     busy = true;
-    const { accept } = await import('../start/accept.ts');
+    const tiles = tilesOf(given);
+    watched = tiles.length > 0 ? { parts: tiles, held: [], answer: null } : null;
+    const { accept, pressKey } = await import('../start/accept.ts');
+    /* ONE HANDLE FOR THE BUILD, kept through every Try again: a call that went in and never answered is told from a new
+       press by it, so its entries are not written a second time. */
+    const asked: Accepting = given.key === undefined ? { ...given, key: pressKey() } : given;
     /* THE NEW RECORD BY ITS NAME: this page is under no slug, so its own base is the host's, and the record's is under it. */
-    const out = await accept(createClient({ base: apiBase({ origin: apiBase(), pathname: `${BASE}/${name}/` }) }), asked).catch(() => null);
+    const client = createClient({ base: apiBase({ origin: apiBase(), pathname: `${BASE}/${name}/` }) });
+    /* NOTHING TO DRAW, NOTHING READ: a build with no part on is the title and its one line, and the record is left alone. */
+    const stop =
+      watched === null
+        ? () => {}
+        : watchHeld(
+            async () => {
+              const held = await client.packs();
+              return held.ok ? (held.value as readonly HeldPart[]) : null;
+            },
+            (held) => {
+              if (watched && watched.answer === null) watched = { ...watched, held };
+            },
+          );
+    const out = await accept(client, asked).catch(() => null);
+    stop();
     if (out?.nav) pref.write({ nav: out.nav });
     /* NOTHING ANSWERED: the record may be empty, so opening it as it is lands on its /start, which asks the question
        there, not on the end of a first run that never wrote anything. */
@@ -738,14 +803,19 @@
     if (allWritten(out)) {
       again = null;
       forget();
+      /* THE CALL'S OWN WORD, newer than the last reading: nothing refused, so every tile says made as the record opens. */
+      if (watched) watched = { ...watched, answer: [] };
       stage = words.makingOpen;
       location.assign(at(madeAt));
       return;
     }
-    /* NOTHING ANSWERED: the record is made and may be empty, so it is the whole press again. Otherwise only what is left,
-       over the rail order this press already wrote. */
-    again = { name, asked: out === null ? asked : { ...asked, nav: out.nav ?? asked.nav, proposal: { ...asked.proposal, rows: out.left } } };
-    missed = out === null ? [] : out.failed.map((f) => f.said);
+    /* WHAT IS LEFT, ASKED FOR WITH `again`: the record writes only what it does not hold yet, so a call that never
+       answered here but went in there is not written twice. The entries are the ones the call handed back, over the
+       rail order this press already wrote. */
+    again = { name, asked: out === null ? { ...asked, again: true } : { ...asked, again: true, nav: out.nav ?? asked.nav, proposal: { ...asked.proposal, rows: out.left } } };
+    /* THE PART-MADE STATE IS THE CALL'S OWN ANSWER: what it said it could not make, and why, and nothing guessed. */
+    missed = out === null ? [] : out.failed;
+    watched = null;
     busy = false;
     step = 'made-partly';
   }
@@ -805,12 +875,14 @@
 
   /* ── drawing ─────────────────────────────────────────────────────────────── */
 
+  /** Whether the build is being written into the record now, so its tiles are the whole screen (`Making.svelte`). */
+  const watching = $derived(step === 'making' && watched !== null);
   /** Whether the build stands beside the words: while describing and keeping, and while what was said is being made. */
   const showBuild = $derived(
     step === 'describe' ||
       step === 'question' ||
       step === 'keep' ||
-      ((step === 'sent' || step === 'verifying' || step === 'lock' || step === 'making' || step === 'waiting') && sentence.trim() !== ''),
+      ((step === 'sent' || step === 'verifying' || step === 'lock' || step === 'making' || step === 'waiting') && sentence.trim() !== '' && !watching),
   );
 
   /* THIS SCREEN'S FIRST DRAW IS ITS STEP, whichever it is, once the host has answered or the address has said. */
@@ -837,6 +909,10 @@
 
 <Frame end={signedIn === null ? signInLink : undefined}>
   <div class="board" data-paired={showBuild ? '' : undefined}>
+    {#if watching && watched}
+      <!-- THE BUILD BEING WRITTEN, tile by tile across the whole board: each part says where it is, read from the record. -->
+      <Making parts={watched.parts} states={makingStates(watched.parts, watched.held, watched.answer)} />
+    {:else}
     <div class="talk">
       {#if step === 'loading' || step === 'verifying'}
         <!-- NOTHING IS ASKED BEFORE THE HOST SAYS SIGN-UP IS OPEN: the page's name, never "Who are you?", which a closed
@@ -1050,7 +1126,13 @@
         <p class="lede" role="status">{missed.length > 0 ? words.madePartly : words.madeUnreached}</p>
         {#if missed.length > 0}
           <ul class="missed">
-            {#each missed as m, i (i)}<li>{m}</li>{/each}
+            <!-- THE CALL'S OWN ANSWER: the part in the person's words, and under it the record's sentence for why. -->
+            {#each missed as m, i (i)}
+              <li>
+                {m.said}
+                {#if m.why.trim() !== '' && m.why !== m.said}<span class="missed-why">{m.why}</span>{/if}
+              </li>
+            {/each}
           </ul>
         {/if}
         <div class="go"><Button weight="primary" onclick={writeAgain} disabled={busy || again === null}>{words.tryAgain}</Button></div>
@@ -1091,6 +1173,7 @@
       <aside class="build" aria-label={firstRun.mineTitle}>
         <Building {parts} title={read?.title ?? null} {places} {locale} />
       </aside>
+    {/if}
     {/if}
   </div>
 </Frame>
@@ -1506,6 +1589,11 @@
     color: var(--ink);
     font-size: var(--t-base);
     line-height: var(--lh-body);
+  }
+
+  .missed-why {
+    display: block;
+    color: var(--dim);
   }
 
   @media (prefers-reduced-motion: reduce) {

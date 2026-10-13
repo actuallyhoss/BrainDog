@@ -55,3 +55,14 @@ test('A QUESTION NOBODY ASKED BY HAND IS WHAT IT ASKS, from the record, a rule o
     ['You', 'suggested Renew the domain?'],
   ]);
 });
+
+test('A CLAUSE THAT OPENS ON "with" GOES WHEN THE CLAUSE IT LEANS ON GOES, and stands when that one stands', () => {
+  const body = '{{orders-late}} late, and {{orders-owed-named.first_who}} still owes {{orders-owed-named.first_total}}, with {{orders-owed-named.more}} more order(s) not paid at all';
+  const both = leadOf(body, said({ 'orders-late': 2, 'orders-owed-named.first_who': 'Salma', 'orders-owed-named.first_total': 'EGP 1,350', 'orders-owed-named.more': 2 }));
+  assert.match(both, /still owes \{\{orders-owed-named\.first_total\}\}, with \{\{orders-owed-named\.more\}\} more orders not paid at all$/u);
+  /* NOBODY TO NAME (a reader who may not see People): the count of the others is not said after nobody. */
+  const nameless = leadOf(body, said({ 'orders-late': 2, 'orders-owed-named.more': 2 }));
+  assert.equal(nameless, '{{orders-late}} late');
+  /* ONE DEBTOR AND NO OTHER ORDER: the clause is nought and goes by itself, as before. */
+  assert.doesNotMatch(leadOf(body, said({ 'orders-late': 2, 'orders-owed-named.first_who': 'Salma', 'orders-owed-named.first_total': 'EGP 1,350', 'orders-owed-named.more': 0 })), /with/u);
+});

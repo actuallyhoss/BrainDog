@@ -3,7 +3,7 @@
  * on a record that installed Money the way a person does, with no example entries and no account.
  *
  * A shop owner says "Nadia paid 900 on InstaPay" on her first day. She holds no account, so the payment is kept as an
- * invoice to Nadia, paid today, and Today's "In" reads `settled-in-7d` beside the Ledger's `received-7d`. Both are
+ * invoice to Nadia, paid today, and Today's "Paid" reads `settled-in-7d` beside "Came in", the Ledger's `received-7d`. Both are
  * read here: EGP 900 after the payment, nothing (never nought) before it, and two currencies never one number.
  *
  * RED FIRST: with either figure out of `figures/spending.ts` or `figures/due.ts`, the first test fails on `METRICS`.

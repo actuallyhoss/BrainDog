@@ -25,6 +25,7 @@ import {
   LADDER_RULE,
   SLASH,
   ceilingOf,
+  endedByCutOff,
   kindsOfWrite,
   ladderAgentOf,
   madeByIn,
@@ -50,6 +51,29 @@ export const ANOMALY_MS = 2 * 60_000;
 const KEPT = (agent: string): string => `ladder:${agent}`;
 const OFFERS = 'ladder:offers';
 const MARKS = 'ladder:untrusted';
+/** Why each kind was last taken back, one name an agent, since the `ladder` table has a column for when and none for why. */
+const DROPPED = (agent: string): string => `ladder:dropped:${agent}`;
+
+/** What takes a rung back, each as the sentence a person reads beside it (`standing`). */
+const DROP_SAID = {
+  undone: 'A change like this was undone.',
+  declined: `${DECLINES_DROP} changes like this in a row were declined.`,
+  burst: `It made more than ${ANOMALY_WRITES} changes in two minutes.`,
+  app: 'It began writing from another app.',
+} as const;
+export type DropWhy = keyof typeof DROP_SAID;
+
+/** The migration that made the ladder, whose run lifted the write tokens already there (`seedLadder` in the kernel). */
+const LADDER_ARRIVED = 25;
+/** How long after that migration a rung it set can be dated: the lift runs in the same pass, moments later. */
+const LIFT_WINDOW_MS = 60_000;
+/** How far before a drop the undo that caused it is looked for: both are written in one transaction. */
+const UNDO_WINDOW_MS = 5_000;
+
+/** Where one agent stands on one kind, as a person reads it: the kind in words, never its key. */
+export type StandingKind = { kind: string; rung: Rung; since: string; lifted: boolean; dropped: { at: string; why: string | null } | null };
+/** Where every agent stands: each by its name, never a grant's id. */
+export type Standing = { agents: { agent: string; kinds: StandingKind[] }[] };
 
 /** The rungs in order, lowest first, and the one above each. */
 const ORDER: readonly Rung[] = ['ask', 'tell', 'quiet'];
@@ -202,23 +226,26 @@ export function ladder(deps: LadderDeps) {
     for (const k of kinds) {
       const was = keptOf(agent, k.key);
       const declines = was.declines + 1;
-      if (declines >= DECLINES_DROP) drop(agent, [k.key]);
+      if (declines >= DECLINES_DROP) drop(agent, [k.key], 'declined');
       else keepOf(agent, k.key, { kept: was.kept, declines });
     }
   };
 
   /**
    * Take an agent back to Ask on these kinds, or on every kind when `kinds` is `null`, and forget what it was kept for,
-   * so climbing again starts from nothing.
+   * so climbing again starts from nothing. `why` is which of the four it was, kept for `standing` to say.
    *
    * AND AN OFFER STILL WAITING FOR ONE OF THEM IS WITHDRAWN (research-audit-20 M2). "You kept them all" stopped being true
    * the moment one was undone, declined a third time or written in a burst, and a yes to it would have set the rung the
    * drop just took away. It is answered as not done, signed by the ladder, so Decide shows it settled and never asks it.
    */
-  const drop = (agent: string, kinds: readonly string[] | null): void => {
+  const drop = (agent: string, kinds: readonly string[] | null, why?: DropWhy): void => {
     const at = iso();
     const keys = kinds ?? sql.all<{ kind: string }>('SELECT kind FROM ladder WHERE agent = ?', agent).map((r) => r.kind);
     for (const kind of keys) {
+      /* WHY, KEPT BESIDE WHEN, for a kind that has a rung to lose. An undo says `undone`; a drop kept before it did
+         left none, and `standing` still reads the undo itself for that one. */
+      if (sql.one('SELECT 1 AS y FROM ladder WHERE agent = ? AND kind = ?', agent, kind)) kernel.setPref(DROPPED(agent), kind, why === undefined ? null : { why, at });
       sql.exec("UPDATE ladder SET rung = 'ask', accepted_unchanged = 0, since = ?, dropped_at = ? WHERE agent = ? AND kind = ?", at, at, agent, kind);
       kernel.setPref(KEPT(agent), kind, null);
     }
@@ -244,7 +271,7 @@ export function ladder(deps: LadderDeps) {
         iso(deps.now() - ANOMALY_MS),
       )?.n ?? 0;
     if (n <= ANOMALY_WRITES) return false;
-    drop(agent, null);
+    drop(agent, null, 'burst');
     return true;
   };
 
@@ -266,7 +293,7 @@ export function ladder(deps: LadderDeps) {
     if (typeof before !== 'string' || before.trim().toLowerCase() === c.app.trim().toLowerCase()) return false;
     const any = sql.one<{ y: number }>("SELECT 1 AS y FROM ladder WHERE agent = ? AND rung <> 'ask' AND dropped_at IS NULL LIMIT 1", c.token);
     if (!any) return false;
-    drop(c.token, null);
+    drop(c.token, null, 'app');
     return true;
   };
 
@@ -325,6 +352,7 @@ export function ladder(deps: LadderDeps) {
     if (option === 'yes' && (ORDER as readonly string[]).includes(o.rung)) {
       rowFor(o.agent, o.kind);
       sql.exec('UPDATE ladder SET rung = ?, accepted_unchanged = 0, since = ?, dropped_at = NULL WHERE agent = ? AND kind = ?', o.rung, iso(), o.agent, o.kind);
+      kernel.setPref(DROPPED(o.agent), o.kind, null);
     }
     kernel.setPref(KEPT(o.agent), o.kind, null);
     return true;
@@ -333,7 +361,85 @@ export function ladder(deps: LadderDeps) {
   /** Who climbs for a question's filer: a grant, or Slash, and `null` for a person, a rule or the system. */
   const agentOfActor = (actor: string): string | null => (actor === SLASH ? SLASH : ladderAgentOf(sql, actor));
 
-  return { grantOf, untrusted, markUntrusted, gate, rungFor, noteFault, kept, declined, drop, anomaly, clientChanged, answered, agentOfActor };
+  /* ── where every agent stands, read back ────────────────────────────── */
+
+  /**
+   * Where every agent stands (ENG-A12): each connected grant that may change the record, by the name its owner gave it,
+   * with every kind it has a rung for, and Slash once it has one. READ-ONLY: it writes no row and makes none at Ask.
+   *
+   * AN AGENT WITH NO RUNG HAS NO KINDS, which reads as everything asks, and is listed because it is connected. A grant
+   * revoked or run out is not listed at all: it can write nothing, so it stands nowhere. A kind whose list is gone is
+   * left out, since there is nothing left to change in it.
+   *
+   * TWO KINDS OF KEY ARE NOT AGENTS, as `liveAgents` in the kernel counts them: a job's bearer (`job:`) and a report key
+   * (`report:`), each labelled by code with an id and never named by its owner. A grant the operator's cut-off ended
+   * (`validFrom`) is refused like a revoked one, so it is not listed either.
+   *
+   * THE RUNG IS THE ONE A WRITE WOULD MEET: Ask once dropped, and never above the grant's scope (`ceilingOf`).
+   *
+   * `lifted` IS DATED, NOT STORED. The lift (`seedLadder`) sets Do and tell in the pass that made the table, so a rung
+   * still at Do and tell since that moment is one it set; a yes to an offer needs ten changes kept first and is later.
+   *
+   * `why` IS WHAT `drop` WAS TOLD, and for an undo, which tells it nothing, the undo found in `undone` at that moment.
+   * A drop from before the reason was kept answers `null`.
+   */
+  const standing = (validFrom?: string): Standing => {
+    const at = iso();
+    const arrived = sql.one<{ applied_at: string }>('SELECT applied_at FROM migration WHERE version = ?', LADDER_ARRIVED)?.applied_at;
+    const from = arrived === undefined ? Number.NaN : Date.parse(arrived);
+    const listName = (id: string): string => kernel.register(id)?.name ?? id;
+
+    const kindsOf = (agent: string, scope: Scope | null): StandingKind[] => {
+      const out: StandingKind[] = [];
+      const rows = sql.all<{ kind: string; rung: string; since: string; dropped_at: string | null }>('SELECT kind, rung, since, dropped_at FROM ladder WHERE agent = ?', agent);
+      for (const r of rows) {
+        const cut = r.kind.indexOf(':');
+        const list = cut > 0 ? r.kind.slice(0, cut) : null;
+        if (list === null || !kernel.register(list)) continue;
+        const held: Rung = r.dropped_at === null && (ORDER as readonly string[]).includes(r.rung) ? (r.rung as Rung) : 'ask';
+        const rung = scope === null ? held : (ceilingOf(scope, held) ?? 'ask');
+        const since = Date.parse(r.since);
+        out.push({
+          kind: kindWords({ key: r.kind, list, verb: r.kind.slice(cut + 1), floor: null }, listName),
+          rung,
+          since: r.since,
+          lifted: r.dropped_at === null && r.rung === 'tell' && since >= from && since <= from + LIFT_WINDOW_MS,
+          dropped: r.dropped_at === null ? null : { at: r.dropped_at, why: whyDropped(agent, r.kind, r.dropped_at) },
+        });
+      }
+      return out.sort((a, b) => (a.kind < b.kind ? -1 : a.kind > b.kind ? 1 : 0));
+    };
+
+    const agents: Standing['agents'] = sql
+      .all<{ id: string; scope: string; label: string | null; created_at: string }>(
+        `SELECT id, scope, label, created_at FROM token
+         WHERE scope <> 'read' AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > ?)
+           AND (label IS NULL OR (substr(label, 1, 4) <> 'job:' AND substr(label, 1, 7) <> 'report:'))
+         ORDER BY created_at, rowid`,
+        at,
+      )
+      .filter((t) => !endedByCutOff(validFrom, t.created_at))
+      .map((t) => ({ agent: (t.label ?? '').trim() || 'Your agent', kinds: kindsOf(t.id, t.scope as Scope) }));
+    const slash = kindsOf(SLASH, null);
+    if (slash.length > 0) agents.push({ agent: 'Slash', kinds: slash });
+    return { agents };
+  };
+
+  /** Why one kind was taken back at `at`, as a sentence, or `null` when nothing kept says (see `standing`). */
+  const whyDropped = (agent: string, kind: string, at: string): string | null => {
+    const kept = prefRead(DROPPED(agent), kind) as { why?: unknown; at?: unknown } | undefined;
+    if (kept && kept.at === at && typeof kept.why === 'string' && kept.why in DROP_SAID) return DROP_SAID[kept.why as DropWhy];
+    const undone = sql.one(
+      'SELECT 1 AS y FROM undone WHERE agent = ? AND at <= ? AND at >= ? AND (kinds IS NULL OR EXISTS (SELECT 1 FROM json_each(undone.kinds) WHERE value = ?)) LIMIT 1',
+      agent,
+      at,
+      new Date(Date.parse(at) - UNDO_WINDOW_MS).toISOString(),
+      kind,
+    );
+    return undone ? DROP_SAID.undone : null;
+  };
+
+  return { standing, grantOf, untrusted, markUntrusted, gate, rungFor, noteFault, kept, declined, drop, anomaly, clientChanged, answered, agentOfActor };
 }
 
 /** The floors as a person reads them, each the start of a sentence. */

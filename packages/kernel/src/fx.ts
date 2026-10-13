@@ -7,8 +7,12 @@
  * record convert the same rows at the same rates to the same minor unit (`08 §2.5`).
  *
  * TWO CURRENCIES ARE STILL NEVER ADDED AS THEY ARE. Either every amount has a rate into the currency the figure is
- * in, and the figure is converted and says as of when, or one does not, and the figure is one amount per currency
- * with every missing pair named. There is no third answer that adds what it can and leaves out the rest.
+ * in, and the figure is converted and says as of when, or one does not. Then a SUM converts every amount it can and
+ * lists every one it cannot: it is `atleast`, the converted total with the amounts left out beside it, one a currency,
+ * and whoever writes it makes the total wear its mark. That holds only while every amount left out is nought or more,
+ * because a sum with a subtraction left out is not a lower bound, and only for a sum, because leaving an amount out
+ * of an average, a least or a most can move it either way. Every other figure with a rate missing is one amount per
+ * currency with every missing pair named.
  *
  * A RATE IS A ROW OF THE LIST THAT DECLARES `rates:`, whose four parts name the fields playing `currency`, `base`,
  * `rate` and `as_of` (`roles.ts`); a record older than the key has them under those names on a list called `fx`. One
@@ -25,6 +29,9 @@ export type Amount = { currency: string; amount: number; day: string | null };
 
 /** One currency's part of a figure that is not added up. */
 export type Part = { currency: string; amount: number };
+
+/** Whether a figure is a sum that left amounts out for want of a rate, so its total is a lower bound. */
+export const isAtLeast = (a: Across): a is Extract<Across, { kind: 'atleast' }> => a.kind === 'atleast';
 
 export type Across =
   /** Every amount was already in `currency`, or there was only one currency and no other was asked for. */
@@ -43,6 +50,14 @@ export type Across =
    * `RATE_STALE_DAYS` before the figure's day.
    */
   | { kind: 'converted'; currency: string; amount: number; asOf: string; forward: boolean; stale: boolean }
+  /**
+   * A sum that converted what it could: `amount` is the least the whole can be, in `currency`.
+   *
+   * `left` is what no rate reached, one part a currency in code order, each nought or more, and `missing` is those
+   * currencies' codes. `asOf`, `forward` and `stale` are `converted`'s, over the rates that were used; `asOf` is empty
+   * when the only amounts added were already in `currency`.
+   */
+  | { kind: 'atleast'; currency: string; amount: number; asOf: string; forward: boolean; stale: boolean; left: Part[]; missing: string[] }
   /** Not added up: one part per currency, largest code order, and each pair with no rate as `EGP to USD`. */
   | { kind: 'parts'; parts: Part[]; missing: string[] };
 
@@ -170,6 +185,7 @@ export function across(amounts: readonly Amount[], into: string | null, rates: r
 
   const missing = new Set<string>();
   const converted: number[] = [];
+  const left: Amount[] = [];
   /* THE OLDEST RATE USED, so the empty string cannot win the comparison the way it did when this
      was the newest. A figure that converted nothing keeps `asOf` empty and reports `stale: false`,
      which is what `one` and `parts` already mean. */
@@ -184,21 +200,23 @@ export function across(amounts: readonly Amount[], into: string | null, rates: r
       const r = rateFor(rates, a.currency, into, (a.day ?? today).slice(0, 10));
       if (!r) {
         missing.add(`${a.currency} to ${into}`);
+        left.push(a);
         continue;
       }
       converted.push(convertMinor(a.amount, a.currency, into, r.rate));
       if (asOf === '' || r.as_of < asOf) asOf = r.as_of;
       forward ||= r.forward;
     }
-  if (into !== null && convert && missing.size === 0)
-    return {
-      kind: 'converted',
-      currency: into,
-      amount: reduceOf(kind, converted) ?? 0,
-      asOf,
-      forward,
-      stale: asOf !== '' && rateIsStale(asOf, today.slice(0, 10)),
-    };
+  if (into !== null && convert) {
+    const dated = { currency: into, amount: reduceOf(kind, converted) ?? 0, asOf, forward, stale: asOf !== '' && rateIsStale(asOf, today.slice(0, 10)) };
+    if (missing.size === 0) return { kind: 'converted', ...dated };
+    /* CONVERT WHAT IT CAN, LIST WHAT IT CANNOT. Only a sum, only when something was added, and only when nothing left
+       out is under nought: then the total can only be more than this, and it is safe to say at least. */
+    if (kind === 'sum' && converted.length > 0 && left.every((a) => a.amount >= 0)) {
+      const parts = partsOf(left);
+      return { kind: 'atleast', ...dated, left: parts, missing: parts.map((p) => p.currency) };
+    }
+  }
   return { kind: 'parts', parts: partsOf(amounts, kind), missing: [...missing].sort() };
 }
 

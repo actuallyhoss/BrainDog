@@ -1,0 +1,138 @@
+{
+  "id": "mariam-two-debtors",
+  "name": "Mariam",
+  "who": "Runs a small candle shop in Alexandria and freelances as a designer. Orders come in by WhatsApp and Instagram, and she loses track of them and of who owes her. Two people owe her at once.",
+  "said": "I'm Mariam. I run a small candle shop in Alexandria and freelance as a designer. I lose track of orders and who owes me.",
+  "chip": "I run a small shop",
+  "expects": "shop",
+  "standing": false,
+  "says": {
+    "plain": "I'm Mariam. I run a small candle shop in Alexandria and freelance as a designer. I lose track of orders and who owes me.",
+    "hard": "I make candles at home, people message me for them, and I forget who still owes me."
+  },
+  "answers": {
+    "name": "Mariam",
+    "currency": "EGP",
+    "kind": "messages"
+  },
+  "answer": "messages",
+  "email": "mariam-two-debtors@people.braindog.test",
+  "slug": "mariams-candles-two",
+  "zone": "Africa/Cairo",
+  "locale": "en-EG",
+  "languages": [
+    "en-EG",
+    "ar-EG"
+  ],
+  "start": "2026-10-05T09:00:00Z",
+  "first": "Nadia wants 3 vanilla jars for Friday, paid 900 on InstaPay",
+  "later": [
+    {
+      "day": 7,
+      "said": [
+        "Salma wants 6 amber jars for Saturday, 1,350 not paid yet",
+        "Salma wants 4 tea lights for Sunday, 600 not paid yet",
+        "Dalia wants 2 gift boxes for Sunday, 400 not paid yet"
+      ]
+    },
+    {
+      "day": 15,
+      "said": [
+        "Omar wants 4 amber jars for Thursday",
+        "Laila wants 1 gift box for Friday",
+        "Karim wants 6 tea lights for Saturday",
+        "Youssef wants 2 vanilla jars for Sunday"
+      ]
+    }
+  ],
+  "expect": {
+    "who": {
+      "question": "Who are you?",
+      "chips": 5,
+      "promises": [
+        {
+          "says": "free, with no card",
+          "match": "free\\b.{0,24}\\bno card"
+        },
+        {
+          "says": "nothing is saved until you keep it",
+          "match": "nothing (is )?saved until you keep"
+        },
+        {
+          "says": "yours to export or move",
+          "match": "yours to (export|move|take)"
+        }
+      ]
+    },
+    "heard": {
+      "usecase": "shop",
+      "title": "Mariam's Candles",
+      "lit": [
+        "Mariam",
+        "a small candle shop",
+        "freelance as a designer",
+        "orders",
+        "who owes me"
+      ],
+      "became": {
+        "a small candle shop": [
+          "Orders",
+          "Products"
+        ],
+        "freelance as a designer": [
+          "Clients",
+          "Invoices"
+        ],
+        "who owes me": [
+          "Money",
+          "EGP"
+        ]
+      },
+      "places": [
+        "Today",
+        "Orders",
+        "Products",
+        "Clients",
+        "Money"
+      ]
+    },
+    "question": {
+      "about": "arrivesBy",
+      "choices": 3
+    },
+    "keep": {
+      "lists": [
+        "orders",
+        "products",
+        "people",
+        "transactions",
+        "obligations"
+      ],
+      "currency": "EGP"
+    },
+    "tell": {
+      "lists": [
+        "people",
+        "orders",
+        "obligations"
+      ]
+    },
+    "today": {
+      "first": "source",
+      "lists": [
+        "orders",
+        "people"
+      ],
+      "money": "Paid EGP 900"
+    },
+    "offer": {
+      "id": "week:orders",
+      "before": 13,
+      "after": 15,
+      "lead": {
+        "says": "8 orders this month, 4 to ship this week, 4 late, and Salma still owes EGP 1,350, with 2 more orders not paid at all",
+        "match": "^8 orders this month, 4 to ship this week, 4 late, and Salma still owes EGP 1,350, with 2 more orders not paid at all$"
+      }
+    }
+  }
+}

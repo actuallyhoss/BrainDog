@@ -19,7 +19,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { HELD, collect, fold, heldIn, hitsIn, judge, namesIn, namesOfDocument, namesOfSource, read } from '../core-names.mjs';
+import { HELD, collect, fold, heldIn, hitsIn, judge, kernelWords, namesIn, namesOfDocument, namesOfSource, read, unnamed } from '../core-names.mjs';
 import { EXEMPT, HELD as WORDS_HELD, PUBLIC_WORDS, WORDS, uncomment, wordsWith } from '../shell-words.mjs';
 
 const gates = join(import.meta.dirname, '..');
@@ -176,6 +176,60 @@ for (const [tree, place] of [
     assert.deepEqual(places(said), [place], said);
     assert.match(said, /1 finding\(s\)/u);
   });
+
+test('a word the kernel declares is not a place, and after register. it still is', () => {
+  const own = kernelWords(repo);
+  /* READ OFF THE KERNEL, never listed: block kinds, a list's keys, an answer's keys, and what a money value is answered as. */
+  for (const word of ['lines', 'roadmap', 'progress', 'steps', 'source', 'parts']) assert.ok(own.has(word), word);
+  /* AND NOTHING AN ADD-ON ALONE DECLARES: a list the kernel's grammar never says stays a name. */
+  for (const word of ['tasks', 'orders', 'transactions', 'making']) assert.ok(!own.has(word), word);
+  assert.deepEqual(kernelWords(join(gates, 'negative', 'core-names-string')), new Set(), 'a tree with no kernel grammar declares no word');
+
+  const names = namesOf('lines', 'tasks');
+  const lines = [
+    "const a = kind === 'lines';",
+    "const b = list === 'tasks';",
+    'const c = db.register.lines.count();',
+    "const d = 'register.lines';",
+    "const e = 'lines:one';",
+  ];
+  const kernel = new Set(['lines']);
+  assert.deepEqual(hitsIn(lines.join('\n'), names, false, kernel).map((h) => [h.line, h.key]), [[2, 'tasks'], [3, 'lines'], [4, 'lines']]);
+  /* WITHOUT THE KERNEL'S WORDS every one of the five is a place, as it was. */
+  assert.deepEqual(hitsIn(lines.join('\n'), names).map((h) => h.line), [1, 2, 3, 4, 5]);
+});
+
+test('a class, an id, a role and a style rule in markup are not read, and every other attribute is', () => {
+  const names = namesOf('tasks', 'status');
+  const page = [
+    '<script lang="ts">',
+    "  const open = list === 'tasks';",
+    '</script>',
+    '<section class="tasks wide" aria-labelledby="tasks-h">',
+    '  <h2 id="tasks-h">Yours</h2>',
+    '  <p role="status">Saved.</p>',
+    '  <a href="/r/tasks" data-list="tasks">Open</a>',
+    "  <p class={on ? 'tasks' : ''}>A class worked out in code is a string like any other.</p>",
+    '</section>',
+    '<style>',
+    "  .tasks::before { content: 'tasks'; }",
+    '</style>',
+  ].join('\n');
+  assert.deepEqual(hitsIn(page, names, true).map((h) => [h.line, h.key]), [[2, 'tasks'], [7, 'tasks'], [7, 'tasks'], [8, 'tasks']]);
+  /* NOTHING MOVES: what is blanked keeps its length and its lines, so a place after it is where it was. */
+  assert.equal(unnamed(page, true).length, page.length);
+  assert.equal(unnamed(page, true).split('\n').length, page.split('\n').length);
+  /* AND A FILE THAT IS NOT MARKUP IS READ WHOLE: `class="tasks"` in a string of a `.ts` file is a string. */
+  assert.equal(unnamed(page), page);
+});
+
+test('the planted tree core-names-kernel-word is red twice, at the real leak, and its decoys are left', () => {
+  const { status, said } = run(join(gates, 'negative', 'core-names-kernel-word'));
+  assert.equal(status, 1, said);
+  assert.deepEqual(places(said), ['packages/render/src/seeded-leak.ts:2', 'packages/render/src/seeded-leak.ts:3'], said);
+  assert.match(said, /lines, a list of desk, in `register\.lines`/u);
+  assert.match(said, /2 finding\(s\)/u);
+});
 
 test('a root with no code, or with no add-on to read a name from, could not run', () => {
   const empty = run(join(gates, 'negative', 'core-names-empty'));

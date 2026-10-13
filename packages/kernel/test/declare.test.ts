@@ -2367,6 +2367,23 @@ test('THE CLOSED LISTS ARE `42 §4.4`’s OWN, and this is the test that stops t
   assert.deepEqual(undocumented(field, FLD), ['deadline', 'derived', 'label', 'qualifies', 'search', 'to', 'unit']);
 });
 
+test('ONCE NAMES WRITTEN FIELDS OF ITS OWN LIST, or the list is refused', () => {
+  const fields = [{ id: 'what', type: 'text', required: true }, { id: 'hint', type: 'text' }, { id: 'made', type: 'text', derived: true }];
+  assert.equal(refusedWith(withFields(fields, { ...NO_STATE, once: ['what'] })), null);
+  assert.equal(refusedWith(withFields(fields, { ...NO_STATE, once: [] })), null);
+  const at = (once: unknown) => validateDeclaration(withFields(fields, { ...NO_STATE, once }))?.at;
+  assert.equal(at('what'), 'once');
+  assert.equal(at(['what', 7]), 'once');
+  assert.equal(at(['what', 'colour']), 'once[1]', 'a field the list does not have');
+  assert.equal(at(['made']), 'once[0]', 'a derived field, which no write sets');
+});
+
+test('A HEAT TAKES of: AT INSTALL, as a ring does, and a table still does not', () => {
+  const heat = { kind: 'heat', heading: 'Paid on the day', source: 'register.obligations', columns: [{ field: 'due' }] };
+  assert.equal(refusedWith(page({ blocks: [{ ...heat, of: 'state is paid' }] })), null);
+  assert.equal(refusedWith(page({ blocks: [{ kind: 'table', source: 'register.obligations', columns: [{ field: 'what' }], of: 'state is paid' }] })), 'DECLARATION_INVALID');
+});
+
 test('STEPS NAME A REF AND A BOOL OF THEIR OWN LIST, or the list is refused', () => {
   const body = (steps: unknown) => ({
     id: 'register.milestones',

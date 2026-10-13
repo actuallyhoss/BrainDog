@@ -21,6 +21,13 @@
  * in view only, so a big day in January does not wash September pale; and a day after today is not washed at all,
  * as `days.ts` marks it, because nothing on it has happened yet.
  *
+ * A DAY SET AGAINST ITS OWN WHOLE IS WRITTEN `3 of 12`, which is what a block with `of:` hands over: three of the
+ * twelve things on that day are the ones the block asks about. The wash is then THE SHARE, a quarter of the day a
+ * step, and not how busy the day was beside the busiest: a day wholly of them is full whether it held two or two
+ * hundred, and the grid says so in words (`HEAT_SHARE`), because the same four steps mean something else there. One
+ * row written that way makes the block a share, and a row beside it with no whole does not read: a count has no
+ * place on a scale of shares.
+ *
  * THE `who` FORM IS `day | who`, one line a person and a dot a week (`heatPeoplePlan`), below.
  *
  * ON A PHONE THE GRID IS EIGHT WEEKS, the last eight of these twelve. That is the host's stylesheet hiding the first
@@ -28,7 +35,7 @@
  */
 
 import { calendarDay } from './calendar.ts';
-import { heatGrid, washSteps, type Wash } from './days.ts';
+import { heatGrid, washSteps, WASH_STEPS, type Wash } from './days.ts';
 import { signedOf } from './bridge.ts';
 import { day } from './format.ts';
 import { addDays } from './forecast.ts';
@@ -42,9 +49,9 @@ export type HeatInput = { day: string; value: string };
 /** One day of the grid, in the order a drawer lays them: week by week, Monday first. */
 export type HeatCell = {
   day: string;
-  /** `null` for a gap, `0` for a day counted empty, `1` to `4` for how busy. Always `null` after today. */
+  /** `null` for a gap, `0` for a day counted empty, `1` to `4` for how busy, or how much of its whole. Always `null` after today. */
   wash: Wash;
-  /** What the rows on this day added up to, as printed, or `null` for a gap. */
+  /** What the rows on this day added up to, as printed (`3`, or `3 of 12` on a share), or `null` for a gap. */
   count: string | null;
   today: boolean;
   future: boolean;
@@ -61,7 +68,12 @@ export type HeatPlan = {
   outside: number;
   /** No counted day in view: the block is its sentence. */
   empty: boolean;
+  /** Each day is washed by its share of that day's whole, and the drawers say so (`HEAT_SHARE`). */
+  share?: true;
 };
+
+/** A value written against its whole, `3 of 12`: the part and the whole as written. */
+const OF = /^(.+?)\s+of\s+(.+)$/u;
 
 /** Two decimals at most, and no trailing zeros, so a count of hours reads `2.5` and a count of things `3`. */
 const said = (n: number): string => String(Math.round(n * 100) / 100);
@@ -71,22 +83,35 @@ export function heatPlan(rows: readonly HeatInput[], today: string, weeks = HEAT
   const grid = heatGrid(today, weeks);
   const inView = new Set(grid.cells.filter((c) => !c.future).map((c) => c.day));
   const counts: Record<string, number> = {};
+  /* EACH DAY'S WHOLE, on a share. A day whose whole is nothing is a gap: nothing was there to be a share of. */
+  const wholes: Record<string, number> = {};
+  const share = rows.some((r) => OF.test(r.value.trim()));
   const skipped: number[] = [];
   let outside = 0;
   rows.forEach((r, i) => {
     const d = calendarDay(r.day);
-    const v = r.value.trim() === '' ? 1 : signedOf(r.value);
-    if (d === null || !Number.isFinite(v) || v < 0) skipped.push(i);
+    const written = share ? OF.exec(r.value.trim()) : null;
+    const v = share ? (written ? signedOf(written[1]!) : NaN) : r.value.trim() === '' ? 1 : signedOf(r.value);
+    const whole = written ? signedOf(written[2]!) : 0;
+    if (d === null || !Number.isFinite(v) || v < 0 || (share && !(Number.isFinite(whole) && whole >= v))) skipped.push(i);
     else if (!inView.has(d)) outside++;
-    else counts[d] = (counts[d] ?? 0) + v;
+    else if (share && whole === 0) return;
+    else {
+      counts[d] = (counts[d] ?? 0) + v;
+      if (share) wholes[d] = (wholes[d] ?? 0) + whole;
+    }
   });
 
   const days = grid.cells.map((c) => c.day);
-  const washes = washSteps(counts, days);
+  /* A SHARE HAS ITS OWN SCALE, the whole of the day, rounded up as `washSteps` rounds so one of forty is not washed as none. */
+  const part = (d: string): number => counts[d]! / wholes[d]!;
+  const washes: Wash[] = share
+    ? days.map((d) => (!Object.hasOwn(counts, d) ? null : counts[d] === 0 ? 0 : (Math.min(WASH_STEPS, Math.ceil(part(d) * WASH_STEPS)) as Wash)))
+    : washSteps(counts, days);
   const cells = grid.cells.map((c, i) => ({
     day: c.day,
     wash: c.future ? null : washes[i]!,
-    count: Object.hasOwn(counts, c.day) ? said(counts[c.day]!) : null,
+    count: !Object.hasOwn(counts, c.day) ? null : share ? `${said(counts[c.day]!)} of ${said(wholes[c.day]!)}` : said(counts[c.day]!),
     today: c.today,
     future: c.future,
   }));
@@ -99,6 +124,15 @@ export function heatPlan(rows: readonly HeatInput[], today: string, weeks = HEAT
     .reduce((best, d) => (counts[d]! > counts[best]! ? d : best));
   const most = counts[busiest]!;
   const head = `${weeks} weeks to ${day(today)}, ${counted} ${counted === 1 ? 'day' : 'days'} counted`;
+  if (share) {
+    /* THE FULLEST DAY, by its share and not its size, the earliest on a tie. */
+    const fullest = Object.keys(counts)
+      .sort()
+      .reduce((best, d) => (part(d) > part(best) ? d : best));
+    const top = cells.find((c) => c.day === fullest)!.count!;
+    const tail = counts[fullest]! > 0 ? `the fullest ${day(fullest)} with ${top}.` : 'none with anything in it.';
+    return { weeks, cells, name: `${head}, each by its ${HEAT_SHARE}, ${tail}`, skipped, outside, empty: false, share: true };
+  }
   const name = most > 0 ? `${head}, the busiest ${day(busiest)} with ${said(most)}.` : `${head}, none with anything in it.`;
   return { weeks, cells, name, skipped, outside, empty: false };
 }
@@ -114,6 +148,11 @@ export const heatLines = (plan: HeatPlan): { day: string; count: string }[] =>
 export const HEAT_NONE = 'Nothing here falls in the last twelve weeks.';
 export const HEAT_DAY = 'Day';
 export const HEAT_VALUE = 'Value';
+/** What a day's wash is on a block with `of:`, as the grid's name and the table's heading say it. */
+export const HEAT_SHARE = "share of that day's whole";
+/** The table's value heading on such a block, and the line under its grid. */
+export const HEAT_SHARE_HEAD = "Share of that day's whole";
+export const HEAT_SHARE_LINE = "Each day is washed by its share of that day's whole.";
 export const heatSkipped = (said: readonly string[]): string => `Not drawn, because the day or the value does not read: ${said.join(', ')}.`;
 export const heatOutside = (n: number): string =>
   `${n} ${n === 1 ? 'day falls' : 'days fall'} outside the twelve weeks to today and ${n === 1 ? 'is' : 'are'} not drawn.`;

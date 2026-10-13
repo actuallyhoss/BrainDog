@@ -154,6 +154,7 @@ const REGISTER = {
     org: 'on the one list meet writes organisations into, the field that plays each part: name, keys, kind, domain, merged_into',
     pairs: 'transfer detection: the fields the record matches two legs of one move by',
     hand: '{person?: <ref field>, agent?: <text field>, taken?: <state value>}: who holds a row, a person by a ref field and an agent by the text field it signs with, and the state a row moves to when an agent takes it. Either may be left out, but not both',
+    once: 'the fields an add-on plants and never changes after, by id: [name]. Its own update leaves each as the row holds it; a person still edits them',
     order: '{field, dir?: asc|desc}: the order a read with none of its own comes back in, by a number, day, time or text field of this list',
   },
   field: {

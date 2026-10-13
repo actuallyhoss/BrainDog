@@ -73,7 +73,7 @@ test('no line carries an em dash or an id', () => {
   for (const line of lines) assert.doesNotMatch(line, /\u2014|#\d|[0-9A-HJKMNP-TV-Z]{26}/, line);
 });
 
-/* THIS HOST'S LAST RESTORE TEST (LCH-C04): `GET /account/drill`, `{ ok, value: { at, pass, records } | { at: null } }`. */
+/* THIS HOST'S LAST RESTORE TEST (LCH-C04): `GET /account/drill`, `{ ok, value: { at, pass, record_copies } | { at: null } }`. */
 
 const D = 24 * H;
 /** A door that answers `status` with `body`, and keeps the address it was asked. */
@@ -87,7 +87,7 @@ const door = (status: number, body: unknown) => {
 };
 
 test('a passed test reads its age, and is no fault', async () => {
-  const { io, asked } = door(200, { ok: true, value: { at: back(12 * D), pass: true, records: 3 } });
+  const { io, asked } = door(200, { ok: true, value: { at: back(12 * D), pass: true, record_copies: 3 } });
   const drill = await readDrill(io);
   assert.deepEqual(asked, ['/account/drill']);
   assert.deepEqual(drill, { at: back(12 * D), pass: true, records: 3 });
@@ -95,13 +95,13 @@ test('a passed test reads its age, and is no fault', async () => {
 });
 
 test('a failed test is a fault, and the word failed says so beside the red', async () => {
-  const { io } = door(200, { ok: true, value: { at: back(3 * D), pass: false, records: 0 } });
+  const { io } = door(200, { ok: true, value: { at: back(3 * D), pass: false, record_copies: 0 } });
   const line = drillLine((await readDrill(io))!, NOW);
   assert.deepEqual(line, { text: "This host's last restore test: failed 3 days ago", fault: true, mark: null });
 });
 
 test('a test that tried no record reads what it did, never "passed", and is a fault with its word', async () => {
-  const { io } = door(200, { ok: true, value: { at: back(12 * D), pass: true, records: 0 } });
+  const { io } = door(200, { ok: true, value: { at: back(12 * D), pass: true, record_copies: 0 } });
   const line = drillLine((await readDrill(io))!, NOW);
   assert.deepEqual(line, {
     text: "This host's last restore test, 12 days ago: the Directory's copy opened; no record's copy was tried",
@@ -119,9 +119,12 @@ test('a test that tried no record reads what it did, never "passed", and is a fa
 
 test('a pass with no count draws no line, where a failure with none still reads failed', () => {
   assert.equal(drillOf({ at: back(D), pass: true }), null);
-  assert.equal(drillOf({ at: back(D), pass: true, records: -1 }), null);
-  assert.equal(drillOf({ at: back(D), pass: true, records: '3' }), null);
+  assert.equal(drillOf({ at: back(D), pass: true, record_copies: -1 }), null);
+  assert.equal(drillOf({ at: back(D), pass: true, record_copies: '3' }), null);
   assert.deepEqual(drillOf({ at: back(D), pass: false }), { at: back(D), pass: false, records: 0 });
+  /* A HOST ON THE BUILD BEFORE THE NAME MOVED still answers `records`, and its line is still drawn. */
+  assert.deepEqual(drillOf({ at: back(D), pass: true, records: 3 }), { at: back(D), pass: true, records: 3 });
+  assert.deepEqual(drillOf({ at: back(D), pass: true, record_copies: 2, directory_only: false }), { at: back(D), pass: true, records: 2 });
 });
 
 test('a host never tested reads "Never tested" as a fault, and stays red until the first test', async () => {

@@ -444,7 +444,13 @@ const withoutDirection = (doc: Body): Body => ({
     }),
 });
 /** AND 3.17.0'S CROSS-CHECK (cash-check-52): `cash-cross-check`, the one figure it adds, goes. */
-const withoutCrossCheck = (doc: Body): Body => ({ ...doc, declarations: (doc.declarations as Body[]).filter((d) => d.metric !== 'cash-cross-check') });
+const withoutCrossCheck = (doc: Body): Body => ({
+  ...doc,
+  declarations: (doc.declarations as Body[])
+    .filter((d) => d.metric !== 'cash-cross-check')
+    /* AND THE TWO BLOCKS THE MONEY PAGE DRAWS IT WITH (cash-page-54): the tile and the line for no balance. */
+    .map((d) => (d.page !== 'money' || !Array.isArray(d.blocks) ? d : { ...d, blocks: (d.blocks as Body[]).filter((b) => b.heading !== 'Cash now does not add up' && b.body !== 'No balance has been typed yet.') })),
+});
 const withoutCashStale = (doc: Body): Body => ({ ...doc, declarations: (doc.declarations as Body[]).filter((d) => d.rule !== 'cash-stale') });
 const LATEST: Record<string, { version: string; released: string; undo: (doc: Body) => Body }> = {
   /* AN ACCOUNT'S DIGITS SAID THE LAST FOUR. */

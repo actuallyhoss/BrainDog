@@ -28,7 +28,7 @@
   import { chipsOf, columnsFor, currencyFor, display, DOM_CAP, iconFor, joinOf, labelOf, toRows, type Filter, whereOf } from '$lib/record/api.ts';
   /* Type only, so the client's route table stays out of this chunk. */
   import { joinNames, type Names } from '$lib/record/remote.ts';
-  import { open, read, type Boot, type Refusal } from '$lib/data/record.ts';
+  import { open, read, tally, type Boot, type Refusal, type Tally } from '$lib/data/record.ts';
   import { live } from '$lib/data/live.svelte.ts';
   import { searchable } from '$lib/record/find.ts';
   import type { Entry, Fields, RegisterDecl } from '$lib/record/schema.ts';
@@ -442,6 +442,8 @@
   let fetching = false;
   /** How many rows hold each pill's value, as the record counted them. `facets` adds this tab's. */
   let counted = $state(new Map<string, Map<string, number>>());
+  /** Why some pills carry no number: the record's refusal to count them, said in one line under the bar. */
+  let uncounted = $state<Refusal | null>(null);
 
   /** The rows the record returned, by number: what a cell, the editor and the menu look a row up in. */
   const bySeq = $derived(new Map(pages.flat().map((e) => [e.seq, e] as const)));
@@ -462,6 +464,7 @@
       matched = 0;
       named = null;
       counted = new Map();
+      uncounted = null;
     }
     refusal = null;
     stale = false;
@@ -565,7 +568,7 @@
       const bar = size >= ENOUGH_TO_SIFT || text !== '' || chips.length > 0;
       const [answer, facets] = await Promise.all([
         src.page(register, { filters: chips, q: text, sort: order, join: joined }, null),
-        bar ? countAll(register, s.value, chips, text, joined) : Promise.resolve(new Map<string, Map<string, number>>()),
+        bar ? countAll(register, s.value, chips, text, joined) : Promise.resolve<Tally>({ counts: new Map(), withheld: null }),
       ]);
       if (asked !== said) return true;
       if (!answer.ok) return refuse(answer.refusal);
@@ -574,7 +577,8 @@
       named = answer.value.names;
       cursor = answer.value.cursor;
       matched = answer.value.matched;
-      counted = facets;
+      counted = facets.counts;
+      uncounted = facets.withheld;
       return true;
     });
     if (asked === said) busy = false;
@@ -669,7 +673,7 @@
     const src = await open();
     const [answer, facets] = await Promise.all([
       src.page(register, { filters: chips, q: text, sort: order, join: joined }, null),
-      counted.size > 0 ? countAll(register, decl, chips, text, joined) : Promise.resolve(counted),
+      counted.size > 0 || uncounted ? countAll(register, decl, chips, text, joined) : Promise.resolve<Tally>({ counts: counted, withheld: null }),
     ]);
     if (asked !== said || !answer.ok || mine !== rechecks) return;
     /* THE READER SCROLLED WHILE THIS WAS OUT, and page 2 is now under page 1: the same seam as above. */
@@ -690,7 +694,8 @@
     named = answer.value.names;
     cursor = answer.value.cursor;
     matched = answer.value.matched;
-    counted = facets;
+    counted = facets.counts;
+    uncounted = facets.withheld;
   }
 
   /** The stale mark's control: the question asked again from the top, as a question the reader chose to ask. */
@@ -707,21 +712,24 @@
    *
    * UNDER "or" THE CHIPS WIDEN THE LIST AND NARROW NOTHING, so a pill is counted under the search alone: how many
    * entries hold its value, which is what pressing it adds to the list.
+   *
+   * A FIELD THE RECORD WOULD NOT COUNT HAS NO NUMBERS, NEVER NOUGHTS (`tally`): it was filled with a 0 a value, which
+   * read "Open 0, Paid 0" over a list that opened full. The refusal comes back beside the counts as `withheld`, and
+   * the screen says it in a line under the bar.
    */
-  async function countAll(register: string, d: RegisterDecl, chips: Filter[], text: string, joined: typeof join): Promise<Map<string, Map<string, number>>> {
+  async function countAll(register: string, d: RegisterDecl, chips: Filter[], text: string, joined: typeof join): Promise<Tally> {
     const src = await open();
-    const out = new Map<string, Map<string, number>>();
-    await Promise.all(
-      filterableOf(d.fields)
-        .filter((f) => f.type === 'enum')
-        .map(async (f) => {
-          /* "or" ONLY WITH MORE THAN ONE CHIP, as `either` reads it: one chip joined by "or" still narrows the list. */
-          const others = joined === 'any' && chips.length > 1 ? [] : chips.filter((x) => x.field !== f.id);
-          const n = await src.counts(register, { filters: others, q: text }, f.id, f.values ?? []);
-          out.set(f.id, n.ok ? n.value : new Map((f.values ?? []).map((v) => [v, 0])));
-        }),
+    return tally(
+      await Promise.all(
+        filterableOf(d.fields)
+          .filter((f) => f.type === 'enum')
+          .map(async (f) => {
+            /* "or" ONLY WITH MORE THAN ONE CHIP, as `either` reads it: one chip joined by "or" still narrows the list. */
+            const others = joined === 'any' && chips.length > 1 ? [] : chips.filter((x) => x.field !== f.id);
+            return [f.id, await src.counts(register, { filters: others, q: text }, f.id, f.values ?? [])] as const;
+          }),
+      ),
     );
-    return out;
   }
 
 
@@ -1721,6 +1729,8 @@
   const filterable = $derived(filterableOf(decl?.fields ?? []));
   /* The fields the bar filters by: every declared enum a reader can sift on. */
   const enums = $derived(filterable.filter((f) => f.type === 'enum'));
+  /** The refusal to count, while there are pills on screen to miss their numbers. The bar's own test, as `ChipsBar` is handed it. */
+  const unsaid = $derived(uncounted && enums.length > 0 && (siftable || q !== '' || filters.length > 0) ? uncounted : null);
 
   /**
    * HOW MANY ROWS HOLD EACH PILL'S VALUE, printed quietly beside its word.
@@ -2512,7 +2522,7 @@
       since a tile never holds a tile.
     -->
     <Tile class="list-tile" data-view={view}>
-      <div class="list-tools">
+      <div class="list-tools" data-uncounted={unsaid ? '' : undefined}>
         <!-- THE SEARCH AND THE FILTERS, which draw themselves only while there is something to sift, and the phone's
              filter sheet behind its one button. Which filters are on is the address, read and written here. -->
         <ChipsBar
@@ -2541,6 +2551,12 @@
           </span>
         </div>
       </div>
+
+      <!-- THE FILTERS CARRY NO NUMBERS, AND THIS SAYS SO: the record would not count the list for this person, or the
+           count did not come back. One plain line under the bar, where the numbers would have been read. -->
+      {#if unsaid}
+        <p class="uncounted" data-uncounted-note role="status">{unsaid.code === 'FORBIDDEN' ? copy.countsWithheld : copy.countsUnread}</p>
+      {/if}
 
       <!-- CAPTURE, THE LIST'S FIRST LINE: a name and Enter. Not on the arrival itself, where New in the head is the way
            in, and where nobody may add, why not, in the line's place. -->
@@ -2881,6 +2897,15 @@
     margin: 0;
     color: var(--ink2);
     font-size: var(--fs-meta);
+  }
+
+  /* WHY THE FILTERS HAVE NO NUMBERS, one plain line at the body size under the bar. */
+  .uncounted {
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--fs-body);
+    line-height: 1.4;
+    overflow-wrap: anywhere;
   }
 
   /* WHY THERE IS NO CAPTURE LINE, one dim sentence where the line would stand. */

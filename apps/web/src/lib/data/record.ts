@@ -134,6 +134,26 @@ export async function countsOf(
   return { ok: true, value: out, ...(counter ? { absent: true as const } : {}) };
 }
 
+/** A bar's counts: each field the record counted, and the refusal of any it would not. */
+export type Tally = { counts: Map<string, Map<string, number>>; withheld: Refusal | null };
+
+/**
+ * Every field's answer from `counts`, as a strip of pills draws it.
+ *
+ * A REFUSED COUNT IS NOT A COUNT OF NOUGHT. A field the record would not count was filled with a 0 for each of its
+ * values, so a person the record does not count for read "Open 0, Paid 0" over a list that opened full. A count
+ * nobody can trust is worse than none: a refused field has NO entry here, which a pill reads as no number at all, and
+ * the first refusal is handed on as `withheld` so the screen can say in a line why the numbers are missing.
+ */
+export function tally(answers: readonly (readonly [field: string, said: Said<Map<string, number>>])[]): Tally {
+  const out: Tally = { counts: new Map(), withheld: null };
+  for (const [field, said] of answers) {
+    if (said.ok) out.counts.set(field, said.value);
+    else out.withheld ??= said.refusal;
+  }
+  return out;
+}
+
 /**
  * A call the screen is waiting on, bracketed by its readiness counters.
  *

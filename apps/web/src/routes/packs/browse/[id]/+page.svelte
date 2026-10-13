@@ -59,7 +59,7 @@
   import Preview from '../Preview.svelte';
   import { browserStore, catalogueText, keepFirstKey, readHostCatalogue, signedWords, trustForEntry, trustWords } from '../catalogue.ts';
   import { FIXABLE, hasTheme, stageFix } from '$lib/theme/staged.ts';
-  import { askOnDecide, diffOf, install, notOwner, planFor, turnOn, type OfferClient, type Planned } from './offer.ts';
+  import { askOnDecide, diffOf, install, notOwner, planFor, sheetWords, turnOn, waitsOf, type OfferClient, type Planned } from './offer.ts';
 
   const KINDS: readonly ListingKind[] = ['module', 'usecase', 'pack'];
   const kind = $derived<ListingKind>(KINDS.find((k) => k === page.url.searchParams.get('kind')) ?? 'usecase');
@@ -272,6 +272,11 @@
   let planned = $state.raw<Planned | null>(null);
   /** A Kennel entry asked for on Decide: the proposal id, empty when the record named none. */
   let filed = $state<string | null>(null);
+
+  /* WHAT THE INSTALL SENDS AND WHAT WAITS, as sentences under the plan (`offer.ts`): which key goes to which host and how
+     often, and the parts left out until the record holds a list. Both are empty for most add-ons, and then nothing is
+     drawn. */
+  const waits = $derived(planned ? waitsOf(planned, (id) => names.get(id) ?? moduleTitle(id)) : []);
 
   /** Whether the button can be pressed: the record has answered, and a Kennel version verified and is trusted. */
   const pressable = $derived(!busy && client !== null && states !== null && file !== null && (listing?.source !== 'kennel' || (trust !== null && !untrusted)));
@@ -506,8 +511,21 @@
         {busy}
         onapprove={() => void approve()}
         oncancel={() => (planned = null)}
+        extra={waits.length > 0 ? told : undefined}
       />
     {/if}
+
+    {#snippet told()}
+      {#if waits.length > 0}
+        <section class="told" aria-labelledby="told-waits-h">
+          <h3 class="told-h" id="told-waits-h">{sheetWords.waits}</h3>
+          <ul class="told-lines">
+            {#each waits as line (line)}<li>{line}</li>{/each}
+          </ul>
+          <p class="told-note">{sheetWords.waitsNote}</p>
+        </section>
+      {/if}
+    {/snippet}
 
     <div class="act narrow-only">{@render act()}</div>
   {/if}
@@ -746,6 +764,35 @@
     margin: 0;
     min-inline-size: 0;
     overflow-wrap: anywhere;
+  }
+
+  /* THE TWO SENTENCES UNDER THE PLAN: flat text in the sheet's own column, no card of their own. */
+  .told {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+  }
+  .told-h {
+    margin: 0;
+    color: var(--dim);
+    font-size: var(--fs-meta);
+    font-weight: 500;
+  }
+  .told-lines {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    color: var(--ink);
+    font-size: var(--fs-body);
+    overflow-wrap: anywhere;
+  }
+  .told-note {
+    margin: 0;
+    color: var(--dim);
+    font-size: var(--fs-body);
   }
 
   .narrow-only {

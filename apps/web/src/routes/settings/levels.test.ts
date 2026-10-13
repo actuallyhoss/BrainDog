@@ -25,7 +25,7 @@ import { OWNER_CONTROLS, ownsRecord, words } from './levels.ts';
 
 /** Every area the rail offers, in the order the page draws them. */
 const AREAS = [
-  'appearance', 'keyboard', 'navigation', 'pages', 'people', 'recovery', 'sessions', 'identity',
+  'appearance', 'look', 'keyboard', 'navigation', 'pages', 'people', 'recovery', 'sessions', 'identity',
   'agents', 'ingest', 'notifications', 'backups', 'billing', 'delete', 'export',
 ];
 

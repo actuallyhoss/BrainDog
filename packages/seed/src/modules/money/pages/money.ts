@@ -5,6 +5,7 @@ import { ACCOUNTS_TILE } from './parts/accounts.ts';
 import { ADD_ACCOUNT } from './parts/add-account.ts';
 import { BY_BOOK } from './parts/by-book.ts';
 import { CHASING } from './parts/chasing.ts';
+import { CROSS_CHECK } from './parts/cross-check.ts';
 import { FORECAST } from './parts/forecast.ts';
 import { HEADLINE } from './parts/headline.ts';
 import { HEADS_UP } from './parts/heads-up.ts';
@@ -57,6 +58,11 @@ import { RUNWAY } from './parts/runway.ts';
  * draws compact in a side column (`asks.ts`). Heads up follows the walk, and what comes in and goes out is open under
  * it, with only the months behind and what already moved folded under History. When the money runs out is said once,
  * in its tile, and no longer in the line, which says what there is.
+ *
+ * WHETHER CASH NOW ADDS UP, SINCE money-core 3.17.0 (REC-A17): the record works Cash now out a second way, and while
+ * the two disagree one tile under the walk says so in the danger colour and in words (`parts/cross-check.ts`). It is
+ * not drawn at nought, so a record that is right reads no word about a check. With no balance typed there is nothing
+ * to check, and one line says that under the box to add an account.
  */
 export const MONEY_PAGE: SeedPage = {
   page: 'money',
@@ -77,6 +83,7 @@ export const MONEY_PAGE: SeedPage = {
     ...RUNWAY,
     ...ACCOUNTS_TILE,
     ...QUEUE,
+    ...CROSS_CHECK,
     ...HEADS_UP,
     ...NEXT_30,
     ...INSTALMENTS,

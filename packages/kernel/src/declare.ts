@@ -60,6 +60,7 @@ import { BLOCK_KIND_MODULES, kindModule } from './kinds/index.ts';
 /* THE PAGE WORDS THE INSTALL AND THE READ REFUSE IN ONE SENTENCE: a section's host panel, a path's short view and a roadmap's columns. */
 import { panelFault, roadmapFault, shortFault } from './kinds/words.ts';
 import type { FlowDecl } from './rules.ts';
+import { linkFault } from './rule-link.ts';
 /* THE FORMAT, THE WINDOW AND THE TWO FIGURES THAT ARE NOT A SUM, checked here by the same functions that read them. */
 import { clockOf, isMoneyFormat, windowMs, type EvalContext } from './metrics.ts';
 import { WALKS, WALK_SOURCE, crosscheckFault, isCrosscheck, isRolled, rolledFault, walksToZero, type Rolled } from './money-figures.ts';
@@ -4085,6 +4086,8 @@ function createFault(
  *   `hand`    `{ person?, agent?, taken? }`: who holds a row, a person by a `ref` field and an agent by the `text` field
  *             it signs with, and the state a row moves to when an agent takes it (`HAND_PARTS`, `handFault` below).
  *             The app's "Hand to" reads it, and nothing in the kernel names the list that declares it.
+ *   `once`    the fields an add-on plants and never patches: its own later write (`WriteContext.pack`) leaves them as
+ *             a row holds them, and a person's edit is not narrowed (the write path in `index.ts`, SHL-A09).
  *
  * `rates` AND `meets` ARE NOT IN `42 §4.4` YET, and `declare.test.ts` lists what the code admits that the document does
  * not publish. They landed in a change that did not include the document or that test.
@@ -4102,6 +4105,7 @@ const REGISTER_KEYS = [
   'delete',
   'owner_only',
   'hand',
+  'once',
 ] as const;
 
 /**
@@ -4132,6 +4136,24 @@ const REPEAT_READ = ['freq', 'interval', 'count', 'until', 'workday'] as const;
  * (`LINKS` in `packages/seed/src/packs/first-party.ts`), and a list that hands only to agents is still handed.
  */
 const HAND_PARTS = ['person', 'agent', 'taken'] as const;
+
+/** Why a list's `once:` names what an add-on cannot plant, or `null` when it is a list of this list's own written fields. */
+function onceFault(id: string, fields: readonly (FieldLike & { derived?: boolean })[], once: unknown): Refusal | null {
+  const mine = fields.filter((f) => f.derived !== true).map((f) => f.id);
+  if (!Array.isArray(once) || once.some((o) => typeof o !== 'string'))
+    return bad('DECLARATION_INVALID', `${id}'s once is a list of its own field ids, such as [name]: the fields an add-on plants and never changes after.`, 'once', mine);
+  const at = (once as string[]).findIndex((o) => !mine.includes(o));
+  if (at < 0) return null;
+  const named = (once as string[])[at]!;
+  return bad(
+    'DECLARATION_INVALID',
+    fields.some((f) => f.id === named)
+      ? `${id}'s once names ${named}, which the record works out itself, so no add-on writes it. Take it out of once.`
+      : `${id}'s once names ${named}, and ${id} has no such field.`,
+    `once[${at}]`,
+    mine,
+  );
+}
 
 /** Why a list's `hand:` would write what its fields cannot hold, or `null` when every part it names is there. */
 function handFault(id: string, fields: readonly FieldLike[], state: unknown, hand: unknown): Refusal | null {
@@ -4946,6 +4968,20 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
     const over = patternFault((decl.body as { when?: unknown }).when, decl.id);
     if (over) return over;
 
+    /* A LINK THAT FILTERS OR TAKES A FIELD THE LINKED LIST DOES NOT DECLARE (`rules.ts` `linkFault`, REC-B10). Compiled,
+       such a filter matches nothing, so the rule installed and filed nothing for ever. A list not installed yet is not
+       refused here: such a link has always linked nothing. */
+    if (installed) {
+      const linked = linkFault(
+        (register) => {
+          const fields = fieldsOf(installed, register);
+          return fields === null ? null : ({ register, fields: Object.fromEntries(fields.map((f) => [f, {}])) } as never);
+        },
+        decl.body as never,
+      );
+      if (linked) return linked;
+    }
+
     /* THE TRIGGER, THE STEPS AND THE PATH, in `flow-lint.ts`. A rule with `on: { every: 1h }` installed before this line
        existed and so did one with `every: 5m`, a `tag` on a clock tick, or no register and no trigger at all: nothing
        read `on:`, and the pass selects rules by `register`, so each was a declaration read by nothing. A rule that
@@ -5429,6 +5465,13 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
      field or leave a row in a state its list does not have. Checked here, at install, and not when somebody presses. */
   if (decl.body.hand !== undefined) {
     const fault = handFault(id, fields as unknown as FieldLike[], state, decl.body.hand);
+    if (fault) return fault;
+  }
+
+  /* `once:` NAMES FIELDS OF THIS LIST THAT A WRITE CAN SET. An id the list does not have would be inert, and a derived
+     field is refused on every write, so neither is a field an add-on could plant once. */
+  if (decl.body.once !== undefined) {
+    const fault = onceFault(id, fields as unknown as (FieldLike & { derived?: boolean })[], decl.body.once);
     if (fault) return fault;
   }
 

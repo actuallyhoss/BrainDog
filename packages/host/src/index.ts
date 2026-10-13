@@ -309,6 +309,9 @@ const CORE_ROUTES: readonly Route[] = [
     takes: { url: 'text' } },
   { name: 'fetchUseCase', group: 'ADMIN', writes: false, what: 'The text of a shared use-case file at an https address, read by the host with no credentials. It writes nothing.',
     takes: { url: 'text' } },
+  /* THE WHOLE FIRST RUN AS ONE CALL (USE-B04). The browser ran it as a script of a dozen calls, so a closed tab left a
+     record part made. ADMIN as `installPack` is: it installs add-ons, and only the owner in a browser may. */
+  { name: 'setup', group: 'ADMIN', writes: true, what: 'Make this record from what its owner accepted, in one call: the add-ons in order, then their name, their words, the settings and what they asked to start with. It answers what was done and what was not, and asked with again it writes only what is missing.' },
   { name: 'installPack', group: 'ADMIN', writes: true, what: 'Apply the plan somebody approved, with the calls-out lines it asks for. A browser session only.' },
   { name: 'uninstallPack', group: 'ADMIN', writes: true, what: 'Take one back out. Its declarations go; its rows stay.' },
   { name: 'disablePack', group: 'ADMIN', writes: true, what: 'Turn a pack off. It stays listed, its rows stay, and what leans on it is named first.' },
@@ -597,6 +600,8 @@ export type RecordSurface = {
   fetchShared(args: never, ctx: never): Promise<Result<unknown>>;
   fetchUseCase(args: never, ctx: never): Promise<Result<unknown>>;
   exportUseCase(args: never, ctx: never): Promise<Result<unknown>>;
+  /** OPTIONAL as `countBy` is: the route lands in the same wave as the record's method, and both hosts compile either way. */
+  setup?(args: never, ctx: never): Promise<Result<unknown>>;
   installPack(args: never, ctx: never): Promise<Result<unknown>>;
   uninstallPack(args: never, ctx: never): Promise<Result<unknown>>;
   disablePack(args: never, ctx: never): Promise<Result<unknown>>;
@@ -715,6 +720,12 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     fetchShared: (a, ctx) => api.fetchShared(a as never, ctx as never),
     fetchUseCase: (a, ctx) => api.fetchUseCase(a as never, ctx as never),
     exportUseCase: (a, ctx) => api.exportUseCase(a as never, ctx as never),
+    /* `at: 'setup'` IS HOW A CLIENT TELLS THIS FROM THE RECORD'S OWN `NOT_IN_THIS_BUILD` (no backups here, no sign-in
+       here), which is an answer about the record and no reason to fall back to the old way. */
+    setup: async (a, ctx) =>
+      api.setup
+        ? api.setup(a as never, ctx as never)
+        : { ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog cannot set a record up in one call yet, so nothing was written.', at: 'setup' } },
     installPack: (a, ctx) => api.installPack(a as never, ctx as never),
     uninstallPack: (a, ctx) => api.uninstallPack(a as never, ctx as never),
     disablePack: (a, ctx) => api.disablePack(a as never, ctx as never),

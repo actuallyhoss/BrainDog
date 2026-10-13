@@ -76,7 +76,7 @@ export const MAYBE = {
   'expect.question.about': [isText, 'what the one question is about'],
   'expect.question.choices': [isCount, 'how many answers it offers'],
   'expect.heard.became': [(v) => v !== null && typeof v === 'object' && !Array.isArray(v) && Object.values(v).every(isTexts), 'what each phrase becomes, { phrase: [the places it names] }'],
-  'expect.today.money': [isText, 'the money tile as Today draws it, such as In EGP 900'],
+  'expect.today.money': [isText, 'the money tile as Today draws it, such as Paid EGP 900'],
   'expect.offer.lead': [(v) => isText(v?.says) && isText(v?.match) && isPattern(v.match), "the Orders page's sentence on that day, as { says, match }"],
 };
 

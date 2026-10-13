@@ -19,7 +19,12 @@ import { counted } from './counted.ts';
 const TO_SEND = 'state is new or ready';
 
 /* THIS WEEK IS TODAY AND THE SEVEN DAYS AFTER, AND LATE IS ITS OWN COUNT (shop-sentence-52): "6 to ship this week" counted
-   the two already past their day, beside a page offer that said four. An order past its day is late, never this week's. */
+   the two already past their day, beside a page offer that said four. An order past its day is late, never this week's.
+   IT IS THE HOUSE'S WEEK AND STAYS SO (shop-owed-53-54): every Due this week in every use case is `due before +8d`, and
+   a shop that read Monday to Sunday would say nought to ship on a Sunday with three due on the Monday. The pen is what
+   counted another week, Monday to Sunday in every state, and offered a second page by the week beside this one. It
+   reads this `due before +8d` as a page already by the week (`byWeek` in the record's `emergent.ts`) and offers none,
+   so the clause is written in those words and no others. */
 const THIS_WEEK = `${TO_SEND}, due after -1d, due before +8d`;
 const LATE = `${TO_SEND}, due before today`;
 
@@ -28,18 +33,23 @@ const OWED = 'state is not paid, total is set';
 const NOT_PAID = [{ field: 'state', not: 'paid' }, { field: 'total', present: true }];
 
 /* WHO THE LINE CAN NAME: an order nothing was paid on, so its total is what is owed, with a person and a day on it. The
-   day is what orders them, oldest first, so the line names the one the Owed to you tile opens on. */
+   day is what orders them, oldest first, so the line names the one the Owed to you tile opens on.
+   IT NAMES ONE AND COUNTS THE REST (shop-owed-53-54): Salma owed 1,350 and 600 and Dalia 400, and the line said "Salma
+   still owes EGP 1,350" with the other thousand nowhere in it. `.more` is every order here but the one named. */
 const OWED_NAMED = { all: [...NOT_PAID, { field: 'paid', empty: true }, { field: 'who', present: true }, { field: 'due', present: true }] };
 
-/* AND EVERY OTHER ORDER NOT PAID IN FULL, counted where it cannot be named: part paid, nobody's, or with no day. */
+/* AND EVERY ORDER NOT PAID IN FULL THAT IS NOT ONE OF THOSE, counted where it cannot be named: part paid, nobody's, or
+   with no day. The two split the owed orders between them, so named, more and other add up to Owed to you. */
 const OWED_OTHER = { all: [...NOT_PAID, { any: [{ field: 'paid', present: true }, { field: 'who', empty: true }, { field: 'due', empty: true }] }] };
 
 export const SHOP = {
   usecase: 'shop',
   /* 1.0.0: the first version, with Orders and Products and the Orders page.
      1.1.0: this week starts today and late is its own clause and tile; a part-paid order is owed; the line names the
-     oldest order nothing was paid on, and counts the ones it cannot name. */
-  version: '1.1.0',
+     oldest order nothing was paid on, and counts the ones it cannot name.
+     1.2.0: the line counts every other order nothing was paid on beside the one it names, where it said only the
+     oldest and left the rest out. */
+  version: '1.2.0',
   title: 'Shop',
   summary: 'The orders you take, who they are for and when they are due, what has been paid, and the things you sell.',
   author: 'BrainDog',
@@ -141,12 +151,15 @@ export const SHOP = {
                EGP 1,350". A clause whose figure is nought is left out, so a new shop reads no line. The clauses are cut
                at commas (`leadOf`), so each goes on its own when it has nothing to say.
                THE OWED CLAUSE NAMES THE OLDEST ORDER NOTHING WAS PAID ON, its person and its total, one order's both.
-               An order it cannot name that way (part paid, nobody's, no day) is counted in the clause before it, which
-               needs no name, so an unpaid order is never left out of the line. */
+               EVERY OTHER ORDER NOTHING WAS PAID ON IS COUNTED IN THE CLAUSE AFTER IT, "with 2 more orders not paid at
+               all", hers or anybody's, and nought more is left out. An order that cannot be named that way (part paid,
+               nobody's, no day) is counted in the clause before, which needs no name. Named, more and not paid in full
+               are every order in Owed to you, each once. The amounts are never added: two orders may be in two
+               currencies. */
             kind: 'note',
             lead: true,
             span: 12,
-            body: '{{orders-30d}} order(s) this month, {{orders-due-7d}} to ship this week, {{orders-late}} late, {{orders-owed-other}} not paid in full, and {{orders-owed-named.first_who}} still owes {{orders-owed-named.first_total}}',
+            body: '{{orders-30d}} order(s) this month, {{orders-due-7d}} to ship this week, {{orders-late}} late, {{orders-owed-other}} not paid in full, and {{orders-owed-named.first_who}} still owes {{orders-owed-named.first_total}}, with {{orders-owed-named.more}} more order(s) not paid at all',
           },
           {
             /* WHAT IS PAST ITS DAY AND NOT SENT, the longest late first, drawn only while something is. */

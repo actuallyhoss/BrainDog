@@ -95,7 +95,7 @@ export function methods(deps: RecordDeps) {
     /* THE LADDER DROPS INSIDE THE UNDO'S TRANSACTION: a throw in between takes the undo back with it. */
     const out = kernel.transaction(() => {
       const applied = kernel.undoApply(scope, args.hash as string, actorOf(ctx), opts);
-      if (applied.ok) for (const mark of applied.value.undone) if (mark.agent !== null) trust.drop(mark.agent, mark.kinds);
+      if (applied.ok) for (const mark of applied.value.undone) if (mark.agent !== null) trust.drop(mark.agent, mark.kinds, 'undone');
       return applied;
     });
     if (!out.ok) return out;

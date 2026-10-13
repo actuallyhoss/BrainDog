@@ -1,10 +1,10 @@
 /**
- * Today's "Money this week" (use case 6, step 6): her first Today reads "In EGP 900" after "Nadia paid 900 on InstaPay",
+ * Today's "Money this week" (use case 6, step 6): her first Today reads "Paid EGP 900" after "Nadia paid 900 on InstaPay",
  * on a record that installed Money the way a person does and holds no account.
  *
  * WHAT WOULD BE SILENTLY WRONG: the tile reading the Ledger's money in, which counts a transfer between her own accounts
  * and never sees a payment kept as a paid invoice ("Nothing came in" on the week she was paid); two currencies, or the
- * two figures, added into one number; a week with nothing paid saying "In 0"; and a Today kept by the arrange mode's
+ * two figures, added into one number; a week with nothing paid saying "Paid 0"; two cells both named "In"; and a Today kept by the arrange mode's
  * first Done losing its week (B46.8).
  *
  * The tile is read off a real record (`openRecord`, Money and People installed with no example entries), each figure
@@ -23,7 +23,7 @@ import { firstPartyDocument } from '@braindog/seed';
 import '../record/fixtures/fill.ts';
 import { tileOf, type LiveBlock } from '../record/page-live.ts';
 import { holdsOf, previewedBody } from '../page/home-arrange.ts';
-import { IN, MONEY_WEEK, OWED, OWED_TO_YOU, WEEK_IN, homeDrawn, weekMoney, type Week } from './default-home.ts';
+import { MONEY_WEEK, OWED, OWED_TO_YOU, WEEK_IN, WEEK_IN_SAID, homeDrawn, weekMoney, type Week } from './default-home.ts';
 
 /** Tuesday 6 October 2026. */
 const NOW = Date.parse('2026-10-06T09:00:00Z');
@@ -111,28 +111,31 @@ function drawn(k: Kernel): { tile: LiveBlock; line: string | undefined } {
 
 const cells = (b: LiveBlock): string[][] => (b.drawn ? (b.metrics ?? []).map((m) => [m.label, m.value]) : []);
 
-test('THE TILE IS MONEY\'S OWN TWO FIGURES AS "In", side by side, and what is owed beside them, drawn only where Money has them', () => {
+test('THE TILE IS MONEY\'S OWN TWO FIGURES, EACH BY ITS OWN NAME ("Paid", "Came in"), side by side, and what is owed beside them, drawn only where Money has them', () => {
   const b = weekMoney();
   assert.equal(b.kind, 'stat');
   assert.equal(b.heading, MONEY_WEEK);
   assert.deepEqual(b.cells, [
-    { metric: 'settled-in-7d', label: IN },
-    { metric: 'received-7d', label: IN },
+    { metric: 'settled-in-7d', label: 'Paid' },
+    { metric: 'received-7d', label: 'Came in' },
     { metric: OWED, label: OWED_TO_YOU },
   ]);
   assert.deepEqual(WEEK_IN, ['settled-in-7d', 'received-7d']);
   /* NEVER THE LEDGER'S `way is in`, which counts her own transfers: no list is read for it at all. */
   assert.equal(b.source, undefined);
   assert.equal(b.when?.metric, 'settled-in-7d', 'a record on an older Money draws no tile rather than one it cannot read');
-  assert.doesNotMatch(`${b.heading} ${IN} ${OWED_TO_YOU}`, /—|\brow\b/u);
+  /* NO TWO CELLS SHARE A NAME: the same EGP 900 under "In" twice read as the money counted twice. */
+  const names = (b.cells ?? []).map((c) => c.label);
+  assert.equal(new Set(names).size, names.length);
+  assert.doesNotMatch(`${b.heading} ${names.join(' ')}`, /—|\brow\b/u);
 });
 
-test('A FRESH SHOP READS NO MONEY TILE, and after "Nadia paid 900 on InstaPay" it reads In EGP 900 with no account', async () => {
+test('A FRESH SHOP READS NO MONEY TILE, and after "Nadia paid 900 on InstaPay" it reads Paid EGP 900 with no account', async () => {
   const k = await fresh();
-  assert.deepEqual(cells(drawn(k).tile), [], 'nothing paid, nothing owed: no tile, never "In 0"');
+  assert.deepEqual(cells(drawn(k).tile), [], 'nothing paid, nothing owed: no tile, never "Paid 0"');
   paid(k, 'Nadia', 90_000, 'EGP');
   const { tile, line } = drawn(k);
-  assert.deepEqual(cells(tile), [['In', 'EGP 900.00']], 'the paid invoice is in; the empty Ledger and nothing owed are not drawn');
+  assert.deepEqual(cells(tile), [['Paid', 'EGP 900.00']], 'the paid invoice is paid; the empty Ledger and nothing owed are not drawn');
   assert.equal(line, 'EGP 900 came in this week.');
 });
 
@@ -168,7 +171,7 @@ test('A TRANSFER BETWEEN TWO OF HER OWN ACCOUNTS IS NOT MONEY IN: only what some
   assert.doesNotMatch(drawn(k).line ?? '', /came in|paid/u);
   /* WHAT SOMEBODY PAID INTO HER WALLET IS IN, beside the transfer, which still is not. */
   moved(k, wallet, 'in', 30_000, 'EGP', 'A customer');
-  assert.deepEqual(cells(drawn(k).tile), [['In', 'EGP 300.00']]);
+  assert.deepEqual(cells(drawn(k).tile), [['Came in', 'EGP 300.00']]);
 });
 
 /* RED UNTIL `lib/record/metrics.ts` `partsShown` writes a bare `money` format's parts in each currency's own units
@@ -179,22 +182,27 @@ test('TWO CURRENCIES ARE WRITTEN IN THEIR OWN UNITS, in the tile and in the line
   paid(k, 'Nadia', 90_000, 'EGP');
   paid(k, 'Sam', 4_000, 'USD');
   const { tile, line } = drawn(k);
-  assert.deepEqual(cells(tile).map(([l, v]) => [l, v!.replace(/\s*·\s*/gu, ' · ')]), [['In', 'EGP 900.00 · USD 40.00']]);
+  assert.deepEqual(cells(tile).map(([l, v]) => [l, v!.replace(/\s*·\s*/gu, ' · ')]), [['Paid', 'EGP 900.00 · USD 40.00']]);
   assert.equal(line, 'EGP 900 and USD 40 came in this week.');
 });
 
 test('A WEEK WITH NOTHING PAID SAYS NOTHING: a nought is no figure, and a tile of noughts is not drawn', () => {
   const tile = (values: Record<string, string>): LiveBlock =>
-    ({ ...weekMoney(), drawn: true, rows: [], entries: [], matched: [], columns: [], refusals: [], shown: 0, total: 0, stale_at: '', metrics: Object.entries(values).map(([id, v]) => ({ id, label: id === OWED ? OWED_TO_YOU : IN, value: v, note: '' })) }) as unknown as LiveBlock;
+    ({ ...weekMoney(), drawn: true, rows: [], entries: [], matched: [], columns: [], refusals: [], shown: 0, total: 0, stale_at: '', metrics: Object.entries(values).map(([id, v]) => ({ id, label: id === OWED ? OWED_TO_YOU : WEEK_IN_SAID[id as (typeof WEEK_IN)[number]], value: v, note: '' })) }) as unknown as LiveBlock;
   const home = (b: LiveBlock) => homeDrawn([b], NOW, undefined, undefined, null, WEEK);
   const none = home(tile({ 'settled-in-7d': 'EGP 0.00', 'received-7d': '0', 'owed-to-you': 'EGP 0.00' }));
   assert.equal(none.blocks[0]!.drawn, false);
   assert.doesNotMatch(none.sentence?.text ?? '', /came in|paid/u);
   /* WHAT IS OWED IS SAID WHERE IT IS SOMETHING, beside what came in. */
   const owed = home(tile({ 'settled-in-7d': 'EGP 900.00', 'received-7d': '0', 'owed-to-you': 'EGP 1,350.00' }));
-  assert.deepEqual(cells(owed.blocks[0]!), [['In', 'EGP 900.00'], ['Owed to you', 'EGP 1,350.00']]);
+  assert.deepEqual(cells(owed.blocks[0]!), [['Paid', 'EGP 900.00'], ['Owed to you', 'EGP 1,350.00']]);
   /* AND WHAT IS OWED IS NEVER SAID AS COME IN. */
   assert.equal(owed.sentence?.text, 'EGP 900 came in this week.');
+  /* THE SAME EGP 900 IN BOTH FIGURES (a payment marked paid, and one of that amount in the ledger) READS AS TWO THINGS,
+     each by its name, never as two Ins, in the tile and in the line, and never added. */
+  const both = home(tile({ 'settled-in-7d': 'EGP 900.00', 'received-7d': 'EGP 900.00', 'owed-to-you': '0' }));
+  assert.deepEqual(cells(both.blocks[0]!), [['Paid', 'EGP 900.00'], ['Came in', 'EGP 900.00']]);
+  assert.equal(both.sentence?.text, 'EGP 900 was paid, and EGP 900 came in this week.');
   /* A FIGURE THE RECORD COULD NOT READ still says so, and is never taken for nought. */
   assert.equal(cells(home(tile({ 'settled-in-7d': '—' })).blocks[0]!).length, 1);
 });

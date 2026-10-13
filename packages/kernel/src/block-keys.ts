@@ -92,7 +92,7 @@ export const KEY_KINDS: Readonly<Record<string, readonly string[]>> = {
   field: ['diff'],
   row: ['diff', 'inputs'],
   about: ['table', 'cards'],
-  of: ['ring'],
+  of: ['ring', 'heat'],
 };
 
 /**
@@ -138,7 +138,7 @@ export const ANSWER_KEYS: readonly string[] = [
   'scope_marks', 'feed', 'seen', 'history', 'values', 'said', 'bars', 'measures', 'latest', 'past', 'changes', 'working_now',
   'quiet', 'lateness', 'late_name', 'sells', 'fx',
   'fills', 'rings', 'queue', 'nexts', 'trends', 'done_now', 'next', 'open', 'types', 'home',
-  'short_now', 'window', 'files', 'lanes',
+  'short_now', 'window', 'files', 'lanes', 'wholeRead',
 ];
 
 /**

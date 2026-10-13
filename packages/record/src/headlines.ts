@@ -205,10 +205,13 @@ const nought = (text: string): boolean => text.split(' · ').every((part) => /^(
  */
 export function rulesLine(template: string, values: Readonly<Record<string, Json>>): string {
   const said = (path: string): string | null => (Object.hasOwn(values, path) ? figureText(values[path]) : null);
-  const kept = template.split(/,\s+/u).filter((clause) => {
+  const stands = (clause: string): boolean => {
     const figures = holesOf(clause).map(said);
     return figures.length === 0 || (figures.every((f) => f !== null) && figures.some((f) => !nought(f!)));
-  });
+  };
+  /* A CLAUSE THAT OPENS ON "with" LEANS ON THE ONE BEFORE IT, and goes when that one goes, as the app's `leadOf` drops it. */
+  let before = true;
+  const kept = template.split(/,\s+/u).filter((clause) => (before = stands(clause) && (before || !/^with\b/iu.test(clause))));
   return kept
     .join(', ')
     .replace(/\{\{\s*([^{}\s]+)\s*\}\}((?:\s+[A-Za-z]+)*?)\s+([A-Za-z]+)\(s\)/gu, (_, path: string, between: string, word: string) => {

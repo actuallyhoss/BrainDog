@@ -379,6 +379,35 @@ test('"NO ORDERS" REFUSES ORDERS: a thing said not to be had is not heard, by a 
   assert.ok(late.heard.some((h) => h.phrase === 'orders' && h.became === 'Orders'));
 });
 
+test('A REFUSAL IS CARRIED ACROSS "OR", "AND" AND COMMAS, and past had, longer, got and ever', () => {
+  const money = (s: string): boolean => propose(s, CTX).modules.includes('money-core');
+  const orders = (s: string): boolean => propose(s, CTX).heard.some((h) => /orders/iu.test(h.phrase));
+
+  /* "OR" ALWAYS CARRIES, "nor" with it, and a small word after the join does not stop it. */
+  for (const s of ['I run a shop, no orders or invoices', 'I run a shop, no orders or any invoices', "I'm a student, no shop nor invoices"]) assert.ok(!money(s), s);
+  /* "AND" CARRIES TO A THING THERE IS MORE THAN ONE OF. */
+  assert.ok(!money("I run a shop, I don't take orders and invoices"));
+  /* A RUN OF COMMAS THAT ENDS IN "OR" OR "AND" IS ONE REFUSAL. */
+  for (const s of ['I run a shop, no orders, invoices or taxes', 'I run a shop, no orders, invoices, or taxes', 'I run a shop, no orders, invoices and taxes']) assert.ok(!money(s), s);
+  const list = propose("I'm a freelance designer, no orders, products or taxes", CAIRO);
+  assert.deepEqual(list.also, [], 'the shop is not taken beside');
+  assert.ok(!list.heard.some((h) => /orders|products|taxes/iu.test(h.phrase)), 'none of the three is lit');
+
+  /* WHAT IS NOT JOINED STRAIGHT ON IS KEPT: words between, a bare comma, a thing that is done and not had. */
+  assert.ok(money("I'm a freelance designer, no orders, I send invoices"), 'words between end the carry');
+  assert.ok(propose('I run a shop, no invoices, taxes', CTX).heard.some((h) => h.phrase === 'taxes'), 'a bare comma carries nothing');
+  assert.ok(propose("I'm not a shop and freelance as a designer", CTX).heard.some((h) => h.phrase === 'freelance as a designer'), 'the freelancing is kept');
+  assert.ok(propose('I have no shop, freelance designer', CTX).heard.some((h) => h.phrase === 'freelance'));
+  const late = propose('I sell candles, no late orders or invoices', CTX);
+  assert.ok(late.heard.some((h) => h.phrase === 'orders') && late.modules.includes('money-core'), 'orders kept are not a refusal to carry');
+
+  /* THE SMALL WORDS BETWEEN THE REFUSAL AND THE THING: had, longer, got, ever. */
+  for (const s of ['I never had orders', 'I no longer take any orders', "I haven't got orders", 'I have not got any orders', "I don't ever take orders"]) {
+    const p = propose(`I'm a freelance designer, ${s}`, CAIRO);
+    assert.ok(!orders(`I'm a freelance designer, ${s}`) && p.also.length === 0 && !p.places.some((x) => x.name === 'Orders'), s);
+  }
+});
+
 test('ONE LINE FOR ONE THING: a second phrase that became the same is folded into the first', () => {
   const p = propose("I'm Mariam. I run a small candle shop and freelance as a designer. I want to track orders, who owes me, and taxes.", CAIRO);
   assert.deepEqual(linesOf(p), [

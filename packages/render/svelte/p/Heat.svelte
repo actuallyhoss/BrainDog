@@ -3,6 +3,9 @@
   and the counted days said again as a table. `src/heat.ts` over `src/days.ts` decides every cell; `heat` in
   `src/html.ts` is this file's twin, and `heat.test.ts` holds the two to one tree with one clock.
 
+  A BLOCK WITH `of:` WRITES EACH DAY `3 of 12`, and the wash is then the day's share of its own whole: the line under
+  the grid and the table's heading say so (`HEAT_SHARE_LINE`), because the four steps mean something else there.
+
   THE `who` FORM IS A LINE A PERSON, a dot in each of the twelve weeks they were in touch, each person's dots named
   in words, so it needs no fold of numbers under it (`heatPeoplePlan`).
 
@@ -14,6 +17,8 @@
   import {
     HEAT_DAY,
     HEAT_NONE,
+    HEAT_SHARE_HEAD,
+    HEAT_SHARE_LINE,
     HEAT_VALUE,
     heatLines,
     heatMissed,
@@ -85,11 +90,12 @@
         ></span>
       {/each}
     </div>
+    {#if plan.share}<p class="heat-share">{HEAT_SHARE_LINE}</p>{/if}
     <details class="lines-numbers">
       <summary class="lines-toggle">{LINES_NUMBERS}</summary>
       <table class="heat-table">
         <thead>
-          <tr><th scope="col">{HEAT_DAY}</th><th scope="col">{HEAT_VALUE}</th></tr>
+          <tr><th scope="col">{HEAT_DAY}</th><th scope="col">{plan.share ? HEAT_SHARE_HEAD : HEAT_VALUE}</th></tr>
         </thead>
         <tbody>
           {#each heatLines(plan) as l}

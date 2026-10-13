@@ -108,7 +108,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   'money-core': [
     {
       version: '3.17.0',
-      notes: 'Money works out your cash a second way, entry by entry from the last statement, so a cash figure that is wrong can be caught.',
+      notes: 'Money works out your cash a second way, entry by entry from the last statement, so a cash figure that is wrong can be caught. If the two ever disagree, Money says so in one red tile under Cash ahead.',
     },
     {
       version: '3.16.0',

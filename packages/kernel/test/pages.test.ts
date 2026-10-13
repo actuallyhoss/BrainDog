@@ -389,7 +389,7 @@ test('AND A PREDICATE OVER THE STATE READS THE MIRRORED COLUMN, which `02 §1` s
 
 /* ── a register bigger than one read ─────────────────────────────────────── */
 
-test('A BLOCK THAT ADDS ITS ROWS UP REFUSES PAST ONE READ, and it was summing 200 of 301', async () => {
+test('A BLOCK THAT ADDS ITS ROWS UP ADDS UP EVERY ROW PAST ONE READ, where it was summing 200 of 301 and then refused', async () => {
   /**
    * `pages.ts` HAS SAID SINCE IT WAS WRITTEN THAT THIS REFUSAL EXISTS, and it did not exist. The
    * comment over `REDUCES` reads "a register past that says it cannot be drawn rather than adding
@@ -412,14 +412,12 @@ test('A BLOCK THAT ADDS ITS ROWS UP REFUSES PAST ONE READ, and it was summing 20
     assert.ok(k.create('obligations', { what: `Row ${n}`, amount: gbp(100), due: day(1), state: 'open' }, { actor: 'p_1' }).ok);
   assert.equal((k.list({ register: 'obligations' }) as { value: { matched: number } }).value.matched, 301);
 
+  /* SINCE PGS-B05 THE BLOCK ANSWERS `wholeRead`, its parts and total over every row, and refuses nothing: the refusal
+     above made a list past 200 rows undrawable. The first 200 rows still ride beside it. */
   const split = blocks(k.page('invoicing'))[0] as { rows?: unknown[]; matched?: number; refusals?: { code: string; fix: string }[] };
-  const said = split.refusals ?? [];
-  assert.equal(said.length, 1, `a split over 301 rows drew ${(split.rows ?? []).length} rows, matched ${split.matched}, and refused nothing`);
-  assert.equal(said[0]?.code, 'OUT_OF_BOUNDS');
-  assert.match(String(said[0]?.fix), /301/u);
-  assert.match(String(said[0]?.fix), /200/u);
-  /* AND A REFUSAL MEANS THE BLOCK DREW NOTHING, which is the contract every other refusal here keeps. */
-  assert.equal((split.rows ?? []).length, 0, 'the block refused and handed back rows to add up anyway');
+  assert.deepEqual(split.refusals, []);
+  assert.equal(split.matched, 301);
+  assert.equal((split as { wholeRead?: { rows: { rows: number }[] } }).wholeRead?.rows.reduce((a, r) => a + r.rows, 0), 301);
   sql.close();
 });
 
@@ -464,7 +462,7 @@ test('AND A REGISTER THAT IS EXACTLY ONE READ IS A WHOLE ANSWER, not a slice of 
   sql.close();
 });
 
-test('AND ONE ROW PAST ONE READ IS A SLICE AND IS REFUSED, which is the side nothing was measuring', async () => {
+test('AND ONE ROW PAST ONE READ IS ADDED UP WHOLE TOO, which is the side nothing was measuring', async () => {
   /**
    * THE CEILING WAS MEASURED FROM BELOW ONLY, AND ABOVE IT IS WHERE THE SUM GOES SHORT. The test
    * above holds the comparison against being tightened, and the cost of tightening it is a refusal
@@ -493,14 +491,10 @@ test('AND ONE ROW PAST ONE READ IS A SLICE AND IS REFUSED, which is the side not
   assert.equal((k.list({ register: 'obligations' }) as { value: { matched: number } }).value.matched, 201);
 
   const split = blocks(k.page('invoicing'))[0] as { rows?: unknown[]; matched?: number; refusals?: { code: string; fix: string }[] };
-  const said = split.refusals ?? [];
-  assert.equal(said.length, 1, `a split over 201 rows drew ${(split.rows ?? []).length} rows, matched ${split.matched}, and refused nothing`);
-  assert.equal(said[0]?.code, 'OUT_OF_BOUNDS');
-  /* BOTH NUMBERS IN THE SENTENCE, because "matched 201 where a block that adds up reads 200" is the
-     whole of what the author has to read to narrow the predicate. */
-  assert.match(String(said[0]?.fix), /201/u);
-  assert.match(String(said[0]?.fix), /200/u);
-  assert.equal((split.rows ?? []).length, 0, 'the block refused and handed back rows to add up anyway');
+  /* SINCE PGS-B05 the 201st row is in the sum: `wholeRead` adds up every row, and nothing is refused. */
+  assert.deepEqual(split.refusals, []);
+  assert.equal(split.matched, 201);
+  assert.equal((split as { wholeRead?: { rows: { rows: number }[] } }).wholeRead?.rows.reduce((a, r) => a + r.rows, 0), 201);
   sql.close();
 });
 

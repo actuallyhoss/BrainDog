@@ -49,8 +49,6 @@ export const words = {
   asYouType: 'builds as you type',
   /** Under the places: nothing is drawn in them that the person did not say. */
   startsEmpty: 'Each place starts empty and fills with what you tell it. No sample entries.',
-  /** Under the build, before anything was typed. */
-  lightsUp: 'Each part lights up as I hear it.',
   /** The build's reading line: what is on, and what waits. */
   onReading: (on: readonly string[], waiting: string | null) =>
     on.length === 0
@@ -59,9 +57,6 @@ export const words = {
         : ''
       : `${firstRun.and(on)} ${on.length === 1 ? 'is' : 'are'} on${waiting ? `, and ${waiting} waits on your answer` : ''}.`,
   nothingSaved: 'Nothing is saved until you finish.',
-  /** The parts that are on, read aloud: never a total, since a part left off is not a step behind. */
-  progress: (on: readonly string[], waiting: string | null) =>
-    [on.length === 0 ? 'No part is on yet' : `On: ${firstRun.and(on)}`, waiting ? `${waiting} waits on your answer` : ''].filter((s) => s !== '').join('; ') + '.',
   /** Why a part is on, as the meta at the right of its tile. */
   fromWords: 'from your words',
   byHand: 'turned on by you',
@@ -168,6 +163,8 @@ export type Part = {
   held: string | null;
   /** The phrases that turned it on, in sentence order. */
   why: string[];
+  /** Where the first of them stands among everything heard, from 0; absent for a part no phrase turned on. */
+  heardAt?: number;
   entries: Entry[];
   /** What its lists are called. */
   lists: string[];
@@ -216,7 +213,7 @@ export function casePart(u: { usecase: string; title: string; summary: string; p
   }
   /* A PHRASE IS THE USE CASE'S where it says its title or one of its lists: "a small candle shop" became Orders and Products. */
   const why = phrasesFor([u.title, ...lists], heard);
-  return { id: `usecase-${u.usecase}`, name: u.title, icon: 'home', on: true, state: why.length === 0 && byHand ? 'hand' : 'heard', held: null, why, entries: [], lists, blurb: u.summary };
+  return { id: `usecase-${u.usecase}`, name: u.title, icon: 'home', on: true, state: why.length === 0 && byHand ? 'hand' : 'heard', held: null, why, ...heardAt(why, heard), entries: [], lists, blurb: u.summary };
 }
 
 /**
@@ -243,6 +240,12 @@ function phrasesFor(name: string | readonly string[], heard: readonly Said[]): s
     if (became.some((w) => words.includes(w)) && !out.includes(h.phrase)) out.push(h.phrase);
   }
   return out;
+}
+
+/** Where a part's first phrase stands among everything heard, for the order the build is drawn in. */
+function heardAt(why: readonly string[], heard: readonly Said[]): { heardAt?: number } {
+  const at = why.length === 0 ? -1 : heard.findIndex((h) => h.phrase === why[0]);
+  return at < 0 ? {} : { heardAt: at };
 }
 
 export type PartsIn = {
@@ -276,18 +279,19 @@ export function partsOf(p: PartsIn): Part[] {
     const state: PartState = !on ? 'off' : id === p.waiting ? 'waiting' : held !== null ? 'held' : why.length > 0 ? 'heard' : p.byHand.has(id) ? 'hand' : 'heard';
     const entries = on ? p.rows.flatMap((r) => (moduleOfList(r.register)?.id === id ? [entryOf(r)] : [])) : [];
     const lists = (info?.registers ?? []).map((r) => info?.titles[r] ?? r);
-    return { id, name, icon: partIcon(id), on, state, held, why, entries, lists, blurb: info?.blurb ?? '' };
+    return { id, name, icon: partIcon(id), on, state, held, why, ...heardAt(why, p.heard), entries, lists, blurb: info?.blurb ?? '' };
   });
 }
 
 /**
- * The parts that are on, in the order they were heard: the ones made first, then the one waiting on an answer. A part
- * left off is not drawn, so nothing reads as a step not yet taken, and nothing totals them (USE-B07).
+ * THE BUILD, AS IT IS DRAWN: only the parts that are on, in the order they were heard. A part a phrase turned on stands
+ * where its first phrase does; one that is on for another reason (a use case needs it, or the person turned it on)
+ * comes after, in the order it was offered. A part left off is not here at all, so nothing reads as a step not yet
+ * taken, and nothing totals them (USE-B07).
  */
-export function stepsOf(parts: readonly Part[]): { order: Part[]; done: number; current: boolean } {
-  const made = parts.filter((p) => p.on && p.state !== 'waiting');
-  const waiting = parts.filter((p) => p.on && p.state === 'waiting');
-  return { order: [...made, ...waiting], done: made.length, current: waiting.length > 0 };
+export function stepsOf(parts: readonly Part[]): Part[] {
+  const on = parts.filter((p) => p.on);
+  return [...on.filter((p) => p.heardAt !== undefined).sort((a, b) => (a.heardAt ?? 0) - (b.heardAt ?? 0)), ...on.filter((p) => p.heardAt === undefined)];
 }
 
 /* ── the sentence under the title ─────────────────────────────────────── */
@@ -297,12 +301,12 @@ export type Sentence = { before: string; needs: string; after: string };
 
 /**
  * "One question left: which of pounds and dollars is home." The phrase that needs him is the open question, and only
- * that; with none, the sentence says there is nothing left to ask, or, with nothing on, how to make something. It says
- * what waits, never how many parts there are.
+ * that; with none, the sentence says there is nothing left to ask, or, where the caller says nothing is on (`empty`),
+ * how to make something. It says what waits on an answer and takes no number: there is no total to say.
  */
-export function statusOf(on: number, question: string | null): Sentence {
+export function statusOf(question: string | null, empty = false): Sentence {
   if (question) return { before: '', needs: 'One question left', after: `: ${question}.` };
-  return { before: on === 0 ? `Nothing is on yet. ${firstRun.makeSomething}` : words.noQuestion, needs: '', after: '' };
+  return { before: empty ? `Nothing is on yet. ${firstRun.makeSomething}` : words.noQuestion, needs: '', after: '' };
 }
 
 /* ── the places ───────────────────────────────────────────────────────── */
@@ -329,7 +333,7 @@ export function placeIcon(place: Pick<Place, 'kind' | 'id'>): IconName {
 export function placesFrom(places: readonly Place[] | undefined, parts: readonly Part[]): Place[] {
   if (places && places.length > 0) return [...places];
   const today: Place = { kind: 'today', id: 'today', name: 'Today', phrase: null, at: null };
-  return [today, ...stepsOf(parts).order.filter((p) => !p.id.startsWith('usecase-')).map((p): Place => ({ kind: 'module', id: p.id, name: p.name, phrase: p.why[0] ?? null, at: null }))];
+  return [today, ...[...parts.filter((p) => p.on && p.state !== 'waiting'), ...parts.filter((p) => p.on && p.state === 'waiting')].filter((p) => !p.id.startsWith('usecase-')).map((p): Place => ({ kind: 'module', id: p.id, name: p.name, phrase: p.why[0] ?? null, at: null }))];
 }
 
 /* ── the words, marked ────────────────────────────────────────────────── */
@@ -641,4 +645,77 @@ export function passkeyOffered(
   host: { ok: true; value: { passkey: boolean; me: unknown; firstRun?: boolean | undefined } } | { ok: false },
 ): boolean {
   return can.webauthn && can.secure && host.ok && host.value.passkey && host.value.me !== null && host.value.firstRun === true;
+}
+
+/* ── the making ───────────────────────────────────────────────────────── */
+
+/** One tile of the build after the press: the part's own glyph and name, and the phrase that turned it on. */
+export type MakingPart = Pick<Part, 'id' | 'name' | 'icon'> & { why?: readonly string[] };
+
+/** Where one part is: being made, made, or not made, with the record's own sentence for why. */
+export type Making = 'making' | 'made' | { refused: string };
+
+/** What a record holds of an add-on, as `packs` answers it: its id, and when it was turned off. */
+export type Held = { id: string; disabled_at: string | null };
+
+/** What `setup` could not make: the part, and the record's sentence. */
+export type Refused = { part: string; why: string };
+
+/** What the making step says. No count and no bar: each tile says its own state, and that is all there is to say. */
+export const making = {
+  title: 'Making your BrainDog',
+  line: 'Each part is made in turn. Today opens when the last one is in.',
+  /** Once the record has answered and something was refused: what was made stays, and the rest can be asked for again. */
+  partTitle: 'Some of it could not be made',
+  partLine: 'What was made stays. Go back to ask again for the rest.',
+  back: 'Go back',
+  making: 'Making',
+  made: 'Made',
+  notMade: 'Not made',
+  /** Where the record refused a part and gave no sentence of its own. */
+  noReason: 'It was left as it was. Everything else stays.',
+} as const;
+
+/** How often the page reads what the record holds while `setup` runs, in milliseconds. */
+export const MAKING_EVERY = 400;
+
+/**
+ * EACH PART'S STATE, READ FROM THE RECORD AND NEVER GUESSED. A part is made once the record holds its add-on, on
+ * (`held`, read while `setup` runs); it is refused where the call's answer says so (`answer`, `null` until the call
+ * answers), in the record's own sentence; and until one of those it is being made. Once the call has answered, a part
+ * it did not refuse is made: the answer is the record's word, and it is newer than the last reading.
+ *
+ * A part is its add-on by the id they share: `people`, `money-core`, and `usecase-shop` for a use case, which the
+ * answer may also say by the use case's bare id.
+ */
+export function makingStates(parts: readonly MakingPart[], held: readonly Held[], answer: readonly Refused[] | null): Record<string, Making> {
+  const on = new Set(held.filter((h) => h.disabled_at === null).map((h) => h.id));
+  const out: Record<string, Making> = {};
+  for (const p of parts) {
+    const bare = p.id.startsWith('usecase-') ? p.id.slice('usecase-'.length) : p.id;
+    const refused = answer?.find((f) => f.part === p.id || f.part === bare);
+    out[p.id] = refused ? { refused: refused.why.trim() === '' ? making.noReason : refused.why } : on.has(p.id) || answer !== null ? 'made' : 'making';
+  }
+  return out;
+}
+
+/**
+ * READ WHAT THE RECORD HOLDS, AGAIN AND AGAIN, UNTIL TOLD TO STOP: once now, then `every` milliseconds after each
+ * reading comes back, so a slow record is never asked twice at once. A reading that fails says nothing and the last one
+ * stands. Answers the stop, which the page calls when `setup` answers; nothing is handed over after it.
+ */
+export function watchHeld(read: () => Promise<readonly Held[] | null>, on: (held: readonly Held[]) => void, every: number = MAKING_EVERY): () => void {
+  let stopped = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const turn = async () => {
+    const held = await read().catch(() => null);
+    if (stopped) return;
+    if (held) on(held);
+    timer = setTimeout(() => void turn(), every);
+  };
+  void turn();
+  return () => {
+    stopped = true;
+    clearTimeout(timer);
+  };
 }

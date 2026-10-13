@@ -124,6 +124,9 @@ export const FIRST_PARTY_LISTS: ReadonlyMap<string, ModuleId> = new Map(MODULES.
  * NOT EVERY LIST IN `MODULE_LISTS`. Money's `balances`, `fx` and `snapshots` hold what the module keeps for its own
  * sums (a balance on a day, a rate, a night's figures) and nobody renames them; giving them words would put three more
  * boxes on Settings > Words and push Personal past the 64 settings a pack may declare.
+ *
+ * @deprecated SHL-A09: an add-on's manifest says this itself now, as `words`, and `useCasePack` takes the manifests' words
+ * (`wordsOf`). This table is only the fallback for a caller that hands none in, and goes when the last one does.
  */
 export const MODULE_WORDS: Readonly<Record<string, { name: string; one: string }>> = {
   things: { name: 'Projects', one: 'project' },
@@ -181,12 +184,32 @@ export type UseCase = {
    * write path, and only between rows that are still examples, so a file that shares its own lists shares their links too.
    */
   links: ExampleLink[];
+  /**
+   * What it lays over the add-ons it stands on, by add-on id (SHL-A09): `{ work: { words, config, hide } }`. Empty when
+   * the file says none. Each part is applied when the use case goes in, as the person's own choice, so the add-on's next
+   * update keeps it: the words are this use case's label settings (`useCasePack`), the config is sent with the add-on's
+   * install (`overSettings`), and the hidden pages come off the rail (`overHidden`).
+   */
+  over: Record<string, Over>;
+  /** What this version changed, in its author's words, when the file says (`readChanges`). It travels on the carried pack. */
+  changes?: string;
 };
+
+/** What a person calls a list: many of it and one of it. An add-on's manifest says both for each list a person can rename. */
+export type ListWords = { name: string; one: string };
+
+/** What a use case lays over one add-on: words for its lists, values for its settings, and its pages to leave off the rail. */
+export type Over = { words?: Record<string, Partial<ListWords>>; config?: Record<string, unknown>; hide?: string[] };
 
 /** One link between two example rows, by their titles. `list` when the field holds a list of refs. */
 export type ExampleLink = { register: string; title: string; field: string; to: string; target: string; list?: true };
 
-const KEYS = ['usecase', 'version', 'title', 'summary', 'author', 'license', 'audience', 'tone', 'signals', 'modules', 'voice', 'labels', 'pack', 'skills', 'nav', 'links'];
+const KEYS = ['usecase', 'version', 'title', 'summary', 'changes', 'author', 'license', 'audience', 'tone', 'signals', 'modules', 'voice', 'labels', 'over', 'pack', 'skills', 'nav', 'links'];
+const OVER_KEYS = ['words', 'config', 'hide'];
+const WORD_KEYS = ['name', 'one'];
+/** A page id, as `index.ts` reads one in a pack file, for a page a use case hides. */
+const PAGE_ID = /^[a-z][a-z0-9_-]{0,63}$/;
+const HIDE_CEILING = 32;
 const LINK_KEYS = ['register', 'title', 'field', 'to', 'target', 'list'];
 const LINK_NAME = /^[a-z][a-z0-9_]{0,63}$/;
 const LINKS_CEILING = 256;
@@ -214,6 +237,23 @@ const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'obj
 const bytes = (s: string): number => new TextEncoder().encode(s).length;
 const malformed = <T>(fix: string, at: string): Result<T> => no<T>('PACK_MALFORMED', fix, { at });
 const text = (v: unknown, most: number): v is string => typeof v === 'string' && v.trim() !== '' && bytes(v) <= most;
+
+/** The most characters a file's `changes` may hold: a few sentences a person reads beside the version, never a changelog. */
+export const CHANGES_MOST = 500;
+
+/**
+ * A file's `changes`, checked: absent, or a line of text of at most `CHANGES_MOST` characters. The same check holds for a
+ * use case here, for an add-on's manifest in `normalise` and for a file in `publishTo`, so both say their notes the same way.
+ *
+ * CHARACTERS AND NOT BYTES, counted as code points, because the limit is what a person reads, and a sentence in Arabic
+ * or with a pound sign is no longer to them than the same sentence in plain letters.
+ */
+export function readChanges(value: unknown): Result<string | null> {
+  if (value === undefined || value === null) return ok(null);
+  if (typeof value !== 'string' || value.trim() === '' || [...value].length > CHANGES_MOST)
+    return no('VALUE_MALFORMED', `changes says what this version changed, in a line of text of at most ${CHANGES_MOST} characters.`, { at: 'changes' });
+  return ok(value.trim());
+}
 
 /** The pack id a use case carries. */
 export const packIdOf = (usecase: string): string => `usecase-${usecase}`;
@@ -282,6 +322,8 @@ export const LABEL_KEY = new RegExp(`^${SEGMENT}(?:\\.${SEGMENT}){0,2}$`);
 const LABEL_PREFIX = 'label_';
 /** Settings are named in lower case with underscores, at most 32; the dots of a label key are written `__`. */
 const SETTING_NAME = /^[a-z][a-z0-9_]{0,31}$/;
+/** A list's id as a label key spells one, which is what a word laid over it is kept under. */
+const LIST_ID = new RegExp(`^${SEGMENT}$`);
 /** The most settings a pack declares (`readConfig`'s ceiling), which voice and labels share with `shared_version` and `speaks`. */
 const SETTINGS_CEILING = 64;
 const HELD_SETTINGS = 2;
@@ -338,6 +380,90 @@ export const labelKeyOf = (setting: string, title: unknown): string | null => {
   ];
   return candidates.find((k): k is string => k !== null && (LABEL_KEY.test(k) || LIST_WORD_KEY.test(k)) && labelSetting(k) === setting) ?? null;
 };
+
+/**
+ * A use case's `over`, checked: what it lays over each add-on it stands on. Held to `modules`, because a use case that
+ * laid words over an add-on it does not bring would name lists the record may never hold.
+ *
+ * A WORD IS SAID IN ONE PLACE. `labels.tasks` and `over.work.words.tasks.name` are the same setting, so a file that says
+ * both is refused at the second rather than left to whichever was read last.
+ */
+function readOver(raw: unknown, modules: readonly string[], labels: Readonly<Record<string, string>>): Result<Record<string, Over>> {
+  if (raw === undefined || raw === null) return ok({});
+  if (!isObject(raw)) return malformed('over says, for each add-on this use case stands on, its words, config and hide.', 'over');
+  const out: Record<string, Over> = {};
+  const worded = new Set<string>();
+  for (const [addon, entry] of Object.entries(raw)) {
+    const at = `over.${addon}`;
+    if (!modules.includes(addon))
+      return no('VALUE_MALFORMED', `over names ${addon}, which this use case does not stand on. Add it to modules, or take it out of over.`, { at, allowed: [...modules] });
+    if (!isObject(entry)) return malformed(`over.${addon} says words, config and hide.`, at);
+    const stray = Object.keys(entry).find((k) => !OVER_KEYS.includes(k));
+    if (stray !== undefined) return no('FIELD_UNKNOWN', `over has no ${stray}. It says ${OVER_KEYS.join(', ')}.`, { at: `${at}.${stray}`, allowed: OVER_KEYS });
+    const over: Over = {};
+
+    if (entry.words !== undefined) {
+      if (!isObject(entry.words)) return malformed('words is a name and a singular per list.', `${at}.words`);
+      const own = Object.hasOwn(MODULE_LISTS, addon) ? MODULE_LISTS[addon as ModuleId] : null;
+      const words: Record<string, Partial<ListWords>> = {};
+      for (const [list, said] of Object.entries(entry.words)) {
+        const here = `${at}.words.${list}`;
+        if (!LIST_ID.test(list)) return no('VALUE_MALFORMED', `${list} is not a list id: lower-case letters, digits and single underscores.`, { at: here });
+        if (own !== null && !own.lists.includes(list))
+          return no('FIELD_UNKNOWN', `${own.name} has no list called ${list}. Its lists are ${own.lists.join(', ')}.`, { at: here, allowed: [...own.lists] });
+        const keys = isObject(said) ? Object.keys(said) : [];
+        if (!isObject(said) || keys.length === 0 || keys.some((k) => !WORD_KEYS.includes(k)) || keys.some((k) => !text(said[k], VOICE_BYTES)))
+          return no('VALUE_MALFORMED', `${here} says what the list is called, as name, one or both, each a word or a few of at most ${VOICE_BYTES} bytes.`, { at: here });
+        const twice = (said.name !== undefined && labels[list] !== undefined) || (said.one !== undefined && labels[`${list}:one`] !== undefined) || worded.has(list);
+        if (twice) return no('VALUE_MALFORMED', `${list} is given its word twice in this file. Say it in over or in labels, not both.`, { at: here });
+        worded.add(list);
+        words[list] = { ...(typeof said.name === 'string' ? { name: said.name } : {}), ...(typeof said.one === 'string' ? { one: said.one } : {}) };
+      }
+      if (Object.keys(words).length > 0) over.words = words;
+    }
+
+    if (entry.config !== undefined) {
+      if (!isObject(entry.config)) return malformed('config is a value per setting of the add-on.', `${at}.config`);
+      for (const [key, value] of Object.entries(entry.config))
+        if (!SETTING_NAME.test(key) || value === null || value === undefined)
+          return no('VALUE_MALFORMED', `${at}.config.${key} is a value for one of the add-on's settings, by the setting's name.`, { at: `${at}.config.${key}` });
+      if (Object.keys(entry.config).length > 0) over.config = { ...entry.config };
+    }
+
+    if (entry.hide !== undefined) {
+      const hide = entry.hide;
+      if (!Array.isArray(hide) || hide.length > HIDE_CEILING || hide.some((p) => typeof p !== 'string' || !PAGE_ID.test(p)) || new Set(hide).size !== hide.length)
+        return no('VALUE_MALFORMED', `hide is up to ${HIDE_CEILING} of the add-on's pages, each by its id and said once, such as hide: [ledger].`, { at: `${at}.hide` });
+      if (hide.length > 0) over.hide = [...(hide as string[])];
+    }
+    out[addon] = over;
+  }
+  return ok(out);
+}
+
+/** The label keys a use case's `over` gives a word, as `labels` would say them: `tasks` and `tasks:one`. */
+const overLabels = (over: Readonly<Record<string, Over>>): Record<string, string> =>
+  Object.fromEntries(
+    Object.values(over).flatMap((o) =>
+      Object.entries(o.words ?? {}).flatMap(([list, w]) => [...(w.name === undefined ? [] : [[list, w.name]]), ...(w.one === undefined ? [] : [[`${list}:one`, w.one]])]),
+    ),
+  );
+
+/**
+ * The values to send with an add-on's install for a use case that lays config over it: `plan(pack, installed, {
+ * settings: overSettings(u, id, chosen) })`. Sent that way they are kept as values somebody chose, which is why the
+ * add-on's next update keeps them.
+ *
+ * A SETTING THE PERSON ALREADY CHOSE IS LEFT OUT (`chosen` is the record's `config[addon]`), so applying the use case a
+ * second time, or its next version, never puts the file's value back over theirs. Theirs is newer and wins.
+ */
+export function overSettings(u: Pick<UseCase, 'over'>, addon: string, chosen: Readonly<Record<string, unknown>> = {}): Record<string, unknown> {
+  const config = Object.hasOwn(u.over, addon) ? (u.over[addon]?.config ?? {}) : {};
+  return Object.fromEntries(Object.entries(config).filter(([key]) => !Object.hasOwn(chosen, key)));
+}
+
+/** The pages a use case leaves off the rail, as the addresses `nav` uses, in the order the file names them. */
+export const overHidden = (u: Pick<UseCase, 'over'>): string[] => [...new Set(Object.values(u.over).flatMap((o) => (o.hide ?? []).map((page) => `/p/${page}`)))];
 
 /**
  * A use case, checked. Everything but the carried pack's declarations, which `normalise` checks when the
@@ -397,8 +523,13 @@ export function normaliseUseCase(doc: unknown): Result<UseCase> {
       labels[key] = word;
     }
   }
-  if (Object.keys(voice).length + Object.keys(labels).length > SETTINGS_CEILING - HELD_SETTINGS)
-    return no('VALUE_MALFORMED', `A use case's voice and labels are its pack's settings, and a pack has at most ${SETTINGS_CEILING}.`, { at: 'labels' });
+  const over = readOver(doc.over, modules as string[], labels);
+  if (!over.ok) return over as Result<UseCase>;
+  const laid = Object.keys(overLabels(over.value)).length;
+  if (Object.keys(voice).length + Object.keys(labels).length + laid > SETTINGS_CEILING - HELD_SETTINGS)
+    return no('VALUE_MALFORMED', `A use case's voice and labels are its pack's settings, and a pack has at most ${SETTINGS_CEILING}.`, { at: laid > 0 ? 'over' : 'labels' });
+  const changes = readChanges(doc.changes);
+  if (!changes.ok) return changes as Result<UseCase>;
 
   const nav = doc.nav ?? [];
   if (!Array.isArray(nav) || nav.length > NAV_CEILING || nav.some((a) => typeof a !== 'string' || !NAV_ADDRESS.test(a)))
@@ -416,6 +547,8 @@ export function normaliseUseCase(doc: unknown): Result<UseCase> {
     return malformed('A voice is kept as the settings of the pack a use case carries, so a use case with a voice carries a pack.', 'voice');
   if (pack === null && Object.keys(labels).length > 0)
     return malformed('Labels are kept as the settings of the pack a use case carries, so a use case with labels carries a pack.', 'labels');
+  if (pack === null && laid > 0)
+    return malformed('Words laid over an add-on are kept as the settings of the pack a use case carries, so a use case with them carries a pack.', 'over');
 
   const links = doc.links ?? [];
   if (!Array.isArray(links) || links.length > LINKS_CEILING)
@@ -456,6 +589,8 @@ export function normaliseUseCase(doc: unknown): Result<UseCase> {
     skills: (skills as { name: string; trigger: string }[]).map((s) => ({ name: s.name, trigger: s.trigger })),
     nav: [...(nav as string[])],
     links: (links as ExampleLink[]).map((l) => ({ register: l.register, title: l.title, field: l.field, to: l.to, target: l.target, ...(l.list ? { list: true as const } : {}) })),
+    over: over.value,
+    ...(changes.value === null ? {} : { changes: changes.value }),
   });
 }
 
@@ -463,17 +598,37 @@ export function normaliseUseCase(doc: unknown): Result<UseCase> {
 const singularOf = (name: string): string => name.toLowerCase().replace(/ies$/u, 'y').replace(/([^s])s$/u, '$1');
 
 /**
- * Every list a use case holds, with the name and singular its declaration gives it: its own lists, then each first-party
- * module's in the order `modules` names them. A shared add-on's lists are not known here, so they get no words.
+ * What each add-on a use case stands on calls its lists, by add-on id: each one's manifest `words`, handed in by whoever
+ * holds the manifests (`wordsOf`). This module reads no manifest itself, because the modules live in a package above it.
  */
-function heldLists(u: UseCase): { list: string; name: string; one: string | undefined }[] {
+export type AddonWords = Readonly<Record<string, Readonly<Record<string, ListWords>>>>;
+
+/** The `words` of each pack, by pack id, as `useCasePack` takes them: `wordsOf(packs.map((p) => p.manifest))`. */
+export const wordsOf = (manifests: readonly { pack: string; words?: Readonly<Record<string, ListWords>> }[]): AddonWords =>
+  Object.fromEntries(manifests.flatMap((m) => (m.words === undefined ? [] : [[m.pack, m.words]])));
+
+/**
+ * Every list a use case holds, with the name and singular it starts from: its own lists as their declarations say, then
+ * each add-on's in the order `modules` names them, as that add-on's manifest `words` says (`words`).
+ *
+ * A MODULE WHOSE MANIFEST WAS NOT HANDED IN FALLS BACK TO `MODULE_WORDS`, for as long as a caller still passes none.
+ * An add-on that is not a module and was not handed in gets no words here, as before.
+ */
+function heldLists(u: UseCase, words: AddonWords = {}): { list: string; name: string | undefined; one: string | undefined }[] {
   const own = ((u.pack?.declarations ?? []) as unknown[]).flatMap((d) => {
     if (!isObject(d) || Object.keys(d)[0] !== 'register' || typeof d.register !== 'string') return [];
     return [{ list: d.register, name: typeof d.name === 'string' ? d.name : d.register, one: typeof d.one === 'string' ? d.one : undefined }];
   });
-  const modules = u.modules.flatMap((m) => (Object.hasOwn(MODULE_LISTS, m) ? MODULE_LISTS[m as ModuleId].lists : []));
-  const named = modules.flatMap((list) => (Object.hasOwn(MODULE_WORDS, list) ? [{ list, ...MODULE_WORDS[list]! }] : []));
-  return [...own, ...named.filter((m) => !own.some((o) => o.list === m.list))];
+  const named = u.modules.flatMap((m) => {
+    if (Object.hasOwn(words, m)) return Object.entries(words[m] ?? {}).map(([list, w]) => ({ list, name: w.name, one: w.one }));
+    const lists = Object.hasOwn(MODULE_LISTS, m) ? MODULE_LISTS[m as ModuleId].lists : [];
+    return lists.flatMap((list) => (Object.hasOwn(MODULE_WORDS, list) ? [{ list, ...MODULE_WORDS[list]! }] : []));
+  });
+  const known = [...own, ...named.filter((m) => !own.some((o) => o.list === m.list))];
+  /* A LIST `over` GIVES A WORD AND NOBODY ELSE NAMED is an add-on's whose manifest is not in hand: it is held by the
+     word the use case gives it, so its setting is titled like any other list's. */
+  const laid = Object.values(u.over).flatMap((o) => Object.keys(o.words ?? {}));
+  return [...known, ...laid.filter((list) => !known.some((k) => k.list === list)).map((list) => ({ list, name: undefined, one: undefined }))];
 }
 
 /**
@@ -498,24 +653,26 @@ function heldLists(u: UseCase): { list: string; name: string; one: string | unde
  * holds anything, and each module list `MODULE_WORDS` names; a module's own sums (`balances`, `fx`, `snapshots`) are
  * left out there, and a shared add-on's lists are not known here (`heldLists`).
  */
-export function useCasePack(u: UseCase): Record<string, unknown> | null {
+export function useCasePack(u: UseCase, words: AddonWords = {}): Record<string, unknown> | null {
   if (u.pack === null) return null;
   const config: Record<string, { type: 'text'; label: string; default?: string }> = {};
   for (const key of VOICE_KEYS) {
     const line = u.voice[key];
     if (line !== undefined) config[voiceSetting(key)] = { type: 'text', label: VOICE_TITLES[key], default: line };
   }
-  const held = heldLists(u).map(({ list, name, one }) => {
-    const called = u.labels[list] ?? name;
-    return { list, called, singular: u.labels[`${list}:one`] ?? (called !== name ? singularOf(called) : one) };
+  /* WHAT `over` SAYS A LIST IS CALLED IS A LABEL LIKE ANY OTHER (`overLabels`): one setting, whichever key said it. */
+  const labels = { ...overLabels(u.over), ...u.labels };
+  const held = heldLists(u, words).map(({ list, name, one }) => {
+    const called = labels[list] ?? name;
+    return { list, called, singular: labels[`${list}:one`] ?? (called !== undefined && called !== name ? singularOf(called) : one) };
   });
   /* EACH TITLE NAMES THE LIST IN ITS OWN WORDS, the ones a person reads on it, and never by its id. */
-  const calls = new Map(held.map((h) => [h.list, h.called]));
-  for (const [key, word] of Object.entries(u.labels))
+  const calls = new Map(held.flatMap((h) => (h.called === undefined ? [] : [[h.list, h.called] as const])));
+  for (const [key, word] of Object.entries(labels))
     config[labelSetting(key)] = { type: 'text', label: labelTitle(key, calls), default: word };
   const room = (): boolean => Object.keys(config).length < SETTINGS_CEILING - HELD_SETTINGS;
-  const words = [...held.map((h) => [h.list, h.called] as const), ...held.map((h) => [`${h.list}:one`, h.singular] as const)];
-  for (const [key, word] of words) {
+  const listWords = [...held.map((h) => [h.list, h.called] as const), ...held.map((h) => [`${h.list}:one`, h.singular] as const)];
+  for (const [key, word] of listWords) {
     const setting = labelSetting(key);
     if (Object.hasOwn(config, setting) || !room()) continue;
     config[setting] = { type: 'text', label: labelTitle(key, calls), ...(word === undefined ? {} : { default: word }) };
@@ -532,6 +689,7 @@ export function useCasePack(u: UseCase): Record<string, unknown> | null {
     ...(u.pack.summary === undefined ? { summary: u.summary } : {}),
     ...(u.pack.author === undefined ? { author: u.author } : {}),
     ...(u.pack.license === undefined ? { license: u.license } : {}),
+    ...(u.changes === undefined ? {} : { changes: u.changes }),
     config: settings,
   };
 }

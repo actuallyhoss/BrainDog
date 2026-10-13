@@ -187,7 +187,7 @@ export type CatalogueEntry = {
  * The closed list of keys an add-on's manifest may say, which the SDK and the Kennel hold a file to. The record itself
  * stays lenient and reads what it knows. `unlisted` flags a pack named for one person or one bank.
  */
-export const MANIFEST_KEYS = ['pack', 'version', 'title', 'summary', 'changes', 'author', 'license', 'requires', 'provides', 'declarations', 'seeds', 'config', 'extends', 'hands', 'adds', 'note', 'unlisted'] as const;
+export const MANIFEST_KEYS = ['pack', 'version', 'title', 'summary', 'changes', 'author', 'license', 'requires', 'provides', 'declarations', 'seeds', 'config', 'words', 'extends', 'hands', 'adds', 'note', 'unlisted'] as const;
 
 export const PREVIEW_FORMAT = 1;
 
@@ -357,10 +357,11 @@ type Subject = { id: string; version: string; pack: Pack | null; modules: readon
 const subjectOf = (x: Shared | PackFile | CatalogueFile): Subject => {
   const s = 'kind' in x ? (x.kind === 'usecase' ? x.shared : x.file) : x;
   if ('usecase' in s) {
-    const { version: _v, pack: _p, ...words } = s.usecase as unknown as Record<string, unknown>;
+    /* `changes` IS A NOTE ABOUT THE VERSION AND NEVER ONE OF ITS WORDS: two versions always differ in it. */
+    const { version: _v, pack: _p, changes: _c, ...words } = s.usecase as unknown as Record<string, unknown>;
     return { id: s.usecase.usecase, version: s.usecase.version, pack: s.pack, modules: s.usecase.modules, skills: s.usecase.skills.map((k) => k.name), words: words as Json };
   }
-  const { version: _v, provides: _p, requires: _r, ...words } = s.pack.manifest as unknown as Record<string, unknown>;
+  const { version: _v, provides: _p, requires: _r, changes: _c, ...words } = s.pack.manifest as unknown as Record<string, unknown>;
   return { id: s.pack.manifest.pack, version: s.pack.manifest.version, pack: s.pack, modules: Object.keys(s.pack.manifest.requires.packs), skills: [], words: { ...words, title: s.title } as Json };
 };
 

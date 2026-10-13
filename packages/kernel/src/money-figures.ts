@@ -31,6 +31,7 @@ import { RECORD_KEY_SCAN } from './key-scan.ts';
 import { across, type Amount, type Part } from './fx.ts';
 import type { Entry } from './index.ts';
 import {
+  acrossSaid,
   clockOf,
   deltaFrom,
   evaluateMetric,
@@ -42,6 +43,7 @@ import {
   verdictOf,
   windowMs,
   yearBefore,
+  type AcrossSaid,
   type EvalContext,
   type FxRead,
   type Group,
@@ -178,7 +180,7 @@ const moneyOf = (v: unknown): { amount: number; currency: string } | null => {
 const dayIn = (v: unknown): string => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/u.test(v) ? v.slice(0, 10) : '');
 
 /** What one reading of a money figure comes to, before the verdict and the comparison. */
-type Summed = { value: number | null; unit: string | null; parts?: Part[]; fx?: FxRead };
+type Summed = AcrossSaid;
 
 /**
  * Amounts added up by the one currency rule: the currency somebody chose, else their one currency, else a part each.
@@ -187,11 +189,8 @@ type Summed = { value: number | null; unit: string | null; parts?: Part[]; fx?: 
  * in `metrics.ts`): a book that says USD is read in dollars. `home` is only said beside it, as `FxRead` says it.
  */
 function summed(amounts: readonly Amount[], into: string | null, home: string | null, rates: EvalRates, today: string): Summed {
-  const said = across(amounts, into, rates, today, into !== null, 'sum');
-  if (said.kind === 'one') return { value: said.amount, unit: said.currency };
-  if (said.kind === 'converted')
-    return { value: said.amount, unit: said.currency, fx: { into, home, asOf: said.asOf, forward: said.forward, stale: said.stale, missing: [] } };
-  return { value: null, unit: null, parts: said.parts, fx: { into, home, asOf: null, forward: false, stale: false, missing: said.missing } };
+  /* ONE, CONVERTED, AT LEAST OR IN PARTS, as a declared sum says each (`acrossSaid` in `metrics.ts`). */
+  return acrossSaid(across(amounts, into, rates, today, into !== null, 'sum'), amounts, into, home);
 }
 
 type EvalRates = Parameters<typeof across>[2];
@@ -456,6 +455,7 @@ export function readRolled(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result
     ...(verdict.targetIn ? { targetIn: verdict.targetIn } : {}),
     ...(now.whole.parts ? { parts: now.whole.parts } : {}),
     ...(now.whole.fx ? { fx: now.whole.fx } : {}),
+    ...(now.whole.atLeast ? { atLeast: true as const, noRate: now.whole.noRate ?? [] } : {}),
     ...(now.since !== null ? { as_of: now.since } : {}),
     ...(now.groups ? { groups: now.groups, more: now.more } : {}),
   });
@@ -861,8 +861,8 @@ export function figureLists(
   return [...out];
 }
 
-/** Every list a predicate hops into (`pointed`), however deep, eight levels at most as `where` reads it. */
-function pointedIn(node: unknown, level = 1): string[] {
+/** Every list a predicate hops into (`pointed`), however deep, eight levels at most as `where` reads it. A sentence hops nowhere. */
+export function pointedIn(node: unknown, level = 1): string[] {
   if (level > 8 || node === null || typeof node !== 'object' || Array.isArray(node)) return [];
   const n = node as Record<string, unknown>;
   const hop = n.pointed as { register?: unknown; where?: unknown } | null | undefined;

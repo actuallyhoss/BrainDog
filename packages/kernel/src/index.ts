@@ -194,7 +194,7 @@ import { onDecided, onMetrics, onTime } from './flow.ts';
 import { RELATIVE_DAY } from './flow-lint.ts';
 import { capability } from './capabilities.ts';
 import { carryPins } from './pairs.ts';
-import { pruneFirings } from './rules.ts';
+import { linkPatternFault, pruneFirings } from './rules.ts';
 import { runway, type Horizon, type Leg, type Runway } from './forecast.ts';
 import { WALK_SOURCE } from './money-figures.ts';
 import { referencedBy } from './referenced.ts';
@@ -423,7 +423,7 @@ export { HANDOFFS_OPEN, openSteps, readHandoffsOpen, type OpenStep } from './bui
 export { KEYS_IN_TEXT, RECORD_KEY_SCAN, keysInText, placeOf, readKeysInText, scanKeys, type KeyFinding, type KeyScan } from './key-scan.ts';
 export { CROSSCHECK_ENTRIES_MOST, ROLLED_ACCOUNTS_MOST, ROLLED_CHECKS_MOST, WALKS, WALK_SOURCE, figureLists } from './money-figures.ts';
 export type { Crosscheck, Rolled, RolledCheck, RolledMoves, Walked } from './money-figures.ts';
-export { HOME_CURRENCY_SETTING, across, convertMinor, dayFieldOf, homeFrom, pairParts, partsOf, rateFor, ratesFrom, reduceOf } from './fx.ts';
+export { HOME_CURRENCY_SETTING, across, convertMinor, dayFieldOf, homeFrom, isAtLeast, pairParts, partsOf, rateFor, ratesFrom, reduceOf } from './fx.ts';
 export type { Across, Amount, Part, Rate, Reduce } from './fx.ts';
 export { RAIL_PAGES, REDUCES, ROW_TEXT_MOST, SEED_ACTOR, WITHHELD_CODES, byOf, fill, pathsOf, railRoom, readBlock, readPage, resolvePages, slugify, whollyWithheld } from './pages.ts';
 /* THE PAGES CENSUS (`census.ts`, PGS-A01): what one page's answer says about itself, refused blocks, paths that named nothing, dashes. */
@@ -450,7 +450,7 @@ export {
   twoSentences,
   URGENT_NOTE,
 } from './digest.ts';
-export { CREATE_CEILING, applyRule, dryRun, fill as fillTemplate, marker, order as orderRules, runRules } from './rules.ts';
+export { CREATE_CEILING, applyRule, dryRun, fill as fillTemplate, linkFault, linkPatternFault, marker, order as orderRules, runRules } from './rules.ts';
 export { runway } from './forecast.ts';
 export { SERIES_AHEAD, SERIES_BACK, SERIES_LINES, barsOf } from './series.ts';
 export { SETUP_KIND, setupCollapser, type FeedLine } from './feed.ts';
@@ -547,7 +547,7 @@ export type DeclarationBundle = { declarations: Declaration[] };
 export type { Analysis, Counted, Finding, Observation, Signal } from './observe.ts';
 export type { Answered, Arrival, Arrived, Confidence, DoorLine, Extracted, Extractor, FieldOutcome, IngestDecl, IngestDeps, NumberReaders, PatternLine, PatternReport, Sender } from './ingest.ts';
 export type { ForecastDeps, Horizon, Leg, Runway, Step } from './forecast.ts';
-export type { DryRun, Fired, RuleAction, RuleDecl, RulesDeps, RulesOutcome } from './rules.ts';
+export type { DryRun, Fired, LinkTo, RuleAction, RuleDecl, RulesDeps, RulesOutcome } from './rules.ts';
 export type { Assembled, Channel, DigestDecl, DigestDeps, DigestPart, DigestSection, Sent } from './digest.ts';
 export type { BlockResult, DecidedQuestion, PageBlock, PageDecl, PageDeps, PageFilter, PageResult, PageRow, LastChange, RowChange, QueueCandidate, QueueOption, QueueQuestion, QuestionFacts } from './pages.ts';
 export { doesOf, type DoesNames } from './does.ts';
@@ -788,6 +788,14 @@ export type RegisterDecl = {
   /** Who holds a row: a link to the person it is handed to, a text field naming the agent, and a state it moves
    * to when an agent takes it (checked at install by `declare.ts`'s `handFault`). */
   hand?: { person?: string; agent?: string; taken?: string };
+  /**
+   * The fields an add-on writes once (SHL-A09): what it plants on a row it makes, and never patches on a row that is
+   * already there. A category's name is the case: the add-on's next version may spell it another way, and the person
+   * has renamed theirs since. Read by the write path for a write that says it is the add-on's (`WriteContext.pack`),
+   * and by nothing else: a person changes the field as they change any other, which is what `immutable` forbids and
+   * this does not.
+   */
+  once?: readonly string[];
 };
 
 export type Entry = {
@@ -883,6 +891,15 @@ export type WriteContext = {
    * list" (`mergeDoor`), since a write that does not say who reads it may be answered to anybody.
    */
   reads?: ((register: string) => boolean) | undefined;
+  /**
+   * The write is an add-on's own: its install or its update planting a row or going over one it planted before.
+   *
+   * WHAT IT CHANGES IS ONE THING. On a row that already exists, a field the list declares `once` is left as the row
+   * holds it, and the rest of the patch is written: no refusal, since the add-on did nothing wrong by carrying the
+   * value, and the row's own is the newer word. On a create every field is written, `once` or not. A write without
+   * this is a person's or an agent's and is not narrowed at all.
+   */
+  pack?: true | undefined;
 };
 
 const RESERVED = new Set(['id', 'seq', 'register', 'created_at', 'updated_at', 'version', 'spoken', 'title']);
@@ -3713,6 +3730,13 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           if (!isAbsent(out.value)) merged[f.id] = out.value;
         }
 
+      /* WRITTEN ONCE BY THE ADD-ON (`once`, SHL-A09): its update leaves the field as the row holds it, set or empty,
+         and writes the rest. An existing row only: the row an add-on makes takes every field it was given. */
+      const kept = new Set<string>(w.pack === true && current ? (decl.once ?? []) : []);
+      /* OUT OF THE PATCH, NOT ONLY PAST THE LOOP: a field read beside another (the account a `currency_from` amount
+         takes its code from) is then read from the row, as the value that stands. A derived field stays in, to be
+         refused below as it is for anyone. */
+      if (kept.size) patch = Object.fromEntries(Object.entries(patch).filter(([key]) => !kept.has(key) || known.get(key)?.derived === true));
       for (const [key, value] of Object.entries(patch)) {
         if (key === 'deleted_at') continue;
         if (RESERVED.has(key) || key.startsWith('_'))
@@ -3819,6 +3843,18 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
         if (f.required && value === undefined && (!current || touched.includes(f.id)))
           return no<Entry>('REQUIRED_MISSING', `${register} needs ${f.id}.`, { at: f.id });
+
+        /* A PATTERN A RULE'S LINK WILL RUN IS CHECKED AS IT IS WRITTEN (`rules.ts` `linkPatternFault`, REC-B10). A list
+           says how each row matches in `<by>_by` beside `<by>`; one stored as `pattern` is run inside a later write, and
+           one that can take for ever was stored and then never run, with nothing said. Asked when either is written. */
+        if (value === 'pattern' && f.id.endsWith('_by')) {
+          const by = f.id.slice(0, -'_by'.length);
+          const said = merged[by];
+          if (known.has(by) && typeof said === 'string' && (!current || touched.includes(f.id) || touched.includes(by))) {
+            const fault = linkPatternFault(said);
+            if (fault !== null) return no<Entry>('VALUE_MALFORMED', `The pattern ${fault}.`, { at: by });
+          }
+        }
 
         /* REQUIRED WHILE ANOTHER FIELD SAYS SO, checked when either of the two is written, for the
            reason `required` is: a row is not refused for a rule it predates. */
@@ -6102,11 +6138,13 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       return out;
     },
     /* THE RUNS NOT FINISHED, the most recently heard from first. The block applies its own `where` and `limit`. */
+    /* TWO RUNS SEEN IN THE SAME INSTANT COME THE OLDER FIRST (`id`), said in the query: left to the plan, the order of a
+       tie moved when migration 39 gave the list a new index to walk. */
     sessionsLive: () =>
       sql
         .all<{ id: string }>(
           `SELECT id FROM entry WHERE register = '${SESSION}' AND deleted_at IS NULL AND state NOT IN (SELECT value FROM json_each(?))
-           ORDER BY json_extract(fields, '$.last_seen') DESC`,
+           ORDER BY json_extract(fields, '$.last_seen') DESC, id`,
           JSON.stringify(FINISHED),
         )
         .map((r) => byId(r.id))
@@ -6281,6 +6319,23 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         ...c.params,
       );
       return ok(rows);
+    },
+    /* A LIST ADDED UP IN ONE GROUPED QUERY, for a block that adds up (`wholeRead`, PGS-B05): by each label, by the unit
+       of what is added, and by the day a money amount is dated, so the page converts a sum a day and never a row. */
+    whole: (q) => {
+      if (!registers.has(q.register)) return no('REGISTER_UNKNOWN', `There is no register called ${q.register}.`, { allowed: [...registers.keys()] });
+      const schema = schemaOf(q.register);
+      const c = compile(q.where, schema);
+      if (c.bad.length) return { ok: false, refusal: c.bad[0]! };
+      const by = q.by.map(({ field, day }) => (day ? `substr(${fieldSqlIn(schema, field)}, 1, 10)` : `NULLIF(${fieldSqlIn(schema, field, 'text')}, '')`));
+      const type = q.value === null ? null : (schema.fields[q.value]?.type ?? 'text');
+      const amount = q.value === null ? 'NULL' : fieldSqlIn(schema, q.value);
+      const unit = type === 'money' ? `json_extract(fields, '${jsonPath(q.value!)}.currency')` : type === 'quantity' ? `json_extract(fields, '${jsonPath(q.value!)}.unit')` : 'NULL';
+      const on = q.dated === null || q.value === null ? 'NULL' : `CASE WHEN ${amount} IS NULL THEN NULL ELSE substr(${fieldSqlIn(schema, q.dated)}, 1, 10) END`;
+      const cols = [...by.map((e, n) => `${e} AS b${n}`), `${unit} AS unit`, `${on} AS day`, `COALESCE(SUM(${amount}), 0) AS sum`, `COUNT(*) AS n`, `COUNT(${amount}) AS said`];
+      const group = Array.from({ length: by.length + 2 }, (_, n) => n + 1).join(', ');
+      const rows = sql.all<Record<string, unknown>>(`SELECT ${cols.join(', ')} FROM entry WHERE register = ? AND deleted_at IS NULL AND (${c.sql}) GROUP BY ${group}`, q.register, ...c.params);
+      return ok(rows.map((r) => ({ by: q.by.map((_, n) => (r[`b${n}`] ?? null) as Json), unit: typeof r.unit === 'string' ? r.unit : null, day: typeof r.day === 'string' ? r.day : null, sum: Number(r.sum), rows: Number(r.n), said: Number(r.said) })));
     },
     /*
      * THE NEWEST EVENTS, for a `feed` or an `agents` block. A row's event names the row as a page names it,

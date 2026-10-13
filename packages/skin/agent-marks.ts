@@ -66,6 +66,8 @@ const ALIASES: Readonly<Record<string, MarkedAgent>> = {
   anthropic: 'claude',
   'codex-cli': 'codex',
   openai: 'codex',
+  'gemini-cli': 'gemini',
+  'github-copilot': 'copilot',
   'github copilot': 'copilot',
 };
 

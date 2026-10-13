@@ -22,7 +22,7 @@ import { validateDeclaration } from '@braindog/kernel';
 
 import { credentialKey, credentialValue, NESTED_MOST, nestedPast } from './credentials.ts';
 import { normalise, SEEDS_PER_REGISTER, type Pack, type PackSource } from './index.ts';
-import { FIRST_PARTY_LISTS, MODULE_LISTS, normaliseUseCase, packIdOf, useCasePack, type Audience, type ExampleLink, type UseCase, type VoiceKey } from './usecase.ts';
+import { CHANGES_MOST, FIRST_PARTY_LISTS, MODULE_LISTS, normaliseUseCase, packIdOf, readChanges, useCasePack, type Audience, type ExampleLink, type UseCase, type VoiceKey } from './usecase.ts';
 
 /** The most a shared use case may weigh, in bytes of its file. The built-in five are each under 40 KB. */
 export const SHARED_MOST_BYTES = 256 * 1024;
@@ -42,22 +42,9 @@ export type Shared = {
   changes?: string;
 };
 
-/** The most characters a file's `changes` may hold: a few sentences a person reads beside the version, never a changelog. */
-export const CHANGES_MOST = 500;
-
-/**
- * A file's `changes`, checked: absent, or a line of text of at most `CHANGES_MOST` characters. The same check holds for a
- * use case here and for an add-on in `publishTo`, so both say their notes the same way.
- *
- * CHARACTERS AND NOT BYTES, counted as code points, because the limit is what a person reads, and a sentence in Arabic
- * or with a pound sign is no longer to them than the same sentence in plain letters.
- */
-export function readChanges(value: unknown): Result<string | null> {
-  if (value === undefined || value === null) return ok(null);
-  if (typeof value !== 'string' || value.trim() === '' || [...value].length > CHANGES_MOST)
-    return no('VALUE_MALFORMED', `changes says what this version changed, in a line of text of at most ${CHANGES_MOST} characters.`, { at: 'changes' });
-  return ok(value.trim());
-}
+/* `CHANGES_MOST` AND `readChanges` LIVE IN `usecase.ts`, which reads a use case's `changes` itself now and imports nothing
+   from here; they are exported from this file as they always were. */
+export { CHANGES_MOST, readChanges };
 
 const isMap = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
@@ -106,16 +93,12 @@ export async function readShared(input: unknown, source: PackSource = { kind: 'p
       at: shaped,
     });
 
-  /* `changes` IS THE CATALOGUE'S KEY, NOT THE USE CASE'S. It says what one version changed, so it is read here, at the
-     door every shared file walks through, and taken off before the use case's own shape is checked: the use case keeps
-     its closed list of keys, and a file that says its changes installs exactly as one that does not. */
-  const { changes: said, ...rest } = doc;
-  const changes = readChanges(said);
-  if (!changes.ok) return changes as Result<Shared>;
-  const noted = changes.value === null ? {} : { changes: changes.value };
-
-  const u = normaliseUseCase(rest);
+  /* `changes` SAYS WHAT ONE VERSION CHANGED, and the use case reads it as one of its own keys now (SHL-A09), so the note
+     travels on the pack it carries and a record can show it. A file that says its changes still installs exactly as one
+     that does not: the note is kept out of the pack's checksum, as its title is. */
+  const u = normaliseUseCase(doc);
   if (!u.ok) return u as Result<Shared>;
+  const noted = u.value.changes === undefined ? {} : { changes: u.value.changes };
   const carried = useCasePack(u.value);
   if (carried === null) return ok({ usecase: u.value, pack: null, doc: null, bytes, ...noted });
   const pack = await normalise(carried, source);

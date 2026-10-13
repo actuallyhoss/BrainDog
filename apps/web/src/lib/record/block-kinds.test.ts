@@ -143,27 +143,24 @@ test('ONE NAME, ONE SET: the record and this app mean the same seven kinds by RE
   assert.ok(!SUMS.has('section'), 'a section adds nothing up, so a short answer is not a wrong figure');
 });
 
-test('A REDUCING BLOCK PAST ONE READ IS REFUSED BY THE RECORD AND DRAWN AS A REFUSAL BY THE APP', async () => {
+test('A REDUCING BLOCK PAST ONE READ IS ADDED UP WHOLE BY THE RECORD AND DRAWN FROM THAT WHOLE BY THE APP', async () => {
   const blocks = await record();
 
-  /* THE RECORD'S HALF: 301 matched against a read of 200 is a figure that would have been short by
-     a hundred and one rows, so the block draws nothing and says why. */
+  /* THE RECORD'S HALF (PGS-B05): 301 matched against a read of 200 was a figure short by a hundred and one rows, and
+     then a refusal. Now the block carries `wholeRead`, its parts added up over every row, beside the first 200. */
   for (const heading of ['By state', 'Shared out']) {
-    const block = of(blocks, heading);
-    const said = block.refusals ?? [];
-    assert.equal(said.length, 1, `${heading}: ${(block.rows ?? []).length} rows, matched ${block.matched}, refusals ${JSON.stringify(said)}`);
-    assert.equal(said[0]?.code, 'OUT_OF_BOUNDS', heading);
-    assert.match(String(said[0]?.fix), /301/u, heading);
-    assert.match(String(said[0]?.fix), /200/u, heading);
-    assert.equal((block.rows ?? []).length, 0, `${heading}: the block refused and handed back rows to add up anyway`);
+    const block = of(blocks, heading) as Answered & { wholeRead?: { rows: { rows: number }[] } };
+    assert.deepEqual(block.refusals ?? [], [], heading);
+    assert.equal(block.matched, ROWS_HELD, heading);
+    assert.equal(block.wholeRead?.rows.reduce((a, r) => a + r.rows, 0), ROWS_HELD, `${heading}: the whole read left rows out`);
 
-    /* AND THIS APP'S HALF, over the record's own answer rather than over a hand-written one: the
-       record's sentence is what the reader gets, not this file's one line about a block that
-       cannot be drawn. */
+    /* AND THIS APP'S HALF, over the record's own answer: rows short of the match are drawn from the whole, and the
+       block is neither refused nor said to be undrawable. */
+    REGISTERS.bulk = BULK as never;
     const drawn = blockOf(block as never, new Map(), NOW);
     assert.equal(drawn.cannot, undefined, heading);
-    assert.deepEqual(drawn.refusals, [said[0]?.fix], heading);
-    assert.equal(drawn.rows?.length ?? 0, 0, heading);
+    assert.deepEqual(drawn.refusals ?? [], [], heading);
+    assert.ok((drawn.rows?.length ?? 0) > 0, `${heading}: nothing was drawn from the whole`);
   }
 });
 

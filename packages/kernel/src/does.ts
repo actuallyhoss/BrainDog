@@ -93,9 +93,57 @@ function packsSaid(packs: Record<string, unknown>, names: DoesNames): string[] {
   return out;
 }
 
+/** "every hour", "every 15 minutes", from an interval as an action says it (`1h`, `15m`). One it cannot read is "on a schedule". */
+const UNITS: Readonly<Record<string, string>> = { s: 'second', m: 'minute', h: 'hour', d: 'day', w: 'week' };
+function everySaid(every: string): string {
+  const m = /^(\d{1,4})([smhdw])$/u.exec(every.trim());
+  if (!m || Number(m[1]) === 0) return 'on a schedule';
+  const unit = UNITS[m[2]!]!;
+  return Number(m[1]) === 1 ? `every ${unit}` : `every ${Number(m[1])} ${unit}s`;
+}
+
+/**
+ * "Sends your key 'stripe' to api.stripe.com every hour.", one sentence for each action an install would arm, from the
+ * plan's `calls_out` (`@braindog/declare`'s `Diff`) or a proposal's `egress` (`actions.ts` `Egress`).
+ *
+ * THE KEY BY ITS LABEL AND THE HOST, AND NOTHING ELSE THAT NAMES IT. The diff's own line reads `CALLS OUT <host> · every
+ * 1h · grant "<label>"` and carries the action's id beside it; a person approving an install reads which of their keys
+ * goes where and how often. The label is the plan's `grant` or the proposal's `key`, and a script's is its labels
+ * joined with ", " (`scriptEgress`), which are said one by one. An action with no key sends none, and says "Calls".
+ *
+ * ONLY WHAT THE PRESS ARMS. An action the record already runs unchanged (`change: 'same'`) was approved before and is
+ * left out, so a plan that calls nothing new says nothing. Two actions that read the same are said once.
+ */
+function callsSaid(calls: readonly unknown[]): string[] {
+  const out: string[] = [];
+  for (const c of calls) {
+    const call = obj(c);
+    if (call.change === 'same') continue;
+    const every = typeof call.every === 'string' ? call.every.trim() : '';
+    const ruled = call.trigger === 'rule' || call.trigger === 'both';
+    if (every === '' && !ruled) continue;
+    const label = typeof call.grant === 'string' ? call.grant : typeof call.key === 'string' ? call.key : '';
+    const labels = label.split(',').map((l) => l.trim()).filter((l) => l !== '');
+    const host = typeof call.host === 'string' && call.host.trim() !== '' ? call.host.trim() : 'an address it does not name';
+    const day = typeof call.per_day === 'number' && call.per_day > 0 ? `up to ${call.per_day} times a day` : null;
+    const often =
+      every === ''
+        ? `when a rule runs it${day ? `, ${day}` : ''}`
+        : `${everySaid(every)}${ruled ? `, and ${day ? `${day} ` : ''}when a rule runs it` : ''}`;
+    const what = labels.length === 0 ? `Calls ${host}` : `Sends your ${labels.length === 1 ? 'key' : 'keys'} ${joined(labels.map((l) => `'${l}'`))} to ${host}`;
+    const line = `${what} ${often}.`;
+    if (!out.includes(line)) out.push(line);
+  }
+  return out;
+}
+
+/** What a body says it calls: a plan's `calls_out`, or a proposal's `egress`. */
+const callsIn = (b: Record<string, unknown>): unknown[] => (Array.isArray(b.calls_out) ? b.calls_out : arr(b.egress));
+
 /**
  * What accepting a question of `kind` with `body` would do, as one line, or `''` when the body says nothing this can
- * read. A choice between options changes nothing but the record of what was chosen, and it says so.
+ * read. A choice between options changes nothing but the record of what was chosen, and it says so. `install` takes a
+ * plan's diff and says what the install would send out, or `''` when it arms nothing new.
  */
 export function doesOf(kind: string, body: unknown, names: DoesNames = {}): string {
   const b = obj(body);
@@ -117,8 +165,13 @@ export function doesOf(kind: string, body: unknown, names: DoesNames = {}): stri
     case 'pack': {
       const verb = ['install', 'enable', 'disable'].find((v) => typeof b[v] === 'string');
       if (verb === undefined) return '';
-      return `${capital(packsSaid({ [verb]: [b[verb]] }, names).join(', '))}.`;
+      /* AN INSTALL THAT CALLS OUT SAYS SO AFTER WHAT IT ADDS, key by label and host. Turning a pack on or off arms nothing new. */
+      const sends = verb === 'install' ? callsSaid(callsIn(b)) : [];
+      return [`${capital(packsSaid({ [verb]: [b[verb]] }, names).join(', '))}.`, ...sends].join(' ');
     }
+    /* A PLAN, as `planPack` answers it: only what it sends, since the sheet it is drawn on already says what it adds. */
+    case 'install':
+      return callsSaid(callsIn(b)).join(' ');
     case 'settings': {
       const values = Object.keys(obj(b.values));
       const pack = typeof b.pack === 'string' ? (names.pack?.(b.pack) ?? spoken(b.pack)) : null;

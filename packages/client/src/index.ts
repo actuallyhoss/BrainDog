@@ -786,6 +786,47 @@ export type Understood = {
   dropped?: string[];
 };
 
+/**
+ * What `setup` takes (USE-B04): an arrangement, as Decide's proposals carry one, and the three things the first run adds.
+ * The record checks every part; this names them so a caller sees what there is to send.
+ */
+export type SetupBody = {
+  /** The owner: met when the list that holds people is on, written to their account name when it is not. */
+  me?: { name: string; email?: string; note?: string };
+  /** What this person calls a list, by the list: `{ tasks: 'jobs' }`. */
+  names?: Record<string, string>;
+  /** On a record that already holds a person's lists, write only what is missing. Without it such a record refuses. */
+  again?: boolean;
+  [part: string]: unknown;
+};
+/**
+ * What `setup` answers, which is the record's own `SetupAnswer` (`AnswerOr`): `done` is what landed, by kind (the
+ * add-ons `installed`, the `settings`, `me`, the `rows`), `failed` each part that was not written, by the part's id
+ * (`install:money`, `me`, `rows`) with a sentence a person can read, and `skipped` what had nowhere to go.
+ */
+export type SetupAnswer = AnswerOr<'setup', { done: Record<string, string[]>; failed: { part: string; label?: string; why: string }[]; skipped?: { part: string; label?: string; why: string }[] }>;
+
+/**
+ * A host that has no such call: an older one answers `ROUTE_UNKNOWN`, and one built over a record without the method
+ * answers `NOT_IN_THIS_BUILD` at the call's own name. The record's own `NOT_IN_THIS_BUILD` (at `host`, at a field) is an
+ * answer like any other. THROWN, where every other answer here is a value, so the one caller that falls back to
+ * the old way for a release catches exactly this and nothing else. It goes when that fallback does.
+ */
+export const NO_SUCH_CALL = 'NO_SUCH_CALL';
+export class NoSuchCall extends Error {
+  override readonly name = NO_SUCH_CALL;
+  readonly code = NO_SUCH_CALL;
+  readonly call: string;
+  readonly refusal: Refusal;
+  constructor(call: string, refusal: Refusal) {
+    super(`This BrainDog has no call named ${call}.`);
+    this.call = call;
+    this.refusal = refusal;
+  }
+}
+/** Whether something caught is that. By name, so it holds across two copies of this package. */
+export const isNoSuchCall = (e: unknown): e is NoSuchCall => e instanceof Error && e.name === NO_SUCH_CALL;
+
 const WRITES = new Set(ROUTES.filter((r) => r.writes).map((r) => r.name));
 const NAMES = new Set(ROUTES.map((r) => r.name));
 
@@ -984,6 +1025,15 @@ export type EngineState = 'answering' | 'not_answering' | 'never_asked' | 'off' 
 export type EngineHealth = {
   health: { state: EngineState; last_ok: string | null; since: string | null };
   said: { text: string; whose: 'ours' | 'yours' | null };
+};
+
+/**
+ * `trust`'s answer (ENG-A12): each connected agent by name, and for each kind of change the rung it stands on (Ask, Do
+ * and tell, Do quietly), since when, whether it was lifted there, and when and why it was put back to Ask. See
+ * `Standing` in `packages/record/src/ladder.ts`.
+ */
+export type TrustStanding = {
+  agents: { agent: string; kinds: { kind: string; rung: 'ask' | 'tell' | 'quiet'; since: string; lifted: boolean; dropped: { at: string; why: string | null } | null }[] }[];
 };
 
 /**
@@ -1230,6 +1280,16 @@ export function createClient(options: ClientOptions) {
      */
     slashSetup: <T = unknown>(ask: Record<string, unknown>) => hostDoor<T>('slash/setup', ask),
     slashMapping: <T = unknown>(ask: Record<string, unknown>) => hostDoor<T>('slash/mapping', ask),
+    /**
+     * Make the record from what its owner accepted, in one call (USE-B04). The answer is a value like any other, a
+     * refusal included, except from a host with no such call: that throws `NoSuchCall`.
+     */
+    setup: async (body: SetupBody) => {
+      const out = await call<SetupAnswer>('setup', body as Record<string, unknown>);
+      if (!out.ok && 'refusal' in out && (out.refusal.code === 'ROUTE_UNKNOWN' || (out.refusal.code === 'NOT_IN_THIS_BUILD' && out.refusal.at === 'setup')))
+        throw new NoSuchCall('setup', out.refusal);
+      return out;
+    },
     boot: () => call<Boot>('boot'),
     version: () => call<Version>('version'),
     schema: (register: string) => call<unknown>('schema', { register }),
@@ -1634,6 +1694,8 @@ export function createClient(options: ClientOptions) {
     /* THE DOOR'S HEALTH (AGT-A02). ADMIN, so a browser session at owner: every connection, its app, build and last tool
        call, and the seven signs. It takes nothing and changes nothing. */
     doorHealth: () => call<AnswerOr<'doorHealth', DoorHealth>>('doorHealth'),
+    /** How far each connected agent is trusted with each kind of change, by name (ENG-A12). It writes nothing. */
+    trust: () => call<AnswerOr<'trust', TrustStanding>>('trust'),
     changeEmail: (email: string) => accountDoor<Record<string, never>>('email', { email }),
     confirmEmail: (token: string) => accountDoor<{ email: string; unreached: number }>('email/confirm', { token }),
 

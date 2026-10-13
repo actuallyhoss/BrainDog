@@ -106,6 +106,15 @@ test('ON A HOST THAT SELLS NO PLAN THE SAME THREE REFUSALS NAME NO DOOR: no Clou
   assert.equal(dir.joinRecord(REC, bo.value.id).refusal?.fix, FREE_JOIN_REFUSED_SHORT);
 });
 
+test('READ FROM THE DIRECTORY ON A HOST THAT SELLS NO PLAN, the owner is told the short sentence too', async () => {
+  const c = await studio({});
+  assert.equal((c.directory as unknown as { setPlan(r: string, p: string): unknown }).setPlan(REC, 'free'), null);
+  const out = await c.invite('bo@example.test');
+  assert.equal(out.status, 403, JSON.stringify(out.body));
+  assert.equal(out.body.refusal?.fix, FREE_ONE_PERSON_SHORT);
+  for (const short of [FREE_ONE_PERSON_SHORT, FREE_JOIN_REFUSED_SHORT]) assert.doesNotMatch(short, /Cloud|Settings|link/u);
+});
+
 test('SIGN-UP IS OPEN WHERE SIGNUP SAYS open, with billing off', async () => {
   const c = await cloud({ SIGNUP: 'open' });
   const res = await c.ask('/auth/signup/name?slug=bakery');

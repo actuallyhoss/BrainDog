@@ -422,8 +422,11 @@ test('A QUESTION NAMING A VARIABLE SET FROM A SECRET FIELD IS REFUSED AT PROPOSE
 
     await s.object().alarm();
 
-    assert.equal(s.sent.length, 1, `${s.sent.length} model calls for one question`);
-    assert.match(s.sent[0]!.body, /Rent/, 'the question that went out was not the one about this row');
+    /* THE QUESTION'S OWN CALLS. The alarm also writes the page headlines now, a background ask this host counts since
+       cloud-background-54, so that call goes out beside it; the secret is looked for in every one of them below. */
+    const asked = s.sent.filter((p) => /answering one question for an automation/u.test(p.body));
+    assert.equal(asked.length, 1, `${asked.length} model calls for one question`);
+    assert.match(asked[0]!.body, /Rent/, 'the question that went out was not the one about this row');
     assert.doesNotMatch(s.sent.map((p) => p.body).join('\n'), /hunter2/, 'the secret field left the record');
   } finally {
     s.close();

@@ -99,8 +99,11 @@ test('A PRESS ON THE WORKER WRITES A LEDGER ROW AND IS REFUSED PAST THE OPERATOR
   assert.ok(turned.length > 0 && turned.every((r) => r.status === 'refused' && r.code === 'SLASH_BUDGET_SPENT' && r.neurons === 0), JSON.stringify(turned));
   const calls = rows.filter((r) => r.model !== '-');
   assert.equal(calls.length, 3, JSON.stringify(rows));
+  /* ONE OF THE THREE IS THE DAILY LOOK (cloud-background-54): the Worker counts a background ask now, so the look asks
+     a model on the first press of the day and takes one of the three the ceiling lets through. */
+  assert.deepEqual(calls.map((r) => r.question).sort(), ["Slash's daily look", "Slash's press", "Slash's press"], JSON.stringify(calls));
   for (const r of calls) {
-    assert.deepEqual([r.kind, r.model, r.status, r.code, r.question], ['read', 'glm-5.3-flash', 'ok', null, "Slash's press"]);
+    assert.deepEqual([r.kind, r.model, r.status, r.code], [r.question === "Slash's daily look" ? 'pattern' : 'read', 'glm-5.3-flash', 'ok', null]);
     /* PRICED AT THE INCLUDED MODEL'S RATE, the one the package prices the door's asks at, never 0. */
     assert.ok(r.tokens_in > 0 && r.tokens_out > 0, JSON.stringify(r));
     assert.equal(r.neurons, Math.round((r.tokens_in * 13_636) / 1e6 + (r.tokens_out * 45_455) / 1e6));

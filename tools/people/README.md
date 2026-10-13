@@ -9,6 +9,10 @@ here for one person, Mariam. The other seven people of USE-B01 and their nightly
 - `mariam.json`: who she is, what she types at "Who are you?", the starting point she would tap, her one answer
   (`messages`), her address at a test sink, her first real thing ("Nadia wants 3 vanilla jars for Friday, paid 900 on
   InstaPay"), what she tells on later days, and under `expect` what each step must show.
+- `mariam-two-debtors.json`: Mariam again with two people owing her at once (shop-owed-53-54). On day 7 Salma asks
+  for a second order and Dalia for one, none of them paid, so on day 15 the Orders page opens on "8 orders this month,
+  4 to ship this week, 4 late, and Salma still owes EGP 1,350, with 2 more orders not paid at all". Walk her with
+  `node tools/people/expect/first-run.mjs tools/people/mariam-two-debtors.json`. No standing record uses her.
 - `expect/first-run.mjs`: the walk. `expect.*` are pure checks, one for each step, that take what was seen and answer
   `{ id, pass, saw }`. `walk(person, host)` goes through the seven steps the way a browser does and hands each check
   what it saw. `selfHost(person)` starts a fresh self-host on a clock the walk can move. `deployed(origin, linkFile)`
@@ -64,8 +68,8 @@ any step is red.
 | 3. One question | Exactly one question ("Where do your orders come in?"). Each of its three answers says what it means, and it says it is the only question. Her answer is kept and nothing more is asked. | first-read-45, signup-flow-46 |
 | 4. Keep it | The mailed link makes her, the free record is made and opened as the sign-up page does it, then the build she saw is kept, made by the page's own `accepting()` (`routes/signup/build.ts`), never a copy: Orders, Products, People, the Ledger and Bills and invoices, with her as the only person, nothing tagged as an example, and the record in EGP. | link-carry-45, signup-flow-46, signup-build-46, signin-46, uc6-signup-49 |
 | 5. Tell it one real thing | The card previews her sentence as a client, an order and a paid item in Bills and invoices (a fresh shop holds no account, so not the Ledger). Nothing is added before the press. One press adds them all under one batch, and the lists grow by exactly that many. One Undo takes them all back: every list is back to its count, and each entry the press made is looked for by its number and gone. | capture-record-45, capture-read-45, first-today-parts-45, uc6-tell-49 |
-| 6. Her first Today | Once she has told it something, the card is gone. Today, drawn by Home's own readers, has a money tile reading "In EGP 900". The next steps come in the order her answer puts them, Hide hides them, and nothing drawn from use is offered on day 0. | first-today-parts-45, home-first-46, uc6-today-49 |
-| 7. A page for her pattern | With Orders read on three different weeks and four orders due this week, nothing is offered on day 13. On day 15 the pen offers `week:orders`, saying why in her list's own words, and the Orders page opens on its sentence: "6 orders this month, 4 to ship this week, 2 late, and Salma still owes EGP 1,350". | offer-pattern-45, offer-card-46, uc6-shop-49 |
+| 6. Her first Today | Once she has told it something, the card is gone. Today, drawn by Home's own readers, has a money tile reading "Paid EGP 900". The next steps come in the order her answer puts them, Hide hides them, and nothing drawn from use is offered on day 0. | first-today-parts-45, home-first-46, uc6-today-49 |
+| 7. A page for her pattern | With Orders read on three different weeks and four orders due this week, nothing is offered on day 13. On day 15 the pen offers `week:orders`, saying why in her list's own words, and the Orders page opens on its sentence: "6 orders this month, 4 to ship this week, 2 late, and Salma still owes EGP 1,350". With two people owing (`mariam-two-debtors.json`) it ends ", with 2 more orders not paid at all". | offer-pattern-45, offer-card-46, uc6-shop-49 |
 
 The self-host has no sign-up, so the walk opens the record the way its owner does, with the server key, and builds it
 the same way. Step 4's sign-up is walked on the hosted service instead, in one process (expect/keep-it.mjs): the mailed

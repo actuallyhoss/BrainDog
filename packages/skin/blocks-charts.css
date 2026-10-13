@@ -2622,6 +2622,7 @@
   .heat-empty,
   .heat-skipped,
   .heat-outside,
+  .heat-share,
   .heat-more {
     margin: 0;
     color: var(--dim);

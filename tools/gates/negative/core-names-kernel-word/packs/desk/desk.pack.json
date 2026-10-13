@@ -1,0 +1,11 @@
+{
+  "pack": "desk",
+  "version": "1.0.0",
+  "title": "Desk",
+  "summary": "Planted: a list called tasks, and one called lines, which is also a block kind of this tree's kernel.",
+  "requires": { "format": 1, "primitives": 1, "packs": {} },
+  "declarations": [
+    { "register": "tasks", "name": "Tasks", "title": "what", "fields": [{ "id": "what", "type": "text" }] },
+    { "register": "lines", "name": "Lines", "title": "what", "fields": [{ "id": "what", "type": "text" }] }
+  ]
+}

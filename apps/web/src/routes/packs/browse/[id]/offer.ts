@@ -10,12 +10,17 @@
  *
  * ONLY THE OWNER INSTALLS FROM A BROWSER. Anybody else is refused by the record, and a Kennel entry is then asked for on
  * Decide instead (`catalogue.ts` `askForVersion`), where the owner reads the same plan.
+ *
+ * WHAT IT SENDS AND WHAT WAITS ARE SAID AS SENTENCES ON THE SHEET (`sendsOf`, `waitsOf`): which key goes to which host
+ * and how often, in the kernel's words (`doesOf`), and the parts the plan left out until the record holds a list.
  */
 
 import type { createClient } from '@braindog/client';
+import { doesOf } from '@braindog/kernel';
 import type { CatalogueEntry } from '@braindog/declare/catalogue';
 
 import type { Listing } from '../../../../lib/market/listing.ts';
+import { words } from '../../../../lib/market/words.ts';
 import { packDocument, relabelDocument, type PackState } from '../../../../lib/record/packs.ts';
 import { afterInstall, installShared, keepVoice, planShared, speakingStates, switchTo, voiceQuestion, type SharedPlan } from '../../sharing.ts';
 import { askForVersion } from '../catalogue.ts';
@@ -37,6 +42,64 @@ const refusedOf = (r: Wire<unknown>, fallback: string): Refused => (r.ok ? { ok:
 
 /** What the plan sheet draws: the record's `Diff`, or the use case's plan whole. */
 export const diffOf = (p: Planned): unknown => (p.kind === 'pack' ? p.diff : p.plan);
+
+/**
+ * What installing the plan would send out, a sentence for each action: "Sends your key 'stripe' to api.stripe.com every
+ * hour." The kernel writes it (`doesOf`, kind `install`) from the plan's `calls_out`, so Decide and this sheet say an
+ * action the same way. Empty when the plan arms nothing new.
+ *
+ * A USE CASE IS ASKED PACK BY PACK, from the calls `sharing.ts` already read off each pack's plan, and a sentence two
+ * packs share is said once.
+ */
+export function sendsOf(p: Planned): string[] {
+  const calls: unknown[] =
+    p.kind === 'pack'
+      ? isMap(p.diff) && Array.isArray(p.diff.calls_out)
+        ? p.diff.calls_out
+        : []
+      : p.plan.packs.flatMap((pack) => pack.calls.map((c) => ({ host: c.host, every: c.every, key: c.key, trigger: c.trigger ?? 'schedule', per_day: c.perDay ?? null })));
+  const said = calls.map((c) => doesOf('install', { calls_out: [c] })).filter((line) => line !== '');
+  return [...new Set(said)];
+}
+
+/** The words over the two groups of sentences on the sheet, kept with the market's other words. */
+export const sheetWords = { sends: words.sends, waits: words.waits, waitsNote: words.waitsNote } as const;
+
+/** What a part waits for, said: a role any list may play in the market's own words (`words.waitsOn`), else the list by its name. */
+const waitedFor = (h: string, nameOf: (id: string) => string): string => (Object.hasOwn(words.waitsOn, h) ? words.waitsOn[h]! : nameOf(h));
+
+const and = (names: readonly string[]): string => (names.length <= 1 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`);
+
+/**
+ * What the plan left out until the record holds a list (`Diff.waiting`), as sentences: "Clients waits until you have
+ * People.", "2 parts of Clients wait until you have People."
+ *
+ * BY NAME, NEVER BY PLACE. The plan says where each part sits (`register.clients.fields[2]`), which is an address
+ * nobody typed. A part is said by the list or page it belongs to, and counted when it is only a piece of one, and what
+ * it waits for is the list's name as `nameOf` gives it, or a role in plain words. A use case's plan carries none, and
+ * says nothing.
+ */
+export function waitsOf(p: Planned, nameOf: (id: string) => string): string[] {
+  const waiting = p.kind === 'pack' && isMap(p.diff) && Array.isArray(p.diff.waiting) ? p.diff.waiting : [];
+  const by = new Map<string, { owner: string; whole: boolean; parts: number; holds: string[] }>();
+  for (const w of waiting) {
+    if (!isMap(w) || typeof w.at !== 'string' || !Array.isArray(w.holds)) continue;
+    const holds = [...new Set(w.holds.filter((h): h is string => typeof h === 'string' && h !== '').map((h) => waitedFor(h, nameOf)))];
+    const m = /^([a-z_]+)\.([^.[]+)(.*)$/u.exec(w.at);
+    if (holds.length === 0 || !m) continue;
+    const owner = nameOf(m[1] === 'register' ? m[2]! : `${m[1]}.${m[2]}`);
+    const key = `${owner}\u0000${holds.join('\u0000')}`;
+    const n = by.get(key) ?? { owner, whole: false, parts: 0, holds };
+    if (m[3] === '') n.whole = true;
+    else n.parts += 1;
+    by.set(key, n);
+  }
+  return [...by.values()].map((n) => {
+    const until = `until you have ${and(n.holds)}`;
+    if (n.whole) return `${n.owner} waits ${until}.`;
+    return n.parts === 1 ? `One part of ${n.owner} waits ${until}.` : `${n.parts} parts of ${n.owner} wait ${until}.`;
+  });
+}
 
 /**
  * The record's plan for a listing. `doc` is an add-on's verified document, or `null` for a module, whose document is

@@ -193,6 +193,16 @@ const PAGE: Declaration = {
         unset: 'Uncategorised',
         empty: 'Nothing has gone out in the last 12 months.',
       },
+      /* A BAR SIZED BY WORDS, which nothing can add up: past one read it is still refused (`pastOneRead` in the kernel's
+         `pages.ts`), where the bar above is added up over every row since PGS-B05. */
+      {
+        kind: 'bar',
+        heading: 'Sized by its name',
+        span: 5,
+        source: 'register.ledger',
+        where: WENT_OUT,
+        columns: [{ field: 'category' }, { field: 'what' }],
+      },
       {
         kind: 'table',
         heading: 'Every movement',
@@ -299,7 +309,12 @@ const shownFor = (block: Answered): { title: string; lines: string[] } => {
 
 test('A CHART PAST THE CEILING IS NOT A FILTER NOBODY UNDERSTOOD, and the heading may not say it was', async () => {
   const { blocks, admitted } = await ledger();
-  const bar = answeredBlock(blocks, 'Where it went, 12 months');
+  /* THE LEDGER'S OWN BAR IS ADDED UP WHOLE (PGS-B05): every one of the 216 rows is in its parts, and nothing is refused. */
+  const went = answeredBlock(blocks, 'Where it went, 12 months') as Answered & { wholeRead?: { rows: { rows: number }[] } };
+  assert.deepEqual(went.refusals ?? [], []);
+  assert.equal(went.wholeRead?.rows.reduce((a, r) => a + r.rows, 0), GOES_OUT);
+  /* AND THE ONE THAT STILL CANNOT BE ADDED UP, a bar sized by a column of words, is refused as every sum once was. */
+  const bar = answeredBlock(blocks, 'Sized by its name');
 
   /* THE RECORD'S HALF, and the two facts the heading used to contradict: the filter ran, excluding
      four rows of the 220 held, and what it admitted is 216 rather than nothing. */
@@ -345,7 +360,7 @@ test('AND A MISSPELT COLUMN IS NOT A SECOND CURRENCY, which is the same guess in
   /* ONE HEADING OVER TWO DIFFERENT REFUSALS, which is the whole of the repair: the state is what this
      file knows and the reason is what the record said, so the same line stands over both while the
      lines under them differ. */
-  const bar = shownFor(answeredBlock(blocks, 'Where it went, 12 months'));
+  const bar = shownFor(answeredBlock(blocks, 'Sized by its name'));
   assert.equal(shown.title, bar.title, 'the heading is a guess about the refusal again');
   assert.notDeepEqual(shown.lines, bar.lines);
 });

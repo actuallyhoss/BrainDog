@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { COMING_UP_LIMIT, DEFAULT_HOME, TODAY_LEAD, captureHeading, homeDrawn, railed, slashLineOf, todayHome, type HomeVoice } from './default-home.ts';
+import { COMING_UP_LIMIT, DEFAULT_HOME, TODAY_LEAD, captureHeading, homeDrawn, railed, slashLineOf, todayHome, type HomeVoice, type Week } from './default-home.ts';
 import { homeLineOf, recordDay } from './home-line.ts';
 import type { LiveBlock } from '../record/page-live.ts';
 import type { WithRows } from './home-rows.ts';
@@ -491,4 +491,37 @@ test('WITH boot’S waits HOME SAYS THE BADGE’S NUMBER: every open question an
   const calm = homeDrawn([block({ kind: 'note', lead: true, body: 'Calm.' })], NOW, undefined, undefined, { questions: 0, inbox: 0, working: 0, seqs: [] });
   assert.equal(calm.sentence, null);
   assert.equal(calm.lead, 'Calm.');
+});
+
+/* ── a record's week ───────────────────────────────────────────────────── */
+
+/** A shop's week as `weekOf` reads it off its Orders. */
+const WEEK: Week = { due: { register: 'orders', name: 'Orders', one: 'Order', day: 'due', who: 'who', what: 'what', open: 'state is not paid', paid: 'paid' } };
+
+test('THIS WEEK STARTS TODAY AND LATE IS ITS OWN CLAUSE: an order due yesterday, today and next week reads two due and one late, said once', () => {
+  /* Friday 2 October: yesterday is late, today and next Thursday are this week's. */
+  const body = todayHome({ tasks: false, adds: false, money: false, week: WEEK });
+  const due = body.blocks.find((b) => b.heading === 'Orders due this week')!;
+  /* THE SAME DAYS AS THE SHOP'S OWN FIGURE (`orders-due-7d`, shop 1.1.0): today and the seven after, never a day past. */
+  assert.equal(due.where, 'state is not paid, due after -1d, due before +8d');
+  const JARS = { row: 'orders#1', title: 'Vanilla jars', day: '2026-10-01' };
+  /* What Late holds is the case: the order past its day, a bill beside it, or nothing. */
+  const answered = (late: Record<string, unknown>[]): LiveBlock[] => body.blocks.map((b) => {
+    const cols = ((b as unknown as { columns?: { field: string }[] }).columns ?? []).map((c) => ({ field: c.field, label: '', width: '' }));
+    const base = { ...(b as unknown as Partial<LiveBlock> & { kind: string }), columns: cols };
+    /* THE RECORD ANSWERS THE TILE WITH THE TWO NOT YET PAST THEIR DAY, and Late with the one that is, by its list and number. */
+    if (b === due) return block({ ...base, register: 'orders' }, [{ who: 'people#1', what: 'Gift box', due: '2026-10-02' }, { who: 'people#2', what: 'Tea lights', due: '2026-10-08' }], [2, 3]);
+    if (b.source === 'deadlines' && b.where === 'day before today') return block(base, late);
+    return block(base);
+  });
+  const drawn = homeDrawn(answered([JARS]), NOW, undefined, undefined, null, WEEK);
+  assert.deepEqual(drawn.sentence, { text: 'One order is late. Two more are due this week, the first today.', needs: 'One order is late' });
+  assert.doesNotMatch(drawn.sentence!.text, /thing/u, 'the late order is said once, by its own name');
+  /* THE TILE HOLDS THE TWO, AND LATE THE ONE: the three are never one count. */
+  assert.deepEqual(shown(drawn.blocks).map((b) => [b.heading, b.entries.length]), [['Orders due this week', 2], ['Late', 1]]);
+  /* SOMETHING ELSE LATE IS STILL THE HOUSE'S TO SAY, after the orders and without them. */
+  const bill = answered([{ row: 'obligations#4', title: 'Rent', day: '2026-09-30' }, JARS]);
+  assert.equal(homeDrawn(bill, NOW, undefined, undefined, null, WEEK).sentence?.text, 'One order is late. Two more are due this week, the first today. One thing is two days late.');
+  /* NOTHING LATE: the line is the week's, as it was. */
+  assert.deepEqual(homeDrawn(answered([]), NOW, undefined, undefined, null, WEEK).sentence, { text: 'Two orders are due this week, the first today.', needs: '' });
 });

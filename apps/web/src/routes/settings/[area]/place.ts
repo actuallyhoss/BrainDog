@@ -57,6 +57,7 @@ export const DEFAULT_GROUPS: readonly AreaGroup[] = [
     icon: 'sliders-horizontal',
     areas: [
       area('/settings/appearance', 'Appearance', 'sun', 'Colour, text size and density'),
+      area('/settings/look', 'Look', 'eye', 'Every control and chart, as drawn'),
       area('/settings/keyboard', 'Keyboard', 'keyboard', 'Character keys and shortcuts'),
       area('/settings/navigation', 'Navigation', 'rows', 'Where it sits, its order and hidden pages'),
       area('/settings/pages', 'Pages', 'doc', 'Every page, and the one that opens first'),

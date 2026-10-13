@@ -608,3 +608,35 @@ test('TURNING A PACK BACK ON SHOWS WHAT IT WILL CALL OUT AGAIN, and is refused w
   assert.deepEqual(api.kernel.actionOrigins(), []);
   sql.close();
 });
+
+test('AN ENTRY FOR A LIST THE SAME ARRANGEMENT INSTALLS IS TAKEN, read against the record as its add-ons leave it', async () => {
+  const { api, sql } = await record();
+  /* Nothing is installed: Courses and Tasks arrive with this arrangement, and the entries are for them. */
+  const body = {
+    why: ['They named a course and what is due for it.'],
+    usecase: 'study',
+    rows: [
+      { register: 'courses', fields: { name: 'Anatomy' } },
+      { register: 'tasks', fields: { what: 'Read chapter 4', state: 'open' } },
+    ],
+  };
+  const arranged = value<{ id: string }>(await api.propose({ question: 'Set this up for studies?', body_kind: 'arrange', body } as never, agent));
+  const filed = value<{ body: { rows: { register: string }[]; parts: { id: string; requires?: string[] }[] } }>(await api.governance({ id: arranged.id }, owner));
+  assert.deepEqual(filed.body.rows.map((r) => r.register), ['courses', 'tasks']);
+  assert.ok(filed.body.parts.some((p) => p.id === 'rows:courses'));
+
+  /* A field the list will not have is refused against the list as planned, by its own fields. */
+  const wrong = refusal(
+    await api.propose({ question: 'Set this up?', body_kind: 'arrange', body: { ...body, rows: [{ register: 'courses', fields: { teacher: 'Dr Said' } }] } } as never, agent),
+  );
+  assert.equal(wrong.code, 'FIELD_UNKNOWN');
+  assert.deepEqual(wrong.allowed, ['name']);
+  /* And a list neither the record nor the arrangement holds is still unknown. */
+  const none = refusal(await api.propose({ question: 'Set this up?', body_kind: 'arrange', body: { ...body, rows: [{ register: 'invoices', fields: { name: 'x' } }] } } as never, agent));
+  assert.equal(none.code, 'REGISTER_UNKNOWN');
+
+  const done = value<{ applied: { installed: string[]; rows: string[] } }>(await api.decide(accept(arranged.id), owner));
+  assert.deepEqual(done.applied.installed, ['work', 'usecase-study']);
+  assert.deepEqual(done.applied.rows, ['courses#1', 'tasks#1']);
+  sql.close();
+});

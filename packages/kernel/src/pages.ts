@@ -24,7 +24,7 @@ import { clausesOf, quoteValue } from '@braindog/where';
 import { unquoted } from '@braindog/where';
 
 import type { ActionRow } from './actions.ts';
-import { BLOCK_READS, FILTER_TYPES, blockKeyOf, keyedBlocks, kindsReading, wrongKindKey } from './block-keys.ts';
+import { ANSWER_KEYS, BLOCK_READS, FILTER_TYPES, blockKeyOf, keyedBlocks, kindsReading, wrongKindKey } from './block-keys.ts';
 import { applyLook, composeLook, lookOf, mergeLook, type LookBody } from './compose.ts';
 import { HANDOFFS_OPEN, builtInFigure, type OpenStep } from './built-in-figures.ts';
 import type { ActionBlocking } from './signs-actions.ts';
@@ -39,11 +39,11 @@ import { panelFault, roadmapFault, shortFault } from './kinds/words.ts';
 import { BODY_KINDS, type Shows } from './govern.ts';
 import { CARD_FOLD, CARD_FOLD_MOST } from './declare.ts';
 import type { Json } from './coerce.ts';
-import type { Part, Rate } from './fx.ts';
+import { across, dayFieldOf as datedBy, isAtLeast, partsOf, type Amount, type Part, type Rate } from './fx.ts';
 import type { Entry } from './index.ts';
 import { predicateOf, windowMs, wordsOf, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import { HORIZON_CAP, runway, type Horizon, type Leg, type Only, type Runway } from './forecast.ts';
-import { figureLists, isRolled, type PointsAt, type Rolled } from './money-figures.ts';
+import { figureLists, isRolled, pointedIn, type PointsAt, type Rolled } from './money-figures.ts';
 import { withAdds, type PageAddition } from './page-adds.ts';
 import { barsOf, type Bars, type SeriesLine } from './series.ts';
 import { isBucket } from './buckets.ts';
@@ -282,6 +282,8 @@ export type BlockResult = PageBlock & {
   fx?: { home: string | null; rates: Rate[] };
   /** How many the predicate matched, which is what a total is a total OF. */
   matched: number;
+  /** On a kind that adds up over a list: its parts and its total over every row (`WholeRead`). */
+  wholeRead?: WholeRead;
   /** A `stat` block's figures, in the order its cells named them. */
   /** Each cell's figure, and the target the record holds for it, so a host says the record's target rather than its own build's. */
   readings?: { metric: string; label?: string; reading: Reading | null; refusal?: Refusal; trend?: (number | null)[]; target?: MetricDecl['target'] }[];
@@ -756,6 +758,11 @@ export type PageDeps = {
    * page's reader filters. Absent, the page counts them from `list`, which reads every row to do it.
    */
   tally?: (q: { register: string; field: string; where?: Predicate | undefined }) => Result<{ value: Json; n: number }[]>;
+  /**
+   * A list added up in the database, in one grouped query, for a block that adds up (`WholeAsk`, `WholePart`). Absent,
+   * the block reads every row a page at a time through `list` and adds them up here, to the same answer.
+   */
+  whole?: (q: WholeAsk) => Result<WholePart[]>;
   /** The record's timezone, which a day of readings is counted in. `UTC` when absent. */
   tz?: string;
   /**
@@ -889,7 +896,11 @@ export const WHOLE_RECORD = '*';
  * the figure was the first 200 amounts added up. `apps/web` happened to guard it, which made the
  * kernel's own correctness rule the property of one of its callers: `packages/mcp` publishes the
  * same answer to an agent as "rows and figures", and an agent totalling a bar over a 250-row
- * register was told nothing. The refusal is below, where every consumer gets it.
+ * register was told nothing. The refusal was below, where every consumer got it.
+ *
+ * AND THE REFUSAL IS GONE WHERE A WHOLE READ IS HANDED (PGS-B05, `handsWhole`), because it made a list past 200 rows
+ * undrawable: the Ledger's own chart of where the money went was dead from its 201st row. These kinds now answer
+ * `wholeRead`, added up over every row (`wholeOf`), and what bounds them is time (`WHOLE_MS`), not a count.
  *
  * `section` IS NOT ONE OF THESE. Its count on screen is `total`, the whole match, so it is never
  * showing a slice; it reads no row to be right, and measured over the same 301 rows it draws its
@@ -930,7 +941,94 @@ export const SUMS: ReadonlySet<string> = new Set(['bar', 'chips', 'gauge', 'heat
  * kind that is the actual difference between the questions.
  */
 export const REDUCES: ReadonlySet<string> = new Set([...SUMS, 'section']);
-const READ_WHOLE = 200;
+/**
+ * HOW MANY ROWS RIDE BESIDE A WHOLE READ, and it is no longer a ceiling (PGS-B05). A kind that adds up answers
+ * `wholeRead`, its parts and its total over every row, and these rows are handed with it so a drawer written before
+ * `wholeRead` still draws a list this short as it did. Past them it has only `wholeRead` to draw from.
+ */
+const ROWS_BESIDE = 200;
+
+/** How long a whole read may take before the block is refused instead, in milliseconds: the bound that replaced 200 rows. */
+export const WHOLE_MS = 250;
+/** How many parts a whole read hands back by label; the smallest past that are added into `rest`, never dropped. */
+export const WHOLE_PARTS = 200;
+/** A page of the list a whole read walks when the host hands no grouped read (`PageDeps.whole`). */
+const WHOLE_PAGE = 500;
+/**
+ * How many rows that walk reads at most (audit 53, finding 7). TIME IS THE BOUND, AND A CLOCK MAY NOT MOVE: on a host
+ * whose `performance.now()` stands still through one piece of work the walk never ran late, so a ledger of any length
+ * was walked a page at a time on every open of the page. A count holds whatever the clock does. The grouped read a
+ * host hands in (`PageDeps.whole`) is one query and is not counted here.
+ */
+export const WHOLE_WALK_ROWS = 50_000;
+
+/**
+ * WHETHER THIS BUILD HANDS A WHOLE READ AT ALL, which is whether `ANSWER_KEYS` (`block-keys.ts`) lists `wholeRead`.
+ *
+ * THE RECORD BLANKS A HELD BLOCK BY THAT LIST AND BY NOTHING ELSE (`shellOf` in `packages/record`), so an answer key
+ * missing from it stays on a block a reader is held from. Measured with `wholeRead` unlisted: a member invited to
+ * Categories alone opened a page with a bar over Transactions and was handed every label and the total off the held
+ * block, which is the fault `latest` had (`test/answers-keys.test.ts`). So the key is handed only where the list that
+ * takes it off again has it, and where it does not a kind that adds up reads as it did before: `ROWS_BESIDE` rows, and
+ * a refusal past them. ASKED WHEN A BLOCK IS READ, never when this file loads, as every read of that file's lists is.
+ */
+const handsWhole = (): boolean => ANSWER_KEYS.includes('wholeRead');
+
+/** What a whole read asks the database: the fields it groups by, and the field it adds up, or `null` to count rows. */
+export type WholeAsk = {
+  register: string;
+  where?: Predicate | undefined;
+  /** `day: true` groups by the day a value falls on, its first ten characters, so an instant is grouped by its day. */
+  by: readonly { field: string; day?: true }[];
+  value: string | null;
+  /** The list's day field, grouped by as well when the value is money, so each amount is converted at its own day's rate. */
+  dated: string | null;
+};
+
+/**
+ * One group of a whole read as the database answers it: the value of each `by` field as the rows hold it, the currency
+ * or unit the amounts were in (`null` for a bare number), their day, their sum, and how many rows there were and how
+ * many of them held a value. Two currencies are two groups, so nothing is added across them here.
+ */
+export type WholePart = { by: Json[]; unit: string | null; day: string | null; sum: number; rows: number; said: number };
+
+/** One part of a block that adds up: a label as the rows hold it, never a name made up here. */
+export type WholeRow = {
+  /** The first column's value as stored, `null` for the rows that hold none. A heat's is its day. */
+  label: Json;
+  /** On a heat drawn a person a line (`who: true`): who, as stored. */
+  who?: Json;
+  rows: number;
+  /** The sum, or the count where the block counts. `null` when it is money in currencies that are not added: see `parts`. */
+  value: number | null;
+  /** The currency or unit `value` is in. Absent on a count and on a bare number. */
+  unit?: string;
+  /** One amount a currency, when they could not be added into one. */
+  parts?: Part[];
+  /** The whole this part is a share of: a heat day's under `of:`, and all the rows of a `progress` group. */
+  of?: number | null;
+};
+
+/**
+ * What a kind that adds up answers beside its rows (PGS-B05): its parts by label and the total of EVERY row its scope
+ * and `where` admit, added up in the database or over the whole list, never over a page of it.
+ */
+export type WholeRead = {
+  /** The parts, largest first; a heat's days oldest first, and only the days of its twelve weeks. */
+  rows: WholeRow[];
+  /** The sum or the count over every row. `null` when it is money that could not be added into one currency. */
+  total: number | null;
+  unit?: string;
+  parts?: Part[];
+  /** Present when the money was converted into the home currency: the oldest rate's day, and whether it is stale. */
+  converted?: { asOf: string; stale: boolean };
+  /** The whole the total is a share of: what a heat's `of:` admits, or every row a `progress` counted. */
+  of?: number | null;
+  /** Past `WHOLE_PARTS` labels: how many more there were, and what they add up to. */
+  rest?: { labels: number; rows: number; value: number | null; unit?: string; parts?: Part[] };
+  /** On a heat: the rows dated outside its twelve weeks, or holding no day, which no cell draws. */
+  outside?: number;
+};
 
 /** The register `sessions.live` and `sessions.working` read, whose fields their columns name. */
 const SESSION = 'session';
@@ -1872,11 +1970,14 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
      installed block drawing a hole on the page; nothing here still says a deploy is owed. */
   /* `of:` IS READ BY ONE KIND OVER ONE KIND OF SOURCE, and anywhere else it would be a sentence the block drew
      without, which is the misspelt key above by another route. */
-  if (block.of !== undefined && !(block.kind === 'ring' && typeof block.source === 'string' && block.source.startsWith('register.')))
+  /* AND A HEAT OVER A LIST READS ONE TOO (PGS-B05): each day's whole, which its wash is then a share of (`wholeOf`). */
+  /* ONLY WHERE A WHOLE READ IS HANDED (`handsWhole`): without one nothing reads a heat's `of:`, and it is unread again. */
+  const takesOf = block.kind === 'ring' || (block.kind === 'heat' && handsWhole());
+  if (block.of !== undefined && !(takesOf && typeof block.source === 'string' && block.source.startsWith('register.')))
     unread.push({
       code: 'DECLARATION_INVALID',
       /* A RING AN AUTHOR WROTE OUT WAS TOLD "a ring has none", which reads as if no ring could take the key. */
-      fix: `of: names the whole a ring over a list is set against, ${block.kind === 'ring' ? 'and this ring is not over a list' : `and a ${block.kind} has none`}.`,
+      fix: `of: names the whole a ring or a heat over a list is set against, ${takesOf ? `and this ${block.kind} is not over a list` : `and a ${block.kind} has none`}.`,
       at: 'of',
     });
 
@@ -2124,7 +2225,7 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
   /* AND A SECTION ASKS FOR ONE: it draws its count, `matched`, which is the whole match however few rows are read, and
      sends none of them (`leanRows`). It read fifty projects whole for the one number "Parked and finished" says. */
   const limit = SUMS.has(block.kind)
-    ? READ_WHOLE
+    ? ROWS_BESIDE
     : block.kind === 'section' && block.limit !== 0
       ? 1
       : block.limit === undefined
@@ -2181,26 +2282,17 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
   const whole = short ? ask(said.predicate, 1) : listed;
   if (!whole.ok) return { ...base, refusals: refused(whole) ? also(whole.refusal) : also() };
 
-  /* AND A REGISTER PAST THAT ONE READ SAYS SO, which is what the comment over `SUMS` had been
-     promising while this line was missing. The read above asked for 200 and `list` answers how many
-     the predicate matched, so the two numbers are in hand here and nowhere else: 301 matched against
-     200 read is a block whose every figure would be short by a hundred and one rows.
-
-     `OUT_OF_BOUNDS` RATHER THAN A NEW CODE OR `NOT_IN_THIS_BUILD`. `30 §6` closes the list at a
-     hundred and twenty-five and this is what that row already says, a value against a named bound
-     with both numbers in the sentence; `NOT_IN_THIS_BUILD` is 501 and its row says "the repair is a
-     deploy, not an edit", and the repair here is an edit the author can make in the declaration.
-     `at: 'where'` points at the key that makes the block answerable, because narrowing the predicate
-     is the fix and the kind is not the mistake. */
-  if (SUMS.has(block.kind) && listed.value.matched > READ_WHOLE)
-    return {
-      ...base,
-      refusals: also({
-        code: 'OUT_OF_BOUNDS',
-        fix: `A ${block.kind} adds up every row it matched, and ${register} matched ${listed.value.matched} where a block that adds up reads ${READ_WHOLE}. Narrow it with where: until it matches ${READ_WHOLE} or fewer, or draw it as a list.`,
-        at: 'where',
-      }),
-    };
+  /* WHERE NO WHOLE READ IS HANDED (`handsWhole`), A SUM OVER A PAGE OF ITS ROWS IS STILL A WRONG NUMBER, so the block
+     says so as it always did. Where one is handed this never fires, and what bounds the block is time (`wholeLate`). */
+  const pastOneRead = (): BlockResult => ({
+    ...base,
+    refusals: also({
+      code: 'OUT_OF_BOUNDS',
+      fix: `A ${block.kind} adds up every row it matched, and ${register} matched ${listed.value.matched} where a block that adds up reads ${ROWS_BESIDE}. Narrow it with where: until it matches ${ROWS_BESIDE} or fewer, or draw it as a list.`,
+      at: 'where',
+    }),
+  });
+  if (SUMS.has(block.kind) && !handsWhole() && listed.value.matched > ROWS_BESIDE) return pastOneRead();
 
   /* THE COLUMNS ARE CHECKED AGAINST THE REGISTER. A column naming a field nobody declared renders as
      an empty cell under a heading that promises one, which reads as "no value" rather than as "no
@@ -2296,6 +2388,42 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
         refusals: also({ code: 'MIXED_CURRENCY', fix: `A row here is in ${other.currency} and ${figure?.id} is in ${unit}, and two currencies are never set against each other. Give the row's ${limitField} in ${unit}, or read a figure in ${other.currency}.`, at: figure?.at ?? 'spent' }),
       };
   }
+  /* A KIND THAT ADDS UP ANSWERS ITS WHOLE (PGS-B05): its parts and its total over every row the scope and the `where`
+     admit, read here after every check above, so a block refused for a column is never added up first. The rows above
+     are the first of them and ride beside it. A BLOCK THAT INHERITS ADDS UP ITS PROJECT'S ROWS AND THE ONES THAT APPLY
+     EVERYWHERE, the two sentences its list was read by, as one. */
+  let wholeRead: WholeRead | null = null;
+  if (SUMS.has(block.kind) && handsWhole()) {
+    const reach = (p: Predicate | undefined): Result<Predicate | undefined> => {
+      if (!(inherit && scope)) return ok(p);
+      const everywhere = everywhereOf(deps, register, scope, p);
+      return everywhere.ok ? ok({ any: [p!, everywhere.value] }) : everywhere;
+    };
+    /* A HEAT'S `of:` IS A SENTENCE OVER THE SAME LIST, refused at `of:` as a ring's is, and the part is always inside
+       the whole: the days are counted where both the `where` and the `of:` hold. */
+    let part = said.predicate;
+    let whole: Predicate | undefined | null = null;
+    if (block.kind === 'heat' && block.of !== undefined) {
+      const shape = block.of as unknown;
+      if (typeof shape !== 'string' && (typeof shape !== 'object' || shape === null || Array.isArray(shape)))
+        return { ...base, refusals: also({ code: 'VALUE_MALFORMED', fix: `of: is a sentence over ${register}, such as list is work.`, at: 'of' }) };
+      const wanted = predicateOf(block.of, schema, deps.ctx);
+      if (wanted.bad.length) return { ...base, refusals: also(...wanted.bad.map((r) => ({ ...r, at: 'of' }))) };
+      const home = inherit && scope ? allOf(said.predicate).find((n) => (n as Leaf).field === scope.field && typeof (n as Leaf).is === 'string') : undefined;
+      part = andOf([...allOf(said.predicate), ...allOf(wanted.predicate)]);
+      const all = reach(andOf([...(home ? [home] : []), ...allOf(wanted.predicate)]));
+      if (!all.ok) return { ...base, refusals: refused(all) ? also({ ...all.refusal, at: 'of' }) : also() };
+      whole = all.value;
+    }
+    const admitted = reach(part);
+    if (!admitted.ok) return { ...base, refusals: refused(admitted) ? also(admitted.refusal) : also() };
+    const added = wholeOf(deps, block, register, schema, admitted.value, whole);
+    if (!added.ok) return { ...base, refusals: refused(added) ? also(added.refusal) : also() };
+    wholeRead = added.value;
+    /* AND A BLOCK WHOSE COLUMNS NAME NOTHING THIS CAN ADD UP (`wholeShape`) HAS NO WHOLE, so its drawer adds up the rows
+       it is handed, and past one read of them that is the wrong number the refusal was written for. It still says so. */
+    if (wholeRead === null && listed.value.matched > ROWS_BESIDE) return pastOneRead();
+  }
   /* A BAR OR A SPLIT ADDS UP ITS ROWS WHERE IT IS DRAWN, so the home currency and the rates travel beside them, and the
      rows are converted or split by currency with the same arithmetic a figure uses (`fx.ts`). */
   const held = block.kind === 'bar' || block.kind === 'split' ? deps.ctx.fx?.() : undefined;
@@ -2303,6 +2431,7 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
     ...base,
     ...spent,
     rows,
+    ...(wholeRead ? { wholeRead } : {}),
     ...(held && (held.home !== null || held.rates.length > 0) ? { fx: { home: held.home, rates: [...held.rates] } } : {}),
     ...changesOf(deps, register, rows, asksChanged),
     ...(block.working === true ? { working_now: workingOf(deps, register, rows) } : {}),
@@ -2811,22 +2940,12 @@ function trendOf(deps: PageDeps, metric: string, window: string): { trend?: (num
 type Listed = { rows: Entry[]; matched: number; inherited?: number };
 
 /**
- * A project's rows, then the rows that apply everywhere.
- *
- * `inScope` DECIDES WHAT IS HIDDEN, so the page and a run's context cannot disagree about which
- * global row a project's row replaces. It does not take a predicate, so the rows themselves come from
- * `list`, and what `inScope` contributes is the set of titles a project row has claimed.
+ * The rows that apply everywhere as a block that inherits reads them, beside its project's own: the block's `where`
+ * without its project clause, over the rows with no project, less the ones the project replaced with its own.
+ * `listInherited` reads a page by it, and a whole read adds up by it (`wholeOf`), so the two cannot disagree.
  */
-function listInherited(
-  deps: PageDeps,
-  register: string,
-  scope: { field: string; to: string },
-  predicate: Predicate | undefined,
-  limit: number,
-  order: PageBlock['order'],
-): Result<Listed> {
-  const clauses: Predicate[] =
-    predicate === undefined ? [] : Array.isArray((predicate as { all?: unknown }).all) ? (predicate as { all: Predicate[] }).all : [predicate];
+function everywhereOf(deps: PageDeps, register: string, scope: { field: string; to: string }, predicate: Predicate | undefined): Result<Predicate> {
+  const clauses = allOf(predicate);
   const home = clauses.find((n): n is Leaf => (n as Leaf).field === scope.field && typeof (n as Leaf).is === 'string');
   if (!home)
     return no('REQUIRED_MISSING', `A block that inherits names its project in where:, as ${scope.field} is <project>.`, { at: 'where' });
@@ -2841,14 +2960,268 @@ function listInherited(
   const titleOf = (e: Entry): string => String(e.fields[title ?? ''] ?? '');
   const visible = new Set(shown.value.inherited.map(titleOf));
   const hidden = title ? [...new Set(claimed.value.rows.map(titleOf))].filter((t) => !visible.has(t)) : [];
+  return ok({
+    all: [...rest, { field: scope.field, empty: true }, ...(hidden.length ? [{ none: [{ field: title!, in: hidden }] }] : [])],
+  });
+}
+
+/** A predicate's clauses when it is a run of them, else the one it is; none for none. */
+const allOf = (p: Predicate | undefined): Predicate[] =>
+  p === undefined ? [] : Array.isArray((p as { all?: unknown }).all) ? (p as { all: Predicate[] }).all : [p];
+/** Clauses as one predicate, every one of which must hold; `undefined` for none. */
+const andOf = (cs: readonly Predicate[]): Predicate | undefined => (cs.length === 0 ? undefined : cs.length === 1 ? cs[0] : { all: [...cs] });
+
+/**
+ * The refusal of a whole read that ran past `WHOLE_MS`, or `null` for one inside it. The count of rows was the old
+ * bound and it refused a list anybody could have added up; time is what a page actually has less of.
+ */
+export const wholeLate = (ms: number): Refusal | null =>
+  ms > WHOLE_MS ? { code: 'OUT_OF_BOUNDS', fix: 'Adding this up took longer than a page waits. Narrow this with a where: so it adds up fewer.', at: 'where' } : null;
+
+/** What a stored value adds: its number and the currency or unit it is in, or `null` for a value that is not an amount. */
+function amountIn(v: unknown): { n: number; unit: string | null } | null {
+  if (typeof v === 'number') return Number.isFinite(v) ? { n: v, unit: null } : null;
+  if (typeof v === 'string') return v.trim() !== '' && Number.isFinite(Number(v)) ? { n: Number(v), unit: null } : null;
+  if (v === null || typeof v !== 'object') return null;
+  const held = v as { amount?: unknown; currency?: unknown; value?: unknown; unit?: unknown };
+  if (typeof held.amount === 'number' && Number.isFinite(held.amount)) return { n: held.amount, unit: typeof held.currency === 'string' ? held.currency : null };
+  if (typeof held.value === 'number' && Number.isFinite(held.value)) return { n: held.value, unit: typeof held.unit === 'string' ? held.unit : null };
+  return null;
+}
+
+/**
+ * Every row a whole read asks for, as groups: the host's one grouped query when it hands one (`PageDeps.whole`), else
+ * the list read to its end a page at a time and grouped here. EITHER WAY IT IS EVERY ROW, and either way it stops at
+ * `WHOLE_MS` with the sentence that says to narrow it: a walk checks the clock after each page, so a list too long to
+ * add up costs a quarter of a second and never the whole of it.
+ */
+function wholeParts(deps: PageDeps, ask: WholeAsk): Result<WholePart[]> {
+  const started = performance.now();
+  const late = (): Result<WholePart[]> | null => {
+    const refusal = wholeLate(performance.now() - started);
+    return refusal ? { ok: false, refusal } : null;
+  };
+  if (deps.whole) {
+    const got = deps.whole(ask);
+    return got.ok ? (late() ?? got) : got;
+  }
+  const groups = new Map<string, WholePart>();
+  let cursor: string | undefined;
+  let walked = 0;
+  do {
+    const page = deps.list({ register: ask.register, where: ask.where, limit: WHOLE_PAGE, ...(cursor ? { cursor } : {}) });
+    if (!page.ok) return page;
+    walked += page.value.rows.length;
+    if (walked > WHOLE_WALK_ROWS) return { ok: false, refusal: wholeLate(Infinity)! };
+    for (const row of page.value.rows) {
+      const by = ask.by.map(({ field, day }): Json => {
+        const v = row.fields[field];
+        if (v === undefined || v === null || v === '') return null;
+        return day ? (typeof v === 'string' && v.length >= 10 ? v.slice(0, 10) : null) : (v as Json);
+      });
+      const amount = ask.value === null ? null : amountIn(row.fields[ask.value]);
+      const on = ask.dated === null || amount === null ? null : row.fields[ask.dated];
+      const day = typeof on === 'string' && on.length >= 10 ? on.slice(0, 10) : null;
+      const key = JSON.stringify([by, amount?.unit ?? null, day]);
+      const group = groups.get(key) ?? { by, unit: amount?.unit ?? null, day, sum: 0, rows: 0, said: 0 };
+      group.rows += 1;
+      if (amount) {
+        group.sum += amount.n;
+        group.said += 1;
+      }
+      groups.set(key, group);
+    }
+    cursor = page.value.rows.length > 0 && typeof page.value.cursor === 'string' && page.value.cursor !== '' ? page.value.cursor : undefined;
+    const stop = late();
+    if (stop) return stop;
+  } while (cursor !== undefined);
+  return ok([...groups.values()]);
+}
+
+/** The types a block adds up: a number, a length of time, money, or a quantity in its unit. */
+const SUMMED: ReadonlySet<string> = new Set(['int', 'decimal', 'duration', 'money', 'quantity']);
+
+/** What some rows add up to while they are being gathered: how many, and their amounts by currency and day. */
+type Gathered = { rows: number; said: number; done: number; bare: number; amounts: Amount[] };
+const gathered = (): Gathered => ({ rows: 0, said: 0, done: 0, bare: 0, amounts: [] });
+const gather = (into: Gathered, part: WholePart, done: boolean): void => {
+  into.rows += part.rows;
+  into.said += part.said;
+  if (done) into.done += part.rows;
+  if (part.said === 0) return;
+  if (part.unit === null) into.bare += part.sum;
+  else into.amounts.push({ currency: part.unit, amount: part.sum, day: part.day });
+};
+
+/** The first day a heat draws: the Monday eleven weeks before the week `today` is in (`render/src/days.ts` `heatGrid`). */
+function heatFrom(today: string): string {
+  const at = new Date(`${today}T00:00:00Z`);
+  const sinceMonday = (at.getUTCDay() + 6) % 7;
+  return new Date(at.getTime() - (sinceMonday + 77) * 86_400_000).toISOString().slice(0, 10);
+}
+
+/**
+ * How a kind that adds up reads its columns, or `null` when its columns name nothing this can add up (a column that is
+ * not a field of the list, or a value that is a list of links, which the host adds up from the rows it is handed).
+ *
+ *   bar, split   the first column's values, each with the sum of the second, or its rows where there is no second
+ *   chips        the first column's values, each with its rows
+ *   gauge        one sum of the second column
+ *   heat         each day of the first column with the sum of the second, or its rows; `who: true` counts a day a person
+ *   progress     the first column's values, each with how many of its rows say yes in the second (a yes or no, or the
+ *                list's own status where it says which states are done); any other progress is a track a row, and its
+ *                whole is one sum of the second column
+ */
+function wholeShape(deps: PageDeps, block: PageBlock, register: string, schema: Schema): { by: WholeAsk['by']; value: string | null; done: ((v: Json) => boolean) | null } | null {
+  const [first, second] = (block.columns ?? []).map((c) => c.field);
+  const typeOf = (f: string | undefined): string | undefined => (f !== undefined && Object.hasOwn(schema.fields, f) ? schema.fields[f]!.type : undefined);
+  if ((first !== undefined && typeOf(first) === undefined) || (second !== undefined && typeOf(second) === undefined)) return null;
+  const label = first === undefined ? [] : [{ field: first }];
+  const summed = second !== undefined && SUMMED.has(typeOf(second)!) ? second : undefined;
+  if (block.kind === 'chips') return { by: label, value: null, done: null };
+  if (block.kind === 'heat') {
+    if (first === undefined) return null;
+    if (block.who === true) return second === undefined ? null : { by: [{ field: first, day: true }, { field: second }], value: null, done: null };
+    return second !== undefined && summed === undefined ? null : { by: [{ field: first, day: true }], value: summed ?? null, done: null };
+  }
+  if (block.kind === 'progress' && first !== undefined && second !== undefined && block.spent === undefined && block.toward === undefined && block.range !== true) {
+    if (typeOf(second) === 'bool') return { by: [...label, { field: second }], value: null, done: (v) => v === true || v === 1 };
+    const states = schema.state === second ? (deps.lists?.().find((l) => l.id === register)?.done ?? []) : [];
+    if (states.length > 0) return { by: [...label, { field: second }], value: null, done: (v) => states.includes(String(v)) };
+  }
+  if (second !== undefined && summed === undefined) return null;
+  if (block.kind === 'gauge' || block.kind === 'progress') return { by: [], value: summed ?? null, done: null };
+  return { by: label, value: summed ?? null, done: null };
+}
+
+/**
+ * A kind that adds up, over every row its scope and `where` admit (PGS-B05): the parts by label and the total, or
+ * `null` when its columns name nothing to add up. `whole` is a heat's `of:` as a predicate, `null` when it has none.
+ *
+ * MONEY IS ADDED UP AS A FIGURE ADDS IT (`fx.ts` `across`): in the home currency at each amount's own day's rate when
+ * the record has one and the rates reach, else in the rows' one currency, else one amount a currency and no number.
+ * Two currencies are never one sum, in a part or in the total.
+ *
+ * A PART WHOSE ROWS HOLD NOTHING TO ADD IS LEFT OUT, as a bar with nothing sized has no bar: a zero would say it holds
+ * none. Its rows are still in every count.
+ */
+function wholeOf(deps: PageDeps, block: PageBlock, register: string, schema: Schema, where: Predicate | undefined, whole: Predicate | undefined | null): Result<WholeRead | null> {
+  const shape = wholeShape(deps, block, register, schema);
+  if (!shape) return ok(null);
+  const money = shape.value !== null && schema.fields[shape.value]?.type === 'money';
+  const held = money ? deps.ctx.fx?.() : undefined;
+  const home = held?.home ?? null;
+  const today = localDays(readableZone(deps.ctx.tz ?? deps.tz))(deps.ctx.asOfMs ?? deps.ctx.nowMs);
+  const ask = (w: Predicate | undefined) =>
+    wholeParts(deps, { register, where: w, by: shape.by, value: shape.value, dated: money && home !== null ? datedBy(schema.fields) : null });
+  type Figure = Pick<WholeRow, 'value' | 'unit' | 'parts'> & { converted?: { asOf: string; stale: boolean } };
+  const figure = (g: Gathered): Figure => {
+    if (shape.value === null) return { value: shape.done ? g.done : g.rows };
+    if (g.amounts.length === 0) return { value: g.bare };
+    const a = across(g.amounts, home, held?.rates ?? [], today, home !== null);
+    if (a.kind === 'parts') return { value: null, parts: a.parts };
+    /* AT LEAST IS NOT A TOTAL (`fx.ts` `atleast`): a part or a total that left an amount out for want of a rate is one
+       amount a currency, unconverted, as it was before a sum could say at least. No reader of a whole draws the mark
+       yet, and a lower bound with no mark is wrong money on a screen. */
+    if (isAtLeast(a)) return { value: null, parts: partsOf(g.amounts) };
+    return { value: a.amount, ...(a.currency ? { unit: a.currency } : {}), ...(a.kind === 'converted' ? { converted: { asOf: a.asOf, stale: a.stale } } : {}) };
+  };
+
+  const read = ask(where);
+  if (!read.ok) return read;
+  const heat = block.kind === 'heat';
+  const from = heat ? heatFrom(today) : '';
+  const drawn = (label: Json): label is string => typeof label === 'string' && label >= from && label <= today;
+  const total = gathered();
+  const byLabel = new Map<string, { label: Json; who?: Json; sum: Gathered }>();
+  let outside = 0;
+  for (const part of read.value) {
+    const done = shape.done ? shape.done(part.by[1] ?? null) : false;
+    gather(total, part, done);
+    if (shape.by.length === 0) continue;
+    const label = part.by[0] ?? null;
+    if (heat && !drawn(label)) {
+      outside += part.rows;
+      continue;
+    }
+    const who = heat && shape.by.length === 2 ? { who: part.by[1] ?? null } : {};
+    const key = JSON.stringify([label, 'who' in who ? who.who : 0]);
+    const at = byLabel.get(key) ?? { label, ...who, sum: gathered() };
+    gather(at.sum, part, done);
+    byLabel.set(key, at);
+  }
+
+  /* A HEAT'S `of:` IS EACH DAY'S WHOLE, read the same way over what the `of:` admits, so a day's wash is a share. */
+  const wholes = new Map<string, Gathered>();
+  const every = gathered();
+  if (heat && whole !== null) {
+    const all = ask(whole);
+    if (!all.ok) return all;
+    for (const part of all.value) {
+      gather(every, part, false);
+      const label = part.by[0] ?? null;
+      if (!drawn(label)) continue;
+      const at = wholes.get(label) ?? gathered();
+      gather(at, part, false);
+      wholes.set(label, at);
+    }
+  }
+
+  const said = (g: Gathered): boolean => shape.value === null || g.said > 0;
+  const text = (v: Json): string => (typeof v === 'string' ? v : JSON.stringify(v));
+  const parts = [...byLabel.values()].filter((g) => said(g.sum)).map((g) => ({ ...g, figure: figure(g.sum) }));
+  if (heat) parts.sort((a, b) => text(a.label).localeCompare(text(b.label)) || text(a.who ?? null).localeCompare(text(b.who ?? null)));
+  else parts.sort((a, b) => (b.figure.value ?? -Infinity) - (a.figure.value ?? -Infinity) || b.sum.rows - a.sum.rows || text(a.label).localeCompare(text(b.label)));
+  const kept = heat ? parts : parts.slice(0, WHOLE_PARTS);
+  const rows = kept.map(({ label, who, sum, figure: { converted: _at, ...f } }): WholeRow => {
+    const share = heat && whole !== null ? { of: figure(wholes.get(label as string) ?? gathered()).value } : shape.done ? { of: sum.rows } : {};
+    return { label, ...(who === undefined ? {} : { who }), rows: sum.rows, ...f, ...share };
+  });
+  const past = parts.slice(kept.length);
+  const tail = gathered();
+  for (const g of past) {
+    tail.rows += g.sum.rows;
+    tail.said += g.sum.said;
+    tail.done += g.sum.done;
+    tail.bare += g.sum.bare;
+    tail.amounts.push(...g.sum.amounts);
+  }
+  const { converted: _rest, ...rest } = figure(tail);
+  return ok({
+    rows,
+    ...figureTotal(figure(total)),
+    ...(heat && whole !== null ? { of: figure(every).value } : shape.done ? { of: total.rows } : {}),
+    ...(past.length > 0 ? { rest: { labels: past.length, rows: tail.rows, ...rest } } : {}),
+    ...(heat ? { outside } : {}),
+  });
+}
+
+/** A figure as a whole read's total says it: `total` where a part says `value`. */
+const figureTotal = ({ value, ...rest }: { value: number | null; unit?: string; parts?: Part[]; converted?: { asOf: string; stale: boolean } }): Pick<WholeRead, 'total' | 'unit' | 'parts' | 'converted'> => ({ total: value, ...rest });
+
+/**
+ * A project's rows, then the rows that apply everywhere.
+ *
+ * `inScope` DECIDES WHAT IS HIDDEN, so the page and a run's context cannot disagree about which
+ * global row a project's row replaces. It does not take a predicate, so the rows themselves come from
+ * `list`, and what `inScope` contributes is the set of titles a project row has claimed.
+ */
+function listInherited(
+  deps: PageDeps,
+  register: string,
+  scope: { field: string; to: string },
+  predicate: Predicate | undefined,
+  limit: number,
+  order: PageBlock['order'],
+): Result<Listed> {
+  const reach = everywhereOf(deps, register, scope, predicate);
+  if (!reach.ok) return reach;
+  const everywhere = reach.value;
 
   const sorted = order?.length ? { order } : {};
   const own = deps.list({ register, where: predicate, limit, ...sorted });
   if (!own.ok) return own;
   const room = limit - own.value.rows.length;
-  const everywhere: Predicate = {
-    all: [...rest, { field: scope.field, empty: true }, ...(hidden.length ? [{ none: [{ field: title!, in: hidden }] }] : [])],
-  };
   /* ASKED EVEN WITH NO ROOM, because `matched` is what the total is a total of. */
   const global = deps.list({ register, where: everywhere, limit: Math.max(1, room), ...sorted });
   if (!global.ok) return global;
@@ -3671,6 +4044,9 @@ export function fill(doc: unknown, row: Entry | null, param?: string): unknown {
   return walk(scope === undefined ? doc : { ...(doc as object), within: scope }, false);
 }
 
+/* Every list a predicate hops into (`pointed`): the one walk `money-figures.ts` keeps for a figure's `where`. */
+export { pointedIn };
+
 /**
  * The registers a page draws from, so a caller's scope can be checked against it.
  *
@@ -3730,6 +4106,11 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
   if (decl.for?.register) named.add(decl.for.register);
   for (const block of decl.blocks ?? []) {
     add(block.source);
+    /* A `where:` THAT HOPS INTO ANOTHER LIST READS THAT LIST (audit 49-50, finding 5). A table over Categories kept to
+       the ones a transaction points at was held by Categories alone, so a member who may not open Transactions read
+       which categories have entries, off a page. A figure's hops were already named (`figureLists`); a block's own
+       `where:` and a ring's or a heat's `of:` are named here, by the same walk. */
+    for (const list of [...pointedIn(block.where), ...pointedIn(block.of)]) named.add(list);
     /* INPUTS READ A ROW OF `register:` AND DRAW ITS FIGURES, so the list is the block's as a source's is. A capture's is
        not: it reads nothing. */
     if (block.kind === 'inputs' && typeof block.register === 'string') named.add(block.register);

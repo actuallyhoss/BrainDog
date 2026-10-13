@@ -40,7 +40,8 @@ export const CASH_FIGURES: Record<string, SeedMetric> = {
    * the reader gives the verdict itself, so the target here only says which way a tile words it.
    *
    * WITH NO BALANCE TYPED IT HAS NO VALUE, never a nought that checked nothing, and says "No balance has been typed
-   * yet": a page draws its sentence for that on `when: { metric: cash-cross-check, empty: true }`.
+   * yet": the Money page draws its sentence for that on `when: { metric: cash-now, empty: true }`, for the reason written
+   * in `pages/parts/cross-check.ts`.
    */
   'cash-cross-check': {
     metric: 'cash-cross-check',

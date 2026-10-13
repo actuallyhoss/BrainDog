@@ -77,30 +77,38 @@ test('WHY A PART IS ON: a use case, the person, or the answer it waits on', () =
   assert.equal(parts.find((x) => x.id === 'estate')?.state, 'off');
 });
 
-test('ONLY THE PARTS THAT ARE ON ARE DRAWN, made then waiting, and nothing is a step behind', () => {
-  const parts = partsOf({ offered: OFFERED, modules: ['portfolio', 'money-core', 'agents'], heard: [], rows: [], heldBy: () => null, byHand: new Set(), waiting: 'money-core' });
-  const s = stepsOf(parts);
+test('ONLY THE PARTS THAT ARE ON ARE DRAWN, in the order they were heard, and nothing is a step behind', () => {
+  const heard = [
+    { phrase: 'we bill Fenwick', became: 'Money' },
+    { phrase: 'my shops', became: 'Projects' },
+  ];
+  const parts = partsOf({ offered: OFFERED, modules: ['portfolio', 'money-core', 'agents'], heard, rows: [], heldBy: () => null, byHand: new Set(['agents']), waiting: 'money-core' });
+  const steps = stepsOf(parts);
+  assert.ok(Array.isArray(steps), 'the build answers something besides its parts, which is where a count lived');
   assert.deepEqual(
-    s.order.map((p) => p.id),
-    ['portfolio', 'agents', 'money-core'],
+    steps.map((p) => p.id),
+    ['money-core', 'portfolio', 'agents'],
+    'Money was heard first, then Projects; Agents was turned on by hand and comes after',
   );
-  assert.ok(s.order.every((p) => p.on), 'a part left off is drawn, and reads as a step not yet taken');
-  assert.equal(s.done, 2);
-  assert.equal(s.current, true);
-  assert.equal(stepsOf(partsOf({ offered: OFFERED, modules: ['portfolio'], heard: [], rows: [], heldBy: () => null, byHand: new Set(), waiting: null })).current, false);
+  assert.ok(steps.every((p) => p.on), 'a part left off is drawn, and reads as a step not yet taken');
+  assert.equal(steps.length, 3, 'the parts that are off are not in the build');
+  /* NOTHING ABOUT THE BUILD IS A NUMBER: no parts done, no total, no step it is on. */
+  for (const key of ['done', 'current', 'total', 'order']) assert.equal((steps as unknown as Record<string, unknown>)[key], undefined, `the build says ${key}`);
+  assert.deepEqual(stepsOf(partsOf({ offered: OFFERED, modules: [], heard: [], rows: [], heldBy: () => null, byHand: new Set(), waiting: null })), []);
 });
 
 test('THE SENTENCE UNDER THE TITLE SAYS WHAT WAITS, never a count, and only the open question in red', () => {
-  assert.deepEqual(statusOf(4, 'which of pounds and dollars is home'), {
+  assert.deepEqual(statusOf('which of pounds and dollars is home'), {
     before: '',
     needs: 'One question left',
     after: ': which of pounds and dollars is home.',
   });
-  const done = statusOf(1, null);
+  const done = statusOf(null);
   assert.equal(done.needs, '', 'nothing waits, so nothing is red');
   assert.match(done.before, /^Nothing left to ask/u);
-  assert.match(statusOf(0, null).before, /^Nothing is on yet\./u);
-  for (const s of [statusOf(4, 'which currency'), done, statusOf(0, null)])
+  assert.match(statusOf(null, true).before, /^Nothing is on yet\./u);
+  assert.equal(statusOf.length, 1, 'the sentence takes a number of parts again');
+  for (const s of [statusOf('which currency'), done, statusOf(null, true)])
     assert.doesNotMatch(`${s.before}${s.needs}${s.after}`, /\b(of (two|three|four|five|six|seven|\d+))\b|\d+ of \d+/iu, 'the sentence counts parts');
   assert.equal(numberWord(12), '12');
   assert.equal(numberWord(3, true), 'Three');
@@ -241,13 +249,13 @@ test('WITH NO PLACES READ, THE BUILD IS TODAY AND EACH PART THAT IS ON, and neve
 });
 
 test('THE BUILD SAYS NO COUNT, AND NAMES NO SAMPLE AS HERS', () => {
-  const said = [words.yours, words.asYouType, words.startsEmpty, words.progress(['People', 'Money'], 'Money'), words.progress([], null)];
+  const said = [words.yours, words.asYouType, words.startsEmpty, words.onReading(['People', 'Money'], 'Money'), words.onReading([], 'Money')];
   for (const line of said) {
     assert.doesNotMatch(line, /\d+ of \d+|\bof (two|three|four|five|six)\b/iu, `a count: ${line}`);
     assert.doesNotMatch(line, /\brows?\b|—/u, `a word a person should not read: ${line}`);
   }
   assert.equal(words.startsEmpty, 'Each place starts empty and fills with what you tell it. No sample entries.');
-  assert.equal((words as Record<string, unknown>).parts, undefined, 'the "N of M" words are back');
+  for (const gone of ['parts', 'lightsUp', 'progress']) assert.equal((words as Record<string, unknown>)[gone], undefined, `the words of a counted build are back: ${gone}`);
 });
 
 test('THE ZONE\'S ONE CURRENCY: EGP in Cairo, the euro in Berlin, and none where the zone keeps no region or two', () => {

@@ -58,10 +58,12 @@ export function readDrill(body: unknown, now: number = Date.now()): { ok: true; 
 
 /**
  * The note the operator's own record takes (`OPS_RECORD`), in the walk's form (`summaryOf` in `nightly.ts`):
- * `drill 2026-10-09 · pass · 2 records`. The records are the copies the drill opened, each one record's.
+ * `drill 2026-10-09 · pass · 2 records`. The records are the copies the drill opened, each one record's. A drill of
+ * the Directory alone opened none of them, so its note says `directory only` and never `0 records`.
  */
 export function drillNote(d: HostDrill): string {
-  return `drill ${d.at.slice(0, 10)} · ${d.pass ? 'pass' : 'fail'} · ${String(d.copies)} records`;
+  const opened = directoryOnly(d) ? 'directory only' : `${String(d.copies)} records`;
+  return `drill ${d.at.slice(0, 10)} · ${d.pass ? 'pass' : 'fail'} · ${opened}`;
 }
 
 /**
@@ -85,13 +87,14 @@ export function olderDrill(told: HostDrill, kept: HostDrill | null): boolean {
   return Number.isFinite(was) && Date.parse(told.at) < was;
 }
 
-/** What the door answers: when, whether it passed, how many records it opened, and whether it opened the Directory alone. */
-export type DrillAnswer = { at: string; pass: boolean; records: number; directory_only: boolean } | { at: null };
+/** What the door answers: when, whether it passed, how many records' copies it opened, and whether it opened the Directory alone. */
+export type DrillAnswer = { at: string; pass: boolean; record_copies: number; directory_only: boolean } | { at: null };
 
 /**
- * What `GET /account/drill` answers a signed-in person, or `{ at: null }`. `records` is the count of records whose copy
- * was opened; `directory_only` is true when that is none because the drill opened the Directory's copy and no other.
+ * What `GET /account/drill` answers a signed-in person, or `{ at: null }`. `record_copies` is the count of records whose
+ * copy was opened (the drill's `copies`, never its `records`, which is the Directory's own count); `directory_only` is
+ * true when that is none because the drill opened the Directory's copy and no other.
  */
 export function drillAnswer(d: HostDrill | null): DrillAnswer {
-  return d === null ? { at: null } : { at: d.at, pass: d.pass, records: d.copies, directory_only: directoryOnly(d) };
+  return d === null ? { at: null } : { at: d.at, pass: d.pass, record_copies: d.copies, directory_only: directoryOnly(d) };
 }

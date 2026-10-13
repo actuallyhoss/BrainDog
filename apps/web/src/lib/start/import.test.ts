@@ -1,12 +1,12 @@
 /**
- * The one press, for a file the person pointed at (`importFile` in `routes/start/accept.ts`), and a list kept in their
- * own word (`named`). The client is a fake that keeps every call, so what is under test is what the press sends.
+ * The one press, for a file the person pointed at (`importFile` in `routes/start/accept.ts`). The client is a
+ * fake that keeps every call, so what is under test is what the press sends.
  */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { importFile, named } from '../../routes/start/accept.ts';
+import { importFile } from '../../routes/start/accept.ts';
 import { byRules, exportLists, readExport, type Export } from './export.ts';
 
 type Call = { name: string; args: Record<string, unknown> };
@@ -78,9 +78,3 @@ test('A LIST OF THE FILE\'S OWN IS FILED AND KEPT IN THE PRESS, then filled', as
   assert.deepEqual(created[0]?.args, { register: 'hsbc', fields: { date: '2026-03-01', description: 'TESCO', amount: { amount: -1230, currency: 'GBP' } } });
 });
 
-test('A LIST IS KEPT IN THE PERSON\'S OWN WORD, and nothing else in the module moves', () => {
-  const doc = { pack: 'portfolio', declarations: [{ register: 'things', name: 'Projects' }, { page: 'projects', title: 'Projects' }] };
-  assert.deepEqual(named(doc, { things: 'Shops' }), { pack: 'portfolio', declarations: [{ register: 'things', name: 'Shops' }, { page: 'projects', title: 'Projects' }] });
-  assert.equal(named(doc, undefined), doc);
-  assert.equal(named(null, { things: 'Shops' }), null);
-});

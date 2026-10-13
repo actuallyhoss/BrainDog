@@ -175,6 +175,40 @@ test('A LIST A PAGE ALREADY DRAWS BY THE WEEK IS NOT OFFERED ITS WEEK', async ()
   assert.deepEqual(weekly(penOn(15)), [], 'a list a calendar draws was offered a week page');
 });
 
+test('WHAT IS DUE THIS WEEK IS WHAT IS STILL TO DO: six due with two paid says four, and with three paid of six nothing is offered', async () => {
+  const paid = (api: Awaited<ReturnType<typeof shop>>['api'], days: readonly string[]): void => {
+    for (const [i, due] of days.entries()) value(api.kernel.create('orders', { what: `Paid order ${i + 1}`, due, state: 'paid' }, { actor: 'p_owner' }));
+  };
+  const four = await shop();
+  paid(four.api, ['2026-09-16', '2026-09-19']);
+  const offer = weekly(four.penOn(15))[0];
+  assert.equal(offer?.why, 'Orders has 4 due this week. Give them a page of their own?', 'a paid order was counted as due');
+  const due = (offer!.change.to.body as { blocks: { heading?: string; where?: unknown }[] }).blocks.find((b) => b.heading === 'Due this week');
+  assert.ok(JSON.stringify(due?.where).endsWith('{"field":"state","not_in":["paid"]}]}'), JSON.stringify(due?.where));
+
+  const three = await shop(3, { due: THIS_WEEK.slice(0, 3) });
+  paid(three.api, ['2026-09-16', '2026-09-18', '2026-09-19']);
+  assert.deepEqual(weekly(three.penOn(15)), [], 'three still to do and three paid read as a week of six');
+});
+
+test('A TABLE THAT ALREADY READS THE WEEK AHEAD COUNTS AS THE WEEK PAGE, and one reading a month ahead or the past does not', async () => {
+  const tabled = async (where: unknown): Promise<PenItem[]> => {
+    const { api, penOn } = await shop();
+    const page = {
+      page: 'order-desk',
+      title: 'Order desk',
+      requires: ['register.orders'],
+      blocks: [{ kind: 'table', heading: 'To send', source: 'register.orders', where, columns: [{ field: 'what' }, { field: 'due' }], empty: 'No orders.' }],
+    };
+    value(await api.setDeclaration({ body: page, version: 0 }, owner));
+    return weekly(penOn(15));
+  };
+  assert.deepEqual(await tabled('state is new or sent, due after -1d, due before +8d'), [], 'a table of the week ahead was offered a week page');
+  assert.deepEqual(await tabled({ all: [{ field: 'due', lt: '+7d' }] }), [], 'a table due inside seven days was offered a week page');
+  assert.equal((await tabled('due before +30d')).length, 1, 'a table of the month ahead read as a week page');
+  assert.equal((await tabled('due before today')).length, 1, 'a table of what is late read as a week page');
+});
+
 /* ── Mariam's shop, installed as onboarding installs it (`seed/test/shop-usecase.test.ts`) ─────────────────────────── */
 
 const hostFor = (k: Kernel): Host => ({

@@ -284,12 +284,12 @@ function weigh(b: BlockResult, input: ComposeInput): Weighed {
 
 /**
  * WHETHER A BLOCK DREW NOTHING, and so is not drawn (§35: "an empty or unused part is not drawn"). A list that read no
- * row, a figure that read no value. A note, a heading, the line a row is typed into and a written block are never
+ * row, a figure that read no value; a figure in several currencies, one amount a currency, is a value. A note, a heading, the line a row is typed into and a written block are never
  * empty: what they show is what their author wrote.
  */
 export function drewNothing(b: BlockResult): boolean {
   if (ROWLESS.has(b.kind) || b.drawn === false || b.refusals.length > 0) return false;
-  if (b.readings !== undefined) return b.readings.length > 0 && b.readings.every((r) => !r.refusal && (r.reading === null || r.reading.value === null));
+  if (b.readings !== undefined) return b.readings.length > 0 && b.readings.every((r) => !r.refusal && (r.reading === null || (r.reading.value === null && !r.reading.parts?.length)));
   if (typeof b.source !== 'string') return false;
   if (!b.source.startsWith('register.') && !LISTED.has(b.source)) return false;
   return b.rows.length === 0 && b.matched === 0 && (b.feed?.length ?? 0) === 0 && (b.queue?.length ?? 0) === 0 && (b.measures?.length ?? 0) === 0;

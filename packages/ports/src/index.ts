@@ -457,3 +457,13 @@ export type {
 } from './auth.ts';
 export type { SignupCall, SignupName, SignupVerified } from './auth.ts';
 export type { AccountCall, AccountClosed, Suspended } from './auth.ts';
+
+/*
+ * The model call's one seam: `Inference`, its request and answer types, and its three refusals.
+ *
+ * A PLAIN `export *` AND NOT `export type *`, which the port's own header measured: the file ships
+ * values (`modelMissing` and its neighbours) and the type-only form erases them, so the first
+ * consumer reads a barrel that appears to export the port and does not. No name in it is declared
+ * above, which matters because a local declaration wins over a star export without a word.
+ */
+export * from './inference.ts';
