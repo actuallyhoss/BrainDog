@@ -33,7 +33,7 @@ export function methods(deps: RecordDeps) {
 
     /**
      * Set the record's quiet hours: `{ quiet: { from: 'HH:MM', to: 'HH:MM' } }`, `{ quiet: 'off' }`, or
-     * `{ quiet: null }` to put 22:00 to 08:00 back. ADMIN, an owner in a browser, as every record setting is.
+     * `{ quiet: null }` to put 21:00 to 08:00 back. ADMIN, an owner in a browser, as every record setting is.
      */
     async setQuietHours(args: { quiet?: unknown } | undefined, ctx: CallContext): Promise<Quiet> {
       const stop = admin(ctx, 'change the quiet hours');

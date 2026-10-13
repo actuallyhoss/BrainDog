@@ -390,7 +390,7 @@ export const account = {
   quietHeld: (from: string, to: string) => `Notices are held from ${from} to ${to}.`,
   quietOff: 'Off. Your summary goes when it is due, day or night.',
   quietOwner: 'Only an owner can change these.',
-  quietDefault: 'Put back 22:00 to 08:00',
+  quietDefault: 'Put back 21:00 to 08:00',
   urgentKinds: 'Urgent',
   interruptCap: 'At most',
   interruptCapIs: 'One urgent interruption an hour.',

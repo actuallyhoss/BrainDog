@@ -21,6 +21,10 @@
  *      Asked once: a pair the owner said no to, or a merge he undid, is never asked about again. A later meeting of
  *      somebody the question names keeps it current (`reask`), and one who may be the same person joins it rather than
  *      opening another, so a question is never left stale by the work it is about.
+ *   5. A MODEL'S READING OF A DOUBTFUL PAIR IS SETTLED IN THREE BANDS (`settleVerdicts`): dropped under 0.6, one
+ *      question from there, and from 0.9 a question that says the two look certain. Only with the host's switch handed
+ *      on, something else the record holds agreeing (`corroborated`) and no bar against it is that top band a fold,
+ *      made as one batch with one Undo. A score alone never folds anybody.
  *
  * TEXT ANYBODY COULD HAVE WRITTEN IS NOT EVIDENCE (H1). A mail, a bank text, an import or any other arrival (`untrusted`,
  * or a source that says so) never strong-merges, never carries a key onto somebody already known, and never folds an
@@ -1767,13 +1771,16 @@ function clusterBody(deps: Pick<PeopleDeps, 'sql' | 'nameOf' | 'titleOf' | 'nowM
  * One question for a cluster of people who may be one, in names and evidence: "Are Teodor Vance (Brightwell, met 6 times)
  * and teodorvance (GitHub) one person?" Accepting it folds every other into the one kept, carrying what they hold.
  */
-function askCluster(deps: PeopleDeps, list: DeclaredList<MeetsFields>, rows: readonly Row[], confidence?: number): Result<string | null> {
+function askCluster(deps: PeopleDeps, list: DeclaredList<MeetsFields>, rows: readonly Row[], confidence?: number, why: Agreed | null = null): Result<string | null> {
   const drawn = clusterBody(deps, list, rows);
   if (drawn === null) return ok(null);
   const { body, sorted, keep, folds } = drawn;
   const named = (r: Row) => `${nameOfRow(list, r) || 'someone unnamed'}${evidence(deps, list, r)}`;
   const one = nameOfRow(list, keep) || 'the first';
-  const likely = confidence === undefined ? '' : ' They look likely to be.';
+  /* A MODEL'S READING SAYS HOW SURE IT WAS (the bands, `settleVerdicts`), and what else the record holds that agrees. */
+  /* "BOTH" MEANS THE TWO ASKED ABOUT: beside others taken into the same question, the sentence names its two. */
+  const agreed = why === null ? '' : ` ${sorted.length === 2 ? why.said : why.named}`;
+  const likely = confidence === undefined ? '' : ` They look ${confidence >= BAND_SURE ? 'certain' : 'likely'} to be.${agreed}`;
   /* THE OWNER IS ASKED ABOUT HIMSELF AS HIMSELF: kept is always his own row, so the question says "you". */
   const mine = list.fields.self !== undefined && keep.fields[list.fields.self] === true;
   const who = mine ? (sorted.length === 2 ? 'both you' : 'all you') : 'one person';
@@ -1961,8 +1968,16 @@ const rewrite = (deps: Pick<PeopleDeps, 'sql'>, id: string, body: Record<string,
  * Ask about a cluster once: when a question already waits on any of them, the others join it, and nobody he said is
  * somebody else; otherwise a new one. Answers the question's id, or `null` when nobody new joined one already open.
  * `may` says who else may be taken in beside the ones asked about: everybody like them, unless the caller is stricter.
+ * `why` is the sentence of what else agrees with a model's reading, said in a question this call opens.
  */
-function askOrExtend(deps: PeopleDeps, list: DeclaredList<MeetsFields>, asked: readonly Row[], confidence?: number, may: (r: Row) => boolean = () => true): Result<string | null> {
+function askOrExtend(
+  deps: PeopleDeps,
+  list: DeclaredList<MeetsFields>,
+  asked: readonly Row[],
+  confidence?: number,
+  may: (r: Row) => boolean = () => true,
+  why: Agreed | null = null,
+): Result<string | null> {
   /* THE CLUSTER, NOT THE PAIR: whoever is like one of them is asked about in the same question. The owner typed in twice
      ("Kas", and his own row "Kas") is never met again by any key, so asked only about the newcomer, his second row would
      stay apart for good, and two questions about one person go stale on each other's answer. */
@@ -1976,7 +1991,7 @@ function askOrExtend(deps: PeopleDeps, list: DeclaredList<MeetsFields>, asked: r
     }
   const ids = new Set(rows.map((r) => r.id));
   const touching = openAsked(deps, list).filter((q) => q.offer === null && q.members.some((m) => ids.has(m.id)));
-  if (touching.length === 0) return askCluster(deps, list, rows, confidence);
+  if (touching.length === 0) return askCluster(deps, list, rows, confidence, why);
   const [target, ...rest] = touching as [Asked, ...Asked[]];
   const members = [...target.members];
   const joined: Row[] = [];
@@ -2474,35 +2489,178 @@ export function answeredOnly(payload: string, result: unknown): string {
   });
 }
 
+
+/* ── a model's answer, in three bands ────────────────────────────────── */
+
+/** From here a model's reading of a pair is one question for the cluster. Under it the pair is left alone. */
+export const BAND_ASK = 0.6;
+
+/** From here the reading is the top band: a question that says the two look certain, or, switched on, a fold. */
+export const BAND_SURE = 0.9;
+
 /**
- * A model's answer to an `infer.resolve` job, filed: a pair it is at least 0.6 sure of becomes the cluster question,
- * worded as any other and saying it looks likely; under that is left alone, and the pair is never handed again. The
- * answer may speak only about the pairs it was handed: a hash the job did not carry is passed by.
- *
- * NOTHING IS MERGED ON A MODEL'S WORD. A model only proposes (`slash.ts`); a merge made without asking is the strong
- * rules', which are the record's own.
+ * What a host hands with a model's answer. `fold` is the top band's switch, and it is off unless handed on: the
+ * product's bar and the record's own earned trust are both the host's to read, never a constant here.
  */
-export function fileVerdicts(deps: PeopleDeps, payload: string, result: unknown): Result<string[]> {
+export type SettleOpts = { fold?: boolean };
+
+/** One pair the top band folded: the batch its Undo takes, who was kept and who folded, and why in one sentence. */
+export type BandFold = { batch: string; kept: string; folded: string; sentence: string };
+
+/** What settling an answer did: the questions it opened or added somebody to, and the pairs it folded. */
+export type Settlement = { questions: string[]; folds: BandFold[] };
+
+/** A person's other names as two names compare, each beside the words it was written in. */
+function aliasesOf(list: DeclaredList<MeetsFields>, row: Row): { key: string; said: string }[] {
+  const at = list.fields;
+  if (at.aliases === undefined) return [];
+  return listOf(row.fields[at.aliases])
+    .map(nameOnly)
+    .filter((n): n is string => n !== undefined)
+    .map((said) => ({ key: nameKey(said), said }))
+    .filter((a) => a.key !== '');
+}
+
+/** What agrees about a pair, in one sentence: `said` of the two alone ("Both are on X."), `named` beside others. */
+type Agreed = { said: string; named: string };
+
+/** The first word of every name a person goes by, two letters or more: `mira` for Mira Okafor and for Mira O. */
+const firstsOf = (list: DeclaredList<MeetsFields>, row: Row): string[] => namesOf(list, row).map((n) => n.split(' ')[0] ?? '').filter((w) => w.length >= 2);
+
+/**
+ * WHAT ELSE THE RECORD HOLDS THAT AGREES TWO PEOPLE ARE ONE, as the one sentence a question or a match says, or `null`
+ * for nothing. Three things count, in this order: a project both are on; an address at one organisation's domain
+ * together with one first name; and one of them going by the other's name.
+ *
+ * NONE OF THEM IS ENOUGH ALONE TO FOLD ANYBODY. Two colleagues share a project and a domain (M4), and a first name is
+ * shared by strangers. Each is only the second signal beside a model that read the two as one.
+ */
+function agreement(deps: Pick<PeopleDeps, 'titleOf'>, list: DeclaredList<MeetsFields>, a: Row, b: Row): Agreed | null {
+  const at = list.fields;
+  const two = `${nameOfRow(list, a) || 'someone unnamed'} and ${nameOfRow(list, b) || 'someone unnamed'}`;
+  if (at.projects !== undefined) {
+    const theirs = new Set(listOf(b.fields[at.projects]));
+    const shared = listOf(a.fields[at.projects]).find((p) => theirs.has(p));
+    if (shared !== undefined) {
+      const on = `on ${deps.titleOf(shared) ?? 'the same project'}.`;
+      return { said: `Both are ${on}`, named: `${two} are both ${on}` };
+    }
+  }
+  /* A PUBLIC MAIL HOST IS NOBODY'S ORGANISATION: two people of one first name at it are two people. */
+  const work = (row: Row): string[] => identity(list, row).emails.map((e) => e.domain).filter((d) => d !== '' && !isPublicMail(d));
+  const domains = new Set(work(b));
+  const domain = work(a).find((d) => domains.has(d));
+  if (domain !== undefined) {
+    const firsts = new Set(firstsOf(list, b));
+    const first = firstsOf(list, a).find((w) => firsts.has(w));
+    if (first !== undefined) {
+      /* SAID AS ONE OF THEM WRITES IT, capital and accents kept, and as the key only when neither name leads with it. */
+      const said = [a, b].map((r) => nameOfRow(list, r).split(/\s+/u)[0] ?? '').find((w) => nameKey(w) === first) ?? first;
+      const have = `have an address at ${domain} and the first name ${said}.`;
+      return { said: `Both ${have}`, named: `${two} both ${have}` };
+    }
+  }
+  for (const [one, other] of [[a, b], [b, a]] as const) {
+    const names = new Set(namesOf(list, other));
+    const alias = aliasesOf(list, one).find((x) => names.has(x.key));
+    if (alias !== undefined) {
+      const goes = `${nameOfRow(list, one) || 'One of them'} also goes by ${alias.said}.`;
+      return { said: goes, named: goes };
+    }
+  }
+  return null;
+}
+
+/**
+ * Whether anything else the record holds agrees that these two people are one: they share a project, or an address at
+ * one organisation's domain and a first name, or one goes by the other's name. The second signal the top band needs
+ * beside a model's score; a pair with none is never folded, whatever the score. `false` for somebody gone or folded.
+ */
+export function corroborated(deps: Pick<PeopleDeps, 'sql' | 'list' | 'titleOf'>, a: string, b: string): boolean {
   const list = deps.list;
-  if (!list) return ok([]);
+  if (!list || a === b) return false;
+  const [x, y] = [rowById(deps.sql, a), rowById(deps.sql, b)];
+  return x !== null && y !== null && agreement(deps, list, x, y) !== null;
+}
+
+/**
+ * THE BARS: a pair nothing folds without his answer, however sure a model is and whatever else agrees. The record's
+ * own person, since which row is him is his to say; two people money points at; and a row only text anybody could
+ * have written vouches for (H1). A row another member made is left out before this, as everywhere here, and a person
+ * is never paired with an organisation at all.
+ */
+function barred(deps: Pick<PeopleDeps, 'sql' | 'moneyAt'>, list: DeclaredList<MeetsFields>, a: Row, b: Row): boolean {
+  const self = list.fields.self;
+  if (self !== undefined && (a.fields[self] === true || b.fields[self] === true)) return true;
+  if (deps.moneyAt?.(a.id) === true && deps.moneyAt?.(b.id) === true) return true;
+  return !vouched(deps, list, a) || !vouched(deps, list, b);
+}
+
+/**
+ * A model's answer to an `infer.resolve` job, settled in three bands by its score for each pair. The answer may speak
+ * only about the pairs it was handed: a hash the job did not carry is passed by.
+ *
+ *   under 0.6   left alone, and the pair is never handed again.
+ *   from 0.6    one question for the cluster, worded as any other, saying the two look likely and what else agrees.
+ *   from 0.9    the same question, saying they look certain. With the switch handed on (`opts.fold`), and something
+ *               else agreeing (`corroborated`), and no bar against it (`barred`), the pair is folded instead: one
+ *               batch a pair, written through the caller's own write, with the sentence in its note and one Undo.
+ *   past 1      no score at all (85, said as a percentage): asked about as likely, and never folded.
+ *
+ * A SCORE ALONE NEVER FOLDS. The top band has two locks and neither is here: the product's bar and the record's own
+ * earned trust are read by the host, which hands the switch. Left out, it is off, and every band only asks.
+ *
+ * A PAIR HE ANSWERED OR UNDID IS SETTLED FOR GOOD (`refused`): an Undo of a fold is a no, so the same answer handed
+ * again folds nothing and asks nothing. A fold the record refuses is taken back whole and asked instead.
+ */
+export function settleVerdicts(deps: PeopleDeps, payload: string, result: unknown, opts: SettleOpts = {}): Result<Settlement> {
+  const settled: Settlement = { questions: [], folds: [] };
+  const list = deps.list;
+  if (!list) return ok(settled);
   let job: Partial<ResolveJob>;
   try {
     job = JSON.parse(payload) as Partial<ResolveJob>;
   } catch {
-    return ok([]);
+    return ok(settled);
   }
   const said = (result as { verdicts?: unknown } | null | undefined)?.verdicts;
   if (!Array.isArray(said)) return no('VALUE_MALFORMED', 'An answer about pairs carries verdicts: [{ hash, same, confidence }].', { at: 'result.verdicts' });
-  const opened: string[] = [];
   for (const v of said as { hash?: unknown; same?: unknown; confidence?: unknown }[]) {
     const pair = typeof v?.hash === 'string' ? job.rows?.[v.hash] : undefined;
     const confidence = typeof v?.confidence === 'number' ? v.confidence : 0;
-    if (!pair || v.same !== true || confidence < 0.6) continue;
+    if (!pair || v.same !== true || confidence < BAND_ASK) continue;
+    /* ONE OF THEM GONE is a pair an earlier fold of this answer, or his own hand, already settled. */
     const [a, b] = [rowById(deps.sql, pair[0]), rowById(deps.sql, pair[1])];
-    if (!a || !b || deps.othersRow?.(a.id) === true || deps.othersRow?.(b.id) === true || refused(deps, list, a, b)) continue;
-    const asked = askOrExtend(deps, list, [a, b], confidence);
+    if (!a || !b || a.id === b.id || deps.othersRow?.(a.id) === true || deps.othersRow?.(b.id) === true || refused(deps, list, a, b)) continue;
+    const why = agreement(deps, list, a, b);
+    /* A SCORE IS BETWEEN 0 AND 1. One past it (85, said as a percentage) is not the top band: it asks, as likely. */
+    const sure = confidence >= BAND_SURE && confidence <= 1;
+    if (opts.fold === true && sure && why !== null && !barred(deps, list, a, b)) {
+      const [keep, gone] = order(list, a, b);
+      const note = `Matched ${nameOfRow(list, gone) || 'a duplicate'} with ${nameOfRow(list, keep) || 'the person already known'}: ${why.said}`.slice(0, 280);
+      const made = deps.attempt ? deps.attempt(() => fold_(deps, list, keep, [gone], note)) : fold_(deps, list, keep, [gone], note);
+      if (made.ok) {
+        settled.folds.push({ batch: made.value, kept: keep.id, folded: gone.id, sentence: why.said });
+        /* A QUESTION WAITING ON EITHER OF THEM is brought up to the one they now are, as after any meeting. */
+        const fresh = reask(deps, list, [keep.id, gone.id]);
+        if (!fresh.ok) return fresh as Result<never>;
+        continue;
+      }
+      /* WITH NOTHING TO TAKE THE WRITES BACK, a refusal is the caller's to hear; taken back, the pair is asked about. */
+      if (!deps.attempt) return made as Result<never>;
+    }
+    const asked = askOrExtend(deps, list, [a, b], sure ? confidence : BAND_ASK, undefined, why);
     if (!asked.ok) return asked as Result<never>;
-    if (asked.value !== null) opened.push(asked.value);
+    if (asked.value !== null && !settled.questions.includes(asked.value)) settled.questions.push(asked.value);
   }
-  return ok(opened);
+  return ok(settled);
+}
+
+/**
+ * `settleVerdicts` with the top band's switch off, answering the questions it opened: what a caller that hands no
+ * switch gets, and so nothing is folded on a model's word through this name.
+ */
+export function fileVerdicts(deps: PeopleDeps, payload: string, result: unknown): Result<string[]> {
+  const settled = settleVerdicts(deps, payload, result);
+  return settled.ok ? ok(settled.value.questions) : (settled as Result<never>);
 }

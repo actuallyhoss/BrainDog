@@ -265,6 +265,18 @@ export type McpSurface<C> = {
    */
   about?(args: { name: string }, ctx: C): Answer;
   /**
+   * What matters on the record now, a card a line (the record's `briefing`, READ+, ENG-B12). It backs
+   * `braindog:briefing`. Optional as the reads above are: a surface without it answers `NOT_IN_THIS_BUILD`.
+   */
+  briefing?(args: Record<string, never>, ctx: C): Answer;
+  /** What stopped on the record now, the longest quiet first (the record's `exceptions`, READ+, ENG-B13). It backs `braindog:exceptions`. */
+  exceptions?(args: Record<string, never>, ctx: C): Answer;
+  /**
+   * What went stale where the caller stands, each with the one call that clears it (the record's `stale`, READ+,
+   * AGT-C18). It backs `braindog:stale`. Optional as the reads above are.
+   */
+  stale?(args: Record<string, never>, ctx: C): Answer;
+  /**
    * Take back a question this run asked, while it is still open (the record's `withdraw`, DATA, AGT-C07). It backs
    * `propose`'s `withdraw`. Optional for the command line's reason above, and a surface without it answers that
    * `NOT_IN_THIS_BUILD`. Who may is the record's to say, and its refusal is said as it came.
@@ -952,6 +964,11 @@ const HANDOFFS_PAGE = {
 
 /** The tools that became resources, by their old name: where a call to one is read now. */
 const NOW_READ_AT: Readonly<Record<string, string>> = { understand: 'braindog:understand' };
+/**
+ * The reads that were never tools, by the name an agent would call: where each is read. `about` takes a name and reads
+ * like a tool, and a seventeenth could not be paid for out of the list every turn carries (`budget.test.ts`).
+ */
+const READ_NOT_CALLED: Readonly<Record<string, string>> = { about: 'braindog:about/<name>' };
 
 /** The line a write sent again with a used `op_id` ends with: the first answer stands, and nothing new was written. */
 export const REPLAYED = 'Already saved by this operation.';
@@ -1012,6 +1029,11 @@ const TTL = new Map([
   ['understand', MINUTE],
   /* NEVER HELD, AS `context` IS NOT: a step another run left a minute ago is the one a new session should take. */
   ['handoffs', 0],
+  /* NEVER HELD EITHER: a step dropped or a question withdrawn a moment ago is not stale any more. */
+  ['stale', 0],
+  ['briefing', MINUTE],
+  ['exceptions', MINUTE],
+  ['about', MINUTE],
   ['sessions', 0],
   ['boot', MINUTE],
   ['digest', MINUTE],
@@ -1080,6 +1102,10 @@ const FIXED: readonly Resource[] = [
   resource('context', 'The briefing for where you are: your session, your project, and what applies here.'),
   resource('understand', 'What the record would link and ask next, in names. Read before meet.'),
   resource('handoffs', 'The next steps runs left and nobody has taken, newest first, each with the app that left it and its project.'),
+  resource('briefing', 'What matters here now: what is late, what is due, what stopped and what waits, a line each.'),
+  resource('exceptions', 'What stopped: what went quiet or has not run, the longest first, each in a sentence.'),
+  resource('stale', 'What went stale where you stand, each with the one call that clears it.'),
+  resource('about', 'What one thing is, by its name: read about/<name>, with a space as %20.'),
   resource(
     'sessions/live',
     'Who else is working now, on what, and in which repository. Two sessions in one working tree overwrite each other. Coordinate or stop.',
@@ -2878,9 +2904,11 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       /* A TOOL THAT BECAME A RESOURCE IS SAID BY ITS ADDRESS: a session opened before the change keeps the older list
          until it restarts, and its call is told where the answer is read now rather than a nearest tool. */
       const now = Object.hasOwn(NOW_READ_AT, name) ? NOW_READ_AT[name] : undefined;
+      const at = Object.hasOwn(READ_NOT_CALLED, name) ? READ_NOT_CALLED[name] : undefined;
+      const fix = now ? `${name} is no longer a tool. Read the resource ${now}.` : at ? `${name} is read, not called. Read the resource ${at}.` : `There is no tool called ${name}.`;
       const refusal = taught(
-        { code: 'ROUTE_UNKNOWN', fix: now ? `${name} is no longer a tool. Read the resource ${now}.` : `There is no tool called ${name}.`, allowed: TOOLS.map((t) => t.name) },
-        best === null || now ? undefined : callOf(best, args),
+        { code: 'ROUTE_UNKNOWN', fix, allowed: TOOLS.map((t) => t.name) },
+        best === null || now || at ? undefined : callOf(best, args),
       );
       return said({ ok: false, refusal }, refusalBrief(refusal as Record<string, unknown>));
     }
@@ -2973,6 +3001,72 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
   };
 
   /**
+   * WHAT MATTERS, WHAT STOPPED AND WHAT WENT STALE, as `braindog:briefing`, `braindog:exceptions` and `braindog:stale`:
+   * each is the record's own read of that name, so who may read it and what they are shown is the record's to say, and
+   * its refusal passes through in its words.
+   *
+   * ONLY THE WORDS AND THE HANDLES A TOOL TAKES ARE PASSED ON, key by key. A card's `cause` is the handle the record
+   * keeps it by, `at` is the moment it was worked out and `basis` a checksum: none is for an agent to read, and a key
+   * the record adds later is not passed on until it is named here. An answer of no shape reads as nothing to say.
+   */
+  const briefingRead = async (ctx: C): Promise<Result<unknown>> => {
+    if (!surface.briefing) return unbuilt('braindog:briefing', 'Read braindog:context for where you stand.');
+    const out = await surface.briefing({}, ctx);
+    if (!out.ok) return out;
+    const cards = isObject(out.value) && Array.isArray(out.value.cards) ? out.value.cards : [];
+    return {
+      ok: true,
+      value: {
+        cards: cards.flatMap((c: unknown) =>
+          isObject(c) && typeof c.line === 'string'
+            ? [{ ...(typeof c.h === 'string' ? { h: c.h } : {}), line: c.line, ...(typeof c.row === 'string' && c.row !== '' ? { row: c.row } : {}) }]
+            : [],
+        ),
+      },
+    };
+  };
+  const exceptionsRead = async (ctx: C): Promise<Result<unknown>> => {
+    if (!surface.exceptions) return unbuilt('braindog:exceptions', 'Read braindog:actions for what runs on a clock and when it last ran.');
+    const out = await surface.exceptions({}, ctx);
+    if (!out.ok) return out;
+    const found = isObject(out.value) && Array.isArray(out.value.exceptions) ? out.value.exceptions : [];
+    const text = (e: Record<string, unknown>, key: string) => (typeof e[key] === 'string' ? { [key]: e[key] } : {});
+    return {
+      ok: true,
+      value: {
+        exceptions: found.flatMap((e: unknown) => {
+          if (!isObject(e) || typeof e.said !== 'string') return [];
+          /* WHAT TO OPEN: its name, and beside it the handle `get` takes. */
+          const row = isObject(e.row) && typeof e.row.name === 'string' && typeof e.row.id === 'string' ? { row: { name: e.row.name, id: e.row.id } } : {};
+          return [{ ...text(e, 'kind'), ...text(e, 'subject'), said: e.said, ...text(e, 'since'), ...row }];
+        }),
+      },
+    };
+  };
+  /**
+   * A STALE LINE IS ITS WORDS, HOW MANY, AND THE ONE CALL THAT CLEARS IT, written out to copy as a refusal's `try` is
+   * (`callOf`), whether the record wrote the call or named its tool and arguments. A line with no words or no call
+   * tells an agent nothing it can act on, so it is not passed on. Nothing stale is said in a sentence.
+   */
+  const staleRead = async (ctx: C): Promise<Result<unknown>> => {
+    if (!surface.stale) return unbuilt('braindog:stale', 'Read braindog:handoffs for the steps left, and braindog:decisions for the questions open.');
+    const out = await surface.stale({}, ctx);
+    if (!out.ok) return out;
+    /* THE RECORD ANSWERS `{ lines, count }` (`methods/stale.ts`); a surface that hands the lines bare, or under `stale`,
+       is read the same. */
+    const v = out.value;
+    const lines = Array.isArray(v) ? v : isObject(v) && Array.isArray(v.lines) ? v.lines : isObject(v) && Array.isArray(v.stale) ? v.stale : [];
+    const stale = lines.flatMap((l: unknown) => {
+      if (!isObject(l) || typeof l.said !== 'string') return [];
+      const c = l.clear;
+      const clear = typeof c === 'string' ? c : isObject(c) && typeof c.tool === 'string' ? callOf(c.tool, isObject(c.args) ? c.args : {}) : '';
+      if (clear === '') return [];
+      return [{ ...(typeof l.kind === 'string' ? { kind: l.kind } : {}), said: l.said, ...(typeof l.count === 'number' ? { count: l.count } : {}), clear }];
+    });
+    return { ok: true, value: { stale, ...(stale.length === 0 ? { said: 'Nothing is stale where you stand.' } : {}) } };
+  };
+
+  /**
    * A page, a block of one, or the Home page, as a resource reads it.
    *
    * `braindog:page/home` IS THE HOME THE RECORD DECLARES (`homeIn`), so the instructions' "read the Home page" lands on
@@ -3061,7 +3155,16 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       }
       return surface.about({ name }, ctx);
     }
+    /* THE BARE ADDRESS SAYS HOW TO ASK, so the list can name the read: asked of `version`, the read rung, and of nobody's name. */
+    if (head === 'about' && !rest) {
+      if (!surface.about) return unbuilt('about', 'Search the record for the name instead.');
+      const may = await surface.version(ctx);
+      return may.ok ? { ok: true, value: { read: 'braindog:about/<name>', said: 'Write the name after about/ as a person says it, with a space as %20.' } } : may;
+    }
     if (head === 'handoffs' && !rest) return handoffsRead(ctx);
+    if (head === 'briefing' && !rest) return briefingRead(ctx);
+    if (head === 'exceptions' && !rest) return exceptionsRead(ctx);
+    if (head === 'stale' && !rest) return staleRead(ctx);
     if (head === 'context' && !rest) {
       if (!surface.context) return unbuilt('context', 'Read braindog:boot instead.');
       const raw = await surface.context({}, ctx);

@@ -53,8 +53,19 @@ test('an installed home is arranged where it is, and an address that is neither 
 
 test("Today's body is built from what the shell says the record holds", () => {
   const owner = { level: 'owner', owner: true, person: 'p_1', lists: null } as never;
-  assert.deepEqual(holdsOf({ lists: [{ id: 'tasks', name: 'Tasks' }], pages: ['money'], me: owner }, {}), { tasks: true, adds: true, money: true, one: 'task' });
-  assert.deepEqual(holdsOf({ lists: [{ id: 'notes', name: 'Notes' }], pages: [], me: owner }, {}), { tasks: false, adds: false, money: false });
+  assert.deepEqual(holdsOf({ lists: [{ id: 'tasks', name: 'Tasks' }], pages: ['money'], me: owner }, {}), { tasks: true, adds: true, money: true, quiet: true, one: 'task' });
+  assert.deepEqual(holdsOf({ lists: [{ id: 'notes', name: 'Notes' }], pages: [], me: owner }, {}), { tasks: false, adds: false, money: false, quiet: true });
+});
+
+test("what went quiet is the owner's, as the vital signs are, and a kept Today keeps the tile", async () => {
+  const owner = { level: 'owner', owner: true, person: 'p_1', lists: null } as never;
+  const member = { level: 'member', owner: false, person: 'p_2', lists: null } as never;
+  const shell = { lists: [{ id: 'tasks', name: 'Tasks' }], pages: ['money'] };
+  assert.equal(holdsOf({ ...shell, me: owner }, {}).quiet, true);
+  assert.equal(holdsOf({ ...shell, me: member }, {}).quiet, undefined, 'the shell says who reads every list only of the owner');
+  const quiet = (body: Awaited<ReturnType<typeof previewedBody>>) => (body?.blocks ?? []).filter((b) => b.source === 'exceptions');
+  assert.equal(quiet(await previewedBody('today', holdsOf({ ...shell, me: owner }, {}))).length, 1);
+  assert.equal(quiet(await previewedBody('today', holdsOf({ ...shell, me: member }, {}))).length, 0);
 });
 
 test("Today's line on the vital signs is drawn where the record has the Health page, and a kept Today keeps it", async () => {

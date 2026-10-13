@@ -37,6 +37,10 @@
  * read by `handoff.ts`'s `openHandoffs`, the read the briefing hands a new session its step from, so the Agents page
  * and the card count the same steps. With `about` filled, one project's.
  *
+ * AND THE TIDY AS NUMBERS (AGT-C18): `gone-stale`, how many things every finder in `tidy.ts` counts stale now, one
+ * figure a finder beside it (`stale-runs-empty` and the rest, built from the registry when asked for), and `tidied-week`,
+ * how many the record cleared in seven days, from the lines the hourly pass keeps. Both are reads and write nothing.
+ *
  * AND WHERE THINGS APPLY (AGT-D01): `projects-unplaced`, the projects that name no repository and no folder, so no run
  * can land in them, and `keys-unopenable`, the keys whose sealed value names a grant revoked or gone. The agents add-on
  * cannot declare either, since it does not know another list's field names. AND `record.door`, the reader the add-on's
@@ -71,6 +75,7 @@ import { intervalMs } from './pull.ts';
 import { KEYS_IN_TEXT } from './key-scan.ts';
 import { holdDays } from './hold.ts';
 import { isUnknownMark } from './marks.ts';
+import { finderOf, staleNow, tidied } from './tidy.ts';
 /* `people.ts` REACHES `ingest.ts` AND THROUGH IT MUCH OF THE KERNEL. Only a function is taken, called on a read and never
    as this file loads, so the ring it closes meets no word before it is set. */
 
@@ -188,6 +193,76 @@ export function readHandoffsOpen(sql: Sql, ctx: Pick<EvalContext, 'nowMs'>, decl
   const about = (decl as HandoffsDecl | undefined)?.about;
   const n = openSteps(sql, ctx.nowMs, typeof about === 'string' ? about : null).length;
   return ok({ value: n, unit: null, rows: n, held: n, delta: null, why: 'no comparison asked for', met: null, refusals: [] });
+}
+
+/* ── the tidy as numbers (AGT-C18) ─────────────────────────────────────── */
+
+/** The source the tidy's figures read: what the finders count now, and what the hourly pass kept. No list holds either. */
+export const RECORD_TIDY = 'record.tidy';
+
+/**
+ * A figure over the tidy. `stale`: what is stale now, for every finder or the one `finder` names. `tidied`: what the
+ * record cleared over the figure's window, read from the lines the pass keeps.
+ */
+export type TidyDecl = MetricDecl & { tidy: 'stale' | 'tidied'; finder?: string | undefined };
+
+/** How many things are stale now, every finder's count added up. THE TARGET IS NONE: a stale thing is one to clear. */
+const GONE_STALE: TidyDecl = {
+  metric: 'gone-stale',
+  name: 'Things gone stale',
+  source: RECORD_TIDY,
+  value: { count: 'id' },
+  target: { lte: 0 },
+  window: '1d',
+  compare: 'none',
+  format: 'int',
+  tidy: 'stale',
+};
+
+/** How many things the record cleared in seven days. NO TARGET: a quiet week with nothing to clear is not a bad one. */
+const TIDIED_WEEK: TidyDecl = {
+  metric: 'tidied-week',
+  name: 'Things tidied this week',
+  source: RECORD_TIDY,
+  value: { count: 'id' },
+  window: '7d',
+  compare: 'none',
+  format: 'int',
+  tidy: 'tidied',
+};
+
+const STALE_PREFIX = 'stale-';
+
+/** The id of one finder's figure: `stale-runs-empty` for the finder `runs-empty`. */
+export const staleFigureOf = (finder: string): string => `${STALE_PREFIX}${finder}`;
+
+/**
+ * One finder's figure, or `null` when no finder has that id. BUILT WHEN ASKED FOR, never kept in the table: the registry
+ * is open, so a finder another part registers later has its figure without a line here. Its name is the finder's own
+ * words, and with none its id said as words, so a tile never shows a key.
+ */
+function staleFigure(id: string): TidyDecl | null {
+  if (!id.startsWith(STALE_PREFIX)) return null;
+  const finder = finderOf(id.slice(STALE_PREFIX.length));
+  if (finder === undefined) return null;
+  const words = finder.id.replaceAll('-', ' ');
+  return { ...GONE_STALE, metric: id, name: finder.name ?? `Stale: ${words}`, finder: finder.id };
+}
+
+/**
+ * The tidy's numbers. ALWAYS NOW, as the finders count and as the open steps are read: a kept day's stale count is in
+ * the pass's own lines, which `tidyDays` reads. A figure naming a finder that is gone reads nothing, never nought.
+ */
+export function readTidy(sql: Sql, ctx: Pick<EvalContext, 'nowMs'>, decl: MetricDecl): Result<Reading> {
+  const d = decl as TidyDecl;
+  if (d.tidy === 'tidied') {
+    const days = Math.max(1, Math.round((intervalMs(decl.window ?? '7d') ?? 7 * 86_400_000) / 86_400_000));
+    return judged(decl, tidied(sql, ctx.nowMs, days, d.finder), `cleared by the record in ${days === 1 ? 'the last day' : `${days} days`}`);
+  }
+  if (d.finder === undefined) return judged(decl, staleNow(sql, ctx.nowMs), 'stale now, every kind added up');
+  const finder = finderOf(d.finder);
+  if (finder === undefined) return judged(decl, null, 'nothing on this record counts these');
+  return judged(decl, staleNow(sql, ctx.nowMs, [finder]), 'stale now');
 }
 
 /* ── the signs of a living record (REC-A01) ────────────────────────────── */
@@ -442,6 +517,8 @@ export const BUILT_IN_FIGURES: Readonly<Record<string, MetricDecl>> = {
   'green-days': GREEN_DAYS,
   'rates-age-days': RATES_AGE_DAYS,
   'handoffs-open': HANDOFFS,
+  'gone-stale': GONE_STALE,
+  'tidied-week': TIDIED_WEEK,
   'projects-unplaced': PROJECTS_UNPLACED,
   'keys-unopenable': KEYS_UNOPENABLE,
   'keys-in-text': KEYS_IN_TEXT,
@@ -453,7 +530,7 @@ export const BUILT_IN_FIGURES: Readonly<Record<string, MetricDecl>> = {
 };
 
 /** The built-in figure called `id`, or `null`; never one `Object.prototype` lends. */
-export const builtInFigure = (id: string): MetricDecl | null => (Object.hasOwn(BUILT_IN_FIGURES, id) ? BUILT_IN_FIGURES[id]! : null);
+export const builtInFigure = (id: string): MetricDecl | null => (Object.hasOwn(BUILT_IN_FIGURES, id) ? BUILT_IN_FIGURES[id]! : staleFigure(id));
 
 /**
  * How many questions are open now: not answered, and not put off past this moment. A deferred question is not waiting

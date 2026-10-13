@@ -15,7 +15,7 @@ resolve offline, the vault's wrapped keys, and the two job tables of tier C.)*
 ```sql
 -- IDENTITY AND SHAPE ------------------------------------------------------------
 record        -- one row (singleton = 1). id 'rec_' + ULID, slug, name, locale, tz, format_ver (mirrors PRAGMA user_version), created_at,
-              --   quiet (the record's quiet hours, 09 §5 rule 3: NULL reads as 22:00 to 08:00, 'off', or {"from":"HH:MM","to":"HH:MM"} in tz; migration 0020)
+              --   quiet (the record's quiet hours, 09 §5 rule 3: NULL reads as 21:00 to 08:00, 'off', or {"from":"HH:MM","to":"HH:MM"} in tz; migration 0020)
 pack          -- installed packs: id, version, source, installed_at, manifest json, checksum
 declaration   -- every declared thing: kind, id, version, pack_id, body json, checksum, superseded_at, retired. PRIMARY KEY (id, version)
 migration     -- applied kernel migrations: version, applied_at, checksum

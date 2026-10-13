@@ -112,6 +112,28 @@ export type DigestDeps = {
    * turns notifications off, after which the one that mattered arrives somewhere they no longer look.
    */
   interrupted: () => boolean;
+  /**
+   * The record's quiet hours, read from `record.quiet` (`quietOf`). Inside them no level pushes or mails.
+   *
+   * OPTIONAL, AND ABSENT HOLDS NOTHING. A caller that has not read the record's window cannot know it is not `'off'`,
+   * and what `notify` holds is said again only by a digest that reads `held`: a notice held by a window nobody read
+   * would be a failed payment that made no sound at eleven and was in nothing at eight.
+   */
+  quiet?: QuietWindow;
+  /** How many things wait on the person now, which is all an active push says. Absent, it says the one it is about. */
+  waiting?: () => number;
+  /**
+   * Whether a time-sensitive notice for this cause has already pushed or mailed. Once for its cause, however long ago.
+   *
+   * A DEP FOR THE REASON `interrupted` IS ONE. The push and the mail `notify` queues carry `cause`, so a caller can
+   * answer this over them. Absent, or for a notice that names no cause, the hour's limit holds instead, as it did.
+   */
+  told?: (cause: string) => boolean;
+  /**
+   * The time-sensitive notices said since the last digest went, each with its instant. The digest keeps the ones said
+   * inside quiet hours (`heldIn`), which are the ones that made no sound, and leads with them.
+   */
+  held?: () => HeldNotice[];
   mint: () => string;
   nowMs: number;
   tz: string;
@@ -234,10 +256,14 @@ export function runDigest(deps: DigestDeps, decl: DigestDecl): Sent {
 
   /* NOT SENT, and the schedule still moves on. A digest that skipped is not a digest that failed:
      the next one is due at the same hour next week either way. */
-  if (carrying.length === 0) return { sections: 0, channels: [], skipped: true };
+  /* EXCEPT WHEN SOMETHING WAS HELD. A notice quiet hours kept from sounding is said by the next digest or by nothing,
+     so a digest with no section of its own still goes on the morning one waits. */
+  const held = deps.held && deps.quiet !== undefined ? heldIn(deps.held(), deps.tz, deps.quiet) : [];
+  if (carrying.length === 0 && held.length === 0) return { sections: 0, channels: [], skipped: true };
 
   const name = decl.name ?? decl.digest;
-  const text = render(name, carrying);
+  const lines = held.map((h) => h.say);
+  const text = render(name, carrying, lines);
   const channels = [...new Set(decl.channels)].slice(0, 5);
 
   /* EVERYTHING THE SENDING NEEDS, DECIDED INSIDE THE ALARM'S TRANSACTION. The prose path sends
@@ -248,9 +274,10 @@ export function runDigest(deps: DigestDeps, decl: DigestDecl): Sent {
     digest: decl.digest,
     name,
     text,
-    headline: headline(name, carrying),
+    headline: headline(name, carrying, lines),
     channels,
     sections: carrying,
+    ...(lines.length > 0 ? { held: lines } : {}),
     ...(decl.webhook?.url ? { webhook: decl.webhook.url } : {}),
     ...(decl.webhook?.url && decl.webhook.grant ? { webhook_grant: decl.webhook.grant } : {}),
   };
@@ -300,6 +327,8 @@ export type Assembled = {
    * digest would have been handed the number `3`. The count the push title needs is `.length`.
    */
   sections: DigestPart[];
+  /** What quiet hours held since the last digest, soonest first, as each was said. It leads the text and the headline. */
+  held?: string[];
   webhook?: string;
   /**
    * The vault label the webhook's POST is signed with, as the declaration's `webhook.grant` says it (09 §6).
@@ -368,7 +397,7 @@ ${sent.text}` : sent.text;
       /* NO CONTENT IN A PUSH. It says how many things and where, and the record is where they are:
          a lock screen is not a place a person chose to read their business on. `because` is the same
          `digest.<id>` mark the email arm carries; `lapseDrops` also reads this one by its `/digest/` url. */
-      deps.outbox('notify.push', { title: `${sent.name}: ${sent.sections.length} items`, url: `/digest/${sent.digest}`, because: `digest.${sent.digest}` });
+      deps.outbox('notify.push', { title: `${sent.name}: ${sent.sections.length + (sent.held?.length ?? 0)} items`, url: `/digest/${sent.digest}`, because: `digest.${sent.digest}` });
       continue;
     }
     if (channel === 'webhook') {
@@ -425,8 +454,8 @@ export function twoSentences(said: string): string {
 }
 
 /** The one line an in-app note carries: the headings and their counts, under 280 characters. */
-export function headline(name: string, sections: DigestPart[]): string {
-  const parts = sections.map((s) =>
+export function headline(name: string, sections: DigestPart[], held: readonly string[] = []): string {
+  const own = sections.map((s) =>
     /* A REFUSED SECTION IS AN EM DASH, NOT A ZERO. It fell through to `rows.length`, so a money
        figure the record had refused to compute was announced as nothing owed — the email said why
        and the notification said zero, and the notification is the one somebody reads first. */
@@ -436,6 +465,7 @@ export function headline(name: string, sections: DigestPart[]): string {
         ? `${s.heading} ${figure(s.reading)}`
         : `${s.heading} ${s.rows.length}`,
   );
+  const parts = held.length > 0 ? [`${HELD_HEADING} ${held.length}`, ...own] : own;
   return `${name}: ${parts.join(' · ')}`.slice(0, 280);
 }
 
@@ -451,8 +481,16 @@ function figure(r: Reading): string {
 }
 
 /** The body, as the block dialect — so an email and a page are drawn from the same text. */
-export function render(name: string, sections: DigestPart[]): string {
+export function render(name: string, sections: DigestPart[], held: readonly string[] = []): string {
   const out: string[] = [`# ${name}`, ''];
+  /* WHAT WAS HELD LEADS, because it is the part somebody was meant to hear last night. Five lines and a count of the
+     rest: a night that held twenty is a night to open the record, not one to read in a mail. */
+  if (held.length > 0) {
+    out.push(`## ${HELD_HEADING}`, '');
+    for (const say of held.slice(0, HELD_LINES)) out.push(`- ${say}`);
+    if (held.length > HELD_LINES) out.push('', `And ${held.length - HELD_LINES} more.`);
+    out.push('');
+  }
   for (const s of sections) {
     out.push(`## ${s.heading}`);
     if (s.refusals.length) {
@@ -584,8 +622,25 @@ export function localParts(
  */
 export type QuietWindow = { from: string; to: string } | 'off';
 
-/** The window a record holds until its owner says otherwise, which is the constant this file used to hard-code. */
-export const QUIET_DEFAULT: { from: string; to: string } = { from: '22:00', to: '08:00' };
+/** The window a record holds until its owner says otherwise: 21:00 to 08:00. It was 22:00; a window somebody set is kept as set. */
+export const QUIET_DEFAULT: { from: string; to: string } = { from: '21:00', to: '08:00' };
+
+/** One time-sensitive notice as a digest reads it back: when it was said, and its one line. */
+export type HeldNotice = { at: number; say: string };
+
+/** The heading a digest leads with when quiet hours held something, and how many lines it draws before it counts. */
+const HELD_HEADING = 'Held in quiet hours';
+const HELD_LINES = 5;
+
+/**
+ * The notices that were said inside quiet hours, soonest first: the ones `notify` wrote and did not sound.
+ *
+ * BY THE INSTANT EACH WAS SAID AND THE WINDOW AS IT IS NOW. Nothing marks a held notice apart from a sounded one but
+ * the hour on its event, so the hour is what is read; a window moved overnight is read as it stands in the morning.
+ */
+export function heldIn(said: readonly HeldNotice[], tz: string, window: QuietWindow): HeldNotice[] {
+  return said.filter((n) => inQuietHours(n.at, tz, window)).sort((a, b) => a.at - b.at);
+}
 
 /**
  * What `record.quiet` holds, read as a window (migration 0020).
@@ -614,7 +669,7 @@ export function quietOf(stored: string | null | undefined): QuietWindow {
 export const hhmm = (t: { hh: number; mm: number }): string => `${String(t.hh).padStart(2, '0')}:${String(t.mm).padStart(2, '0')}`;
 
 /**
- * Whether an instant falls inside the record's quiet hours. A non-urgent notification inside them waits.
+ * Whether an instant falls inside the record's quiet hours. A notification inside them waits, whatever its level.
  *
  * THE WINDOW IS THE RECORD'S, AND ABSENT READS AS THE DEFAULT, so a caller that has not read `record.quiet` keeps the
  * behaviour every record had while this was a constant. A window whose ends are equal holds nothing: `setQuietHours`
@@ -650,7 +705,7 @@ export function quietEnds(ms: number, tz: string, window: QuietWindow): number {
  * What an urgent notice's `note` event carries in `field`, the column a note otherwise leaves empty, as a comment's
  * resolution carries `resolve` there.
  *
- * THE EVENT IS THE ONLY TRACE OF WHICH IT WAS. `notify` routes by `urgent` and the outbox rows it queued drain and go,
+ * THE EVENT IS THE ONLY TRACE OF WHICH IT WAS. `notify` routes by its level and the outbox rows it queued drain and go,
  * so a reader of the log later could not tell an interrupt from a note bound for the digest, and a person's mute
  * (`mutedFor`) has to: what interrupts is never muted.
  */
@@ -680,41 +735,69 @@ export function noteEvent(sql: Sql, mint: () => string, nowMs: number, actor: st
   );
 }
 
+/** How loud one notice is. `passive` is the note; `active` adds a push; `time-sensitive` adds a push and a mail. */
+export const LEVELS = ['passive', 'active', 'time-sensitive'] as const;
+export type Level = (typeof LEVELS)[number];
+
+/** The level a notice asks for. A level said wins; `urgent: true` alone is time-sensitive, as every caller that says it means. */
+export const levelOf = (said: { level?: Level | undefined; urgent?: boolean | undefined }): Level =>
+  said.level ?? (said.urgent === true ? 'time-sensitive' : 'passive');
+
+/** What an active push says: how many things wait, and never what they are. */
+const waitingLine = (n: number): string => (n === 1 ? '1 thing waits for you' : `${n} things wait for you`);
+
 /**
- * ONE NOTIFICATION, ROUTED BY `urgent`. `09 §4`, and `45 §5.9` names this helper.
+ * ONE NOTIFICATION, ROUTED BY ITS LEVEL. `09 §4`, and `45 §5.9` names this helper.
  *
- * `urgent` WAS WRITTEN IN FOUR PLACES AND READ IN NONE. A rule declaring
- * `{ notify: { say: "Payment failed", urgent: true } }`, and a credential expiring inside
- * forty-eight hours, both wrote a `note` event and stopped — so nothing left the record, for either
- * of the two things `09 §5` names as urgent by default. The pack install diff meanwhile told the
- * person it *"interrupts you"*, which made the diff the only honest reader of a key nothing else
- * consumed.
+ * THREE LEVELS, AND THEY DIFFER BY CHANNEL. Passive is the `note` event, which the digest and the unread count are
+ * counted over. Active is the note and one push that says how many things wait. Time-sensitive is the note, a push
+ * and a mail. A phone cannot always be asked to tell two pushes apart, so what tells the levels apart is what arrives:
+ * nothing, a push, a push and a mail.
  *
- * `09 §4`: "`true` interrupts — the `note` event **plus a `notify.push` and a `notify.email` outbox
- * row**, at most one interrupt per hour per record; the default, `false`, lands in the digest".
+ * `urgent: true` IS TIME-SENSITIVE. It was once written in four places and read in none: a rule declaring
+ * `{ notify: { say: "Payment failed", urgent: true } }` wrote a note and stopped, while the install diff told the
+ * person it "interrupts you". Every caller that says it still gets the push and the mail.
  *
- * THE RATE LIMIT IS PER RECORD AND NOT PER RULE. Ten rules firing on one write is one afternoon, and
- * ten interruptions is a person who turns notifications off — after which the one that mattered
- * arrives somewhere they no longer look. `09 §7` states it as a thing this subsystem must never do.
+ * AN ACTIVE PUSH IS ONE AN HOUR PER RECORD, NOT PER RULE. Ten rules firing on one write is one afternoon, and ten
+ * pushes is a person who turns notifications off, after which the one that mattered arrives somewhere they no longer
+ * look. `09 §7` states it as a thing this subsystem must never do. So the push carries a count and not a sentence:
+ * the one that was swallowed is still in the number the next one says.
  *
- * AND QUIET HOURS DO NOT APPLY. `09 §5` rule 3 moves a NON-urgent notification out of 22:00–08:00,
- * and a non-urgent notification is a `note` that lands in the digest — which is already batched, and
- * whose own schedule row decides when it goes. An urgent one is urgent at three in the morning or it
- * was never urgent; holding it until eight would make "a payment failed" a thing you find out about
- * after the retry window closed.
+ * A TIME-SENSITIVE ONE IS ONCE FOR ITS CAUSE, and is not swallowed by the hour: a failed payment five minutes after
+ * a question was filed is still a failed payment. A notice that names no cause, or a caller that cannot say what was
+ * told, keeps the hour's limit it always had.
+ *
+ * AND INSIDE QUIET HOURS NOTHING SOUNDS. This used to let an urgent notice through at three in the morning on the
+ * argument that it was urgent then or never. His ruling is the other way: no sound inside them. The note is written,
+ * marked as before, and the next digest leads with it (`heldIn`, `runDigest`), so what was held is the first thing
+ * read in the morning and not a thing found by scrolling.
  */
 export function notify(deps: DigestDeps, said: Notice): void {
+  const level = levelOf(said);
+
   /* THE EVENT ALWAYS, because it is the record's own memory of the thing having happened, and it is
      what the digest and the unread count are counted over. */
-  deps.note(said.actor, said.say.slice(0, 280), said.urgent === true);
-  if (!said.urgent) return;
+  deps.note(said.actor, said.say.slice(0, 280), level === 'time-sensitive');
+  if (level === 'passive') return;
 
-  /* AT MOST ONE PER HOUR. The check is the caller's because this file holds no SQL — and it is a
-     check rather than a queue: an interrupt that waits an hour to arrive is a notification, and the
-     record already has one of those. */
-  if (deps.interrupted()) return;
+  /* HELD, AND BY THE RECORD'S OWN WINDOW ONLY (`DigestDeps.quiet`). Nothing is queued to go later: a push that
+     arrives at eight about eleven is a second thing saying what the digest at eight already leads with. */
+  if (deps.quiet !== undefined && inQuietHours(deps.nowMs, deps.tz, deps.quiet)) return;
 
-  deps.outbox('notify.push', { title: said.say.slice(0, 120), url: said.url ?? '/' });
+  if (level === 'active') {
+    /* AT MOST ONE PER HOUR. The check is the caller's because this file holds no SQL, and it is a check rather than
+       a queue: the count the next push carries already holds this one. */
+    if (deps.interrupted()) return;
+    const waiting = Math.max(1, Math.trunc(deps.waiting?.() ?? 1));
+    deps.outbox('notify.push', { title: waitingLine(waiting), url: said.url ?? '/', level });
+    return;
+  }
+
+  const cause = said.cause !== undefined && said.cause !== '' && deps.told ? said.cause : null;
+  if (cause === null ? deps.interrupted() : deps.told?.(cause) === true) return;
+  const marked = cause === null ? {} : { cause };
+
+  deps.outbox('notify.push', { title: said.say.slice(0, 120), url: said.url ?? '/', level, ...marked });
 
   /* AND THE EMAIL, WHICH IS THE HALF THAT SURVIVES A PHONE IN A DRAWER. `09 §3` gives push "one
      line, no content" and email "anything with a table in it", so the email carries the reason and
@@ -725,19 +808,27 @@ export function notify(deps: DigestDeps, said: Notice): void {
       to,
       subject: said.say.slice(0, 120),
       text: said.because ? `${said.say}\n\n${said.because}` : said.say,
+      ...marked,
     });
 }
 
-/** What one interrupt carries. `09 §4`'s six keys, minus the three the caller has already resolved. */
+/** What one notice carries. `09 §4`'s six keys, minus the three the caller has already resolved. */
 export type Notice = {
   /** Who or what it is about: `rule:chase`, `grant:g_01J…`. The event's actor. */
   actor: string;
-  /** One line, and the whole of what a push carries. */
+  /** One line, and the whole of what a time-sensitive push carries. */
   say: string;
-  /** Why, for the email. A push carries no content — a lock screen is not a place somebody chose to read their business on. */
+  /** Why, for the email. A push carries no content: a lock screen is not a place somebody chose to read their business on. */
   because?: string | undefined;
   /** Where in the app it is about. */
   url?: string | undefined;
-  /** `false` lands in the digest; `true` interrupts, at most once an hour per record. */
+  /** How loud it is (`LEVELS`). Unsaid, `urgent` decides. */
+  level?: Level | undefined;
+  /** `true` is time-sensitive and `false` is passive, for a caller that says no `level`. */
   urgent?: boolean | undefined;
+  /**
+   * What a time-sensitive notice is about, as a handle the caller keeps stable: it pushes and mails once for it.
+   * It rides the queued push and mail so the caller can answer `told`, and is never shown to a person.
+   */
+  cause?: string | undefined;
 };

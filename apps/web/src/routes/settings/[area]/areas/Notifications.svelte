@@ -92,7 +92,7 @@
     void put(end === 'from' ? { from: typed, to } : { from, to: typed });
   }
 
-  /* ON PUTS THE DEFAULT BACK rather than inventing a window: 22:00 to 08:00 is what every record started with. */
+  /* ON PUTS THE DEFAULT BACK rather than inventing a window: 21:00 to 08:00 is what a record holds until somebody sets one. */
   const flip = (): void => void put(on ? 'off' : null);
 
   /* ── the rules that tell you ─────────────────────────────────────────────
@@ -238,7 +238,7 @@
           <p class="quiet-refused" role="alert"><span role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span> {refusal}</p>
         {/if}
         <p class="hint">{copy.quietWhy}</p>
-        {#if quiet.quiet !== null && on && (from !== '22:00' || to !== '08:00')}
+        {#if quiet.quiet !== null && on && (from !== '21:00' || to !== '08:00')}
           <Button weight="bare" disabled={busy} onclick={() => void put(null)}>{copy.quietDefault}</Button>
         {/if}
       </div>
@@ -254,7 +254,7 @@
 <style>
   /* THE QUIET HOURS, AS ONE ROW: the well, the sentence with its two pickers inside it, and the switch at the row's end
      (a switch sits beside its sentence, never 700px from it). The pickers sit inside the sentence, so it
-     reads "Hold notices from 22:00 to 08:00". The row's measure is the one every settings row keeps, so the switch
+     reads "Hold notices from 21:00 to 08:00". The row's measure is the one every settings row keeps, so the switch
      lands where the switches of the other areas land. */
   .quiet {
     display: grid;

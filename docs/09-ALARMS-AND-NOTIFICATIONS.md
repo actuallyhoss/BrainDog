@@ -279,11 +279,11 @@ an agent or a pack, and anything a pack marks urgent shows in the install diff a
 *(An earlier revision made a failed payment and an expiring domain core defaults. Those are one
 owner's use cases, and use cases stay out of the core.)*
 
-**3 · Quiet hours, per record, on by default.** 22:00–08:00 in the record's timezone. A
+**3 · Quiet hours, per record, on by default.** 21:00–08:00 in the record's timezone (22:00 until October 14th 2026; a window an owner set is kept as set). A
 non-urgent notification due inside quiet hours moves to the next opening. This is why the record
 stores a timezone and why plain days render at noon UTC ([02-DATA-MODEL](02-DATA-MODEL.md) §4).
 An owner sets them in Settings > Notifications: a start and an end, or off, kept in `record.quiet`
-(migration 0020, where NULL reads as 22:00 to 08:00) and changed through `setQuietHours`, which logs
+(migration 0020, where NULL reads as 21:00 to 08:00) and changed through `setQuietHours`, which logs
 an `edit` event on the record. The window applies where a digest comes due: the `digest` schedule
 handler runs nothing inside it and comes due again at its end. An urgent notice never waits (rule 2).
 

@@ -494,6 +494,13 @@ export type Matched = Answer<'matched'>;
 export type Exceptions = Answer<'exceptions'>;
 
 /**
+ * `stale`: what went stale where the caller stands, as `{ lines, count }`. Each line is `{ kind, said, count, clear }`:
+ * one kind of thing in one sentence, how many, and the one call that clears it. `count` is the lines' counts added up,
+ * the number `context` carries as `stale`. Nothing is counted that the caller may not read.
+ */
+export type Stale = Answer<'stale'>;
+
+/**
  * `briefing`: what matters today as cards, in the record's order, seven at most. `h` is the card's handle, `line` its
  * one sentence, `row` the thing it opens as a record says one (`tasks#12`) or `null`, `cause` what several questions
  * share, and `by` whether the model wrote the line or the rules did. `at` is when it was written and `basis` what it
@@ -1734,6 +1741,11 @@ export function createClient(options: ClientOptions) {
      * than its page allows, each in one sentence. Held to what the caller may read, and it changes nothing. READ+.
      */
     exceptions: () => call<Exceptions>('exceptions', {}),
+    /**
+     * What went stale where the caller stands: steps left earlier that nobody took, questions that waited, and what the
+     * hourly tidy counts, a line a kind with the one call that clears it. It changes nothing. READ+.
+     */
+    stale: () => call<Stale>('stale', {}),
 
     /* THE SCHEDULED ACTIONS. `actions` is READ+; `resumeAction` is ADMIN, so a browser session, and it is the only
        thing that starts a paused action again. */
@@ -1801,7 +1813,7 @@ export function createClient(options: ClientOptions) {
       call<Answer<'resolveComment'>>('resolveComment', args as Record<string, unknown>),
 
     /* THE RECORD'S QUIET HOURS (`docs/09` §5 rule 3): READ+ to read, ADMIN to change, since the window holds the summary
-       back for everybody. `quiet: null` puts 22:00 to 08:00 back. */
+       back for everybody. `quiet: null` puts 21:00 to 08:00 back. */
     quietHours: () => call<Answer<'quietHours'>>('quietHours'),
     setQuietHours: (quiet: { from: string; to: string } | 'off' | null) => call<Answer<'setQuietHours'>>('setQuietHours', { quiet }),
 

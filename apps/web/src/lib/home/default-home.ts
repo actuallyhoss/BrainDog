@@ -110,6 +110,12 @@ export type Holds = {
    * something needs a look and opens nothing is a dead end, and Settings says the count in plain words there.
    */
   health?: boolean;
+  /**
+   * The record reads what went quiet onto a page for this reader (the source `exceptions`: a list or a way in that
+   * stopped, a feed that missed its time), so Today carries the tile that says which (`quietTile`). Left out or `false`,
+   * Today is as it was: a record that does not read it, or a reader it is not shown to, would be drawn a refusal.
+   */
+  quiet?: boolean;
 };
 
 /** The fewest days a figure's line is drawn from (DIRECTION §39: a chart has at least three points, else the tile shows the number). */
@@ -253,6 +259,46 @@ export function signsLine(): PageBlock[] {
   ];
 }
 
+/** The one source Today's tile of what went quiet reads, which belongs to no list. */
+export const QUIET = 'exceptions';
+/** The tile's name and what each of its three columns is called: the house's words, the same on every record. */
+const QUIET_WORDS = { heading: 'Gone quiet', subject: 'What', since: 'Last seen', was: 'Before' } as const;
+
+/**
+ * WHAT WENT QUIET (ENG-B13): the things this record was taking and has stopped taking, one line each, with what a person
+ * calls it, the day it was last there and what it was before, in the record's own words ("Written to on 5 of 14 days").
+ * Each was said only on its own page, so a feed that stopped a fortnight ago was found by opening the page it fed.
+ *
+ * NO `where:` AND NO `order:`. Every kind is shown, and the longest quiet first is the read's own order, which refuses
+ * one written over it. NO `empty:` EITHER, so on a day nothing is quiet the record leaves the block out (`drawn.ts`) and
+ * Today is as it was: "Nothing has gone quiet" every morning is a line nobody needs. IT NAMES NO LIST, so it is the same
+ * tile on every record, and the names in it are the record's.
+ */
+export function quietTile(): PageBlock {
+  return {
+    kind: 'table',
+    heading: QUIET_WORDS.heading,
+    icon: 'history',
+    source: QUIET,
+    columns: [
+      { field: 'subject', label: QUIET_WORDS.subject },
+      { field: 'since', label: QUIET_WORDS.since },
+      { field: 'was', label: QUIET_WORDS.was },
+    ],
+    limit: 6,
+  };
+}
+
+/**
+ * THE TILE ON A RECORD THAT DOES NOT READ IT IS NOT DRAWN. A host built before the source answers the block as a
+ * refusal ("exceptions is not a source this record reads"), and so does a record that will not show it to this reader;
+ * neither is anything a person can act on from Today, so the block is marked not drawn and left at its place, as every
+ * block a page hides is, and each write still finds its block by index. Every other block is handed back as it came.
+ */
+export function quietHeld<B extends { source?: string | undefined; refusals: readonly unknown[]; drawn: boolean }>(blocks: readonly B[]): B[] {
+  return blocks.map((b) => (b.source === QUIET && b.drawn && b.refusals.length > 0 ? { ...b, drawn: false } : b));
+}
+
 /** The two blocks a record's week opens Today on: its own words, naming its list ("Orders due this week"). */
 function weekBlocks(w: Week): PageBlock[] {
   const due: PageBlock = {
@@ -271,7 +317,8 @@ function weekBlocks(w: Week): PageBlock[] {
 
 /**
  * TODAY'S BODY, in the words of the voice that speaks. In reading order: the page's line, the line a task is typed
- * into, the questions waiting on the reader as tiles, one line while a vital sign reads red (`signsLine`), what is late
+ * into, the questions waiting on the reader as tiles, one line while a vital sign reads red (`signsLine`), what has
+ * gone quiet (`quietTile`), what is late
  * (the tasks late or due today, then the money that fell due), the work handed back and the urgent work; beside them, the agents at work, cash, the next few things
  * that fall due, and what changed since the reader last looked. The record lints it as it would any body before it
  * draws it.
@@ -351,6 +398,9 @@ export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
       /* WHAT IS WRONG WITH THE RECORD ITSELF, said only while a vital sign reads red: under what needs you, since it
          needs a look too, and over the work, which it may be the reason for. */
       ...(holds.health ? signsLine() : []),
+      /* WHAT STOPPED ARRIVING, where the record reads it for this reader: under the vital signs, which say the record is
+         unwell, and over the work, which a feed that stopped may be the reason for. Not drawn when nothing is quiet. */
+      ...(holds.quiet ? [quietTile()] : []),
       ...(holds.tasks ? work : [lateMoney]),
       /* THE RUNS WORKING NOW, one line each with the agent's face; not drawn when none is. Which runs those are is the
          record's one word for it (`sessions.working`, heard from inside its own clock), so this table takes no `where:`

@@ -7,6 +7,7 @@
  * by the ladder is `ladderFault`, asked at the gate. This file decides only what the record does with those facts:
  *   - a write at Ask, on the floor, or from a run that read text from outside the record is filed as a question instead
  *   - a write at Do and tell or Do quietly is written, and counts as one more change kept
+ *   - a learning added where its run is, or confirmed, is written at any rung, and counts towards none (`learnt`)
  *   - after `OFFER_AFTER` kept within `OFFER_DAYS`, with none undone, the owner is asked once whether it may climb
  *   - an undo, `DECLINES_DROP` declines in a row, an anomaly or a change of app takes it back to Ask.
  *
@@ -33,6 +34,7 @@ import {
   shapeIn,
   type ChangeKind,
   type Kernel,
+  type ListShape,
   type Rung,
   type Scope,
 } from '@braindog/kernel';
@@ -62,6 +64,9 @@ const DROP_SAID = {
   app: 'It began writing from another app.',
 } as const;
 export type DropWhy = keyof typeof DROP_SAID;
+
+/** The day field a list of learnings fades its rows by, which is how one is told from any other list (`learnt`). */
+const FADES = 'confirmed_on';
 
 /** The migration that made the ladder, whose run lifted the write tokens already there (`seedLadder` in the kernel). */
 const LADDER_ARRIVED = 25;
@@ -156,6 +161,41 @@ export function ladder(deps: LadderDeps) {
     return ceilingOf(scope, rung) ?? 'ask';
   };
 
+  /** The row a value names, by its id, whichever way it was said (`things#3`, a prefix, the id), or `null` for none. */
+  const rowNamed = (said: unknown): string | null => (typeof said === 'string' && said.trim() !== '' ? (kernel.get(said.trim())?.id ?? said.trim()) : null);
+
+  /**
+   * Whether a write is a learning captured where its run is, or one confirmed, which pass at any rung ("Capturing a
+   * learning needs nobody", AGT-C14): asked about, the first ten never got written, so no agent kept what it found out.
+   *
+   * A LEARNING IS READ FROM WHAT ITS LIST DECLARES, never from the list's name: a day the record fades rows by
+   * (`FADES`, the same reading `context` and the card make). Any add-on's list that declares one is treated alike.
+   *
+   * CAPTURED WHERE THE RUN IS, AND NOWHERE ELSE. A new one that names no place is put in its run's project by the
+   * kernel. One that names a place passes only when that is the project its run already stands in; before a run's
+   * first write the ladder has no run to read that from, and a named place asks.
+   *
+   * CONFIRMED IS THE DAY AND NOTHING BESIDE IT. What a patch sends back as it already was is no change. Where it
+   * applies, its words and its status are edits like any other and stand on their own rung, and a day more than one
+   * ahead would keep a row from ever fading, so it asks too.
+   */
+  const learnt = (c: Caller, shape: ListShape | null, op: 'create' | 'update', patch: Record<string, unknown>, was: Record<string, unknown> | null): boolean => {
+    const live = (shape?.fields ?? []).filter((f) => (f as { retired?: unknown }).retired !== true);
+    if (!live.some((f) => f.id === FADES && f.type === 'day')) return false;
+    const scoped = live.find((f) => f.scope !== undefined);
+    if (op === 'create') {
+      if (scoped === undefined || patch[scoped.id] === undefined) return true;
+      if (c.run === null || scoped.type !== 'ref') return false;
+      return rowNamed(patch[scoped.id]) === rowNamed(kernel.get(c.run)?.fields.project);
+    }
+    if (was === null) return false;
+    const same = (key: string): boolean =>
+      JSON.stringify(patch[key] ?? null) === JSON.stringify(was[key] ?? null) || (key === scoped?.id && scoped.type === 'ref' && rowNamed(patch[key]) === rowNamed(was[key]));
+    const changed = Object.keys(patch).filter((key) => patch[key] !== undefined && !same(key));
+    const day = patch[FADES];
+    return changed.length === 1 && changed[0] === FADES && typeof day === 'string' && day.slice(0, 10) <= iso(deps.now() + 86_400_000).slice(0, 10);
+  };
+
   /**
    * What one write by an agent does at its rung (`Gate`). `self` is the row an update or a delete writes, whose maker the
    * `others` floor reads; a new row has none.
@@ -164,11 +204,16 @@ export function ladder(deps: LadderDeps) {
     /* WHAT THE ROW HOLDS NOW, so a row sent back whole with its unchanged nulls is not read as clearing them. */
     const held = selfId === null ? undefined : sql.one<{ fields: string }>('SELECT fields FROM entry WHERE id = ?', selfId)?.fields;
     const was = held === undefined ? null : (JSON.parse(held) as Record<string, unknown>);
-    const kinds = kindsOfWrite({ list, op, patch, shape: shapeIn(sql, list), madeBy: selfId === null ? null : madeByIn(sql, selfId), person: c.person, was });
+    const shape = shapeIn(sql, list);
+    const kinds = kindsOfWrite({ list, op, patch, shape, madeBy: selfId === null ? null : madeByIn(sql, selfId), person: c.person, was });
     const from = untrusted(c);
     if (from !== null) return { write: false, kinds, why: `This run read ${from}, so its changes ask for the rest of it.` };
     const floor = kinds.find((k) => k.floor !== null);
     if (floor) return { write: false, kinds, why: `${FLOOR_SAID[floor.floor!]}, which always asks.` };
+    /* A LEARNING CAPTURED OR CONFIRMED NEEDS NOBODY (`learnt`), below the two lines above and never over them. It is
+       answered as written and told, and with no kinds: `kept` counts what is handed to it towards the next rung, and
+       a kind that never asked has no rung to be offered. */
+    if (op !== 'delete' && learnt(c, shape, op, patch, was)) return { write: true, rung: 'tell', kinds: [] };
     const rung = rungFor(c.token, c.scope, kinds);
     if (rung === 'ask') return { write: false, kinds, why: `Changes like this ask until ${OFFER_AFTER} of them have been kept as they were.` };
     return { write: true, rung, kinds };

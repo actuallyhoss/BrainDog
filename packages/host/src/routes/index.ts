@@ -40,6 +40,7 @@ import { ROUTES as about } from './about.ts';
 import { ROUTES as briefing } from './briefing.ts';
 import { ROUTES as exceptions } from './exceptions.ts';
 import { ROUTES as matched } from './matched.ts';
+import { ROUTES as stale } from './stale.ts';
 /* END ROUTES */
 
 export const EXTRA_ROUTES: readonly Route[] = [
@@ -71,5 +72,6 @@ export const EXTRA_ROUTES: readonly Route[] = [
   ...briefing,
   ...exceptions,
   ...matched,
+  ...stale,
   /* END ROUTES */
 ];

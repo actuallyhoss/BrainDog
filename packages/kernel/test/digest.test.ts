@@ -440,7 +440,7 @@ test('and a daily one lands every day, at that hour where the customer is', () =
   assert.notEqual(at, london);
 });
 
-test('quiet hours are 22:00 to 08:00 where the customer is, not where the server is', () => {
+test('quiet hours are 21:00 to 08:00 where the customer is, not where the server is', () => {
   // Which is why the record stores a timezone and why plain days render at noon UTC.
   assert.equal(inQuietHours(Date.UTC(2026, 8, 5, 23), 'Europe/London'), true);
   assert.equal(inQuietHours(Date.UTC(2026, 8, 5, 12), 'Europe/London'), false);

@@ -121,6 +121,16 @@ test('A FOLD THE STRONG RULES MADE IS LISTED ONCE: who into whom by name, one se
   sql.close();
 });
 
+test('A FOLD THE BANDS MADE SAYS ITS OWN SENTENCE, never the handle the two happen to share', async () => {
+  /* What `settleVerdicts` writes in the fold's note (`people.ts`): 'Matched A with B: <sentence>'. Nothing folds on a
+     score yet, so the note of a fold the strong rules made is rewritten to the one a band fold carries. */
+  const { sql, matched, batch } = await folded();
+  sql.exec("UPDATE event SET note = 'Matched Teodor Vance with Teodor Vance: both are on Lanternfish.' WHERE batch = ? AND note IS NOT NULL", batch);
+  const out = value<Matched>(await matched(undefined, owner));
+  assert.equal(out?.matches[0]?.evidence, 'Both are on Lanternfish.');
+  sql.close();
+});
+
 test('IT WRITES NOTHING AND FOLDS NOTHING: the log and the people are as they were after any number of reads', async () => {
   const { sql, matched, live } = await folded();
   const before = sql.one<{ n: number }>('SELECT count(*) AS n FROM event')!.n;

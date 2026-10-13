@@ -278,7 +278,7 @@ export type AckDeps = {
    * own suggestion row would be a second `propose` with its own idea of what a body must contain,
    * and the whole point of the gate is that there is one.
    */
-  propose?: (p: { question: string; body_kind: string; body: Record<string, unknown> }, actor: string) => Result<{ id: string }>;
+  propose?: (p: { question: string; body_kind: string; body: Record<string, unknown>; cause?: string }, actor: string) => Result<{ id: string }>;
   /**
    * Send an assembled digest onto its channels, for the ack of the model call that held it.
    *
@@ -437,8 +437,23 @@ export function ack(sql: Sql, deps: AckDeps, args: Ack): Result<null> {
         return no<null>('VALUE_MALFORMED', `Job ${args.id} came back without a question and a body kind, so there is nothing to file.`, {
           at: 'result',
         });
+      /* UNDER THE CAUSE THE JOB WAS QUEUED FOR (`ingest.ts` `patternCause`, ENG-B07), when it names one, so the question
+         is the one open question of its cause and a shape asked about is found by that and not only by its samples.
+         The job's own word, never the model's: a draft cannot say what it is the answer to. */
+      const queued = (() => {
+        try {
+          return (JSON.parse(row.payload) as { cause?: unknown } | null)?.cause;
+        } catch {
+          return undefined;
+        }
+      })();
       const filed = deps.propose(
-        { question: drafted.question, body_kind: drafted.body_kind, body: (drafted.body ?? {}) as Record<string, unknown> },
+        {
+          question: drafted.question,
+          body_kind: drafted.body_kind,
+          body: (drafted.body ?? {}) as Record<string, unknown>,
+          ...(typeof queued === 'string' && queued !== '' ? { cause: queued } : {}),
+        },
         'slash',
       );
       if (!filed.ok) return filed as Result<null>;

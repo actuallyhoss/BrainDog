@@ -14,5 +14,5 @@ import type { Route } from '../index.ts';
 
 export const ROUTES: readonly Route[] = [
   { name: 'quietHours', group: 'READ+', writes: false, what: 'The record’s quiet hours, when a summary that comes due is held until they end, in the record’s time zone.' },
-  { name: 'setQuietHours', group: 'ADMIN', writes: true, what: 'Set the record’s quiet hours to a start and an end, turn them off, or put 22:00 to 08:00 back.' },
+  { name: 'setQuietHours', group: 'ADMIN', writes: true, what: 'Set the record’s quiet hours to a start and an end, turn them off, or put 21:00 to 08:00 back.' },
 ];

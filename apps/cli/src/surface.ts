@@ -59,6 +59,10 @@ const reachable = <T>(r: Result<T>): Result<T> =>
  *
  * `inboxPatterns` JOINED WITH ITS ADDRESS (`braindog:inbox/patterns`), for `triage`'s lesson: a stdio agent with the
  * `inbox` reach reads what each pattern did with what came in, as an agent over HTTP can.
+ *
+ * `briefing`, `exceptions`, `stale` AND `about` JOINED WITH THEIR ADDRESSES (`braindog:briefing`, `braindog:exceptions`,
+ * `braindog:stale`, `braindog:about/<name>`), for `actions`'s lesson: each backs a resource and no tool, so left off
+ * this list the address is simply absent from a stdio session. The probe keeps each off until the client routes it.
  */
 const LATER = [
   'context',
@@ -77,6 +81,10 @@ const LATER = [
   'previewChange',
   'tryAutomation',
   'understandPlan',
+  'briefing',
+  'exceptions',
+  'stale',
+  'about',
 ] as const;
 
 export async function surfaceOver(clientFor: (ctx: Ctx) => Client): Promise<McpSurface<Ctx>> {

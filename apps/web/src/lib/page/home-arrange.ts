@@ -63,7 +63,7 @@ export function keptAs(slug: string, pages: readonly string[]): Kept | null {
  *
  * AND THE RECORD'S WEEK, where it keeps one (`weekOf`), which the caller reads off the lists' declarations it has learnt
  * (`weekHeld`). AND WHETHER IT HAS THE HEALTH PAGE, which Today's line on the vital signs opens (`signsLine`): the line is
- * drawn only where that page is, and only for the owner: a count of the record's insides is not a member's to be told (audit 71). Home hands the week in for Today's own body; the arrange mode hands it in too, or Today kept by a first Done
+ * drawn only where that page is, and only for the owner: a count of the record's insides is not a member's to be told (audit 71). AND WHAT WENT QUIET (`quietTile`), which is the owner's as the vital signs are: the record shows that source only to a reader of every list, and the shell says that for certain only of the owner. Home hands the week in for Today's own body; the arrange mode hands it in too, or Today kept by a first Done
  * lost "Orders due this week" and the week's money on the day it was arranged (B46.8).
  */
 export function holdsOf(shell: Pick<Shell, 'lists' | 'pages' | 'me'>, heard: Labels = labels(), week?: Week): Holds {
@@ -71,7 +71,7 @@ export function holdsOf(shell: Pick<Shell, 'lists' | 'pages' | 'me'>, heard: Lab
   const tasks = list !== undefined;
   const bare = REGISTERS[TASKS] ?? (list ? { id: TASKS, name: list.name, one: singularOf(list.name) } : undefined);
   const one = tasks && bare ? relabel(bare, heard).one : undefined;
-  return { tasks, adds: tasks && may(shell, 'append', TASKS), money: shell.pages.includes('money'), ...(shell.me.owner === true && shell.pages.includes('health') ? { health: true } : {}), ...(one ? { one } : {}), ...(week ? { week } : {}) };
+  return { tasks, adds: tasks && may(shell, 'append', TASKS), money: shell.pages.includes('money'), ...(shell.me.owner === true && shell.pages.includes('health') ? { health: true } : {}), ...(shell.me.owner === true ? { quiet: true } : {}), ...(one ? { one } : {}), ...(week ? { week } : {}) };
 }
 
 /**
@@ -175,7 +175,7 @@ export function whileHeld(body: PageBody): PageBody {
 export async function previewedBody(slug: string, holds: Holds): Promise<PageBody | null> {
   if (slug === 'today') {
     const { todayHome } = await import('../home/default-home.ts');
-    return whileHeld(plainBody(todayHome({ tasks: holds.tasks, adds: holds.tasks, money: true, ...(holds.health ? { health: true } : {}), ...(holds.week ? { week: holds.week } : {}) }, HOUSE_VOICE)));
+    return whileHeld(plainBody(todayHome({ tasks: holds.tasks, adds: holds.tasks, money: true, ...(holds.health ? { health: true } : {}), ...(holds.quiet ? { quiet: true } : {}), ...(holds.week ? { week: holds.week } : {}) }, HOUSE_VOICE)));
   }
   if (slug === 'decide') return plainBody((await import('../../routes/decide/views.ts')).decideHome());
   return null;

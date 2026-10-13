@@ -42,7 +42,8 @@ export type TidyAsk = { question: string; does: string };
 /** What a finder answers. `stale`: how many now. `did`: how many the record cleared in the last day. */
 export type Found = { stale: number; did: number; ask: TidyAsk | null };
 
-export type Finder = { id: string; find(sql: Sql, nowMs: number): Found };
+/** `name` is what the finder counts, in plain words, as its figure is called: "Ended runs that wrote nothing". */
+export type Finder = { id: string; name?: string | undefined; find(sql: Sql, nowMs: number): Found };
 
 /** What `tidy` needs to file a question: the record's counter and its mint, as the write path holds them. */
 export type TidyDeps = { sql: Sql; nowMs: number; mint: () => string; allocate: (name: string) => number };
@@ -101,6 +102,7 @@ const repo = (t: string): string => `coalesce(json_extract(${t}.fields, '$.repo'
  */
 const runsStopped: Finder = {
   id: 'runs-stopped',
+  name: 'Runs that stopped answering',
   find(sql, nowMs) {
     /* COUNTED BY THE ONE CLOCK (`presence.ts` `unheardRuns`), which is the only file that compares a run's last seen with the time. */
     const stale = unheardRuns(sql, nowMs, ABANDON_MS, ['active', 'idle']);
@@ -123,6 +125,7 @@ const runsStopped: Finder = {
  */
 const runsEmpty: Finder = {
   id: 'runs-empty',
+  name: 'Ended runs that wrote nothing',
   find(sql, nowMs) {
     const stale = unheardRuns(sql, nowMs, EMPTY_RUN_MS, ['done', 'abandoned'], "json_extract(fields, '$.wrote') = 0");
     if (stale === 0) return { stale, did: 0, ask: null };
@@ -147,6 +150,7 @@ const runsEmpty: Finder = {
  */
 const stepsOld: Finder = {
   id: 'steps-old',
+  name: 'Steps passed over or left too long',
   find(sql, nowMs) {
     const stale = count(
       sql,
@@ -183,6 +187,7 @@ const stepsOld: Finder = {
  */
 const questionsOld: Finder = {
   id: 'questions-old',
+  name: 'Questions open more than 14 days',
   find(sql, nowMs) {
     const stale = count(
       sql,
@@ -361,4 +366,30 @@ export function tidyDays(sql: Sql, nowMs: number, days = 7): TidyDay[] {
     dayOf(nowMs - Math.max(1, days) * DAY_MS),
     dayOf(nowMs),
   );
+}
+
+/* ── the two numbers a figure reads ─────────────────────────────────────── */
+
+/**
+ * How many things are stale now: every finder's `stale`, added up. A READ: it files no question, keeps no line and makes
+ * no table, so a figure or a page may call it at any moment and the hourly pass is still the only thing that asks.
+ */
+export function staleNow(sql: Sql, nowMs: number, list: readonly Finder[] = finders()): number {
+  let n = 0;
+  for (const finder of list) n += finder.find(sql, nowMs).stale;
+  return n;
+}
+
+/**
+ * How many things the record cleared in the last `days` days, today included: the kept lines' `did`, added up, for
+ * every finder or the one named. 0 on a record the pass has not run on yet. A READ, as `tidyDays` under it is.
+ *
+ * WHAT IT COUNTS TWICE: a line's `did` looks back a day from its last pass (`DID_MS`), so today's line, written at
+ * nine, still holds what was cleared yesterday after nine, which yesterday's line holds too. The sum is right again
+ * once today's pass is later in the day than the clearing was. At most one day's clearing, for less than a day.
+ */
+export function tidied(sql: Sql, nowMs: number, days = 7, finder?: string): number {
+  let n = 0;
+  for (const line of tidyDays(sql, nowMs, days)) if (finder === undefined || line.finder === finder) n += line.did;
+  return n;
 }

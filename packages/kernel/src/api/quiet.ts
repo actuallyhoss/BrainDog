@@ -1,7 +1,7 @@
 /**
  * The record's quiet hours, the kernel's half: `quietHours` and `setQuietHours` (`09 §5` rule 3).
  *
- * ONE COLUMN, `record.quiet` (migration 0020), AND NO SETTINGS LIST. NULL reads as 22:00 to 08:00, `'off'` holds nothing
+ * ONE COLUMN, `record.quiet` (migration 0020), AND NO SETTINGS LIST. NULL reads as 21:00 to 08:00, `'off'` holds nothing
  * back, and `{"from":"HH:MM","to":"HH:MM"}` is a window in the record's time zone. `quietOf` in `digest.ts` is the one
  * reader of what is stored, and the `digest` schedule handler in `index.ts` the one place the window is applied.
  *
@@ -23,7 +23,7 @@ import type { KernelParts } from '../parts.ts';
 import { slashMayWrite } from '../slash.ts';
 
 /**
- * What the record holds: a window, `'off'`, or `null` for the default (22:00 to 08:00), which is what a record that was
+ * What the record holds: a window, `'off'`, or `null` for the default (21:00 to 08:00), which is what a record that was
  * never told otherwise holds and what `setQuietHours({ quiet: null })` puts back.
  */
 export type QuietHeld = { from: string; to: string } | 'off' | null;

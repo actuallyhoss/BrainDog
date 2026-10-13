@@ -27,11 +27,12 @@
  * pattern nobody has approved yet writing rows into somebody's ledger is the one failure this whole
  * design exists to prevent.
  *
- * AND A SHAPE NOBODY HAS A PATTERN FOR EARNS ONE DRAFT AT ITS THIRD ARRIVAL, outside the
- * transaction. Not one per payload: a model call per arrival is a bill that scales with a stranger's
- * sending rate, and two of anything is a coincidence. Three is the smallest number of examples a
- * pattern can be written from and the smallest that is not a coincidence, which is why it is the
- * same three.
+ * AND A SHAPE NOBODY HAS A PATTERN FOR IS OWED ONE DRAFT FROM ITS THIRD ARRIVAL UNTIL IT IS ANSWERED,
+ * outside the transaction (`owedShapes`). Not one per payload: a model call per arrival is a bill
+ * that scales with a stranger's sending rate, and two of anything is a coincidence. Three is the
+ * smallest number of examples a pattern can be written from and the smallest that is not a
+ * coincidence, which is why it is the same three. One draft a shape at a time, and one a day at most
+ * after a draft that came to nothing.
  */
 
 import type { Refusal, Result, Sql } from '@braindog/ports';
@@ -3492,59 +3493,150 @@ export type ProposeDeps = {
   outbox: (payload: unknown) => string;
 };
 
+/** How long a draft that came to nothing keeps its shape from being asked about again: one day. */
+const OWED_AGAIN_MS = 86_400_000;
+/** The most pattern questions read when looking for the one a shape was already asked. Newest first. */
+const ASKED_SCAN = 200;
+
 /**
- * `3′` — the one draft an unmatched shape earns, OUTSIDE the arrival's transaction.
+ * The cause a shape's one question carries, and the key its answer is remembered by: `pattern:<shape>`.
  *
- * AT THE THIRD AND ONLY AT THE THIRD. Not one per payload, because a model call per arrival is a
- * bill that scales with a stranger's sending rate; and not again at the fourth, because the draft
- * for this shape is already queued and a second is the same question asked twice. If nobody answered
- * it, that is a thing a person retries from the raw inbox — retrying a model call automatically
- * bills twice for one payload.
+ * A SHAPE THAT IS NOT A CAUSE AS IT STANDS IS NAMED BY ITS HASH. An address may hold a `+` or a space and be any
+ * length, and a cause may not (`cause.ts`, `CAUSE`), so a question carrying one would be refused when it was filed.
+ */
+export function patternCause(shape: string): string {
+  const cause = `pattern:${shape}`;
+  return /^[\p{L}\p{N}#@._:/-]{1,192}$/u.test(shape) ? cause : `pattern:${sha256(new TextEncoder().encode(shape)).slice(0, 32)}`;
+}
+
+/** A shape still owed a draft: how many of it wait, and the three oldest of them, oldest first. */
+export type Owed = { shape: string; channel: Channel; waiting: number; examples: string[] };
+
+/**
+ * What waits on one channel with no pattern, by shape, newest first.
  *
- * THE DRAFT CARRIES IDS AND NOT BODIES. Whoever drafts reads the three raws itself; copying them
- * here would put an untrusted stranger's text into a queue that is summarised in front of a person.
+ * `rowid` BREAKS THE TIE, because a burst arrives inside one millisecond and `ts` alone then orders them by nothing in
+ * particular, which would hand a person three examples in an order that is not the order they came in.
+ *
+ * AND AN UNVERIFIED ARRIVAL IS NOT AN EXAMPLE OF ANYTHING. `12 §3` makes it ineligible to match, and a draft proposed
+ * from three of them is a pattern written to read a stranger's forgeries, paid for by the record's owner: this is the
+ * one place an arrival nothing vouched for could still spend money. The state and the reason together are the test,
+ * because `UNVERIFIED` is the only reason an untriaged arrival ever carries.
+ */
+function waitingOn(sql: Sql, nowMs: number, channel: Channel): Map<string, string[]> {
+  const by = new Map<string, string[]>();
+  const seen = sql.all<{ id: string; headers: string | null }>(
+    `SELECT id, headers FROM inbox_raw WHERE state = 'untriaged' AND channel = ? AND ts >= ?
+     AND (reason IS NULL OR reason <> ?) ORDER BY ts DESC, rowid DESC LIMIT ?`,
+    channel,
+    instant(nowMs - WINDOW_DAYS * 86_400_000),
+    UNVERIFIED,
+    SCAN,
+  );
+  for (const r of seen) {
+    const shape = shapeOf(channel, JSON.parse(r.headers ?? '{}') as Record<string, string>);
+    const ids = by.get(shape);
+    if (ids) ids.push(r.id);
+    else by.set(shape, [r.id]);
+  }
+  return by;
+}
+
+/** The shapes with a draft out: one still on its way, or one that came to nothing inside the last day. */
+function draftedShapes(sql: Sql, nowMs: number): Set<string> {
+  const out = new Set<string>();
+  /* `failed` IS STILL OUT: it is on the queue's retry ladder, and the ladder ends in `dead`. `done` and `dead` are over,
+     and keep the shape for a day, so a route that is down is tried once a day and never once an arrival. */
+  const rows = sql.all<{ payload: string }>(
+    "SELECT payload FROM outbox WHERE kind = 'infer.draft' AND (state IN ('pending', 'leased', 'failed') OR created >= ?)",
+    instant(nowMs - OWED_AGAIN_MS),
+  );
+  for (const r of rows) {
+    const p = parsed(r.payload);
+    /* BOTH SPELLINGS: the draft queued here names its `shape`, and the analyser's names it as a finding's `subject`. */
+    if (typeof p?.shape === 'string') out.add(p.shape);
+    else if (p?.signal === 'ingest.unmatched' && typeof p.subject === 'string') out.add(p.subject);
+  }
+  return out;
+}
+
+/**
+ * The shapes owed a draft: three or more waiting, no question open for the shape, no answer to one, and no draft out.
+ *
+ * OWED UNTIL IT IS ANSWERED, NOT ONCE (ENG-B07). The draft used to be earned at exactly the third arrival, so a call
+ * that failed, or a third that came while another was being filed, left the shape waiting behind a button for ever.
+ * Now every arrival of a shape asks whether it is still owed, and these four are the whole answer.
+ *
+ * THE MEMORY IS THE QUESTION AND ITS DECISION. A question is the shape's when it carries `patternCause(shape)`, or when
+ * the arrivals it was drawn from (`body.samples`) are of that shape, which is how one filed with no cause is found.
+ * Their shape is read from the arrivals themselves and not from what still waits, because a no has to outlast the
+ * three it was said about being filed, ignored or thirty days old. Open, it is the one question and nothing more is drafted. Answered yes or no, the shape is never owed again:
+ * a yes installed a pattern and what still waits is what that pattern does not read, and a no is a no. One taken back
+ * by whoever filed it is not an answer. There is no teaching table yet, so this is all that is remembered.
+ *
+ * `only` keeps an arrival's look to its own channel. Nothing here asks: it says what is owed, and `propose` queues.
+ */
+export function owedShapes(sql: Sql, nowMs: number, only?: Channel): Owed[] {
+  const waiting: Owed[] = [];
+  for (const channel of only ? [only] : CHANNELS)
+    for (const [shape, ids] of waitingOn(sql, nowMs, channel))
+      /* OLDEST FIRST, because three examples read in the order they arrived is what a person checks the proposal
+         against, and the scan had to be newest-first to be bounded. */
+      if (ids.length >= PROPOSE_AT)
+        waiting.push({ shape, channel, waiting: ids.length, examples: ids.slice(-PROPOSE_AT).reverse() });
+  if (waiting.length === 0) return [];
+
+  const drafted = draftedShapes(sql, nowMs);
+  const asked = sql.all<{ status: string; resolved_as: string | null; cause: string | null; body: string }>(
+    "SELECT status, resolved_as, cause, body FROM suggestion WHERE body_kind = 'pattern' ORDER BY rowid DESC LIMIT ?",
+    ASKED_SCAN,
+  );
+  const settled = (q: { status: string; resolved_as: string | null }): boolean =>
+    q.status === 'open' || q.resolved_as === 'addressed' || q.resolved_as === 'wont-fix' || q.resolved_as === 'incorrect';
+  const drawn = asked.filter(settled).map((q) => {
+    const samples = parsed(q.body)?.samples;
+    return { cause: q.cause, samples: Array.isArray(samples) ? samples.filter((id) => typeof id === 'string') : [] };
+  });
+  /* An erased arrival kept nothing to tell its shape by, so it speaks for no shape. */
+  const shapeById = new Map<string, string>();
+  for (const r of sql.all<{ id: string; channel: Channel; headers: string | null }>(
+    "SELECT id, channel, headers FROM inbox_raw WHERE state <> 'erased' AND id IN (SELECT value FROM json_each(?))",
+    JSON.stringify(drawn.flatMap((q) => q.samples)),
+  ))
+    shapeById.set(r.id, shapeOf(r.channel, (parsed(r.headers) ?? {}) as Record<string, string>));
+
+  return waiting
+    .filter((o) => {
+      if (drafted.has(o.shape)) return false;
+      const cause = patternCause(o.shape);
+      if (sql.one('SELECT 1 AS x FROM decision WHERE cause = ? LIMIT 1', cause) !== undefined) return false;
+      return !drawn.some((q) => q.cause === cause || q.samples.some((id) => shapeById.get(id) === o.shape));
+    });
+}
+
+/**
+ * `3′`: the draft a shape with no pattern is owed, OUTSIDE the arrival's transaction.
+ *
+ * ASKED AT EVERY ARRIVAL OF THE SHAPE, AND QUEUED ONLY WHILE IT IS OWED (`owedShapes`). Never one per payload, because
+ * a model call per arrival is a bill that scales with a stranger's sending rate: one draft a shape at a time, one a
+ * day at most after a draft that came to nothing, and none once a person has been asked.
+ *
+ * THE DRAFT CARRIES IDS AND NOT BODIES. Whoever drafts reads the three arrivals itself; copying them here would put an
+ * untrusted stranger's text into a queue that is summarised in front of a person.
  */
 export function propose(deps: ProposeDeps, channel: Channel, headers: Record<string, string>): string | null {
   const shape = shapeOf(channel, headers);
-  const since = instant(deps.nowMs - WINDOW_DAYS * 86_400_000);
-
-  /* THE SHAPE IS IN THE QUERY, not in a filter over a page of rows. A cap applied per CHANNEL and
-     then filtered in JS meant that on a busy inbox the three examples of a NEW shape were truncated
-     out before the filter ran — so the shape that most needed a pattern was the one that never got
-     one, at the third arrival or ever after. The expression is the same `from`-then-`to` fallback
-     `shapeOf` computes, so the two cannot disagree. */
-  const WHO = "COALESCE(NULLIF(TRIM(json_extract(headers, '$.from')), ''), NULLIF(TRIM(json_extract(headers, '$.to')), ''), '')";
-  const seen = deps.sql
-    .all<{ id: string; headers: string | null }>(
-      /* `rowid` BREAKS THE TIE, because a burst arrives inside one millisecond and `ts` alone then
-         orders them by nothing in particular — which would hand a person three examples in an order
-         that is not the order they came in. */
-      /* AND AN UNVERIFIED ROW IS NOT AN EXAMPLE OF ANYTHING. `12 §3` makes it ineligible to match,
-         and a draft proposed from three of them is a pattern written to read a stranger's forgeries,
-         paid for by the record's owner: this is the one place an arrival nothing vouched for could
-         still spend money. The state and the reason together are the test, because `UNVERIFIED` is
-         the only reason an untriaged row ever carries. */
-      `SELECT id, headers FROM inbox_raw WHERE state = 'untriaged' AND channel = ? AND ts >= ?
-       AND (reason IS NULL OR reason <> ?) AND ${WHO} IS NOT NULL ORDER BY ts DESC, rowid DESC LIMIT ?`,
-      channel,
-      since,
-      UNVERIFIED,
-      SCAN,
-    )
-    .filter((r) => shapeOf(channel, JSON.parse(r.headers ?? '{}') as Record<string, string>) === shape);
-
-  if (seen.length !== PROPOSE_AT) return null;
-
-  /* OLDEST FIRST, because three examples read in the order they arrived is what a person checks the
-     proposal against — and the query above had to be newest-first to bound its scan. */
-  const examples = seen.map((r) => r.id).reverse();
+  const owed = owedShapes(deps.sql, deps.nowMs, channel).find((o) => o.shape === shape);
+  if (!owed) return null;
   return deps.outbox({
     shape,
     channel,
     n: PROPOSE_AT,
+    waiting: owed.waiting,
     window: `${WINDOW_DAYS}d`,
-    examples,
-    why: `${PROPOSE_AT} payloads shaped like ${shape} arrived in thirty days and no pattern matched any of them.`,
+    examples: owed.examples,
+    cause: patternCause(shape),
+    why: `${owed.waiting} payloads shaped like ${shape} arrived in thirty days and no pattern matched any of them.`,
   });
 }
 

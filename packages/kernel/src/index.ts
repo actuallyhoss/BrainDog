@@ -170,7 +170,7 @@ import {
   type DigestDecl,
   type DigestDeps,
 } from './digest.ts';
-import { inQuietHours, quietEnds, quietOf } from './digest.ts';
+import { URGENT_NOTE, inQuietHours, quietEnds, quietOf } from './digest.ts';
 import { CREATE_CEILING, applyRule, dryRun, marker, runRules, type Applied as RuleApplied, type DryRun, type FlowDecl, type RuleDecl, type RulesDeps } from './rules.ts';
 import {
   advance as advanceRun,
@@ -253,8 +253,9 @@ import { slashMayWrite } from './slash.ts';
 import { answeredOnly, askOwnRows, askSame, fileVerdicts, joinOrganisation, meet as meetPerson, resolveJob, type MeetArgs, type Met, type PeopleDeps } from './people.ts';
 import { meetsRole, orgRole, ratesRole, type MeetsFields, type OrgFields } from './roles.ts';
 import { entityLists, foldChain, foldEnd, foldedCarry, holderOf, keyedLists, mergeFieldOf, rebuildKeys, rekey, rowKeys, type KeyedList } from './entities.ts';
-import { builtInFigure, openSteps } from './built-in-figures.ts';
+import { builtInFigure, openSteps, readOpenQuestions } from './built-in-figures.ts';
 import { openExceptions } from './exceptions.ts';
+import { finders, tidyHour } from './tidy.ts';
 import { sourceModule } from './sources/index.ts';
 import { beatRun, workingRuns } from './presence.ts';
 import { agentOf as ladderAgentOf, keysOfStamp, kindOfEvent, kindsOfProposal, madeByIn, personOf, recordReader, shapeIn, tokenOfRun } from './change-kind.ts';
@@ -429,6 +430,8 @@ export { BEFORE, comparisonOf, monthBefore, yearBefore } from './metrics.ts';
 export type { Before, Halves } from './metrics.ts';
 export { SESSIONS_WORKING, readRunsWorking } from './built-in-figures.ts';
 export { HANDOFFS_OPEN, openSteps, readHandoffsOpen, type OpenStep } from './built-in-figures.ts';
+/* THE TIDY AS FIGURES (AGT-C18): the source, its reader, and the id of one finder's own figure. */
+export { RECORD_TIDY, readTidy, staleFigureOf, type TidyDecl } from './built-in-figures.ts';
 export { KEYS_IN_TEXT, RECORD_KEY_SCAN, keysInText, placeOf, readKeysInText, scanKeys, type KeyFinding, type KeyScan } from './key-scan.ts';
 export { CROSSCHECK_ENTRIES_MOST, CROSSCHECK_NOTHING, CROSSCHECK_TOO_MANY, ROLLED_ACCOUNTS_MOST, ROLLED_CHECKS_MOST, WALKS, WALK_SOURCE, beyondOf, figureLists } from './money-figures.ts';
 export type { Beyond, Crosscheck, Rolled, RolledCheck, RolledMoves, Walked, WalkReading } from './money-figures.ts';
@@ -447,6 +450,8 @@ export { applyLook, composeLook, drewNothing, lookOf, mergeLook, questionsLead, 
 export { figureSaid, figuresOf, fillHoles, holesIn, withoutHoles } from './compose.ts';
 /* WHAT WENT QUIET (ENG-B13, `exceptions.ts`): the read, what it answers and the lists a caller hands it to watch. */
 export { LISTS_A_READ, openExceptions, type Exception, type Was, type Watched } from './exceptions.ts';
+/* THE TIDY (AGT-C18, `tidy.ts`): what is stale now and what the record cleared, a finder a line, as the hourly sweep keeps it. */
+export { KEEP_DAYS, causeOfFinder, finderOf, finders, registerFinder, staleNow, tidied, tidyDays, tidyHour, type Finder, type Found, type TidyAsk, type TidyDay, type TidyDeps, type TidyLine } from './tidy.ts';
 /* WHAT A ROW IS AND WHERE IT WAS SEEN (ENG-B02, `about.ts`): the one read of a person, an organisation or a project, and the candidates a text may be about. */
 export { CANDIDATES, SEEN_KEPT, SEEN_SHOWN, aboutOf, aboutOfRow, candidatesFor, keysIn } from './about.ts';
 export type { About, AboutDeps, AboutKind, AboutLink, AboutSeen, Candidate as AboutCandidate, FoundBy, Handed, HandleRow } from './about.ts';
@@ -455,7 +460,10 @@ export {
   CHANNELS,
   carryingOf,
   headline,
+  heldIn,
   inQuietHours,
+  LEVELS,
+  levelOf,
   localParts,
   mutedFor,
   nextOccurrence,
@@ -491,6 +499,12 @@ export {
 } from './backfill.ts';
 export { MET_CAP, PEOPLE, RESOLVE_PAIRS_NIGHT, pairHash, peopleTwiceIds, peopleTwiceIdsIn } from './people.ts';
 export type { MeetArgs, Met, MetRow, ResolveJob, ResolveSide } from './people.ts';
+/* THE BANDS A MODEL'S ANSWER IS SETTLED IN (ENG-B04, `people.ts`). Nothing here folds by itself: `settleVerdicts` folds
+   only for a caller that hands it the switch, and no caller in this file does. */
+export { BAND_ASK, BAND_SURE, corroborated, settleVerdicts, type BandFold, type Settlement, type SettleOpts } from './people.ts';
+/* THE OTHER PAIRS (ENG-B04, `resolve.ts`): two organisations or two projects that read as one, and a name seen that no
+   row is called. A read that writes nothing and asks nothing. */
+export { PAIRS_MOST, evidenceOf, pairsFor, type Pair, type PairHow, type PairRow, type PairSide, type Pairs } from './resolve.ts';
 export type { MeetsFields, OrgFields, RatesFields } from './roles.ts';
 /* THE LIST HOLDING THE RATES, by its `rates:` key or, on a record older than the key, by the name it had (`roles.ts`):
    exported so a page that draws the rates finds the same list the conversion reads. */
@@ -537,6 +551,8 @@ export { CHANNELS as INGEST_CHANNELS, CONFIDENCES, PROPOSE_AT, arrive, day as in
 export { SIGNALS, WINDOWS, analyse, findingsFrom, observe } from './observe.ts';
 /* WHAT A CARD SAYS OF AN AMOUNT AND OF WHERE A RUN STANDS (ENG-B12): the kernel's own two readings, so the briefing writes neither again. */
 export { moneyText } from './ingest.ts';
+/* THE SHAPES OWED A PATTERN (ENG-B07): which arrivals wait on a draft, and the cause their one question is filed under. */
+export { owedShapes, patternCause, type Owed } from './ingest.ts';
 export { runPlace } from './handoff.ts';
 export { FLOOR_MS, applyPull, checkInterval, firePull, intervalMs, jitterMs } from './pull.ts';
 export { applyPage, writePoints } from './fetched.ts';
@@ -574,7 +590,7 @@ export type { Analysis, Counted, Finding, Observation, Signal } from './observe.
 export type { Answered, Arrival, Arrived, Confidence, DoorLine, Extracted, Extractor, FieldOutcome, IngestDecl, IngestDeps, NumberReaders, PatternLine, PatternReport, Sender } from './ingest.ts';
 export type { CycleLine, ForecastDeps, Horizon, Leg, Runway, Step } from './forecast.ts';
 export type { DryRun, Fired, LinkTo, RuleAction, RuleDecl, RulesDeps, RulesOutcome } from './rules.ts';
-export type { Assembled, Channel, DigestDecl, DigestDeps, DigestPart, DigestSection, Sent } from './digest.ts';
+export type { Assembled, Channel, DigestDecl, DigestDeps, DigestPart, DigestSection, HeldNotice, Level, Sent } from './digest.ts';
 export type { BlockResult, DecidedQuestion, PageBlock, PageDecl, PageDeps, PageFilter, PageResult, PageRow, LastChange, RowChange, QueueCandidate, QueueOption, QueueQuestion, QuestionFacts } from './pages.ts';
 export { doesOf, type DoesNames } from './does.ts';
 export type { Aggregation, Crossed, DeclaredSign, EvalContext, FxRead, Group, Lookups, MetricDecl, Reading, Scored, Snapshot, TargetIn, TrendSaid, Value } from './metrics.ts';
@@ -6685,7 +6701,11 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
          to queue one row a keyless host would leave `pending` for ever. */
       outbox: (kind, payload) => {
         if (kind !== 'notify.push') return void enqueue(sql, mint, clock.now(), kind, payload);
-        for (const id of ownersPushSubs(sql)) enqueue(sql, mint, clock.now(), 'notify.push', { sub: { id } });
+        /* AND THE CAUSE OF A TIME-SENSITIVE NOTICE THAT NAMES ONE (`notify`), a handle and never a word, so `told`
+           below can say it was already told. A push that names no cause is its phone's id and nothing else, as before. */
+        const cause = (payload as { cause?: unknown } | null)?.cause;
+        const marked = typeof cause === 'string' && cause !== '' ? { cause } : {};
+        for (const id of ownersPushSubs(sql)) enqueue(sql, mint, clock.now(), 'notify.push', { sub: { id }, ...marked });
       },
       note: (actor, text, urgent) => noteEvent(sql, mint, clock.now(), actor, text, urgent),
       delivers: opts.delivers ?? [],
@@ -6707,6 +6727,33 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         )?.n
           ? true
           : false,
+      /* THE RECORD'S OWN QUIET HOURS (`record.quiet`, AGT-C19): inside them `notify` sounds nothing, and what was held
+         leads the next digest (`held` below). Handed together, or a notice is held and then said by nothing. */
+      quiet: quietOf(sql.one<{ quiet: string | null }>('SELECT quiet FROM record WHERE singleton = 1')?.quiet),
+      /* HOW MANY THINGS WAIT ON THE PERSON: the open questions that are not put off, the number Decide shows. */
+      waiting: () => {
+        const open = readOpenQuestions(sql, { nowMs: clock.now() });
+        return open.ok ? Number(open.value.value ?? 0) : 0;
+      },
+      /* WHETHER THIS CAUSE WAS ALREADY TOLD, counted over the push and the mail `notify` queued for it. A row stays in
+         the outbox after it is sent, so once is once however long ago. */
+      told: (cause) => (sql.one<{ n: number }>("SELECT count(*) AS n FROM outbox WHERE kind IN ('notify.push', 'notify.email') AND json_extract(payload, '$.cause') = ?", cause)?.n ?? 0) > 0,
+      /* THE TIME-SENSITIVE NOTES SINCE THE LAST DIGEST WENT. `runDigest` keeps the ones said inside quiet hours.
+
+         "WENT" IS READ OFF WHAT A DIGEST LEAVES, ON ANY CHANNEL: its in-app note, or the mail or webhook it queued, which
+         carry `because: digest.<id>`. Read off the note alone, a digest that only mails would lead with the same held
+         notice every week for ever, since it writes no note. */
+      held: () =>
+        sql
+          .all<{ ts: string; note: string | null }>(
+            `SELECT ts, note FROM event WHERE kind = 'note' AND field = ?
+               AND ts > max(
+                 coalesce((SELECT max(ts) FROM event WHERE kind = 'note' AND actor LIKE 'digest:%'), ''),
+                 coalesce((SELECT max(created) FROM outbox WHERE kind IN ('notify.email', 'notify.webhook') AND json_extract(payload, '$.because') LIKE 'digest.%'), '')
+               ) ORDER BY ts`,
+            URGENT_NOTE,
+          )
+          .map((e) => ({ at: Date.parse(e.ts), say: e.note ?? '' })),
       mint,
       nowMs: clock.now(),
       tz: recordIdentity(sql)?.tz ?? 'UTC',
@@ -7321,6 +7368,21 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     /* A QUESTION THAT IS ALREADY SO is closed as moot in the same hour, with the sentence that says why (`cause.ts`
        `recheck`, AGT-C08): the owner answered it by doing it, so it leaves Decide and counts on no brake. */
     transaction(() => recheck(sql, clock.now(), mint));
+    /* AND THE TIDY COUNTS WHAT IS LEFT (`tidy.ts` `tidyHour`, AGT-C18): one line a finder a day in `tidy_line`, after
+       the cleaning above, so a line says what is still stale and what this hour cleared.
+
+       IT COUNTS AND ASKS NOTHING: each finder is run with its question taken off, because no question the record
+       signs is wired on. One already open under a finder's cause is named on its line and left as it was filed.
+
+       A FINDER A TRANSACTION, EACH IN ITS OWN TRY, so one that throws loses its own line and never stops the books. */
+    for (const finder of finders()) {
+      try {
+        const counted = { ...finder, find: (s: Sql, at: number) => ({ ...finder.find(s, at), ask: null }) };
+        transaction(() => tidyHour({ sql, nowMs: clock.now(), mint, allocate }, [counted]));
+      } catch {
+        /* Its line is missing for this hour, which is what a reader of the lines sees. */
+      }
+    }
     /* A DEVICE GRANT past its time, or silent for fourteen days, is let go in the same hour. */
     transaction(() => deviceSweep(tokenDeps()));
     /* A JOB NOBODY TOOK IN A DAY, OR ONE WHOSE MACHINE STOPPED ANSWERING, is let go in the same hour (`jobs.ts`). */
@@ -7559,7 +7621,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
          opening"), and is not run and dropped: the row comes due again at the window's end, runs then, and only then
          arms its declared next occurrence. This is the one place the window applies, because a digest is the one
          non-urgent thing that leaves the record; a reminder writes an in-app note, and an urgent notice never waits
-         (rule 2). The window is the record's own column, NULL reading as 22:00 to 08:00 (migration 0020). */
+         (rule 2). The window is the record's own column, NULL reading as 21:00 to 08:00 (migration 0020 made the column; the default moved in AGT-C19). */
       const quiet = quietOf(sql.one<{ quiet: string | null }>('SELECT quiet FROM record WHERE singleton = 1')?.quiet);
       const now = clock.now();
       if (inQuietHours(now, tz, quiet)) return quietEnds(now, tz, quiet);

@@ -187,7 +187,7 @@ import {
 } from './headlines.ts';
 import { nameOnly, scrubbed, spokenName } from './scrub.ts';
 import { lookRefusedKey, noteRefusal, refusedFor, rehearse } from './compose-rehearse.ts';
-import { composeLooks, keepLook as keepLookOf, keptBy, lookHeld, lookInputOf, undoLook as undoLookOf, type LookBody, type LookNext } from './compose-look.ts';
+import { composeLooks, keepLook as keepLookOf, keptBy, lookBasis, lookHeld, lookInputOf, undoLook as undoLookOf, type LookBody, type LookNext } from './compose-look.ts';
 import {
   BODY_DEPTH,
   SAID_DEPTH,
@@ -207,7 +207,8 @@ import { handleOf, isHandle, spokenOf } from './question-handles.ts';
 import { dropPushSub, readPushSub, savePushSub } from './push.ts';
 import { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, REPORT_ROWS_PER_MINUTE, REPORT_WINDOW_MS, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
 import type { Directory } from './directory.ts';
-import { methods } from './methods/index.ts';
+import { methods, type RecordDeps as MethodDeps } from './methods/index.ts';
+import { staleCount, staleFor as staleLines } from './methods/stale.ts';
 import type { EngineHealthRead } from './methods/engine.ts';
 import { quietSign } from './methods/signs.ts';
 import { methods as jobMethods } from './jobs.ts';
@@ -229,6 +230,7 @@ export type { ExportArgs, PlannedPack } from './usecase.ts';
 export type { Automation, AutomationRow, AutomationRun, Said as AutomationSaid, ScriptRow } from './automations.ts';
 export { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, REPORT_ROWS_PER_MINUTE, REPORT_WINDOW_MS, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
 export type { UsedBy, UsedByRun } from './methods/agents.ts';
+export type { Stale, StaleLine } from './methods/stale.ts';
 export type { AutomationVersion, Checked as AutomationChecked, Switched as AutomationSwitched } from './methods/automations.ts';
 export type { PenItem } from './emergent.ts';
 /* THE ENGINE'S READINGS, THE ARITHMETIC ALONE (engine-readings-59): what was asked, answered, kept and refused, the
@@ -1484,6 +1486,14 @@ export type Context = {
    * anybody narrower is answered `[]`, since a sign counts across every list.
    */
   signs: { name: string; said: string }[];
+  /**
+   * How many things are stale where the caller stands (AGT-C18): the counts of the lines the read `stale` answers them,
+   * added up, which that read says one by one with the call that clears each. A number and no names. What the tidy's
+   * finders count across every list is in it only for a caller who reads the whole record; anybody narrower is
+   * counted their own steps and questions. Optional on the type only, so a context drawn by hand still reads;
+   * `context` always sends it.
+   */
+  stale?: number;
   /** One sentence: what to call next. */
   next: string;
   /**
@@ -4132,24 +4142,43 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * read as the page lint reads a page. One that would print a fault is not written and is counted against the basis it
    * was composed from (`look.refused.<page>`); after two for one basis the page is left to its rules until it moves.
    * Answers the sentence for the log, or `null` for a look that may be written.
+   *
+   * THE LINE OF THE SAME ANSWER IS REHEARSED WITH IT. Slash's line is kept as a pref and never in the look
+   * (`composeLooks`), so it is laid here as the look's headline when it was written from this basis, and read as the
+   * page would print it. A refusal is the whole answer's: the line is marked refused where it is kept, and `headlineFor`
+   * does not say a line so marked. The mark is on that answer's line and no other's, so the next answer's line is its own.
    */
   const lookRehearsed = (page: string, title: string, body: LookBody): string | null => {
     const key = lookRefusedKey(page);
-    const kept = kernel.prefsOf(SLASH)[key];
-    if (refusedFor(body.basis, kept) === 'leave') return `Slash's arrangement of ${title} was refused twice, so the page is left as it is until something on it changes.`;
+    const prefs = kernel.prefsOf(SLASH);
+    const kept = prefs[key];
+    const line = storedHeadline(prefs[headlineKey(page)]);
+    const same = line !== null && lookBasis(line.basis, line.facts) === body.basis;
+    const whole: LookBody = same ? { ...body, headline: line.text } : body;
+    const unsaid = (): void => {
+      if (same) kernel.setPref(SLASH, headlineKey(page), { ...line, refused: true });
+    };
+    if (refusedFor(body.basis, kept) === 'leave') {
+      unsaid();
+      return `Slash's arrangement of ${title} was refused twice, so the page is left as it is until something on it changes.`;
+    }
     const read = kernel.page(page);
     if (!read.ok) return `${title} could not be read, so it was left as it is.`;
     const decl = kernel.metricDecl('questions-open');
     const open = decl ? kernel.metric(decl) : null;
-    const tried = rehearse(read.value, body, { waiting: open?.ok ? open.value.value : null, typesOf: lintTypesOf, keysOf: lintKeysOf });
+    const tried = rehearse(read.value, whole, { waiting: open?.ok ? open.value.value : null, typesOf: lintTypesOf, keysOf: lintKeysOf });
     if (!tried.ok) {
       kernel.setPref(SLASH, key, noteRefusal(body.basis, kept));
+      unsaid();
       const first = tried.findings[0]!;
       return `Slash's arrangement of ${title} was not kept: ${first.part === title ? 'the page' : first.part} ${first.said.charAt(0).toLowerCase()}${first.said.slice(1)} The page stays as it is.`;
     }
     if (kept !== undefined && kept !== null) kernel.setPref(SLASH, key, null);
     return null;
   };
+
+  /** Whether a page's kept line is of an answer whose look was refused (`lookRehearsed` marks it), so it is not said. */
+  const lineRefused = (kept: unknown): boolean => typeof kept === 'object' && kept !== null && (kept as { refused?: unknown }).refused === true;
 
   const slashHeadlines = async (today: string, again = false): Promise<{ said: string[]; dropped: string[] }> => {
     const model = deps.slashModel;
@@ -4319,9 +4348,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        goes out while what it was written from holds and the thing it names is drawn for this reader. */
     const look = lookHeld(kernel, slug, basis, facts, blocks);
     if (look.ownerHeadline) return { line: null, next: look.next };
-    const stored = storedHeadline(kernel.prefsOf(SLASH)[headlineKey(slug)]);
+    const keptLine = kernel.prefsOf(SLASH)[headlineKey(slug)];
+    const stored = storedHeadline(keptLine);
     if (stored === null || stored.basis !== basis) return { line: null, next: look.next };
     if (stored.facts !== undefined && facts() !== stored.facts) return { line: null, next: look.next };
+    /* AN ANSWER WHOSE LOOK WAS REFUSED IS REFUSED WHOLE (`lookRehearsed`): its line came from the same answer, so the page
+       keeps the line its rules wrote until the page is answered for again. */
+    if (lineRefused(keptLine)) return { line: null, next: look.next };
     return { line: { at: lead.at, text: stored.text }, next: look.next };
   };
 
@@ -7539,6 +7572,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       organisations: orgs === null ? [] : organisationsOf(orgs, orgLinked, orgNamed),
       faded,
       signs: redSigns(ctx),
+      stale: staleOf(ctx),
       next,
     };
     return carded(ctx, told, {
@@ -7549,6 +7583,36 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     });
   };
 
+  /** Whether the caller reads the whole record, which a number counted across every list is held to. */
+  const readsWhole = (ctx: CallContext): boolean => {
+    const p = ctx.principal;
+    return (
+      p.kind === 'system' ||
+      ((p.kind === 'person' || p.kind === 'token') && p.level !== null && p.level !== 'append' && (ctx.registers === undefined || ctx.registers === '*') && readsEveryList(ctx))
+    );
+  };
+
+  /**
+   * What every file under `methods/` is handed: the guards of this file and never a copy of them. ONE OBJECT, built on
+   * the first call, so `context` counts what went stale through the same guards the read `stale` answers through.
+   */
+  let methodsHanded: MethodDeps | null = null;
+  const methodDeps = (): MethodDeps => (methodsHanded ??= { kernel, sql, guard, scoped, readable, sightOf, admin, vault, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), ...(deps.engineLedger === undefined ? {} : { engineLedger: deps.engineLedger }), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom, createDoor: (ctx, register, fields) => { const stop = mergeShaped(ctx, register, fields, null) ?? keyHeld(ctx, register, fields, null); return stop ? { refusal: stop } : { fields: huedOf(register, fields) }; }, withheld: drawnWithheld });
+
+  /**
+   * The stale count `context` carries: the lines the read `stale` would answer this caller at this moment, added up
+   * (`methods/stale.ts`), so the number an agent starts with is the number it is then told one by one. Nothing is
+   * counted that the caller may not read. A READ, and one that throws costs the number, never the card an agent starts
+   * from.
+   */
+  const staleOf = (ctx: CallContext): number => {
+    try {
+      return staleCount(staleLines(methodDeps(), ctx, clock.now()));
+    } catch {
+      return 0;
+    }
+  };
+
   /**
    * THE RED SIGNS FOR THE BRIEFING, by name and sentence, to the callers `signs` answers and nobody else: the system, or
    * a person or key at a level that reads, held to no list and no part of one (`methods/signs.ts`, and `readsEveryList`
@@ -7557,11 +7621,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * red sign in that file's words, never a message or a question quoted from the inbox.
    */
   const redSigns = (ctx: CallContext): Context['signs'] => {
-    const p = ctx.principal;
-    const whole =
-      p.kind === 'system' ||
-      ((p.kind === 'person' || p.kind === 'token') && p.level !== null && p.level !== 'append' && (ctx.registers === undefined || ctx.registers === '*') && readsEveryList(ctx));
-    if (!whole) return [];
+    if (!readsWhole(ctx)) return [];
     const read = kernel.signs();
     if (!read.ok) return [];
     const inbox = allows(ctx, 'owner') === null || inboxReached(ctx);
@@ -12219,7 +12279,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        handed the guards above rather than a copy of them, so a method there is held to the same ladder as every method
        in this file; the `guards` gate reads those files as it reads this one, and refuses a name two files both define,
        since the later one would win here without a word. */
-    ...methods({ kernel, sql, guard, scoped, readable, sightOf, admin, vault, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), ...(deps.engineLedger === undefined ? {} : { engineLedger: deps.engineLedger }), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom, createDoor: (ctx, register, fields) => { const stop = mergeShaped(ctx, register, fields, null) ?? keyHeld(ctx, register, fields, null); return stop ? { refusal: stop } : { fields: huedOf(register, fields) }; }, withheld: drawnWithheld }),
+    ...methods(methodDeps()),
     /* AND THE JOB METHODS, WHICH ARE `jobs.ts`'S AND NOT UNDER `methods/`: the owner's, in a browser, and a runner's,
        for a machine enrolled as one. Handed the same guards, so the owner's are held to `admin` as every ADMIN method
        here is, and a runner's admit the one principal every guard above refuses. */

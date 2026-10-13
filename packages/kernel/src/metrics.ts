@@ -45,6 +45,7 @@ import {
   RECORD_PLACES,
   RECORD_RATES,
   RECORD_SIGNS,
+  RECORD_TIDY,
   RECORD_VITALS,
   SESSIONS_WORKING,
   readDeadPaths,
@@ -59,6 +60,7 @@ import {
   readRatesAge,
   readRunsWorking,
   readSign,
+  readTidy,
   readVitals,
 } from './built-in-figures.ts';
 import { SESSION, SESSION_PREFIX } from './session.ts';
@@ -1274,6 +1276,7 @@ export const sourceReaders = (): Readonly<Record<string, SourceReader>> => (read
   [RECORD_SIGNS]: readSign,
   [SESSIONS_WORKING]: (sql, ctx) => readRunsWorking(sql, ctx),
   [HANDOFFS_OPEN]: readHandoffsOpen,
+  [RECORD_TIDY]: readTidy,
   [RECORD_VITALS]: readVitals,
   [RECORD_RATES]: (_sql, ctx, decl) => readRatesAge(ctx, decl),
   [RECORD_DOOR]: readDoor,

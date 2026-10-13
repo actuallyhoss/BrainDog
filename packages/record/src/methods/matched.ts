@@ -148,6 +148,14 @@ export function methods(deps: RecordDeps) {
        * that a folded one holds too. With none to read, the reason the batch wrote down, which is the rule's own.
        */
       const evidenceOf = (folded: readonly Folded[], end: string): string => {
+        /* A FOLD THE BANDS MADE (`people.ts` `settleVerdicts`) WROTE ITS OWN SENTENCE, 'Matched A with B: <sentence>',
+           and that is the evidence: the two were folded on what else the record holds, not on a handle they share, so
+           the handle's sentence below would say a reason that was not the reason. */
+        const banded = folded.map((f) => f.note ?? '').find((n) => n.startsWith('Matched ') && n.includes(': '));
+        if (banded !== undefined) {
+          const said = banded.slice(banded.indexOf(': ') + 2).trim();
+          if (said !== '') return `${said.charAt(0).toUpperCase()}${said.slice(1)}`;
+        }
         const carry = [at.email, at.handles, at.keys];
         const theirs = folded.flatMap((f) => keysIn(fieldsOf(f.fields), carry));
         const bare = (key: string): string => key.replace(/^[a-z]+:/u, '').toLowerCase();

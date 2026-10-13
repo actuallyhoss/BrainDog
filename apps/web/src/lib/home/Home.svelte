@@ -18,7 +18,30 @@
 
   IT LISTENS. A write from an agent, a rule or another tab moves the record's version, and Home reads its page again
   without a reload and without blanking it (`listen`).
+
+  TWO READS OF THEIR OWN STAND AROUND THE PAGE: the briefing over it, what matters today as the record wrote it, and
+  who the record matched as the board's last line. Each is asked for beside the page and never by its read, each is
+  fetched with its own part when it is asked for, and each draws nothing for a record that answers none (`homeReads`).
 -->
+<script module lang="ts">
+  /** What Today draws, top to bottom. */
+  export type HomePart = 'briefing' | 'page' | 'matched';
+
+  /**
+   * What Today draws and in what order, from how many briefing cards and how many matches the record answered: the
+   * briefing first, the page, and who was matched last. A read still out, a refusal and an empty answer are all none,
+   * and a record with neither draws its page as it did before there was either.
+   *
+   * IT IMPORTS NOTHING, so `home-reads.test.ts` runs it as it is written.
+   */
+  export function homeReads(briefing: number, matched: number): HomePart[] {
+    const parts: HomePart[] = ['page'];
+    if (briefing > 0) parts.unshift('briefing');
+    if (matched > 0) parts.push('matched');
+    return parts;
+  }
+</script>
+
 <script lang="ts">
   import { apiBase } from '$lib/at.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
@@ -48,6 +71,7 @@
     railed,
     slashLineOf,
     todayHome,
+    quietHeld,
     weekOf,
     type Holds,
     type HomeVoice,
@@ -68,6 +92,8 @@
   import { waitsNow, workingNow } from '$lib/home/waits.svelte.ts';
   import { words } from '$lib/home/words.ts';
   import { cutLine, homeLineOf } from '$lib/home/home-line.ts';
+  import type { BriefingRow } from '$lib/home/briefing.ts';
+  import type { MatchedRow } from '$lib/home/matched.ts';
   import { untrack } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import { typing } from '$lib/a11y/keys.svelte.ts';
@@ -257,12 +283,13 @@
       return m.pageReader(apiBase()).read(slug);
     }
     /* TODAY'S BODY IS DRAWN BY THE RECORD, never installed: `previewPage` answers the body as `page` answers an installed
-       one, each block held to the reader, and writes nothing. `drawnOf` is the one reader of that answer. */
+       one, each block held to the reader, and writes nothing. `drawnOf` is the one reader of that answer. A host built
+       before it reads what went quiet answers that one tile as a refusal, which is not drawn (`quietHeld`). */
     const body = todayHome(held, spoken);
     const m = await import('../../routes/decide/[id]/proposed.ts');
     const drawn = await m.drawnOf(body, apiBase());
     if (drawn.from === 'live')
-      return { from: 'live', page: { page: { page: body.page, title: body.title, layout: body.layout }, blocks: drawn.blocks }, now: drawn.now };
+      return { from: 'live', page: { page: { page: body.page, title: body.title, layout: body.layout }, blocks: quietHeld(drawn.blocks) }, now: drawn.now };
     if (drawn.from === 'refused') return { from: 'refused', fix: drawn.fix };
     return null;
   }
@@ -383,6 +410,45 @@
      row there, it stood between "Today" and the line that says what today holds. Drawn once, in one place or the other. */
   const wide = new MediaQuery('(width >= 900px)', true);
 
+  /**
+   * THE TWO READS AROUND THE PAGE, each with the part that draws it: the briefing (`briefing.ts`) and who the record
+   * matched (`matched.ts`). `null` until one has answered, and an answer of none draws nothing.
+   *
+   * BESIDE THE PAGE READ AND NEVER IN IT. The page is asked for in its own effect and waits on neither, so Today
+   * paints as fast as it did; what lands later is put in its place by `homeReads`, keyed, and moves nothing drawn.
+   *
+   * FETCHED WHEN ASKED FOR, the reader and its part alike, as `Today.svelte` fetches the briefing's: this screen is the
+   * front door, and nothing here is added to what it loads first. Neither read can fail the screen, since each
+   * answers none for a host without the call, a reader it refuses and a line that dropped.
+   *
+   * ASKED AGAIN WHEN THE RECORD MOVES, and what is drawn stays until the new answer lands.
+   */
+  type BriefingPart = typeof import('./Briefing.svelte').default;
+  type MatchedPart = typeof import('./Matched.svelte').default;
+  let brief = $state.raw<{ cards: readonly BriefingRow[]; Part: BriefingPart } | null>(null);
+  let matched = $state.raw<{ rows: readonly MatchedRow[]; Part: MatchedPart } | null>(null);
+  $effect(() => {
+    if (data.refused) return;
+    void moving.version;
+    const base = apiBase();
+    let here = true;
+    /* BRACKETED AS A READ OF THIS SCREEN, so the screen is not measured with a tile still on its way, and closed as
+       fine whatever came back: neither read refuses the screen. */
+    const at = untrack(opened);
+    const briefing = Promise.all([import('./briefing.ts'), import('./Briefing.svelte')]).then(async ([m, part]) => {
+      const out = await m.readBriefing(base);
+      if (here) brief = { cards: out.value, Part: part.default };
+    });
+    const matches = Promise.all([import('./matched.ts'), import('./Matched.svelte')]).then(async ([m, part]) => {
+      const out = await m.readMatched(base);
+      if (here) matched = { rows: out.value, Part: part.default };
+    });
+    void Promise.allSettled([briefing, matches]).then(() => closed(true, at));
+    return () => {
+      here = false;
+    };
+  });
+
   /* NOTHING TO DRAW AT ALL: the line says so, and nothing under it. A host that cannot draw Today's body is calm too. */
   const calm = $derived((shaped !== null && !drawsAny(shaped.blocks)) || (settled && got === null));
 
@@ -487,44 +553,58 @@
       {#snippet actions()}<Button weight="primary" href="/start">{said('start_here')}</Button>{/snippet}
     </Empty>
   {:else}
-    <!-- THE EXAMPLES SETTING UP PLANTED, offered once they are all that is left to explain. -->
-    {#if data.live}<ClearExamples />{/if}
+    <!--
+      TOP TO BOTTOM AS `homeReads` SAYS: the briefing, the page, who was matched. Keyed by the part, so a read that
+      lands after the page is put over or under it and the page drawn is the page that stays.
+    -->
+    {#each homeReads(brief?.cards.length ?? 0, matched?.rows.length ?? 0) as part (part)}
+      {#if part === 'briefing'}
+        <!-- WHAT MATTERS TODAY, first, and nothing where the record wrote no briefing. -->
+        {#if brief}<brief.Part cards={brief.cards} />{/if}
+      {:else if part === 'matched'}
+        <!-- WHO THE RECORD MATCHED ON ITS OWN, the board's last line, and nothing where it matched nobody. -->
+        {#if matched}<matched.Part rows={matched.rows} />{/if}
+      {:else}
+        <!-- THE EXAMPLES SETTING UP PLANTED, offered once they are all that is left to explain. -->
+        {#if data.live}<ClearExamples />{/if}
 
-    <!-- A FIRST TODAY OPENS ON THE CARD: one real thing, read into the entries it becomes, added on one press. -->
-    {#if tell}<TellOne options={tellOptions} onadded={toldOne} />{/if}
+        <!-- A FIRST TODAY OPENS ON THE CARD: one real thing, read into the entries it becomes, added on one press. -->
+        {#if tell}<TellOne options={tellOptions} onadded={toldOne} />{/if}
 
-    {#if calm && lands}
-      <!--
-        A COLLEAGUE WHO HOLDS LISTS AND NOT THE RECORD IS TOLD WHICH LIST IS THEIRS, and is never told the record is
-        empty.
-      -->
-      <Empty
-        kind="cleared"
-        title={lands.kind === 'list' ? copy.yourList(lands.name) : copy.yourLists(new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(lands.lists.map((l) => l.name)))}
-        body={copy.yourListBody}
-      >
-        {#snippet actions()}
-          {#if lands.kind === 'list'}
-            <Button weight="primary" href={lands.href}>{copy.openList(lands.name)}</Button>
-          {:else}
-            {#each lands.lists as l (l.href)}<Button weight="quiet" href={l.href}>{copy.openList(l.name)}</Button>{/each}
-          {/if}
-        {/snippet}
-      </Empty>
-    {:else if settled && got === null}
-      <!-- A HOST THAT CANNOT DRAW THE PAGE: the calm line, and what fills it, rather than a blank. -->
-      <Empty kind="cleared" title={waitsLine?.text ?? nothing} body={said('fills_with')} />
-    {/if}
+        {#if calm && lands}
+          <!--
+            A COLLEAGUE WHO HOLDS LISTS AND NOT THE RECORD IS TOLD WHICH LIST IS THEIRS, and is never told the record is
+            empty.
+          -->
+          <Empty
+            kind="cleared"
+            title={lands.kind === 'list' ? copy.yourList(lands.name) : copy.yourLists(new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(lands.lists.map((l) => l.name)))}
+            body={copy.yourListBody}
+          >
+            {#snippet actions()}
+              {#if lands.kind === 'list'}
+                <Button weight="primary" href={lands.href}>{copy.openList(lands.name)}</Button>
+              {:else}
+                {#each lands.lists as l (l.href)}<Button weight="quiet" href={l.href}>{copy.openList(l.name)}</Button>{/each}
+              {/if}
+            {/snippet}
+          </Empty>
+        {:else if settled && got === null}
+          <!-- A HOST THAT CANNOT DRAW THE PAGE: the calm line, and what fills it, rather than a blank. -->
+          <Empty kind="cleared" title={waitsLine?.text ?? nothing} body={said('fills_with')} />
+        {/if}
 
-    <!-- A CALM PAGE WITH A LINE IN ITS HEAD STILL DRAWS ITS READER, which holds the writes the line adds through. -->
-    {#if (drawn !== null && (!calm || shaped?.capture)) || !settled}
-      <div class="body">
-        <PageView bind:this={view} {slug} got={drawn} mode="home" {reread} />
-      </div>
-    {/if}
+        <!-- A CALM PAGE WITH A LINE IN ITS HEAD STILL DRAWS ITS READER, which holds the writes the line adds through. -->
+        {#if (drawn !== null && (!calm || shaped?.capture)) || !settled}
+          <div class="body">
+            <PageView bind:this={view} {slug} got={drawn} mode="home" {reread} />
+          </div>
+        {/if}
 
-    <!-- AND UNDER TODAY'S BLOCKS, THE NEXT STEPS, until they are hidden. -->
-    {#if steps.length > 0}<WantMore {steps} onhide={() => (prefs = readPref())} />{/if}
+        <!-- AND UNDER TODAY'S BLOCKS, THE NEXT STEPS, until they are hidden. -->
+        {#if steps.length > 0}<WantMore {steps} onhide={() => (prefs = readPref())} />{/if}
+      {/if}
+    {/each}
   {/if}
 </div>
 

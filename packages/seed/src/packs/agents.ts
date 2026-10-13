@@ -354,6 +354,9 @@ export const AGENTS_METRICS: Record<string, SeedMetric> = {
  *
  * THE DAY DRAWN OVER THEM, SINCE 1.8.0: Today's lanes, the last 24 hours of runs as spans of time, under the line.
  *
+ * WHAT WAS LEFT, AND EARLIER FOLDED, SINCE 1.11.0: Left for the next run sits under Working, the steps nobody has taken,
+ * and Earlier keeps its place as the last of the groups but under a fold of its own, below Needs a look.
+ *
  * NO PEOPLE ON THEM. "People met lately" would make the page require `register.people`, and then a
  * record without People could not take this pack. The people an agent meets are on the People page.
  */
@@ -368,20 +371,24 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
       /* THE PAGE'S ONE LINE, said of the runs alone since 1.5.0: who is working and what was left for the next one. Two
          notes on the one figure, so exactly one of them draws, and a clause whose figure is nought is left out by the
          writer, so a record where nothing is working and nothing was left says that and stops. What waits on you is
-         Decide's, and how many lessons have faded is the Learnings list's. */
+         Decide's, and how many lessons have faded is the Learnings list's.
+
+         WHAT WAS LEFT IS THE RECORD'S COUNT SINCE 1.11.0 (AGT-C12): `handoffs-open`, the steps nobody has taken, the
+         ones Left for the next run draws. Until then it read this pack's `runs-left-next`, every stopped run with a
+         step written, so a step a later run had taken was still counted and the line disagreed with the briefing. */
       {
         kind: 'note',
         lead: true,
         span: 12,
         when: { metric: 'runs-working', gt: 0 },
-        body: '{{runs-working}} agent(s) working now, {{runs-left-next}} run(s) left a next step',
+        body: '{{runs-working}} agent(s) working now, {{handoffs-open}} step(s) left for the next run',
       },
       {
         kind: 'note',
         lead: true,
         span: 12,
         when: { metric: 'runs-working', is: 0 },
-        body: 'No agent is working right now, and {{runs-left-next}} run(s) left a next step',
+        body: 'No agent is working right now, and {{handoffs-open}} step(s) left for the next run',
       },
       /* THE DAY AS A PICTURE, SINCE 1.8.0 (DIRECTION §39, the picture first): the last 24 hours, one lane a run, from when
          it started (`started`, which the record stamps as a run opens) to when it was last heard from, the runs still
@@ -434,6 +441,28 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         limit: 12,
         when: { metric: 'runs-working', gt: 0 },
       },
+      /* WHAT WAS LEFT FOR THE NEXT RUN, SINCE 1.11.0 (AGT-C12, "Agents page with no dead runs"): the steps runs left and
+         nobody has taken, from the record's own `handoffs.open`, the read a new run is handed its step from, so the
+         page never lists a step the briefing would not offer. A card leads with the step, then who left it and when,
+         and its mark, which a host says in words: Next for the one a new run is handed, Left earlier for one past a
+         week or passed over. Every step and not only the next ones, because a step passed over is the one somebody
+         has to rule on. The source comes the newest first and takes no `order:`; six are drawn and the rest counted.
+         WHO IS THE AGENT'S NAME (`agent`) and not `run`, which is a handle only a host that knows runs can say. */
+      {
+        kind: 'cards',
+        heading: 'Left for the next run',
+        icon: 'arrow',
+        span: 12,
+        source: 'handoffs.open',
+        columns: [
+          { field: 'next', as: 'title' },
+          { field: 'agent', label: 'Left by', as: 'who' },
+          { field: 'left_at', label: 'Left', as: 'when' },
+          { field: 'mark', label: 'Status', as: 'fact' },
+        ],
+        limit: 6,
+        when: { metric: 'handoffs-open', gt: 0 },
+      },
       /* THE RUNS THAT STOPPED TODAY, SINCE 1.6.0, and with them where each left off: what the next session starts from. */
       {
         kind: 'cards',
@@ -446,18 +475,6 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         limit: 8,
         when: { metric: 'runs-today', gt: 0 },
       },
-      /* AND EVERY RUN LAST HEARD FROM BEFORE TODAY, the latest first, six drawn and the rest counted under them. */
-      {
-        kind: 'cards',
-        heading: 'Earlier',
-        icon: 'history',
-        span: 12,
-        source: 'sessions.live',
-        where: RUNS_EARLIER,
-        columns: STOPPED_COLUMNS,
-        limit: 6,
-        when: { metric: 'runs-earlier', gt: 0 },
-      },
       /* WHAT TO PUT RIGHT IN THE KEYS AND TOOLS, SINCE 1.10.0 (AGT-D01), as one tile of up to four lines, as Money's Heads
          up is: a boxed section draws the blocks after it, up to the next section, on one surface, and each line is drawn
          only while its figure is above nought, so a record with nothing wrong draws no tile at all (a section over
@@ -465,7 +482,8 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
 
          UNDER THE RUNS AND NOT UNDER THE LINE, where the scope first put it: the page is the runs (DIRECTION §37), and
          a page shows at most six tiles before the rest is folded (`test/calm-pages.test.ts`), so the lanes and the four
-         groups keep the top and this is the sixth. */
+         groups keep the top and this is the sixth. STILL THE SIXTH SINCE 1.11.0: Left for the next run is over it, and
+         Earlier went under a fold of its own below it. */
       {
         kind: 'section',
         heading: 'Needs a look',
@@ -481,8 +499,46 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
       /* KEYS WRITTEN WHERE A KEY SHOULD NOT BE (the kernel's built-in `keys-in-text`, read a slice a night by its key
          scan): a count of places, and the first one's list and number in the reading's why, never the key. */
       { kind: 'note', tone: 'warn', span: 12, when: { metric: 'keys-in-text', gt: 0 }, body: 'Keys written in plain text: {{keys-in-text}} place(s). Move each to the vault.' },
-      /* WHAT THE BRAIN LEARNED, FOLDED SHUT SINCE 1.10.0: a log looked up, not read each time the page opens, and the
-         section that folds it is what closes Needs a look above it. */
+      /* WHAT HAS GONE STALE, SINCE 1.11.0 (AGT-C18): the record's own `gone-stale`, every finder's count added up (steps
+         nobody took in a month, questions left open, runs that did nothing), and beside it what the record cleared in
+         seven days (`tidied-week`), so the line says both what waits and that something is clearing it. Drawn only
+         while anything is stale; a record that cannot read the figure yet draws nothing, as for any `when:`. */
+      { kind: 'note', tone: 'warn', span: 12, when: { metric: 'gone-stale', gt: 0 }, body: 'Things gone stale: {{gone-stale}}. Tidied this week: {{tidied-week}}.' },
+      /* EVERY RUN LAST HEARD FROM BEFORE TODAY, FOLDED SHUT SINCE 1.11.0. Left for the next run made seven tiles before
+         the fold and a page shows six (`test/calm-pages.test.ts`), so one gave way, and it is this one: what a stopped
+         run left is said above now, by the steps themselves, so the runs of other days are looked up and not read each
+         time the page opens, as Work folds what was finished. The heading counts them, which the record answers with
+         the whole match off one run read (`matched`), and the cards under it wear no heading of their own, since the
+         fold's says what they are. The latest first, six drawn and the rest counted under them, as before. A section
+         whose `when:` says no hides what it holds, so a record with no such run draws neither.
+
+         IT IS ALSO WHAT CLOSES Needs a look above it: a boxed section holds the blocks after it up to the next one.
+
+         THE TWO TILES HEADED Today WERE NOT MADE ONE. Only a boxed section draws two blocks on one surface, and it
+         takes every block up to the next section, so the day's lanes and the runs that stopped today could share a
+         tile only by moving the picture down from under the line or by a heading put in to stop the box. */
+      {
+        kind: 'section',
+        heading: 'Earlier',
+        icon: 'history',
+        span: 12,
+        fold: true,
+        source: 'sessions.live',
+        where: RUNS_EARLIER,
+        limit: 1,
+        when: { metric: 'runs-earlier', gt: 0 },
+      },
+      {
+        kind: 'cards',
+        span: 12,
+        source: 'sessions.live',
+        where: RUNS_EARLIER,
+        columns: STOPPED_COLUMNS,
+        limit: 6,
+        when: { metric: 'runs-earlier', gt: 0 },
+      },
+      /* WHAT THE BRAIN LEARNED, FOLDED SHUT SINCE 1.10.0: a log looked up, not read each time the page opens. Its section
+         closed Needs a look until 1.11.0, when Earlier's came between them. */
       {
         kind: 'section',
         heading: 'What the brain learned',
@@ -617,8 +673,14 @@ export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, Se
      `runs-unplaced` (AGT-D01); Needs a look on the agents home under the runs, one tile of four lines each drawn only
      while a key or tool needs putting right, the fourth over the kernel's `keys-in-text`; What the brain learned
      folded shut under its own section; and five figures over the agent door's own signs (`record.door`, AGT-B01). No
-     list, field or figure goes. */
-  manifest: { id: 'agents', version: '1.10.0', requires: ['register.things'] },
+     list, field or figure goes. 1.10.0 is live.
+     1.11.0 TAKES NOTHING AWAY, SO IT IS MINOR (AGT-C12 job c): Left for the next run on the agents home, cards over the record's
+     `handoffs.open` between Working and Today, and the line counts the same steps by the built-in `handoffs-open`
+     where it read `runs-left-next`. That figure stays declared, read by no block. Needs a look gains a fifth line, over
+     the record's `gone-stale` and `tidied-week` (AGT-C18). Earlier goes under a fold of its own below Needs a look,
+     with its count on the heading, so the page still shows six tiles before its fold. No list, field or figure goes,
+     and every other block 1.10.0 drew is as it was. */
+  manifest: { id: 'agents', version: '1.11.0', requires: ['register.things'] },
   registers: AGENTS_REGISTERS,
   pages: AGENTS_PAGES,
   metrics: AGENTS_METRICS,

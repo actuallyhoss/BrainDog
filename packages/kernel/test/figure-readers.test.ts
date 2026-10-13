@@ -45,6 +45,7 @@ test('EVERY SOURCE THAT IS NO LIST’S HAS ONE READER BY ITS WORD, the door’s 
     'record.places',
     'record.rates',
     'record.signs',
+    'record.tidy',
     'record.vitals',
     'sessions.working',
   ]);

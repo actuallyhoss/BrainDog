@@ -77,11 +77,12 @@
   import { latest } from './latest.ts';
   import { palette as opener } from './open.svelte.ts';
   import { untrack } from 'svelte';
+  import { ABOUT_WAIT, aboutRows, aboutWords, asksAbout } from './about.ts';
   import { capLine, drawProposal, drawReading, offersSlash, pass2Refused, secondPass, slashWords, type Drawn, type DrawnProposal } from './slash.ts';
   import Cited from '../ui/Cited.svelte';
   import SlashOut from '$lib/ui/SlashOut.svelte';
   import DecisionCard from '$lib/decide/DecisionCard.svelte';
-  import type { SlashStatus } from '@braindog/client';
+  import type { About, SlashStatus } from '@braindog/client';
 
   let { open = $bindable(false), nav }: { open?: boolean; nav: NavEntry[] } = $props();
 
@@ -325,6 +326,20 @@
   let found = $state<{ text: string; hits: Hits } | null>(null);
   const asking = latest((text: string) => reader().then((r) => r.find(text, RECORD_CAP)), 120);
 
+  /**
+   * WHAT THE NAME IN THE BOX IS, FOR THE NAME IT ANSWERS (`about.ts`, ENG-B02): the record's `about` read, asked once the
+   * typing rests and kept only while the box still says that name. A refusal and an answer of nothing draw the same
+   * thing, which is nothing: the search below is what says when nothing matched.
+   */
+  let known = $state<{ name: string; answer: About } | null>(null);
+  const aboutAsk = latest(
+    (name: string) =>
+      client()
+        .then((c) => c.about({ name }))
+        .catch(unreached),
+    ABOUT_WAIT,
+  );
+
   /** The rows changed last and the figures, read once each time a live palette opens. */
   let extra = $state<{ recent: Recent[]; figures: Metric[] } | null>(null);
 
@@ -380,6 +395,8 @@
     /* AND THE CUSTOMISE ROWS WITH IT, for the same reason: "dark" or "hide inbox" is a thing to do, typed out. */
     [copy.customise.group]: -1,
     [copy.records]: 0,
+    /* WHAT THE NAME IS, OVER THE LISTS THAT HOLD THE WORD: the one thing meant comes before every row that mentions it. */
+    [aboutWords.group]: 0.5,
     [RECENT]: 2,
     [copy.decide]: 3,
     [FIGURES]: 4,
@@ -467,6 +484,25 @@
     return found?.text === parsed.text ? found.hits : null;
   });
 
+  /** The name the record is asked about, or `null`: never with no record, and never a sentence the palette acts on. */
+  const aboutName = $derived(isLive ? asksAbout({ prefix: parsed.prefix, text: parsed.text, acting: live.creation !== null || live.page !== null }) : null);
+  /** What it is, as rows, only while the answer is for the name in the box. */
+  const aboutShown = $derived(known !== null && known.name === aboutName ? aboutRows(known.answer, known.name, shell.now ?? Date.now()) : []);
+
+  $effect(() => {
+    const name = aboutName;
+    if (!open || name === null) {
+      aboutAsk.cancel();
+      return;
+    }
+    /* ALREADY ANSWERED: typing on and back to the same name asks nothing twice. */
+    if (untrack(() => known?.name) === name) return;
+    aboutAsk.ask(name, (out) => {
+      if (out.ok) known = { name, answer: out.value };
+    });
+    return () => aboutAsk.cancel();
+  });
+
   /** A live query the record has not answered yet. The panel stays quiet rather than saying nothing matched. */
   const pending = $derived(searching && isLive && hits === null);
 
@@ -527,6 +563,9 @@
         icon: listNamed.get(r.register)?.icon ?? 'rows',
       }));
     const needle = text.toLowerCase();
+    /* WHAT THE NAME IS, FIRST INTO THE LIST so the cap below never cuts it, and its place on screen is its group's rank. */
+    const about = aboutShown;
+    const aboutAt = new Set(about.flatMap((r) => r.href ?? []));
     /**
      * ONE QUERY MEANS ONE THING IN THIS PANEL, and four groups still disagreed.
      *
@@ -559,7 +598,7 @@
       const has = tokensOf(title);
       return want.every((w) => has.some((tok) => tok.startsWith(w)));
     };
-    const out: Row[] = [];
+    const out: Row[] = [...about];
 
     // Exact spoken id first, always. It is the string a person heard out loud.
     // AND THE LINE UNDER IT SAID SO. `spoken id` is what this repository calls the convention among
@@ -742,7 +781,9 @@
          the decisions and the pages all arrived as one undifferentiated block, so a person scanning
          for a person had to read every obligation on the way. `search()` round-robins across the
          sources, so the groups are short. */
-      for (const hit of kept)
+      for (const hit of kept) {
+        /* DRAWN ONCE, as a page is: the thing the name means is already a row, with what it is, at this address. */
+        if (aboutAt.has(hit.href)) continue;
         out.push({
           id: `h-${hit.href}`,
           title: hit.title,
@@ -757,6 +798,7 @@
           icon: hit.icon,
           complete: hit.title,
         });
+      }
 
       /**
        * AND THE OVERFLOW IS A ROW, NOT A CAPTION.

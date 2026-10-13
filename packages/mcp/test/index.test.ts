@@ -162,6 +162,12 @@ test('AND THE RESOURCES GO THE SAME WAY, more quietly, which is the half of this
     'braindog:understand',
     /* THE STEPS LEFT, drawn by `previewPage`, which the narrow surface has not got. */
     'braindog:handoffs',
+    /* WHAT MATTERS, WHAT STOPPED, WHAT WENT STALE AND WHAT A NAME IS (batch 85): the record's own reads, which the
+       narrow surface has not got. */
+    'braindog:briefing',
+    'braindog:exceptions',
+    'braindog:stale',
+    'braindog:about',
     'braindog:sessions/live',
     'braindog:inbox',
     'braindog:inbox/patterns',
