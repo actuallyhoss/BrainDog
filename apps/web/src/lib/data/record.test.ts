@@ -146,6 +146,8 @@ function record(name: string, params: URLSearchParams): Response {
     /* `obligations` also declares `book`, a ref to `books` (money-core `BOOK`), which the walk asks for
        whether or not a sample row carries one: none here do, so the target list is empty. */
     if (register === 'books') return page([], null);
+    /* AND `account`, a ref to `accounts` (money-core's bill on an account), empty here for the same reason. */
+    if (register === 'accounts') return page([], null);
   }
   return json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: `Nothing here answers ${name}.` } });
 }

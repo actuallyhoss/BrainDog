@@ -9,6 +9,8 @@ import { MONEY } from './shared.ts';
  * `book-cash` counts it: it is cash that moved and nothing earned or spent.
  */
 const BOOK_MONTH = 'state is cleared, transfer is false, on at least bom';
+/** The same entries over the thirteen months a book's chart reads, a month to a point. */
+const BOOK_MONTHS = 'state is cleared, transfer is false, on after -13m';
 
 export const BOOK_FIGURES: Record<string, SeedMetric> = {
   /**
@@ -118,6 +120,93 @@ export const BOOK_FIGURES: Record<string, SeedMetric> = {
     value: { count: 'id' },
     format: 'int',
     target: { lte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  /**
+   * WHAT ONE BOOK IS OWED AND WHAT IT OWES, read once per book as `book-cash` is: `book-owed-to:Personal` fills
+   * `{{it}}` with the book's name. EACH IS ITS WHOLE-RECORD FIGURE'S CLAUSE WITH THE BOOK ADDED, word for word
+   * (`owed-to-you` and `owed-by-you` in `due.ts`, which share `OPEN`), so the books of a record whose bills are all
+   * filed add up to the two figures Money leads with, and no two of them disagree about which bills are still live.
+   * Late or months ahead, a bill still open is owed.
+   *
+   * IN THE BOOK'S OWN CURRENCY where the book says one, else the record's, and one amount a currency where neither can
+   * add them (`MONEY`). They read Bills and invoices and nothing else: a repeating line and an instalment are money
+   * that will fall due, and what falls due is the walk's to say.
+   *
+   * NOUGHT OR MORE, as `book-in-month` is held: the ceiling on what a record owes is a setting (`owed-by-you`), and no
+   * ceiling on one book is one anybody would keep. AFTER THE COUNTS, so every figure above keeps its place.
+   */
+  'book-owed-to': {
+    metric: 'book-owed-to',
+    name: 'Due to come into one book',
+    source: 'register.obligations',
+    where: `${OPEN}, direction is owed to me, book is {{it}}`,
+    value: { sum: 'amount' },
+    format: MONEY,
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  'book-owed-by': {
+    metric: 'book-owed-by',
+    name: 'Due to go out of one book',
+    source: 'register.obligations',
+    where: `${OPEN}, direction is owed by me, book is {{it}}`,
+    value: { sum: 'amount' },
+    format: MONEY,
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  /**
+   * THE SAME THREE, A MONTH AT A TIME, for the chart on a book's page (In and out, by month; `pages/book.ts` draws it
+   * once all three are declared): thirteen months back of one book's cleared entries, no transfer, grouped by the month
+   * each was on. The net is the amount signed by its direction over the same entries, as `book-net-month` is, and the
+   * chart is drawn only where it holds a reading. LAST, so every figure above keeps its place.
+   */
+  'book-in-by-month': {
+    metric: 'book-in-by-month',
+    name: 'Money into one book, by month',
+    source: 'register.transactions',
+    where: `${BOOK_MONTHS}, direction is in, book is {{it}}`,
+    value: { sum: 'amount' },
+    group_by: 'on',
+    bucket: 'month',
+    format: MONEY,
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  'book-out-by-month': {
+    metric: 'book-out-by-month',
+    name: 'Money out of one book, by month',
+    source: 'register.transactions',
+    where: `${BOOK_MONTHS}, direction is out, book is {{it}}`,
+    value: { sum: 'amount' },
+    group_by: 'on',
+    bucket: 'month',
+    format: MONEY,
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  'book-net-by-month': {
+    metric: 'book-net-by-month',
+    name: 'Left over in one book, by month',
+    source: 'register.transactions',
+    where: `${BOOK_MONTHS}, book is {{it}}`,
+    value: { sum: { product: ['amount', { lookup: 'sign', by: 'direction' }] } },
+    lookups: { sign: LOOKUPS.sign! },
+    group_by: 'on',
+    bucket: 'month',
+    format: MONEY,
+    target: { gte: 0 },
     window: '30d',
     compare: 'none',
   },

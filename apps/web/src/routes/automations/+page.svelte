@@ -10,6 +10,9 @@
   ONE ROW EACH, TWO LINES: its name and what it is, then where it stands. The second line is the verdict and wraps
   rather than losing its end to an ellipsis, which on a phone was exactly the part that said what to do.
 
+  THE NAME, THE TABS AND THE TAB'S OWN ACTION ARE DRAWN ONCE, IN `+layout.svelte`, over this page and Runs alike, so
+  the selection slides to Runs as it does between the other four.
+
   THE NEW-ACTION SHEET OPENS FROM THE ADDRESS, `?new=door` or `?new=action&preset=<id>`, so a
   declared page links to a sheet already filled in and this hub is the one reader. Closing it takes the two keys off
   the address and redraws the tab under it, so what was just made shows without a reload.
@@ -19,27 +22,24 @@
   import { goto } from '$app/navigation';
   import { at } from '$lib/at.ts';
   import { titleOf } from '$lib/title.ts';
-  import PageHead from '$lib/ui/PageHead.svelte';
-  import Button from '$lib/ui/Button.svelte';
   import NewAction from '$lib/ui/NewAction.svelte';
   import WebhookDoors from '$lib/ui/WebhookDoors.svelte';
   import { drew } from '$lib/ui/screen.svelte.ts';
   import { words } from '$lib/flow/flow.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
-  import HubTabs from './HubTabs.svelte';
   import AutomationsTab from './AutomationsTab.svelte';
   import ScheduledTab from './ScheduledTab.svelte';
   import ScriptsTab from './ScriptsTab.svelte';
-  import { hubWords as w, newOf, tabOf, withoutNew, type Sentence } from './hub.ts';
+  import { newOf, tabOf, withoutNew } from './hub.ts';
+  import { hubHead } from './hub-head.ts';
 
   const tab = $derived(tabOf(page.url.searchParams));
   const ask = $derived(newOf(page.url.searchParams));
 
-  /* THE HEADING COUNTS AUTOMATIONS ONLY ON ITS OWN TAB, as it did when this was the list; a count of five kinds at
-     once would be a sum nobody asked for. */
-  let count = $state<number | undefined>(undefined);
-  /* AND THE SENTENCE UNDER IT, from the same read: how many run by themselves, and which one is failing. */
-  let said = $state<Sentence | null>(null);
+  /* THE HEAD IS THE LAYOUT'S (`+layout.svelte`), so the tabs stay while this page and Runs change under them. It counts
+     automations only on their own tab, as it did when this was the list (a count of five kinds at once would be a sum
+     nobody asked for), and says the sentence from the same read: how many run by themselves, and which one is failing. */
+  const head = hubHead();
 
   /* BUMPED WHEN THE SHEET CLOSES, so the tab under it reads again and a door or an action just made is listed. */
   let drawn = $state(0);
@@ -62,30 +62,10 @@
 
 <svelte:head><title>{titleOf(words.heading)}</title></svelte:head>
 
-<!-- THE TABS ARE THE TOOLBAR'S GLASS SEGMENTED CONTROL, beside the one primary action, which is the tab's own: "New
-     automation", "New scheduled action", "New script", and none on Doors, whose section carries "New door" for an owner. -->
-<PageHead
-  icon="refresh"
-  title={words.heading}
-  count={tab === 'automations' ? count : undefined}
-  sentence={tab === 'automations' ? said?.text : undefined}
-  needs={tab === 'automations' && said?.needs ? said.needs : undefined}
->
-  {#snippet actions()}
-    <HubTabs here={tab} />
-    {#if tab === 'automations'}
-      <Button weight="primary" href="/automations/new">{words.newOne}</Button>
-    {:else if tab === 'scheduled'}
-      <Button weight="primary" href="/automations?tab=scheduled&new=action">{w.newAction}</Button>
-    {:else if tab === 'scripts'}
-      <Button weight="primary" href="/scripts/new">{w.newScript}</Button>
-    {/if}
-  {/snippet}
-</PageHead>
 <div class="page">
   {#key drawn}
     {#if tab === 'automations'}
-      <AutomationsTab {owner} oncount={(n) => (count = n)} onsentence={(s) => (said = s)} />
+      <AutomationsTab {owner} oncount={(n) => (head.automations = n)} onsentence={(s) => (head.said = s)} />
     {:else if tab === 'scheduled'}
       <ScheduledTab />
     {:else if tab === 'scripts'}

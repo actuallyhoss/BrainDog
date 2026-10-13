@@ -140,7 +140,7 @@ type Answered = {
   /* A SECTION'S `true`, AND ON A GROUPED CARD BLOCK `true` OR HOW MANY OF EACH GROUP SHOW, narrowed below. */
   fold?: unknown;
   icon?: string;
-  columns?: { field: string; label?: unknown; width?: string; align?: 'start' | 'end'; as?: string; sign?: { field: string; minus: string }; metric?: unknown }[];
+  columns?: { field: string; label?: unknown; width?: string; align?: 'start' | 'end'; as?: string; sign?: { field: string; minus: string }; metric?: unknown; or?: unknown }[];
   cells?: { metric: string; label?: unknown; trend?: unknown; note?: unknown }[];
   /* THE KEYS THE RECORD NEVER CHECKED, NAMED RATHER THAN COUNTED. This said THE SIX and listed
      seven, and `label` below makes any count wrong again, so it names them: `kind`, `where`,
@@ -604,6 +604,8 @@ const columnsOf = (b: Answered) => {
       align: c.align ?? 'start',
       truncate: fieldOf(register, c.field)?.type === 'money' ? ('never' as const) : ('end' as const),
       ...(as === undefined ? {} : { as }),
+      /* THE SECOND FIELD RIDES ALONG (`toRows` reads it where the first holds nothing): dropped here, no live page ever read it. */
+      ...(typeof c.or === 'string' ? { or: c.or } : {}),
     };
   });
 };

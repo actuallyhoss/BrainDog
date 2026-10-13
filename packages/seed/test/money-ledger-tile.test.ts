@@ -9,10 +9,10 @@
  * the page yet, for the two reasons `parts/ledger.ts` gives; the last test fails the day either reason is gone, so the
  * box is not forgotten.
  *
- * WHO WAS PAID, AND NOT YET ON THE TILE (REC-B16 step 5). The record keeps a payee by the name a person reads beside the
- * bank's own line, and the tile still says the bank's line. The three tests at the foot say what is wanted (a `todo`,
- * red until it is built), what must not move with it (the day, the signed amount, the order), and why it waits: a
- * column names one field, and a field with no value is an empty cell.
+ * WHO WAS PAID, ON THE TILE (REC-B16 step 5). The record keeps a payee by the name a person reads beside the bank's own
+ * line, and the tile says the payee, and the description where an entry holds none. The three tests at the foot hold
+ * the two lines, what did not move with them (the day, the signed amount, the order), and why the column names a
+ * second field: a payee column alone is an empty cell on every entry a person typed.
  */
 
 import { test } from 'node:test';
@@ -26,7 +26,7 @@ import { NOW, REGISTERS, TRANSACTIONS, day, declarations, installSeed, metricDec
 import { MONEY_PAGE } from '../src/modules/money/pages/money.ts';
 import { ADD_MOVEMENT, LEDGER, LEDGER_LINES } from '../src/modules/money/pages/parts/ledger.ts';
 
-type Column = { field: string; sign?: { field: string; minus: string } };
+type Column = { field: string; or?: string; sign?: { field: string; minus: string } };
 type Drawn = { kind?: string; heading?: string; drawn?: boolean; refusals: readonly unknown[]; columns?: readonly Column[]; rows?: readonly { id: string; seq: number; fields: Record<string, unknown> }[] };
 
 const drawn = (k: Kernel): Drawn[] => {
@@ -165,12 +165,17 @@ test('ADD A MOVEMENT IS DECLARED AND WAITS: one line cannot say an amount, an ac
 });
 
 /**
- * What a line of a timeline says for its name: its second cell, the value of the second column's field
- * (`packages/render/src/html.ts`, and `cells` in the app's `record/api.ts`). A field holding nothing is an empty cell.
+ * What a line of a timeline says for its name: its second cell, the value of the second column's field, and of the
+ * field its `or:` names where the first holds nothing (`toRows` in the app's `record/api.ts`; the record hands over
+ * both). A column with no `or:` over a field holding nothing is an empty cell.
  */
 const named = (tile: Drawn, row: { fields: Record<string, unknown> }): string => {
-  const said = row.fields[tile.columns?.[1]?.field ?? ''];
-  return typeof said === 'string' ? said : '';
+  const column = tile.columns?.[1];
+  const said = (field: string | undefined): string => {
+    const value = row.fields[field ?? ''];
+    return typeof value === 'string' ? value : '';
+  };
+  return said(column?.field) || said(column?.or);
 };
 
 /** A record with one account and two entries: one a bank door filed, with its payee, and one a person typed. */
@@ -190,9 +195,9 @@ async function paidAndTyped(extra: unknown[] = []): Promise<Kernel> {
   return k;
 }
 
-/* WANTED, AND RED UNTIL IT IS BUILT (a `todo`, so it is counted and fails no run). "Strips a trailing processor
-   reference" (the owner): he reads who he paid, and the bank's own line only where nothing better is known. */
-test('A LINE SAYS WHO WAS PAID, and an entry a person typed, with no payee, says its description', { todo: 'a column cannot fall back yet' }, async () => {
+/* "Strips a trailing processor reference" (the owner): he reads who he paid, and the bank's own line only where
+   nothing better is known. */
+test('A LINE SAYS WHO WAS PAID, and an entry a person typed, with no payee, says its description', async () => {
   const k = await paidAndTyped();
   const tile = drawn(k).find((b) => b.heading === 'Ledger');
   assert.ok(tile, 'the page draws no Ledger');
@@ -208,16 +213,16 @@ test('THE DAY, THE SIGNED AMOUNT AND THE ORDER ARE THE LEDGER\'S, whatever its n
   /* THREE CELLS, which is all a timeline draws: a fourth column for the payee would never be on the page. */
   assert.equal(columns.length, 3);
   assert.deepEqual(columns[0], { field: 'on' });
+  assert.deepEqual(columns[1], { field: 'payee', or: 'what' });
   assert.deepEqual(columns[2], { field: 'amount', sign: { field: 'direction', minus: 'out' } });
   assert.deepEqual((LEDGER[0] as { order?: unknown }).order, [{ field: 'on', dir: 'desc' }]);
   assert.deepEqual((tile.rows ?? []).map((r) => String(r.fields.on)), [day(0), day(-1)]);
   assert.deepEqual((tile.rows ?? []).map((r) => (r.fields.amount as { amount: number }).amount), [4_500, 90_000]);
 });
 
-/* WHY IT WAITS, MEASURED. The same Ledger with the payee as its name: the line a bank door filed reads well, and the
-   line a person typed says nothing at all, which is worse than the bank's words. THE DAY THIS FAILS, a column can fall
-   back: give `LEDGER` columns of its own in `parts/ledger.ts` and take the `todo` off the test above. */
-test('A PAYEE COLUMN SAYS NOTHING FOR AN ENTRY WITH NO PAYEE, so the tile keeps the description until a column can fall back', async () => {
+/* WHY THE COLUMN NAMES A SECOND FIELD, MEASURED. The same Ledger with the payee alone as its name: the line a bank
+   door filed reads well, and the line a person typed says nothing at all, which is worse than the bank's words. */
+test('A PAYEE COLUMN ALONE SAYS NOTHING FOR AN ENTRY WITH NO PAYEE, so the tile falls back to the description', async () => {
   const probe = {
     id: 'page.ledger-payee-probe',
     kind: 'page',
@@ -232,9 +237,11 @@ test('A PAYEE COLUMN SAYS NOTHING FOR AN ENTRY WITH NO PAYEE, so the tile keeps 
   assert.ok(out.ok, sayOf(out));
   const tile = (out.value as unknown as { blocks: Drawn[] }).blocks[0]!;
   assert.deepEqual(tile.refusals, []);
-  assert.deepEqual((tile.rows ?? []).map((r) => named(tile, r)), ['Chillout', ''], 'a payee column falls back now: draw it on the Ledger');
-  /* AND THE TILE AS IT SHIPS says the bank's line for both, reference and all. */
+  assert.deepEqual((tile.rows ?? []).map((r) => named(tile, r)), ['Chillout', '']);
+  /* AND THE TILE AS IT SHIPS says the payee, and the words typed where there is none. The bank's own line is still on
+     the entry, for a host that opens it. */
   const shipped = drawn(k).find((b) => b.heading === 'Ledger');
   assert.ok(shipped, 'the page draws no Ledger');
-  assert.deepEqual((shipped.rows ?? []).map((r) => named(shipped, r)), ['CHILLOUT CAFE 4471 REF 99812', 'Rent']);
+  assert.deepEqual((shipped.rows ?? []).map((r) => named(shipped, r)), ['Chillout', 'Rent']);
+  assert.deepEqual((shipped.rows ?? []).map((r) => r.fields.what), ['CHILLOUT CAFE 4471 REF 99812', 'Rent']);
 });

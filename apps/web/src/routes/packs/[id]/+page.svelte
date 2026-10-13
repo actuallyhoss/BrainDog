@@ -36,6 +36,8 @@
   import { currencyChoices } from '$lib/record/currencies.ts';
   import { settingChoices } from './said.ts';
   import { heldNames, holdName, waitingIn, waitingLine } from './waiting.ts';
+  import { lineSaid, pairsOf, rateNote, rateSaid, readRates, type PairRead } from './rates.ts';
+  import { Sparkline } from '$lib/viz/index.ts';
   import { kennelFetch, publishedText } from '$lib/market/publish.ts';
   import {
     UNITS,
@@ -195,8 +197,28 @@
     if (got.ok && String(page.params.id) === want) {
       installed = got.value.find((p) => p.id === want) ?? null;
       void readWaiting(got.value, want);
+      void readPairs(installed?.registers ?? [], want);
     }
   }
+
+  /**
+   * THE RATES THE RECORD HOLDS, for the rates tile: the newest of each pair, and its last 90 days. Read off whichever of
+   * this add-on's own lists declares `rates:`, so no list is named here, and only on the page that sets the home
+   * currency, which is where the tile is. Empty until the record answers and when it holds none, and the tile is then
+   * the sentence and the button alone.
+   */
+  let rates = $state<Awaited<ReturnType<typeof readRates>>>([]);
+  async function readPairs(registers: readonly string[], want: string) {
+    rates = [];
+    if (!settings || !(HOME_CURRENCY_SETTING in settings.config)) return;
+    const got = await readRates(createClient({ base: apiBase() }), registers);
+    if (String(page.params.id) === want) rates = got;
+  }
+  /* Worked out again when the home currency is saved, because a pair is read into it. */
+  const pairs = $derived.by((): PairRead[] => {
+    const home = settings?.values[HOME_CURRENCY_SETTING];
+    return pairsOf(rates, new Date().toISOString().slice(0, 10), typeof home === 'string' && home !== '' ? home : null);
+  });
 
   /**
    * WHAT OF THIS ADD-ON WAITS for the record to hold a list (`when: { holds }`), worked out on read: its own file at the
@@ -557,9 +579,25 @@
              This page drew a form written for one pack, which it imported by name; now it links to the same sheet
              every scheduled action is made on, filled in for a rate. It stays offered once one is set up, because each
              currency is an action of its own and a second currency is the same press again. -->
-        <!-- A TILE, AND NO CHART IN IT: the rates are fetched by an action, and until one runs there is no rate here to
-             draw. It is a control tile, which the design system allows to hold no figure. -->
+        <!-- THE TILE HOLDS WHAT THE RECORD HOLDS: the newest rate of each pair, and a line of its last 90 days once
+             there are points enough to draw (`rates.ts`). Until an action has fetched one there is no rate here, and
+             it is the control tile it was, which the design system allows to hold no figure. -->
         <Tile icon="money" title={copy.ratesHeading}>
+          {#if pairs.length > 0}
+            <ul class="rates">
+              {#each pairs as p (`${p.currency} ${p.base}`)}
+                <li class="rate">
+                  <div class="rate-said">
+                    <p class="rate-now num">{rateSaid(p)}</p>
+                    <p class="rate-note">{rateNote(p)}</p>
+                  </div>
+                  {#if p.chart}
+                    <span class="rate-line"><Sparkline values={p.points.map((point) => point.rate)} summary={lineSaid(p)} /></span>
+                  {/if}
+                </li>
+              {/each}
+            </ul>
+          {/if}
           <p class="rates-why">{copy.ratesWhy}</p>
           <div class="settings-actions">
             <Button weight="quiet" href={at('/automations?new=action&preset=rates')}>{copy.ratesSetUp}</Button>
@@ -678,6 +716,44 @@
     font-size: var(--t-base);
     line-height: 20px;
     text-wrap: pretty;
+  }
+
+  /* THE RATES: one line a pair, what one is worth and as of when on the left, its last 90 days on the right. */
+  .rates {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .rate {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-3);
+  }
+
+  .rate-now {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--t-lg);
+    font-weight: 600;
+    line-height: 24px;
+  }
+
+  .rate-note {
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-base);
+    line-height: 20px;
+  }
+
+  .rate-line {
+    flex: 0 1 120px;
+    min-inline-size: 80px;
   }
 
   /* ONE SETTING: its label above its control, its note and any refusal under it. */

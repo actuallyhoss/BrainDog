@@ -19,7 +19,10 @@ const NAMED = (list: string): string =>
   `Settings say which list each name belongs to, such as "Name of the ${list} list", and the names of your lists come first.`;
 
 export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>> = {
-  personal: [{ version: '2.3.1', notes: NAMED('Ledger') }],
+  personal: [
+    { version: '2.4.0', notes: 'The count of the budgets you have set is kept by Money now, so Home and Money read the same one. Nothing you see on Home changes.' },
+    { version: '2.3.1', notes: NAMED('Ledger') },
+  ],
   student: [{ version: '1.5.1', notes: NAMED('Courses') }],
   founder: [
     {

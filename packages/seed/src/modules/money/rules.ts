@@ -249,14 +249,14 @@ export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
   },
   SETTLE_SCRIPT,
   /**
-   * A THING ON AN ACCOUNT IS IN THAT ACCOUNT'S BOOK (REC-A09 job 1): a Ledger entry, a repeating line or an instalment
+   * A THING ON AN ACCOUNT IS IN THAT ACCOUNT'S BOOK (REC-A09 job 1): a Ledger entry, a bill, a repeating line or an instalment
    * written with an account and no book starts `script.book_from_account`, which fills the book from the account
    * (`scripts/book-from-account.js`). Until these rules a book's page counted only what somebody filed by hand, and
    * nothing a bank's text wrote.
    *
    * A RULE AND A SCRIPT, NOT A `set`, because the book is the account's and a fill reads the row that was written alone.
-   * ONE RULE FOR EACH LIST, since a trigger names one. NO RULE FOR BILLS AND INVOICES: that list holds no account, so
-   * there is nothing to take a book from, and `account is set` would be refused on it.
+   * ONE RULE FOR EACH LIST, since a trigger names one. BILLS AND INVOICES IS THE FOURTH (`bill-takes-book`): the list
+   * held no account until it gained one for this, and `account is set` would have been refused on it before.
    *
    * ON A WRITE TO THE ACCOUNT ALONE. An edit to an entry's words starts nothing, and neither does the write the script
    * makes. So a thing somebody takes out of its book stays out, and one moved to another account keeps the book it
@@ -269,6 +269,7 @@ export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
   ...(
     [
       ['entry-takes-book', 'File a Ledger entry in its account\'s book', 'transactions'],
+      ['bill-takes-book', 'File a bill or an invoice in its account\'s book', 'obligations'],
       ['repeat-takes-book', 'File a repeating line in its account\'s book', 'recurring'],
       ['part-takes-book', 'File an instalment in its account\'s book', 'installments'],
     ] as const

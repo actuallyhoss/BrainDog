@@ -28,7 +28,11 @@ const TODAY = Date.UTC(2026, 8, 18, 12);
 const MONTH = ['book-in-month', 'book-out-month', 'book-net-month'] as const;
 /** What is filed in no book, by the list it is in. */
 const UNFILED = { 'ledger-in-no-book': 'transactions', 'bills-in-no-book': 'obligations', 'repeating-in-no-book': 'recurring', 'instalments-in-no-book': 'installments' } as const;
-const ALL = [...MONTH, ...Object.keys(UNFILED)];
+/** What one book is owed and what it owes, by the way its bills and invoices go (book-owed-figures-73). */
+const OWED = { 'book-owed-to': 'owed to me', 'book-owed-by': 'owed by me' } as const;
+/** The three a book's chart reads, a month to a point (book-page-months-73), declared after the two above. */
+const BY_MONTH = ['book-in-by-month', 'book-out-by-month', 'book-net-by-month'] as const;
+const ALL = [...MONTH, ...Object.keys(UNFILED), ...Object.keys(OWED), ...BY_MONTH];
 
 const value = <T>(r: unknown): T => {
   const x = r as { ok: boolean; value: T; refusal?: { code: string; fix: string; at?: string } };
@@ -225,6 +229,119 @@ test('NO NAME A PERSON READS SAYS ROW, and each count names its own list', () =>
   assert.equal(METRICS['ledger-in-no-book']!.name, 'Ledger entries in no book');
   assert.equal(METRICS['bills-in-no-book']!.name, 'Bills and invoices in no book');
 });
+
+/** One bill or invoice. What a test does not say is open, in piastres, due on the 25th and filed in the Studio book. */
+const owed = (r: Kept, direction: 'owed_to_me' | 'owed_by_me', amount: number, more: Record<string, unknown> = {}): Entry => {
+  const fields = { what: `${direction} ${amount}`, direction, amount: { amount, currency: 'EGP' }, due: '2026-09-25', state: 'open', book: r.studio.id, ...more };
+  return value<Entry>(r.k.create('obligations', Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined)), OWNER));
+};
+
+/* RED FIRST (book-owed-figures-73): with the two out of `BOOK_FIGURES`, the first test of the file fails on `METRICS`
+   and each of these on the figure it reads. */
+test("OWED TO A BOOK AND OWED BY IT ARE THE BOOK'S OPEN BILLS AND INVOICES, by the way they go, each read once per book", async () => {
+  const r = await fresh();
+  owed(r, 'owed_to_me', 600_000);
+  owed(r, 'owed_to_me', 150_000, { state: 'part', due: '2026-08-01' }); // part paid and already late: still owed
+  owed(r, 'owed_by_me', 90_000);
+  owed(r, 'owed_by_me', 40_000, { due: '2027-03-01' }); // months ahead: still owed
+
+  owed(r, 'owed_to_me', 70_000, { state: 'paid', settled: '2026-09-02' }); // paid, so owed by nobody
+  owed(r, 'owed_by_me', 30_000, { state: 'paid', settled: '2026-09-02' });
+  owed(r, 'owed_to_me', 800_000, { book: r.home.id }); // the other book's
+  owed(r, 'owed_by_me', 300_000, { book: r.home.id });
+  owed(r, 'owed_to_me', 11_000, { book: undefined }); // filed in no book
+  owed(r, 'owed_by_me', 12_000, { book: undefined });
+
+  const to = read(r.k, 'book-owed-to');
+  const by = read(r.k, 'book-owed-by');
+  /* E£7,500.00 over two invoices and E£1,300.00 over two bills. */
+  assert.equal(to.value, 750_000);
+  assert.equal(to.rows, 2, 'a paid invoice, a bill, the other book or one in no book was counted as owed to this book');
+  assert.equal(by.value, 130_000);
+  assert.equal(by.rows, 2, 'a paid bill, an invoice, the other book or one in no book was counted as owed by this book');
+  assert.equal(to.unit, 'EGP');
+  assert.equal(by.unit, 'EGP');
+  /* HELD TO THE BOOK'S OWN, and never to every bill of the record. */
+  assert.equal(to.held, 6);
+  /* AND THE OTHER BOOK READS ITS OWN, from the same declaration. */
+  assert.equal(read(r.k, 'book-owed-to', 'Household').value, 800_000);
+  assert.equal(read(r.k, 'book-owed-by', 'Household').value, 300_000);
+});
+
+test('EACH IS ITS WHOLE-RECORD FIGURE CUT TO ONE BOOK, and names no field of another list', async () => {
+  const { k } = await fresh();
+  const list = k.declarations().find((d) => d.id === 'register.obligations');
+  const fields = new Set(((JSON.parse(String(list?.body ?? '{}')) as { fields?: { id: string }[] }).fields ?? []).map((f) => f.id));
+  assert.ok(fields.has('book') && fields.has('direction'), 'Bills and invoices no longer holds a book or a direction');
+  for (const [id, way] of Object.entries(OWED)) {
+    const decl = METRICS[id]!;
+    assert.equal(decl.source, 'register.obligations');
+    assert.deepEqual(decl.value, { sum: 'amount' });
+    assert.equal(decl.format, 'money', `${id} names a currency or is no money figure`);
+    const whole = METRICS[id === 'book-owed-to' ? 'owed-to-you' : 'owed-by-you']!;
+    assert.equal(decl.where, `${String(whole.where)}, book is {{it}}`, `${id} counts other bills than ${whole.metric} does`);
+    assert.match(String(decl.where), new RegExp(`direction is ${way},`));
+    /* EVERY CLAUSE STARTS WITH A FIELD BILLS AND INVOICES HOLDS: no account, no category, no `on`. */
+    for (const clause of String(decl.where).split(',')) assert.ok(fields.has(clause.trim().split(' ')[0]!), `${id} reads ${clause.trim()}, which is no field of Bills and invoices`);
+    for (const key of ['legs', 'opening', 'lookups', 'group_by', 'pack']) assert.equal((decl as unknown as Record<string, unknown>)[key], undefined, `${id} reads more than its one list`);
+  }
+});
+
+test('ACROSS TWO CURRENCIES WHAT A BOOK IS OWED IS ONE AMOUNT A CURRENCY, and never the two added', async () => {
+  const r = await fresh();
+  owed(r, 'owed_to_me', 600_000);
+  owed(r, 'owed_to_me', 20_000, { amount: { amount: 20_000, currency: 'USD' } });
+  owed(r, 'owed_by_me', 90_000);
+  const to = read(r.k, 'book-owed-to');
+  assert.equal(to.value, null, 'Egyptian pounds were added to dollars');
+  assert.equal(to.unit, null);
+  assert.deepEqual([...(to.parts ?? [])].sort((a, b) => a.currency.localeCompare(b.currency)), [{ currency: 'EGP', amount: 600_000 }, { currency: 'USD', amount: 20_000 }]);
+  /* WHAT IT OWES IS ALL IN POUNDS, so it is one amount. */
+  assert.deepEqual([read(r.k, 'book-owed-by').value, read(r.k, 'book-owed-by').unit], [90_000, 'EGP']);
+});
+
+test("A BOOK THAT SAYS ITS CURRENCY IS READ IN IT: a dollar book's invoices in pounds are said in dollars", async () => {
+  const r = await fresh();
+  assert.ok(r.k.setPackConfig('money-core', { home_currency: 'EGP' }, OWNER).ok);
+  value(r.k.create('fx', { currency: 'USD', base: 'EGP', rate: 50, as_of: '2026-09-01' }, OWNER));
+  const quartz = value<Entry>(r.k.create('books', { name: 'Quartz', currency: 'USD' }, OWNER));
+  owed(r, 'owed_to_me', 400_000, { book: quartz.id, amount: { amount: 400_000, currency: 'USD' } });
+  owed(r, 'owed_to_me', 5_000_000, { book: quartz.id }); // E£50,000.00 at fifty pounds a dollar is $1,000.00
+  owed(r, 'owed_by_me', 2_500_000, { book: quartz.id });
+  owed(r, 'owed_to_me', 20_000, { amount: { amount: 20_000, currency: 'USD' } }); // Studio says no currency
+  assert.deepEqual([read(r.k, 'book-owed-to', 'Quartz').value, read(r.k, 'book-owed-to', 'Quartz').unit], [500_000, 'USD']);
+  assert.deepEqual([read(r.k, 'book-owed-by', 'Quartz').value, read(r.k, 'book-owed-by', 'Quartz').unit], [50_000, 'USD']);
+  /* A BOOK THAT SAYS NOTHING is read as every figure is, in the home currency: $200.00 is E£10,000.00. */
+  assert.deepEqual([read(r.k, 'book-owed-to').value, read(r.k, 'book-owed-to').unit], [1_000_000, 'EGP']);
+});
+
+test('A BOOK THAT IS OWED NOTHING AND OWES NOTHING READS NO VALUE, and a book whose bills are all paid reads nought', async () => {
+  const r = await fresh();
+  owed(r, 'owed_to_me', 800_000, { book: r.home.id });
+  owed(r, 'owed_by_me', 300_000, { book: undefined });
+  for (const id of Object.keys(OWED)) {
+    const got = read(r.k, id);
+    assert.equal(got.rows, 0);
+    assert.equal(got.held, 0, `${id} counts another book's bills, or every bill, as this book's`);
+    assert.notEqual(got.met, false, `${id} gives a book with no bills a missed target`);
+    assert.equal(got.parts, undefined);
+  }
+  owed(r, 'owed_by_me', 30_000, { state: 'paid', settled: '2026-09-02' });
+  for (const id of Object.keys(OWED)) {
+    const got = read(r.k, id);
+    assert.deepEqual([got.rows, got.value, got.held], [0, 0, 1], id);
+    assert.notEqual(got.met, false, `${id} calls a book that owes nothing a miss`);
+  }
+});
+
+/* "LASTS UNTIL" FOR ONE BOOK (REC-A09 step 2 names it `book-lasts-until`) is not a figure a pack can declare yet. The
+   day the money runs out is walked from an opening figure (`runs-out-on`, `opening: { metric: 'cash-now' }`), and a
+   walk names its opening by a bare id and reads that figure as it is stored (`readWalk` in
+   `packages/kernel/src/money-figures.ts`). So a walk filled for one book opens from `book-cash` asked about a book
+   called `{{it}}` and is refused `REF_UNKNOWN`, and one that names `book-cash:{{it}}` is refused `METRIC_UNKNOWN`
+   (both measured on this record, 13 October 2026). The book's page draws the walk itself, from
+   `book-cash:{{name}}`, and that is the one place a book's last day is said until the reader fills the opening. */
+test.todo("THE DAY ONE BOOK'S MONEY RUNS OUT IS A FIGURE, walked from that book's cash over that book's bills");
 
 /* ONE COUNT OVER THE FOUR LISTS (REC-A09 step 2 names it `rows-in-no-book`) is not a figure a pack can declare: a figure
    reads one list (`packages/kernel/src/metrics.ts`, `register.<list>`). Until the record reads a figure over the lists that

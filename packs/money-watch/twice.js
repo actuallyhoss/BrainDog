@@ -14,12 +14,16 @@
  * IT ASKS ONCE. A third charge of the same amount a day later belongs to the pair already asked about, so it adds no
  * second question, and a pair you answered is never asked about again.
  *
- * "BOTH REAL" IS REMEMBERED. Once you have said both were real, a later pair of that payee, account and amount is not
- * asked about, however long after, and no line is written for it. "One is a mistake" is remembered for its own pair
- * only: the next pair is asked about. A different amount, or another account, is another question.
+ * "BOTH REAL" IS REMEMBERED, FOR ABOUT NINETY DAYS. Once you have said both were real, a pair of that payee, account
+ * and amount within ninety days of the one you answered about is not asked about, and no line is written for it. After
+ * that it is asked about once more, since a charge made twice by mistake a year on is not the two coffees of last
+ * spring. "One is a mistake" is remembered for its own pair only: the next pair is asked about. A different amount,
+ * or another account, is another question.
  *
- * IT SWITCHES ITSELF OFF. After three answers of "Both real" in a row it writes one line in Money watch saying so and
- * stops looking. Change that line to "Switched on again" and it starts over.
+ * IT SWITCHES ITSELF OFF, A PAYEE AT A TIME. After three answers of "Both real" in a row about one payee it writes one
+ * line in Money watch saying so and stops looking at that payee. Every other payee is still watched: two bus fares a
+ * day say nothing about a shop that charged twice. Change that line to "Switched on again" and it starts over. A line
+ * written before the count was a payee's names nobody and switched the whole flag off, and it still does until changed.
  *
  * STARTED THREE WAYS, and it tells them apart by what it is handed: a cleared Ledger entry (look around that entry), a
  * new line of its own in Money watch (ask about it), an answer on one (mark the mistake void, and count the times
@@ -30,6 +34,8 @@ const FLAG = 'twice';
 const NAME = 'Charged twice';
 /** How far apart two charges may be and still be one charge made twice, in days. */
 const APART = 2;
+/** How long "Both real" is remembered for a payee, account and amount, in days. */
+const REMEMBER = 90;
 /** How far back the nightly look reaches, in days. */
 const BACK = 14;
 /** The most new lines one run writes, so a ledger imported whole does not fill Decide in one night. */
@@ -112,8 +118,17 @@ const counts = (f) => f.state === 'cleared' && f.direction === 'out' && f.transf
 /** Every line of this flag in Money watch. */
 const flagsSoFar = (ctx) => allInWindow(ctx, 'money_flags', 'found', EARLIEST, shift(ctx.today(), 1), [{ field: 'flag', is: FLAG }]);
 
-/** Look for pairs around one entry, or over the last two weeks, and write a line for each one not written before. */
-async function look(ctx, started) {
+/** Whether a line names nobody: one written before the count was a payee's, which spoke for the whole flag. */
+const whole = (l) => typeof l.fields.payee !== 'string' || l.fields.payee === '';
+
+/** Whether the flag is switched off for `who`: by a line about that payee, or by an old one about the whole flag. */
+const stopped = (lines, who) => lines.some((l) => l.fields.said === 'off' && (whole(l) || l.fields.payee === who));
+
+/**
+ * Look for pairs around one entry, or over the last two weeks, and write a line for each one not written before. `off`
+ * holds the payees the flag is switched off for.
+ */
+async function look(ctx, started, off) {
   const today = ctx.today();
   let from = shift(today, -BACK - 1);
   let to = today;
@@ -135,6 +150,7 @@ async function look(ctx, started) {
   }
   let written = 0;
   for (const { payee, rows } of groups.values()) {
+    if (off.has(payee.name)) continue;
     rows.sort((a, b) => (a.fields.on < b.fields.on ? -1 : a.fields.on > b.fields.on ? 1 : a.seq - b.seq));
     for (let i = 0; i < rows.length; ) {
       /* ONE RUN OF CHARGES, each within two days of the one before it. */
@@ -146,15 +162,17 @@ async function look(ctx, started) {
       const [first, newer] = run;
       const last = run[run.length - 1];
       /* ASKED ABOUT ALREADY, when a line for this payee, account and amount sits within two days of the run. AND
-         SAID TO BE REAL, when one of any date was answered "Both real": two coffees a morning are asked about once. */
+         SAID TO BE REAL, when one of the ninety days before it was answered "Both real": two coffees a morning are
+         asked about once a season, never once a morning. */
       const near = shift(first.fields.on, -APART - 1);
+      const kept = shift(first.fields.on, -REMEMBER);
       const lines = await allInWindow(ctx, 'money_flags', 'on', EARLIEST, shift(last.fields.on, APART), [
         { field: 'flag', is: FLAG },
         { field: 'payee', is: payee.name },
       ]);
       const amount = newer.fields.amount;
       const same = (b) => b.fields.account === newer.fields.account && b.fields.amount && b.fields.amount.amount === amount.amount && b.fields.amount.currency === amount.currency;
-      if (lines.some((b) => same(b) && (b.fields.said === 'real' || b.fields.on > near))) continue;
+      if (lines.some((b) => same(b) && ((b.fields.said === 'real' && b.fields.on > kept) || b.fields.on > near))) continue;
       if (written === MOST) {
         ctx.log(`More than ${MOST} pairs were found, and the rest wait for the next look.`);
         return;
@@ -210,17 +228,22 @@ async function strike(ctx, flag) {
   ctx.update(`transactions#${newer.seq}`, { state: 'void' }, newer.version);
 }
 
-/** After an answer: three of "Both real" in a row since it was last switched on switch the flag off, said once. */
-async function quiet(ctx) {
-  const lines = await flagsSoFar(ctx);
-  if (lines.some((l) => l.fields.said === 'off')) return;
+/**
+ * After an answer about a payee: three of "Both real" in a row about that payee, since it was last switched on, switch
+ * the flag off for that payee, said once. Answers about anybody else are not in the row.
+ */
+async function quiet(ctx, flag) {
+  const who = flag.fields.payee;
+  if (whole(flag)) return;
+  const lines = (await flagsSoFar(ctx)).filter((l) => whole(l) || l.fields.payee === who);
+  if (stopped(lines, who)) return;
   const since = Math.max(0, ...lines.filter((l) => l.fields.said === 'on').map((l) => l.seq));
   const answered = lines
     .filter((l) => l.seq > since && (l.fields.said === 'real' || l.fields.said === 'mistake'))
     .sort((a, b) => (a.updated_at < b.updated_at ? 1 : a.updated_at > b.updated_at ? -1 : b.seq - a.seq));
   if (answered.length < 3 || answered.slice(0, 3).some((l) => l.fields.said !== 'real')) return;
-  const said = `${NAME} was switched off after both charges were real three times in a row. Switch it on again in Money watch.`;
-  ctx.write('money_flags', { what: said, flag: FLAG, said: 'off', found: ctx.today() });
+  const said = `${NAME} was switched off for ${who} after both charges were real three times in a row. Switch it on again in Money watch.`;
+  ctx.write('money_flags', { what: said, flag: FLAG, payee: who, said: 'off', found: ctx.today() });
   ctx.log(said);
 }
 
@@ -232,12 +255,13 @@ export default async function run(ctx) {
     if (handed.fields.flag !== FLAG) return null;
     const answer = handed.fields.said;
     if (answer === 'mistake') await strike(ctx, handed);
-    if (answer === 'real' || answer === 'mistake') await quiet(ctx);
+    if (answer === 'real' || answer === 'mistake') await quiet(ctx, handed);
     if (answer !== undefined && answer !== null && answer !== '') return null;
-    if ((await flagsSoFar(ctx)).some((l) => l.fields.said === 'off')) return null;
+    if (stopped(await flagsSoFar(ctx), handed.fields.payee)) return null;
     return ask(ctx, handed);
   }
-  if ((await flagsSoFar(ctx)).some((l) => l.fields.said === 'off')) return null;
-  await look(ctx, handed);
+  const off = (await flagsSoFar(ctx)).filter((l) => l.fields.said === 'off');
+  if (off.some(whole)) return null;
+  await look(ctx, handed, new Set(off.map((l) => l.fields.payee)));
   return null;
 }

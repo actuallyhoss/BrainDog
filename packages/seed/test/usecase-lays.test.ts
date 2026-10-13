@@ -92,6 +92,13 @@ const LAID: Record<string, Laid> = {
       'Folded into the unreleased 2.6.0 (founder-numbers-edge-64, audit 61 claim 5; integrate 64): Server and provider numbers reads no reading dated after today (`at before tomorrow` in its clauses); the list of what is laid is unchanged -> c448e3ee3c366703',
     ],
   },
+  /* PERSONAL LAYS FOR THE FIRST TIME AT 2.4.0 (budgets-set-73, integrate 73): the count of budgets set goes to Money,
+     which declares it since money-core 3.17.0. 2.3.1, released, laid nothing and has no entry. */
+  'personal@2.4.0': {
+    lays: ['hands metric.budgets-set to money-core'],
+    declares: '5719e519311f68f0',
+    history: ['2.4.0 hands the count of budgets set, `metric.budgets-set`, to money-core, which declares it itself (budgets-set-73) -> 5719e519311f68f0'],
+  },
 };
 
 /** What is wrong with one use case's document against `LAID`, as sentences. Empty when nothing is. */
@@ -144,9 +151,11 @@ test('a block added or a list handed on with the version left alone fails, and s
 });
 
 test('a use case that starts to lay something asks for an entry, and an entry for one that lays nothing is refused', () => {
-  const personal = structuredClone(docOf('personal')) as Doc;
-  assert.deepEqual(problems('personal', personal), []);
-  assert.ok(problems('personal', { ...personal, hands: { 'register.goals': 'work' } }).some((p) => p.includes('has no entry here')));
-  const stale = { [`personal@${String(personal.version)}`]: { lays: [], declares: '0000000000000000', history: ['-> 0000000000000000'] } };
-  assert.ok(problems('personal', personal, stale).some((p) => p.includes('lays nothing')));
+  /* STUDENT, SINCE PERSONAL 2.4.0 HANDS A FIGURE ON: the use case here must be one that lays nothing. */
+  const student = structuredClone(docOf('student')) as Doc;
+  assert.ok(!lays(student), 'Student lays something now, so this proves nothing: use a use case that lays nothing');
+  assert.deepEqual(problems('student', student), []);
+  assert.ok(problems('student', { ...student, hands: { 'register.courses': 'work' } }).some((p) => p.includes('has no entry here')));
+  const stale = { [`student@${String(student.version)}`]: { lays: [], declares: '0000000000000000', history: ['-> 0000000000000000'] } };
+  assert.ok(problems('student', student, stale).some((p) => p.includes('lays nothing')));
 });

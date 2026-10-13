@@ -5,12 +5,19 @@ import { MOVED_COLUMNS } from '../shared.ts';
 /** How many entries the tile draws. Six, so the page stays a page: the Ledger itself holds the rest. */
 export const LEDGER_LINES = 6;
 
+/**
+ * The tile's three cells: the day, who was paid, and the amount signed by the way the money went. The day and the
+ * amount are `MOVED_COLUMNS`' own, so the sign is said once. The name reads `payee` and falls back to `what`, the
+ * bank's line or the words a person typed, on an entry no payee was read for.
+ */
+export const LEDGER_COLUMNS = [MOVED_COLUMNS[0]!, { field: 'payee', or: 'what' }, MOVED_COLUMNS[2]!];
+
 export const LEDGER: Record<string, unknown>[] = [
   {
     /* THE LEDGER, OPEN, WHERE THE MONEY IS READ (REC-B15). "Ledger, add, edit, delete" and "I hate this tabs" (the
        owner): what moved was twelve lines folded shut under History, and he went looking for his transactions. Now
-       the six newest stand in a tile of their own, newest first, as a calm list (`MOVED_COLUMNS`): the day, what the
-       bank called it and the amount signed by its own direction. Every line is its entry, which the app opens to be
+       the six newest stand in a tile of their own, newest first, as a calm list (`LEDGER_COLUMNS`): the day, who was
+       paid and the amount signed by its own direction. Every line is its entry, which the app opens to be
        changed or deleted, and the block's own link opens the whole Ledger.
 
        HEADED BY THE LIST'S OWN NAME, so the word a person looks for is the word on the page and on the rail.
@@ -39,11 +46,11 @@ export const LEDGER: Record<string, unknown>[] = [
        THE APP DRAWS THIS LINE ABOVE THE MOVEMENTS when the record answered both figures (`writtenLine` in the app's
        `apps/web/src/lib/record/blocks.ts`), and draws none while either is unanswered.
 
-       THE NAME IS STILL WHAT THE BANK CALLED IT, AND NOT YET WHO WAS PAID (REC-B16 step 5). The record keeps the payee
-       by the name a person reads (`payee`, filled where a bank door read one), and an entry a person typed holds none.
-       A column names one field and a field holding nothing is an empty cell, so a payee column would say `Chillout`
-       on one line and nothing at all on the line under it. Until a column can fall back to a second field, the tile
-       keeps `MOVED_COLUMNS`; `test/money-ledger-tile.test.ts` measures it and goes red the day one can.
+       THE NAME IS WHO WAS PAID, AND THE BANK'S OWN LINE WHERE NOBODY IS KNOWN (REC-B16 step 5). The record keeps the
+       payee by the name a person reads (`payee`, filled where a bank door read one), and an entry a person typed holds
+       none. A payee column alone would say `Chillout` on one line and nothing at all on the line under it, so the
+       column names a second field (`or: 'what'`, a column's own key since batch 72) and a host reads the description
+       where the payee holds nothing. `LEDGER_COLUMNS` below; `test/money-ledger-tile.test.ts` holds both lines.
 
        NO GATE OF ITS OWN: a line is not a thing a tile holds, so a Ledger nothing has moved on is still not drawn. */
     kind: 'timeline',
@@ -53,7 +60,7 @@ export const LEDGER: Record<string, unknown>[] = [
     span: 12,
     source: 'register.transactions',
     where: 'state is not void',
-    columns: MOVED_COLUMNS,
+    columns: LEDGER_COLUMNS,
     order: [{ field: 'on', dir: 'desc' }],
     limit: LEDGER_LINES,
     empty: 'Nothing has moved yet.',

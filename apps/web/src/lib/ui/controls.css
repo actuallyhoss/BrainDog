@@ -274,15 +274,21 @@
     }
   }
 
-  /* THE CHOSEN SEGMENT: the tile's colour, a hairline and a breath of shadow, so it is a shape on the track in light and
-     in dark, where a shadow alone does not show. Ink text, and no weight change, so choosing does not make it the
-     loudest thing in the bar. */
+  /* THE CHOSEN SEGMENT: the tile's colour and ink text, and no weight change, so choosing does not make it the loudest
+     thing in the bar. */
   .segment[data-on] {
     background: var(--tile);
+    color: var(--ink);
+  }
+
+  /* ON A TRACK WRITTEN BY HAND, which has no thumb, it is a hairline and a breath of shadow as well, so it is a shape
+     on the track in light and in dark, where a shadow alone does not show. A track the component draws (`data-slides`)
+     never has them, not even before its thumb is measured: the fill it starts with is the thumb's own flat colour, so
+     nothing changes when the thumb takes over. */
+  :not(.segmented[data-slides]) > .segment[data-on] {
     box-shadow:
       0 1px 2px color-mix(in srgb, var(--ink) 10%, transparent),
       0 0 0 1px var(--rule);
-    color: var(--ink);
   }
 
   /**

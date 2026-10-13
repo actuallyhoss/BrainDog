@@ -1,5 +1,5 @@
 /**
- * A Ledger entry, a repeating line and an instalment take their account's book (REC-A09 job 1).
+ * A Ledger entry, a bill, a repeating line and an instalment take their account's book (REC-A09 job 1).
  *
  * EVERY MONEY LIST CARRIES AN OPTIONAL LINK TO A BOOK, AND UNTIL NOW NOTHING FILLED IT. A book's page reads the field on
  * each list, since a filter cannot follow an entry to its account's book, so an entry typed in on Acme's account sat
@@ -10,8 +10,8 @@
  * RED FIRST: with `BOOK_FROM_ACCOUNT_SCRIPT` in no pack document nothing is queued when an entry is made, and its
  * book stays empty.
  *
- * A BILL IS THE ONE THAT CANNOT YET (the todo at the foot): Bills and invoices holds no account, so there is nothing
- * to take a book from. The decision files one that holds an account, which its own test measures.
+ * A BILL WAS THE ONE THAT COULD NOT, AND NOW CAN (the tests at the foot): Bills and invoices holds the account a bill is
+ * paid from or an invoice into, so `bill-takes-book` files it as the other three rules file theirs.
  */
 
 import { test } from 'node:test';
@@ -126,6 +126,7 @@ const books = (r: Rec) => {
 };
 const entry = (account: string, more: Fields = {}) => ({ what: 'NORTHGATE ESTATES', on: '2026-10-02', direction: 'out', amount: gbp(4_200), account, state: 'cleared', ...more });
 const repeat = (account: string, more: Fields = {}) => ({ what: 'Studio rent', direction: 'out', amount: gbp(400_000), every: 'monthly', next_due: '2026-11-01', state: 'live', account, ...more });
+const bill = (account: string, more: Fields = {}) => ({ what: 'Studio insurance', direction: 'owed_by_me', amount: gbp(48_000), due: '2026-11-20', state: 'open', account, ...more });
 const part = (account: string, more: Fields = {}) => ({ what: 'Laptop, part 2', plan: 'Laptop', direction: 'out', amount: gbp(30_000), due: '2026-11-15', state: 'open', account, ...more });
 
 type Rule = { rule: string; on: { written: { register: string; op: string[]; fields: string[] } }; when: string; steps: { script: { id: string; input: Fields } }[] };
@@ -135,8 +136,8 @@ test('the script and the rules that start it are Money\'s own, and go into its p
   assert.ok(MONEY_AUTOMATIONS.includes(BOOK_FROM_ACCOUNT_SCRIPT), 'the script is in no pack document');
   const d = BOOK_FROM_ACCOUNT_SCRIPT as Fields;
   assert.deepEqual([d.script, d.pack, d.egress, d.keys], ['book_from_account', 'money-core', [], []]);
-  /* ONE RULE FOR EACH LIST THAT HOLDS AN ACCOUNT. Bills holds none, so no rule names it (the todo at the foot). */
-  assert.deepEqual(RULES.map((r) => r.on.written.register).sort(), ['installments', 'recurring', 'transactions']);
+  /* ONE RULE FOR EACH LIST THAT HOLDS AN ACCOUNT, Bills and invoices among them (the tests at the foot). */
+  assert.deepEqual(RULES.map((r) => r.on.written.register).sort(), ['installments', 'obligations', 'recurring', 'transactions']);
   for (const r of RULES) {
     /* ONLY A WRITE TO THE ACCOUNT, so an edit to an entry's words starts nothing, and neither does the book the script
        itself writes. */
@@ -367,16 +368,68 @@ test('a record with no book, or with nothing out of its book, is asked nothing',
 });
 
 /**
- * A BILL HAS NO ACCOUNT TO TAKE A BOOK FROM. Bills and invoices holds who, how much and when, and not the account it
- * is paid from or into, so no rule can read `account is set` on it. The decision already files a bill that
- * holds one (its test above). When the list gains the field, the job is a fourth rule and the list's name in the script.
+ * A BILL TAKES ITS ACCOUNT'S BOOK TOO (REC-A09 step 1). Bills and invoices holds the account a bill is paid from or an
+ * invoice is paid into, optional as it is on an instalment, and `bill-takes-book` is the fourth rule. Until the list
+ * held one there was nothing to take a book from, and a bill was in a book only when somebody filed it there.
  */
-test('Bills and invoices holds no account yet, so no rule names it', () => {
-  const fields = (OBLIGATIONS_REGISTER.fields as readonly { id: string }[]).map((f) => f.id);
-  assert.ok(!fields.includes('account'), 'Bills holds an account now: add `bill-takes-book` beside the three rules in rules.ts, and close the todo below');
+test('Bills and invoices holds an account, and a rule of its own files a bill by it', () => {
+  const account = (OBLIGATIONS_REGISTER.fields as readonly Fields[]).find((f) => f.id === 'account');
+  assert.deepEqual(account, { id: 'account', type: 'ref', to: 'accounts', index: true });
+  const rule = RULES.find((r) => r.on.written.register === 'obligations');
+  assert.equal(rule?.rule, 'bill-takes-book');
 });
-test('a bill written with an account in book Acme and no book gets book Acme', { todo: 'Bills and invoices holds no account field (lists/obligations.ts)' }, () => {
-  assert.ok(RULES.some((r) => r.on.written.register === 'obligations'));
+test('a bill written with an account in book Acme and no book gets book Acme', async () => {
+  const r = await money();
+  const b = books(r);
+  const made = r.made('obligations', bill(b.inAcme));
+  assert.equal(r.bookOf(made.id), null, 'a book was typed by the test');
+  await r.turn();
+  assert.equal(r.bookOf(made.id), b.acme, 'the bill is in no book');
+  const said = r.log.filter((l) => /Acme/u.test(l)).join(' ');
+  assert.match(said, /Studio insurance is in Acme, the book its account is in\./u);
+  assert.doesNotMatch(said, /—|#\d|\brow\b|01[0-9A-Z]{24}/u);
+  /* AND NOTHING ELSE ABOUT THE BILL CHANGED. */
+  const { book: _b, ...rest } = r.k.get(made.id)!.fields;
+  assert.deepEqual(rest, made.fields);
+  r.sql.close();
+});
+test('a bill with its own book keeps it, and one on an account in no book, or on no account, is filed in none', async () => {
+  const r = await money();
+  const b = books(r);
+  const own = r.made('obligations', bill(b.inAcme, { book: b.home }));
+  const { account: _a, ...bare } = bill(b.inAcme, { what: 'Council tax' });
+  const loose = r.made('obligations', bare);
+  assert.equal(r.queued(), 0, 'a bill that names its book, or holds no account, started the script');
+  const none = r.made('obligations', bill(b.inNone, { what: 'Old joint fee' }));
+  await r.turn();
+  assert.equal(r.bookOf(own.id), b.home);
+  assert.equal(r.bookOf(loose.id), null);
+  assert.equal(r.bookOf(none.id), null);
+  assert.equal(r.k.get(none.id)!.version, none.version, 'a bill on an account in no book was written');
+  /* PUT ON AN ACCOUNT LATER, it takes that account's book then. */
+  value(r.k.update('obligations', loose.id, { account: b.inAcme }, OWNER));
+  await r.turn();
+  assert.equal(r.bookOf(loose.id), b.acme);
+  r.sql.close();
+});
+/** THE NUMBER `bills-in-no-book` SAYS (`figures/books.ts`): open or part paid, never one paid or written off. */
+test('the bills an account already held are counted in the one question while they are open or part paid', async () => {
+  const r = await money();
+  const acme = r.made('books', { name: 'Acme' }).id;
+  const account = r.made('accounts', { name: 'Acme current', kind: 'bank', liquid: true, balance: gbp(1_000_000), as_of: '2026-10-01' }).id;
+  const stands = [r.made('obligations', bill(account)), r.made('obligations', bill(account, { what: 'Printer lease', state: 'part' })), r.made('transactions', entry(account))];
+  const gone = [r.made('obligations', bill(account, { what: 'Old rates', state: 'paid' })), r.made('obligations', bill(account, { what: 'Lost deposit', state: 'written_off' }))];
+  await r.turn();
+  value(r.k.update('accounts', account, { book: acme }, OWNER));
+  await r.night();
+  const q = r.asked('open')[0]!;
+  assert.equal(r.said(q.id).replace(/^"|"$/gu, ''), '1 Ledger entry and 2 bills and invoices are in no book, and their account is in one. File each in its account\'s book?');
+  const file = q.body!.options!.find((o) => o.label === 'File them')!;
+  assert.equal(file.patches?.length, 3);
+  value(r.k.decide(q.id, { decide: { option: file.id, reason: 'They are the company\'s.' } }, 'p_1'));
+  for (const e of stands) assert.equal(r.bookOf(e.id), acme, `${e.register} was not filed`);
+  for (const e of gone) assert.equal(r.bookOf(e.id), null, `${e.register} that no longer stands was filed`);
+  r.sql.close();
 });
 
 /**

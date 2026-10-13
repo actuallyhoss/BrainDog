@@ -511,6 +511,9 @@ export function bankKey(raw: string): string | null {
 /** Small words a name writes in lower case after its first word: `Royal Bank of Canada`. */
 const SMALL_WORDS = new Set(['of', 'and', 'the', 'for']);
 
+/** Initials everybody reads as initials though they hold a vowel and name a kind of place: a cash machine is `ATM`. */
+const ALWAYS_INITIALS = new Set(['atm']);
+
 /**
  * One word of a bank's capitals in plain case: `CHILLOUT` is `Chillout` and `COCA-COLA` is `Coca-Cola`. A short
  * word with no vowel is initials and stays as it is (`KFC`, `HSBC`), since nobody says it as a word.
@@ -520,9 +523,18 @@ const SMALL_WORDS = new Set(['of', 'and', 'the', 'for']);
  * (`CIB Transfer`, `XO Telecom`). Four letters before another word are far more often a word or somebody's first name
  * (`John Smith`, `Cedar Lane Bakery`), and so is any short word later in a name. A kind of shop and a joining word
  * are words wherever they stand (`Cafe`, `Bar 12`, `Al Ahly`), and only capitals are kept: `ikea` is `Ikea`.
+ *
+ * A CASH MACHINE IS THE ONE KIND OF PLACE THAT IS INITIALS, wherever it stands and however the bank printed it:
+ * `ATM CASH WITHDRAWAL` is `ATM Cash Withdrawal`, never `Atm`. Case alone changes, so its key does not.
  */
 function plainWord(word: string, first: boolean, only: boolean): string {
   const letters = word.replace(/[^\p{L}]/gu, '');
+  /* Each run of letters and digits is looked at alone, so `(ATM)` and `ATM-CAIRO` hold it as `ATM CAIRO` does. */
+  if (word.split(/[^\p{L}\p{M}\p{N}]+/u).some((part) => ALWAYS_INITIALS.has(part.toLowerCase())))
+    return word
+      .split(/([^\p{L}\p{M}\p{N}]+)/u)
+      .map((part, i) => (i % 2 === 1 ? part : ALWAYS_INITIALS.has(part.toLowerCase()) ? part.toUpperCase() : plainWord(part, false, false)))
+      .join('');
   if (letters.length > 1 && letters.length < 6 && !/[aeiouy]/i.test(letters.normalize('NFKD'))) return word.toUpperCase();
   const low = word.toLowerCase();
   const short = letters.length > 1 && letters.length <= (only ? 4 : first ? 3 : 0);

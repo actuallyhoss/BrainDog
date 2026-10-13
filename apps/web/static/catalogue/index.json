@@ -257,8 +257,34 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.3.1",
+      "latest": "1.3.2",
       "versions": [
+        {
+          "version": "1.3.2",
+          "checksum": "a4c39e01fb56411899a7badb1dcd26d6686665ccf185e07fb0b7b8d17ff4c730",
+          "bytes": 14983,
+          "published_at": "2026-10-13T18:26:31.073Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Cash counts"
+            ],
+            "pages": [
+              "Cash counts"
+            ],
+            "rules": [
+              "Write the difference of each count"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "A count that was not compared because its account holds an entry in another currency now says which balance to type: the balance its bank or statement shows, not the cash in the box, then count again. Before, it said to type the account's balance, which read as the cash just counted, and a box typed that way agrees with the next count and never shows the gap. Nothing else changed: still no balance check and no difference are written for such a count.",
+          "preview": true
+        },
         {
           "version": "1.3.1",
           "checksum": "b1cffbbf320df5aa93084fb94b6aa0611dd81f563f179afd563376eb0edb87c2",
@@ -1259,7 +1285,7 @@
       "kind": "pack",
       "id": "money-watch",
       "title": "Money watch",
-      "summary": "Reads the Ledger for a charge made twice and a payment that repeats, and asks you once about each. A flag whose last three answers changed nothing switches itself off.",
+      "summary": "Reads the Ledger for a charge made twice and a payment that repeats, and asks you once about each. Charged twice stops asking about a payee whose last three answers were Both real, and Looks like it repeats switches itself off after three No's in a row.",
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
@@ -1267,9 +1293,9 @@
       "versions": [
         {
           "version": "1.1.0",
-          "checksum": "3e239c6a375f30fd2945ec7f9b490d5ad2c65740ce7dae4daaa51714af9eaf83",
-          "bytes": 38208,
-          "published_at": "2026-10-13T17:22:29.546Z",
+          "checksum": "ba5787ebcc4a3ee1430e09b2e820aa29c0456f2057a14b275393129c91fd4afe",
+          "bytes": 39842,
+          "published_at": "2026-10-13T18:26:31.073Z",
           "bump": "patch",
           "reach": {
             "modules": [
@@ -1293,7 +1319,7 @@
             "skills": [],
             "calls_out": []
           },
-          "notes": "\"One is a mistake\" marks the newer charge void even when that entry was edited after the question was asked. A payee added to Repeating is next due a month after its newest payment on the day you answer, not on a day already paid. And the line that says Charged twice switched itself off now says why in your words: both charges were real three times in a row. And once you have said both charges were real, a later pair of that payee, account and amount is not asked about again.",
+          "notes": "\"One is a mistake\" marks the newer charge void even when that entry was edited after the question was asked. A payee added to Repeating is next due a month after its newest payment on the day you answer. The line that says Charged twice switched itself off says why: both charges were real three times in a row. Both real is remembered for about ninety days, then asked once more. And three of Both real in a row switch Charged twice off for that payee only, not for everyone.",
           "preview": true
         },
         {

@@ -1323,6 +1323,16 @@
     }
   }
 
+  /* A NOTE WHOSE LINE IS ONE LINK IS A 44 TARGET UNDER A THUMB (13 §7): Today's line on the vital signs is its link and
+     nothing else, and measured 19 tall. The link grows, the words stay on their line. */
+  @media (pointer: coarse) {
+    .block-slot > :global(.block[data-kind='note'] p > a:only-child) {
+      display: inline-flex;
+      align-items: center;
+      min-block-size: var(--tap);
+    }
+  }
+
   /* THE WELL SAYS WHAT IS UNDER IT, in the washes a tile's well takes (`ui/IconWell.svelte`): red where something under
      the section is late or needs the person, the working accent's tint over questions waiting, the earn green over
      cash. The row names the tone (`blocks.ts` `sectionWell`) and the renderer writes it on the well, naming no colour.

@@ -75,6 +75,11 @@ export const OBLIGATIONS_REGISTER: MoneyRegister = {
     { id: 'thing', label: 'Project', type: 'ref', to: 'things', index: true },
     /* INDEXED, because a book's page filters its bills by it. */
     { ...BOOK, index: true },
+    /* THE ACCOUNT A BILL IS PAID FROM, OR AN INVOICE INTO (REC-A09 step 1). Optional, as on an instalment: a bill nobody
+       has put on an account holds none. It is what `bill-takes-book` reads, so a bill on Acme's account is in Acme's
+       book by no hand. INDEXED, because the nightly count asks for the bills of one account, AND IT IS THE EIGHTH AND
+       LAST INDEX THIS LIST MAY HOLD (`INDEX_CEILING`): the next field a page filters on wants one of these given up. */
+    { id: 'account', type: 'ref', to: 'accounts', index: true },
     { id: 'note', type: 'text' },
     /**
      * WHAT IT IS FOR, so a page can say where the money goes. Indexed, because a page groups by it

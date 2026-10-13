@@ -423,8 +423,13 @@ async function press(client, preview) {
  *
  * `host` is `{ origin, sink?, owner?, advance?(days), close() }`: `selfHost` makes one; a caller may hand in another.
  * `say` is told each line as it is decided.
+ *
+ * `shot`, where a caller hands one, is shown the record at the two moments a first screen is judged (`screens.mjs`
+ * draws them for `first-screen.mjs`): `kept`, just after the build and before she has told it anything, and `told`,
+ * once her first real thing is in and Today is hers. It is handed `{ when, boot, t, base }` and what it answers is not
+ * read; a throw from it is its caller's to catch, and no step waits on it.
  */
-export async function walk(person, host, say = () => {}) {
+export async function walk(person, host, say = () => {}, shot = null) {
   const out = [];
   const step = (r) => {
     out.push(r);
@@ -484,6 +489,8 @@ export async function walk(person, host, say = () => {}) {
     return out;
   }
 
+  if (shot) await shot({ when: 'kept', boot, t: opened.t, base: opened.base });
+
   /* 5. Tell it one real thing: the preview, the press, its one Undo, then the press again, as she keeps it. */
   const counts = { before: countsOf(boot) };
   const preview = await readOn(client, person.first, today(), boot);
@@ -505,6 +512,7 @@ export async function walk(person, host, say = () => {}) {
 
   /* 6. Her first Today, from `boot`, with this device's answer: where her orders come in. */
   boot = valueOf(await client.boot());
+  if (shot && boot) await shot({ when: 'told', boot, t: opened.t, base: opened.base });
   const pref = { arrivesBy: person.answer };
   const bootOk = boot !== null;
   step(

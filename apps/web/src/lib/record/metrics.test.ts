@@ -286,6 +286,18 @@ test('A SUM THAT CONVERTED WHAT IT COULD SAYS AT LEAST, names the pair it lacks,
   assert.equal(meetsTarget({ ...METRICS.overdue!, target: { gte: 100 } }, 420000, {}), true, 'a figure that is not at least is held as before');
 });
 
+test('A STALE RATE NAMES WHERE RATES ARE KEPT UP, and asks for no press that is not on the page', () => {
+  const fx = { into: 'EGP', home: 'EGP', asOf: '2026-07-01', forward: false, stale: true, missing: [] };
+  const note = fxNote({ fx });
+  assert.ok(note);
+  assert.match(note, /^Converted at rates as of 1 Jul 2026/u, 'it still says which day the rates are from');
+  assert.doesNotMatch(note, /Update the rates/u);
+  assert.match(note, /Exchange rates/u);
+  assert.match(note, /Set up exchange rates/u);
+  assert.equal(fxNote({ fx: { ...fx, forward: true } }), note);
+  assert.equal(fxNote({ fx: { ...fx, stale: false } }), 'Converted at rates as of 1 Jul 2026.');
+});
+
 /* ── a difference in parts, and against the window before (REC-B19) ──────── */
 
 /** 13 October 2026, midday: the clock and the entries of the record's own test, so both readers hold the same answers. */

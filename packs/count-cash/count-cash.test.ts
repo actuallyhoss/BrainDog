@@ -36,7 +36,7 @@ import { firstPartyDocument } from '../../packages/seed/src/index.ts';
 const HERE = new URL('./', import.meta.url);
 const SOURCE = readFileSync(new URL('count.js', HERE), 'utf8');
 const TEXT = readFileSync(new URL('count-cash.pack.json', HERE), 'utf8');
-const PACK = JSON.parse(TEXT) as { pack: string; declarations: Record<string, unknown>[] };
+const PACK = JSON.parse(TEXT) as { pack: string; changes: string; declarations: Record<string, unknown>[] };
 const SCRIPT = PACK.declarations.find((d) => typeof d.script === 'string') as {
   script: string;
   runs: Record<string, unknown>;
@@ -93,8 +93,10 @@ test('THE PACK CARRIES count.js AS ITS SOURCE, byte for byte; it fetches nothing
   assert.ok(file.ok, fixOf(file));
   assert.equal(file.value.pack.manifest.pack, 'count-cash');
   /* 1.3.0 BESIDE THE RELEASED 1.2.0: a count can say why it was not compared, a field added and none taken away.
-     1.3.1 BESIDE THE PUBLISHED 1.3.0: the same sentence, now naming the way out. Words only, so a patch. */
-  assert.equal(file.value.pack.manifest.version, '1.3.1');
+     1.3.1 BESIDE THE PUBLISHED 1.3.0: the same sentence, now naming the way out. Words only, so a patch.
+     1.3.2 BESIDE THE PUBLISHED 1.3.1: the way out now says which balance to type. Words only again. */
+  assert.equal(file.value.pack.manifest.version, '1.3.2');
+  assert.match(PACK.changes, /the balance its bank or statement shows, not the cash in the box/);
   const counts = PACK.declarations.find((d) => d.register === 'cash_counts') as { fields: { id: string }[] };
   assert.deepEqual(counts.fields.map((f) => f.id), ['account', 'counted', 'on', 'difference', 'said', 'note']);
 });
@@ -164,8 +166,11 @@ const moved = (seq: number, on: string, amount: number, currency: string, more: 
   row(`01K5TXN00000000000000000${String(seq).padStart(2, '0')}`, 'transactions', seq, { what: 'Paid out', on, direction: 'out', amount: { amount, currency }, account: BOX.id, state: 'cleared', ...more });
 
 /* 1.3.1 NAMES THE WAY OUT. The sentence alone left a box with one foreign sale uncounted for good and never said that
-   a newer balance on the account is what lets the next count through. */
-const NOT_COMPARED = "This account holds an entry in another currency, so it was not compared. Type the account's balance, then count again.";
+   a newer balance on the account is what lets the next count through.
+   1.3.2 SAYS WHICH BALANCE. "Type the account's balance" read as the cash just counted, and a box typed to the count
+   agrees with the next count for good: the gap the count was for is never written. The figure to type is the one
+   somebody else states, the bank or the statement. */
+const NOT_COMPARED = 'This account holds an entry in another currency, so it was not compared. On the account, type the balance its bank or statement shows, not the cash in the box, then count again.';
 
 test('AN ACCOUNT HOLDING A CLEARED ENTRY IN ANOTHER CURRENCY SINCE ITS STATEMENT IS NOT COMPARED, and the count says so', async () => {
   /* THE FAULT, MEASURED ON 1.2.0: the box was said to hold 500.00 on the 20th, 20.00 went out in pounds and 87.50 in
@@ -179,8 +184,11 @@ test('AN ACCOUNT HOLDING A CLEARED ENTRY IN ANOTHER CURRENCY SINCE ITS STATEMENT
 });
 
 test('THE SENTENCE NAMES THE WAY OUT, AND THE WAY OUT WORKS: the balance typed after the foreign entry, and the next count is compared', async () => {
-  assert.match(NOT_COMPARED, /Type the account's balance, then count again\.$/);
-  assert.match(SOURCE, /const NOT_COMPARED = "This account holds an entry in another currency, so it was not compared\. Type the account's balance, then count again\.";/);
+  /* WHICH BALANCE, THEN THE WAY OUT, in that order and in one sentence a person reads under What happened. */
+  assert.match(NOT_COMPARED, /type the balance its bank or statement shows, not the cash in the box, then count again\.$/);
+  assert.doesNotMatch(NOT_COMPARED, /Type the account's balance/);
+  assert.doesNotMatch(NOT_COMPARED, /\u2014/);
+  assert.ok(SOURCE.includes(`const NOT_COMPARED = '${NOT_COMPARED}';`), 'count.js says another sentence than this test holds');
   /* SHE TYPES 392.50 AS OF THE 24TH, after the euros of the 23rd, and counts 390.00 on the 25th: out by 2.50, written. */
   const typed = row(BOX.id, 'accounts', 4, { ...BOX.fields, balance: { amount: 39_250, currency: 'GBP' }, as_of: '2026-09-24' }, 7);
   const count = row('01K5CNT0000000000000000005', 'cash_counts', 5, { account: BOX.id, counted: { amount: 39_000, currency: 'GBP' }, on: '2026-09-25' });

@@ -11,6 +11,10 @@
  *   the nearest landmark around it (`navigation` for the rail and the More sheet, `main`, ...) or `null`.
  * - `counts`: the lists as that person reads them, keyed by the list's id or by the name the screen gives it. A value
  *   is a count, or the entries themselves as `{ name, tags }` where the rig read them.
+ * - `owner`: whether the reader owns the record, where the rig knows; left out, nothing is judged by it.
+ *
+ * WITH NO RIG, `screens.mjs` draws the snapshots itself: the web's own rail and Today, rendered for the server from a
+ * record a walk just made (`first-run.mjs`), which is what this file's command hands in when it is given no file.
  *
  * EACH CHECK ANSWERS `{ id, pass, saw }`: `true` or `false` with what it saw, or `null` when the snapshot does not hold
  * what the check reads (the rig is told what to hand it, the product is not blamed). `saw` is read by a person in the
@@ -19,6 +23,7 @@
 
 import { firstRun } from '../../../apps/web/src/lib/first-run.ts';
 import { words as signupWords } from '../../../apps/web/src/routes/signup/words.ts';
+import { pageWords } from '../../../apps/web/src/lib/record/page-new.ts';
 
 /** Words the first screens never say: a tour, a checklist, getting started. */
 const TOUR = /\b(tour|checklist|getting started|onboarding steps?)\b/iu;
@@ -28,6 +33,15 @@ const STEPS_COUNT = /\b\d+\s+of\s+\d+\b/iu;
 
 /** Sample entries said out loud. */
 const SAMPLE = /\bsample (record|data|entries|entry|rows?)\b/iu;
+
+/** Today's line on the vital signs, in either of its two wordings (`signsLine` in `lib/home/default-home.ts`). */
+export const SIGNS = /\b(?:one|\d+) vital signs? needs? a look\b/iu;
+
+/** Today's own path: the app's front door, with or without the record's name and the word. */
+const TODAY = /^\/app(\/[^/]+)?(\/today)?\/?$/u;
+
+/** The narrowest screen that draws the rail with its names; under it the places are behind a press. */
+const RAIL_FROM = 900;
 
 /** The pages of the first run, before anything is kept: sign-up and the start page. */
 const FIRST_RUN = /^\/(signup|start)(\/|$|\?)/u;
@@ -62,6 +76,12 @@ export const UNITS = {
   'team-no-task': 'USE-B07',
 };
 
+/** The same, for the two checks that read the app's shell as drawn (`drawnScreen`). */
+export const DRAWN_UNITS = {
+  'pages-line': 'PGS-C30',
+  'signs-line': 'PRF-A05',
+};
+
 const pass = (id, saw) => ({ id, pass: true, saw });
 const fail = (id, saw) => ({ id, pass: false, saw });
 const unseen = (id, saw) => ({ id, pass: null, saw });
@@ -83,6 +103,12 @@ function countOf(counts, ...keys) {
 
 /** The places in the rail (or the More sheet at 390): every link inside a navigation landmark. */
 export const railOf = (snap) => (snap.roles ?? []).filter((r) => r.landmark === 'navigation' && (r.role === 'link' || r.role === 'tab')).map((r) => r.name);
+
+/** Everything a person can land on in the rail, a button and a box as well as a link. */
+const inRail = (snap) => (snap.roles ?? []).filter((r) => r.landmark === 'navigation');
+
+/** A place's name without the count the rail draws after it: "Orders 2" is Orders. */
+const bare = (name) => String(name).replace(/\s+\d+$/u, '');
 
 /** The first few words around a match, for `saw`. */
 function around(text, re) {
@@ -161,7 +187,9 @@ export const firstScreen = {
       return rail.length > 0 ? fail('rail-has-rows', `the first run draws a rail: ${rail.join(', ')}`) : pass('rail-has-rows', 'no rail on the first run');
     }
     if (rail.length === 0) return unseen('rail-has-rows', 'no rail or More sheet on this screen');
-    const read = rail.filter((name) => !ALWAYS.some((a) => same(a, name)) && countOf(snap.counts, name) !== undefined);
+    /* A LIST'S ROW SAYS ITS COUNT AFTER ITS NAME, and a screen reader hears both as the link's name. */
+    const names = rail.map((name) => (countOf(snap.counts, name) === undefined ? bare(name) : name));
+    const read = [...new Set(names)].filter((name) => !ALWAYS.some((a) => same(a, name)) && countOf(snap.counts, name) !== undefined);
     const empty = read.filter((name) => size(countOf(snap.counts, name)) === 0);
     if (empty.length > 0) return fail('rail-has-rows', `${empty.join(', ')} ${empty.length === 1 ? 'is' : 'are'} in the rail with nothing in ${empty.length === 1 ? 'it' : 'them'}`);
     if (read.length === 0) return unseen('rail-has-rows', `the rig read no list for any place in the rail (${rail.join(', ')})`);
@@ -183,8 +211,63 @@ export const firstScreen = {
   },
 };
 
+/* ── the checks that read the shell as drawn ──────────────────────────────────────────────────────────── */
+
+/**
+ * Two checks over the app's shell once it is drawn (audit 71, finding 8): the rail's line that makes a page, and
+ * Today's line on the vital signs. Kept beside the seven and not among them, since they read a rail's buttons and
+ * headings and Today's links, which a snapshot of the first run's words alone never holds.
+ */
+export const drawnScreen = {
+  /**
+   * The rail holds the line that makes a page exactly once, under one "Pages": the rail's own heading while the record
+   * has no made page, the Pages place once it has. "New page" for whoever owns the record, "Suggest a page" for anybody
+   * else. Not judged on the first run, which has no rail, under 900 wide, where the places are behind a press, nor on the
+   * narrow rail.
+   */
+  'pages-line'(snap) {
+    const rail = inRail(snap);
+    if (FIRST_RUN.test(snap.path ?? '')) return unseen('pages-line', 'the first run has no rail');
+    if (rail.length === 0) return unseen('pages-line', 'no rail on this screen');
+    if (Number.isFinite(snap.width) && snap.width < RAIL_FROM) return unseen('pages-line', `at ${snap.width} wide the places are behind a press`);
+    const lines = rail.filter((r) => r.role !== 'heading' && [pageWords.newPage, pageWords.suggestPage].some((w) => same(w, r.name)));
+    const homes = rail.filter((r) => same(pageWords.section, r.role === 'heading' ? r.name : bare(r.name)) && (r.role === 'heading' || r.role === 'link'));
+    /* THE NARROW RAIL draws glyphs and no heading at all, and has no room for a name to be typed: nothing to judge. */
+    if (lines.length === 0 && !rail.some((r) => r.role === 'heading')) return unseen('pages-line', 'the narrow rail has no room for the line');
+    if (lines.length === 0) return fail('pages-line', `the rail has no "${pageWords.newPage}" and no "${pageWords.suggestPage}"`);
+    if (lines.length > 1) return fail('pages-line', `the rail says ${lines.map((r) => `"${r.name}"`).join(' and ')}, ${lines.length} lines where one makes a page`);
+    const [line] = lines;
+    if (homes.length === 0) return fail('pages-line', `"${line.name}" stands under no "${pageWords.section}"`);
+    if (homes.length > 1) return fail('pages-line', `"${pageWords.section}" is in the rail ${homes.length} times`);
+    const mine = same(line.name, pageWords.newPage);
+    if (snap.owner === true && !mine) return fail('pages-line', `whoever owns the record is told "${line.name}", not "${pageWords.newPage}"`);
+    if (snap.owner === false && mine) return fail('pages-line', `somebody who does not own the record is told "${line.name}", not "${pageWords.suggestPage}"`);
+    return pass('pages-line', `"${line.name}" once, under ${homes[0].role === 'heading' ? `the rail's own "${pageWords.section}"` : `the ${pageWords.section} place`}`);
+  },
+
+  /**
+   * Today says how many vital signs need a look at most once, as words that open the page they are shown on, and only
+   * to whoever owns the record (audit 71, finding 5). A Today that says nothing of them has nothing wrong to say.
+   */
+  'signs-line'(snap) {
+    if (!TODAY.test(snap.path ?? '')) return unseen('signs-line', `not Today (${snap.path})`);
+    const main = (snap.roles ?? []).filter((r) => r.landmark === 'main');
+    if (main.length === 0) return unseen('signs-line', 'Today was not drawn on this screen');
+    const said = (Array.isArray(snap.text) ? snap.text : textOf(snap).split('\n')).filter((t) => SIGNS.test(t));
+    if (said.length === 0) return pass('signs-line', 'Today says nothing about the vital signs');
+    const line = around(said[0], SIGNS);
+    if (snap.owner === false) return fail('signs-line', `somebody who does not own the record is told "${line}"`);
+    if (said.length > 1) return fail('signs-line', `Today says it ${said.length} times: "${line}"`);
+    if (!main.some((r) => r.role === 'link' && SIGNS.test(r.name))) return fail('signs-line', `"${line}" opens nothing`);
+    return pass('signs-line', `Today says "${line}", and the words open the page`);
+  },
+};
+
 /** Every check, in order, on one snapshot as one person. */
 export const checkScreen = (snap, person) => Object.values(firstScreen).map((check) => check(snap, person));
+
+/** The seven and then the two that read the shell as drawn, on one snapshot handed in. */
+export const checkDrawn = (snap, person) => [...checkScreen(snap, person), ...Object.values(drawnScreen).map((check) => check(snap, person))];
 
 /* ── run as a command ─────────────────────────────────────────────────────────────────────────────────── */
 
@@ -210,14 +293,27 @@ export function lineOf(r, colour = false) {
  * check is red, 0 when none is. A check that read nothing leaves the code alone and is said as UNCHECKED on that line.
  *
  * WITH NO SCREEN, only the checks that read words are judged, on the first run's own words; the rest say "not seen",
- * since a list nobody read and a rail nobody drew prove nothing.
+ * since a list nobody read and a rail nobody drew prove nothing. A SCREEN HANDED IN is judged by the seven and by the
+ * two that read the shell as drawn (`drawnScreen`).
  */
 export function report(screens, person, colour = false) {
   const out = [];
   const all = [];
   for (const snap of screens ?? [wordsScreen()]) {
-    const judged = checkScreen(snap, person).map((r) => (screens === null && !WORDS_ONLY.has(r.id) ? unseen(r.id, 'no screen was handed in, only the words of the first run') : r));
-    out.push(screens === null ? `The first run's own words (${snap.text.length} sentences), as ${person.name}` : `${snap.path ?? 'a screen with no path'}${snap.width ? ` at ${snap.width} wide` : ''}, as ${person.name}`);
+    /* THE WORDS BESIDE DRAWN SCREENS (`words: true`) are judged by the two checks that read words and by nothing else:
+       the screens beside them are what the rest read. A screen handed in is judged by all nine. */
+    const judged =
+      screens === null
+        ? checkScreen(snap, person).map((r) => (WORDS_ONLY.has(r.id) ? r : unseen(r.id, 'no screen was handed in, only the words of the first run')))
+        : snap.words === true
+          ? checkScreen(snap, person).filter((r) => WORDS_ONLY.has(r.id))
+          : checkDrawn(snap, person);
+    const drew = [snap.drew, snap.moment].filter((x) => typeof x === 'string' && x !== '').join(', ');
+    out.push(
+      screens === null || snap.words === true
+        ? `The first run's own words (${snap.text.length} sentences), as ${person.name}`
+        : `${snap.path ?? 'a screen with no path'}${snap.width ? ` at ${snap.width} wide` : ''}${drew ? ` (${drew})` : ''}, as ${person.name}`,
+    );
     for (const r of judged) out.push(`  ${lineOf(r, colour)}`);
     all.push(...judged);
   }
@@ -230,28 +326,80 @@ export function report(screens, person, colour = false) {
   return { lines: out, code };
 }
 
+
+/** What each moment of the walk is called in a screen's heading. */
+const MOMENTS = { kept: 'just kept, before anything was told', told: 'after the first real thing' };
+
 /**
- * `node tools/people/expect/first-screen.mjs [screen.json] [person.json]`: `screen.json` is one snapshot or a list of
- * them, as the rig writes them; with none, the first run's own words are judged. Mariam by default. Exit 0 when no
- * check is red, 1 when one is, 2 when a file could not be read (said in a line, never in silence).
+ * The screens of one walk as `person`, drawn (`screens.mjs`) on a fresh self-host that is closed again: the first run's
+ * own words, then Today with its rail and a list's rail at each of the two moments. The walk's own steps are
+ * `first-run.mjs`'s to judge and are not said here; a walk that never reached the record draws nothing, and the caller
+ * is told why in `why`.
+ */
+export async function drawnScreens(person) {
+  const { selfHost, walk } = await import('./first-run.mjs');
+  const { screensOf } = await import('./screens.mjs');
+  const host = await selfHost(person);
+  const drawn = [];
+  const steps = [];
+  let broke = null;
+  try {
+    /* A WALK THAT THROWS PAST THE TWO MOMENTS (day 15, for a person the walk is not yet written for) has still shown
+       both, so what was drawn is kept and judged; a throw before either is why nothing was drawn. */
+    await walk(person, host, (r) => void steps.push(r), async (shot) => {
+      for (const snap of await screensOf(shot)) drawn.push({ ...snap, moment: MOMENTS[shot.when] ?? shot.when });
+    });
+  } catch (e) {
+    broke = e instanceof Error ? e.message : String(e);
+  } finally {
+    await host.close();
+  }
+  const red = steps.find((r) => r.pass === false);
+  return { screens: [{ ...wordsScreen(), words: true }, ...drawn], why: drawn.length > 0 ? null : (broke ?? red?.saw ?? 'the walk never opened the record') };
+}
+
+/**
+ * `node tools/people/expect/first-screen.mjs [screen.json] [person.json] [--as <person.json>] [--words] [--write <file>]`.
+ *
+ * `screen.json` is one snapshot or a list of them, as a rig writes them. WITH NONE, the screens are drawn here: a fresh
+ * self-host, the walk of `first-run.mjs`, and the web's own rail and Today rendered at its two moments (`--write` keeps
+ * them as a file that can be handed back in). `--words` judges only the first run's own words, with nothing drawn and
+ * no host started. Mariam by default; `--as` names somebody else with no screen file before it. Exit 0 when no check is red, 1 when one is, 2 when a file could not be read or
+ * the screens could not be drawn (said in a line, never in silence).
  */
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const { readFileSync } = await import('node:fs');
-  const [screenFile, personFile = new URL('../mariam.json', import.meta.url).pathname] = process.argv.slice(2);
+  const { readFileSync, writeFileSync } = await import('node:fs');
+  const args = process.argv.slice(2);
+  const flag = (name) => (args.includes(name) ? args[args.indexOf(name) + 1] : undefined);
+  const [screenFile, second] = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--write' && args[i - 1] !== '--as');
+  const personFile = flag('--as') ?? second ?? new URL('../mariam.json', import.meta.url).pathname;
+  const stop = (why) => {
+    console.log(`first-screen: red. ${why}. Exit code 2.`);
+    process.exit(2);
+  };
   const read = (file, what) => {
     try {
       return JSON.parse(readFileSync(file, 'utf8'));
     } catch (e) {
-      console.log(`first-screen: red. ${what} could not be read: ${e instanceof Error ? e.message : String(e)}. Exit code 2.`);
-      process.exit(2);
+      return stop(`${what} could not be read: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
   const person = read(personFile, 'the person');
-  const handed = screenFile === undefined ? null : read(screenFile, 'the screen');
-  const screens = handed === null ? null : Array.isArray(handed) ? handed : [handed];
-  if (screens !== null && (screens.length === 0 || screens.some((s) => s === null || typeof s !== 'object'))) {
-    console.log('first-screen: red. the screen file holds no snapshot. Exit code 2.');
-    process.exit(2);
+  let screens = null;
+  if (screenFile !== undefined) {
+    const handed = read(screenFile, 'the screen');
+    screens = Array.isArray(handed) ? handed : [handed];
+    if (screens.length === 0 || screens.some((s) => s === null || typeof s !== 'object')) stop('the screen file holds no snapshot');
+  } else if (!args.includes('--words')) {
+    try {
+      const drawn = await drawnScreens(person);
+      if (drawn.why !== null) stop(`no screen was drawn: ${drawn.why}`);
+      screens = drawn.screens;
+    } catch (e) {
+      stop(`the screens could not be drawn: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    const keep = flag('--write');
+    if (keep !== undefined) writeFileSync(keep, `${JSON.stringify(screens, null, 1)}\n`);
   }
   const { lines, code } = report(screens, person, process.stdout.isTTY === true);
   for (const line of lines) console.log(line);

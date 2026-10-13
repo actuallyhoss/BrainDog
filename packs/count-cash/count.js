@@ -36,15 +36,20 @@
  *
  * THE WAY OUT IS SAID ON THE COUNT (1.3.1). The sentence under What happened ends by naming it: type the account's
  * balance, then count again. Without it a box with one sale in another currency read as uncounted for good.
+ *
+ * WHICH BALANCE IS SAID TOO (1.3.2). "The account's balance" read as the cash just counted, and a box typed to the
+ * count agrees with the next count for good, so the gap the count was for is never written. The sentence now asks for
+ * the figure the bank or the statement shows, and says it is not the cash in the box.
  */
 
 const WHAT = 'Cash count difference';
 /**
  * What a count says when its account was not compared, and the way out (1.3.1): a balance typed on the account after
- * the entry is a newer statement, so the next count rolls from it and is compared. The account's name is in the run's
- * log beside it.
+ * the entry is a newer statement, so the next count rolls from it and is compared. The balance to type is the one the
+ * bank or the statement shows (1.3.2), never the cash just counted, which would hide the gap. The account's name is in
+ * the run's log beside it.
  */
-const NOT_COMPARED = "This account holds an entry in another currency, so it was not compared. Type the account's balance, then count again.";
+const NOT_COMPARED = 'This account holds an entry in another currency, so it was not compared. On the account, type the balance its bank or statement shows, not the cash in the box, then count again.';
 
 /** The most rows one `ctx.record.list` answers, the record's own page. A full page may have left rows out. */
 const PAGE = 50;

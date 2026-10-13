@@ -17,6 +17,10 @@
  * starts, which reads the entry that day. Next on a new Repeating line is counted from the newest payment the Ledger
  * holds at the answer. And "Both real" is not a no, so the line that switches the flag off says what was said.
  *
+ * STILL 1.1.0, NOT YET RELEASED (audit of batch 71, finding 7). "Both real" was remembered for good, which hid a real
+ * double charge a year on, and three of them in a row about any three payees switched the watch off for everyone. It
+ * is remembered for about ninety days, and the three in a row are one payee's and switch off that payee alone.
+ *
  * RED FIRST, MEASURED: with no `twice.js` and no `money-watch.pack.json` this file failed at its first read, ENOENT,
  * before a single test ran.
  */
@@ -290,26 +294,60 @@ test('"BOTH REAL" IS REMEMBERED: the same payee, account and amount is not asked
   }
 });
 
-test('A PAIR PASSED OVER BECAUSE BOTH WERE REAL IS NOT AN ANSWER: the count of three in a row and its line are as they were', async () => {
+test('"BOTH REAL" IS REMEMBERED FOR ABOUT NINETY DAYS: a pair inside them is passed over, one after them is asked about again', async () => {
+  /* RED FIRST, MEASURED before the change (audit of batch 71, finding 7): the answer was remembered for good, so the
+     pair of 6 Oct opened nothing, fourteen weeks after she had said both were real, and a charge made twice by
+     mistake a year on would never have been asked about. */
   const r = await fresh();
   try {
-    const pair = async (what: string, on: string) => {
-      await r.charge(what, on, 15_000);
-      await r.charge(what, on, 15_000);
+    const pair = async (on: string) => {
+      await r.charge('Cilantro', on, 15_000);
+      await r.charge('Cilantro', on, 15_000);
     };
-    const OFF = 'Charged twice was switched off after both charges were real three times in a row. Switch it on again in Money watch.';
-    await pair('Cilantro', '2026-09-15');
+    await pair('2026-07-01');
+    assert.deepEqual(r.open().map((q) => q.question), ['Cilantro E£150 twice on 1 Jul. Both real?']);
     await r.answer(r.open()[0]!.id, 'real');
-    await pair('Costa', '2026-09-18');
+    /* EIGHTY-ONE DAYS ON: still remembered, nothing asked and no line written. */
+    await pair('2026-09-20');
+    assert.deepEqual([r.open(), r.flags().length], [[], 1]);
+    /* NINETY-SEVEN DAYS ON: asked again, in the same words as the first time. */
+    await pair('2026-10-06');
+    assert.deepEqual(r.open().map((q) => q.question), ['Cilantro E£150 twice on 6 Oct. Both real?']);
+    /* SAID AGAIN, REMEMBERED AGAIN, counted from the pair she answered about. */
     await r.answer(r.open()[0]!.id, 'real');
-    /* TWO IN A ROW, then Cilantro three times more: no question, no answer, so still two and still on. */
+    await pair('2026-10-10');
+    await r.nextDay();
+    assert.deepEqual(r.open(), []);
+    assert.deepEqual(r.flags().map((f) => [f.on, f.said ?? null]), [['2026-07-01', 'real'], ['2026-10-06', 'real']]);
+  } finally {
+    await r.close();
+  }
+});
+
+test('THREE IN A ROW IS COUNTED A PAYEE: three payees said to be real switch nothing off, and a pair passed over is not an answer', async () => {
+  /* RED FIRST, MEASURED before the change: the third "Both real" in a row switched the whole flag off whoever it was
+     about, so Cilantro, Costa and Paul, once each, ended the watch on every payee. */
+  const r = await fresh();
+  try {
+    const pair = async (what: string, on: string, amount = 15_000) => {
+      await r.charge(what, on, amount);
+      await r.charge(what, on, amount);
+    };
+    const OFF = 'Charged twice was switched off for Cilantro after both charges were real three times in a row. Switch it on again in Money watch.';
+    for (const [what, on, amount] of [['Cilantro', '2026-09-15', 15_000], ['Costa', '2026-09-18', 15_000], ['Paul', '2026-09-20', 15_000], ['Cilantro', '2026-09-21', 22_500]] as const) {
+      await pair(what, on, amount);
+      await r.answer(r.open()[0]!.id, 'real');
+    }
+    /* FOUR IN A ROW OVER THREE PAYEES, two of them Cilantro's: still on for everyone. */
+    assert.equal(r.flags().some((f) => f.said === 'off'), false, 'switched off by answers about other payees');
+    /* THEN CILANTRO'S E£150 three times more: remembered, so no question and no answer, and still two for Cilantro. */
     for (const on of ['2026-09-22', '2026-09-29', '2026-10-06']) await pair('Cilantro', on);
     assert.deepEqual(r.open(), []);
-    assert.equal(r.flags().length, 2);
-    /* THE THIRD ANSWER switches it off, in the words it had. */
-    await pair('Paul', '2026-10-08');
+    assert.equal(r.flags().length, 4);
+    /* CILANTRO'S THIRD ANSWER switches it off for Cilantro, and the line names who. */
+    await pair('Cilantro', '2026-10-08', 30_000);
     await r.answer(r.open()[0]!.id, 'real');
-    assert.deepEqual(r.flags().filter((f) => f.said === 'off').map((f) => [f.what, f.flag]), [[OFF, 'twice']]);
+    assert.deepEqual(r.flags().filter((f) => f.said === 'off').map((f) => [f.what, f.flag, f.payee]), [[OFF, 'twice', 'Cilantro']]);
   } finally {
     await r.close();
   }
@@ -390,32 +428,36 @@ test('NOT A MONTH APART, OR NOT WITHIN A TENTH, IS NO OFFER; and a payee with a 
 
 /* ── Quiet ─────────────────────────────────────────────────────────────────────────────────────── */
 
-test('QUIET: a flag declined three times in a row switches itself off with one line, and is switched on again in Money watch', async () => {
+test('QUIET: three of "Both real" in a row about one payee switch Charged twice off for that payee with one line, and it is switched on again in Money watch', async () => {
   const r = await fresh();
   try {
-    const pair = async (what: string, on: string) => {
-      await r.charge(what, on, 15_000);
-      await r.charge(what, on, 15_000);
+    const pair = async (what: string, on: string, amount: number) => {
+      await r.charge(what, on, amount);
+      await r.charge(what, on, amount);
     };
-    /* "BOTH REAL" IS NOT A NO, so the line says what she said (1.0.0 said "after three no's"). */
-    const OFF = 'Charged twice was switched off after both charges were real three times in a row. Switch it on again in Money watch.';
-    /* TWO NO'S, A MISTAKE, THEN TWO NO'S: never three in a row, so it is still on. */
-    for (const [what, on, said] of [['Cilantro', '2026-10-01', 'real'], ['Costa', '2026-10-02', 'real'], ['Zooba', '2026-10-03', 'mistake'], ['Paul', '2026-10-04', 'real'], ['Eish', '2026-10-05', 'real']] as const) {
-      await pair(what, on);
+    /* "BOTH REAL" IS NOT A NO, so the line says what she said (1.0.0 said "after three no's"), and about whom. */
+    const OFF = 'Charged twice was switched off for Cilantro after both charges were real three times in a row. Switch it on again in Money watch.';
+    /* TWO REAL, A MISTAKE, THEN TWO REAL, each a different amount: never three in a row, so it is still on. */
+    for (const [on, amount, said] of [['2026-10-01', 10_000, 'real'], ['2026-10-02', 11_000, 'real'], ['2026-10-03', 12_000, 'mistake'], ['2026-10-04', 13_000, 'real'], ['2026-10-05', 14_000, 'real']] as const) {
+      await pair('Cilantro', on, amount);
       const asked = r.open();
-      assert.equal(asked.length, 1, what);
+      assert.equal(asked.length, 1, on);
       await r.answer(asked[0]!.id, said);
     }
     assert.equal(r.flags().some((f) => f.said === 'off'), false, 'switched off before three in a row');
 
-    /* THE THIRD IN A ROW. One line says so, once, and the next pair asks nothing. */
-    await pair('Brown Nose', '2026-10-06');
+    /* THE THIRD IN A ROW. One line says so, once, and the next pair of Cilantro's asks nothing. */
+    await pair('Cilantro', '2026-10-06', 15_000);
     await r.answer(r.open()[0]!.id, 'real');
-    assert.deepEqual(r.flags().filter((f) => f.said === 'off').map((f) => [f.what, f.flag]), [[OFF, 'twice']]);
-    await pair('Dukes', '2026-10-07');
+    assert.deepEqual(r.flags().filter((f) => f.said === 'off').map((f) => [f.what, f.flag, f.payee]), [[OFF, 'twice', 'Cilantro']]);
+    await pair('Cilantro', '2026-10-07', 16_000);
     await r.nextDay();
     assert.deepEqual(r.open(), []);
     assert.equal(r.flags().filter((f) => f.what === OFF).length, 1, 'said more than once');
+    /* EVERY OTHER PAYEE IS STILL WATCHED: a charge made twice by somebody else is asked about. */
+    await pair('Dukes', '2026-10-07', 15_000);
+    assert.deepEqual(r.open().map((q) => q.question), ['Dukes E£150 twice on 7 Oct. Both real?']);
+    await r.answer(r.open()[0]!.id, 'mistake');
     /* THE OTHER FLAG IS STILL ON: each has its own count. */
     for (const on of ['2026-08-14', '2026-09-14', '2026-10-14']) await r.charge('SPOTIFY', on, 9_900);
     assert.deepEqual(r.open().map((q) => q.question), ['Add Spotify to Repeating, E£99 around the 14th?']);
@@ -427,10 +469,27 @@ test('QUIET: a flag declined three times in a row switches itself off with one l
     assert.ok(line);
     await r.set('money_flags', line.seq, { said: 'on' });
     await r.nextDay();
-    assert.deepEqual(r.open().map((q) => q.question), ['Dukes E£150 twice on 7 Oct. Both real?']);
-    /* AND THE OLD NO'S ARE NOT COUNTED AGAIN: one more no does not switch it off. */
+    assert.deepEqual(r.open().map((q) => q.question), ['Cilantro E£160 twice on 7 Oct. Both real?']);
+    /* AND THE OLD ANSWERS ARE NOT COUNTED AGAIN: one more "Both real" does not switch it off. */
     await r.answer(r.open()[0]!.id, 'real');
     assert.equal(r.flags().filter((f) => f.said === 'off').length, 0);
+  } finally {
+    await r.close();
+  }
+});
+
+test('A LINE THAT SWITCHED THE WHOLE FLAG OFF, written before the count was a payee\'s, still holds until it is switched on again', async () => {
+  const r = await fresh();
+  try {
+    /* AS 1.0.0 AND THE FIRST 1.1.0 WROTE IT: no payee on the line, and it was told to her as the whole flag. */
+    const old = await r.add('money_flags', { what: 'Charged twice was switched off after both charges were real three times in a row. Switch it on again in Money watch.', flag: 'twice', said: 'off', found: '2026-10-01' });
+    await r.charge('Talabat', '2026-10-07', 97_999);
+    await r.charge('Talabat', '2026-10-07', 97_999);
+    await r.nextDay();
+    assert.deepEqual(r.open(), []);
+    await r.set('money_flags', old.seq, { said: 'on' });
+    await r.nextDay();
+    assert.deepEqual(r.open().map((q) => q.question), ['Talabat E£979.99 twice on 7 Oct. Both real?']);
   } finally {
     await r.close();
   }

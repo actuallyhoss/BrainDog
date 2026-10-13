@@ -1,6 +1,7 @@
 /** A book's page: Money's own layout over the rows filed in one book. */
 
 import type { SeedPage } from '../../base.ts';
+import { BOOK_FIGURES } from '../figures/books.ts';
 import { CONFIRMED_COLUMN, CONFIRMED_STALE } from './parts/ages.ts';
 import { BOOK_LEGS, DUE_30D, MOVED_COLUMNS } from './shared.ts';
 
@@ -20,8 +21,13 @@ import { BOOK_LEGS, DUE_30D, MOVED_COLUMNS } from './shared.ts';
  * beside its arithmetic, and what moved as a calm list. The accounts stay cards here, each with the day its balance was
  * true, because a book's few accounts are the page's subject and Cash now by account is a figure of the whole record.
  * SINCE money-core 3.4.0 the month ahead and what moved are folded under the accounts, as Money's are.
+ *
+ * A BLOCK IS ON THE PAGE ONCE EVERY FIGURE IT READS IS DECLARED (REC-A09 step 3, second half). What a book is owed and
+ * its months are read from figures of one book (`figures/books.ts`), and those are declared by their own jobs: a cell
+ * naming a figure nobody declared is refused where it is read, and a chart's `when:` naming one draws nothing for ever.
+ * So the page is built over `declared`, and the one Money ships is built over the figures Money declares.
  */
-export const MONEY_BOOK_PAGE: SeedPage = {
+export const bookPage = (declared: (figure: string) => boolean): SeedPage => ({
   page: 'money-book',
   title: '{{name}}',
   for: { register: 'books' },
@@ -76,6 +82,8 @@ export const MONEY_BOOK_PAGE: SeedPage = {
       ],
       when: { metric: 'book-net-month:{{name}}', empty: false },
     },
+    ...owedRow(declared),
+    ...monthsChart(declared),
     {
       kind: 'cards',
       heading: 'Accounts',
@@ -165,4 +173,67 @@ export const MONEY_BOOK_PAGE: SeedPage = {
       empty: 'Nothing has moved in {{name}} yet.',
     },
   ],
-};
+});
+
+/**
+ * What a book is owed, what it owes and the day its money lasts until, each by the words a person reads under it. THE
+ * WORDS ARE MONEY'S OWN, "due to come in" and "due to go out" (`figures/flow.ts`): no word on a Money page says who owes
+ * whom (`money.ts`, "MONEY IS A FINANCE PAGE").
+ */
+const OWED_CELLS: [figure: string, label: string][] = [
+  ['book-owed-to', 'Due to come in'],
+  ['book-owed-by', 'Due to go out'],
+  ['book-lasts-until', 'Money lasts until'],
+];
+
+/**
+ * WHAT THIS BOOK IS OWED AND OWES, AND HOW LONG ITS MONEY LASTS, IN ONE ROW under its month: the rest of the figures
+ * read once a book (REC-A09 step 2). A ROW OF ITS OWN AND NOT THREE MORE CELLS OF THIS MONTH, because that row is drawn
+ * only while the month has money in it and a bill is owed whatever moved this month.
+ *
+ * A CELL FOR EACH FIGURE DECLARED, in this order, and no row with none. NO `when:`, because a block's `when:` reads one
+ * figure and no one of these three holds an amount whenever another does; and it needs none, since the record leaves
+ * out a row whose every figure is empty, so a book with nothing due draws no row of noughts.
+ */
+function owedRow(declared: (figure: string) => boolean): Record<string, unknown>[] {
+  const cells = OWED_CELLS.filter(([figure]) => declared(figure)).map(([figure, label]) => ({ metric: `${figure}:{{name}}`, label }));
+  if (cells.length === 0) return [];
+  return [{ kind: 'stat', heading: 'What is due', icon: 'scale', span: 12, cells }];
+}
+
+/** The figures the chart reads: its two lines, and what was left each month, which it is drawn on. */
+const BY_MONTH = { in: 'book-in-by-month', out: 'book-out-by-month', net: 'book-net-by-month' };
+
+/**
+ * THIS BOOK'S MONTHS, IN AND OUT: Money's own chart (`parts/history.ts`) narrowed to the book, as a project's page
+ * narrows it to the project. A line names its figure with this book as its parameter, as a cell does.
+ *
+ * WHAT MOVED AND NOTHING AHEAD. Money's chart draws three months to come from what is due and what repeats, and those
+ * are read over the whole record with no book to be asked about, so this one stops at the month the clock is in.
+ *
+ * DRAWN ON WHAT WAS LEFT, as This month is drawn on its net: read over the entries of both lines, it holds an amount
+ * while either does, so a book only paid into has its months and a book nothing moved in has no empty chart. ALL THREE
+ * FIGURES OR NO CHART, because a chart with one line says a book earned and never spent.
+ */
+function monthsChart(declared: (figure: string) => boolean): Record<string, unknown>[] {
+  if (!Object.values(BY_MONTH).every(declared)) return [];
+  return [
+    {
+      kind: 'series',
+      heading: 'In and out, by month',
+      icon: 'chart-column',
+      span: 12,
+      series: [
+        { metric: `${BY_MONTH.in}:{{name}}`, label: 'Money in' },
+        { metric: `${BY_MONTH.out}:{{name}}`, label: 'Money out', dir: 'out' },
+      ],
+      back: 12,
+      net: true,
+      when: { metric: `${BY_MONTH.net}:{{name}}`, empty: false },
+      empty: 'Nothing moved in {{name}} in these months.',
+    },
+  ];
+}
+
+/** The page Money ships: a book's page over the figures of one book that Money declares. */
+export const MONEY_BOOK_PAGE: SeedPage = bookPage((figure) => figure in BOOK_FIGURES);

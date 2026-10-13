@@ -124,8 +124,9 @@ test('record_index names every figure money-core declares, and resources/list ev
      `book-spent-month`, which money-core declared after it, over the same slot. And `project-said` (portfolio 1.16.0),
      whether one project says where it stands, read about one project at a time. And money-core 3.17.0's
      `budget-passed-on`, read about one category, and its eight figures of one plan (`plan is {{it}}`, two of them plan-lead-all-paid-72's), and its three of one book's month
-     (`book is {{it}}`): in, out and net. */
-  const templates = ['project-owed', 'project-in-by-month', 'project-out-by-month', 'book-cash', 'book-spent-month', 'project-in-month', 'project-out-month', 'project-kept-month', 'project-said', 'budget-passed-on', 'plan-parts-paid', 'plan-parts', 'plan-paid', 'plan-left', 'plan-next-due', 'plan-last-due', 'plan-parts-open', 'plan-share-left', 'book-in-month', 'book-out-month', 'book-net-month'];
+     (`book is {{it}}`): in, out and net, and what is due to come into one book and go out of it (book-owed-figures-73),
+     and the same three by month, which a book's chart is drawn on (book-page-months-73). */
+  const templates = ['project-owed', 'project-in-by-month', 'project-out-by-month', 'book-cash', 'book-spent-month', 'project-in-month', 'project-out-month', 'project-kept-month', 'project-said', 'budget-passed-on', 'plan-parts-paid', 'plan-parts', 'plan-paid', 'plan-left', 'plan-next-due', 'plan-last-due', 'plan-parts-open', 'plan-share-left', 'book-in-month', 'book-out-month', 'book-net-month', 'book-owed-to', 'book-owed-by', 'book-in-by-month', 'book-out-by-month', 'book-net-by-month'];
   assert.deepEqual(offered.map((u) => u.slice('braindog:metric/'.length)).sort(), declared.filter((id) => !templates.includes(id)).sort());
   for (const uri of offered) assert.ok((await tools(api as never).read(uri, owner)).ok, `${uri} is offered and refuses`);
   sql.close();

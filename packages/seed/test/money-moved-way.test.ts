@@ -20,7 +20,7 @@ import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 import { NOW, REGISTERS, day, declarations, metricDeclarations, pageDeclarations } from '../src/index.ts';
 import { MONEY_BOOK_PAGE } from '../src/modules/money/pages/book.ts';
 import { MONEY_PAGE } from '../src/modules/money/pages/money.ts';
-import { LEDGER } from '../src/modules/money/pages/parts/ledger.ts';
+import { LEDGER, LEDGER_COLUMNS } from '../src/modules/money/pages/parts/ledger.ts';
 import { MOVED_COLUMNS } from '../src/modules/money/pages/shared.ts';
 
 type Column = { field: string; sign?: { field: string; minus: string } };
@@ -56,7 +56,7 @@ test('EVERY LIST OF WHAT MOVED SIGNS ITS AMOUNT BY THE WAY THE MONEY WENT, on Mo
     assert.ok(block, `${where} lists nothing that moved`);
     assert.equal(block.kind, 'timeline', where);
     assert.equal(block.source, 'register.transactions', where);
-    assert.deepEqual(block.columns, MOVED_COLUMNS, `${where} lists what moved in columns of its own`);
+    assert.deepEqual(block.columns, where === 'a book' ? MOVED_COLUMNS : LEDGER_COLUMNS, `${where} lists what moved in columns of its own`);
 
     /* THE SIGN IS ON A CELL A TIMELINE DRAWS: a fourth column would be declared and never seen. */
     const columns = block.columns!;

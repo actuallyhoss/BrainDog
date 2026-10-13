@@ -900,6 +900,49 @@ test('A THING NEVER DONE OR ONLY WISHED FOR IS NOT HEARD: "I never ran a shop", 
   }
 });
 
+test('A WISH HOLDS TO THE END OF ITS CLAUSE, AND "STILL DO" POINTS BACK: "We hope to have invoices sorted", "I used to love taking orders and still do"', () => {
+  const lit = (p: ReturnType<typeof propose>, word: RegExp): boolean => p.heard.some((h) => word.test(h.phrase)) || p.places.some((x) => x.phrase !== null && word.test(x.phrase));
+  const kept = (s: string, word: RegExp): void => assert.ok(lit(propose(s, CAIRO), word), s);
+  const none = (s: string, word: RegExp): void => assert.ok(!lit(propose(s, CAIRO), word), s);
+
+  /* WHAT BATCH 71 LEFT, word for word. Whoever hopes to have their invoices sorted has invoices. */
+  kept('We hope to have invoices sorted', /invoices/iu);
+  kept('I used to love taking orders and still do', /orders/iu);
+  none('I was never a designer', /designer|freelance/iu);
+  assert.notEqual(propose('I was never a freelance designer', CAIRO).usecase, 'freelancer');
+  kept('I hope to track orders', /orders/iu);
+  kept('I wish my shop had more orders', /shop/iu);
+
+  /* A WISH REFUSES ONLY A THING THAT ENDS THE CLAUSE: words after it say how the thing they have is hoped to be. */
+  for (const s of ['I hope to have invoices paid on time', 'We wish we had orders under control', 'I hope to get orders out faster', 'We hope to have invoices and orders sorted', 'I hope to get orders in on time']) {
+    kept(s, /invoices|orders/iu);
+  }
+  /* A word of when ends it still, and so does where a thing not yet had is hoped to be, after a verb of starting. */
+  for (const s of [
+    'I wish I had a shop',
+    'I hope to have a shop soon',
+    'I hope to take orders someday',
+    'I hope to have a shop one day, I freelance for now',
+    'I wish I had a shop or orders',
+    'I hope to open a shop in Cairo',
+    'I dream of opening a shop by the sea',
+    'I hope to have a shop next year',
+    'I wish I had a shop in Cairo',
+    'I wish we had a small shop near the station',
+  ]) {
+    none(s, /shop|orders/iu);
+  }
+
+  /* "STILL DO" AFTER THE CLAUSE POINTS BACK AT WHAT WAS DONE, so it goes on. */
+  for (const s of ['I used to take orders and still do', 'I used to take orders, and I still do', 'We used to take orders and invoices and we still do', 'I used to enjoy taking orders. I still do.', 'I used to run a shop and I still do today']) {
+    kept(s, /shop|orders/iu);
+  }
+  /* Denied, or said of something else, it points back at nothing. */
+  for (const s of ['I used to take orders and still do not', "I used to take orders and still don't", 'I used to take orders. I still do my own taxes', 'I used to take orders and my sister still does', 'I used to take orders but I stopped']) {
+    none(s, /orders/iu);
+  }
+});
+
 test("A SENTENCE THAT OPENS WITH A REFUSAL NAMES NOBODY: Don't need orders, I freelance as a designer", () => {
   const typed = "Don't need orders, I freelance as a designer";
   const p = propose(typed, CAIRO);

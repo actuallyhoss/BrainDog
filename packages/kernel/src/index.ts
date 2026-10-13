@@ -483,6 +483,9 @@ export {
 export { MET_CAP, PEOPLE, RESOLVE_PAIRS_NIGHT, pairHash } from './people.ts';
 export type { MeetArgs, Met, MetRow, ResolveJob, ResolveSide } from './people.ts';
 export type { MeetsFields, OrgFields, RatesFields } from './roles.ts';
+/* THE LIST HOLDING THE RATES, by its `rates:` key or, on a record older than the key, by the name it had (`roles.ts`):
+   exported so a page that draws the rates finds the same list the conversion reads. */
+export { ratesRole } from './roles.ts';
 /* THE IDENTITY KEYS (`identity-keys.ts`), for every door that reads who something is about: one normaliser, so a key
    the CLI harvests from a commit and one the record holds are the same string. */
 export { KEY_KINDS, PUBLIC_MAIL, WEAK_KINDS, bankKey, githubOfAddress, isMachineIdentity, isOrganisationAddress, isPublicMail, isWeakKey, keyFrom, keyOf, keyOfAny, keysOf, kindOfKey, nameWords, parseFrom, payeeName, registrable, valueOfKey } from './identity-keys.ts';

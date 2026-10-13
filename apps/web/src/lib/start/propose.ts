@@ -295,6 +295,11 @@ const WHOLE: readonly Whole[] = [
  * A THING NEVER DONE OR ONLY WISHED FOR IS NOT HAD EITHER: "I never ran a shop" is read through the verb of before
  * (`DID_IT`), "I wish I had a shop" and "I hope to open a shop one day" through the wish (`WISHED`), and "I used to
  * love taking orders" through the word of liking (`LIKED`). "Now I love them" takes nothing up (`ONLY_LIKED`).
+ *
+ * A WISH HOLDS TO THE END OF ITS CLAUSE, as a stopping does: "We hope to have invoices sorted" is somebody with
+ * invoices, and "I hope to have a shop one day" is nobody with a shop. Only a thing still to be started is wished
+ * for wherever it sits (`TO_START`): "I hope to open a shop in Cairo". AND "STILL DO" POINTS BACK AT WHAT WAS DONE
+ * (`STILL_DOES`): "I used to love taking orders and still do" keeps its orders.
  */
 const REFUSES = "no|not|never|without|zero|don['’]?t|do\\s+not|doesn['’]?t|does\\s+not|haven['’]?t|hasn['’]?t|hadn['’]?t";
 /* `send` and its ending apart: the whole word is a field an add-on declares, and the core spells none (the core-names gate). */
@@ -344,6 +349,8 @@ const MONTH = 'january|february|march|april|may|june|july|august|september|octob
 const WHEN = [
   'anymore|any\\s+more|any\\s+longer|altogether|entirely|completely|at\\s+all|too|either|as\\s+well',
   'for\\s+good|for\\s+now|now|already|today|yesterday|recently|lately',
+  /* And the words of later, which end a wish as these end a stopping: "I hope to have a shop one day". */
+  'one\\s+day|some\\s*day|soon|eventually|in\\s+(?:the\\s+)?future|next\\s+(?:year|month|week|spring|summer|autumn|fall|winter)',
   '(?:last|this)\\s+(?:year|month|week|spring|summer|autumn|fall|winter)',
   `(?:back\\s+)?in\\s+(?:\\d{4}|${MONTH})`,
   `(?:(?:a\\s+)?(?:few|couple\\s+of|long)\\s+|[\\p{L}\\p{N}]+\\s+)?(?:${SPAN}|while|time)\\s+ago`,
@@ -379,6 +386,10 @@ const WISHED = new RegExp(
   `(?:^|[^\\p{L}\\p{N}'’])(?:${WISHES})\\s+(?:that\\s+)?(?:${SOMEBODY}\\s+)?(?:(?:${GETS})\\s+){0,5}(?:(?:a|an|any|some|(?:${OWN})\\s+own)\\s+)?(?:(?:${[...PLAIN].join('|')})\\s+)*$`,
   'iu',
 );
+/* A thing still to be opened or started is not had, whatever is said after it: "I hope to open a shop in Cairo". */
+const TO_START = new RegExp(`(?:^|\\s)(?:open|opened|opening|start|started|starting)\\s+(?:(?:a|an|any|some|(?:${OWN})\\s+own)\\s+)?(?:(?:${[...PLAIN].join('|')})\\s+)*$`, 'iu');
+/* And so is a phrase heard that is the starting itself: "start a" in "I hope to start a small shop with this". */
+const STARTS = /^(?:open|opened|opening|start|started|starting)(?![\p{L}\p{N}])/iu;
 /* What follows says the thing is had after all: it is hoped for in here, wished to have come sooner, or had now
    ("I always wanted a shop and now I have one"). */
 const HAD_ANYWAY = /^(?:\s+(?:here|sooner|earlier|(?:with|in|on|through|using)\s+(?:this|braindog))|\s*,?\s+(?:and|but)\s+(?:(?:i|we)\s+)?(?:now|finally|today)\s+(?:(?:i|we)\s+)?(?:have|own|run|do|did|got))(?![\p{L}\p{N}])/iu;
@@ -398,6 +409,15 @@ const takenUp = (back: string): RegExp =>
     'iu',
   );
 const TAKEN_UP = { many: takenUp('them|those'), one: takenUp('it|that'), done: takenUp('them|those|it') };
+/* "and still do", "and I still do", "I still do." after the clause: what was done then is done now. Never "still do
+   not" or "still don't", never somebody else ("my sister still does"), never another thing ("I still do my own taxes"). */
+const STILL_DOES = new RegExp(
+  `^(?:\\s+(?:${WHEN}))?\\s*[,;.]?\\s*(?:(?:and|but)\\s+)?(?:(?:i|we)\\s+)?(?:still\\s+do|do\\s+still)(?![\\p{L}\\p{N}'’])(?!\\s+not(?![\\p{L}\\p{N}]))${CLAUSE_END}`,
+  'iu',
+);
+/* Where one thing wished for would be, which ends the wish as a word of when does: "I wish I had a shop in Cairo",
+   "by the sea". Never of many, which are had and hoped to be somewhere: "I hope to get orders in on time". */
+const SOMEWHERE = new RegExp(`^\\s+(?:in|near|by|at)(?:\\s+(?!(?:and|or|nor|but|so|because|since)(?![\\p{L}\\p{N}]))[\\p{L}\\p{N}'’-]+){1,3}${CLAUSE_END}`, 'iu');
 const ENDS = new RegExp(`^${CLAUSE_END}`, 'iu');
 const ITSELF_ENDED = new RegExp(`^\\s+(?:(?:was|got)\\s+)?(?:closed|shut|sold)(?:\\s+(?:down|up))?${CLAUSE_END}`, 'iu');
 /* After the verb itself, what was sold or kept comes first: "done selling candles", never "selling candles on paper". */
@@ -481,8 +501,9 @@ function refusedIn(said: string, known: readonly Said[] = []): (span: Said) => b
     }
     const word = said.slice(from, to).toLowerCase();
     const back = PLAIN.has(word) || IS_DONE.test(word) ? TAKEN_UP.done : end > to || (MANY.test(word) && !/ss$/iu.test(word)) ? TAKEN_UP.many : TAKEN_UP.one;
-    return back.test(said.slice(end));
+    return back.test(said.slice(end)) || STILL_DOES.test(said.slice(end));
   };
+  const many = (from: number, to: number): boolean => MANY.test(said.slice(from, to)) && !/ss$/iu.test(said.slice(from, to));
   /* How a thing was refused: by a word of refusal, or by a word of having stopped, which holds only at a clause's end. */
   const not = (from: number, to: number): Refusal => {
     const before = said.slice(0, from);
@@ -490,8 +511,9 @@ function refusedIn(said: string, known: readonly Said[] = []): (span: Said) => b
     const used = USED_TO.test(before);
     if (NO_LONGER.test(before) || used) return closes(from, to) && !again(from, to) ? 'stopped' : null;
     if (NOT.test(before)) return 'refused';
-    /* A thing only wished or hoped for is refused as one said not to be had is. */
-    if (WISHED.test(before) && !HAD_ANYWAY.test(said.slice(to))) return 'refused';
+    /* A thing only wished or hoped for is refused as one said not to be had is, where it ends the clause: "We hope to
+       have invoices sorted" is somebody with invoices. One still to be started is refused wherever it sits. */
+    if (WISHED.test(before) && !HAD_ANYWAY.test(said.slice(to)) && (TO_START.test(before) || STARTS.test(said.slice(from, to)) || closes(from, to) || (!many(from, to) && SOMEWHERE.test(said.slice(to))))) return 'refused';
     if (ENDED.test(before)) return ends(to) ? 'stopped' : null;
     if (ENDED_ITSELF.test(before) && ITSELF_ENDED.test(said.slice(to))) return 'stopped';
     /* One thing sold, and nothing takes it up again: whoever sold a stall does not run it. */

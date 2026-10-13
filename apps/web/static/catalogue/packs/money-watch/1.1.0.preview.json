@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "made_at": "2026-10-13T17:22:29.546Z",
+  "made_at": "2026-10-13T18:26:31.073Z",
   "pages": [
     {
       "blocks": [
@@ -54,7 +54,7 @@
         "register.money_flags"
       ],
       "title": "Money watch",
-      "read_at": "2026-10-13T17:22:29.546Z",
+      "read_at": "2026-10-13T18:26:31.073Z",
       "zone": "UTC",
       "look": {
         "look": "money-watch",

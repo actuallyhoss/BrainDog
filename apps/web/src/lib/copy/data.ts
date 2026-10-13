@@ -49,7 +49,10 @@ export const data = {
   figureAtLeast: (amount: string, pairs: readonly string[]) =>
     `At least ${amount} here; no rate from ${pairs.length > 1 ? `${pairs.slice(0, -1).join(', ')} or ${pairs[pairs.length - 1]}` : (pairs[0] ?? '')} for the rest.`,
   figureConvertedForward: (day: string) => `Converted at rates as of ${day}, the first after some of these amounts.`,
-  figureConvertedStale: (day: string) => `Converted at rates as of ${day}. Update the rates for a current figure.`,
+  /* NOTHING BESIDE A FIGURE UPDATES A RATE, so the stale sentence names where rates are kept up and the way in, by the
+     names they carry on Money's settings (`packs.ratesSetUp`), and asks for no press that is not on the page. */
+  figureConvertedStale: (day: string) =>
+    `Converted at rates as of ${day}, which are out of date. Rates are kept up in Exchange rates: Set up exchange rates, in Money’s settings, fetches them every day.`,
   /** A target declared in one currency, said in the one the figure was converted into. */
   targetConverted: (line: string, from: string) => `${line}, converted from ${from} at the latest rate`,
 } as const;

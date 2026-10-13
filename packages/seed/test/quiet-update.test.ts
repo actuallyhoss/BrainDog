@@ -614,6 +614,23 @@ const withoutBookFill = (doc: Body): Body =>
  */
 const PLAN_LEAD_72: ReadonlySet<string> = new Set(['plan-parts-open', 'plan-share-left']);
 const withoutPlanLeads = (doc: Body): Body => ({ ...doc, declarations: (doc.declarations as Body[]).filter((d) => !PLAN_LEAD_72.has(String(d.metric))) });
+/**
+ * AND BATCH 73'S, folded into the same unreleased step: the count of budgets set, which Money declares itself now
+ * (budgets-set-73); the two figures of what is due to and from one book (book-owed-figures-73) and the three of a book's
+ * months (book-page-months-73), with the row What is due and the chart In and out, by month they draw on a book's page;
+ * and the rule that files a bill in its account's book, with the account a bill names (bill-takes-book-73). The script
+ * the rule starts went whole with `withoutBookFill`, and the Ledger tile's name column with the tile
+ * (`withoutLedgerTile`, ledger-payee-73).
+ */
+const MONEY_FIGURES_73: ReadonlySet<string> = new Set(['budgets-set', 'book-owed-to', 'book-owed-by', 'book-in-by-month', 'book-out-by-month', 'book-net-by-month']);
+const BOOK_BLOCKS_73: ReadonlySet<string> = new Set(['What is due', 'In and out, by month']);
+const withoutBatch73 = (doc: Body): Body => {
+  const cut = withPage(doc, 'money-book', (now) => now.filter((b) => !BOOK_BLOCKS_73.has(String(b.heading))), (d) => !MONEY_FIGURES_73.has(String(d.metric)) && d.rule !== 'bill-takes-book');
+  return {
+    ...cut,
+    declarations: (cut.declarations as Body[]).map((d) => (d.register === 'obligations' && Array.isArray(d.fields) ? { ...d, fields: (d.fields as Body[]).filter((f) => f.id !== 'account') } : d)),
+  };
+};
 /** Batch 63's four figures of this month's spending against last (spend-figures-63), new in the unreleased money-core 3.17.0. */
 const SPEND_VS_LAST: ReadonlySet<string> = new Set(['spent-last-month', 'spent-by-category-last-month', 'spent-by-category-to-date-last-month', 'spent-vs-last-month']);
 const LATEST: Record<string, { version: string; released: string; undo: (doc: Body) => Body }> = {
@@ -622,7 +639,7 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
     version: '3.13.0',
     released: '2e09983b40aba73e',
     undo: (raw) => {
-      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(withoutPlanLeads(raw))))))))))));
+      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(withoutPlanLeads(withoutBatch73(raw)))))))))))));
       return {
       ...doc,
       /* AND THE SCRIPT THAT MARKS A BILL PAID, WITH THE RULE THAT STARTS IT (settle-rule-60), both newer than 3.13.0. */

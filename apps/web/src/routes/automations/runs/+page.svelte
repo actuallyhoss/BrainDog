@@ -21,19 +21,17 @@
   import { apiBase } from '$lib/at.ts';
   import { untrack } from 'svelte';
   import { titleOf } from '$lib/title.ts';
-  import PageHead from '$lib/ui/PageHead.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Section from '$lib/ui/Section.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import { HeatGrid } from '$lib/viz/index.ts';
   import { closed, drew, opened } from '$lib/ui/screen.svelte.ts';
-  import { words } from '$lib/flow/flow.ts';
   import { openAutomations, type AutomationRow, type RunRow } from '$lib/flow/source.ts';
   import { openActions, type ActionRow } from '$lib/record/actions.ts';
   import { readScripts, type Script } from '$lib/record/scripts.ts';
-  import HubTabs from '../HubTabs.svelte';
   import HubRows from '../HubRows.svelte';
   import { clockOf, heatReading, hubWords as w, kindIcon, runDays, runHeat, runLines, type HubRow, type RunLine } from '../hub.ts';
+  import { hubHead } from '../hub-head.ts';
 
   /* HOW MANY AUTOMATIONS HAVE THEIR OWN RUNS READ, newest last run first. Past these a rule is its last run alone, so a
      record with a hundred rules costs a bounded number of reads. */
@@ -93,6 +91,13 @@
     if (from === 'ready' && lines.length > 0) drew('ready');
   });
 
+  /* THE HEAD AND ITS TABS ARE THE LAYOUT'S (`../+layout.svelte`), so the selection slides here from the tab left
+     behind. This page says how many runs it lists, and nothing until they are read. */
+  const head = hubHead();
+  $effect(() => {
+    head.runs = from === 'ready' ? lines.length : undefined;
+  });
+
   const now = Date.now();
 
   const rowOf = (l: RunLine): HubRow => ({
@@ -113,9 +118,6 @@
 
 <svelte:head><title>{titleOf(w.tab.runs)}</title></svelte:head>
 
-<PageHead icon="refresh" title={words.heading} count={from === 'ready' ? lines.length : undefined}>
-  {#snippet actions()}<HubTabs here="runs" />{/snippet}
-</PageHead>
 <div class="page">
   {#if from === 'refused'}
     <Empty kind="error" heading title={fix} />

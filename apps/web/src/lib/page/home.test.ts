@@ -505,3 +505,11 @@ test('THE RULE IS THE KERNEL’S, NOT A COPY: home.ts hands it on in one line an
     'a second copy of the rule drifts from the record',
   );
 });
+
+test('A NOTE THAT IS ONE LINK IS A 44 TARGET UNDER A THUMB, by the token and on a coarse pointer only', () => {
+  /* Today's line on the vital signs is a note whose words are the link (`signsLine`); it measured 181 by 19 at 320 to 640. */
+  assert.match(
+    BODY,
+    /@media \(pointer: coarse\) \{\s*\.block-slot > :global\(\.block\[data-kind='note'\] p > a:only-child\) \{\s*display: inline-flex;\s*align-items: center;\s*min-block-size: var\(--tap\);\s*\}\s*\}/u,
+  );
+});

@@ -10,7 +10,7 @@
  * card that paid a company bill is in the company's book because somebody said so. An account in no book fills
  * nothing, so a record that keeps one set of money is never written by this.
  *
- * IT RUNS TWO WAYS. Handed one thing by a rule (`entry-takes-book` and its two siblings in `../rules.ts`), it files
+ * IT RUNS TWO WAYS. Handed one thing by a rule (`entry-takes-book` and its three siblings in `../rules.ts`), it files
  * that one and says so in names. Handed nothing, once a day, it counts what sits in no book on an account that is in
  * one, which is what an account held before it was put in a book, and asks ONE QUESTION THAT SAYS HOW MANY. The
  * answer is the change: "File them" carries each patch at the version the script read, so the gate refuses a pick
@@ -46,24 +46,36 @@ export function bookFromAccount(rows, inBook) {
  * person may name one (`input.row`, "transactions#12"). With neither it is the daily count and its one question.
  *
  * A SCRIPT'S LIST IS ONE PAGE OF FIFTY, so each is read a page at a time, each next page asking for numbers below the
- * lowest one read, as `plans-from-names.js` reads. ASKED BY ACCOUNT, since the account is indexed on all three lists
+ * lowest one read, as `plans-from-names.js` reads. ASKED BY ACCOUNT, since the account is indexed on all four lists
  * and a Ledger of ten thousand entries in no book, on accounts in no book, is then never read at all.
  *
  * "FILE THEM" CARRIES AT MOST 900 CHANGES, under the 1,000 a declaration may ask for. Past that the answer says so, and
  * the cause carries the count, so what is left is a new question the night after the first is answered.
  *
  * THE COUNT IS OF WHAT STILL STANDS, AS THE PAGE COUNTS IT (`figures/books.ts`, the figures of what is in no book): a
- * Ledger entry that is not void, a repeating line that has not ended, an instalment still open. So the question and
- * the page say one number, and "File them" writes nothing onto a void entry, an ended line or a cancelled part
+ * Ledger entry that is not void, a bill open or part paid, a repeating line that has not ended, an instalment still
+ * open. So the question and the page say one number, and "File them" writes nothing onto a void entry, a bill paid or
+ * written off, an ended line or a cancelled part
  * (audit 71 finding 1). A thing handed by a rule or by name is filed whatever its status: somebody wrote it just now.
  */
 export default async function run(ctx) {
   const PAGE = 50;
   const MOST = 900;
-  /* THE LISTS THAT HOLD AN ACCOUNT, and what one thing on each is called. Bills and invoices holds none. */
-  const LISTS = ['transactions', 'recurring', 'installments'];
-  const STANDS = { transactions: (s) => s !== 'void', recurring: (s) => s !== 'ended', installments: (s) => s === 'open' };
-  const CALLED = { transactions: ['Ledger entry', 'Ledger entries'], recurring: ['repeating line', 'repeating lines'], installments: ['instalment', 'instalments'] };
+  /* THE LISTS THAT HOLD AN ACCOUNT, and what one thing on each is called. Bills and invoices is among them since it
+     gained an account (REC-A09 step 1), and is said by the list's own name: half of them are invoices. */
+  const LISTS = ['transactions', 'obligations', 'recurring', 'installments'];
+  const STANDS = {
+    transactions: (s) => s !== 'void',
+    obligations: (s) => s === 'open' || s === 'part',
+    recurring: (s) => s !== 'ended',
+    installments: (s) => s === 'open',
+  };
+  const CALLED = {
+    transactions: ['Ledger entry', 'Ledger entries'],
+    obligations: ['bill or invoice', 'bills and invoices'],
+    recurring: ['repeating line', 'repeating lines'],
+    installments: ['instalment', 'instalments'],
+  };
   const input = ctx.input && typeof ctx.input === 'object' ? ctx.input : {};
   const held = (v) => typeof v === 'string' && v !== '';
   const every = async (list, where) => {
@@ -160,7 +172,7 @@ export default async function run(ctx) {
 
 /**
  * The script as Money's pack document writes it, as `LAST_DAY_SCRIPT` is: no egress, no keys, once a day and when a
- * rule hands it a thing. It reads accounts and books for the link and the name, and writes the book on the three lists
+ * rule hands it a thing. It reads accounts and books for the link and the name, and writes the book on the four lists
  * alone. `limits.writes` is the most a script may ask for, since one answer files everything an account already held.
  */
 export const BOOK_FROM_ACCOUNT_SCRIPT = {
@@ -170,8 +182,8 @@ export const BOOK_FROM_ACCOUNT_SCRIPT = {
   runs: { every: '1d', rule: true },
   egress: [],
   keys: [],
-  reads: ['accounts', 'books', 'transactions', 'recurring', 'installments'],
-  writes: ['transactions', 'recurring', 'installments'],
+  reads: ['accounts', 'books', 'transactions', 'obligations', 'recurring', 'installments'],
+  writes: ['transactions', 'obligations', 'recurring', 'installments'],
   limits: { writes: 1000 },
   source: `${bookFromAccount.toString()}\nexport default ${run.toString()}`,
 };

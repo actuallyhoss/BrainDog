@@ -1,4 +1,4 @@
-/** Money's figures over a category's budget: the day this month's spending on it reached the most a month. */
+/** Money's figures over a category's budget: how many are set, and the day this month's spending on one reached the most a month. */
 
 import type { SeedMetric } from '../../base.ts';
 import { MONEY } from './shared.ts';
@@ -40,6 +40,28 @@ export const BUDGET_FIGURES: Record<string, SeedMetric> = {
     where: 'state is cleared, transfer is false, direction is out, on at least bom, category is {{it}}',
     value: { running: { sum: 'amount', order: 'on', until: { gte: { field: 'budget', of: 'category' } } } },
     format: MONEY,
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  /* HOW MANY BUDGETS ARE SET, WHICH IS WHAT MONEY'S OWN BUDGETS TILE IS DRAWN ON (audit 70 finding 1, budgets-set-73).
+     `pages/parts/budget.ts` draws the tile `when: { metric: 'budgets-set', gt: 0 }`, and until now only the Personal use
+     case declared that count (`usecases/personal.ts`), so a record with Money and no Personal drew no tile and was told
+     nothing. The figure a Money block reads is Money's to declare.
+
+     WORD FOR WORD AS PERSONAL COUNTS IT, so the two are one declaration under one name and a record that holds both
+     reads one number: the live categories money goes out on that hold a most a month, which is the sentence the tile
+     and the line are drawn over (`BUDGETED`). A count, with no good or bad number, so `target: { gte: 0 }`.
+
+     AFTER `budget-passed-on`, so that figure keeps its place among the budget figures. */
+  'budgets-set': {
+    metric: 'budgets-set',
+    name: 'Budgets set',
+    source: 'register.categories',
+    where: 'state is live, direction is out, budget is set',
+    value: { count: 'id' },
+    format: 'int',
     target: { gte: 0 },
     window: '30d',
     compare: 'none',

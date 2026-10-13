@@ -128,8 +128,12 @@ export const PERSONAL = {
      nothing goes, so a minor step.
      2.3.1: the settings that hold each list's name and one of it are titled by what the list is called ("Name of
      the Ledger list"), not by its id ("Label: transactions"), and every list's name is declared before any
-     singular, so the 64-setting ceiling costs a singular first. Titles and order only, so a patch step. */
-  version: '2.3.1',
+     singular, so the 64-setting ceiling costs a singular first. Titles and order only, so a patch step.
+     2.4.0: the count of budgets set goes to Money (`hands`), which declares `budgets-set` itself since money-core
+     3.17.0 so that its own Budgets tile has the count on a record with no use case. Two packs cannot own one
+     figure, so this version stops declaring it and Home's budget tile reads Money's. A minor step: the figure is
+     handed with its id, where and value as they were, and nothing a record holds goes. */
+  version: '2.4.0',
   title: 'Personal',
   summary: 'Your money and bills, what you are saving for, and the projects and goals you care about.',
   author: 'BrainDog',
@@ -233,6 +237,10 @@ export const PERSONAL = {
        picker reads the studio's five first, in the household's words (`labels`). They stay the record's own if Personal
        is ever taken out, because rows hold them. */
     extends: { 'register.people': { values: { role: ['family', 'friend', 'landlord', 'tradesperson', 'adviser'] } } },
+    /* THE COUNT OF BUDGETS SET GOES TO MONEY WITH ITS ID, SINCE 2.4.0: money-core 3.17.0 declares `budgets-set` under the
+       same id, as Founder's organisations went to People. A record on 2.3.1 takes this update before Money's, or the two
+       in one plan with Money told what this hands it (`planFile`); Money's alone, first, is refused at the figure. */
+    hands: { 'metric.budgets-set': 'money-core' },
     declarations: [
       {
         register: 'savings_goals',
@@ -407,8 +415,8 @@ export const PERSONAL = {
         compare: 'none',
       },
       /* WHAT HOME AND THE GOALS PAGE ARE DRAWN ON, SINCE 2.2.0, each over its tile's own clauses, so no tile is drawn
-         over nothing. Counts, with no good or bad number. */
-      counted('budgets-set', 'Budgets set', 'register.categories', 'state is live, direction is out, budget is set'),
+         over nothing. Counts, with no good or bad number. `budgets-set`, WHICH THE BUDGET TILE WAITS ON, IS MONEY'S SINCE
+         2.4.0 (`hands` below): the same count, declared once, by the pack whose list it counts. */
       counted('savings-active', 'Savings goals on the go', 'register.savings_goals', 'state is not paused'),
       counted('goals-active', 'Goals on the go', 'register.goals', 'state is active, kind is goal'),
       counted('habits-active', 'Habits on the go', 'register.goals', 'state is active, kind is habit'),

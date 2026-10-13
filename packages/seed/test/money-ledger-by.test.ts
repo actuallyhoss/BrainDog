@@ -26,7 +26,7 @@ import { KINDS } from '../../render/src/kinds.ts';
 
 import { NOW, day, firstPartyDocument } from '../src/index.ts';
 import { FILING_FIGURES } from '../src/modules/money/figures/filing.ts';
-import { LEDGER, LEDGER_LINES } from '../src/modules/money/pages/parts/ledger.ts';
+import { LEDGER, LEDGER_COLUMNS, LEDGER_LINES } from '../src/modules/money/pages/parts/ledger.ts';
 import { MOVED_COLUMNS } from '../src/modules/money/pages/shared.ts';
 
 const OWNER = { actor: 'p_1' };
@@ -128,7 +128,7 @@ test('THE TILE IS STILL SIX LINES OF THE LEDGER, with its own empty line', () =>
   assert.deepEqual([tile.kind, tile.heading, tile.source, tile.where], ['timeline', 'Ledger', 'register.transactions', 'state is not void']);
   assert.equal(tile.limit, LEDGER_LINES);
   assert.equal(LEDGER_LINES, 6);
-  assert.deepEqual(tile.columns, MOVED_COLUMNS);
+  assert.deepEqual(tile.columns, LEDGER_COLUMNS);
   assert.equal(tile.empty, 'Nothing has moved yet.');
 });
 

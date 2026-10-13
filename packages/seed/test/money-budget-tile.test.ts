@@ -9,10 +9,13 @@
  * only for one that reached its line. The tile is read through the kernel on a page of these two blocks and nothing
  * else, because placing them on Money's page is money-wire-70's.
  *
- * TWO THINGS THIS FILE DECLARES FOR ITSELF, AND SAYS SO. `budgets-set` is the Personal use case's figure today and
- * Money declares none, so the page here declares the same count; the test at the foot is a `todo` until Money holds
- * it. And no page reader writes a note once a row yet, so `lines` below reads the note exactly as it is declared, with
- * the kernel's own `fill` and the kernel's own reading of the figure; the second `todo` is the page doing it.
+ * THE COUNT THE TILE IS DRAWN ON IS MONEY'S OWN (audit 70 finding 1, budgets-set-73). `budgets-set` was the Personal use
+ * case's figure and Money declared none, so a record with Money and no Personal drew no tile and was told nothing. Every
+ * record here installs Money and no use case, and the page declares the two blocks and no figure.
+ *
+ * ONE THING THIS FILE DOES FOR ITSELF, AND SAYS SO. No page reader writes a note once a row yet, so `lines` below reads
+ * the note exactly as it is declared, with the kernel's own `fill` and the kernel's own reading of the figure; the
+ * `todo` at the foot is the page doing it.
  *
  * RED FIRST: with no `parts/budget.ts` the file does not load.
  */
@@ -54,12 +57,8 @@ const hostFor = (k: Kernel): Host => ({
   claimed: (pack) => k.packClaims(pack),
 });
 
-/** The count the tile is drawn on. Personal's own declaration of it today (`usecases/personal.ts`), word for word. */
-const BUDGETS_SET: Declaration = {
-  id: 'metric.budgets-set',
-  kind: 'metric',
-  body: { metric: 'budgets-set', name: 'Budgets set', source: 'register.categories', where: BUDGETED, value: { count: 'id' }, format: 'int', target: { gte: 0 }, window: '30d', compare: 'none' } as never,
-};
+/** The count the tile is drawn on, as Personal has always declared it (`usecases/personal.ts`), word for word. */
+const BUDGETS_SET = { metric: 'budgets-set', name: 'Budgets set', source: 'register.categories', where: BUDGETED, value: { count: 'id' }, format: 'int', target: { gte: 0 }, window: '30d', compare: 'none' };
 
 /** A page of the two blocks and nothing else. Nothing ships it: Money's page places them (money-wire-70). */
 const PROBE: Declaration = { id: 'page.budget-probe', kind: 'page', body: { page: 'budget-probe', title: 'Budgets', blocks: BUDGET } as never };
@@ -107,7 +106,7 @@ type Drawn = {
 
 /** The tile as the record draws it on the page of the two blocks. */
 const tile = async (k: Kernel): Promise<Drawn> => {
-  if (!k.declarations().some((d) => d.id === PROBE.id)) value(await k.install([BUDGETS_SET, PROBE]));
+  if (!k.declarations().some((d) => d.id === PROBE.id)) value(await k.install([PROBE]));
   const found = value<{ blocks: Drawn[] }>(k.page('budget-probe')).blocks.find((b) => b.kind === 'progress');
   assert.ok(found, 'the page draws no budget tile');
   return found;
@@ -236,8 +235,23 @@ test('EACH CATEGORY ANSWERS FOR ITSELF, a name of two words too, in the order th
   assert.deepEqual(lines(r.k), ['Outing passed its budget on 19 Oct.', 'Eating out passed its budget on 7 Oct.']);
 });
 
-test("MONEY HOLDS THE COUNT ITS OWN TILE IS DRAWN ON, where it is the Personal use case's today", { todo: 'figures/budgets.ts declares budgets-set (blocked: not this job\'s file)' }, () => {
+test('MONEY HOLDS THE COUNT ITS OWN TILE IS DRAWN ON, in the words the Personal use case counts by', () => {
   assert.ok(metricDeclarations().some((d) => d.id === 'metric.budgets-set'), 'Money declares no budgets-set, so its budget tile is drawn only where Personal is installed');
+  assert.deepEqual(BUDGET_FIGURES['budgets-set'], BUDGETS_SET, 'Money and Personal count the budgets set by two different sentences');
+});
+
+test('MONEY AND NO USE CASE: one budget set and passed draws the tile and writes the line', async () => {
+  const r = await fresh();
+  assert.deepEqual(r.k.packs().map((p) => p.id).filter((id) => !['portfolio', 'people', 'money-core'].includes(id)), [], 'the record holds more than Money');
+  assert.ok(r.k.declarations().some((d) => d.id === 'metric.budgets-set'), 'Money was installed and the record holds no budgets-set');
+  const outing = category(r, 'Outing', 100_000);
+  spent(r, '2026-10-19', 110_000, outing);
+
+  const drawn = await tile(r.k);
+  assert.deepEqual(drawn.refusals, []);
+  assert.notEqual(drawn.drawn, false, 'a budget is set on a record with Money alone and no tile is drawn');
+  assert.deepEqual((drawn.rows ?? []).map((row) => row.fields.name), ['Outing']);
+  assert.deepEqual(lines(r.k), ['Outing passed its budget on 19 Oct.']);
 });
 
 test('THE PAGE WRITES THE LINE ITSELF, one a category that passed', { todo: 'the page reader writes a note once for each entry of its source (blocked: packages/kernel)' }, async () => {
