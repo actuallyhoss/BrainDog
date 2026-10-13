@@ -322,3 +322,64 @@ test('A PERSON\'S PAGE SAYS THEIR ORGANISATION AND WHERE THEY WERE SEEN, NEVER A
   assert.ok(list && list.drawn !== false);
   assert.equal(list.rows.length, ORGANISATIONS.length);
 });
+
+/* ── Somebody held twice (AGT-D05 job 5): the kernel's built-in `held-twice`, said on the page ─────────────────────── */
+
+type Drawn = PageResult['blocks'][number] & { body?: string; lead?: boolean; tone?: string; span?: number; when?: unknown };
+const twice = (k: Kernel): unknown => {
+  const decl = k.metricDecl('held-twice');
+  assert.ok(decl, 'held-twice is not a figure of this record');
+  const read = k.metric(decl);
+  assert.ok(read.ok, sayOf(read));
+  return read.value.value;
+};
+const twiceOn = (page: PageResult): Drawn | undefined => (page.blocks as Drawn[]).find((b) => b.kind === 'note' && String(b.body).includes('{{held-twice}}'));
+/** A page's blocks as they were drawn, less the one note, so two readings of a page can be held side by side. */
+const others = (page: PageResult) => (page.blocks as Drawn[]).filter((b) => b !== twiceOn(page)).map((b) => [b.kind, b.heading ?? null, b.drawn !== false, b.body ?? null]);
+
+test('SOMEBODY HELD TWICE IS SAID UNDER THE PAGE\'S LINE, by how many and never by a number of theirs', async () => {
+  const k = await seeded();
+  /* TWO OF ONE NAME, NEITHER WITH AN ADDRESS: the plain rule's pair, which the figure counts as one too many. */
+  for (const more of [{ role: 'contractor' }, {}]) {
+    const made = k.create('people', { name: 'Odile Farrow', ...more }, { actor: 'p_1' });
+    assert.ok(made.ok, sayOf(made));
+  }
+  assert.equal(twice(k), 1);
+
+  const page = opened(k, 'people');
+  for (const b of page.blocks) assert.deepEqual(b.refusals, [], String(b.heading));
+  const note = twiceOn(page);
+  assert.ok(note, 'People says nothing of somebody held twice');
+  assert.notEqual(note.drawn, false);
+  assert.equal(note.body, 'People who may be on this record twice: {{held-twice}}');
+  /* NO QUESTION IS PROMISED: nothing asks about a plain pair by night yet, so the note says the number and stops. */
+  assert.doesNotMatch(String(note.body), /Decide/u);
+  assert.equal((note as { values?: Record<string, unknown> }).values?.['held-twice'], 1);
+  /* AFTER THE PAGE'S LINE AND BEFORE THE CARDS, and not a second headline: a page opens on one sentence. */
+  const at = page.blocks.indexOf(note);
+  assert.equal(at, 2);
+  assert.ok((page.blocks.slice(0, at) as Drawn[]).every((b) => b.kind === 'note' && b.lead === true));
+  assert.equal(page.blocks[at + 1]?.heading, 'Everyone');
+  assert.notEqual(note.lead, true);
+  /* NO ID, NO LIST'S NUMBER: the count and plain words. */
+  assert.doesNotMatch(String(note.body).replace('{{held-twice}}', '1'), /people#|#\d|\b[0-9A-HJKMNP-TV-Z]{26}\b|—/u);
+});
+
+test('NOBODY HELD TWICE SAYS NOTHING, and the rest of the page is as it was', async () => {
+  const k = await seeded();
+  assert.equal(twice(k), 0);
+  const quietPage = opened(k, 'people');
+  assert.equal(twiceOn(quietPage)?.drawn, false, 'the note is drawn at nought');
+
+  /* AS DECLARED: whole width, no intent of its own, drawn only above nought. */
+  const declared = (PAGES.people!.blocks as unknown as Drawn[]).filter((b) => b.kind === 'note' && String(b.body).includes('{{held-twice}}'));
+  assert.equal(declared.length, 1);
+  assert.deepEqual(declared[0]!.when, { metric: 'held-twice', gt: 0 });
+  assert.equal(declared[0]!.span, 12);
+  assert.equal(declared[0]!.tone, undefined);
+
+  /* THE SAME PAGE WITH SOMEBODY HELD TWICE differs by that note and the two new cards, and by nothing else. */
+  const before = others(quietPage);
+  for (let i = 0; i < 2; i++) assert.ok(k.create('people', { name: 'Odile Farrow' }, { actor: 'p_1' }).ok);
+  assert.deepEqual(others(opened(k, 'people')), before);
+});

@@ -14,7 +14,7 @@ import { readFileSync } from 'node:fs';
 import { useCase } from '@braindog/seed/usecases';
 import { moduleDocument } from '@braindog/seed/usecases/install';
 
-import { DEFAULT_HOME, FIRST_TODAY_MOST, MONEY_WEEK, TELL_LINE, WEEK_IN_SAID, amountSpoken, drawsAny, homeDrawn, todayHome, weekOf, type WeekDecl } from './default-home.ts';
+import { DEFAULT_HOME, FIRST_TODAY_MOST, MONEY_WEEK, OWED, OWED_TO_YOU, TELL_LINE, WEEK_IN_SAID, amountSpoken, drawsAny, homeDrawn, todayHome, weekOf, type WeekDecl } from './default-home.ts';
 import { addedByHand, showTell, wantMore } from './first-today.ts';
 import { playedBy } from '../start/parts.ts';
 import type { LiveBlock } from '../record/page-live.ts';
@@ -78,7 +78,7 @@ function answer(b: PageBlock, rows: { fields: Raw; cells: string[] }[] = []): Li
 /** A tile of figures as the record answers it, each figure as the reader wrote it ("EGP 900.00"). */
 const tile = (b: PageBlock, cells: Record<string, string>): LiveBlock => ({
   ...answer(b),
-  metrics: Object.entries(cells).map(([id, value]) => ({ id, label: id === 'owed-to-you' ? 'Owed to you' : (WEEK_IN_SAID as Record<string, string>)[id]!, value, note: '' })),
+  metrics: Object.entries(cells).map(([id, value]) => ({ id, label: id === OWED ? OWED_TO_YOU : (WEEK_IN_SAID as Record<string, string>)[id]!, value, note: '' })),
 });
 
 const HOME = new URL('./Home.svelte', import.meta.url);
@@ -117,7 +117,7 @@ test("TODAY'S FIRST BLOCKS ON A SHOP are what is due this week and the money in;
   const order = body.blocks.map((b) => b.heading ?? b.kind);
   assert.deepEqual(order.slice(0, 3), ['note', 'Orders due this week', MONEY_WEEK]);
   const rest = body.blocks.slice(3).map((b) => b.source);
-  assert.deepEqual(rest, ['governance.open', 'deadlines', 'sessions.live', 'deadlines', 'activity']);
+  assert.deepEqual(rest, ['governance.open', 'deadlines', 'sessions.working', 'deadlines', 'activity']);
   /* THEIR OWN WORDS name their own things, never an id or a list's place. */
   for (const b of body.blocks.slice(1, 3)) {
     assert.doesNotMatch(`${b.heading} ${b.empty ?? ''}`, /\brow\b|—|#/u);

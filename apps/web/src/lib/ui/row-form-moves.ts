@@ -20,9 +20,14 @@
  * fields a move out needs filled (`requires`, as the reason a learning was superseded) and that only a decision makes
  * it (`by: 'decide'`). Both were offered bare, so the refusal was the first a person heard of either. `movesWith`
  * carries them beside each move out, and `moveWord` is the few words drawn there.
+ *
+ * EVERY FIELD ASKED FOR IS NAMED. `requires` is a list and the record wants all of it, so a move that wanted a reason
+ * and a date said "needs a reason", took the reason, and was refused for the date. `needs` is the whole list, and the
+ * word joins the labels as a person writes them: "needs a reason and date".
  */
 
 import { copy } from '../copy.ts';
+import { list } from '../copy/english.ts';
 import type { FieldDecl } from '../record/schema.ts';
 
 const isMap = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -40,11 +45,15 @@ export function movesFrom(f: Pick<FieldDecl, 'values' | 'transitions'>, stored: 
   return offered.includes(stored) ? offered : [stored, ...offered];
 }
 
-/** One value on offer, and what the record asks of a move to it: the field it wants filled, or a decision. */
+/** The field names in a `requires`, each once: an empty string or anything that is no string names no field. */
+const fieldsOf = (requires: unknown): readonly string[] =>
+  Array.isArray(requires) ? [...new Set(requires.filter((need): need is string => typeof need === 'string' && need !== ''))] : [];
+
+/** One value on offer, and what the record asks of a move to it: the fields it wants filled, or a decision. */
 export interface Move {
   readonly value: string;
-  /** The first field the record wants filled before the row leaves its state. */
-  readonly needs?: string;
+  /** The fields the record wants filled before the row leaves its state, in the order the list declares them. */
+  readonly needs?: readonly string[];
   /** Only an accepted proposal makes this move. */
   readonly byDecision?: true;
 }
@@ -57,21 +66,33 @@ export function movesWith(f: Pick<FieldDecl, 'values' | 'transitions'>, stored: 
   const offered = movesFrom(f, stored);
   const move = typeof stored === 'string' && stored !== '' && isMap(f.transitions) ? f.transitions[stored] : undefined;
   if (!isMap(move)) return offered.map((value) => ({ value }));
-  const needs = Array.isArray(move.requires) ? move.requires.find((need) => typeof need === 'string' && need !== '') : undefined;
+  const needs = fieldsOf(move.requires);
   const asked: Omit<Move, 'value'> = {
-    ...(typeof needs === 'string' ? { needs } : {}),
+    ...(needs.length > 0 ? { needs } : {}),
     ...(move.by === 'decide' ? { byDecision: true as const } : {}),
   };
   return offered.map((value) => (value === stored ? { value } : { value, ...asked }));
 }
 
+/* "a reason", as it reads inside a longer word: what `moveNeedsReason` says after the "needs" every such word opens on. */
+const reasonWord = (): string => {
+  const opens = copy.moveNeeds('');
+  return copy.moveNeedsReason.startsWith(opens) ? copy.moveNeedsReason.slice(opens.length) : copy.moveNeedsReason;
+};
+
 /**
  * The words beside a move, or none. A DECISION COMES FIRST: a move only a proposal makes is not made here whatever is
  * filled, and the proposal is where its reason goes. `why` is the field a list keeps its reason in, and any other
  * field is said by the label the list gives it.
+ *
+ * A FIELD ALREADY FILLED IS NOT ASKED FOR AGAIN (`filled`, which the form answers from the row and from what is typed),
+ * so the word shortens as the fields are filled and goes with the last one. Two fields the form gives one label are
+ * said once.
  */
-export function moveWord(m: Move, labelOf: (field: string) => string): string {
+export function moveWord(m: Move, labelOf: (field: string) => string, filled: (field: string) => boolean = () => false): string {
   if (m.byDecision) return copy.moveAsksDecide;
-  if (m.needs === undefined) return '';
-  return m.needs === 'why' ? copy.moveNeedsReason : copy.moveNeeds(labelOf(m.needs));
+  const asked = fieldsOf(m.needs).filter((field) => !filled(field));
+  if (asked.length === 0) return '';
+  if (asked.length === 1 && asked[0] === 'why') return copy.moveNeedsReason;
+  return copy.moveNeeds(list([...new Set(asked.map((field) => (field === 'why' ? reasonWord() : labelOf(field))))]));
 }

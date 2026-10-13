@@ -37,3 +37,22 @@ test('AND IS NOT HEARD BY CHANCE: each summary names a signal of its own card, a
     assert.ok(top.score > next.score || letters(top) > letters(next), `${u.usecase} is proposed over ${next.usecase} only by catalogue order`);
   }
 });
+
+test('SMALL BUSINESS SAYS MONEY IN AND MONEY OUT, never who owes whom, and is proposed on the words it always was', () => {
+  /* MONEY IS A FINANCE APPLICATION, NOT A LEDGER OF WHO OWES WHOM (DIRECTION, "Money is a finance application"): the
+     card a person reads first and the line an empty Home says are held to it, as whole words so "owner" is no miss. */
+  const business = USE_CASES.find((u) => u.usecase === 'business')!;
+  const owes = /\b(owe|owed|owes|owing)\b/i;
+  assert.doesNotMatch(business.summary, owes, 'the card says who owes whom');
+  assert.doesNotMatch(business.voice?.fills_with ?? '', owes, 'an empty Home says who owes whom');
+  assert.match(business.summary, /^Money in and out\b/);
+
+  /* THE WORDS MOVED AND THE SIGNALS DID NOT (`business.ts`): a signal added to carry a reworded summary is a card
+     proposed to people who never meant it, so the list is held whole and nothing in it speaks of owing. */
+  assert.deepEqual(business.signals, [
+    'business', 'small business', 'my business', 'studio', 'agency', 'freelance', 'freelancer', 'freelancing',
+    'consultancy', 'consulting', 'clients', 'client', 'customers', 'invoice', 'invoices', 'invoicing', 'domains',
+    'hosting', 'subscriptions', 'contractors', 'accountant', 'vat', 'bookkeeping', 'retainer', 'foundry',
+  ]);
+  assert.equal(arrange('track what my brother owed me for the holiday').pick, null);
+});

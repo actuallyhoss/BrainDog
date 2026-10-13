@@ -767,6 +767,59 @@ test('A THING STOPPED AND TAKEN UP AGAIN CARRIES ON, whichever word stopped it: 
   }
 });
 
+test('A THING ONLY FELT ABOUT IS NOT TAKEN UP AGAIN, and a stall sold or had before is no shop: "still miss them", "now I hate them", "when I had the stall"', () => {
+  const lit = (p: ReturnType<typeof propose>, word: RegExp): boolean => p.heard.some((h) => word.test(h.phrase)) || p.places.some((x) => x.phrase !== null && word.test(x.phrase));
+  const orders = (p: ReturnType<typeof propose>): boolean => p.places.some((x) => x.name === 'Orders');
+  const none = (s: string, word: RegExp): void => {
+    for (const typed of [s, `I'm a freelance designer. ${s}`]) {
+      const p = propose(typed, CAIRO);
+      assert.ok(!lit(p, word) && !orders(p) && p.usecase !== 'shop', typed);
+    }
+  };
+
+  /* THE THREE SENTENCES, word for word: none keeps Orders, and the stall is not heard as a shop. */
+  none('I stopped taking orders and still miss them', /orders/iu);
+  none('I sold the stall and now I hate them', /stall/iu);
+  none('I used to take orders when I had the stall', /orders|stall/iu);
+
+  /* A WORD OF FEELING OR REMEMBERING BEFORE THE WORD THAT POINTS BACK takes nothing up, whichever word stopped it. */
+  for (const s of [
+    'I stopped taking orders and now I hate them',
+    'I used to take orders and now I really miss them',
+    'I no longer take orders but still regret them',
+    'I quit taking orders and still think about them',
+    'I am done taking orders and invoices and still dread them',
+    'I used to take orders and these days I barely remember them',
+  ]) {
+    none(s, /orders/iu);
+  }
+  none('I used to run a small shop and still miss it', /shop/iu);
+  assert.ok(!lit(propose("I'm a freelance designer. I stopped selling candles and still miss it", CAIRO), /sell/iu), 'selling that is only missed has stopped');
+  /* What is done with it now still takes it up, as before. */
+  for (const s of ['I stopped taking orders and still take them for friends', 'I used to take orders and now track them here', 'I used to keep orders; now I want those here']) {
+    assert.ok(lit(propose(s, CAIRO), /orders/iu), s);
+  }
+
+  /* A THING SOMEBODY SOLD IS GONE, said plainly and with no "when" before it. */
+  for (const s of ['I sold the stall', 'I sold my shop last year', 'We sold the stall to a friend', 'I have sold our old shop', 'I sold off the stall and now I teach']) {
+    none(s, /shop|stall/iu);
+  }
+  for (const s of ['I never sold the stall', "I haven't sold the shop", 'I sold candles at my stall', 'If I sold the stall I would be lost', 'I wish I had sold the stall', 'I sold the stall holders their signs']) {
+    assert.ok(lit(propose(s, CAIRO), /shop|stall/iu), s);
+  }
+
+  /* A THING SOMEBODY HAD, OWNED OR RAN, after "when", was theirs before and is not now. */
+  for (const s of ['I sent invoices back when I had the stall', 'I stopped taking orders. That was when we ran a small shop', 'When I owned the shop, I never slept']) {
+    const p = propose(`I'm a freelance designer. ${s}`, CAIRO);
+    assert.ok(!lit(p, /shop|stall/iu) && p.usecase !== 'shop', s);
+  }
+  const took = propose('I took orders when I had the stall', CAIRO);
+  assert.ok(lit(took, /orders/iu) && !lit(took, /stall/iu), 'the orders were said plainly, and only the stall is from before');
+  for (const s of ['When I had the stall for a year I hired help', 'I take orders when I have the stall open', 'I had the stall repainted', 'Once I had the stall, orders poured in']) {
+    assert.ok(lit(propose(s, CAIRO), /stall/iu), s);
+  }
+});
+
 test("A SENTENCE THAT OPENS WITH A REFUSAL NAMES NOBODY: Don't need orders, I freelance as a designer", () => {
   const typed = "Don't need orders, I freelance as a designer";
   const p = propose(typed, CAIRO);

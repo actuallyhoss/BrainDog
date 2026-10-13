@@ -1545,8 +1545,11 @@ const DECLARED: Record<string, Version> = {
       page.home-business setting.shared_version setting.speaks setting.voice_coming_up setting.voice_fills_with
       setting.voice_nothing_due
     `,
-    declares: 'dda4e6d26f4e24c5',
-    history: ["The title of `page.home-business` says Today where it said Overview -> dda4e6d26f4e24c5"],
+    declares: '92204fb054af5ecd',
+    history: [
+      "The title of `page.home-business` says Today where it said Overview -> dda4e6d26f4e24c5",
+      "`setting.voice_fills_with` says money coming in and money going out where it said what you are owed and what you owe (business-words-69) -> 92204fb054af5ecd",
+    ],
   },
   /** SHOP IS NEW (use case 6 of the vision): its first entry, Orders, Products and the Orders page. Unreleased, so the
       Orders section, an order's total and the month's count fold into it rather than a 1.0.1. */

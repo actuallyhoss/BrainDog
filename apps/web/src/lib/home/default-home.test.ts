@@ -6,6 +6,9 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { DatabaseSync } from 'node:sqlite';
+
+import { openRecord } from '@braindog/kernel';
 
 import { COMING_UP_LIMIT, DEFAULT_HOME, TODAY_LEAD, captureHeading, homeDrawn, railed, slashLineOf, todayHome, weekMoney, type HomeVoice, type Week } from './default-home.ts';
 import { homeLineOf, recordDay } from './home-line.ts';
@@ -38,9 +41,9 @@ const shown = (blocks: readonly LiveBlock[]): LiveBlock[] => blocks.filter((b) =
 
 test('THE BODY IS BUILT FROM WHAT THE RECORD HOLDS: no work blocks without tasks, no line to add without the right, no cash without Money', () => {
   const kinds = (b: { blocks: { kind: string; source?: string }[] }) => b.blocks.map((x) => x.source ?? x.kind);
-  assert.deepEqual(kinds(DEFAULT_HOME), ['note', 'capture', 'governance.open', 'register.tasks', 'deadlines', 'register.tasks', 'register.tasks', 'sessions.live', 'stat', 'deadlines', 'activity']);
-  assert.deepEqual(kinds(todayHome({ tasks: false, adds: false, money: false })), ['note', 'governance.open', 'deadlines', 'sessions.live', 'deadlines', 'activity']);
-  assert.deepEqual(kinds(todayHome({ tasks: true, adds: false, money: false })), ['note', 'governance.open', 'register.tasks', 'deadlines', 'register.tasks', 'register.tasks', 'sessions.live', 'deadlines', 'activity']);
+  assert.deepEqual(kinds(DEFAULT_HOME), ['note', 'capture', 'governance.open', 'register.tasks', 'deadlines', 'register.tasks', 'register.tasks', 'sessions.working', 'stat', 'deadlines', 'activity']);
+  assert.deepEqual(kinds(todayHome({ tasks: false, adds: false, money: false })), ['note', 'governance.open', 'deadlines', 'sessions.working', 'deadlines', 'activity']);
+  assert.deepEqual(kinds(todayHome({ tasks: true, adds: false, money: false })), ['note', 'governance.open', 'register.tasks', 'deadlines', 'register.tasks', 'register.tasks', 'sessions.working', 'deadlines', 'activity']);
   /* WHAT IS LATE AND WHAT COMES UP ARE TWO READS, so the late ones never use up the next few's rows. */
   const due = DEFAULT_HOME.blocks.filter((b) => b.source === 'deadlines') as unknown as { where?: string; limit?: number }[];
   assert.deepEqual(due.map((b) => [b.where, b.limit]), [['day before today', 8], ['day after -1d', COMING_UP_LIMIT]]);
@@ -569,4 +572,49 @@ test('PAID AND CAME IN OF ONE AMOUNT ARE TWO MONEYS, said side by side, and are 
   assert.equal(line({ 'settled-in-7d': { value: 'EGP 900.00', backs: ['obligations#4'] }, 'received-7d': 'EGP 900.00' }), two);
   assert.equal(line({ 'settled-in-7d': { value: 'EGP 900.00', backs: ['obligations#4', 'obligations#5'] }, 'received-7d': { value: 'EGP 900.00', backs: ['obligations#4', 'obligations#5'] } }), two);
   assert.equal(line({ 'settled-in-7d': 'EGP 900.00', 'received-7d': 'EGP 150.00' }), 'EGP 900 was paid, and EGP 150 came in this week.');
+});
+
+/* ── working means working ─────────────────────────────────────────────── */
+
+/** Today's table of the runs at work, as the house body declares it. */
+const workingNow = () => DEFAULT_HOME.blocks.find((b) => b.heading === 'Working now')!;
+
+test('WORKING NOW READS THE ONE WORD THE RECORD HAS FOR WORKING, and spells no rule of its own', () => {
+  const b = workingNow();
+  assert.equal(b.source, 'sessions.working');
+  /* WHICH RUNS AND IN WHAT ORDER ARE THE CLOCK'S: a page that chose its own would count another "working". */
+  assert.equal('where' in b, false);
+  assert.equal('order' in b, false);
+  assert.deepEqual(b.columns?.map((c) => c.field), ['agent', 'doing', 'last_seen']);
+  /* IN EVERY BODY TODAY BUILDS, whatever the record holds. */
+  for (const holds of [{ tasks: false, adds: false, money: false }, { tasks: true, adds: false, money: true }])
+    assert.deepEqual(todayHome(holds).blocks.filter((x) => x.source?.startsWith('sessions.')).map((x) => [x.source, x.where, x.order]), [['sessions.working', undefined, undefined]]);
+});
+
+test('A RUN QUIET FOR 20 MINUTES IS NOT WORKING NOW, though it is active and was heard from today', async () => {
+  const at = Date.parse('2026-10-02T12:00:00Z');
+  const db = new DatabaseSync(':memory:');
+  const sql = {
+    exec: (text: string, ...params: unknown[]) => (params.length === 0 ? db.exec(text) : void db.prepare(text).run(...(params as never[]))),
+    all: (text: string, ...params: unknown[]) => db.prepare(text).all(...(params as never[])),
+    one: (text: string, ...params: unknown[]) => db.prepare(text).get(...(params as never[])),
+    transactionSync: <T>(fn: () => T): T => fn(),
+  } as unknown as Parameters<typeof openRecord>[0];
+  const k = await openRecord(sql, { now: () => at });
+  for (const [doing, minutes] of [['Write the note', 20], ['Fix the invoice export', 5]] as const) {
+    const made = k.create('session', { doing, agent: 'claude', state: 'active' }, { actor: 'p_1', stamp: { last_seen: new Date(at - minutes * 60_000).toISOString() } });
+    assert.ok(made.ok, JSON.stringify(made));
+  }
+  const out = k.block(workingNow() as never);
+  assert.deepEqual(out.refusals, []);
+  assert.deepEqual(out.rows.map((r) => r.fields.doing), ['Fix the invoice export']);
+  assert.equal(out.matched, 1);
+  /* AND THE RECORD TAKES THE TABLE AS A PAGE'S OWN: nothing in it is refused at install. */
+  const installed = (await k.install([{ id: 'page.working', kind: 'page', body: { page: 'working', title: 'Working', layout: DEFAULT_HOME.layout, blocks: [workingNow()] } }] as never)) as { ok: boolean; refusal?: { fix: string } };
+  assert.ok(installed.ok, installed.refusal?.fix);
+  db.close();
+});
+
+test('THE MONEY TILE SAYS WHAT IS STILL TO COME IN, beside what was paid and what came in', () => {
+  assert.deepEqual(weekMoney().cells?.map((c) => c.label), ['Paid', 'Came in', 'Still to come in']);
 });

@@ -795,8 +795,9 @@ export function readWalk(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result<R
      read as money that lasts. Day 0 is today, as a count and as the day itself. */
   const under = toZero && opening < 0;
   const total = under ? (walked.walk === 'zero_on' ? Math.round(Date.parse(`${today}T00:00:00Z`) / DAY) : 0) : totalOf(walk.value, walked.walk);
-  /* NEVER UNDER INSIDE THE SPAN: no value still, and beside it the last day the walk looked at (`Beyond`). */
-  const beyond: Beyond | null = toZero && total === null ? { day: new Date(Date.parse(`${today}T00:00:00Z`) + horizon * DAY).toISOString().slice(0, 10), days: horizon } : null;
+  /* NEVER UNDER INSIDE THE SPAN: no value still, and beside it the last day the walk looked at (`Beyond`). A WALK WITH
+     NOTHING HELD AND NOTHING COMING LOOKED AT NOTHING: a record nobody has put money in is not money that lasts. */
+  const beyond: Beyond | null = toZero && total === null && (opening > 0 || walk.value.steps.length > 0) ? { day: new Date(Date.parse(`${today}T00:00:00Z`) + horizon * DAY).toISOString().slice(0, 10), days: horizon } : null;
   const verdict = verdictOf(decl, total, unit, home.rates, today);
   const converted = walk.value.converted;
   return ok<WalkReading>({

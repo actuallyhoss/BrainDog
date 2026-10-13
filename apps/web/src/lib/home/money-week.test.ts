@@ -195,7 +195,7 @@ test('A WEEK WITH NOTHING PAID SAYS NOTHING: a nought is no figure, and a tile o
   assert.doesNotMatch(none.sentence?.text ?? '', /came in|paid/u);
   /* WHAT IS OWED IS SAID WHERE IT IS SOMETHING, beside what came in. */
   const owed = home(tile({ 'settled-in-7d': 'EGP 900.00', 'received-7d': '0', 'owed-to-you': 'EGP 1,350.00' }));
-  assert.deepEqual(cells(owed.blocks[0]!), [['Paid', 'EGP 900.00'], ['Owed to you', 'EGP 1,350.00']]);
+  assert.deepEqual(cells(owed.blocks[0]!), [['Paid', 'EGP 900.00'], ['Still to come in', 'EGP 1,350.00']]);
   /* AND WHAT IS OWED IS NEVER SAID AS COME IN. */
   assert.equal(owed.sentence?.text, 'EGP 900 came in this week.');
   /* EGP 900 IN BOTH FIGURES (a payment marked paid, and one of that amount in the ledger) IS TWO MONEYS: the tile names

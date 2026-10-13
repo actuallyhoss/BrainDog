@@ -106,10 +106,10 @@ test('A ROW THAT CANNOT RUN RIGHT NOW IS ABSENT, NOT GREYED OUT', () => {
 });
 
 test('THE ROW THAT MAKES SOMETHING is declared, admitted, and there only while the query is a whole sentence', () => {
-  /* FIFTEEN, and it was fourteen: `Customise` joined the add row (DIRECTION §35). The count is exact on purpose,
-     because a row added or lost here is a change to what every screen can reach, and it should arrive with the line
-     that says so. */
-  assert.equal(COMMANDS.length, 15, `the palette declares ${COMMANDS.length} rows`);
+  /* SIXTEEN, and it was fifteen: `New page` joined the add row and `Customise` (PGS-C30, `new-page.test.ts`). The
+     count is exact on purpose, because a row added or lost here is a change to what every screen can reach, and it
+     should arrive with the line that says so. */
+  assert.equal(COMMANDS.length, 16, `the palette declares ${COMMANDS.length} rows`);
   const add = COMMANDS.find((c) => c.id === 'c-add');
   assert.ok(add, 'no row adds anything');
   assert.equal(admits(add), null, `the add row is refused: ${admits(add)}`);
@@ -276,7 +276,7 @@ test('AND IT REACHES THE ROWS YOU CHANGED LAST, off a ledger the record was alre
 test('every act the palette can perform is a named one, so no row smuggles in an argument', () => {
   /* A closure hanging off a declaration would let the next acting row take an object, and test 1
      would stop being checkable. The list is closed and the palette switches on the name. */
-  assert.deepEqual([...ACTS], ['undo', 'add', 'customise']);
+  assert.deepEqual([...ACTS], ['undo', 'add', 'customise', 'page']);
   for (const c of COMMANDS) {
     if (c.href !== null) continue;
     assert.ok(c.act !== undefined && (ACTS as readonly string[]).includes(c.act), `${c.id} acts, and does not say what it does`);

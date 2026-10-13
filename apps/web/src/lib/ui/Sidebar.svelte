@@ -56,11 +56,23 @@
     return down > 0 ? Math.min(down, up) : 0;
   }
   /* edge-cue:end */
+
+  /* page-line:start (the rail's line that makes a page; kept between two marks so a test can read and run it) */
+  /** What the line says: whoever owns the record makes the page, and anybody else suggests it (`page-new.ts`). */
+  export function pageLine(owner: boolean, words: { newPage: string; suggestPage: string }): string {
+    return owner ? words.newPage : words.suggestPage;
+  }
+  /** Whether a place is the one made pages sit under: the section of that name, and never Today or Work so named. */
+  export function holdsPages(item: { key: string; label: string }, section: string): boolean {
+    return item.key === `section:${section}` && item.label === section;
+  }
+  /* page-line:end */
 </script>
 
 <script lang="ts">
   import { tick, untrack } from 'svelte';
-  import { BASE, at, here as inside } from '../at.ts';
+  import { BASE, apiBase, at, here as inside } from '../at.ts';
+  import { goto, invalidateAll } from '$app/navigation';
   import { page } from '$app/state';
   import { copy } from '../copy.ts';
   import { said } from '../voice.svelte.ts';
@@ -78,6 +90,7 @@
   import Menu from './Menu.svelte';
   import { toasts } from './toast.svelte.ts';
   import { levelWord, openRecord, type SwitcherRow } from '../record/switcher.ts';
+  import { dropPage, newPage, pageClient, pageWords } from '../record/page-new.ts';
   import type { Shell, Working } from '../record/boot-live.ts';
   import type { SpineKey } from '../spine.ts';
 
@@ -133,6 +146,8 @@
     fewerLists: 'Show fewer',
     /* The new-list row under the lists, said only here. */
     newList: 'New list',
+    /* What the box asks for once the new-page line is pressed; the line's own words are `pageWords`. */
+    pageName: 'Name the page',
     /* THE HOLDING PEN'S ROW: how many offers wait, and Settings, Navigation says what they are. */
     suggested,
     /* HOW MANY AGENTS ARE AT IT, the rail's one row about them, and what pressing it opens. */
@@ -171,6 +186,57 @@
     /* A WHOLE NAVIGATION AND NOT `goto`. Every answer this tab kept was read from the record being left. */
     if (out.from === 'opened') return location.assign(out.to);
     toasts.push(out.from === 'absent' ? copy.recordNotOpened : out.fix, { intent: 'warn' });
+  }
+
+  /**
+   * A NEW PAGE, FROM THE FOOT OF PAGES (PGS-C30). The line becomes a box for the name, and Enter sends it through
+   * `newPage`, the one call the palette makes too: whoever owns the record gets the page and is taken to it, with one
+   * toast whose Undo takes it back out; anybody else files it on Decide and stays where they are. A refusal is its own
+   * sentence on a toast, and the box keeps what was typed.
+   */
+  const pageWord = $derived(pageLine(shell.me?.owner === true, pageWords));
+  let naming = $state(false);
+  let pageTitle = $state('');
+  let making = $state(false);
+  let nameBox = $state<HTMLInputElement | null>(null);
+
+  async function startPage() {
+    naming = true;
+    await tick();
+    nameBox?.focus();
+  }
+  const stopPage = () => ((naming = false), (pageTitle = ''));
+
+  async function makePage() {
+    if (making) return;
+    making = true;
+    const client = pageClient(apiBase());
+    const title = pageTitle.replace(/\s+/gu, ' ').trim();
+    const out = await newPage(pageTitle, { client, pages: shell.pages ?? [], owner: shell.me?.owner === true });
+    making = false;
+    if (!out.ok) {
+      toasts.push(out.fix, { intent: 'warn' });
+      return void nameBox?.focus();
+    }
+    stopPage();
+    if (out.as === 'suggested') return void toasts.push(out.said);
+    /* THE SHELL IS KEPT FOR THE TAB (`boot-live.ts`), so the kept answer is dropped before it is read again: the rail
+       and the next page's address come from a list that holds this page. */
+    const reread = async () => (await import('../record/boot-live.ts')).forget();
+    await reread();
+    const home = `/p/${out.slug}`;
+    toasts.push(out.said, {
+      undo: () =>
+        void dropPage(out.id, { client }).then(async (back) => {
+          if (!back.ok) return void toasts.push(back.fix, { intent: 'warn' });
+          await reread();
+          /* THE PAGE IS GONE, so a reader still on it is taken to Today, and the rail is read again either way. */
+          if (under(home)) await goto(at('/'), { invalidateAll: true });
+          else await invalidateAll();
+          toasts.push(pageWords.undone(title));
+        }),
+    });
+    await goto(at(home), { invalidateAll: true });
   }
 
   /** The narrow rail's flyout: the name of the row under the pointer or the focus, since the row shows only its glyph. */
@@ -442,6 +508,36 @@
     {/if}
   {/snippet}
 
+  <!-- THE LAST LINE UNDER PAGES: "New page", or "Suggest a page" for anybody who does not own the record. Pressed, it
+       is the box the name is typed into: Enter makes the page, Escape or leaving it empty puts the line back. Not on
+       the narrow rail, which has no room for a name. -->
+  {#snippet pageLineOf(item: FlatItem)}
+    {#if !icons && holdsPages(item, pageWords.section)}
+      {#if naming}
+        <form class="item view page-name" onsubmit={(e) => (e.preventDefault(), void makePage())}>
+          <input
+            bind:this={nameBox}
+            bind:value={pageTitle}
+            class="page-box"
+            type="text"
+            aria-label={pageWord}
+            placeholder={words.pageName}
+            maxlength="80"
+            autocomplete="off"
+            enterkeyhint="done"
+            readonly={making}
+            onkeydown={(e) => e.key === 'Escape' && (e.stopPropagation(), stopPage())}
+            onblur={() => pageTitle.trim() === '' && !making && stopPage()}
+          />
+        </form>
+      {:else}
+        <button type="button" class="item view tap" data-page-line onclick={() => void startPage()}>
+          <span class="item-name">{pageWord}</span>
+        </button>
+      {/if}
+    {/if}
+  {/snippet}
+
   <div
     class="scroll"
     bind:this={scroller}
@@ -463,6 +559,7 @@
               >{/if}
           </a>
           {@render viewsOf(item)}
+          {@render pageLineOf(item)}
         </li>
       {/each}
     </ul>
@@ -560,6 +657,7 @@
               <span class="rail-glyph"><Icon name={item.icon as IconName} size="l" /></span><span class="item-name">{item.label}</span>
             </a>
             {@render viewsOf(item)}
+            {@render pageLineOf(item)}
           </li>
         {/each}
         {#each tools as t (t.href)}
@@ -1127,6 +1225,36 @@
     padding-inline-start: calc(5px + 28px + 10px);
     font-size: var(--t-sm);
     font-weight: 400;
+  }
+
+  /* THE NEW-PAGE LINE reads as an offer and not as a page already there, so it is drawn in `--dim`. */
+  .item.view[data-page-line] {
+    color: var(--dim);
+  }
+
+  /* ITS BOX, WHERE THE LINE WAS: the row's own height and indent, flat, with the focus ring the board draws. 16px, so a
+     phone does not zoom the rail to it. */
+  .page-name {
+    padding-inline-end: 5px;
+  }
+
+  /* The box is the surface here, so the line around it takes no hover of its own. */
+  form.item.page-name:hover {
+    background: none;
+  }
+
+  .page-box {
+    flex: 1;
+    min-inline-size: 0;
+    block-size: 30px;
+    padding: 0 8px;
+    margin-inline-start: -8px;
+    border: 0;
+    border-radius: var(--r-sm, 8px);
+    background: var(--tile);
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--t-md);
   }
 
   .tally {

@@ -51,7 +51,7 @@
 <script lang="ts">
   import '@braindog/skin/kinds/queue.css';
   import './form.css';
-  import { tick, untrack } from 'svelte';
+  import { getContext, tick, untrack } from 'svelte';
   import { page as route } from '$app/state';
   import { invalidateAll } from '$app/navigation';
   import { since } from 'braindog-render';
@@ -65,7 +65,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Face from '$lib/ui/Face.svelte';
   import Icon from '$lib/ui/Icon.svelte';
-  import { queueWords, type Way } from '$lib/page/queue-answer.ts';
+  import { QUEUE_FILE, queueWords, waysOf, type FileAt, type Way } from '$lib/page/queue-answer.ts';
   import LeadPreview from '$lib/page/LeadPreview.svelte';
   import type { Picked } from '$lib/page/picked.svelte.ts';
   import { words as pageWords } from '$lib/page/words.ts';
@@ -125,7 +125,21 @@
   /* THE READER BY THE NAME THE RECORD GIVES THEM, for the line a Slash proposal leaves ("Slash suggested · Mara accepted"). */
   const person = $derived((me?.person ? names.get(me.person) : undefined)?.trim() || copy.feedYou);
 
-  const card = $derived(cardOf(question, { me: me?.person ?? null, names, now: Date.now(), lead }));
+  /* WHERE THE PAGE THAT DREW THIS CARD SERVES A FILE IT HOLDS (`QueueAnswer.svelte` hands it down by name), or nothing on a
+     host that holds none: the card keeps no address of its own. */
+  const fileAt = getContext<FileAt | undefined>(QUEUE_FILE);
+
+  const said = $derived(cardOf(question, { me: me?.person ?? null, names, now: Date.now(), lead }));
+  /* AN OPTION THAT IS A PICTURE (his D28.33, "each option shown as what it is"): `cardOf` is handed no way to a file and
+     leaves it out, so the same options are read once more with the page's (`waysOf`, which keeps an address of another
+     host off the card) and only a picture is taken from that reading. Before `inlineOf`, so answers that are pictures
+     are the form's choices and not a row of bare buttons. */
+  const pictures = $derived(
+    new Map(fileAt ? waysOf(question, fileAt).flatMap((w) => (w.shows && 'file' in w.shows ? [[w.key, w.shows] as const] : [])) : []),
+  );
+  const card = $derived(
+    pictures.size === 0 ? said : { ...said, ways: said.ways.map((w) => ({ ...w, shows: w.shows ?? pictures.get(w.key) ?? null })) },
+  );
   const from = $derived([card.by.app, card.by.run].filter((s): s is string => s !== null));
   /* THE ANSWERS AS A ROW OF BUTTONS, one press each (`inlineOf`), or the form's list to choose from and Decide. */
   const inline = $derived(inlineOf(card, compact));
@@ -439,12 +453,14 @@
   });
 </script>
 
-<!-- A CHOICE'S WORDS: what it is, where it says (its colours or its figure, inside the choice and nowhere else, after
-     `visualOf` held it to the renderer's reading), its name, and one line of what it does. -->
+<!-- A CHOICE'S WORDS: what it is, where it says (its colours, its figure or its picture, inside the choice and nowhere
+     else, after `visualOf` held it to the renderer's reading), its name, and one line of what it does. A PICTURE SAYS
+     NOTHING ALOUD (`alt=""`): the option's name beside it is what it is called. -->
 {#snippet choiceBody(way: Way)}
   <span class="dc-choice-main">
     {#if way.shows && 'swatch' in way.shows}<span class="queue-visual" data-shows="swatch" aria-hidden="true"
         >{#each way.shows.swatch as colour}<span class="queue-swatch" style="--swatch:{colour}"></span>{/each}</span
+      >{:else if way.shows && 'file' in way.shows}<span class="queue-visual" data-shows="file"><img class="queue-file dc-choice-file" src={way.shows.file.src} alt="" /></span
       >{:else if way.shows}<span class="queue-visual" data-shows="figure"><span class="queue-figure num">{way.shows.figure}</span></span>{/if}
     <span class="queue-label dc-choice-name" dir="auto">{way.label}</span>
     {#if way.because}<span class="dc-choice-does" dir="auto">{way.because}</span>{/if}
@@ -1071,6 +1087,13 @@
     margin: 0;
     color: var(--ink2);
     font-size: var(--t-base);
+  }
+
+  /* A PICTURE OPTION AT A SWATCH'S SIZE (the skin's `.queue-swatch`, 20px), so a choice led by a picture stands where one
+     led by a colour does. The skin's tile size is for the renderer's own queue, where the picture is the tile. */
+  .dc-choice-file {
+    flex: none;
+    inline-size: 20px;
   }
 
   .qa-done-words {

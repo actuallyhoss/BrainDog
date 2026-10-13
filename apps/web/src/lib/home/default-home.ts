@@ -8,7 +8,7 @@
  *
  * TAILORED TO WHAT THE RECORD HOLDS. The body is built from what the shell already says the record has: the work blocks
  * only where it keeps tasks, the line a task is typed into only where the reader may add one, and cash only where the
- * Money page is. Everything else is a source the record answers across its lists (`governance.open`, `sessions.live`,
+ * Money page is. Everything else is a source the record answers across its lists (`governance.open`, `sessions.working`,
  * `deadlines`, `activity`), so nothing here is anybody's own record by name (§27).
  *
  * CALM. A block with nothing in it is not drawn, a row shown in one block is not shown again in the next, and the
@@ -205,7 +205,8 @@ export const MONEY_WEEK = 'Money this week';
  * the same money twice.
  */
 export const WEEK_IN_SAID: Record<(typeof WEEK_IN)[number], string> = { 'settled-in-7d': 'Paid', 'received-7d': 'Came in' };
-export const OWED_TO_YOU = 'Owed to you';
+/** What is still owed to you, said as money still on its way and never as a debt held over somebody. */
+export const OWED_TO_YOU = 'Still to come in';
 
 /** Any figure at all: a `when:` that asks only that the record has the figure (`home-arrange.ts` `whileHeld`). */
 const ANY = -Number.MAX_SAFE_INTEGER;
@@ -319,13 +320,14 @@ export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
       /* ANSWERED WHERE THEY ARE SHOWN: the page's writes are on, so a queue draws `QueueAnswer`. */
       { kind: 'queue', heading: voice.needsYou, icon: 'ask', source: 'governance.open', limit: NEEDS_YOU_LIMIT, empty: voice.nothingWaiting, ...TILES },
       ...(holds.tasks ? work : [lateMoney]),
-      /* THE RUNS STILL WORKING, one line each with the agent's face; not drawn when none is. */
+      /* THE RUNS WORKING NOW, one line each with the agent's face; not drawn when none is. Which runs those are is the
+         record's one word for it (`sessions.working`, heard from inside its own clock), so this table takes no `where:`
+         and no `order:`, and a run that went quiet this morning is not working until midnight. */
       {
         kind: 'table',
         heading: voice.workingNow,
         icon: 'session',
-        source: 'sessions.live',
-        where: 'state is active, last_seen is today',
+        source: 'sessions.working',
         columns: [
           { field: 'agent', label: 'Agent' },
           { field: 'doing', label: 'Doing' },

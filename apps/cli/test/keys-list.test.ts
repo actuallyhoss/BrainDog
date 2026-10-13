@@ -16,7 +16,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { keys, type KeysIo } from '../src/keys.ts';
-import { KEYS_PAGE, keyLine, keysList, withoutKeys, type KeyRead } from '../src/keys-list.ts';
+import { KEYS_PAGE, dayHere, keyLine, keysList, withoutKeys, type KeyRead } from '../src/keys-list.ts';
 
 const scratch = mkdtempSync(join(tmpdir(), 'braindog-keys-list-'));
 after(() => rmSync(scratch, { recursive: true, force: true }));
@@ -60,27 +60,43 @@ const FIVE: Row[] = [
 ];
 const MANY: Row[] = [...FIVE, ...Array.from({ length: 115 }, (_, i) => row(i + 6, { label: `Key ${String(i + 6).padStart(3, '0')}`, opens: 'A service', value: GRANT }))];
 
-/** A host holding `rows` as its Keys, answering `schema` and `list` in pages of what it is asked for. */
-async function host(t: { after: (fn: () => Promise<void>) => void }, rows: Row[], refusal?: { code: string; fix: string }) {
-  const seen: { method: string; register: string | null; limit: string | null; cursor: string | null; headers: Record<string, unknown> }[] = [];
+/**
+ * A host holding `rows` as its Keys, answering `schema` and `list` in pages of what it is asked for.
+ *
+ * `today` IS THE DAY ON THE RECORD'S OWN CLOCK, which `<field> before today` is read against as the record reads it, in
+ * its zone. `today: null` is a host that refuses the sentence, and `deaf: true` one that answers every key whatever it
+ * was asked.
+ */
+async function host(
+  t: { after: (fn: () => Promise<void>) => void },
+  rows: Row[],
+  refusal?: { code: string; fix: string } | null,
+  clock: { today: string | null; deaf?: boolean } = { today: '2026-10-13' },
+) {
+  const seen: { method: string; register: string | null; limit: string | null; cursor: string | null; where: string | null; headers: Record<string, unknown> }[] = [];
   const server = createServer((req, res) => {
     req.resume();
     req.on('end', () => {
       const url = new URL(req.url ?? '/', 'http://stub');
       const method = url.pathname.replace(/^\/api\//, '');
       const register = url.searchParams.get('register');
-      seen.push({ method, register, limit: url.searchParams.get('limit'), cursor: url.searchParams.get('cursor'), headers: req.headers });
+      const where = url.searchParams.get('where');
+      seen.push({ method, register, limit: url.searchParams.get('limit'), cursor: url.searchParams.get('cursor'), where, headers: req.headers });
+      const asked = where === null ? null : /^(\w+) before today$/u.exec(where);
+      const today = clock.today;
+      const unread = where !== null && clock.deaf !== true && (asked === null || today === null);
       let value: unknown = null;
       if (method === 'schema') value = register === 'credentials' ? KEYS_LIST : { id: 'things', title: 'name', fields: [{ id: 'name', type: 'text' }] };
       if (method === 'list') {
-        const all = register === 'credentials' ? rows : PROJECTS;
+        const held = register === 'credentials' ? rows : PROJECTS;
+        const all = asked && today !== null && clock.deaf !== true ? held.filter((r) => typeof r.fields[asked[1]!] === 'string' && (r.fields[asked[1]!] as string) < today) : held;
         const from = Number(url.searchParams.get('cursor') ?? '0');
         const limit = Number(url.searchParams.get('limit') ?? '50');
         value = { rows: all.slice(from, from + limit), matched: all.length, cursor: from + limit < all.length ? String(from + limit) : null };
       }
-      const no = refusal && method === 'list' && register === 'credentials';
+      const no = method === 'list' && register === 'credentials' ? (refusal ?? (unread ? { code: 'VALUE_MALFORMED', fix: 'That filter could not be read.' } : null)) : null;
       res.writeHead(no ? 403 : 200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify(no ? { ok: false, refusal } : { ok: true, value }));
+      res.end(JSON.stringify(no ? { ok: false, refusal: no } : { ok: true, value }));
     });
   });
   await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
@@ -202,11 +218,11 @@ test('--json GIVES THE SAME KEYS: one row a key with the five facts, in the orde
   assert.equal(await keys(['list', '--json'], one), 0, one.said.join('\n'));
   assert.equal(one.answered.length, 1);
   const { keys: rows } = one.answered[0]!.value as { keys: KeyRead[] };
-  assert.deepEqual(rows[0], { name: 'Apple developer', opens: 'The Lanternfish app in the store', applies: 'Lanternfish', sealed: false, kept: 'the password manager, under Apple', expires: '2026-10-01' });
-  assert.deepEqual(rows[1], { name: 'Cloudflare deploy', opens: 'Deploys of every site', applies: 'Everywhere', sealed: true, kept: null, expires: null });
+  assert.deepEqual(rows[0], { name: 'Apple developer', opens: 'The Lanternfish app in the store', applies: 'Lanternfish', sealed: false, kept: 'the password manager, under Apple', expires: '2026-10-01', expired: true });
+  assert.deepEqual(rows[1], { name: 'Cloudflare deploy', opens: 'Deploys of every site', applies: 'Everywhere', sealed: true, kept: null, expires: null, expired: false });
   /* The lines are made from these rows and nothing else. */
-  assert.deepEqual(rows.map((k) => keyLine(k, '2026-10-13')), one.lines);
-  for (const k of rows) assert.deepEqual(Object.keys(k), ['name', 'opens', 'applies', 'sealed', 'kept', 'expires']);
+  assert.deepEqual(rows.map((k) => keyLine(k)), one.lines);
+  for (const k of rows) assert.deepEqual(Object.keys(k), ['name', 'opens', 'applies', 'sealed', 'kept', 'expires', 'expired']);
 });
 
 test('READ IN PAGES OF FIFTY TO THE END, each page asked for where the last one stopped, and no run named', async (t) => {
@@ -214,7 +230,7 @@ test('READ IN PAGES OF FIFTY TO THE END, each page asked for where the last one 
   const one = io(h.base);
   assert.equal(await keysList([], one), 0, one.said.join('\n'));
   assert.equal(KEYS_PAGE, 50);
-  const reads = h.seen.filter((s) => s.method === 'list' && s.register === 'credentials');
+  const reads = h.seen.filter((s) => s.method === 'list' && s.register === 'credentials' && s.where === null);
   assert.deepEqual(reads.map((s) => [s.limit, s.cursor]), [['50', null], ['50', '50'], ['50', '100']]);
   for (const s of h.seen) {
     assert.ok(Number(s.limit ?? '0') <= 50, 'no read asks for more than fifty');
@@ -263,4 +279,71 @@ test('--json WITH NOBODY WAITING FOR THE ANSWER prints the one document itself, 
   const { answer: _other, ...two } = io(shut.base);
   assert.equal(await keys(['list', '--json'], two), 1);
   assert.deepEqual(JSON.parse(two.lines[0]!), { ok: false, refusals: [{ code: 'FORBIDDEN', fix: 'This login cannot read Keys.' }] });
+});
+
+/* RED BEFORE: today was this machine's UTC date. At 22:30 UTC on the 13th it is already the 14th in Cairo, and a key
+   whose day was the 13th read "expires" for three more hours. The record is asked which keys are past their day. */
+test('A KEY IS PAST ITS DAY BY THE RECORD’S OWN CLOCK, in its zone, in the line and in the document', async (t) => {
+  const rows = [row(1, { label: 'Ends on the 13th', opens: 'A service', expires: '2026-10-13' }), row(2, { label: 'Ends on the 14th', opens: 'A service', expires: '2026-10-14' })];
+  const late = Date.parse('2026-10-13T22:30:00Z');
+
+  const cairo = await host(t, rows, null, { today: '2026-10-14' });
+  const one = { ...io(cairo.base), now: () => late };
+  assert.equal(await keys(['list', '--json'], one), 0, one.said.join('\n'));
+  assert.deepEqual(one.lines.map((l) => l.split(' · ').at(-1)), ['expired 13 October 2026', 'expires 14 October 2026']);
+  assert.deepEqual((one.answered[0]!.value as { keys: KeyRead[] }).keys.map((k) => k.expired), [true, false]);
+  assert.deepEqual(one.said, ['2 keys: 2 kept elsewhere.'], 'nothing is said of the clock when the record answered');
+  /* The record is asked in its own words, by the field its declaration marks as the deadline, and no run is named. */
+  const asked = cairo.seen.filter((s) => s.where !== null);
+  assert.deepEqual(asked.map((s) => [s.register, s.where, s.limit]), [['credentials', 'expires before today', '50']]);
+  assert.equal(asked[0]!.headers['x-braindog-session'], undefined);
+
+  /* The other side of the day: 01:30 UTC on the 14th is still the 13th in Los Angeles, and neither key is past. */
+  const west = await host(t, rows, null, { today: '2026-10-13' });
+  const two = { ...io(west.base), now: () => Date.parse('2026-10-14T01:30:00Z') };
+  assert.equal(await keys(['list'], two), 0, two.said.join('\n'));
+  assert.deepEqual(two.lines.map((l) => l.split(' · ').at(-1)), ['expires 13 October 2026', 'expires 14 October 2026']);
+});
+
+test('A RECORD THAT CANNOT SAY WHICH KEYS ARE PAST is said so once, and each key is judged by this machine’s own day', async (t) => {
+  const zone = process.env.TZ;
+  t.after(() => void (zone === undefined ? delete process.env.TZ : (process.env.TZ = zone)));
+  process.env.TZ = 'Africa/Cairo';
+  const late = Date.parse('2026-10-13T22:30:00Z');
+  assert.equal(dayHere(late), '2026-10-14');
+  process.env.TZ = 'America/Los_Angeles';
+  assert.equal(dayHere(late), '2026-10-13');
+
+  process.env.TZ = 'Africa/Cairo';
+  const rows = [row(1, { label: 'Ends on the 13th', opens: 'A service', expires: '2026-10-13' }), row(2, { label: 'Ends in a year', opens: 'A service', expires: '2027-10-13' })];
+  /* One host refuses the sentence, and one answers every key whatever it was asked: a key a year off is past nowhere
+     on earth, so that answer is not believed either. */
+  for (const clock of [{ today: null }, { today: '2026-10-14', deaf: true }]) {
+    const h = await host(t, rows, null, clock);
+    const one = { ...io(h.base), now: () => late };
+    assert.equal(await keys(['list'], one), 0, one.said.join('\n'));
+    assert.deepEqual(one.lines.map((l) => l.split(' · ').at(-1)), ['expires 13 October 2027', 'expired 13 October 2026']);
+    assert.deepEqual(one.said, ['Your record did not say which keys are past their day, so each is judged by the date on this machine.', '2 keys: 2 kept elsewhere.']);
+    for (const line of one.said) assert.doesNotMatch(line, /—/u);
+  }
+});
+
+/* RED BEFORE: a value in code marks kept its mark, so the question was asked of "`sk-live-..." and a short one passed;
+   and a character nobody sees inside a value hid its shape from the question, then was taken out for printing, which
+   put the value on the line whole. */
+test('A VALUE IN CODE MARKS, OR BROKEN BY A CHARACTER NOBODY SEES, IS NOT SAID BACK EITHER', async (t) => {
+  const short = ['ghp', 'AbCdEfG'].join('_');
+  const split = ['gh', 'p_AbCdEfGh'].join('\u200b');
+  const joined = split.replace('\u200b', '');
+  const h = await host(t, [row(1, { label: 'Marked', opens: `The forge, with \`${short}\` and *${short}*`, where: `the note that says ${split}` })]);
+  for (const args of [['list'], ['list', '--json']]) {
+    const one = io(h.base);
+    assert.equal(await keys(args, one), 0, one.said.join('\n'));
+    const all = everything(one);
+    assert.ok(!all.includes(short) && !all.includes(joined), `${args.join(' ')} said a typed value back`);
+  }
+  const one = io(h.base);
+  await keys(['list'], one);
+  assert.deepEqual(one.lines, ['Marked · opens The forge, with `[hidden]` and *[hidden]* · Everywhere · kept at the note that says [hidden] · no expiry day']);
+  assert.equal(withoutKeys('a `plain` word, *twice*, and a | bar'), 'a `plain` word, *twice*, and a | bar');
 });

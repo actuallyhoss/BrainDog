@@ -6,8 +6,13 @@
  * a line whose day went by with no payment matched kept a day in the past and no screen counted it. `repeating-overdue`
  * counts the live lines whose "Next" is more than three days gone.
  *
- * RED FIRST: with `repeating-overdue` out of `SIGNS_FIGURES`, the first test fails on `METRICS['repeating-overdue']` and
- * the install declares no such figure.
+ * ONLY A LINE A PAYMENT WAS MATCHED TO BEFORE IS JUDGED (repeating-sign-fix-69, audit 67 claim 1). Nothing links an
+ * arriving payment to a repeating line by itself, so on a line nobody has matched a payment to, "Next" stands still
+ * whether the money went or not, and the sign was red on a line Money watch had just added. Such a line has no "Last
+ * paid" and is left out; one that has it and whose "Next" then went by is the payment the record can say is missing.
+ *
+ * RED FIRST: with `last_paid is set` out of the figure's `where`, the first test fails on the sentence and the Money
+ * watch test counts 1.
  */
 
 import { test } from 'node:test';
@@ -59,16 +64,24 @@ const stuck = (k: Kernel) => {
   return read.value;
 };
 
-/** A repeating line with its "Next" so many days from today, live unless said. */
+/** A repeating line with its "Next" so many days from today, live unless said, and with no payment matched to it yet. */
 const line = (k: Kernel, what: string, next: number, more: Record<string, unknown> = {}) =>
   value<Entry>(
     k.create('recurring', { what, direction: 'out', amount: { amount: 400_000, currency: 'GBP' }, every: 'monthly', next_due: day(next), state: 'live', ...more }, OWNER),
   );
 
+/**
+ * A line a payment was matched to so many days ago, as Money's `settle` leaves one: "Last paid" and "Last amount"
+ * written, and "Next" wherever `next` says.
+ */
+const paid = (k: Kernel, what: string, next: number, last: number, more: Record<string, unknown> = {}) =>
+  line(k, what, next, { last_paid: day(last), last_amount: { amount: 400_000, currency: 'GBP' }, ...more });
+
 test('MONEY DECLARES THE SIGN FOR A STUCK REPEATING LINE, and the record installs it with the rest of Money', async () => {
   const sign = METRICS['repeating-overdue'];
   assert.ok(sign, 'Money does not declare repeating-overdue');
   assert.equal(sign.source, 'register.recurring');
+  assert.equal(sign.where, 'state is live, next_due before -3d, last_paid is set', 'live, more than three days gone, and matched to a payment before');
   assert.deepEqual(sign.value, { count: 'id' }, 'a count, so no two currencies can meet in it');
   assert.deepEqual(sign.target, { lte: 0 }, 'none stuck is the mark');
   assert.equal(sign.format, 'int');
@@ -78,29 +91,60 @@ test('MONEY DECLARES THE SIGN FOR A STUCK REPEATING LINE, and the record install
   assert.ok(k.declarations().find((d) => d.id === 'metric.repeating-overdue'), 'money-core installed without repeating-overdue');
 });
 
-test('A LIVE LINE WHOSE NEXT IS FOUR DAYS GONE COUNTS, and one three days gone does not yet', async () => {
+test('A LINE PAID BEFORE WHOSE NEXT IS FOUR DAYS GONE COUNTS, and one three days gone does not yet', async () => {
   const k = await moneyCore();
-  line(k, 'Rent', -4);
-  line(k, 'Phone', -3);
+  paid(k, 'Rent', -4, -34);
+  paid(k, 'Phone', -3, -33);
 
   const read = stuck(k);
   assert.equal(read.value, 1, 'the fourth day gone is stuck; the third is still inside the days a payment takes to land');
   assert.equal(read.met, false, 'one stuck line misses the mark');
 });
 
+test('A LINE MONEY WATCH JUST ADDED IS NOT RED, though its Next has gone by with nothing matched to it', async () => {
+  const k = await moneyCore();
+  /* The fields `packs/money-watch/repeats.js` writes after a yes, and no others: no payment was ever matched to it. */
+  line(k, 'Netflix', -4, { amount: { amount: 1_099, currency: 'GBP' }, day_of_month: '12', note: 'Added by Money watch from three payments about a month apart.' });
+
+  const read = stuck(k);
+  assert.equal(read.value, 0, 'nothing was ever matched to it, so the record cannot say a payment is missing');
+  assert.equal(read.met, true, 'a line just added does not miss the mark');
+});
+
+test('A LINE NOBODY EVER MATCHED A PAYMENT TO IS NOT JUDGED, however long ago its Next was', async () => {
+  const k = await moneyCore();
+  line(k, 'Rent', -40);
+  line(k, 'Salary', -200, { direction: 'in' });
+  paid(k, 'Hosting', -9, -39);
+
+  assert.equal(stuck(k).value, 1, 'the one line a payment was matched to before, and neither of the two it never was');
+});
+
+test('A LINE WHOSE PAYMENT WAS MATCHED IS NOT STUCK: its Next moved on with the match', async () => {
+  const k = await moneyCore();
+  /* As `settle` leaves a monthly line paid two days ago: "Last paid" then, "Next" a cycle ahead. */
+  paid(k, 'Rent', 28, -2);
+  /* And one matched on its day, which a yearly line's "Next" then left a year off. */
+  paid(k, 'Hosting', 365, 0, { every: 'yearly' });
+
+  const read = stuck(k);
+  assert.equal(read.value, 0);
+  assert.equal(read.met, true);
+});
+
 test('A PAUSED OR ENDED LINE IS NOT STUCK, however long ago its Next was', async () => {
   const k = await moneyCore();
-  line(k, 'Gym', -40, { state: 'paused' });
-  line(k, 'Old lease', -200, { state: 'ended' });
+  paid(k, 'Gym', -40, -70, { state: 'paused' });
+  paid(k, 'Old lease', -200, -230, { state: 'ended' });
 
   assert.equal(stuck(k).value, 0);
 });
 
 test('A LINE WHOSE NEXT IS TODAY OR AHEAD IS NOT STUCK, and with none stuck the mark is met', async () => {
   const k = await moneyCore();
-  line(k, 'Rent', 12);
-  line(k, 'Salary', 0, { direction: 'in' });
-  line(k, 'Insurance', -1);
+  paid(k, 'Rent', 12, -18);
+  paid(k, 'Salary', 0, -30, { direction: 'in' });
+  paid(k, 'Insurance', -1, -31);
 
   const read = stuck(k);
   assert.equal(read.value, 0);
@@ -109,10 +153,10 @@ test('A LINE WHOSE NEXT IS TODAY OR AHEAD IS NOT STUCK, and with none stuck the 
 
 test('EVERY STUCK LINE COUNTS ONCE, in any currency and either way', async () => {
   const k = await moneyCore();
-  line(k, 'Rent', -4);
-  line(k, 'Hosting', -30, { amount: { amount: 2_000, currency: 'USD' }, every: 'yearly' });
-  line(k, 'Salary', -9, { direction: 'in', amount: { amount: 5_000_000, currency: 'EGP' } });
-  line(k, 'Water', 3);
+  paid(k, 'Rent', -4, -34);
+  paid(k, 'Hosting', -30, -395, { amount: { amount: 2_000, currency: 'USD' }, last_amount: { amount: 2_000, currency: 'USD' }, every: 'yearly' });
+  paid(k, 'Salary', -9, -39, { direction: 'in', amount: { amount: 5_000_000, currency: 'EGP' }, last_amount: { amount: 4_900_000, currency: 'EGP' } });
+  paid(k, 'Water', 3, -27);
 
   assert.equal(stuck(k).value, 3);
 });

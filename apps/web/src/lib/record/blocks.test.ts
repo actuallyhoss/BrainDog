@@ -531,6 +531,22 @@ test('A LIST THAT HOLDS LINES SAYS ITS WRITTEN LINE ONCE, ABOVE THEM, and only w
   assert.deepEqual(drawnIn(ledgerOf(rows, { values: { 'filed-today': '2', 'filed-for-you-30d': 0 } })), [line, 'timeline:2']);
   assert.deepEqual(drawnIn(ledgerOf(rows, { values: { 'filed-today': 'Dana', 'filed-for-you-30d': 'Kiln' } })), [line, 'timeline:2'], 'answers that are all words are a line as before');
 
+  /* MONEY IS A FIGURE TOO, written with its currency or held as an amount beside one: nought of it is no line. */
+  const one = (v: unknown) => drawnIn(ledgerOf(rows, { body: '{{filed-today}} filed today.', values: { 'filed-today': v } }));
+  const said = ['{{filed-today}} filed today.', 'timeline:2'];
+  for (const nought of ['EGP 0.00', '0.00 EGP', '£0', '$0.00', '0 €', 'EGP 0', '-EGP 0.00', { amount: 0, currency: 'EGP' }, [{ amount: 0, currency: 'EGP' }, { amount: 0, currency: 'GBP' }]]) {
+    assert.deepEqual(one(nought), ['timeline:2'], `${JSON.stringify(nought)} is nought`);
+  }
+  for (const some of ['EGP 12.00', '12.00 EGP', '£1,204.50', 'EGP 1,000', '1,000', { amount: 1200, currency: 'EGP' }, [{ amount: 0, currency: 'EGP' }, { amount: 5, currency: 'GBP' }]]) {
+    assert.deepEqual(one(some), said, `${JSON.stringify(some)} is above nought`);
+  }
+  /* A WORD IS STILL A WORD, capitals and a number in it or not: it is no figure, so it neither says the line nor takes it. */
+  for (const word of ['Dana', 'EGP', 'USA', '3 Sep', '12 days', 'Flat 0', '0 of 4', '1,2', {}]) {
+    assert.deepEqual(one(word), said, `${JSON.stringify(word)} is a word`);
+  }
+  assert.deepEqual(drawnIn(ledgerOf(rows, { values: { 'filed-today': 'EGP 0.00', 'filed-for-you-30d': 'EGP 12.00' } })), [line, 'timeline:2']);
+  assert.deepEqual(drawnIn(ledgerOf(rows, { values: { 'filed-today': 'EGP 0.00', 'filed-for-you-30d': 'nobody' } })), ['timeline:2']);
+
   /* WORDS WITH NO FIGURE IN THEM ARE A LINE TOO, and a line of spaces is none. */
   assert.deepEqual(drawnIn(ledgerOf(rows, { body: 'Newest first.', values: undefined })), ['Newest first.', 'timeline:2']);
   assert.deepEqual(drawnIn(ledgerOf(rows, { body: '   ' })), ['timeline:2']);

@@ -1459,7 +1459,7 @@ const DECLARED: Record<string, Version> = {
       metric.plan-next-due metric.plan-last-due metric.installments-paid-by-plan metric.installments-total-by-plan
       metric.budget-passed-on
     `,
-    declares: 'f6bc381aff1f291a',
+    declares: '624b3eb831b48599',
     history: [
       "`cash-cross-check` is declared (cash-check-52, REC-A17): Cash now worked out a second way, each cash account walked entry by entry from its newest statement, less Cash now, a currency at a time; no value while no balance is typed -> 73738171ae2405ba",
       'The Money page draws the check (cash-page-54, REC-A17): one tile, Cash now does not add up, while `cash-cross-check` is not nought, and one line while no balance is typed -> e4a453d69795fe22',
@@ -1475,6 +1475,7 @@ const DECLARED: Record<string, Version> = {
       "Folded into the unreleased 3.17.0 (plans-list-66, REC-B12 jobs 1 and 2; integrate 66; commit 63423720, the deployed build, holds 3.16.0): a plan is a thing of its own. The list `register.plans` is added before Instalments, `register.installments` gains `plan_row` (Part of, a link to its plan) and `left_after` (Left after, money), `script.plans_from_names` makes one plan for each plan text, links the parts and writes what is left after each, once a day and when `rule.part-counts-plan` hands it a part made or changed -> e84778f2db7564d6",
       "Folded into the unreleased 3.17.0 (repeating-overdue-67, REC-B11 step 8; integrate 67; commit 63423720, the deployed build, holds 3.16.0): `metric.repeating-overdue`, how many live repeating lines have a Next more than three days gone; a figure added, nothing taken away -> 6811e7a441a592fa",
       "Folded into the unreleased 3.17.0 (batch 68, integrate 68; commit 63423720, the deployed build, holds 3.16.0), one fingerprint for four changes: the Ledger gains `payee`, a text labelled Paid to or from, searchable and not indexed, and `counterparty_text` keeps its id and is labelled As the bank wrote it (payee-field-68, REC-B16 step 2); the plans script never opens a closed plan and takes a plan as well as a part, and `rule.plan-links-parts` starts it when a plan is made (plans-calm-67-68); `page.money-plan`, the page of one plan, with six figures of one plan, `metric.plan-parts-paid`, `metric.plan-parts`, `metric.plan-paid`, `metric.plan-left`, `metric.plan-next-due` and `metric.plan-last-due`, and two by plan, `metric.installments-paid-by-plan` and `metric.installments-total-by-plan` (plan-page-68, REC-B12); and `metric.budget-passed-on`, the day a category's spending reached its budget, a running total with a stop (budget-passed-on-68, REC-B19 step 4); a field, a rule, a page and nine figures added, nothing taken away -> f6bc381aff1f291a",
+      "Folded into the unreleased 3.17.0 (repeating-sign-fix-69, audit 67 claim 1; integrate 69; commit 63423720, the deployed build, holds 3.16.0): `metric.repeating-overdue` counts only a line a payment was matched to before, its where gaining `last_paid is set` -> 624b3eb831b48599",
     ],
   },
   'work@1.17.0': {
@@ -1519,6 +1520,20 @@ const DECLARED: Record<string, Version> = {
       "`page.health` is added: the record's vital signs by state, from the kernel's signs source and the figures signs-red and green-days -> d3d856a65e4d2519",
       "`page.health` says nought red as 'No vital sign needs a look.' rather than 'Everything on this record is alive.', since signs-red reads 0 with one sign green and the rest unread -> 12f442c25447cbca",
       "Folded into the unreleased 3.3.0 (figures-47): `page.health` says how many signs are not read yet under its first line, from the new built-in figure signs-unread, and its green-days lines say every watched sign was green, where they said nothing was red -> a2e56f28aecca9ca",
+    ],
+  },
+  /* PEOPLE SAYS WHO MAY BE HELD TWICE (people-held-twice-69). 3.3.0 IS RELEASED (commit 63423720 holds it). The same ids. */
+  'people@3.4.0': {
+    holds: `
+      metric.organisations-count metric.people-count metric.people-in-touch-12w metric.people-in-touch-30d metric.people-in-touch-90d
+      metric.people-quiet
+      page.health page.people page.relation page.someone
+      register.organisations register.people
+      rule.meet-payees rule.meet-sender-organisations rule.meet-senders
+    `,
+    declares: '3c1698b71103bfe4',
+    history: [
+      "`page.people` says how many people may be on the record twice, in one note under its two lead notes, from the built-in figure held-twice and drawn only above nought; a note added, nothing taken away -> 3c1698b71103bfe4",
     ],
   },
   /* A PROJECT OTHERS POINT AT STAYS, AND WHERE IT STANDS IS SAID (batch 46, REC-C08 and REC-C16). 1.15.0 IS RELEASED. */

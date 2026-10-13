@@ -12,6 +12,11 @@
  * on that row, and the patch starts the script a third time to act: add the Repeating line, and count the no's.
  * Nothing in `packages/` changed for it.
  *
+ * 1.1.0, AND WHY (audit of batch 67). "One is a mistake" carried a change to the Ledger entry at the version read on
+ * the day of the question, and `askOf` refuses a change with no version, so the void moved into the run the answer
+ * starts, which reads the entry that day. Next on a new Repeating line is counted from the newest payment the Ledger
+ * holds at the answer. And "Both real" is not a no, so the line that switches the flag off says what was said.
+ *
  * RED FIRST, MEASURED: with no `twice.js` and no `money-watch.pack.json` this file failed at its first read, ENOENT,
  * before a single test ran.
  */
@@ -195,12 +200,37 @@ test('CHARGED TWICE: two like charges open ONE question, a third adds none, and 
     assert.equal(r.open().length, 1);
     assert.deepEqual(r.flags().map((f) => [f.what, f.flag, f.payee, f.on, f.said ?? null]), [['Talabat E£979.99 twice on 7 Oct', 'twice', 'Talabat', '2026-10-07', null]]);
 
-    /* THE ANSWER IS THE WRITE. The newer of the two is void and the older stands; nothing else in the Ledger moved. */
+    /* THE ANSWER WRITES WHAT SHE SAID, and the run it starts marks the newer of the two void. The older stands, and
+       nothing else in the Ledger moved. */
     await r.answer(asked[0]!.id, 'mistake');
     assert.deepEqual(r.rows<{ state: string }>('transactions').map((t) => t.state), ['cleared', 'void', 'cleared', 'cleared']);
     assert.equal((r.api.kernel.get(second.id)?.fields as { state: string }).state, 'void');
     assert.deepEqual(r.flags().map((f) => f.said), ['mistake']);
     /* AND IT IS NOT ASKED AGAIN: the third charge now sits a day from the first, and the pair was answered. */
+    assert.deepEqual(r.open(), []);
+  } finally {
+    await r.close();
+  }
+});
+
+test('AN ENTRY EDITED AFTER THE QUESTION WAS ASKED IS STILL MARKED VOID, and one no longer cleared is left alone', async () => {
+  /* RED FIRST, MEASURED on 1.0.0: "One is a mistake" carried the entry's version as read on the day of the question,
+     so after one edit the answer was refused whole and the entry stayed cleared. */
+  const r = await fresh();
+  try {
+    await r.charge('Talabat', '2026-10-07', 97_999);
+    const second = await r.charge('Talabat', '2026-10-07', 97_999);
+    await r.charge('Zooba', '2026-10-08', 15_000);
+    const gone = await r.charge('Zooba', '2026-10-08', 15_000);
+    const asked = r.open();
+    assert.deepEqual(asked.map((q) => q.question), ['Talabat E£979.99 twice on 7 Oct. Both real?', 'Zooba E£150 twice on 8 Oct. Both real?']);
+    /* DAYS LATER, BY HAND: one is filed, and the other she already marked void herself. */
+    await r.set('transactions', second.seq, { what: 'Talabat, charged again' });
+    await r.set('transactions', gone.seq, { state: 'void' });
+    await r.answer(asked[0]!.id, 'mistake');
+    await r.answer(asked[1]!.id, 'mistake');
+    assert.deepEqual(r.rows<{ state: string }>('transactions').map((t) => t.state), ['cleared', 'void', 'cleared', 'void']);
+    assert.deepEqual(r.flags().map((f) => f.said), ['mistake', 'mistake']);
     assert.deepEqual(r.open(), []);
   } finally {
     await r.close();
@@ -262,6 +292,23 @@ test('LOOKS LIKE IT REPEATS: three payments a month apart open one offer, and ye
   }
 });
 
+test('A YES GIVEN AFTER THE NEXT PAYMENT CAME writes Next one month after that payment, never the day it was paid', async () => {
+  /* RED FIRST, MEASURED on 1.0.0: Next was 13 October, the day October's payment already sat in the Ledger, so the new
+     line waited for a payment it had and was past its day within the week. */
+  const r = await fresh();
+  try {
+    for (const on of ['2026-07-14', '2026-08-13', '2026-09-13']) await r.charge('NETFLIX.COM', on, 21_900, { counterparty_text: 'NETFLIX.COM' });
+    const asked = r.open();
+    assert.deepEqual(asked.map((q) => q.question), ['Add Netflix to Repeating, E£219 around the 13th?']);
+    /* OCTOBER'S COMES WHILE THE QUESTION WAITS, a little dearer and with the bank's own reference on it. */
+    await r.charge('NETFLIX.COM 8841', '2026-10-13', 22_900, { counterparty_text: 'NETFLIX.COM 8841' });
+    await r.answer(asked[0]!.id, 'yes');
+    assert.deepEqual(r.rows<{ what: string; next_due: string; day_of_month: string; amount: unknown }>('recurring').map((l) => [l.what, l.next_due, l.day_of_month, l.amount]), [['Netflix', '2026-11-13', '13', egp(21_900)]]);
+  } finally {
+    await r.close();
+  }
+});
+
 test('NOT A MONTH APART, OR NOT WITHIN A TENTH, IS NO OFFER; and a payee with a live line is not offered', async () => {
   const r = await fresh();
   try {
@@ -289,7 +336,8 @@ test('QUIET: a flag declined three times in a row switches itself off with one l
       await r.charge(what, on, 15_000);
       await r.charge(what, on, 15_000);
     };
-    const OFF = "Charged twice was switched off after three no's. Switch it on again in Money watch.";
+    /* "BOTH REAL" IS NOT A NO, so the line says what she said (1.0.0 said "after three no's"). */
+    const OFF = 'Charged twice was switched off after both charges were real three times in a row. Switch it on again in Money watch.';
     /* TWO NO'S, A MISTAKE, THEN TWO NO'S: never three in a row, so it is still on. */
     for (const [what, on, said] of [['Cilantro', '2026-10-01', 'real'], ['Costa', '2026-10-02', 'real'], ['Zooba', '2026-10-03', 'mistake'], ['Paul', '2026-10-04', 'real'], ['Eish', '2026-10-05', 'real']] as const) {
       await pair(what, on);

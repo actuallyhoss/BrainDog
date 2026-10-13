@@ -1166,6 +1166,37 @@ export function toSegments(block: BlockResult, kinds?: Readonly<Record<string, K
   return [...writtenLine(block, kinds), ...drawn, ...(outside === null ? [] : parse(outside, { page: true }))];
 }
 
+/** A currency beside an amount, as a person writes one: its code ("EGP") or its sign ("£"), before the amount or after. */
+const BESIDE = String.raw`(?:[A-Z]{3}|\p{Sc})`;
+const WRITTEN_MONEY = new RegExp(String.raw`^([-+\u2212]?)\s*${BESIDE}?\s*([-+\u2212]?)\s*(\d+|\d{1,3}(?:,\d{3})+)(\.\d+)?\s*${BESIDE}?$`, 'u');
+
+/**
+ * THE FIGURES IN ONE ANSWER OF THE RECORD, for `writtenLine` to ask whether any is above nought. A number is itself. A
+ * string is the number it reads as, and money written out is read with its currency and its thousands commas taken off:
+ * "EGP 0.00", "0.00 EGP", "£1,204.50". An amount held beside its currency is its amount, and a figure in several
+ * currencies is one figure a currency, NEVER ADDED: the question is only whether one of them is above nought. Anything
+ * else is a word and no figure: a name, a day ("3 Sep"), "12 days", a currency with no amount.
+ */
+function figuresIn(v: unknown): number[] {
+  if (typeof v === 'number') return Number.isFinite(v) ? [v] : [];
+  if (typeof v === 'string') {
+    const text = v.trim();
+    if (text === '') return [];
+    const plain = Number(text);
+    if (Number.isFinite(plain)) return [plain];
+    const [, before, inner, whole, part] = WRITTEN_MONEY.exec(text) ?? [];
+    if (whole === undefined) return [];
+    const n = Number(whole.replaceAll(',', '') + (part ?? ''));
+    return [/[-\u2212]/u.test(`${before}${inner}`) ? -n : n];
+  }
+  if (Array.isArray(v)) return v.every((p) => figuresIn(p).length === 1 && typeof p === 'object') ? v.flatMap(figuresIn) : [];
+  if (v !== null && typeof v === 'object') {
+    const { amount, currency } = v as { amount?: unknown; currency?: unknown };
+    if (typeof amount === 'number' && Number.isFinite(amount) && typeof currency === 'string') return [amount];
+  }
+  return [];
+}
+
 /**
  * A LIST'S WRITTEN LINE, its `body`, said once above the lines it holds: Money's Ledger says "6 filed today. 41 filed
  * for you in 30 days." over its movements. Before this a `body` was drawn only where a block had no lines of its own
@@ -1194,11 +1225,9 @@ function writtenLine(block: BlockResult, kinds?: Readonly<Record<string, KindSpe
   /* NO FIGURE ABOVE NOUGHT IS NO LINE: over payments somebody typed by hand the Ledger read "0 filed today. 0 filed for you
      in 30 days.", which says nothing happened in the place a person looks for what did. One figure above nought and
      the line is said whole, noughts and all. A FIGURE IS WHAT READS AS A NUMBER, however the record sent it ("0", "0.0"),
-     so a nought beside a name is still no line, and a line whose answers are all words is said as it was. */
-  const figures = paths.map((path) => values?.[path]).flatMap((v) => {
-    const n = typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN;
-    return Number.isFinite(n) ? [n] : [];
-  });
+     so a nought beside a name is still no line, and a line whose answers are all words is said as it was. MONEY READS
+     AS ONE TOO (`figuresIn`): "EGP 0.00" was a word here, and a Ledger of nothing filed said so in money. */
+  const figures = paths.flatMap((path) => figuresIn(values?.[path]));
   if (figures.length > 0 && !figures.some((n) => n > 0)) return [];
   return parse(body, { page: true });
 }

@@ -21,7 +21,9 @@
  *
  * ONE MORE IN 3.17.0 (REC-B11 step 8):
  * - `repeating-overdue`, how many live repeating lines have a "Next" more than three days gone. `settle` moves "Next"
- *   when a payment is matched to the line, and until this nothing said when one was not.
+ *   when a payment is matched to the line, and until this nothing said when one was not. In the same unreleased 3.17.0
+ *   (repeating-sign-fix-69, audit 67 claim 1) it counts only a line a payment was matched to before, so a line just
+ *   added is not judged by a day nothing could have moved.
  */
 
 import type { SeedMetric } from '../../base.ts';
@@ -125,6 +127,18 @@ export const SIGNS_FIGURES: Record<string, SeedMetric> = {
    * line nobody ended. `next_due before -3d` leaves out the third day itself: three days is what a payment takes to land
    * and be matched, the same three the Ledger's own age is allowed.
    *
+   * ONLY A LINE A PAYMENT WAS MATCHED TO BEFORE, `last_paid is set`. Nothing links an arriving payment to a repeating
+   * line by itself: "Settles" points at Bills alone, and a line is matched when a person or an agent runs `settle` on
+   * it. So on a line nobody has matched, "Next" stands still whether the money went or not, and the count was red four
+   * days after Money watch added a line, with nothing to press. A line with a "Last paid" is one whose payments are
+   * matched, and its "Next" gone by is a payment that was not.
+   *
+   * NOT YET WHAT WAS ASKED, which is a line with no cleared payment on its account for its amount since three days
+   * before its "Next". A `where` cannot say it: no ref goes from a Ledger entry to a line for `pointed` to follow, a
+   * day is read from today and never from the row's own "Next", and no test holds one field against another. And the
+   * mark cannot be taken off in its place, since a figure with no target is refused. So a line never matched whose
+   * money truly stopped is not counted here; the question on its day asks about it (`rules.ts`, "Did it go through?").
+   *
    * A paused or ended line is not waiting for anything and is left out. A COUNT, NEVER A SUM, so no two currencies meet
    * in it. None is the mark; a record with no repeating lines has none stuck.
    */
@@ -132,7 +146,7 @@ export const SIGNS_FIGURES: Record<string, SeedMetric> = {
     metric: 'repeating-overdue',
     name: 'Repeating lines past their day',
     source: 'register.recurring',
-    where: 'state is live, next_due before -3d',
+    where: 'state is live, next_due before -3d, last_paid is set',
     value: { count: 'id' },
     format: 'int',
     target: { lte: 0 },

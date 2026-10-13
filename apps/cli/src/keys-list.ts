@@ -2,10 +2,13 @@
  * `braindog keys list [--project <name>] [--everywhere] [--json] [--host <host>]`: the Keys index, one line a key
  * (AGT-D08, RQ-AGT-434). Its name, what it opens, where it applies, "sealed" or where it is kept, and the day it expires.
  *
+ * WHETHER THAT DAY IS PAST IS THE RECORD'S TO SAY. Today is a day in the record's zone, and this machine's UTC date is
+ * another day for some hours of every night, so the record is asked which keys are past theirs (`pastOf`).
+ *
  * NEVER A VALUE AND NEVER A GRANT'S ID. A key's row holds, under its secret field, the id of the grant the vault sealed
  * the value in, or what is already known of that grant. This command reads that field for one thing, whether anything
  * is there, and keeps a yes or a no. The rows it hands on, to a person or under `--json`, are built here from five
- * named facts, so a field the record adds later, or anything somebody left in a row, is never printed by passing through.
+ * named facts and whether the fifth is past, so a field the record adds later, or anything somebody left in a row, is never printed by passing through.
  * Nor is a row's own id or its number: a person knows a key by its name.
  *
  * READS ONLY, UNDER THE LOGIN, IN PAGES OF FIFTY. It opens no key, so it needs no vault grant, and it sends no session
@@ -41,8 +44,12 @@ const PAGES = 200;
 const EVERYWHERE = 'Everywhere';
 const SOME_PROJECT = 'A project';
 
-/** One key as this command hands it on: five facts, `sealed` and `kept` being the two halves of the fourth. */
-export type KeyRead = { name: string; opens: string; applies: string; sealed: boolean; kept: string | null; expires: string | null };
+/**
+ * One key as this command hands it on: five facts, `sealed` and `kept` being the two halves of the fourth, and
+ * `expired`, whether the fifth is past. A program reading the document is told, because the day alone would leave it
+ * to judge by a clock of its own.
+ */
+export type KeyRead = { name: string; opens: string; applies: string; sealed: boolean; kept: string | null; expires: string | null; expired: boolean };
 
 const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
 const text = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
@@ -86,16 +93,27 @@ const sealedIn = (v: unknown): boolean => (isObject(v) ? v.sealed === true : typ
  * control characters only. Each piece between the marks a sentence, a path or a URL puts around one is asked the
  * question `install` and `doctor` ask (`looksLikeToken`), and a piece that is one is said as `[hidden]`. A long word
  * that mixes letters and digits is hidden too, which is the side to be wrong on.
+ *
+ * ASKED OF THE WORDS AS THEY WILL BE PRINTED, so `printable` comes first: a character nobody sees, typed inside a
+ * value, hid its shape from the question and was then taken out for the line, which said the value whole. And the
+ * marks a note puts around a value (a code mark, a star, a bar) are marks here too, or a short value kept its mark
+ * and passed.
  */
 const HIDDEN = '[hidden]';
 export const withoutKeys = (words: string): string =>
-  words
-    .split(/([\\/=:?&"',;\s()[\]{}<>]+)/)
+  printable(words)
+    .split(/([\\/=:?&"',;\s()[\]{}<>`*|]+)/)
     .map((piece, i) => (i % 2 === 1 || piece === '' || !looksLikeToken(piece.replace(/[.!]+$/, '')) ? piece : HIDDEN))
     .join('');
 
+/**
+ * WHICH KEYS ARE PAST THEIR DAY: the rows the record named when it was asked, or, when it could not say, the day to
+ * judge each by, `2026-10-13`.
+ */
+export type Past = ReadonlySet<string> | string;
+
 /** The keys as they are handed on: retired ones left out, by name. `names` is each project's name by its row. */
-export function readKeys(rows: readonly unknown[], names: ReadonlyMap<string, string>, shape: Shape = AGENTS): KeyRead[] {
+export function readKeys(rows: readonly unknown[], names: ReadonlyMap<string, string>, past: Past, shape: Shape = AGENTS): KeyRead[] {
   return rows
     .flatMap((r): KeyRead[] => {
       if (!isObject(r) || !isObject(r.fields)) return [];
@@ -103,6 +121,7 @@ export function readKeys(rows: readonly unknown[], names: ReadonlyMap<string, st
       if (shape.done.includes(text(f[shape.state]))) return [];
       const project = text(f[shape.project]);
       const sealed = sealedIn(f[shape.secret]);
+      const expires = text(f[shape.expires]) || null;
       return [
         {
           name: text(f[shape.title]) || 'A key with no name',
@@ -110,7 +129,8 @@ export function readKeys(rows: readonly unknown[], names: ReadonlyMap<string, st
           applies: project === '' ? EVERYWHERE : (names.get(project) ?? SOME_PROJECT),
           sealed,
           kept: sealed ? null : withoutKeys(text(f[shape.where])) || null,
-          expires: text(f[shape.expires]) || null,
+          expires,
+          expired: expires !== null && (typeof past === 'string' ? expires.slice(0, 10) < past : typeof r.id === 'string' && past.has(r.id)),
         },
       ];
     })
@@ -126,9 +146,9 @@ function dayOf(day: string): string {
   return m && month ? `${String(Number(m[3]))} ${month} ${m[1]!}` : day;
 }
 
-/** One key's line. `today` is a day, `2026-10-13`: a key past its day says "expired", a word and never a colour. */
-export function keyLine(k: KeyRead, today: string): string {
-  const day = k.expires === null ? 'no expiry day' : `${k.expires.slice(0, 10) < today ? 'expired' : 'expires'} ${dayOf(k.expires)}`;
+/** One key's line. A key past its day says "expired", a word and never a colour. */
+export function keyLine(k: KeyRead): string {
+  const day = k.expires === null ? 'no expiry day' : `${k.expired ? 'expired' : 'expires'} ${dayOf(k.expires)}`;
   const kept = k.sealed ? 'sealed' : k.kept === null ? 'kept nowhere named' : `kept at ${k.kept}`;
   return [k.name, k.opens === '' ? 'opens nothing named' : `opens ${k.opens}`, k.applies, kept, day].join(' · ');
 }
@@ -148,11 +168,11 @@ export function countLine(keys: readonly KeyRead[], where: string): string {
 type Reader = { call: (name: string, args?: Record<string, unknown>) => Promise<Result<unknown>> };
 
 /** Every row of one list, read fifty at a time to the end, or the answer that stopped it. */
-async function readAll(client: Reader, register: string): Promise<Result<unknown[]>> {
+async function readAll(client: Reader, register: string, where?: string): Promise<Result<unknown[]>> {
   const rows: unknown[] = [];
   let cursor: string | null = null;
   for (let page = 0; page < PAGES; page++) {
-    const got = await client.call('list', { register, limit: KEYS_PAGE, ...(cursor ? { cursor } : {}) });
+    const got = await client.call('list', { register, limit: KEYS_PAGE, ...(where === undefined ? {} : { where }), ...(cursor ? { cursor } : {}) });
     if (!got.ok) return got;
     const value = isObject(got.value) ? got.value : {};
     if (Array.isArray(value.rows)) rows.push(...(value.rows as unknown[]));
@@ -160,6 +180,40 @@ async function readAll(client: Reader, register: string): Promise<Result<unknown
     if (cursor === null) break;
   }
   return { ok: true, value: rows };
+}
+
+const DAY_MS = 86_400_000;
+const two = (n: number): string => String(n).padStart(2, '0');
+
+/** The day it is on this machine, in the zone the machine keeps: `2026-10-13`. */
+export function dayHere(now: number): string {
+  const d = new Date(now);
+  return `${String(d.getFullYear())}-${two(d.getMonth() + 1)}-${two(d.getDate())}`;
+}
+
+const UNSAID = 'Your record did not say which keys are past their day, so each is judged by the date on this machine.';
+
+/**
+ * WHICH KEYS ARE PAST THEIR DAY, ASKED OF THE RECORD AND NOT WORKED OUT HERE. Today is a day in the record's zone, and
+ * no read under a login alone answers that zone. The record reads `today` in a filter on its own clock, though, so
+ * the filter is the question: the keys whose day is `before today`. It was this machine's UTC date, and a key whose
+ * day was the 13th read "expires" until three in the morning of the 14th in Cairo.
+ *
+ * AN ANSWER IS BELIEVED ONLY IF IT COULD BE TRUE. No zone is more than a day from UTC, so a key the record calls past
+ * while its day is tomorrow's UTC date or later was not picked by the filter: the host answered every key. That, and a
+ * host that refuses the sentence, leave the day on this machine, which is the reader's own, and one sentence saying so.
+ */
+function pastOf(asked: Result<unknown[]>, expires: string, now: number): Past | null {
+  if (!asked.ok) return null;
+  const ceiling = new Date(now + DAY_MS).toISOString().slice(0, 10);
+  const ids = new Set<string>();
+  for (const r of asked.value) {
+    if (!isObject(r) || typeof r.id !== 'string') continue;
+    const day = isObject(r.fields) ? text(r.fields[expires]).slice(0, 10) : '';
+    if (day !== '' && !(day < ceiling)) return null;
+    ids.add(r.id);
+  }
+  return ids;
 }
 
 /** The sentence for a record that will not answer, by why. */
@@ -215,7 +269,12 @@ async function read(host: string | undefined, wanted: string | undefined, everyw
   const decl = await client.call('schema', { register: KEYS });
   const shape = shapeOf(decl.ok ? decl.value : null);
   const none: Result<unknown[]> = { ok: true, value: [] };
-  const [held, projects, home] = await Promise.all([readAll(client, KEYS), shape.projects === '' ? none : readAll(client, shape.projects), shape.projects === '' ? none : client.call('schema', { register: shape.projects })]);
+  const [held, projects, home, late] = await Promise.all([
+    readAll(client, KEYS),
+    shape.projects === '' ? none : readAll(client, shape.projects),
+    shape.projects === '' ? none : client.call('schema', { register: shape.projects }),
+    readAll(client, KEYS, `${shape.expires} before today`),
+  ]);
   if (!held.ok) return refuse(sinks, held, refusalLine(held, to));
 
   const title = home.ok && isObject(home.value) ? text(home.value.title) || 'name' : 'name';
@@ -242,10 +301,12 @@ async function read(host: string | undefined, wanted: string | undefined, everyw
     where = names.get([...ids][0]!) ?? SOME_PROJECT;
   }
 
-  const keys = printable(readKeys(rows, names, shape));
-  const today = new Date(now).toISOString().slice(0, 10);
+  const past = pastOf(late, shape.expires, now);
+  const keys = printable(readKeys(rows, names, past ?? dayHere(now), shape));
   sinks.answer?.({ value: { keys } });
-  for (const k of keys) sinks.out(keyLine(k, today));
+  for (const k of keys) sinks.out(keyLine(k));
+  /* SAID ONLY WHEN A DAY IS ON A LINE, because a list with no expiry days was judged by nothing. */
+  if (past === null && keys.some((k) => k.expires !== null)) sinks.say(UNSAID);
   sinks.say(countLine(keys, printable(where)));
   return 0;
 }

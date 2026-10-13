@@ -473,6 +473,7 @@
     <!-- THE LEAD QUESTION IS DRAWN WHOLE when the block says `lead:`, with what accepting it would put on the screen. -->
     {#each asked.shown as question, n (question.id)}<QueueAnswer
         {question}
+        file={opts.file}
         onanswered={() => {}}
         pick={block.queue.length > 1 ? pick : null}
         lead={(block as { lead?: unknown }).lead === true && n === 0}

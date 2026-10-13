@@ -84,9 +84,9 @@ test('THE STORED VALUE IS THE ONE READ, so pressing a move does not change what 
 test('A MOVE THAT ASKS FOR A FIELD SAYS WHICH, on every move out of the state and not on what the row holds', () => {
   assert.equal(typeof moves.movesWith, 'function', 'row-form-moves.ts exports no movesWith');
   assert.deepEqual(moves.movesWith(STATE, 'holding'), [
-    { value: 'open', needs: 'note' },
+    { value: 'open', needs: ['note'] },
     { value: 'holding' },
-    { value: 'done', needs: 'note' },
+    { value: 'done', needs: ['note'] },
   ]);
 });
 
@@ -104,13 +104,13 @@ test('A MOVE THAT ASKS FOR NOTHING CARRIES NO WORD, and neither does a row that 
   assert.deepEqual(moves.movesWith(STATE, 'archived'), bare);
 });
 
-test('BOTH AT ONCE, AND A DECLARATION THAT IS NOT ONE: the first field asked for is named, and junk asks for nothing', () => {
+test('BOTH AT ONCE, AND A DECLARATION THAT IS NOT ONE: every field asked for is named, and junk asks for nothing', () => {
   const both: FieldDecl = {
     ...STATE,
     values: ['a', 'b'],
     transitions: { a: { to: ['b'], requires: ['why', 'note'], by: 'decide' }, b: { to: ['a'], requires: [] } },
   };
-  assert.deepEqual(moves.movesWith(both, 'a'), [{ value: 'a' }, { value: 'b', needs: 'why', byDecision: true }]);
+  assert.deepEqual(moves.movesWith(both, 'a'), [{ value: 'a' }, { value: 'b', needs: ['why', 'note'], byDecision: true }]);
   assert.deepEqual(moves.movesWith(both, 'b'), [{ value: 'a' }, { value: 'b' }]);
   const junk = { ...both, transitions: { a: { to: ['b'], requires: 'why', by: 7 } } } as unknown as FieldDecl;
   assert.deepEqual(moves.movesWith(junk, 'a'), [{ value: 'a' }, { value: 'b' }]);
@@ -125,9 +125,56 @@ test('THE WORD A PERSON READS: a reason by its name, any other field by its labe
   assert.equal(typeof moves.moveWord, 'function', 'row-form-moves.ts exports no moveWord');
   const label = (id: string) => (id === 'note' ? 'Note' : id);
   assert.equal(moves.moveWord({ value: 'open' }, label), '');
-  assert.equal(moves.moveWord({ value: 'open', needs: 'why' }, label), 'needs a reason');
-  assert.equal(moves.moveWord({ value: 'open', needs: 'note' }, label), 'needs note');
+  assert.equal(moves.moveWord({ value: 'open', needs: ['why'] }, label), 'needs a reason');
+  assert.equal(moves.moveWord({ value: 'open', needs: ['note'] }, label), 'needs note');
   assert.equal(moves.moveWord({ value: 'open', byDecision: true }, label), 'asks Decide');
   /* A move that wants both is only made by the decision, and the proposal is where the reason goes. */
-  assert.equal(moves.moveWord({ value: 'open', needs: 'why', byDecision: true }, label), 'asks Decide');
+  assert.equal(moves.moveWord({ value: 'open', needs: ['why'], byDecision: true }, label), 'asks Decide');
+});
+
+/* ── a move that asks for more than one field ──
+   IT NAMED THE FIRST AND STOPPED. `requires` is a list, and the record refuses the move until every field in it is
+   filled, so a move that wanted a reason and a date said "needs a reason", took the reason, and was refused for the date. */
+
+const TWO = {
+  ...STATE,
+  values: ['a', 'b'],
+  transitions: { a: { to: ['b'], requires: ['why', 'date'] }, b: { to: ['a'], requires: ['', 'why', 7, 'why', ''] } },
+} as unknown as FieldDecl;
+
+test('A MOVE THAT ASKS FOR TWO FIELDS NAMES BOTH, joined as a person writes a list', () => {
+  const label = (id: string) => ({ date: 'Date', owner: 'Owner' })[id] ?? id;
+  const [, toB] = moves.movesWith(TWO, 'a');
+  assert.deepEqual(toB, { value: 'b', needs: ['why', 'date'] });
+  assert.equal(moves.moveWord(toB!, label), 'needs a reason and date');
+  /* In the order the list declares them, and three as a person writes three. */
+  assert.equal(moves.moveWord({ value: 'b', needs: ['date', 'why'] }, label), 'needs date and a reason');
+  assert.equal(moves.moveWord({ value: 'b', needs: ['why', 'date', 'owner'] }, label), 'needs a reason, date and owner');
+});
+
+test('ONE FIELD READS AS IT DID, and a requirement that is no field name is not one', () => {
+  /* An empty string and a number name nothing, and a field asked for twice is asked for once. */
+  const [toA] = moves.movesWith(TWO, 'b');
+  assert.deepEqual(toA, { value: 'a', needs: ['why'] });
+  assert.equal(moves.moveWord(toA!, (id) => id), 'needs a reason');
+  assert.equal(moves.moveWord({ value: 'a', needs: [] }, (id) => id), '');
+  assert.equal(moves.moveWord({ value: 'a', needs: ['', 'why', ''] }, (id) => id), 'needs a reason');
+  /* Nothing left to ask for is no `needs` at all, as a move that asks for nothing carries none. */
+  const none = { ...TWO, transitions: { a: { to: ['b'], requires: ['', 3] } } } as unknown as FieldDecl;
+  assert.deepEqual(moves.movesWith(none, 'a'), [{ value: 'a' }, { value: 'b' }]);
+});
+
+test('A FIELD ALREADY FILLED IS NOT ASKED FOR AGAIN, and the word goes when all of them are', () => {
+  const label = (id: string) => (id === 'date' ? 'Date' : id);
+  const m = { value: 'b', needs: ['why', 'date'] };
+  assert.equal(moves.moveWord(m, label, (id) => id === 'why'), 'needs date');
+  assert.equal(moves.moveWord(m, label, (id) => id === 'date'), 'needs a reason');
+  assert.equal(moves.moveWord(m, label, () => true), '');
+  assert.equal(moves.moveWord(m, label, () => false), 'needs a reason and date');
+  /* A decision is asked for whatever is filled: the move is not made here. */
+  assert.equal(moves.moveWord({ ...m, byDecision: true }, label, () => true), 'asks Decide');
+});
+
+test('TWO FIELDS THE FORM GIVES ONE LABEL ARE SAID ONCE, so the word never repeats itself', () => {
+  assert.equal(moves.moveWord({ value: 'b', needs: ['x', 'y', 'why'] }, (id) => (id === 'why' ? id : 'another field')), 'needs another field and a reason');
 });

@@ -287,6 +287,10 @@ const WHOLE: readonly Whole[] = [
  * taking orders when I closed the shop" and "as the shop closed" have no orders, where "after hours", "as a favour" and
  * "when I am busy" are how it is done.
  * The thing ended there is gone with it (`ENDED`, `ENDED_ITSELF`), so neither sentence has a shop either.
+ *
+ * A WORD OF FEELING TAKES NOTHING UP (`FEELS`): "I stopped taking orders and still miss them" and "now I hate them"
+ * point back at the orders and do nothing with them, so they stay stopped. AND A THING SOLD, OR HAD BEFORE, IS GONE:
+ * "I sold the stall" has no shop (`SOLD`), nor has "when I had the stall", "when we ran a small shop" (`ENDED`).
  */
 const REFUSES = "no|not|never|without|zero|don['’]?t|do\\s+not|doesn['’]?t|does\\s+not|haven['’]?t|hasn['’]?t|hadn['’]?t";
 /* `send` and its ending apart: the whole word is a field an add-on declares, and the core spells none (the core-names gate). */
@@ -340,19 +344,30 @@ const DID = '[\\p{L}]+ed|shut|sold|left|went|quit|lost|had|got|gave|took|became|
 const SINCE_WHEN = `(?:when|after|once|as)\\s+(?:${SOMEBODY}|(?:the|${OWN})\\s+[\\p{L}\\p{N}'’-]+)\\s+(?:${DID})(?![\\p{L}\\p{N}])`;
 /* And the thing that was ended there is gone too: the shop in "when I closed the shop", the stall in "after we sold our stall". */
 const ENDED = new RegExp(
-  `(?:^|[^\\p{L}\\p{N}])(?:when|after|once|since)\\s+${SOMEBODY}\\s+(?:closed|shut|sold|left|lost|quit)(?:\\s+(?:down|up))?\\s+(?:(?:the|a|an|${OWN})\\s+)?(?:(?:${PAST})\\s+)*(?:(?:${[...PLAIN].join('|')})\\s+)*$`,
+  `(?:^|[^\\p{L}\\p{N}])(?:(?:when|after|once|since)\\s+${SOMEBODY}\\s+(?:closed|shut|sold|left|lost|quit)(?:\\s+(?:down|up))?|when\\s+${SOMEBODY}\\s+(?:still\\s+)?(?:had|owned|ran))\\s+(?:(?:the|a|an|${OWN})\\s+)?(?:(?:${PAST})\\s+)*(?:(?:${[...PLAIN].join('|')})\\s+)*$`,
   'iu',
 );
 /* The same thing said as what ended, not as what somebody ended: "as the shop closed", "once my stall shut down".
    The word of whose it is may be part of the phrase heard ("my shop"), so it is not asked for here. */
 const ENDED_ITSELF = new RegExp(`(?:^|[^\\p{L}\\p{N}])(?:when|after|once|since|as)\\s+(?:(?:the|${OWN})\\s+)?(?:(?:${PAST})\\s+)*(?:(?:${[...PLAIN].join('|')})\\s+)*$`, 'iu');
+/* A thing somebody sold is gone with no "when" before it: "I sold the stall", "we have sold our old shop". Never one
+   that is denied ("I never sold the stall") or only supposed ("if I sold the stall", "I wish I had sold it"), and never what is sold day to
+   day, which is many ("I sold my products"). What follows is the clause's end, or who it went to and for what. */
+const SOLD = new RegExp(
+  `(?<!(?:^|[^\\p{L}\\p{N}])(?:if|unless|whether|wish|wished|wishes)\\s+)(?<![\\p{L}\\p{N}'’])${SOMEBODY}\\s+(?:(?:have|has|had|just|now|since|already)\\s+){0,2}${UNDENIED}sold(?:\\s+(?:off|up))?\\s+(?:(?:the|a|an|${OWN})\\s+)?(?:(?:${PAST})\\s+)*(?:(?:${[...PLAIN].join('|')})\\s+)*$`,
+  'iu',
+);
+const SOLD_TO = /^\s+(?:to|for)(?![\p{L}\p{N}])/iu;
 const CLAUSE_END = `(?:\\s+(?:${WHEN}))?\\s*(?:$|[^\\p{L}\\p{N}\\s]|(?:and|or|nor|but|so|because|since)(?![\\p{L}\\p{N}])|${SINCE_WHEN})`;
 /* A thing taken up again: a word of now ("now", "still", "instead") after the clause, then at most four words, none a join or a word of refusal or
    of stopping, and the word that points back. "them" and "those" point at many, "it" and "that" at one. */
 const NOW = 'now|today|nowadays|these\\s+days|currently|still|instead';
+/* A word of feeling or remembering takes nothing up: "and still miss them", "now I hate them", "still think about them".
+   The thing is pointed back at and nothing is done with it. "love" is not one: it is said of what goes on as often. */
+const FEELS = 'miss(?:es|ed|ing)?|hat(?:e|es|ed|ing)|regret(?:s|ted|ting)?|mourn(?:s|ed|ing)?|dread(?:s|ed|ing)?|resent(?:s|ed|ing)?|loathe[sd]?|despise[sd]?|detest(?:s|ed)?|remember(?:s|ed|ing)?|recall(?:s|ed|ing)?|forget|forgot|forgotten|think|thinking|dream(?:s|ed|ing)?|wish|grieve';
 const takenUp = (back: string): RegExp =>
   new RegExp(
-    `^(?:\\s+(?:${WHEN}))?(?:\\s+(?!(?:and|or|nor|but|so|because|since)(?![\\p{L}\\p{N}]))[\\p{L}\\p{N}'’-]+){0,3}\\s*[,;]?\\s*(?:(?:and|but|so)\\s+)?(?:${SOMEBODY}\\s+)?(?:${NOW})\\s+(?:(?!(?:${DENIES}|done|finished|stopped|quit|and|or|nor|but|so|because|since)(?![\\p{L}\\p{N}'’]))[\\p{L}\\p{N}'’-]+\\s+){1,4}(?:${back})(?![\\p{L}\\p{N}])`,
+    `^(?:\\s+(?:${WHEN}))?(?:\\s+(?!(?:and|or|nor|but|so|because|since)(?![\\p{L}\\p{N}]))[\\p{L}\\p{N}'’-]+){0,3}\\s*[,;]?\\s*(?:(?:and|but|so)\\s+)?(?:${SOMEBODY}\\s+)?(?:${NOW})\\s+(?:(?!(?:${DENIES}|${FEELS}|done|finished|stopped|quit|and|or|nor|but|so|because|since)(?![\\p{L}\\p{N}'’]))[\\p{L}\\p{N}'’-]+\\s+){1,4}(?:${back})(?![\\p{L}\\p{N}])`,
     'iu',
   );
 const TAKEN_UP = { many: takenUp('them|those'), one: takenUp('it|that'), done: takenUp('them|those|it') };
@@ -450,6 +465,9 @@ function refusedIn(said: string, known: readonly Said[] = []): (span: Said) => b
     if (NOT.test(before)) return 'refused';
     if (ENDED.test(before)) return ends(to) ? 'stopped' : null;
     if (ENDED_ITSELF.test(before) && ITSELF_ENDED.test(said.slice(to))) return 'stopped';
+    /* One thing sold, and nothing takes it up again: whoever sold a stall does not run it. */
+    const one = said.slice(from, to);
+    if (SOLD.test(before) && (!MANY.test(one) || /ss$/iu.test(one)) && (ends(to) || SOLD_TO.test(said.slice(to)))) return 'stopped';
     /* A word of size is said before its thing ("done selling handmade candles"), so it ends as the verb does. And a
        thing somebody stopped is taken up again as a "used to" is: "I stopped taking orders and now track them here". */
     if (NOT_STOPPED.test(before)) return closes(from, to) && !again(from, to) ? 'stopped' : null;

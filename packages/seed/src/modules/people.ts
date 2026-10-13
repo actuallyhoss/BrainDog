@@ -504,6 +504,20 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
         body: '{{people-quiet.first}} has been quiet since {{people-quiet.since}}, and {{people-quiet.more}} other(s) have too',
       },
       {
+        /* SOMEBODY HELD TWICE (AGT-D05): the record's own figure of the people it holds more than once, as far as the
+           plain rules can tell (two of one name, one of them with no address or handle; a second marked as the
+           record's own person). Under the page's line and never a second headline, since a page opens on one sentence,
+           and left off at nought. THE FIGURE'S WORDS, THEN THE NUMBER, as the notes over a record's keys are written,
+           so it reads right for one and for many. "May be", because two real people can share a name, and the answer
+           is the person's. NOTHING IS SAID OF DECIDE: the pass that would ask about each pair by night (`askTwice` in
+           the kernel) is called by nothing yet, so a line promising a question would promise one that never comes.
+           No intent: it is a thing to look at, not a thing gone wrong. */
+        kind: 'note',
+        span: 12,
+        when: { metric: 'held-twice', gt: 0 },
+        body: 'People who may be on this record twice: {{held-twice}}',
+      },
+      {
         /* CARDS, with a face for each person, rather than a table of four columns read
            as a directory. Each card still opens the person's row. Their role, and the projects they were
            met in, because most people here arrive from an agent's commit rather than by hand, and the one you

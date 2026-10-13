@@ -204,7 +204,8 @@
 
   /**
    * A SEGMENTED CONTROL IS ONE RECTANGLE (DIRECTION §39): the `--field` fill at radius 8, 2px round its segments, and
-   * the chosen segment the tile's own colour with a hairline and a breath of shadow. The selected state has to be a
+   * the chosen segment the tile's own colour, sliding to the next choice where `Segmented.svelte` draws the track (the
+   * thumb, below) and with a hairline and a breath of shadow where the track is still written by hand. The selected state has to be a
    * SHAPE and not a shade: a slightly lighter grey behind one word out of four is the single most-missed control in
    * dense software. The same on the board and in a tile, because there is no glass to choose between.
    *
@@ -282,6 +283,56 @@
       0 1px 2px color-mix(in srgb, var(--ink) 10%, transparent),
       0 0 0 1px var(--rule);
     color: var(--ink);
+  }
+
+  /**
+   * THE SLIDING SELECTION (DIRECTION §39, `Segmented.svelte`). A track the component draws carries `data-slides`, and
+   * once it has measured its chosen segment, `data-thumb` and that segment's box as `--x`, `--y`, `--w` and `--h`.
+   * The thumb is the track's `::before` at that box, and choosing MOVES it: one `transform` transition of `--d-state`,
+   * so nothing is laid out again and nothing beside the control shifts. Its width is the new label's at once.
+   *
+   * IT IS THE TILE'S COLOUR AND NOTHING ELSE: no hairline, no shadow. A shape that travels is seen without them.
+   *
+   * `data-thumb='jump'` IS A THUMB THAT DOES NOT TRAVEL: the first placing, a label that changed size, a track that
+   * has wrapped to two lines, and a reader who asked for less motion (the component says so, and `a11y.css` cuts the
+   * duration as well). A track written by hand, with no `data-slides`, keeps the fill above.
+   */
+  .segmented[data-slides] {
+    --x: 0px;
+    --y: 0px;
+    --w: 0px;
+    --h: 0px;
+
+    position: relative;
+  }
+
+  /* Above the thumb, which is positioned and would otherwise paint over the words. */
+  .segmented[data-slides] > .segment {
+    position: relative;
+  }
+
+  .segmented[data-thumb]::before {
+    content: '';
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: 0;
+    inline-size: var(--w);
+    block-size: var(--h);
+    background: var(--tile);
+    border-radius: calc(var(--r-ctl) - 2px);
+    transform: translate(var(--x), var(--y));
+    transition: transform var(--d-state) var(--ease-out);
+    pointer-events: none;
+  }
+
+  .segmented[data-thumb='jump']::before {
+    transition: none;
+  }
+
+  /* The thumb is the selection now, so the segment under it draws none of its own. */
+  .segmented[data-thumb] > .segment[data-on] {
+    background: none;
+    box-shadow: none;
   }
 
   /**

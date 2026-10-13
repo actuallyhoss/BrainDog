@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { COMPACT_MOST, compactOf, laterLine, queueMergeOf, queueWords, waysOf } from './queue-answer.ts';
+import { COMPACT_MOST, compactOf, laterLine, queueMergeOf, queueWords, visualOf, waysOf } from './queue-answer.ts';
 
 const now = Date.parse('2026-10-02T09:00:00Z');
 
@@ -123,4 +123,44 @@ test('A QUEUE OUTSIDE DECIDE SHOWS AT MOST THREE, and says how many more wait th
   assert.equal(queueWords.moreOnDecide(5), '5 more on Decide');
   assert.equal(queueWords.moreOnDecide(1200), '1,200 more on Decide');
   for (const line of [queueWords.choose, queueWords.moreOnDecide(2), queueWords.hard('Chase it'), queueWords.suggestedSaid]) assert.doesNotMatch(line, /—|\b(row|rows|entity|list item)\b/iu);
+});
+
+/* WHERE A PAGE SERVES A FILE IT HOLDS: the lining's photograph, and nothing for a file the block does not hold. */
+const serves = (row: string, field: string): string | null => (row === 'parts#2' ? `/app/acme/files/${row.replace('#', '/')}/${field}` : null);
+
+test('AN OPTION THAT IS A PICTURE IS DRAWN FROM THE ADDRESS THE PAGE SERVES IT AT (D28.33)', () => {
+  const photo = { file: { row: 'parts#2', field: 'photo' } };
+  assert.deepEqual(visualOf(photo, serves), { file: { row: 'parts#2', field: 'photo', src: '/app/acme/files/parts/2/photo' } });
+  assert.equal(visualOf(photo), null, 'a card handed no way to an address draws no picture');
+  assert.equal(visualOf({ file: { row: 'parts#9', field: 'photo' } }, serves), null, 'a file the page does not hold');
+  assert.equal(visualOf({ file: { row: 'parts#2' } }, serves), null, 'a file with no field');
+  assert.equal(visualOf({ file: { row: '../parts#2', field: 'photo' } }, () => '/files/x'), null, 'a spelling the renderer does not read is never asked for');
+});
+
+test('A PICTURE FROM ANOTHER HOST IS REFUSED, whatever the page hands back', () => {
+  const photo = { file: { row: 'parts#2', field: 'photo' } };
+  for (const src of ['https://elsewhere.example/p.png', '//elsewhere.example/p.png', '/\\elsewhere.example/p.png', 'data:image/png;base64,AAAA', 'javascript:alert(1)', ''])
+    assert.equal(visualOf(photo, () => src), null, src);
+  assert.equal(visualOf(photo, () => null), null);
+});
+
+test('A COLOUR AND A FIGURE ARE READ AS THEY WERE, with or without a way to a file', () => {
+  for (const file of [undefined, serves]) {
+    assert.deepEqual(visualOf({ swatch: ['#1f3a5f', '#c9a227'] }, file), { swatch: ['#1f3a5f', '#c9a227'] });
+    assert.deepEqual(visualOf({ figure: 'EGP 1,200' }, file), { figure: 'EGP 1,200' });
+    assert.equal(visualOf({ swatch: ['red;background:url(//x)'] }, file), null, 'a colour the renderer would refuse');
+    assert.equal(visualOf(null, file), null);
+    assert.equal(visualOf('swatch:#1f3a5f', file), null);
+  }
+});
+
+test('THE WAYS TO ANSWER CARRY THE PICTURE ONLY WHERE THE CARD WAS HANDED THE WAY TO IT', () => {
+  const q = {
+    options: [
+      { key: 'navy', label: 'Navy lining', because: '', recommended: true, shows: { file: { row: 'parts#2', field: 'photo' } } },
+      { key: 'gold', label: 'Gold lining', because: '', recommended: false, shows: { swatch: ['#c9a227'] } },
+    ],
+  } as Parameters<typeof waysOf>[0];
+  assert.deepEqual(waysOf(q).map((w) => w.shows), [null, { swatch: ['#c9a227'] }]);
+  assert.deepEqual(waysOf(q, serves).map((w) => w.shows), [{ file: { row: 'parts#2', field: 'photo', src: '/app/acme/files/parts/2/photo' } }, { swatch: ['#c9a227'] }]);
 });

@@ -1062,7 +1062,7 @@
                             <span class="card-visual" data-shows="swatch" aria-hidden="true">
                               {#each shows.swatch as colour, s (s)}<span class="card-swatch" style:--swatch={colour}></span>{/each}
                             </span>
-                          {:else if shows}
+                          {:else if shows && 'figure' in shows}
                             <span class="card-visual" data-shows="figure"><span class="card-figure num">{shows.figure}</span></span>
                           {/if}
                           <button

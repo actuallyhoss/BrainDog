@@ -133,6 +133,21 @@ test('NOTHING COMING AT ALL is still a walk that never goes under', async () => 
   sql.close();
 });
 
+test('NOTHING HELD AND NOTHING COMING is a walk that looked at nothing: no value and no beyond', async () => {
+  const { k, sql } = await record(money(0), []);
+  for (const kind of ['days_to_zero', 'zero_on']) {
+    const r = read(k, walk(kind, { walk: kind }));
+    assert.equal(r.value, null);
+    assert.equal(beyondOf(r), null);
+    assert.equal('beyond' in r, false);
+  }
+  sql.close();
+  /* NOTHING HELD AND MONEY COMING IN is a walk that looked: it never goes under, and says how far. */
+  const paid = await record(money(0), COMING.slice(0, 1));
+  assert.deepEqual(beyondOf(read(paid.k, walk('lasts', { walk: 'days_to_zero' }))), { day: '2027-09-20', days: 365 });
+  paid.sql.close();
+});
+
 test('A WALK THAT GOES UNDER IS UNCHANGED: its value is the crossing and it carries no beyond', async () => {
   /* 168,000.00 held, +10,000.00 on the 25th, -4,000.00 on the 1st, -200,000.00 on the 10th: under on 10 October. */
   const { k, sql } = await record(money(16_800_000), COMING);

@@ -41,6 +41,7 @@ import { terms, tokensOf } from '../record/find.ts';
 import type { IconName } from '../ui/icons.ts';
 import { words } from './create.ts';
 import type { Offer } from './customise.ts';
+import { words as pageWords, type Paging } from './new-page.ts';
 
 /**
  * The verbs the palette can perform in place rather than travel to.
@@ -58,8 +59,11 @@ import type { Offer } from './customise.ts';
  *
  * `customise` IS THE SAME SHAPE. `Dark mode`, `Open on Money`, `Hide Inbox`: the change and the thing it changes are
  * words in the box, read by `customise()` in `customise.ts`, and what it takes is `Live.customise`.
+ *
+ * `page` TOO (PGS-C30). `New page: Wedding` makes a page whose name is typed in the box, read by `paging()` in
+ * `new-page.ts`, and what it takes is `Live.page`.
  */
-export const ACTS = ['undo', 'add', 'customise'] as const;
+export const ACTS = ['undo', 'add', 'customise', 'page'] as const;
 export type Act = (typeof ACTS)[number];
 
 /**
@@ -70,7 +74,7 @@ export type Act = (typeof ACTS)[number];
  * Tasks from the inbox, from a page and from Settings. No binding is needed to prove that, and
  * inventing one to satisfy the test would put a key in the `?` sheet that does nothing.
  */
-const NAMES_ITS_TARGET: readonly Act[] = ['add', 'customise'];
+const NAMES_ITS_TARGET: readonly Act[] = ['add', 'customise', 'page'];
 
 /** A row a query can make: the list it goes in and the words it is titled with. `create.ts` reads it. */
 export type Creation = { register: string; title: string };
@@ -86,6 +90,11 @@ export type Live = {
    * empty, so a caller that knows nothing of them is answered as before.
    */
   customise?: readonly Offer[];
+  /**
+   * The page the query would make or suggest (`new-page.ts`), its name empty while the row is only found by its words.
+   * `null` or absent when the query is about something else, or nobody here may ask for a page.
+   */
+  page?: Paging | null;
 };
 
 export type Command = {
@@ -256,5 +265,21 @@ export const COMMANDS: readonly Command[] = [
     group: copy.customise.group,
     icon: 'settings',
     when: (live) => (live.customise?.length ?? 0) > 0,
+  },
+  /**
+   * AND THE ROW THAT MAKES A PAGE (PGS-C30). No control made one: a person who wanted an empty page pasted source.
+   *
+   * THE TITLE HERE IS THE DECLARATION'S. The palette draws `New page`, then `New page: Wedding` once the box holds a
+   * name, and `Suggest a page` for somebody who does not own the record, all of it `new-page.ts`'s reading of the
+   * query. With no record, or a query about something else, there is no row.
+   */
+  {
+    id: 'c-page',
+    title: pageWords.declared,
+    href: null,
+    act: 'page',
+    group: copy.commands,
+    icon: 'plus',
+    when: (live) => (live.page ?? null) !== null,
   },
 ];

@@ -639,13 +639,16 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
   },
   /* GONE QUIET AND LAST IN TOUCH STOOD OVER EVERYONE, two lists of the people on the cards under them. */
   /* AND PEOPLE 3.3.0'S HEALTH PAGE, the record's vital signs, comes off first. */
+  /* AND PEOPLE 3.4.0'S NOTE OF WHO MAY BE HELD TWICE comes off the People page with it (people-held-twice-69). */
   people: {
     version: '3.1.0',
     released: '36328d2fcaeb58f3',
     undo: (raw) =>
       withPage({ ...raw, declarations: (raw.declarations as Body[]).filter((d) => d.page !== 'health') }, 'people', (now) =>
         now.flatMap((b) =>
-          b.heading !== 'Everyone'
+          (b.when as Body | undefined)?.metric === 'held-twice'
+            ? []
+            : b.heading !== 'Everyone'
             ? [b]
             : [
                 {

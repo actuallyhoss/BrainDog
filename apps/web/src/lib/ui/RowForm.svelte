@@ -199,12 +199,11 @@
    */
   const filled = (field: string): boolean => (typed[field] ?? '').trim() !== '' || (values?.[field] ?? '') !== '';
   const word = (m: Move): string => {
-    if (!m.byDecision && m.needs !== undefined && filled(m.needs)) return '';
     return moveWord(m, (field) => {
       const named = fields.find((f) => f.id === field);
       /* A field this form does not draw has no label here, and an id is never the word. */
       return named ? labelOf(named) : copy.anotherField;
-    });
+    }, filled);
   };
 
   /**

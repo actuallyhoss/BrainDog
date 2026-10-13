@@ -66,6 +66,7 @@
   import { commands, type Act, type Creation } from './admit.ts';
   import { addRow, creation, offered, words as createWords } from './create.ts';
   import { customise, type Change, type Look, type Place } from './customise.ts';
+  import { FILL, asked as pageAsked, maker as pageMaker, paging, pressed as pagePressed, rowTitle as pageRow, whoOf, type Paging } from './new-page.ts';
   import { apply as applyChange, keptNow, lookNow, pageMenu } from './customise-apply.ts';
   import { navPrefs } from '../nav-prefs.svelte.ts';
   import { said as voiced } from '../voice.svelte.ts';
@@ -118,6 +119,8 @@
     creation?: Creation | undefined;
     /** What a customise row changes (`customise.ts`). Only those rows carry it. */
     change?: Change | undefined;
+    /** The page the new page row makes or suggests (`new-page.ts`). Only that row carries it. */
+    paging?: Paging | undefined;
   };
 
   let el = $state<HTMLDialogElement>();
@@ -149,7 +152,9 @@
       open?: number;
       /* EVERY LIST, THE EMPTY ONES TOO, and who is asking: what the add row is offered on, and to whom (`create.ts`). */
       lists?: { id: string; name: string }[];
-      me?: { level: string; lists: string[] | null };
+      me?: { level: string; lists: string[] | null; owner?: boolean };
+      /* THE SLUG OF EVERY PAGE `boot` LISTS, so a second page of one name lands beside the first (`new-page.ts`). */
+      pages?: string[];
       questions?: { id: string; title: string }[];
       slash?: boolean;
     },
@@ -271,6 +276,8 @@
      or where no record answered. */
   const addLists = $derived(isLive ? offered(shell) : []);
   const addNamed = $derived(new Map(addLists.map((l) => [l.id, l.name])));
+  /** Who may ask for a page: the owner makes one, anybody else on the record suggests one, and with no record nobody. */
+  const pageWho = $derived(whoOf(shell));
 
   /**
    * WHAT A CUSTOMISE ROW CAN NAME (`customise.ts`): the app's own screens, the nav's pages under the names this person
@@ -444,6 +451,8 @@
       parsed.prefix === null || parsed.prefix === '>'
         ? customise(parsed.text, { look, places, hidden: navPrefs.hidden, home: navPrefs.home, pageMenu: pageHere, kept: lookKept })
         : [],
+    /* THE PAGE THE QUERY WOULD MAKE, in the same modes: found by its words with no name yet, a sentence once it has one. */
+    page: parsed.prefix === null || parsed.prefix === '>' ? paging(parsed.text, pageWho) : null,
   });
 
   /** Whether this query is one the record's search answers: `#`, `@` or no prefix, and two characters or more. */
@@ -572,7 +581,7 @@
          `commands(live)` and never `COMMANDS`: the admission rule and the standing rule are both
          applied in there, so no row this file draws can have skipped them. */
       const every = commands(live);
-      const admitted = every.filter((c) => c.act !== 'add' && c.act !== 'customise');
+      const admitted = every.filter((c) => c.act !== 'add' && c.act !== 'customise' && c.act !== 'page');
       /* THE ADD ROW IS NOT FOUND BY ITS TITLE, it is made out of the query. `commands(live)` holds it only while
          `live.creation` does, so asking for it is asking the standing rule, and it is drawn as the sentence it will
          write rather than as its declaration's name. No `complete`: the box already says exactly what `⇥` would.
@@ -590,6 +599,15 @@
       if (changing && !live.creation)
         for (const o of live.customise ?? [])
           out.push({ id: o.id, title: o.title, detail: o.detail, href: null, group: changing.group, icon: o.icon, act: changing.act, change: o.change, complete: o.complete });
+      /* THE NEW PAGE ROW (PGS-C30), drawn as `new-page.ts` reads the query. THE SENTENCE GOES ABOVE EVERYTHING, with the
+         add row and for its reason; found only by its words it sits among the commands, after them (below). With no
+         name yet a press writes the sentence into the box, so `⇥` does the same. */
+      const paged = every.find((c) => c.act === 'page');
+      const pageRowOf = (group: string): Row | null =>
+        paged && live.page ? { id: paged.id, title: pageRow(live.page), href: null, group, icon: paged.icon, act: paged.act, paging: live.page, ...(live.page.title === '' ? { complete: FILL } : {}) } : null;
+      const pageSaid = pageAsked(text);
+      const pageFirst = pageSaid ? pageRowOf(createWords.group) : null;
+      if (pageFirst) out.push(pageFirst);
       const exact = admitted.filter((c) => starts(c.title) && c.title.toLowerCase().startsWith(needle));
       const rest = admitted.filter((c) => !exact.includes(c) && starts(c.title));
       out.push(
@@ -604,6 +622,8 @@
           complete: c.title,
         })),
       );
+      const pageFound = pageSaid ? null : pageRowOf(paged?.group ?? copy.commands);
+      if (pageFound) out.push(pageFound);
     }
 
     if (prefix === null || prefix === '/') {
@@ -939,6 +959,11 @@
       q = row.change.text;
       return void input?.focus();
     }
+    /* AND SO DOES NEW PAGE WITH NO NAME YET: the box takes the sentence, and the next word typed is the page's name. */
+    if (row.act === 'page' && row.paging?.title === '') {
+      q = FILL;
+      return void input?.focus();
+    }
     open = false;
     /* THE ONE ROW THAT DOES SOMETHING RATHER THAN GO SOMEWHERE. It is checked on the act rather
        than on a flag, so no row's behaviour is described in two places. The standing rule means it
@@ -950,6 +975,10 @@
     }
     if (row.act === 'add') {
       if (row.creation) void add(row.creation);
+      return;
+    }
+    if (row.act === 'page') {
+      if (row.paging) void newPage(row.paging);
       return;
     }
     if (row.act === 'customise' && row.change) return customiseRun(row.change);
@@ -988,6 +1017,28 @@
         }),
     });
     void invalidateAll();
+  }
+
+  /**
+   * THE NEW PAGE ROW, PRESSED (PGS-C30): `new-page.ts` makes the page or files the suggestion, opens what it made and
+   * shows the one receipt. This hands it the screen: the record, the pages `boot` lists, the address bar and the toasts.
+   * Undo leaves the page only when the reader is still on it.
+   */
+  function newPage(p: Paging) {
+    if (!isLive) return;
+    return pagePressed(p, {
+      make: pageMaker(apiBase(page.url), shell.pages ?? [], !p.suggest),
+      go: (href) => goto(at(href)),
+      toast: (text, opts) => toasts.push(text, opts),
+      /* THE SHELL IS KEPT FOR THE TAB (`boot-live.ts`), so the kept answer is dropped first: the rail and the next
+         page's address are read from a list that holds the page just made or taken away. */
+      refresh: async () => {
+        (await import('$lib/record/boot-live.ts')).forget();
+        await invalidateAll();
+      },
+      leave: (href) => (page.url.pathname === new URL(at(href), page.url).pathname ? goto(at('/')) : undefined),
+      notReached: copy.writeNotReached,
+    });
   }
 
   /**

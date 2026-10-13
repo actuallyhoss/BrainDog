@@ -2,8 +2,8 @@
  * Small business: the first-party setup onboarding made before use cases existed.
  *
  * IT CARRIES NO LIST. Its modules are whichever first-party packs the sentence names, which is what onboarding
- * already did, and it speaks in the house voice but for three lines of Home that name what a business is owed and
- * owes. It is in the catalogue so the arranger can say "this reads like a business" as plainly as it says
+ * already did, and it speaks in the house voice but for three lines of Home that name a business's money in and
+ * out. It is in the catalogue so the arranger can say "this reads like a business" as plainly as it says
  * "student".
  *
  * ITS PACK IS ONE PAGE, ITS HOME, SINCE 1.2.0. Money's own Home retired with money-core 3.0.0, and a record
@@ -36,6 +36,10 @@ export const BUSINESS_EXAMPLES = [
  * (`test/card-summary-proposes-itself.test.ts`). The summary moved and the signals did not: with "owed" as a signal,
  * "track what my brother owed me for the holiday", which proposes nothing today, proposed Small business (measured).
  * Neither is in a pack, since Small business carries none, so the version stays.
+ *
+ * IT SAYS MONEY IN AND OUT, NOT WHO OWES WHOM (DIRECTION, "Money is a finance application, not a ledger of who owes
+ * whom"). It read "What your clients owe you and what you owe"; typed back now it hears hosting and subscriptions,
+ * still two signals of its own and none of another card's, and again the signals did not move.
  */
 export const BUSINESS = {
   usecase: 'business',
@@ -58,7 +62,7 @@ export const BUSINESS = {
      1.7.0 is live. */
   version: '1.7.1',
   title: 'Small business',
-  summary: 'What your clients owe you and what you owe, the hosting and subscriptions you run on, the people involved and the work.',
+  summary: 'Money in and out, the hosting and subscriptions you run on, the people involved and the work.',
   author: 'BrainDog',
   license: 'MIT',
   audience: 'individual',
@@ -74,7 +78,7 @@ export const BUSINESS = {
   voice: {
     coming_up: 'Falling due',
     nothing_due: 'No invoice, bill or renewal falls due in the next two weeks.',
-    fills_with: 'What you are owed, what you owe, the questions waiting on you and what changed while you were away show up here as your lists fill.',
+    fills_with: 'Money coming in, money going out, the questions waiting on you and what changed while you were away show up here as your lists fill.',
   },
   skills: [],
   pack: {

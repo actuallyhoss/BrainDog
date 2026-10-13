@@ -485,8 +485,7 @@ async function drawn(client: Client): Promise<{ questions: QueueQuestion[]; runs
       {
         kind: 'table',
         heading: 'Working now',
-        source: 'sessions.live',
-        where: 'state is active',
+        source: 'sessions.working',
         columns: [{ field: 'agent' }, { field: 'doing' }, { field: 'last_seen' }],
         limit: 8,
       },

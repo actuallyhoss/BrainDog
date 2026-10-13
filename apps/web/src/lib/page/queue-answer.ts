@@ -10,7 +10,7 @@
  */
 
 import type { QueueQuestion } from '@braindog/kernel';
-import { day, relative, showsOf } from 'braindog-render';
+import { day, fileSrc, relative, showsOf } from 'braindog-render';
 
 import { citedWords } from '../cite.ts';
 import { copy } from '../copy.ts';
@@ -96,22 +96,47 @@ export function proposer(who: string, me: string | null = null, names: ReadonlyM
   return said.kind === 'rule' ? { name: queueWords.rule(inSentence(said.name)), kind: 'rule' } : said;
 }
 
-/** What an option is, where the card can draw it: its colours, or a few words or a figure. */
-export type Visual = { swatch: string[] } | { figure: string };
+/** What an option is, where the card can draw it: its colours, a few words or a figure, or a picture the page serves. */
+export type Visual = { swatch: string[] } | { figure: string } | { file: { row: string; field: string; src: string } };
+
+/**
+ * WHERE A PAGE SERVES A FILE IT HOLDS, by the row and the field (`BlockSlot.svelte`, the renderer's `RenderOptions.file`):
+ * an address, or `null` for a file the page does not hold.
+ */
+export type FileAt = (row: string, field: string) => string | null | undefined;
+
+/**
+ * THE NAME THE PAGE'S WAY TO A FILE IS HANDED DOWN UNDER (`QueueAnswer.svelte` sets it, the card under it reads it), so
+ * the card asks the page that drew it and holds no address of its own.
+ */
+export const QUEUE_FILE = 'queue-file';
 
 /**
  * An option's visual, held to the renderer's own reading first (`showsOf`), or `null`.
  *
  * THE SAME CHECK THE FENCE MAKES (`blocks.ts` `showsCell`), because a swatch is the one colour from the record that
- * reaches a style, and a spelling the renderer would refuse is left out rather than written into `--swatch`. A FILE IS
- * LEFT OUT HERE: only the page's `RenderOptions.file` turns a row's file into an address, and this card is handed none.
+ * reaches a style, and a spelling the renderer would refuse is left out rather than written into `--swatch`.
+ *
+ * A FILE IS A PICTURE ONLY WHERE THE PAGE SAYS WHERE IT IS SERVED (`file`), and only from this host: the address rides
+ * on the visual once `fileSrc` has passed it, the check the renderer's own tile makes, since a picture loaded from
+ * elsewhere tells another host who is reading and when. A card handed no way to an address, a file the page does not
+ * hold and an address of another host all leave the visual out, and the option reads by its name.
  */
-export function visualOf(shows: unknown): Visual | null {
+export function visualOf(shows: unknown, file?: FileAt): Visual | null {
   if (shows === null || typeof shows !== 'object') return null;
-  const s = shows as { swatch?: unknown; figure?: unknown };
-  const cell = Array.isArray(s.swatch) ? `swatch:${s.swatch.join(',')}` : typeof s.figure === 'string' ? `figure:${s.figure}` : '';
+  const s = shows as { swatch?: unknown; figure?: unknown; file?: unknown };
+  const cell = Array.isArray(s.swatch) ? `swatch:${s.swatch.join(',')}` : typeof s.figure === 'string' ? `figure:${s.figure}` : fileCell(s.file);
   const read = cell === '' ? null : showsOf(cell);
-  return read === null || 'file' in read ? null : read;
+  if (read === null || !('file' in read)) return read;
+  const src = file ? fileSrc(file(read.file.row, read.file.field)) : null;
+  return src === null ? null : { file: { ...read.file, src } };
+}
+
+/** A file as the renderer spells one (`file:parts#2/photo`), or nothing for a value that names no row and field. */
+function fileCell(file: unknown): string {
+  if (file === null || typeof file !== 'object') return '';
+  const { row, field } = file as { row?: unknown; field?: unknown };
+  return typeof row === 'string' && typeof field === 'string' ? `file:${row}/${field}` : '';
 }
 
 /** One way to answer, in the words a reader sees, with what it is where it says. */
@@ -129,8 +154,11 @@ export type Way = { key: string; label: string; because: string; recommended: bo
  *
  * NOR AN ADDRESS OR AN ID. Whoever asked wrote the answers too, and an agent titles one "Merge into rohan@x.com" as
  * readily as "Merge into Rohan": each label and reason is read through `spoken`, as the question is (audit 21 #4).
+ *
+ * `file` IS THE PAGE'S WAY TO A FILE IT HOLDS: with it an option that is a picture carries its address, and without it
+ * the option reads by its name (`visualOf`).
  */
-export function waysOf(q: Pick<QueueQuestion, 'options'>): Way[] {
+export function waysOf(q: Pick<QueueQuestion, 'options'>, file?: FileAt): Way[] {
   if (q.options.length === 0)
     return [
       { key: 'accept', label: copy.acceptIt, because: '', recommended: false, shows: null, hard: false },
@@ -141,7 +169,7 @@ export function waysOf(q: Pick<QueueQuestion, 'options'>): Way[] {
     label: spoken(saidOf(o.label)) || queueWords.nth(i + 1),
     because: spoken(saidOf(o.because)),
     recommended: o.recommended,
-    shows: visualOf(o.shows),
+    shows: visualOf(o.shows, file),
     hard: o.hard === true,
   }));
 }

@@ -8,7 +8,9 @@
  * and a web ending cut off.
  *
  * WHAT IT WRITES. One line in Money watch for each payee it finds, and nothing in Repeating until you answer. "Yes,
- * add it" writes a monthly line with the newest amount, due a month after the newest payment. "No" writes nothing.
+ * add it" writes a monthly line with the amount asked about, due one month after the newest payment the Ledger
+ * holds on the day you answer, so a payment that came while the question waited is not expected again. "No" writes
+ * nothing.
  *
  * IT ASKS ONCE A PAYEE. A payee you answered about, yes or no, is never offered again.
  *
@@ -208,7 +210,34 @@ function ask(flag) {
   };
 }
 
-/** After a yes: the line in Repeating, monthly, at the newest amount, on the next day it falls due from today. */
+/**
+ * The day of the newest payment to the payee a line was written about, as the Ledger holds it now: the one the line
+ * names, or a later one within a tenth of its amount. Null when the payment the line names is gone.
+ */
+async function newestPaid(ctx, flag) {
+  const paid = typeof flag.fields.paid === 'string' ? await ctx.record.get(flag.fields.paid) : null;
+  if (paid === null || !counts(paid.fields)) return null;
+  const names = new Map();
+  const who = await payeeOf(ctx, paid.fields, names);
+  const amount = flag.fields.amount;
+  let newest = paid.fields.on;
+  if (newest >= ctx.today()) return newest;
+  for (const row of await allInWindow(ctx, 'transactions', 'on', newest, ctx.today(), [{ field: 'state', is: 'cleared' }, { field: 'direction', is: 'out' }])) {
+    const f = row.fields;
+    if (!counts(f) || f.amount.currency !== amount.currency || Math.abs(f.amount.amount - amount.amount) * 10 > amount.amount) continue;
+    if ((await payeeOf(ctx, f, names)).key === who.key && f.on > newest) newest = f.on;
+  }
+  return newest;
+}
+
+/**
+ * After a yes: the line in Repeating, monthly, at the amount asked about.
+ *
+ * NEXT IS ONE CYCLE AHEAD OF THE NEWEST PAYMENT, read on the day of the answer and not the day of the question. A yes
+ * given after the next payment came would otherwise write a line still waiting for a payment the Ledger already
+ * holds, and nothing matches an arriving payment to a line, so it would sit past its day from its first week. The
+ * day of the month stays the one asked about. A day already gone is moved on a month at a time.
+ */
 async function add(ctx, flag) {
   const name = String(flag.fields.payee);
   if (await carried(ctx, name)) {
@@ -217,7 +246,9 @@ async function add(ctx, flag) {
   }
   const today = ctx.today();
   const day = Number(String(flag.fields.on).slice(8, 10));
+  const paidOn = await newestPaid(ctx, flag);
   let due = String(flag.fields.on);
+  if (paidOn !== null) while (dayNumber(due) - dayNumber(paidOn) < NEAR) due = monthOn(due);
   while (due < today) due = monthOn(due);
   const also = {};
   if (typeof flag.fields.account === 'string' && flag.fields.account !== '') also.account = flag.fields.account;

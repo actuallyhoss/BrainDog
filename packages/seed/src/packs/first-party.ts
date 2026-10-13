@@ -492,7 +492,8 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   only cleared money is counted. Nothing starts it for an instalment or a repeating line: Settles points at Bills
  *   alone. A rule and a script added inside the unreleased step, so no version of its own.
  *   One more sign of life (repeating-overdue-67, REC-B11 step 8): `repeating-overdue`, how many live repeating lines
- *   have a Next more than three days gone, with nought the target. A figure added inside the unreleased step.
+ *   have a Next more than three days gone, with nought the target. Only a line a payment was matched to before is
+ *   counted (repeating-sign-fix-69): `last_paid is set`. A figure added inside the unreleased step.
  *   A name beside the bank's words (payee-field-68, REC-B16 step 2): the Ledger gains `payee`, Paid to or from,
  *   searchable and not indexed, and `counterparty_text` is labelled As the bank wrote it.
  * - portfolio 1.16.0 and work 1.18.0 (batch 46, REC-C08's remainder and REC-C16): a project others point at stays. Projects
@@ -553,10 +554,14 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   `plan-paid`, `plan-left`, `plan-next-due` and `plan-last-due`, and two by plan, `installments-paid-by-plan` and
  *   `installments-total-by-plan` (plan-page-68, REC-B12); and `budget-passed-on`, the day a category's spending
  *   reached its budget, a running total with a stop (budget-passed-on-68, REC-B19 step 4).
+ * - people 3.4.0: the People page says how many people may be on the record twice (people-held-twice-69), one note under
+ *   its two lead notes, from the built-in figure held-twice and drawn only above nought. 3.3.0 is released (commit
+ *   63423720 holds it), so a version of its own. A note added, nothing taken away, so a minor step that reaches a record
+ *   on its own and asks no question.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.17.0',
-  people: '3.3.0',
+  people: '3.4.0',
   'money-core': '3.17.0',
   estate: '2.2.0',
   work: '1.19.0',

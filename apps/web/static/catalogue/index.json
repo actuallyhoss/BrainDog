@@ -1233,12 +1233,43 @@
       "kind": "pack",
       "id": "money-watch",
       "title": "Money watch",
-      "summary": "Reads the Ledger for a charge made twice and a payment that repeats, and asks you once about each. A flag you say no to three times in a row switches itself off.",
+      "summary": "Reads the Ledger for a charge made twice and a payment that repeats, and asks you once about each. A flag whose last three answers changed nothing switches itself off.",
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.0.0",
+      "latest": "1.1.0",
       "versions": [
+        {
+          "version": "1.1.0",
+          "checksum": "9ef9cf66486250f6be6c4fe397522dfaa0e2fadb3dc9abb7a4fe8642643232a8",
+          "bytes": 37501,
+          "published_at": "2026-10-13T16:40:59.475Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Money watch"
+            ],
+            "pages": [
+              "Money watch"
+            ],
+            "rules": [
+              "Look for a charge made twice when an entry clears",
+              "Ask about a charge made twice",
+              "Act on an answer about a charge made twice",
+              "Look for a payment that repeats when an entry clears",
+              "Ask about a payment that repeats",
+              "Act on an answer about a payment that repeats"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "\"One is a mistake\" marks the newer charge void even when that entry was edited after the question was asked. A payee added to Repeating is next due a month after its newest payment on the day you answer, not on a day already paid. And the line that says Charged twice switched itself off now says why in your words: both charges were real three times in a row.",
+          "preview": true
+        },
         {
           "version": "1.0.0",
           "checksum": "de447fe8387492a49229af7cb3836063e8c58085e82e441848f62eba2099c684",

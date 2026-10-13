@@ -1,7 +1,8 @@
 <!--
   How the list is drawn, from 640px up: the table, the board or the cards, and first, on a list of people that says who
   is with which organisation, those people in groups. ONE SEGMENTED CONTROL at the end of the list's toolbar
-  (DIRECTION 39): one rectangle in the field's fill, and the chosen view the tile's colour on it (`controls.css`).
+  (DIRECTION 39): one rectangle in the field's fill, and the chosen view the tile's colour on it, which slides to the
+  view chosen next (`Segmented.svelte`, `controls.css`).
 
   THE CHOICE IS THE ADDRESS'S (`?view=`), written by the page's `setView`, so a link to a board opens on the board and
   Back undoes a switch. The board is offered only where the list has lanes to draw (`laneFieldOf`). Below 640 there is
@@ -12,6 +13,7 @@
 -->
 <script lang="ts">
   import Icon from '$lib/ui/Icon.svelte';
+  import Segmented from '$lib/ui/Segmented.svelte';
   import type { IconName } from '$lib/ui/icons.ts';
   import type { View } from './list.ts';
 
@@ -43,7 +45,7 @@
   );
 </script>
 
-<div class="segmented view-switch" role="group" aria-label={words.group}>
+<Segmented class="view-switch" role="group" aria-label={words.group}>
   {#each views as [v, glyph] (v)}
     <button
       type="button"
@@ -58,12 +60,12 @@
       <Icon name={glyph} size="s" /><span class="view-word">{words[v]}</span>
     </button>
   {/each}
-</div>
+</Segmented>
 
 <style>
   /* ONE ROW, THE TOOLBAR'S HEIGHT: the track and its segments are `controls.css`'s; this only keeps it on one line and
-     sets the glyph beside the word. */
-  .view-switch {
+     sets the glyph beside the word. The track is `Segmented`'s own element, so its rules reach it by this part's name. */
+  :global(.view-switch) {
     flex-wrap: nowrap;
     flex: none;
   }
@@ -91,7 +93,7 @@
 
   /* A PHONE DRAWS CARDS, so there is nothing here to choose. */
   @media (width < 640px) {
-    .view-switch {
+    :global(.view-switch) {
       display: none;
     }
   }

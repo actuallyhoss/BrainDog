@@ -7,7 +7,9 @@
  * and a web ending cut off.
  *
  * WHAT IT WRITES. One line in Money watch for each pair it finds, and nothing in the Ledger until you answer. "Both
- * real" changes nothing. "One is a mistake" marks the newer of the two void, so it is no longer counted.
+ * real" changes nothing. "One is a mistake" marks the newer of the two void, so it is no longer counted. The answer
+ * itself only writes what you said on the line; the run it starts reads the entry as it is that day and marks it
+ * void, so an entry edited since the question was asked is not refused on an old reading of it.
  *
  * IT ASKS ONCE. A third charge of the same amount a day later belongs to the pair already asked about, so it adds no
  * second question, and a pair you answered is never asked about again.
@@ -16,8 +18,8 @@
  * stops looking. Change that line to "Switched on again" and it starts over.
  *
  * STARTED THREE WAYS, and it tells them apart by what it is handed: a cleared Ledger entry (look around that entry), a
- * new line of its own in Money watch (ask about it), an answer on one (count the no's). Once a night it is handed
- * nothing and looks at the last two weeks.
+ * new line of its own in Money watch (ask about it), an answer on one (mark the mistake void, and count the times
+ * both were real). Once a night it is handed nothing and looks at the last two weeks.
  */
 
 const FLAG = 'twice';
@@ -183,15 +185,22 @@ async function ask(ctx, flag) {
       about: String(flag.fields.payee),
       options: [
         { id: 'real', label: 'Both real', because: 'Both stay in the Ledger as they are.', patches: [mine('real')] },
-        {
-          id: 'mistake',
-          label: 'One is a mistake',
-          because: 'The newer of the two is marked void, so it is no longer counted.',
-          patches: [mine('mistake'), { id: `transactions#${newer.seq}`, version: newer.version, fields: { state: 'void' } }],
-        },
+        /* NO CHANGE TO THE LEDGER RIDES ON THE ANSWER. A change an answer carries must name the version it read, and
+           an answer may come days later, after the entry was edited. `strike` makes it, from that day's reading. */
+        { id: 'mistake', label: 'One is a mistake', because: 'The newer of the two is marked void, so it is no longer counted.', patches: [mine('mistake')] },
       ],
     },
   };
+}
+
+/** After "One is a mistake": the newer of the two is marked void, at the version it has now. */
+async function strike(ctx, flag) {
+  const newer = typeof flag.fields.paid === 'string' ? await ctx.record.get(flag.fields.paid) : null;
+  if (newer === null || newer.fields.state !== 'cleared') {
+    ctx.log(`${flag.fields.what}: the newer of the two is no longer a cleared entry, so nothing was marked void.`);
+    return;
+  }
+  ctx.update(`transactions#${newer.seq}`, { state: 'void' }, newer.version);
 }
 
 /** After an answer: three of "Both real" in a row since it was last switched on switch the flag off, said once. */
@@ -203,7 +212,7 @@ async function quiet(ctx) {
     .filter((l) => l.seq > since && (l.fields.said === 'real' || l.fields.said === 'mistake'))
     .sort((a, b) => (a.updated_at < b.updated_at ? 1 : a.updated_at > b.updated_at ? -1 : b.seq - a.seq));
   if (answered.length < 3 || answered.slice(0, 3).some((l) => l.fields.said !== 'real')) return;
-  const said = `${NAME} was switched off after three no's. Switch it on again in Money watch.`;
+  const said = `${NAME} was switched off after both charges were real three times in a row. Switch it on again in Money watch.`;
   ctx.write('money_flags', { what: said, flag: FLAG, said: 'off', found: ctx.today() });
   ctx.log(said);
 }
@@ -215,6 +224,7 @@ export default async function run(ctx) {
   if (handed !== null && handed.register === 'money_flags') {
     if (handed.fields.flag !== FLAG) return null;
     const answer = handed.fields.said;
+    if (answer === 'mistake') await strike(ctx, handed);
     if (answer === 'real' || answer === 'mistake') await quiet(ctx);
     if (answer !== undefined && answer !== null && answer !== '') return null;
     if ((await flagsSoFar(ctx)).some((l) => l.fields.said === 'off')) return null;
