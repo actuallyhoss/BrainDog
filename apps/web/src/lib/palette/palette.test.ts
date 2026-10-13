@@ -207,7 +207,13 @@ test('AND IT REACHES THE FIGURES, which no search could reach before', () => {
   /* Six metrics are declared, each with a target and a window, and the only way to any of them was
      to know which page it was a tile on. The palette lists the ones that can be read, drawn with
      the reading and the target beside the name so the row answers without being opened. */
-  const drawn = Object.entries(METRICS).filter(([, d]) => !isTemplate(d) && unreadable(d).length === 0 && d.source !== 'register.books');
+  /* A COUNT PER A DISTINCT OF ITS OWN ROWS reads no value while it counts no row (money-core's `repeating-overdue`,
+     batch 74), and the sample holds no such row: a figure with nothing to say has no row here, as it has no door. */
+  const silentWhenNone = (d: { value?: unknown }): boolean => {
+    const ratio = (d.value as { ratio?: { per?: object } } | undefined)?.ratio;
+    return ratio !== undefined && ratio.per !== undefined && 'distinct' in ratio.per;
+  };
+  const drawn = Object.entries(METRICS).filter(([, d]) => !isTemplate(d) && unreadable(d).length === 0 && d.source !== 'register.books' && !silentWhenNone(d));
   /* THE SAMPLE KEEPS NO BOOK, so a figure over books has no row to open and the palette rightly gives it no door. */
   assert.ok(drawn.length >= 5, 'the figures group would be all but empty');
   for (const [id, decl] of drawn) {

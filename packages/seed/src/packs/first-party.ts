@@ -572,16 +572,24 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   And batch 72's (plan-lead-all-paid-72), in the same unreleased step: two figures of one plan, `plan-parts-open` and
  *   `plan-share-left`, and the plan page's second lead sentence, for a plan with every part paid. And the nightly
  *   count of `script.book_from_account` is of what still stands, as the page counts it (audit 71 finding 1).
+ *   Batch 74 took `plan-share-left` out again (plan-lead-one-figure-74): the plan page's two lead sentences each wait
+ *   on `plan-parts` and `plan-parts-open` together, two counts, so a plan in two currencies or of nought amounts is
+ *   led by one sentence.
  *   And batch 73's, in the same unreleased step (commit 63423720, the deployed build, holds 3.16.0): a fourth rule,
  *   `bill-takes-book`, so a bill or invoice on an account is filed in that account's book, Bills and invoices gaining
  *   the account it names (bill-takes-book-73); Money declares `budgets-set` itself, which Personal 2.4.0 hands it
  *   (budgets-set-73); two figures of what is due to and from one book (book-owed-figures-73) and three of a book's
  *   months, with the row What is due and the chart In and out, by month on a book's page (book-page-months-73); and the
  *   Ledger tile on Money says who was paid, and the bank's own line where nobody is known (ledger-payee-73).
+ *   And batch 74's, in the same unreleased step: a project's money on its way, `project-owed`, is named Still to come
+ *   in, where it said Owed to you (owed-words-74); and `repeating-overdue` reads no value where it read nought, the
+ *   count per the one state its lines are in, so a record whose lines were never matched is shown no mark it met
+ *   (seed-money-signs-73-74).
  * - people 3.4.0: the People page says how many people may be on the record twice (people-held-twice-69), one note under
  *   its two lead notes, from the built-in figure held-twice and drawn only above nought. 3.3.0 is released (commit
  *   63423720 holds it), so a version of its own. A note added, nothing taken away, so a minor step that reaches a record
- *   on its own and asks no question.
+ *   on its own and asks no question. Still unreleased, it takes batch 74's link with no version of its own: the note
+ *   links the list of everyone in order of name (people-twice-link-74).
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.17.0',

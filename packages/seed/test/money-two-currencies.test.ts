@@ -218,7 +218,7 @@ function figureFaults(f: Figure, said: Read, alone: Alone, bare: Read | undefine
   if (!isMoney(f)) {
     const out: string[] = [];
     /* A SHARE OF TWO SUMS OF MONEY ANSWERS ONCE A CURRENCY BY THE KERNEL'S OWN RULE (metrics.ts, "A HALF IN PARTS ... IS
-       THE FIGURE ONCE PER CURRENCY"), so its parts are no fault: money-core 3.17.0's `plan-share-left` is the first. */
+       THE FIGURE ONCE PER CURRENCY"), so its parts are no fault. No figure is one today. */
     const share = /"ratio"/.test(JSON.stringify(f.value ?? null));
     if ((said.parts !== undefined && !share) || (said.unit !== null && /^[A-Z]{3}$/.test(said.unit))) out.push(`${f.metric} is not money and answers in ${said.unit ?? 'parts'}`);
     /* A RUNWAY ADDS THE CURRENCIES UP BEFORE IT COUNTS DAYS, so it may only answer once every one of them can be. */

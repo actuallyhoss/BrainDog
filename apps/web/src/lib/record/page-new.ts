@@ -3,7 +3,8 @@
  *
  * ONE BODY, TWO WAYS IN. Whoever owns the record sets the page through `setDeclaration`, as "Save as a view" does
  * (`rows-write.ts`). Anybody else files the very same body as a change on Decide, and nothing is written until it is
- * accepted there. The body is built once, so a suggested page and a made one cannot differ.
+ * accepted there. The body is built once, so a suggested page and a made one differ in one thing only: the sentence of
+ * the note, which is written for whoever made the page.
  *
  * ITS SHAPE IS NOT SET HERE. A page holds 1 to 24 blocks (`packages/record/src/grammar.ts`), so an empty one cannot be
  * declared: it carries one note that says it is empty and how to fill it, which the first thing put on the page
@@ -35,6 +36,13 @@ export const pageWords = {
    * entry there that takes a description, by the name that entry is drawn with.
    */
   empty: `This page is empty. To fill it, open the menu at the top of the page, choose ${changeWords.change}, and say what you want on it.`,
+  /**
+   * The same block on a page somebody suggested.
+   *
+   * ITS MAKER HAS NO SUCH ENTRY: the menu offers it to the owner alone (`ChangePage.svelte`), so the note says who can
+   * fill the page and where, and reads true to the owner who accepted it as well.
+   */
+  emptySuggested: `This page is empty. The owner of this BrainDog can fill it from the menu at the top of the page, with ${changeWords.change}.`,
   blank: 'Give the page a name first.',
   long: 'That name is too long for a page. Keep it to 80 characters or fewer.',
   made: (title: string) => `${title} is ready.`,
@@ -95,13 +103,18 @@ export function slugFor(title: string, taken: readonly string[]): string {
   for (let n = 2; ; n++) if (!held.has(`${stem}-${n}`)) return `${stem}-${n}`;
 }
 
-/** An empty page, as a declaration the kernel already validates: its title, its place on the rail, and one note. */
-export function pageBody(slug: string, title: string): Record<string, unknown> {
+/**
+ * An empty page, as a declaration the kernel already validates: its title, its place on the rail, and one note.
+ *
+ * `owner` IS WHETHER ITS MAKER OWNS THE RECORD, which picks the note's sentence. A page made before this keeps the one
+ * it was stored with.
+ */
+export function pageBody(slug: string, title: string, owner: boolean): Record<string, unknown> {
   return {
     page: slug,
     title,
     nav: { section: pageWords.section, order: NAV_ORDER },
-    blocks: [{ kind: 'note', span: 12, body: pageWords.empty }],
+    blocks: [{ kind: 'note', span: 12, body: owner ? pageWords.empty : pageWords.emptySuggested }],
   };
 }
 
@@ -124,7 +137,7 @@ export async function newPage(title: string, deps: NewPageDeps): Promise<MadePag
 
   const slug = slugFor(named, deps.pages);
   const id = `page.${slug}`;
-  const body = pageBody(slug, named);
+  const body = pageBody(slug, named, deps.owner);
 
   if (deps.owner) {
     const out = await deps.client.call('setDeclaration', { body });

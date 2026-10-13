@@ -108,8 +108,9 @@ const part = (got: Read, category: Entry): Part | undefined => got.groups?.find(
 test('MONEY DECLARES THE FOUR, after every figure it already held, and a fresh record installs them', async () => {
   for (const id of FOUR) assert.ok(METRICS[id], `Money no longer declares ${id}`);
   for (const id of FOUR) assert.equal(METRICS[id]!.format, 'money', `${id} names a currency or is no money figure`);
-  /* LAST IN THE DOCUMENT, in this order, so no figure a record already holds moves. */
-  assert.deepEqual(Object.keys(MONEY_METRICS).slice(-FOUR.length - 24, -24), [...FOUR]);
+  /* LAST IN THE DOCUMENT, in this order, so no figure a record already holds moves. Twenty-three came after them by
+     batch 74, which took `plan-share-left` out again (plan-lead-one-figure-74). */
+  assert.deepEqual(Object.keys(MONEY_METRICS).slice(-FOUR.length - 23, -23), [...FOUR]);
   const { k } = await fresh();
   for (const id of FOUR) assert.ok(k.declarations().some((d) => d.id === `metric.${id}`), `money-core installed without ${id}`);
 });

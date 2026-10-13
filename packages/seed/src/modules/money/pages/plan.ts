@@ -8,15 +8,22 @@ const PARTS = 'plan is {{name}}';
 /** Drawn only while the plan has a part that stands, so no tile says nought of nought. */
 const HAS_PARTS = { metric: 'plan-parts:{{name}}', gte: 1 };
 
-/** Drawn only while a part is still open: the sentence about what is left has something left to say. */
-const HAS_OPEN = { metric: 'plan-parts-open:{{name}}', gte: 1 };
-
 /**
- * Drawn only once the plan has parts and none of them is open. One figure says both, the share of the plan's money
- * still open (`plan-share-left` in `figures/plans.ts`): nought when every part is paid, and no value at all, which
- * meets no test, on a plan with no part.
+ * THE TWO LEAD SENTENCES OF A PLAN WITH PARTS EACH WAIT ON TWO COUNTS HELD TOGETHER, SINCE BATCH 74, when a block's
+ * `when:` learnt `all:` (`drawnWhen` in `packages/kernel/src/pages.ts`): the parts that stand, and the parts still
+ * open. A count is one number whatever currencies the parts are in and whatever their amounts add up to.
+ *
+ * THEY WAITED ON A SHARE OF THE PLAN'S MONEY IN BATCH 72, because a `when:` tested one figure and "no part open" is
+ * true of a plan with no part too. A share is answered once a currency, so a plan with its dollars paid and its
+ * pounds open drew both sentences; and parts that add up to nought have no share, so a plan of them all paid drew none.
  */
-const ALL_PAID = { metric: 'plan-share-left:{{name}}', lte: 0 };
+const OPEN_PARTS = 'plan-parts-open:{{name}}';
+
+/** Drawn only while a part is still open: the sentence about what is left has something left to say. */
+const HAS_OPEN = { all: [HAS_PARTS, { metric: OPEN_PARTS, gte: 1 }] };
+
+/** Drawn only once the plan has parts and none of them is open. */
+const ALL_PAID = { all: [HAS_PARTS, { metric: OPEN_PARTS, lt: 1 }] };
 
 /**
  * ONE PAGE A PLAN, UNDER MONEY, SINCE REC-B12 (jobs 3 and 4): "instalment plan's own page" (the owner). A TEMPLATE, as
@@ -35,6 +42,8 @@ const ALL_PAID = { metric: 'plan-share-left:{{name}}', lte: 0 };
  *
  * THREE LEAD SENTENCES AND ONE DRAWN, SINCE BATCH 72: no part yet, a part still open (`HAS_OPEN`), and every part paid
  * (`ALL_PAID`), which reads "2 of 2 paid, and nothing is left. The last part was on 1 Feb 2027." and never "0 left".
+ * In two currencies it is still one: a plan with any part open reads what is left, and only a plan with none reads
+ * that nothing is.
  */
 export const MONEY_PLAN_PAGE: SeedPage = {
   page: 'money-plan',

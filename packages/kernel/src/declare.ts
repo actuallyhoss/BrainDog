@@ -1011,6 +1011,63 @@ const METRIC_ID = /^[a-z][a-z0-9_-]{0,31}$/u;
 /** The comparisons a block's `when:` reads (`pages.ts` `drawnWhen`); `empty` is the test beside none of them. */
 const WHEN_COMPARES = ['gt', 'gte', 'lt', 'lte', 'is', 'not'] as const;
 
+/**
+ * What is wrong with one leaf of a block's `when:`, as a sentence with its fix, or `null`. `said` is how the refusal
+ * names it: "page.cash.blocks[0]'s when", and "…'s when all[1]" for a leaf inside an `all`.
+ */
+function whenLeafFault(leaf: unknown, said: string): string | null {
+  const when = leaf as { metric?: unknown; empty?: unknown; beyond?: unknown } | null;
+  if (when === null || typeof when !== 'object' || typeof when.metric !== 'string' || !METRIC_ID.test(metricNamed(when.metric))) return `${said} is one leaf naming a metric.`;
+  const compares: string[] = WHEN_COMPARES.filter((k) => Object.hasOwn(when, k));
+  /* `beyond:` IS THE ONE TEST A WALK THAT NEVER WENT UNDER MEETS (`money-figures.ts` `beyondOf`). Its reading has no
+     value, so no comparison holds of it, and it is not `empty` on a record that holds money: "Your money lasts past
+     20 Sep 2027" had no condition to be drawn under. `beyond: true` holds while the reading says how far it looked,
+     `beyond: false` while it does not. It is the leaf's whole test, as `empty` is. */
+  if (when.beyond !== undefined) {
+    if (typeof when.beyond !== 'boolean') return `${said} has beyond: ${JSON.stringify(when.beyond)}, and beyond is true or false.`;
+    const beside = [...compares, ...(when.empty !== undefined ? ['empty'] : [])];
+    if (beside.length > 0)
+      return `${said} says beyond and ${beside.join(' and ')}. A walk that never went under has no value to compare, so beyond is the whole test: { metric, beyond: true }. Two tests are two leaves: { all: [{ metric, beyond: true }, { metric, ... }] }.`;
+  }
+  /* `empty:` IS THE ONE TEST A FIGURE WITH NO VALUE MEETS (PGS-C06). No comparison holds of a figure nobody has
+     given a value, so "No balance has been typed yet" could not be said where the sentence about cash goes.
+     `empty: true` holds while the figure has no value and no amount in any currency, `empty: false` once it has
+     one. It is the leaf's whole test: beside a comparison one of the two would never be read. */
+  if (when.empty !== undefined) {
+    if (typeof when.empty !== 'boolean') return `${said} has empty: ${JSON.stringify(when.empty)}, and empty is true or false.`;
+    if (compares.length > 0)
+      return `${said} says empty and ${compares.join(' and ')}. A figure with no value meets no comparison, so empty is the whole test: { metric, empty: true }.`;
+  }
+  return null;
+}
+
+/**
+ * What is wrong with a block's `when:`, or `null`: one leaf, or `all:` of two or more that must every one hold.
+ *
+ * A LEAF WITH `metric:` IN PLACE OF `field:` (`06 §1`), evaluated at render and never compiled. A `when:` naming
+ * nothing is a block that is either always drawn or never, and both of those are indistinguishable from the block
+ * working.
+ *
+ * `all:` IS FLAT AND IS THE WHOLE WHEN. One leaf in it is the leaf written the long way, none is a block that never
+ * draws, an `all` inside one says nothing the outer one does not, and a `metric:` or a test beside it would never be
+ * read (`pages.ts` `drawnWhen` reads the leaves and nothing else). Each is refused with what to write instead.
+ */
+function whenFault(when: unknown, said: string): string | null {
+  if (when === null || typeof when !== 'object' || !Object.hasOwn(when, 'all')) return whenLeafFault(when, said);
+  const all = (when as { all: unknown }).all;
+  const beside = Object.keys(when).filter((k) => k !== 'all');
+  if (beside.length > 0) return `${said} says all and ${beside.join(' and ')}. all is the whole when, so move ${beside.length > 1 ? 'them' : 'it'} into a leaf: { all: [{ metric, ... }, { metric, ... }] }.`;
+  if (!Array.isArray(all) || all.length < 2)
+    return `${said} has an all of ${Array.isArray(all) ? (all.length === 1 ? 'one leaf' : 'no leaves') : JSON.stringify(all ?? null)}, and all is two or more leaves that must every one hold. Write one test as the leaf alone, when: { metric, ... }.`;
+  for (const [i, leaf] of all.entries()) {
+    if (leaf !== null && typeof leaf === 'object' && Object.hasOwn(leaf, 'all'))
+      return `${said} all[${i}] is an all inside an all. Every leaf must hold either way, so write them as one all: { all: [leaf, leaf, leaf] }.`;
+    const fault = whenLeafFault(leaf, `${said} all[${i}]`);
+    if (fault) return fault;
+  }
+  return null;
+}
+
 /* ── a part that waits on what the record holds (SHL-A08) ──────────────────────────────────────────────────────── */
 
 /**
@@ -1919,24 +1976,8 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
        A `when:` naming nothing is a block that is either always drawn or never — and both of those
        are indistinguishable from the block working. */
     if (block.when !== undefined) {
-      const when = block.when as { metric?: unknown; empty?: unknown };
-      if (when === null || typeof when !== 'object' || typeof when.metric !== 'string' || !METRIC_ID.test(metricNamed(when.metric)))
-        return bad('DECLARATION_INVALID', `${id}.${at}'s when is one leaf naming a metric.`, at);
-      /* `empty:` IS THE ONE TEST A FIGURE WITH NO VALUE MEETS (PGS-C06). No comparison holds of a figure nobody has
-         given a value, so "No balance has been typed yet" could not be said where the sentence about cash goes.
-         `empty: true` holds while the figure has no value and no amount in any currency, `empty: false` once it has
-         one. It is the leaf's whole test: beside a comparison one of the two would never be read. */
-      if (when.empty !== undefined) {
-        if (typeof when.empty !== 'boolean')
-          return bad('DECLARATION_INVALID', `${id}.${at}'s when has empty: ${JSON.stringify(when.empty)}, and empty is true or false.`, at);
-        const beside = WHEN_COMPARES.filter((k) => Object.hasOwn(when, k));
-        if (beside.length > 0)
-          return bad(
-            'DECLARATION_INVALID',
-            `${id}.${at}'s when says empty and ${beside.join(' and ')}. A figure with no value meets no comparison, so empty is the whole test: { metric, empty: true }.`,
-            at,
-          );
-      }
+      const fault = whenFault(block.when, `${id}.${at}'s when`);
+      if (fault) return bad('DECLARATION_INVALID', fault, at);
     }
 
     if (block.columns !== undefined) {

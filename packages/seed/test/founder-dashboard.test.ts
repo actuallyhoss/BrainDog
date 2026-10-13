@@ -213,7 +213,7 @@ test('A FOUNDER’S PROJECT HAS A PAGE, with Estate since founder 1.4.0: what is
     'Skills',
   ]);
   for (const b of blocks) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
-  assert.deepEqual((blocks.find((b) => b.heading === 'At a glance') as unknown as { cells: { label: string }[] }).cells.map((c) => c.label), ['Open', 'Owed to you', 'Costs a year', 'Done this week'], 'with Estate present, what it costs a year takes the place the task figures held');
+  assert.deepEqual((blocks.find((b) => b.heading === 'At a glance') as unknown as { cells: { label: string }[] }).cells.map((c) => c.label), ['Open', 'Still to come in', 'Costs a year', 'Done this week'], 'with Estate present, what it costs a year takes the place the task figures held');
   assert.equal(blocks[0]!.drawn, false, 'nothing is handed back, so that sentence is not drawn');
   assert.notEqual(blocks[1]!.drawn, false, 'and nothing is open, so that one is');
   /* THE PROJECT'S NOTE, which is where an imported plan and its decisions are written, and which this example has none of. */

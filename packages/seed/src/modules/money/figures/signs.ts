@@ -25,7 +25,8 @@
  *   (repeating-sign-fix-69, audit 67 claim 1) it counts only a line a payment was matched to before, so a line just
  *   added is not judged by a day nothing could have moved. And it is named for that, "Matched repeating lines past
  *   their day" (repeating-sign-72, audit 69 finding 5): a line nothing was matched to is not counted, so its nought is
- *   no word on those.
+ *   no word on those. And it no longer says nought at all (audit 72 finding 5): with no matched line past its day it
+ *   reads no value, so a record whose lines were never matched is not shown a mark it met.
  */
 
 import type { SeedMetric } from '../../base.ts';
@@ -150,15 +151,28 @@ export const SIGNS_FIGURES: Record<string, SeedMetric> = {
    * that reads it moves. (The first name is spelled in the test alone, which holds that the seed never writes it.)
    * A page that draws it says matched too, and never offers it as a watch on every repeating line.
    *
+   * AND WITH NONE TO COUNT IT READS NO VALUE, NEVER NOUGHT (audit 72 finding 5). The name was not enough: the blind
+   * record still read 0 and met its mark, a clean answer from a sign that saw none of its lines. So the count is read
+   * per the states its lines are in, the way `uncategorised-share-30d` above reads nothing for a month of nothing. The
+   * `where` keeps live lines alone, so that is one state when a line is counted, and the figure is the count itself, a
+   * whole number; with no line counted it is none, a ratio over nought answers no value, and no value has no verdict.
+   *
+   * THAT SILENCES THE CLEAN RECORD TOO, and it is said here because it is a loss: lines matched and none past its day
+   * reads no value as well, where it read 0 and met. The two halves of a ratio share the one `where`, and no reading
+   * tests a day against today, so nothing a figure can declare tells "every matched line is on time" from "no line was
+   * ever matched": both are no line under this `where`. Of the two ways to be wrong, saying nothing of a kept record
+   * is the smaller. The nought comes back when the kernel can count the lines past a day inside a wider `where`
+   * (`state is live, last_paid is set`), which is its own job in `packages/kernel/src/metrics.ts`.
+   *
    * A paused or ended line is not waiting for anything and is left out. A COUNT, NEVER A SUM, so no two currencies meet
-   * in it. None is the mark; a record with no repeating lines has none stuck.
+   * in it. None is still the mark, so one stuck line misses it; a record with no repeating lines is not judged.
    */
   'repeating-overdue': {
     metric: 'repeating-overdue',
     name: 'Matched repeating lines past their day',
     source: 'register.recurring',
     where: 'state is live, next_due before -3d, last_paid is set',
-    value: { count: 'id' },
+    value: { ratio: { of: { count: 'id' }, per: { distinct: 'state' } } },
     format: 'int',
     target: { lte: 0 },
     window: '30d',

@@ -31,6 +31,7 @@
   import IconWell from '$lib/ui/IconWell.svelte';
   import Face from '$lib/ui/Face.svelte';
   import Menu from '$lib/ui/Menu.svelte';
+  import Segmented from '$lib/ui/Segmented.svelte';
   import Section from '$lib/ui/Section.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import Bars from '$lib/viz/Bars.svelte';
@@ -99,8 +100,9 @@
   /* A FIELD PUT ON OR TAKEN OFF A LIST, IN WORDS, from the same helper Home's feed says it with. STATIC, and the lead's
      `readUnseen` with it: one module both imported and imported lazily is neither split nor shared, only warned about. */
   import { declaredOf, readUnseen } from '$lib/record/history-live.ts';
-  /* WHEN THE READER'S MARK MOVES: stamped as they leave, with the newest line this page held (`read-mark.ts`). */
-  import { readMarkOf, seenAfter, stampOf as markStamp } from './read-mark.ts';
+  /* WHEN THE READER'S MARK MOVES: stamped as they leave, with the newest line this page held. The rule is every
+     screen's (`lib/page/read-mark.ts`), and Home stamps through it too. */
+  import { readMarkOf, seenAfter, stampOf as markStamp } from '$lib/page/read-mark.ts';
 
   /**
    * What an event kind is called, and what it looks like — all forty of them.
@@ -570,8 +572,12 @@
     {#if offerAll || actors.length > 1 || kinds.length > 1 || days.length > 1}
       <!-- THE FILTERS ARE ONE SEGMENTED CONTROL: one `--field` rectangle, each filter a segment in it, and a filter that
            narrows the stream wears the chosen segment's tile fill, so a narrowed stream says so at a glance. Who and
-           what open their menus from their segment; the day is the native select, drawn as a segment. -->
-      <div class="segmented filters" role="group" aria-label={historyWords.filters}>
+           what open their menus from their segment; the day is the native select, drawn as a segment.
+
+           THE TRACK IS THE ONE PART (`Segmented.svelte`), as a list's view switch is, so it is drawn the way every
+           other track is: flat, with the selection moving to the segment chosen next. More than one filter can narrow
+           at once, and then the part's one selection sits under the first and the others keep the same flat fill. -->
+      <Segmented class="filters" role="group" aria-label={historyWords.filters}>
         {#if offerAll}
           <!-- THE RECORD'S OWN BOOKKEEPING, ON OR OFF. A switch and not a filter: it is how much of the log is drawn, and
                Clear filters leaves it as it is. -->
@@ -627,7 +633,7 @@
             {#each days as d (d)}<option value={d}>{daySaid(d)}</option>{/each}
           </select>
         {/if}
-      </div>
+      </Segmented>
     {/if}
 
     {#if who || what || when || list}
@@ -995,16 +1001,17 @@
   }
 
   /* THE TRACK HOLDS ITS SEGMENTS IN ONE ROW and wraps only when the bar cannot hold it. A menu's trigger is a button
-     round its segment, so it sits in the track as the segment it draws; the focus ring follows the segment's corner. */
-  .filters {
+     round its segment, so it sits in the track as the segment it draws; the focus ring follows the segment's corner.
+     The track is `Segmented`'s own element, so its rules reach it by this screen's name for it, under the toolbar. */
+  .tools :global(.filters) {
     align-items: center;
   }
 
-  .filters :global(.menu-root) {
+  .tools :global(.filters .menu-root) {
     display: inline-flex;
   }
 
-  .filters :global(.menu-trigger) {
+  .tools :global(.filters .menu-trigger) {
     border-radius: calc(var(--r-ctl) - 2px);
   }
 
@@ -1014,6 +1021,12 @@
     gap: 6px;
     box-sizing: border-box;
     max-inline-size: 22ch;
+  }
+
+  /* A CHOSEN MENU SEGMENT IS FLAT, as the part's selection is: it sits inside its trigger and not on the track, so
+     `controls.css` would give it the hairline and shadow of a track written by hand. */
+  .seg-menu[data-on] {
+    box-shadow: none;
   }
 
   .seg-word {

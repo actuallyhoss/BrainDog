@@ -1472,7 +1472,7 @@ const DECLARED: Record<string, Version> = {
       metric.project-numbers-7d metric.projects-earning-silent adds.page.portfolio.4
       adds.page.estate.5 metric.service-numbers
     `,
-    declares: '63df5982b0d1f484',
+    declares: 'dee2ed32ad8a72ee',
     history: [
       "`setting.voice_home` and the title of `page.home-founder` say Today where both said Overview; `due-this-week` and Due this week start today; `late-money` is added with a Late table ahead of the week, oldest first; Lapsing loses its Cost column -> 1a6e6f8b5a7311cc",
       "Folded into the unreleased 2.6.0 (sketchpad-60; integrate 60): `page.project`'s Tools and servers reads the project's own tools alone (`kind is tool, scope is project`), so a project with none of its own draws no card where it listed everybody's -> 11f22bd8f6e3f8d2",
@@ -1481,6 +1481,7 @@ const DECLARED: Record<string, Version> = {
       "Folded into the unreleased 2.6.0 (founder-bound-66; integrate 66; commit 63423720 still holds 2.5.0): `metric.datapoints-7d`, `metric.datapoints-30d`, `metric.datapoints-reported` and `metric.project-numbers-7d` end today (`at before tomorrow`), so a reading dated after today is not a number reported -> 9c75914a4b35aa6a",
       "Folded into the unreleased 2.6.0 (founder-runway-words-68; integrate 68; commit 63423720 still holds 2.5.0): `metric.datapoints-held` and the dashboard's Latest numbers end today (`at before tomorrow`) -> b7181eced6b7c8f8",
       "Folded into the unreleased 2.6.0 (project-own-cards-72, PGS-C31; integrate 72; commit 63423720 still holds 2.5.0): `page.project`'s Keys and Skills read the project's own alone (`kind is key, scope is project`, `kind is skill, scope is project`), so a project with none of its own draws neither card where each listed everybody's -> 63df5982b0d1f484",
+      "Folded into the unreleased 2.6.0 (batch 74, integrate 74; commit 63423720 still holds 2.5.0), one fingerprint for two changes, no id added or taken away: `page.project`'s At a glance cell over `project-owed` is labelled Still to come in, where it said Owed to you (owed-words-74); and `page.home-founder`'s line of what there is ends \"it lasts the year\" when the walk reached its last day above zero, a second lead note drawn on `all:` of one book and `runway-days` carrying `beyond`, the line with the days stepping aside on `beyond: false` (founder-lasts-74, REC-B07) -> dee2ed32ad8a72ee",
     ],
   },
   'team@2.19.0': {

@@ -468,7 +468,7 @@ test('A PROJECT PAGE SAYS WHAT WAS FINISHED THIS WEEK AT A GLANCE, ITS MONEY BY 
      Done, by week was a tile 280px tall for bars of 1 and 2 (the second design review's fix 5). The last of the four
      figures, counted over Kiln's own tasks finished in the last seven days, and no other project's. */
   assert.ok(!page.blocks.some((b) => b.heading === 'Done, by week' || (b.kind === 'series' && b.heading !== 'Money by month')), 'a project page charts its finished work by the week again');
-  assert.deepEqual((block(page, 'At a glance').readings ?? []).map((r) => r.label), ['Open', 'Owed to you', 'Costs a year', 'Done this week']);
+  assert.deepEqual((block(page, 'At a glance').readings ?? []).map((r) => r.label), ['Open', 'Still to come in', 'Costs a year', 'Done this week']);
   const kiln = THINGS.findIndex((t) => t.name === 'Kiln') + 1;
   const done = k.list({ register: 'tasks', where: 'state is done, done_on after -8d', limit: 50 } as never);
   assert.ok(done.ok, sayOf(done));
@@ -522,7 +522,7 @@ test('A PROJECT PAGE ON A RECORD WITH NO MONEY HAS NO MONTH OF MONEY, rather tha
   const some = projectTemplate(['things', 'tasks', 'people', 'obligations', 'transactions']);
   assert.deepEqual(
     (some.blocks as { heading?: string; cells?: { label: string }[] }[]).find((b) => b.heading === 'At a glance')!.cells!.map((c) => c.label),
-    ['Open', 'Owed to you', 'Due soon', 'Done this week'],
+    ['Open', 'Still to come in', 'Due soon', 'Done this week'],
   );
   /* AND NO FOLDED HEADING OVER NOTHING: the Money section goes with the blocks it held. */
   assert.ok(!headings.includes('Money'), 'a record without Money draws a Money section with nothing under it');

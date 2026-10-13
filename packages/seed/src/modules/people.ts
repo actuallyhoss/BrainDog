@@ -511,11 +511,17 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
            so it reads right for one and for many. "May be", because two real people can share a name, and the answer
            is the person's. NOTHING IS SAID OF DECIDE: the pass that would ask about each pair by night (`askTwice` in
            the kernel) is called by nothing yet, so a line promising a question would promise one that never comes.
-           No intent: it is a thing to look at, not a thing gone wrong. */
+           No intent: it is a thing to look at, not a thing gone wrong.
+
+           AND SOMETHING TO PRESS (audit 69, finding 3), where the line said a number and stopped: the list of people in
+           order of name, since two of one name sit side by side there and that is where one is merged into the other.
+           THE WHOLE LIST AND NOT THE PAIRS ALONE, because a list's address narrows by a field's value, a search and an
+           order, and "held twice" is a pair the kernel works out and no value a field holds. So the words say what to
+           look for, and a chip that looked like the answer and was not stays out. */
         kind: 'note',
         span: 12,
         when: { metric: 'held-twice', gt: 0 },
-        body: 'People who may be on this record twice: {{held-twice}}',
+        body: 'People who may be on this record twice: {{held-twice}}. [See everyone by name](/r/people?sort=name) and look for the same person listed twice.',
       },
       {
         /* CARDS, with a face for each person, rather than a table of four columns read

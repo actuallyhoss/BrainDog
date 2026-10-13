@@ -207,13 +207,17 @@ const UNSAID = 'Your record did not say which keys are past their day, so each i
  * and every key read "expired", one whose day is today among them. Two more tells, read against the whole list (`held`).
  * A key with no day is past no day, so one in the answer was not picked by the filter. And an answer holding every
  * dated key says nothing the filter could not have been ignored to say, so it is believed only when each of those days
- * is past in every zone on earth (before yesterday's UTC date); one nearer than that is left to this machine's day.
+ * is past in every zone on earth (before yesterday's UTC date).
+ *
+ * ONE NEARER THAN THAT IS NOT GUESSED AT, IT IS ASKED ABOUT (`near`, and `heard` below). It was left to this machine's
+ * day, and a record whose only dated key ended yesterday was told it had not answered when it had. `near` marks that
+ * one case and the caller puts the opposite question to the record.
  */
-function pastOf(asked: Result<unknown[]>, held: readonly unknown[], expires: string, now: number): Past | null {
+function pastOf(asked: Result<unknown[]>, held: readonly unknown[], expires: string, now: number): { ids: Set<string>; near: boolean } | null {
   if (!asked.ok) return null;
   const ceiling = new Date(now + DAY_MS).toISOString().slice(0, 10);
   const floor = new Date(now - DAY_MS).toISOString().slice(0, 10);
-  const dayIn = (r: unknown): string => (isObject(r) && isObject(r.fields) ? text(r.fields[expires]).slice(0, 10) : '');
+  const dayIn = dayBy(expires);
   const ids = new Set<string>();
   for (const r of asked.value) {
     if (!isObject(r) || typeof r.id !== 'string') continue;
@@ -222,8 +226,25 @@ function pastOf(asked: Result<unknown[]>, held: readonly unknown[], expires: str
     ids.add(r.id);
   }
   const dated = held.filter((r) => isObject(r) && typeof r.id === 'string' && dayIn(r) !== '');
-  if (dated.length > 0 && dated.every((r) => ids.has((r as { id: string }).id)) && dated.some((r) => !(dayIn(r) < floor))) return null;
-  return ids;
+  return { ids, near: dated.length > 0 && dated.every((r) => ids.has((r as { id: string }).id)) && dated.some((r) => !(dayIn(r) < floor)) };
+}
+
+/** A key's day as the record holds it, `2026-10-13`, or "" for a key with none. */
+const dayBy =
+  (expires: string) =>
+  (r: unknown): string =>
+    isObject(r) && isObject(r.fields) ? text(r.fields[expires]).slice(0, 10) : '';
+
+/**
+ * WHETHER THE RECORD READ THE FILTER, told by its answer to the opposite question: the keys whose day is `after today`.
+ * No key is both before today and after it. A host that answers every key whatever it is asked gives the same keys
+ * twice, and one that cannot read the sentence refuses it; a record that reads its filters gives none of the keys it
+ * called past, and no key without a day. Only that last one is believed.
+ */
+function heard(after: Result<unknown[]>, past: ReadonlySet<string>, expires: string): boolean {
+  if (!after.ok) return false;
+  const dayIn = dayBy(expires);
+  return after.value.every((r) => isObject(r) && typeof r.id === 'string' && !past.has(r.id) && dayIn(r) !== '');
 }
 
 /** The sentence for a record that will not answer, by why. */
@@ -311,7 +332,9 @@ async function read(host: string | undefined, wanted: string | undefined, everyw
     where = names.get([...ids][0]!) ?? SOME_PROJECT;
   }
 
-  const past = pastOf(late, held.value, shape.expires, now);
+  /* THE SECOND QUESTION IS PUT ONLY WHEN THE FIRST ANSWER COULD BE EITHER, so a record that plainly answered is read once. */
+  const said = pastOf(late, held.value, shape.expires, now);
+  const past: Past | null = said === null ? null : !said.near || heard(await readAll(client, KEYS, `${shape.expires} after today`), said.ids, shape.expires) ? said.ids : null;
   const keys = printable(readKeys(rows, names, past ?? dayHere(now), shape));
   sinks.answer?.({ value: { keys } });
   for (const k of keys) sinks.out(keyLine(k));

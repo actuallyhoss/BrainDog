@@ -42,6 +42,7 @@ import {
   thingOf,
   type Told,
 } from './lines.ts';
+import { readMarkOf, seenAfter } from '../../lib/page/read-mark.ts';
 
 const local = (d: number, h: number, m = 0): number => new Date(2026, 8, d, h, m).getTime();
 const iso = (d: number, h: number, m = 0): string => new Date(local(d, h, m)).toISOString();
@@ -422,4 +423,14 @@ test('TWO NAMED RUNS ARE TWO LANES, and the runs the record cannot name share on
 test('A NAMED RUN IS STILL COUNTED AS AN AGENT', () => {
   const t = tallyOf([runEv(runAgo(2), 'S42', CODE), runEv(runAgo(3), 'you')], null, NO_NAMES);
   assert.deepEqual(t.groups, [{ group: 'agent', count: 1 }, { group: 'you', count: 1 }]);
+});
+
+/* THE READER'S MARK (PGS-C02): once Activity's stamp lands, what the away read holds is `seenAfter()`, and the sentence
+   under the title says so. The stamp's own rule is tested where it lives (`lib/page/read-mark.test.ts`). */
+test('THE AWAY LINE IS NOT DRAWN AFTER A STAMP: what was read is said as nothing new', () => {
+  const before = { actors: ['p_1', 'run_2', 'run_2'], capped: true, byWho: null };
+  assert.match(awaySaid(before.actors, 'p_1', NO_NAMES, before.capped, before.byWho), /while you were away/u);
+  const after = seenAfter();
+  assert.equal(awaySaid(after.actors, 'p_1', NO_NAMES, after.capped, after.byWho), historyWords.nothingNew);
+  assert.equal(readMarkOf(9, after.actors.length), null, 'a page already stamped stamped again');
 });

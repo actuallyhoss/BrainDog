@@ -1461,11 +1461,11 @@ const DECLARED: Record<string, Version> = {
       rule.entry-takes-book rule.repeat-takes-book rule.part-takes-book script.book_from_account
       metric.book-in-month metric.book-out-month metric.book-net-month
       metric.ledger-in-no-book metric.repeating-in-no-book metric.instalments-in-no-book metric.bills-in-no-book
-      metric.plan-parts-open metric.plan-share-left
+      metric.plan-parts-open
       metric.budgets-set rule.bill-takes-book metric.book-owed-to metric.book-owed-by
       metric.book-in-by-month metric.book-out-by-month metric.book-net-by-month
     `,
-    declares: '04023fea3c0b315d',
+    declares: '14fbef1eab97533e',
     history: [
       "`cash-cross-check` is declared (cash-check-52, REC-A17): Cash now worked out a second way, each cash account walked entry by entry from its newest statement, less Cash now, a currency at a time; no value while no balance is typed -> 73738171ae2405ba",
       'The Money page draws the check (cash-page-54, REC-A17): one tile, Cash now does not add up, while `cash-cross-check` is not nought, and one line while no balance is typed -> e4a453d69795fe22',
@@ -1486,6 +1486,7 @@ const DECLARED: Record<string, Version> = {
       "Folded into the unreleased 3.17.0 (batch 71, integrate 71; commit 63423720, the deployed build, holds 3.16.0), one fingerprint for three changes, eleven ids added and none taken away: a thing on an account is in that account's book, `rule.entry-takes-book`, `rule.repeat-takes-book` and `rule.part-takes-book` start `script.book_from_account` when a Ledger entry, a repeating line or an instalment is written with an account and no book, and once a day the script asks one question about what an account held before it was put in a book (book-fill-71, REC-A09 step 1); seven figures, `metric.book-in-month`, `metric.book-out-month` and `metric.book-net-month` read once a book, and `metric.ledger-in-no-book`, `metric.repeating-in-no-book`, `metric.instalments-in-no-book` and `metric.bills-in-no-book` over the whole record (book-figures-71, REC-A09 step 2); and `page.money-book` gains This month, one row of book-in-month, book-out-month and book-net-month, drawn only while the book's month holds an amount (book-page-71, REC-A09 step 3) -> cc2fbb245bf45a53",
       "Folded into the unreleased 3.17.0 (batch 72, integrate 72; commit 63423720, the deployed build, holds 3.16.0), one fingerprint for three changes, two ids added and none taken away: `metric.repeating-overdue` is named Matched repeating lines past their day, since a line no payment was matched to is not counted, its id, where and value as they were (repeating-sign-72, audit 69 finding 5); and `page.money-plan` leads a plan all paid with its own sentence, the first lead waiting on `metric.plan-parts-open` and the new one on `metric.plan-share-left`, two figures of one plan added and nothing taken away (plan-lead-all-paid-72); and `script.book_from_account`'s nightly count leaves out a void Ledger entry, an ended repeating line and an instalment not open, as the figures of what is in no book do, so the question says the page's number and File them writes on none of them (audit 71 finding 1) -> a0efc60af881f46f",
       "Folded into the unreleased 3.17.0 (batch 73, integrate 73; commit 63423720, the deployed build, holds 3.16.0), one fingerprint for five changes, seven ids added and none taken away: Money declares `metric.budgets-set` itself, the count its Budgets tile waits on, which Personal 2.4.0 hands it (budgets-set-73, audit 70 finding 1); `rule.bill-takes-book` starts `script.book_from_account` for a bill or invoice written with an account and no book, `register.obligations` gains `account`, a link to its account, and the nightly question counts open and part-paid bills too (bill-takes-book-73); `metric.book-owed-to` and `metric.book-owed-by`, a book's open bills and invoices by the way they go, named Due to come into one book and Due to go out of one book (book-owed-figures-73); `metric.book-in-by-month`, `metric.book-out-by-month` and `metric.book-net-by-month`, thirteen months of one book, and `page.money-book` gains the row What is due and the chart In and out, by month (book-page-months-73); and the Ledger tile on `page.money` names who was paid (`payee`) and falls back to the bank's line (`or: 'what'`) (ledger-payee-73) -> 04023fea3c0b315d",
+      "Folded into the unreleased 3.17.0 (batch 74, integrate 74; commit 63423720, the deployed build, holds 3.16.0), one fingerprint for three changes, one id taken away and none added: `page.money-plan`'s two lead sentences each wait on two counts held together (`all:` of `plan-parts` and `plan-parts-open`), so `metric.plan-share-left`, which batch 72 added inside this same unreleased step and no released version ever held, is gone (plan-lead-one-figure-74, audit 72 finding 6); `metric.project-owed` is named Still to come in, where it said Owed to you, its id, source, where, value and target as they were (owed-words-74); and `metric.repeating-overdue` reads no value where it read nought, its value the count per the one state its lines are in, so a record whose lines were never matched is not shown a mark it met, its id, where, name and target as they were (seed-money-signs-73-74, audit 72 finding 5) -> 14fbef1eab97533e",
     ],
   },
   'work@1.17.0': {
@@ -1541,9 +1542,10 @@ const DECLARED: Record<string, Version> = {
       register.organisations register.people
       rule.meet-payees rule.meet-sender-organisations rule.meet-senders
     `,
-    declares: '3c1698b71103bfe4',
+    declares: '900ff4486ed1626e',
     history: [
       "`page.people` says how many people may be on the record twice, in one note under its two lead notes, from the built-in figure held-twice and drawn only above nought; a note added, nothing taken away -> 3c1698b71103bfe4",
+      "Folded into the unreleased 3.4.0 (people-twice-link-74; integrate 74; commit 63423720, the deployed build, holds 3.3.0): `page.people`'s note of people who may be held twice links the list of everyone in order of name (`/r/people?sort=name`) and says what to look for; no id added or taken away -> 900ff4486ed1626e",
     ],
   },
   /* A PROJECT OTHERS POINT AT STAYS, AND WHERE IT STANDS IS SAID (batch 46, REC-C08 and REC-C16). 1.15.0 IS RELEASED. */

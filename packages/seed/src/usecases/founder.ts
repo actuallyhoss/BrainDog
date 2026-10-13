@@ -155,14 +155,28 @@ const BROWSE_LIVE = '/packs/browse?q=polls';
  * is and how long it lasts while the record keeps one set of money, and Cash now a book once it keeps two, because one
  * figure over two books adds a company's money to a person's own. A LINE AND NOT A TILE SINCE 1.11.0, as Money's is
  * since money-core 3.4.0: the tile beside it said the same figures again.
+ *
+ * TWO LINES, AND ONE OF THEM IS DRAWN (REC-B07, batch 74). `runway-days` has no value when the walk looked its whole
+ * year and never went under, and none either over two currencies with no rate or with no account, so "it lasts the
+ * year" is chosen by the reading carrying `beyond` and never by the figure being empty. The line with the days stands
+ * on every other record with one book, where a lead note drops the days when there are none; it steps aside for the
+ * second on `beyond: false`, or the cash would be said twice.
  */
+const ONE_BOOK = { metric: 'books-held', lt: 2 };
 const WHAT_YOU_HAVE: Record<string, unknown>[] = [
   {
     kind: 'note',
     lead: true,
     span: 12,
     body: 'Cash is {{cash-now}} across {{cash-accounts}} account(s), and on what is due it runs out in {{runway-days}} day(s).',
-    when: { metric: 'books-held', lt: 2 },
+    when: { all: [ONE_BOOK, { metric: 'runway-days', beyond: false }] },
+  },
+  {
+    kind: 'note',
+    lead: true,
+    span: 12,
+    body: 'Cash is {{cash-now}} across {{cash-accounts}} account(s), and on what is due it lasts the year.',
+    when: { all: [ONE_BOOK, { metric: 'runway-days', beyond: true }] },
   },
   {
     kind: 'bar',
@@ -353,11 +367,13 @@ export const FOUNDER = {
      the table, by the same clause. A reading dated after today was counted, and listed first, newest first. A clause on
      a figure and one on a block, nothing added.
 
-     WHAT HOME SAYS WHEN THE MONEY LASTS IS NOT IN THIS VERSION (REC-B07, batch 68). `runway-days` has no value when the
-     walk stays above zero, and none either when cash is in two currencies with no rate or when there is no account, so
-     a line chosen by `when: { metric: 'runway-days', empty: true }` would say "it does not run out" over a bill nobody
-     can say is covered. The line still says the days only while there are days
-     (`packages/seed/test/founder-runway-words.test.ts` holds the three records it must stay silent on). */
+     AND WHAT HOME SAYS WHEN THE MONEY LASTS (REC-B07, left out in batch 68, in since batch 74). `runway-days` has no
+     value when the walk stays above zero, and none either when cash is in two currencies with no rate or when there is
+     no account, so a line chosen by `when: { metric: 'runway-days', empty: true }` would have said the money lasts over
+     a bill nobody can say is covered. A `when:` now takes two tests and reads the walk reaching its last day
+     (`beyond`), so Home's line of what there is ends "it lasts the year" on exactly that record, with one book, and the
+     line with the days stands everywhere else (`packages/seed/test/founder-runway-words.test.ts` holds the three
+     records it must stay silent on). A block added and a condition narrowed on the one before it, nothing taken away. */
   version: '2.6.0',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',

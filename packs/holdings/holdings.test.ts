@@ -117,11 +117,11 @@ async function put(api: Api, doc: unknown): Promise<Out> {
  * run in QuickJS by the same runner the self-host builds (`apps/selfhost/src/script.ts`). The cost script fetches
  * nothing, so the socket, the pin and the key opener are doubles that refuse.
  */
-async function settle(api: Api, rounds = 3): Promise<void> {
+async function settle(api: Api, rounds = 3, now: () => number = () => NOW): Promise<void> {
   const refuse = async (): Promise<never> => {
     throw new Error('the cost script fetches nothing');
   };
-  const run = scriptRunner({ run: runInQuickJs, send: refuse, pin: refuse, openKey: refuse, grantOf: () => null, reads: scriptReads(api), now: () => NOW } as never);
+  const run = scriptRunner({ run: runInQuickJs, send: refuse, pin: refuse, openKey: refuse, grantOf: () => null, reads: scriptReads(api), now } as never);
   for (let i = 0; i < rounds; i++) {
     await api.kernel.drain();
     await api.kernel.runActions(refuse as never, { script: run, limit: 50 });
@@ -784,10 +784,11 @@ async function asking(): Promise<{ api: Api; night: () => Promise<void>; asked: 
       question: sql.one<{ to_v: string }>("SELECT to_v FROM event WHERE kind = 'suggest' AND target = ?", `suggestion:${s.id}`)?.to_v ?? '',
       labels: (JSON.parse(s.body) as { options: { label: string }[] }).options.map((o) => o.label),
     }));
-  /* A DAY AND AN HOUR, since a nightly clock is due some minutes past the day (its own spread). */
+  /* A DAY AND AN HOUR, since a nightly clock is due some minutes past the day (its own spread). THE SCRIPT IS HANDED
+     THE SAME CLOCK, so its `ctx.today()` turns with the night, as it does on a host, and the pair it picks turns too. */
   const night = async (): Promise<void> => {
     clock.advance(25 * 3_600_000);
-    await settle(api, 4);
+    await settle(api, 4, clock.now);
   };
   const answer = async (id: string, option: string): Promise<void> => {
     said(api.kernel.decide(id, { decide: { option, reason: 'Looked at both.' } } as never, 'p_1'));
@@ -855,4 +856,96 @@ test('THE SCRIPT IN THE FILE IS twin.js, byte for byte: it reads holdings and ac
   assert.deepEqual([script.egress, script.keys, script.reads, script.writes, script.runs], [[], [], ['holdings', 'accounts'], ['accounts'], { every: '1d' }]);
   /* NO RULE STARTS IT: a question a write opened would come the moment a name was typed, mid-edit. */
   assert.deepEqual(file().declarations.filter((d) => d.rule !== undefined).map((d) => d.rule), ['holdings_cost']);
+});
+
+/* ── What the script is not told (audit 71, finding 6) ─────────────────────────────────────────── */
+
+/**
+ * WHY THESE TWO ARE `todo`. A script is handed lists and nothing about questions: `ctx.record` reads the lists it
+ * declared, and whether a cause waits or was answered is said to the host after the run, never to the script. So
+ * `twin.js` cannot skip a pair somebody answered, and it cannot ask again about one whose account moved. And an answer's
+ * change must say the version it read, so it cannot leave that out either. Both are the record's to fix, not this
+ * file's. The tests beside them hold what is true today, so the two faults have a size.
+ */
+const WAITS = 'the record tells a script nothing about a question it asked, and an answer\'s change must carry a version';
+
+/**
+ * One pair asked about and answered "Keep counting it", then a second pair written down: how many nights until the
+ * second is asked about. `idle` nights pass first, so the two calls stand on days of either parity and one of them
+ * lands the day's pick on the answered pair.
+ */
+async function nightsToSecond(idle: number): Promise<number> {
+  const { api, night, asked, answer, close } = await asking();
+  try {
+    for (let i = 0; i < idle; i += 1) await night();
+    bank(api, ACCOUNT);
+    hold(api, HOLDING);
+    await night();
+    await answer(asked()[0]!.id, 'keep');
+    bank(api, { ...ACCOUNT, name: 'Term deposit' });
+    hold(api, { ...HOLDING, label: 'TERM DEPOSIT' });
+    for (let n = 1; n <= 4; n += 1) {
+      await night();
+      if (asked().length === 2) return n;
+    }
+    return Infinity;
+  } finally {
+    close();
+  }
+}
+let secondAsked: Promise<number[]> | undefined;
+const bothParities = (): Promise<number[]> => (secondAsked ??= Promise.all([nightsToSecond(0), nightsToSecond(1)]));
+
+test('ON A RECORD: a pair written down after another was answered IS asked about, within two nights on any day', async () => {
+  const nights = await bothParities();
+  assert.ok(nights.every((n) => n <= 2), `the second pair waited ${nights.join(' and ')} nights; an answered pair hid it`);
+});
+
+test('ON A RECORD: the night the pick lands on an answered pair, the run asks about the other one', { todo: WAITS }, async () => {
+  assert.deepEqual(await bothParities(), [1, 1], 'on one of two days the run picked the answered pair and asked nothing');
+});
+
+/** A record with the pair asked about, and then the account's balance moved, as a balance does. */
+async function movedSinceAsked(): Promise<Awaited<ReturnType<typeof asking>> & { account: string; question: string }> {
+  const record = await asking();
+  const account = bank(record.api, ACCOUNT);
+  hold(record.api, HOLDING);
+  await record.night();
+  said(record.api.kernel.update('accounts', account, { balance: egp(3_100_000) } as never, { actor: 'p_1' }));
+  return { ...record, account, question: record.asked()[0]!.id };
+}
+const stop = (api: Api, id: string): Out => api.kernel.decide(id, { decide: { option: 'stop', reason: 'Looked at both.' } } as never, 'p_1') as Out;
+
+test('ON A RECORD: an account that moved since the question REFUSES "Stop counting it" and writes nothing, and the question waits', async () => {
+  const { api, night, asked, account, question, close } = await movedSinceAsked();
+  try {
+    const out = stop(api, question);
+    assert.equal(out.ok, false);
+    assert.equal(out.refusal?.code, 'VERSION_STALE');
+    /* THE REFUSAL NAMES THE ACCOUNT, never its number. */
+    assert.match(out.refusal!.fix, /"Silver Bar" changed after this was asked/u);
+    assert.equal(api.kernel.get(account)!.fields.liquid, true, 'a refused answer changed the account');
+    /* ONE QUESTION STILL, AND STILL OPEN: nights add none, since the pair's cause is waiting. */
+    for (let i = 0; i < 2; i += 1) await night();
+    assert.deepEqual(asked().map((q) => q.status), ['open']);
+    /* "Keep counting it" changes nothing, so it is never stale and still ends it. */
+    said(api.kernel.decide(question, { decide: { option: 'keep', reason: 'Looked at both.' } } as never, 'p_1'));
+    assert.deepEqual(asked().map((q) => q.status === 'open'), [false]);
+  } finally {
+    close();
+  }
+});
+
+test('ON A RECORD: an account that moved since the question can still be taken out of cash, the night after at the latest', { todo: WAITS }, async () => {
+  const { api, night, asked, account, close } = await movedSinceAsked();
+  try {
+    await night();
+    const open = asked().filter((q) => q.status === 'open');
+    assert.equal(open.length, 1);
+    const out = stop(api, open[0]!.id);
+    assert.ok(out.ok, `${out.refusal?.code}: ${out.refusal?.fix}`);
+    assert.equal(api.kernel.get(account)!.fields.liquid, false);
+  } finally {
+    close();
+  }
 });

@@ -37,6 +37,7 @@
   import PageView from '$lib/page/PageView.svelte';
   import HeadCapture from '$lib/home/HeadCapture.svelte';
   import { listen } from '$lib/page/listen.svelte.ts';
+  import { stampOf } from '$lib/page/read-mark.ts';
   import { holdsOf, voiceOf } from '$lib/page/home-arrange.ts';
   import {
     FIRST_TODAY_MOST,
@@ -355,22 +356,27 @@
   /**
    * THE MARK IS STAMPED WHEN THE READER LEAVES, and only when Home drew what is new: a use case's page with no feed has
    * shown nothing to mark read. `pagehide` covers a closed tab, and the effect's end covers leaving for another screen.
-   * A mark that did not land leaves the record's where it was, so the same lines come back rather than being lost.
+   *
+   * THROUGH THE ONE STAMP (`lib/page/read-mark.ts`), which Activity uses too: one mark a visit, and a mark that did not
+   * land leaves the record's where it was and is tried at the next leave, so the same lines come back rather than
+   * being lost. A shell that held nothing new has no cursor, and no cursor is no mark: a bare one would mark lines
+   * this screen never held.
+   *
+   * THE RECORD IS NAMED WHEN THE SCREEN OPENS. By the time it ends the address is already the next screen's, and that
+   * may be another record's.
    */
   const feeds = $derived((live?.page.blocks ?? []).some((b) => b.kind === 'feed' && b.source === 'activity'));
-  let stamped = false;
-  function stamp() {
-    if (stamped || data.refused || !feeds) return;
-    stamped = true;
-    const upTo = data.upTo;
-    void import('$lib/record/news-live.ts').then((m) => m.markAll(apiBase(), upTo)).catch(() => {});
-  }
   $effect(() => {
-    const leave = () => stamp();
+    const base = apiBase();
+    const stamp = stampOf((upTo) => import('$lib/record/news-live.ts').then((m) => m.markAll(base, upTo)));
+    const leave = () => {
+      if (data.refused || !feeds) return;
+      void stamp.leave(data.upTo);
+    };
     addEventListener('pagehide', leave);
     return () => {
       removeEventListener('pagehide', leave);
-      untrack(stamp);
+      untrack(leave);
     };
   });
 

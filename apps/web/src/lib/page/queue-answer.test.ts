@@ -154,6 +154,42 @@ test('A COLOUR AND A FIGURE ARE READ AS THEY WERE, with or without a way to a fi
   }
 });
 
+test('A FIGURE THAT IS AN ID OR AN ADDRESS IS NOT DRAWN, and a plain one still is (audit 72 #3)', () => {
+  for (const file of [undefined, serves]) {
+    for (const figure of ['3 of 5', 'EGP 1,200', '50%', '4.5 GB', '12/10/2026', '2026-10-12', '1,200.50', '  3 of 5  '])
+      assert.deepEqual(visualOf({ figure }, file), { figure: figure.trim() }, figure);
+    for (const figure of [
+      'tasks#8',
+      '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+      'p_9f2c',
+      'agent:claude',
+      'joaquin@x.com',
+      'https://github.com/x/y',
+      '10.0.0.1',
+      'mac.local:8787',
+      '~/notes/budget.md',
+      '{{ref:tasks#8}}',
+      '{{ref:tasks#8|Sofa}}',
+      '{{money:120000:EGP}}',
+    ])
+      assert.equal(visualOf({ figure }, file), null, figure);
+    /* A FIGURE IS NEVER DRAWN WITH A PART TAKEN OUT: "3" is not what "3 of tasks#8" said. */
+    for (const figure of ['3 of tasks#8', 'EGP 1,200 at 10.0.0.1', 'Jo <jo@x.io>', '3 of {{ref:tasks#8}}']) assert.equal(visualOf({ figure }, file), null, figure);
+    assert.equal(visualOf({ figure: '   ' }, file), null, 'a blank figure');
+  }
+});
+
+test('AN OPTION WHOSE FIGURE IS AN ID READS BY ITS NAME, with no visual beside it', () => {
+  const ways = waysOf({
+    options: [
+      { key: 'a', label: 'Three of five', because: '', recommended: true, shows: { figure: '3 of 5' } },
+      { key: 'b', label: 'The sofa', because: '', recommended: false, shows: { figure: 'tasks#8' } },
+      { key: 'c', label: 'Ask Jo', because: '', recommended: false, shows: { figure: 'jo@x.io' } },
+    ],
+  });
+  assert.deepEqual(ways.map((w) => [w.label, w.shows]), [['Three of five', { figure: '3 of 5' }], ['The sofa', null], ['Ask Jo', null]]);
+});
+
 test('THE WAYS TO ANSWER CARRY THE PICTURE ONLY WHERE THE CARD WAS HANDED THE WAY TO IT', () => {
   const q = {
     options: [

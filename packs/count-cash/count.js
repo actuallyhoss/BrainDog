@@ -23,8 +23,8 @@
  * WHICH BOOK. The check and the difference are filed in the account's own book when it has one (money-core 3.1.0), so
  * a book's page shows them beside the account they are about.
  *
- * WHAT IT REFUSES TO GUESS. A count in another currency than the account's is said and nothing is written, because
- * two currencies are never subtracted. A count dated before the day the account's own balance is from is kept and
+ * WHAT IT REFUSES TO GUESS. A count in another currency than the account's is said on the count and nothing else is
+ * written, because two currencies are never subtracted. A count dated before the day the account's own balance is from is kept and
  * changes nothing, because that balance already says more than an older count can correct. A count that agrees writes
  * no transaction and still writes the check, since the balance was checked on that day.
  *
@@ -40,6 +40,11 @@
  * WHICH BALANCE IS SAID TOO (1.3.2). "The account's balance" read as the cash just counted, and a box typed to the
  * count agrees with the next count for good, so the gap the count was for is never written. The sentence now asks for
  * the figure the bank or the statement shows, and says it is not the cash in the box.
+ *
+ * A COUNT IN ANOTHER CURRENCY SAYS SO ON THE COUNT TOO (1.3.3). Counted in one currency against an account held or
+ * last stated in another, the run wrote its reason to its own log and nothing a person reads, so the count stood with
+ * no difference and no word. Both of those paths now write What happened, naming the two currencies and the way out:
+ * count in the account's currency. Still no check and no difference for such a count.
  */
 
 const WHAT = 'Cash count difference';
@@ -50,6 +55,9 @@ const WHAT = 'Cash count difference';
  * the run's log beside it.
  */
 const NOT_COMPARED = 'This account holds an entry in another currency, so it was not compared. On the account, type the balance its bank or statement shows, not the cash in the box, then count again.';
+
+/** What a count in another currency than its account says under What happened (1.3.3), with the way out. */
+const otherCurrency = (counted, held) => `This count is in ${counted} and the account is in ${held}, so it was not compared. Count in the account's currency.`;
 
 /** The most rows one `ctx.record.list` answers, the record's own page. A full page may have left rows out. */
 const PAGE = 50;
@@ -138,7 +146,8 @@ export default async function run(ctx) {
   const day = String(count.fields.on);
 
   if (held !== null && typeof held === 'object' && counted.currency !== held.currency) {
-    ctx.log(`This count is counted in ${counted.currency} and ${name} is held in ${held.currency}, and two currencies are not subtracted, so nothing was written.`);
+    ctx.log(`This count is counted in ${counted.currency} and ${name} is held in ${held.currency}, and two currencies are not subtracted, so no difference was written.`);
+    ctx.update(`cash_counts#${count.seq}`, { said: otherCurrency(counted.currency, held.currency) }, count.version);
     return;
   }
   if (typeof account.fields.as_of === 'string' && account.fields.as_of > day) {
@@ -153,7 +162,8 @@ export default async function run(ctx) {
     return;
   }
   if (rolled.amount === undefined) {
-    ctx.log(`This count is counted in ${counted.currency} and ${name} was last said to hold ${rolled.currency}, and two currencies are not subtracted, so nothing was written.`);
+    ctx.log(`This count is counted in ${counted.currency} and ${name} was last said to hold ${rolled.currency}, and two currencies are not subtracted, so no difference was written.`);
+    ctx.update(`cash_counts#${count.seq}`, { said: otherCurrency(counted.currency, rolled.currency) }, count.version);
     return;
   }
 

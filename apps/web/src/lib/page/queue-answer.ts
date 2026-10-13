@@ -121,15 +121,25 @@ export const QUEUE_FILE = 'queue-file';
  * on the visual once `fileSrc` has passed it, the check the renderer's own tile makes, since a picture loaded from
  * elsewhere tells another host who is reading and when. A card handed no way to an address, a file the page does not
  * hold and an address of another host all leave the visual out, and the option reads by its name.
+ *
+ * A FIGURE IS WORDS SOMEBODY ELSE WROTE, as the label is, so it is read through `spoken` too (audit 72 #3), and it is
+ * drawn only when `spoken` takes nothing out of it: "3" is not what "3 of tasks#8" said, and a figure with a part gone
+ * would be a number nobody wrote. A citation in braces is no figure either. Such an option reads by its name.
  */
 export function visualOf(shows: unknown, file?: FileAt): Visual | null {
   if (shows === null || typeof shows !== 'object') return null;
   const s = shows as { swatch?: unknown; figure?: unknown; file?: unknown };
-  const cell = Array.isArray(s.swatch) ? `swatch:${s.swatch.join(',')}` : typeof s.figure === 'string' ? `figure:${s.figure}` : fileCell(s.file);
+  const cell = Array.isArray(s.swatch) ? `swatch:${s.swatch.join(',')}` : typeof s.figure === 'string' ? figureCell(s.figure) : fileCell(s.file);
   const read = cell === '' ? null : showsOf(cell);
   if (read === null || !('file' in read)) return read;
   const src = file ? fileSrc(file(read.file.row, read.file.field)) : null;
   return src === null ? null : { file: { ...read.file, src } };
+}
+
+/** A figure as the renderer spells one (`figure:3 of 5`), or nothing for one that holds an address, an id or a citation. */
+function figureCell(figure: string): string {
+  const said = figure.trim();
+  return said !== '' && !/\{\{|\}\}/u.test(said) && spoken(said) === said ? `figure:${said}` : '';
 }
 
 /** A file as the renderer spells one (`file:parts#2/photo`), or nothing for a value that names no row and field. */

@@ -77,6 +77,21 @@ export const liveWords = {
   unsaid: copy.nothingMatched,
 } as const;
 
+/**
+ * WHAT A PAGE SAYS ONCE, AT ITS FOOT (`footed`), kept here beside the call as `page-new.ts` keeps `pageWords`.
+ *
+ * RATES OUT OF DATE ARE THE PAGE'S NEWS AND NOT A TILE'S: the sentence was printed under every converted figure and had
+ * nothing to press. Here it is said once, with the one way to stop it happening again, which opens the rates action
+ * already filled in (`routes/packs/[id]` offers the same address from Money's settings).
+ */
+export const footWords = {
+  ratesStale: (day: string): string =>
+    `Figures on this page are converted at rates as of ${day}, which are out of date. [Keep rates current](${RATES_PRESET})`,
+} as const;
+
+/** The rates action, filled in and waiting for a yes. Record-relative: the renderer's `href` puts the record in front. */
+const RATES_PRESET = '/automations?new=action&preset=rates';
+
 /** A refusal as the record sends one, and only the keys read here. */
 type Said = { code: string; fix: string };
 
@@ -683,7 +698,20 @@ function backsOf(r: Reading): { backs?: string[] } {
   return held.length ? { backs: held } : {};
 }
 
-export function tileOf(cell: NonNullable<Answered['readings']>[number], values?: Record<string, unknown>, missed: 'warn' | 'bad' = 'warn'): Metric {
+/** A figure converted at rates that are out of date: the one thing a page says at its foot and not under the figure. */
+const staleRead = (r: Reading | null | undefined): r is Reading & { fx: FxRead & { asOf: string } } => !!r && !r.parts && !!r.fx?.stale && typeof r.fx.asOf === 'string';
+
+/**
+ * `stale` IS WHERE "THESE RATES ARE OUT OF DATE" IS SAID. `tile` is under the figure, which is right wherever a tile is
+ * drawn alone (Home, the palette, the news). `foot` is a page, which says it once under everything (`footed`): the tile
+ * there still names the day its rates are from, and leaves the rest to the foot.
+ */
+export function tileOf(
+  cell: NonNullable<Answered['readings']>[number],
+  values?: Record<string, unknown>,
+  missed: 'warn' | 'bad' = 'warn',
+  stale: 'tile' | 'foot' = 'tile',
+): Metric {
   const at = cell.metric.indexOf(':');
   const template = METRICS[at < 0 ? cell.metric : cell.metric.slice(0, at)];
   const built = template && at >= 0 ? withParam(template, cell.metric.slice(at + 1)) : template;
@@ -694,7 +722,7 @@ export function tileOf(cell: NonNullable<Answered['readings']>[number], values?:
   const label = str(cell.label) ?? decl?.name ?? cell.metric;
   const r = cell.reading;
   /* A FIGURE IN SEVERAL CURRENCIES IS EACH AMOUNT IN ITS OWN, never a blank, and says why it is not one number. */
-  const across = r ? fxNote(r) : null;
+  const across = !r ? null : stale === 'foot' && staleRead(r) ? fxNote({ ...r, fx: { ...r.fx, stale: false } }) : fxNote(r);
   const said = (fallback: string) =>
     typeof cell.note === 'string'
       ? noteOf(cell.note, (id) => {
@@ -1372,7 +1400,7 @@ export function blockOf(
     return { ...shell, authored: tracks, shown: tracks.length, total: plans.length + (typeof past === 'number' && past > 0 ? past : 0) };
   }
   /* A STAT OVER A REGISTER AND NO FIGURES draws a tile a measure from the rows (`measures.ts`), as the kernel answers it. */
-  if (b.cells || (kind === 'stat' && !registerOf(b))) return { ...shell, metrics: (readings ?? []).map((cell) => tileOf(cell, values, b.tone === 'bad' ? 'bad' : 'warn')) };
+  if (b.cells || (kind === 'stat' && !registerOf(b))) return { ...shell, metrics: (readings ?? []).map((cell) => tileOf(cell, values, b.tone === 'bad' ? 'bad' : 'warn', 'foot')) };
   /* A BAR OR A SPLIT OVER A FIGURE draws the parts the record read, EACH BY ITS NAME: a part keyed by a ref is the row
      it points at, read from the walk `pageReader` made of that list, and never the ULID the key is. */
   if (typeof source === 'string' && source.startsWith('metric.')) {
@@ -1875,6 +1903,24 @@ const heldOf = (listed: unknown): { address: string; title?: string }[] =>
     : [];
 
 /**
+ * A PAGE'S BLOCKS WITH ITS FOOT UNDER THEM: one note, and only when a tile above it was converted at rates that are out
+ * of date. `answered` and `drawn` are the same blocks, as the record sent them and as `blockOf` drew them.
+ *
+ * THE DAY NAMED IS THE OLDEST, because that is the figure furthest from true. A block that is not drawn, or that drew
+ * no tiles, asks for nothing; so does a figure still in parts, whose own sentence is about a rate that is missing and
+ * stays under it. With nothing out of date the blocks come back as they were handed in.
+ */
+export function footed(answered: readonly Answered[], drawn: LiveBlock[], now: number): LiveBlock[] {
+  const days = answered.flatMap((b, i) =>
+    drawn[i]?.metrics && drawn[i]!.drawn !== false ? (b.readings ?? []).flatMap((c) => (staleRead(c.reading) ? [c.reading.fx.asOf] : [])) : [],
+  );
+  if (days.length === 0) return drawn;
+  const oldest = days.reduce((a, b) => (b < a ? b : a));
+  const foot = { kind: 'note', key: 'rates-out-of-date', span: 12, body: footWords.ratesStale(fmtDay(oldest)), rows: [], matched: 0, refusals: [] };
+  return [...drawn, blockOf(foot as unknown as Answered, new Map(), now)];
+}
+
+/**
  * A READ OF ONE PAGE, NARROWED BY THE READER'S CHOICE when they made one (`?f.thing=12`, `$lib/page/filters.ts`).
  * Every block over a list with that field is narrowed by the kernel, and the answer's `filters` carries what may be
  * chosen next; an empty choice is no choice, and the page is asked for by its slug alone.
@@ -2052,11 +2098,15 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
         now,
         page: {
           page: identity ? { ...page, identity } : page,
-          blocks: blocks.map((b, i) => {
-            const drawn = blockOf(b, refs, now, me, names, runs);
-            const held = linked.get(i);
-            return held && !drawn.cannot ? { ...drawn, linked: held } : drawn;
-          }),
+          blocks: footed(
+            blocks,
+            blocks.map((b, i) => {
+              const drawn = blockOf(b, refs, now, me, names, runs);
+              const held = linked.get(i);
+              return held && !drawn.cannot ? { ...drawn, linked: held } : drawn;
+            }),
+            now,
+          ),
         },
       };
     },

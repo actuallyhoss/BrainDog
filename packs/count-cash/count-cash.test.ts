@@ -94,9 +94,11 @@ test('THE PACK CARRIES count.js AS ITS SOURCE, byte for byte; it fetches nothing
   assert.equal(file.value.pack.manifest.pack, 'count-cash');
   /* 1.3.0 BESIDE THE RELEASED 1.2.0: a count can say why it was not compared, a field added and none taken away.
      1.3.1 BESIDE THE PUBLISHED 1.3.0: the same sentence, now naming the way out. Words only, so a patch.
-     1.3.2 BESIDE THE PUBLISHED 1.3.1: the way out now says which balance to type. Words only again. */
-  assert.equal(file.value.pack.manifest.version, '1.3.2');
-  assert.match(PACK.changes, /the balance its bank or statement shows, not the cash in the box/);
+     1.3.2 BESIDE THE PUBLISHED 1.3.1: the way out now says which balance to type. Words only again.
+     1.3.3 BESIDE THE PUBLISHED 1.3.2: a count in another currency than its account says so on the count, where only
+     the run's log did (audit 73 finding 3). A sentence written on two paths, no field added, so a patch. */
+  assert.equal(file.value.pack.manifest.version, '1.3.3');
+  assert.match(PACK.changes, /now says so on the count, under What happened/);
   const counts = PACK.declarations.find((d) => d.register === 'cash_counts') as { fields: { id: string }[] };
   assert.deepEqual(counts.fields.map((f) => f.id), ['account', 'counted', 'on', 'difference', 'said', 'note']);
 });
@@ -127,11 +129,16 @@ const writesOf = (a: ScriptAnswer): ScriptWrite[] => {
 
 const BOX = row('01K5BOX0000000000000000001', 'accounts', 4, { name: 'Cash box', kind: 'cash', balance: { amount: 50_000, currency: 'GBP' }, as_of: '2026-09-20', liquid: true }, 6);
 
-test('A COUNT IN ANOTHER CURRENCY IS SAID AND NOTHING IS WRITTEN, because two currencies are never subtracted', async () => {
+/** What a count in another currency than its account says (1.3.3): the two currencies, and the way out. */
+const OTHER_CURRENCY = "This count is in EUR and the account is in GBP, so it was not compared. Count in the account's currency.";
+
+test('A COUNT IN ANOTHER CURRENCY IS SAID ON THE COUNT AND NOTHING ELSE IS WRITTEN, because two currencies are never subtracted', async () => {
   const count = row('01K5CNT0000000000000000001', 'cash_counts', 1, { account: BOX.id, counted: { amount: 41_250, currency: 'EUR' }, on: '2026-09-25' });
   const a = await runInQuickJs(decl(), hostOf(count, BOX));
-  assert.deepEqual(writesOf(a), []);
+  /* SAID WHERE A PERSON READS IT (1.3.3): the log is not on their screen. No check and no difference, as before. */
+  assert.deepEqual(writesOf(a), [{ op: 'update', spoken: 'cash_counts#1', patch: { said: OTHER_CURRENCY }, version: 1 }]);
   assert.match(a.log, /counted in EUR and Cash box is held in GBP/);
+  assert.doesNotMatch(OTHER_CURRENCY, /\u2014/);
 });
 
 test('A COUNT DATED BEFORE THE BALANCE IT WOULD CORRECT IS KEPT AND CHANGES NOTHING, since a later balance already says more', async () => {
@@ -181,6 +188,17 @@ test('AN ACCOUNT HOLDING A CLEARED ENTRY IN ANOTHER CURRENCY SINCE ITS STATEMENT
   assert.deepEqual(writesOf(a), [{ op: 'update', spoken: 'cash_counts#3', patch: { said: NOT_COMPARED }, version: 2 }]);
   /* THE LOG LINE IS THE ONE 1.3.0 WROTE, whole: the way out is for the person reading the count, not for the run's log. */
   assert.equal(a.log.trim(), 'Cash box holds an entry in another currency than GBP since it was last stated, so this count was not compared and no difference was written.');
+});
+
+test('AN ACCOUNT LAST STATED IN ANOTHER CURRENCY THAN THE COUNT SAYS SO ON THE COUNT TOO, by the currency of that statement', async () => {
+  /* The account's own balance is in the count's currency, and a balance check after it is in pounds: the roll starts
+     from the check, so there is nothing to subtract the count from. 1.3.2 wrote that to the log alone. */
+  const till = row('01K5BOX0000000000000000002', 'accounts', 5, { name: 'Till', kind: 'cash', balance: { amount: 50_000, currency: 'EUR' }, as_of: '2026-09-20', liquid: true }, 3);
+  const check = row('01K5BAL0000000000000000001', 'balances', 1, { account: till.id, as_of: '2026-09-22', balance: { amount: 40_000, currency: 'GBP' } });
+  const count = row('01K5CNT0000000000000000009', 'cash_counts', 9, { account: till.id, counted: { amount: 41_250, currency: 'EUR' }, on: '2026-09-25' }, 2);
+  const a = await runInQuickJs(decl(), hostWith(count, till, [check]));
+  assert.deepEqual(writesOf(a), [{ op: 'update', spoken: 'cash_counts#9', patch: { said: OTHER_CURRENCY }, version: 2 }]);
+  assert.match(a.log, /counted in EUR and Till was last said to hold GBP/);
 });
 
 test('THE SENTENCE NAMES THE WAY OUT, AND THE WAY OUT WORKS: the balance typed after the foreign entry, and the next count is compared', async () => {

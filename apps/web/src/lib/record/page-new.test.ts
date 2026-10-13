@@ -88,7 +88,7 @@ test('A SLUG IS THE TITLE IN LOWER CASE, and a second page of that name takes th
 });
 
 test('THE BODY IS THE TITLE, A PLACE UNDER Pages, AND ONE NOTE SAYING THE PAGE IS EMPTY', () => {
-  assert.deepEqual(pageBody('wedding', 'Wedding'), {
+  assert.deepEqual(pageBody('wedding', 'Wedding', true), {
     page: 'wedding',
     title: 'Wedding',
     nav: { section: pageWords.section, order: 900 },
@@ -97,12 +97,39 @@ test('THE BODY IS THE TITLE, A PLACE UNDER Pages, AND ONE NOTE SAYING THE PAGE I
   assert.equal(pageWords.section, 'Pages');
 });
 
+/* THE NOTE IS STORED IN THE PAGE, so it is written once, for the person who made it. An owner has Change this page on
+   the page's menu. A member has no such entry (`ChangePage.svelte`), so a page he suggested must not send him to it. */
+test('THE EMPTY NOTE NAMES THE WAY IN ONLY FOR A MAKER WHO HAS IT, and otherwise says who can fill the page', () => {
+  const noteOf = (owner: boolean) => (pageBody('wedding', 'Wedding', owner).blocks as { kind: string; body: string }[])[0]!.body;
+  const [mine, theirs] = [noteOf(true), noteOf(false)];
+
+  assert.equal(mine, pageWords.empty);
+  assert.match(mine, /^This page is empty\. To fill it, open the menu/u);
+  assert.match(mine, /choose Change this page/u);
+
+  assert.equal(theirs, pageWords.emptySuggested);
+  assert.notEqual(theirs, mine);
+  assert.match(theirs, /^This page is empty\./u, 'a member is not told the page is empty');
+  assert.match(theirs, /The owner of this BrainDog can fill it/u, 'a member is not told who can fill the page');
+  assert.doesNotMatch(theirs, /To fill it, open|\byou\b/iu, 'a member is sent to an entry he does not have');
+});
+
+test('EACH WAY IN STORES ITS OWN NOTE: the made page tells its owner the way, the suggested one names the owner', async () => {
+  const k = await record();
+  const { client, asked } = served(k);
+  await newPage('Wedding', { client, pages: [], owner: true });
+  await newPage('Garden', { client, pages: ['wedding'], owner: false });
+  const noteIn = (body: unknown) => (body as { blocks: { body: string }[] }).blocks[0]!.body;
+  assert.equal(noteIn(asked[0]!.args.body), pageWords.empty);
+  assert.equal(noteIn((asked[1]!.args.body as { to: { body: unknown } }).to.body), pageWords.emptySuggested);
+});
+
 test('AN OWNER MAKES THE PAGE THROUGH setDeclaration, and the record then lists it', async () => {
   const k = await record();
   const { client, asked } = served(k);
   const out = await newPage('Wedding', { client, pages: slugsOf(k), owner: true });
   assert.deepEqual(out, { ok: true, slug: 'wedding', id: 'page.wedding', as: 'made', said: pageWords.made('Wedding') });
-  assert.deepEqual(asked, [{ method: 'setDeclaration', args: { body: pageBody('wedding', 'Wedding') } }]);
+  assert.deepEqual(asked, [{ method: 'setDeclaration', args: { body: pageBody('wedding', 'Wedding', true) } }]);
   assert.deepEqual(slugsOf(k), ['wedding']);
 
   /* A SECOND Wedding LANDS BESIDE THE FIRST, against the pages the record now lists, and never over it. */
@@ -134,7 +161,7 @@ test('A MEMBER SUGGESTS THE SAME BODY AND WRITES NOTHING: it waits on Decide unt
       args: {
         question: pageWords.question('Wedding'),
         body_kind: 'change',
-        body: { declaration_id: 'page.wedding', to: { id: 'page.wedding', kind: 'page', body: pageBody('wedding', 'Wedding') } },
+        body: { declaration_id: 'page.wedding', to: { id: 'page.wedding', kind: 'page', body: pageBody('wedding', 'Wedding', false) } },
       },
     },
   ]);
@@ -192,7 +219,7 @@ test("THE RECORD'S REFUSAL IS SAID IN ITS OWN SENTENCE, and a record that did no
 });
 
 test('NO SENTENCE A PERSON READS CARRIES AN EM DASH OR AN ID', () => {
-  const said = [pageWords.blank, pageWords.long, pageWords.empty, pageWords.raced, pageWords.notReached, pageWords.made('Wedding'), pageWords.suggested('Wedding'), pageWords.question('Wedding'), pageWords.undone('Wedding')];
+  const said = [pageWords.blank, pageWords.long, pageWords.empty, pageWords.emptySuggested, pageWords.raced, pageWords.notReached, pageWords.made('Wedding'), pageWords.suggested('Wedding'), pageWords.question('Wedding'), pageWords.undone('Wedding')];
   for (const s of said) {
     assert.ok(!s.includes('\u2014'), s);
     assert.ok(!/page\.[a-z]|slug|declaration/iu.test(s), s);

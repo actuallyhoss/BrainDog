@@ -27,7 +27,7 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
   founder: [
     {
       version: '2.6.0',
-      notes: "Home is called Today. What is already late has its own table, Late, ahead of Due this week, which now starts today. Lapsing no longer has a Cost column. A project page lists only its own keys, tools and skills. A number can say which service it is about. Renewals shows those under Server and provider numbers, six at most, and only while there is one. Server and provider numbers leaves out a number dated after today, and so does Numbers reported. Latest numbers leaves them out too.",
+      notes: "Home is called Today. What is late has its own table, Late, ahead of Due this week, which now starts today. Lapsing no longer has a Cost column. A project page lists only its own keys, tools and skills. A number can say which service it is about. Renewals shows those under Server and provider numbers while there is one. Numbers dated after today are left out everywhere. A project's money on its way is named Still to come in. Today says the money lasts the year when nothing due runs it out.",
     },
     {
       version: '2.5.0',

@@ -43,7 +43,7 @@ import { across, dayFieldOf as datedBy, isAtLeast, partsOf, type Amount, type Pa
 import type { Entry } from './index.ts';
 import { predicateOf, windowMs, wordsOf, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
 import { HORIZON_CAP, runway, type Horizon, type Leg, type Only, type Runway } from './forecast.ts';
-import { figureLists, isRolled, pointedIn, type PointsAt, type Rolled } from './money-figures.ts';
+import { beyondOf, figureLists, isRolled, pointedIn, type PointsAt, type Rolled } from './money-figures.ts';
 import { withAdds, type PageAddition } from './page-adds.ts';
 import { barsOf, type Bars, type SeriesLine } from './series.ts';
 import { isBucket } from './buckets.ts';
@@ -54,6 +54,16 @@ import { nextSteps, stepsPercent, tallySteps, type StepsDecl } from './steps.ts'
 import { COSTS, type Cost, type Wait } from './weigh.ts';
 import { MEASURES_MOST, MEASURE_BUCKETS, measureBucket, measureLines, measureSeries, measureWindow, readableZone, type MeasureLatest, type MeasureSeries, type RawReading } from './measures.ts';
 import { localDays } from './measures.ts';
+
+/** One test of one figure in a block's `when:`: the figure, and the one of `empty`, `beyond` or a comparison it is held to. */
+export type WhenLeaf = { metric: string; empty?: boolean; beyond?: boolean; gt?: number; gte?: number; lt?: number; lte?: number; is?: number; not?: number };
+
+/** The leaves of a `when:`, whether it is written as one or as `all:` of several. Anything that is not a leaf is left out. */
+export function whenLeaves(when: PageBlock['when']): WhenLeaf[] {
+  if (!when || typeof when !== 'object') return [];
+  const said = Array.isArray((when as { all?: unknown }).all) ? (when as { all: unknown[] }).all : 'all' in when ? [] : [when];
+  return said.filter((leaf): leaf is WhenLeaf => leaf !== null && typeof leaf === 'object' && typeof (leaf as WhenLeaf).metric === 'string');
+}
 
 export type PageBlock = {
   kind: string;
@@ -160,7 +170,10 @@ export type PageBlock = {
    */
   /* `empty: true` holds while the figure reads with no value and no amount in any currency, and `empty: false` while it
      has one (PGS-C06): the one test a figure with nothing in it meets. */
-  when?: { metric: string; empty?: boolean; gt?: number; gte?: number; lt?: number; lte?: number; is?: number; not?: number };
+  /* `beyond: true` holds while the reading carries `beyond` (`money-figures.ts` `beyondOf`): a walk to zero that looked
+     as far as it walks and never went under, which has no value and so meets no comparison. `all:` is two or more
+     leaves, and the block draws only while every one holds. */
+  when?: WhenLeaf | { all: WhenLeaf[] };
   /** A `series`'s lines: figures grouped by one date bucket, and how many buckets back and ahead it draws. */
   series?: SeriesLine[];
   back?: number;
@@ -1765,6 +1778,16 @@ function narrowed(deps: PageDeps, block: PageBlock, clauses: ReadonlyMap<string,
 function drawnWhen(deps: PageDeps, block: PageBlock): boolean {
   const when = block.when;
   if (!when) return true;
+  /* TWO TESTS ARE ONE CONDITION: `all:` draws only while every leaf holds, and a leaf that cannot be read fails it as it
+     fails alone. A leaf that is not a leaf (`whenLeaves` leaves it out) fails it too, so an `all` never draws on less
+     than it says. */
+  const leaves = whenLeaves(when);
+  if ('all' in when) return leaves.length >= 2 && leaves.length === when.all.length && leaves.every((leaf) => leafHolds(deps, leaf));
+  return leaves.length === 1 && leafHolds(deps, leaves[0]!);
+}
+
+/** Whether one leaf of a `when:` holds of the figure it names. */
+function leafHolds(deps: PageDeps, when: WhenLeaf): boolean {
   const decl = deps.metric(when.metric.split(':')[0] ?? '');
   if (!decl) return false;
   const at = when.metric.indexOf(':');
@@ -1774,6 +1797,10 @@ function drawnWhen(deps: PageDeps, block: PageBlock): boolean {
      whatever is late in dollars, and "Late to you" is not hidden because two currencies cannot be added. */
   const parts = read.value.parts;
   const said = parts ? parts.map((p) => p.amount) : read.value.value === null ? [] : [read.value.value];
+  /* BEYOND IS THE ONE TEST A WALK THAT NEVER WENT UNDER MEETS: its reading has no value, so no comparison holds of it,
+     and on a record that holds money it is not empty in any sense a person means. True while the reading carries how
+     far it looked, false while it does not. */
+  if (when.beyond !== undefined) return when.beyond === (beyondOf(read.value) !== null);
   /* EMPTY IS THE ONE TEST A FIGURE WITH NO VALUE MEETS (PGS-C06): true while no amount is held in any currency. A sum of
      money over no rows reads 0 with no currency, which is no amount at all; 0 EGP typed as a balance is one, and a count
      of nought is a count. A figure that cannot be read, or that nobody declared, still draws nothing, above. */
@@ -4290,9 +4317,10 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
       if (c !== null && typeof c === 'object' && typeof c.metric === 'string') addFigure(trendNamed(c.metric).id);
     /* A `when:` READS A FIGURE TOO, and a block that draws only when a number crosses a line is a
        statement about that number whether or not the block is on the page. */
-    if (block.when?.metric) {
-      const at = block.when.metric.indexOf(':');
-      addFigure(at < 0 ? block.when.metric : block.when.metric.slice(0, at));
+    /* EVERY LEAF'S, when it is `all:` of several: each is a statement about its own figure. */
+    for (const leaf of whenLeaves(block.when)) {
+      const at = leaf.metric.indexOf(':');
+      addFigure(at < 0 ? leaf.metric : leaf.metric.slice(0, at));
     }
     /* AND SO DOES A `{{path}}` IN ITS PROSE, which the page answer now fills from the record. */
     for (const path of pathsOf(block, (id) => (metric?.(id) ?? builtInFigure(id)) !== null, true)) {

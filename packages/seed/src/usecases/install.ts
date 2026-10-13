@@ -53,9 +53,10 @@ type ModuleWords = Readonly<Record<string, Readonly<Record<string, string>>>>;
 
 /**
  * THE PLAIN WORDS, which every use case but a business's starts from. Money and a
- * project's page speak a business's money as they ship: "Owed to you", "Late to you", "Most owed by you". Nobody but
- * a founder or a small business is owed money by a client on an invoice, so a person, a student, a team or somebody
- * starting a project reads what is due to them and what they have to pay.
+ * project's page speak a business's money as they ship: "Receivables", "Late payables", "Nothing owed either way".
+ * Nobody but a founder or a small business is owed money by a client on an invoice, so a person, a student, a team or
+ * somebody starting a project reads what is due to them and what they have to pay. A project's money on its way is
+ * Still to come in for everyone since batch 74 (owed-words-74), so no plain word is laid over it.
  */
 const PLAIN_NAMES: ModuleWords = {
   'money-core': {
@@ -69,7 +70,6 @@ const PLAIN_NAMES: ModuleWords = {
     'Late payables': 'Late to pay',
   },
   portfolio: {
-    'Owed to you': 'Due to you',
     'Nothing owed either way on {{name}}.': 'No money is due either way on {{name}}.',
   },
 };

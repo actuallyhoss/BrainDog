@@ -28,7 +28,7 @@ import { ok, refused } from '@braindog/ports';
 import { jsonPath, compile, isColumn, QUANTIFIERS, type Compiled, type Predicate, type Schema } from '@braindog/where';
 
 import type { Entry } from './index.ts';
-import { moneyText } from './ingest.ts';
+import { exponentOf, moneyText } from './ingest.ts';
 import { fold } from './ingest.ts';
 import { sealedEver } from './declare.ts';
 import { instant } from './migrate.ts';
@@ -1085,6 +1085,13 @@ function rowValue(head: string, tail: string | undefined, row: Entry, nowMs: num
     /* THE CURRENCY'S OWN DECIMALS. It was `amount / 100` to two places for every code, so JPY 129,900
        was written `JPY 1299.00` and KWD 1.500 was `KWD 15.00`, into patches, notes and questions. */
     return isMoney(value) ? moneyWords(value) : String(value);
+  /* THE TWO FORMS A MESSAGE IS WRITTEN IN. Each reads only what it knows, a money and a day, and anything else falls
+     through to the bare value below, as a form nobody declared does. */
+  if (kind === 'short' && isMoney(value)) return moneyShort(value);
+  if (kind === 'on') {
+    const day = dayWords(value, nowMs);
+    if (day !== null) return day;
+  }
   if (kind === 'quantity' && isQuantity(value)) return `${value.value} ${value.unit}`;
   if (kind === 'until' || kind === 'ago') {
     const at = Date.parse(`${String(value).slice(0, 10)}T12:00:00Z`);
@@ -1109,6 +1116,56 @@ function rowValue(head: string, tail: string | undefined, row: Entry, nowMs: num
  * draws figures, which is why `moneyText` lives in `ingest.ts` beside the exponent table it reads.
  */
 const moneyWords = (m: { amount: number; currency: string }): string => moneyText(m.amount, m.currency);
+
+/**
+ * The currencies a message writes by a sign, each sign one currency's alone: a bare `$` is the US dollar's and every
+ * other dollar carries its letters. A currency not here is written by its code, `SAR 12,000`, never by a neighbour's
+ * sign. A TABLE AND NOT `Intl`'s, whose signs move with the runtime's data: a sentence the record keeps is the same
+ * words whichever machine filled it.
+ *
+ * A CURRENCY ENGLISH WRITES BY ITS CODE IS NOT HERE, as it has no sign in `braindog-render`'s `money.ts` either: the
+ * franc, the riyal and the Egyptian pound are each written by their letters (his word, 9 October), and the kernel
+ * names no one country's money.
+ */
+const SIGN: Readonly<Record<string, string>> = {
+  GBP: '£', EUR: '€', USD: '$', JPY: '¥', CNY: 'CN¥', INR: '₹', KRW: '₩', ILS: '₪',
+  CAD: 'CA$', AUD: 'A$', NZD: 'NZ$', HKD: 'HK$', SGD: 'S$', MXN: 'MX$', BRL: 'R$',
+};
+
+/**
+ * `{{short:amount}}`, money as a message says it: `£12,000`, `£12,000.50`, `−£39`, `SAR 12,000`.
+ *
+ * WHOLE UNITS WHEN THE MINOR PART IS NOUGHT, and the currency's own decimals when it is not, so nothing is rounded
+ * away: `{{money:amount}}` stays the form a note keeps, with the code and every decimal.
+ */
+function moneyShort(m: { amount: number; currency: string }): string {
+  const code = m.currency.toUpperCase();
+  const exp = exponentOf(code);
+  const places = m.amount % 10 ** exp === 0 ? 0 : exp;
+  const body = (Math.abs(m.amount) / 10 ** exp).toLocaleString('en-u-nu-latn', { minimumFractionDigits: places, maximumFractionDigits: places });
+  const minus = m.amount < 0 ? '−' : '';
+  const sign = SIGN[code];
+  return sign === undefined ? `${code} ${minus}${body}` : `${minus}${sign}${body}`;
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
+
+/**
+ * `{{on:due}}`, a day as a message says it: `30 Oct`, and `5 Jan 2027` when the year is not the one the fill is made
+ * in. `null` for a value that is not a day on the calendar, which the caller then writes as it stands.
+ *
+ * THE DAY AS WRITTEN, with no zone applied: a date field holds a day, and a moment's first ten characters are the day
+ * `{{ago:field}}` already counts from.
+ */
+function dayWords(value: unknown, nowMs: number): string | null {
+  const m = typeof value === 'string' ? /^(\d{4})-(\d{2})-(\d{2})(?:$|[T ])/.exec(value) : null;
+  if (m === null) return null;
+  const [year, month, day] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const at = new Date(Date.UTC(year, month - 1, day));
+  if (at.getUTCFullYear() !== year || at.getUTCMonth() !== month - 1 || at.getUTCDate() !== day) return null;
+  const words = `${day} ${MONTHS[month - 1]!}`;
+  return year === new Date(nowMs).getUTCFullYear() ? words : `${words} ${year}`;
+}
 
 /**
  * `{{metric.<id>}}` as a run's fill writes it: the figure read as a page reads it (`evaluateMetric` with the record's

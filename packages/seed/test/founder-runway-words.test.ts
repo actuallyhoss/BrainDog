@@ -2,15 +2,16 @@
  * What Home says of how long the money lasts, and the numbers a founder's pages count (founder-runway-words-68, REC-B07
  * and what founder-bound-66 left).
  *
- * TWO THINGS, AND ONE OF THEM WAITS. `datapoints-held` and the Latest numbers table it is the `when:` of end today, by
- * the clause the other four counts of numbers end on (`at before tomorrow`): a reading dated tomorrow was counted and
- * listed first. RED FIRST: the count read 1 and the table drew the reading.
+ * TWO THINGS. `datapoints-held` and the Latest numbers table it is the `when:` of end today, by the clause the other
+ * four counts of numbers end on (`at before tomorrow`): a reading dated tomorrow was counted and listed first. RED FIRST:
+ * the count read 1 and the table drew the reading.
  *
- * THE SENTENCE FOR MONEY THAT LASTS IS A TODO, AND THE TESTS UNDER IT SAY WHY. `runway-days` has no value when the walk
- * stays above zero for the year, and also when cash is in two currencies with no rate between them, and on a record with
- * no account. A second note under `when: { metric: 'runway-days', empty: true }` would say "it does not run out" on all
- * three, and `when:` reads one figure, so it could not keep `books-held < 2` beside it. Until a `when:` can ask whether
- * the walk reached its last day (`beyond` on the reading, walk-beyond-68), Home says the days only while there are days.
+ * AND THE SENTENCE FOR MONEY THAT LASTS (founder-lasts-74), WHICH WAITED ON THE KERNEL. `runway-days` has no value when
+ * the walk stays above zero for the year, and also when cash is in two currencies with no rate between them, and on a
+ * record with no account. A note under `when: { metric: 'runway-days', empty: true }` would have said the money lasts on
+ * all three. It is chosen by `when: { all: [books-held lt 2, runway-days beyond] }` instead: the walk reached its last
+ * day above zero (`beyond` on the reading), and the record keeps one set of money. The line with the days carries
+ * `beyond: false` beside the same count of books, so one of the two is drawn and the cash is said once.
  */
 
 import { test } from 'node:test';
@@ -81,7 +82,7 @@ const bill = (k: Kernel, amount: number, due: number): void =>
   void value(k.create('obligations', { what: 'Corporation tax', direction: 'owed_by_me', amount: gbp(amount), due: day(due), state: 'open' }, OWNER));
 
 const RUNS_OUT = 'Cash is {{cash-now}} across {{cash-accounts}} account(s), and on what is due it runs out in {{runway-days}} day(s).';
-const LASTS = 'Cash is {{cash-now}} across {{cash-accounts}} account(s), and on what is due it does not run out.';
+const LASTS = 'Cash is {{cash-now}} across {{cash-accounts}} account(s), and on what is due it lasts the year.';
 
 test('A READING DATED AFTER TODAY IS NOT ONE OF THE NUMBERS: datapoints-held leaves it out, and Latest numbers does not list it', async () => {
   const k = await founder();
@@ -119,12 +120,12 @@ test('WITH MONEY THAT RUNS OUT IN TWELVE DAYS, Home says the cash, the accounts 
 });
 
 /**
- * WHAT A SENTENCE FOR MONEY THAT LASTS HAS TO HOLD, WHOEVER WRITES IT. Each of these has no `runway-days`, and on none
- * of them is "it does not run out" known: the three tests after this one are green today because the sentence is not
- * said at all, and they stay so only if it is chosen by more than the figure being empty.
+ * WHAT THE SENTENCE FOR MONEY THAT LASTS HOLDS. Each of the three records after this has no `runway-days`, and on none
+ * of them is "it lasts the year" known: they stay green only because the sentence is chosen by more than the figure
+ * being empty.
  */
 const neverSaysItLasts = (k: Kernel, why: string): void =>
-  assert.deepEqual(said(k).filter((b) => /does not run out/u.test(b.body ?? '')).map((b) => b.body), [], why);
+  assert.deepEqual(said(k).filter((b) => /lasts the year|does not run out/u.test(b.body ?? '')).map((b) => b.body), [], why);
 
 test('TWO CURRENCIES WITH NO RATE HAVE NO DAY COUNT, and Home does not say the money lasts: a bill past the pounds held is still due', async () => {
   const k = await founder();
@@ -153,14 +154,34 @@ test('WITH TWO BOOKS, Home draws each book and adds them into no sentence, wheth
   assert.equal(cash(k), undefined, "one Cash now over a company's money and a person's own, with a bill due");
 });
 
-/* TODO UNTIL A `when:` CAN TELL MONEY THAT LASTS FROM A DAY COUNT NOBODY CAN WORK OUT. What is wanted is this sentence
-   on exactly the record below, one currency, one book and a walk that reached its last day above zero, and on none of
-   the three above. Today the clause with the days is left out by the writer (`leadOf`), and Home reads "Cash is
-   GBP 5,000.00 across 1 account." */
-test('WITH MONEY THAT LASTS THE YEAR, Home says it does not run out', { todo: 'waits on a when: that reads the walk reaching its last day (beyond), and on two tests in one when:' }, async () => {
+/* ONE CURRENCY, ONE BOOK AND A WALK THAT REACHED ITS LAST DAY ABOVE ZERO: the one record the sentence is said on, and
+   none of the three above. The line with the days is not drawn beside it, so the cash is said once. */
+test('WITH MONEY THAT LASTS THE YEAR, Home says it lasts the year, once, and says no day count', async () => {
   const k = await founder();
   account(k, 'Current account', gbp(500_000));
   bill(k, 100_000, 12);
   assert.equal(figure(k, 'runway-days'), null);
-  assert.equal(cash(k)?.body, LASTS);
+  const line = cash(k);
+  assert.ok(line, 'Home says no sentence of what there is');
+  assert.equal(line.body, LASTS);
+  assert.equal(line.lead, true);
+  assert.deepEqual(line.values, { 'cash-now': gbp(500_000), 'cash-accounts': 1 });
+  assert.deepEqual(said(k).filter((b) => b.body?.startsWith('Cash is ')).map((b) => b.body), [LASTS], 'the cash is said twice');
+
+  /* A BILL PAST THE CASH TURNS IT BACK TO THE DAYS, and the sentence that it lasts goes. */
+  bill(k, 900_000, 30);
+  assert.equal(figure(k, 'runway-days'), 30);
+  assert.deepEqual(said(k).filter((b) => b.body?.startsWith('Cash is ')).map((b) => b.body), [RUNS_OUT]);
+});
+
+/* THE LINE WITH THE DAYS STILL STANDS WHERE NOBODY CAN COUNT THEM: one book, two currencies and no rate. It says what is
+   held and drops the days, as it did before the second line was written. */
+test('TWO CURRENCIES WITH NO RATE STILL DRAW THE LINE OF WHAT THERE IS, with no day count in it', async () => {
+  const k = await founder();
+  account(k, 'Current account', gbp(500_000));
+  account(k, 'Dollar account', { amount: 500_000, currency: 'USD' });
+  const line = cash(k);
+  assert.ok(line, 'the line of what there is went with the days');
+  assert.equal(line.body, RUNS_OUT);
+  assert.equal(line.values?.['runway-days'], undefined);
 });

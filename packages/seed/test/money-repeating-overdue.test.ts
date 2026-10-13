@@ -18,6 +18,12 @@
  * only `settle` writes one, so on a record nobody runs `settle` on the sign reads 0 whatever stopped. Under the name
  * "Repeating lines past their day" a reader took that 0 as every line watched. The name now says matched lines, and
  * nothing in the seed keeps the old one. RED FIRST: under the old name the two tests of the name fail.
+ *
+ * AND WITH NONE TO COUNT IT SAYS NOTHING (audit 72 finding 5). The name did not stop the number: a record whose lines
+ * were all written by Money watch read 0 and met its mark, a clean answer from a sign that could see none of them. The
+ * count is now read per the one state its lines are in, so with no matched line past its day there is nothing to divide
+ * by and the reading is no value and no verdict. RED FIRST: as a plain count, every test below that asks for no value
+ * reads 0, and every one that asks for no verdict reads met.
  */
 
 import { test } from 'node:test';
@@ -89,7 +95,7 @@ test('MONEY DECLARES THE SIGN FOR A STUCK REPEATING LINE, and the record install
   assert.ok(sign, 'Money does not declare repeating-overdue');
   assert.equal(sign.source, 'register.recurring');
   assert.equal(sign.where, 'state is live, next_due before -3d, last_paid is set', 'live, more than three days gone, and matched to a payment before');
-  assert.deepEqual(sign.value, { count: 'id' }, 'a count, so no two currencies can meet in it');
+  assert.deepEqual(sign.value, { ratio: { of: { count: 'id' }, per: { distinct: 'state' } } }, 'a count per the one state, so no two currencies can meet in it');
   assert.deepEqual(sign.target, { lte: 0 }, 'none stuck is the mark');
   assert.equal(sign.format, 'int');
   assert.equal(sign.compare, 'none');
@@ -150,8 +156,8 @@ test('A LINE MONEY WATCH JUST ADDED IS NOT RED, though its Next has gone by with
   line(k, 'Netflix', -4, { amount: { amount: 1_099, currency: 'GBP' }, day_of_month: '12', note: 'Added by Money watch from three payments about a month apart.' });
 
   const read = stuck(k);
-  assert.equal(read.value, 0, 'nothing was ever matched to it, so the record cannot say a payment is missing');
-  assert.equal(read.met, true, 'a line just added does not miss the mark');
+  assert.equal(read.value, null, 'nothing was ever matched to it, so the record cannot say a payment is missing, nor that none is');
+  assert.equal(read.met, null, 'a line just added does not miss the mark, and does not meet it either');
 });
 
 test('A LINE NOBODY EVER MATCHED A PAYMENT TO IS NOT JUDGED, however long ago its Next was', async () => {
@@ -171,8 +177,8 @@ test('A LINE WHOSE PAYMENT WAS MATCHED IS NOT STUCK: its Next moved on with the 
   paid(k, 'Hosting', 365, 0, { every: 'yearly' });
 
   const read = stuck(k);
-  assert.equal(read.value, 0);
-  assert.equal(read.met, true);
+  assert.equal(read.value, null, 'no line is stuck, and the sign does not say nought');
+  assert.equal(read.met, null);
 });
 
 test('A PAUSED OR ENDED LINE IS NOT STUCK, however long ago its Next was', async () => {
@@ -180,18 +186,18 @@ test('A PAUSED OR ENDED LINE IS NOT STUCK, however long ago its Next was', async
   paid(k, 'Gym', -40, -70, { state: 'paused' });
   paid(k, 'Old lease', -200, -230, { state: 'ended' });
 
-  assert.equal(stuck(k).value, 0);
+  assert.equal(stuck(k).value, null);
 });
 
-test('A LINE WHOSE NEXT IS TODAY OR AHEAD IS NOT STUCK, and with none stuck the mark is met', async () => {
+test('A LINE WHOSE NEXT IS TODAY OR AHEAD IS NOT STUCK, and with none stuck the sign says nothing', async () => {
   const k = await moneyCore();
   paid(k, 'Rent', 12, -18);
   paid(k, 'Salary', 0, -30, { direction: 'in' });
   paid(k, 'Insurance', -1, -31);
 
   const read = stuck(k);
-  assert.equal(read.value, 0);
-  assert.equal(read.met, true, 'lines are held and none is stuck');
+  assert.equal(read.value, null);
+  assert.equal(read.met, null, 'lines are held and none is stuck, which the sign leaves unsaid');
 });
 
 test('EVERY STUCK LINE COUNTS ONCE, in any currency and either way', async () => {
@@ -204,8 +210,29 @@ test('EVERY STUCK LINE COUNTS ONCE, in any currency and either way', async () =>
   assert.equal(stuck(k).value, 3);
 });
 
-test('A RECORD WITH NO REPEATING LINES HAS NONE STUCK', async () => {
+test('A RECORD WITH NO REPEATING LINES IS NOT JUDGED', async () => {
   const read = stuck(await moneyCore());
-  assert.equal(read.value, 0);
-  assert.equal(read.met, true, 'none held, none stuck');
+  assert.equal(read.value, null);
+  assert.equal(read.met, null, 'none held, so nothing to say');
+});
+
+test('A RECORD NOBODY MATCHES PAYMENTS ON READS NO VALUE, never a clean nought from a sign that sees none of its lines', async () => {
+  const k = await moneyCore();
+  /* What a record kept by Money watch alone holds: every line written from the bank's payments, none ever matched,
+     and each "Next" standing where it was written, long gone. */
+  const watched = { note: 'Added by Money watch from three payments about a month apart.' };
+  line(k, 'Netflix', -40, { ...watched, amount: { amount: 1_099, currency: 'GBP' } });
+  line(k, 'Rent', -12, watched);
+  line(k, 'Salary', -200, { ...watched, direction: 'in', amount: { amount: 5_000_000, currency: 'EGP' } });
+
+  const blind = stuck(k);
+  assert.equal(blind.value, null, 'three lines past their day and none counted is not nought stuck');
+  assert.equal(blind.met, null, 'and a sign with no reading meets no mark');
+
+  /* The day one of them is matched and its "Next" then goes by, the sign has a line to see and says so as a whole number. */
+  paid(k, 'Hosting', -9, -39);
+  const seen = stuck(k);
+  assert.equal(seen.value, 1, 'the count itself, since every line it reads is live');
+  assert.ok(Number.isInteger(seen.value), 'a count, never a share');
+  assert.equal(seen.met, false);
 });

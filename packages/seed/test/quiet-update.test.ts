@@ -608,11 +608,12 @@ const BOOK_RULES_71: ReadonlySet<string> = new Set(['entry-takes-book', 'repeat-
 const withoutBookFill = (doc: Body): Body =>
   withPage(doc, 'money-book', (now) => now.filter((b) => b.heading !== 'This month'), (d) => !BOOK_FIGURES_71.has(String(d.metric)) && !BOOK_RULES_71.has(String(d.rule)) && d.script !== 'book_from_account');
 /**
- * AND BATCH 72'S (plan-lead-all-paid-72), folded into the same unreleased step: the two figures the plan page's lead
- * sentences wait on go. The page itself, with its second lead sentence, goes with every plan (`withoutPlans`), since
- * 3.13.0 held no plan at all, so no lead is put back by hand.
+ * AND BATCH 72'S (plan-lead-all-paid-72), folded into the same unreleased step: the one figure the plan page's lead
+ * sentences wait on goes (batch 74 took the second, `plan-share-left`, out again: plan-lead-one-figure-74). The page
+ * itself, with its second lead sentence, goes with every plan (`withoutPlans`), since 3.13.0 held no plan at all, so
+ * no lead is put back by hand.
  */
-const PLAN_LEAD_72: ReadonlySet<string> = new Set(['plan-parts-open', 'plan-share-left']);
+const PLAN_LEAD_72: ReadonlySet<string> = new Set(['plan-parts-open']);
 const withoutPlanLeads = (doc: Body): Body => ({ ...doc, declarations: (doc.declarations as Body[]).filter((d) => !PLAN_LEAD_72.has(String(d.metric))) });
 /**
  * AND BATCH 73'S, folded into the same unreleased step: the count of budgets set, which Money declares itself now
@@ -631,6 +632,17 @@ const withoutBatch73 = (doc: Body): Body => {
     declarations: (cut.declarations as Body[]).map((d) => (d.register === 'obligations' && Array.isArray(d.fields) ? { ...d, fields: (d.fields as Body[]).filter((f) => f.id !== 'account') } : d)),
   };
 };
+/**
+ * AND BATCH 74'S, folded into the same unreleased step and undone first: a project's money on its way is named Owed to
+ * you again, where it is Still to come in (owed-words-74). The plan page's leads on two counts go with every plan
+ * (`withoutPlans`), the share figure batch 74 took out was never in a released version, and `repeating-overdue`,
+ * whose value batch 74 changed, is dropped whole with the other signs (`SIGNS_ADDED`), so none of the three is put
+ * back by hand.
+ */
+const withoutBatch74 = (doc: Body): Body => ({
+  ...doc,
+  declarations: (doc.declarations as Body[]).map((d) => (d.metric === 'project-owed' ? { ...d, name: 'Owed to you' } : d)),
+});
 /** Batch 63's four figures of this month's spending against last (spend-figures-63), new in the unreleased money-core 3.17.0. */
 const SPEND_VS_LAST: ReadonlySet<string> = new Set(['spent-last-month', 'spent-by-category-last-month', 'spent-by-category-to-date-last-month', 'spent-vs-last-month']);
 const LATEST: Record<string, { version: string; released: string; undo: (doc: Body) => Body }> = {
@@ -639,7 +651,7 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
     version: '3.13.0',
     released: '2e09983b40aba73e',
     undo: (raw) => {
-      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(withoutPlanLeads(withoutBatch73(raw)))))))))))));
+      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(withoutPlanLeads(withoutBatch73(withoutBatch74(raw))))))))))))));
       return {
       ...doc,
       /* AND THE SCRIPT THAT MARKS A BILL PAID, WITH THE RULE THAT STARTS IT (settle-rule-60), both newer than 3.13.0. */
@@ -921,6 +933,9 @@ const DUE_NO_NEAR_EDGE = 'state is open or part, due before +8d';
  * AND THE FOUNDER'S HOME AS IT WAS BEFORE FOUNDER 2.6.0, undone first: Home called Overview in the voice and on the page,
  * Due this week with no near edge and no figure or table for what is late, and a Cost column under Lapsing. Undone
  * with the changes before it, so the version before is still the one released.
+ * AND BATCH 74'S TWO, folded into the same unreleased 2.6.0: the project page's cell over `project-owed` says Owed to
+ * you again (owed-words-74), and Home's line of what there is is one note on one book, with no second note ending "it
+ * lasts the year" (founder-lasts-74).
  */
 const lookBefore = (doc: Body, id: string): Body => {
   if (id !== 'founder') return doc;
@@ -932,12 +947,21 @@ const lookBefore = (doc: Body, id: string): Body => {
       .filter((d) => d.metric !== 'late-money')
       .map((d) => {
         if (d.metric === 'due-this-week') return { ...d, where: DUE_NO_NEAR_EDGE };
+        if (d.page === 'project')
+          return {
+            ...d,
+            blocks: (d.blocks as Body[]).map((b) =>
+              b.heading === 'At a glance' ? { ...b, cells: (b.cells as Body[]).map((c) => (c.metric === 'project-owed:{{name}}' ? { ...c, label: 'Owed to you' } : c)) } : b,
+            ),
+          };
         if (d.page !== 'home-founder') return d;
         return {
           ...d,
           title: 'Overview',
           blocks: (d.blocks as Body[]).flatMap((b) => {
             if (b.heading === 'Late') return [];
+            if (b.kind === 'note' && typeof b.body === 'string' && b.body.endsWith('it lasts the year.')) return [];
+            if (b.kind === 'note' && typeof b.body === 'string' && b.body.includes('{{runway-days}}')) return [{ ...b, when: { metric: 'books-held', lt: 2 } }];
             if (b.heading === 'Due this week') return [{ ...b, where: DUE_NO_NEAR_EDGE }];
             if (b.heading === 'Lapsing') return [{ ...b, columns: [...(b.columns as Body[]), { field: 'cost', label: 'Cost', width: '13ch', align: 'end' }] }];
             return [b];

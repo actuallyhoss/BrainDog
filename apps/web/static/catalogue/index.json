@@ -257,8 +257,34 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.3.2",
+      "latest": "1.3.3",
       "versions": [
+        {
+          "version": "1.3.3",
+          "checksum": "73e7507d31792cd107c510510cba99cabcdfbd0d33398ffcc55233173f0f8b36",
+          "bytes": 15863,
+          "published_at": "2026-10-13T18:46:06.261Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Cash counts"
+            ],
+            "pages": [
+              "Cash counts"
+            ],
+            "rules": [
+              "Write the difference of each count"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "A count in another currency than its account now says so on the count, under What happened: which two currencies, and to count in the account's currency. Before, the reason went to the run's log alone, so the count stood with no difference and no word. Nothing else changed: still no balance check and no difference are written for such a count.",
+          "preview": true
+        },
         {
           "version": "1.3.2",
           "checksum": "a4c39e01fb56411899a7badb1dcd26d6686665ccf185e07fb0b7b8d17ff4c730",

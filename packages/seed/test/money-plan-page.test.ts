@@ -159,7 +159,7 @@ test('the page is one page a plan, under Money, and needs the list of plans', ()
 });
 
 test('every figure of one plan is read once a plan, by the name its parts share', () => {
-  assert.deepEqual(Object.keys(PLAN_FIGURES), ['plan-parts-paid', 'plan-parts', 'plan-paid', 'plan-left', 'plan-parts-open', 'plan-share-left', 'plan-next-due', 'plan-last-due']);
+  assert.deepEqual(Object.keys(PLAN_FIGURES), ['plan-parts-paid', 'plan-parts', 'plan-paid', 'plan-left', 'plan-parts-open', 'plan-next-due', 'plan-last-due']);
   for (const [id, f] of Object.entries(PLAN_FIGURES)) {
     assert.equal(f.metric, id);
     assert.equal(f.source, 'register.installments');
@@ -355,16 +355,62 @@ test('the lead is one of three sentences, by whether the plan has a part and whe
   assert.match(shed.body!, /^No part of Shed is on Instalments yet\./);
 });
 
-test('the two figures the lead waits on tell a plan all paid from a plan with a part open and from one with none', async () => {
+test('the two counts the lead waits on tell a plan all paid from a plan with a part open and from one with none', async () => {
   const k = await moneyCore();
   write(k, 'Flat', SIX);
   write(k, 'Desk', ['paid', 'paid']);
   const of = (id: string, name: string): Reading => value<Reading>(k.metric({ ...PLAN_FIGURES[id], where: String(PLAN_FIGURES[id]!.where).replace('{{it}}', name) } as never));
 
+  /* PARTS THAT STAND, THEN PARTS STILL OPEN: 6 and 4 with a part open, 2 and 0 all paid, 0 and 0 with no part. */
+  assert.deepEqual([of('plan-parts', 'Flat').value, of('plan-parts', 'Desk').value, of('plan-parts', 'Shed').value], [6, 2, 0]);
   assert.deepEqual([of('plan-parts-open', 'Flat').value, of('plan-parts-open', 'Desk').value, of('plan-parts-open', 'Shed').value], [4, 0, 0]);
-  /* FOUR OF SIX EQUAL PARTS ARE OPEN, so two thirds of the money is; nought once all is paid; and no value with no part. */
-  assert.ok(Math.abs(of('plan-share-left', 'Flat').value! - 4 / 6) < 1e-9);
-  assert.deepEqual([of('plan-share-left', 'Desk').value, of('plan-share-left', 'Shed').value], [0, null]);
+});
+
+test('all paid is two counts held together, and no share of the money is asked', () => {
+  const leads = (MONEY_PLAN_PAGE.blocks as { lead?: boolean; when?: unknown }[]).filter((b) => b.lead === true).map((b) => b.when);
+  /* NO PART, A PART OPEN, EVERY PART PAID. Counts only: a count is one number whatever currencies the parts are in,
+     and is a number when the parts' amounts add up to nought, where a share of the money was neither. */
+  assert.deepEqual(leads, [
+    { metric: 'plan-parts:{{name}}', lt: 1 },
+    { all: [{ metric: 'plan-parts:{{name}}', gte: 1 }, { metric: 'plan-parts-open:{{name}}', gte: 1 }] },
+    { all: [{ metric: 'plan-parts:{{name}}', gte: 1 }, { metric: 'plan-parts-open:{{name}}', lt: 1 }] },
+  ]);
+  assert.equal('plan-share-left' in PLAN_FIGURES, false, 'the share is no longer a figure');
+  assert.equal(Object.values(PLAN_FIGURES).some((f) => 'lookups' in f), false, 'and no figure of a plan reads by a table of factors');
+});
+
+test('a plan whose parts are all nought and all paid still says nothing is left', async () => {
+  const k = await moneyCore();
+  /* PARTS OF NOUGHT ARE PARTS: a deposit waived, a month free. Their amounts add up to nought, so a share of the
+     money had nothing to divide by and the page was led by no sentence at all. */
+  value(k.create('plans', { name: 'Gym' }, OWNER));
+  for (const n of [1, 2]) value(k.create('installments', { what: `Gym, part ${n}`, plan: 'Gym', number: n, direction: 'out', amount: egp(0), due: due(n), state: 'paid' }, OWNER));
+  const gym = pageOf(k, 'Gym');
+  assert.equal(leadOf(gym).body, paidUpOf('Gym'));
+  assert.deepEqual([said(gym, 'plan-parts-paid'), said(gym, 'plan-parts')], [2, 2]);
+  assert.equal(dayOf(said(gym, 'plan-last-due')), daysOf(due(2)));
+});
+
+test('a plan in two currencies with one all paid and one open is led by the open sentence alone', async () => {
+  const k = await moneyCore();
+  const part = (plan: string, n: number, amount: Money, state: string): void =>
+    void value(k.create('installments', { what: `${plan}, part ${n}`, plan, number: n, direction: 'out', amount, due: due(n), state }, OWNER));
+  /* NO RATE IS ON THE RECORD, so nothing here is turned into one currency: dollars all paid, pounds still open. */
+  value(k.create('plans', { name: 'Trip' }, OWNER));
+  part('Trip', 1, { amount: 50_000, currency: 'USD' }, 'paid');
+  part('Trip', 2, egp(PART), 'open');
+  const trip = pageOf(k, 'Trip');
+  /* ONE BLOCK LEADS (`leadOf` holds that), and it is the one about what is left, in the currency that is left. */
+  assert.equal(leadOf(trip).body, sentenceOf('Trip'));
+  assert.deepEqual([said(trip, 'plan-parts-paid'), said(trip, 'plan-parts'), said(trip, 'plan-left')], [1, 2, egp(PART)]);
+
+  /* AND BOTH CURRENCIES PAID IS ALL PAID, once and not once a currency. */
+  value(k.create('plans', { name: 'Tour' }, OWNER));
+  part('Tour', 1, { amount: 50_000, currency: 'USD' }, 'paid');
+  part('Tour', 2, egp(PART), 'paid');
+  const tour = pageOf(k, 'Tour');
+  assert.equal(leadOf(tour).body, paidUpOf('Tour'));
+  assert.deepEqual([said(tour, 'plan-parts-paid'), said(tour, 'plan-parts')], [2, 2]);
 });
 
 test('nothing a person reads on the page is an id, a dash or a word about the list', () => {

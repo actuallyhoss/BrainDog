@@ -533,10 +533,12 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
   /* HELD TO THE MOST A PERSON SAID MAY BE OWED TO THEM AT ONCE, SINCE portfolio 1.5.0: Money's own setting
      (`most_owed_to_you`, `MONEY_TARGET_SETTINGS` in `money.ts`), which the record reads from the pack this figure is
      filed in, and a project owed more than the whole record's line is past it by the person's own measure. The number
-     it carried was one studio's size in one currency. Empty until somebody sets it, so no verdict until then. */
+     it carried was one studio's size in one currency. Empty until somebody sets it, so no verdict until then.
+     NAMED AS MONEY STILL ON ITS WAY, the words Shop heads its unpaid orders with, where it said Owed to you: the id,
+     what it sums and the setting it is held to are as they were. */
   'project-owed': {
     metric: 'project-owed',
-    name: 'Owed to you',
+    name: 'Still to come in',
     source: 'register.obligations',
     where: `${OPEN}, direction is owed to me, thing is {{it}}`,
     value: { sum: 'amount' },
@@ -1109,7 +1111,8 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         area: 'rail',
         cells: [
           { metric: 'project-open:{{name}}', label: 'Open' },
-          { metric: 'project-owed:{{name}}', label: 'Owed to you' },
+          /* LABELLED AS ITS FIGURE IS NAMED, since the figure's name heads the list this opens. */
+          { metric: 'project-owed:{{name}}', label: 'Still to come in' },
           { metric: 'project-cost:{{name}}', label: 'Costs a year' },
           /* HOW ITS WORK IS MOVING, AS A FIGURE WITH ITS LINE, where a chart of its own stood: what was finished on it
              in the last seven days, and `trend:` asks for how that moved over four weeks, as Work's Done this week
