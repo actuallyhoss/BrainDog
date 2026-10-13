@@ -1030,6 +1030,8 @@ export type WholeRead = {
   rest?: { labels: number; rows: number; value: number | null; unit?: string; parts?: Part[] };
   /** On a heat: the rows dated outside its twelve weeks, or holding no day, which no cell draws. */
   outside?: number;
+  /** On a heat: how many distinct days outside its twelve weeks hold a row. A row with no day is in `outside` and is no day. */
+  outsideDays?: number;
 };
 
 /** The register `sessions.live` and `sessions.working` read, whose fields their columns name. */
@@ -3002,8 +3004,8 @@ function amountIn(v: unknown): { n: number; unit: string | null } | null {
  * Every row a whole read asks for, as groups: the host's one grouped query when it hands one (`PageDeps.whole`), else
  * the list read to its end a page at a time and grouped here. EITHER WAY IT IS EVERY ROW, and either way it stops at
  * `WHOLE_MS` with the sentence that says to narrow it: a walk checks the clock after each page, so a list too long to
- * add up costs a quarter of a second and never the whole of it. THE WALK HOLDS A COUNT AS WELL (`wholeLong`), which
- * stops it where the clock stands still.
+ * add up costs a quarter of a second and never the whole of it. BOTH HOLD A COUNT AS WELL (`wholeLong`), which stops
+ * the walk where the clock stands still and refuses a grouped answer whose parts hold more rows than a walk may read.
  */
 function wholeParts(deps: PageDeps, ask: WholeAsk): Result<WholePart[]> {
   const started = performance.now();
@@ -3013,7 +3015,10 @@ function wholeParts(deps: PageDeps, ask: WholeAsk): Result<WholePart[]> {
   };
   if (deps.whole) {
     const got = deps.whole(ask);
-    return got.ok ? (late() ?? got) : got;
+    if (!got.ok) return got;
+    /* THE SAME COUNT AS THE WALK: the rows behind the parts, so a list the browser refuses to count is refused here. */
+    const long = wholeLong(got.value.reduce((n, part) => n + (Number.isFinite(part.rows) ? part.rows : 0), 0));
+    return long ? { ok: false, refusal: long } : (late() ?? got);
   }
   const groups = new Map<string, WholePart>();
   let cursor: string | undefined;
@@ -3146,6 +3151,10 @@ function wholeOf(deps: PageDeps, block: PageBlock, register: string, schema: Sch
   const total = gathered();
   const byLabel = new Map<string, { label: Json; who?: Json; sum: Gathered }>();
   let outside = 0;
+  /* AND THE DAYS OUTSIDE THE WINDOW, EACH ONCE (`outsideDays`): a host says "N days fall outside the twelve weeks", and
+     forty entries on one old day are one day. An entry holding no day is no day at all: it is in `outside`, which is
+     what the cells fall short of the total by, and not in the days. */
+  const outsideDays = new Set<string>();
   for (const part of read.value) {
     const done = shape.done ? shape.done(part.by[1] ?? null) : false;
     gather(total, part, done);
@@ -3153,6 +3162,7 @@ function wholeOf(deps: PageDeps, block: PageBlock, register: string, schema: Sch
     const label = part.by[0] ?? null;
     if (heat && !drawn(label)) {
       outside += part.rows;
+      if (typeof label === 'string') outsideDays.add(label);
       continue;
     }
     const who = heat && shape.by.length === 2 ? { who: part.by[1] ?? null } : {};
@@ -3203,7 +3213,7 @@ function wholeOf(deps: PageDeps, block: PageBlock, register: string, schema: Sch
     ...figureTotal(figure(total)),
     ...(heat && whole !== null ? { of: figure(every).value } : shape.done ? { of: total.rows } : {}),
     ...(past.length > 0 ? { rest: { labels: past.length, rows: tail.rows, ...rest } } : {}),
-    ...(heat ? { outside } : {}),
+    ...(heat ? { outside, outsideDays: outsideDays.size } : {}),
   });
 }
 

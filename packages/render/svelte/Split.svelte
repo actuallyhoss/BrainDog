@@ -7,7 +7,7 @@
 -->
 <script lang="ts">
   import { headlineFigure, inline, text, TONES, MISSING, type Block, type Row, type RenderOptions } from '../src/index.ts';
-  import { SPLIT_AMOUNT, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitPlan, splitSentence } from '../src/split.ts';
+  import { SPLIT_AMOUNT, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitListed, splitPlan, splitSentence } from '../src/split.ts';
   import { signedOf } from '../src/bridge.ts';
   import Text from './Text.svelte';
 
@@ -15,7 +15,8 @@
 
   const rows = $derived(block.rows.filter((r) => !r.hole));
   const holes = $derived(block.rows.filter((r) => r.hole));
-  const plan = $derived(splitPlan(rows.map((r) => signedOf(text(inline(r.cells[1] ?? '', opts))))));
+  const values = $derived(rows.map((r) => signedOf(text(inline(r.cells[1] ?? '', opts)))));
+  const plan = $derived(splitPlan(values));
   const said = (r: Row | undefined) => text(inline(r?.cells[0] ?? '', opts));
   const name = $derived(splitSentence(plan.parts.map((p) => ({ label: said(rows[p.at]), share: p.share }))));
   /* A late part is striped as well as red (DIRECTION §42), by a pattern of its own: `$props.id()` keeps two charts on
@@ -66,16 +67,19 @@
     <ul class="split-legend">
       {#each rows as row, i}
         {@const part = plan.parts.find((p) => p.at === i)}
+        <!-- A part at nought is left out of the legend (`splitListed`); the fold below still says it. -->
+        {#if splitListed(plan, values[i] ?? NaN)}
         <li class="split-item" data-intent={row.tone}>
           <span class="split-dot" data-step={part?.step} aria-hidden="true"></span>
           <span class="split-label"><Text nodes={inline(row.cells[0] ?? '', opts)} {opts} /></span>
-          <span class="split-value num"><Text nodes={inline(headlineFigure(row.cells[1] || MISSING), opts)} {opts} /></span>
+          <span class="split-value num"><Text nodes={inline(headlineFigure(row.cells[1] || MISSING, opts.home), opts)} {opts} /></span>
           {#if part}<span class="split-share num">{part.share}</span>{/if}
           <span class="split-note"><Text nodes={inline(row.cells[2] ?? '', opts)} {opts} /></span>
           {#if row.tone}
             <span class="glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>
           {/if}
         </li>
+        {/if}
       {/each}
     </ul>
   {/if}

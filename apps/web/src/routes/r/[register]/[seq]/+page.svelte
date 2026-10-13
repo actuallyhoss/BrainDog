@@ -1249,7 +1249,7 @@
                      page of this record draws a calendar, so a date stays a plain figure. -->
                 <Document
                   src={shownOf(docs?.[f.id], String(row.fields[f.id]))}
-                  opts={{ resolve: resolverOf(docs?.[f.id], String(row.fields[f.id])), link, hole: (path: string | null) => holes?.press(path), now: clock, href: at }}
+                  opts={{ resolve: resolverOf(docs?.[f.id], String(row.fields[f.id])), link, hole: (path: string | null) => holes?.press(path), now: clock, href: at, home: homeCurrency() }}
                 />
               {/if}
             </article>

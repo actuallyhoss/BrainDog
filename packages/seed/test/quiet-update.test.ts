@@ -448,8 +448,13 @@ const withoutCrossCheck = (doc: Body): Body => ({
   ...doc,
   declarations: (doc.declarations as Body[])
     .filter((d) => d.metric !== 'cash-cross-check')
-    /* AND THE TWO BLOCKS THE MONEY PAGE DRAWS IT WITH (cash-page-54): the tile and the line for no balance. */
-    .map((d) => (d.page !== 'money' || !Array.isArray(d.blocks) ? d : { ...d, blocks: (d.blocks as Body[]).filter((b) => b.heading !== 'Cash now does not add up' && b.body !== 'No balance has been typed yet.') })),
+    /* AND THE BLOCK THE MONEY PAGE DRAWS IT WITH (cash-page-54): the tile. The line for no balance it also drew went
+       before release, and in the same unreleased step the page gained its lead for two books or more, which goes too. */
+    .map((d) =>
+      d.page !== 'money' || !Array.isArray(d.blocks)
+        ? d
+        : { ...d, blocks: (d.blocks as Body[]).filter((b) => b.heading !== 'Cash now does not add up' && !(b.kind === 'note' && b.lead === true && (b.when as Body | undefined)?.gte === 2)) },
+    ),
 });
 /**
  * AND 3.17.0'S FILING RULES AND CLOSED ACCOUNTS (filing-list-56, account-state-56), folded into the same unreleased step:
@@ -738,7 +743,7 @@ const DONE_BY_WEEK: Body = {
  * with no line asked for (`trend`).
  */
 const projectBefore = (doc: Body, id: string): Body =>
-  withPage(workingBefore(numbersBefore(standsBefore(doc), id), id), 'project', (now) =>
+  withPage(workingBefore(numbersBefore(standsBefore(lookBefore(doc, id)), id), id), 'project', (now) =>
     now.flatMap((b) => {
       if (b.kind === 'roadmap') return [DONE_BY_WEEK, b];
       if (b.heading !== 'At a glance') return [b];
@@ -746,6 +751,39 @@ const projectBefore = (doc: Body, id: string): Body =>
       return [{ ...b, cells }];
     }),
   );
+
+/** The window Due this week read until founder 2.6.0: no near edge, so a bill already late was listed as due this week. */
+const DUE_NO_NEAR_EDGE = 'state is open or part, due before +8d';
+
+/**
+ * AND THE FOUNDER'S HOME AS IT WAS BEFORE FOUNDER 2.6.0, undone first: Home called Overview in the voice and on the page,
+ * Due this week with no near edge and no figure or table for what is late, and a Cost column under Lapsing. Undone
+ * with the changes before it, so the version before is still the one released.
+ */
+const lookBefore = (doc: Body, id: string): Body => {
+  if (id !== 'founder') return doc;
+  const config = doc.config as Record<string, Body> | undefined;
+  return {
+    ...doc,
+    ...(config === undefined ? {} : { config: { ...config, voice_home: { ...config.voice_home, default: 'Overview' } } }),
+    declarations: (doc.declarations as Body[])
+      .filter((d) => d.metric !== 'late-money')
+      .map((d) => {
+        if (d.metric === 'due-this-week') return { ...d, where: DUE_NO_NEAR_EDGE };
+        if (d.page !== 'home-founder') return d;
+        return {
+          ...d,
+          title: 'Overview',
+          blocks: (d.blocks as Body[]).flatMap((b) => {
+            if (b.heading === 'Late') return [];
+            if (b.heading === 'Due this week') return [{ ...b, where: DUE_NO_NEAR_EDGE }];
+            if (b.heading === 'Lapsing') return [{ ...b, columns: [...(b.columns as Body[]), { field: 'cost', label: 'Cost', width: '13ch', align: 'end' }] }];
+            return [b];
+          }),
+        };
+      }),
+  };
+};
 
 /**
  * AND WHERE IT STANDS AS IT WAS BEFORE portfolio 1.16.0: the typed card on every project, said or not, and no figures
@@ -827,7 +865,7 @@ test("A USE CASE'S UPDATE THAT FOLDS A CHART INTO A FIGURE LOSES NOTHING, and go
     const next = value<Pack>(await normalise(now, { kind: 'local' }));
     const diff = await plan(next, stateOf(k, sql));
     assert.deepEqual(losses(diff), [], `${id}: nothing would be lost`);
-    assert.deepEqual([diff.adds.length, diff.retires.length, diff.conflicts.length], [id === 'founder' ? 2 : 0, 0, 0], `${id}: only a page changed`);
+    assert.deepEqual([diff.adds.length, diff.retires.length, diff.conflicts.length], [id === 'founder' ? 3 : 0, 0, 0], `${id}: only a page changed`);
     value(await install(next, diff, hostFor(k), diff.planHash));
     assert.equal(k.packs().find((p) => p.id === pack)?.version, u.version);
     const held = (k.declarations() as { id: string; body: unknown }[]).find((d) => d.id === 'page.project')!;

@@ -33,27 +33,28 @@ test('a judgement ranks below anything that would write', () => {
   assert.ok(costRank(costOf('rowset', { register: 'tasks', rows: [{ fields: {} }] })) < costRank(costOf('options', {})));
 });
 
-test('a rowset that only adds rows is cheap, and one that changes a row somebody has is not', () => {
+test('a rowset that adds rows is cheap, and so is one that changes a row somebody has: the history puts it back', () => {
   const adding = { register: 'tasks', rows: [{ fields: { title: 'One' } }, { fields: { title: 'Two' } }] };
   assert.equal(costOf('rowset', adding), 'rows');
   /* `at` IS WHAT SAYS THERE IS SOMETHING UNDER IT (`govern.ts` reads `at`, `version` and `patch`). */
   const changing = { register: 'tasks', rows: [{ fields: { title: 'One' } }, { at: 'tasks#3', version: 2, patch: { title: 'Two' } }] };
-  assert.equal(costOf('rowset', changing), 'undo');
+  assert.equal(costOf('rowset', changing), 'rows');
 });
 
 test('enough rows arriving at once is itself the event', () => {
   const rows = (n: number) => ({ register: 'tasks', rows: Array.from({ length: n }, (_, i) => ({ fields: { title: String(i) } })) });
   assert.equal(costOf('rowset', rows(MANY_ROWS - 1)), 'rows');
   assert.equal(costOf('rowset', rows(MANY_ROWS)), 'shape');
-  /* AND IT IS STILL THE DEARER BAND THAT WINS: one update among two hundred creates is an update. */
+  /* AND AN UPDATE AMONG THEM CHANGES NOTHING: forty rows, one of them an update with an empty patch, is still the
+     many that is the event, and no dearer. */
   const many = rows(MANY_ROWS * 2);
   many.rows[0] = { at: 'tasks#1', version: 1, patch: {} } as unknown as { fields: { title: string } };
-  assert.equal(costOf('rowset', many), 'undo');
+  assert.equal(costOf('rowset', many), 'shape');
 });
 
-test('a declaration that replaces one is dearer than a declaration that is new', () => {
+test('a declaration that replaces one weighs what a new one does: the one it replaces is kept as a prior version', () => {
   assert.equal(costOf('change', { declaration_id: 'page.work', to: { kind: 'page' } }), 'shape');
-  assert.equal(costOf('change', { declaration_id: 'page.work', to: { kind: 'page' }, from: { kind: 'page' } }), 'undo');
+  assert.equal(costOf('change', { declaration_id: 'page.work', to: { kind: 'page' }, from: { kind: 'page' } }), 'shape');
 });
 
 test('turning a pack off is the dearest thing a pack proposal can ask for', () => {

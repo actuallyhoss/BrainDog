@@ -326,7 +326,7 @@ test('A SMALL BUSINESS ON 1.6.0 IS UPDATED AND NEVER OFFERED SHOP', async () => 
     },
   };
   const steps = await updateFirstParty(port);
-  assert.deepEqual(steps.filter((s) => s.pack === 'usecase-business').map((s) => [s.from, s.to]), [['1.6.0', '1.7.0']], JSON.stringify(steps));
+  assert.deepEqual(steps.filter((s) => s.pack === 'usecase-business').map((s) => [s.from, s.to]), [['1.6.0', useCase('business')!.version]], JSON.stringify(steps));
   assert.ok(!steps.some((s) => s.pack === 'usecase-shop'), JSON.stringify(steps));
   assert.deepEqual(asked, []);
   assert.ok(!k.packs().some((p) => p.id === 'usecase-shop'));

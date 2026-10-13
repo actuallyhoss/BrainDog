@@ -18,6 +18,7 @@
  */
 
 import { isMoney, type MoneyValue } from './schema.ts';
+import { AMOUNT_SPACE, exponentOf, readAmount, writeAmount, type Amount, type WrittenAmount } from 'braindog-render';
 import { homeCurrency } from './api.ts';
 
 export type { MoneyValue };
@@ -243,33 +244,17 @@ export function merge(totals: readonly Total[]): Total {
 
 /* ── drawing an amount ──────────────────────────────────────────────────── */
 
-/** How English writes a currency in one of its two displays, or `undefined`; it throws on a code the runtime refuses. */
-const written = (currency: string, currencyDisplay: 'symbol' | 'narrowSymbol'): string | undefined =>
-  new Intl.NumberFormat('en', { style: 'currency', currency, currencyDisplay }).formatToParts(0).find((p) => p.type === 'currency')?.value;
-
 /**
- * The symbol a currency is written with, or `null` when it has none of its own and is written by its code.
+ * The sign a currency is written with, or `null` when it has none of its own and is written by its code.
  *
- * A DRAWING DECISION. `money()` in `braindog-render` still writes `GBP 28,320.00`, code first, and
- * everything that reads figures back out of text reads that. What changes is only the glyphs a
- * screen sets: the record's home currency is written the way a person writes it, `£28,320.00`, and
- * any other currency keeps its code beside the symbol so two currencies never look alike.
- *
- * A CURRENCY ENGLISH WRITES BY ITS CODE HAS NO SYMBOL HERE, even where the runtime knows a narrow one. The narrow
- * display alone gave `E£` for EGP, where English writes `EGP`, as it writes `CHF` and `KWD`, and the contract for
- * money on a screen says a currency with no symbol keeps its code first. A
- * currency that does have one is drawn with its narrow form, `$` rather than `CA$`, because the code after every
- * figure that is not in the home currency already says which dollar it is. A HEADLINE TOO: "EGP 1,350", as every
- * other place writes it (his word, 9 October), never "E£1,350".
+ * NOT A RULE OF THIS FILE'S. The one table that says how an amount is written on a screen is `braindog-render`'s
+ * `money.ts`, and this asks it: the sign is whatever the one writer puts in front of the home currency's figure. This
+ * module kept a sign table of its own, and with two tables one record wrote `$3.63 USD` in a cell, `US$4,012.46` on a
+ * bar and `EGP -700` in a line. So `£` for GBP, `$` for USD, and `null` for EGP, CHF and KWD, which English writes by
+ * their codes ("EGP 1,350", his word, 9 October, never "E£1,350").
  */
 export function symbolOf(currency: string): string | null {
-  try {
-    if (written(currency, 'symbol')?.toUpperCase() === currency.toUpperCase()) return null;
-    const narrow = written(currency, 'narrowSymbol');
-    return narrow && narrow.toUpperCase() !== currency.toUpperCase() ? narrow : null;
-  } catch {
-    return null;
-  }
+  return writeAmount({ minor: 0, currency }, currency, 'read')?.sign || null;
 }
 
 /**
@@ -277,47 +262,56 @@ export function symbolOf(currency: string): string | null {
  * figure a person checks against a statement, and "£100" for £100.49 or "£1,000" for £999.50 was a different amount
  * (research audit 14-15a, M6). From ten thousand up the fraction is a rounding a glance does not miss.
  */
-const WHOLE_FROM = 10_000;
+const WHOLE_FROM = 10_000n;
 
 /**
- * A TILE'S AMOUNT IN WHOLE UNITS, from its digits: "1,086,213" and ".41" are "1,086,213", and a half rounds up. Under
- * `WHOLE_FROM` units the amount is exact, and only a fraction of all zeros goes.
+ * A TILE'S AMOUNT IN WHOLE UNITS, in minor units still: 1,086,213.41 is 1,086,213.00, and a half rounds up, away from
+ * nought. Under `WHOLE_FROM` units the amount is as it was. WHICH AMOUNT A HEADLINE SAYS is this module's; how any
+ * amount is written is the one writer's, so the rounded amount goes to it like any other.
  */
-function wholeUnits(whole: string, fraction: string): { whole: string; fraction: string } {
-  const digits = whole.replace(/,/gu, '');
-  if (Number(digits) < WHOLE_FROM) return { whole, fraction: /^\.0+$/u.test(fraction) ? '' : fraction };
-  return { whole: /^\.[5-9]/u.test(fraction) ? grouped(String(Number(digits) + 1)) : whole, fraction: '' };
+function wholeUnits(amount: Amount): Amount {
+  const unit = 10n ** BigInt(exponentOf(amount.currency));
+  const size = amount.minor < 0n ? -amount.minor : amount.minor;
+  if (unit === 1n || size / unit < WHOLE_FROM) return amount;
+  const whole = ((size + unit / 2n) / unit) * unit;
+  return { minor: amount.minor < 0n ? -whole : whole, currency: amount.currency };
 }
 
 /**
  * An amount in parts: the whole and the fraction apart, so a figure can set its pence quieter, and
- * `iso` present only when the currency has a symbol and is not the home one.
+ * `iso` present only when the code stands after the figure, which is a currency with a sign that is not the home one.
  *
- * A CURRENCY WITH NO SYMBOL KEEPS ITS CODE IN FRONT, as part of `lead` (`EGP 58,185.54`), home or not: the code is
+ * A CURRENCY WITH NO SIGN KEEPS ITS CODE IN FRONT, as part of `lead` (`EGP 58,185.54`), home or not: the code is
  * the only mark it has, so it belongs to the figure, and a second code after it would say the currency twice.
+ * `lead` also holds the minus, in front of everything (`−EGP 497.26`, `−$12.00`), as the writer's table has it.
  *
  * `text` is the output of `money()`. Anything that is not a figure `money()` wrote comes back `null`.
  */
 export type Drawn = { lead: string; whole: string; fraction: string; iso: string | null };
 
-const WRITTEN = /^([A-Z]{3}) (−?)([\d,]+)(\.\d+)?$/u;
+/** How `Setting` and the older `true`/`false` map onto the amount a figure says and the writer's own two settings. */
+function written(amount: Amount, home: string | null, setting: Setting | boolean): WrittenAmount | null {
+  const headline = setting === true || setting === 'headline';
+  return writeAmount(headline ? wholeUnits(amount) : amount, home, setting === 'exact' ? 'exact' : 'read');
+}
 
 /**
  * `headline` IS A TILE'S FIGURE, OR THE PAGE'S ONE LINE: an amount of ten thousand or more is in whole units
  * (`wholeUnits`). `figure` keeps the amount exact, for a bar's value or any figure read against others. `true` is
  * `headline`. A currency English writes by its code keeps its code in both, as it does everywhere ("EGP 1,350").
+ *
+ * THE PARTS ARE THE ONE WRITER'S (`writeAmount` in `braindog-render`), set out the way `Money` draws them. Left to
+ * the default, the parts keep every minor unit, since a cell of a ledger is what asks for them.
  */
 export function drawn(text: string, home: string | null, setting: boolean | 'headline' | 'figure' = false): Drawn | null {
-  const m = WRITTEN.exec(text);
-  if (!m) return null;
-  const [, currency, minus, whole, fraction] = m as unknown as [string, string, string, string, string | undefined];
-  const symbol = symbolOf(currency);
-  const amount = setting === true || setting === 'headline' ? wholeUnits(whole, fraction ?? '') : { whole, fraction: fraction ?? '' };
+  const amount = readAmount(text);
+  const w = amount && written(amount, home, setting === true || setting === 'headline' ? 'headline' : 'exact');
+  if (!w) return null;
   return {
-    lead: symbol === null ? `${currency} ${minus}` : `${minus}${symbol}`,
-    whole: amount.whole,
-    fraction: amount.fraction,
-    iso: symbol !== null && currency !== home ? currency : null,
+    lead: `${w.minus}${w.codePlace === 'before' ? `${w.code}${AMOUNT_SPACE}` : w.sign}`,
+    whole: w.whole,
+    fraction: w.fraction,
+    iso: w.codePlace === 'after' ? w.code : null,
   };
 }
 
@@ -330,12 +324,28 @@ export function drawn(text: string, home: string | null, setting: boolean | 'hea
  */
 export type Setting = 'exact' | 'sentence' | 'figure' | 'headline';
 
+/** A figure `money()` wrote, where it stands in other words: the code, a true minus or none, grouped digits, a fraction. */
+const WRITTEN = /\b([A-Z]{3}) (−?)(\d{1,3}(?:,\d{3})*)(?:\.(\d+))?(?![\d,]*\d)/gu;
+
+/**
+ * The amount in one such figure, or `null`. Three capitals the runtime does not list as tender are not money. A
+ * SENTENCE MAY LEAVE MINOR UNITS UNSAID, "Pay USD 20" or "GBP 12.5", and that is still the amount: the units missing
+ * are noughts, filled in so the strict reader takes it. More places than the currency has is not an amount of it.
+ */
+function amountIn(currency: string, minus: string, whole: string, fraction = ''): Amount | null {
+  const exp = exponentOf(currency);
+  if (!TENDER.has(currency) || fraction.length > exp) return null;
+  return readAmount(`${currency} ${minus}${whole}${exp > 0 ? `.${fraction.padEnd(exp, '0')}` : ''}`);
+}
+
 /**
  * A sentence with every figure `money()` wrote in it redrawn the same way, as plain text.
  *
- * THE HOME CURRENCY IS WRITTEN BY ITS SYMBOL ALONE IN EVERY SETTING, "£39" and never "£39 GBP", and any other keeps
- * its code after the figure in every setting too, "$4,800 USD": two currencies never look alike, a headline's
- * included, since the narrow `$` is the same mark for four dollars. That is the design system's rule (`2.3`).
+ * ONE SPELLING A CURRENCY, IN EVERY SETTING, and it is the one writer's table (`braindog-render`'s `money.ts`), which a
+ * table cell, a bar and a chart are written by too. The home currency by its sign alone, "£39" and never "£39 GBP";
+ * any other with its code after the figure, "$4,800 USD", since the narrow `$` is the same mark for four dollars; a
+ * currency with no sign by its code in front, "EGP 700"; and the minus in front of everything, "−EGP 497.26". This
+ * function kept a rule of its own, and it differed from the writer's by a space and by where the minus stood.
  *
  * A FRACTION OF ALL ZEROS IS DROPPED OUTSIDE A LEDGER: "£33,850" and "EGP 58,185", because ".00" in a sentence is width
  * a phone does not have and says nothing a round figure does not. A fraction that is not all zeros is part of the figure
@@ -345,15 +355,10 @@ export type Setting = 'exact' | 'sentence' | 'figure' | 'headline';
  * `headline` and `false` is `sentence`, as the callers that predate the settings pass them; a table cell asks for `exact`.
  */
 export function symbolText(text: string, home: string | null, setting: Setting | boolean = 'sentence'): string {
-  const exact = setting === 'exact';
-  const standing = setting === true || setting === 'headline' ? 'headline' : setting === 'figure' ? 'figure' : false;
-  return text.replace(/\b[A-Z]{3} −?[\d,]+(?:\.\d+)?/gu, (hit) => {
-    const d = drawn(hit, home, standing);
-    /* THREE CAPITALS THE RUNTIME DOES NOT LIST AS TENDER ARE NOT MONEY, and their figure is left as it was written. */
-    if (!d || !TENDER.has(hit.slice(0, 3))) return hit;
-    const fraction = !exact && /^\.0+$/u.test(d.fraction) ? '' : d.fraction;
-    /* THE CODE STAYS WITH ITS AMOUNT, so a line of amounts in several currencies breaks between them and never inside one. */
-    return `${d.lead}${d.whole}${fraction}${d.iso ? ` ${d.iso}` : ''}`;
+  return text.replace(WRITTEN, (hit: string, currency: string, minus: string, whole: string, fraction: string | undefined) => {
+    const amount = amountIn(currency, minus, whole, fraction);
+    /* What is not an amount is left as it was written. */
+    return (amount && written(amount, home, setting)?.text) ?? hit;
   });
 }
 

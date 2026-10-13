@@ -122,22 +122,62 @@
 
   /**
    * FIVE TRACKS DO NOT FIT ON A PHONE, AND THE ONE THAT GAVE WAY WAS THE CHART: `minmax(0, 1fr)` is the only track that
-   * can yield and it is the bar, measured at exactly 0px in every `bar` and `gauge` row at 390. So the row becomes two
-   * lines, as `.row` does: the label leads, and the bar, the value, the note and the glyph share the line under it.
-   * FOUR TRACKS AND NOT THREE, because the glyph is a fifth child only on a toned row; given three it took a line alone.
+   * can yield and it is the bar, measured at exactly 0px in every `bar` and `gauge` row at 390. So the row is lines of
+   * its own, as `.row` is.
+   *
+   * THE NAME AND ITS FIGURE SHARE THE FIRST LINE, THE FIGURE AT THE END, and the bar takes the whole width under them.
+   * The figure used to sit after the bar on the second line, in tracks a step apart, so a book's amount ended against
+   * the next thing on the line and two were read as one run of digits. Now each row is one name and one figure with
+   * the row's own gap between them: the name's track gives way and wraps, the figure's is its own width and is never
+   * cut, and a figure that is a sentence wraps inside the share of the line it is allowed. The note is the last line,
+   * and an empty one takes none. The rows stand a step further apart than a wide screen's, since each is now three.
    */
   @media (width < 640px) {
+    /* Only where the rows are bars: a ring and a split are this primitive too, and keep their own air. */
+    .prop:has(> .prop-row) {
+      gap: var(--sp-3);
+    }
+
     .prop-row {
-      grid-template-columns: minmax(0, 1fr) auto auto auto;
-      gap: var(--sp-1) var(--sp-2);
+      grid-template-columns: minmax(35%, 1fr) minmax(0, auto) auto;
+      gap: var(--sp-1) var(--sp-4);
+      align-items: baseline;
     }
 
     .prop-label {
-      grid-column: 1 / -1;
+      grid-area: 1 / 1;
+      min-inline-size: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .prop-value {
+      grid-area: 1 / 2;
+      justify-self: end;
+      min-inline-size: 0;
+      text-align: end;
+      overflow-wrap: anywhere;
+    }
+
+    .prop-row > .glyph {
+      grid-area: 1 / 3;
+      align-self: center;
+    }
+
+    /* The mark's track is empty on a row with no tone, and its gap would hold the figure a step short of the bar's end. */
+    .prop-row:not(:has(> .glyph)) > .prop-value {
+      grid-column: 2 / -1;
     }
 
     .prop-track {
-      grid-column: 1;
+      grid-area: 2 / 1 / auto / -1;
+    }
+
+    .prop-note {
+      grid-area: 3 / 1 / auto / -1;
+    }
+
+    .prop-note:empty {
+      display: none;
     }
   }
 }

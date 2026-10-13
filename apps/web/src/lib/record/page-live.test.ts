@@ -1087,7 +1087,7 @@ test('A FIGURE GROUPED BY A REF NAMES EACH PART BY ITS ROW, the record’s own l
   learnHome('EGP');
   try {
     const figures = draw(walked.block).segments.flatMap((s) => (s.type === 'block' ? s.rows.map((r) => r.cells[1]) : []));
-    assert.deepEqual(figures, ['EGP 1,086,213.41', 'EGP 120,000', 'EGP 9,382.59']);
+    assert.deepEqual(figures, ['EGP\u00a01,086,213.41', 'EGP\u00a0120,000', 'EGP\u00a09,382.59']);
   } finally {
     learnHome(null);
   }
@@ -1551,6 +1551,9 @@ test('A HEAT SAYS HOW MANY DAYS FALL OUTSIDE ITS TWELVE WEEKS, since no cell dra
   assert.equal(blockOf(heat as never, new Map(), AT).cannot, undefined);
   assert.match(said(heat), /3 days fall outside the twelve weeks/u);
   assert.match(said({ ...heat, wholeRead: { ...days, total: 4, outside: 1 } }), /1 day falls outside the twelve weeks/u);
+  /* DAYS WHERE THE RECORD COUNTED DAYS: three entries on one old day are one day, and three with no day are none. */
+  assert.match(said({ ...heat, wholeRead: { ...days, outsideDays: 1 } }), /1 day falls outside the twelve weeks/u);
+  assert.doesNotMatch(said({ ...heat, wholeRead: { ...days, outsideDays: 0 } }), /outside the twelve weeks/u);
   /* NONE OUTSIDE SAYS NOTHING, and a count that is no count says nothing rather than a wrong number. */
   assert.doesNotMatch(said({ ...heat, matched: 3, wholeRead: { ...days, total: 3, outside: 0 } }), /outside the twelve weeks/u);
   assert.doesNotMatch(said({ ...heat, matched: 3, wholeRead: { rows: days.rows, total: 3 } }), /outside the twelve weeks/u);

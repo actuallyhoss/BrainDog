@@ -1518,7 +1518,7 @@ export type SlashMeter = {
    * A METER WITHOUT IT LETS THE LOOK ASK NOTHING, because `hold` counts against his asks and Free's `ASK_CAP_FREE` are his
    * alone: the look falls to the rules, and no skill or headline is drafted.
    */
-  background?(kind?: SlashBackground): Promise<{ ok: true; value: SlashHeld } | { ok: false; refusal: Refusal }>;
+  background?(kind?: SlashBackground, payload?: unknown): Promise<{ ok: true; value: SlashHeld } | { ok: false; refusal: Refusal }>;
 };
 
 /**
@@ -2623,7 +2623,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const background = kind !== 'draft' && kind !== 'form';
       if (background && !meter.background) return { spent: 'This host cannot count an ask against the background allowance, so its model was not asked.' };
       /* A LEDGER THAT CANNOT BE READ IS A CAP THAT CANNOT BE CHECKED, so the model is not asked: the side a spend errs on. */
-      const hold = await (background ? meter.background!(kind) : meter.hold(kind)).catch(() => ({ ok: false as const, refusal: { code: 'INTERNAL', fix: "Slash's ledger could not be read, so its model was not asked." } }));
+      const hold = await (background ? meter.background!(kind, input) : meter.hold(kind)).catch(() => ({ ok: false as const, refusal: { code: 'INTERNAL', fix: "Slash's ledger could not be read, so its model was not asked." } }));
       if (!hold.ok) return { spent: hold.refusal.fix };
       held = hold.value;
     }
@@ -3804,16 +3804,17 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         dropped.push(`${SLASH_OPEN_CAP} of Slash's questions are already waiting on Decide, so the next version of ${b.name} waits for a slot.`);
         continue;
       }
+      /* WHAT THE MODEL IS ABOUT TO BE SENT, read before the ask is held, so a host can refuse what must never leave. */
+      const input = skillDraftInput(b);
       let held: SlashHeld | undefined;
       if (meter?.background) {
-        const hold = await meter.background('skill').catch(() => ({ ok: false as const, refusal: { code: 'INTERNAL', fix: "Slash's ledger could not be read, so its model was not asked." } }));
+        const hold = await meter.background('skill', input).catch(() => ({ ok: false as const, refusal: { code: 'INTERNAL', fix: "Slash's ledger could not be read, so its model was not asked." } }));
         if (!hold.ok) {
           dropped.push(`${hold.refusal.fix} No next version of ${b.name} was drafted.`);
           break;
         }
         held = hold.value;
       }
-      const input = skillDraftInput(b);
       let raw: unknown;
       try {
         raw = await skill(input);

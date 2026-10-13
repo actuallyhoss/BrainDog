@@ -8,7 +8,7 @@
  * Eastern Arabic digits break tabular alignment: prose may use the locale's digits, a ledger may not.
  */
 
-import { amountsIn, readAmount, writeAmount, type AmountSetting, type WrittenAmount } from './money.ts';
+import { amountsIn, writeFigure, type AmountSetting, type WrittenAmount } from './money.ts';
 
 const MINUS = '−';
 const NUM = 'en-u-nu-latn';
@@ -17,19 +17,23 @@ const NUM = 'en-u-nu-latn';
  * THE HOME CURRENCY, AS THE OLD NAMES BELOW ARE TOLD IT (REC-C05). `symbolFigure`, `headlineFigure`, `barFigure`,
  * `axisFigure` and `leadingCode` each wrote an amount their own way, from text, with a sign table of their own. Told
  * the record's home currency (a code, or `null` for a record that has none) each is one call of the one writer in
- * `money.ts`: the stored figure is read once (`readAmount`) and written once (`writeAmount`).
+ * `money.ts`: the figure is read once (`readFigure`) and written once (`writeAmount`), by the one table there. So a
+ * currency that is not the home one reads the same in a cell, on a tile, on a bar and in a sentence: `$3.63 USD`.
  *
  * NOT TOLD (`undefined`), each keeps the path it had, because a caller that does not know the home currency cannot
- * be given the rule, and every drawer still calls these without it. That path goes when the last of them passes
- * `home`. Text that is not a stored figure, a drawing or a bare number, keeps that path too: it is never read as one.
+ * be given the rule. That path writes the unambiguous symbol (`US$3.63`), which is a second spelling, so it is only
+ * for a host that draws nothing else of the record; it goes when the last host passes `home`. Text that is not one
+ * whole figure, a compact drawing, a sign with no code or a bare number, keeps that path too: it is never read as one.
  */
 export type Home = string | null | undefined;
 
-/** A stored figure as the one writer writes it, or `null` when the home is not told or the text is not a stored figure. */
+/** A figure as the one writer writes it, or `null` when the home is not told or the text is not one whole figure. */
 function writtenOnce(text: string, home: Home, setting: AmountSetting): WrittenAmount | null {
   if (home === undefined) return null;
-  const amount = readAmount(text.trim());
-  return amount && writeAmount(amount, home, setting);
+  /* ONE READER FOR THE THREE WAYS A HOST HANDS A FIGURE ON: stored (`USD 3.63`), stored before figures were grouped
+     (`USD 4012.46`), and drawn first with its code after (`$3.63 USD`). The last two fell to the path below and came
+     out `US$4,012.46` beside a cell's `$3.63 USD`: two spellings of one currency on one record. */
+  return writeFigure(text, home, setting);
 }
 
 /**
@@ -126,7 +130,7 @@ export function leadingCode(
   }
   /* A SIGN WRITTEN IN FRONT OF THE CODE IS PART OF THE FIGURE. A page may mark an amount as money in or money out
      ("+GBP 850.00"), and read as not a figure at all the whole cell stayed in the code’s spelling, in a column of symbols. */
-  const m = /^([+\u2212-]?)([A-Z]{3}) (?=[\u2212\-\d])/u.exec(text);
+  const m = /^([+\u2212-]?)([A-Z]{3})[ \u00a0](?=[\u2212\-\d])/u.exec(text);
   return m ? { currency: m[2]!, rest: text.slice(m[0].length), sign: m[1] ?? '' } : null;
 }
 
@@ -229,7 +233,7 @@ export const integer = (value: number): string => signed(value, (n) => n.toLocal
  * U+00A0 between them, so a line of amounts never breaks inside one, and the plain space this pattern asked for read
  * every such figure as no figure at all: the forecast's axis said `£31,035.00 GBP` in full and a tile kept its `.00`.
  */
-const FIGURE_PARTS = /^([+−-]?)([A-Z]{3} |[A-Z]{0,2}\p{Sc})?([−-]?)(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d+))?([ \u00a0\u202f][A-Z]{3})?$/u;
+const FIGURE_PARTS = /^([+−-]?)([A-Z]{3}[ \u00a0]|[A-Z]{0,2}\p{Sc})?([−-]?)(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d+))?([ \u00a0\u202f][A-Z]{3})?$/u;
 
 type FigureParts = { sign: string; unit: string; inner: string; whole: string; minor: string; code: string };
 
@@ -278,7 +282,7 @@ const grouped = (digits: string): string => digits.replace(/^0+(?=\d)/u, '').rep
  */
 function oneMark(p: FigureParts): { unit: string; code: string } {
   const code = p.code.trim();
-  if (code === '' || p.unit === '' || /^[A-Z]{3} $/u.test(p.unit)) return { unit: p.unit, code: p.code };
+  if (code === '' || p.unit === '' || /^[A-Z]{3}[ \u00a0]$/u.test(p.unit)) return { unit: p.unit, code: p.code };
   return { unit: symbolOf(code) ?? `${code} `, code: '' };
 }
 
@@ -323,7 +327,7 @@ export function headlineFigure(text: string, home?: Home): string {
 function headlineOne(text: string): string {
   const p = figureParts(text);
   if (!p) return text;
-  const coded = /^[A-Z]{3} $/u.test(p.unit) ? p.unit.trim() : '';
+  const coded = /^[A-Z]{3}[ \u00a0]$/u.test(p.unit) ? p.unit.trim() : '';
   const code = p.code.trim() || coded;
   /* A FIGURE WITH NO CURRENCY IN IT IS NOT ONE THIS FUNCTION SAYS. */
   if (code === '' && p.unit === '') return text;
@@ -332,7 +336,10 @@ function headlineOne(text: string): string {
   const plus = p.sign === '+' ? '+' : '';
   const minus = p.sign === MINUS || p.inner === MINUS ? MINUS : '';
   const symbol = symbolOf(code);
-  return symbol === null ? `${plus}${code} ${minus}${body}` : `${plus}${minus}${symbol}${body}`;
+  if (symbol !== null) return `${plus}${minus}${symbol}${body}`;
+  /* A CODE JOINED BY THE NO-BREAK SPACE IS THE ONE WRITER'S DRAWING (`−EGP 73,615.27`), and it keeps the writer's
+     order, the minus in front and the same space: said this path's way it read `EGP −73,615.27` beside itself. */
+  return p.unit.endsWith(' ') ? `${plus}${minus}${code} ${body}` : `${plus}${code} ${minus}${body}`;
 }
 
 /** An amount in minor units as a headline says it: `headlineMoney(3_385_000, 'GBP')` is `£33,850`. */

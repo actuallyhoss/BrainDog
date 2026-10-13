@@ -11,8 +11,15 @@
 
   A TILE ON THE BOARD (DIRECTION 39): flat, no border, no shadow. The drawing is a small board inside it, its blocks
   drawn as the board's own colour, so it reads as a picture of a page and not as a tile inside a tile.
+
+  THE COMPACT FORM IS ONE QUIET LINE THAT OPENS ON TAP (`compact`, look fault G). On a page somebody opened to read
+  their own things, the whole card over the first tile outranked the page: a first screen on a phone, a third of one on
+  a laptop. So there it is Slash's mark, the sentence on one line and a chevron, and a press opens the card whole, with
+  the same line as its way to close. Nothing is hidden for good: the sentence is the line's accessible name whole, even
+  where a narrow screen cuts it.
 -->
 <script lang="ts">
+  import { tick } from 'svelte';
   import Tile from '../ui/Tile.svelte';
   import Button from '../ui/Button.svelte';
   import Icon from '../ui/Icon.svelte';
@@ -22,19 +29,50 @@
     item,
     acts,
     busy = null,
+    compact = false,
   }: {
     item: PenItem;
     acts: Pick<OfferActs, 'make' | 'notNow'>;
     /** The id of the offer being made, while it is: the card's Make it waits and says so. */
     busy?: string | null | undefined;
+    /** One line that opens on tap, for a page whose own content comes first. Left out, the card is drawn whole. */
+    compact?: boolean | undefined;
   } = $props();
+
+  /* WHILE IT IS BEING MADE THE CARD STAYS OPEN, so the press that started it is not folded away under the finger. */
+  let opened = $state(false);
+
+  /* THE PRESS KEEPS ITS PLACE: opening swaps the line for the card and folding swaps it back, so the focus is put on
+     the button that took the pressed one's place, and a keyboard is never dropped at the top of the page. */
+  let line = $state<HTMLButtonElement | null>(null);
+  let fold = $state<HTMLButtonElement | null>(null);
+  async function turn(open: boolean): Promise<void> {
+    opened = open;
+    await tick();
+    (open ? fold : line)?.focus();
+  }
 
   const drawn = $derived(draftDrawing(item));
   const making = $derived(busy === item.id);
+  const folded = $derived(compact && !opened && !making);
 </script>
 
-<Tile class="offer-card" data-offer={item.id}>
-  <p class="offer-who"><span class="offer-mark" title="Slash"><Icon name="slash" size="s" /></span>{offerWords.noticed}</p>
+{#if folded}
+  <button bind:this={line} type="button" class="offer-line" data-offer={item.id} data-compact aria-expanded="false" aria-label="{offerWords.noticed}: {item.why}" onclick={() => void turn(true)}>
+    <span class="offer-mark"><Icon name="slash" size="s" /></span>
+    <span class="offer-line-why">{item.why}</span>
+    <span class="offer-turn"><Icon name="chevronDown" size="s" /></span>
+  </button>
+{:else}
+<Tile class="offer-card" data-offer={item.id} data-compact={compact ? '' : undefined}>
+  {#if compact}
+    <button bind:this={fold} type="button" class="offer-who offer-fold" aria-expanded="true" onclick={() => void turn(false)}>
+      <span class="offer-mark"><Icon name="slash" size="s" /></span>{offerWords.noticed}
+      <span class="offer-turn" data-up><Icon name="chevronDown" size="s" /></span>
+    </button>
+  {:else}
+    <p class="offer-who"><span class="offer-mark" title="Slash"><Icon name="slash" size="s" /></span>{offerWords.noticed}</p>
+  {/if}
   <p class="offer-why">{item.why}</p>
   {#if drawn.blocks.length > 0}
     <div class="offer-mini" role="group" aria-label={offerWords.drawing(drawn.title)}>
@@ -55,6 +93,7 @@
     <Button weight="bare" disabled={making} onclick={() => void acts.notNow(item)}>{offerWords.notNow}</Button>
   </div>
 </Tile>
+{/if}
 
 <style>
   :global(.offer-card) {
@@ -74,7 +113,69 @@
 
   .offer-mark {
     display: inline-flex;
+    flex: none;
     color: var(--action-text);
+  }
+
+  /* THE FOLDED LINE: a tile one line tall, the board's own radius, body text in the quiet ink. A whole row to press,
+     44px on a finger, and never a second line: what does not fit is cut, and the press opens it whole. */
+  .offer-line {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    inline-size: 100%;
+    min-block-size: 40px;
+    padding: var(--sp-2) 20px;
+    border: 0;
+    border-radius: var(--r-lg);
+    background: var(--bg);
+    color: var(--dim);
+    font: inherit;
+    font-size: var(--fs-body);
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .offer-line:hover {
+    color: var(--ink);
+  }
+
+  .offer-line-why {
+    flex: 1;
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .offer-turn {
+    display: inline-flex;
+    flex: none;
+    margin-inline-start: auto;
+    color: var(--dim);
+  }
+
+  .offer-turn[data-up] {
+    transform: rotate(180deg);
+  }
+
+  /* THE OPEN CARD'S WAY BACK: the same line it opened from, as a bare row the width of the card. */
+  .offer-fold {
+    inline-size: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: var(--fs-meta);
+    text-align: start;
+    cursor: pointer;
+  }
+
+  @media (pointer: coarse) {
+    .offer-line,
+    .offer-fold {
+      min-block-size: 44px;
+    }
   }
 
   /* THE CARD'S LINE IS THE QUESTION'S SIZE (DIRECTION 39's 17), at medium, as the mockup's step 7 draws it. */

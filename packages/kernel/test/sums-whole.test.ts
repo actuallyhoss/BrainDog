@@ -355,6 +355,57 @@ test('A HOST THAT HANDS ONE GROUPED READ IS ASKED ONCE, and the list is not walk
   });
 });
 
+test('THE GROUPED READ HOLDS THE SAME COUNT AS THE WALK: parts whose rows add to 50,001 are refused, and 50,000 are answered', () => {
+  const schema = k.schemaOf('ledger');
+  assert.ok(schema);
+  /* A host whose one grouped read answers two parts, `rows` between them. Neither part alone is past the ceiling. */
+  const grouped = (rows: number) => {
+    const seen = { asked: 0 };
+    const deps = {
+      pages: () => [],
+      metric: () => null,
+      read: () => ({ ok: false, refusal: { code: 'METRIC_UNKNOWN', fix: 'There is no such figure.' } }),
+      list: () => ({ ok: true, value: { rows: [], matched: rows, cursor: null } }),
+      schemaOf: () => schema,
+      titleOf: () => 'what',
+      runway: () => null,
+      ctx: { nowMs: NOW, schemaOf: () => schema },
+      whole: () => {
+        seen.asked += 1;
+        return {
+          ok: true,
+          value: [
+            { by: ['Rent'], unit: 'EGP', day: null, sum: rows - 20_000, rows: rows - 20_000, said: rows - 20_000 },
+            { by: ['Food'], unit: 'EGP', day: null, sum: 20_000, rows: 20_000, said: 20_000 },
+          ],
+        };
+      },
+    } as unknown as PageDeps;
+    const answer = () => readBlock(deps, { kind: 'bar', source: 'register.ledger', columns: BY_CATEGORY } as never) as Answered;
+    return { seen, answer };
+  };
+
+  /* THE CLOCK STANDS STILL, so the count is the only bound that can speak. */
+  const still = mock.method(performance, 'now', () => 0);
+  try {
+    const most = grouped(WHOLE_WALK_ROWS);
+    const b = most.answer();
+    assert.deepEqual(b.refusals, []);
+    assert.equal(b.wholeRead?.total, WHOLE_WALK_ROWS);
+    assert.equal(most.seen.asked, 1);
+
+    const over = grouped(WHOLE_WALK_ROWS + 1);
+    const refused = over.answer();
+    assert.equal(refused.wholeRead, undefined, 'a list the browser refuses to count was added up by the host');
+    assert.equal(refused.refusals?.[0]?.code, 'OUT_OF_BOUNDS');
+    assert.equal(refused.refusals?.[0]?.at, 'where');
+    assert.equal(refused.refusals?.[0]?.fix, wholeLong(WHOLE_WALK_ROWS + 1)?.fix);
+    assert.equal(over.seen.asked, 1);
+  } finally {
+    still.mock.restore();
+  }
+});
+
 test('WHERE ANSWER_KEYS DOES NOT LIST IT NO WHOLE READ IS HANDED, and a block past 200 rows is refused as it was', () => {
   key(false);
   try {

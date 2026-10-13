@@ -33,6 +33,12 @@
  * RED BEFORE THE SPLIT, measured with the one count put back: "five background asks spent 3 of his asks", and the look
  * after his three reads turned away.
  *
+ * AND THE TWO TOGETHER STAY INSIDE THE MONTH'S BUDGET (ceiling-total-57-58). Held apart, each side could spend the whole
+ * ceiling, so one record could cost the operator twice the number he set. The joint cases make every call cost its worst,
+ * 232 neurons, at a budget of 696: his asks and the background's are asked in turn until both are turned away, and the
+ * ledger's bill is never past 696. RED WITHOUT THE JOINT CAP, measured with it switched off: three
+ * cases fail, each on a read that was answered past the budget.
+ *
  * THE CLOCK IS MOCKED, because a press on a record younger than two weeks asks no model at all, and the Worker's clock
  * is `Date.now()`. The binding is a local function and no test here spends a neuron.
  */
@@ -43,7 +49,8 @@ import assert from 'node:assert/strict';
 import { createRecordApi } from '@braindog/record';
 
 import { fixedClock, openSqlite } from '../../../packages/kernel/test/sqlite.ts';
-import { workerSlashDoor } from '../src/slash.ts';
+import { PURPOSES } from '@braindog/host/infer';
+import { HIS_CALL, workerSlashDoor } from '../src/slash.ts';
 import { slashDays, workerSlashMeter, workerUnderstandLedger } from '../src/slash-meter.ts';
 import { cloud } from './cloud-harness.ts';
 
@@ -245,12 +252,16 @@ const TASKS = {
 type Refused = { ok: boolean; refusal?: { code: string; fix: string } };
 type Status = { asks: { used: number; cap: number } };
 
-async function paletteAndBackground(neurons: string) {
+/** The worst ask the ceiling counts every call as, 12,000 tokens in and 1,500 out: 232 neurons on the included model. */
+const DEAR = { in: 12_000, out: 1_500 };
+const CHEAP = { in: 100, out: 10 };
+
+async function paletteAndBackground(neurons: string, reply = { prompt_tokens: 700, completion_tokens: 60 }) {
   let runs = 0;
   const AI = {
     run: async () => {
       runs++;
-      return { choices: [{ message: { role: 'assistant', content: PREDICATE }, finish_reason: 'stop' }], usage: { prompt_tokens: 700, completion_tokens: 60 } };
+      return { choices: [{ message: { role: 'assistant', content: PREDICATE }, finish_reason: 'stop' }], usage: reply };
     },
   };
   const env = { SLASH_ENDPOINT: '', AI, AI_GATEWAY: 'braindog', SLASH_INCLUDED: 'yes', SLASH_INCLUDED_MONTH_NEURONS: neurons };
@@ -266,12 +277,16 @@ async function paletteAndBackground(neurons: string) {
   const meter = workerSlashMeter(env, () => api, deps);
   const understand = workerUnderstandLedger(env, () => api, deps);
   /** One background ask, settled as a model that answered where it was held. */
-  const background = async (kind: 'look' | 'headline' | 'skill' | 'understand', unreached = false): Promise<Refused> => {
+  const background = async (kind: 'look' | 'headline' | 'skill' | 'understand', unreached = false, usage = CHEAP): Promise<Refused> => {
     const held = kind === 'understand' ? await understand.background(kind) : await meter.background!(kind);
-    if (held.ok) held.value.settle(unreached ? { usage: { in: 0, out: 0 }, code: 'UNREACHABLE' } : { usage: { in: 100, out: 10 } });
+    if (held.ok) held.value.settle(unreached ? { usage: { in: 0, out: 0 }, code: 'UNREACHABLE' } : { usage });
     return held;
   };
-  return { engine, background, own, at, api, runs: () => runs, done: () => (sql.close(), own.close()) };
+  /** One background ask held and left in flight: the model has been called and has not answered yet. */
+  const inFlight = async (kind: 'look' | 'headline' | 'skill') => meter.background!(kind);
+  /** What the month has spent of the included model, his and the background's together, as the ledger bills it. */
+  const billed = (): number => own.one<{ n: number | null }>("SELECT SUM(neurons) AS n FROM slash_call WHERE model <> '-'")?.n ?? 0;
+  return { engine, background, inFlight, billed, own, at, api, runs: () => runs, done: () => (sql.close(), own.close()) };
 }
 
 test('A CEILING OF THREE ASKS, FIVE BACKGROUND ASKS, AND THE PALETTE STILL ANSWERS: the two are counted and held apart', async () => {
@@ -425,6 +440,94 @@ test("THE RECORD'S OWN DRAFT IS HELD OVER THE BACKGROUND'S COUNT: asked after hi
     assert.equal(runs(), 4, 'a draft past the background\'s three reached the binding');
     const n = own.one<{ n: number }>("SELECT COUNT(*) AS n FROM slash_call WHERE model <> '-' AND spends = 'background'")?.n;
     assert.equal(n, 3);
+  } finally {
+    done();
+  }
+});
+
+/* ── the two together, inside the month's budget (ceiling-total-57-58) ───────────────────────────────────────────────── */
+
+const DEAR_REPLY = { prompt_tokens: DEAR.in, completion_tokens: DEAR.out };
+const BUDGET = 696;
+
+test("HIS ASKS AND THE BACKGROUND'S TOGETHER NEVER SPEND PAST THE MONTH'S BUDGET: every call at its worst, and the bill stops at the ceiling", async () => {
+  const { engine, background, billed, runs, done } = await paletteAndBackground(String(BUDGET), DEAR_REPLY);
+  try {
+    /* THREE CALLS AT THEIR WORST ARE THE WHOLE MONTH, whoever asked: a read, a look, a read. */
+    assert.ok(((await engine.read('What is still open?', OWNER_CTX)) as Refused).ok);
+    assert.ok((await background('look', false, DEAR)).ok);
+    assert.ok(((await engine.read('open tasks', OWNER_CTX)) as Refused).ok);
+    assert.equal(runs(), 2);
+    assert.ok(billed() > BUDGET - 232 && billed() <= BUDGET, `three calls at their worst billed ${billed()} of ${BUDGET}`);
+
+    /* NEITHER COUNT IS REACHED, his two of three and the background's one of three, AND BOTH ARE TURNED AWAY. */
+    for (let i = 0; i < 5; i++) {
+      const read = (await engine.read(`one more ${i}`, OWNER_CTX)) as Refused;
+      assert.equal(read.refusal?.code, 'SLASH_BUDGET_SPENT', JSON.stringify(read));
+      for (const kind of ['look', 'headline', 'skill', 'understand'] as const) {
+        const more = await background(kind, false, DEAR);
+        assert.equal(more.refusal?.code, 'SLASH_BUDGET_SPENT', `${kind}: ${JSON.stringify(more)}`);
+      }
+    }
+    assert.equal(runs(), 2, 'an ask past the budget reached the binding');
+    assert.ok(billed() <= BUDGET, `the month billed ${billed()} neurons against a budget of ${BUDGET}`);
+
+    /* AND HE IS TOLD NO ASKS ARE LEFT, not one of three still to make on a host refusing every one. */
+    const { used, cap } = (engine.status() as Status).asks;
+    assert.deepEqual([used, cap], [2, 2]);
+  } finally {
+    done();
+  }
+});
+
+test('THE BACKGROUND AT ITS WORST CANNOT SPEND THE CEILING TWICE OVER WITH HIM: its three dear asks are the month, and his read is turned away', async () => {
+  const { engine, background, billed, runs, done } = await paletteAndBackground(String(BUDGET), DEAR_REPLY);
+  try {
+    for (const kind of ['look', 'headline', 'skill'] as const) assert.ok((await background(kind, false, DEAR)).ok, kind);
+    const read = (await engine.read('What is still open?', OWNER_CTX)) as Refused;
+    assert.equal(read.refusal?.code, 'SLASH_BUDGET_SPENT', JSON.stringify(read));
+    assert.equal(runs(), 0, 'a read past the budget reached the binding');
+    assert.ok(billed() <= BUDGET, `the month billed ${billed()} neurons against a budget of ${BUDGET}`);
+  } finally {
+    done();
+  }
+});
+
+test('AN ASK IN FLIGHT IS TAKEN AT ITS WORST UNTIL ITS BILL IS IN: three held and unanswered fill the month, and settled cheap they leave room', async () => {
+  const { engine, inFlight, runs, done } = await paletteAndBackground(String(BUDGET));
+  try {
+    const held = [await inFlight('look'), await inFlight('headline'), await inFlight('skill')];
+    assert.deepEqual(held.map((h) => h.ok), [true, true, true], JSON.stringify(held));
+    /* NO NEURON IS BILLED YET AND EACH MAY STILL COST 232, so a fourth call could end the month past its budget. */
+    const early = (await engine.read('What is still open?', OWNER_CTX)) as Refused;
+    assert.equal(early.refusal?.code, 'SLASH_BUDGET_SPENT', JSON.stringify(early));
+    assert.equal(runs(), 0);
+    /* THE BILLS COME IN SMALL, and the room they did not use is his again. */
+    for (const h of held) if (h.ok) h.value.settle({ usage: CHEAP });
+    const read = (await engine.read('What is still open?', OWNER_CTX)) as Refused;
+    assert.ok(read.ok, JSON.stringify(read));
+    assert.equal(runs(), 1);
+  } finally {
+    done();
+  }
+});
+
+test('WHOSE A CALL IS COMES FROM THE PURPOSES TABLE: an unanswered call of every purpose is his exactly where the table says a person pays', async () => {
+  const { engine, own, at, done } = await paletteAndBackground(String(BUDGET));
+  try {
+    assert.ok(engine.status());
+    const ts = new Date(at.now()).toISOString();
+    for (const purpose of Object.keys(PURPOSES))
+      own.exec(
+        "INSERT INTO slash_call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, code, purpose, spends) VALUES (?, ?, 'read', 'a', 'glm-5.3-flash', 0, 0, 0, 0, 'error', 'UNREACHABLE', ?, 'none')",
+        `call_${purpose}`,
+        ts,
+        purpose,
+      );
+    const his = own.all<{ purpose: string }>(`SELECT purpose FROM slash_call WHERE ${HIS_CALL} ORDER BY purpose`).map((r) => r.purpose);
+    const persons = Object.entries(PURPOSES).filter(([, who]) => who.spends === 'person').map(([purpose]) => purpose).sort();
+    assert.deepEqual(his, persons);
+    assert.deepEqual(persons, ['ask', 'automation', 'plan'], 'the table moved whose asks are a person\'s: read the ceiling\'s counts again');
   } finally {
     done();
   }

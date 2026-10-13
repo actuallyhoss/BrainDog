@@ -23,7 +23,7 @@ test('ANOTHER CURRENCY KEEPS ITS CODE AFTER THE FIGURE, and one with no symbol k
   const foreign = moneyInText('Invoice for USD 4800.00 is due', 'GBP');
   assert.match(foreign, /\$4,800\s?USD/u);
   assert.ok(!foreign.includes('USD 4'), foreign);
-  assert.equal(moneyInText('EGP 58185.54 in the bank', 'EGP'), 'EGP 58,185.54 in the bank');
+  assert.equal(moneyInText('EGP 58185.54 in the bank', 'EGP'), 'EGP\u00a058,185.54 in the bank');
 });
 
 test('A NEGATIVE HAS A TRUE MINUS IN FRONT OF THE SYMBOL, whichever minus the sentence was stored with', () => {
@@ -33,7 +33,7 @@ test('A NEGATIVE HAS A TRUE MINUS IN FRONT OF THE SYMBOL, whichever minus the se
 
 test('THE CURRENCY’S OWN DECIMALS ARE KEPT, and a whole with none is grouped all the same', () => {
   assert.match(moneyInText('JPY 129900', 'GBP'), /^¥129,900\s?JPY$/u);
-  assert.equal(moneyInText('KWD 1.500', 'KWD'), 'KWD 1.500');
+  assert.equal(moneyInText('KWD 1.500', 'KWD'), 'KWD\u00a01.500');
 });
 
 test('THREE CAPITALS AND A NUMBER ARE NOT MONEY UNLESS THE CODE IS TENDER', () => {

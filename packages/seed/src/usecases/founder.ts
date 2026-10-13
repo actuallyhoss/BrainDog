@@ -23,6 +23,7 @@
  * case's fingerprint, which `usecase-versions.test.ts` then asks a version for.
  */
 import { DUE_THIS_WEEK } from '../modules/money.ts';
+import { DUE_WINDOW, LATE_MONEY, LATE_WINDOW } from '../modules/money/pages/shared.ts';
 import { projectTemplate } from '../modules/portfolio.ts';
 import { counted } from './counted.ts';
 
@@ -328,8 +329,14 @@ export const FOUNDER = {
      2.5.0 (REC-C16 part b, REC-C08 step 9): `project-numbers-7d`, the numbers a project sent this week, as the last
      figure of Where it stands on `page.project`; and `projects-earning-silent`, a project marked Earning with no cleared
      money in and no number in 90 days, named on Projects in a line under In play. Two figures, a cell and a block laid
-     on another pack's page added, nothing taken away. */
-  version: '2.5.0',
+     on another pack's page added, nothing taken away.
+
+     2.6.0, FROM THE LOOK AT A REAL RECORD ON 13 OCTOBER. Home is called Today, in the voice and as the page's title,
+     where both said Overview under a rail item that said Today. Due this week starts today (`DUE_WINDOW`), and what is
+     already late has its own table ahead of it, Late, oldest first, with its own count (`late-money`): a bill four days
+     late was listed as due this week. Lapsing loses its Cost column, which was a dash on every line. A figure and a
+     block added, a window narrowed, a column and two words changed, so a minor step. 2.5.0 is live. */
+  version: '2.6.0',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
   author: 'BrainDog',
@@ -344,7 +351,7 @@ export const FOUNDER = {
   ],
   modules: ['portfolio', 'people', 'money-core', 'estate', 'work'],
   voice: {
-    home: 'Overview',
+    home: 'Today',
     right_now: 'The numbers',
     needs_you: 'Needs your call',
     nothing_needs_you: 'Nothing needs your call',
@@ -417,7 +424,9 @@ export const FOUNDER = {
       /* WHAT THE FOUNDER'S PAGES ARE DRAWN ON, SINCE 1.11.0, each over its list's own clauses. */
       counted('datapoints-held', 'Numbers', 'register.datapoints'),
       counted('organisations-held', 'Organisations', 'register.organisations'),
-      counted('due-this-week', 'Due this week', 'register.obligations', 'state is open or part, due before +8d'),
+      counted('due-this-week', 'Due this week', 'register.obligations', DUE_WINDOW),
+      /* WHAT IS ALREADY LATE, SINCE 2.6.0, over the Late table's own clauses (`LATE_MONEY`). */
+      counted('late-money', 'Late', 'register.obligations', LATE_WINDOW),
       /* AND SINCE 1.16.0: the week Numbers this week draws, every number a project ever sent, and what Lapsing lists,
          each over its block's own clauses. */
       counted('datapoints-7d', 'Numbers reported, 7 days', 'register.datapoints', 'at after -7d, source is not example'),
@@ -438,7 +447,7 @@ export const FOUNDER = {
            somebody has to act on this week, and the latest-numbers and organisations tables went to the Dashboard,
            which already drew both. */
         page: 'home-founder',
-        title: 'Overview',
+        title: 'Today',
         icon: 'home',
         requires: ['register.datapoints', 'register.accounts', 'register.obligations', 'register.services', 'register.books'],
         blocks: [
@@ -456,12 +465,19 @@ export const FOUNDER = {
             authored: [{ cells: ['Connect a bank or a payments feed', BROWSE_MONEY, 'Balances and payments arrive on their own'] }],
           },
           ...NUMBERS_THIS_WEEK,
+          /* WHAT IS LATE HAS ITS OWN TABLE, AHEAD OF THE WEEK, SINCE 2.6.0 (`LATE_MONEY`, Money's own block by name): a
+             salary due four days ago was listed under Due this week, which from 2.6.0 starts today. The oldest first.
+             Drawn only while something is late. */
+          { ...LATE_MONEY, when: { metric: 'late-money', gt: 0 } },
           /* ONLY WHILE SOMETHING IS DUE, SINCE 1.11.0, over the table's own clauses. */
           { ...DUE_THIS_WEEK, when: { metric: 'due-this-week', gt: 0 } },
           {
             /* WHAT IS LAPSING NOW (`LAPSING_SOON`), SINCE 1.16.0, and it was every service Estate's own `lapsing` tile
                counts. Soonest renewal first, since that is the one that goes first. Drawn only while it lists one, so it
-               says nothing of its own when nothing is. */
+               says nothing of its own when nothing is.
+
+               NO COST COLUMN, SINCE 2.6.0. A domain let go mostly holds no cost, and the column was a dash on every
+               line. What a service costs is on Services and on its own page. */
             kind: 'table',
             heading: 'Lapsing',
             icon: 'clock-alert',
@@ -472,7 +488,6 @@ export const FOUNDER = {
             columns: [
               { field: 'name', label: 'Name', width: 'minmax(16ch,1fr)' },
               { field: 'renews', label: 'Renews', width: '15ch', align: 'end' },
-              { field: 'cost', label: 'Cost', width: '13ch', align: 'end' },
             ],
             order: [{ field: 'renews', dir: 'asc' }],
             limit: 6,
@@ -506,7 +521,8 @@ export const FOUNDER = {
         ],
       },
       {
-        /* `Dashboard` AND NOT `Overview`, which is what this use case's voice calls Home: two rail items with one name.
+        /* `Dashboard` AND NOT `Overview`, which this use case's voice called Home until 2.6.0: two rail items with one
+           name.
 
            THE WHOLE PORTFOLIO ON ONE PAGE: every number a project reported, as a line over thirty days against the thirty
            before, with every number and organisation folded under them. A `lines` block over Datapoints names which field

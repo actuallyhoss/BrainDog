@@ -10,7 +10,10 @@
  * - one minor unit apart draws ONE tile, in the danger tone, whose heading says it in words and whose figure is the
  *   difference in the currency it is in;
  * - apart in two currencies the tile is drawn and reads the two amounts, never one number over both;
- * - with no balance typed, the check has no value, and the page says the sentence the reading gives for that.
+ * - with no balance typed, the check has no value, and the page draws nothing about it: the reading says why to whoever
+ *   asks the figure, and the box to add an account is what stands on the page. A line of the page's own said it while
+ *   3.17.0 was being made; it was untrue with accounts and none of them cash, and it went for the lead a record with
+ *   two books opens on, Money being at the most blocks a page declares.
  *
  * THE DIFFERENCE IS PLANTED AS THE KERNEL'S OWN TEST PLANTS IT (`packages/kernel/test/cash-cross-figure.test.ts`): a
  * movement called "Read wrong" comes back to the walk one minor unit heavier than the record holds. The walk reads
@@ -114,7 +117,7 @@ type Block = { kind: string; heading?: string; body?: string; tone?: string; dra
 
 const SENTENCE = /balance has been typed/;
 
-/** Every block of Money that is about the check, in the page's order: the tile on its figure, and the line for no balance. */
+/** Every block of Money that is about the check, in the page's order: the tile on its figure, and any line about a balance typed. */
 function about(k: Kernel): { all: Block[]; drawn: Block[] } {
   const page = value<{ blocks: Block[] }>(k.page('money'));
   const all = page.blocks.filter((b) => (b.cells ?? []).some((c) => c.metric === CHECK) || SENTENCE.test(b.body ?? ''));
@@ -127,12 +130,12 @@ const differenceOn = (b: Block | undefined): Reading | null => (b?.readings ?? [
 /** Everything a person reads on a block: its heading, its line, and each figure's label and note. */
 const words = (b: Block): string => [b.heading, b.body, ...(b.cells ?? []).flatMap((c) => [(c as Cell).label, (c as Cell).note])].filter((t) => typeof t === 'string').join(' ');
 
-test('the Money page holds one tile on the check and a line for no balance, and neither is drawn where the entries agree', async () => {
+test('the Money page holds one tile on the check and nothing else, and it is not drawn where the entries agree', async () => {
   const k = await moneyCore();
   write(k, false);
   assert.deepEqual([checked(k).value, checked(k).unit, checked(k).met], [0, 'GBP', true]);
   const { all, drawn } = about(k);
-  assert.deepEqual(all.map((b) => b.kind), ['stat', 'note'], 'a tile for a difference, a line for no balance, and nothing else on the check');
+  assert.deepEqual(all.map((b) => b.kind), ['stat'], 'a tile for a difference, and nothing else on the check');
   assert.deepEqual(drawn, [], 'a check at nought says nothing, so nothing is drawn');
 });
 
@@ -183,13 +186,14 @@ test('apart in two currencies the tile is drawn and reads each amount in its own
   assert.deepEqual(about(k).drawn.map((d) => [d.kind, d.tone]), [['stat', 'bad']], 'the tile was left out with two currencies out');
 });
 
-test('WITH NO BALANCE TYPED the page says the sentence the reading gives, as a line, and draws no tile', async () => {
+test('WITH NO BALANCE TYPED the reading says why, and the page draws nothing about the check: the box to add an account stands', async () => {
   const k = await moneyCore();
   const read = checked(k);
   assert.deepEqual([read.value, read.unit, read.met], [null, null, null]);
-  const { drawn } = about(k);
-  assert.deepEqual(drawn.map((b) => b.kind), ['note']);
-  assert.equal(drawn[0]!.body, `${read.why}.`, 'the line on the page is not the sentence the check gives for no value');
+  assert.equal(read.why, 'No balance has been typed yet');
+  assert.deepEqual(about(k).drawn, [], 'no tile and no line: a check with no value is never read as a pass or drawn as one');
+  const page = value<{ blocks: Block[] }>(k.page('money'));
+  assert.deepEqual(page.blocks.filter((b) => b.drawn !== false && b.heading === 'Add an account').map((b) => b.kind), ['capture']);
 });
 
 /**
@@ -204,7 +208,8 @@ test('an account that is not cash is still nothing to check, and the reading say
   const read = checked(k);
   assert.deepEqual([read.value, read.unit, read.met], [null, null, null]);
   assert.equal(read.why, 'No account counts as cash yet', 'the check said no balance was typed of an account that has one');
-  assert.deepEqual(about(k).drawn.map((b) => b.kind), ['note']);
+  /* AND THE PAGE SAYS NOTHING UNTRUE OF IT: the line that said no balance had been typed, of an account that has one, is gone. */
+  assert.deepEqual(about(k).drawn, []);
 });
 
 test('a balance of nought is a balance: the check reads nought in its currency and the page says nothing', async () => {
@@ -218,7 +223,7 @@ test('what the page says of the check is plain: no long dash, and none of the wo
   const k = await moneyCore();
   write(k, false);
   const { all } = about(k);
-  assert.equal(all.length, 2);
+  assert.equal(all.length, 1);
   for (const b of all) {
     const said = words(b);
     assert.ok(said.length > 20, said);

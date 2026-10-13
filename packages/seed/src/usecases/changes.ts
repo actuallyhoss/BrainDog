@@ -23,6 +23,10 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
   student: [{ version: '1.5.1', notes: NAMED('Courses') }],
   founder: [
     {
+      version: '2.6.0',
+      notes: 'Home is called Today. What is already late has its own table, Late, ahead of Due this week, which now starts today. Lapsing no longer has a Cost column.',
+    },
+    {
       version: '2.5.0',
       notes:
         'Numbers can hold money. A reading can carry an amount in its own currency where a plain value was required, and Latest numbers shows it beside Value. A project that reports a number is set up through the live feed add-on.',
@@ -57,6 +61,7 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
     { version: '1.0.0', notes: 'The first version: Orders and Products, and an Orders page that says the month\'s orders, what ships this week and who still owes you.' },
   ],
   business: [
+    { version: '1.7.1', notes: 'Home is called Today on the page too, as it already was in the menu.' },
     {
       version: '1.7.0',
       notes:

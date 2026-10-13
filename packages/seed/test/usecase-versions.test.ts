@@ -1421,6 +1421,29 @@ const DECLARED: Record<string, Version> = {
       "`project-numbers-7d` and `projects-earning-silent` are added; Where it stands on `page.project` takes Last worked and Numbers this week; Projects names the earning projects gone silent (`adds.page.portfolio.4`) -> a94b1a5c70bac1af",
     ],
   },
+  /* THE LOOK AT A REAL RECORD ON 13 OCTOBER: Today by name, what is late apart from the week, no Cost under Lapsing. 2.5.0 IS LIVE. */
+  'founder@2.6.0': {
+    holds: `
+      metric.datapoints-30d metric.datapoints-7d metric.datapoints-held metric.datapoints-reported metric.due-this-week
+      metric.lapsing-30d metric.late-money metric.organisations-held page.dashboard page.home-founder page.project register.datapoints
+      setting.label_accounts setting.label_books setting.label_categories setting.label_datapoints
+      setting.label_installments setting.label_obligations setting.label_people setting.label_recurring
+      setting.label_services setting.label_tasks setting.label_things setting.label_tracks setting.label_transactions
+      setting.label_updates setting.one_accounts setting.one_books setting.one_categories setting.one_datapoints
+      setting.one_installments setting.one_obligations setting.one_people setting.one_recurring setting.one_services
+      setting.one_tasks setting.one_things setting.one_tracks setting.one_transactions setting.one_updates
+      setting.shared_version setting.speaks setting.voice_coming_up setting.voice_fills_with setting.voice_home
+      setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you setting.voice_no_questions
+      setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting setting.voice_overdue
+      setting.voice_pen_waits setting.voice_right_now setting.voice_since_away setting.voice_working_now
+      adds.page.relation.1 adds.page.relation.2 adds.page.relation.3 hands.register.organisations.people
+      metric.project-numbers-7d metric.projects-earning-silent adds.page.portfolio.4
+    `,
+    declares: '1a6e6f8b5a7311cc',
+    history: [
+      "`setting.voice_home` and the title of `page.home-founder` say Today where both said Overview; `due-this-week` and Due this week start today; `late-money` is added with a Late table ahead of the week, oldest first; Lapsing loses its Cost column -> 1a6e6f8b5a7311cc",
+    ],
+  },
   'team@2.19.0': {
     holds: `
       metric.tickets-blocked metric.tickets-done-by-agents metric.tickets-due-else metric.tickets-in-flight
@@ -1485,6 +1508,15 @@ const DECLARED: Record<string, Version> = {
     history: [
       "`page.home-business` is 1.6.0's word for word; the version stepped because shop and store are Shop's words now, so a shop is proposed Shop -> 070472676d3012ef",
     ],
+  },
+  /** TODAY BY NAME, as the founder's Home is since 2.6.0: the page said Overview under a rail item that says Today. 1.7.0 IS LIVE. */
+  'business@1.7.1': {
+    holds: `
+      page.home-business setting.shared_version setting.speaks setting.voice_coming_up setting.voice_fills_with
+      setting.voice_nothing_due
+    `,
+    declares: 'dda4e6d26f4e24c5',
+    history: ["The title of `page.home-business` says Today where it said Overview -> dda4e6d26f4e24c5"],
   },
   /** SHOP IS NEW (use case 6 of the vision): its first entry, Orders, Products and the Orders page. Unreleased, so the
       Orders section, an order's total and the month's count fold into it rather than a 1.0.1. */

@@ -282,16 +282,19 @@ test('PROJECTS OPENS WHAT IT HOLDS WHILE IT IS SHORT, and folds it only past fou
   assert.deepEqual(under(long, 'Parked and finished').map((b) => [b.heading, b.rows.length]), [['Not in play', 5]]);
   assert.equal(block(long, 'Parked and finished').matched, 5);
 
-  /* WITH NOTHING UNDER EITHER, the parked heading is not drawn, open or folded. SINCE portfolio 1.16.0 the open tile of
-     earnings, agents and dates still is, holding one line: none of the projects in play says what it earned. An open
-     tile has no figure of more than nought to be drawn on; it is drawn because the line under it is. */
+  /* WITH NOTHING UNDER EITHER, neither heading is drawn, open or folded. From portfolio 1.16.0 the open tile of
+     earnings, agents and dates still was, holding one line that none of the projects in play says what it earned.
+     SINCE 1.17.0 that line is drawn only while one says, so with none saying the tile has nothing under it. */
   const bare = await seeded();
   for (const n of THINGS.keys()) assert.ok(bare.update('things', `things#${n + 1}`, { lane: 'building', revenue: null, agent: null, aim: null } as never, { actor: 'p_1' }).ok);
   const ends = opened(bare, 'portfolio');
   assert.equal(block(ends, 'In play').rows.length, THINGS.length);
   assert.deepEqual(pair(ends, 'Parked and finished').map((b) => b.drawn), [false, false], 'Parked and finished: a heading over nothing');
-  assert.deepEqual(pair(ends, 'Earnings, agents and dates').map((b) => b.drawn !== false), [true, false]);
-  assert.deepEqual(under(ends, 'Earnings, agents and dates').filter((b) => b.drawn !== false).map((b) => [b.kind, b.heading]), [['note', undefined]]);
+  assert.deepEqual(pair(ends, 'Earnings, agents and dates').map((b) => b.drawn !== false), [false, false]);
+  /* AND THE LINE IT HELD IS NOT DRAWN EITHER. Read off the page, since `under` starts from a heading that is drawn. */
+  const said = (ends.blocks as (Read & { body?: string })[]).filter((b) => typeof b.body === 'string' && b.body.includes('say what they earned'));
+  assert.ok(said.length > 0, 'the page no longer declares the line');
+  assert.deepEqual(said.map((b) => b.drawn !== false), said.map(() => false));
 });
 
 test('A PROJECT PAST THE DAY IT AIMED FOR IS ASKED ABOUT ON DECIDE, once, and nothing is written', async () => {

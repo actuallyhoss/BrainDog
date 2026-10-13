@@ -31,6 +31,31 @@
 <script module lang="ts">
   /** THE HOLDING PEN'S ROW: how many offers wait. The phone's More sheet says it in the same words (`+layout.svelte`). */
   export const suggested = (n: number): string => `${n} suggested`;
+
+  /* edge-cue:start (`sidebar-scroll-58.test.ts` reads the lines between these two marks and runs them) */
+  /** How far, in px, the scroller's content fades out at an edge that has more past it. */
+  export const EDGE_FADE = 24;
+  /**
+   * WHICH EDGES OF THE SCROLLER HAVE MORE PAST THEM, from the three numbers a scroller knows. Nothing when everything
+   * fits, and nothing at the foot once the end is reached. A pixel of slack, because a zoomed page rests on a fraction.
+   */
+  export function edgeCue(scrollTop: number, clientHeight: number, scrollHeight: number): { above: boolean; below: boolean } {
+    const hidden = scrollHeight - clientHeight;
+    if (!(hidden > 1)) return { above: false, below: false };
+    return { above: scrollTop > 1, below: hidden - scrollTop > 1 };
+  }
+  /**
+   * HOW FAR TO SCROLL SO A FOCUSED ROW IS WHOLLY IN VIEW AND CLEAR OF THE FADES: the row's top and bottom and the
+   * scroller's, all from `getBoundingClientRect`. Negative is up, 0 is "it already is". A row taller than the clear
+   * part is taken to its top.
+   */
+  export function focusShift(top: number, bottom: number, viewTop: number, viewBottom: number, fade: number = EDGE_FADE): number {
+    const up = top - (viewTop + fade);
+    const down = bottom - (viewBottom - fade);
+    if (up < 0) return up;
+    return down > 0 ? Math.min(down, up) : 0;
+  }
+  /* edge-cue:end */
 </script>
 
 <script lang="ts">
@@ -232,6 +257,42 @@
     if (bottom > view.bottom) scroller.scrollTop += Math.min(bottom - view.bottom, box.top - view.top);
   }
 
+  /* THE EDGE CUE: a rail that scrolls says so. The foot fades while there is more below, and the head while there is
+     more above (`edgeCue`), measured on every scroll and whenever the rail's height or what is in it changes (a group
+     folding, a project arriving). It was a scrollbar drawn only under the pointer, so the last group was cut off
+     mid-row with nothing to say it went on. */
+  let edges = $state({ above: false, below: false });
+  function measure() {
+    if (!scroller) return;
+    const next = edgeCue(scroller.scrollTop, scroller.clientHeight, scroller.scrollHeight);
+    if (next.above !== edges.above || next.below !== edges.below) edges = next;
+  }
+  $effect(() => {
+    const el = scroller;
+    if (!el) return;
+    measure();
+    const size = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : undefined;
+    size?.observe(el);
+    const kids = typeof MutationObserver === 'function' ? new MutationObserver(measure) : undefined;
+    kids?.observe(el, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-shut'] });
+    return () => {
+      size?.disconnect();
+      kids?.disconnect();
+    };
+  });
+
+  /* THE KEYBOARD NEVER LANDS ON A ROW IT CANNOT SEE. A browser scrolls a focused row to the scroller's edge, which is
+     now under the fade, so the rail takes it clear of that (`focusShift`). Only for focus the keyboard gave: a click is
+     already on a row in view. */
+  function seen(target: EventTarget | null) {
+    const el = target as HTMLElement | null;
+    if (!scroller || !el || typeof el.matches !== 'function' || !el.matches(':focus-visible')) return;
+    const box = el.getBoundingClientRect();
+    const view = scroller.getBoundingClientRect();
+    const by = focusShift(box.top, box.bottom, view.top, view.bottom);
+    if (by !== 0) scroller.scrollTop += by;
+  }
+
   /* WHERE "2 WORKING" GOES: the Agents place, among the seven or under More (`agentsHref`). */
   const agentsAt = $derived(agentsHref([...places, ...more]));
   /** The makers of the agents at work, each once, three at most: the marks the working tile wears. */
@@ -354,7 +415,14 @@
     {/if}
   {/snippet}
 
-  <div class="scroll" bind:this={scroller}>
+  <div
+    class="scroll"
+    bind:this={scroller}
+    data-more-above={edges.above ? '' : undefined}
+    data-more-below={edges.below ? '' : undefined}
+    onscroll={measure}
+    onfocusin={(e) => seen(e.target)}
+  >
     <!-- THE PLACES. Decide carries how many questions wait, as the red count, and named, not only coloured (13 §5.1). -->
     <ul class="group">
       {#each places as item (item.key)}
@@ -767,6 +835,11 @@
   /* ONE SCROLLER FOR EVERYTHING BETWEEN THE ASK FIELD AND THE PERSON, so an open group scrolls rather than pushing the
      places off the rail. */
   .scroll {
+    /* `EDGE_FADE`, and how much of it each edge takes: none until that edge has more past it. */
+    --edge: 24px;
+    --edge-above: 0px;
+    --edge-below: 0px;
+
     display: flex;
     flex: 1;
     flex-direction: column;
@@ -774,8 +847,28 @@
     margin-inline: calc(-1 * var(--sp-1));
     padding-inline: var(--sp-1);
     overflow-y: auto;
+    /* A THIN THUMB THAT IS ALWAYS THERE while the rail scrolls (a browser draws none when everything fits). It was
+       transparent until pointed at, which hid the only sign of a longer rail. */
     scrollbar-width: thin;
-    scrollbar-color: transparent transparent;
+    scrollbar-color: color-mix(in srgb, var(--ink) 18%, transparent) transparent;
+    /* A row scrolled to by the browser (a focus, a find) stops clear of the fades. */
+    scroll-padding-block: var(--edge);
+  }
+
+  /* THE EDGE CUE (`edgeCue`): the rows fade out at an edge with more past it. A mask on the rows, not a painted band,
+     so the board's colour shows through in both themes and nothing is drawn when everything fits or the end is
+     reached. */
+  .scroll[data-more-above] {
+    --edge-above: var(--edge);
+  }
+
+  .scroll[data-more-below] {
+    --edge-below: var(--edge);
+  }
+
+  .scroll[data-more-above],
+  .scroll[data-more-below] {
+    mask-image: linear-gradient(to bottom, transparent, var(--ink) var(--edge-above), var(--ink) calc(100% - var(--edge-below)), transparent);
   }
 
   /* AN AUTHOR RULE, because `hidden` is a user-agent one and loses to any `display` written here. */
@@ -1130,7 +1223,7 @@
     }
 
     .scroll:hover {
-      scrollbar-color: color-mix(in srgb, var(--ink) 16%, transparent) transparent;
+      scrollbar-color: color-mix(in srgb, var(--ink) 32%, transparent) transparent;
     }
 
     .fold:hover {

@@ -141,6 +141,9 @@ export function countSentence(
   const stale = Math.min(Math.max(0, late), n);
   const overdue =
     stale === 0 ? '' : stale === n ? (n === 1 ? past : `all of them ${past}`) : `${numberWord(stale)} of them ${past}`;
+  /* HOW MANY, THEN WHERE: "The first ten are hard to undo" read as a rank, not a count, so the count is said as one
+     ("Ten of them are hard to undo, and they come first."); one is still "the first one", and all is "all of them".
+     "Of them" is said once a sentence: after "three of them for over two weeks" it is "Four are hard to undo". */
   const hard = Math.min(Number(undo), n);
   const which = n > 1 ? ' for the first' : '';
   const then =
@@ -151,7 +154,7 @@ export function countSentence(
           ? ` ${n === 2 ? 'Both' : 'All of them'} are hard to undo.`
           : hard === 1
             ? ' The first one is hard to undo.'
-            : ` The first ${numberWord(hard)} are hard to undo.`
+            : ` ${capital(numberWord(hard))}${overdue.includes('of them') ? '' : ' of them'} are hard to undo, and they come first.`
       : option
         ? who
           ? ` ${who} suggests “${option}”${which}.`

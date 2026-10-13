@@ -162,7 +162,7 @@ test('6. HER FIRST TODAY: green on the card gone and Paid EGP 900; red on the ti
 });
 
 test('7. A PAGE FOR HER PATTERN: green on day 15 with Orders saying who still owes; red on an early offer, none, or a sentence with no owed clause', () => {
-  const offer = { id: 'week:orders', title: 'Orders this week', why: 'Orders has 4 due this week. Give them a page of their own?' };
+  const offer = { id: 'week:orders', title: 'Orders this week', why: '4 orders due this week. Want a page of their own for them?' };
   const lead = '6 orders this month, 4 to ship this week, 2 late, and Salma still owes EGP 1,350';
   const seen = { early: [], earlyDay: 13, late: [offer], lateDay: 15, weeks: 3, thisWeek: 4, lead };
   const green = expect.offer(seen, MARIAM);

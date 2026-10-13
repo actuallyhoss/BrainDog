@@ -52,8 +52,11 @@ export const BUSINESS = {
      under a block that is already there, so a minor step. 1.5.0 is live.
      1.7.0: "shop" and "store" are Shop's words now (`shop.ts`), which carries Orders and Products where a business
      carries no list, so a shop is proposed the lists it writes in. A business that also sells is still Small business,
-     with Shop beside it. The use case a sentence proposes changed, so a minor step. */
-  version: '1.7.0',
+     with Shop beside it. The use case a sentence proposes changed, so a minor step.
+     1.7.1: its Home is titled Today, where it said Overview under a rail item that says Today (this use case's voice
+     names no word for Home, so the rail says the house's). One word on a page that is already there, so a patch step.
+     1.7.0 is live. */
+  version: '1.7.1',
   title: 'Small business',
   summary: 'What your clients owe you and what you owe, the hosting and subscriptions you run on, the people involved and the work.',
   author: 'BrainDog',
@@ -85,7 +88,7 @@ export const BUSINESS = {
            tiles. `register.session` is the kernel's own list and is on every record, so requiring it asks nothing of
            the sentence. */
         page: 'home-business',
-        title: 'Overview',
+        title: 'Today',
         icon: 'home',
         requires: ['register.session'],
         blocks: [

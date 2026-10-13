@@ -191,7 +191,7 @@
           >
         </p>
         <!-- A QUESTION IS A CARD'S HEADLINE, its money said short (`£39`, not `£39.00 GBP`), as the mirror says it. -->
-        <h3 class="queue-question"><Text nodes={nodes(symbolText(item.question, true))} {opts} /></h3>
+        <h3 class="queue-question"><Text nodes={nodes(symbolText(item.question, true, opts.home))} {opts} /></h3>
         {#if suggested}<p class="queue-suggested">{queueSuggested(suggested.label)}</p>{/if}
         {#if item.why && reasoned}<p class="queue-why"><Text nodes={nodes(item.why)} {opts} /></p>{/if}
         {#if whole && item.does.length}

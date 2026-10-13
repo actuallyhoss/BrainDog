@@ -711,11 +711,15 @@ const EARNS = {
    step 6, "0 of 14"). The split is hidden while none says, so a record where nobody had said read nothing at all about
    earnings, and a split of two said nothing of the nine silent beside them. Two counts, never a sum: projects that earn
    in two currencies are counted once each, and no amount is added. Drawn while one project is in play, since "0 of 0"
-   says nothing the line at the top does not. */
+   says nothing the line at the top does not.
+
+   ONLY WHILE ONE SAYS, SINCE portfolio 1.17.0. "0 of 11 projects in play say what they earned in a year" read as a
+   telling off on a record that never meant to say, under a split that was not drawn. So the line goes with the split
+   it sits beside: both are drawn from the first project that says, and neither before. */
 const EARNS_SAID = {
   kind: 'note',
   span: 12,
-  when: { metric: 'projects-live', gt: 0 },
+  when: { metric: 'projects-earning-said', gt: 0 },
   body: '{{projects-earning-said}} of {{projects-live}} projects in play say what they earned in a year',
 };
 

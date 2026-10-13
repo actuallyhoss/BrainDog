@@ -8,7 +8,8 @@ import { LAST_DAY_SCRIPT } from './scripts/last-day.js';
  * rule is on, it goes the entry's way or either way, and it names the entry's account or no account.
  *
  * NOT WHETHER THE RULE'S CATEGORY IS STILL LIVE. That is a question about the row the rule points at, and this filter
- * reads one list. The record leaves out a category that was deleted; one that was retired is the kernel's to leave out.
+ * reads one list. The record leaves out a category that was deleted or retired when it takes it (`take`), and writes
+ * no rule into `filed_by` where it took nothing (`also`).
  */
 const FILED = (reads: 'payee' | 'description') => ({
   all: [
@@ -23,16 +24,16 @@ const FILED = (reads: 'payee' | 'description') => ({
 const NAMED = { all: [{ field: 'state', is: 'live' }, { field: 'direction', in: ['{{direction}}', 'both'] }] };
 
 /**
- * The two steps that file by one text of the entry: the rule's category into `category`, the rule into `filed_by`.
+ * The one step that files by one text of the entry: the rule's category into `category`, the rule into `filed_by`.
  *
- * TWO LOOKUPS, AND ONLY THE FIRST ASKS ABOUT THE CATEGORY. Where the first finds a rule and links nothing, because the
- * rule's category is gone, the second still writes that rule into `filed_by`, beside whatever category an earlier
- * step filed. One step that writes both, or neither, is the kernel's to give.
+ * ONE LOOKUP THAT WRITES BOTH, OR NEITHER (`also`). It was two, and only the first asked about the category: where
+ * that one found a rule and linked nothing, because the rule's category was gone or retired, the second still wrote
+ * the rule into `filed_by`, beside whatever category an earlier step filed. Now the rule found is written only where
+ * its category is.
  */
-const filedBy = (reads: 'payee' | 'description', value: string): Record<string, unknown>[] => {
-  const to = { register: 'filing_rules', by: 'match', value, where: FILED(reads) };
-  return [{ link: { field: 'category', to: { ...to, take: 'category' } } }, { link: { field: 'filed_by', to } }];
-};
+const filedBy = (reads: 'payee' | 'description', value: string): Record<string, unknown> => ({
+  link: { field: 'category', to: { register: 'filing_rules', by: 'match', value, where: FILED(reads), take: 'category', also: 'filed_by' } },
+});
 
 /**
  * The rules Money ships with. A rule asks where a person has a choice to make, and tells or acts where there is none.
@@ -72,10 +73,10 @@ export const MONEY_RULES: Record<string, SeedRule> = {
    * ladder: the whole text, how it starts, anywhere in it, a pattern, and on one rung the longest. Two that fit
    * equally file nothing, because no category is better than a wrong one.
    *
-   * FOUR STEPS, TWO FOR EACH TEXT A RULE MAY READ. The description is tried first and "Paid to or from" after it, and
-   * a later step that finds a rule writes over the earlier one, so a rule on "Paid to or from" wins where both fit. An
-   * entry with no "Paid to or from" is left to the rules that read the description. Each pair is one lookup made
-   * twice: once for the rule's category, once for the rule itself, which goes into `filed_by`.
+   * ONE STEP FOR EACH TEXT A RULE MAY READ, TWO IN ALL. The description is tried first and "Paid to or
+   * from" after it, and a later step that finds a rule writes over the earlier one, so a rule on "Paid to or from"
+   * wins where both fit. An entry with no "Paid to or from" is left to the rules that read the description. Each is
+   * one lookup that writes the rule's category and, with it, the rule itself into `filed_by` (`filedBy`).
    *
    * AND A CATEGORY'S OWN "Matches" STILL FILES, FOR THE ONE VERSION THAT FIELD STAYS. It is the first step, so any
    * filing rule that fits writes over it, and it now reads the category too (`NAMED`): a live one that goes the entry's
@@ -92,8 +93,8 @@ export const MONEY_RULES: Record<string, SeedRule> = {
     when: 'state is cleared, transfer is false, category is empty',
     then: [
       { link: { field: 'category', to: { register: 'categories', by: 'match', value: '{{what}}', where: NAMED } } },
-      ...filedBy('description', '{{what}}'),
-      ...filedBy('payee', '{{counterparty_text}}'),
+      filedBy('description', '{{what}}'),
+      filedBy('payee', '{{counterparty_text}}'),
     ],
     once_per: ['entry'],
   },

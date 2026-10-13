@@ -36,9 +36,9 @@ import { spanMs } from './vault.ts';
 import { evaluateMetric, predicateOf, type Aggregation, type EvalContext, type MetricDecl } from './metrics.ts';
 import { isMoneyFormat } from './metrics.ts';
 import { RUN_PATH, inlineFault, rowlessCreate } from './flow-lint.ts';
-import { linkFault, whereFields } from './rule-link.ts';
+import { alsoFault, linkFault, whereFields } from './rule-link.ts';
 
-export { linkFault };
+export { alsoFault, linkFault };
 import { FIGURE } from './figure.ts';
 import { observe } from './observe.ts';
 
@@ -53,8 +53,14 @@ import { observe } from './observe.ts';
  * `take` NAMES A FIELD OF THE ROW FOUND, and what that field holds is linked in the row's place: a filing rule is
  * found by its text and the ledger row is given the rule's category. A row found that holds nothing there links
  * nothing, and neither does one that points at a row deleted or in a state its own list calls done (`done:`).
+ *
+ * `also` NAMES A SECOND FIELD OF THE ROW BEING LINKED, and the row found is written there beside what was taken from
+ * it: the ledger row is given the rule's category and, in `also`, the rule that filed it. BOTH OR NEITHER. Two steps
+ * were two lookups, and the one with no `take` never asked about the category, so a rule whose category was retired
+ * was still written as the rule that filed the row. It is for a link that takes, and the field is a ref to the linked
+ * list (`alsoFault`).
  */
-export type LinkTo = { register: string; by: string; value: string; where?: Predicate; take?: string };
+export type LinkTo = { register: string; by: string; value: string; where?: Predicate; take?: string; also?: string };
 
 export type RuleAction =
   | { tag: string }
@@ -473,7 +479,7 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
         if (value === null) continue;
         /* A FILTER OR A `take` OVER A FIELD THE LINKED LIST DOES NOT HAVE LINKS NOTHING AND SAYS SO, for a rule stored
            before anything refused it. Unfiltered, it would file under the very rows the rule ruled out. */
-        const fault = linkFault(deps.schemaOf, { rule: rule.rule, then: [action] });
+        const fault = linkFault(deps.schemaOf, { rule: rule.rule, then: [action] }) ?? alsoFault(deps.schemaOf, { rule: rule.rule, register: rule.register, then: [action] });
         if (fault) {
           undone((fault.at ?? 'then[0]').replace('then[0]', `then[${i}]`), 'DECLARATION_INVALID', fault.fix.replace('then[0]', `then[${i}]`));
           continue;
@@ -483,6 +489,11 @@ export function runRules(deps: RulesDeps, fired: Fired): RulesOutcome {
         if ('id' in found) {
           patch[action.link.field] = found.id;
           did.push(`link ${action.link.field}`);
+          /* THE ROW FOUND, BESIDE WHAT WAS TAKEN FROM IT, and only here: a take that links nothing writes neither. */
+          if (action.link.to.also !== undefined) {
+            patch[action.link.to.also] = found.row;
+            did.push(`link ${action.link.to.also}`);
+          }
         }
       } else if ('note' in action) {
         /* HELD UNTIL THE WRITE HAS HAPPENED. A rule whose write the register then refuses has not
@@ -643,8 +654,9 @@ const RUNGS: Record<number, LinkRung> = { 2: 'starts', 3: 'contains', 4: 'patter
 const PATTERN_MAX = 120;
 const PATTERN_READS = 512;
 
-/** The row a `link` found and the rung it was found on, or the sentence saying why it links nothing. */
-type Linked = { id: string; rung: LinkRung } | { none: string };
+/** What a `link` links (`id`), the row it found (`row`, another row where the link takes) and the rung it was found
+ *  on, or the sentence saying why it links nothing. */
+type Linked = { id: string; row: string; rung: LinkRung } | { none: string };
 
 /**
  * The most rows of the linked list the `starts` and `contains` rungs read for one link, longest first on each rung.
@@ -718,7 +730,7 @@ function linkOf(deps: Pick<RulesDeps, 'sql' | 'schemaOf' | 'doneOf' | 'ctx'>, to
   /* NOR ONE ITS OWN LIST CALLS FINISHED. A retired category is still there to open, and filing under it is what
      retiring it was for stopping. The filter cannot ask this, since it reads the list the rule is found in. */
   if (typeof there.state === 'string' && deps.doneOf(there.register).includes(there.state)) return { none: `the ${to.take} of the one found is ${there.state.replace(/[._-]+/gu, ' ')}` };
-  return { id: taken, rung: found.rung };
+  return { id: taken, row: found.row, rung: found.rung };
 }
 
 /** A compiled `link.to.where`: the clause and what fills it. */
@@ -739,7 +751,7 @@ function climb(deps: Pick<RulesDeps, 'sql' | 'schemaOf'>, to: Pick<LinkTo, 'regi
     value,
     ...filled,
   );
-  if (whole.length === 1) return { id: whole[0]!.id, rung: 'exact' };
+  if (whole.length === 1) return { id: whole[0]!.id, row: whole[0]!.id, rung: 'exact' };
   if (whole.length > 1) return { none: 'two rows bear that name' };
 
   /* THE FIELD IS ASKED OF THE LIST'S DECLARATION, never guessed from the rows, so its name is a declared field id and
@@ -780,7 +792,7 @@ function climb(deps: Pick<RulesDeps, 'sql' | 'schemaOf'>, to: Pick<LinkTo, 'regi
     break;
   }
   if (won === null) return { none: unsafe ? 'a pattern that might match it is not safe to run, so it was not tried' : NOTHING };
-  return { id: won.id, rung: RUNGS[won.rung]! };
+  return { id: won.id, row: won.id, rung: RUNGS[won.rung]! };
 }
 
 /** A text that is one `{{field}}` and nothing else, which is how a filter asks for what the row itself holds. */
@@ -1531,7 +1543,7 @@ export function dryRun(deps: RulesDeps, candidate: RuleDecl, limit = PREVIEW, re
   if (linted) return { ok: false, refusal: linted };
   /* AND A LINK'S FILTER IS ASKED OF THE LIST IT FILTERS, so a field that list does not have is said here and not
      previewed as "nothing bears that name" on every row. */
-  const unlinked = linkFault(deps.schemaOf, candidate);
+  const unlinked = linkFault(deps.schemaOf, candidate) ?? alsoFault(deps.schemaOf, candidate);
   if (unlinked) return { ok: false, refusal: unlinked };
 
   /* The candidate takes its place among the others by the same ordering the pass uses — replacing a
@@ -1645,7 +1657,9 @@ function describe(deps: RulesDeps, rule: RuleDecl, entry: Entry): string[] {
          link reads as it always has; a link found further down says how, since that is what a person checks before
          turning a `starts` or `contains` category on. */
       const found = linkOf(deps, linkTo(a.link.to, entry, (text) => fill(text, entry, deps.nowMs)), fill(a.link.to.value, entry, deps.nowMs));
-      out.push('id' in found ? `link ${a.link.field}${RUNG_SAID[found.rung]}` : `link ${a.link.field}: ${found.none}`);
+      /* ONE LINE FOR A LINK THAT WRITES TWO FIELDS, since it writes both or neither. */
+      const fields = typeof a.link.to.also === 'string' ? `${a.link.field} and ${a.link.to.also}` : a.link.field;
+      out.push('id' in found ? `link ${fields}${RUNG_SAID[found.rung]}` : `link ${fields}: ${found.none}`);
     }
   }
   return out;

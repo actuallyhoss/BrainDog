@@ -154,7 +154,7 @@ test('PROJECTS SAYS HOW MANY OF THOSE IN PLAY SAY WHAT THEY EARNED, a count of e
   assert.deepEqual(drawn[0]!.values, { 'projects-earning-said': 3, 'projects-live': 3 });
 });
 
-test('WITH NONE SAYING, THE LINE STANDS ALONE and the split stays hidden', async () => {
+test('WITH NONE SAYING, THE LINE GOES WITH THE SPLIT: neither is drawn', async () => {
   const k = await seeded();
   /* EVERY PROJECT IN PLAY FORGETS WHAT IT EARNED, as on an imported record where nobody has said. */
   const listed = k.list({ register: 'things', limit: 100 });
@@ -164,9 +164,9 @@ test('WITH NONE SAYING, THE LINE STANDS ALONE and the split stays hidden', async
   for (const row of earning) assert.ok(k.update('things', `things#${row.seq}`, { revenue: null }, PERSON).ok);
   const page = opened(k, 'portfolio');
   const line = earnsLine(page).filter((b) => b.drawn !== false);
-  assert.equal(line.length, 1, 'the line went with the split');
-  /* "0 of 3", WHICH IS A SENTENCE A PERSON CAN ACT ON, where the page said nothing about earnings at all. */
-  assert.deepEqual(line[0]!.values, { 'projects-earning-said': 0, 'projects-live': 3 });
+  /* SINCE portfolio 1.17.0 THE LINE IS DRAWN ONLY WHILE ONE SAYS: "0 of 3 projects in play say what they earned in a
+     year" read as a telling off on a record that never meant to say. */
+  assert.equal(line.length, 0, 'the line goes with the split');
   const split = (page.blocks as Drawn[]).filter((b) => b.heading === 'What each one earns' && b.drawn !== false);
   assert.deepEqual(split, [], 'the split is drawn over nothing');
 });

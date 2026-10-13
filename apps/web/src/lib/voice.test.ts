@@ -40,7 +40,11 @@ test('THE VOICE IS READ FROM SETTINGS THE SAME WAY THE FORMAT WRITES THEM', () =
 
 test('THE STARTER USE CASES SPEAK DIFFERENTLY FROM EACH OTHER AND FROM THE HOUSE', () => {
   const homes = USE_CASES.map((u) => lineOf(u.voice, 'home'));
-  assert.equal(new Set(homes.filter((h) => h !== copy.home)).size, USE_CASES.filter((u) => u.voice.home).length);
+  /* ALL BUT ONE WORD: Student and, since founder 2.6.0, Solo founder both call Home Today, which is what the rail and
+     the page already said of each. Every other use case that names Home has a word of its own. */
+  const own = homes.filter((h) => h !== copy.home);
+  assert.equal(new Set(own).size, USE_CASES.filter((u) => u.voice.home).length - 1);
+  assert.deepEqual(own.filter((h, i) => own.indexOf(h) !== i), ['Today']);
 });
 
 test('THE VOICE COMES FROM THE FIRST USE-CASE PACK SWITCHED ON', () => {

@@ -682,7 +682,14 @@ export function toneOf(register: string, e: Entry, now: number = Date.now()): Ta
   const r = REGISTERS[register];
   if (!r) return undefined;
   const state = r.state ? String(e.fields[r.state] ?? '') : '';
-  if (r.done?.includes(state)) return 'good';
+  /* A DONE STATE IS GOOD NEWS ONLY WHERE A ROW HAD TO GET THERE. Every done row was `good`, so a ledger, whose
+     ordinary row is `cleared`, drew a green dot on every line and the dot said nothing. A list whose state field
+     declares a done state as its `default` writes its rows already done: done there means recorded, not finished, and
+     it carries no tone. Read from the declaration, never from the list's name. */
+  if (r.done?.includes(state)) {
+    const born = r.fields.find((f) => f.id === r.state)?.default;
+    return typeof born === 'string' && r.done.includes(born) ? undefined : 'good';
+  }
   /* DECLARED, not guessed. This was "the first indexed `day` field", which for `tracks` is `opened`
      — always in the past — so every open track came out `bad`. */
   const dated = r.fields.find((f) => f.type === 'day' && f.deadline);

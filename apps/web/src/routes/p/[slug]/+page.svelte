@@ -188,7 +188,8 @@
 />
 
 {#if strip}<PageTabs {strip} />{/if}
-<!-- THE OFFER SITS UNDER THE PAGE'S HEADER (PageView's `offer`), so the page's name comes first. -->
-{#snippet offerCard()}{#if offer}<OfferCard item={offer} acts={offerActions} busy={offerBusy} />{/if}{/snippet}
+<!-- THE OFFER SITS UNDER THE PAGE'S OWN BLOCKS (PageView's `offer`), as one quiet line that opens on tap, so the page's
+     content comes first on a phone and on a laptop alike. -->
+{#snippet offerCard()}{#if offer}<OfferCard item={offer} acts={offerActions} busy={offerBusy} compact />{/if}{/snippet}
 <PageView {slug} {showSource} {got} {reread} offer={offer ? offerCard : undefined} />
 

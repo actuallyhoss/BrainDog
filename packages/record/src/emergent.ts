@@ -823,6 +823,64 @@ function lowBeside(deps: PenDeps, list: string, packOf: ReadonlyMap<string, stri
   return null;
 }
 
+/** A name as it reads inside a sentence: a word that is only capitalised in lower case, every other as typed (`slash.ts`). */
+const inSentence = (name: string): string => name.trim().replace(/\p{L}+/gu, (w) => (/^\p{Lu}\p{Ll}*$/u.test(w) ? w.toLowerCase() : w));
+
+/** Names ending in s that are not a count of things, so "6 savings this week" is never said of them. */
+const NOT_MANY = /(?:ss|us|is|ics|news|series|species|savings|earnings|goods|clothes|canvas|atlas|alias|gas)$/iu;
+
+/** Whether a list's name is already the word for many of its entries: Orders, Assignments, HSBC cards. */
+const saysMany = (name: string): boolean => {
+  const last = /\p{L}+$/u.exec(name.trim())?.[0] ?? '';
+  return last.length >= 4 && /s$/iu.test(last) && !NOT_MANY.test(last);
+};
+
+/** Many of a declared singular, where English says how: transaction, transactions; log entry, log entries; box, boxes. */
+const manyOf = (one: string): string => {
+  const word = one.trim();
+  /* The one plural English does not build from its singular, kept in the word's own capitals. */
+  if (/(?:^|\s)person$/iu.test(word)) return word.replace(/(pe)rson$/iu, '$1ople');
+  if (/[^aeiou]y$/iu.test(word)) return `${word.slice(0, -1)}ies`;
+  return /(?:s|x|z|ch|sh)$/iu.test(word) ? `${word}es` : `${word}s`;
+};
+
+/** The singular each list declares for itself (`one`), by list, read off the declarations the record holds. */
+function onesOf(declared: readonly { id: string; kind: string; body: string }[]): Map<string, string> {
+  const ones = new Map<string, string>();
+  for (const row of declared) {
+    if (row.kind !== 'register' || !row.body.includes('"one"')) continue;
+    try {
+      const one = (JSON.parse(row.body) as { one?: unknown }).one;
+      if (typeof one === 'string' && one.trim() !== '') ones.set(row.id.slice('register.'.length), one.trim());
+    } catch {
+      continue;
+    }
+  }
+  return ones;
+}
+
+/**
+ * What a person calls several of a list's entries, mid-sentence: the list's own name where it is already that word
+ * (Orders, "orders"), else many of the singular it declares (Ledger, "transactions"), else its name and "entries"
+ * (Ledger with no singular, "ledger entries"). Never "Ledger has 6": nobody says that of a list.
+ *
+ * THE DECLARED SINGULAR WINS OVER A NAME THAT ONLY LOOKS LIKE MANY: Finances declaring "transaction" holds
+ * transactions, never "6 finances". The name is kept where it ends in many of that singular (HSBC cards, "card").
+ */
+export const manySaid = (name: string, one: string | undefined): string => {
+  if (one === undefined) return saysMany(name) ? inSentence(name) : `${inSentence(name)} entries`;
+  const many = manyOf(inSentence(one));
+  const last = (said: string): string => (/\p{L}+$/u.exec(said.trim())?.[0] ?? '').toLowerCase();
+  return saysMany(name) && last(name) === last(many) ? inSentence(name) : many;
+};
+
+/**
+ * The week offer's sentence: what was seen, then the question, as a person would put it. "4 orders due this week. Want
+ * a page of their own for them?" The count leads because it is the news; the list is named by its entries.
+ */
+export const weekSaid = (n: number, name: string, one: string | undefined, due: boolean): string =>
+  `${n.toLocaleString('en')} ${n === 1 ? (one !== undefined ? inSentence(one) : `${inSentence(name)} entry`) : manySaid(name, one)}${due ? ' due' : ''} this week. Want a page of their own for them?`;
+
 /**
  * The week offers: for each list the caller reads with a day on its entries, at least `PEN_WEEK_FEWEST` of them in this
  * week, read on at least `PEN_WEEKS_READ` different weeks, and no page that reads it by the week, one page of its week.
@@ -843,6 +901,7 @@ function weeksOffered(deps: PenDeps): PenItem[] {
   const held = heldPages(declared);
   const taken = new Set([...pages.map((p) => p.slug), ...held.map((p) => p.slug)]);
   const packOf = new Map(declared.filter((d) => d.kind === 'register').map((d) => [d.id.slice('register.'.length), d.pack_id]));
+  const ones = onesOf(declared);
   const since = dayOf(use.nowMs - WEEKS_BACK * 7 * DAY_MS);
   const lastIn = new Map<string, number>();
   for (const p of pages) if (p.nav) lastIn.set(p.nav.section, Math.max(lastIn.get(p.nav.section) ?? 0, p.nav.order));
@@ -919,11 +978,10 @@ function weeksOffered(deps: PenDeps): PenItem[] {
     };
     if (kernel.lint([{ id: `page.${slug}`, kind: 'page', body }]) !== null) continue;
     taken.add(slug);
-    const said = `${n.toLocaleString('en')}${due ? ' due' : ''} this week`;
     const draft = { id: `page.${slug}`, kind: 'page', body };
     offers.push({
       rows: n,
-      item: { id: signatureOf('week', id), kind: 'page', register: id, title, why: `${decl.name} has ${said}. Give them a page of their own?`, change: { to: draft }, list: id, draft },
+      item: { id: signatureOf('week', id), kind: 'page', register: id, title, why: weekSaid(n, decl.name, ones.get(id), due), change: { to: draft }, list: id, draft },
     });
   }
   return offers

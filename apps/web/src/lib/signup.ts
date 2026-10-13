@@ -302,8 +302,9 @@ export const SAID_MOST = 2000;
  */
 export type Draft = { said: string; currency: string | null; usecase: string | null; reply?: Reply | null; cut?: boolean; key?: string };
 
-/** What a build's key looks like, as the page makes it (`first-run-` and a UUID): short, and nothing a link could misread. */
-const KEY = /^[A-Za-z0-9_-]{1,100}$/;
+/** What a build's key looks like, as the page makes it (`first-run-` and a UUID): short, nothing a link could misread, and no
+ * longer than the record takes (64, `packages/record/src/arrange.ts` `setup`), so a key kept here is never one refused there. */
+const KEY = /^[A-Za-z0-9_-]{1,64}$/;
 const keyOf = (v: unknown): string | null => (typeof v === 'string' && KEY.test(v) ? v : null);
 
 /** The one question's answer, read back off something kept, or `null` when it is not one. */

@@ -205,7 +205,7 @@ test('the head counts what is hard to undo and what has waited from the record, 
   const lead = withCounts(queueBlock(qs.slice(0, 1), 12, true), { stale: 3, hardToUndo: 4 });
   const rest = withCounts(queueBlock(qs, 12), { stale: 3, hardToUndo: 4 });
   const shaped = decideDrawn([noteBlock(), lead, rest], CLOCK, undefined, null, LATE);
-  assert.equal(shaped.sentence.text, '12 questions wait on you, three of them for over two weeks. The first four are hard to undo.');
+  assert.equal(shaped.sentence.text, '12 questions wait on you, three of them for over two weeks. Four are hard to undo, and they come first.');
   assert.equal(shaped.sentence.needs, 'three of them for over two weeks');
 
   /* THE MOST EITHER QUEUE SAID, since both count every open question. */
@@ -227,7 +227,7 @@ test('with boot\'s waits the head says the record\'s one count, and the calm lin
   /* THE BADGE'S NUMBER (`waits`), not the three the queue drew, and its late and hard counts. */
   const waits = { questions: 25, late: 10, hard: 2, inbox: 32 };
   const shaped = decideDrawn([noteBlock(), queueBlock(qs.slice(0, 1), 3, true), queueBlock(qs, 3)], CLOCK, () => '', waits, LATE);
-  assert.equal(shaped.sentence.text, '25 questions wait on you, ten of them for over two weeks. The first two are hard to undo.');
+  assert.equal(shaped.sentence.text, '25 questions wait on you, ten of them for over two weeks. Two are hard to undo, and they come first.');
   assert.equal(shaped.open, 25);
   /* NO QUESTION BUT 32 ARRIVALS: "Nothing waits on you" would be false. */
   const inbox = decideDrawn([noteBlock(), queueBlock([], 0, true), queueBlock([], 0)], CLOCK, undefined, { questions: 0, late: 0, hard: 0, inbox: 32 }, LATE);

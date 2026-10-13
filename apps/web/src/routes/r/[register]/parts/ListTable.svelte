@@ -19,7 +19,7 @@
   import { valueSaid } from '$lib/voice.ts';
   import { symbolFigure } from 'braindog-render';
   import { Table, type Column, type TableRow } from 'braindog-render/svelte';
-  import { display, DOM_CAP, identityOf, labelOf } from '$lib/record/api.ts';
+  import { display, DOM_CAP, homeCurrency, identityOf, labelOf } from '$lib/record/api.ts';
   import { currencyTypedIn } from '$lib/ui/money-typed.ts';
   import { isFile, isJson, isQuantity, unitOf, unitsOf } from '$lib/record/field-draft.ts';
   import { scopeFieldOf, scopeOf } from '$lib/record/scope-move.ts';
@@ -190,6 +190,7 @@
   <Table
     columns={toned}
     rows={calm}
+    home={homeCurrency()}
     {total}
     cap={DOM_CAP}
     {onmore}

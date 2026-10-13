@@ -156,6 +156,9 @@ function runTokens(value: string): string[] {
   return run.split(',').map((t) => t.trim());
 }
 
+/** What a gap in a run is called in the line's accessible name. */
+const NO_VALUE = 'no value';
+
 /**
  * A run of numbers as a line in a `0 0 1000 100` box, or null when there are fewer than two.
  *
@@ -201,7 +204,26 @@ export function trendOf(value: string): { d: string; end: string; said: string[]
     n <= 7 && lo >= 0
       ? numbers.flatMap((v, i) => (v === null ? [] : [`M${at(((i + 0.5) / n) * 1000)} 100V${at(hi === 0 ? 96 : 100 - Math.max(4, (v / hi) * 90))}`])).join(' ')
       : null;
-  return { d, end, said: numbers.map((n, i) => (n === null ? 'no value' : tokens[i]!)), bars };
+  return { d, end, said: numbers.map((n, i) => (n === null ? NO_VALUE : tokens[i]!)), bars };
+}
+
+/**
+ * A card's trend, or `null` when it is not drawn.
+ *
+ * A LINE WITH NO NAME AND NO NUMBER IS NOT A CHART. Projects drew one card in eleven with a bare red stroke: no word
+ * for what it counted, no figure, nothing to read it against. So a card's trend is drawn only when its column has a
+ * name (`trend: Done per week`) and more than one of its points is above or below nought;
+ * a run of noughts with one count in it is a single fact, and a figure says a single fact better. When it is drawn
+ * it carries `last`, the newest value as its cell wrote it, and both drawers print that and the name beside the line.
+ */
+export function cardTrend(value: string, label: string): (NonNullable<ReturnType<typeof trendOf>> & { last: string; label: string }) | null {
+  const name = label.trim();
+  if (!name) return null;
+  const t = trendOf(value);
+  if (!t) return null;
+  const known = t.said.filter((s) => s !== NO_VALUE);
+  if (known.filter((s) => Number(s.replace(/−/gu, '-').replace(/,/gu, '')) !== 0).length < 2) return null;
+  return { ...t, last: known[known.length - 1]!, label: name };
 }
 
 /**

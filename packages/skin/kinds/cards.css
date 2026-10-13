@@ -56,6 +56,14 @@
     border-block-start: 1px solid var(--rule);
   }
 
+  /* A RUN OF CARDS THAT ARE EACH ONLY A NAME IS A LIST OF NAMES, SET CLOSE: Projects drew eleven of them as eleven
+     boxes with nothing in, at a full card's air. Where no card in the grid has a line under its head, each takes a
+     row's air instead. For the whole grid and never one card of it, so the names in a row stay on one line; a row
+     is as tall as its tallest card, which is why one card with a body made its whole row twice the height. */
+  .cards-grid:not(:has(> .cards-item > :not(.cards-head))) > .cards-item {
+    padding-block: var(--sp-2);
+  }
+
   .cards-item:has(.cards-title a):hover .cards-title {
     text-decoration: underline;
     text-decoration-color: var(--edge);
@@ -204,11 +212,35 @@
      sparkline is. Its line and dot are the stat's (`.trend-line` in `stat.css`), drawn again here so this sheet
      stands on its own. */
   .cards-trend {
-    flex: 1 1 6rem;
-    min-inline-size: 5rem;
-    max-inline-size: 120px;
+    grid-area: line;
+    inline-size: 100%;
     block-size: 32px;
     overflow: visible;
+  }
+
+  /* A TREND IS NEVER A BARE LINE: it stands beside its newest value, over the name of what it counts, as a ring stands
+     beside its number. The line keeps the width it had, between a shape's least and a sparkline's most. */
+  .cards-trended {
+    display: grid;
+    flex: 1 1 12rem;
+    grid-template-areas:
+      'line value'
+      'line label';
+    grid-template-columns: minmax(5rem, 120px) minmax(0, 1fr);
+    align-items: center;
+    column-gap: var(--sp-3);
+    min-inline-size: 0;
+  }
+
+  .cards-trended .cards-value {
+    grid-area: value;
+    color: var(--ink);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .cards-trended .cards-label {
+    grid-area: label;
   }
 
   .cards-trend-line {

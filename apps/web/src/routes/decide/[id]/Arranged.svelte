@@ -12,6 +12,7 @@
 -->
 <script lang="ts">
   import { copy } from '$lib/copy.ts';
+  import { fieldChange } from '$lib/decide/card.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import Proposed from './Proposed.svelte';
   import KeyNeeded from './KeyNeeded.svelte';
@@ -139,12 +140,21 @@
                 <li>
                   <span class="arr-title">{change.title}</span>
                   <dl class="arr-fields">
+                    <!-- A VALUE WHERE THERE WAS NONE IS "Set to", not "Now empty" beside what it will be; a field
+                         empty on both sides is no change and is not drawn (`card.ts` `fieldChange`). -->
                     {#each change.fields as f, j (j)}
-                      <dt>{f.field}</dt>
-                      <dd>
-                        {#if f.before !== null}<span class="arr-was"><span class="arr-tag">{copy.arrangeBefore}</span>{f.before}</span>{/if}
-                        <span class="arr-will"><span class="arr-tag">{copy.arrangeAfter}</span>{f.after}</span>
-                      </dd>
+                      {@const how = fieldChange(f.before, f.after, copy.arrangeEmpty)}
+                      {#if how !== 'none'}
+                        <dt>{f.field}</dt>
+                        <dd>
+                          {#if how === 'set'}
+                            <span class="arr-will"><span class="arr-tag">{copy.arrangeSetTo}</span>{f.after}</span>
+                          {:else}
+                            <span class="arr-was"><span class="arr-tag">{copy.arrangeBefore}</span>{f.before}</span>
+                            <span class="arr-will"><span class="arr-tag">{copy.arrangeAfter}</span>{f.after}</span>
+                          {/if}
+                        </dd>
+                      {/if}
                     {/each}
                   </dl>
                 </li>

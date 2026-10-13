@@ -11,7 +11,6 @@
     CARDS_NONE,
     MISSING,
     TONES,
-    TREND,
     agentMarkFill,
     cardLayout,
     cardsCount,
@@ -25,18 +24,18 @@
     ringDash,
     ringOf,
     text,
-    trendOf,
     type AgentMark,
     type Block,
     type RenderOptions,
     type Row,
   } from '../src/index.ts';
   /* From the module and not the root, which does not export it: the word is this drawer's and `html.ts`'s alone. */
-  import { CARDS_NEXT, RUN_OPEN, isDimmed, markGlyphOf, runFaceOf, runMarkOf, type RunCell, type RunFace } from '../src/cards.ts';
+  import { CARDS_NEXT, RUN_OPEN, cardTrend, isDimmed, markGlyphOf, runFaceOf, runMarkOf, type RunCell, type RunFace } from '../src/cards.ts';
   import { cellNamesNothing, glyphPath, glyphWaits } from '../src/inline.ts';
   import { hueOf } from '../src/cards.ts';
   import { pictureSrc } from '../src/gallery.ts';
-  import { hrefFor } from '../src/html.ts';
+  import { hrefFor, written } from '../src/html.ts';
+  import { AMOUNT_SPACE } from '../src/money.ts';
   import Text from './Text.svelte';
 
   /**
@@ -151,12 +150,15 @@
       <!-- A CARD'S FIGURE IS A TILE'S, said short as `amount(headlineFigure(...))` in the mirror says it: `£18,400`. -->
       <!-- A figure that names nothing is left out, as `toHTML` leaves it (`cellNamesNothing`): the card keeps the rest. -->
       {@const shows = L.figure >= 0 && !cellNamesNothing(r.cells[L.figure], opts)}
-      {@const short = L.figure >= 0 ? headlineFigure(r.cells[L.figure] ?? '') : ''}
-      {@const symbol = L.figure >= 0 ? symbolFigure(short) : null}
-      {@const coded = L.figure >= 0 ? leadingCode(short) : null}
+      <!-- TOLD THE RECORD'S HOME, THE ONE WRITER SAYS IT (`written`, html.ts), as `Grid.svelte` draws a stat's figure. -->
+      {@const w = L.figure >= 0 ? written(r.cells[L.figure] ?? '', opts, 'read') : null}
+      {@const short = w ? w.text : L.figure >= 0 ? headlineFigure(r.cells[L.figure] ?? '', opts.home) : ''}
+      {@const symbol = w ? (w.codePlace === 'before' ? null : w.text) : L.figure >= 0 ? symbolFigure(short) : null}
+      {@const coded = !w && L.figure >= 0 ? leadingCode(short) : null}
       <!-- `.amount` holds the code and its first figure on one line; ` · US$21,300` after it wraps (`figureEnd`, html.ts). -->
       {@const end = coded ? coded.rest.search(/\s|$/u) : 0}
-      {@const t = L.trend >= 0 ? trendOf(said(r, L.trend)) : null}
+      <!-- A TREND IS DRAWN WITH ITS NAME AND ITS NEWEST VALUE, OR NOT AT ALL (`cardTrend`): a bare line said nothing. -->
+      {@const t = L.trend >= 0 ? cardTrend(said(r, L.trend), label(L.trend)) : null}
       {@const m = L.ring >= 0 ? ringOf(said(r, L.ring)) : null}
       {@const whoFace = L.who >= 0 ? initialOf(said(r, L.who)) : null}
       {@const whoMark = L.who >= 0 ? markFor(said(r, L.who)) : null}
@@ -200,7 +202,9 @@
             {#if shows}
               <span class="cards-figure"
                 ><span class="cards-value num"
-                  >{#if !r.cells[L.figure]}{MISSING}{:else if symbol}{symbol}{:else if coded}<span class="amount"
+                  >{#if !r.cells[L.figure]}{MISSING}{:else if symbol}{symbol}{:else if w}<span class="amount"
+                    >{w.minus}<span class="amount-code">{w.code}</span>{AMOUNT_SPACE}{w.whole}{w.fraction}</span
+                  >{:else if coded}<span class="amount"
                     >{coded.sign}<span class="amount-code">{coded.currency}</span>
                     <Text nodes={inline(coded.rest.slice(0, end), opts)} {opts} /></span
                   ><Text nodes={inline(coded.rest.slice(end), opts)} {opts} />{:else}<Text nodes={inline(short, opts)} {opts} />{/if}</span
@@ -209,16 +213,16 @@
             {/if}
             {#if t}
               <!-- A word-sized line, so it is named by its numbers and is not a tab stop. -->
-              <svg
+              <span class="cards-trended"><svg
                 class="cards-trend"
                 viewBox="0 0 1000 100"
                 preserveAspectRatio="none"
                 role="img"
-                aria-label="{label(L.trend) || TREND}: {t.said.join(', ')}"
+                aria-label="{t.label}: {t.said.join(', ')}"
               >
                 <path class="cards-trend-line" d={t.d} vector-effect="non-scaling-stroke"></path>
                 <path class="cards-trend-end" d={t.end} vector-effect="non-scaling-stroke"></path>
-              </svg>
+              </svg><span class="cards-value num">{t.last}</span><span class="cards-label">{t.label}</span></span>
             {/if}
             {#if L.ring >= 0 && r.cells[L.ring]}
               <span class="cards-ring"

@@ -74,6 +74,18 @@ const LAID: Record<string, Laid> = {
       'Projects names the earning projects gone silent, a line with no heading of its own after In play (stands-50) -> 092fe0f5bb736b52',
     ],
   },
+  /* 2.6.0 LAYS NOTHING NEW: its changes are on its own Home (Today by name, Late, the week from today, no Cost). */
+  'founder@2.6.0': {
+    lays: [
+      'adds page.relation after People: Numbers, 30 days',
+      'adds page.relation after People: Latest numbers',
+      'adds page.relation after People: Send numbers here',
+      'adds page.portfolio after In play: ',
+      'hands register.organisations to people',
+    ],
+    declares: '092fe0f5bb736b52',
+    history: ['2.6.0 lays what 2.5.0 laid, word for word -> 092fe0f5bb736b52'],
+  },
 };
 
 /** What is wrong with one use case's document against `LAID`, as sentences. Empty when nothing is. */

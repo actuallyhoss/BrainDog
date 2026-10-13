@@ -197,6 +197,8 @@ export const decide = {
   arrangeBefore: 'Now',
   arrangeAfter: 'Will be',
   arrangeEmpty: 'empty',
+  /** Before a value where there was none: "Set to Friday", never "Now empty" and an arrow. */
+  arrangeSetTo: 'Set to',
   arrangeYes: 'yes',
   arrangeNo: 'no',
   arrangeNewValue: 'a new value',

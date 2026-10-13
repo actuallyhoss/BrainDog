@@ -684,6 +684,8 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
   assert.deepEqual(headings, [
     /* THE HEADLINE LINE, which carries no heading: it is the sentence in the page's headline tile. */
     undefined,
+    /* AND THE LINE A RECORD WITH TWO BOOKS OPENS ON, SINCE money-core 3.17.0: how many books and accounts, and no sum. */
+    undefined,
     'What you have, by book',
     'Add an account',
     'Cash ahead',
@@ -692,10 +694,9 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
     'Runs out',
     'Accounts',
     'Waiting on you',
-    /* THE CHECK, DRAWN SINCE cash-page-54 (REC-A17): one tile while the two ways of adding cash up disagree, and one
-       line while no balance is typed. */
+    /* THE CHECK, DRAWN SINCE cash-page-54 (REC-A17): one tile while the two ways of adding cash up disagree. The line
+       it drew while no balance is typed went for the lead above: Money is at the most blocks a page declares. */
     'Cash now does not add up',
-    undefined,
     /* ONE TILE OF THREE LINES, SINCE money-core 3.5.0: an old balance, money late coming in and money late going out,
        each a note with no heading of its own under one boxed section. */
     'Heads up',
@@ -826,7 +827,11 @@ test('EVERY MONEY TILE WEARS A GLYPH, the headline sits beside its walk, and no 
       assert.equal(blocks[walk]!.span, 12, `${slug}: Cash ahead is not the whole main column`);
       assert.equal((blocks[stat] as { area?: string }).area, 'rail', `${slug}: the figure is not in the side column`);
       assert.equal(stat, walk + 1, `${slug}: something stands between the walk and the figure beside it`);
-      assert.ok(blocks.slice(1, walk).every((b) => b.kind === 'bar' || b.kind === 'capture'), `${slug}: something stands between the line and its walk`);
+      /* THE LINE IS ONE OF TWO SINCE money-core 3.17.0, one a record draws: its cash with one book, where it is kept with two. */
+      assert.ok(
+        blocks.slice(1, walk).every((b) => b.kind === 'bar' || b.kind === 'capture' || (b.kind === 'note' && (b as { lead?: boolean }).lead === true)),
+        `${slug}: something stands between the line and its walk`,
+      );
     } else if (stat >= 0) {
       assert.equal(blocks[stat]!.span, 4, `${slug}: the headline tile is not a third of the row`);
       assert.equal(blocks[walk]!.span, 8, `${slug}: Cash ahead does not fill the rest of the headline's row`);
@@ -938,7 +943,7 @@ test('THE ACCOUNTS ADD UP TO CASH NOW, the calendar is the next thirty days, and
  * box to add the first account, which is the one thing to do. Waiting on you is drawn only while something is asked
  * (`questions-open`), so a record nobody has asked anything of draws no band saying so.
  */
-test('A BLOCK WITH NOTHING TO SAY IS NOT DRAWN, so a fresh record reads its line, the box to add an account and that no balance is typed', async () => {
+test('A BLOCK WITH NOTHING TO SAY IS NOT DRAWN, so a fresh record reads its line and the box to add an account', async () => {
   const k = await openRecord(openSqlite(), { now: () => NOW });
   for (const id of ['portfolio', 'people', 'money-core']) assert.ok((await put(k, document(id))).ok, id);
   const out = k.page('money');
@@ -947,7 +952,7 @@ test('A BLOCK WITH NOTHING TO SAY IS NOT DRAWN, so a fresh record reads its line
   for (const b of blocks) assert.deepEqual(b.refusals, [], `${String(b.heading)} is refused`);
   assert.deepEqual(
     blocks.filter((b) => b.drawn !== false).map((b) => b.heading),
-    [undefined, 'Add an account', undefined],
+    [undefined, 'Add an account'],
   );
 });
 
@@ -1232,18 +1237,20 @@ test("A BOOK'S PAGE READS WHOLE, and with two books the Money page's headline is
     const out = k.page('money');
     assert.ok(out.ok, sayOf(out));
     /* THE LINE IS THE LEAD, SINCE money-core 3.5.0: the lines of Heads up carry no heading either. */
-    return (out.value as { blocks: readonly { heading?: string; drawn?: boolean; lead?: boolean }[] }).blocks
+    return (out.value as { blocks: readonly { heading?: string; drawn?: boolean; lead?: boolean; body?: string }[] }).blocks
       .filter((b) => b.drawn !== false)
-      .map((b) => (b.lead === true ? undefined : (b.heading ?? '')));
+      .map((b) => (b.lead === true ? (b.body?.includes('{{cash-now}}') ? undefined : 'kept in') : (b.heading ?? '')));
   };
   assert.ok(drawn().includes(undefined) && !drawn().includes('What you have, by book'));
   made('Home');
   const two = drawn();
   assert.ok(!two.includes(undefined), 'one Cash now over two books is still said');
+  /* AND THE LINE SAYS WHERE THE MONEY IS KEPT INSTEAD, SINCE money-core 3.17.0: two counts, never the sum. */
+  assert.equal(two[0], 'kept in');
   /* WHAT IS WAITING ON THE PERSON MAY LEAD, wherever the page declares it: the record's own look puts the questions
      first while there are any (`look.<page>`'s `lead`, `loop/contract-17.md`), so the books' figure is held beside the
      walk among the rest. */
-  assert.deepEqual(two.filter((h) => h !== 'Waiting on you').slice(0, 2), ['What you have, by book', 'Cash ahead']);
+  assert.deepEqual(two.filter((h) => h !== 'Waiting on you').slice(0, 3), ['kept in', 'What you have, by book', 'Cash ahead']);
 });
 
 test('CASH AHEAD OPENS ON THREE MONTHS AND WALKS TO THE LONGEST LENGTH IT OFFERS, so a year and two are a press away', async () => {

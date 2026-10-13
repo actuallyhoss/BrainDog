@@ -62,7 +62,12 @@ import { RUNWAY } from './parts/runway.ts';
  * WHETHER CASH NOW ADDS UP, SINCE money-core 3.17.0 (REC-A17): the record works Cash now out a second way, and while
  * the two disagree one tile under the walk says so in the danger colour and in words (`parts/cross-check.ts`). It is
  * not drawn at nought, so a record that is right reads no word about a check. With no balance typed there is nothing
- * to check, and one line says that under the box to add an account.
+ * to check and nothing is said of it: the box to add an account is what stands there.
+ *
+ * A LINE FOR TWO BOOKS, SINCE money-core 3.17.0: a record that keeps more than one book opens on how many books and
+ * accounts its money is kept in (`parts/headline.ts`), where the app said its own filler because no block was the
+ * lead. TWENTY-FOUR BLOCKS, THE MOST A PAGE DECLARES (`BLOCK_CEILING` in `packages/kernel/src/declare.ts`): the line
+ * took the place of the one that said no balance had been typed (`parts/cross-check.ts`).
  */
 export const MONEY_PAGE: SeedPage = {
   page: 'money',

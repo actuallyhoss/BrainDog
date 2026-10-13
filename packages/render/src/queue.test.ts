@@ -149,5 +149,5 @@ test('A `does` LINE BELONGS TO THE QUESTION ABOVE IT, in order, and one before a
 
 test('THE BAND FOR ADDING THINGS SAYS SO IN THE PERSON\'S WORDS, not the system\'s', () => {
   for (const word of Object.values(QUEUE_COSTS)) assert.doesNotMatch(word, /\brows?\b|\blist\b|\bentit/u, word);
-  assert.equal(QUEUE_COSTS.rows, 'Adds to your things');
+  assert.equal(QUEUE_COSTS.rows, 'Adds to or changes your things');
 });

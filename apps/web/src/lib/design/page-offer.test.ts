@@ -49,7 +49,7 @@ const pen = penOf([
     kind: 'page',
     register: 'orders',
     title: 'Orders this week',
-    why: 'Orders has 4 due this week. Give them a page of their own?',
+    why: '4 orders due this week. Want a page of their own for them?',
     change: { to: draft },
     list: 'orders',
     draft,

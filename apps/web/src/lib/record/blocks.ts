@@ -1127,7 +1127,9 @@ export function toSegments(block: BlockResult, kinds?: Readonly<Record<string, K
   }
   const drawn = groupedSegments(block, kinds) ?? drawSegments(block, kinds);
   /* A HEAT SAYS WHAT ITS CELLS LEAVE OUT, under them: twelve weeks of days add to less than a list that reaches further back. */
-  const outside = block.kind === 'heat' ? outsideSaid(keyOf(block, 'outside')) : null;
+  /* DAYS WHERE THE RECORD COUNTED DAYS (`outsideDays`), and with none of them, as when every entry outside holds no day,
+     nothing is said of days. A record that sends no such count is read as before. */
+  const outside = block.kind === 'heat' ? outsideSaid(keyOf(block, 'outsideDays') ?? keyOf(block, 'outside')) : null;
   return outside === null ? drawn : [...drawn, ...parse(outside, { page: true })];
 }
 

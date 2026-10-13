@@ -564,10 +564,17 @@
     }
   }
 
-  /* ON A PHONE THE FIGURES ARE TWO BY TWO, rather than a stack of rows pushing what needs you off the screen. */
+  /* ON A PHONE THE FIGURES ARE TWO BY TWO, rather than a stack of rows pushing what needs you off the screen.
+
+     ONLY WHILE THE TILE HOLDS 480px, which is where a stat stops being tiles and becomes rows, the label on the left
+     and the figure on the right (`kinds/stat.css`). Under that this rule still set two across, over the sheet's one
+     column, so two rows stood on one line and ran into each other, one figure against the next label, at 390
+     (the look of 13 October, fault C). */
   @media (width < 640px) {
-    .body :global(.grid:has(> .cell:nth-child(2))) {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+    @container stat (inline-size >= 480px) {
+      .body :global(.grid:has(> .cell:nth-child(2))) {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
     }
   }
 

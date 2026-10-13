@@ -30,7 +30,7 @@
 import type { CardRole } from './cards.ts';
 import type { Tone } from './kinds.ts';
 import { leadingCode, symbolFigure } from './format.ts';
-import { type WrittenAmount, readAmount, writeAmount } from './money.ts';
+import { type WrittenAmount, writeFigure } from './money.ts';
 import { takeWorking } from './working.ts';
 
 export type Column = {
@@ -239,8 +239,9 @@ export type TableCellBody =
 export function tableCellBody(value: string | null | undefined, home?: string | null): { working: boolean; body: TableCellBody } {
   const taken = takeWorking(value ?? null);
   if (taken.text === null) return { working: false, body: { kind: 'missing' } };
-  const stored = home === undefined ? null : readAmount(taken.text);
-  const amount = stored && writeAmount(stored, home ?? null, 'exact');
+  /* ONE WHOLE FIGURE, HOWEVER IT REACHED THE CELL (`writeFigure`): the stored form, one stored ungrouped, and one a
+     host drew first are the same amount and are written the same way. */
+  const amount = home === undefined ? null : writeFigure(taken.text, home ?? null, 'exact');
   if (amount) {
     const body: TableCellBody =
       amount.codePlace === 'before'

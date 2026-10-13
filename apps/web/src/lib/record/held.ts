@@ -64,6 +64,21 @@ export function seqTitled(register: string, said: string, same: (a: string, b: s
 export const FINISHED = new Map<string, ReadonlySet<number>>();
 
 /**
+ * The states of a list that keep a row out of a picker: its `done:`, unless the list's state field starts a new row in
+ * one of them, and then none.
+ *
+ * A LIST WHOSE ROWS ARE BORN FINISHED HAS NO ROW TO HIDE. A ledger entry is `cleared` the moment it is written, so
+ * leaving the finished ones out emptied Installments' "Paid by" of every payment that could have paid the part, and
+ * the one entry it was for was never offered. Finished means "no longer offered" only where a row starts unfinished
+ * and somebody closes it: an account, a category, a project.
+ */
+export function leftOut(decl: Pick<RegisterDecl, 'state' | 'done' | 'fields'> | undefined): readonly string[] {
+  const done = decl?.done ?? [];
+  const starts = decl?.fields?.find((f) => f.id === decl.state)?.default;
+  return typeof starts === 'string' && done.includes(starts) ? [] : done;
+}
+
+/**
  * The rows a ref into `register` can point at, as a picker offers them: by name, or as its kind and number for a row
  * with none, "Book #2", as `unnamed` in `api.ts` says it. It said `books#2`, the id an agent passes, which is never what
  * a person reads (DIRECTION §37).
@@ -73,7 +88,8 @@ export const FINISHED = new Map<string, ReadonlySet<number>>();
  * Portage and a fourth project the record never held, and the number sent was a real row of the record's.
  *
  * A ROW ITS OWN LIST CALLS FINISHED IS LEFT OUT (`FINISHED`), except `keep`, the row the form already points at, so
- * an entry on an account closed since still shows where it is.
+ * an entry on an account closed since still shows where it is. A list whose new rows start finished leaves none out
+ * (`leftOut`).
  */
 export const refOptions = (register: string, keep?: number | null): { value: number; label: string }[] => {
   const kind = REGISTERS[register]?.one ?? register.replace(/_/g, ' ');

@@ -18,7 +18,7 @@
 <script lang="ts">
   import { inline, magnitudeOfCell, text, trendOf, SPARKLINE_POINT, TREND, TONES, MISSING, type Block, type Row, type RenderOptions } from '../../src/index.ts';
   import { barFigure } from '../../src/format.ts';
-  import { drawnRows } from '../../src/html.ts';
+  import { drawnRows, gaugeFigure } from '../../src/html.ts';
   import Text from '../Text.svelte';
   import Trend from '../Trend.svelte';
   import Split from '../Split.svelte';
@@ -113,8 +113,8 @@
            page writes one, `{{cash.now}} | {{cash.target}}`, printed the author's braces and drew
            a bar of length zero. It is the same finding as `timeline`'s date cell one primitive
            over, on the two cells in this block that ARE the numbers. -->
-      <span class="prop-value num"><Text nodes={inline(row.cells[1] ?? MISSING, opts)} {opts} /></span>
-      <span class="prop-note num">of <Text nodes={inline(row.cells[2] ?? MISSING, opts)} {opts} /></span>
+      <span class="prop-value num"><Text nodes={inline(gaugeFigure(row.cells[1], opts) ?? MISSING, opts)} {opts} /></span>
+      <span class="prop-note num">of <Text nodes={inline(gaugeFigure(row.cells[2], opts) ?? MISSING, opts)} {opts} /></span>
       {#if row.tone}
         <span class="glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>
       {/if}
@@ -124,7 +124,7 @@
     {#snippet cells(row: Row, v: number, drawable: boolean)}
       <span class="prop-label"><Text nodes={inline(row.cells[0] ?? '', opts)} {opts} /></span>
       {#if drawable}<span class="prop-track" style="--magnitude:{fixed(v / scale)}"></span>{/if}
-      <span class="prop-value num"><Text nodes={inline(barFigure(row.cells[1] ?? MISSING), opts)} {opts} /></span>
+      <span class="prop-value num"><Text nodes={inline(barFigure(row.cells[1] ?? MISSING, opts.home), opts)} {opts} /></span>
       <span class="prop-note"><Text nodes={inline(row.cells[2] ?? '', opts)} {opts} /></span>
       {#if row.tone}
         <span class="glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>

@@ -71,7 +71,7 @@
   import Section from '$lib/ui/Section.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import { PEOPLE, withChip } from '$lib/who.ts';
-  import { accept, pressKey, type NotMade } from './accept.ts';
+  import { accept, pressKey, type NotMade, type SetupRow } from './accept.ts';
   import {
     added,
     browserCurrencyEnv,
@@ -231,6 +231,7 @@
   function take(p: Proposal) {
     const handCurrency = currency !== null && currency !== (proposal?.currency ?? null);
     proposal = p;
+    owed = undefined;
     if (!caseByHand) chosen = p.usecase;
     kept = [...new Set([...p.modules.filter((id) => !offByHand.has(id)), ...onByHand])];
     /* A CURRENCY TYPED IS THE ANSWER; one chosen by hand stands until a later turn types one. */
@@ -344,6 +345,7 @@
     /* WHAT WAS READ STANDS BESIDE THE FIELD until the words are read again as they are typed. */
     live = proposal;
     proposal = null;
+    owed = undefined;
     failed = null;
     draft = null;
     drafting = false;
@@ -600,6 +602,13 @@
    * press that answers clears it, and other entries are another press.
    */
   let unanswered: { key: string; rows: string } | null = null;
+  /**
+   * THE USE CASE'S PLAN STILL TO MAKE, as the last answered press handed it back (`Accepted.plan`), sent with the next
+   * press in place of the plan formed whole from the sentence: an answered press is followed by one under a new key,
+   * and the record passes over only a key it holds, so the whole plan would be written a second time. `undefined`
+   * until a press has answered with one, and again once the reading it belonged to is replaced.
+   */
+  let owed: readonly SetupRow[] | undefined;
   /** What could not be made, `null` until a press has come back with something refused. */
   let failed = $state<NotMade[] | null>(null);
   const nothing = $derived(u === null && modules.length === 0 && using === null && !(file !== null && mapping !== null));
@@ -641,8 +650,9 @@
       const rows = JSON.stringify(asked.proposal.rows);
       const resent = unanswered !== null && unanswered.rows === rows;
       if (!resent) unanswered = { key: pressKey(), rows };
-      const out = await accept(client, { ...asked, key: unanswered!.key, again: alreadyMade || pressed || resent, email: signed.ok ? (signed.value.me?.email ?? null) : null });
+      const out = await accept(client, { ...asked, key: unanswered!.key, again: alreadyMade || pressed || resent, email: signed.ok ? (signed.value.me?.email ?? null) : null, ...(owed === undefined ? {} : { plan: owed }) });
       if (!out.unheard) unanswered = null;
+      if (!out.unheard && out.plan !== undefined) owed = out.plan;
       stop();
       pressed = true;
       /* WHAT THE RECORD REFUSED STAYS ON ITS TILE, in the record's own sentence, until the person goes back. A press

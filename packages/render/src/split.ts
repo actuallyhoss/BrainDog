@@ -67,6 +67,14 @@ export function splitPlan(values: readonly number[], holes: readonly boolean[] =
   return { parts, cuts, empty: false };
 }
 
+/**
+ * Whether a row stands in the legend. A PART AT NOUGHT IS LEFT OUT: it has no length on the track, so its dot and
+ * `EGP 0` sat against the part before it and read as one more share of the whole. A row with no number yet, or a
+ * credit, still has something to say and stays, and when every part is nought the legend prints them all, because
+ * then it is all there is. The fold of numbers under the track keeps every row either way.
+ */
+export const splitListed = (plan: SplitPlan, value: number): boolean => plan.empty || value !== 0;
+
 /** The track's accessible name: each part and its share, in order. */
 export const splitSentence = (parts: readonly { label: string; share: string }[]): string =>
   parts.map((p) => `${p.label || SPLIT_PART} ${p.share}`).join(', ');

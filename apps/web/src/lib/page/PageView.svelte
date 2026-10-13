@@ -100,8 +100,11 @@
     /** Whether a home's questions are drawn whole (Decide) rather than compact (everywhere else). */
     whole?: boolean;
     /**
-     * The pen's offer for this page (uc6-places-47), drawn under the page's header and inside `.hosted`, so the page's
-     * name comes first at every width and a row open in the docked panel never sits over the card.
+     * The pen's offer for this page (uc6-places-47), drawn UNDER THE PAGE'S OWN BLOCKS and inside `.hosted`. It was
+     * drawn between the header and the first tile, where on Money it took a phone's whole first screen and stood over
+     * the accounts on a laptop (look fault G): an offer never outranks what the page was opened for. So it is the
+     * board's last line, one quiet row that opens on tap, as DIRECTION 39 puts "Changed for you" at the bottom of the
+     * board. Not drawn over the page's source, which is the declaration and nothing else.
      */
     offer?: Snippet | undefined;
   } = $props();
@@ -471,7 +474,6 @@
       <Arrange bind:this={arranger} {arrangement} {slug} page={live.page.page} declared={live.page.blocks} {all} bind:extra {showSource} {reread} />
     {/snippet}
   </PageHead>
-  {#if offer}<div class="page-offer">{@render offer()}</div>{/if}
 
   <!-- THE LINE THE PAGE OPENS ON, drawn once: in the header's row, or handed to the body to sit under its sentence. -->
   {#snippet lineInHead()}
@@ -504,6 +506,8 @@
       pick={hosting ? picked : null}
       {onwalk}
     />
+    <!-- THE OFFER COMES AFTER EVERY BLOCK OF THE PAGE, never before the first. -->
+    {#if offer}<div class="page-offer" data-after="blocks">{@render offer()}</div>{/if}
     {#if hosting}<BatchBar {picked} />{/if}
   {/if}
   </div>
@@ -602,10 +606,10 @@
 {/if}
 
 <style>
-  /* THE OFFER UNDER THE HEADER, one tile gap from what follows, in the page's own gutter. */
+  /* THE OFFER UNDER THE PAGE'S BLOCKS, one tile gap below the last, in the page's own gutter. */
   .page-offer {
     padding-inline: var(--gutter);
-    margin-block-end: var(--tile-gap);
+    margin-block: var(--tile-gap);
   }
 
   .hosted {

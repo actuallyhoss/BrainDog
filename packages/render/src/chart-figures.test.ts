@@ -148,9 +148,14 @@ test('A TABLE CELL OF MONEY IS READ ONCE AND WRITTEN ONCE: the home by its sign,
 });
 
 test('A CELL THAT IS NOT STORED MONEY IS LEFT ALONE, and so is every caller that names no home', () => {
-  for (const text of ['Q3', '12%', 'E£1,299', '$31k', 'EGP 1,299', '1,299.00', 'THE 100', 'about EGP 1,299.00', '+GBP 850.00']) {
+  for (const text of ['Q3', '12%', 'E£1,299', '$31k', 'EGP 1,299', '1,299.00', 'THE 100', 'about EGP 1,299.00']) {
     assert.deepEqual(tableCellBody(text, 'EGP').body, tableCellBody(text).body, text);
   }
+  /* MONEY COMING IN, WRITTEN WITH ITS PLUS, is one whole figure and the writer's too (`writeFigure`): the plus stays in
+     front of everything, where a minus stands. A caller that names no home still leaves it as it came. */
+  assert.equal((tableCellBody('+GBP 850.00', 'EGP').body as { text: string }).text, `+£850.00${NB}GBP`);
+  assert.equal((tableCellBody('+GBP 850.00', 'GBP').body as { text: string }).text, '+£850.00');
+  assert.deepEqual(tableCellBody('+GBP 850.00').body, { kind: 'symbol', text: '+£850.00' });
   assert.deepEqual(tableCellBody(money(129_900, 'GBP')).body, { kind: 'symbol', text: '£1,299.00' });
   /* Hours and counts are not money: the writer does not touch them. */
   const hours = [['Week', 'Hours'], ['W1', '12h'], ['W2', '31h'], ['W3', '40h']];
@@ -160,4 +165,11 @@ test('A CELL THAT IS NOT STORED MONEY IS LEFT ALONE, and so is every caller that
   assert.deepEqual(seriesPlan(drawn, false, 'GBP'), seriesPlan(drawn), 'a figure a page drew itself is not read back');
   const count = [{ label: 'Bike', value: '3', third: '7' }];
   assert.deepEqual(ringPlan(count, 'GBP'), ringPlan(count));
+});
+
+test('A RING TOWARD A TARGET IN ANOTHER CURRENCY SAYS NOTHING IS LEFT: one currency is never taken from another', () => {
+  const mixed = ringPlan([{ label: 'Fund', value: money(294_795, 'USD'), third: money(70_231_800, 'EGP') }], 'EGP');
+  assert.equal(mixed.left, '');
+  const one = ringPlan([{ label: 'Fund', value: money(294_795, 'EGP'), third: money(70_231_800, 'EGP') }], 'EGP');
+  assert.equal(one.left, `EGP${NB}699,370.05 to go`);
 });

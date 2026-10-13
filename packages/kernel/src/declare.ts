@@ -60,7 +60,7 @@ import { BLOCK_KIND_MODULES, kindModule } from './kinds/index.ts';
 /* THE PAGE WORDS THE INSTALL AND THE READ REFUSE IN ONE SENTENCE: a section's host panel, a path's short view and a roadmap's columns. */
 import { panelFault, roadmapFault, shortFault } from './kinds/words.ts';
 import type { FlowDecl } from './rules.ts';
-import { linkFault } from './rule-link.ts';
+import { alsoFault, linkFault } from './rule-link.ts';
 /* THE FORMAT, THE WINDOW AND THE TWO FIGURES THAT ARE NOT A SUM, checked here by the same functions that read them. */
 import { clockOf, isMoneyFormat, windowMs, type EvalContext } from './metrics.ts';
 import { WALKS, WALK_SOURCE, crosscheckFault, isCrosscheck, isRolled, rolledFault, walksToZero, type Rolled } from './money-figures.ts';
@@ -4980,6 +4980,17 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
         decl.body as never,
       );
       if (linked) return linked;
+      /* AND A LINK'S `also` THAT IS NOT A REF TO THE LINKED LIST (`alsoFault`): it would hold an id nothing can open. Asked
+         of the rule's own list, with each field's type and where it points, which the check above has no need of. */
+      const also = alsoFault((register) => {
+        const shape = installed.get(`register.${register}`);
+        if (shape === undefined || !Array.isArray(shape.fields)) return null;
+        const fields = (shape.fields as { id?: unknown; type?: unknown; to?: unknown; retired?: unknown }[])
+          .filter((f) => f?.retired !== true && typeof f?.id === 'string')
+          .map((f) => [f.id, { type: f.type, ...(typeof f.to === 'string' ? { to: f.to } : {}) }]);
+        return { register, fields: Object.fromEntries(fields) } as never;
+      }, decl.body as never);
+      if (also) return also;
     }
 
     /* THE TRIGGER, THE STEPS AND THE PATH, in `flow-lint.ts`. A rule with `on: { every: 1h }` installed before this line

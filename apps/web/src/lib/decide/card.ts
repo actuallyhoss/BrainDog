@@ -56,6 +56,12 @@ export const cardWords = {
   to: 'to',
   /** A value that was empty before, or is emptied. */
   nothing: 'nothing',
+  /** A field that held nothing and now holds something: said in words, never as a struck "nothing" and an arrow. */
+  setTo: (value: string) => `Set to ${value}`,
+  /** The same where the record names no field: the value is what is added. */
+  adds: (value: string) => `Adds ${value}`,
+  /** A value taken away, leaving nothing in its place. */
+  removes: (value: string) => `Removes ${value}`,
   /** Said to a screen reader before who asked, on the line over the question; the question's own page heads its side with it. */
   askedBy: 'Asked by',
   /** THE CARD'S SIDE, ON A WIDE TILE (DIRECTION §39): why it is asked and what it changes, each under a quiet heading. */
@@ -68,6 +74,13 @@ export type Asker = { name: string; kind: ActorKind; app: string | null; run: st
 
 /** One thing accepting changes, from what to what, in words. `what` is empty where the record names no field. */
 export type Shift = { what: string; before: string; after: string };
+
+/**
+ * THE SAME CHANGE AS THE CARD DRAWS IT. Only a value that replaces another is drawn struck with an arrow (`said` is
+ * `null`, and `before` and `after` are read); a value where there was none, or one taken away, is one plain phrase
+ * ("Set to Friday", "Adds Weekly", "Removes Friday"), because "nothing" struck through with an arrow says nothing.
+ */
+export type ShiftLine = { what: string; before: string; after: string; said: string | null };
 
 /** A money value as the record keeps one: an integer of minor units and its currency. */
 export type Moved = { amount: number; currency: string };
@@ -99,6 +112,8 @@ export type Card = {
   money: string;
   /** What changes, from what to what, where the record says. */
   shifts: Shift[];
+  /** The same changes as the card draws them: a value where there was none is a phrase, never a struck "nothing". */
+  lines: ShiftLine[];
   /** The ways to answer, in the record's order; Accept names its amount and Reject says Decline. */
   ways: Way[];
   /** The answer Enter gives, or `null` where a key must not answer (hard to undo, or money moves). */
@@ -176,6 +191,10 @@ export function movesOf(v: unknown): Moved[] {
   return [...by].map(([currency, { net, moved }]) => ({ amount: Math.abs(net) === moved ? net : moved, currency }));
 }
 
+/** A value that holds nothing: none sent, an empty word, or a list of none. */
+const emptyValue = (v: unknown): boolean =>
+  v === null || v === undefined || (typeof v === 'string' && v.trim() === '') || (Array.isArray(v) && v.every(emptyValue));
+
 /**
  * A value from before or after a change, in words: money in its currency, a list joined, an empty value said as nothing.
  * `null` for a value that is an id or a handle, which no card says, so the change it belongs to is left to its page.
@@ -185,7 +204,7 @@ export function movesOf(v: unknown): Moved[] {
  * them, and a value that was nothing but an id or a path, which `spoken` empties, is left to its page too.
  */
 function valueSaid(v: unknown, home: string | null | undefined): string | null {
-  if (v === null || v === undefined || v === '') return cardWords.nothing;
+  if (emptyValue(v)) return cardWords.nothing;
   const m = movedOf(v, true);
   if (m) return home === undefined ? moneyInText(money(m.amount, m.currency)) : moneyInText(money(m.amount, m.currency), home);
   if (typeof v === 'boolean') return v ? 'yes' : 'no';
@@ -211,11 +230,23 @@ const fieldSaid = (v: unknown): string => (typeof v === 'string' && /^[a-z][a-z0
  * are drawn: a card says what moves, and the question's own page says all of it.
  */
 export function shiftsOf(q: QueueQuestion, home?: string | null): Shift[] {
-  const out: Shift[] = [];
-  const push = (what: unknown, before: unknown, after: unknown) => {
+  return shiftLinesOf(q, home).map(({ what, before, after }) => ({ what, before, after }));
+}
+
+/**
+ * THE SAME CHANGES AS LINES A CARD DRAWS (`ShiftLine`). A side that held nothing is known here, from the value itself
+ * and not from its word, so a field whose text is the word "nothing" is still a value. Nothing to nothing is no change
+ * and no line.
+ */
+export function shiftLinesOf(q: QueueQuestion, home?: string | null): ShiftLine[] {
+  const out: ShiftLine[] = [];
+  const push = (label: unknown, before: unknown, after: unknown) => {
     const b = valueSaid(before, home);
     const a = valueSaid(after, home);
-    if (a !== null && b !== null && a !== b) out.push({ what: fieldSaid(what), before: b, after: a });
+    if (a === null || b === null || a === b) return;
+    const what = fieldSaid(label);
+    const said = emptyValue(before) ? (what ? cardWords.setTo(a) : cardWords.adds(a)) : emptyValue(after) ? cardWords.removes(b) : null;
+    out.push({ what, before: b, after: a, said });
   };
   const changes = field(q, 'changes');
   if (Array.isArray(changes)) {
@@ -330,6 +361,7 @@ export function cardOf(q: QueueQuestion, ctx: CardContext): Card {
     moves,
     money: said === '' ? '' : cardWords.moves(said),
     shifts: shiftsOf(q, ctx.home),
+    lines: shiftLinesOf(q, ctx.home),
     ways,
     enter: acceptKey({ options: keyed.options, band: cost }, moves.length > 0),
     decline: declineKey(keyed),
@@ -341,14 +373,36 @@ export function cardOf(q: QueueQuestion, ctx: CardContext): Card {
 }
 
 /**
+ * WHETHER AN ANSWER IS HARD TO TAKE BACK: the record's band is `undo` and nothing else. The band is the record's to
+ * give (the kernel's `weigh`), and a change the record keeps a prior version of comes as `shape`, so the care is said
+ * on the few cards that need it and keeps its weight. No kind, no word of the question and no missing band reads as hard.
+ */
+export const hardOf = (card: Pick<Card, 'cost'>): boolean => card.cost === 'undo';
+
+/**
  * WHAT A BUTTON THAT ANSWERS SAYS, with the care a hard answer asks for in its own words (DIRECTION §39): "Decide, can’t
  * be undone easily", "Accept £12.98, can’t be undone easily". Every other band leaves the words as they are; the band
  * still ranks the card and still takes Enter away (`acceptKey`), it is only not drawn as a chip.
  */
-export const pressSaid = (card: Pick<Card, 'cost'>, label: string): string => (card.cost === 'undo' ? queueWords.hard(label) : label);
+export const pressSaid = (card: Pick<Card, 'cost'>, label: string): string => (hardOf(card) ? queueWords.hard(label) : label);
 
 /** The words a hard answer's button adds after its name (", can’t be undone easily"), or nothing, so the name stays its own. */
-export const pressTail = (card: Pick<Card, 'cost'>): string => (card.cost === 'undo' ? queueWords.hardTail : '');
+export const pressTail = (card: Pick<Card, 'cost'>): string => (hardOf(card) ? queueWords.hardTail : '');
+
+/**
+ * WHETHER "WHAT IT CHANGES" HAS A LINE UNDER IT: what accepting does, the money it writes, or a change from what to
+ * what. The link to the whole change is no line, so a card with the link alone draws the link and no heading over it.
+ */
+export const saysChanges = (card: Pick<Card, 'does' | 'money' | 'lines'>): boolean => card.does !== '' || card.money !== '' || card.lines.length > 0;
+
+/**
+ * HOW ONE FIELD OF A WHOLE CHANGE IS SAID (the question's own page, `Arranged.svelte`), from its two values in words
+ * and the page's word for an empty one: `set` where there was nothing before ("Set to Friday", never "Now empty, will
+ * be Friday"), `change` where one value replaces another or is taken away, and `none` where both sides hold nothing,
+ * which is no change and draws no line.
+ */
+export const fieldChange = (before: string | null, after: string, empty: string): 'none' | 'set' | 'change' =>
+  before === null || before === empty ? (after === empty ? 'none' : 'set') : 'change';
 
 /** THE MOST ANSWERS A ROW OF BUTTONS HOLDS: past three, a row is a list read sideways, and the form's choices read it. */
 export const INLINE_MOST = 3;

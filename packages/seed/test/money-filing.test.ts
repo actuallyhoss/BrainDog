@@ -189,16 +189,12 @@ test('A CATEGORY SET BY HAND IS LEFT ALONE, and so is an entry between a person\
 });
 
 /**
- * NOT YET TRUE, AND MARKED SO. Whether a rule's category is live is a question about the row the rule points at. The
- * rule's filter reads one list (`via` is refused), and the kernel's `take` leaves out a category that was deleted and
- * not one that was retired. `linkOf` leaves out a taken row whose own list calls it done since integrate 56, so the
- * first assertion below holds now.
- *
- * AND THAT ALONE LEAVES `filed_by` WRITTEN. The step that writes it is a second lookup with no `take`, so it never
- * asks about the rule's category: the entry would name a rule and hold no category. The second assertion below needs
- * the kernel to write the rule found and what was taken from it in one step, or not at all.
+ * Whether a rule's category is live is a question about the row the rule points at. The rule's filter reads one list
+ * (`via` is refused), so the answer is the link's: `take` leaves out a category that was deleted or that its own list
+ * calls done, and `also` writes the rule found into `filed_by` only where the category was taken. It was a second
+ * lookup that never asked, and the entry named a rule and held no category.
  */
-test('A RETIRED CATEGORY FILES NOTHING', { todo: 'the kernel: one link step that writes the rule found with what is taken from it, or neither' }, async () => {
+test('A RETIRED CATEGORY FILES NOTHING', async () => {
   const { k, outing, card } = await fresh();
   rule(k, { match: 'Talabat', match_by: 'starts', direction: 'out', category: outing.id });
   value(k.update('categories', outing.id, { state: 'retired' }, OWNER));

@@ -37,6 +37,7 @@
   import { resolverOf, type LiveBlock } from '../record/page-live.ts';
   import { page as route } from '$app/state';
   import { REGISTERS } from '../record/held.ts';
+  import { homeCurrency } from '../record/api.ts';
   import { toSegments } from '../record/blocks.ts';
   import { bindableFor, seedBlock, seedPackBlock } from '../record/seed.ts';
   import { blockWords } from '../record/block-edit.ts';
@@ -86,7 +87,7 @@
 
      AND THE RECORD'S CLOCK IS THE SHELL'S `now`, which `boot` answered with. It was the seed's `NOW`, so every
      preview's `{{ago:}}` was told against 3 September 2026 on a record read weeks later. */
-  const opts = $derived({ resolve, now: route.data.now, href: at });
+  const opts = $derived({ resolve, now: route.data.now, href: at, home: homeCurrency() });
 
   const PURPOSES = ['figure', 'list', 'plan', 'say', 'media'] as const;
 

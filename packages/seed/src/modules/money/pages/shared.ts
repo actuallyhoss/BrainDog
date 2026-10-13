@@ -31,23 +31,51 @@ export const BOOK_LEGS: Leg[] = CASH_LEGS.filter((leg) => BOOKED.has(leg.registe
  * use case's `home-<id>` page, else the default Home, which names no list. The founder's
  * Home takes this block by reference (`usecases/founder.ts`), so the window, the columns and the order stay one
  * declaration and cannot drift from each other.
+ *
+ * FROM TODAY, SINCE founder 2.6.0 (`DUE_WINDOW`). The window had no near edge, so a bill four days late was listed as
+ * due this week with nothing but its day to say otherwise. What is already late is `LATE_MONEY`'s, under its own word.
  */
+export const DUE_WINDOW = 'state is open or part, due after -1d, due before +8d';
+
+/** THE COLUMNS OF A BILL OR AN INVOICE ON A HOME, one array for what is due and what is late, so the two read alike. */
+const OWED_COLUMNS = [
+  { field: 'what', label: 'Description', width: 'minmax(14ch,1fr)' },
+  { field: 'party', label: 'Who', width: 'minmax(10ch,18ch)' },
+  { field: 'amount', label: 'Amount', width: '15ch', align: 'end', sign: { field: 'direction', minus: 'owed_by_me' } },
+  { field: 'due', label: 'Due', width: '13ch', align: 'end' },
+];
+
 export const DUE_THIS_WEEK: Readonly<Record<string, unknown>> = {
   kind: 'table',
   heading: 'Due this week',
   icon: 'calendar-clock',
   span: 12,
   source: 'register.obligations',
-  where: 'state is open or part, due before +8d',
-  columns: [
-    { field: 'what', label: 'Description', width: 'minmax(14ch,1fr)' },
-    { field: 'party', label: 'Who', width: 'minmax(10ch,18ch)' },
-    { field: 'amount', label: 'Amount', width: '15ch', align: 'end', sign: { field: 'direction', minus: 'owed_by_me' } },
-    { field: 'due', label: 'Due', width: '13ch', align: 'end' },
-  ],
+  where: DUE_WINDOW,
+  columns: OWED_COLUMNS,
   order: [{ field: 'due', dir: 'asc' }],
   limit: 6,
   empty: 'Nothing is due this week.',
+};
+
+/**
+ * WHAT IS ALREADY LATE, AS ONE BLOCK A USE CASE'S HOME TAKES BESIDE `DUE_THIS_WEEK`, SINCE founder 2.6.0: every bill
+ * and invoice still open or part paid whose day has passed, the oldest first, since that one has waited longest. The
+ * two windows meet at today and share no day, so nothing is listed twice and nothing falls between them. The heading
+ * is the word that says it is late; no colour is asked to say so alone.
+ */
+export const LATE_WINDOW = 'state is open or part, due before today';
+
+export const LATE_MONEY: Readonly<Record<string, unknown>> = {
+  kind: 'table',
+  heading: 'Late',
+  icon: 'octagon-alert',
+  span: 12,
+  source: 'register.obligations',
+  where: LATE_WINDOW,
+  columns: OWED_COLUMNS,
+  order: [{ field: 'due', dir: 'asc' }],
+  limit: 6,
 };
 
 /**

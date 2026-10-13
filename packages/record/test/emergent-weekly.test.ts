@@ -112,7 +112,7 @@ test('AT 15 DAYS ORDERS IS OFFERED ONE WEEK PAGE, said in its own words, and kee
   assert.equal(offer.kind, 'page');
   assert.equal(offer.list, 'orders');
   assert.equal(offer.register, 'orders');
-  assert.equal(offer.why, 'Orders has 4 due this week. Give them a page of their own?');
+  assert.equal(offer.why, '4 orders due this week. Want a page of their own for them?');
   assert.doesNotMatch(`${offer.title} ${offer.why}`, /\u2014|\brows?\b|ULID|#/u);
   assert.deepEqual(offer.draft, offer.change.to, 'the draft the card draws is not the page keeping writes');
   assert.ok(!pen.some((i) => i.id === 'page:orders'), 'Orders was offered a plain page beside its week');
@@ -182,7 +182,7 @@ test('WHAT IS DUE THIS WEEK IS WHAT IS STILL TO DO: six due with two paid says f
   const four = await shop();
   paid(four.api, ['2026-09-16', '2026-09-19']);
   const offer = weekly(four.penOn(15))[0];
-  assert.equal(offer?.why, 'Orders has 4 due this week. Give them a page of their own?', 'a paid order was counted as due');
+  assert.equal(offer?.why, '4 orders due this week. Want a page of their own for them?', 'a paid order was counted as due');
   const due = (offer!.change.to.body as { blocks: { heading?: string; where?: unknown }[] }).blocks.find((b) => b.heading === 'Due this week');
   assert.ok(JSON.stringify(due?.where).endsWith('{"field":"state","not_in":["paid"]}]}'), JSON.stringify(due?.where));
 
@@ -265,7 +265,7 @@ test('MARIAM: HER SHOP\'S ORDERS, READ THROUGH ITS OWN PAGE ON THREE WEEKS, is o
   const pen = penFor({ kernel: api.kernel, reads: () => true, pages: api.kernel.pages(), dismissed: new Set(), use: { sql, nowMs } });
   const offer = weekly(pen)[0];
   assert.ok(offer, `Orders was not offered its week: ${JSON.stringify(pen.map((i) => i.id))}`);
-  assert.equal(offer.why, 'Orders has 4 due this week. Give them a page of their own?');
+  assert.equal(offer.why, '4 orders due this week. Want a page of their own for them?');
   const body = offer.change.to.body as { nav: { section: string }; blocks: { kind: string; heading?: string; source?: string }[] };
   assert.equal(body.nav.section, 'Orders', 'the week page was not offered beside the Orders page');
   assert.deepEqual(body.blocks.map((b) => b.heading ?? b.kind), ['stat', 'Due this week', 'Owed', 'Running low']);
@@ -298,7 +298,7 @@ test('RUNNING LOW IS NEVER DRAWN FROM A DATED LIST: a student\'s Assignments wee
   const pen = penFor({ kernel: api.kernel, reads: () => true, pages: api.kernel.pages(), dismissed: new Set(), use: { sql, nowMs } });
   const offer = pen.find((i) => i.id === 'week:assignments');
   assert.ok(offer, `Assignments was not offered its week: ${JSON.stringify(pen.map((i) => i.id))}`);
-  assert.equal(offer.why, 'Assignments has 4 due this week. Give them a page of their own?');
+  assert.equal(offer.why, '4 assignments due this week. Want a page of their own for them?');
   const headings = (offer.change.to.body as { blocks: { heading?: string }[] }).blocks.map((b) => b.heading);
   assert.ok(!headings.includes('Running low'), `minutes were drawn as running low: ${JSON.stringify(headings)}`);
 });

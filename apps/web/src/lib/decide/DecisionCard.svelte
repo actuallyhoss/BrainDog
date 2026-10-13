@@ -73,7 +73,7 @@
   import type { Press } from '../../routes/decide/merge.ts';
   import { hold, type Held } from '../../routes/decide/press.ts';
   import MergeCard from '../../routes/decide/MergeCard.svelte';
-  import { answeredLine, cardOf, cardWords, inlineOf, pressOf, pressSaid, pressTail, primaryOf, startsOn } from './card.ts';
+  import { answeredLine, cardOf, cardWords, inlineOf, pressOf, pressSaid, pressTail, primaryOf, saysChanges, startsOn } from './card.ts';
   import { footprint, settle } from './settle.ts';
 
   let {
@@ -143,8 +143,10 @@
   const optId = (key: string): string => idOf?.(key) ?? `${uid}-opt-${key}`;
   /* THE WHOLE CHANGE, ONE LINK AWAY, where it is worth a look and the host has no other door to the question. */
   const seeWhole = $derived(card.seeWhole && whole && !link);
-  /* WHETHER THE SIDE SAYS WHAT IT CHANGES: a line of what accepting does, money, a change from what to what, or the link. */
-  const changesAny = $derived(card.does !== '' || card.money !== '' || card.shifts.length > 0 || seeWhole);
+  /* WHETHER THE SIDE SAYS WHAT IT CHANGES: a line of what accepting does, money, or a change from what to what. The
+     heading is drawn only over such a line; the link to the whole change alone is drawn alone. */
+  const changesSaid = $derived(saysChanges(card));
+  const changesAny = $derived(changesSaid || seeWhole);
   /* THE SIDE IS DRAWN ONLY WITH SOMETHING IN IT: why it is asked, or what it changes. Who asked is the line over the question. */
   const side = $derived(!compact && (card.why !== '' || changesAny));
 
@@ -651,24 +653,32 @@
           </div>
         {/if}
         <!-- WHAT IT CHANGES: what accepting the lead does, the money it writes, what changes from what to what, and the
-             whole change one link away. -->
-        {#if changesAny}
+             whole change one link away. A value where there was none is a phrase ("Set to Friday"); only a value that
+             replaces another is struck, with the arrow to what it becomes. -->
+        {#if changesSaid}
           <div class="dc-part dc-part-changes" role="group" aria-labelledby="{uid}-changes">
             <h4 class="dc-h" id="{uid}-changes">{cardWords.changes}</h4>
             {#if card.does}<p class="dc-does" dir="auto">{card.does}</p>{/if}
-            {#if card.money || card.shifts.length > 0}
+            {#if card.money || card.lines.length > 0}
               <ul class="dc-moves">
                 {#if card.money}<li class="dc-money num">{card.money}</li>{/if}
-                {#each card.shifts as s, i (i)}
+                {#each card.lines as s, i (i)}
                   <li class="dc-shift">
                     {#if s.what}<span class="dc-what">{s.what}</span>{/if}
-                    <span class="dc-before" dir="auto">{s.before}</span><span class="dc-to"><Icon name="arrow" size="s" /><span class="dc-said">{cardWords.to}</span></span><span dir="auto">{s.after}</span>
+                    {#if s.said !== null}
+                      <span dir="auto">{s.said}</span>
+                    {:else}
+                      <span class="dc-before" dir="auto">{s.before}</span><span class="dc-to"><Icon name="arrow" size="s" /><span class="dc-said">{cardWords.to}</span></span><span dir="auto">{s.after}</span>
+                    {/if}
                   </li>
                 {/each}
               </ul>
             {/if}
             {#if seeWhole}<a class="qa-see tap" href={at(card.href)}>{queueWords.seeWhole}</a>{/if}
           </div>
+        {:else if seeWhole}
+          <!-- NOTHING TO SAY UNDER THE HEADING, so no heading: the link to the whole change stands on its own. -->
+          <div class="dc-part dc-part-changes"><a class="qa-see tap" href={at(card.href)}>{queueWords.seeWhole}</a></div>
         {/if}
       </div>
     {/if}

@@ -110,3 +110,19 @@ test('a picker leaves out a row its own list calls finished, and keeps the one a
   assert.equal(held.TITLES.get('accounts')?.get(2), 'Old card');
   refMapOf('accounts', []);
 });
+
+test('a list whose new rows start finished leaves none out of a picker: a cleared entry is offered in Paid by', () => {
+  const paidBy = held.REGISTERS.installments!.fields.find((f) => f.id === 'paid_by')!;
+  assert.equal(paidBy.to, 'transactions');
+  const ledger = held.REGISTERS.transactions!;
+  const starts = ledger.fields.find((f) => f.id === ledger.state)?.default;
+  assert.ok(typeof starts === 'string' && ledger.done?.includes(starts), 'a ledger entry no longer starts finished, so this test holds nothing');
+  assert.deepEqual(held.leftOut(ledger), []);
+  const title = ledger.title!;
+  const row = (seq: number, name: string, state?: string): RecordRow => ({ id: `01JLIVELEDGER000000000000${seq}`, seq, fields: { [title]: name, ...(state ? { state } : {}) }, version: 1, created_at: '2026-09-20T10:00:00Z' });
+  refMapOf('transactions', [row(1, 'Deposit', 'cleared'), row(2, 'Second part', 'pending'), row(3, 'Sent twice', 'void')]);
+  assert.deepEqual(held.refOptions(paidBy.to!).map((o) => o.label), ['Deposit', 'Second part', 'Sent twice']);
+  refMapOf('transactions', []);
+  /* AND A LIST WHOSE ROWS START OPEN STILL LEAVES ITS CLOSED ONES OUT. */
+  assert.deepEqual(held.leftOut(held.REGISTERS.accounts), held.REGISTERS.accounts!.done);
+});

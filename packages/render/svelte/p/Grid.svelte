@@ -18,6 +18,8 @@
   import { takeWorking, WORKING_GLYPH, WORKING_LABEL } from '../../src/working.ts';
   import { TODO_META_JOIN, todoMeta } from '../../src/todo.ts';
   import { valueWord } from '../../src/format.ts';
+  import { written } from '../../src/html.ts';
+  import { AMOUNT_SPACE } from '../../src/money.ts';
   import { drawnRows, emptied } from '../../src/html.ts';
   import Text from '../Text.svelte';
   import Cards from '../Cards.svelte';
@@ -443,9 +445,12 @@
            because money is never a bare number, and the text is unchanged; only the emphasis moves,
            the way `Money` already sets a row's amount. -->
       <!-- A STAT'S FIGURE IS A HEADLINE, said the way `headlineFigure` says one: `£33,850`, `EGP 412,300`. -->
-      {@const figure = headlineFigure(row.cells[1] ?? '')}
-      {@const symbol = symbolFigure(figure)}
-      {@const coded = leadingCode(figure)}
+      <!-- TOLD THE RECORD'S HOME, THE ONE WRITER SAYS IT (`written`, html.ts): its code quiet where it stands in front,
+           and its text as it is where a sign says the currency. Not told, the figure is drawn as it always was. -->
+      {@const w = written(row.cells[1] ?? '', opts, 'read')}
+      {@const figure = w ? w.text : headlineFigure(row.cells[1] ?? '', opts.home)}
+      {@const symbol = w ? (w.codePlace === 'before' ? null : w.text) : symbolFigure(figure)}
+      {@const coded = w ? null : leadingCode(figure)}
       <!-- `.amount` holds the code and its first figure on one line; ` · £24,800` after it wraps (`figureEnd`, html.ts). -->
       {@const end = coded ? coded.rest.search(/\s|$/u) : 0}
       {@const chars = figureChars(figure)}
@@ -458,7 +463,9 @@
       >
         <span class="cell-label"><Text nodes={inline(row.cells[0] ?? '', opts)} {opts} /></span>
         <span class="cell-figure num" data-fit={chars === null ? undefined : ''} style={chars === null ? undefined : `--chars:${chars}`}>
-          {#if !row.cells[1]}{MISSING}{:else if symbol}{symbol}{:else if coded}<span class="amount"
+          {#if !row.cells[1]}{MISSING}{:else if symbol}{symbol}{:else if w}<span class="amount"
+              >{w.minus}<span class="amount-code">{w.code}</span>{AMOUNT_SPACE}{w.whole}{w.fraction}</span
+            >{:else if coded}<span class="amount"
               >{coded.sign}<span class="amount-code">{coded.currency}</span>
               <Text nodes={inline(coded.rest.slice(0, end), opts)} {opts} /></span
             ><Text nodes={inline(coded.rest.slice(end), opts)} {opts} />{:else}<Text
@@ -467,7 +474,7 @@
             />{/if}
         </span>
         <Trend cls="cell-trend" label={row.cells[0] ?? ''} value={row.cells[3] ?? ''} {opts} />
-        <span class="cell-note"><Text nodes={inline(symbolText(row.cells[2] ?? '', true), opts)} {opts} /></span>
+        <span class="cell-note"><Text nodes={inline(symbolText(row.cells[2] ?? '', true, opts.home), opts)} {opts} /></span>
         {#if row.tone}
           <span class="glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>
         {/if}

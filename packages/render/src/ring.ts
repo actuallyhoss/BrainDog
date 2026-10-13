@@ -18,6 +18,7 @@
  */
 
 import type { Tone } from './kinds.ts';
+import { readFigure } from './money.ts';
 import { signedOf } from './bridge.ts';
 import { ringOf } from './cards.ts';
 import { progressPlan, progressSentence } from './progress.ts';
@@ -108,6 +109,10 @@ function progressRing(r: RingInput, home: string | null | undefined): RingPlan {
   if (!Number.isFinite(signedOf(r.value))) return { ...base, ...NO_RING, arcs: [], name: '' };
   const [p] = progressPlan([{ value: r.value, target: r.third, ...(r.tone ? { tone: r.tone } : {}) }], 'goal', home);
   if (p?.drawable) {
+    /* WHAT IS LEFT IS ONE AMOUNT LESS ANOTHER, so it is said only in one currency: a value in dollars toward a target
+       in pounds read "EGP 699,370.05 to go", one currency taken from another. With two, nothing is said to be left. */
+    const [has, wants] = [readFigure(r.value.trim()), readFigure((r.third ?? '').trim())];
+    const mixed = has !== null && wants !== null && has.currency !== wants.currency;
     return {
       ...base,
       ring: true,
@@ -115,7 +120,7 @@ function progressRing(r: RingInput, home: string | null | undefined): RingPlan {
       centre: p.share,
       name: progressSentence(r.label, r.value, r.third, p.share),
       ...(p.intent ? { intent: p.intent } : {}),
-      left: p.left,
+      left: mixed ? '' : p.left,
     };
   }
   const m = ringOf(r.value);

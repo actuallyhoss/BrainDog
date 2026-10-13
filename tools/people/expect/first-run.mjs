@@ -247,7 +247,9 @@ export const expect = {
     if (!late) missing.push(`nothing for Orders on day ${seen.lateDay} (the pen held ${seen.late.map((x) => x.id).join(', ') || 'nothing'}, Orders read on ${seen.weeks} weeks, ${seen.thisWeek} due this week)`);
     else if (!/\S/u.test(late.why ?? '') || /\brows?\b/u.test(late.why)) missing.push(`its why says "${late.why}"`);
     /* THE ORDERS PAGE'S OWN SENTENCE that day, as its head draws it: "6 orders this month, ..., and Salma still owes EGP 1,350". */
-    if (want.lead !== undefined && !new RegExp(want.lead.match, 'u').test(seen.lead ?? '')) missing.push(`Orders says ${seen.lead ? `"${seen.lead}"` : 'no sentence'}, not "${want.lead.says}"`);
+    /* READ AS A PERSON READS IT: the one money writer joins a code to its figure by a no-break space, which reads as a
+       space, so a person's script says "EGP 1,350" with a plain one. */
+    if (want.lead !== undefined && !new RegExp(want.lead.match, 'u').test((seen.lead ?? '').replaceAll('\u00a0', ' '))) missing.push(`Orders says ${seen.lead ? `"${seen.lead}"` : 'no sentence'}, not "${want.lead.says}"`);
     const lead = seen.lead ? `; Orders says "${seen.lead}"` : '';
     return missing.length === 0
       ? pass('offer', `nothing on day ${seen.earlyDay}; on day ${seen.lateDay}, "${late.title}": ${late.why}${lead}`)

@@ -228,6 +228,8 @@ export type LiveBlock = BlockResult & {
   cannot?: string;
   /** A heat's: how many of its list's days fall outside its twelve weeks, which no cell draws and the block says under them. */
   outside?: number;
+  /** A heat's: how many distinct days those are, where the record says (`outsideDays`). What the sentence under the cells counts. */
+  outsideDays?: number;
   /**
    * An `inputs` block's: the record's home currency as the kernel answers it beside `types`, or `null` where none is set,
    * which a bare figure typed into an empty money box is written in (`inputs-write.ts` `home`).
@@ -1559,10 +1561,15 @@ export function blockOf(
   /* AND A HEAT SAYS HOW MANY OF ITS ROWS NO CELL DRAWS (`outside`), whichever it was drawn from: its cells add to less
      than the list by that many, and the drawer says so under them (`blocks.ts` `outsideSaid`). */
   let outside = 0;
+  let outsideDays: number | undefined;
   if (SUMS.has(kind)) {
     const adds = kind === 'heat' && (b.columns ?? []).length > 1 && (b as { who?: unknown }).who !== true;
     const lines = wholeOf(summed, kind, adds);
     if (kind === 'heat' && lines !== null) outside = outsideOf(summed) ?? 0;
+    /* HOW MANY DAYS THOSE ARE, where the record says: forty entries on one old day are one day, and an entry with no
+       day is none, so the sentence counts days and the arithmetic above still counts entries. */
+    const days = (summed as { outsideDays?: unknown } | null)?.outsideDays;
+    if (outside > 0 && counted(days)) outsideDays = days;
     const shares = kind === 'heat' && lines !== null && lines.some((l) => l.of !== undefined);
     if (sent.length < matched || shares) {
       const whole = lines === null ? null : wholeRows(kind, b.columns ?? [], lines);
@@ -1673,6 +1680,7 @@ export function blockOf(
     ...open,
     ...(spentBy === undefined ? {} : { spentBy }),
     ...(outside > 0 ? { outside } : {}),
+    ...(outsideDays === undefined ? {} : { outsideDays }),
     names: namesOf(refs),
     ...(cardGroups ? { groups: cardGroups } : {}),
     ...(bylines ? { bylines } : {}),

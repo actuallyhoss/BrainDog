@@ -183,6 +183,9 @@
       return typeof v === 'string' || v === null || v === undefined ? said(v ?? null) : v;
     },
     now,
+    /* THE RECORD'S HOME CURRENCY, so every amount the drawers write is the one writer's (`money.ts`): `null` on a
+       record with none. */
+    home: homeCurrency(),
     /* A forecast's knobs and its readout: arithmetic over the walk already on the page, kept in memory. */
     scenario: true,
     /* AND A LENGTH PAST THE WALK'S REACH, which the record is asked to walk (`walkFor`). */
@@ -449,12 +452,12 @@
   <!-- A TABLE OVER A WALK DRAWN ONCE PER CURRENCY: each currency's rows under its code, and why, once. -->
   {#each walkTables(block) ?? [] as part}
     {#each part.said as segment}{#if segment.type === 'markdown'}<div class="document"><Markdown {segment} {opts} /></div>{/if}{/each}
-    {#if part.table}<Table columns={part.table.columns} rows={part.table.rows} total={part.table.total} label={headingText} href={inApp} />{/if}
+    {#if part.table}<Table columns={part.table.columns} rows={part.table.rows} total={part.table.total} label={headingText} href={inApp} home={homeCurrency()} />{/if}
   {/each}
 {:else if block.kind === 'table' && !block.answer}
   <!-- THE ROWS THAT ARRIVED SINCE IT WAS LAST DRAWN ARE MARKED, as a list's are, where the page can write. -->
   {@const all = writes ? writes.arrivedTable(i, block.rows, block) : block.rows}
-  <Table columns={block.columns} rows={folded ? all.slice(0, folded.shown) : all} total={block.total} label={headingText} href={inApp} scope={block.scopeCells} {icon} />
+  <Table columns={block.columns} rows={folded ? all.slice(0, folded.shown) : all} total={block.total} label={headingText} href={inApp} home={homeCurrency()} scope={block.scopeCells} {icon} />
   {#if folded}<button type="button" class="block-more tap" onclick={(e) => void unfold(e, folded?.shown ?? 0)}>{words.more(folded.more)}</button>{/if}
 {:else if block.kind === 'queue' && block.queue && block.queue.length > 0 && writes}
   <!-- A QUESTION IS ANSWERED WHERE IT IS SHOWN (`QueueAnswer.svelte`): one card a question, and the count of what is left is still the door to Decide. -->

@@ -32,12 +32,14 @@
 /**
  * The four, worst first — which is the order they are ranked in, and the order they are compared in.
  *
- * - `undo`  — accepting it is hard to take back: it changes rows somebody already has, replaces a
- *             declaration that exists, or turns a pack off. The other button tomorrow does not
- *             return the record to where it was.
+ * - `undo`  — accepting it is hard to take back, because the record keeps nothing to go back to: it
+ *             turns a pack off, or it moves money. The other button tomorrow does not return the
+ *             record to where it was.
  * - `shape` — accepting it changes what everyone sees: a pack installed or turned on, a pack's
- *             settings, a page. Reversible, and not quietly: everyone who opens the record meets it.
- * - `rows`  — accepting it adds rows or a rule that will add them. Deletable, one at a time.
+ *             settings, a page, a declaration new or replaced. Reversible, and not quietly: everyone
+ *             who opens the record meets it.
+ * - `rows`  — accepting it adds rows, changes or removes rows that exist, or adds a rule that will
+ *             add them. Deletable, put back or restored, one at a time.
  * - `call`  — a judgement with nothing attached. Accepting it writes a decision and its reason and
  *             changes no part of the record, which is what makes it the cheapest to get wrong and
  *             the one most worth thinking about last.
@@ -70,14 +72,19 @@ const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 /**
  * A `rowset`: every row that carries `at` is an update of a row that exists, and the rest are new.
  *
- * ONE UPDATE IS ENOUGH TO MAKE IT THE DEARER BAND. A batch of a hundred creates and one update is
- * still a batch that changes something somebody already has, and `decide` applies a rowset
- * all-or-nothing (`govern.ts`), so the one update cannot be taken separately either.
+ * AN UPDATE IS NOT HARD TO UNDO, AND UNTIL BATCH 58 IT WAS SAID TO BE. Every field a write changes is an `edit`
+ * line in the history with what it said before (`event.from_v`), and Put back on the decision writes those values in
+ * again, so the record keeps the way back and the band says so: an update weighs what a new row weighs. A row removed
+ * is the same (`patch.deleted_at`): it is kept and marked, and Put back restores it (`undo.ts`).
+ *
+ * MONEY IS THE ONE WRITE THAT IS. A figure a row carries is read by a balance, a report and whoever was told the
+ * number the moment it lands, and putting the row back does not un-tell them. `movesMoney` is the rule `waitOf` reads
+ * below, on a new row or a patch alike, and one such row is enough: `decide` applies a rowset all-or-nothing
+ * (`govern.ts`), so it cannot be taken separately.
  */
 function rowsetCost(body: Record<string, unknown>): Cost {
-  const rows = arr(body.rows);
-  if (rows.some((r) => typeof obj(r).at === 'string')) return 'undo';
-  return rows.length >= MANY_ROWS ? 'shape' : 'rows';
+  if (movesMoney(body)) return 'undo';
+  return arr(body.rows).length >= MANY_ROWS ? 'shape' : 'rows';
 }
 
 /**
@@ -110,10 +117,14 @@ export function costOf(bodyKind: string, body: unknown): Cost {
   switch (bodyKind) {
     case 'rowset':
       return rowsetCost(b);
-    /* A DECLARATION THAT EXISTS IS REPLACED, and the one it replaces is not kept: `from` is what says
-       there is something under it. A `change` proposing a declaration that is new only adds one. */
+    /* A DECLARATION THAT EXISTS IS REPLACED, AND THE ONE IT REPLACES IS KEPT. The `declaration` table is never edited:
+       the new version goes in beside the old one, which is stamped `superseded_at` and stays (`declare.ts`). That
+       holds for a whole body with a `from` under it, an addition, a retire, and a retype, whose rows are ordinary
+       edits in one batch that Put back undoes as one (`api/retype.ts`). So a skill's wording changed is the band a new
+       declaration is, and `from` no longer raises it: read as "nothing is kept" it made every such card hard to undo
+       (batch 58). */
     case 'change':
-      return b.from === undefined || b.from === null ? 'shape' : 'undo';
+      return 'shape';
     /* `disable` TAKES A REGISTER OFF EVERY SCREEN IT IS ON. Install and enable add one. */
     case 'pack':
       return typeof b.disable === 'string' ? 'undo' : 'shape';
@@ -134,6 +145,17 @@ export function costOf(bodyKind: string, body: unknown): Cost {
 }
 
 /**
+ * `movesMoney` as SQL over a `suggestion` row. It stands above `COST_SQL` and `WAIT_SQL`, which both read it, and
+ * `kernel/index.ts`'s `BAND_SQL` is `COST_SQL`; its caller has already seen that `$.rows` is an array.
+ */
+const MOVES_MONEY_SQL = `EXISTS (SELECT 1 FROM json_each(body, '$.rows') AS r, json_each(CASE
+      WHEN r.type <> 'object' THEN NULL
+      WHEN json_type(r.value, '$.at') IS NULL THEN r.value
+      WHEN json_type(r.value, '$.patch') = 'object' THEN json_extract(r.value, '$.patch') END) AS f
+    WHERE f.type = 'object' AND json_type(f.value, '$.amount') = 'integer' AND json_type(f.value, '$.currency') = 'text'
+      AND json_extract(f.value, '$.currency') GLOB '[A-Z][A-Z][A-Z]' AND length(json_extract(f.value, '$.currency')) = 3)`;
+
+/**
  * `costOf` as SQL over a `suggestion` row's `body_kind` and `body` columns, so a queue counts and ranks every open
  * question without reading one body into this process (audit 16, M5). Each arm is `costOf`'s own, in its order, and
  * `test/weigh-sql.test.ts` holds the two to the same answer over every shape `costOf` reads.
@@ -144,11 +166,10 @@ export function costOf(bodyKind: string, body: unknown): Cost {
 export const COST_SQL = `(CASE
   WHEN json_valid(body) AND json_type(body) = 'object' THEN (CASE body_kind
     WHEN 'rowset' THEN (CASE
-      WHEN json_type(body, '$.rows') = 'array'
-        AND EXISTS (SELECT 1 FROM json_each(body, '$.rows') AS r WHERE r.type = 'object' AND json_type(r.value, '$.at') = 'text') THEN 'undo'
+      WHEN json_type(body, '$.rows') = 'array' AND ${MOVES_MONEY_SQL} THEN 'undo'
       WHEN COALESCE(json_array_length(body, '$.rows'), 0) >= ${MANY_ROWS} THEN 'shape'
       ELSE 'rows' END)
-    WHEN 'change' THEN (CASE WHEN COALESCE(json_type(body, '$.from'), 'null') = 'null' THEN 'shape' ELSE 'undo' END)
+    WHEN 'change' THEN 'shape'
     WHEN 'pack' THEN (CASE WHEN json_type(body, '$.disable') = 'text' THEN 'undo' ELSE 'shape' END)
     WHEN 'settings' THEN 'shape'
     WHEN 'arrange' THEN (CASE
@@ -310,14 +331,6 @@ export function waitRows(sql: WaitSql): WaitRows {
     },
   };
 }
-
-/** `movesMoney` as SQL over a `suggestion` row, the rule `kernel/index.ts`'s `MONEY_ROWS_SQL` holds for `BAND_SQL`. */
-const MOVES_MONEY_SQL = `EXISTS (SELECT 1 FROM json_each(body, '$.rows') AS r, json_each(CASE
-      WHEN r.type <> 'object' THEN NULL
-      WHEN json_type(r.value, '$.at') IS NULL THEN r.value
-      WHEN json_type(r.value, '$.patch') = 'object' THEN json_extract(r.value, '$.patch') END) AS f
-    WHERE f.type = 'object' AND json_type(f.value, '$.amount') = 'integer' AND json_type(f.value, '$.currency') = 'text'
-      AND json_extract(f.value, '$.currency') GLOB '[A-Z][A-Z][A-Z]' AND length(json_extract(f.value, '$.currency')) = 3)`;
 
 /** `dueInside` as SQL: a deadline day from the first `?` to the second, in what a row would write or in the row as it is. */
 const DUE_SQL = `EXISTS (SELECT 1 FROM json_each(body, '$.register') AS g, json_each(body, '$.rows') AS r,

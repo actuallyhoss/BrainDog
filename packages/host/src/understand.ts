@@ -1197,7 +1197,7 @@ type Held = { settle(outcome: { usage: { in: number; out: number }; code?: strin
 
 /** The ledger an understanding ask is written in: `slashRecordMeter(...)` on either host. */
 export type UnderstandLedger = {
-  background(kind: 'understand'): Promise<{ ok: true; value: Held } | { ok: false; refusal: { code: string; fix: string } }>;
+  background(kind: 'understand', payload?: unknown): Promise<{ ok: true; value: Held } | { ok: false; refusal: { code: string; fix: string } }>;
 };
 
 /** The two asks a host's `SlashModel` answers, as `endpointModel` and `anthropicModel` build them. */
@@ -1216,7 +1216,7 @@ export function understandingOver(
   ledger: UnderstandLedger,
 ): { resolve: NonNullable<ModelJobUnderstand['resolve']>; mentions: NonNullable<ModelJobUnderstand['mentions']> } {
   const held = async <I>(ask: (input: I) => Promise<unknown>, input: I): Promise<Result<unknown>> => {
-    const hold = await ledger.background('understand');
+    const hold = await ledger.background('understand', input);
     if (!hold.ok) return { ok: false, refusal: { code: hold.refusal.code, fix: hold.refusal.fix } };
     try {
       const answer = await ask(input);

@@ -635,24 +635,15 @@ export type ViewRow = {
 };
 
 /**
- * A rowset whose rows write a money value (`{ amount, currency }` with an integer amount), as SQL over a `suggestion`
- * row: what `cardFacts` reads as the money a question moves, one row's write at a time (an update's `patch`, a new row
- * itself). Each value is guarded before `json_each` reads it, which throws on text that is not JSON.
+ * THE BAND A QUEUE RANKS AND COUNTS BY IS `costOf`'s, as SQL (`COST_SQL` in `weigh.ts`), and nothing beside it.
+ *
+ * ONE RULE NOW. It was `COST_SQL` under a clause of this file's own that said a rowset writing a money
+ * value is always hard to undo (audit 19, H3), so such a question never sat in a cheap band where Enter would accept
+ * it. That clause is now `costOf`'s own rowset arm, in the same SQL (`MOVES_MONEY_SQL`), and a second copy here could
+ * only ever disagree with it. `questionFrom` says the same of the question it draws, and one thing more that no body
+ * can say: a money field cleared (`movesMoney` below, read by the field's declared type).
  */
-const MONEY_ROWS_SQL = `(body_kind = 'rowset' AND json_valid(body) AND json_type(body) = 'object' AND json_type(body, '$.rows') = 'array'
-  AND EXISTS (SELECT 1 FROM json_each(body, '$.rows') AS r, json_each(CASE
-      WHEN r.type <> 'object' THEN NULL
-      WHEN json_type(r.value, '$.at') IS NULL THEN r.value
-      WHEN json_type(r.value, '$.patch') = 'object' THEN json_extract(r.value, '$.patch') END) AS f
-    WHERE f.type = 'object' AND json_type(f.value, '$.amount') = 'integer' AND json_type(f.value, '$.currency') = 'text'
-      AND json_extract(f.value, '$.currency') GLOB '[A-Z][A-Z][A-Z]' AND length(json_extract(f.value, '$.currency')) = 3))`;
-
-/**
- * THE BAND A QUEUE RANKS AND COUNTS BY: `costOf`'s, except that a question that moves money is always hard to undo
- * (audit 19, H3), so it never sits in a cheap band where Enter would accept it. `questionFrom` says the same of the
- * question it draws.
- */
-const BAND_SQL = `(CASE WHEN ${MONEY_ROWS_SQL} THEN 'undo' ELSE ${COST_SQL} END)`;
+const BAND_SQL = COST_SQL;
 const BAND_RANK_SQL = `(CASE ${BAND_SQL} ${COSTS.map((c, i) => `WHEN '${c}' THEN ${i}`).join(' ')} ELSE ${COSTS.length} END)`;
 
 /** How many of its writes a dry walk over the past says, in names (`kernel.backfill({ dry: true })`). */
@@ -5876,7 +5867,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       kind,
       question: questionOf(sql, String(r.id)) ?? '',
       why: typeof body.context === 'string' ? body.context : '',
-      /* MONEY IS ALWAYS HARD TO UNDO, so a card that moves it is never accepted with Enter (`BAND_SQL` ranks it so). */
+      /* MONEY IS ALWAYS HARD TO UNDO, so a card that moves it is never accepted with Enter (`BAND_SQL` ranks it so, as
+         `costOf` does). The floor is asked as well, since it reads a money field cleared, which no body spells. */
       cost: facts.money !== undefined || movesMoney(r, kind, body) ? 'undo' : costOf(kind, body),
       options,
       ...(typeof body.about === 'string' && body.about !== '' ? { about: body.about } : {}),

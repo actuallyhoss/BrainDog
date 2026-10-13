@@ -8,7 +8,7 @@
  */
 
 import { MISSING, exponentOf, money, quantity, type Home } from './format.ts';
-import { readAmount, writeAmount, type AmountSetting } from './money.ts';
+import { readAmount, readFigure, writeAmount, type AmountSetting } from './money.ts';
 
 const MINUS = '−';
 const NUM = 'en-u-nu-latn';
@@ -18,14 +18,17 @@ const NUMBER = /(?<![\p{L}\p{N}.,])[−-]?\d[\d,]*(?:\.(\d+))?/u;
  * `value` in the shape of `template`: `£34,850.00`, `USD 12.00`, `−£1,600.00`, or a plain number.
  *
  * A STORED FIGURE IS NOT COPIED, IT IS READ (REC-C05). When the template is one `money()` wrote, `EGP 1,299.00`,
- * only its currency is taken (`readAmount`) and the value is written as an amount in it. Told the home currency
+ * only its currency is taken (`readFigure`) and the value is written as an amount in it. Told the home currency
  * (a code, or `null` for a record with none), by the one writer, in the setting asked for. Not told, in the stored
  * form again, so whoever draws it next (`axisFigure`, `headlineFigure`) reads an amount and never a drawing.
  * A template that is a drawing or a plain number keeps the path below.
  */
 export function figureLike(template: string, value: number, home?: Home, setting: AmountSetting = 'exact'): string {
   if (!Number.isFinite(value)) return MISSING;
-  const stored = readAmount(template.trim());
+  /* TOLD THE HOME, A TEMPLATE THE HOST DREW FIRST (`$3.63 USD`) STILL NAMES ITS CURRENCY (`readFigure`), so the value is
+     the writer's too. Not told, only the stored form is read, as it always was: a drawing keeps the path below, which
+     copies its shape, since nobody draws this figure again. */
+  const stored = home === undefined ? readAmount(template.trim()) : readFigure(template.trim());
   if (stored) {
     /* Half a minor unit rounds away from nought, on either side of it, as the path below always did. */
     const minor = Math.sign(value) * Math.round(Math.abs(value) * 10 ** exponentOf(stored.currency));

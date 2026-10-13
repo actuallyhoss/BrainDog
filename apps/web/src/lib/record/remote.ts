@@ -24,7 +24,7 @@
 import { KERNEL_FIELDS, parseWhere, quoteValue } from '@braindog/where';
 
 import { identityOfRow, whereOf, type Identity } from './api.ts';
-import { FINISHED, REGISTERS, seqTitled, TITLES } from './held.ts';
+import { FINISHED, leftOut, REGISTERS, seqTitled, TITLES } from './held.ts';
 import { searchable, terms } from './find.ts';
 import type { Entry, Fields, Filter, RegisterDecl } from './schema.ts';
 import { declaredValue, schemaOf } from './where.ts';
@@ -139,9 +139,10 @@ export function refMapOf(register: string, rows: readonly Pick<RecordRow, 'id' |
   const titleOf = new Map<number, string>();
   const markOf = new Map<number, Identity>();
   const title = REGISTERS[register]?.title;
-  /* WHICH OF THEM ARE FINISHED, by the list's own `state:` and `done:`, for the picker to leave out (`held.ts`). */
+  /* WHICH OF THEM ARE FINISHED, by the list's own `state:` and `done:`, for the picker to leave out (`held.ts`): none
+     where a new row starts finished, as a ledger entry starts cleared (`leftOut`). */
   const state = REGISTERS[register]?.state;
-  const done = REGISTERS[register]?.done ?? [];
+  const done = leftOut(REGISTERS[register]);
   const over = new Set<number>();
   for (const r of rows) {
     if (r.seq === null) continue;

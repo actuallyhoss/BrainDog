@@ -82,7 +82,7 @@ test('WAITING IS PURE: a question opened past two weeks is late, and an instant 
     nowMs: NOW,
     questions: [
       { opened_at: at(LATE_DAYS + 1), body_kind: 'options', body: {} },
-      { opened_at: at(LATE_DAYS - 1), body_kind: 'change', body: { from: { a: 1 } } },
+      { opened_at: at(LATE_DAYS - 1), body_kind: 'pack', body: { disable: 'money' } },
       { opened_at: 'not a day', body_kind: 'options', body: {} },
     ],
     inbox: null,

@@ -78,7 +78,7 @@ import { codeOf, fixOf, type Refusal, type Result, type Sql } from '@braindog/po
 import type { SlashBackground, SlashMeter } from '@braindog/record';
 
 import { httpStatus } from './index.ts';
-import { mayThink, type Reads } from './infer.ts';
+import { mayThink, sendable, type Reads } from './infer.ts';
 import { backgroundMeter, BACKGROUND_JOBS_MONTH, HEADLINE_ASK, UNDERSTAND_ASK, type AskPurpose, type AskSpends } from './model-jobs.ts';
 import { slashBaseUrlOf, slashKeySave } from './slash.ts';
 import { VAULT_HEADERS } from './vault.ts';
@@ -668,9 +668,12 @@ const monthResets = (ms: number): string => {
  */
 export type SlashBackgroundAsk = SlashBackground | 'understand';
 
-/** The record's `SlashMeter` with its background ask always there, which this host's ledger counts. */
+/**
+ * The record's `SlashMeter` with its background ask always there, which this host's ledger counts. `payload` is what the
+ * ask is about to send its model, all of it: handed here so it is read before the ask is held (`background`).
+ */
 export type SlashRecordMeter = SlashMeter & {
-  background(kind?: SlashBackgroundAsk): ReturnType<NonNullable<SlashMeter['background']>>;
+  background(kind?: SlashBackgroundAsk, payload?: unknown): ReturnType<NonNullable<SlashMeter['background']>>;
 };
 
 /**
@@ -798,12 +801,20 @@ export function slashRecordMeter(deps: SlashLedgerDeps): SlashRecordMeter {
      * `ask` is optional because a record a release behind calls `background()` for its skill drafts alone.
      *
      * AND ONLY WHILE HE LETS IT READ: all four are behind his one switch, asked first (`mayThink`).
+     *
+     * AND NEVER WHAT IS NEVER SENT, whatever the switch says: `payload` is what the caller is about to hand its model, and
+     * a sealed field, a key or a file's bytes anywhere in it refuses the ask here (`infer.ts` `sendable`), on the look, the
+     * headlines and a skill draft as on understanding. The refusal names which of the three and never where or what.
      */
-    async background(ask: SlashBackgroundAsk = 'skill') {
+    async background(ask: SlashBackgroundAsk = 'skill', payload?: unknown) {
       /* THE CONSENT RULE BEFORE THE LEDGER (ENG-A09): off, the record reads the refusal as "the rules speak" and no row
          is written, held or turned away, because nothing was asked and no month was spent. */
       const may = await mayThink(ask in BACKGROUND_PURPOSE ? ask : 'skill', deps.reads);
       if (!may.ok) return { ok: false, refusal: { code: codeOf(may), fix: fixOf(may) } };
+      /* AND THE PAYLOAD BEFORE THE LEDGER TOO: nothing was asked, so no row is written, held or turned away, no month is
+         spent, and a month already spent does not get to answer first and leave the payload unread. */
+      const clean = sendable(payload);
+      if (!clean.ok) return { ok: false, refusal: { code: codeOf(clean), fix: fixOf(clean) } };
       const engine = await deps.engine();
       if (engine === undefined) return { ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'Slash has no ledger on this host to count the draft in.' } };
       const status = engine.status() as { tier?: unknown; model?: unknown } | undefined;

@@ -1,4 +1,4 @@
-/** Cash now, checked against its entries: said only while the two ways of adding it up disagree, or cannot be compared. */
+/** Cash now, checked against its entries: said only while the two ways of adding it up disagree. */
 
 export const CROSS_CHECK: Record<string, unknown>[] = [
   {
@@ -13,7 +13,7 @@ export const CROSS_CHECK: Record<string, unknown>[] = [
 
        THE DANGER COLOUR, AND WORDS WITH IT: the heading says what is wrong, so the colour is never the only mark.
 
-       ONE BLOCK, as Money stands two under the most a page declares. WHAT THAT COSTS TODAY: out in two currencies at
+       ONE BLOCK, as Money stands at the most a page declares. WHAT THAT COSTS TODAY: out in two currencies at
        once the difference is two amounts and no one value, and a page's look leaves out a tile whose every figure has
        no value (`drewNothing` in `packages/kernel/src/compose.ts`, which does not read a figure's amounts by
        currency). Until it does, that one day draws no tile; `packages/seed/test/cash-cross-page.test.ts` says so. */
@@ -31,25 +31,13 @@ export const CROSS_CHECK: Record<string, unknown>[] = [
     ],
     when: { metric: 'cash-cross-check', not: 0 },
   },
-  {
-    /* NOTHING TO CHECK YET IS SAID, NEVER READ AS A PASS: with no balance typed the check has no value, and its
-       reading says why in these words (`readCrosscheck` in `packages/kernel/src/money-figures.ts`). A LINE AND NOT A
-       FIGURE, as a figure with no value is never drawn (`packages/kernel/src/drawn.ts`), so the sentence is written
-       here and `packages/seed/test/cash-cross-page.test.ts` holds it to the reading's for a record with no account:
-       the two cannot drift. The line stands under the box that adds one.
-
-       THE READING HAS A SECOND SENTENCE THIS LINE DOES NOT SAY (audit 54, item 7): with accounts and none of them
-       counted as cash it reads "No account counts as cash yet", since an account is not saved without a balance and
-       one has been typed. A line's words are written and not read off a figure, and Money stands at the most blocks
-       a page declares, so on that day the page still says these words. It wants a line that reads its figure's own.
-
-       ON CASH NOW HOLDING NOTHING, which is the same day: a check that agrees in two currencies reads nought with no
-       currency, and `empty:` takes that for no amount at all, so a condition on the check itself would say no balance
-       was typed on a record whose two currencies both add up. Cash now in two currencies is two amounts and never
-       empty. */
-    kind: 'note',
-    span: 12,
-    body: 'No balance has been typed yet.',
-    when: { metric: 'cash-now', empty: true },
-  },
+  /* NO LINE FOR "NO BALANCE HAS BEEN TYPED YET", THOUGH ONE STOOD HERE WHILE 3.17.0 WAS BEING MADE. With no balance typed
+     the check has no value and its reading says why (`readCrosscheck` in `packages/kernel/src/money-figures.ts`); the
+     page said the same in a line of its own, drawn while Cash now held nothing. It went for three reasons. It stood
+     under the box to add an account, drawn on the same day, which already says there is no account to read. It was
+     untrue on the one other day it was drawn: with accounts and none of them counted as cash a balance HAS been typed,
+     and the reading says "No account counts as cash yet" there. And Money was at the most blocks a page declares, so
+     it held the place of the line a record with two books opens on (`headline.ts`). The reading still says why to
+     whoever asks the figure, and `packages/seed/test/cash-cross-page.test.ts` holds that the page draws nothing about
+     the check on that day. */
 ];

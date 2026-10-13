@@ -94,7 +94,7 @@ test('A HEAT OVER SIXTY DAYS READS SIXTY ROWS, and it read fifty and drew ten bu
   sql.close();
 });
 
-type Whole = { rows: { label: unknown; who?: unknown; rows: number; value: number | null; of?: number | null }[]; total: number | null; of?: number | null; outside?: number };
+type Whole = { rows: { label: unknown; who?: unknown; rows: number; value: number | null; of?: number | null }[]; total: number | null; of?: number | null; outside?: number; outsideDays?: number };
 const wholeOf = (b: Answered): Whole => {
   const w = (b as { wholeRead?: Whole }).wholeRead;
   assert.ok(w, 'the heat answered no wholeRead');
@@ -124,13 +124,17 @@ test('a day outside the twelve weeks is counted and said, never placed, and a he
     { what: 'Today', on: day(0), state: 'done' },
     { what: 'Today too', on: day(0), state: 'open' },
     { what: 'Last year', on: day(-400), state: 'done' },
+    { what: 'Last year too', on: day(-400), state: 'done' },
+    { what: 'And a third that day', on: day(-400), state: 'open' },
     { what: 'Tomorrow', on: day(1), state: 'open' },
     { what: 'No day', state: 'open' },
   ]);
   const w = wholeOf(first(k));
   assert.deepEqual(w.rows, [{ label: day(0), rows: 2, value: 2 }]);
-  assert.equal(w.total, 5, 'the total is of every row the where admits');
-  assert.equal(w.outside, 3);
+  assert.equal(w.total, 7, 'the total is of every row the where admits');
+  assert.equal(w.outside, 5, 'every row no cell draws: what the cells fall short of the total by');
+  /* DAYS, NOT ENTRIES: three on one old day are one day, tomorrow is another, and the one with no day is no day. */
+  assert.equal(w.outsideDays, 2);
   sql.close();
 });
 

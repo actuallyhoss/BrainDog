@@ -819,8 +819,10 @@
        back the entries it did not write, which go under a new key, over the rail order this press already wrote
        (`pressAgain`). */
     again = { name, asked: pressAgain(asked, out) };
-    /* AN ANSWERED PRESS HANDS BACK A NEW KEY, and it replaces the old one. */
-    if (again.asked.key) keepKey(localStore(), again.asked.key);
+    /* THE KEY KEPT BESIDE THE SENTENCE STAYS THE FIRST ONE. An answered press hands back a new key for what is left,
+       and that one is this page's alone: a reload builds the whole plan from the kept sentence again, and under a key
+       the record never held it would write every entry a second time. Under the first key the record passes over
+       what that press wrote, so a reload writes nothing twice. */
     /* THE PART-MADE STATE IS THE CALL'S OWN ANSWER: what it said it could not make, and why, and nothing guessed. */
     missed = out === null ? [] : out.failed;
     watched = null;

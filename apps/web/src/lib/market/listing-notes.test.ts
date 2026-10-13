@@ -41,7 +41,7 @@ test('a record on an older Solo founder is offered the update with the note of e
   assert.equal(update.from, '2.3.0');
   assert.deepEqual(update.notes, notes.map((n) => n.notes), `every note from ${older} to the newest`);
   /* ONE VERSION BEHIND READS ONLY THE NEWEST NOTE. */
-  const behind = firstPartyUpdates([{ ...held[0]!, version: older }]).find((u) => u.id === 'founder');
+  const behind = firstPartyUpdates([{ ...held[0]!, version: notes[1]!.version }]).find((u) => u.id === 'founder');
   assert.deepEqual(behind?.notes, [notes[0]!.notes]);
 });
 

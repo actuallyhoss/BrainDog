@@ -48,10 +48,9 @@ const queue = (k: Awaited<ReturnType<typeof record>>['k'], more: Partial<PageBlo
 
 test('THE EXPENSIVE QUESTION A MONTH OLD LEADS, under twenty-five newer cheap ones, and the counts are of all of them', async () => {
   const { k, sql, clock } = await record();
-  /* A month ago: one change to a row somebody has, which is hard to undo. */
-  const old = value<{ id: string }>(
-    k.propose({ question: 'Rename the glaze test?', body_kind: 'rowset', body: { register: 'tasks', rows: [{ at: 'tasks#1', version: 1, patch: { what: 'Glaze test two' } }] } }, 'slash'),
-  );
+  /* A month ago: a pack turned off, which is hard to undo. A row renamed no longer is (the history puts it back), so
+     the question that must lead is one the record keeps no way back from. */
+  const old = value<{ id: string }>(k.propose({ question: 'Turn Money off?', body_kind: 'pack', body: { disable: 'money' } }, 'slash'));
   /* Then twenty-five calls, the first five more than two weeks ago and the rest this week. */
   clock.set(NOW - 30 * DAY);
   for (let i = 0; i < 25; i += 1) {

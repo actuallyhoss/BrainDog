@@ -167,7 +167,7 @@
            `aria-rowcount` now; this was the one caller of six that added the header itself, and
            the other five did not, so five surfaces announced one row too few and this one was
            right by hand. -->
-      <Table columns={comparison.columns} rows={comparison.rows} total={comparison.rows.length} label={block.heading} href={opts.href} />
+      <Table columns={comparison.columns} rows={comparison.rows} total={comparison.rows.length} label={block.heading} href={opts.href} home={opts.home} />
     {/if}
   {:else if block.kind === 'inputs'}
     <!-- BY KIND, because the callback belongs to one kind on a primitive two others share: handed to `Rows`, a `spec`

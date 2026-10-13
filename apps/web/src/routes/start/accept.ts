@@ -78,6 +78,12 @@ export type Accepting = {
    * 2). Left out, `accept` makes one for this call alone.
    */
   key?: string;
+  /**
+   * THE USE CASE'S PLAN STILL TO MAKE, as an answered press handed it back (`Accepted.plan`, set by `pressAgain`):
+   * sent in place of the plan formed from the sentence, so an entry of it that is in is not written again under the
+   * next press's new key. Left out, the plan is formed whole.
+   */
+  plan?: readonly SetupRow[];
 };
 
 /** A handle for one build's entries, as a page sets it on `Accepting.key`. */
@@ -104,6 +110,11 @@ export type Accepted = {
   refused?: { part: string; why: string }[];
   /** The record never answered, twice over: the build may have gone in, so the next press carries the same `key`. */
   unheard?: true;
+  /**
+   * The use case's plan the record did not write, when it answered a press that carried one: all of it, none, or a
+   * missing list's entries.
+   */
+  plan?: SetupRow[];
 };
 
 /**
@@ -113,11 +124,22 @@ export type Accepted = {
  * A PRESS NOBODY ANSWERED KEEPS ITS KEY (`out` is `null` for one that threw, or says `unheard`): the same entries are
  * asked for, and the record passes them over if they went in. A PRESS THAT WAS ANSWERED TAKES A NEW ONE: the record
  * said which entries it did not write, and may have kept the first key for the ones it did, so the same key again
- * would pass over the very entries that are still missing.
+ * would pass over the very entries that are still missing. THAT NEW KEY CARRIES ONLY WHAT IS STILL TO MAKE: the
+ * sentence's entries it handed back (`left`) and the plan's (`plan`), which may be none at all. Sent whole, the plan
+ * would be written a second time, since the record passes over only a key it holds (audit 55, claim 8). A draft that
+ * went onto Decide is not filed again.
  */
 export function pressAgain(asked: Accepting, out: Accepted | null): Accepting {
   if (out === null || out.unheard) return { ...asked, again: true, key: asked.key ?? pressKey() };
-  return { ...asked, again: true, key: pressKey(), nav: out.nav ?? asked.nav, proposal: { ...asked.proposal, rows: out.left } };
+  return {
+    ...asked,
+    again: true,
+    key: pressKey(),
+    nav: out.nav ?? asked.nav,
+    proposal: { ...asked.proposal, rows: out.left },
+    ...(out.plan === undefined ? {} : { plan: out.plan }),
+    ...(out.filed ? { drafted: null } : {}),
+  };
 }
 
 /** The record's own sentence for a refusal, or the calm one when nothing answered. */
@@ -221,6 +243,22 @@ export function rowsFor(asked: Accepting, first = 0): { rows: SetupRow[]; left: 
     left.push({ register: row.register, fields: row.fields, ...(still === undefined ? {} : { party: still }) });
   }
   return { rows, left };
+}
+
+/**
+ * The entries `keep` keeps, each still pointing at the kept ones by their new places. A link to one left out is
+ * dropped: that entry is in the record already, and the page never learns what the record called it.
+ */
+function keptRows(rows: readonly SetupRow[], keep: (r: SetupRow) => boolean): SetupRow[] {
+  const place = new Map<number, number>();
+  const out: SetupRow[] = [];
+  for (const [i, r] of rows.entries()) {
+    if (!keep(r)) continue;
+    const links = Object.fromEntries(Object.entries(r.links ?? {}).flatMap(([field, to]) => (place.has(to) ? [[field, place.get(to)!]] : [])));
+    place.set(i, out.length);
+    out.push({ register: r.register, fields: r.fields, ...(Object.keys(links).length === 0 ? {} : { links }) });
+  }
+  return out;
 }
 
 /** Who the sentence is from: the name the proposal carries, which the model may have read where the rules did not, and the words after it. */
@@ -327,7 +365,8 @@ const CASE = 'usecase-';
 export async function accept(client: Client, asked: Accepting): Promise<Accepted> {
   if (typeof (client as { setup?: unknown }).setup !== 'function') return oldScript(client).accept(asked);
   const cases = casesOf(asked);
-  const formed = cases[0] ? await formedRows(cases[0], asked.today, whoOf(asked).bio).catch(() => []) : [];
+  /* THE PLAN AS THE LAST PRESS HANDED IT BACK, when there was one (`pressAgain`), else formed from the sentence. */
+  const formed = asked.plan ?? (cases[0] ? await formedRows(cases[0], asked.today, whoOf(asked).bio).catch(() => []) : []);
   /* THE PRESS'S OWN HANDLE, so its entries are written once however often the call is sent. */
   const body: SetupBody = { ...bodyOf(asked, formed), key: asked.key ?? pressKey() };
   const unsent = rowsFor(asked, formed.length).left;
@@ -351,6 +390,8 @@ export async function accept(client: Client, asked: Accepting): Promise<Accepted
   const none = parts.some((f) => f.part === 'rows');
   const lost = new Set(parts.flatMap((f) => (f.part.startsWith('rows:') ? [f.part.slice('rows:'.length)] : [])));
   const left = none ? asked.proposal.rows : [...asked.proposal.rows.filter((r) => lost.has(r.register)).map(({ register, fields }) => ({ register, fields })), ...unsent];
+  /* AND THE PLAN'S, by the same rule, so the next press sends none of it that is in. */
+  const plan = none ? [...formed] : keptRows(formed, (r) => lost.has(r.register));
 
   /* THE RAIL ORDER EACH USE CASE CARRIES, laid over the reader's own, for every one that went in. */
   let nav: string[] | null = null;
@@ -382,7 +423,7 @@ export async function accept(client: Client, asked: Accepting): Promise<Accepted
     failed.push(...(await importFile(client, asked.imported, asked.currency ?? asked.proposal.currency, asked.locale ?? 'en', read?.ok ? read.value : [])));
   }
 
-  return { failed, left, nav, filed, refused };
+  return { failed, left, nav, filed, refused, ...(formed.length === 0 ? {} : { plan }) };
 }
 
 /** How many of a file's entries go to the record in one call. */

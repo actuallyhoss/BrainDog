@@ -26,7 +26,7 @@ import { kindSpec } from './kind-spec.ts';
 import { cellNamesNothing, inline, magnitudeOfCell, text as plain, type Inline, type InlineOptions } from './inline.ts';
 import { glyphPath } from './inline.ts';
 import { MISSING, barFigure, day, figureChars, headlineFigure, leadingCode, symbolFigure, symbolText, valueWord } from './format.ts';
-import { CARDS_NEXT, CARDS_NONE, cardsCount, FOLD_HIDE, FOLD_SHOW, RUN_OPEN, TREND, agentMarkFill, cardLayout, counted, type AgentMark, initialOf, isDimmed, isQuiet, markGlyphOf, markOf, ringDash, ringOf, runFaceOf, runMarkOf, trendOf, type RunCell, type RunFace } from './cards.ts';
+import { CARDS_NEXT, CARDS_NONE, cardsCount, FOLD_HIDE, FOLD_SHOW, RUN_OPEN, TREND, agentMarkFill, cardLayout, cardTrend, counted, type AgentMark, initialOf, isDimmed, isQuiet, markGlyphOf, markOf, ringDash, ringOf, runFaceOf, runMarkOf, trendOf, type RunCell, type RunFace } from './cards.ts';
 import { FEED_EARLIER, feedBurst, feedCasedNodes, feedNew, feedPlan } from './feed.ts';
 import { FILTERS_ALL, filtersMore, filtersPlan, type Filter } from './filters.ts';
 import { QUEUE_DOES, QUEUE_REASONS, QUEUE_RECOMMENDED, fileSrc, queueMore, queuePlan, queueReasoned, queueSuggested, queueWays, type QueueShows } from './queue.ts';
@@ -39,12 +39,12 @@ import { rowsCell, timelineCell, timelineDays } from './timeline.ts';
 import { CHOICE_KEYS, rowKey } from './cursor.ts';
 import { TABLE_CHUNK, TABLE_ROWS_LABEL, ariaSort, chunkRows, comparisonPlan, glyphColumn, intrinsicRows, tableCellBody } from './table.ts';
 import { AGENTS_EARLIER, agentsPlan } from './agents.ts';
-import { SPLIT_AMOUNT, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitPlan, splitSentence } from './split.ts';
+import { SPLIT_AMOUNT, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitListed, splitPlan, splitSentence } from './split.ts';
 import { BRIDGE_AMOUNT, BRIDGE_STEP, bridgePlan, bridgeSentence, signedOf } from './bridge.ts';
 import { SERIES_NET, SERIES_NONE, seriesPlan, type SeriesPlan } from './series.ts';
 import { LINES_AGAINST, LINES_NONE, LINES_NUMBERS, linesOnly, linesPlan } from './lines.ts';
 import { PROGRESS_NONE, PROGRESS_OF, PROGRESS_TOTAL, progressPlan, progressRangeSaid, progressSentence, progressSpentSaid, rangePlan, rangeSentence } from './progress.ts';
-import { AMOUNT_SPACE } from './money.ts';
+import { AMOUNT_SPACE, writeFigure, type AmountSetting, type WrittenAmount } from './money.ts';
 import { FORECAST_BALANCE, FORECAST_MOVE, FORECAST_NONE, FORECAST_NUMBERS, FORECAST_PAINT, FORECAST_WHAT, FORECAST_WHEN, baseKnobs, forecastFigure, forecastModel, forecastPlan, scenario, underNote } from './forecast.ts';
 import { DIFF_GLYPHS, DIFF_WORDS, diffFolded, diffPlan, type DiffLine } from './diff.ts';
 import { ROADMAP_LEGEND, ROADMAP_NONE, ROADMAP_TODAY, roadmapAxis, roadmapFlip, roadmapLegend, roadmapLines, roadmapPlan, roadmapRow, roadmapSentence, roadmapShare, roadmapSkipped, roadmapToday } from './roadmap.ts';
@@ -506,12 +506,12 @@ function grid(b: Block, o: RenderOptions): string {
   const body = shown
     .map(
       (r) =>
-        `<div class="cell"${toneAttrs(r.tone)}>${cell('cell-label', r.cells[0], o)}<span class="cell-figure num"${fitAttrs(r.cells[1] && headlineFigure(r.cells[1]))}>${
+        `<div class="cell"${toneAttrs(r.tone)}>${cell('cell-label', r.cells[0], o)}<span class="cell-figure num"${fitAttrs(r.cells[1] && headlineFigure(r.cells[1], o.home))}>${
           /* The code quiet or the symbol in its place, as `Grid.svelte` draws it: this printed the
              code at full size, and the two trees differed on every stat with an amount in it. A stat's
              figure is a headline, so it is said the way `headlineFigure` says one: `£33,850`, not `£33,850.00`. */
-          r.cells[1] ? amount(headlineFigure(r.cells[1]), o) : MISSING
-        }</span>${trendSvg('cell-trend', r.cells[0] ?? '', r.cells[3] ?? '', o)}${cell('cell-note', r.cells[2] && symbolText(r.cells[2], true), o)}${toneGlyph(r.tone)}</div>`,
+          r.cells[1] ? amount(r.cells[1], o) : MISSING
+        }</span>${trendSvg('cell-trend', r.cells[0] ?? '', r.cells[3] ?? '', o)}${cell('cell-note', r.cells[2] && symbolText(r.cells[2], true, o.home), o)}${toneGlyph(r.tone)}</div>`,
     )
     .join('');
   return `<div class="grid" style="--cells:${shown.length}">${body}</div>`;
@@ -587,7 +587,7 @@ function proportional(b: Block, o: RenderOptions): string {
     const value = numeric(r);
     const target = magnitudeOfCell(String(r.cells[2] ?? ''), o);
     const m = Number.isFinite(value) && Number.isFinite(target) && target !== 0 ? value / target : 0;
-    return `<div class="prop"><div class="prop-row"${toneAttrs(r.tone)}>${cell('prop-label', r.cells[0], o)}<span class="prop-track" style="--magnitude:${magnitude(m)}"></span><span class="prop-value num">${drawn(r.cells[1])}</span><span class="prop-note num">of ${drawn(r.cells[2])}</span>${toneGlyph(r.tone)}</div></div>`;
+    return `<div class="prop"><div class="prop-row"${toneAttrs(r.tone)}>${cell('prop-label', r.cells[0], o)}<span class="prop-track" style="--magnitude:${magnitude(m)}"></span><span class="prop-value num">${drawn(gaugeFigure(r.cells[1], o))}</span><span class="prop-note num">of ${drawn(gaugeFigure(r.cells[2], o))}</span>${toneGlyph(r.tone)}</div></div>`;
   }
   const scale = Math.max(0, ...b.rows.filter((r) => !r.hole).map(numeric).filter(Number.isFinite));
   /* A BAR WHOSE FIGURE NAMES NOTHING IS LEFT OUT (`drawnRows`); one with no value yet keeps its dash and its hole. */
@@ -599,7 +599,7 @@ function proportional(b: Block, o: RenderOptions): string {
          claims the value IS zero. The number is still printed, with its sign. */
       const drawable = Number.isFinite(v) && v >= 0 && !r.hole && scale > 0;
       const track = drawable ? `<span class="prop-track" style="--magnitude:${magnitude(v / scale)}"></span>` : '';
-      const inner = `${cell('prop-label', r.cells[0], o)}${track}<span class="prop-value num">${drawn(barFigure(r.cells[1] ?? MISSING))}</span>${cell('prop-note', r.cells[2], o)}${toneGlyph(r.tone)}`;
+      const inner = `${cell('prop-label', r.cells[0], o)}${track}<span class="prop-value num">${drawn(barFigure(r.cells[1] ?? MISSING, o.home))}</span>${cell('prop-note', r.cells[2], o)}${toneGlyph(r.tone)}`;
       return r.hole
         /* A HOLE ROW IS A CONTROL ONLY WHERE THE HOST CAN ACT ON IT — the same rule as an inline
            hole, for the same reason. This was a `<button>` with no handler on either side of the
@@ -843,7 +843,8 @@ function split(b: Block, o: RenderOptions): string {
   const rows = b.rows.filter((r) => !r.hole);
   const holes = b.rows.filter((r) => r.hole);
   /* Signed as drawn, so `−£40.00` is a credit with no part rather than a part of 40. */
-  const plan = splitPlan(rows.map((r) => signedOf(plain(inline(r.cells[1] ?? '', o)))));
+  const values = rows.map((r) => signedOf(plain(inline(r.cells[1] ?? '', o))));
+  const plan = splitPlan(values);
   const partOf = (i: number) => plan.parts.find((p) => p.at === i);
   const said = (r: Row) => plain(inline(r.cells[0] ?? '', o));
   /* The track is 1000 by 100 stretched to its box, so the 10 by 60 tile's stripe follows its width: about 3px apart on
@@ -862,8 +863,10 @@ function split(b: Block, o: RenderOptions): string {
   const legend = rows.length
     ? `<ul class="split-legend">${rows
         .map((r, i) => {
+          /* A part at nought is left out of the legend (`splitListed`); the fold below still says it. */
+          if (!splitListed(plan, values[i]!)) return '';
           const part = partOf(i);
-          return `<li class="split-item"${toneAttrs(r.tone)}><span class="split-dot"${part ? ` data-step="${part.step}"` : ''} aria-hidden="true"></span>${cell('split-label', r.cells[0], o)}<span class="split-value num">${renderInline(inline(headlineFigure(r.cells[1] || MISSING), o), o)}</span>${part ? `<span class="split-share num">${escape(part.share)}</span>` : ''}${cell('split-note', r.cells[2], o)}${toneGlyph(r.tone)}</li>`;
+          return `<li class="split-item"${toneAttrs(r.tone)}><span class="split-dot"${part ? ` data-step="${part.step}"` : ''} aria-hidden="true"></span>${cell('split-label', r.cells[0], o)}<span class="split-value num">${renderInline(inline(headlineFigure(r.cells[1] || MISSING, o.home), o), o)}</span>${part ? `<span class="split-share num">${escape(part.share)}</span>` : ''}${cell('split-note', r.cells[2], o)}${toneGlyph(r.tone)}</li>`;
         })
         .join('')}</ul>`
     : '';
@@ -938,7 +941,28 @@ function fitAttrs(value: string | null | undefined): string {
  */
 const figureEnd = (rest: string): number => rest.search(/\s|$/u);
 
-function amount(value: string, o: RenderOptions): string {
+/**
+ * A stored amount as the one writer writes it for this page (`money.ts`), or `null` when the host has not said the
+ * record's home currency or the cell is not one stored amount, and then the cell is drawn the way it always was.
+ */
+export function written(value: string, o: Pick<RenderOptions, 'home'>, setting: AmountSetting): WrittenAmount | null {
+  if (o.home === undefined) return null;
+  return writeFigure(value, o.home, setting);
+}
+
+/** A gauge's value or target: a stored amount as the writer says it short, and anything else as its cell wrote it. */
+export const gaugeFigure = (cell: string | undefined, o: Pick<RenderOptions, 'home'>): string | undefined =>
+  cell === undefined ? cell : (written(cell, o, 'read')?.text ?? cell);
+
+/** A headline's amount from its cell: the writer's where the page says its home, the code quiet where it stands in front. */
+function amount(cell: string, o: RenderOptions): string {
+  const w = written(cell, o, 'read');
+  if (w) {
+    return w.codePlace === 'before'
+      ? `<span class="amount">${escape(w.minus)}<span class="amount-code">${escape(w.code)}</span>${AMOUNT_SPACE}${escape(`${w.whole}${w.fraction}`)}</span>`
+      : escape(w.text);
+  }
+  const value = headlineFigure(cell, o.home);
   const symbol = symbolFigure(value);
   if (symbol) return escape(symbol);
   const coded = leadingCode(value);
@@ -1026,11 +1050,12 @@ function cards(b: Block, o: RenderOptions & { runs?: readonly (RunCell | null)[]
       /* A CARD'S FIGURE THAT NAMES NOTHING IS LEFT OUT, as a tile's is (`drawnRows`): the card keeps its name and facts. */
       const figure =
         L.figure >= 0 && !cellNamesNothing(r.cells[L.figure], o)
-          ? `<span class="cards-figure"><span class="cards-value num">${r.cells[L.figure] ? amount(headlineFigure(r.cells[L.figure]!), o) : MISSING}</span>${labelled(L.figure)}</span>`
+          ? `<span class="cards-figure"><span class="cards-value num">${r.cells[L.figure] ? amount(r.cells[L.figure]!, o) : MISSING}</span>${labelled(L.figure)}</span>`
           : '';
-      const t = L.trend >= 0 ? trendOf(said(r, L.trend)) : null;
+      /* A TREND IS DRAWN WITH ITS NAME AND ITS NEWEST VALUE, OR NOT AT ALL (`cardTrend`): a bare line said nothing. */
+      const t = L.trend >= 0 ? cardTrend(said(r, L.trend), label(L.trend)) : null;
       const trend = t
-        ? `<svg class="cards-trend" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(`${label(L.trend) || TREND}: ${t.said.join(', ')}`)}"><path class="cards-trend-line" d="${t.d}" vector-effect="non-scaling-stroke"></path><path class="cards-trend-end" d="${t.end}" vector-effect="non-scaling-stroke"></path></svg>`
+        ? `<span class="cards-trended"><svg class="cards-trend" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(`${t.label}: ${t.said.join(', ')}`)}"><path class="cards-trend-line" d="${t.d}" vector-effect="non-scaling-stroke"></path><path class="cards-trend-end" d="${t.end}" vector-effect="non-scaling-stroke"></path></svg><span class="cards-value num">${escape(t.last)}</span><span class="cards-label">${escape(t.label)}</span></span>`
         : '';
       const m = L.ring >= 0 ? ringOf(said(r, L.ring)) : null;
       /* The ring is decoration beside the value it draws, which is printed, so it is hidden and the
@@ -1208,7 +1233,7 @@ function queue(b: Block, o: RenderOptions): string {
       /* WHO ASKED AND WHEN ARE THE CARD'S SECONDARY LINE, shown on hover or focus (`data-calm`). */
       const by = `<p class="queue-by"><span class="queue-who" data-calm="">${drawn(item.who)}</span><span class="queue-when" data-calm="">${drawn(item.when)}</span></p>`;
       /* A QUESTION IS A CARD'S HEADLINE, so its money is said short: "was due 4 days ago, £39. Did it go through?" */
-      const question = `<h3 class="queue-question">${drawn(symbolText(item.question, true))}</h3>`;
+      const question = `<h3 class="queue-question">${drawn(symbolText(item.question, true, o.home))}</h3>`;
       const why = item.why ? `<p class="queue-why">${drawn(item.why)}</p>` : '';
       /* THE LEAD QUESTION IS DRAWN WHOLE (`queue lead`): what its agents recommend, why, and what accepting it changes,
          a line each, above its ways to answer. Only the first, which is the one a person answers next; the rest are
@@ -1615,8 +1640,8 @@ function ring(b: Block, o: RenderOptions): string {
 
   if (plan.form === 'progress') {
     const r = b.rows[0]!;
-    const target = r.cells[2] ? `<span class="ring-of">${RING_OF}</span><span class="ring-target">${drawn(headlineFigure(r.cells[2]))}</span>` : '';
-    return `<div class="prop ring" data-form="progress">${dial}<div class="ring-row"${toneAttrs(plan.intent)}><span class="ring-label">${drawn(r.cells[0])}</span><span class="ring-figures num"><span class="ring-value">${drawn(headlineFigure(r.cells[1] || MISSING))}</span>${target}</span>${
+    const target = r.cells[2] ? `<span class="ring-of">${RING_OF}</span><span class="ring-target">${drawn(headlineFigure(r.cells[2], o.home))}</span>` : '';
+    return `<div class="prop ring" data-form="progress">${dial}<div class="ring-row"${toneAttrs(plan.intent)}><span class="ring-label">${drawn(r.cells[0])}</span><span class="ring-figures num"><span class="ring-value">${drawn(headlineFigure(r.cells[1] || MISSING, o.home))}</span>${target}</span>${
       plan.left ? `<span class="ring-left num">${escape(plan.left)}</span>` : ''
     }${toneGlyph(plan.intent)}</div></div>`;
   }
@@ -1625,7 +1650,7 @@ function ring(b: Block, o: RenderOptions): string {
     .map((r, i) => {
       const arc = plan.arcs.find((a) => a.row === i);
       const share = plan.shares[i];
-      return `<li class="ring-item"${toneAttrs(r.tone)}><span class="ring-dot"${arc ? ` data-step="${arc.step}"` : ''} aria-hidden="true"></span><span class="ring-label">${drawn(r.cells[0])}</span><span class="ring-value num">${drawn(headlineFigure(r.cells[1] || MISSING))}</span>${
+      return `<li class="ring-item"${toneAttrs(r.tone)}><span class="ring-dot"${arc ? ` data-step="${arc.step}"` : ''} aria-hidden="true"></span><span class="ring-label">${drawn(r.cells[0])}</span><span class="ring-value num">${drawn(headlineFigure(r.cells[1] || MISSING, o.home))}</span>${
         share ? `<span class="ring-share num">${escape(share)}</span>` : ''
       }${r.cells[2] ? `<span class="ring-note">${drawn(r.cells[2])}</span>` : ''}${toneGlyph(r.tone)}</li>`;
     })

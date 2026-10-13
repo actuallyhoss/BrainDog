@@ -96,10 +96,10 @@ export function workerSlashMeter(env: SlashEnv, api: () => RecordApi, deps: Slas
   const built = meterBuilder(env, api, deps);
   return {
     hold: async (kind) => (await built()).hold(kind),
-    background: async (kind = 'skill') => {
+    background: async (kind = 'skill', payload?: unknown) => {
       const meter = await built();
       if (await includedCeilingReached(env, deps)) return ceilingSpent(deps.clock.now(), WAITS[kind] ?? WAITS.skill);
-      return meter.background(kind);
+      return meter.background(kind, payload);
     },
   };
 }
@@ -115,10 +115,10 @@ export function workerSlashMeter(env: SlashEnv, api: () => RecordApi, deps: Slas
 export function workerUnderstandLedger(env: SlashEnv, api: () => RecordApi, deps: SlashEngineDeps): UnderstandLedger {
   const built = meterBuilder(env, api, deps);
   return {
-    background: async (kind) => {
+    background: async (kind, payload?: unknown) => {
       const meter = await built();
       if (await includedCeilingReached(env, deps)) return ceilingSpent(deps.clock.now(), 'the doubtful names wait');
-      return meter.background(kind);
+      return meter.background(kind, payload);
     },
   };
 }

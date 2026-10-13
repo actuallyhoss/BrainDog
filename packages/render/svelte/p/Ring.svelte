@@ -72,8 +72,8 @@
       <div class="ring-row" data-intent={plan.intent}>
         <span class="ring-label"><Text nodes={inline(r.cells[0] ?? '', opts)} {opts} /></span>
         <span class="ring-figures num"
-          ><span class="ring-value"><Text nodes={inline(headlineFigure(r.cells[1] || MISSING), opts)} {opts} /></span>{#if r.cells[2]}<span class="ring-of">{RING_OF}</span><span
-              class="ring-target"><Text nodes={inline(headlineFigure(r.cells[2]), opts)} {opts} /></span
+          ><span class="ring-value"><Text nodes={inline(headlineFigure(r.cells[1] || MISSING, opts.home), opts)} {opts} /></span>{#if r.cells[2]}<span class="ring-of">{RING_OF}</span><span
+              class="ring-target"><Text nodes={inline(headlineFigure(r.cells[2], opts.home), opts)} {opts} /></span
             >{/if}</span
         >
         {#if plan.left}<span class="ring-left num">{plan.left}</span>{/if}
@@ -86,7 +86,7 @@
           <li class="ring-item" data-intent={r.tone}>
             <span class="ring-dot" data-step={arc?.step} aria-hidden="true"></span>
             <span class="ring-label"><Text nodes={inline(r.cells[0] ?? '', opts)} {opts} /></span>
-            <span class="ring-value num"><Text nodes={inline(headlineFigure(r.cells[1] || MISSING), opts)} {opts} /></span>
+            <span class="ring-value num"><Text nodes={inline(headlineFigure(r.cells[1] || MISSING, opts.home), opts)} {opts} /></span>
             {#if plan.shares[i]}<span class="ring-share num">{plan.shares[i]}</span>{/if}
             {#if r.cells[2]}<span class="ring-note"><Text nodes={inline(r.cells[2], opts)} {opts} /></span>{/if}
             {@render mark(r.tone)}

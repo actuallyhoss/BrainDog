@@ -95,7 +95,7 @@ export const QUEUE_DOES = 'What it changes';
 export const QUEUE_COSTS: Record<string, string> = {
   undo: 'Hard to undo',
   shape: 'Changes the setup',
-  rows: 'Adds to your things',
+  rows: 'Adds to or changes your things',
   call: 'Your call',
 };
 

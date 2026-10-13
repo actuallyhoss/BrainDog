@@ -385,14 +385,14 @@ test('a sentence redraws its figures, and a currency with no symbol keeps its co
 });
 
 test('A CURRENCY ENGLISH WRITES BY ITS CODE IS SAID ONCE, code first, home or not', () => {
-  assert.deepEqual(drawn('EGP 58,185.54', 'EGP'), { lead: 'EGP ', whole: '58,185', fraction: '.54', iso: null });
-  assert.deepEqual(drawn('EGP 1,299.00', 'GBP'), { lead: 'EGP ', whole: '1,299', fraction: '.00', iso: null });
-  assert.equal(symbolText('EGP 58,185.54 in the bank', 'EGP'), 'EGP 58,185.54 in the bank');
+  assert.deepEqual(drawn('EGP 58,185.54', 'EGP'), { lead: 'EGP\u00a0', whole: '58,185', fraction: '.54', iso: null });
+  assert.deepEqual(drawn('EGP 1,299.00', 'GBP'), { lead: 'EGP\u00a0', whole: '1,299', fraction: '.00', iso: null });
+  assert.equal(symbolText('EGP 58,185.54 in the bank', 'EGP'), 'EGP\u00a058,185.54 in the bank');
 });
 
 test('A SENTENCE AND A HEADLINE DROP A FRACTION OF ALL ZEROS, and a ledger keeps its pence', () => {
   assert.equal(symbolText('GBP 33,850.00', 'GBP', true), '£33,850');
-  assert.equal(symbolText('EGP 58,185.00', 'GBP', true), 'EGP 58,185');
+  assert.equal(symbolText('EGP 58,185.00', 'GBP', true), 'EGP\u00a058,185');
   assert.equal(symbolText('GBP 33,850.50', 'GBP'), '£33,850.50', 'a fraction that is not all zeros is part of a sentence’s figure');
   assert.equal(symbolText('GBP 33,850.00', 'GBP'), '£33,850');
   assert.equal(symbolText('Bills past their due date: GBP 10,540.00 still to pay.', 'GBP', 'sentence'), 'Bills past their due date: £10,540 still to pay.');
@@ -408,31 +408,31 @@ test('A SENTENCE AND A HEADLINE DROP A FRACTION OF ALL ZEROS, and a ledger keeps
  * every other place writes it, never "E£1,350" (his word, 9 October).
  */
 test('A HEADLINE IS WHOLE UNITS, AND EGP IS WRITTEN EGP THERE AS EVERYWHERE: "EGP 1,086,213.41" over Today is "EGP 1,086,213"', () => {
-  assert.equal(symbolText('EGP 1,086,213.41', 'EGP', 'headline'), 'EGP 1,086,213');
-  assert.equal(symbolText('EGP 1,086,213.50', 'EGP', 'headline'), 'EGP 1,086,214', 'a half rounds up');
-  assert.equal(symbolText('EGP −99,999.99', 'EGP', 'headline'), 'EGP −100,000', 'and carries into the next thousand');
-  assert.equal(symbolText('EGP 58,185.00', 'EGP', true), 'EGP 58,185', '`true` is the headline the lead line asks for');
-  assert.equal(symbolText('EGP 1,350.00', 'EGP', true), 'EGP 1,350', 'the Orders line: never E£1,350');
+  assert.equal(symbolText('EGP 1,086,213.41', 'EGP', 'headline'), 'EGP\u00a01,086,213');
+  assert.equal(symbolText('EGP 1,086,213.50', 'EGP', 'headline'), 'EGP\u00a01,086,214', 'a half rounds up');
+  assert.equal(symbolText('EGP −99,999.99', 'EGP', 'headline'), '−EGP\u00a0100,000', 'and carries into the next thousand');
+  assert.equal(symbolText('EGP 58,185.00', 'EGP', true), 'EGP\u00a058,185', '`true` is the headline the lead line asks for');
+  assert.equal(symbolText('EGP 1,350.00', 'EGP', true), 'EGP\u00a01,350', 'the Orders line: never E£1,350');
   assert.equal(symbolText('GBP 33,850.50', 'GBP', true), '£33,851');
-  assert.equal(symbolText('Cash is EGP 1,086,213.41 across 13 accounts', 'EGP', true), 'Cash is EGP 1,086,213 across 13 accounts');
-  assert.deepEqual(drawn('EGP 1,086,213.41', 'EGP', true), { lead: 'EGP ', whole: '1,086,213', fraction: '', iso: null });
+  assert.equal(symbolText('Cash is EGP 1,086,213.41 across 13 accounts', 'EGP', true), 'Cash is EGP\u00a01,086,213 across 13 accounts');
+  assert.deepEqual(drawn('EGP 1,086,213.41', 'EGP', true), { lead: 'EGP\u00a0', whole: '1,086,213', fraction: '', iso: null });
 
   /* UNDER TEN THOUSAND THE AMOUNT IS EXACT, so its fraction stays where it is not all zeros. */
   assert.equal(symbolText('GBP 4.37', 'GBP', 'headline'), '£4.37');
   assert.equal(symbolText('GBP 12.00', 'GBP', 'headline'), '£12');
 
   /* ONLY THE RECORD'S OWN CURRENCY TAKES THE SIGN: any other is said by its code, which already names it. */
-  assert.equal(symbolText('EGP 412,300.00', 'GBP', 'headline'), 'EGP 412,300');
+  assert.equal(symbolText('EGP 412,300.00', 'GBP', 'headline'), 'EGP\u00a0412,300');
   assert.equal(symbolText('USD 48,000.70', 'EGP', 'headline'), '$48,001\u00a0USD');
   /* AND ONLY A SIGN THE FIGURES ARE READ BACK BY: a narrow form that is letters keeps the code, as one with none does. */
-  assert.equal(symbolText('SEK 1,200.00', 'SEK', 'headline'), 'SEK 1,200');
-  assert.equal(symbolText('KWD 12,345.678', 'KWD', 'headline'), 'KWD 12,346');
+  assert.equal(symbolText('SEK 1,200.00', 'SEK', 'headline'), 'SEK\u00a01,200');
+  assert.equal(symbolText('KWD 12,345.678', 'KWD', 'headline'), 'KWD\u00a012,346');
   assert.equal(symbolText('JPY 1,299', 'JPY', 'headline'), '¥1,299');
 
   /* A SENTENCE AND A LEDGER ARE AS THEY WERE. */
-  assert.equal(symbolText('EGP 1,086,213.41', 'EGP'), 'EGP 1,086,213.41');
-  assert.equal(symbolText('EGP 1,086,213.41', 'EGP', 'exact'), 'EGP 1,086,213.41');
-  assert.deepEqual(drawn('EGP 58,185.54', 'EGP'), { lead: 'EGP ', whole: '58,185', fraction: '.54', iso: null });
+  assert.equal(symbolText('EGP 1,086,213.41', 'EGP'), 'EGP\u00a01,086,213.41');
+  assert.equal(symbolText('EGP 1,086,213.41', 'EGP', 'exact'), 'EGP\u00a01,086,213.41');
+  assert.deepEqual(drawn('EGP 58,185.54', 'EGP'), { lead: 'EGP\u00a0', whole: '58,185', fraction: '.54', iso: null });
 });
 
 /**
@@ -448,10 +448,10 @@ test('A HEADLINE IS ROUNDED ONLY FROM TEN THOUSAND UP, and a bar\'s value is nev
   assert.deepEqual(drawn('GBP 999.50', 'GBP', true), { lead: '£', whole: '999', fraction: '.50', iso: null });
 
   /* A BAR'S VALUE IS READ AGAINST THE BARS BESIDE IT, so it keeps every minor unit. */
-  assert.equal(symbolText('EGP 1,086,213.41', 'EGP', 'figure'), 'EGP 1,086,213.41');
-  assert.equal(symbolText('EGP 58,185.00', 'EGP', 'figure'), 'EGP 58,185', 'a fraction of all zeros still goes');
+  assert.equal(symbolText('EGP 1,086,213.41', 'EGP', 'figure'), 'EGP\u00a01,086,213.41');
+  assert.equal(symbolText('EGP 58,185.00', 'EGP', 'figure'), 'EGP\u00a058,185', 'a fraction of all zeros still goes');
   assert.equal(symbolText('USD 48,000.70', 'EGP', 'figure'), '$48,000.70\u00a0USD');
-  assert.deepEqual(drawn('EGP 1,086,213.41', 'EGP', 'figure'), { lead: 'EGP ', whole: '1,086,213', fraction: '.41', iso: null });
+  assert.deepEqual(drawn('EGP 1,086,213.41', 'EGP', 'figure'), { lead: 'EGP\u00a0', whole: '1,086,213', fraction: '.41', iso: null });
 });
 
 test('ANY OTHER CURRENCY KEEPS ITS CODE IN EVERY SETTING, a headline too, and the home one never carries it', () => {

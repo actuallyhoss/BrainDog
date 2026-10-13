@@ -462,8 +462,8 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   kernel walks each cash account entry by entry from its newest statement, apart from the roll, and the figure is the
  *   difference a currency at a time: nought, or the figure on Money is wrong. With no balance typed it has no value.
  *   MONEY-CORE 3.16.0 IS RELEASED (`test/fixtures/released/money-core-3.16.0.json`), so this is a version of its own. One
- *   figure added, nothing taken away or retyped, so a minor step that reaches a record on its own. The Money page draws it (cash-page-54): one tile under the walk while it is not nought, and one line while no
- *   balance is typed.
+ *   figure added, nothing taken away or retyped, so a minor step that reaches a record on its own. The Money page draws it (cash-page-54): one tile under the walk while it is not nought. The line it drew while no
+ *   balance is typed went before release, for the lead a record with two books opens on (below).
  *   Filing rules (filing-list-56, REC-B10 job 3): a list of its own, a text, how it matches, which way and the category
  *   it files under; the Ledger says which rule filed an entry (`filed_by`); a rule for money in never files money out,
  *   and a category's own Matches files for this one version more, live and the right way only.
@@ -474,7 +474,12 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   the Ledger entry that paid it, and a repeating line Last paid and Last amount. The Ledger declares
  *   `delete: refuse_while_referenced`, so a payment an instalment names is not deleted out from under it. Fields and a
  *   delete rule added, nothing taken away, still minor. The script that writes them (`scripts/settle.js`) is not
- *   registered yet, so a person fills them until it is.
+ *   registered yet, so a person fills them until it is, and the note a person reads says nothing of them until then.
+ *   A lead for two books (the look of 13 October, fault F): with two books or more Money's first line says how many
+ *   books and accounts the money is kept in, two counts and no sum, where no block was the lead and the app said its
+ *   own filler. Money is at the most blocks a page declares, so it took the place of the line for no balance typed,
+ *   which stood under the box to add an account and was untrue with accounts and none of them cash. A block swapped
+ *   for another inside the unreleased step, so no version of its own.
  * - portfolio 1.16.0 and work 1.18.0 (batch 46, REC-C08's remainder and REC-C16): a project others point at stays. Projects
  *   declares `delete: refuse_while_referenced`, as Accounts does, so a project a task, a bill, a service or a person names
  *   is not deleted out from under them, and the refusal names the lists and how many. Under What each one earns, one
@@ -491,9 +496,14 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   Network. A record that came in from a cloud account brought its own values for these with no label, and the month
  *   by type read a key. Four values added after the eight and nothing taken away, so the step is a minor one; a value a
  *   record added itself stays (laidBack).
+ * - portfolio 1.17.0 (seed-58, the look of 13 October, fault J): the line under What each one earns is drawn only while
+ *   one project in play says what it earned (`projects-earning-said` above nought), where it was drawn while any was in
+ *   play and read "0 of 11 projects in play say what they earned in a year" on a record that never meant to say. The
+ *   words are the same. PORTFOLIO 1.16.0 IS RELEASED, so this is a version of its own. One `when` changed on the two
+ *   keyed copies of a block that is there, nothing added or taken away, so a minor step.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
-  portfolio: '1.16.0',
+  portfolio: '1.17.0',
   people: '3.3.0',
   'money-core': '3.17.0',
   estate: '2.2.0',

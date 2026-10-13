@@ -58,3 +58,31 @@ export function linkFault(schemaOf: (register: string) => Schema | null, rule: P
   }
   return null;
 }
+
+/**
+ * What is wrong with a rule's `link.to.also`, or `null`.
+ *
+ * ASKED OF THE RULE'S OWN LIST, which `linkFault` is not handed: `also` names a field of the row being linked, and
+ * what is written there is a row of the linked list, so the field is a ref to that list. One that is not would hold an
+ * id nothing can open. The install refuses the rule with this as it lands, the dry run refuses it too, and the pass leaves
+ * the one step out and says so, for a rule stored before anything asked. HERE BESIDE `linkFault`, so the install can
+ * ask it without closing the ring of imports this file was made to keep open.
+ */
+export function alsoFault(schemaOf: (register: string) => Schema | null, rule: Pick<RuleDecl, 'rule' | 'register' | 'then'>): Refusal | null {
+  for (const [i, action] of (Array.isArray(rule.then) ? rule.then : []).entries()) {
+    const link = (action as { link?: { field?: unknown; to?: Partial<LinkTo> } } | null)?.link;
+    const to = link?.to;
+    if (to === null || typeof to !== 'object' || to.also === undefined) continue;
+    const at = `then[${i}].link.to.also`;
+    const no = (fix: string, code: Refusal['code'] = 'DECLARATION_INVALID'): Refusal => ({ code, fix: `rule.${rule.rule}'s ${at} ${fix}`, at });
+    if (typeof to.also !== 'string' || to.also === '') return no('names a field, such as filed_by.');
+    if (to.take === undefined) return no(`writes what was found beside what is taken from it, and this link takes nothing. Give it a take, or link ${to.also} in a step of its own.`);
+    if (to.also === link?.field) return no(`names ${to.also}, the field this link already writes. Name a second field.`);
+    const own = schemaOf(rule.register);
+    if (own === null) continue;
+    const field = Object.hasOwn(own.fields, to.also) ? own.fields[to.also] : undefined;
+    if (field === undefined) return no(`writes a field of ${rule.register}, and ${rule.register} has no field called ${to.also}.`, 'FIELD_UNKNOWN');
+    if (field.type !== 'ref' || field.to !== to.register) return no(`writes what was found in ${to.register}, and ${to.also} is not a ref to ${to.register}.`);
+  }
+  return null;
+}

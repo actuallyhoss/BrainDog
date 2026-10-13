@@ -10,6 +10,10 @@
  * NONE ON THE PAGE THE OFFER MADE. Made, the page reads the same list, and until `boot` is read again the pen still
  * holds the offer: it would offer her the page she is reading.
  *
+ * UNDER THE PAGE, NEVER OVER IT (look fault G; `PageView.svelte` places it). The card was drawn between the page's header and its first
+ * tile, where on Money it took a phone's first screen and stood over the accounts on a laptop. It is drawn after the
+ * page's blocks, folded to one line that a press opens, so an offer never outranks what the page was opened for.
+ *
  * PURE, AND NODE LOADS IT, so `page-offer.test.ts` holds the rule without a component.
  */
 import { offerFor, slugOfDraft, type OfferHeld, type PenItem } from './pen.ts';
@@ -33,7 +37,7 @@ export function firstList(page: OfferedPage): string | null {
   return null;
 }
 
-/** The one offer to draw above this page, or `null`: the week offer for its first list, unless it made this page. */
+/** The one offer to draw under this page, or `null`: the week offer for its first list, unless it made this page. */
 export function pageOffer(pen: readonly PenItem[], page: OfferedPage, held: OfferHeld): PenItem | null {
   const list = firstList(page);
   if (list === null) return null;
