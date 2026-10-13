@@ -1,5 +1,8 @@
 /** Money's first line: what the money is doing, in one sentence. */
 
+const ONE_BOOK = { metric: 'books-held', lt: 2 };
+const WHAT_THERE_IS = 'Cash is {{cash-now}} across {{cash-accounts}} account(s), {{cash-now.change}} on a month ago.';
+
 export const HEADLINE: Record<string, unknown>[] = [
   {
     /* THE HEADLINE LINE, SAID FROM THE FIGURES: what the money is doing, in one sentence inside the page's headline
@@ -20,8 +23,8 @@ export const HEADLINE: Record<string, unknown>[] = [
     kind: 'note',
     lead: true,
     span: 12,
-    when: { metric: 'books-held', lt: 2 },
-    body: 'Cash is {{cash-now}} across {{cash-accounts}} account(s), {{cash-now.change}} on a month ago.',
+    when: ONE_BOOK,
+    body: WHAT_THERE_IS,
   },
   {
     /* WITH TWO BOOKS OR MORE THE LINE SAYS WHERE THE MONEY IS KEPT, AND NO SUM, SINCE money-core 3.17.0. No block here
@@ -38,4 +41,31 @@ export const HEADLINE: Record<string, unknown>[] = [
   /* NO "WHAT YOU HAVE" TILE BESIDE THE LINE, SINCE money-core 3.4.0. It said Cash now, the accounts and how long it
      lasts, which are the three figures the line above says, so a person read them twice before reading anything
      else. Cash ahead draws how the same cash moves, the whole width. */
+];
+
+/**
+ * THE LINE THAT SAYS THE MONEY LASTS THE YEAR, DECLARED AND NOT PLACED (money-lasts-line-76, REC-B07). Money is at
+ * twenty-four blocks, the most a page declares (`BLOCK_CEILING` in `packages/kernel/src/declare.ts`), and this is a
+ * third lead note where `HEADLINE` holds two: placed today, Money is refused at install. It comes in when a block is
+ * given up for it: `MONEY_PAGE` then spreads this where it spreads `HEADLINE`.
+ *
+ * WHAT IT CHANGES. The line of what there is steps aside while the money lasts (`beyond: false`), or the cash would be
+ * said twice; it still stands where nobody can count the days, with no account or over two currencies and no rate.
+ */
+export const HEADLINE_LASTS: Record<string, unknown>[] = [
+  { ...HEADLINE[0], when: { all: [ONE_BOOK, { metric: 'runway-days', beyond: false }] } },
+  {
+    /* THAT IT LASTS THE YEAR IS THE LINE'S, BECAUSE NO TILE SAYS IT. The tile of when it runs out is drawn only while
+       the walk has a day it goes under on (`runway.ts`), so a record whose money lasts read nothing of how long. The
+       same line, ending on the year, as Home says it (`usecases/founder.ts`). `runway-days` has no value on this
+       record, and none either over two currencies with no rate or with no account, so the line is chosen by the
+       reading carrying `beyond`, the walk having reached its last day above zero, and never by the figure being
+       empty. "The year" and not "for good": the walk looks 365 days and knows no further. */
+    kind: 'note',
+    lead: true,
+    span: 12,
+    when: { all: [ONE_BOOK, { metric: 'runway-days', beyond: true }] },
+    body: `${WHAT_THERE_IS.slice(0, -1)}, and on what is due it lasts the year.`,
+  },
+  ...HEADLINE.slice(1),
 ];

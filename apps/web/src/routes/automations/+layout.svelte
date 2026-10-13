@@ -11,7 +11,8 @@
   ONE AUTOMATION'S OWN SCREEN (`[id]`, and `new`) sits under this layout too and draws its own head, with a way back,
   so nothing is drawn here for it.
 
-  WHAT ONLY A PAGE HAS READ (how many, and the sentence) reaches the head through `hub-head.ts`.
+  WHAT ONLY A PAGE HAS READ (how many, and the sentence) reaches the head through `hub-head.ts`, and is cleared when
+  the tab changes, so the head says nothing a page has not read on this visit.
 -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
@@ -21,7 +22,7 @@
   import { words } from '$lib/flow/flow.ts';
   import HubTabs from './HubTabs.svelte';
   import { hubWords as w } from './hub.ts';
-  import { emptyHead, headFor, shareHead, tabHere } from './hub-head.ts';
+  import { clearHead, emptyHead, headFor, shareHead, tabHere } from './hub-head.ts';
 
   let { children }: { children: Snippet } = $props();
 
@@ -30,6 +31,15 @@
 
   const tab = $derived(tabHere(page.route.id, page.url.searchParams));
   const shown = $derived(tab ? headFor(tab, head) : null);
+
+  /* A TAB LEFT TAKES ITS FIGURES WITH IT. The head lives as long as this layout, so the count and the sentence read
+     on one visit to a tab were still here on the next, shown as today's until the page had read again. `$effect.pre`,
+     not `$effect`: a page says its count in a plain effect as it is drawn, and a clear that ran after that would wipe
+     the fresh figure for good. It follows the tab alone, so a sheet opening over a tab blanks nothing. */
+  $effect.pre(() => {
+    void tab;
+    clearHead(head);
+  });
 </script>
 
 <!-- THE TABS ARE THE TOOLBAR'S SEGMENTED CONTROL, beside the one primary action, which is the tab's own: "New

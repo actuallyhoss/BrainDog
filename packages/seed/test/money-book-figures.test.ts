@@ -21,6 +21,7 @@ import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 import { METRICS, firstPartyDocument } from '../src/index.ts';
 import { BOOK_FIGURES } from '../src/modules/money/figures/books.ts';
 import { MONEY_METRICS } from '../src/modules/money/figures/index.ts';
+import { MONEY_BOOK_PAGE } from '../src/modules/money/pages/book.ts';
 
 const OWNER = { actor: 'p_1' };
 /** Noon on 18 September 2026. */
@@ -32,7 +33,8 @@ const UNFILED = { 'ledger-in-no-book': 'transactions', 'bills-in-no-book': 'obli
 const OWED = { 'book-owed-to': 'owed to me', 'book-owed-by': 'owed by me' } as const;
 /** The three a book's chart reads, a month to a point (book-page-months-73), declared after the two above. */
 const BY_MONTH = ['book-in-by-month', 'book-out-by-month', 'book-net-by-month'] as const;
-const ALL = [...MONTH, ...Object.keys(UNFILED), ...Object.keys(OWED), ...BY_MONTH];
+/** And the day one book's money runs out (book-lasts-until-76), declared last of all. */
+const ALL = [...MONTH, ...Object.keys(UNFILED), ...Object.keys(OWED), ...BY_MONTH, 'book-lasts-until'];
 
 const value = <T>(r: unknown): T => {
   const x = r as { ok: boolean; value: T; refusal?: { code: string; fix: string; at?: string } };
@@ -334,14 +336,70 @@ test('A BOOK THAT IS OWED NOTHING AND OWES NOTHING READS NO VALUE, and a book wh
   }
 });
 
-/* "LASTS UNTIL" FOR ONE BOOK (REC-A09 step 2 names it `book-lasts-until`) is not a figure a pack can declare yet. The
-   day the money runs out is walked from an opening figure (`runs-out-on`, `opening: { metric: 'cash-now' }`), and a
-   walk names its opening by a bare id and reads that figure as it is stored (`readWalk` in
-   `packages/kernel/src/money-figures.ts`). So a walk filled for one book opens from `book-cash` asked about a book
-   called `{{it}}` and is refused `REF_UNKNOWN`, and one that names `book-cash:{{it}}` is refused `METRIC_UNKNOWN`
-   (both measured on this record, 13 October 2026). The book's page draws the walk itself, from
-   `book-cash:{{name}}`, and that is the one place a book's last day is said until the reader fills the opening. */
-test.todo("THE DAY ONE BOOK'S MONEY RUNS OUT IS A FIGURE, walked from that book's cash over that book's bills");
+/* "LASTS UNTIL" FOR ONE BOOK (REC-A09 step 2 names it `book-lasts-until`; book-lasts-until-76). It waited on the reader:
+   a walk named its opening by a bare id and read that figure as it is stored (`readWalk` in
+   `packages/kernel/src/money-figures.ts`), so a walk filled for one book opened from `book-cash` asked about a book
+   called `{{it}}` and was refused. The opening now carries the hole, `book-cash:{{it}}`, and is filled before it is
+   looked up (book-walk-opening-76).
+
+   RED FIRST: with the figure out of `BOOK_FIGURES`, the first test of the file fails on `METRICS` and these on the
+   figure they read. */
+const LASTS = 'book-lasts-until';
+/** A day as the record holds one for `format: day`: whole days since 1970. */
+const dayOf = (iso: string): number => Date.parse(`${iso}T00:00:00Z`) / 86_400_000;
+
+test("THE DAY ONE BOOK'S MONEY RUNS OUT IS A FIGURE, walked from that book's cash over that book's bills", async () => {
+  const r = await fresh();
+  /* E£50,000.00 IN THE STUDIO'S ACCOUNT. E£20,000.00 out on the 25th leaves 30,000.00, 5,000.00 in on 5 October makes
+     35,000.00, and 40,000.00 out on 20 October is the day it goes under. */
+  owed(r, 'owed_by_me', 2_000_000);
+  owed(r, 'owed_to_me', 500_000, { due: '2026-10-05' });
+  assert.equal(read(r.k, LASTS).value, null, 'a book with money left after every bill was given a day it runs out');
+  assert.notEqual(read(r.k, LASTS).met, false, 'a book whose money lasts the year is called a miss');
+  owed(r, 'owed_by_me', 4_000_000, { due: '2026-10-20' });
+  /* WHAT IS NOT THIS BOOK'S MOVES NOTHING: the other book's bill, past all the Studio holds, and one filed in no book. */
+  owed(r, 'owed_by_me', 9_000_000, { due: '2026-09-20', book: r.home.id });
+  owed(r, 'owed_by_me', 9_000_000, { due: '2026-09-19', book: undefined });
+  owed(r, 'owed_by_me', 9_000_000, { due: '2026-09-21', state: 'paid', settled: '2026-09-17' }); // already paid
+
+  const studio = read(r.k, LASTS);
+  assert.equal(studio.value, dayOf('2026-10-20'), "the Studio's last day is not the day its own bills take its own cash under");
+  assert.equal(studio.met, false, 'a day the money runs out inside the year is not said as a miss');
+  /* AND THE OTHER BOOK READS ITS OWN, from the same declaration: E£90,000.00 out of E£50,000.00 on the 20th. */
+  assert.equal(read(r.k, LASTS, 'Household').value, dayOf('2026-09-20'));
+});
+
+test("IT OPENS FROM THE BOOK'S OWN CASH, so money put into the book moves its last day and money put into another does not", async () => {
+  const r = await fresh();
+  owed(r, 'owed_by_me', 6_000_000, { due: '2026-10-01' });
+  owed(r, 'owed_by_me', 3_000_000, { due: '2026-11-01' });
+  assert.equal(read(r.k, LASTS).value, dayOf('2026-10-01'));
+  /* E£500,000.00 MORE IN THE OTHER BOOK is the other book's. */
+  value(r.k.create('accounts', { name: 'Own savings', kind: 'bank', balance: { amount: 50_000_000, currency: 'EGP' }, as_of: '2026-09-01', book: r.home.id }, OWNER));
+  assert.equal(read(r.k, LASTS).value, dayOf('2026-10-01'), "another book's account was walked as this book's cash");
+  /* E£20,000.00 MORE IN THE STUDIO carries it past the first bill to the second. */
+  value(r.k.create('accounts', { name: 'Studio savings', kind: 'bank', balance: { amount: 2_000_000, currency: 'EGP' }, as_of: '2026-09-01', book: r.studio.id }, OWNER));
+  assert.equal(read(r.k, LASTS).value, dayOf('2026-11-01'));
+  assert.equal(read(r.k, 'book-cash').value, 7_000_000, 'the walk opens from a figure other than the cash the page leads with');
+});
+
+test("IT WALKS THE LEGS THE BOOK'S OWN CASH AHEAD WALKS, held to the book it is asked about, and says a day", () => {
+  const figure = METRICS[LASTS] as unknown as { name: string; pack: string; source: string; format: string; opening: { metric: string }; value: unknown; legs: { register: string; where: string }[] };
+  assert.equal(figure.source, 'forecast.runway');
+  assert.equal(figure.pack, 'money-core', 'a figure over the walk reads no one list, so it is filed in no pack unless it names one');
+  assert.deepEqual(figure.opening, { metric: 'book-cash:{{it}}' });
+  assert.deepEqual(figure.value, { walk: 'zero_on', within: '365d' });
+  assert.equal(figure.format, 'day');
+  /* THE PAGE'S LEGS, with the page's hole renamed to the figure's and nothing else changed. */
+  const page = (MONEY_BOOK_PAGE.blocks as { kind: string; from?: { register: string; where: string }[] }[]).find((b) => b.kind === 'forecast')!.from!;
+  assert.deepEqual(figure.legs, page.map((leg) => ({ ...leg, where: leg.where.replace('{{name}}', '{{it}}') })));
+  for (const leg of figure.legs) assert.match(leg.where, /book is \{\{it\}\}$/u, `${leg.register} is walked over every book`);
+  assert.doesNotMatch(JSON.stringify(figure.legs), /\{\{name\}\}/u);
+  /* AND THE CELL THAT READS IT IS ON THE PAGE, under the words a person reads. */
+  const cells = (MONEY_BOOK_PAGE.blocks as { cells?: { metric: string; label: string }[] }[]).flatMap((b) => b.cells ?? []);
+  assert.deepEqual(cells.find((c) => c.metric.startsWith(`${LASTS}:`)), { metric: `${LASTS}:{{name}}`, label: 'Money lasts until' });
+  assert.doesNotMatch(figure.name, /\brows?\b|\bentit|\u2014/iu);
+});
 
 /* ONE COUNT OVER THE FOUR LISTS (REC-A09 step 2 names it `rows-in-no-book`) is not a figure a pack can declare: a figure
    reads one list (`packages/kernel/src/metrics.ts`, `register.<list>`). Until the record reads a figure over the lists that

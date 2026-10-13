@@ -61,6 +61,7 @@ export {
   type QueueRowKind,
   type QueueShows,
 } from './queue.ts';
+export { spoken } from './spoken.ts';
 export {
   CAPTURE_ADD,
   CAPTURE_ROWS,

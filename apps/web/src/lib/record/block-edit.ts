@@ -62,10 +62,11 @@ export const blockWords = {
   shortLabel: 'What its switch says',
   shortHelp: 'Both, or neither.',
   when: 'Show it only when',
-  whenHelp: 'A sentence about a figure, such as owed > 0, or owed has nothing while it has no value yet. Leave it blank to show it always.',
+  whenHelp:
+    'A sentence about a figure, such as owed > 0, or owed has nothing while it has no value yet. Say lasts beyond for money that never runs out, and join two with and. Leave it blank to show it always.',
   whenKept: 'This block is shown by a rule the editor cannot draw, so it is kept as written.',
   whenNothing: 'Only when it has nothing',
-  whenBad: 'Name a figure, then > 0, < 10, = 3 or has nothing. Leave it blank to show it always.',
+  whenBad: 'Name a figure, then > 0, < 10, = 3, has nothing or lasts beyond. Join two with and. Leave it blank to show it always.',
   sort: 'Sort by',
   sortNone: 'None',
   sortUp: 'Lowest first',
@@ -261,23 +262,32 @@ const NUMBER = /^-?\d+(?:\.\d+)?$/u;
 /* THE WORDS FOR A FIGURE WITH NO VALUE, the first of each the one the sheet prints. */
 const NOTHING = ['has nothing', 'is empty', 'has no value'];
 const SOMETHING = ['has a value', 'is not empty', 'is set'];
+/* THE WORDS FOR A WALK THAT NEVER WENT UNDER (`beyond:`, `pages.ts` `leafHolds`), the first of each the one printed.
+   "Does not last beyond" is every other reading, a figure that is no walk among them, so it is not said as "runs out". */
+const BEYOND = ['lasts beyond', 'never runs out', 'is beyond'];
+const WITHIN = ['does not last beyond', 'is not beyond'];
+/** The tests that are a leaf's whole test, each with its key, its value and its words. */
+const WHOLE = [
+  ['empty', true, NOTHING],
+  ['empty', false, SOMETHING],
+  ['beyond', true, BEYOND],
+  ['beyond', false, WITHIN],
+] as const;
+/* WHAT JOINS THE TESTS OF AN `all:`, every one of which must hold. */
+const AND = / and /giu;
 
 /**
- * A typed `when` as the kernel's leaf: `owed > 0` is `{ metric: 'owed', gt: 0 }`, `cash-now has nothing` is
- * `{ metric: 'cash-now', empty: true }`. `undefined` for an empty box (no condition) and `null` for words it cannot read.
+ * One typed test as the kernel's leaf: `owed > 0` is `{ metric: 'owed', gt: 0 }`, `cash-now has nothing` is
+ * `{ metric: 'cash-now', empty: true }`, `cash-runway lasts beyond` is `{ metric: 'cash-runway', beyond: true }`.
+ * `null` for words it cannot read. `t` is trimmed, with single spaces.
  */
-export function whenOf(said: string): Record<string, unknown> | null | undefined {
-  const t = said.trim().replace(/\s+/gu, ' ');
-  if (t === '') return undefined;
+function leafOf(t: string): Record<string, unknown> | null {
   const lower = t.toLowerCase();
-  for (const [words, empty] of [
-    [NOTHING, true],
-    [SOMETHING, false],
-  ] as const)
+  for (const [key, value, words] of WHOLE)
     for (const w of words)
       if (lower.endsWith(` ${w}`)) {
         const metric = t.slice(0, -w.length - 1).trim();
-        return FIGURE.test(metric) ? { metric, empty } : null;
+        return FIGURE.test(metric) ? { metric, [key]: value } : null;
       }
   for (const [op, sign] of SIGNS) {
     const at = t.indexOf(sign);
@@ -288,6 +298,35 @@ export function whenOf(said: string): Record<string, unknown> | null | undefined
     return { metric, [op]: Number(n) };
   }
   return null;
+}
+
+/**
+ * Several typed tests joined by `and`, as the leaves of the kernel's `all:`, or `null` unless every one of them reads.
+ *
+ * A NAME MAY HOLD THE WORD ITSELF (`project-owed:Salt and Pepper > 0`), so each `and` is tried as the join in turn and
+ * the first that leaves a whole test on its left and whole tests on its right is the one meant.
+ */
+function leavesOf(t: string): Record<string, unknown>[] | null {
+  for (const join of t.matchAll(AND)) {
+    const head = leafOf(t.slice(0, join.index));
+    if (head === null) continue;
+    const rest = t.slice(join.index + join[0].length);
+    const tail = leavesOf(rest) ?? (leafOf(rest) === null ? null : [leafOf(rest)!]);
+    if (tail !== null) return [head, ...tail];
+  }
+  return null;
+}
+
+/**
+ * A typed `when` as the kernel writes it: one test is its leaf, and two or more joined by `and` are
+ * `{ all: [leaf, leaf] }`, which draws only while every one holds (`pages.ts` `drawnWhen`). `undefined` for an empty box
+ * (no condition) and `null` for words it cannot read.
+ */
+export function whenOf(said: string): Record<string, unknown> | null | undefined {
+  const t = said.trim().replace(/\s+/gu, ' ');
+  if (t === '') return undefined;
+  const all = leavesOf(t);
+  return all !== null ? { all } : leafOf(t);
 }
 
 /** Whether the typed `when` is one the record would take: empty, or a sentence `whenOf` reads. */
@@ -302,19 +341,28 @@ export const whenFits = (said: string): boolean => whenOf(said) !== null;
 export function whenSaid(when: unknown): string | null {
   if (when === undefined) return '';
   if (typeof when === 'string') return when;
-  if (!isObject(when) || typeof when.metric !== 'string') return null;
-  let said: string | null = null;
-  if (typeof when.empty === 'boolean') said = `${when.metric} ${when.empty ? NOTHING[0] : SOMETHING[0]}`;
-  else for (const [op, sign] of SIGNS) if (typeof when[op] === 'number') said ??= `${when.metric} ${sign} ${String(when[op])}`;
-  return said !== null && same(whenOf(said), when) ? said : null;
+  if (!isObject(when)) return null;
+  const tests = Array.isArray(when.all) ? when.all.map(leafSaid) : [leafSaid(when)];
+  if (tests.includes(null)) return null;
+  const said = tests.join(' and ');
+  return same(whenOf(said), when) ? said : null;
+}
+
+/** One stored leaf in the sheet's words, by the first test it holds, or `null` when it holds none the sheet can say. */
+function leafSaid(leaf: unknown): string | null {
+  if (!isObject(leaf) || typeof leaf.metric !== 'string') return null;
+  for (const [key, value, words] of WHOLE) if (leaf[key] === value) return `${leaf.metric} ${words[0]}`;
+  for (const [op, sign] of SIGNS) if (typeof leaf[op] === 'number') return `${leaf.metric} ${sign} ${String(leaf[op])}`;
+  return null;
 }
 
 /**
  * The sentence "only when it has nothing" makes of what is typed: the figure kept, its test made `has nothing`.
- * `null` when no figure is named yet, so the choice has nothing to say it about.
+ * `null` when no figure is named yet, or several tests are, so the choice has no one figure to say it about.
  */
 export function whenNothing(said: string): string | null {
   const leaf = whenOf(said);
+  if (isObject(leaf) && Array.isArray(leaf.all)) return null;
   const metric = isObject(leaf) && typeof leaf.metric === 'string' ? leaf.metric : FIGURE.test(said.trim()) ? said.trim() : null;
   return metric === null ? null : `${metric} ${NOTHING[0]}`;
 }

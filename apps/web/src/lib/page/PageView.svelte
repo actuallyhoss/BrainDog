@@ -54,6 +54,8 @@
   import { areaOf, headCaptureAt, layoutOf } from './layout.ts';
   import { arranged, emptyHidden } from './home.ts';
   import { leadIndex } from './lead.ts';
+  import { stampOf } from './read-mark.ts';
+  import type { Cursor } from '@braindog/client';
   import { asksActions, judgedWith, readHeld } from './panels.ts';
   import type { ActionRow } from '$lib/record/actions.ts';
   import SourceView from './SourceView.svelte';
@@ -268,6 +270,38 @@
      TODAY AND DECIDE ARRANGE THEIR BODY, NOT WHAT THEIR SCREEN DREW (`home-arrange.ts`): the mode reads the body again,
      one block for each it declares, and a body nobody installed yet is installed by the first Done. */
   const shell = $derived(route.data as unknown as Shell);
+
+  /* ── the reader's mark ─────────────────────────────────────────────────────
+     A PAGE THAT DRAWS WHAT IS NEW SINCE THE MARK STAMPS THE MARK WHEN THE READER LEAVES IT (PGS-C02), through the one
+     stamp Home and Activity use (`read-mark.ts`): one mark a visit, and a mark that did not land is tried at the next
+     leave. A declared page with a `feed` `since: seen` never moved it, so the lines it called new were new again at
+     every visit until Home or Activity was opened.
+
+     ONLY A PAGE AT ITS OWN ADDRESS. Home stamps for the body it draws, and a preview writes nothing. Not over the
+     declaration as text, and not for a feed this build could not draw: neither showed a line to mark read. */
+  const marksNew = $derived(mode === 'page' && !showSource && !!live && live.page.blocks.some((b) => b.kind === 'feed' && b.since === 'seen' && !b.cannot));
+  /* EACH PAGE VISITED HAS A STAMP OF ITS OWN, since `/p/[slug]` keeps this part across pages. The record and the cursor
+     are the ones the page opened on: by the time the visit ends the address is the next screen's, and that may be
+     another record's. A shell that held nothing new has no cursor, and no cursor is no mark (`stampOf`). `pagehide`
+     covers a closed tab, and the effect's end covers leaving for another screen. */
+  $effect(() => {
+    void slug;
+    const base = untrack(() => apiBase());
+    const stamp = stampOf((upTo) => import('$lib/record/news-live.ts').then((m) => m.markAll(base, upTo)));
+    let drew: { upTo: Cursor | null } | null = null;
+    /* Its own effect, so the feed arriving does not end the visit and send the mark early. */
+    $effect(() => {
+      if (marksNew) drew = { upTo: shell.upTo ?? null };
+    });
+    const leave = () => {
+      if (drew) void stamp.leave(drew.upTo);
+    };
+    addEventListener('pagehide', leave);
+    return () => {
+      removeEventListener('pagehide', leave);
+      leave();
+    };
+  });
   /** The page this home arranges and whether the record holds it, or `null` off a home or for one with nothing to arrange. */
   const kept = $derived(mode === 'home' && live ? keptAs(slug, shell.pages ?? []) : null);
   /** The home's body as the mode moves it, from the moment Edit layout is chosen until the arrangement is let go. */
@@ -693,6 +727,26 @@
     /* A READER THE MENU OFFERS NOTHING keeps no empty row over the page. */
     .home-page > .home-tools:not(:has(button, a)) {
       display: none;
+    }
+  }
+
+  /* ON A PHONE THE ⋯ IS ON THE SENTENCE'S ROW (look fault N). A row of its own at 390 was about 60px of nothing over
+     the first tile, with one dot-mark at its end. Where the body stands right under its screen's sentence (`PageHead`'s
+     `.page-said`, then Home's page and body with nothing before them), the ⋯ is raised to the end of that sentence, as
+     it is raised over the body at a pointer, and the sentence keeps it a tap's room so no word runs under it.
+
+     ONLY THERE. Under a line to type into, a first-run card or a screen that wraps its head (Decide), what is over the
+     body is not a sentence with room at its end, and the ⋯ keeps the row it had. From 601px a touch screen keeps the
+     row too: the head has the width for it. */
+  @media (hover: none) and (width <= 600px) {
+    :global(.page-said + .page > .body:first-child) > .home-page:not([data-arranging]) > .home-tools {
+      position: absolute;
+      margin: 0;
+      inset-block-end: 100%;
+    }
+
+    :global(.page-said:has(+ .page > .body:first-child > .home-page:not([data-arranging]) > .home-tools :is(button, a))) {
+      padding-inline-end: calc(var(--gutter) + var(--tap) + var(--sp-2));
     }
   }
 

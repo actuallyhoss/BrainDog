@@ -41,6 +41,7 @@ import {
   triggerIcon,
   type RunLine,
 } from './hub.ts';
+import { clearHead, emptyHead, headFor } from './hub-head.ts';
 
 const at = (y: number, m: number, d: number, h = 9, min = 0): number => new Date(y, m - 1, d, h, min).getTime();
 const iso = (t: number): string => new Date(t).toISOString();
@@ -326,4 +327,40 @@ test("A HELD RUN THAT SAYS WHY ITSELF IS NOT BLAMED ON THE MONTH'S LIMIT, and on
   assert.match(said!.said, new RegExp(`^Held .+\\. ${off.replace(/\./g, '\\.')}$`));
   const [quiet] = runLines([], new Map(), [action('rates', { last: { at, outcome: 'held', status: null, note: '' } })], [], NOW);
   assert.match(quiet!.said, /by this month's limit\.$/);
+});
+
+/* THE HEAD OVER THE HUB (`hub-head.ts`, `+layout.svelte`). The head outlives the page under it, so a figure read on
+   one visit to a tab was still there on the next, shown as today's while the page read again. */
+
+test('AFTER A TAB CHANGE THE HEAD SHOWS NO COUNT UNTIL THE PAGE UNDER IT HAS READ ITS OWN', () => {
+  const head = emptyHead();
+  /* The Automations tab reads four, one failing. */
+  head.automations = 4;
+  head.said = { text: '4 run by themselves. Chase invoices is failing.', needs: 'Chase invoices is failing.' };
+  /* He goes to Runs: nothing of the tab he left is kept, and Runs says nothing until it has read. */
+  clearHead(head);
+  assert.deepEqual(head, emptyHead());
+  assert.deepEqual(headFor('runs', head), { count: undefined, sentence: undefined, needs: undefined });
+  head.runs = 31;
+  assert.equal(headFor('runs', head).count, 31);
+  /* Back on Automations, where one was deleted meanwhile: the old four and the old sentence are not shown as
+     today's, and the three it reads now are. */
+  clearHead(head);
+  assert.deepEqual(headFor('automations', head), { count: undefined, sentence: undefined, needs: undefined });
+  head.automations = 3;
+  head.said = { text: '3 run by themselves.', needs: '' };
+  assert.deepEqual(headFor('automations', head), { count: 3, sentence: '3 run by themselves.', needs: undefined });
+  /* The same object is cleared, never swapped: the pages hold it, and a new one would never hear them. */
+  const held = head;
+  assert.equal(clearHead(head), held);
+});
+
+test('THE LAYOUT CLEARS THE HEAD WHEN THE TAB CHANGES, BEFORE THE PAGE UNDER IT SAYS ANYTHING', () => {
+  const layout = readFileSync(new URL('./+layout.svelte', import.meta.url), 'utf8').replaceAll(/<!--[\s\S]*?-->/gu, '');
+  /* `$effect.pre`, not `$effect`: a page writes its count in a plain effect as it is drawn, and a clear that ran
+     after it would wipe the fresh figure for good. */
+  assert.match(layout, /\$effect\.pre\(\(\) => \{\s*void tab;\s*clearHead\(head\);\s*\}\);/u);
+  /* It follows the tab alone. Read off the whole address, a sheet opening (`?new=`) would blank a count still true. */
+  const clear = /\$effect\.pre\(\(\) => \{[\s\S]*?\}\);/u.exec(layout)?.[0] ?? '';
+  assert.doesNotMatch(clear, /page\./u);
 });

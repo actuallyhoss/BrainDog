@@ -10,7 +10,7 @@
  * queue's `where: about is <what>` keeps. So a project page gates its 'Waiting on you' with
  * `when: { metric: 'questions-open:{{spoken}}', gt: 0 }` (or `{{name}}`, whichever its queue's `about is` names), and the
  * queue is not drawn as 'Nothing matched' while other projects have questions waiting. The parameter reaches the count
- * the way it reaches every figure (`fill` in `pages.ts`): the figure holds `about: '{{it}}'`, and the reader fills the
+ * the way it reaches every figure (`fill` in `fill.ts`): the figure holds `about: '{{it}}'`, and the reader fills the
  * hole. Read with no parameter the hole is still there, and the count is the whole record's.
  *
  * A DECLARED FIGURE OF THE SAME ID WINS. The record asks its declarations first and these second, so a pack that
@@ -75,7 +75,7 @@ import { isUnknownMark } from './marks.ts';
 /** The source a built-in figure over the open questions reads, the same word a `queue` block's source is. */
 export const GOVERNANCE_OPEN = 'governance.open';
 
-/** The hole a parameter fills, as `fill` in `pages.ts` reads it. Still there, the figure was read with no parameter. */
+/** The hole a parameter fills, as `fill` in `fill.ts` reads it. Still there, the figure was read with no parameter. */
 const PARAM = '{{it}}';
 
 /**

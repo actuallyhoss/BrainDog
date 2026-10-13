@@ -1,7 +1,8 @@
 /** Money's figures of one book's month, and of what is filed in no book (REC-A09 step 2). */
 
 import { LOOKUPS, OPEN, type SeedMetric } from '../../base.ts';
-import { MONEY } from './shared.ts';
+import { BOOK_LEGS } from '../pages/shared.ts';
+import { MONEY, RUNS_OUT_NEVER } from './shared.ts';
 
 /**
  * A BOOK'S MONTH IS ITS CLEARED LEDGER ENTRIES SINCE THE FIRST, AND NO TRANSFER, the clauses `book-spent-month` counts
@@ -11,6 +12,13 @@ import { MONEY } from './shared.ts';
 const BOOK_MONTH = 'state is cleared, transfer is false, on at least bom';
 /** The same entries over the thirteen months a book's chart reads, a month to a point. */
 const BOOK_MONTHS = 'state is cleared, transfer is false, on after -13m';
+/**
+ * ONE BOOK'S WALK AS A FIGURE READS IT: the legs a book's page walks (`BOOK_LEGS` in `pages/shared.ts`), each held to
+ * the book the figure is asked about. A page fills `{{name}}` from the book it draws and a figure fills `{{it}}` from
+ * what it is asked, so the hole is renamed and nothing else is written again: the figure and the Cash ahead beside it
+ * walk the same legs and cross on the same day.
+ */
+const BOOK_WALK = BOOK_LEGS.map((leg) => ({ ...leg, where: String(leg.where).replace('{{name}}', '{{it}}') }));
 
 export const BOOK_FIGURES: Record<string, SeedMetric> = {
   /**
@@ -207,6 +215,36 @@ export const BOOK_FIGURES: Record<string, SeedMetric> = {
     bucket: 'month',
     format: MONEY,
     target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  /**
+   * THE DAY ONE BOOK'S MONEY RUNS OUT, read once per book as `book-cash` is: `book-lasts-until:Personal` fills `{{it}}`
+   * with the book's name, in its legs and in the figure it opens from. It is `runs-out-on` (`runway.ts`) for one book:
+   * the walk from that book's cash over that book's bills, repeating lines, instalments and money on its way, a year
+   * ahead, said as a day. The cell Money lasts until on a book's page reads it (`pages/book.ts`).
+   *
+   * IT WAITED ON THE READER. A walk named its opening by a bare id and read that figure as it is stored, so a walk
+   * filled for one book opened from `book-cash` asked about a book called `{{it}}`. The opening now carries the hole
+   * and is filled before it is looked up.
+   *
+   * NO EVERYDAY SPENDING, as the book's own Cash ahead has none (`EVERYDAY` in `legs.ts`), so the cell and the chart
+   * above it name the same day. A BOOK WHOSE MONEY LASTS THE YEAR HAS NO VALUE, and its cell is left off the page.
+   * ANY DAY IT NAMES IS A MISS, held to the day no walk of a year reaches, as `runs-out-on` is.
+   *
+   * MONEY'S BY NAME, because a figure over the walk reads no one list. LAST, so every figure above keeps its place.
+   */
+  'book-lasts-until': {
+    metric: 'book-lasts-until',
+    name: "The day one book's money runs out",
+    pack: 'money-core',
+    source: 'forecast.runway',
+    legs: BOOK_WALK,
+    opening: { metric: 'book-cash:{{it}}' },
+    value: { walk: 'zero_on', within: '365d' },
+    format: 'day',
+    target: { gte: RUNS_OUT_NEVER },
     window: '30d',
     compare: 'none',
   },

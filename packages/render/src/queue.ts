@@ -54,9 +54,13 @@
  * rather than trusting the kernel did: a cell that is not six hex digits could close the custom property it is written
  * into and write a style of its own. It is drawn only inside that option's visual, never as a colour the page, the card
  * or the tile is drawn in.
+ *
+ * A FIGURE IS WORDS SOMEBODY ELSE WROTE, as the label is, and an agent writes `3 of tasks#8` into one as readily as
+ * a price. It is read through `spoken`, and drawn only when `spoken` takes nothing out of it (audit 72 #3).
  */
 
 import { safeHref } from './inline.ts';
+import { spoken } from './spoken.ts';
 
 /**
  * A `does` ROW IS ONE LINE OF WHAT ACCEPTING THE QUESTION ABOVE IT CHANGES ("Adds 12 tasks to Work"), written by the
@@ -135,13 +139,24 @@ const SWATCH_MOST = 8;
 const FILE = /^([a-z][a-z0-9_]*#[1-9][0-9]*)\/([a-z][a-z0-9_]*)$/u;
 
 /**
- * An option's visual from its cell, or null for a cell that says none or says it wrongly.
+ * An option's visual from its cell, or null for a cell that says none, says it wrongly, or says what no person reads.
  *
- * NULL FOR BOTH, and the parser tells them apart (`queueFault`): a blank cell is an option with nothing to show, and a
- * cell this cannot read is a fault in the fence. A host that built the block by hand gets the visual left out, never a
- * value written into a style it did not pass.
+ * NULL FOR ALL THREE, and the parser tells the first two apart (`queueFault`): a blank cell is an option with nothing
+ * to show, and a cell this cannot read is a fault in the fence. A host that built the block by hand gets the visual
+ * left out, never a value written into a style it did not pass.
+ *
+ * A FIGURE `spoken` WOULD CHANGE IS LEFT OUT, NOT MENDED: "3" is not what "3 of tasks#8" said, and a figure with a
+ * part gone is a number nobody wrote. The option reads by its name. It is no fault either (`speltOf` is what the
+ * fence is held to), because the spelling is right and a queue that degraded over one agent's id would take every
+ * other question on the page down with it.
  */
 export function showsOf(value: string): QueueShows | null {
+  const read = speltOf(value);
+  return read !== null && 'figure' in read && spoken(read.figure) !== read.figure ? null : read;
+}
+
+/** A cell read by its spelling alone: one of the three, well formed, whatever its figure says. */
+function speltOf(value: string): QueueShows | null {
   const v = value.trim();
   const at = v.indexOf(':');
   if (at < 0) return null;
@@ -224,7 +239,7 @@ export function queueFault(rows: readonly (readonly string[])[]): string | null 
       /* A VISUAL THIS CANNOT READ IS A FAULT, AND NO VISUAL IS NOT, the rule the band above keeps: `swatch:red` left
          out in silence is an option drawn without the one thing that said what it was. */
       const shows = (cells[6] ?? '').trim();
-      if (shows !== '' && showsOf(shows) === null) return `a visual this build does not draw: "${shows}"`;
+      if (shows !== '' && speltOf(shows) === null) return `a visual this build does not draw: "${shows}"`;
       options += 1;
     }
   }

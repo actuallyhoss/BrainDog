@@ -139,14 +139,17 @@ test('AND EVERY SEED IS A ROW THE REGISTER WOULD HAVE ACCEPTED ANYWAY', async ()
   const diff = await plan(pack, stateOf(k));
   value(await install(pack, diff, hostFor(k), diff.planHash));
 
+  /* ONE ROW A LIST, and categories as their starter set (ruling 341), so the seeds are counted by list. */
+  const rows = new Map<string, number>();
+  for (const seed of pack.seeds) rows.set(seed.register, (rows.get(seed.register) ?? 0) + 1);
   let seeded = 0;
-  for (const seed of pack.seeds) {
-    assert.equal(k.count(seed.register), 1, `${seed.register} has no example row`);
-    const row = k.get(`${seed.register}#1`)!;
-    assert.deepEqual(row.fields.tags, ['example'], `${seed.register}'s example is not marked as one`);
-    seeded++;
+  for (const [register, n] of rows) {
+    assert.equal(k.count(register), n, `${register} does not hold its example rows`);
+    for (let i = 1; i <= n; i++) assert.deepEqual(k.get(`${register}#${i}`)!.fields.tags, ['example'], `${register}'s example is not marked as one`);
+    seeded += n;
   }
   assert.ok(seeded > 0);
+  assert.ok((rows.get('categories') ?? 0) >= 6, 'categories arrive as a starter set');
   sql.close();
 });
 

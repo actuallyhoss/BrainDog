@@ -657,6 +657,19 @@ const withoutBatch75 = (doc: Body): Body => ({
         : d,
   ),
 });
+/**
+ * AND BATCH 76'S, folded into the same unreleased step and undone first: the day one book's money runs out,
+ * `book-lasts-until`, goes, and with it the cell Money lasts until on a book's What is due (book-lasts-until-76, REC-A09
+ * step 2); it is left out as `runs-out-on` is above. The starter categories batch 76 gave Money (ruling 341) are seeds,
+ * which no fingerprint reads.
+ */
+const withoutBatch76 = (doc: Body): Body =>
+  withPage(
+    doc,
+    'money-book',
+    (now) => now.map((b) => (Array.isArray(b.cells) ? { ...b, cells: (b.cells as Body[]).filter((c) => c.metric !== 'book-lasts-until:{{name}}') } : b)),
+    (d) => d.metric !== 'book-lasts-until',
+  );
 /** Batch 63's four figures of this month's spending against last (spend-figures-63), new in the unreleased money-core 3.17.0. */
 const SPEND_VS_LAST: ReadonlySet<string> = new Set(['spent-last-month', 'spent-by-category-last-month', 'spent-by-category-to-date-last-month', 'spent-vs-last-month']);
 const LATEST: Record<string, { version: string; released: string; undo: (doc: Body) => Body }> = {
@@ -665,7 +678,7 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
     version: '3.13.0',
     released: '2e09983b40aba73e',
     undo: (raw) => {
-      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(withoutPlanLeads(withoutBatch73(withoutBatch74(withoutBatch75(raw)))))))))))))));
+      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(withoutPlanLeads(withoutBatch73(withoutBatch74(withoutBatch75(withoutBatch76(raw))))))))))))))));
       return {
       ...doc,
       /* AND THE SCRIPT THAT MARKS A BILL PAID, WITH THE RULE THAT STARTS IT (settle-rule-60), both newer than 3.13.0. */

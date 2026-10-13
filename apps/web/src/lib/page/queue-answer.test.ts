@@ -179,6 +179,39 @@ test('A FIGURE THAT IS AN ID OR AN ADDRESS IS NOT DRAWN, and a plain one still i
   }
 });
 
+test('ONLY A PLAIN FIGURE IS DRAWN: a run, a time a machine wrote and a key read by the name (audit 74 #3)', () => {
+  for (const file of [undefined, serves]) {
+    /* THE SIX THE AUDIT RAN, each of which `spoken` leaves as it was: an id with a letter no ULID holds, a run's name,
+       a machine's time, two keys and a word that says no number. */
+    for (const figure of ['01K5BOX0000000000000000003', 'S731', '2026-10-06T19:07:01.610Z', 'g_abc123def', 'sk-live-abc123', 'cake'])
+      assert.equal(visualOf({ figure }, file), null, figure);
+    /* AND THEIR KIN: a wave's name, a clock's count, a time without its seconds, and an id beside a real number. */
+    for (const figure of ['W076', 'abc123', '1759777621610', '2026-10-06T19:07', '20261006T190701Z', '3 of S731', '3 sk_live_x', 'EGP 1,200 (S731)'])
+      assert.equal(visualOf({ figure }, file), null, figure);
+    /* WHAT A PERSON WRITES FOR A NUMBER STAYS, with its sign, its currency, its unit and the words beside it. */
+    for (const figure of [
+      '$1,200',
+      '1,200 EGP',
+      '-5%',
+      '~40',
+      '4.5GB',
+      '10km/h',
+      '3rd',
+      '1.2M',
+      '19:07',
+      '12 (of 20)',
+      '\u20AC40 / month',
+      '12% year-on-year',
+      '3 \u00D7 4',
+      'No. 3',
+      'Q3 2026',
+      'v2',
+      '\u0663 \u0645\u0646 \u0665',
+    ])
+      assert.deepEqual(visualOf({ figure }, file), { figure }, figure);
+  }
+});
+
 test('AN OPTION WHOSE FIGURE IS AN ID READS BY ITS NAME, with no visual beside it', () => {
   const ways = waysOf({
     options: [

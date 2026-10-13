@@ -13,7 +13,7 @@ import { firstPartyModules } from '@braindog/seed/packs/modules';
 import { USE_CASES } from '@braindog/seed/usecases';
 
 import { compareVersion } from '../../lib/market/listing.ts';
-import { changeLine, declarationName, firstPartyUpdates, ledBy, readFirst } from './improved.ts';
+import { changeLine, declarationName, firstPartyUpdates, inTurn, ledBy, ordered, readFirst, readInOrder, type Improved } from './improved.ts';
 import { words } from './words.ts';
 
 const shipped = (id: string): string => {
@@ -122,4 +122,96 @@ test('Decide and Add-ons read what waits from one place', () => {
   const decide = source('./+page.svelte');
   assert.match(decide, /import\('\.\/improved\.ts'\)/u, 'Decide does not read what waits');
   assert.match(decide, /import\('\.\/Improved\.svelte'\)/u, 'Decide does not draw the card');
+});
+
+/* ── one update waits on another (`lib/market/update-order.ts`) ───────────── */
+
+/** Money and Personal as they wait when both are behind: Money's plan is refused at the figure Personal still holds. */
+const waiting = (key: string, kind: 'module' | 'usecase', id: string, title: string, file: unknown = null): Improved => ({ key, kind, id, title, from: '1.0.0', to: '2.0.0', file: { doc: null, text: file === null ? null : JSON.stringify(file) }, notes: [] });
+const moneyU = waiting('module:money-core', 'module', 'money-core', 'Money');
+const personalU = waiting('usecase:personal', 'usecase', 'personal', 'Personal', { usecase: 'personal', pack: { pack: 'usecase-personal', hands: { 'metric.budgets-set': 'money-core' } } });
+const workU = waiting('module:work', 'module', 'work', 'Work');
+const moneyDiff = (more: Record<string, unknown> = {}) => diff({ pack: { id: 'money-core', version: '3.17.0', summary: '' }, installed_version: '3.16.0', conflicts: [{ id: 'metric.budgets-set', pack: 'usecase-personal' }], ...more });
+const personalDiff = diff({ pack: { id: 'usecase-personal', version: '2.4.0', summary: '' }, installed_version: '2.3.0' });
+
+test('the update that hands something on goes in before the one that takes it', () => {
+  assert.deepEqual(ordered([moneyU, personalU]).map((u) => u.title), ['Personal', 'Money']);
+  assert.deepEqual(ordered([workU, moneyU, personalU]).map((u) => u.title), ['Work', 'Personal', 'Money']);
+  /* WITH NOBODY TO WAIT FOR, the order is the one they came in. */
+  assert.deepEqual(ordered([moneyU, workU]).map((u) => u.title), ['Money', 'Work']);
+});
+
+test('this build’s own Money and Personal wait in that order when both are behind', () => {
+  const both = firstPartyUpdates([held('money-core', '1.0.0'), held('usecase-personal', '0.0.1')]);
+  const titles = both.map((u) => u.key);
+  assert.deepEqual([...titles].sort(), ['module:money-core', 'usecase:personal'], 'Money and Personal do not both wait, so this test reads nothing');
+  assert.deepEqual(ordered(both).map((u) => u.key), ['usecase:personal', 'module:money-core']);
+});
+
+test('a conflict the update before it clears is no stop, and the two go in on one press', () => {
+  const run = [personalU, moneyU];
+  const out = readInOrder(run, [personalDiff, moneyDiff()], [], named);
+  assert.equal(out.read, false, 'Money waiting on Personal is read as a stop');
+  assert.deepEqual(out.sheet?.stops, []);
+  /* TAKEN ALONE, the same plan is a stop, as the record would refuse it. */
+  assert.equal(readFirst([moneyDiff()], [], named).read, true);
+  assert.equal(readInOrder([moneyU], [moneyDiff()], [], named).sheet?.stops.length, 1);
+});
+
+test('what else such a plan carries is still read first, and the sheet says what it goes in after', () => {
+  const run = [personalU, moneyU];
+  const takes = readInOrder(run, [personalDiff, moneyDiff({ retires: [{ id: 'register.old_budgets', rows: 3 }] })], [], named);
+  assert.equal(takes.read, true);
+  assert.deepEqual(takes.sheet?.stops, []);
+  const worth = takes.sheet?.parts[1]?.sections.find((s) => s.key === 'worth');
+  assert.ok(worth?.rows.some((r) => /goes in after/u.test(r.detail ?? '')), 'the sheet does not say Money goes in after Personal');
+  /* A CONFLICT NO UPDATE HERE CLEARS STOPS IT, in the same run or not. */
+  const own = readInOrder(run, [personalDiff, moneyDiff({ conflicts: [{ id: 'metric.budgets-set', pack: '(this record)' }] })], [], named);
+  assert.equal(own.read, true);
+  assert.equal(own.sheet?.stops.length, 1);
+});
+
+/** A run of the card's installs over plans that are only names, with what happened written down. */
+async function run(order: readonly Improved[], more: { landed?: string[]; refuse?: string; asks?: Record<string, string[]> } = {}) {
+  const log: string[] = [];
+  const plans = order.map((u) => ({ u, p: `${u.title}@0` }));
+  const out = await inTurn(plans, {
+    replan: async (u) => (log.push(`plan ${u.title}`), { ok: true as const, planned: `${u.title}@1` }),
+    asksOf: (p) => more.asks?.[p] ?? [],
+    landed: (p) => (more.landed ?? []).includes(p),
+    install: async (p) => (log.push(`install ${p}`), p === more.refuse ? { ok: false as const, fix: 'Refused.' } : { ok: true as const }),
+    unread: words.improvedRead,
+  });
+  return { log, out };
+}
+
+test('Accept installs Personal first, and plans Money again once Personal has landed', async () => {
+  const { log, out } = await run(ordered([moneyU, personalU]));
+  assert.deepEqual(log, ['install Personal@0', 'plan Money', 'install Money@1']);
+  assert.deepEqual(out, { done: 2, passed: 0, fix: '' });
+});
+
+test('an update the one before it already brought in is passed over, and a refusal stops the run where it is', async () => {
+  const passed = await run([personalU, moneyU, workU], { landed: ['Money@1'] });
+  assert.deepEqual(passed.log, ['install Personal@0', 'plan Money', 'plan Work', 'install Work@1']);
+  assert.deepEqual(passed.out, { done: 2, passed: 1, fix: '' });
+  const refused = await run([personalU, moneyU, workU], { refuse: 'Money@1' });
+  assert.deepEqual(refused.log, ['install Personal@0', 'plan Money', 'install Money@1']);
+  assert.deepEqual(refused.out, { done: 1, passed: 0, fix: 'Refused.' });
+  /* A LINE NOBODY WAS SHOWN stops it too, before anything of that update goes in. */
+  const unread = await run([personalU, moneyU], { asks: { 'Money@1': ['GET api.example.com/rates'] } });
+  assert.deepEqual(unread.log, ['install Personal@0', 'plan Money']);
+  assert.deepEqual(unread.out, { done: 1, passed: 0, fix: words.improvedRead });
+});
+
+test('the card orders what waits before it plans, and installs in turn', () => {
+  const card = source('./Improved.svelte');
+  const from = card.indexOf('async function accept(');
+  const to = card.indexOf('async function installAll(');
+  assert.ok(from >= 0 && to > from, 'the card no longer reads the way this test assumes');
+  const accept = card.slice(from, to);
+  assert.match(accept, /const run = ordered\(updates\);/u, 'Accept plans in the order the updates came in');
+  assert.match(accept, /for \(const u of run\)/u);
+  assert.match(accept, /readInOrder\(run, /u, 'Accept reads a conflict the run clears as a stop');
+  assert.match(card.slice(to), /inTurn\(plans, /u, 'the card keeps its own loop of installs');
 });

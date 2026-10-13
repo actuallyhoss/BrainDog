@@ -51,6 +51,7 @@ import {
   cashPoints,
   targetConfigOf,
 } from './modules/money.ts';
+import { STARTER_CATEGORIES } from './modules/money/lists/categories.ts';
 export { MONEY_HOME_SETTING, MONEY_TARGET_SETTINGS, targetConfigOf } from './modules/money.ts';
 import { ESTATE_METRICS, ESTATE_PAGES, ESTATE_REGISTERS, SERVICES } from './modules/estate.ts';
 import { ESTATE_AUTOMATIONS, estateTargetConfig } from './modules/estate.ts';
@@ -296,9 +297,10 @@ export function forWrite(register: string, fields: Fields): Record<string, unkno
  * a metric with a product and a page with a template is a format nobody finds out about until
  * somebody else writes one — so the differential test is against this, not against a toy.
  *
- * ITS SEEDS ARE ONE ROW EACH, and the demo dataset is not in it. A pack's `seeds:` are examples —
- * one per register, tagged so they can be told from real rows and deleted. Forty cross-linked rows
- * are a demonstration, which is `installSeed`'s job and a different thing.
+ * ITS SEEDS ARE ONE ROW A LIST, and the demo dataset is not in it. A pack's `seeds:` are examples,
+ * tagged so they can be told from real rows and deleted. CATEGORIES ALONE ARRIVE AS A STARTER SET
+ * (`STARTER_CATEGORIES`, ruling 341), eight of them, in and out. Forty cross-linked rows are a
+ * demonstration, which is `installSeed`'s job and a different thing.
  */
 export function packDocument(): Record<string, unknown> {
   return {
@@ -337,10 +339,11 @@ export function packDocument(): Record<string, unknown> {
        so it arrives empty and the demonstration is what fills it. */
     /* ONLY WHAT THE PACK DECLARES. Agent runs are the kernel's register, and a run's `last_seen` and
        `project` are fields no seed row may set, so an example run would stop the install halfway. */
-    seeds: ORDER.filter((register) => register in REGISTERS && (ROWS[register] ?? []).length > 0 && !needsARef(register)).map((register) => ({
-      register,
-      fields: forWrite(register, exampleRow(register)),
-    })),
+    /* CATEGORIES ARE THE STARTER SET (ruling 341), and no row of the sample studio's: a new record's first payment has
+       somewhere to go, money in and money out. */
+    seeds: ORDER.filter((register) => register in REGISTERS && (ROWS[register] ?? []).length > 0 && !needsARef(register)).flatMap((register) =>
+      (register === 'categories' ? STARTER_CATEGORIES : [exampleRow(register)]).map((fields) => ({ register, fields: forWrite(register, fields as Fields) })),
+    ),
   };
 }
 

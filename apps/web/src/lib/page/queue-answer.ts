@@ -136,10 +136,40 @@ export function visualOf(shows: unknown, file?: FileAt): Visual | null {
   return src === null ? null : { file: { ...read.file, src } };
 }
 
-/** A figure as the renderer spells one (`figure:3 of 5`), or nothing for one that holds an address, an id or a citation. */
+/* A NUMBER AS A PERSON WRITES ONE: a sign or a currency's mark, digits with their own stops ("1,200.50", "12/10/2026",
+   "19:07"), and at most a short unit after them ("4.5GB", "50%", "3rd", "10km/h"). Letters with digits after them is
+   how an id is spelled, so a time with its `T` ("2026-10-06T19:07:01.610Z") and a ULID stop here. */
+const NUMBER = /^[+\-\u2212\u00B1~\u2248<>\u2264\u2265]*\p{Sc}?\p{Nd}[\p{Nd}.,:/\u2013-]*[\p{L}\p{Sc}%\u2030\u00B0\u00D7]{0,4}(?:\/\p{L}{1,4})?$/u;
+/* A SHORT NAME WITH ITS NUMBER, as a quarter, a paper size or a version is said ("Q3", "A4", "v2", "FY26"): one or two
+   letters and one or two digits. A run's own name has more ("S731", "W076"). */
+const NAMED = /^\p{L}{1,2}\p{Nd}{1,2}$/u;
+/* A WORD BESIDE A NUMBER ("of", "EGP", "km/h", "year-on-year") or a mark between two ("/", "\u00D7"): letters only, so no
+   underscore and no digit, which is how a key or a handle is spelled. */
+const WORD = /^(?:\p{L}[\p{L}\p{M}]*(?:['\u2019./-]\p{L}[\p{L}\p{M}]*)*\.?|[+\u2212\u00B1\u00D7\u00F7=/\u00B7\u2013-]|\p{Sc})$/u;
+/* TWELVE DIGITS IN A ROW IS A CLOCK'S COUNT OR AN ID ("1759777621610"), not an amount anybody wrote. */
+const COUNTED = /\p{Nd}{12}/u;
+
+/**
+ * WHETHER WORDS ARE A PLAIN FIGURE (audit 74 #3, DIRECTION 40: no raw id or raw timestamp on his pages). `spoken` takes
+ * out the ids it knows by their spelling, and a run's name, a ULID with a letter no ULID holds, a machine's time and a
+ * key pass it untouched. So a figure is held to what a figure IS and not to what an id is not: it says a number, and
+ * every word of it is a number, a short name with its number, or a word that stands beside one.
+ */
+function plain(said: string): boolean {
+  if (!/\p{Nd}/u.test(said) || COUNTED.test(said)) return false;
+  return said.split(/\s+/u).every((word) => {
+    const bare = word.replace(/^[(\["'\u201C\u2018]+/u, '').replace(/[)\]"'\u201D\u2019,;!?]+$/u, '');
+    return bare === '' ? false : NUMBER.test(bare) || NAMED.test(bare) || WORD.test(bare);
+  });
+}
+
+/**
+ * A figure as the renderer spells one (`figure:3 of 5`), or nothing for one that holds an address, an id or a citation,
+ * or that is no plain figure (`plain`): such an option reads by its name.
+ */
 function figureCell(figure: string): string {
   const said = figure.trim();
-  return said !== '' && !/\{\{|\}\}/u.test(said) && spoken(said) === said ? `figure:${said}` : '';
+  return said !== '' && !/\{\{|\}\}/u.test(said) && spoken(said) === said && plain(said) ? `figure:${said}` : '';
 }
 
 /** A file as the renderer spells one (`file:parts#2/photo`), or nothing for a value that names no row and field. */

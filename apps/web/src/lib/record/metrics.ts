@@ -30,7 +30,7 @@ import type { Entry } from './schema.ts';
 
 /* ── the document ────────────────────────────────────────────────────────── */
 
-/** The nine this build reads. `median`, `last`, `running` and `trend` are §2.3 and series-only. */
+/** The ten this build reads. `median`, `last`, `running` and `trend` are §2.3 and series-only. */
 export type Aggregation =
   | { sum: Operand }
   | { count: string }
@@ -42,7 +42,10 @@ export type Aggregation =
      in and the rows that leave a field empty. Each is a count or a number of days, never money. */
   | { age: string }
   | { currencies: string }
-  | { empty: string };
+  | { empty: string }
+  /* AND ITS FOURTH (signs-metric-75-76): how many rows hold a day that is gone, `by` whole days or more, counted inside
+     a `where` that does not say the day. `past` is written first, as the record reads the first key's field. */
+  | { past: string; by?: string | undefined };
 
 /**
  * A field, or a row-level product of a field and a named lookup.
@@ -296,8 +299,8 @@ const registerOf = (source: string): string | null =>
  * under a code the declaration chose rather than the rows did.
  */
 function currenciesOf(rows: Entry[], agg: Aggregation): Set<string> {
-  /* AN AGE, A COUNT OF CURRENCIES AND A COUNT OF EMPTY ROWS ADD NO MONEY, so no two currencies meet in them. */
-  if ('age' in agg || 'currencies' in agg || 'empty' in agg) return new Set();
+  /* AN AGE, A COUNT OF CURRENCIES, OF EMPTY ROWS AND OF DAYS GONE ADD NO MONEY, so no two currencies meet in them. */
+  if ('age' in agg || 'currencies' in agg || 'empty' in agg || 'past' in agg) return new Set();
   const field =
     'count' in agg ? agg.count : 'distinct' in agg ? agg.distinct : 'sum' in agg ? agg.sum : 'avg' in agg ? agg.avg : 'min' in agg ? agg.min : agg.max;
   const id = typeof field === 'string' ? field : field.product[0];
@@ -444,10 +447,16 @@ export function hrefFor(decl: MetricDecl): string | null {
  */
 /* A WHERE MAY BE A PREDICATE TREE and not a sentence (one sentence cannot mix a comma with an `or`), and a tree is
    never a template, so only a sentence is searched. */
-export const isTemplate = (decl: MetricDecl): boolean => typeof decl.where === 'string' && decl.where.includes('{{');
+/* A WALK'S HOLE IS IN ITS LEGS AND IN THE FIGURE IT OPENS FROM (book-walk-opening-76): `book-lasts-until` has no `where`
+   and opens from `book-cash:{{it}}`. Read by `where` alone it was a figure with nothing to fill, offered in the palette
+   and read bare, where the record refuses it and asks for it by name. */
+export const isTemplate = (decl: MetricDecl): boolean => {
+  const walk = decl as { legs?: unknown; opening?: unknown };
+  return (typeof decl.where === 'string' && decl.where.includes('{{')) || JSON.stringify([walk.legs ?? null, walk.opening ?? null]).includes('{{');
+};
 
-/** The nine aggregations this build reads. `08` §2.2 publishes eleven; the rest are post-v1. */
-const READS_AGGREGATION = ['sum', 'count', 'avg', 'min', 'max', 'distinct', 'age', 'currencies', 'empty'];
+/** The ten aggregations this build reads. `08` §2.2 publishes eleven; the rest are post-v1. */
+const READS_AGGREGATION = ['sum', 'count', 'avg', 'min', 'max', 'distinct', 'age', 'currencies', 'empty', 'past'];
 
 /**
  * Every key a metric document may carry here, so one it may not is named rather than ignored.
@@ -679,6 +688,8 @@ function halfOf(agg: Aggregation, rows: readonly Entry[]): HalfRead {
   const amounts = new Map<string, number>();
   const none = (refusal: string): HalfRead => ({ value: null, rows: rows.length, amounts, refusal });
   if ('age' in agg) return none('value: the age of the newest day is read by the record, and not inside a difference here');
+  /* THE RECORD'S DAY IS NOT THIS TAB'S: a day is gone by the record's own today, so the count is the record's to make. */
+  if ('past' in agg) return none('value: the days that are gone are counted by the record, and not inside a difference here');
   const op = 'count' in agg ? agg.count : 'distinct' in agg ? agg.distinct : 'sum' in agg ? agg.sum : 'avg' in agg ? agg.avg : 'min' in agg ? agg.min : 'max' in agg ? agg.max : 'currencies' in agg ? agg.currencies : agg.empty;
   if (typeof op !== 'string') return none('value: a figure multiplied by a factor is read by the record, and not inside a difference here');
   const said = rows.map((e) => (op === 'id' ? e.seq : e.fields[op])).filter((v) => v !== null && v !== undefined && v !== '');

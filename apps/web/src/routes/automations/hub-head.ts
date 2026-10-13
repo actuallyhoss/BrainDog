@@ -7,6 +7,9 @@
  *
  * KEPT BY KIND, NOT AS "THE COUNT": the layout picks by the tab the address names, so a figure one page left behind is
  * never shown over the other.
+ *
+ * AND CLEARED WHEN THE TAB CHANGES (`clearHead`), so a figure a tab left behind is not shown over that same tab on
+ * the way back, before it has read again.
  */
 
 import { getContext, setContext } from 'svelte';
@@ -25,6 +28,19 @@ const KEY = Symbol('hub-head');
 
 /** A head with nothing read yet. */
 export const emptyHead = (): HubHead => ({ automations: undefined, said: null, runs: undefined });
+
+/**
+ * Nothing read yet, on the head the pages already hold. THE HEAD OUTLIVES THE PAGE UNDER IT, so a figure read on one
+ * visit to a tab was still there on the next and was shown as today's while the page read again: four automations
+ * over a list of three. The layout calls this when the tab changes. The object is cleared, never swapped, because
+ * each page took its handle once and a new object would never hear it.
+ */
+export function clearHead(head: HubHead): HubHead {
+  head.automations = undefined;
+  head.said = null;
+  head.runs = undefined;
+  return head;
+}
 
 /** The layout shares its head (a `$state` object, so a page's write redraws it). */
 export const shareHead = (head: HubHead): HubHead => setContext(KEY, head);

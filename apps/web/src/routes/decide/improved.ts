@@ -15,6 +15,10 @@
  * something away, move something on, or change what the owner's own rows mean is not taken on one press: it opens on
  * the plan sheet, read whole, which is where Add-ons approves the same thing (`readFirst`).
  *
+ * ONE THAT WAITS ON ANOTHER GOES IN AFTER IT (`ordered`, `readInOrder`, `inTurn`). Money's update is refused at a figure
+ * Personal holds until Personal's own update hands it over, so the two taken as they came stopped the card for good.
+ * The order is the one "Update all" on Add-ons takes, read from the same place (`lib/market/update-order.ts`).
+ *
  * PURE, with relative imports and the seed's own, so `improved.test.ts` loads it in Node.
  */
 
@@ -24,6 +28,7 @@ import { builtInFile } from '@braindog/seed/usecases/share';
 
 import { actionOf, compareVersion, listingsOf } from '../../lib/market/listing.ts';
 import { sheetOf, type Sheet } from '../../lib/market/plan.ts';
+import { inOrder, marked } from '../../lib/market/update-order.ts';
 import { METRICS } from '../../lib/record/declared.ts';
 import { PAGES, REGISTERS } from '../../lib/record/held.ts';
 import type { PackState } from '../../lib/record/packs.ts';
@@ -99,6 +104,69 @@ export function readFirst(diffs: readonly unknown[], asks: readonly string[], na
   const calls = sheet.parts.some((p) => p.calls.some((c) => c.change !== 'same'));
   const keeps = sheet.parts.some((p) => p.sections.some((s) => READ_FIRST.has(s.key)));
   return { read: sheet.stops.length > 0 || asks.length > 0 || calls || keeps, sheet };
+}
+
+/** What waits, in the order it goes in: an update that hands something on before the one that takes it. */
+export const ordered = (updates: readonly Improved[]): Improved[] => inOrder(updates);
+
+const isMap = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/** A plan without the conflicts an earlier update of the run clears, which are an order and nothing to read. */
+function cleared(diff: unknown): unknown {
+  if (!isMap(diff) || !Array.isArray(diff.conflicts)) return diff;
+  return { ...diff, conflicts: diff.conflicts.filter((c) => !(isMap(c) && c.waits === 'after')) };
+}
+
+/**
+ * `readFirst` FOR A RUN IN ITS ORDER (`ordered`), each plan beside the update it is for. A conflict the update before it
+ * clears is not a stop, because that update has landed by the time this one is planned again, and it is not a reason to
+ * read either: nothing is lost or moved, one goes in after the other. Everything else a plan carries is judged as
+ * before. `shown` is what the sheet draws, where such a plan says what it goes in after.
+ */
+export function readInOrder(run: readonly Improved[], diffs: readonly unknown[], asks: readonly string[], nameOf: (id: string) => string): { read: boolean; sheet: Sheet | null; shown: unknown[] } {
+  const shown = diffs.map((d) => marked(d, run, run));
+  return { read: readFirst(shown.map(cleared), asks, nameOf).read, sheet: readFirst(shown, asks, nameOf).sheet, shown };
+}
+
+/** A plan for a version the record already holds: an earlier update of the same run brought it in. */
+export function landed(diff: unknown): boolean {
+  if (!isMap(diff) || !isMap(diff.pack)) return false;
+  return typeof diff.installed_version === 'string' && diff.installed_version === diff.pack.version;
+}
+
+/**
+ * EACH PLAN IN TURN, PLANNED AGAIN JUST BEFORE IT GOES IN, because the record's version is in every plan's hash and the
+ * one before it moved it, and because a plan that waited on the one before it only reads clean once that has landed. A
+ * plan that now asks to approve a line nobody was shown stops there, as "Update all" does, and one the update before
+ * it already brought in is passed over. The card hands in the record's own plan and install; a test hands in names.
+ */
+export async function inTurn<U, P>(
+  plans: readonly { u: U; p: P }[],
+  by: {
+    replan: (u: U) => Promise<{ ok: true; planned: P } | { ok: false; fix: string }>;
+    asksOf: (p: P) => readonly string[];
+    landed: (p: P) => boolean;
+    install: (p: P) => Promise<{ ok: true } | { ok: false; fix: string }>;
+    /** What is said when a plan asks for a line the press did not show. */
+    unread: string;
+  },
+): Promise<{ done: number; passed: number; fix: string }> {
+  const shown = new Set(plans.flatMap(({ p }) => by.asksOf(p)));
+  let done = 0;
+  let passed = 0;
+  for (const [i, { u, p }] of plans.entries()) {
+    const fresh = i === 0 ? { ok: true as const, planned: p } : await by.replan(u);
+    if (!fresh.ok) return { done, passed, fix: fresh.fix };
+    if (i > 0 && by.landed(fresh.planned)) {
+      passed += 1;
+      continue;
+    }
+    if (by.asksOf(fresh.planned).some((line) => !shown.has(line))) return { done, passed, fix: by.unread };
+    const out = await by.install(fresh.planned);
+    if (!out.ok) return { done, passed, fix: out.fix };
+    done += 1;
+  }
+  return { done, passed, fix: '' };
 }
 
 /** The one line a card says for an update: its newest note, or that a newer version is there when it carries none. */

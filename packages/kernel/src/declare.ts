@@ -62,7 +62,7 @@ import { panelFault, roadmapFault, shortFault } from './kinds/words.ts';
 import type { FlowDecl } from './rules.ts';
 import { alsoFault, linkFault } from './rule-link.ts';
 /* THE FORMAT, THE WINDOW AND THE TWO FIGURES THAT ARE NOT A SUM, checked here by the same functions that read them. */
-import { clockOf, isMoneyFormat, TREND_AHEAD_MOST, windowMs, type EvalContext } from './metrics.ts';
+import { clockOf, isMoneyFormat, kindOf, pastFault, TREND_AHEAD_MOST, windowMs, type EvalContext } from './metrics.ts';
 import { WALKS, WALK_SOURCE, crosscheckFault, isCrosscheck, isRolled, rolledFault, walksToZero, type Rolled } from './money-figures.ts';
 import { INDEX_CEILING } from './observe.ts';
 import { SOURCE_MODULES, sourceModule } from './sources/index.ts';
@@ -523,6 +523,11 @@ function metricBody(decl: Declaration, installed?: Known): Refusal | null {
         return bad('RATIO_MIXED_SOURCE', `${id}: both operands must share one source and one predicate.`, 'value');
     }
 
+  /* HOW LONG `past` WAITS IS READ HERE AS THE READER READS IT, so a `by` that is no number of days is refused once, at
+     install, and not on every read of a figure that went in. */
+  const waits = pastFault(body.value);
+  if (waits !== null) return bad('VALUE_MALFORMED', `${id}: ${waits}.`, 'value');
+
   /* `money`, OR `money.<CUR>` FROM BEFORE A FIGURE COULD LEAVE ITS CURRENCY UNSAID. `02 §3` is why a money figure is
      never a bare number, and it is still not one: the currency is the record's home currency, else the one its rows are
      in, else one amount per currency (`metrics.ts` `evaluateMetric`). A pack cannot know which currency the record it
@@ -592,12 +597,14 @@ function metricBody(decl: Declaration, installed?: Known): Refusal | null {
       if (l === null || typeof l !== 'object' || Array.isArray(l) || !['register', 'on', 'amount'].every((k) => typeof l[k] === 'string' && l[k] !== ''))
         return bad('DECLARATION_INVALID', `${id}'s leg ${i + 1} names the list it walks, the day each row moves on and its amount: register, on and amount.`, `legs[${i}]`);
     }
+    /* AN OPENING MAY CARRY A PARAMETER AFTER THE FIRST COLON, as a stat cell's figure does: a walk read once a book
+       opens from `book-cash:{{it}}`, and the reader fills it before it looks the figure up (`readWalk`). */
     const opening = body.opening as { metric?: unknown } | undefined;
-    if (walksToZero(v.walk) ? typeof opening?.metric !== 'string' || !METRIC_ID.test(opening.metric) : opening !== undefined)
+    if (walksToZero(v.walk) ? typeof opening?.metric !== 'string' || !METRIC_ID.test(metricNamed(opening.metric)) || /:\s*$/u.test(opening.metric) : opening !== undefined)
       return bad(
         'DECLARATION_INVALID',
         walksToZero(v.walk)
-          ? `${id} ${v.walk === 'zero_on' ? 'names the day the money runs out' : 'counts the days until the money runs out'} from what is held now: opening: { metric: <id> }.`
+          ? `${id} ${v.walk === 'zero_on' ? 'names the day the money runs out' : 'counts the days until the money runs out'} from what is held now: opening: { metric: <id> }, or <id>:{{it}} for a figure read once for each of something.`
           : `${id} adds up movements, and only the days until zero and the day of it walk from an opening.`,
         'opening',
       );
@@ -713,7 +720,7 @@ function shapeReadsFault(id: string, source: unknown, value: unknown, installed:
 function valueFields(value: unknown): string[] {
   const flat = (agg: unknown): string[] => {
     if (agg === null || typeof agg !== 'object') return [];
-    const operand = Object.values(agg)[0];
+    const operand = kindOf(agg)?.[1];
     if (typeof operand === 'string') return [operand];
     const p = (operand as { product?: unknown } | undefined)?.product;
     if (!Array.isArray(p) || typeof p[0] !== 'string') return [];
@@ -790,7 +797,9 @@ function fieldsOf(installed: Known, register: string): string[] | null {
 function figureListsFault(id: string, body: { source?: unknown; value?: unknown; legs?: unknown; opening?: unknown }, installed: Known): Refusal | null {
   /* THE FIGURE A WALK OPENS FROM IS ASKED FOR THE SAME WAY, and one step deep as the reader takes it: a walk that opens
      from a walk is refused on every read, so it is refused here. */
-  const opens = (body.opening as { metric?: unknown } | undefined)?.metric;
+  const said = (body.opening as { metric?: unknown } | undefined)?.metric;
+  /* The figure itself, without the parameter an opening read once a book carries (`book-cash:{{it}}`). */
+  const opens = typeof said === 'string' ? metricNamed(said) : undefined;
   if (body.source === WALK_SOURCE && typeof opens === 'string') {
     const opened = installed.get(`metric.${opens}`);
     if (opened === undefined) return bad('METRIC_UNKNOWN', `${id} walks from ${opens}, and there is no metric called ${opens}.`, 'opening');

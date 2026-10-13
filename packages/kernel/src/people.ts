@@ -2231,15 +2231,15 @@ export function askSame(deps: PeopleDeps, ids: readonly string[]): Result<{ id: 
   return ok(waiting === undefined ? null : { id: waiting.id, asked: false });
 }
 
+/** Somebody held more than once, as the plain rules read it: the rows that may be one person, and how many would go. */
+type Twice = { ids: string[]; surplus: number };
+
 /**
- * How many people the record holds more than once, as far as the plain rules can tell: the rows that would go if every
- * plain pair he has not answered were one person (three rows of one name are two), and each row marked as the record's
- * own person beyond the first. A row is counted once: his two rows and a third of his name are two, not three. What the
- * `held-twice` figure counts; nought on a record with no people list.
+ * ONE PASS BEHIND THE COUNT AND THE PEOPLE IT IS ABOUT (`peopleTwice`, `peopleTwiceIds`), so the two never disagree:
+ * every row marked as the record's own person is joined to the first, and both of every plain pair he has not answered.
+ * His own rows first, then the pairs oldest first, each row once.
  */
-export function peopleTwice(deps: Pick<PeopleDeps, 'sql' | 'list' | 'nameOf' | 'othersRow'>): number {
-  const list = deps.list;
-  if (!list) return 0;
+function twice(deps: Pick<PeopleDeps, 'sql' | 'nameOf' | 'othersRow'>, list: DeclaredList<MeetsFields>): Twice {
   /* EACH ROW POINTS AT THE OLDEST IT IS PAIRED WITH, so a group of pairs counts one fewer than its rows. */
   const head = new Map<string, string>();
   const find = (id: string): string => {
@@ -2247,8 +2247,10 @@ export function peopleTwice(deps: Pick<PeopleDeps, 'sql' | 'list' | 'nameOf' | '
     while (head.get(at) !== undefined && head.get(at) !== at) at = head.get(at)!;
     return at;
   };
+  const ids = new Set<string>();
   let surplus = 0;
   const join = (a: string, b: string): void => {
+    ids.add(a).add(b);
     const [x, y] = [find(a), find(b)];
     if (x === y) return;
     head.set(y, x);
@@ -2257,17 +2259,31 @@ export function peopleTwice(deps: Pick<PeopleDeps, 'sql' | 'list' | 'nameOf' | '
   const own = selfRows(deps, list).filter((r) => deps.othersRow?.(r.id) !== true);
   for (const r of own.slice(1)) join(own[0]!.id, r.id);
   for (const [a, b] of plainPairs(deps, list, false)) join(a.id, b.id);
-  return surplus;
+  return { ids: [...ids], surplus };
 }
 
 /**
- * `peopleTwice` FOR A READER THAT HOLDS ONLY THE DATABASE, which is all a figure is read with (`readPeopleTwice` in
- * `built-in-figures.ts`). The three parts the record hands the nightly pass are read here as the record reads them: the
- * people list from the live declarations (`meetsRole`, so two lists declaring it are none), a row's spoken name from its
- * list's prefix and number, and another member's row from who its create line names. `null`, never nought, on a record
- * with no people list: nobody was looked for.
+ * How many people the record holds more than once, as far as the plain rules can tell: the rows that would go if every
+ * plain pair he has not answered were one person (three rows of one name are two), and each row marked as the record's
+ * own person beyond the first. A row is counted once: his two rows and a third of his name are two, not three. What the
+ * `held-twice` figure counts; nought on a record with no people list.
  */
-export function peopleTwiceIn(sql: Sql): number | null {
+export function peopleTwice(deps: Pick<PeopleDeps, 'sql' | 'list' | 'nameOf' | 'othersRow'>): number {
+  return deps.list ? twice(deps, deps.list).surplus : 0;
+}
+
+/**
+ * WHO `peopleTwice` COUNTS: every row of every plain pair he has not answered, and every row marked as the record's own
+ * person where more than one is, each once. The people a list is narrowed to when somebody asks who is held twice, so
+ * there are always more of them than the count: two rows of one name are two people here and one too many there. None
+ * on a record with no people list.
+ */
+export function peopleTwiceIds(deps: Pick<PeopleDeps, 'sql' | 'list' | 'nameOf' | 'othersRow'>): string[] {
+  return deps.list ? twice(deps, deps.list).ids : [];
+}
+
+/** What `peopleTwiceIn` and `peopleTwiceIdsIn` read with: the nightly pass's parts, from the database alone. */
+function twiceDepsIn(sql: Sql): Pick<PeopleDeps, 'sql' | 'list' | 'nameOf' | 'othersRow'> | null {
   type Body = RoleList & { seq_prefix?: unknown; fields?: readonly FieldShape[] };
   const lists = sql
     .all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'register' AND superseded_at IS NULL AND retired = 0 AND json_valid(body)")
@@ -2277,7 +2293,7 @@ export function peopleTwiceIn(sql: Sql): number | null {
   if (people === null) return null;
   const body = lists.find((b) => b.id === people.register);
   const prefix = typeof body?.seq_prefix === 'string' && body.seq_prefix !== '' && body.seq_prefix !== '#' ? body.seq_prefix : null;
-  return peopleTwice({
+  return {
     sql,
     list: { ...people, declaredFields: Array.isArray(body?.fields) ? body.fields : [] },
     /* A PERSON AS A QUESTION'S BODY NAMES THEM (`nameOf` in the record), so a pair he answered is found again. */
@@ -2292,7 +2308,28 @@ export function peopleTwiceIn(sql: Sql): number | null {
       const levels = sql.all<{ level: string }>('SELECT level FROM member WHERE person_id = ?', by).map((m) => m.level);
       return levels.length > 0 && !levels.includes('owner');
     },
-  });
+  };
+}
+
+/**
+ * `peopleTwice` FOR A READER THAT HOLDS ONLY THE DATABASE, which is all a figure is read with (`readPeopleTwice` in
+ * `built-in-figures.ts`). The three parts the record hands the nightly pass are read here as the record reads them: the
+ * people list from the live declarations (`meetsRole`, so two lists declaring it are none), a row's spoken name from its
+ * list's prefix and number, and another member's row from who its create line names. `null`, never nought, on a record
+ * with no people list: nobody was looked for.
+ */
+export function peopleTwiceIn(sql: Sql): number | null {
+  const deps = twiceDepsIn(sql);
+  return deps === null ? null : peopleTwice(deps);
+}
+
+/**
+ * `peopleTwiceIds` for the same reader: who the `held-twice` figure is about, for a list narrowed to them. `null`,
+ * never an empty answer, on a record with no people list.
+ */
+export function peopleTwiceIdsIn(sql: Sql): string[] | null {
+  const deps = twiceDepsIn(sql);
+  return deps === null ? null : peopleTwiceIds(deps);
 }
 countHeldTwiceBy(peopleTwiceIn);
 

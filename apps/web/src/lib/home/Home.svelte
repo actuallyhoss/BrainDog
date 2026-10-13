@@ -37,7 +37,7 @@
   import PageView from '$lib/page/PageView.svelte';
   import HeadCapture from '$lib/home/HeadCapture.svelte';
   import { listen } from '$lib/page/listen.svelte.ts';
-  import { stampOf } from '$lib/page/read-mark.ts';
+  import { readMarkOf, stampOf } from '$lib/page/read-mark.ts';
   import { holdsOf, voiceOf } from '$lib/page/home-arrange.ts';
   import {
     FIRST_TODAY_MOST,
@@ -62,7 +62,7 @@
   import { madeSteps } from '$lib/start/made.ts';
   import { playedBy } from '$lib/start/parts.ts';
   import type { TellOptions } from '$lib/tell/read.ts';
-  import { createClient } from '@braindog/client';
+  import { createClient, type Cursor } from '@braindog/client';
   import { sentenceOf } from '$lib/home/today-tiles.ts';
   import { waitsNow, workingNow } from '$lib/home/waits.svelte.ts';
   import { words } from '$lib/home/words.ts';
@@ -220,6 +220,35 @@
   /** A read of Home's own is out: `listen` waits for it rather than asking again on top of it. */
   let reading = false;
 
+  /**
+   * WHAT WAS NEW WHEN HOME'S PAGE WAS LAST READ, which the mark is stamped with on leaving: the record's own cursor for
+   * it, how many lines, and the number of the newest. The shell's cursor is as old as the tab, so a line that landed
+   * while Home was open, and was drawn here when the page was read again, came back as new on the next visit.
+   *
+   * ASKED BEFORE THE PAGE READ IT GOES WITH, and kept only once that page is drawn, so the mark does not reach past
+   * what this screen held. `null` until one has answered, and the shell's cursor is stamped then, as before.
+   */
+  type News = { upTo: Cursor | null; unseen: number; held: number };
+  let news: News | null = null;
+  /** Which read of the page is the latest: an older one's answer, landing late, is not the page on screen. */
+  let pageRead = 0;
+  async function newsNow(): Promise<News | null> {
+    try {
+      const out = await createClient({ base: apiBase() }).whatsNew();
+      if (!out.ok) return null;
+      const held = out.value.events.reduce((top, e) => Math.max(top, e.rowid ?? 0), 0);
+      return { upTo: out.value.upTo, unseen: out.value.events.length, held };
+    } catch {
+      return null;
+    }
+  }
+  /** Keep what was new beside the page just drawn, unless a later read of the page has gone out since. */
+  function keepNews(before: Promise<News | null>, mine: number): void {
+    void before.then((now) => {
+      if (now !== null && mine === pageRead) news = now;
+    });
+  }
+
   /** Home's page, from whichever of the three sources the record holds. */
   async function readBody(slug: string | null, spoken: HomeVoice, held: Holds): Promise<Opened | null> {
     if (slug !== null) {
@@ -249,11 +278,14 @@
     const at = untrack(opened);
     let ok = false;
     reading = true;
+    const mine = ++pageRead;
+    const before = newsNow();
     void readBody(slug, spoken, held)
       .then((out) => {
         if (slug !== declares) return;
         got = out;
         ok = out?.from === 'live';
+        if (ok) keepNews(before, mine);
       })
       .catch(() => {})
       .finally(() => {
@@ -269,13 +301,19 @@
     if (data.refused) return;
     const slug = declares;
     reading = true;
+    const mine = ++pageRead;
+    /* A home that draws no feed of the log has shown nothing new, and asks nothing. */
+    const before = untrack(() => feeds) ? newsNow() : null;
     try {
       const out = await readBody(
         slug,
         untrack(() => voice),
         untrack(() => holds),
       );
-      if (slug === declares && out?.from === 'live') got = out;
+      if (slug === declares && out?.from === 'live') {
+        got = out;
+        if (before) keepNews(before, mine);
+      }
     } catch {
       /* The page as it was read stays; the next version asks again. */
     } finally {
@@ -359,8 +397,11 @@
    *
    * THROUGH THE ONE STAMP (`lib/page/read-mark.ts`), which Activity uses too: one mark a visit, and a mark that did not
    * land leaves the record's where it was and is tried at the next leave, so the same lines come back rather than
-   * being lost. A shell that held nothing new has no cursor, and no cursor is no mark: a bare one would mark lines
-   * this screen never held.
+   * being lost.
+   *
+   * WITH THE NEWEST LINE THIS SCREEN DREW (`readMarkOf`), not the shell's cursor alone, which is as old as the tab: what
+   * was new when the page was last read (`news`). Until that has answered the shell's cursor is the one sent. A shell
+   * that held nothing new has no cursor, and no cursor is no mark: a bare one would mark lines this screen never held.
    *
    * THE RECORD IS NAMED WHEN THE SCREEN OPENS. By the time it ends the address is already the next screen's, and that
    * may be another record's.
@@ -371,7 +412,8 @@
     const stamp = stampOf((upTo) => import('$lib/record/news-live.ts').then((m) => m.markAll(base, upTo)));
     const leave = () => {
       if (data.refused || !feeds) return;
-      void stamp.leave(data.upTo);
+      const upTo = news ? readMarkOf(news.upTo ?? data.upTo, news.unseen, news.held) : readMarkOf(data.upTo, data.upTo === null ? 0 : 1);
+      void stamp.leave(upTo);
     };
     addEventListener('pagehide', leave);
     return () => {

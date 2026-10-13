@@ -48,6 +48,7 @@ export const FIRST_DRAW: readonly FirstRead[] = [
   { method: 'page', ask: 'page', post: false, by: "Home, drawing the record's own home page" },
   { method: 'get', ask: 'row', post: false, by: 'Home, naming the agent run a block shows' },
   { method: 'previewPage', ask: 'body', post: true, by: 'Home, drawing Today where no home page is declared' },
+  { method: 'whatsNew', ask: 'bare', post: false, by: 'Home, asking what is new before each read of its page' },
 ];
 
 /**

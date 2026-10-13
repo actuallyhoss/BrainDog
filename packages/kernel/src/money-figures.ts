@@ -25,6 +25,7 @@ import { no, ok } from '@braindog/ports';
 import { compile, jsonPath, type Schema } from '@braindog/where';
 
 import { GROUP_CAP } from './buckets.ts';
+import { fill } from './fill.ts';
 import { GOVERNANCE_OPEN, HANDOFFS_OPEN, RECORD_DOOR, RECORD_KEYS, RECORD_LISTS, RECORD_MARKS, RECORD_PATHS, RECORD_PEOPLE, RECORD_PLACES, RECORD_SIGNS, RECORD_VITALS, SESSIONS_WORKING } from './built-in-figures.ts';
 import { runway, type Leg, type Runway } from './forecast.ts';
 import { RECORD_KEY_SCAN } from './key-scan.ts';
@@ -738,12 +739,24 @@ export function readWalk(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result<R
     const from = decl.opening?.metric;
     if (typeof from !== 'string' || from === '')
       return no<Reading>('REQUIRED_MISSING', `${decl.metric}: ${walked.walk === 'zero_on' ? 'the day the money runs out is' : 'the days until the money runs out are'} walked from a figure of what is held now: opening: { metric: cash-now }.`, { at: 'opening' });
-    const row = sql.one<{ body: string }>("SELECT body FROM declaration WHERE id = ? AND kind = 'metric' AND superseded_at IS NULL AND retired = 0", `metric.${from}`);
-    if (!row) return no<Reading>('METRIC_UNKNOWN', `${decl.metric}: there is no metric called ${from} to walk from.`, { at: 'opening' });
-    const figure = JSON.parse(row.body) as MetricDecl;
+    /* THE FIRST COLON SEPARATES, as in a stat cell and a forecast block's opening (`pages.ts`): `book-cash:Kiln` is one
+       book's cash. A walk read once a book holds `book-cash:{{it}}`, which the reader that filled the walk's own
+       parameter has filled by now (`fill` walks every string of the figure), so the opening is read about the same
+       book the legs are. Looked up whole, the id was no figure at all. */
+    const colon = from.indexOf(':');
+    const named = colon < 0 ? from : from.slice(0, colon);
+    const param = colon < 0 ? undefined : from.slice(colon + 1);
+    /* A HOLE NOBODY FILLED IS NO NAME TO ASK ABOUT. Read bare, a walk of each book would open from the cash of a book
+       called `{{it}}`, and the refusal would be about a book nobody wrote. */
+    if (param !== undefined && /\{\{\w+\}\}/.test(param))
+      return no<Reading>('REQUIRED_MISSING', `${decl.metric}: this figure is read once for each of something and opens from ${named} for the same one. Ask for it by name, as ${decl.metric}:<name>.`, { at: 'opening' });
+    const row = sql.one<{ body: string }>("SELECT body FROM declaration WHERE id = ? AND kind = 'metric' AND superseded_at IS NULL AND retired = 0", `metric.${named}`);
+    if (!row) return no<Reading>('METRIC_UNKNOWN', `${decl.metric}: there is no metric called ${named} to walk from.`, { at: 'opening' });
+    const stored = JSON.parse(row.body) as MetricDecl;
+    const figure = param === undefined ? stored : (fill(stored, null, param) as MetricDecl);
     /* ONE STEP DEEP. A walk opened from a walk would read its own kind again, and a loop of two would never end. */
     if (isWalked(figure))
-      return no<Reading>('DECLARATION_INVALID', `${decl.metric}: a walk opens from a figure of what is held, and ${from} is itself a walk.`, { at: 'opening' });
+      return no<Reading>('DECLARATION_INVALID', `${decl.metric}: a walk opens from a figure of what is held, and ${named} is itself a walk.`, { at: 'opening' });
     const read = evaluateMetric(sql, figure, ctx);
     if (!read.ok) return read;
     /* AN OPENING THAT IS AT LEAST IS NO OPENING TO WALK FROM. The day a lower bound runs out is not the day the money
@@ -920,7 +933,9 @@ export function figureLists(
     if (d.source === WALK_SOURCE) for (const leg of legsOf(d)) if (typeof leg?.register === 'string') out.add(leg.register);
   };
   add(decl);
-  const opened = decl.source === WALK_SOURCE && typeof decl.opening?.metric === 'string' ? figure?.(decl.opening.metric) : null;
+  /* The figure without its parameter: `book-cash:{{it}}` reads the lists `book-cash` reads, and looked up whole it
+     named none of them, so a member held away from Accounts would have been drawn a book's last day. */
+  const opened = decl.source === WALK_SOURCE && typeof decl.opening?.metric === 'string' ? figure?.(decl.opening.metric.split(':')[0] ?? '') : null;
   /* ONE STEP DEEP, as the walk itself reads it: a walk never opens from a walk. */
   if (opened && opened.source !== WALK_SOURCE) add(opened);
   /* A CROSS-CHECK READS EVERY LIST THE FIGURE IT CHECKS READS, its statements and its moves, one step deep as well. */

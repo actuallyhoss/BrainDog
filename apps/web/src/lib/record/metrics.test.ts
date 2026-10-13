@@ -494,3 +494,23 @@ test('ONE CURRENCY THIS MONTH AND ANOTHER LAST MONTH IS NO CHANGE THAT MAY BE SA
   assert.deepEqual([...currenciesRead(now, VS_LAST.value)], ['EGP'], 'one window alone holds one currency');
   assert.deepEqual([...currenciesRead(now, VS_LAST.value, then)].sort(), ['EGP', 'USD']);
 });
+
+test('THE DAYS THAT ARE GONE ARE AN AGGREGATION THIS BUILD READS, alone and as the half of a ratio (signs-metric-75-76)', () => {
+  const late = { past: 'due', by: '3d' };
+  assert.deepEqual(unreadable({ ...METRICS.overdue!, value: late }), [], 'a count of days gone was named as unreadable');
+  assert.deepEqual(unreadable({ ...METRICS.overdue!, value: { ratio: { of: late, per: { distinct: 'state' } } } }), []);
+  /* A RECORD HOLDS A DECLARATION WITH ITS KEYS IN ORDER, so a stored one arrives `{ by, past }` and is read the same. */
+  const stored = { by: '3d', past: 'due' };
+  assert.deepEqual(unreadable({ ...METRICS.overdue!, value: { ratio: { of: stored, per: { distinct: 'state' } } } }), []);
+  assert.deepEqual([...currenciesRead([], stored)], []);
+  /* IT ADDS NO MONEY, so no two currencies meet in it. */
+  assert.deepEqual([...currenciesRead([], late)], []);
+  /* INSIDE A DIFFERENCE IT IS THE RECORD'S TO COUNT, as an age is: a day is gone by the record's own today. */
+  const r = diffRead({ ...VS_LAST, value: { diff: { of: { past: 'on' }, per: { count: 'id' } } } }, [], DIFF_NOW);
+  assert.match(r.refusals.join(), /counted by the record/u);
+});
+
+test("A WALK THAT OPENS FROM ONE BOOK'S CASH IS A TEMPLATE, though it has no where to hold the hole (book-walk-opening-76)", () => {
+  assert.equal(isTemplate(METRICS['book-lasts-until']!), true, 'a walk asked about no book was read as a figure');
+  assert.equal(isTemplate(METRICS['runs-out-on']!), false, "the record's own walk has no hole");
+});

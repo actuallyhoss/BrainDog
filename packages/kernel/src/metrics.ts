@@ -72,7 +72,7 @@ import { isCrosscheck, isRolled, isWalked, readCrosscheck, readRolled, readWalk 
 import { TREND_POINTS, trendOf, type Trend } from './trend.ts';
 
 /** The six this build reads. The other five are `08` §2.2's and are refused by name. */
-export const AGGREGATIONS = ['sum', 'count', 'avg', 'min', 'max', 'distinct', 'age', 'currencies', 'empty'] as const;
+export const AGGREGATIONS = ['sum', 'count', 'avg', 'min', 'max', 'distinct', 'age', 'currencies', 'empty', 'past'] as const;
 /**
  * A row-level multiplication, before the sum.
  *
@@ -96,7 +96,12 @@ export type Aggregation =
   /** How many currencies a money field is kept in (money-signs B2). */
   | { currencies: string }
   /** How many rows leave the field empty, any type (money-signs B3). */
-  | { empty: string };
+  | { empty: string }
+  /**
+   * How many rows hold a day that is gone, `by` whole days or more: `{ past: 'next_due', by: '3d' }` counts what
+   * `next_due before -3d` selects, inside a `where` that does not say it (signs-metric-75-76). `past` is written first.
+   */
+  | { past: string; by?: string | undefined };
 
 /**
  * The window a difference takes its second half from (REC-B19): the same `where`, read against the clock moved back.
@@ -1454,6 +1459,10 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
 
   const fields = aggregationsOf(decl.value);
   if (fields.length === 0) at('VALUE_MALFORMED', 'a value is an aggregation, a ratio or a diff', 'value');
+  /* `past` WAITS A WHOLE NUMBER OF DAYS, and a `by` it cannot read is refused: read as none, a line three days late
+     and a line due yesterday would be the same count under a declaration that says otherwise. */
+  const waits = pastFault(decl.value);
+  if (waits !== null) at('VALUE_MALFORMED', waits, 'value');
   if (schema)
     for (const f of fields) {
       for (const id of [f.field, f.by].filter((x): x is string => typeof x === 'string'))
@@ -2084,7 +2093,7 @@ export const withLabels = (groups: readonly Group[], names: GroupNames): Group[]
 /**
  * The currency a figure scoped to one row is read in, when that row says it is kept in one.
  *
- * `book-cash:Quartz` IS A QUESTION ABOUT QUARTZ (`fill` in `pages.ts` sets `within` to the clauses its parameter
+ * `book-cash:Quartz` IS A QUESTION ABOUT QUARTZ (`fill` in `fill.ts` sets `within` to the clauses its parameter
  * filled), and Quartz says USD: its page led with its cash in pounds Egyptian, converted. So a scope that pins a ref to
  * one row, in a top-level clause, is asked what that row says, and a single answer is the figure's currency. Two rows
  * that disagree, a list the caller may not read and a row that says nothing all leave the home currency as it was.
@@ -2598,6 +2607,19 @@ function read(
   return one(sql, schema, decl.value, where, params, lookups, fx);
 }
 
+/**
+ * An aggregation's kind and what it reads: the key that is an aggregation, wherever it sits.
+ *
+ * BY NAME AND NOT BY PLACE. `past` is the one aggregation with a second key, `by`, and a record holds a declaration
+ * with its keys in order, so `{ past: 'next_due', by: '3d' }` comes back `{ by, past }`. Read by its first key, a
+ * stored figure was refused "no field called 3d" on every read while the same figure handed over unstored answered. A
+ * value that names no aggregation still answers its first key, so the refusal goes on naming what was written.
+ */
+export function kindOf(agg: object): [string, unknown] | undefined {
+  const entries = Object.entries(agg);
+  return entries.find(([key]) => (AGGREGATIONS as readonly string[]).includes(key)) ?? entries[0];
+}
+
 /** One aggregation, as one SELECT. Money groups by currency; everything else is a scalar. */
 function one(
   sql: Sql,
@@ -2608,7 +2630,7 @@ function one(
   lookups?: Record<string, Record<string, number>> | undefined,
   fx?: Across,
 ): Result<Read> {
-  const [kind, operand] = Object.entries(agg)[0] as [string, string | Product];
+  const [kind, operand] = kindOf(agg) as [string, string | Product];
   const product = typeof operand === 'object' && operand !== null ? operand.product : null;
   const field = product ? product[0] : (operand as string);
   const rows = Number(sql.one<{ n: number }>(`SELECT count(*) AS n FROM entry WHERE ${where}`, ...params)?.n ?? 0);
@@ -2658,6 +2680,29 @@ function one(
       rows,
       refusals: [],
     });
+
+  /* THE ROWS WHOSE DAY IS GONE, COUNTED INSIDE A WIDER `where` (signs-metric-75-76, audit 74 claim 7). A ratio's two
+     halves share the one `where`, so with the day in it "every matched line is on time" and "no line was ever
+     matched" were both no row, and a sign could not say nought of the first without saying it of the second. Here the
+     `where` holds who is judged and this counts the late among them: no row is still nought over nothing, which a
+     ratio answers with no value, and rows with none late is a nought that was read. THE DAY IS THE PREDICATE'S, so
+     `{ past: f, by: '3d' }` and `f before -3d` count the same rows on a live read and on a read of a day gone: both
+     end at the reading's own day (`fx.today`, `clockOf`). A row with no day is not late. No day to read from is no
+     value, never nought. */
+  if (kind === 'past') {
+    const days = pastDays(agg);
+    const today = fx?.today ?? null;
+    const edge = days === null || today === null ? null : new Date(Date.parse(`${today.slice(0, 10)}T12:00:00Z`) - days * DAY).toISOString().slice(0, 10);
+    if (edge === null) return ok({ value: null, unit: null, rows, refusals: [] });
+    return ok({
+      value: Number(
+        sql.one<{ n: number }>(`SELECT count(*) AS n FROM entry WHERE ${where} AND substr(json_extract(fields, ?), 1, 10) < ?`, ...params, jsonPath(field), edge)?.n ?? 0,
+      ),
+      unit: null,
+      rows,
+      refusals: [],
+    });
+  }
 
   /* THE AGE OF THE NEWEST DAY, in whole days to the reading's own day: `{ max: 'on' }` is a day, not an age, and read
      as a number it is twenty thousand. No row, or no day to count from, is no value (money-signs B1). */
@@ -2839,12 +2884,39 @@ function aggregate(
   return ok({ value: out?.v === null || out?.v === undefined ? null : Number(out.v), unit: null, rows, refusals: [] });
 }
 
+/** The most days `past` waits before a day counts as gone: ten years, past which it is a typing slip. */
+const PAST_BY_MOST = 3650;
+
+/**
+ * How many whole days gone a `past` counts from, or `null` when its `by` is not a number of days.
+ *
+ * `by: '3d'` IS THREE DAYS, and left out it is none, so a day before today is gone. Days only: a month is not a number
+ * of days, and a line "a month late" is the predicate's to say.
+ */
+function pastDays(agg: Aggregation): number | null {
+  const by = (agg as { by?: unknown }).by;
+  if (by === undefined) return 0;
+  const days = typeof by === 'string' ? /^(\d{1,4})d$/u.exec(by) : null;
+  return days && Number(days[1]) <= PAST_BY_MOST ? Number(days[1]) : null;
+}
+
+/**
+ * What is wrong with how long a value's `past` waits, or `null`: the one sentence the reader refuses with, and the
+ * install too (`declare.ts`), so a figure that would be refused on every read never goes in (signs-metric-75-76).
+ */
+export function pastFault(value: unknown): string | null {
+  if (value === null || typeof value !== 'object') return null;
+  return halvesOf(value as Value).some((half) => 'past' in half && pastDays(half) === null)
+    ? `past waits a whole number of days, written by: '3d', up to ${PAST_BY_MOST}d; leave by out to count a day before today`
+    : null;
+}
+
 /** The aggregations money across currencies is converted for, or read one currency at a time. */
 const REDUCIBLE = new Set(['sum', 'avg', 'min', 'max']);
 
 /** The money field an aggregation reads, or `null` when it reads a count or a field that is not money. */
 function moneyFieldOf(schema: Schema, agg: Aggregation): string | null {
-  const [, operand] = Object.entries(agg)[0] as [string, string | Product];
+  const [, operand] = kindOf(agg) as [string, string | Product];
   const field = typeof operand === 'object' && operand !== null ? operand.product[0] : operand;
   return schema.fields[field]?.type === 'money' ? field : null;
 }
@@ -2886,6 +2958,8 @@ function unaggregatable(kind: string, field: string, schema: Schema): string | n
   const type = Object.hasOwn(schema.fields, field) ? schema.fields[field]?.type : undefined;
   /* AN AGE IS COUNTED FROM A DAY, and currencies are read off money: on any other field each is a number about nothing. */
   if (kind === 'age') return type === undefined || type === 'day' || type === 'instant' ? null : `age reads a day, and ${field} is a ${type}. Name a day or instant field.`;
+  /* A DAY ALONE: an instant is gone at a moment in a zone, which the predicate reads and this does not. */
+  if (kind === 'past') return type === undefined || type === 'day' ? null : `past reads a day, and ${field} is ${type === 'instant' ? 'an' : 'a'} ${type}. Name a day field.`;
   if (kind === 'currencies') return type === undefined || type === 'money' ? null : `currencies reads money, and ${field} is a ${type}. Name a money field.`;
   if (!['sum', 'avg', 'min', 'max'].includes(kind) || field === 'id') return null;
   if (type === undefined || NUMERIC.has(type)) return null;
@@ -2937,10 +3011,16 @@ function keysOf(value: unknown): string[] {
   return Object.entries(value as Record<string, unknown>).flatMap(([k, v]) => [k, ...keysOf(v)]);
 }
 
+/** The one aggregation of a value, or the two halves of a ratio or a difference. */
+function halvesOf(value: Value): Aggregation[] {
+  const pair = 'ratio' in value ? value.ratio : 'diff' in value ? value.diff : null;
+  return (pair ? [pair.of, pair.per] : [value as Aggregation]).filter((half): half is Aggregation => half !== null && typeof half === 'object');
+}
+
 /** Every aggregation a value expression reads, with the field each names. */
 function aggregationsOf(value: Value): { kind: string; field: string; by?: string; lookup?: string }[] {
   const flat = (agg: Aggregation): { kind: string; field: string; by?: string; lookup?: string }[] => {
-    const entry = Object.entries(agg)[0];
+    const entry = kindOf(agg);
     if (!entry) return [];
     const [kind, operand] = entry;
     if (typeof operand === 'string') return [{ kind, field: operand }];

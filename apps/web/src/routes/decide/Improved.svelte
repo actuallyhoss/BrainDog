@@ -23,7 +23,7 @@
   import '$lib/decide/form.css';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { diffOf, install, planFor, type OfferClient, type Planned } from '../packs/browse/[id]/offer.ts';
-  import { changeLine, ledBy, readFirst, type Improved } from './improved.ts';
+  import { changeLine, inTurn, landed, ledBy, ordered, readInOrder, type Improved } from './improved.ts';
   import { words } from './words.ts';
 
   let {
@@ -59,7 +59,8 @@
 
   /**
    * Accept: every plan made now, then installed on this press when nothing in them asks to be read, and opened on the
-   * sheet when something does.
+   * sheet when something does. AN UPDATE THAT HANDS SOMETHING ON IS TAKEN BEFORE THE ONE IT HANDS TO (`ordered`), and
+   * the one that waits is not read as stopped (`readInOrder`): it is planned again once the first has landed.
    */
   async function accept() {
     if (busy || updates.length === 0) return;
@@ -69,54 +70,40 @@
     client ??= createClient({ base: apiBase() });
     const c = client;
     try {
+      const run = ordered(updates);
       const plans: { u: Improved; p: Planned }[] = [];
-      for (const u of updates) {
+      for (const u of run) {
         const out = await planOf(c, u);
         if (!out.ok) return void (fix = out.fix);
         plans.push({ u, p: out.planned });
       }
-      const diffs = plans.map(({ p }) => diffOf(p));
-      const first = readFirst(diffs, plans.flatMap(({ p }) => asksOf(p)), nameOf);
+      const first = readInOrder(run, plans.map(({ p }) => diffOf(p)), plans.flatMap(({ p }) => asksOf(p)), nameOf);
       if (!first.read) return void (await installAll(c, plans));
       if (!first.sheet) return void (elsewhere = true);
       fix = words.improvedRead;
-      sheet = { diff: diffs.length === 1 ? diffs[0] : diffs, then: () => installAll(c, plans) };
+      sheet = { diff: first.shown.length === 1 ? first.shown[0] : first.shown, then: () => installAll(c, plans) };
     } finally {
       busy = false;
     }
   }
 
-  /**
-   * EACH PLAN IN TURN, PLANNED AGAIN JUST BEFORE IT GOES IN, because the record's version is in every plan's hash and the
-   * one before it moved it. A plan that now asks to approve a line nobody was shown stops there, as "Update all" does.
-   */
+  /** Each plan in turn, planned again just before it goes in (`improved.ts` `inTurn`), and what the card says after. */
   async function installAll(c: OfferClient, plans: readonly { u: Improved; p: Planned }[]) {
-    const shown = new Set(plans.flatMap(({ p }) => asksOf(p)));
-    let done = 0;
-    for (const { u, p } of plans) {
-      const fresh = done === 0 ? { ok: true as const, planned: p } : await planOf(c, u);
-      if (!fresh.ok) {
-        fix = fresh.fix;
-        break;
-      }
-      if (asksOf(fresh.planned).some((line) => !shown.has(line))) {
-        fix = words.improvedRead;
-        break;
-      }
-      const out = await install(c, fresh.planned, held, pref.read().nav ?? [], copy.writeRaced);
-      if (!out.ok) {
-        fix = out.fix;
-        break;
-      }
-      if (out.nav) pref.write({ nav: out.nav });
-      done += 1;
-    }
+    const out = await inTurn(plans, {
+      replan: (u) => planOf(c, u),
+      asksOf,
+      landed: (p) => landed(diffOf(p)),
+      install: async (p) => {
+        const went = await install(c, p, held, pref.read().nav ?? [], copy.writeRaced);
+        if (went.ok && went.nav) pref.write({ nav: went.nav });
+        return went;
+      },
+      unread: words.improvedRead,
+    });
     sheet = null;
-    if (done === plans.length) fix = '';
-    if (done > 0) {
-      toasts.push(words.improvedDone(done), { intent: 'good' });
-      ondone();
-    }
+    fix = out.fix;
+    if (out.done > 0) toasts.push(words.improvedDone(out.done), { intent: 'good' });
+    if (out.done > 0 || out.passed > 0) ondone();
   }
 
   function approve() {

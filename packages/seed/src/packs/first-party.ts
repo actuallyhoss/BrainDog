@@ -588,6 +588,11 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   And batch 75's, in the same unreleased step: Bills and invoices gains `chase_draft`, Draft to send, and
  *   `invoice-chased` writes it where it is empty when Chase it is answered, the invoice's amount and due day in one
  *   sentence, never over words somebody changed (money-chase-draft-75, REC-B22 step 1). No id added or taken away.
+ *   And batch 76's, in the same unreleased step: `book-lasts-until`, the day one book's money runs out, walked from
+ *   that book's cash over its own bills, repeating lines, instalments and money on its way, and the cell Money lasts
+ *   until on a book's What is due (book-lasts-until-76, REC-A09 step 2); and Money's seeds carry a starter set of
+ *   eight categories, in and out, in place of one of the sample's (ruling 341, money-starter-categories-76), which no
+ *   fingerprint reads and only a record installing Money afresh is given. One id added, none taken away.
  * - people 3.4.0: the People page says how many people may be on the record twice (people-held-twice-69), one note under
  *   its two lead notes, from the built-in figure held-twice and drawn only above nought. 3.3.0 is released (commit
  *   63423720 holds it), so a version of its own. A note added, nothing taken away, so a minor step that reaches a record

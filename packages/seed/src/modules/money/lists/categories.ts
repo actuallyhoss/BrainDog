@@ -63,3 +63,27 @@ export const CATEGORIES_REGISTER: MoneyRegister = {
     { id: 'note', type: 'text' },
   ],
 };
+
+/**
+ * THE STARTER SET, ruling 341: what Money plants on a new record so the first payment has somewhere to go.
+ *
+ * ENTRIES AND NOT A CLOSED LIST. The categories somebody uses are found over the first month and half of them are
+ * theirs alone, so these are a start a person renames, retires and adds to, and nothing reads one by its name.
+ * BOTH WAYS, because the direction guard above offers a payment in only the ones that can be right for it, and a
+ * set with no `in` would leave the first income with nothing to be filed under.
+ *
+ * NO `match` AND NO `budget`: a shop's name as a bank writes it and a monthly limit are a person's own, and a
+ * guessed one would file or flag money nobody asked it to. EIGHT, which is the most a pack may seed one list with
+ * (`SEEDS_PER_REGISTER` in `@braindog/declare`). None shares a name with the sample studio's (`sample.ts`), since
+ * `name` is unique and one record may be given both.
+ */
+export const STARTER_CATEGORIES: readonly { name: string; direction: 'in' | 'out'; state: 'live' }[] = [
+  { name: 'Sales', direction: 'in', state: 'live' },
+  { name: 'Pay', direction: 'in', state: 'live' },
+  { name: 'Other income', direction: 'in', state: 'live' },
+  { name: 'Rent', direction: 'out', state: 'live' },
+  { name: 'Bills', direction: 'out', state: 'live' },
+  { name: 'Subscriptions', direction: 'out', state: 'live' },
+  { name: 'Food', direction: 'out', state: 'live' },
+  { name: 'Transport', direction: 'out', state: 'live' },
+];

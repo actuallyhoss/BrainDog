@@ -238,7 +238,11 @@ test('AND IT REACHES THE FIGURES, which no search could reach before', () => {
   }
   /* AND THE ONES IT DROPS REALLY ARE UNREADABLE, so the filter is not throwing away rows that work. */
   for (const [id, decl] of Object.entries(METRICS))
-    if (isTemplate(decl)) assert.match(decl.where ?? '', /\{\{/u, `${id} is dropped as a template and carries no parameter`);
+    if (isTemplate(decl)) {
+      /* A walk's parameter is in its legs and its opening and not in a `where` (`book-lasts-until`). */
+      const walk = decl as { legs?: unknown; opening?: unknown };
+      assert.match(`${decl.where ?? ''}${JSON.stringify([walk.legs ?? null, walk.opening ?? null])}`, /\{\{/u, `${id} is dropped as a template and carries no parameter`);
+    }
 });
 
 test('AND IT REACHES THE ROWS YOU CHANGED LAST, off a ledger the record was already keeping', () => {

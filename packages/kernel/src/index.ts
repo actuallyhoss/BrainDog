@@ -480,7 +480,7 @@ export {
   BACKFILL_ACTOR, BACKFILL_LIMIT, BACKFILL_SOURCE, PAYEE_SEEN, organisationsHolding, tidy as tidyPayee, understandBackfill, undoBackfill,
   type BackfillDeps, type BackfillOptions, type BackfillSuggestion, type Backfilled, type Named as BackfillNamed, type Slice as BackfillSlice, type SliceName as BackfillSliceName,
 } from './backfill.ts';
-export { MET_CAP, PEOPLE, RESOLVE_PAIRS_NIGHT, pairHash } from './people.ts';
+export { MET_CAP, PEOPLE, RESOLVE_PAIRS_NIGHT, pairHash, peopleTwiceIds, peopleTwiceIdsIn } from './people.ts';
 export type { MeetArgs, Met, MetRow, ResolveJob, ResolveSide } from './people.ts';
 export type { MeetsFields, OrgFields, RatesFields } from './roles.ts';
 /* THE LIST HOLDING THE RATES, by its `rates:` key or, on a record older than the key, by the name it had (`roles.ts`):

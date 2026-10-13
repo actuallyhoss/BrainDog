@@ -21,6 +21,7 @@ import * as cards from './cards.ts';
 import * as format from './format.ts';
 import * as cursor from './cursor.ts';
 import * as timeline from './timeline.ts';
+import * as spokenModule from './spoken.ts';
 
 const exported = root as Record<string, unknown>;
 
@@ -55,6 +56,7 @@ test('THE NEW NAMES IN THE OLDER MODULES ARE ON THE ROOT', () => {
     ['choiceOf', cursor],
     ['CHOICE_KEYS', cursor],
     ['timelineDays', timeline],
+    ['spoken', spokenModule],
   ];
   for (const [name, mod] of wanted) {
     assert.ok(name in mod, `${name} is no longer exported by its module; this list is stale`);

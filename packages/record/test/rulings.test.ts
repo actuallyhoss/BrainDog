@@ -153,7 +153,7 @@ test('ruling 341: categories are rows a record owns, so a person adds one with n
   sql.close();
 });
 
-test('ruling 341: Money seeds a starter set of categories, in and out', { todo: 'SHL-A15 builds it' }, () => {
+test('ruling 341: Money seeds a starter set of categories, in and out', () => {
   const seeds = ((firstPartyDocument('money-core') as { seeds?: { register: string; fields: { direction?: string } }[] }).seeds ?? []).filter((s) => s.register === 'categories');
   assert.ok(seeds.length >= 6, `Money seeds ${seeds.length} categories, the sample studio's, and not a starter set`);
   assert.ok(seeds.some((s) => s.fields.direction === 'in') && seeds.some((s) => s.fields.direction === 'out'));

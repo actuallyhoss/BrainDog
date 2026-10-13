@@ -12,6 +12,7 @@ import { openRecord, type Kernel } from '@braindog/kernel';
 import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.ts';
 
 import { AGENTS_PACK, FIRST_PARTY, NOW, crossPack, firstPartyDocument, firstPartyManifest, packDocument } from '../src/index.ts';
+import { STARTER_CATEGORIES } from '../src/modules/money/lists/categories.ts';
 
 const value = <T>(r: unknown): T => {
   const x = r as { ok: boolean; value: T; refusal?: { code: string; fix: string; at?: string } };
@@ -184,10 +185,14 @@ test('INSTALLED IN ORDER ON AN EMPTY RECORD, each through its own plan, they mak
   /* Each pack's claims are its own, so turning one off later retires only what it brought. */
   for (const id of FIRST_PARTY) assert.deepEqual([...one.k.packClaims(id)].sort(), firstPartyManifest(id).provides);
 
-  /* And the example rows arrive marked, one per register the starter seeds. */
-  for (const seed of (packDocument() as { seeds: { register: string }[] }).seeds) {
-    assert.equal(one.k.count(seed.register), 1, `${seed.register} has no example row`);
-    assert.deepEqual(one.k.get(`${seed.register}#1`)!.fields.tags, ['example']);
+  /* And the example rows arrive marked, one per register the starter seeds, and categories as their starter set
+     (ruling 341), every one of them marked. */
+  const seeded = new Map<string, number>();
+  for (const seed of (packDocument() as { seeds: { register: string }[] }).seeds) seeded.set(seed.register, (seeded.get(seed.register) ?? 0) + 1);
+  for (const [register, rows] of seeded) {
+    assert.equal(rows, register === 'categories' ? STARTER_CATEGORIES.length : 1, `${register} is seeded ${rows} times`);
+    assert.equal(one.k.count(register), rows, `${register} does not hold its example rows`);
+    for (let n = 1; n <= rows; n++) assert.deepEqual(one.k.get(`${register}#${n}`)!.fields.tags, ['example'], `${register}#${n}`);
   }
 
   one.sql.close();

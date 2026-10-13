@@ -144,3 +144,69 @@ test('THE RULE LIVES IN ONE FILE: the copy beside Activity is gone', () => {
   for (const old of ['read-mark.ts', 'read-mark.test.ts'])
     assert.equal(existsSync(new URL(`../../routes/audit/${old}`, import.meta.url)), false, `routes/audit/${old} is a second home for the rule`);
 });
+
+/* ── A line that arrives while Home is open ────────────────────────────── */
+
+/**
+ * WHAT WAS MEASURED (audit 74, claim 6). Home stamped the shell's cursor, which `boot` answered when the tab opened. A
+ * line that landed while Home was open was drawn there when the page was read again, and the mark was still stamped
+ * below it, so the next visit said that line was new a second time.
+ *
+ * Home's leave is two lines, said here as it is written there: what was new when its page was last read wins, and
+ * until that has answered the shell's cursor is the one sent.
+ */
+type News = { upTo: number | string | null; unseen: number; held: number };
+const homeMark = (shell: number | string | null, news: News | null) =>
+  news ? readMarkOf(news.upTo ?? shell, news.unseen, news.held) : readMarkOf(shell, shell === null ? 0 : 1);
+
+test('A LINE THAT ARRIVES WHILE HOME IS OPEN IS MARKED AT LEAVE, with the newest line Home drew and not the cursor the tab opened on', async () => {
+  const sent: unknown[] = [];
+  const stamp = stampOf(async (upTo) => (sent.push(upTo), true));
+  /* The tab opened on 100 with three lines new, and Home drew them. */
+  let news: News | null = { upTo: 100, unseen: 3, held: 100 };
+  assert.equal(homeMark(100, news), 100);
+  /* A line lands, the record's version moves, and Home reads its page again and draws it. */
+  news = { upTo: 101, unseen: 4, held: 101 };
+  assert.equal(await stamp.leave(homeMark(100, news)), true);
+  assert.deepEqual(sent, [101], 'the line drawn while Home was open was left unseen, and comes back as new');
+});
+
+test('A HOME OPENED ON A SHELL THAT HELD NOTHING NEW still marks the line that arrived while it was open', async () => {
+  const sent: unknown[] = [];
+  const stamp = stampOf(async (upTo) => (sent.push(upTo), true));
+  /* Nothing was new at boot, so the shell has no cursor, and the first leave has nothing to send. */
+  assert.equal(await stamp.leave(homeMark(null, { upTo: null, unseen: 0, held: 0 })), false);
+  assert.equal(await stamp.leave(homeMark(null, { upTo: 41, unseen: 1, held: 41 })), true);
+  assert.deepEqual(sent, [41]);
+});
+
+test('A MEMBER HELD TO NAMED LISTS sends back the cursor the page read answered with, and never a number', () => {
+  const opened = 'e.01M1RQ3130J6MBME97EKYKKWZ2';
+  const later = 'e.01M1RQ4FZ0J6MBME97EKYKKWZ9';
+  /* Her lines carry no number, so `held` is 0 and the newer cursor is the one handed back, exactly as it came. */
+  assert.equal(homeMark(opened, { upTo: later, unseen: 2, held: 0 }), later);
+});
+
+test('NOTHING NEW WHEN THE PAGE WAS READ IS NOTHING TO STAMP, though the tab opened on a cursor', () => {
+  /* Activity stamped the mark in the same tab; the shell still holds the cursor it opened on. */
+  assert.equal(homeMark(100, { upTo: null, unseen: 0, held: 0 }), null, 'Home stamped a mark another screen had already moved');
+});
+
+test('UNTIL THE RECORD HAS SAID WHAT IS NEW, HOME STAMPS THE SHELL’S CURSOR, and no cursor is still no mark', () => {
+  assert.equal(homeMark(100, null), 100);
+  assert.equal(homeMark('e.01M1RQ3130J6MBME97EKYKKWZ2', null), 'e.01M1RQ3130J6MBME97EKYKKWZ2');
+  assert.equal(homeMark(null, null), null);
+});
+
+test('Home stamps through `readMarkOf` with what its last page read held, and asks before the page read it goes with', () => {
+  const text = read(SCREENS.Home);
+  assert.match(text, /import \{[^}]*\breadMarkOf\b[^}]*\} from '\$lib\/page\/read-mark\.ts';/u, 'Home does not import the one rule');
+  assert.doesNotMatch(text, /stamp\.leave\(data\.upTo\)/u, 'Home stamps the cursor the tab opened on');
+  assert.match(text, /news \? readMarkOf\(news\.upTo \?\? data\.upTo, news\.unseen, news\.held\) : readMarkOf\(data\.upTo, data\.upTo === null \? 0 : 1\)/u, 'the leave in this file’s `homeMark` is no longer Home’s');
+  /* BOTH READS OF THE PAGE, the first and the one a new version of the record starts: each asks what is new before its
+     page read goes out, so the cursor kept is never newer than the page it is kept beside. */
+  const reads = [...text.matchAll(/newsNow\(\)[\s\S]{0,120}?\breadBody\(/gu)];
+  assert.equal(reads.length, 2, 'a read of Home’s page does not ask what is new before it');
+  assert.equal(text.match(/\bkeepNews\(before, mine\)/gu)?.length, 2, 'what was new is kept beside a page that was not drawn');
+  assert.equal(text.match(/\.whatsNew\(/gu)?.length, 1, 'Home asks what is new in a second place');
+});
