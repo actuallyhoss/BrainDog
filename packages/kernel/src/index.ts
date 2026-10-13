@@ -418,10 +418,11 @@ export { COSTS, MANY_ROWS, WAITS, WAIT_RANK_SQL, WAIT_SQL, costOf, costRank, wai
 export { AGGREGATIONS, bucketState, deltaFrom, evaluateMetric, fxOfPair, largestFirst, meets, rateUnit, scorePrediction, snapshot, targetCurrency, targetFor, targetInto, targetOf, windowMs } from './metrics.ts';
 export { clockOf, isMoneyFormat, verdictOf } from './metrics.ts';
 export { readDeclaredSigns, vitalOf } from './metrics.ts';
+export { farRates, pointSaid } from './metrics.ts';
 export { SESSIONS_WORKING, readRunsWorking } from './built-in-figures.ts';
 export { HANDOFFS_OPEN, openSteps, readHandoffsOpen, type OpenStep } from './built-in-figures.ts';
 export { KEYS_IN_TEXT, RECORD_KEY_SCAN, keysInText, placeOf, readKeysInText, scanKeys, type KeyFinding, type KeyScan } from './key-scan.ts';
-export { CROSSCHECK_ENTRIES_MOST, ROLLED_ACCOUNTS_MOST, ROLLED_CHECKS_MOST, WALKS, WALK_SOURCE, figureLists } from './money-figures.ts';
+export { CROSSCHECK_ENTRIES_MOST, CROSSCHECK_TOO_MANY, ROLLED_ACCOUNTS_MOST, ROLLED_CHECKS_MOST, WALKS, WALK_SOURCE, figureLists } from './money-figures.ts';
 export type { Crosscheck, Rolled, RolledCheck, RolledMoves, Walked } from './money-figures.ts';
 export { HOME_CURRENCY_SETTING, across, convertMinor, dayFieldOf, homeFrom, isAtLeast, pairParts, partsOf, rateFor, ratesFrom, reduceOf } from './fx.ts';
 export type { Across, Amount, Part, Rate, Reduce } from './fx.ts';
@@ -452,6 +453,7 @@ export {
 } from './digest.ts';
 export { CREATE_CEILING, applyRule, dryRun, fill as fillTemplate, linkFault, linkPatternFault, marker, order as orderRules, runRules } from './rules.ts';
 export { runway } from './forecast.ts';
+export { cycleAfter, restDaysOf } from './forecast.ts';
 export { SERIES_AHEAD, SERIES_BACK, SERIES_LINES, barsOf } from './series.ts';
 export { SETUP_KIND, setupCollapser, type FeedLine } from './feed.ts';
 export type { Bars, SeriesLine } from './series.ts';
@@ -546,7 +548,7 @@ export type {
 export type DeclarationBundle = { declarations: Declaration[] };
 export type { Analysis, Counted, Finding, Observation, Signal } from './observe.ts';
 export type { Answered, Arrival, Arrived, Confidence, DoorLine, Extracted, Extractor, FieldOutcome, IngestDecl, IngestDeps, NumberReaders, PatternLine, PatternReport, Sender } from './ingest.ts';
-export type { ForecastDeps, Horizon, Leg, Runway, Step } from './forecast.ts';
+export type { CycleLine, ForecastDeps, Horizon, Leg, Runway, Step } from './forecast.ts';
 export type { DryRun, Fired, LinkTo, RuleAction, RuleDecl, RulesDeps, RulesOutcome } from './rules.ts';
 export type { Assembled, Channel, DigestDecl, DigestDeps, DigestPart, DigestSection, Sent } from './digest.ts';
 export type { BlockResult, DecidedQuestion, PageBlock, PageDecl, PageDeps, PageFilter, PageResult, PageRow, LastChange, RowChange, QueueCandidate, QueueOption, QueueQuestion, QuestionFacts } from './pages.ts';
@@ -6335,7 +6337,20 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const cols = [...by.map((e, n) => `${e} AS b${n}`), `${unit} AS unit`, `${on} AS day`, `COALESCE(SUM(${amount}), 0) AS sum`, `COUNT(*) AS n`, `COUNT(${amount}) AS said`];
       const group = Array.from({ length: by.length + 2 }, (_, n) => n + 1).join(', ');
       const rows = sql.all<Record<string, unknown>>(`SELECT ${cols.join(', ')} FROM entry WHERE register = ? AND deleted_at IS NULL AND (${c.sql}) GROUP BY ${group}`, q.register, ...c.params);
-      return ok(rows.map((r) => ({ by: q.by.map((_, n) => (r[`b${n}`] ?? null) as Json), unit: typeof r.unit === 'string' ? r.unit : null, day: typeof r.day === 'string' ? r.day : null, sum: Number(r.sum), rows: Number(r.n), said: Number(r.said) })));
+      /* A LABEL IS HANDED BACK AS THE ROW HOLDS IT, as the walk hands it: SQLite says a yes or no as 1 or 0 and a value
+         of several parts (a list, an amount) as its JSON text, and a page would draw `1` and `["home"]` for them. */
+      const held = q.by.map(({ field, day }) => (day ? null : (schema.fields[field]?.type ?? null)));
+      const label = (v: unknown, type: string | null): Json => {
+        if (v === undefined || v === null) return null;
+        if (type === 'bool' && (v === 0 || v === 1)) return v === 1;
+        if (typeof v !== 'string' || !(type === 'list' || type === 'json' || type === 'money' || type === 'quantity' || type === 'file') || !/^[[{]/.test(v)) return v as Json;
+        try {
+          return JSON.parse(v) as Json;
+        } catch {
+          return v;
+        }
+      };
+      return ok(rows.map((r) => ({ by: q.by.map((_, n) => label(r[`b${n}`], held[n]!)), unit: typeof r.unit === 'string' ? r.unit : null, day: typeof r.day === 'string' ? r.day : null, sum: Number(r.sum), rows: Number(r.n), said: Number(r.said) })));
     },
     /*
      * THE NEWEST EVENTS, for a `feed` or an `agents` block. A row's event names the row as a page names it,

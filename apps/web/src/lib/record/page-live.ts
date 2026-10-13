@@ -430,8 +430,14 @@ function wholeOf(v: unknown): WholeLine[] | null {
 /** The column a heat's share is written in when the block declares only its day: no list's field, so it is said as written. */
 const WHOLE_SHARE = 'share of whole';
 
-/** How many rows a counted whole is laid out as at most; past it the block says it cannot be drawn. */
-const WHOLE_COUNTED_MOST = 250_000;
+/**
+ * How many rows a counted whole is laid out as at most; past it the block says it cannot be drawn.
+ *
+ * IT IS THE MOST ROWS THE RECORD WALKS FOR A WHOLE (`WHOLE_WALK_ROWS` in `kernel/src/pages.ts`), so no count the
+ * record answers is refused by it, and a count past it is one no walk arrived at. It was 250,000, five times that,
+ * which nothing could reach honestly and which a wrong line could fill on every refresh (audit 53, finding 7).
+ */
+const WHOLE_COUNTED_MOST = 50_000;
 
 /**
  * THE WHOLE'S LINES AS ROWS THE BLOCK'S OWN DRAWER ADDS UP, or `null` where they cannot stand in for the rows.
@@ -452,6 +458,14 @@ function wholeRows(kind: string, columns: readonly { field?: unknown }[], lines:
   const shares = kind === 'heat' && lines.some((l) => l.of !== undefined);
   const counts = kind === 'chips' || (!of && !shares);
   if (shares && lines.some((l) => l.of === undefined)) return null;
+  /* THE COUNTS ARE ADDED UP BEFORE A ROW IS LAID OUT, so a whole past the bound is refused having built nothing. */
+  if (counts) {
+    let all = 0;
+    for (const l of lines) {
+      if (!Number.isInteger(l.value) || l.value < 0) return null;
+      if ((all += l.value) > WHOLE_COUNTED_MOST) return null;
+    }
+  }
   const rows: Row[] = [];
   for (const l of lines) {
     const row = (fields: Record<string, unknown>): Row => ({ id: '', seq: null, fields, version: 0, created_at: '' });
@@ -460,7 +474,6 @@ function wholeRows(kind: string, columns: readonly { field?: unknown }[], lines:
       rows.push(row({ [by]: l.label, [of || WHOLE_SHARE]: sum }));
       continue;
     }
-    if (!Number.isInteger(l.value) || l.value < 0 || rows.length + l.value > WHOLE_COUNTED_MOST) return null;
     const one = row({ [by]: l.label });
     for (let i = 0; i < l.value; i++) rows.push(one);
   }

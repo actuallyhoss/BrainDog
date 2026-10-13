@@ -1464,6 +1464,23 @@ test("A HEAT SET AGAINST ANOTHER WHOLE WRITES EACH DAY AS ITS SHARE, and a block
   assert.deepEqual(drawnCells(blockOf(chips as never, new Map(), AT)).map((c) => c[1]), ['290', '10']);
   assert.equal(blockOf({ ...chips, wholeRead: { rows: [{ label: 'review', value: 2.5 }] } } as never, new Map(), AT).cannot, liveWords.cannot);
 
+  /* A COUNT IS LAID OUT ONLY AS FAR AS THE RECORD WALKS FOR ONE (50,000 rows): at the bound it draws, and one past
+     it, in one label or across several, says it cannot be drawn. */
+  const counted = (...values: number[]) => blockOf({ ...chips, wholeRead: { rows: values.map((value, n) => ({ label: `s${n}`, value })) } } as never, new Map(), AT);
+  assert.deepEqual(drawnCells(counted(49_999, 1)).map((c) => c[1]), ['49999', '1']);
+  assert.equal(counted(50_001).cannot, liveWords.cannot);
+  assert.equal(counted(30_000, 20_001).cannot, liveWords.cannot);
+  assert.equal(counted(3, -1).cannot, liveWords.cannot);
+
+  /* AND LABELS LEFT OUT PAST THE CAP (`rest`) REFUSE A COUNT AND A HEAT AS THEY DO A BAR, whatever the rest holds:
+     the chips drawn would count fewer than the list. */
+  for (const rest of [{ labels: 3, rows: 9, value: 9 }, { labels: 1, rows: 1, value: null, parts: [{ currency: 'GBP', amount: 1 }] }, {}, 0]) {
+    assert.equal(blockOf({ ...chips, wholeRead: { ...chips.wholeRead, rest } } as never, new Map(), AT).cannot, liveWords.cannot, JSON.stringify(rest));
+    assert.equal(blockOf({ ...heat, wholeRead: { ...days, rest } } as never, new Map(), AT).cannot, liveWords.cannot, JSON.stringify(rest));
+  }
+  /* A `rest` THAT IS NOT THERE (absent, or null) leaves the whole as its lines. */
+  assert.equal(blockOf({ ...chips, wholeRead: { ...chips.wholeRead, rest: null } } as never, new Map(), AT).cannot, undefined);
+
   /* AND A THIRD COLUMN IS NOT IN THE LINES: a progress against each row's target is not drawn from two of its three. */
   const tracks = { kind: 'progress', source: 'register.tasks', columns: [{ field: 'what' }, { field: 'effort' }, { field: 'effort' }], rows: [], matched: 300, refusals: [], wholeRead: { rows: [{ label: 'a', value: 1 }] } };
   assert.equal(blockOf(tracks as never, new Map(), AT).cannot, liveWords.cannot);

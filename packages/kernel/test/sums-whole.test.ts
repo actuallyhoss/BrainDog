@@ -9,12 +9,12 @@
  * EACH TEST DRIVES A REAL RECORD, because the answer is about what the database holds and not about a page of it.
  */
 
-import { test, before, after } from 'node:test';
+import { test, before, after, mock } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { ANSWER_KEYS, openRecord, type Declaration, type Kernel } from '../src/index.ts';
 import { createRecordApi, type CallContext } from '../../record/src/index.ts';
-import { WHOLE_MS, readBlock, wholeLate, type PageDeps, type WholeAsk } from '../src/pages.ts';
+import { WHOLE_MS, WHOLE_PARTS, WHOLE_WALK_ROWS, readBlock, wholeLate, wholeLong, type PageDeps, type WholeAsk } from '../src/pages.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
 /**
@@ -67,6 +67,7 @@ const CLEARED = Array.from({ length: ROWS }, (_, n) => n).filter((n) => n % 3 ==
 type Part = { currency: string; amount: number };
 type Whole = {
   rows: { label: unknown; rows: number; value: number | null; unit?: string; parts?: Part[]; of?: number | null }[];
+  rest?: { labels: number; rows: number; value: number | null; unit?: string; parts?: Part[] };
   total: number | null;
   unit?: string | null;
   parts?: Part[];
@@ -195,6 +196,120 @@ test('THE BOUND IS TIME: a whole read past 250 ms is refused with the sentence t
   assert.equal(late?.code, 'OUT_OF_BOUNDS');
   assert.equal(late?.at, 'where');
   assert.match(String(late?.fix), /Narrow this with a where/u);
+});
+
+/**
+ * A host with no grouped read, whose list is `length` rows of 1 EGP each under one category. `says` is the `matched`
+ * it answers with (a host may say less than it holds), and `endless` is a host whose cursor never ends. `walks` counts
+ * the pages the whole read asked for, which are the ones asked for 500 at a time.
+ */
+const walked = (length: number, says = length, endless = false) => {
+  const schema = k.schemaOf('ledger');
+  assert.ok(schema);
+  const seen = { walks: 0 };
+  const one = { fields: { what: 'A movement', category: 'Rent', amount: { amount: 1, currency: 'EGP' } } };
+  const deps = {
+    pages: () => [],
+    metric: () => null,
+    read: () => ({ ok: false, refusal: { code: 'METRIC_UNKNOWN', fix: 'There is no such figure.' } }),
+    list: (q: { limit?: number; cursor?: string }) => {
+      const limit = q.limit ?? 200;
+      if (limit > 200) seen.walks += 1;
+      const from = q.cursor ? Number(q.cursor) : 0;
+      const to = endless ? from + limit : Math.min(length, from + limit);
+      return { ok: true, value: { rows: Array.from({ length: to - from }, () => one), matched: says, cursor: endless || to < length ? String(to) : null } };
+    },
+    schemaOf: () => schema,
+    titleOf: () => 'what',
+    runway: () => null,
+    ctx: { nowMs: NOW, schemaOf: () => schema },
+  } as unknown as PageDeps;
+  const answer = () => readBlock(deps, { kind: 'bar', source: 'register.ledger', columns: BY_CATEGORY } as never) as Answered;
+  return { seen, answer };
+};
+
+test('THE BOUND IS A COUNT AS WELL, for the clock that does not move: a walk past 50,000 rows is refused, and one of 50,000 is added up', () => {
+  assert.equal(WHOLE_WALK_ROWS, 50_000);
+  assert.equal(wholeLong(WHOLE_WALK_ROWS), null);
+  const long = wholeLong(WHOLE_WALK_ROWS + 1);
+  assert.equal(long?.code, 'OUT_OF_BOUNDS');
+  assert.equal(long?.at, 'where');
+  assert.match(String(long?.fix), /too long to add up.*Narrow this with a where/u);
+  assert.doesNotMatch(String(long?.fix), /longer than a page waits/u, 'a clock that stood still was said to have run late');
+
+  /* THE CLOCK STANDS STILL, as it does through one piece of work on a host that holds it: nothing here can run late. */
+  const still = mock.method(performance, 'now', () => 0);
+  try {
+    /* AT THE CEILING IT IS ADDED UP, every row of it. */
+    const most = walked(WHOLE_WALK_ROWS);
+    const b = most.answer();
+    assert.deepEqual(b.refusals, []);
+    assert.equal(b.wholeRead?.total, WHOLE_WALK_ROWS);
+    assert.equal(b.wholeRead?.rows[0]?.rows, WHOLE_WALK_ROWS);
+    assert.equal(most.seen.walks, WHOLE_WALK_ROWS / 500);
+
+    /* ONE PAGE PAST IT, AND THE HOST SAYS HOW MANY: refused off the first page, never after a hundred of them. */
+    const over = walked(WHOLE_WALK_ROWS + 500);
+    const refused = over.answer();
+    assert.equal(refused.wholeRead, undefined);
+    assert.equal(refused.refusals?.[0]?.code, 'OUT_OF_BOUNDS');
+    assert.equal(refused.refusals?.[0]?.fix, long?.fix);
+    assert.equal(over.seen.walks, 1, 'a list its host said was too long was walked anyway');
+
+    /* A HOST THAT SAYS FEWER THAN IT HOLDS, AND WHOSE CURSOR NEVER ENDS: the rows read are counted, so the walk ends. */
+    const endless = walked(0, 3, true);
+    const stopped = endless.answer();
+    assert.equal(stopped.wholeRead, undefined);
+    assert.equal(stopped.refusals?.[0]?.fix, long?.fix);
+    assert.equal(endless.seen.walks, WHOLE_WALK_ROWS / 500 + 1, 'the walk did not stop on the page that passed the ceiling');
+  } finally {
+    still.mock.restore();
+  }
+});
+
+test('PAST 200 LABELS THE 200 LARGEST ARE PARTS AND THE REST ARE ADDED INTO ONE, so the parts and the rest are the total', async () => {
+  /* 260 CATEGORIES OF TWO MOVEMENTS EACH: category `n` adds up to 1000 + 2n, so no two are level and the order is known.
+     The 200 largest are cleared, so a `where` can admit exactly that many. */
+  const LABELS = 260;
+  const past = LABELS - WHOLE_PARTS;
+  const other = openSqlite();
+  try {
+    const wide = await openRecord(other, fixedClock(NOW));
+    assert.ok((await wide.install([LEDGER])).ok);
+    for (let n = 0; n < LABELS; n++)
+      for (const amount of [1000 + n, n])
+        assert.ok(wide.create('ledger', { what: `Movement ${n}`, category: `Category ${n}`, amount: { amount, currency: 'EGP' }, cleared: n >= past }, { actor: 'p_1' }).ok);
+    const of = (n: number) => 1000 + 2 * n;
+    const all = Array.from({ length: LABELS }, (_, n) => of(n));
+    const total = all.reduce((a, b) => a + b, 0);
+
+    const b = wide.block({ kind: 'bar', source: 'register.ledger', columns: BY_CATEGORY } as never) as Answered;
+    assert.deepEqual(b.refusals, []);
+    const w = b.wholeRead;
+    assert.ok(w, 'a bar over 260 labels answered no wholeRead');
+    assert.equal(w.total, total, 'the total is of every label, never of the 200 drawn');
+    assert.equal(w.rows.length, WHOLE_PARTS);
+    /* THE LARGEST ARE THE ONES KEPT, largest first, and the smallest sixty are the rest. */
+    assert.deepEqual(w.rows.map((r) => r.label), Array.from({ length: WHOLE_PARTS }, (_, i) => `Category ${LABELS - 1 - i}`));
+    assert.deepEqual(w.rows.map((r) => r.value), Array.from({ length: WHOLE_PARTS }, (_, i) => of(LABELS - 1 - i)));
+    assert.deepEqual(w.rest, { labels: past, rows: past * 2, value: all.slice(0, past).reduce((a, c) => a + c, 0), unit: 'EGP' });
+    assert.equal(sum(w) + (w.rest?.value ?? 0), total, 'a label past the 200th was dropped from the sum');
+    assert.equal(w.rows.reduce((a, r) => a + r.rows, 0) + (w.rest?.rows ?? 0), LABELS * 2);
+
+    /* AND A COUNT BY LABEL SAYS ITS REST THE SAME WAY: sixty labels more, of two each. */
+    const chips = (wide.block({ kind: 'chips', source: 'register.ledger', columns: [{ field: 'category' }] } as never) as Answered).wholeRead;
+    assert.equal(chips?.rows.length, WHOLE_PARTS);
+    assert.equal(chips?.total, LABELS * 2);
+    assert.deepEqual(chips?.rest, { labels: past, rows: past * 2, value: past * 2 });
+
+    /* EXACTLY 200 LABELS HAVE NO REST: nothing is said to be left over when nothing is. */
+    const few = (wide.block({ kind: 'bar', source: 'register.ledger', where: 'cleared is true', columns: BY_CATEGORY } as never) as Answered).wholeRead;
+    assert.equal(few?.rows.length, WHOLE_PARTS);
+    assert.equal(few?.total, all.slice(past).reduce((a, c) => a + c, 0));
+    assert.equal(few?.rest, undefined);
+  } finally {
+    other.close();
+  }
 });
 
 test('A HOST THAT HANDS ONE GROUPED READ IS ASKED ONCE, and the list is not walked', () => {

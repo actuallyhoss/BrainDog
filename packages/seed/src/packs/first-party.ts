@@ -476,12 +476,16 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   1.15.0 AND WORK 1.17.0 ARE RELEASED, so each is a version of its own. A key on a list, a block and two figures
  *   added, nothing taken away or retyped, so each is a minor step that reaches a record on its own. The project page
  *   moves with them, though no pack holds it (`crossPack`).
+ * - estate 2.2.0: a service's type gains server, database, storage and network, said Server, Database, Storage and
+ *   Network. A record that came in from a cloud account brought its own values for these with no label, and the month
+ *   by type read a key. Four values added after the eight and nothing taken away, so the step is a minor one; a value a
+ *   record added itself stays (laidBack).
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.16.0',
   people: '3.3.0',
   'money-core': '3.17.0',
-  estate: '2.1.0',
+  estate: '2.2.0',
   work: '1.18.0',
 };
 

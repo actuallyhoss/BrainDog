@@ -21,6 +21,7 @@
 
 import { addDays } from './forecast.ts';
 import { day } from './format.ts';
+import { HEAT_WEEKS } from './heat.ts';
 import { parse, type Segment } from './parse.ts';
 
 /** The word every specimen carries, in its label and in what is drawn. */
@@ -211,10 +212,22 @@ export function partSpecimens(): Specimen[] {
       key: 'heat:share',
       kind: 'heat',
       label: "Specimen: heat, each day a share of that day's whole",
-      source: fence(`heat | Done on the day, ${SPECIMEN}`, daysTo(30, 0).map((d, i) => `${d} | ${(valueAt(i) % 5) + (i % 2)} of ${(valueAt(i) % 5) + 1 + (i % 3)}`)),
+      source: fence(`heat | Done on the day, ${SPECIMEN}`, daysTo(SHARE_DAYS, 0).map((d, i) => `${d} | ${shareAt(i).join(' of ')}`)),
     },
   ];
 }
+
+/**
+ * THE SHARE HEAT FILLS ITS GRID: a day for each one the twelve weeks draw, from the first Monday to the sheet's day,
+ * so no day is left unwashed for want of one and none falls outside to be said under the grid.
+ */
+const SHARE_DAYS = (HEAT_WEEKS - 1) * 7 + ((new Date(`${SHEET_DAY}T00:00:00Z`).getUTCDay() + 6) % 7) + 1;
+
+/** A day's part and its whole. The part is never past the whole; some days are none of it and some are all of it. */
+const shareAt = (i: number): [number, number] => {
+  const whole = (valueAt(i) % 5) + 1 + (i % 3);
+  return [Math.min(whole, (valueAt(i) % 5) + (i % 2)), whole];
+};
 
 /** The specimen a form is drawn from where the record holds none: the long fresh chart, the whole plan, or the part. */
 export function specimenFor(kind: string, form?: string): Specimen | undefined {

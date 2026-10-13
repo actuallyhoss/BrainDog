@@ -9,7 +9,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { jcs, openRecord, type Declaration, type Kernel, type Reading } from '../src/index.ts';
+import type { Schema } from '@braindog/where';
+
+import { CROSSCHECK_ENTRIES_MOST, jcs, openRecord, snapshot, type Declaration, type EvalContext, type Kernel, type MetricDecl, type Rate, type Reading } from '../src/index.ts';
+import { CROSSCHECK_TOO_MANY, pointedIn } from '../src/money-figures.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
 /* Noon UTC on 20 September. The record has no zone, so its day is the UTC day. */
@@ -251,4 +254,128 @@ test('THE DECLARATION IS CHECKED: money, rolled, a walk, home and sellable insta
   assert.equal(refusedAt(await k.install([metric(walk('lasts', { walk: 'days_to_zero' }, { opening: { metric: 'nosuch' } }))])), 'METRIC_UNKNOWN at opening');
   assert.equal(refusedAt(await k.install([metric(walk('lasts', { walk: 'days_to_zero' }, { opening: { metric: 'arriving' } }))])), 'DECLARATION_INVALID at opening');
   sql.close();
+});
+
+/* ── at least, a kept point, and a check past its bound (REC-B05) ──────────── */
+
+const FX = register('fx', 'Rates', 'currency', [
+  { id: 'currency', type: 'text', required: true },
+  { id: 'base', type: 'text', required: true },
+  { id: 'rate', type: 'decimal', required: true },
+  { id: 'as_of', type: 'day', index: true, required: true },
+]);
+
+/** The record above with a home currency of pounds Egyptian, a dollar account, and a list of rates to fill. */
+async function abroad(): Promise<{ k: Kernel; sql: NodeSql; ids: Record<string, string> }> {
+  const made = await record();
+  const { k } = made;
+  assert.ok((await k.install([FX])).ok);
+  k.rememberPack({
+    id: 'money-core',
+    version: '1.0.0',
+    source: 'local',
+    ref: null,
+    manifest: jcs({ pack: 'money-core', version: '1.0.0', config: { home_currency: { type: 'text' } } }),
+    checksum: 'not-a-real-checksum',
+  });
+  assert.ok(k.setPackConfig('money-core', { home_currency: 'EGP' }, { actor: 'p_1' }).ok);
+  assert.ok(k.create('accounts', { name: 'Mercury', balance: { amount: 100_000, currency: 'USD' }, as_of: '2026-09-19', liquid: true }, { actor: 'p_1' }).ok);
+  return made;
+}
+
+test('CASH ROLLED FORWARD WITH ONE RATE MISSING IS AT LEAST: what converts is added, the rest is listed, and nothing is a value', async () => {
+  const { k, sql } = await abroad();
+  assert.ok(k.create('fx', { currency: 'USD', base: 'EGP', rate: 50, as_of: '2026-09-20' }, { actor: 'p_1' }).ok);
+  /* 168,000.00 pounds and 1,000.00 dollars at 50. */
+  const whole = read(k, CASH);
+  assert.deepEqual([whole.value, whole.unit, whole.atLeast], [16_800_000 + 5_000_000, 'EGP', undefined]);
+
+  const dirhams = k.create('accounts', { name: 'Dubai', balance: { amount: 120_000, currency: 'AED' }, as_of: '2026-09-19', liquid: true }, { actor: 'p_1' });
+  assert.ok(dirhams.ok);
+  const least = read(k, CASH);
+  assert.equal(least.atLeast, true);
+  assert.deepEqual([least.value, least.unit, least.met, least.delta], [null, null, null, null], 'a lower bound was judged or compared');
+  assert.deepEqual(least.noRate, [{ currency: 'AED', amount: 120_000 }]);
+  assert.deepEqual(least.parts, [
+    { currency: 'EGP', amount: 21_800_000 },
+    { currency: 'AED', amount: 120_000 },
+  ]);
+  assert.deepEqual(least.fx?.missing, ['AED to EGP']);
+
+  /* THE WALK OPENS FROM THE SAME ANSWER, so it has no day to give and says which rate it lacks. */
+  assert.ok((await k.install([metric(CASH)])).ok);
+  const days = read(k, walk('runway', { walk: 'days_to_zero' }, { opening: { metric: 'cash' } }));
+  assert.equal(days.value, null);
+  assert.equal(days.why, 'the figure it walks from has no rate for AED, so it is only at least');
+  assert.deepEqual(days.fx?.missing, ['AED to EGP']);
+
+  /* AN AMOUNT LEFT OUT UNDER NOUGHT COULD PULL THE TOTAL DOWN, so it is one amount a currency and never at least. */
+  assert.ok(k.update('accounts', dirhams.value.id, { balance: { amount: -120_000, currency: 'AED' } }, { actor: 'p_1' }).ok);
+  const apart = read(k, CASH);
+  assert.equal(apart.atLeast, undefined);
+  assert.equal(apart.noRate, undefined);
+  assert.deepEqual(apart.parts?.map((p) => p.currency), ['AED', 'EGP', 'USD']);
+  sql.close();
+});
+
+/** A list's schema as the kernel hands one to a reader, from the declaration above. */
+const schemaOf = (decl: Declaration): Schema => {
+  const body = decl.body as unknown as { id: string; fields: { id: string }[] };
+  return { register: body.id, fields: Object.fromEntries(body.fields.map(({ id, ...field }) => [id, field])) } as unknown as Schema;
+};
+const SCHEMAS = new Map([ACCOUNTS, BALANCES, TRANSACTIONS].map((d) => [schemaOf(d).register, schemaOf(d)]));
+
+test('A KEPT POINT OF CASH NEEDS A RATE OF ITS OWN DAY OR THE DAY BEFORE: a night without one is a gap, filled the night after', async () => {
+  const { sql } = await abroad();
+  const dollar = (as_of: string): Rate => ({ currency: 'USD', base: 'EGP', rate: 50, as_of });
+  const night = (rates: readonly Rate[]) => {
+    const ctx: EvalContext = { nowMs: NOW, schemaOf: (id) => SCHEMAS.get(id) ?? null, fx: () => ({ home: 'EGP', rates }) };
+    const out = snapshot(sql, CASH as unknown as MetricDecl, ctx, { nowAt: new Date(NOW).toISOString(), tz: 'UTC' }, 0);
+    assert.ok(out.ok, JSON.stringify(out));
+    return out.value;
+  };
+  const kept = () => sql.all<{ at: string; value: number; unit: string }>("SELECT at, value, unit FROM metric_point WHERE series = 'cash' ORDER BY at").map((p) => ({ ...p }));
+
+  /* THE 19TH, WITH A RATE NINE DAYS OLD, and then with a later one standing in: no number either way. */
+  assert.deepEqual(night([dollar('2026-09-10')]), { series: 'cash', wrote: 0, backfilled: 0, missing: 1, noRate: 1 });
+  assert.deepEqual(night([dollar('2026-09-20')]), { series: 'cash', wrote: 0, backfilled: 0, missing: 1, noRate: 1 });
+  assert.deepEqual(kept(), []);
+
+  /* A RATE OF THE DAY BEFORE: 165,000.00 pounds as the 19th closed, and 1,000.00 dollars at 50. */
+  assert.deepEqual(night([dollar('2026-09-10'), dollar('2026-09-18')]), { series: 'cash', wrote: 1, backfilled: 0, missing: 0, noRate: 0 });
+  assert.deepEqual(kept(), [{ at: '2026-09-19', value: 16_500_000 + 5_000_000, unit: 'EGP' }]);
+  sql.close();
+});
+
+test('A CROSS-CHECK OVER MORE ENTRIES THAN IT READS SAYS SO, with no value and no verdict, and is not a refusal', async () => {
+  const { k, sql, ids } = await record();
+  const check = { metric: 'cash-check', name: 'Cash now, checked', source: 'register.accounts', value: { crosscheck: { of: 'cash' } }, format: 'money', target: { lte: 0 }, window: '30d', compare: 'none' };
+  assert.ok((await k.install([metric(CASH)])).ok);
+  const right = read(k, check);
+  assert.deepEqual([right.value, right.met], [0, true]);
+
+  /* ONE MORE CLEARED MOVE THAN THE BOUND, written straight in and dated before the account's own day, so the figure
+     counts none of them and is the same number: only the check has more to read than it reads. */
+  const fields = JSON.stringify({ what: 'old', account: ids.a, on: '2026-09-01', amount: egp(1), direction: 'out', state: 'cleared' });
+  sql.exec(
+    `WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i <= ?)
+     INSERT INTO entry (id, register, seq, fields, created_at, updated_at) SELECT printf('zz%024d', i), 'transactions', 1000 + i, ?, ?, ? FROM n`,
+    CROSSCHECK_ENTRIES_MOST,
+    fields,
+    new Date(NOW).toISOString(),
+    new Date(NOW).toISOString(),
+  );
+  assert.equal(read(k, CASH).value, 16_800_000);
+  const many = read(k, check);
+  assert.equal(many.why, CROSSCHECK_TOO_MANY);
+  assert.equal(many.why, 'too many to check');
+  assert.deepEqual([many.value, many.unit, many.met, many.parts], [null, null, null, undefined], 'a check that did not run found something');
+  sql.close();
+});
+
+test('THE LISTS A PREDICATE HOPS INTO are named however deep, and a sentence hops nowhere', () => {
+  assert.deepEqual(pointedIn('state is open'), []);
+  assert.deepEqual(pointedIn({ field: 'state', is: 'open' }), []);
+  const hop = { pointed: { register: 'accounts', where: { any: [{ pointed: { register: 'books' } }, { field: 'liquid', is: true }] } } };
+  assert.deepEqual(pointedIn({ all: [hop, { none: [{ pointed: { register: 'people' } }] }] }), ['accounts', 'books', 'people']);
 });

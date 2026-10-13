@@ -10,6 +10,7 @@ import { USE_CASE_CHANGES } from '@braindog/seed/usecases/share';
 
 import { firstPartyUpdates } from '../../routes/decide/improved.ts';
 import { listingsOf } from './listing.ts';
+import { sheetOf } from './plan.ts';
 import type { PackState } from '../record/packs.ts';
 
 const listings = listingsOf({ kennel: null, counts: null });
@@ -42,4 +43,42 @@ test('a record on an older Solo founder is offered the update with the note of e
   /* ONE VERSION BEHIND READS ONLY THE NEWEST NOTE. */
   const behind = firstPartyUpdates([{ ...held[0]!, version: older }]).find((u) => u.id === 'founder');
   assert.deepEqual(behind?.notes, [notes[0]!.notes]);
+});
+
+/* THE PLAN SHEET SAYS A CALL OUT AS THE KERNEL'S SENTENCE, and never as the record's own `CALLS OUT` line. */
+const stripe = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
+  ingest: 'ingest.stripe-charges',
+  channel: 'pull',
+  host: 'api.stripe.com',
+  every: '1h',
+  trigger: 'schedule',
+  per_day: null,
+  grant: 'stripe',
+  line: 'CALLS OUT api.stripe.com \u00b7 every 1h \u00b7 grant "stripe"',
+  change: 'new',
+  ...over,
+});
+const callsOf = (calls: unknown[]) => {
+  const sheet = sheetOf({ pack: { id: 'stripe', title: 'Stripe', version: '1.0.0' }, planHash: 'h', calls_out: calls }, (id) => id);
+  assert.ok(sheet, 'the plan is read');
+  return sheet.parts.flatMap((p) => p.calls);
+};
+
+test('a Stripe-shaped call is said as a sentence naming the key and the host, with its parts kept', () => {
+  const [call] = callsOf([stripe()]);
+  assert.ok(call);
+  assert.equal(call.line, "Sends your key 'stripe' to api.stripe.com every hour.");
+  assert.deepEqual(
+    { host: call.host, every: call.every, trigger: call.trigger, per_day: call.per_day, grant: call.grant, change: call.change },
+    { host: 'api.stripe.com', every: '1h', trigger: 'schedule', per_day: null, grant: 'stripe', change: 'new' },
+  );
+});
+
+test('a call the record already runs unchanged is the same sentence, and one a rule runs says so', () => {
+  const [same, ruled] = callsOf([stripe({ change: 'same' }), stripe({ trigger: 'both', per_day: 20 })]);
+  assert.equal(same?.change, 'same');
+  assert.equal(same?.line, "Sends your key 'stripe' to api.stripe.com every hour.");
+  assert.equal(ruled?.per_day, 20);
+  assert.match(ruled?.line ?? '', /^Sends your key 'stripe' to api\.stripe\.com every hour, and up to 20 times a day when a rule runs it\.$/u);
+  for (const c of [same, ruled]) assert.doesNotMatch(c?.line ?? '', /CALLS OUT|grant "|\u00b7/u);
 });

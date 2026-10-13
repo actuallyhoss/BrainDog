@@ -900,7 +900,8 @@ export const WHOLE_RECORD = '*';
  *
  * AND THE REFUSAL IS GONE WHERE A WHOLE READ IS HANDED (PGS-B05, `handsWhole`), because it made a list past 200 rows
  * undrawable: the Ledger's own chart of where the money went was dead from its 201st row. These kinds now answer
- * `wholeRead`, added up over every row (`wholeOf`), and what bounds them is time (`WHOLE_MS`), not a count.
+ * `wholeRead`, added up over every row (`wholeOf`), and what bounds them is time (`WHOLE_MS`), with a count far above
+ * any list a person keeps (`WHOLE_WALK_ROWS`) for the host whose clock does not move.
  *
  * `section` IS NOT ONE OF THESE. Its count on screen is `total`, the whole match, so it is never
  * showing a slice; it reads no row to be right, and measured over the same 301 rows it draws its
@@ -957,8 +958,9 @@ const WHOLE_PAGE = 500;
 /**
  * How many rows that walk reads at most (audit 53, finding 7). TIME IS THE BOUND, AND A CLOCK MAY NOT MOVE: on a host
  * whose `performance.now()` stands still through one piece of work the walk never ran late, so a ledger of any length
- * was walked a page at a time on every open of the page. A count holds whatever the clock does. The grouped read a
- * host hands in (`PageDeps.whole`) is one query and is not counted here.
+ * was walked a page at a time on every open of the page. A count holds whatever the clock does, and it is read off
+ * the first page's `matched` where the host says one, so a list past it is refused after one page and not after a
+ * hundred. The grouped read a host hands in (`PageDeps.whole`) is one query and is not counted here.
  */
 export const WHOLE_WALK_ROWS = 50_000;
 
@@ -2978,6 +2980,13 @@ const andOf = (cs: readonly Predicate[]): Predicate | undefined => (cs.length ==
 export const wholeLate = (ms: number): Refusal | null =>
   ms > WHOLE_MS ? { code: 'OUT_OF_BOUNDS', fix: 'Adding this up took longer than a page waits. Narrow this with a where: so it adds up fewer.', at: 'where' } : null;
 
+/**
+ * The refusal of a walk past `WHOLE_WALK_ROWS`, or `null` for one inside it. IT SAYS LENGTH AND NOT TIME, because on
+ * the host this is for no time was seen to pass. The way out is the same one, so the fix ends as `wholeLate`'s does.
+ */
+export const wholeLong = (rows: number): Refusal | null =>
+  rows > WHOLE_WALK_ROWS ? { code: 'OUT_OF_BOUNDS', fix: 'This is too long to add up on a page. Narrow this with a where: so it adds up fewer.', at: 'where' } : null;
+
 /** What a stored value adds: its number and the currency or unit it is in, or `null` for a value that is not an amount. */
 function amountIn(v: unknown): { n: number; unit: string | null } | null {
   if (typeof v === 'number') return Number.isFinite(v) ? { n: v, unit: null } : null;
@@ -2993,7 +3002,8 @@ function amountIn(v: unknown): { n: number; unit: string | null } | null {
  * Every row a whole read asks for, as groups: the host's one grouped query when it hands one (`PageDeps.whole`), else
  * the list read to its end a page at a time and grouped here. EITHER WAY IT IS EVERY ROW, and either way it stops at
  * `WHOLE_MS` with the sentence that says to narrow it: a walk checks the clock after each page, so a list too long to
- * add up costs a quarter of a second and never the whole of it.
+ * add up costs a quarter of a second and never the whole of it. THE WALK HOLDS A COUNT AS WELL (`wholeLong`), which
+ * stops it where the clock stands still.
  */
 function wholeParts(deps: PageDeps, ask: WholeAsk): Result<WholePart[]> {
   const started = performance.now();
@@ -3012,7 +3022,8 @@ function wholeParts(deps: PageDeps, ask: WholeAsk): Result<WholePart[]> {
     const page = deps.list({ register: ask.register, where: ask.where, limit: WHOLE_PAGE, ...(cursor ? { cursor } : {}) });
     if (!page.ok) return page;
     walked += page.value.rows.length;
-    if (walked > WHOLE_WALK_ROWS) return { ok: false, refusal: wholeLate(Infinity)! };
+    const long = wholeLong(Math.max(walked, Number.isFinite(page.value.matched) ? page.value.matched : 0));
+    if (long) return { ok: false, refusal: long };
     for (const row of page.value.rows) {
       const by = ask.by.map(({ field, day }): Json => {
         const v = row.fields[field];

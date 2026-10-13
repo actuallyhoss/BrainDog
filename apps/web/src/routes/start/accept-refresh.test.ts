@@ -19,7 +19,7 @@ import { propose } from '../../lib/start/propose.ts';
 import { NoSuchCall } from '@braindog/client';
 
 import { byRules, exportLists, readExport } from '../../lib/start/export.ts';
-import { accept, fileFor, importFile, type Accepting, type SetupRow } from './accept.ts';
+import { accept, fileFor, importFile, pressAgain, type Accepting, type SetupRow } from './accept.ts';
 
 type Call = { name: string; args: unknown };
 
@@ -193,7 +193,7 @@ function owned(answers: 'answer' | 'never' | 'cut-after' | 'cut-before' | 'lost'
     const here = (r: SetupRow) => held.parts.includes(r.register === 'obligations' ? 'money-core' : r.register === 'things' ? 'portfolio' : r.register === 'tasks' ? 'work' : r.register);
     const rows = (body.rows ?? []).filter(here);
     for (const register of new Set((body.rows ?? []).filter((r) => !here(r)).map((r) => r.register))) failed.push({ part: `rows:${register}`, why: `${register} is not here, so its entries were not written.` });
-    if (body.key !== undefined && held.keys.includes(body.key)) return { done: { installed: [...held.parts] }, failed };
+    if (body.again === true && body.key !== undefined && held.keys.includes(body.key)) return { done: { installed: [...held.parts] }, failed };
     if (rows.some((r) => r.fields.what === 'refuse me')) failed.push({ part: 'rows', why: 'Not today.' });
     else if (rows.length > 0) {
       held.rows.push(...rows);
@@ -257,6 +257,37 @@ test('A BUILD CARRIES ONE KEY THROUGH EVERY PRESS, so Try again after a call tha
   const bare = owned();
   await accept(bare.client, sam());
   assert.match(bare.sent[0]?.key ?? '', /^first-run-/u);
+});
+
+test('TRY AGAIN KEEPS THE KEY OF A PRESS NOBODY ANSWERED, and takes a new one for the entries an answered press handed back', async () => {
+  /* NOBODY ANSWERED, or the press threw: the same build under the same key, with `again`. */
+  const asked = { ...sam(), key: 'first-run-one-build' };
+  const lost = owned('lost');
+  const unheard = pressAgain(asked, await accept(lost.client, asked));
+  assert.equal(unheard.key, 'first-run-one-build');
+  assert.equal(unheard.again, true);
+  assert.deepEqual(unheard.proposal.rows, asked.proposal.rows);
+  assert.equal(pressAgain(asked, null).key, 'first-run-one-build');
+  assert.match(pressAgain(sam(), null).key ?? '', /^first-run-/u);
+
+  /* ANSWERED, WITH ONE LIST REFUSED: its entries come back and the rest are in, under the first key. */
+  const refuse = ['money-core'];
+  const part = owned('answer', refuse);
+  const first = await accept(part.client, asked);
+  assert.ok(first.left.length > 0, 'the entries of the list that was refused were not handed back');
+  const wrote = part.held.rows.length;
+  assert.ok(wrote > 0 && part.held.keys.includes('first-run-one-build'));
+
+  /* THE SAME KEY AGAIN WOULD PASS THEM OVER, so the record would never hold them and the page would say all was made. */
+  refuse.length = 0;
+  const next = pressAgain(asked, first);
+  assert.notEqual(next.key, asked.key, 'the entries still missing were sent under the key of the ones that went in');
+  assert.match(next.key ?? '', /^first-run-/u);
+  assert.deepEqual(next.proposal.rows, first.left);
+  const second = await accept(part.client, next);
+  assert.deepEqual(second.failed, []);
+  assert.equal(part.held.rows.length, wrote + first.left.length, 'the entries handed back were not written, or written twice');
+  assert.ok(part.held.rows.some((r) => r.register === 'obligations'));
 });
 
 test('A CALL CUT OFF IS PRESSED ONCE MORE WITH again, and no entry is written twice', async () => {

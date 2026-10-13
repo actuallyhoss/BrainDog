@@ -32,6 +32,7 @@ import { across, type Amount, type Part } from './fx.ts';
 import type { Entry } from './index.ts';
 import {
   acrossSaid,
+  pointSaid,
   clockOf,
   deltaFrom,
   evaluateMetric,
@@ -116,10 +117,13 @@ export type Rolled = { balance: string; as_of: string; checks?: RolledCheck[]; m
 export type Crosscheck = { of: string };
 
 /**
- * The most entries one cross-check reads, statements and moves together. Past it the figure refuses rather than walk a
- * part: a check over some of the money is a nought nobody can trust.
+ * The most entries one cross-check reads, statements and moves together. Past it the figure has no value and says
+ * `CROSSCHECK_TOO_MANY` rather than walk a part: a check over some of the money is a nought nobody can trust.
  */
 export const CROSSCHECK_ENTRIES_MOST = 50_000;
+
+/** What a cross-check says, as its `why`, of a figure over more entries than it reads. */
+export const CROSSCHECK_TOO_MANY = 'too many to check';
 
 /** `value: { walk, within }` over `source: forecast.runway` (`modules.md` C4). */
 export type Walked = { walk: (typeof WALKS)[number]; within?: string };
@@ -188,7 +192,10 @@ type Summed = AcrossSaid;
  * `into` IS THE HOME CURRENCY, OR THE ONE A ROW THE FIGURE IS ABOUT SAYS IT IS KEPT IN (`groupNames`, `scopeCurrency`
  * in `metrics.ts`): a book that says USD is read in dollars. `home` is only said beside it, as `FxRead` says it.
  */
-function summed(amounts: readonly Amount[], into: string | null, home: string | null, rates: EvalRates, today: string): Summed {
+function summed(amounts: readonly Amount[], into: string | null, home: string | null, rates: EvalRates, today: string, point = false): Summed {
+  /* A KEPT POINT NEEDS A RATE OF ITS OWN DAY OR THE DAY BEFORE (`pointSaid` in `metrics.ts`), else it is no number. */
+  const gap = point ? pointSaid(amounts, into, home, rates, today) : null;
+  if (gap) return gap;
   /* ONE, CONVERTED, AT LEAST OR IN PARTS, as a declared sum says each (`acrossSaid` in `metrics.ts`). */
   return acrossSaid(across(amounts, into, rates, today, into !== null, 'sum'), amounts, into, home);
 }
@@ -421,9 +428,9 @@ export function readRolled(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result
       const kept = aged.slice(0, GROUP_CAP);
       return { whole, since, groups: names ? withLabels(kept, names) : kept, more: Math.max(0, aged.length - GROUP_CAP) };
     }
-    const whole = summed(all, into ?? home.home, home.home, home.rates, on);
+    const whole = summed(all, into ?? home.home, home.home, home.rates, on, ctx.point === true);
     if (!grouped || decl.group_by === undefined) return { whole, since, groups: null, more: 0 };
-    const sums = [...byKey].map(([key, slot]) => ({ key, rows: slot.rows, s: summed(slot.amounts, names?.currency(key) ?? into ?? home.home, home.home, home.rates, on) }));
+    const sums = [...byKey].map(([key, slot]) => ({ key, rows: slot.rows, s: summed(slot.amounts, names?.currency(key) ?? into ?? home.home, home.home, home.rates, on, ctx.point === true) }));
     /* ONE GROUP IN ANOTHER CURRENCY PUTS EVERY GROUP IN PARTS, as `groupsOf` keeps it: bars ranked on raw minor units of
        two currencies are ranked on nothing. */
     const units = new Set(sums.map((g) => g.s.unit).filter((u): u is string => u !== null));
@@ -518,8 +525,10 @@ export function readCrosscheck(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
   if (w.bad.length || m.bad.length) return { ok: false, refusal: (w.bad[0] ?? m.bad[0])! };
 
   let left = CROSSCHECK_ENTRIES_MOST;
+  /* PAST THE BOUND IT IS NOT CHECKED, AND SAYS SO: no value and no verdict, since a check that did not run found
+     nothing right and nothing wrong. It was a refusal, which took the figure off every page that draws it. */
   const tooMany = (): Result<Reading> =>
-    no<Reading>('OUT_OF_BOUNDS', `${decl.metric}: ${of} is over more than ${CROSSCHECK_ENTRIES_MOST} statements and moves, which is more than one check walks.`, { at: 'value' });
+    ok({ ...empty(decl, CROSSCHECK_TOO_MANY, ctx.fx?.().rates ?? [], new Date(clockOf(ctx)).toISOString().slice(0, 10)), met: null });
   /* ONE ACCOUNT'S ENTRIES IN A LIST, oldest written first, each read out whole. `null` past the bound. */
   const entriesOf = (list: string, by: string, account: string, admits: { sql: string; params: readonly unknown[] } | null): Record<string, unknown>[] | null => {
     const rows = sql.all<{ id: string; fields: string }>(
@@ -701,6 +710,13 @@ export function readWalk(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result<R
       return no<Reading>('DECLARATION_INVALID', `${decl.metric}: a walk opens from a figure of what is held, and ${from} is itself a walk.`, { at: 'opening' });
     const read = evaluateMetric(sql, figure, ctx);
     if (!read.ok) return read;
+    /* AN OPENING THAT IS AT LEAST IS NO OPENING TO WALK FROM. The day a lower bound runs out is not the day the money
+       does, so the walk says which rate it lacks, in the opening's own words, and has no value. */
+    if (read.value.value === null && read.value.atLeast === true)
+      return ok({
+        ...empty(decl, `the figure it walks from has no rate for ${(read.value.noRate ?? []).map((p) => p.currency).join(', ')}, so it is only at least`, home.rates, today),
+        ...(read.value.fx ? { fx: read.value.fx } : {}),
+      });
     if (read.value.value === null)
       return ok(empty(decl, 'the figure it walks from is in several currencies with no rate to add them', home.rates, today));
     opening = read.value.value;

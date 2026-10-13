@@ -51,12 +51,17 @@ export const ESTATE_REGISTERS: Record<string, SeedRegister> = {
       /* A HOUSEHOLD'S THINGS AS WELL AS A STUDIO'S, SINCE estate 2.0.0. The four values a studio keeps closed the list to
          a gym, a car's insurance or the electricity, so a person keeping those had no word for what they were. The ids
          stay and four join them; `saas` is said "Software", because the person reading a list of what they pay for is
-         not always somebody who says SaaS. */
+         not always somebody who says SaaS.
+         A MACHINE AND WHAT STANDS BESIDE IT, SINCE estate 2.2.0: `server`, `database`, `storage` and `network`. A record
+         that came in from a cloud account brought its own words for these, a value each and no label, so the month by
+         type read a key where every other part read a name. Hosting stays what a plan with a provider is; these four are
+         the things such a plan is made of, for somebody who keeps them one by one. They join after the eight, so no row
+         moves, and a value a record added itself stays where it is (`laidBack` in `packages/declare/src/index.ts`). */
       {
         id: 'kind',
         label: 'Type',
         type: 'enum',
-        values: ['domain', 'hosting', 'saas', 'certificate', 'subscription', 'membership', 'insurance', 'utility'],
+        values: ['domain', 'hosting', 'saas', 'certificate', 'subscription', 'membership', 'insurance', 'utility', 'server', 'database', 'storage', 'network'],
         labels: {
           domain: 'Domain',
           hosting: 'Hosting',
@@ -66,6 +71,10 @@ export const ESTATE_REGISTERS: Record<string, SeedRegister> = {
           membership: 'Membership',
           insurance: 'Insurance',
           utility: 'Utility',
+          server: 'Server',
+          database: 'Database',
+          storage: 'Storage',
+          network: 'Network',
         },
         index: true,
         required: true,

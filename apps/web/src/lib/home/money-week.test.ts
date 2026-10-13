@@ -198,11 +198,11 @@ test('A WEEK WITH NOTHING PAID SAYS NOTHING: a nought is no figure, and a tile o
   assert.deepEqual(cells(owed.blocks[0]!), [['Paid', 'EGP 900.00'], ['Owed to you', 'EGP 1,350.00']]);
   /* AND WHAT IS OWED IS NEVER SAID AS COME IN. */
   assert.equal(owed.sentence?.text, 'EGP 900 came in this week.');
-  /* THE SAME EGP 900 IN BOTH FIGURES (a payment marked paid, and one of that amount in the ledger) READS AS TWO THINGS,
-     each by its name, never as two Ins, in the tile and in the line, and never added. */
+  /* THE SAME EGP 900 IN BOTH FIGURES (a payment marked paid, and one of that amount in the ledger): the tile still
+     names both figures, each by its name and never added, while the line says the amount once. */
   const both = home(tile({ 'settled-in-7d': 'EGP 900.00', 'received-7d': 'EGP 900.00', 'owed-to-you': '0' }));
   assert.deepEqual(cells(both.blocks[0]!), [['Paid', 'EGP 900.00'], ['Came in', 'EGP 900.00']]);
-  assert.equal(both.sentence?.text, 'EGP 900 was paid, and EGP 900 came in this week.');
+  assert.equal(both.sentence?.text, 'EGP 900 came in this week.');
   /* A FIGURE THE RECORD COULD NOT READ still says so, and is never taken for nought. */
   assert.equal(cells(home(tile({ 'settled-in-7d': '—' })).blocks[0]!).length, 1);
 });

@@ -65,8 +65,7 @@ export const words = {
     return `Published ${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC', ...year })}`;
   },
   calls: 'What it calls out to',
-  /* THE PLAN SHEET'S TWO GROUPS OF SENTENCES under the plan (`offer.ts` `sendsOf`, `waitsOf`). */
-  sends: 'What it sends',
+  /* WHAT WAITS, SAID AS SENTENCES under the plan (`offer.ts` `waitsOf`). */
   waits: 'What waits',
   waitsNote: 'These arrive on their own once you have what they wait for.',
   /* WHAT A PART WAITS FOR WHEN IT NAMES A ROLE AND NOT A LIST (`@braindog/declare` `when.ts`): whichever list plays the

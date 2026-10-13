@@ -11,12 +11,11 @@
  * ONLY THE OWNER INSTALLS FROM A BROWSER. Anybody else is refused by the record, and a Kennel entry is then asked for on
  * Decide instead (`catalogue.ts` `askForVersion`), where the owner reads the same plan.
  *
- * WHAT IT SENDS AND WHAT WAITS ARE SAID AS SENTENCES ON THE SHEET (`sendsOf`, `waitsOf`): which key goes to which host
- * and how often, in the kernel's words (`doesOf`), and the parts the plan left out until the record holds a list.
+ * WHAT WAITS IS SAID AS SENTENCES ON THE SHEET (`waitsOf`): the parts the plan left out until the record holds a list.
+ * What it sends is the plan sheet's own calls group (`$lib/market/plan.ts`).
  */
 
 import type { createClient } from '@braindog/client';
-import { doesOf } from '@braindog/kernel';
 import type { CatalogueEntry } from '@braindog/declare/catalogue';
 
 import type { Listing } from '../../../../lib/market/listing.ts';
@@ -43,27 +42,8 @@ const refusedOf = (r: Wire<unknown>, fallback: string): Refused => (r.ok ? { ok:
 /** What the plan sheet draws: the record's `Diff`, or the use case's plan whole. */
 export const diffOf = (p: Planned): unknown => (p.kind === 'pack' ? p.diff : p.plan);
 
-/**
- * What installing the plan would send out, a sentence for each action: "Sends your key 'stripe' to api.stripe.com every
- * hour." The kernel writes it (`doesOf`, kind `install`) from the plan's `calls_out`, so Decide and this sheet say an
- * action the same way. Empty when the plan arms nothing new.
- *
- * A USE CASE IS ASKED PACK BY PACK, from the calls `sharing.ts` already read off each pack's plan, and a sentence two
- * packs share is said once.
- */
-export function sendsOf(p: Planned): string[] {
-  const calls: unknown[] =
-    p.kind === 'pack'
-      ? isMap(p.diff) && Array.isArray(p.diff.calls_out)
-        ? p.diff.calls_out
-        : []
-      : p.plan.packs.flatMap((pack) => pack.calls.map((c) => ({ host: c.host, every: c.every, key: c.key, trigger: c.trigger ?? 'schedule', per_day: c.perDay ?? null })));
-  const said = calls.map((c) => doesOf('install', { calls_out: [c] })).filter((line) => line !== '');
-  return [...new Set(said)];
-}
-
-/** The words over the two groups of sentences on the sheet, kept with the market's other words. */
-export const sheetWords = { sends: words.sends, waits: words.waits, waitsNote: words.waitsNote } as const;
+/** The words over what waits on the sheet, kept with the market's other words. */
+export const sheetWords = { waits: words.waits, waitsNote: words.waitsNote } as const;
 
 /** What a part waits for, said: a role any list may play in the market's own words (`words.waitsOn`), else the list by its name. */
 const waitedFor = (h: string, nameOf: (id: string) => string): string => (Object.hasOwn(words.waitsOn, h) ? words.waitsOn[h]! : nameOf(h));

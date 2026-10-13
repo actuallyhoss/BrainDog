@@ -7,6 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import type { Block } from './parse.ts';
+import { HEAT_SHARE_LINE, heatPlan } from './heat.ts';
 import { toHTML } from './html.ts';
 import { linesPlan } from './lines.ts';
 import { seriesPlan } from './series.ts';
@@ -143,4 +144,35 @@ test('a failed run is given twice: in red with its mark, and plain with the word
   assert.ok(red.rows.some((r) => r.tone === 'bad'));
   assert.ok(plain.rows.every((r) => r.tone === undefined));
   for (const b of [red, plain]) assert.ok(b.rows.some((r) => /Failed/u.test(r.cells.join(' '))), 'the word says it, with or without the colour');
+});
+
+test('the share heat fills the twelve weeks, no part past its whole, and says how it is washed', () => {
+  const s = partSpecimens().find((p) => p.key === 'heat:share')!;
+  const b = blockOf(s);
+  assert.equal(b.heading, `Done on the day, ${SPECIMEN}`);
+  const days = new Set<string>();
+  for (const r of b.rows) {
+    const [d, value] = r.cells;
+    const written = /^(\d+) of (\d+)$/u.exec(value ?? '');
+    assert.ok(written, `${d} is not written as a part of a whole: ${value}`);
+    const [n, m] = [Number(written[1]), Number(written[2])];
+    assert.ok(m > 0 && n <= m, `${d} holds ${n} of ${m}`);
+    assert.ok(!days.has(d!), `${d} is given twice`);
+    days.add(d!);
+  }
+  /* Every day the grid draws up to the sheet's day holds a share, and none is left outside it or unread. */
+  const plan = heatPlan(b.rows.map((r) => ({ day: r.cells[0] ?? '', value: r.cells[1] ?? '' })), SHEET_DAY);
+  assert.equal(plan.share, true);
+  assert.equal(plan.outside, 0);
+  assert.deepEqual(plan.skipped, []);
+  const drawn = plan.cells.filter((c) => !c.future);
+  assert.equal(drawn.length, b.rows.length);
+  assert.ok(drawn.every((c) => c.count !== null && days.has(c.day)));
+  assert.ok(drawn.length > 11 * 7 && drawn.at(-1)!.day === SHEET_DAY);
+  /* Some days none of the whole and some all of it, so the wash's two ends are on the sheet. */
+  const parts = b.rows.map((r) => (r.cells[1] ?? '').split(' of ').map(Number));
+  assert.ok(parts.some(([n]) => n === 0) && parts.some(([n, m]) => n === m));
+  const html = toHTML(specimenSegments(s), { now: SHEET_NOW });
+  assert.ok(html.includes(`<p class="heat-share">${HEAT_SHARE_LINE.replace("'", '&#39;')}</p>`), 'the line under the grid is not drawn');
+  assert.doesNotMatch(html, /heat-outside|heat-skipped|heat-empty/u);
 });

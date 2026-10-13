@@ -877,6 +877,21 @@ const DECLARED: Record<string, Version> = {
       "`page.estate` is calmer: it says what belongs on a fresh record in one note, the note about a domain pointing nowhere comes under the line, At a glance drops Cost per year, which is the line's month again, the chips by type go, what each domain points at and every service are folded under a new section, every heading wears a glyph, and each tile is drawn only while its figure has any, over the new `renews-90d`, `domains-held` and `services-held` -> f88101804e05c342",
     ],
   },
+  /** A VERSION AND NOT A RESET: estate 2.1.0 is released (`fixtures/released/estate-2.1.0.json`). */
+  'estate@2.2.0': {
+    holds: `
+      metric.domains-held metric.estate-month metric.estate-month-by-kind metric.estate-year metric.lapsing metric.points-nowhere
+      metric.project-cost metric.renews-30d metric.renews-90d metric.services-held
+      page.estate
+      register.services
+      rule.renew-soon rule.renewal-cancelled rule.renewal-kept rule.renewal-passed
+      setting.most_a_month setting.most_a_year setting.most_a_year_on_a_project setting.most_lapsing setting.most_renewing_30d
+    `,
+    declares: '7cccb015ec1bb242',
+    history: [
+      "`register.services`'s `kind` gains `server`, `database`, `storage` and `network` with their labels -> 7cccb015ec1bb242",
+    ],
+  },
   /** A VERSION AND NOT A RESET: work's last version is on `origin/master`. */
   'work@1.11.0': {
     holds: `

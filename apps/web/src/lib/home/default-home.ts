@@ -701,11 +701,13 @@ function weekMoneyDrawn(b: LiveBlock): LiveBlock {
  * where exactly one entry due this week was paid that very amount ("Nadia paid EGP 900."), else as the amount
  * ("EGP 900 came in this week."). Both are said side by side, each by the tile's own name for it and never added
  * ("EGP 900 was paid, and EGP 150 came in this week."): they are two figures, and two amounts under one verb read
- * as the same money twice.
+ * as the same money twice. TWO FIGURES OF ONE AMOUNT ARE SAID ONCE, as one figure is: "EGP 900 was paid, and EGP 900
+ * came in this week." reads as 1,800 to anyone who was paid 900, and the tile beside it still names both.
  */
 function weekInSaid(blocks: readonly LiveBlock[], due: LiveBlock | undefined, w: Week): string | null {
   const tile = blocks.find((b) => b.drawn && !says(b) && isWeekMoney(b));
-  const came = (tile?.metrics ?? []).filter((m) => (WEEK_IN as readonly string[]).includes(m.id) && !nought(m.value) && m.value !== MISSING);
+  const each = (tile?.metrics ?? []).filter((m) => (WEEK_IN as readonly string[]).includes(m.id) && !nought(m.value) && m.value !== MISSING);
+  const came = each.length === 2 && each[0]!.value.trim() === each[1]!.value.trim() ? each.slice(0, 1) : each;
   if (came.length === 0) return null;
   if (came.length === 2) {
     const [settled, received] = WEEK_IN.map((id) => came.find((m) => m.id === id)!.value);
@@ -735,17 +737,29 @@ function weekLate(b: LiveBlock, w: Week, today: string): number[] {
   return where(b, (f) => typeof f.row === 'string' && f.row.startsWith(`${w.due.register}#`) && (dueDay(f) ?? today) < today);
 }
 
+/**
+ * THE WEEK'S LIST'S LATE ONES LATE HOLDS PAST ITS LIMIT. Twelve late orders drawn eight at a time are twelve late, as
+ * the house line counts them (`lateBeyond`): the block's own total says how many it holds. ONLY WHERE EVERY ONE DRAWN IS
+ * THE WEEK'S LIST'S. Late is every list's, so with a bill among the eight what stands past them may be bills, and it
+ * stays the house line's to count as things.
+ */
+function weekLatePast(b: LiveBlock, w: Week, today: string): number {
+  const mine = weekLate(b, w, today);
+  return mine.length > 0 && mine.length === b.entries.length ? lateBeyond(b, today) : 0;
+}
+
 /** A block over what fell due without the week's late ones, for the house line to count: the week's line says those. */
 function lessWeekLate(b: LiveBlock, w: Week, today: string): LiveBlock {
   const mine = weekLate(b, w, today);
   if (mine.length === 0) return b;
-  return pick(b, b.entries.flatMap((_, n) => (mine.includes(n) ? [] : [n])), undefined, b.total - mine.length);
+  const past = weekLatePast(b, w, today);
+  return pick(b, b.entries.flatMap((_, n) => (mine.includes(n) ? [] : [n])), undefined, b.total - mine.length - past);
 }
 
 /**
  * THE WEEK'S LINE, counted from what the blocks drew: "One order is due Friday. Nadia paid EGP 900." What is late
  * leads, in red with its word, AND IS ITS OWN COUNT: "One order is late. Two more are due this week, the first today."
- * The late ones are read off Late (`weekLate`) and the rest off the tile, which starts today, so the tile's number is
+ * The late ones are read off Late (`weekLate`, and `weekLatePast` for those past its limit) and the rest off the tile, which starts today, so the tile's number is
  * the one the list's own page says and the two never differ by what is late. What came in is read off the money tile
  * (`weekInSaid`): by who paid where that is plain, else as the amounts, side by side, never added. Something else
  * waiting (a question, a bill past its day) is still said after it, as the house line says it. With nothing due,
@@ -759,7 +773,7 @@ function weekSentence(blocks: readonly LiveBlock[], today: string, w: Week, hous
   const total = due ? Math.max(due.total, due.entries.length) : 0;
   /* A HOME KEPT FROM AN OLDER TODAY still reads the late ones into its tile: they are late there too, and not this week's. */
   const inTile = days.filter((d) => d < today).length;
-  const late = inTile + blocks.reduce((n, b) => n + weekLate(b, w, today).length, 0);
+  const late = inTile + blocks.reduce((n, b) => n + weekLate(b, w, today).length + weekLatePast(b, w, today), 0);
   const rest = total - inTile;
   if (late > 0 || rest > 0) {
     const one = w.due.one.toLowerCase();

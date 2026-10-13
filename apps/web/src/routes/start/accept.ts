@@ -106,6 +106,20 @@ export type Accepted = {
   unheard?: true;
 };
 
+/**
+ * THE NEXT PRESS OF A BUILD THAT DID NOT ALL GO IN, as a page's Try again sends it: with `again`, so the record writes
+ * only what it does not hold.
+ *
+ * A PRESS NOBODY ANSWERED KEEPS ITS KEY (`out` is `null` for one that threw, or says `unheard`): the same entries are
+ * asked for, and the record passes them over if they went in. A PRESS THAT WAS ANSWERED TAKES A NEW ONE: the record
+ * said which entries it did not write, and may have kept the first key for the ones it did, so the same key again
+ * would pass over the very entries that are still missing.
+ */
+export function pressAgain(asked: Accepting, out: Accepted | null): Accepting {
+  if (out === null || out.unheard) return { ...asked, again: true, key: asked.key ?? pressKey() };
+  return { ...asked, again: true, key: pressKey(), nav: out.nav ?? asked.nav, proposal: { ...asked.proposal, rows: out.left } };
+}
+
 /** The record's own sentence for a refusal, or the calm one when nothing answered. */
 const fixOf = (r: Wire<unknown>, otherwise: string): string => (!r.ok && 'refusal' in r ? r.refusal.fix : otherwise);
 

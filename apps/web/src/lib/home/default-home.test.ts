@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { COMING_UP_LIMIT, DEFAULT_HOME, TODAY_LEAD, captureHeading, homeDrawn, railed, slashLineOf, todayHome, type HomeVoice, type Week } from './default-home.ts';
+import { COMING_UP_LIMIT, DEFAULT_HOME, TODAY_LEAD, captureHeading, homeDrawn, railed, slashLineOf, todayHome, weekMoney, type HomeVoice, type Week } from './default-home.ts';
 import { homeLineOf, recordDay } from './home-line.ts';
 import type { LiveBlock } from '../record/page-live.ts';
 import type { WithRows } from './home-rows.ts';
@@ -524,4 +524,31 @@ test('THIS WEEK STARTS TODAY AND LATE IS ITS OWN CLAUSE: an order due yesterday,
   assert.equal(homeDrawn(bill, NOW, undefined, undefined, null, WEEK).sentence?.text, 'One order is late. Two more are due this week, the first today. One thing is two days late.');
   /* NOTHING LATE: the line is the week's, as it was. */
   assert.deepEqual(homeDrawn(answered([]), NOW, undefined, undefined, null, WEEK).sentence, { text: 'Two orders are due this week, the first today.', needs: '' });
+});
+
+test('TWELVE LATE ORDERS ARE TWELVE LATE, not the eight Late draws, and what stands past a bill is not called an order', () => {
+  /* Late answers its eight oldest and says it holds twelve. */
+  const orders = (n: number) => Array.from({ length: n }, (_, i) => ({ row: `orders#${i + 1}`, title: `Order ${i + 1}`, day: `2026-09-${String(10 + i).padStart(2, '0')}` }));
+  const late = (rows: Record<string, unknown>[], total: number) => block({ kind: 'spec', source: 'deadlines', where: 'day before today', total }, rows);
+  const twelve = homeDrawn([late(orders(8), 12)], NOW, undefined, undefined, null, WEEK);
+  /* THE WEEK'S LINE SAYS ALL TWELVE, AND THE HOUSE LINE SAYS NONE OF THEM AGAIN as things. */
+  assert.deepEqual(twelve.sentence, { text: '12 orders are late.', needs: '12 orders are late' });
+  /* A BILL AMONG THE EIGHT: what stands past them may be bills, so the seven drawn are the orders and the rest are things. */
+  const mixed = homeDrawn([late([{ row: 'obligations#4', title: 'Rent', day: '2026-09-01' }, ...orders(7)], 12)], NOW, undefined, undefined, null, WEEK);
+  assert.match(mixed.sentence!.text, /^Seven orders are late\. /u);
+  assert.doesNotMatch(mixed.sentence!.text, /1[12] orders/u);
+  /* WITH NO BOUND OF ITS OWN what stands past the limit may not have fallen due, and is not counted. */
+  const ahead = homeDrawn([block({ kind: 'spec', source: 'deadlines', total: 12 }, orders(8))], NOW, undefined, undefined, null, WEEK);
+  assert.equal(ahead.sentence?.text, 'Eight orders are late.');
+});
+
+test('PAID AND CAME IN OF ONE AMOUNT ARE SAID ONCE in the line, and two different amounts are still said side by side', () => {
+  const tile = (values: Record<string, string>): LiveBlock =>
+    ({ ...weekMoney(), drawn: true, rows: [], entries: [], matched: [], columns: [], refusals: [], shown: 0, total: 0, stale_at: '', metrics: Object.entries(values).map(([id, value]) => ({ id, label: id, value, note: '' })) }) as unknown as LiveBlock;
+  const line = (values: Record<string, string>) => homeDrawn([tile(values)], NOW, undefined, undefined, null, WEEK).sentence?.text;
+  assert.equal(line({ 'settled-in-7d': 'EGP 900.00', 'received-7d': 'EGP 900.00' }), 'EGP 900 came in this week.');
+  /* THE TILE STILL NAMES BOTH: only the sentence would read as the same money twice. */
+  assert.equal(homeDrawn([tile({ 'settled-in-7d': 'EGP 900.00', 'received-7d': 'EGP 900.00' })], NOW, undefined, undefined, null, WEEK).blocks[0]!.metrics?.length, 2);
+  assert.equal(line({ 'settled-in-7d': 'EGP 900.00 · USD 40.00', 'received-7d': 'EGP 900.00 · USD 40.00' }), 'EGP 900 and USD 40 came in this week.');
+  assert.equal(line({ 'settled-in-7d': 'EGP 900.00', 'received-7d': 'EGP 150.00' }), 'EGP 900 was paid, and EGP 150 came in this week.');
 });

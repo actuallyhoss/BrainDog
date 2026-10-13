@@ -775,9 +775,9 @@
     busy = true;
     const tiles = tilesOf(given);
     watched = tiles.length > 0 ? { parts: tiles, held: [], answer: null } : null;
-    const { accept, pressKey } = await import('../start/accept.ts');
-    /* ONE HANDLE FOR THE BUILD, kept through every Try again: a call that went in and never answered is told from a new
-       press by it, so its entries are not written a second time. */
+    const { accept, pressAgain, pressKey } = await import('../start/accept.ts');
+    /* ONE HANDLE FOR THE BUILD, set here once and kept through every Try again of a press nobody answered: a call that
+       went in and never answered is told from a new press by it, so its entries are not written a second time. */
     const asked: Accepting = given.key === undefined ? { ...given, key: pressKey() } : given;
     /* THE NEW RECORD BY ITS NAME: this page is under no slug, so its own base is the host's, and the record's is under it. */
     const client = createClient({ base: apiBase({ origin: apiBase(), pathname: `${BASE}/${name}/` }) });
@@ -809,10 +809,11 @@
       location.assign(at(madeAt));
       return;
     }
-    /* WHAT IS LEFT, ASKED FOR WITH `again`: the record writes only what it does not hold yet, so a call that never
-       answered here but went in there is not written twice. The entries are the ones the call handed back, over the
-       rail order this press already wrote. */
-    again = { name, asked: out === null ? { ...asked, again: true } : { ...asked, again: true, nav: out.nav ?? asked.nav, proposal: { ...asked.proposal, rows: out.left } } };
+    /* WHAT IS LEFT, ASKED FOR WITH `again`: the record writes only what it does not hold yet. A call that never answered
+       here but may have gone in there is sent under the same key, so it is not written twice; one that answered hands
+       back the entries it did not write, which go under a new key, over the rail order this press already wrote
+       (`pressAgain`). */
+    again = { name, asked: pressAgain(asked, out) };
     /* THE PART-MADE STATE IS THE CALL'S OWN ANSWER: what it said it could not make, and why, and nothing guessed. */
     missed = out === null ? [] : out.failed;
     watched = null;

@@ -183,6 +183,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     },
   ],
   estate: [
+    { version: '2.2.0', notes: 'A service can be a Server, a Database, Storage or a Network, each with its name. Types you added yourself stay as they are.' },
     {
       version: '2.1.0',
       notes:

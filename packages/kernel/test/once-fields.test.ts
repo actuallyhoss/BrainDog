@@ -36,25 +36,12 @@ const CATEGORIES: Declaration = {
   } as never,
 };
 
-/**
- * A record holding Categories with its `once`.
- *
- * THE KEY IS READ HERE BEFORE THE INSTALL CHECK ADMITS IT. `REGISTER_KEYS` in `src/declare.ts` is another job's file and
- * refuses `once` as "no such key" until it is added there, so when install says exactly that, the list goes in without
- * the key and the key is written onto the stored declaration, which is the body the write path reads either way. Once
- * install admits the key the first branch is the whole of this and the second is never reached. Any other refusal fails.
- */
+/** A record holding Categories with its `once`, installed as any list is: the install check admits the key (`onceFault`). */
 async function record(): Promise<{ k: Kernel; sql: NodeSql }> {
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));
   const installed = await k.install([CATEGORIES]);
-  if (!installed.ok) {
-    assert.equal((installed as { refusal?: { at?: string } }).refusal?.at, 'once', JSON.stringify(installed));
-    const { once, ...body } = CATEGORIES.body as unknown as { once: string[] };
-    assert.ok((await k.install([{ ...CATEGORIES, body: body as never }])).ok);
-    sql.exec("UPDATE declaration SET body = json_set(body, '$.once', json(?)) WHERE id = 'register.categories'", JSON.stringify(once));
-    k.reload();
-  }
+  assert.ok(installed.ok, JSON.stringify(installed));
   return { k, sql };
 }
 
@@ -146,12 +133,11 @@ test("an amount the add-on refreshes takes its currency from the account the row
         { id: 'account', type: 'ref', to: 'accounts' },
         { id: 'cap', type: 'money', currency_from: 'account.balance' },
       ],
+      once: ['account'],
     } as never,
   };
   const installed = await k.install([accounts, budgets]);
   assert.ok(installed.ok, JSON.stringify(installed));
-  sql.exec("UPDATE declaration SET body = json_set(body, '$.once', json(?)) WHERE id = 'register.budgets'", JSON.stringify(['account']));
-  k.reload();
   const pounds = k.create('accounts', { name: 'Current', balance: { amount: 0, currency: 'GBP' } }, PERSON);
   const dollars = k.create('accounts', { name: 'Travel card', balance: { amount: 0, currency: 'USD' } }, PERSON);
   assert.ok(pounds.ok && dollars.ok, JSON.stringify([pounds, dollars]));
@@ -163,4 +149,35 @@ test("an amount the add-on refreshes takes its currency from the account the row
   assert.ok(again.ok, JSON.stringify(again));
   assert.equal(fieldsOf(k, made.value.id).account, pounds.value.id);
   assert.deepEqual(fieldsOf(k, made.value.id).cap, { amount: 6000, currency: 'GBP' });
+});
+
+test('a once that does not name written fields of its own list is refused at install, naming the one', async () => {
+  const k = await openRecord(openSqlite(), fixedClock(NOW));
+  const fields = [
+    { id: 'name', type: 'text', required: true },
+    { id: 'made', type: 'text', derived: true },
+  ];
+  const withOnce = (once: unknown): Declaration => ({ ...CATEGORIES, body: { id: 'categories', name: 'Categories', title: 'name', fields, once } as never });
+  const refused = async (once: unknown) => {
+    const out = await k.install([withOnce(once)]);
+    assert.equal(out.ok, false, JSON.stringify(once));
+    return (out as unknown as { refusal: { code: string; at?: string; fix: string } }).refusal;
+  };
+
+  const unknown = await refused(['name', 'colour']);
+  assert.equal(unknown.code, 'DECLARATION_INVALID');
+  assert.equal(unknown.at, 'once[1]');
+  assert.match(JSON.stringify(unknown), /colour/, 'the refusal names the id the list does not have');
+
+  const derived = await refused(['made']);
+  assert.equal(derived.code, 'DECLARATION_INVALID');
+  assert.equal(derived.at, 'once[0]');
+  assert.match(JSON.stringify(derived), /made/);
+
+  for (const shape of ['name', ['name', 7], { name: true }]) assert.equal((await refused(shape)).at, 'once');
+
+  /* NOTHING WAS INSTALLED BY A REFUSED BATCH, and the same list with a good `once`, or an empty one, goes in. */
+  assert.equal(k.create('categories', { name: 'Rent' }, PERSON).ok, false);
+  assert.ok((await k.install([withOnce([])])).ok);
+  assert.ok((await k.install([withOnce(['name'])])).ok);
 });

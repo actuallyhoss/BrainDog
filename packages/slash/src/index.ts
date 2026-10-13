@@ -349,17 +349,18 @@ export function createSlash(deps: SlashDeps, options: SlashOptions = {}): Slash 
   };
 
   /* THE LEDGER, NEWEST FIRST, FOR THE PERSON WHO PAYS FOR IT. A hold still in flight is not an ask yet and is left out; the
-     order is the ledger's own, the order the calls were settled in (`call.ts`, `account`). */
+     order is the ledger's own, the order the calls were settled in (`call.ts`, `account`). Each says what it was for, the
+     `purpose` the store has written since version 3, so the page that lists them can count his own apart from the record's. */
   const history = (limit: number, ctx: CallContext): Result<{ asks: Asked[] }> => {
     if (ctx.principal.kind !== 'person' || ctx.principal.level !== 'owner')
       return no('FORBIDDEN', 'Only the record owner reads what Slash was asked.');
     const most = Number.isInteger(limit) && limit > 0 ? Math.min(limit, ASKS_MOST) : ASKS_LISTED;
     const asks = deps.sql
       .all<Asked>(
-        "SELECT id, ts, kind, status, code, question, model, filed FROM slash_call WHERE code IS NOT 'SLASH_PENDING' ORDER BY rowid DESC LIMIT ?",
+        "SELECT id, ts, kind, purpose, status, code, question, model, filed FROM slash_call WHERE code IS NOT 'SLASH_PENDING' ORDER BY rowid DESC LIMIT ?",
         most,
       )
-      .map((r) => ({ id: r.id, ts: r.ts, kind: r.kind, status: r.status, code: r.code, question: r.question, model: r.model, filed: r.filed }));
+      .map((r) => ({ id: r.id, ts: r.ts, kind: r.kind, purpose: r.purpose, status: r.status, code: r.code, question: r.question, model: r.model, filed: r.filed }));
     return ok({ asks });
   };
 

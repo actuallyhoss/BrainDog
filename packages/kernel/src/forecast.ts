@@ -387,7 +387,7 @@ export function runway(
       /* DAYS THAT DO NOT FIT THE CYCLE ARE SAID TOO, and the row walks by its cycle. Two days on a line paid every month
          walked it twice a month, double the money every figure that counts it by how often reads; one day on twice a
          month is half a pair. A week has no day of the month and a one-off has its own day, so those keep their days. */
-      const off = given && how.cadence && how.cadence.kind !== 'weeks' && given.length !== (how.cadence.kind === 'twice' ? 2 : 1);
+      const off = misfit(given, how.cadence);
       if (off) read.daysOff++;
       const named = off ? null : given;
       read.rows.push({
@@ -806,6 +806,66 @@ function* namedSteps(first: string, every: number, named: readonly Named[]): Gen
     }
     yield day;
   }
+}
+
+/** Days that do not fit how often a row repeats: one day on twice a month, two on a cycle of months (see `runway`). */
+const misfit = (given: readonly Named[] | null | undefined, cadence: Cadence): boolean =>
+  !!given && !!cadence && cadence.kind !== 'weeks' && given.length !== (cadence.kind === 'twice' ? 2 : 1);
+
+/**
+ * One repeating row as the walk reads it: the leg that declares its fields, the row's fields, and the record's rest
+ * days (`restDaysOf`), weekdays from 0 for Sunday. No rest days moves nothing.
+ */
+export type CycleLine = {
+  leg: Pick<Leg, 'on' | 'every' | 'ends' | 'days' | 'weekend'>;
+  fields: Readonly<Record<string, unknown>>;
+  rest?: readonly number[];
+};
+
+/**
+ * The next day a repeating row's money moves on after `day`, or `null` when there is none.
+ *
+ * THE WALK'S OWN STEPS, so the day a paid line moves its "Next" to is the day the forecast walks next: the same cycle
+ * tables (`cadenceOf`), the same days of the month (`daysOf`, and `misfit` for days that do not fit), the same month
+ * end and clamp (`stepsOf`). A row the walk reads once has no next day: a one-off, a cycle no table names, a first day
+ * or an end nobody can read.
+ *
+ * THE DAY THE ROW NAMES, NOT THE DAY IT MOVED TO. A payday on Saturday 31 October paid the working day before answers
+ * 31 October, and the walk moves it to the 30th each time it reads it. Written back moved, the 30th would be the day
+ * the line steps from, and 30 November is not a month end.
+ *
+ * BUT A STEP WHOSE MOVE IS NOT AFTER `day` IS THE PAYMENT `day` ALREADY IS. Asked on Thursday 29 October for a line
+ * paid on Friday the 30th, "the working day before", the 30th is that same pay and the answer is 30 November. So is a
+ * step moved onto or behind the one before it, as in `occurrences`.
+ *
+ * `null` PAST THE ROW'S LAST DAY, which bounds the day the row names, and when `SKIP_CAP` steps do not reach `day`.
+ */
+export function cycleAfter(day: string, line: CycleLine): string | null {
+  const { leg, fields } = line;
+  const after = dayOf(day);
+  const on = String(fields[leg.on] ?? '');
+  if (!on || !Number.isFinite(noon(on)) || !Number.isFinite(noon(after))) return null;
+  const ends = leg.ends ? String(fields[leg.ends] ?? '') : '';
+  if (ends && !Number.isFinite(noon(ends))) return null;
+  const first = dayOf(on);
+  const last = ends ? dayOf(ends) : null;
+  if (last !== null && first > last) return null;
+  const { cadence } = cadenceOf(leg.every, leg.every ? String(fields[leg.every.field] ?? '') : '');
+  if (cadence === null) return null;
+  const given = leg.days ? daysOf(fields[leg.days]) : null;
+  const named = misfit(given, cadence) ? null : (given ?? null);
+  const shift = leg.weekend ? shiftOf(fields[leg.weekend]) : 'leave';
+  const rest = new Set(line.rest ?? []);
+  let prev = '';
+  let n = 0;
+  for (const step of stepsOf(first, noon(first), cadence, named)) {
+    if (!step || n++ >= SKIP_CAP || (last !== null && step > last)) return null;
+    const to = shifted(step, shift, rest);
+    const repeat = to <= prev;
+    prev = to > prev ? to : prev;
+    if (step > after && to > after && !repeat) return step;
+  }
+  return null;
 }
 
 /** How a row repeats, once its cycle value has been looked up in the leg's tables. `null` walks once. */

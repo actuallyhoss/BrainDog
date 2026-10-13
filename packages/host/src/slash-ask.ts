@@ -96,7 +96,8 @@ import { turnedAway } from './slash-turned-away.ts';
  * for this one ask, his own key where he chose it, which the door opens for the asker (`byok`).
  *
  * `history` AND `proposePattern` ARE OPTIONAL so an engine built before them still fits, and a door
- * over one answers their paths 501 in `NO_MODEL`'s words rather than a 500.
+ * over one answers their paths 501 in `NO_MODEL`'s words rather than a 500. Each ask `history` lists carries its
+ * `purpose`, the ledger's own column, which the door passes on untouched.
  */
 export type SlashAskEngine<C> = {
   read(question: string, ctx: C, inference?: unknown): Promise<Result<unknown>>;

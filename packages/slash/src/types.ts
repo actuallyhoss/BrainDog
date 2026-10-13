@@ -302,11 +302,16 @@ export type Status = {
  * THE LEDGER'S OWN COLUMNS AND NOTHING WORKED OUT. `question` is what was typed, or `rule.<id> step <n>` for an
  * automation's, or the record's own words for its press; `filed` is the suggestion it put on Decide. No row of the record
  * and no prompt is here, because the ledger never held one (`call.ts`).
+ *
+ * `purpose` is what the ask was for, the column the store has written since version 3 (`Purpose` above): `ask` for his
+ * own, `headline`, `understand`, `look` and the rest for the record's. It is a string here because the ledger's column
+ * is one, and a screen that counts by it names the ones it knows and keeps the others under their own word.
  */
 export type Asked = {
   id: string;
   ts: string;
   kind: string;
+  purpose: string;
   status: string;
   code: string | null;
   question: string | null;

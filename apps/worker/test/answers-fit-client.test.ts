@@ -24,7 +24,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 
-import type { Boot, SlashStatus } from '../../../packages/client/src/index.ts';
+import type { Boot, SlashAsked, SlashStatus } from '../../../packages/client/src/index.ts';
 
 import { startCloud, type Provisioned, type RunningCloud, type Usage } from './cloud-serve.ts';
 
@@ -157,6 +157,23 @@ const SLASH = {
   asks: keys({ used: 'number', cap: 'number', resets: 'instant', capped: optional('boolean') }),
   background: optional(keys({ used: 'number', cap: 'number' })),
 } satisfies Record<keyof Required<SlashStatus>, Shape>;
+
+/**
+ * `SlashAsked`, an ask as `GET /api/slash/asks` lists it, with exactly the type's keys. `purpose` is optional in the type
+ * for a host built before it said so, and the Worker is not that host, so it is held to sending it.
+ */
+const SLASH_ASKED = {
+  id: 'string',
+  ts: 'instant',
+  kind: 'string',
+  purpose: 'string',
+  status: 'string',
+  code: or('string', 'null'),
+  question: or('string', 'null'),
+  model: 'string',
+  filed: or('string', 'null'),
+} satisfies Record<keyof Required<SlashAsked>, Shape>;
+const SLASH_ASKS = keys({ asks: list(keys(SLASH_ASKED)) });
 
 /** `LiveRun`, a row of `boot.sessions`. */
 const LIVE_RUN = keys({ id: 'string', seq: 'number', spoken: 'string', state: or('string', 'null'), version: 'number', fields: map('any'), stale: 'boolean' });
@@ -326,6 +343,16 @@ test("SLASH'S STATUS: 200 with a key store behind it, and the keys the type lets
     assert.equal(status.asks.used, 0);
     for (const key of ['source', 'provider', 'background'] as const) assert.notEqual(status[key], undefined, `the Cloud left ${key} out of Slash's status`);
     assert.equal(typeof status.asks.capped, 'boolean', 'the Cloud says whether the asks are capped');
+  }
+});
+
+test("SLASH'S ASKS: the owner's list answers 200 as a list of asks, each held to the client's type", async () => {
+  for (const who of [busy, quiet]) {
+    const value = await read(who, '/api/slash/asks');
+    fits(value, SLASH_ASKS, `GET /api/slash/asks for ${who.slug}`);
+    /* NOTHING HERE CAN ASK A MODEL, so the list is empty for both people and an empty list fits any shape: what this
+       holds is the door and its one key. An ask's own keys are held in `packages/slash/test/history-purpose.test.ts`. */
+    assert.deepEqual((value as { asks: unknown[] }).asks, []);
   }
 });
 

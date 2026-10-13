@@ -754,6 +754,13 @@ export type EvalContext = {
    * it holds are the same local day.
    */
   tz?: string | undefined;
+  /**
+   * THIS READ IS A KEPT POINT'S (`snapshot`, REC-B05). A row in a sum takes the nearest rate there is and says how old
+   * it is; a point in a line is drawn as that day's, so each amount needs a rate of its own day or the day before, and
+   * never a later one standing in. Without one the figure has no `value` and names the pair (`pointSaid`), so the night
+   * writes no point: a gap in the line is honest, and a point that is quietly wrong is not. Absent on every other read.
+   */
+  point?: true | undefined;
   /** The register's declared fields, so a predicate and a field expression check against one shape. */
   schemaOf: (register: string) => Schema | null;
   /** A ref written by name: `thing is Kiln`, every row bearing it. Absent means a sentence cannot name one. */
@@ -792,7 +799,7 @@ export type EvalContext = {
 };
 
 /** What a money sum needs to add across currencies: the currency, the rates, today, and the field that dates a row. */
-type Across = { into: string | null; home: string | null; rates: readonly Rate[]; today: string; day: string | null; halves?: true };
+type Across = { into: string | null; home: string | null; rates: readonly Rate[]; today: string; day: string | null; halves?: true; point?: true };
 
 /** What a reading says of a sum added up across currencies, before its rows and its verdict (`across` in `fx.ts`). */
 export type AcrossSaid = Pick<Reading, 'value' | 'unit' | 'parts' | 'fx' | 'atLeast' | 'noRate'>;
@@ -819,6 +826,51 @@ export function acrossSaid(said: Added, amounts: readonly Amount[], into: string
     return { value: null, unit: null, parts: partsOf(amounts), fx: { into, home, asOf: null, forward: false, stale: false, missing } };
   }
   return { value: null, unit: null, parts: said.parts, fx: { into, home, asOf: null, forward: false, stale: false, missing: said.missing } };
+}
+
+/** The day before a day, as text. Noon UTC is only a place to do the subtraction. */
+const dayBefore = (day: string): string => new Date(Date.parse(`${day}T12:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+
+/**
+ * Each pair a kept point has no rate for, as `USD to EGP`, in code order: none at all, only a later one standing in, or
+ * one older than the day before the amount's own day (`today` for an amount whose row has no day).
+ *
+ * THE DAY IS THE AMOUNT'S, as `across` converts each amount at its own day's rate: a bill of the 3rd read in a point of
+ * the 30th was priced on the 3rd, and it is the 3rd's rate that has to be there.
+ *
+ * AN AMOUNT DATED AFTER THE POINT IS HELD TO THE POINT'S DAY. A bill due on the 30th, read on the 16th, has no rate of
+ * the 30th to wait for, and held to its own day a figure of what is still to come would never be a point at all.
+ */
+export function farRates(amounts: readonly Amount[], into: string, rates: readonly Rate[], today: string): string[] {
+  const far = new Set<string>();
+  const point = today.slice(0, 10);
+  /* One answer a currency and day: a figure over a year of rows asks for the same few pairs over and over. */
+  const seen = new Map<string, boolean>();
+  for (const a of amounts) {
+    if (a.currency === into) continue;
+    const day = (a.day ?? today).slice(0, 10);
+    const key = `${a.currency} ${day}`;
+    let isFar = seen.get(key);
+    if (isFar === undefined) {
+      /* The rate `across` converts this amount with, so what is judged is what was used. */
+      const r = rateFor(rates, a.currency, into, day);
+      isFar = !r || r.forward || r.as_of < dayBefore(day > point ? point : day);
+      seen.set(key, isFar);
+    }
+    if (isFar) far.add(`${a.currency} to ${into}`);
+  }
+  return [...far].sort();
+}
+
+/**
+ * What a kept point says of amounts it cannot price on their own days: one amount a currency, no `value`, and each
+ * pair named in `fx.missing`. `null` when every rate is near enough, and the figure is then read as any other is.
+ */
+export function pointSaid(amounts: readonly Amount[], into: string | null, home: string | null, rates: readonly Rate[], today: string, kind: Reduce = 'sum'): AcrossSaid | null {
+  if (into === null) return null;
+  const missing = farRates(amounts, into, rates, today);
+  if (missing.length === 0) return null;
+  return { value: null, unit: null, parts: partsOf(amounts, kind), fx: { into, home, asOf: null, forward: false, stale: false, missing } };
 }
 
 /**
@@ -1291,6 +1343,7 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
     /* The local day on a live read in a zone, as the predicate's `today` is (`clockOf`). */
     today: new Date(clockOf(ctx)).toISOString().slice(0, 10),
     day: dayFieldOf(schema.fields),
+    ...(ctx.point ? { point: true as const } : {}),
   };
   /**
    * AND UNDER `asOfMs` THE CURRENT WINDOW ENDS AT THE AS-OF DAY, as the window before ends at its own.
@@ -2209,6 +2262,9 @@ function aggregate(
         .map((r) => ({ currency: String(r.u), amount: Number(r.v), day: typeof r.d === 'string' ? r.d : null }));
       /* CONVERTED WHEN SOMEBODY CHOSE THE CURRENCY TO ADD UP IN: the record's home currency, or the one a row the figure
          is about says it is kept in (`groupNames`, `scopeCurrency`). `into` is one of the two or it is `null`. */
+      /* A KEPT POINT NEEDS EACH RATE OF ITS OWN DAY OR THE DAY BEFORE, else it is no number and the night writes none. */
+      const gap = fx.point ? pointSaid(amounts, fx.into, fx.home, fx.rates, fx.today, kind as Reduce) : null;
+      if (gap) return ok({ ...gap, rows, refusals: [] });
       const said = across(amounts, fx.into, fx.rates, fx.today, fx.into !== null, kind as Reduce);
       /* ONE, CONVERTED, AT LEAST OR IN PARTS (`acrossSaid`). A half of a ratio or a diff is never at least: a bound
          less a bound, or over one, is a bound on nothing. */
@@ -2507,7 +2563,11 @@ export function targetOf(text: string): { lte: number } | { gte: number } | null
 
 /* ── a figure, kept ────────────────────────────────────────────────── */
 
-export type Snapshot = { series: string; wrote: number; backfilled: number; missing: number };
+/**
+ * `missing` is every day asked for that got no point, and `noRate` is how many of those are missing for want of a rate
+ * of that day (REC-B05): the figure had its rows and no way to price them as that day's.
+ */
+export type Snapshot = { series: string; wrote: number; backfilled: number; missing: number; noRate: number };
 
 /**
  * Yesterday's reading, written down.
@@ -2657,6 +2717,7 @@ export function snapshot(
   /** Yesterday, locally: the date before the local date `nowMs` falls on. */
   const yesterday = back(at(ctx.nowMs), 1);
 
+  let noRate = 0;
   const write = (day: string, overwrite: boolean): 'wrote' | 'kept' | 'missing' => {
     if (!overwrite && sql.one("SELECT 1 AS x FROM metric_point WHERE series = ? AND grain = 'day' AND at = ?", decl.metric, day))
       return 'kept';
@@ -2674,10 +2735,17 @@ export function snapshot(
      */
     /* AND THE ZONE GOES WITH IT, because noon UTC makes every bare day in the predicate a local day
        and an `instant` is only compared with one in a zone (`localInstants`). */
-    const read = evaluateMetric(sql, decl, { ...ctx, asOfMs: Date.parse(`${day}T12:00:00Z`), tz: deps.tz });
+    /* AND AS A POINT (`EvalContext.point`): a rate of the amount's own day or the day before, else no number. */
+    const read = evaluateMetric(sql, decl, { ...ctx, asOfMs: Date.parse(`${day}T12:00:00Z`), tz: deps.tz, point: true });
     /* A NULL VALUE IS NO ROW. A series with a zero on every day nothing happened is a series that
        cannot tell "nothing" from "no answer", and the difference is the whole of a trend. */
-    if (!read.ok || read.value.value === null) return 'missing';
+    if (!read.ok || read.value.value === null) {
+      /* THE REASON IS "NO RATE" when the figure named a pair it could not price, or left amounts out and is at least:
+         a lower bound is not that day's number either. A night with no rate is counted, and a later night with one
+         fills the day in, since the backfill writes every day that holds no point. */
+      if (read.ok && (read.value.atLeast === true || (read.value.fx?.missing.length ?? 0) > 0)) noRate++;
+      return 'missing';
+    }
 
     const wrote = point(read.value.value, read.value.unit);
 
@@ -2709,5 +2777,5 @@ export function snapshot(
     if (out === 'missing') missing++;
   }
 
-  return ok({ series: decl.metric, wrote: today === 'wrote' ? 1 : 0, backfilled, missing });
+  return ok({ series: decl.metric, wrote: today === 'wrote' ? 1 : 0, backfilled, missing, noRate });
 }

@@ -980,11 +980,14 @@ export type SlashSettingsPatch = Partial<{
 /**
  * One ask as `slashAsks` lists it, `Asked` in the same file, newest first. `question` is what was typed, or `null` where
  * an erasure took it; `filed` is the `SG<n>` a proposal put on Decide. `code` is the refusal's, `null` for an answer.
+ * `purpose` is what the ask was for (`ask`, `automation`, `plan`, `headline`, `understand`, `look` and the host's own
+ * names), absent from a host built before it said so.
  */
 export type SlashAsked = {
   id: string;
   ts: string;
   kind: string;
+  purpose?: string;
   status: string;
   code: string | null;
   question: string | null;

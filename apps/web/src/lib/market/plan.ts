@@ -109,11 +109,39 @@ export type SectionKey =
 export type Section = { key: SectionKey; title: string; rows: Row[] };
 
 /**
- * One calls-out line and whether it is new to this record. A call the install would arm is said as the kernel says it on
- * Decide (`doesOf`, kind `install`): "Sends your key 'stripe' to api.stripe.com every hour." One the record already runs
- * unchanged keeps the record's own line, since `doesOf` leaves it out.
+ * One call out and whether it is new to this record. `line` is the kernel's own sentence for it, the one Decide says
+ * (`doesOf`, kind `install`): "Sends your key 'stripe' to api.stripe.com every hour." A call the record already runs
+ * unchanged is said the same way, with no mark beside it.
+ *
+ * WHAT THE SENTENCE IS MADE OF STAYS ON THE CALL (`host`, `every`, `trigger`, `per_day`, `grant`, as the plan names
+ * them), so whoever draws it can say it again or group by host without reading the plan a second time.
  */
-export type Call = { line: string; note: string | null; change: 'new' | 'changed' | 'same' };
+export type Call = {
+  line: string;
+  note: string | null;
+  change: 'new' | 'changed' | 'same';
+  host: string | null;
+  every: string | null;
+  trigger: 'schedule' | 'rule' | 'both';
+  per_day: number | null;
+  /** The key by its label, never the key. */
+  grant: string | null;
+};
+
+/** One call of a plan as a `Call`. `fallback` is said only when the kernel has no sentence for it. */
+function callOf(c: Record<string, unknown>, change: Call['change'], note: string | null, fallback: () => string): Call {
+  const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() !== '' ? v.trim() : null);
+  const made = {
+    host: str(c.host),
+    every: str(c.every),
+    trigger: (c.trigger === 'rule' || c.trigger === 'both' ? c.trigger : 'schedule') as Call['trigger'],
+    per_day: typeof c.per_day === 'number' && c.per_day > 0 ? c.per_day : null,
+    grant: str(c.grant) ?? str(c.key),
+  };
+  /* THE KERNEL LEAVES OUT A CALL MARKED `same`, since on Decide it is nothing new. Here it is still drawn, so it is
+     asked without the mark and reads as the same sentence. */
+  return { line: doesOf('install', { calls_out: [made] }) || fallback(), note, change, ...made };
+}
 
 /** One pack's part of the plan. A single add-on is one part; a use case is one part per pack, in the order they go in. */
 export type Part = { key: string; title: string; move: string; sections: Section[]; calls: Call[] };
@@ -213,11 +241,9 @@ function diffPart(d: Body, name: (id: string) => string): { part: Part; stops: s
       ...section('interrupts', words.interrupts, strings(d.interrupts).map((r) => row(name(`rule.${r}`)))),
       ...section('worth', words.worth, worth),
     ],
-    calls: list(d.calls_out).map((c) => ({
-      line: doesOf('install', { calls_out: [c] }) || text(c.line) || callsOutOf([c]).map(callLine)[0] || text(c.ingest),
-      note: typeof c.key_line === 'string' && c.key_line !== '' ? c.key_line : null,
-      change: c.change === 'changed' ? 'changed' : c.change === 'same' ? 'same' : 'new',
-    })),
+    calls: list(d.calls_out).map((c) =>
+      callOf(c, c.change === 'changed' ? 'changed' : c.change === 'same' ? 'same' : 'new', typeof c.key_line === 'string' && c.key_line !== '' ? c.key_line : null, () => callsOutOf([c]).map(callLine)[0] || text(c.line) || text(c.ingest)),
+    ),
   };
   return { part, stops, title, summary: text(pack.summary), direction, version, installed };
 }
@@ -245,11 +271,9 @@ function sharedParts(plan: Body, name: (id: string) => string): { parts: Part[];
         ...section('moves', words.moves, list(p.hands).map((h) => row(text(h.name), words.movesTo(text(h.to))))),
         ...section('examples', words.examples, examples === 0 ? [] : [row(words.examplesLine(examples))]),
       ],
-      calls: (Array.isArray(p.calls) ? (p.calls as CallOut[]) : []).map((c) => ({
-        line: doesOf('install', { calls_out: [{ host: c.host, every: c.every, key: c.key, trigger: c.trigger ?? 'schedule', per_day: c.perDay ?? null }] }) || callLine(c),
-        note: c.note ?? null,
-        change: 'new' as const,
-      })),
+      calls: (Array.isArray(p.calls) ? (p.calls as CallOut[]) : []).map((c) =>
+        callOf({ host: c.host, every: c.every, grant: c.key, trigger: c.trigger ?? 'schedule', per_day: c.perDay ?? null }, 'new', c.note ?? null, () => callLine(c)),
+      ),
     };
   });
   return { parts: [...turnsOn, ...parts], stops };
