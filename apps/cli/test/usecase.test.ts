@@ -134,7 +134,7 @@ test('usecase install: files a pack proposal carrying the file, prints its Decid
   assert.equal(asked[0]?.args.body_kind, 'pack');
   assert.equal(asked[0]?.args.question, 'Install Study 1.0.1?');
   assert.deepEqual(JSON.parse(String((asked[0]?.args.body as { file: string }).file)), DOC);
-  assert.equal(h.out.at(-1), `Asked the owner to install Study 1.0.1. Nothing is installed until they accept it: ${h.io.env.BRAINDOG_HOST}/decide/SG3`);
+  assert.equal(h.out.at(-1), `Asked the owner to install Study 1.0.1. Nothing is installed until they accept it. Open Decide in the app.`);
 
   /* FROM AN ADDRESS, read here and sent the same way. */
   assert.equal(await usecase(['install', `${h.io.env.BRAINDOG_HOST}/files/study.usecase.json`], h.io), 0, h.said.join('\n'));
@@ -209,7 +209,7 @@ test('usecase install <id>: files a pack proposal for a use case on offer, as an
   assert.equal(await usecase(['install', 'student'], h.io), 0, h.said.join('\n'));
   const proposed = () => h.seen.filter((s) => s.method === 'propose');
   assert.deepEqual(proposed()[0]?.args, { question: 'Set this BrainDog up for Student?', body_kind: 'pack', body: { install: 'usecase-student' }, cause: 'install#usecase-student' });
-  assert.equal(h.out.at(-1), `Asked the owner to set this BrainDog up for Student. Nothing is installed until they accept it: ${h.io.env.BRAINDOG_HOST}/decide/SG3`);
+  assert.equal(h.out.at(-1), `Asked the owner to set this BrainDog up for Student. Nothing is installed until they accept it. Open Decide in the app.`);
 
   /* BY ITS PACK ID TOO, and one on at an older version is asked as its update. */
   assert.equal(await usecase(['install', 'usecase-team'], h.io), 0, h.said.join('\n'));

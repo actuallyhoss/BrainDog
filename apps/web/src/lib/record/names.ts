@@ -38,6 +38,7 @@ export const nameWords = {
   slash: 'Slash',
   brainDog: 'BrainDog',
   agent: 'An agent',
+  helping: 'helping',
   automation: 'An automation',
   number: 'Number',
 } as const;
@@ -118,6 +119,73 @@ function shipped(id: string): string | undefined {
 /** An agent's name: the product's spelling for one a person knows, else the name it was given in words. */
 const agentName = (id: string): string => (Object.hasOwn(AGENT_NAMES, id) ? (AGENT_NAMES[id] ?? humanize(id)) : humanize(id));
 
+/* ── a run, by the agent it is ──────────────────────────────────────────── */
+
+/**
+ * Who a run is, as the record answers it beside a line that run signed (`RunBy` in the kernel's `pages.ts`): the kind
+ * of agent (`claude`, or `other` where it said none), the app it ran in as the run holds it (`claude-code`, sometimes
+ * with its version after it), and the run it helps. `run` is the handle, read only to tell which run this is about.
+ */
+export type RunBy = { run?: string | null; agent: string; client: string | null; parent: string | null };
+
+/**
+ * THE APPS A RUN SAYS IT RAN IN, as a person names them. The app says more than the kind of agent does, since a person
+ * who reads "Claude Code" knows which window did it, so it is read first. One missing from here is its name in words.
+ */
+export const APP_NAMES: Readonly<Record<string, string>> = {
+  'claude-code': 'Claude Code',
+  'claude-ai': 'Claude',
+  'codex-mcp-client': 'Codex',
+  'cursor-vscode': 'Cursor',
+};
+
+/** A word an app or an agent may be called by: letters first, then letters, digits, dashes and underscores. */
+const WORD = /^[a-z][a-z0-9_-]{0,39}$/iu;
+
+/**
+ * What a run's `client` or `agent` says, as a name, or `null` where it says nothing a person could read.
+ *
+ * ONLY ITS FIRST WORD, because an app sends its version after its name (`claude-code 2.1.4`, `claude-code/2.1.4`).
+ * NEVER AN ID, A HANDLE, AN ADDRESS OR A PATH: the text is what an app sent about itself, so one with an `@`, a `#` or
+ * a colon in it, a ULID, a run's own handle (`S42`), or anything that does not open with a letter is no name at all.
+ * `other` is the record's word for an agent that said no kind, which is nobody in particular.
+ */
+function runWord(text: unknown, apps: boolean): string | null {
+  if (typeof text !== 'string') return null;
+  const bare = text.trim().replace(/^agent:/u, '');
+  if (/[@#:]/u.test(bare)) return null;
+  const word = bare.split(/[\s/]/u)[0] ?? '';
+  if (!WORD.test(word) || /^s\d+$/iu.test(word) || ULID.test(word)) return null;
+  const key = word.toLowerCase();
+  if (key === 'other') return null;
+  if (apps && Object.hasOwn(APP_NAMES, key)) return APP_NAMES[key] ?? null;
+  return agentName(Object.hasOwn(AGENT_NAMES, key) ? key : word);
+}
+
+/**
+ * A RUN, AS A PERSON READS IT: the app it ran in ("Claude Code", "Codex", "Cursor"), else the kind of agent it is
+ * ("Claude"), and "Claude Code, helping" where it helps another run. Never its handle.
+ *
+ * `null` OR NOTHING IS An agent, because that is what the record answers for a run it does not hold, and what a caller
+ * has before the record answers `run_by` at all. A run that said neither an app nor a kind is An agent too.
+ */
+export function runByName(by?: RunBy | null): string {
+  if (typeof by !== 'object' || by === null) return nameWords.agent;
+  const name = runWord(by.client, true) ?? runWord(by.agent, false) ?? nameWords.agent;
+  return typeof by.parent === 'string' && by.parent.trim() !== '' ? `${name}, ${nameWords.helping}` : name;
+}
+
+/**
+ * A `run_by` as it came off the wire, as `actor` may read it, or `null` for anything that is not one. A feed and a row's
+ * change are checked only in the keys their screens file them by, so this one is narrowed where it is read.
+ */
+export function runByIn(v: unknown): RunBy | null {
+  if (typeof v !== 'object' || v === null || Array.isArray(v)) return null;
+  const by = v as Record<string, unknown>;
+  const said = (t: unknown): string | null => (typeof t === 'string' ? t : null);
+  return { run: said(by.run), agent: said(by.agent) ?? '', client: said(by.client), parent: said(by.parent) };
+}
+
 /**
  * THE WORDS `actor` HAS SAID FOR SOMETHING THAT IS NOT A PERSON, on this tab, and the kind each belonged to.
  *
@@ -157,15 +225,16 @@ export const saidKind = (name: string): ActorKind | undefined => SAID.get(name.t
  * and the seed are BrainDog, because a person asking who backed up their record is answered by the product's name and
  * not by a principal. A rule is its name (`rule:` on the record, `rule.` in the sample); any other mechanism
  * (`ingest:`, `runner:`) is an automation, named by its id in words, or An automation where that id is a ULID. An agent
- * is its proper name, and a run (`S42`) whose agent the caller does not hold is An agent, until the agents area draws a
- * run by its own face.
+ * is its proper name. A run (`S42`) is named from `run_by`, what the record answers beside a line that run signed
+ * (`runByName`: "Claude Code", and "Claude Code, helping" for a helper); a caller that holds none, or one about some
+ * other run, reads An agent, never the handle.
  *
  * A STRING IN NONE OF THOSE SHAPES IS ALREADY A NAME. Home's feed hands over the name the record gave a person, and
  * that is kept as it was written ("de Vries" stays lower case). Anything left that still looks like an id, with an
  * underscore, a colon or a ULID in it, is Someone on this record rather than itself, and so is anything with an `@`,
  * since that is an address and not a name.
  */
-export function actor(by: string, me: string | null = null, names: ReadonlyMap<string, string> = new Map()): Actor {
+export function actor(by: string, me: string | null = null, names: ReadonlyMap<string, string> = new Map(), run_by: RunBy | null = null): Actor {
   const who = by.trim();
   if (who === 'you' || (me !== null && me !== '' && who === me)) return { name: copy.feedYou, kind: 'you' };
   const named = names.get(who);
@@ -181,7 +250,8 @@ export function actor(by: string, me: string | null = null, names: ReadonlyMap<s
   const agent = /^agent:(.+)$/u.exec(who)?.[1] ?? (Object.hasOwn(AGENT_NAMES, who) ? who : undefined);
   /* AN AGENT NAMED BY AN ID IS STILL AN AGENT, said by its kind's word rather than the ULID it was minted under. */
   if (agent !== undefined) return said(ULID.test(agent) ? nameWords.agent : agentName(agent), 'agent');
-  if (/^S\d+$/u.test(who)) return said(nameWords.agent, 'agent');
+  /* A RUN IS NAMED ONLY BY ITS OWN `run_by`: one that names another run is about a different line, so it is not read. */
+  if (/^S\d+$/u.test(who)) return said(run_by !== null && (run_by.run ?? who) === who ? runByName(run_by) : nameWords.agent, 'agent');
   const mechanism = /^[a-z][a-z0-9-]*:(.+)$/u.exec(who)?.[1];
   /*
    * A MECHANISM NAMED BY A MINTED ID is an automation all the same, said by its kind's word rather than the ULID.

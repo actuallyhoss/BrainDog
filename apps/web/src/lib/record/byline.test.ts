@@ -30,6 +30,25 @@ test('a run whose agent the record does not name is An agent, and an id is never
   assert.equal(b?.app, null, 'a path is not where an agent ran');
 });
 
+test('a run the record says more of (`run_by`) is the app it ran in, handed in or on the change, and never its handle', () => {
+  const claude = { run: 'S42', agent: 'claude', client: 'claude-code 2.1.4', parent: null };
+  const handed = bylineOf({ who: 'S42', agent: 'claude', for: 'p_owner', at: AT }, null, new Map([['p_owner', 'Mara']]), NOW, null, claude);
+  assert.deepEqual([handed?.by, handed?.name, handed?.said, handed?.run], ['agent', 'Claude Code', 'Claude Code for Mara · 2h ago', 'S42']);
+  /* ON THE CHANGE ITSELF, as the record would send it beside `agent`, and with no `agent` at all. */
+  assert.equal(bylineOf({ who: 'S42', agent: 'claude', at: AT, run_by: claude }, null, new Map(), NOW)?.name, 'Claude Code');
+  assert.equal(bylineOf({ who: 'S9', at: AT, run_by: { agent: 'other', client: 'codex-mcp-client', parent: null } }, null, new Map(), NOW)?.name, 'Codex');
+  /* A HELPER IS NOT SAID AS HELPING HERE, since the line goes on to say for whom. */
+  assert.equal(bylineOf({ who: 'S42', at: AT }, null, new Map(), NOW, null, { ...claude, parent: 'S41' })?.name, 'Claude Code');
+  /* ONE ABOUT ANOTHER RUN, ONE THAT SAYS NOTHING READABLE, AND NONE: the agent's own name stands, as before. */
+  assert.equal(bylineOf({ who: 'S42', agent: 'claude', at: AT }, null, new Map(), NOW, null, { ...claude, run: 'S7' })?.name, 'Claude');
+  assert.equal(bylineOf({ who: 'S42', agent: 'claude', at: AT }, null, new Map(), NOW, null, { run: 'S42', agent: 'other', client: 'S42', parent: null })?.name, 'Claude');
+  assert.equal(bylineOf({ who: 'S42', agent: 'claude', at: AT, run_by: 'S42' }, null, new Map(), NOW)?.name, 'Claude');
+  assert.equal(bylineOf({ who: 'S9', at: AT, run_by: null }, null, new Map(), NOW)?.name, 'An agent');
+  /* NOBODY BUT A RUN IS RENAMED BY IT. */
+  assert.equal(bylineOf({ who: 'slash', at: AT }, null, new Map(), NOW, null, claude)?.name, 'Slash');
+  assert.equal(bylineOf({ who: 'rule:late-reply', at: AT, run_by: claude }, null, new Map(), NOW)?.by, 'rule');
+});
+
 test('Slash, a rule and an app each say their own name; a person, you and the sample carry no byline', () => {
   assert.deepEqual([bylineOf({ who: 'slash', at: AT })?.by, bylineOf({ who: 'slash', at: AT })?.name], ['slash', 'Slash']);
   assert.equal(bylineOf({ who: 'rule:late-reply', at: AT })?.by, 'rule');

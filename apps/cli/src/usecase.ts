@@ -35,6 +35,7 @@ import { refused, type Result } from '@braindog/ports';
 import { installFromCatalogue, loadSource, reachLines, sdkVerb } from './catalogue.ts';
 import { oneLine, printable } from './clip.ts';
 import { refuse } from './json.ts';
+import { untilAccepted } from './links.ts';
 import { causeOf, connect, fixOf, joinedSaid, type AgentIo, type Connected } from './skills.ts';
 
 const USAGE =
@@ -304,9 +305,8 @@ export async function proposeFile(text: string, file: { usecase: string; title: 
     io.say('The record took the question and did not say which one it is. Open Decide in the app.');
     return 1;
   }
-  const link = new URL(`/decide/${encodeURIComponent(id)}`, at.to.base).href;
   const joined = joinedSaid(answer.value);
-  io.out(`${joined !== null ? joined : question === undefined ? `Asked the owner to install ${u.title} ${u.version}.` : `Asked the owner: ${oneLine(question)}`} Nothing is installed until they accept it: ${link}`);
+  io.out(`${joined !== null ? joined : question === undefined ? `Asked the owner to install ${u.title} ${u.version}.` : `Asked the owner: ${oneLine(question)}`} ${untilAccepted(at.to, id)}`);
   return 0;
 }
 
@@ -409,9 +409,8 @@ async function installOffered(given: string, host: string | undefined, io: Agent
     io.say('The record took the question and did not say which one it is. Open Decide in the app.');
     return 1;
   }
-  const link = new URL(`/decide/${encodeURIComponent(filed)}`, at.to.base).href;
   const asked = update ? `update ${title} from ${update.from} to ${update.to}` : `set this BrainDog up for ${title}`;
   const joined = joinedSaid(answer.value);
-  io.out(`${joined ?? `Asked the owner to ${asked}.`} Nothing is installed until they accept it: ${link}`);
+  io.out(`${joined ?? `Asked the owner to ${asked}.`} ${untilAccepted(at.to, filed)}`);
   return 0;
 }

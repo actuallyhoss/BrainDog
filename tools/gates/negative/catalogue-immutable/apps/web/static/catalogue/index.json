@@ -1,0 +1,23 @@
+{
+  "format": 1,
+  "name": "Planted",
+  "entries": [
+    {
+      "kind": "pack",
+      "id": "planted-notes",
+      "title": "Planted notes",
+      "summary": "One list of notes.",
+      "author": "Nobody",
+      "license": "MIT",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "bytes": 512,
+          "published_at": "2026-01-01T00:00:00.000Z"
+        }
+      ]
+    }
+  ]
+}

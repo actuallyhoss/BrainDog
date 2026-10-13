@@ -538,6 +538,17 @@ const withoutLedgerTile = (doc: Body): Body => ({
         },
   ),
 });
+/**
+ * AND 3.17.0'S PLANS (plans-list-66, REC-B12 jobs 1 and 2), folded into the same unreleased step: the list Plans goes,
+ * an instalment loses Part of and Left after, and the script that makes and counts plans goes with the rule that starts it.
+ */
+const PLAN_FIELDS: ReadonlySet<string> = new Set(['plan_row', 'left_after']);
+const withoutPlans = (doc: Body): Body => ({
+  ...doc,
+  declarations: (doc.declarations as Body[])
+    .filter((d) => d.register !== 'plans' && d.rule !== 'part-counts-plan' && d.script !== 'plans_from_names')
+    .map((d) => (d.register === 'installments' && Array.isArray(d.fields) ? { ...d, fields: (d.fields as Body[]).filter((f) => !PLAN_FIELDS.has(String(f.id))) } : d)),
+});
 const withoutCashStale = (doc: Body): Body => ({ ...doc, declarations: (doc.declarations as Body[]).filter((d) => d.rule !== 'cash-stale') });
 /** Work as 1.18.0 released it, the frozen document (`fixtures/released/`), which holds the follow-up script as it was. */
 const WORK_1_18 = JSON.parse(readFileSync(new URL('./fixtures/released/work-1.18.0.json', import.meta.url), 'utf8')) as Body;
@@ -549,7 +560,7 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
     version: '3.13.0',
     released: '2e09983b40aba73e',
     undo: (raw) => {
-      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(raw)))))));
+      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(raw))))))));
       return {
       ...doc,
       /* AND THE SCRIPT THAT MARKS A BILL PAID, WITH THE RULE THAT STARTS IT (settle-rule-60), both newer than 3.13.0. */
@@ -889,7 +900,8 @@ const dropAmount = (v: unknown): unknown =>
  * AND NUMBERS AS THEY WERE BEFORE FOUNDER 2.5.0: a reading's `value` required and no `amount`, so no Amount column on a
  * block or a table over them. Undone with the two changes before it, so the version before is still the one released.
  * AND THE UNRELEASED 2.6.0'S SERVICE NUMBERS (estate-numbers-61) come off with them: the field `about_service`, the figure
- * `service-numbers`, and the block laid on Renewals.
+ * `service-numbers`, and the block laid on Renewals. The unreleased 2.6.0's end of day comes off the counts of numbers
+ * too (founder-bound-66): `, at before tomorrow` on each `datapoints-` figure.
  */
 const numbersBefore = (doc: Body, id: string): Body =>
   id !== 'founder'
@@ -898,7 +910,9 @@ const numbersBefore = (doc: Body, id: string): Body =>
         ...doc,
         ...(Array.isArray(doc.adds) ? { adds: (doc.adds as Body[]).filter((a) => (a.block as Body | undefined)?.key !== 'earning-silent' && (a.block as Body | undefined)?.heading !== 'Server and provider numbers') } : {}),
         declarations: (doc.declarations as Body[]).filter((d) => d.metric !== 'project-numbers-7d' && d.metric !== 'projects-earning-silent' && d.metric !== 'service-numbers').map((d) =>
-          d.register === 'datapoints'
+          typeof d.metric === 'string' && d.metric.startsWith('datapoints-') && typeof d.where === 'string'
+            ? { ...d, where: d.where.replace(', at before tomorrow', '') }
+            : d.register === 'datapoints'
             ? { ...d, fields: (d.fields as Body[]).flatMap((f) => (f.id === 'amount' || f.id === 'about_service' ? [] : f.id === 'value' ? [{ ...f, required: true }] : [f])) }
             : (dropAmount(d) as Body),
         ),

@@ -13,6 +13,10 @@
  *
  * A ROW THAT DIFFERS IS NOT OVERWRITTEN. The change is proposed as a rowset update, once per shape of the config.
  *
+ * A TOOL IS WHAT IT RUNS (AGT-D02). A server found under a name the record does not hold is the row of its scope that
+ * starts the same way, when there is one: that row is stamped as seen and nothing is added. A row is asked about only
+ * when how it starts would change, as "Change how <name> starts?".
+ *
  * WRITE IS A DRY RUN UNTIL A SCOPE IS NAMED (question 5). `--scope user` applies the global tools through
  * `claude mcp add-json`, and `--scope project` this repository's, into its `.mcp.json`, only when typed by hand. An
  * entry already there is replaced only when it is still what BrainDog last wrote, by `~/.braindog/tools-lock.json`,
@@ -29,7 +33,7 @@ import type { Brief, Client, Context } from '@braindog/client';
 
 import { hostsPath, readHosts } from './http.ts';
 import { HEADER_NAME, keys } from './keys.ts';
-import { asking, connect, fixOf, isObject, QUESTION, readLock, samePath, sha256, spokenOf, Stopped, thisMachine, valueOf, writeLock, type AgentIo } from './skills.ts';
+import { asking, causeOf, connect, fixOf, isObject, joinedSaid, QUESTION, readLock, samePath, sha256, spokenOf, Stopped, thisMachine, valueOf, writeLock, type AgentIo } from './skills.ts';
 
 type Env = Record<string, string | undefined>;
 
@@ -174,14 +178,18 @@ export function depositor(o: { file: string; env: Env; host: string; headers: Re
 
 /* ── the lock ──────────────────────────────────────────────────────────── */
 
-/** `written`: the SHA-256 of each entry BrainDog applied. `asked`: the config shape each proposal was made for. */
-type ToolsLock = { written: Record<string, string>; asked: Record<string, string> };
+/**
+ * `written`: the SHA-256 of each entry BrainDog applied. `asked`: the config shape each proposal was made for.
+ * `same`: the row a tool found under another name was matched to, by how it starts. `missed`: the rows such a tool was
+ * looked for among and not found, so they are read again only once one of them has changed.
+ */
+type ToolsLock = { written: Record<string, string>; asked: Record<string, string>; same: Record<string, string>; missed: Record<string, string> };
 
 function toolsLock(file: string): ToolsLock | null {
   const held = readLock(file);
   if (held === null) return null;
   const strings = (x: unknown) => Object.fromEntries(Object.entries(isObject(x) ? x : {}).filter((e): e is [string, string] => typeof e[1] === 'string'));
-  return { written: strings(held.written), asked: strings(held.asked) };
+  return { written: strings(held.written), asked: strings(held.asked), same: strings(held.same), missed: strings(held.missed) };
 }
 
 /** JSON with its keys in order, so the same entry always hashes the same. */
@@ -196,6 +204,40 @@ const canonical = (x: unknown): string =>
       : JSON.stringify(x ?? null);
 
 const strings = (x: unknown): string[] => (Array.isArray(x) ? x.filter((v): v is string => typeof v === 'string') : []);
+
+/* ── how a tool starts ─────────────────────────────────────────────────── */
+
+/** What a row or a config says of how a tool starts. */
+type Start = { transport: unknown; command: string | null; args: string[]; endpoint: string | null };
+
+const startOf = (x: Record<string, unknown>): Start => ({
+  transport: x.transport,
+  command: typeof x.command === 'string' ? x.command : null,
+  args: strings(x.args),
+  endpoint: typeof x.endpoint === 'string' ? x.endpoint : null,
+});
+
+/** An address as it is compared: the host in lower case and no slash at the end, so one address written two ways is one. */
+function addressOf(url: string): string {
+  try {
+    const u = new URL(url);
+    return `${u.protocol}//${u.host}${u.pathname.replace(/\/+$/, '')}${u.search}`;
+  } catch {
+    return url;
+  }
+}
+
+/**
+ * A TOOL IS WHAT IT RUNS, NOT WHAT IT IS CALLED (AGT-D02). Two starts with one key are one tool: the same command and
+ * arguments, or the same address. His record held four tools twice, as `x` and `x-mcp`, because the match was by name.
+ */
+const startKey = (s: Start): string => canonical([s.transport, s.command, s.args, s.endpoint === null ? null : addressOf(s.endpoint)]);
+
+/** How a tool starts, as a person would type it, with the home folder written `~`. */
+const startWords = (s: Start, home: string): string => {
+  const words = s.endpoint ?? [s.command ?? '', ...s.args].join(' ').trim();
+  return (home === '' ? words : words.replaceAll(home, '~')).slice(0, 280);
+};
 
 const DAY_MS = 86_400_000;
 
@@ -324,6 +366,42 @@ export async function scanTools(s: ToolScan): Promise<string[]> {
     return { needs, deposited, would };
   };
 
+  /** A listed row read whole, once a scan, and again after this scan has written to it. */
+  type Held = { seq: number; fields: Record<string, unknown>; version: number };
+  const read = new Map<string, Held | null>();
+  const whole = async (r: Brief): Promise<Held | null> => {
+    const had = read.get(r.spoken);
+    if (had !== undefined) return had;
+    const seq = Number(r.spoken.slice(r.spoken.indexOf('#') + 1));
+    const got = valueOf(await s.client.get('tools', seq));
+    const held = isObject(got) && isObject(got.fields) && typeof got.version === 'number' ? { seq, fields: got.fields, version: got.version } : null;
+    read.set(r.spoken, held);
+    return held;
+  };
+
+  /**
+   * The row of this scope that starts as a found tool does, when none has its name. The row found is kept in the lock,
+   * so the next scan reads that one row; a search that found none is kept too, by the rows it read and their versions,
+   * and is not made again until one of them changes. Without that, a tool that waits on a question would have every
+   * row read at every session's start.
+   */
+  const startsAs = async (f: Found, key: string, start: string): Promise<Brief | undefined> => {
+    const among = listed.filter((r) => r.scope === f.scope);
+    const looked = sha256(canonical([start, among.map((r) => [r.spoken, r.version])]));
+    if (lock.missed[key] === looked) return undefined;
+    const last = among.find((r) => r.spoken === lock.same[key]);
+    for (const r of last === undefined ? among : [last, ...among.filter((x) => x !== last)]) {
+      const held = await whole(r);
+      if (held === null || startKey(startOf(held.fields)) !== start) continue;
+      lock.same[key] = r.spoken;
+      delete lock.missed[key];
+      return r;
+    }
+    delete lock.same[key];
+    lock.missed[key] = looked;
+    return undefined;
+  };
+
   const keysSaid = (n: { deposited: number; would: number }) =>
     n.deposited > 0 ? `, with ${String(n.deposited)} key${n.deposited === 1 ? '' : 's'} deposited` : n.would > 0 ? `, and ${String(n.would)} key${n.would === 1 ? '' : 's'} would be deposited` : '';
 
@@ -341,7 +419,11 @@ export async function scanTools(s: ToolScan): Promise<string[]> {
       const names = f.entries.map(needName).sort();
       const shape = sha256(canonical([f.transport, f.command, f.args, f.endpoint, names]));
       if (f.scope === 'global' && project !== null && listed.some((r) => r.scope === 'project' && r.name === f.name)) continue;
-      const row = listed.find((r) => r.scope === f.scope && r.name === f.name);
+      const start = startKey(f);
+      /* By name first, then by how it starts. A tool already asked about is not looked for again: its answer is a
+         row of its own name. */
+      const waits = f.scope === 'global' && project !== null && !reg.truncated && lock.asked[key] === shape;
+      const row = listed.find((r) => r.scope === f.scope && r.name === f.name) ?? (waits ? undefined : await startsAs(f, key, start));
 
       if (row === undefined) {
         if (reg.truncated) {
@@ -367,28 +449,28 @@ export async function scanTools(s: ToolScan): Promise<string[]> {
         continue;
       }
 
-      const seq = Number(row.spoken.slice(row.spoken.indexOf('#') + 1));
-      const got = valueOf(await s.client.get('tools', seq));
-      if (!isObject(got) || !isObject(got.fields) || typeof got.version !== 'number') continue;
-      const fields = got.fields;
+      const got = await whole(row);
+      if (got === null) continue;
+      const { seq, fields } = got;
       const prior = strings(fields.needs);
-      const same =
-        fields.transport === f.transport &&
-        (typeof fields.command === 'string' ? fields.command : null) === f.command &&
-        canonical(strings(fields.args)) === canonical(f.args) &&
-        (typeof fields.endpoint === 'string' ? fields.endpoint : null) === f.endpoint &&
-        canonical(prior.map((p) => p.split('=')[0] ?? p).sort()) === canonical(names);
+      const was = startOf(fields);
 
-      if (same) {
+      /* THE SAME START IS THE SAME TOOL, AND NOTHING IS ASKED: the change would leave the row as it is. A name it needs
+         here that the row lacks is added, and nothing the row names is taken away, since another machine may need it. */
+      if (startKey(was) === start) {
         const patch: Record<string, unknown> = {};
         const hosts = strings(fields.hosts);
         if (!hosts.includes(machine)) patch.hosts = [...hosts, machine];
         const seen = typeof fields.seen === 'string' ? Date.parse(fields.seen) : Number.NaN;
         if (!(now - seen < DAY_MS)) patch.seen = new Date(now).toISOString();
         const n = await needsFor(f, prior, allow);
-        if (n.deposited > 0) patch.needs = n.needs;
+        const label = (need: string) => need.split('=')[0] ?? need;
+        const had = new Set(prior.map(label));
+        const here = new Set(n.needs.map(label));
+        if (n.deposited > 0 || n.needs.some((need) => !had.has(label(need)))) patch.needs = [...n.needs, ...prior.filter((p) => !here.has(label(p)))];
         if (n.would > 0) lines.push(`Tool ${f.name} is recorded${keysSaid(n)}.`);
         if (s.dryRun || Object.keys(patch).length === 0) continue;
+        read.delete(row.spoken);
         const out = await s.client.update({ register: 'tools', seq, patch, version: got.version });
         if (n.deposited > 0) lines.push(valueOf(out) === null ? `Tool ${f.name} could not name its deposited keys in the record: ${fixOf(out)}` : `Tool ${f.name} is recorded${keysSaid(n)}.`);
         continue;
@@ -402,12 +484,21 @@ export async function scanTools(s: ToolScan): Promise<string[]> {
       }
       const patch = { transport: f.transport, command: f.command, args: f.args, endpoint: f.endpoint, needs: n.needs };
       /* THE OWNER'S QUESTION IN WORDS, 80 CHARACTERS AT MOST. It read "Change tools#8 to how fly-copperleaf is set up
-         in ~/.claude.json on Maras-MacBook-Pro.local?": an id, a path and a network name. Those three are the details. */
-      const question = asking('Update the ', f.name, ` tool to match ${thisMachine()}?`);
-      const out = await s.client.call<{ id: string }>('propose', {
+         in ~/.claude.json on Maras-MacBook-Pro.local?", then "Update the fly-copperleaf tool to match this Mac?", which
+         still named a machine and not what would change. The id, the path and the network name are the details, beside
+         how it starts in the record (`was`) and how it starts here (`now`).
+         ASKED ONCE FOR EVERY MACHINE (AGT-C07): the cause is the row and the start asked for, so a second machine with
+         the same config joins the question already open. */
+      const question = asking('Change how ', f.name, ' starts?');
+      const out = await s.client.call<{ id: string; joined?: true; said?: string }>('propose', {
         question,
         body_kind: 'rowset',
-        body: { register: 'tools', rows: [{ at: row.spoken, version: got.version, patch }], details: { source: f.source, machine, row: row.spoken } },
+        body: {
+          register: 'tools',
+          rows: [{ at: row.spoken, version: got.version, patch }],
+          details: { source: f.source, machine, row: row.spoken, was: startWords(was, s.home), now: startWords(f, s.home) },
+        },
+        ...causeOf(`${row.spoken}#${sha256(start).slice(0, 24)}`),
       });
       const made = valueOf(out);
       if (made === null || typeof made.id !== 'string') {
@@ -415,7 +506,12 @@ export async function scanTools(s: ToolScan): Promise<string[]> {
         continue;
       }
       lock.asked[key] = shape;
-      lines.push(`Tool ${f.name} in ${f.source} differs from the one in the record, so that was left as it is${keysSaid(n)}, and the change was asked on Decide: ${question}`);
+      const joined = joinedSaid(made);
+      lines.push(
+        joined === null
+          ? `Tool ${f.name} in ${f.source} differs from the one in the record, so that was left as it is${keysSaid(n)}, and the change was asked on Decide: ${question}`
+          : `Tool ${f.name} in ${f.source} differs from the one in the record, so that was left as it is${keysSaid(n)}, and the change is asked on Decide already. ${joined}`,
+      );
     }
     if (everywhere.length > 0) lines.push(await askEverywhere(s.client, everywhere, lock, machine, s.dryRun));
   } catch (e) {

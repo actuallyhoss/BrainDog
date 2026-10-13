@@ -536,6 +536,11 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   no host draws yet; `filed-for-you-30d` counts what an agent, a bank add-on or a rule made, where it counted
  *   anything but a person (filing-figures-draw-62-63); and `settle` leaves a Paid so far somebody typed when a pending
  *   or void payment paid none of it (audit 62, claim 1).
+ * - money-core 3.17.0, still unreleased (commit 63423720, the deployed build, holds 3.16.0), takes batch 66's change
+ *   with no version of its own (`e84778f2db7564d6`): a plan is a thing of its own (plans-list-66, REC-B12 jobs 1 and
+ *   2). The list `plans`, declared before Instalments, which gains `plan_row` and `left_after`; the script
+ *   `plans_from_names`, once a day and when `part-counts-plan` hands it a part made or changed. A record updating
+ *   holds its plans as rows after the script's first run and its parts linked after the second.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.17.0',

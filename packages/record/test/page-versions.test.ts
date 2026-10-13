@@ -17,6 +17,7 @@ import { no, type Refusal } from '@braindog/ports';
 import { createRecordApi, type CallContext } from '../src/index.ts';
 import { methods, type PageVersion, type PageVersions } from '../src/methods/page-versions.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
+import { SOURCE_MODULES } from '../../kernel/src/sources/index.ts';
 
 const ada: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' } };
 const bo: CallContext = { principal: { kind: 'person', id: 'p_2', level: 'owner' } };
@@ -227,4 +228,97 @@ test('PUT BACK APPLIES A VERSION AS IT WAS ANSWERED, and against a page changed 
   assert.deepEqual(last.versions.map((v) => v.version), [4, 3, 2, 1]);
   assert.deepEqual(last.versions[0]!.body, last.versions[3]!.body);
   sql.close();
+});
+
+/* ── a block over a figure the record no longer holds (audit 64, claim 2) ── */
+
+const payroll = { metric: 'payroll-total', name: 'Payroll total', source: 'register.salaries', value: { count: 'id' }, format: 'int', target: { gte: 0 }, window: '30d', compare: 'none' };
+const stat = (metric: string) => ({ kind: 'stat', cells: [{ metric }] });
+
+/** The Desk at version 3 drew a figure over Salaries, version 4 drew it no more, and then the figure was taken out. */
+async function retiredFigure(third: Record<string, unknown>[] = [table('notes'), stat('payroll-total')]) {
+  const made = await desk();
+  const figure = await made.api.setDeclaration({ body: payroll as never }, ada);
+  assert.ok(figure.ok, JSON.stringify(figure));
+  const drew = await made.api.setDeclaration({ body: over(...third), version: 2 }, ada);
+  assert.ok(drew.ok, JSON.stringify(drew));
+  /* While the figure is there the kernel names its list, so the stat is cut for the Notes reader as a table is. */
+  const before = (await listed(made.read, { page: 'desk' }, noteReader)).versions[0]!;
+  assert.ok((before.cut ?? 0) > 0, 'a block over a figure of a hidden list was shown while the figure was there');
+  const without = await made.api.setDeclaration({ body: over(table('notes')), version: 3 }, ada);
+  assert.ok(without.ok, JSON.stringify(without));
+  const gone = await made.api.retireDeclaration({ id: 'metric.payroll-total' }, ada);
+  assert.ok(gone.ok, JSON.stringify(gone));
+  return made;
+}
+
+test('A STAT OVER A FIGURE SINCE TAKEN OUT, ON A HIDDEN LIST, IS CUT for a reader who does not read every list', async () => {
+  const { sql, read } = await retiredFigure();
+
+  const out = await listed(read, { page: 'desk' }, noteReader);
+  assert.deepEqual(out.versions.map((v) => v.version), [4, 3, 2, 1]);
+  const third = out.versions[1]!;
+  assert.ok((third.cut ?? 0) > 0, 'a stat over a figure the record no longer holds came back whole');
+  assert.equal(third.cut, 1);
+  assert.deepEqual(third.body.blocks, [table('notes')]);
+  assert.doesNotMatch(JSON.stringify(out), /payroll|salar/i, 'the answer names a figure of a list its reader may not read');
+  /* The version that never drew it is whole. */
+  assert.equal(out.versions[0]!.cut, undefined);
+
+  /* And somebody who reads every list is given the stat as it was written. */
+  const whole = (await listed(read, { page: 'desk' }, ada)).versions[1]!;
+  assert.equal(whole.cut, undefined);
+  assert.deepEqual(whole.body.blocks, [table('notes'), stat('payroll-total')]);
+  sql.close();
+});
+
+test('A FIGURE SINCE TAKEN OUT IS CUT WHEREVER A BLOCK READS IT: a hole in a sentence, how far it moved, a line that draws when it crosses', async () => {
+  const shapes: Record<string, unknown>[] = [
+    table('notes'),
+    { kind: 'note', body: 'We pay {{payroll-total}} people.' },
+    { kind: 'note', body: 'Up by {{payroll-total.change}}.' },
+    { kind: 'note', body: 'hello', when: { metric: 'payroll-total', gte: 1 } },
+    { kind: 'note', body: 'The payroll-total figure is on the Money page.' },
+  ];
+  const { sql, read } = await retiredFigure(shapes);
+
+  const third = (await listed(read, { page: 'desk' }, noteReader)).versions[1]!;
+  /* The three that read the figure go. The note that only says its name in a sentence reads nothing and stays. */
+  assert.equal(third.cut, 3);
+  assert.deepEqual(third.body.blocks, [shapes[0], shapes[4]]);
+  sql.close();
+});
+
+test('A FIGURE THAT IS STILL THERE, OVER A LIST ITS READER MAY READ, cuts nothing', async () => {
+  const made = await desk();
+  const count = await made.api.setDeclaration({ body: { ...payroll, metric: 'notes-count', name: 'Notes', source: 'register.notes' } as never }, ada);
+  assert.ok(count.ok, JSON.stringify(count));
+  const drew = await made.api.setDeclaration({ body: over(table('notes'), stat('notes-count')), version: 2 }, ada);
+  assert.ok(drew.ok, JSON.stringify(drew));
+
+  const now = (await listed(made.read, { page: 'desk' }, noteReader)).versions[0]!;
+  assert.equal(now.cut, undefined);
+  assert.equal((now.body.blocks as unknown[]).length, 2);
+  made.sql.close();
+});
+
+test('A BLOCK OVER A SOURCE THIS BUILD NO LONGER KNOWS IS CUT for a reader who does not read every list', async () => {
+  const made = await desk();
+  /* A part of the code that answered by name when the version was written, and is gone when it is read. */
+  SOURCE_MODULES.weather = { read: (_deps, _block, base) => ({ ...base, matched: 0 }) };
+  try {
+    const drew = await made.api.setDeclaration({ body: over(table('notes'), { kind: 'table', source: 'weather' }), version: 2 }, ada);
+    assert.ok(drew.ok, JSON.stringify(drew));
+  } finally {
+    delete SOURCE_MODULES.weather;
+  }
+
+  const now = (await listed(made.read, { page: 'desk' }, noteReader)).versions[0]!;
+  assert.equal(now.cut, 1, 'a block over a source nobody can read any more came back whole');
+  assert.deepEqual(now.body.blocks, [table('notes')]);
+  /* And somebody who reads every list is given it as it was written. */
+  const whole = (await listed(made.read, { page: 'desk' }, ada)).versions[0]!;
+  assert.equal(whole.cut, undefined);
+  assert.equal((whole.body.blocks as unknown[]).length, 2);
+  made.sql.close();
 });

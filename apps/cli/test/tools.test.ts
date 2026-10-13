@@ -375,15 +375,18 @@ test('A ROW THAT DIFFERS IS NOT OVERWRITTEN: a rowset update is proposed, once p
   h.add({ name: 'kiln-deploy', transport: 'stdio', command: 'npx', args: ['-y', 'kiln-mcp@1'], needs: ['KILN_API_TOKEN=credentials#7'], hosts: ['test-machine'], seen: new Date(NOW).toISOString() }, 'project');
   h.mcp({ 'kiln-deploy': { command: 'npx', args: ['-y', 'kiln-mcp@2'], env: { KILN_API_TOKEN: token } } });
 
-  assert.deepEqual(await h.scan(), [`Tool kiln-deploy in .mcp.json differs from the one in the record, so that was left as it is, and the change was asked on Decide: Update the kiln-deploy tool to match ${thisMachine()}?`]);
-  /* THE QUESTION IN WORDS. It read "Change tools#8 to how fly-lanternfish is set up in ~/.claude.json on
-     Maras-MacBook-Pro.local?"; the file, the machine and the handle are now the details. */
-  assert.equal(h.of('propose')[0]?.args.question, `Update the kiln-deploy tool to match ${thisMachine()}?`);
+  assert.deepEqual(await h.scan(), ['Tool kiln-deploy in .mcp.json differs from the one in the record, so that was left as it is, and the change was asked on Decide: Change how kiln-deploy starts?']);
+  /* THE QUESTION IN WORDS, AND NO MACHINE IN IT. It read "Change tools#8 to how fly-lanternfish is set up in
+     ~/.claude.json on Maras-MacBook-Pro.local?", then "Update the kiln-deploy tool to match this Mac?"; the file, the
+     machine and the handle are the details, beside how it starts in the record and how it starts here. */
+  assert.equal(h.of('propose')[0]?.args.question, 'Change how kiln-deploy starts?');
   assert.deepEqual(h.of('propose')[0]?.args.body, {
     register: 'tools',
     rows: [{ at: 'tools#1', version: 1, patch: { transport: 'stdio', command: 'npx', args: ['-y', 'kiln-mcp@2'], endpoint: null, needs: ['KILN_API_TOKEN=credentials#7'] } }],
-    details: { source: '.mcp.json', machine: 'test-machine', row: 'tools#1' },
+    details: { source: '.mcp.json', machine: 'test-machine', row: 'tools#1', was: 'npx -y kiln-mcp@1', now: 'npx -y kiln-mcp@2' },
   });
+  /* ASKED ONCE FOR EVERY MACHINE: the cause is the row and the start asked for, so a second machine joins this one. */
+  assert.match(String(h.of('propose')[0]?.args.cause), /^tools#1#[0-9a-f]{24}$/u);
   assert.deepEqual(h.of('update'), []);
   assert.deepEqual(h.of('vault/deposit'), []);
   assert.deepEqual(h.rows[0]?.fields.args, ['-y', 'kiln-mcp@1']);
@@ -409,7 +412,8 @@ test('EVERY QUESTION THE SCAN ASKS IS WORDS: 80 characters at most, and no id, p
     assert.ok(q.length <= 80, `${String(q.length)} characters: ${q}`);
     assert.doesNotMatch(q, /#\d|~|\.json|test-machine|\/|\\/u, q);
   }
-  assert.match(questions[0]!, /^Update the kiln-x+\.\.\. tool to match this (?:Mac|PC|machine)\?$/u);
+  assert.match(questions[0]!, /^Change how kiln-x+(?:\.\.\.)? starts\?$/u);
+  assert.doesNotMatch(questions[0]!, /this (?:Mac|PC|machine)/u);
   assert.match(questions[1]!, /^Add 9 tools from this (?:Mac|PC|machine), for use everywhere: server-number-0(?:, [^?]+)? and \d more\?$/u);
 });
 
@@ -423,6 +427,57 @@ test('A ROW THAT MATCHES only has this machine added to hosts and seen moved on,
   assert.deepEqual(await h.scan(), []);
   assert.equal(h.of('update').length, 1);
   assert.deepEqual([...h.of('create'), ...h.of('propose'), ...h.of('vault/deposit')], []);
+});
+
+test('A TOOL FOUND UNDER ANOTHER NAME IS THE ROW THAT STARTS THE SAME WAY: it is stamped as seen, nothing is added or asked, and one that starts another way is added', async (t) => {
+  const h = await setup(t, { project: true, grant: true });
+  const before = new Date(NOW - 3 * 86_400_000).toISOString();
+  h.add({ name: 'kiln', transport: 'stdio', command: 'npx', args: ['-y', 'kiln-mcp'], needs: [], hosts: ['studio-desktop'], seen: before }, 'project');
+  h.add({ name: 'docs', transport: 'http', endpoint: 'https://docs.example/mcp', needs: [], hosts: ['studio-desktop'], seen: before }, 'project');
+  h.add({ name: 'fenwick', transport: 'stdio', command: 'fenwick-mcp', args: [], needs: [], hosts: ['studio-desktop'], seen: before }, 'global');
+  h.mcp({
+    'kiln-mcp': { command: 'npx', args: ['-y', 'kiln-mcp'] },
+    'docs-http': { type: 'http', url: 'https://Docs.Example/mcp/' },
+    quill: { command: 'npx', args: ['-y', 'quill-mcp'] },
+  });
+  /* The pair his record holds: one server in the user config under a second name, found from a run in a project. */
+  writeFileSync(h.claudeJson, JSON.stringify({ mcpServers: { 'fenwick-mcp': { command: 'fenwick-mcp' } } }));
+
+  assert.deepEqual(await h.scan(), ['Tool quill in .mcp.json was recorded.']);
+  assert.deepEqual(h.of('create').map((c) => (c.args.fields as { name: string }).name), ['quill'], 'only the tool that starts another way is added');
+  assert.deepEqual(h.of('propose'), []);
+  const stamp = { hosts: ['studio-desktop', 'test-machine'], seen: new Date(NOW).toISOString() };
+  assert.deepEqual(h.of('update').map((u) => u.args), [1, 2, 3].map((seq) => ({ register: 'tools', seq, patch: stamp, version: 1 })));
+  assert.deepEqual(h.rows.map((r) => r.fields.name), ['kiln', 'docs', 'fenwick', 'quill'], 'no row is renamed');
+
+  /* The next scan goes straight to the row it found: one read for each tool, not every row for each. */
+  const reads = h.of('get').length;
+  assert.deepEqual(await h.scan(), []);
+  assert.equal(h.of('get').length - reads, 4);
+  assert.equal(h.of('create').length, 1);
+  assert.equal(h.of('update').length, 3);
+  assert.deepEqual(h.of('propose'), []);
+});
+
+test('A CHANGE THAT WOULD LEAVE THE ROW AS IT IS FILES NO QUESTION: the same address written another way, and a name it needs that the row lacks', async (t) => {
+  const h = await setup(t, { project: true, grant: true });
+  const seen = new Date(NOW).toISOString();
+  h.add({ name: 'docs', transport: 'http', endpoint: 'https://docs.example/mcp/', needs: [], hosts: ['test-machine'], seen }, 'project');
+  h.add({ name: 'kiln-deploy', transport: 'stdio', command: 'npx', needs: ['KILN_API_TOKEN=credentials#7'], hosts: ['test-machine'], seen }, 'project');
+  h.mcp({
+    docs: { type: 'http', url: 'https://DOCS.example/mcp' },
+    'kiln-deploy': { command: 'npx', args: [], env: { KILN_API_TOKEN: fakeValue(), KILN_REGION: 'eu-west' } },
+  });
+
+  assert.deepEqual(await h.scan(), []);
+  assert.deepEqual(h.of('propose'), []);
+  assert.deepEqual(h.of('create'), []);
+  assert.deepEqual(h.of('vault/deposit'), [], 'a key the row already names is not deposited again');
+  /* The row keeps what it holds and gains the one name: nothing it names is taken away. */
+  assert.deepEqual(h.of('update').map((u) => u.args), [{ register: 'tools', seq: 2, patch: { needs: ['KILN_API_TOKEN=credentials#7', 'KILN_REGION'] }, version: 1 }]);
+  assert.equal(h.rows[0]?.fields.endpoint, 'https://docs.example/mcp/');
+  assert.deepEqual(await h.scan(), []);
+  assert.equal(h.of('update').length, 1);
 });
 
 test('A KEY IN A COMMAND OR ARGUMENT keeps the server out of the record; a key-shaped value under any env name is deposited', async (t) => {

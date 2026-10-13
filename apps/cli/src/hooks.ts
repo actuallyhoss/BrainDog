@@ -579,19 +579,23 @@ async function startWork(io: Io, to: Target, at: Position, context: Context, run
   const top = found === null ? null : resolve(found);
   const headers = sessionHeaders(at, 'claude', run, { env: io.env });
   const said: string[] = [];
-  const step = async (label: string, work: (client: Client, signal: AbortSignal) => Promise<string[]>) => {
+  const step = async (label: string, work: (client: Client, signal: AbortSignal, ms: number) => Promise<string[]>) => {
     const left = until - Date.now() - 250;
     if (left <= 0) return;
-    const signal = AbortSignal.timeout(Math.min(START_WORK_MS, left));
+    const ms = Math.min(START_WORK_MS, left);
+    const signal = AbortSignal.timeout(ms);
     try {
-      const lines = await work(clientFor(to, async () => headers, signal), signal);
+      const lines = await work(clientFor(to, async () => headers, signal), signal, ms);
       if (lines.length > 0) said.push(`${label}: ${String(lines.length)} change${lines.length === 1 ? '' : 's'}`);
     } catch {
       said.push(`${label} skipped`);
     }
   };
   if (wants('skills'))
-    await step('skills sync', (client) => syncSkills({ client, context, home, configDir: io.env.CLAUDE_CONFIG_DIR || join(home, '.claude'), top, dryRun: false }));
+    /* The list read stops at half the step's time, on the hook's clock, so what was read is still acted on inside it. */
+    await step('skills sync', (client, _signal, ms) =>
+      syncSkills({ client, context, home, configDir: io.env.CLAUDE_CONFIG_DIR || join(home, '.claude'), top, dryRun: false, until: Date.now() + ms / 2 }),
+    );
   if (wants('tools'))
     await step('tools scan', (client, signal) =>
       scanTools({

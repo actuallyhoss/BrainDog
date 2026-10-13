@@ -254,7 +254,7 @@ export function listGovernance(
   const withheld = costRows(deps.sql);
   /* AND WHAT EACH OPTION COSTS TO HAVE PICKED (`option_costs`, by the option's id), on a question of options: one hard
      option no longer makes the question `undo`, so the reader marks the option that is hard and words only that press. */
-  return ok(out.map((r) => ({ ...r, cost: costOfRow(deps.sql, r, withheld), ...(r.body_kind === 'options' ? { option_costs: optionCosts(r.body) } : {}) })));
+  return ok(out.map((r) => ({ ...r, cost: costOfRow(deps.sql, r, withheld), ...(r.body_kind === 'options' ? { option_costs: optionCosts(r.body, withheld) } : {}) })));
 }
 
 /**
@@ -2534,7 +2534,8 @@ function oneAnswer(deps: GovernDeps, id: string, bodyKind: BodyKind, raw: string
   const body = parse(raw);
   /* AND THE OPTION PICKED IS WEIGHED TOO (`pickCost`). A hard option beside a safe one leaves the question `call`
      since batch 64, and picking the hard one is still an answer that owes its reason. */
-  if (!body || costOf(bodyKind, body) !== 'call' || pickCost(bodyKind, body, option) !== 'call') return null;
+  const rows = costRows(deps.sql);
+  if (!body || costOf(bodyKind, body, rows) !== 'call' || pickCost(bodyKind, body, option, rows) !== 'call') return null;
   /* AN OPTION THAT WRITES CHANGES SOMETHING ELSE, so the one-press sentence would not be true of it. */
   if (listOf(body.options).some((o) => isMap(o) && o.patches !== undefined)) return null;
   const by = deps.sql.one<{ by: string }>('SELECT opened_by AS by FROM suggestion WHERE id = ?', id)?.by ?? '';

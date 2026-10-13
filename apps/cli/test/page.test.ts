@@ -5,7 +5,8 @@
  * (`packages/host/src/index.ts`), and `packages/record/src/index.ts`'s `admin()` refuses a `token`
  * principal by name ("Open this from the app; a token cannot change what this record is") before
  * it looks at anything else. Every bearer this CLI holds is a token to the record, so the stub
- * answers exactly that sentence and the test asserts `push` shows it rather than swallowing it.
+ * answers exactly that refusal, and `push` then asks on Decide instead (DIRECTION 38): the stub keeps
+ * the questions `propose` files and hands them back from `governance`, as the record does.
  */
 
 import { test } from 'node:test';
@@ -78,8 +79,13 @@ function arranged(slug: unknown): unknown {
 
 type Seen = { method: string; args: Record<string, unknown> };
 
-async function stub(t: { after: (fn: () => void | Promise<void>) => void }, opts: { admin?: boolean } = {}) {
+/** How the stub answers: `admin: false` is a token (the ADMIN gate refuses it), `named: false` a key handed a handle and no number. */
+type Opts = { admin?: boolean; named?: boolean; propose?: unknown };
+
+async function stub(t: { after: (fn: () => void | Promise<void>) => void }, opts: Opts = {}) {
   const seen: Seen[] = [];
+  /* THE QUESTIONS WAITING ON DECIDE, as `governance` lists them: what `propose` filed, under the number it answered. */
+  const open: { id: string; body_kind: unknown; body: unknown }[] = [];
   const server: Server = createServer((req, res) => {
     const chunks: Buffer[] = [];
     req.on('data', (c: Buffer) => chunks.push(c));
@@ -101,6 +107,13 @@ async function stub(t: { after: (fn: () => void | Promise<void>) => void }, opts
             ? { ok: false, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Open this from the app; a token cannot change what this record is.', at: 'principal' } }
             : { ok: true, value: { id: 'page.invoicing', kind: 'page' } },
         );
+      if (method === 'governance') return answer({ ok: true, value: open });
+      if (method === 'propose') {
+        if (opts.propose !== undefined) return answer(opts.propose);
+        const id = `SG${String(open.length + 1)}`;
+        open.push({ id, body_kind: args.body_kind, body: args.body });
+        return answer({ ok: true, value: { id: opts.named === false ? 'q.01TESTTESTTESTTESTTESTTEST' : id } });
+      }
       return answer({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: `The stub does not answer ${method}.` } });
     });
   });
@@ -109,7 +122,7 @@ async function stub(t: { after: (fn: () => void | Promise<void>) => void }, opts
   return { base: `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`, seen };
 }
 
-async function setup(t: { after: (fn: () => void | Promise<void>) => void }, opts: { admin?: boolean } = {}) {
+async function setup(t: { after: (fn: () => void | Promise<void>) => void }, opts: Opts = {}) {
   const h = await stub(t, opts);
   const dir = mkdtempSync(join(tmpdir(), 'braindog-page-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
@@ -152,7 +165,10 @@ test('page pull: a page made from a template writes the template, and says so', 
   assert.deepEqual(h.out, [`kiln is one of the pages project makes, one for each row, so project's source was written to ${file}.`]);
 });
 
-test('page push: a good file is sent through setDeclaration exactly as parsed', async (t) => {
+/** How many times the stub was asked one method. */
+const calls = (h: { seen: Seen[] }, method: string): Seen[] => h.seen.filter((s) => s.method === method);
+
+test('page push: an owner’s session applies a good file through setDeclaration exactly as parsed', async (t) => {
   const h = await setup(t, { admin: true });
   const file = join(h.dir, 'invoicing.dog');
   writeFileSync(file, dogText(BODY));
@@ -160,14 +176,67 @@ test('page push: a good file is sent through setDeclaration exactly as parsed', 
   assert.deepEqual(h.out, [`invoicing pushed to ${h.env.BRAINDOG_HOST}.`]);
   const sent = h.seen.find((s) => s.method === 'setDeclaration');
   assert.deepEqual(sent?.args.body, BODY);
+  assert.equal(calls(h, 'propose').length, 0, 'what was applied is not asked about as well');
 });
 
-test('page push: the record’s ADMIN gate refuses a token, and the sentence is shown rather than swallowed', async (t) => {
+test('page push: a token is refused the ADMIN route, so the file is asked on Decide as one change', async (t) => {
   const h = await setup(t, { admin: false });
   const file = join(h.dir, 'invoicing.dog');
   writeFileSync(file, dogText(BODY));
+  assert.equal(await page(['push', file], h.io), 0);
+  assert.deepEqual(h.out, ['invoicing asked as SG1. It waits on Decide.']);
+  assert.deepEqual(h.said, [], 'the refusal that sent it to Decide is not shown as a failure');
+  const asked = calls(h, 'propose');
+  assert.equal(asked.length, 1);
+  /* THE WHOLE DECLARATION, as `grammar pages` says a page is changed: `to` is what `install` takes. */
+  assert.deepEqual(asked[0]?.args, {
+    question: 'Use this version of the Invoicing page?',
+    body_kind: 'change',
+    body: { declaration_id: 'page.invoicing', to: { id: 'page.invoicing', kind: 'page', body: BODY } },
+  });
+});
+
+test('page push: the same file pushed twice files one question', async (t) => {
+  const h = await setup(t, { admin: false });
+  const file = join(h.dir, 'invoicing.dog');
+  writeFileSync(file, dogText(BODY));
+  assert.equal(await page(['push', file], h.io), 0);
+  assert.equal(await page(['push', file], h.io), 0);
+  assert.equal(calls(h, 'propose').length, 1);
+  assert.deepEqual(h.out, ['invoicing asked as SG1. It waits on Decide.', 'invoicing is already waiting as SG1. It waits on Decide.']);
+
+  /* A DIFFERENT BODY FOR THE SAME PAGE IS ANOTHER QUESTION: only the same change is the same ask. */
+  writeFileSync(file, dogText({ ...BODY, title: 'Invoices' }));
+  assert.equal(await page(['push', file], h.io), 0);
+  assert.equal(calls(h, 'propose').length, 2);
+  assert.equal(h.out.at(-1), 'invoicing asked as SG2. It waits on Decide.');
+});
+
+test('page push: the record’s own word that it was asked before is passed on', async (t) => {
+  const h = await setup(t, { admin: false, propose: { ok: true, value: { id: 'SG9', joined: true, said: 'Already waiting as SG9.' } } });
+  const file = join(h.dir, 'invoicing.dog');
+  writeFileSync(file, dogText(BODY));
+  assert.equal(await page(['push', file], h.io), 0);
+  assert.deepEqual(h.out, ['invoicing is already waiting as SG9. It waits on Decide.']);
+});
+
+test('page push: a key handed no number says only that it waits', async (t) => {
+  const h = await setup(t, { admin: false, named: false });
+  const file = join(h.dir, 'invoicing.dog');
+  writeFileSync(file, dogText(BODY));
+  assert.equal(await page(['push', file], h.io), 0);
+  assert.deepEqual(h.out, ['invoicing asked. It waits on Decide.']);
+  assert.doesNotMatch(h.out.join(' '), /q\.01TEST/);
+});
+
+test('page push: a change the record will not file is exit 1 with the record’s sentence', async (t) => {
+  const fix = 'This page reads a list that is not there.';
+  const h = await setup(t, { admin: false, propose: { ok: false, refusal: { code: 'REGISTER_UNRESOLVED', fix, at: 'body.to' } } });
+  const file = join(h.dir, 'invoicing.dog');
+  writeFileSync(file, dogText(BODY));
   assert.equal(await page(['push', file], h.io), 1);
-  assert.deepEqual(h.said, ['Open this from the app; a token cannot change what this record is.']);
+  assert.deepEqual(h.said, [fix]);
+  assert.deepEqual(h.out, []);
 });
 
 test('page push: a file the parser refuses is never sent', async (t) => {
@@ -177,7 +246,7 @@ test('page push: a file the parser refuses is never sent', async (t) => {
   assert.equal(await page(['push', file], h.io), 1);
   assert.match(h.said[0] ?? '', /authored rows/);
   assert.match(h.said[0] ?? '', /line 6/);
-  assert.equal(h.seen.some((s) => s.method === 'setDeclaration'), false, 'a file that cannot be a declaration is never sent');
+  assert.equal(h.seen.some((s) => s.method === 'setDeclaration' || s.method === 'propose'), false, 'a file that cannot be a declaration is never sent');
 });
 
 test('page check: a well-formed file reads clean, offline, with nothing sent', async (t) => {

@@ -9,15 +9,21 @@
  * the rest of the page. A page made for each row of a list has no declaration of its own, so its template's is
  * written, and the command says so.
  *
- * `push` sends what `parseDog` read through `setDeclaration`, the same door the app's own editor uses, "the same lint a
- * pack gets." `check` runs the parse and the kernel's own validation locally and sends nothing at all: it is how
- * somebody finds out a `.dog` file is broken before it is anybody else's problem.
+ * `push` SENDS WHAT `parseDog` READ, WHOLE, AND WHO IS HOLDING THE KEY DECIDES WHAT BECOMES OF IT (DIRECTION 38: an
+ * agent changes a page and the person accepts it in Decide). It is tried first through `setDeclaration`, the door the
+ * app's own editor uses, and an owner's session is applied there and then. `setDeclaration` is an ADMIN route, and
+ * `packages/record/src/index.ts`'s `admin()` refuses any `token` principal outright (`NEEDS_BROWSER_SESSION`), and every
+ * bearer this CLI holds, `braindog login` included, is a token to the record (ADR-060). So that one refusal is not a
+ * failure here: the same declaration is filed with `propose` as one `change`, `{ declaration_id, to }` with `to` the
+ * whole declaration (`grammar pages`, `to_change_one`), and `push` prints the question's number and says it waits on
+ * Decide. Nothing is applied until the person answers it. Any other refusal is shown as the record said it.
  *
- * `push` IS GATED WHERE THIS FILE HAS NO SAY. `setDeclaration` is an ADMIN route, and `packages/record/src/index.ts`'s
- * `admin()` refuses any `token` principal outright ("Open this from the app; a token cannot change what this record
- * is"), and every bearer this CLI holds, `braindog login` included, is a token to the record (ADR-060). So `push` is
- * built exactly as asked and is refused with that sentence until the record grows a door for a proven session that is
- * not a browser cookie. That is a change to `packages/record` and `packages/host`, neither of which this file owns.
+ * THE SAME FILE PUSHED TWICE IS ONE QUESTION. The record joins an agent run's repeat by its cause and says so, and a
+ * key that is no run is not joined there, so the questions still open are read first and one already asking for this
+ * same declaration is named instead of asked again (`feed.ts` does the same for a feed).
+ *
+ * `check` runs the parse and the kernel's own validation locally and sends nothing at all: it is how somebody finds
+ * out a `.dog` file is broken before it is anybody else's problem.
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -26,9 +32,10 @@ import { parseArgs } from 'node:util';
 
 import { dogName, dogText, parseDog, storedOf, type DogParsed } from '@braindog/dog';
 import { validateDeclaration } from '@braindog/kernel';
+import { refused, type Result } from '@braindog/ports';
 
 import { refuse } from './json.ts';
-import { connect, type AgentIo } from './skills.ts';
+import { connect, type AgentIo, type Connected } from './skills.ts';
 
 /** A file the parser refused, said with its name and the line, so the person can go straight to it. */
 const unread = (file: string, no: Extract<DogParsed, { ok: false }>): string => `${file}, line ${String(no.line)}: ${no.fix}`;
@@ -122,10 +129,86 @@ async function push(args: string[], io: AgentIo): Promise<number> {
 
   /* THE BODY AS READ, WHOLE: the file is the declaration, so there is nothing to cut or fill in before it is sent. */
   const out = await at.client.call('setDeclaration', { body: parsed.value });
-  if (!out.ok) return refuse(io, out);
   const name = nameOf(parsed.value);
-  io.out(`${name} pushed to ${at.to.key}.`);
-  io.answer?.({ value: { page: name, host: at.to.key } });
+  if (out.ok) {
+    io.out(`${name} pushed to ${at.to.key}.`);
+    io.answer?.({ value: { page: name, host: at.to.key } });
+    return 0;
+  }
+  /* ONLY THE REFUSAL THAT SAYS "A TOKEN": anything else the record said about the file itself is the answer. */
+  if (!refused(out) || out.refusal.code !== 'NEEDS_BROWSER_SESSION') return refuse(io, out);
+  return ask(at.client, name, parsed.value, io);
+}
+
+const isObject = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
+
+/** A value as text with every map's keys in order, so two declarations that say the same thing read the same. */
+const canon = (v: unknown): string =>
+  Array.isArray(v)
+    ? `[${v.map(canon).join(',')}]`
+    : isObject(v)
+      ? `{${Object.keys(v)
+          .sort()
+          .map((k) => `${JSON.stringify(k)}:${canon(v[k])}`)
+          .join(',')}}`
+      : (JSON.stringify(v) ?? 'null');
+
+/** The most rows one governance read answers with: the record clamps it there (`packages/kernel/src/govern.ts`). */
+const DECIDE_PAGE = 200;
+
+/**
+ * The open question that already asks for this declaration, by the name the record hands this caller; `''` for one
+ * found under no name, and `null` for none. A page at a time, as `feed.ts` reads the add-ons waiting.
+ */
+async function waitingChange(client: Connected['client'], id: string, to: unknown): Promise<Result<string | null>> {
+  const want = canon(to);
+  let cursor: string | undefined;
+  for (let pages = 0; pages < 100; pages++) {
+    const got = await client.governance({ register: 'suggestion', limit: DECIDE_PAGE, ...(cursor === undefined ? {} : { cursor }) });
+    if (!got.ok) return got;
+    if (!Array.isArray(got.value)) return { ok: true, value: null };
+    for (const s of got.value)
+      if (isObject(s) && s.body_kind === 'change' && isObject(s.body) && s.body.declaration_id === id && canon(s.body.to) === want)
+        return { ok: true, value: typeof s.id === 'string' ? s.id : '' };
+    const last: unknown = got.value.at(-1);
+    if (got.value.length < DECIDE_PAGE || !isObject(last) || typeof last.id !== 'string') return { ok: true, value: null };
+    cursor = last.id;
+  }
+  return { ok: true, value: null };
+}
+
+/** A question's number as a person says it. A handle (`q.<id>`) is not one, and is left out of the sentence. */
+const numbered = (id: unknown): string | null => (typeof id === 'string' && /^SG[1-9][0-9]*$/u.test(id) ? id : null);
+
+/** A key's push: the declaration filed as one change on Decide, or the question already waiting for it named. */
+async function ask(client: Connected['client'], name: string, body: Record<string, unknown>, io: AgentIo): Promise<number> {
+  const id = `page.${name}`;
+  const to = { id, kind: 'page', body };
+  const before = (found: string | null): number => {
+    io.out(`${name} is already waiting${found === null ? '' : ` as ${found}`}. It waits on Decide.`);
+    io.answer?.({ value: { page: name, waits: true, asked: false, ...(found === null ? {} : { question: found }) } });
+    return 0;
+  };
+
+  const waiting = await waitingChange(client, id, to);
+  if (!waiting.ok) return refuse(io, waiting);
+  if (waiting.value !== null) return before(numbered(waiting.value));
+
+  /* A TEMPLATE'S TITLE IS A PATTERN (`{{name}}`), which is no name for a page, so its own name is said instead. */
+  const title = typeof body.title === 'string' && body.title.trim() !== '' && !body.title.includes('{{') ? body.title : name;
+  const filed = await client.call('propose', { question: `Use this version of the ${title} page?`, body_kind: 'change', body: { declaration_id: id, to } });
+  if (!filed.ok) return refuse(io, filed);
+  const value = isObject(filed.value) ? filed.value : {};
+  const number = numbered(value.id);
+  if (value.joined === true) return before(number);
+  /* ANSWERED BEFORE, AND NOTHING FILED: the record says what the person said, and that is passed on as it came. */
+  if (value.answered !== undefined && typeof value.said === 'string') {
+    io.out(value.said);
+    io.answer?.({ value: { page: name, waits: false, asked: false, said: value.said } });
+    return 0;
+  }
+  io.out(`${name} asked${number === null ? '' : ` as ${number}`}. It waits on Decide.`);
+  io.answer?.({ value: { page: name, waits: true, asked: true, ...(number === null ? {} : { question: number }) } });
   return 0;
 }
 

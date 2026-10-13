@@ -117,6 +117,7 @@ export function pageWrites(deps: WritesDeps) {
     if (stored().kept.slug !== on) {
       put({ kept: { slug: on, blocks: new Map() }, added: { slug: on, rows: new Map() } });
       deps.arrivals?.forget();
+      runsOf.clear();
     }
   }
 
@@ -139,7 +140,7 @@ export function pageWrites(deps: WritesDeps) {
    * and the hold was taken back, went on drawing the tick it no longer had, as "Not saved". Only a hold that wears
    * something counts: a moved bar wears nothing, and its roadmap keeps its drag until the page is read again.
    */
-  function keptSegment<S extends { rows: Row[] }>(at: number, segment: S, block?: LiveBlock, several = false): S {
+  function keptSegment<S extends { rows: Row[] }>(at: number, segment: S, block?: LiveBlock, several: boolean | number = false): S {
     const { module, kept, added } = stored();
     const on = deps.slug();
     const hold = kept.slug === on ? kept.blocks.get(at) : undefined;
@@ -176,17 +177,71 @@ export function pageWrites(deps: WritesDeps) {
   /**
    * The rows of `segment` that arrived since block `at` was last drawn, marked. Rows the page drew from no record row are never marked.
    *
-   * A BLOCK DRAWN AS SEVERAL RUNS OF ROWS MARKS NONE (`several`). Every run of one block is the same list here
-   * (`listOf`), so each run's rows were new against the run drawn before it, and a block of two runs stood marked for
-   * as long as it kept drawing. Its look is no baseline and marks nothing, as a block the record did not answer.
+   * A BLOCK DRAWN AS SEVERAL RUNS OF ROWS IS READ RUN BY RUN (`several` is the run's place). Every run of one block was
+   * the same list here (`listOf`), so each run's rows were new against the run drawn before it, and a block of two runs
+   * stood marked for as long as it kept drawing. A caller that says only that there are several (`true`) marks none:
+   * its look is no baseline, as a block the record did not answer.
    */
-  function marked<S extends { rows: Row[] }>(at: number, segment: S, block?: LiveBlock, several = false): S {
+  function marked<S extends { rows: Row[] }>(at: number, segment: S, block?: LiveBlock, several: boolean | number = false): S {
     const seen = deps.arrivals;
     if (!seen) return segment;
     const key = (row: Row): string | null => (row.ref ? `${row.ref.register}#${row.ref.seq}` : null);
-    const on = seen.see(listOf(at, block), segment.rows.flatMap((r) => key(r) ?? []), !several && answered(block));
+    const keys = segment.rows.flatMap((r) => key(r) ?? []);
+    const list = listOf(at, block);
+    let on: ReadonlySet<string>;
+    if (typeof several === 'number') on = arrivedInRun(seen, list, several, keys, answered(block));
+    else {
+      /* ONE RUN AGAIN, so what its runs held is no longer what the block draws, and they start again if they come back. */
+      const was = runsOf.get(list);
+      if (was) runsOf.set(list, runsNone(was.turn + 1));
+      on = seen.see(list, keys, !several && answered(block));
+    }
     if (on.size === 0) return segment;
     return { ...segment, rows: segment.rows.map((r) => (on.has(key(r) ?? '') ? { ...r, arrived: true } : r)) };
+  }
+
+  /**
+   * What each run of a block held when it was last drawn, by the block (`listOf`). `was` is the look before `last`, kept
+   * because the runs of one look are drawn one after another: by the time the second run is read, the first has already
+   * given up the row that went from it.
+   */
+  type Runs = { turn: number; last: Map<number, ReadonlySet<string>>; was: Map<number, ReadonlySet<string>>; came: Set<string>; moved: Set<string> };
+  const runsNone = (turn: number): Runs => ({ turn, last: new Map(), was: new Map(), came: new Set(), moved: new Set() });
+  const runsOf = new Map<string, Runs>();
+
+  /**
+   * Which of `keys`, the rows run `run` of block `list` draws now, arrived in the block since it was last drawn.
+   *
+   * EACH RUN IS A LIST OF ITS OWN to `arrivals`, so a run is only ever read against itself. A ROW THAT CAME FROM ANOTHER
+   * RUN OF THE SAME BLOCK DID NOT ARRIVE: a task ticked goes from the open run to the done one, and a group that takes
+   * a place above moves every run below it. So a row new to its run is marked only when no other run held it (`came`),
+   * and one that only changed runs is held unmarked for as long as the mark would have stood (`moved`).
+   */
+  function arrivedInRun(seen: Seen, list: string, run: number, keys: readonly string[], sure: boolean): ReadonlySet<string> {
+    const runs = runsOf.get(list) ?? runsNone(0);
+    runsOf.set(list, runs);
+    const on = seen.see(`${list}#${runs.turn}.${run}`, keys, sure);
+    const elsewhere = new Set<string>();
+    for (const held of [runs.last, runs.was]) for (const [place, had] of held) if (place !== run) for (const k of had) elsewhere.add(k);
+    const out = new Set<string>();
+    for (const k of keys) {
+      if (!on.has(k)) {
+        runs.came.delete(k);
+        runs.moved.delete(k);
+      } else if (runs.came.has(k)) out.add(k);
+      else if (runs.moved.has(k)) continue;
+      else if (elsewhere.has(k)) runs.moved.add(k);
+      else {
+        runs.came.add(k);
+        out.add(k);
+      }
+    }
+    /* A look the record did not answer is no baseline here either, so it is not what the run is said to have held. */
+    if (sure) {
+      runs.was.set(run, runs.last.get(run) ?? new Set());
+      runs.last.set(run, new Set(keys));
+    }
+    return out;
   }
 
   /** A `table` block's rows with the ones that arrived since it was last drawn marked, as `keptSegment` marks a list's. */

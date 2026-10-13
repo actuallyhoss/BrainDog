@@ -280,7 +280,8 @@ const WHOLE: readonly Whole[] = [
  * came from is gone with it when it is said that way: "I stopped taking orders from my old shop" (`WAS_AT`).
  *
  * A "USED TO" THAT IS TAKEN UP AGAIN CARRIES ON (`TAKEN_UP`): "I used to take orders and now track them here" keeps its
- * orders, because "them" points back at them after a word of now. "I used to sell cakes and now sell bread" points back
+ * orders, because "them" points back at them after a word of now. "NO LONGER" CARRIES ON THE SAME WAY: "I no longer
+ * take orders and now track them here" keeps them too. "I used to sell cakes and now sell bread" points back
  * at nothing and has stopped. AND WHEN IT STOPPED ENDS THE CLAUSE AS A WORD OF WHEN DOES (`SINCE_WHEN`): "I stopped
  * taking orders when I closed the shop" has no orders, where "after hours" and "when I am busy" are how it is done.
  * The thing ended there is gone with it (`ENDED`), so that sentence has no shop either.
@@ -439,7 +440,7 @@ function refusedIn(said: string, known: readonly Said[] = []): (span: Said) => b
     const before = said.slice(0, from);
     /* "no longer" and "used to" are read before the bare "no": they hold only at the clause's end, as stopping does. */
     const used = USED_TO.test(before);
-    if (NO_LONGER.test(before) || used) return closes(from, to) && !(used && again(from, to)) ? 'stopped' : null;
+    if (NO_LONGER.test(before) || used) return closes(from, to) && !again(from, to) ? 'stopped' : null;
     if (NOT.test(before)) return 'refused';
     if (ENDED.test(before)) return ends(to) ? 'stopped' : null;
     /* A word of size is said before its thing ("done selling handmade candles"), so it ends as the verb does. */

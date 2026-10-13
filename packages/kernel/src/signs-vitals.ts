@@ -24,8 +24,9 @@
  * (`test/signs-rate-age.test.ts` loads this file first to hold that).
  *
  * AND ONE BESIDE THE THREE (pairs-fx-guard-62-63): `rate-age`, how old the newest rate is. Two currencies pair by
- * themselves only on a rate at most `PAIR_RATE_DAYS` old (`pairs.ts`); past that both halves of a move stay counted and
- * a person is asked, and nothing on the record said why until this did.
+ * themselves only on a rate at most `PAIR_RATE_DAYS` old (`pairs.ts`); past that both halves of a move stay counted,
+ * and nothing on the record said why until this did. NOBODY IS ASKED YET (the question is built in `pairs.ts` and
+ * wired nowhere), so the sign does not say anybody is (audit 65, claim 3).
  */
 
 import type { Sql } from '@braindog/ports';
@@ -268,7 +269,7 @@ function readRateAge(sql: Sql, nowMs: number, tz: string): SignReading {
   if (newest === null) return reading('none', null, 'This record holds no rate yet, so a move between two currencies is not matched by itself.', facts);
   const said = `The newest rate is from ${daySaid(newest.as_of, today)}, ${newest.days === 0 ? 'today' : `${count(newest.days, 'day')} old`}.`;
   if (newest.days <= RATE_DAYS_MOST) return reading('green', newest.days, said, facts);
-  facts.push('Until a newer rate arrives, both sides of such a move stay counted as money out and money in, and you are asked.');
+  facts.push('Until a newer rate arrives, both sides of such a move stay counted as money out and money in.');
   return reading('red', newest.days, `${said} A move between two currencies is matched by itself only on a rate at most ${count(RATE_DAYS_MOST, 'day')} old.`, facts);
 }
 

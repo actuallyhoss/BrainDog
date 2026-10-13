@@ -44,6 +44,7 @@ export function bylinesIn(
     b.entries.forEach((e, n) => {
       const key = `${b.register}#${e.seq}`;
       const mark = Math.max(seen.page, seen.rows[key] ?? 0);
+      /* WHO THE RUN IS, where the record says it on the change (`run_by`), is read there by `bylineOf`: "Claude Code". */
       const line = bylineOf(changes[n], me, names, now, new Date(mark).toISOString());
       if (line === null) return;
       /* OPENED SINCE IT CHANGED: seen, even where the record's own word says it is new. */

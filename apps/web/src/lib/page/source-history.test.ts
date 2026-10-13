@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { historyWords, versionLines, versionsOf, type PageVersion } from './source-history.ts';
+import { historyWords, partFile, versionLines, versionsOf, type PageVersion } from './source-history.ts';
 
 const NOW = Date.parse('2026-10-13T12:00:00Z');
 const ME = 'p_01JABCDEFGHJKMNPQRSTVWXYZ0';
@@ -39,7 +39,7 @@ test('NO ID AND NO RAW TIMESTAMP in anything a line says', () => {
     ME,
   );
   for (const l of lines) {
-    const read = [l.said, l.state ?? '', l.putBack ?? '', l.save].join(' ');
+    const read = [l.said, l.state ?? '', l.putBack ?? '', l.save, l.saveWord].join(' ');
     assert.doesNotMatch(read, /[0-9A-HJKMNP-TV-Z]{26}/u, read);
     assert.doesNotMatch(read, /\d{4}-\d{2}-\d{2}|T\d{2}:\d{2}|@/u, read);
     assert.doesNotMatch(read, /—/u, read);
@@ -147,4 +147,42 @@ test('A VERSION THE RECORD CUT FOR ITS READER SAYS SO AND OFFERS NO PUT BACK, an
   assert.match(view, /if \(busy \|\| !held \|\| !body \|\| \(picked\?\.cut \?\? 0\) > 0\) return;/u);
   const tile = readFileSync(new URL('./SourceHistory.svelte', import.meta.url), 'utf8');
   assert.match(tile, /\{#if line\.cut\}\s*<p class="history-cut">\{line\.cut\}<\/p>/u);
+});
+
+test('A CUT VERSION IS NEVER SAVED AS THE PAGE: the button, its spoken name and the line under it all say a part', () => {
+  const body = { page: 'money', title: 'Money', blocks: [] };
+  const [now, cut, whole] = versionLines(
+    [
+      { version: 3, at: '2026-10-13T10:00:00Z', by: 'Ada', live: true, body, cut: 1 },
+      { version: 2, at: '2026-10-12T12:00:00Z', by: 'agent:claude', body, cut: 2 },
+      { version: 1, at: '2026-10-10T09:00:00Z', by: 'system', body },
+    ],
+    NOW,
+    'Ada',
+  );
+  assert.equal(cut?.saveWord, 'Save your part as a file');
+  assert.equal(cut?.save, 'Save the part you can open of the page as Claude left it 1d ago as a file');
+  /* THE PAGE NOW IS CUT AS THE REST ARE, and its file is a part too. */
+  assert.equal(now?.saveWord, historyWords.savePart);
+  assert.equal(now?.save, 'Save the part you can open of the page as it is now as a file');
+  /* ONE ANSWERED WHOLE reads as it always did. */
+  assert.equal(whole?.saveWord, 'Save as a file');
+  assert.equal(whole?.save, 'Save the page as BrainDog left it 3d ago as a file');
+
+  /* NOTHING A CUT LINE SAYS OF ITS FILE STARTS "Save the page", and the line under it says what the file holds. */
+  for (const l of [now, cut]) {
+    assert.doesNotMatch(`${l?.save} ${l?.saveWord}`, /Save the page|\d{4}-|—/u);
+    assert.match(l?.cut ?? '', /a file saved from it holds only the part you can open/u);
+  }
+  assert.notEqual(historyWords.savePart, historyWords.save);
+
+  /* THE TILE DRAWS THE LINE'S OWN WORD on the button, and the file a cut version is saved as is named a part and said as one. */
+  const tile = readFileSync(new URL('./SourceHistory.svelte', import.meta.url), 'utf8');
+  assert.match(tile, /aria-label=\{line\.save\}.*\n\s*\{line\.saveWord\}/u);
+  assert.equal(partFile('money.dog'), 'money-part.dog');
+  assert.equal(partFile('money'), 'money-part');
+  assert.equal(historyWords.savedPart('money-part.dog'), 'money-part.dog is in your downloads. It holds only the part of the page you can open.');
+  const view = readFileSync(new URL('./SourceView.svelte', import.meta.url), 'utf8');
+  assert.match(view, /const part = \(picked\?\.cut \?\? 0\) > 0;\s*const file = part \? partFile\(fileOf\(body\)\) : fileOf\(body\);/u);
+  assert.match(view, /part \? historyWords\.savedPart\(file\) : copy\.exported\(file\)/u);
 });

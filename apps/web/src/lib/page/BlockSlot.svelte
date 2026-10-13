@@ -393,8 +393,12 @@
       : null,
   );
   const drawing = $derived<Opening<(typeof drawn.segments)[number]>[]>(grouped ?? drawn.segments.map((segment) => ({ kind: 'segment', segment })));
-  /* WHETHER THE BLOCK IS DRAWN AS MORE THAN ONE RUN OF ROWS, which marks no row as arrived (`marked` in `page-writes.ts`). */
+  /* WHETHER THE BLOCK IS DRAWN AS MORE THAN ONE RUN OF ROWS. Such a block is read run by run: each run is handed its
+     place, and a row is marked as arrived only when no other run of the block held it (`marked` in `page-writes.ts`).
+     A BLOCK WHOSE GROUPS OPEN IN PLACE STILL MARKS NONE: the cards a press unfolds are new to their run and were in no
+     other, so by place they would read as arrived on every unfold. */
   const several = $derived(drawing.filter((item) => item.kind === 'segment' && item.segment.type === 'block').length > 1);
+  const runAt = (run: number): boolean | number => (several ? (grouped ? true : run) : false);
 </script>
 
 {#if block.heading}
@@ -478,7 +482,7 @@
     {#if asked.more > 0}<a class="queue-more" href={inApp('/decide')}>{compact ? queueWords.moreOnDecide(asked.more) : queueMore(asked.more)}</a>{/if}
   </div>
 {:else}
-  {#each drawing as item}
+  {#each drawing as item, run}
     {#if item.kind === 'open'}
       <!-- THE REST OF A GROUP, ONE PRESS AWAY, opened where it is; the focus goes to the first card it opened, which
            comes after the ones the group showed folded. -->
@@ -498,7 +502,7 @@
            HANDED, so a board, a checklist, a roadmap and a queue are each read-only exactly where `writes` is null. -->
       <!-- `w` IS A CONSTANT so each callback below keeps the narrowing it was built under. -->
       {@const w = writes}
-      {@const shown = w ? w.keptSegment(i, segment, block, several) : segment}
+      {@const shown = w ? w.keptSegment(i, segment, block, runAt(run)) : segment}
       {@const more = fold ? foldOf(segment.kind, shown.rows.length, open) : null}
       <Block
         cursor={rows?.cursor ?? null}

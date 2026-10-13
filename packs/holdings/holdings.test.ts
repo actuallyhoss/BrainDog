@@ -137,7 +137,8 @@ test('THE FILE DECLARES THE LIST 1.0.0 DID, with `cost` added, and a version abo
   assert.equal(doc.pack, 'holdings');
   /* 1.2.0 adds one key: `holdings-value` is `sellable`, so a forecast's sell control offers it. 1.3.0
      adds a title, a `changes` line and a comment at the top of the script, and nothing a record reads differently. 1.4.0
-     adds a price, the day it was priced and what the holding is worth, two counts, and takes the currency out of the format. */
+     adds a price, the day it was priced and what the holding is worth, two counts, and takes the currency out of the format;
+     before it shipped it gained the oldest day a price was said and a count of the prices over thirty days old. */
   assert.equal(doc.version, '1.4.0');
   assert.equal(doc.declarations.find((d) => d.metric === 'holdings-value')?.sellable, true);
   assert.equal(built.version, '1.0.0', 'the frozen 1.0.0 moved, so this file has to say what it now is beside it');
@@ -170,13 +171,13 @@ test('THE SCRIPT IN THE FILE IS cost.js, byte for byte, and it can reach nothing
   assert.deepEqual([script.egress, script.keys, script.reads, script.writes], [[], [], ['holdings'], ['holdings']]);
 });
 
-test('INSTALLED FROM THE FILE: one list, one rule, one script, five figures and a page, and nothing refused', async () => {
+test('INSTALLED FROM THE FILE: one list, one rule, one script, seven figures and a page, and nothing refused', async () => {
   const { api, close } = await money();
   const diff = await planOf(api, file());
   assert.deepEqual(diff.conflicts, []);
   assert.deepEqual(
     diff.adds.map((a) => a.id).sort(),
-    ['metric.holdings-at-cost', 'metric.holdings-costed', 'metric.holdings-count', 'metric.holdings-unpriced', 'metric.holdings-value', 'page.holdings', 'register.holdings', 'rule.holdings_cost', 'script.holdings_cost'],
+    ['metric.holdings-at-cost', 'metric.holdings-costed', 'metric.holdings-count', 'metric.holdings-priced-on', 'metric.holdings-stale', 'metric.holdings-unpriced', 'metric.holdings-value', 'page.holdings', 'register.holdings', 'rule.holdings_cost', 'script.holdings_cost'],
   );
   said(await put(api, file()));
   assert.equal(api.kernel.packs().find((p) => p.id === 'holdings')?.version, '1.4.0');
@@ -502,5 +503,107 @@ test('A RECORD ON 1.3.0 UPDATES TO THIS FILE AND EVERY COSTED HOLDING GAINS ITS 
   const read = await worth(api);
   assert.deepEqual(read.parts, [['EUR', 600_000], ['USD', 54_000]]);
   assert.equal(read.note, '3 of 3 at what they cost');
+  close();
+});
+
+/* ── 1.4.0, before it shipped: the day a price was said, and a price gone old (REC-B17 Risk) ──────────────────────── */
+
+/**
+ * RED FIRST, MEASURED. The three tests below were written against the file as batch 64 left it and all three failed: a
+ * price written with no day kept no day, so nothing could say how old it was, and the page had no figure over
+ * `priced_on` and no block that read one.
+ *
+ * THE GRAMMAR ALREADY HOLDS IT, which is why nothing here waits on the kernel: the earliest day in a day field is
+ * `{ min: 'priced_on' }` under `format: 'day'`, as money-core's `cash-as-of` is, and `priced_on before -30d` counts the
+ * prices more than thirty days old. The day is the record's own (`ctx.today()`), the 25th of September in every test.
+ */
+const TODAY = '2026-09-25';
+const epochDay = (d: string): number => Math.round(Date.parse(`${d}T00:00:00Z`) / 86_400_000);
+
+/** The two blocks that say how old the prices are, as the page answers them: the plain tile and the warning. */
+async function pricedOn(api: Api): Promise<{ tile: boolean; warning: boolean; day: unknown; tone: unknown; body: string }> {
+  type Cell = { metric: string; reading: { value: number | null } };
+  type Block = { kind: string; heading?: string; tone?: string; body?: string; drawn?: boolean; why?: string; refusals: unknown[]; values?: Body; cells?: { metric: string }[]; readings?: Cell[] };
+  const page = said<{ blocks: Block[] }>(await api.page({ slug: 'holdings' }, owner));
+  for (const b of page.blocks) assert.deepEqual(b.refusals, [], `${b.heading ?? b.kind} was refused`);
+  /* A BLOCK ITS `when` LEFT OUT KEEPS WHAT IT WAS DECLARED WITH AND IS NOT READ, so the tile is found by its cells. */
+  const reads = (b: Block): boolean => JSON.stringify([b.body ?? '', b.cells?.map((c) => c.metric) ?? []]).includes('holdings-priced-on');
+  const on = (b: Block): boolean => b.drawn !== false && b.why === undefined;
+  const tile = page.blocks.find((b) => b.kind === 'stat' && reads(b));
+  const warning = page.blocks.find((b) => b.kind === 'note' && reads(b));
+  assert.ok(tile && warning, 'the page has no tile and no warning over the day its prices were said');
+  const drawn = on(warning) ? warning : tile;
+  const day = on(warning) ? warning.values?.['holdings-priced-on'] : tile.readings?.find((r) => r.metric === 'holdings-priced-on')?.reading.value;
+  return { tile: on(tile), warning: on(warning), day, tone: drawn.tone, body: warning.body ?? '' };
+}
+
+test('A PRICE WRITTEN WITH NO DAY IS STAMPED WITH TODAY, a day somebody typed is kept, and a row that says it all is left alone', async () => {
+  const { api, close } = await inPounds();
+  const bare = hold(api, { label: 'Silver, ten grams', kind: 'commodity', qty: 10, unit_cost: egp(300_000), price: egp(410_000) });
+  const typed = hold(api, { label: 'Silver, five grams', kind: 'commodity', qty: 5, unit_cost: egp(300_000), price: egp(410_000), priced_on: '2026-09-01' });
+  const unpriced = hold(api, { label: 'Term deposit', kind: 'certificate', qty: 1, unit_cost: egp(5_000_000) });
+  await settle(api);
+  const day = (id: string): unknown => api.kernel.get(id)!.fields.priced_on;
+  assert.equal(day(bare), TODAY, 'a price with no day was taken as it is, so nothing can say how old it is');
+  assert.equal(day(typed), '2026-09-01', 'the day somebody typed was written over');
+  assert.equal(day(unpriced), undefined, 'a holding nobody priced was given a day');
+
+  /* AND A PRICE SAID LATER, ON A ROW THAT HAD NONE, IS STAMPED THEN: the rule hears `price`, and the script the empty day. */
+  said(api.kernel.update('holdings', unpriced, { price: egp(5_200_000) } as never, { actor: 'p_1' }));
+  await settle(api);
+  assert.equal(day(unpriced), TODAY);
+  assert.deepEqual(api.kernel.get(unpriced)!.fields.value, egp(5_200_000));
+
+  /* NOTHING MOVED, NOTHING WRITTEN: the host coming round again leaves all three as they stand. */
+  const writes = (id: string): number => (api.kernel as unknown as { history(id: string): unknown[] }).history(id).length;
+  const before = [bare, typed, unpriced].map(writes);
+  await settle(api);
+  assert.deepEqual([bare, typed, unpriced].map(writes), before, 'the script wrote a row again with nothing moved');
+  close();
+});
+
+test('THE PAGE SAYS THE OLDEST DAY A PRICE WAS SAID, and says nothing about a day while nothing is priced', async () => {
+  const { api, close } = await inPounds();
+  const ids = [1, 2, 3].map((n) => hold(api, { label: `Lot ${n}`, kind: 'commodity', qty: n, unit_cost: egp(100_000) }));
+  await settle(api);
+  const none = await pricedOn(api);
+  assert.deepEqual([none.tile, none.warning], [false, false], 'a day was drawn over holdings nobody has priced');
+
+  said(api.kernel.update('holdings', ids[0]!, { price: egp(150_000), priced_on: '2026-09-20' } as never, { actor: 'p_1' }));
+  said(api.kernel.update('holdings', ids[1]!, { price: egp(150_000) } as never, { actor: 'p_1' }));
+  await settle(api);
+  const fresh = await pricedOn(api);
+  assert.deepEqual([fresh.tile, fresh.warning], [true, false]);
+  /* THE OLDEST OF THE TWO, the 20th and not the day the second was stamped, as whole days since 1970 under `format: day`. */
+  assert.equal(fresh.day, epochDay('2026-09-20'));
+  assert.equal(file().declarations.find((d) => d.metric === 'holdings-priced-on')?.format, 'day');
+  close();
+});
+
+test('A PRICE OVER THIRTY DAYS OLD TURNS THE DAY INTO A WARNING, and thirty days exactly does not', async () => {
+  const { api, close } = await inPounds();
+  const ids = [1, 2].map((n) => hold(api, { label: `Lot ${n}`, kind: 'commodity', qty: n, unit_cost: egp(100_000), price: egp(150_000), priced_on: '2026-09-20' }));
+  /* THIRTY DAYS BEFORE THE 25TH OF SEPTEMBER IS THE 26TH OF AUGUST. */
+  said(api.kernel.update('holdings', ids[0]!, { priced_on: '2026-08-26' } as never, { actor: 'p_1' }));
+  await settle(api);
+  const edge = await pricedOn(api);
+  assert.deepEqual([edge.tile, edge.warning, edge.day], [true, false, epochDay('2026-08-26')]);
+
+  said(api.kernel.update('holdings', ids[0]!, { priced_on: '2026-08-25' } as never, { actor: 'p_1' }));
+  await settle(api);
+  const old = await pricedOn(api);
+  /* ONE OR THE OTHER, NEVER BOTH: the warning takes the tile's place, so the day is said once. */
+  assert.deepEqual([old.tile, old.warning], [false, true]);
+  assert.equal(old.tone, 'warn');
+  assert.match(old.body, /^Priced on \{\{holdings-priced-on\}\}/u);
+  /* LATE IS NEVER COLOUR ALONE: the words say it, and the deeper red only repeats them. */
+  assert.match(old.body, /\{\{bad:over 30 days ago\}\}/u);
+  assert.doesNotMatch(old.body, /—/u);
+
+  /* A PRICE TAKEN AWAY TAKES ITS DAY OUT OF THE READING, so an old day beside no price warns about nothing. */
+  said(api.kernel.update('holdings', ids[0]!, { price: null } as never, { actor: 'p_1' }));
+  await settle(api);
+  const gone = await pricedOn(api);
+  assert.deepEqual([gone.tile, gone.warning, gone.day], [true, false, epochDay('2026-09-20')]);
   close();
 });

@@ -7,9 +7,9 @@
  * event, the kind of actor and when, and on a current record the batch it wrote under and the run it came from. Every
  * key past `who` and `at` is narrowed here, so a record on an older build draws a byline without an Undo rather than none.
  *
- * NAMES, NEVER IDS. The actor is said by `names.ts` `actor`, so a run is its agent's name and a ULID is never printed; a
- * run's handle rides beside the name as `run`, for the link to its page, and is not in `said`. Who it acted for is a
- * name the caller holds, or "you", or left out.
+ * NAMES, NEVER IDS. The actor is said by `names.ts` `actor`, so a run is its agent's name, or the app it ran in where the
+ * record says who the run is (`run_by`), and a ULID is never printed; a run's handle rides beside the name as `run`, for
+ * the link to its page, and is not in `said`. Who it acted for is a name the caller holds, or "you", or left out.
  *
  * A PERSON'S OWN CHANGE CARRIES NO BYLINE. The row is theirs, and a list where every row says "You" says nothing.
  *
@@ -18,7 +18,7 @@
 
 import { since } from 'braindog-render';
 
-import { actor, type ActorKind } from './names.ts';
+import { actor, nameWords, runByIn, runByName, type ActorKind, type RunBy } from './names.ts';
 
 /** What kind of thing changed the row: an agent (a run of one), an app (an import, an ingest), a rule, or Slash. */
 export type BylineBy = 'agent' | 'app' | 'rule' | 'slash';
@@ -62,9 +62,17 @@ const NOT_A_NAME = /[0-9A-HJKMNP-TV-Z]{26}|^[pt]_|#\d|[\\/]/u;
  * this build cannot read.
  *
  * `me` is the reader's id and `names` the people the caller holds a name for; `seen` is the reader's read mark, an
- * instant, used only when the record does not say itself whether this change is new to them.
+ * instant, used only when the record does not say itself whether this change is new to them. `run_by` is who the run
+ * that signed the change is, where the caller holds it; the change's own `run_by` is read where it does not.
  */
-export function bylineOf(change: unknown, me: string | null = null, names: ReadonlyMap<string, string> = new Map(), now: number = Date.now(), seen: string | null = null): Byline | null {
+export function bylineOf(
+  change: unknown,
+  me: string | null = null,
+  names: ReadonlyMap<string, string> = new Map(),
+  now: number = Date.now(),
+  seen: string | null = null,
+  run_by?: RunBy | null,
+): Byline | null {
   if (!isObject(change)) return null;
   const who = text(change.who);
   const at = text(change.at);
@@ -72,7 +80,12 @@ export function bylineOf(change: unknown, me: string | null = null, names: Reado
   /* AN AGENT'S RUN IS SAID BY ITS AGENT when the record names one (`agent: 'claude'`), and as An agent when it does not. */
   const agent = text(change.agent);
   const signed = RUN.test(who) && agent !== null && !NOT_A_NAME.test(agent) ? `agent:${agent.toLowerCase()}` : who;
-  const said = actor(signed, me, names);
+  /* AND BY THE APP IT RAN IN where the record says who the run is (`run_by`): "Claude Code" says which window did it. One
+     about another run, or one that says nothing a person could read, is not used, and the agent's own name stands. */
+  const own = RUN.test(who) ? (run_by ?? runByIn(change.run_by)) : null;
+  /* A HELPER IS SAID WITHOUT "helping" HERE: the line goes on to say for whom, and "Claude Code, helping for Mara" reads wrong. */
+  const about = own !== null && (own.run ?? who) === who ? { ...own, parent: null } : null;
+  const said = about === null || runByName(about) === nameWords.agent ? actor(signed, me, names) : actor(who, me, names, about);
   const by = KIND[said.kind];
   if (by === undefined) return null;
   const whom = forOf(change.for, me, names);

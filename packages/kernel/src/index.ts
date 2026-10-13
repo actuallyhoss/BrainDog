@@ -41,6 +41,7 @@ import {
   REMOVED_WINDOW_DAYS,
   readPackConfig,
   retireDeclarations,
+  sourceKnown,
   writePackConfig,
   stageDeclarations,
   type Declaration,
@@ -409,6 +410,8 @@ export { MEASURES_MOST, MEASURE_BACK, MEASURE_BUCKETS, localDays, measureBucket,
 export type { MeasureBucket, MeasureLatest, MeasureLines, MeasureSeries, RawReading } from './measures.ts';
 import type { RawReading } from './measures.ts';
 export type { Bucket } from './buckets.ts';
+export { TREND_BAND, TREND_CAP, TREND_POINTS, trendOf } from './trend.ts';
+export type { Trend, TrendAhead, TrendBucket, TrendFlat, TrendGrowth } from './trend.ts';
 export { dayIn, stampFinished, type FinishedDecl } from './finished.ts';
 export { stepsPercent, tallySteps, type StepsDecl } from './steps.ts';
 /* THE COST BAND, exported because `/decide` computes it in the browser off the same raw rows: it
@@ -5899,6 +5902,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     const body = parsedBody(r.body);
     const kind = String(r.body_kind ?? '');
     const offered = kind === 'options' && Array.isArray(body.options) ? (body.options as unknown[]) : [];
+    const withheld = costRows(sql);
     const options = offered.flatMap((o) => {
       if (o === null || typeof o !== 'object' || Array.isArray(o)) return [];
       const one = o as Record<string, unknown>;
@@ -5907,8 +5911,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
          sent, and a swatch is the one colour from data a drawer puts on a screen. */
       const shows = showsOf(one.shows);
       /* AN OPTION ITS PROPOSER MARKED HARD SAYS SO ON ITS OWN LINE (`weigh.ts` `optionCost`): the question's band no
-         longer rises for one hard option beside a safe one, so the drawer marks the option and keeps a key off it. */
-      const hard = optionCost(one) === 'undo';
+         longer rises for one hard option beside a safe one, so the drawer marks the option and keeps a key off it. An
+         option that writes money, or patches a field its list's history withholds, is hard by what it writes. */
+      const hard = optionCost(one, withheld) === 'undo';
       return [{ key: one.id, label: one.label, because: typeof one.because === 'string' ? one.because : '', recommended: one.recommended === true, ...(shows ? { shows } : {}), ...(hard ? { hard: true as const } : {}) }];
     });
     const does = doesOf(kind, body, {
@@ -7920,6 +7925,14 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * its readings were handed to anybody who could open the page.
      */
     blockRegisters: (block: PageBlock): string[] => registersOfBlock(block, pageDeps().metric, beside()),
+
+    /**
+     * Whether a block's `source` is one this build can read: `register.x`, `metric.x`, `block.n`, or a part of the code
+     * that answers by name. By its shape and never by the record, so a list or a figure since taken out still reads
+     * true: those are asked through `blockRegisters` and the declarations. False is a source from a part of the code
+     * since removed, which names no list anybody can check a reader against.
+     */
+    sourceKnown: (source: string): boolean => sourceKnown(source),
 
     /**
      * What a rule WOULD do, without doing any of it.

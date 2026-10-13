@@ -8,6 +8,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -40,19 +41,37 @@ const CONTEXT = {
   next: 'Start with the task in front of you, and call handoff with your next step before you stop.',
 };
 const PROJECT = { spoken: 'things#1', name: 'Kiln', mark: null, hue: null, how: 'folder' };
+/* The project's own id, which is what a skill's `project` field holds in the list read. */
+const PROJECT_ID = 'e_things_1';
+/** How many rows of each scope `context` shows (`SHOWN` in `packages/record`). */
+const SHOWN = 20;
 
 /** A record with a skills register: `context` lists the active rows, and `get`, `create`, `update` and `propose` answer. */
-async function stubRecord(t: After, o: { project?: boolean; register?: boolean }) {
+async function stubRecord(t: After, o: { project?: boolean; register?: boolean; page?: number }) {
   const rows: Row[] = [];
   const seen: Seen[] = [];
   let proposals = 0;
   const brief = (r: Row) => ({ spoken: `skills#${String(r.seq)}`, version: r.version, scope: r.scope, state: r.state, name: r.fields.name, trigger: r.fields.trigger, rev: r.fields.rev });
+  /* AS THE RECORD ANSWERS IT: the project's own and the ones it inherits, the twenty changed last of each, and
+     `truncated` when either holds more. */
+  const shown = (scope: Row['scope']) => rows.filter((r) => r.state === 'active' && r.scope === scope);
   const context = () => ({
     ...CONTEXT,
     project: o.project ? PROJECT : null,
-    registers: o.register === false ? [] : [{ id: 'skills', name: 'Skills', rows: rows.filter((r) => r.state === 'active').map(brief), inherited: [], truncated: false }],
+    registers:
+      o.register === false
+        ? []
+        : [{ id: 'skills', name: 'Skills', rows: shown('project').slice(-SHOWN).map(brief), inherited: shown('global').slice(-SHOWN).map(brief), truncated: shown('project').length > SHOWN || shown('global').length > SHOWN }],
   });
-  const entry = (r: Row) => ({ id: `e_${String(r.seq)}`, register: 'skills', seq: r.seq, state: r.state, version: r.version, fields: r.fields });
+  /* A row of the list read holds its project as that row's id, and nothing for one that applies everywhere. */
+  const entry = (r: Row) => ({
+    id: `e_${String(r.seq)}`,
+    register: 'skills',
+    seq: r.seq,
+    state: r.state,
+    version: r.version,
+    fields: { ...r.fields, ...(r.scope === 'project' ? { project: PROJECT_ID } : {}) },
+  });
   const server: Server = createServer((req, res) => {
     const chunks: Buffer[] = [];
     req.on('data', (c: Buffer) => chunks.push(c));
@@ -76,6 +95,18 @@ async function stubRecord(t: After, o: { project?: boolean; register?: boolean }
       const missing = () => answer({ ok: false, refusal: { code: 'REF_UNKNOWN', fix: 'There is no such row.' } });
       if (method === 'context') return answer({ ok: true, value: context() });
       if (method === 'attach') return answer({ ok: true, value: { session: { id: 'e_7', seq: 7, state: 'active', version: 1, fields: {} }, spoken: 'S7', resumed: false, project: null, context: context() } });
+      if (method === 'get' && args.register === 'things')
+        return args.seq === 1 && o.project ? answer({ ok: true, value: { id: PROJECT_ID, register: 'things', seq: 1, state: 'active', version: 1, fields: { name: PROJECT.name } } }) : missing();
+      /* Every row whatever its state, oldest first, a page at a time: at most `page` rows however many are asked for. */
+      if (method === 'list') {
+        const where = args.where as { field?: string; is?: unknown } | undefined;
+        const all = rows.filter((r) => where === undefined || (where.field === 'project' && r.scope === 'project' && where.is === PROJECT_ID));
+        /* The cursor is text on the wire; the loop above reads a query's values as JSON, so this one arrives a number. */
+        const from = args.cursor === undefined ? 0 : Number(args.cursor);
+        const size = Math.min(typeof args.limit === 'number' ? args.limit : 50, o.page ?? 500);
+        const page = all.slice(from, from + size);
+        return answer({ ok: true, value: { rows: page.map(entry), matched: all.length, cursor: from + size < all.length ? String(from + size) : null } });
+      }
       if (method === 'get') {
         const r = rows.find((x) => x.seq === args.seq);
         return r ? answer({ ok: true, value: entry(r) }) : missing();
@@ -119,7 +150,7 @@ async function stubRecord(t: After, o: { project?: boolean; register?: boolean }
   return { base: `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`, rows, seen, add, bump, proposals: () => seen.filter((s) => s.method === 'propose') };
 }
 
-async function setup(t: After, o: { project?: boolean; register?: boolean } = {}) {
+async function setup(t: After, o: { project?: boolean; register?: boolean; page?: number } = {}) {
   const host = await stubRecord(t, o);
   const dir = mkdtempSync(join(tmpdir(), 'braindog-skills-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
@@ -132,10 +163,10 @@ async function setup(t: After, o: { project?: boolean; register?: boolean } = {}
   const out: string[] = [];
   const said: string[] = [];
   const io: AgentIo = { env, cwd, home, out: (l) => void out.push(l), say: (l) => void said.push(l), headers: async () => ({}) };
-  const sync = async (s: { dryRun?: boolean } = {}) => {
+  const sync = async (s: { dryRun?: boolean; until?: number; clock?: () => number } = {}) => {
     const at = await connect(undefined, io);
     if (typeof at === 'number') throw new Error(`connect ended with ${String(at)}`);
-    const lines = await syncSkills({ client: at.client, context: at.context, home, configDir, top: o.project ? top : null, dryRun: s.dryRun === true, machine: 'test-machine' });
+    const lines = await syncSkills({ client: at.client, context: at.context, home, configDir, top: o.project ? top : null, dryRun: s.dryRun === true, machine: 'test-machine', ...(s.until === undefined ? {} : { until: s.until }), ...(s.clock === undefined ? {} : { clock: s.clock }) });
     printed.push(...lines);
     return lines;
   };
@@ -370,6 +401,166 @@ test('A PROJECT SKILL is written into the repository and reported as not committ
   const path = join(h.top, '.claude', 'skills', 'kiln-release', 'SKILL.md');
   assert.deepEqual(await h.sync(), [`Skill kiln-release written to ${path} (in the repository, not committed).`]);
   assert.ok(existsSync(path));
+});
+
+/* ── the whole list (AGT-C15) ──────────────────────────────────────────── */
+
+const numbered = (n: number) => `kiln-skill-${String(n).padStart(2, '0')}`;
+
+test('36 SKILLS AND A CONTEXT SHOWING 20: the rest are read by the list read, and a file whose name the record holds is no new row', async (t) => {
+  const h = await setup(t, { page: 10 });
+  for (let n = 1; n <= 36; n++) h.add({ name: numbered(n), trigger: `When step ${String(n)} runs`, body: `# Step ${String(n)}\n`, ...(n === 5 ? { managed: false } : {}) });
+  /* Kept by hand under a name the record holds past the twenty, and one it does not hold at all. */
+  const held = h.global(numbered(5));
+  const fresh = h.global('hand-made');
+  for (const f of [held, fresh]) {
+    mkdirSync(dirname(f), { recursive: true });
+    writeFileSync(f, '# Kept by hand\n');
+  }
+
+  const lines = await h.sync();
+  assert.equal(lines.filter((l) => / written to /u.test(l)).length, 35, 'every managed skill is written, not the twenty context shows');
+  for (let n = 1; n <= 36; n++) if (n !== 5) assert.ok(existsSync(h.global(numbered(n))), `${numbered(n)} is on disk`);
+  assert.equal(readFileSync(held, 'utf8'), '# Kept by hand\n');
+  assert.deepEqual(lines.filter((l) => !/ written to /u.test(l)), [`Skill hand-made in ${fresh} was registered as skills#37, index only.`]);
+  assert.equal(h.rows.filter((r) => r.fields.name === numbered(5)).length, 1, 'the held name got no second row');
+  assert.equal(h.seen.filter((s) => s.method === 'list').length, 4, '36 rows, ten a page');
+  assert.deepEqual(await h.sync(), [], 'a second sync has nothing to do');
+});
+
+test('A CONTEXT THAT SHOWS EVERY SKILL is not read again by the list read', async (t) => {
+  const h = await setup(t);
+  h.add(RELEASE);
+  await h.sync();
+  assert.equal(h.seen.filter((s) => s.method === 'list').length, 0);
+});
+
+test('THE BUDGET ENDS PART WAY: what was read is acted on, nothing is registered, and the rest waits for the next sync', async (t) => {
+  const h = await setup(t, { page: 10 });
+  for (let n = 1; n <= 36; n++) h.add({ name: numbered(n), trigger: `When step ${String(n)} runs`, body: `# Step ${String(n)}\n`, ...(n === 12 ? { managed: false } : {}) });
+  const held = h.global(numbered(12));
+  mkdirSync(dirname(held), { recursive: true });
+  writeFileSync(held, '# Kept by hand\n');
+
+  /* The clock is past the budget before the second page is asked for. */
+  let asked = 0;
+  const lines = await h.sync({ until: 1_000, clock: () => (asked++ === 0 ? 0 : 2_000) });
+  assert.equal(h.seen.filter((s) => s.method === 'list').length, 1);
+  /* Context showed 17 to 36 and the one page read held 1 to 10. */
+  assert.equal(lines.filter((l) => / written to /u.test(l)).length, 30);
+  assert.ok(existsSync(h.global(numbered(3))) && existsSync(h.global(numbered(36))));
+  assert.equal(existsSync(h.global(numbered(14))), false);
+  assert.deepEqual(lines.filter((l) => !/ written to /u.test(l)), ['The record holds more skills than there was time to read, so the rest wait for the next sync.']);
+  assert.equal(h.rows.length, 36, 'a file whose name was not read yet is not registered');
+
+  const after = await h.sync();
+  assert.equal(after.filter((l) => / written to /u.test(l)).length, 5, 'the other six, less the one the record does not manage');
+  assert.equal(h.rows.length, 36);
+});
+
+test('THE SESSION\'S PROJECT IS READ FIRST, and each skill lands where it applies', async (t) => {
+  const h = await setup(t, { project: true, page: 10 });
+  for (let n = 1; n <= 22; n++) h.add({ name: numbered(n), trigger: `When step ${String(n)} runs`, body: `# Step ${String(n)}\n` });
+  for (let n = 23; n <= 46; n++) h.add({ name: numbered(n), trigger: `When step ${String(n)} runs`, body: `# Step ${String(n)}\n` }, 'project');
+
+  const lines = await h.sync();
+  assert.equal(lines.length, 46);
+  const lists = h.seen.filter((s) => s.method === 'list');
+  assert.deepEqual(lists[0]?.args.where, { field: 'project', is: PROJECT_ID });
+  assert.ok(existsSync(join(h.top, '.claude', 'skills', numbered(23), 'SKILL.md')), 'a project skill past the twenty is in the repository');
+  assert.ok(existsSync(h.global(numbered(1))), 'a global skill past the twenty is in the global folder');
+  assert.equal(existsSync(h.global(numbered(23))), false);
+
+  /* With time for the project's pages alone, the project's skills are whole and the global ones wait. */
+  const again = await setup(t, { project: true, page: 10 });
+  for (let n = 1; n <= 22; n++) again.add({ name: numbered(n), trigger: 't', body: `# Step ${String(n)}\n` });
+  for (let n = 23; n <= 46; n++) again.add({ name: numbered(n), trigger: 't', body: `# Step ${String(n)}\n` }, 'project');
+  let asked = 0;
+  await again.sync({ until: 1_000, clock: () => (asked++ < 3 ? 0 : 2_000) });
+  for (let n = 23; n <= 46; n++) assert.ok(existsSync(join(again.top, '.claude', 'skills', numbered(n), 'SKILL.md')), `${numbered(n)} is in the repository`);
+  assert.equal(existsSync(again.global(numbered(1))), false, 'a global skill past the twenty waits');
+});
+
+test('A NAME WITHIN ITS SCOPE IS THE SKILL: a project file named as a global skill is the project\'s own', async (t) => {
+  const h = await setup(t, { project: true });
+  h.add({ ...RELEASE, managed: false });
+  const mine = join(h.top, '.claude', 'skills', 'kiln-release', 'SKILL.md');
+  mkdirSync(dirname(mine), { recursive: true });
+  writeFileSync(mine, '# Release, for this project\n');
+  assert.deepEqual(await h.sync(), [`Skill kiln-release in ${mine} (in the repository, not committed) was registered as skills#2, index only.`]);
+  assert.equal(h.rows[1]?.scope, 'project');
+  assert.deepEqual(await h.sync(), []);
+});
+
+/* ── never committed (H.495) ───────────────────────────────────────────── */
+
+const gitIn = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, stdio: ['ignore', 'pipe', 'ignore'] }).toString();
+
+test('A PROJECT SKILL IN A GIT REPOSITORY is added once to .git/info/exclude, so git status stays clean', async (t) => {
+  const h = await setup(t, { project: true });
+  gitIn(h.top, 'init', '-q');
+  const row = h.add(RELEASE, 'project');
+  h.add({ name: 'everywhere', trigger: 'Always', body: '# Everywhere\n' });
+  const exclude = join(h.top, '.git', 'info', 'exclude');
+  const entry = '/.claude/skills/kiln-release/SKILL.md';
+  const held = () => readFileSync(exclude, 'utf8').split('\n').filter((l) => l === entry).length;
+
+  await h.sync();
+  assert.equal(held(), 1);
+  assert.equal(gitIn(h.top, 'status', '--porcelain'), '', 'git sees nothing to add');
+  assert.doesNotMatch(readFileSync(exclude, 'utf8'), /everywhere/u, 'a file outside the repository is not git\'s to ignore');
+  assert.equal(existsSync(join(h.top, '.gitignore')), false, 'never .gitignore, which is itself committed');
+
+  h.bump(row, '# Release\n\nTag it, push, then say so.\n');
+  assert.equal((await h.sync()).length, 1);
+  assert.equal(held(), 1, 'written twice, listed once');
+  assert.ok(readFileSync(exclude, 'utf8').endsWith('\n'));
+});
+
+test('A PATH GIT ALREADY IGNORES gets no entry, and a dry run writes none', async (t) => {
+  const h = await setup(t, { project: true });
+  gitIn(h.top, 'init', '-q');
+  h.add(RELEASE, 'project');
+  const exclude = join(h.top, '.git', 'info', 'exclude');
+  const before = existsSync(exclude) ? readFileSync(exclude, 'utf8') : '';
+
+  await h.sync({ dryRun: true });
+  assert.equal(existsSync(exclude) ? readFileSync(exclude, 'utf8') : '', before);
+
+  writeFileSync(join(h.top, '.gitignore'), '.claude/\n');
+  await h.sync();
+  assert.ok(existsSync(join(h.top, '.claude', 'skills', 'kiln-release', 'SKILL.md')));
+  assert.equal(existsSync(exclude) ? readFileSync(exclude, 'utf8') : '', before);
+});
+
+test('A PATH GIT ALREADY TRACKS is left alone and reported, and gets no entry', async (t) => {
+  const h = await setup(t, { project: true });
+  gitIn(h.top, 'init', '-q');
+  const path = join(h.top, '.claude', 'skills', 'kiln-release', 'SKILL.md');
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, 'The team\'s own.\n');
+  gitIn(h.top, 'add', '--', '.claude/skills/kiln-release/SKILL.md');
+  /* Tracked and gone from the folder, so the sync would write it. */
+  rmSync(path);
+  h.add(RELEASE, 'project');
+  const exclude = join(h.top, '.git', 'info', 'exclude');
+
+  const said = [`Skill kiln-release was not written to ${path}, because git already tracks that file in this repository.`];
+  assert.deepEqual(await h.sync(), said);
+  assert.equal(existsSync(path), false);
+  assert.doesNotMatch(existsSync(exclude) ? readFileSync(exclude, 'utf8') : '', /kiln-release/u);
+  assert.deepEqual(await h.sync(), [], 'said once');
+
+  /* One the sync wrote and somebody then committed: a newer version is not written over it. */
+  const glaze = h.add({ name: 'kiln-glaze', trigger: 'When glazing', body: '# Glaze\n' }, 'project');
+  const mine = join(h.top, '.claude', 'skills', 'kiln-glaze', 'SKILL.md');
+  await h.sync();
+  const first = readFileSync(mine, 'utf8');
+  gitIn(h.top, 'add', '-f', '--', '.claude/skills/kiln-glaze/SKILL.md');
+  h.bump(glaze, '# Glaze\n\nFire it twice.\n');
+  assert.deepEqual(await h.sync(), [`Skill kiln-glaze was not updated in ${mine}, because git already tracks that file in this repository.`]);
+  assert.equal(readFileSync(mine, 'utf8'), first);
+  assert.deepEqual(await h.sync(), [], 'said once');
 });
 
 test('A DRY RUN writes no file and no lock, and proposes and creates nothing', async (t) => {

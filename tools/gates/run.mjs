@@ -201,6 +201,10 @@ const GATES = [
      deletes a line of `event` is on one list with its reason, and a seventh is red. Beside `migration-lock` because a
      migration is the one other place the log is reshaped, and that gate holds it. */
   ['audit-append-only', call(join(here, 'audit-append-only.mjs'))],
+  /* AND A RELEASED VERSION IS NEVER CHANGED IN PLACE (SHL-B03, `packs/README.md`'s "A published version never changes"):
+     every version in the catalogue of the released commit is still there once, with its checksum, size and date, and
+     no file of one moved. A new version is cut beside it. It reads history, so a shallow checkout is red. */
+  ['catalogue-immutable', call(join(here, 'catalogue-immutable.mjs'))],
   /* AND A DRAWN BOARD SHIPS ONLY WITH HIS YES (EXP-A02): a page, specimen, variant, stand-in or pick changed after his
      yes needs it again, and a yes that misses a width, a theme or a pick is red. */
   ['board-yes', call(join(here, 'board-yes.mjs'))],

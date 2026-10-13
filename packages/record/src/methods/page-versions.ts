@@ -23,6 +23,13 @@
  * lists. A cut version is not the page as it stood, so a host does not offer to put it back: applying it would take
  * those blocks away from everybody.
  *
+ * AND SO IS A BLOCK OVER A FIGURE THE RECORD NO LONGER HOLDS (audit 64, claim 2). The kernel names a figure's lists by
+ * reading the figure, and one since taken out reads nothing, so a stat over a payroll total came back whole to the
+ * Notes reader the day the total was retired. Nothing left says which lists it read, so the block is left out for
+ * anybody who does not read every list, and counted in `cut` with the rest.
+ * AND A BLOCK OVER A SOURCE FROM A PART OF THE CODE SINCE REMOVED goes the same way (integrate 66): the kernel says
+ * whether it knows a source (`sourceKnown`), and one it does not know names no list to check a reader against.
+ *
  * A BODY BEGINS WITH ITS KIND. The kernel stores a declaration with its keys in order of spelling, `blocks` first,
  * and `setDeclaration` reads the kind off the first key, so a version handed back as stored was refused when Put back
  * applied it. Each body is answered `page` first.
@@ -67,6 +74,21 @@ const RUN = /^S[1-9][0-9]*$/u;
 /** A list as a declaration's text says it, `register.bills`, and a row of one by its spoken id, `bills#4`. */
 const NAMED = /register\.([A-Za-z0-9_-]+)/gu;
 const SPOKEN = /(?<![A-Za-z0-9_-])([A-Za-z][A-Za-z0-9_-]*)#[0-9]+/gu;
+
+/** A `{{hole}}` in a sentence, and each word in one that could be a figure's id: `payroll-total` of `{{payroll-total.change}}`. */
+const HOLE = /\{\{([^{}]*)\}\}/gu;
+const WORD = /[a-z][a-z0-9_-]*/gu;
+
+/**
+ * Every figure a piece of a block's text could be naming. A key's whole value is one, with `metric.` before it when it
+ * is a source and whatever follows its first colon left off (`cost:{{name}}` reads `cost`), and so is each word inside
+ * a hole. A word of a plain sentence is not: it reads nothing.
+ */
+const figuresIn = (text: string): string[] => {
+  const whole = text.trim().replace(/^metric\./u, '');
+  const at = whole.indexOf(':');
+  return [at < 0 ? whole : whole.slice(0, at), ...[...text.matchAll(HOLE)].flatMap((hole) => hole[1]!.match(WORD) ?? [])];
+};
 
 /** A declaration's keys with its kind first, as `setDeclaration` reads one. */
 const kindFirst = (body: Body): Body => {
@@ -140,6 +162,22 @@ export function methods(deps: RecordDeps) {
   const cutFor = (ctx: CallContext): ((stored: Body, titleNow: string) => { body: Body; cut: number }) => {
     if (readsEveryList?.(ctx) === true) return (stored) => ({ body: kindFirst(stored), cut: 0 });
     const lists = kernel.registers();
+    /* THE FIGURES THIS RECORD HELD ONCE AND HOLDS NO MORE: every version of a declaration is kept, so a figure with
+       rows and none of them live was taken out. One still there is the kernel's to read, below. */
+    const gone = new Set(
+      sql
+        .all<{ id: string }>(
+          "SELECT DISTINCT id FROM declaration d WHERE kind = 'metric' AND NOT EXISTS (SELECT 1 FROM declaration l WHERE l.id = d.id AND l.kind = 'metric' AND l.superseded_at IS NULL AND l.retired = 0)",
+        )
+        .map((r) => r.id.slice('metric.'.length)),
+    );
+    const unread = (node: unknown, key?: string): boolean => gone.size > 0 && wordsOf(node, key).some((text) => figuresIn(text).some((id) => gone.has(id)));
+    /* AND A BLOCK OVER A SOURCE THIS BUILD NO LONGER KNOWS (`kernel.sourceKnown`): a part of the code that answered by
+       name and has since been removed. It names no list, so nothing can say its reader may read what it drew. */
+    const strange = (block: unknown): boolean => {
+      const source = block !== null && typeof block === 'object' ? (block as { source?: unknown }).source : undefined;
+      return typeof source === 'string' && !kernel.sourceKnown(source);
+    };
     const asked = new Map<string, boolean>();
     const hiddenList = (list: string): boolean => {
       let said = asked.get(list);
@@ -163,15 +201,17 @@ export function methods(deps: RecordDeps) {
       const blocks: unknown[] = Array.isArray(held) ? held : [];
       const read = blocks.map(reads);
       const hidden = [...new Set([...read.flat(), ...said(blocks), ...said(rest)])].filter(hiddenList);
-      if (hidden.length === 0) return { body: kindFirst(stored), cut: 0 };
+      if (hidden.length === 0 && !unread(stored) && !blocks.some(strange)) return { body: kindFirst(stored), cut: 0 };
       const words = hidden.flatMap((id) => [id, lists.get(id)?.name ?? '']).filter((w) => w.trim() !== '');
-      const names = new RegExp(`(?<![\\p{L}\\p{N}])(?:${words.map((w) => w.trim().replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')).join('|')})(?![\\p{L}\\p{N}])`, 'iu');
-      const says = (node: unknown, key?: string): boolean => wordsOf(node, key).some((text) => names.test(text));
+      const names = words.length === 0 ? null : new RegExp(`(?<![\\p{L}\\p{N}])(?:${words.map((w) => w.trim().replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')).join('|')})(?![\\p{L}\\p{N}])`, 'iu');
+      /* WHAT A BLOCK SAYS THAT ITS READER MAY NOT BE SHOWN: a hidden list by its id or its name, or a figure the record
+         no longer holds, whose lists nobody can name any more. */
+      const says = (node: unknown, key?: string): boolean => (names !== null && wordsOf(node, key).some((text) => names.test(text))) || unread(node, key);
       /* A SETTING OF THE PAGE THAT NAMES ONE GOES TOO, and a page made for each row of a hidden list (`for:`) was about
          that list in every block, so none of them is kept. */
       const settings = Object.entries(rest).filter(([key, value]) => !says(value, key));
       const forHidden = rest.for !== undefined && !settings.some(([key]) => key === 'for');
-      const kept = forHidden ? [] : blocks.filter((block, i) => !read[i]!.some((list) => hidden.includes(list)) && !says(block));
+      const kept = forHidden ? [] : blocks.filter((block, i) => !read[i]!.some((list) => hidden.includes(list)) && !says(block) && !strange(block));
       /* AND A TITLE THAT SAYS ONE IS ANSWERED AS THE PAGE IS TITLED NOW, which `pages` already shows this caller. */
       const retitled = says(title);
       const cut = blocks.length - kept.length + (Object.keys(rest).length - settings.length) + (retitled ? 1 : 0);

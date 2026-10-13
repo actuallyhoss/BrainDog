@@ -6,7 +6,7 @@
  *
  *   BrainDog · run S731 · project BrainDog · Claude Code on MacBook
  *   Next     Cut page answers to block summaries. (S729, Claude Code, 5h ago, check before acting)
- *   Waiting  2 on Mara: Update the copperleaf tool to match this Mac? · ...
+ *   Waiting  2 on Mara: Change how copperleaf starts? · ...
  *   Learned  Money is minor units plus currency. Never add two currencies.
  *   More     3 dead ends · 5 learnings · 4 keys by name · call context
  *

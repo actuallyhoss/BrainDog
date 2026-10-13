@@ -36,7 +36,7 @@ import type { MetricDecl } from './metrics.ts';
 import type { Entry, Fields, Filter, FieldDecl, PageBlock, RegisterDecl } from './schema.ts';
 import { listLine } from './tags.ts';
 /* No cycle: `names.ts` reads `held.ts` and the copy, never this file. */
-import { actor, nameWords } from './names.ts';
+import { actor, nameWords, runByIn, type RunBy } from './names.ts';
 import type { Byline } from './byline.ts';
 
 /* THE DECLARATIONS EVERY HELPER BELOW READS, which are `held.ts`'s and not a copy: a list the record taught this tab is
@@ -1470,6 +1470,11 @@ export type FeedRow = {
   rows?: number;
   /** The rows a rule's run folded into this one line, one name a row, newest first (the kernel's `feedRows`). */
   things?: string[];
+  /**
+   * On a row a run signed, who that run is (the kernel's `run_by`), or `null` for a run the record does not hold. Absent
+   * from a row no run signed and from a record on an older build, and such a run is An agent as before.
+   */
+  run_by?: RunBy | null;
 };
 
 /** One step of a cash walk, as this build's walk and the record's both send it. */
@@ -1582,8 +1587,11 @@ export type Parts = {
   unit?: string | null;
 };
 
-/** An agent as a person reads its name: `agent:claude` is Claude and a run (`S42`) is An agent, as `names.ts`'s `actor` says them. */
-const agentNamed = (who: string): string => actorOf(who);
+/**
+ * An agent as a person reads its name: `agent:claude` is Claude, and a run (`S42`) is the app it ran in where the record
+ * says who the run is (`run_by`: "Claude Code") and An agent where it does not, as `names.ts`'s `actor` says them.
+ */
+const agentNamed = (who: string, run_by: RunBy | null = null): string => (who === 'you' ? who : actor(who, null, new Map(), runByIn(run_by)).name);
 
 /**
  * An `agents` block's rows as the renderer reads them: `who | count | what | when`. The agent is named as a person reads
@@ -1592,7 +1600,7 @@ const agentNamed = (who: string): string => actorOf(who);
 export function agentsTable(feed: readonly FeedRow[], now: number): Pick<BlockResult, 'rows' | 'shown'> {
   const rows: TableRow[] = feed.map((r, i) => ({
     key: `${r.at}-${i}`,
-    cells: [r.who === null ? '' : agentNamed(r.who), String(r.count), r.kind === 'setup' ? setupSaid(r.target, r.rows ?? 0) : agentDoing(r.kind, r.thing ?? r.target, r.note), whenOf(r.at, now)],
+    cells: [r.who === null ? '' : agentNamed(r.who, r.run_by ?? null), String(r.count), r.kind === 'setup' ? setupSaid(r.target, r.rows ?? 0) : agentDoing(r.kind, r.thing ?? r.target, r.note), whenOf(r.at, now)],
     href: undefined,
     tone: undefined,
   }));
@@ -1603,8 +1611,8 @@ export function agentsTable(feed: readonly FeedRow[], now: number): Pick<BlockRe
  * WHO DID IT, AS A PERSON READS IT. A live record signs a person's write with their id, and a feed drew
  * `p_01M2PAZ28BN3FTKQB266DVT4HX` beside every line: the reader is You, and anybody else is somebody on the record.
  */
-export const feedWho = (who: string, me: string | null, names: ReadonlyMap<string, string> = new Map()): string => {
-  const said = whoDid(who, me, names);
+export const feedWho = (who: string, me: string | null, names: ReadonlyMap<string, string> = new Map(), run_by: RunBy | null = null): string => {
+  const said = whoDid(who, me, names, runByIn(run_by));
   return said.you && me === null ? actorOf(who) : said.name;
 };
 
@@ -1615,8 +1623,8 @@ export const feedWho = (who: string, me: string | null, names: ReadonlyMap<strin
  * an agent and an automation are each said by name. `person` is whether the subject is somebody at all, which the
  * screens that word "Added by" and filter by person need apart from the name.
  */
-export function whoDid(who: string, me: string | null, names: ReadonlyMap<string, string> = new Map()): { name: string; you: boolean; person: boolean } {
-  const said = actor(who, me, names);
+export function whoDid(who: string, me: string | null, names: ReadonlyMap<string, string> = new Map(), run_by: RunBy | null = null): { name: string; you: boolean; person: boolean } {
+  const said = actor(who, me, names, run_by);
   const you = said.kind === 'you';
   return { name: said.name, you, person: you || said.kind === 'person' };
 }
@@ -1711,7 +1719,7 @@ export function feedTable(feed: readonly FeedRow[], marks: boolean, seen: string
       key: `${r.at}-${i}`,
       /* A LINE THAT SAYS ITS OWN NUMBER IS ONE LINE, so the renderer does not draw "6" in front of "Categorised 6
          payments" as well (`feedBurst`). */
-      cells: [r.by, r.who === null || line.whole ? '' : feedWho(r.who, me, names), line.counted ? '1' : String(r.count), line.what, whenOf(r.at, now)],
+      cells: [r.by, r.who === null || line.whole ? '' : feedWho(r.who, me, names, r.run_by ?? null), line.counted ? '1' : String(r.count), line.what, whenOf(r.at, now)],
       href: undefined,
       tone: undefined,
     };

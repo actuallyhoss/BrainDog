@@ -98,6 +98,7 @@ import { oneLine, printable } from './clip.ts';
 import { hostsPath, target } from './http.ts';
 import { refuse } from './json.ts';
 import { kennelBase, submitToKennel, takeKennel, yankFromKennel } from './kennel.ts';
+import { untilAccepted } from './links.ts';
 import { readPackTest, runPackTest, testFileName } from './pack-test.ts';
 import { checkInScratch } from './scratch.ts';
 import type { AgentIo } from './skills.ts';
@@ -1021,9 +1022,8 @@ async function proposePack(id: string, doc: Record<string, unknown>, question: s
     io.say('The record took the question and did not say which one it is. Open Decide in the app.');
     return 1;
   }
-  const link = new URL(`/decide/${encodeURIComponent(filed)}`, at.to.base).href;
   const joined = joinedSaid(answer.value);
-  io.out(joined !== null ? `${joined} Nothing is installed until they accept it: ${link}` : `Asked the owner: ${question} Nothing is installed until they accept it: ${link}`);
+  io.out(`${joined !== null ? joined : `Asked the owner: ${question}`} ${untilAccepted(at.to, filed)}`);
   return 0;
 }
 

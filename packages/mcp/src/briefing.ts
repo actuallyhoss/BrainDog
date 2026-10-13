@@ -3,7 +3,7 @@
  *
  *     BrainDog · run S731 · project BrainDog · Claude Code on MacBook
  *     Next     Cut page answers to block summaries. (S729, Claude Code, 5h ago, check before acting)
- *     Waiting  2 on Mara: Update copperleaf to match this Mac? · 3 bank texts the pattern couldn't read
+ *     Waiting  2 on Mara: Change how copperleaf starts? · 3 bank texts the pattern couldn't read
  *     Who      Priya Raman (client), Teodor Vance (Copperleaf), Wren, +4 · for Brightwell
  *     Learned  Money is minor units plus currency. Never add two currencies.
  *     More     3 dead ends, 5 learnings and 41 keys by name · call context {"format":"full"}

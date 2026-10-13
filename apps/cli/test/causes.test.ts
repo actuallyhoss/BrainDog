@@ -159,7 +159,7 @@ test('AN OLDER RECORD that ignores cause files each question as before, and the 
   const m = h.machine('desk');
   assert.equal(await pack(['install', PROJECT_BRIEF], m.io), 0, m.said.join('\n'));
   assert.equal(await pack(['install', PROJECT_BRIEF], m.io), 0, m.said.join('\n'));
-  assert.match(m.out.at(-1) ?? '', /^Asked the owner: Install Project brief 2\.0\.0\? .*\/decide\/SG4$/u);
+  assert.match(m.out.at(-1) ?? '', /^Asked the owner: Install Project brief 2\.0\.0\? Nothing is installed until they accept it\. Open Decide in the app\.$/u);
 });
 
 /* ── pack install ──────────────────────────────────────────────────────── */
@@ -169,11 +169,11 @@ test('PACK INSTALL ASKS ONCE: the pack is its cause, and asking again prints "Al
   const m = h.machine('studio');
   assert.equal(await pack(['install', PROJECT_BRIEF], m.io), 0, m.said.join('\n'));
   assert.equal(h.proposals()[0]?.args.cause, 'install#project-brief');
-  assert.match(m.out.at(-1) ?? '', /^Asked the owner: Install Project brief 2\.0\.0\? .*\/decide\/SG1$/u);
+  assert.match(m.out.at(-1) ?? '', /^Asked the owner: Install Project brief 2\.0\.0\? Nothing is installed until they accept it\. Open Decide in the app\.$/u);
 
   assert.equal(await pack(['install', PROJECT_BRIEF], m.io), 0, m.said.join('\n'));
   assert.equal(h.proposals()[1]?.args.cause, 'install#project-brief');
-  assert.equal(m.out.at(-1), `Already waiting as SG1. Nothing is installed until they accept it: ${h.base}/decide/SG1`);
+  assert.equal(m.out.at(-1), `Already waiting as SG1. Nothing is installed until they accept it. Open Decide in the app.`);
 });
 
 /* ── usecase install ───────────────────────────────────────────────────── */
@@ -202,19 +202,19 @@ test('USECASE INSTALL ASKS ONCE: a file, a use case on offer and an update each 
   /* FROM A FILE, keyed as its pack is, so the same use case on offer by its id joins it. */
   assert.equal(await usecase(['install', 'student.usecase.json'], m.io), 0, m.said.join('\n'));
   assert.equal(h.proposals()[0]?.args.cause, 'install#usecase-student');
-  assert.equal(m.out.at(-1), `Asked the owner to install Student 1.0.1. Nothing is installed until they accept it: ${h.base}/decide/SG1`);
+  assert.equal(m.out.at(-1), `Asked the owner to install Student 1.0.1. Nothing is installed until they accept it. Open Decide in the app.`);
   assert.equal(await usecase(['install', 'student'], m.io), 0, m.said.join('\n'));
   assert.equal(h.proposals()[1]?.args.cause, 'install#usecase-student');
-  assert.equal(m.out.at(-1), `Already waiting as SG1. Nothing is installed until they accept it: ${h.base}/decide/SG1`);
+  assert.equal(m.out.at(-1), `Already waiting as SG1. Nothing is installed until they accept it. Open Decide in the app.`);
   assert.equal(await usecase(['install', 'student.usecase.json'], m.io), 0, m.said.join('\n'));
-  assert.equal(m.out.at(-1), `Already waiting as SG1. Nothing is installed until they accept it: ${h.base}/decide/SG1`);
+  assert.equal(m.out.at(-1), `Already waiting as SG1. Nothing is installed until they accept it. Open Decide in the app.`);
 
   /* AN UPDATE, the third place that asks. */
   assert.equal(await usecase(['install', 'team'], m.io), 0, m.said.join('\n'));
   assert.equal(h.proposals()[3]?.args.cause, 'install#usecase-team');
-  assert.equal(m.out.at(-1), `Asked the owner to update Team from 1.0.0 to 1.1.0. Nothing is installed until they accept it: ${h.base}/decide/SG2`);
+  assert.equal(m.out.at(-1), `Asked the owner to update Team from 1.0.0 to 1.1.0. Nothing is installed until they accept it. Open Decide in the app.`);
   assert.equal(await usecase(['install', 'team'], m.io), 0, m.said.join('\n'));
-  assert.equal(m.out.at(-1), `Already waiting as SG2. Nothing is installed until they accept it: ${h.base}/decide/SG2`);
+  assert.equal(m.out.at(-1), `Already waiting as SG2. Nothing is installed until they accept it. Open Decide in the app.`);
 });
 
 /* ── the two helpers ───────────────────────────────────────────────────── */

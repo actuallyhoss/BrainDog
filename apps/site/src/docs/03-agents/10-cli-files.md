@@ -7,7 +7,7 @@ The commands for building with `braindog`: pages as files you can edit, and use 
 ```comparison | Pages
 Command | What it does
 braindog page pull <slug> | Fetch a page's declaration and write it as a .dog file: one page, one file. --out names the file
-braindog page push <file> | Read a .dog file and set it as the page. An owner in the app only: a token is refused, this one included
+braindog page push <file> | Read a .dog file and send it as the page. An owner's session applies it; a key asks on Decide and it waits there for an answer
 braindog page check <file> | Check a .dog file against the page grammar, on this machine. Nothing is sent
 ```
 

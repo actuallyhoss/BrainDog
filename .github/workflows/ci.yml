@@ -168,6 +168,7 @@ jobs:
     steps:
       # THE WHOLE HISTORY, because `commits` holds a floor on how many commits HEAD reaches (WAY-B02) and reads the
       # pushed range: a shallow checkout reaches one commit and the floor is red.
+      # `catalogue-immutable` reads the catalogue of the released commit (SHL-B03), which a shallow checkout does not hold.
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0

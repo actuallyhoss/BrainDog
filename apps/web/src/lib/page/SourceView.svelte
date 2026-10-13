@@ -55,7 +55,7 @@
   import ReadState from '$lib/ui/ReadState.svelte';
   import PageBody from './PageBody.svelte';
   import SourceHistory from './SourceHistory.svelte';
-  import { pageVersionsOf, type PageVersion } from './source-history.ts';
+  import { historyWords, pageVersionsOf, partFile, type PageVersion } from './source-history.ts';
   import { words } from './words.ts';
 
   let {
@@ -324,13 +324,18 @@
     point({ fix: out.fix, line: null });
   }
 
-  /** One version's text as a file, named as the declaration's own first line names it. */
+  /**
+   * One version's text as a file, named as the declaration's own first line names it. A VERSION THE RECORD CUT FOR THIS
+   * READER IS SAVED AS A PART (`money-part.dog`) and said as one: its body is less than the page.
+   */
   function saveVersion(version: number) {
-    const body = versions.find((v) => v.version === version)?.body as Body | undefined;
+    const picked = versions.find((v) => v.version === version);
+    const body = picked?.body as Body | undefined;
     if (!body) return;
-    const file = fileOf(body);
+    const part = (picked?.cut ?? 0) > 0;
+    const file = part ? partFile(fileOf(body)) : fileOf(body);
     saveDog(file, dogText(body));
-    toasts.push(copy.exported(file), { intent: 'good' });
+    toasts.push(part ? historyWords.savedPart(file) : copy.exported(file), { intent: 'good' });
   }
 
   function discard() {

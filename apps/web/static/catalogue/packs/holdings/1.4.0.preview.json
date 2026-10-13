@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "made_at": "2026-10-13T14:02:01.215Z",
+  "made_at": "2026-10-13T15:17:38.879Z",
   "pages": [
     {
       "blocks": [
@@ -47,6 +47,62 @@
           "matched": 0,
           "refusals": [],
           "readings": []
+        },
+        {
+          "cells": [
+            {
+              "label": "Oldest price",
+              "metric": "holdings-priced-on"
+            }
+          ],
+          "heading": "Priced on",
+          "kind": "stat",
+          "span": 12,
+          "when": {
+            "is": 0,
+            "metric": "holdings-stale"
+          },
+          "key": "k0fyxxqv",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "readings": [
+            {
+              "label": "Oldest price",
+              "metric": "holdings-priced-on",
+              "target": {
+                "gte": 0
+              },
+              "reading": {
+                "value": null,
+                "unit": null,
+                "rows": 0,
+                "refusals": [],
+                "held": 0,
+                "delta": null,
+                "why": "no comparison asked for",
+                "met": null
+              }
+            }
+          ],
+          "drawn": false,
+          "why": "when"
+        },
+        {
+          "body": "Priced on {{holdings-priced-on}}, {{bad:over 30 days ago}}. That is the oldest price here. Say what each holding is worth now and the value above is today's.",
+          "kind": "note",
+          "span": 12,
+          "tone": "warn",
+          "when": {
+            "gt": 0,
+            "metric": "holdings-stale"
+          },
+          "key": "k08lez9h",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
         },
         {
           "columns": [
@@ -107,13 +163,14 @@
         "register.holdings"
       ],
       "title": "Holdings",
-      "read_at": "2026-10-13T14:02:01.215Z",
+      "read_at": "2026-10-13T15:17:38.879Z",
       "zone": "UTC",
       "look": {
         "look": "holdings",
-        "basis": "r050pqmr",
+        "basis": "r0j5pvwi",
         "by": "rule",
         "hide": [
+          "k0fyxxqv",
           "k00991of"
         ]
       },

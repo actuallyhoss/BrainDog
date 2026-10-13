@@ -10,7 +10,16 @@
  * A NAME IS A FOLDER NAME OR NOTHING. `^[a-z0-9][a-z0-9-]{0,63}$`, and the path it resolves to must stay inside the
  * skills folder, or nothing is written.
  *
- * A FILE WRITTEN INTO A REPOSITORY IS REPORTED, NEVER COMMITTED (question 13).
+ * A FILE WRITTEN INTO A REPOSITORY IS REPORTED, NEVER COMMITTED (question 13). Its path goes into that repository's own
+ * `.git/info/exclude`, once, unless git ignores it already: never `.gitignore`, which is itself committed. A file git
+ * already tracks is somebody's committed skill, so it is not written and the sync says so.
+ *
+ * THE WHOLE LIST, NOT THE TWENTY `context` SHOWS. When `context` says it cut the skills short, the rest are read by the
+ * list read a page at a time, the session's project first, inside a budget. When the budget ends, what was read is acted
+ * on and the rest waits for the next sync; a file is registered only once every name the record holds has been read.
+ *
+ * A NAME WITHIN ITS SCOPE IS THE SKILL. A file whose name a skill of that scope holds is that skill's file, never a new
+ * row, and a project's file named as a global skill is the project's own.
  *
  * WHAT THE SESSION MAY CREATE IS WHERE ITS RUN IS. An agent's create lands in its run's project, so a file found in
  * the global folder is registered only from a run in no project, and a project's file only from a run in that
@@ -20,7 +29,7 @@
 import { createHash } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { hostname } from 'node:os';
-import { basename, dirname, join, resolve, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import type { Brief, Client, Context } from '@braindog/client';
@@ -286,6 +295,49 @@ function writeText(path: string, text: string): void {
   renameSync(`${path}.tmp`, path);
 }
 
+/** How many skills one page of the list read asks for: under the hundred a long read has been cut at. */
+const PAGE = 50;
+
+/** The most pages one pass reads, so a host whose cursor never ends cannot hold the sync. */
+const PAGES = 40;
+
+/**
+ * How long the list read may take when the caller names no end: half of the three seconds a session's start gives the
+ * whole sync (`START_WORK_MS` in `hooks.ts`), so there is time left to act on what was read.
+ */
+export const READ_MS = 1_500;
+
+/** What a lock entry's `proposed_sha` holds for a file git tracks and the folder does not have: said once, not each sync. */
+const TRACKED = 'tracked';
+
+/** A path as git names it inside `top`, with forward slashes, or `null` when it is not inside. */
+function within(top: string, path: string): string | null {
+  const rel = relative(top, path);
+  return rel === '' || rel.startsWith('..') || isAbsolute(rel) ? null : rel.split(sep).join('/');
+}
+
+/**
+ * Each of these paths git does not already ignore, appended once to the repository's own `.git/info/exclude`.
+ *
+ * NOT `.gitignore`, which is committed and would put the person's own skills in everybody's checkout. `--git-path` is
+ * asked for where the file is, because a linked work tree keeps it in the repository it came from.
+ */
+async function keepOut(top: string, paths: string[]): Promise<void> {
+  const rels = paths.map((p) => within(top, p)).filter((r): r is string => r !== null);
+  if (rels.length === 0) return;
+  const at = await git(top, 'rev-parse', '--git-path', 'info/exclude');
+  if (at === null) return;
+  const ignored = new Set(((await git(top, 'check-ignore', '--', ...rels)) ?? '').split(/\r?\n/u));
+  const file = resolve(top, at);
+  const text = existsSync(file) ? readFileSync(file, 'utf8') : '';
+  const held = new Set(text.split(/\r?\n/u));
+  /* Anchored at the top folder, so it names this file and no other of the same name deeper in. */
+  const fresh = [...new Set(rels.filter((r) => !ignored.has(r)).map((r) => `/${r}`))].filter((l) => !held.has(l));
+  if (fresh.length === 0) return;
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, `${text}${text === '' || text.endsWith('\n') ? '' : '\n'}${fresh.join('\n')}\n`);
+}
+
 export type SkillSync = {
   client: Client;
   context: Context;
@@ -297,6 +349,10 @@ export type SkillSync = {
   top: string | null;
   dryRun: boolean;
   machine?: string;
+  /** When the list read stops, on `clock`: `READ_MS` from now when absent, and `Infinity` for a sync run by hand. */
+  until?: number;
+  /** The time in milliseconds, asked once before each page of the list read; `Date.now` when absent. */
+  clock?: () => number;
 };
 
 type Got = { kind: Kind; text: string; managed: boolean; state: string | null };
@@ -379,15 +435,95 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
     return { trigger: described, version: isObject(written) && typeof written.version === 'number' ? written.version : row.version + 1 };
   };
 
+  /* The paths written inside the repository in this sync, which its exclude file is told about at the end. */
+  const wrote: string[] = [];
   const write = (path: string, text: string, spoken: string, rev: number) => {
     if (s.dryRun) return;
     writeText(path, text);
     lock[path] = { spoken, version: rev, sha256: sha256(text) };
+    if (projectBase !== null && inside(path, projectBase)) wrote.push(path);
+  };
+
+  /** Whether git already tracks this file of the repository: somebody committed it, so it is theirs and not the sync's. */
+  const tracked = async (path: string): Promise<boolean> => {
+    if (s.top === null || projectBase === null || !inside(path, projectBase)) return false;
+    const rel = within(s.top, path);
+    return rel !== null && (await git(s.top, 'ls-files', '--error-unmatch', '--', rel)) !== null;
+  };
+
+  /**
+   * The skills `context` did not show, by the list read, and whether every one was read; `late` when the budget is what
+   * ended it.
+   *
+   * THE SESSION'S PROJECT FIRST, so a start with little time left still has every skill of the folder it is in. The list
+   * read answers every project's skills, each holding its project as that row's id, so the project's id is read once
+   * and a skill of another project is passed over. A retired skill is not listed, as `context` does not list one.
+   */
+  const readRest = async (shown: Brief[]): Promise<{ rest: Brief[]; whole: boolean; late: boolean }> => {
+    const rest: Brief[] = [];
+    const seen = new Set(shown.map((r) => r.spoken));
+    const clock = s.clock ?? Date.now;
+    const until = s.until ?? clock() + READ_MS;
+    try {
+      let home: string | null = null;
+      if (projectBase !== null && s.context.project !== null) {
+        const [register, seq] = s.context.project.spoken.split('#');
+        const row = register && Number.isInteger(Number(seq)) ? valueOf(await s.client.get(register, Number(seq))) : null;
+        home = isObject(row) && typeof row.id === 'string' ? row.id : null;
+      }
+      let whole = true;
+      for (const where of [...(home === null ? [] : [{ field: 'project', is: home }]), null]) {
+        let cursor: string | null = null;
+        for (let page = 0; ; page++) {
+          if (page >= PAGES) return { rest, whole: false, late: false };
+          if (clock() >= until) return { rest, whole: false, late: true };
+          const got = await s.client.list({ register: 'skills', limit: PAGE, ...(where === null ? {} : { where }), ...(cursor === null ? {} : { cursor }) });
+          const value = valueOf(got);
+          /* A host that will not take the project's question is asked for everything below, which holds the same skills. */
+          if (value === null) {
+            if (where === null) return { rest, whole: false, late: false };
+            break;
+          }
+          for (const r of value.rows) {
+            if (!isObject(r) || !isObject(r.fields) || typeof r.seq !== 'number') continue;
+            const spoken = `skills#${String(r.seq)}`;
+            const of = r.fields.project;
+            const mine = where !== null || (home !== null && of === home);
+            if (!mine && of !== undefined && of !== null && of !== '') {
+              /* Another project's skill; or, where the project's own id could not be read, one that cannot be placed. */
+              if (projectBase !== null && home === null) whole = false;
+              continue;
+            }
+            if (seen.has(spoken) || r.state === 'retired') continue;
+            seen.add(spoken);
+            rest.push({
+              spoken,
+              version: typeof r.version === 'number' ? r.version : 1,
+              scope: mine ? 'project' : 'global',
+              state: typeof r.state === 'string' ? r.state : null,
+              name: r.fields.name,
+              trigger: r.fields.trigger,
+              rev: r.fields.rev,
+            });
+          }
+          cursor = typeof value.cursor === 'string' && value.cursor !== '' ? value.cursor : null;
+          if (cursor === null) break;
+        }
+      }
+      return { rest, whole, late: false };
+    } catch (e) {
+      if (!(e instanceof Stopped)) throw e;
+      return { rest, whole: false, late: true };
+    }
   };
 
   try {
-    const listed = [...reg.rows, ...reg.inherited];
+    /* What `context` showed is acted on first, the project's own ahead of what it inherits, then the rest of the list. */
+    const shown = [...reg.rows, ...reg.inherited];
+    const read = reg.truncated ? await readRest(shown) : { rest: [], whole: true, late: false };
+    const listed = [...shown, ...read.rest];
     const listedSpoken = new Set(listed.map((r) => r.spoken));
+    if (read.late) lines.push('The record holds more skills than there was time to read, so the rest wait for the next sync.');
 
     for (const listedRow of listed) {
       let row = listedRow;
@@ -411,6 +547,14 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
         if (now === entry.sha256) {
           /* Unchanged since the lock: a newer version is fetched and written. */
           if (rev <= entry.version) continue;
+          /* Somebody committed the file since it was written: a newer version is not written over it. Said once. */
+          if (await tracked(path)) {
+            if (entry.proposed_sha !== now) {
+              if (!s.dryRun) lock[path] = { ...entry, proposed_sha: now };
+              lines.push(`Skill ${name} was not updated in ${path}, because git already tracks that file in this repository.`);
+            }
+            continue;
+          }
           const got = await fetchRow(row.spoken, name, trigger);
           if (got === null || !got.managed) continue;
           write(path, got.text, row.spoken, rev);
@@ -445,6 +589,7 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
       }
 
       /* No file, or no lock for this row. */
+      const told = locked?.[1].proposed_sha === TRACKED;
       if (locked !== undefined && !s.dryRun) delete lock[locked[0]];
       const got = await fetchRow(row.spoken, name, trigger);
       if (got === null || !got.managed) continue;
@@ -454,6 +599,12 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
         continue;
       }
       if (!existsSync(path)) {
+        /* Tracked and not in the folder: the repository's own skill, taken out here on purpose or not yet checked out. */
+        if (await tracked(path)) {
+          if (!s.dryRun) lock[path] = { spoken: row.spoken, version: 0, sha256: '', proposed_sha: TRACKED };
+          if (!told) lines.push(`Skill ${name} was not written to ${path}, because git already tracks that file in this repository.`);
+          continue;
+        }
         write(path, got.text, row.spoken, rev);
         tell(`Skill ${name} written to ${where(path)}.`, `Skill ${name} would be written to ${where(path)}.`);
         continue;
@@ -508,20 +659,23 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
     }
 
     /* A file with no lock and no row: registered as index only, where the run may create. */
-    const names = new Set(listed.map((r) => r.name));
+    /* A NAME WITHIN ITS SCOPE IS THE SKILL: a file is new only when no skill of the place it is in holds its name. */
+    const names = new Set(listed.map((r) => `${r.scope}:${String(r.name)}`));
     const places: { base: string; scope: 'project' | 'global' }[] = [
       ...(s.context.project === null ? [{ base: s.configDir, scope: 'global' as const }] : []),
       ...(projectBase === null ? [] : [{ base: projectBase, scope: 'project' as const }]),
     ];
-    for (const { base } of places) {
+    for (const { base, scope } of places) {
       for (const file of filesIn(base)) {
         const entry = lock[file.path];
-        if (names.has(file.name) || (entry !== undefined && entry.spoken !== null)) continue;
+        if (names.has(`${scope}:${file.name}`) || (entry !== undefined && entry.spoken !== null)) continue;
         const text = readFileSync(file.path, 'utf8');
         const now = sha256(text);
         if (!text.trim() || entry?.proposed_sha === now) continue;
-        if (reg.truncated) {
-          lines.push(`Skill ${file.name} in ${where(file.path)} was not registered, because the record lists more skills than one context shows.`);
+        /* Until every name the record holds has been read, a file may be a skill it already has. */
+        if (read.late) continue;
+        if (!read.whole) {
+          lines.push(`Skill ${file.name} in ${where(file.path)} was not registered, because not every skill in the record could be read.`);
           continue;
         }
         if (s.dryRun) {
@@ -546,7 +700,17 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
     if (!(e instanceof Stopped)) throw e;
     lines.push('BrainDog stopped answering part way, so the rest of the skills wait for the next sync.');
   } finally {
-    if (!s.dryRun) writeLock(lockFile, lock);
+    if (!s.dryRun) {
+      /* Never committed: the repository's exclude file is told of each file written into it. A failure there leaves the
+         files written and the lock true, and the next write tells it again. */
+      if (s.top !== null && wrote.length > 0)
+        try {
+          await keepOut(s.top, wrote);
+        } catch {
+          /* The exclude file could not be written; the skills are in place either way. */
+        }
+      writeLock(lockFile, lock);
+    }
   }
   return lines;
 }
@@ -574,7 +738,7 @@ export async function skills(args: string[], io: AgentIo): Promise<number> {
     return 0;
   }
   const dryRun = values['dry-run'] === true;
-  const lines = await syncSkills({ client: at.client, context: at.context, home: io.home, configDir: io.env.CLAUDE_CONFIG_DIR || join(io.home, '.claude'), top: at.top, dryRun });
+  const lines = await syncSkills({ client: at.client, context: at.context, home: io.home, configDir: io.env.CLAUDE_CONFIG_DIR || join(io.home, '.claude'), top: at.top, dryRun, until: Infinity });
   for (const line of lines) io.out(line);
   if (lines.length === 0) io.out('Skills are in sync.');
   if (dryRun) io.out('That was a dry run, so nothing was written, sent or proposed.');

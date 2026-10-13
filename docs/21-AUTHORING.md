@@ -299,11 +299,11 @@ The in-app text-with-preview lens of §3.1 is one way to a page's own text. The 
 declaration's exact JSON body, printed in a fixed key order with terse sugar preserved (`columns: [client, amount]`
 stays bare, a sentence prints as itself), so a page pulled, edited by hand or by an agent, and checked (`braindog
 page check <file>`, the same lint the app runs) round-trips without losing a rail, a lead sentence or a tab. What it
-does not do is push itself: `braindog page push <file>` is refused to a bearer token ([ADR-060](16-DECISIONS.md),
-unamended: no ADMIN method is ever held by a token), because applying an edited declaration is the same act as
-accepting one in the app, and needs the same proof a browser session gives. A `.dog` file is therefore pulled and
-checked from anywhere, but applied only by opening it in `SourceView` (§3.1's text lens) and pressing Save, or by an
-owner's session.
+does not do is apply itself: from a bearer token `braindog page push <file>` is proposed as one change and waits on
+Decide ([ADR-060](16-DECISIONS.md), unamended: no ADMIN method is ever held by a token), because applying an edited
+declaration is the same act as accepting one in the app, and needs the same proof a browser session gives. A `.dog`
+file is therefore pulled, checked and proposed from anywhere, but applied only by a person accepting it on Decide, by
+opening it in `SourceView` (§3.1's text lens) and pressing Save, or by an owner's session.
 
 A page's body also carries `{{icon:<name>}}` inline, a glyph and never a path
 ([05-BLOCKS-AND-THEMES](05-BLOCKS-AND-THEMES.md) §7.2): typed in a `note`'s markdown or any other body text the same

@@ -206,6 +206,66 @@ test('a block drawn as two runs of rows, one of them empty, marks no row however
   assert.deepEqual(marks, [false, true, true]);
 });
 
+/** A block of two runs drawn once, each run handed its place: what `BlockSlot` draws of a checklist with a done run. */
+const runs = (p: ReturnType<typeof page>, first: Row[], second: Row[]) => [
+  p.writes.keptSegment(0, { ...p.block, rows: first }, p.block, 0),
+  p.writes.keptSegment(0, { ...p.block, rows: second }, p.block, 1),
+];
+/** The two rows the page opens with. */
+const two = (p: ReturnType<typeof page>) => p.block.rows as unknown as [Row, Row];
+const marks = (drawn: { rows: Row[] }[]) => drawn.map((run) => run.rows.map((r) => Boolean(r.arrived)));
+
+test('two runs each handed their place, one of them empty, mark no row in three looks', () => {
+  const p = page();
+  const [rent, tax] = two(p);
+  for (let look = 1; look <= 3; look += 1) {
+    p.clock(look * 100);
+    assert.deepEqual(marks(runs(p, [rent, tax], [])), [[false, false], []], `look ${String(look)} marked the rows the block already held`);
+  }
+});
+
+test('a row that arrives in one run of several is marked there, and only for a moment', () => {
+  const p = page();
+  const [rent, tax] = two(p);
+  assert.deepEqual(marks(runs(p, [rent], [tax])), [[false], [false]], 'the first look is a baseline');
+  p.clock(100);
+  assert.deepEqual(marks(runs(p, [rent], [AGENT, tax])), [[false], [true, false]]);
+  p.clock(200);
+  assert.deepEqual(marks(runs(p, [rent], [AGENT, tax])), [[false], [true, false]], 'the mark went before its moment was up');
+  p.clock(2_000);
+  assert.deepEqual(marks(runs(p, [rent], [AGENT, tax])), [[false], [false, false]]);
+  /* AND INTO A RUN THE RECORD ANSWERED EMPTY, as into a list answered empty. */
+  const q = page();
+  runs(q, [rent, tax], []);
+  q.clock(100);
+  assert.deepEqual(marks(runs(q, [rent, tax], [AGENT])), [[false, false], [true]]);
+});
+
+test('a row that goes from one run to another did not arrive, whichever way it goes', () => {
+  const p = page();
+  const [rent, tax] = two(p);
+  runs(p, [rent, tax], []);
+  p.clock(100);
+  assert.deepEqual(marks(runs(p, [rent], [tax])), [[false], [false]], 'a row ticked into the done run was marked as arrived');
+  p.clock(200);
+  assert.deepEqual(marks(runs(p, [rent], [tax])), [[false], [false]]);
+  p.clock(300);
+  assert.deepEqual(marks(runs(p, [rent, tax], [])), [[false, false], []], 'a row unticked back was marked as arrived');
+  /* A RUN THAT TAKES A PLACE ABOVE moves every run below it one place, and none of their rows arrived. */
+  p.clock(400);
+  assert.deepEqual(marks(runs(p, [AGENT], [rent, tax])), [[true], [false, false]]);
+});
+
+test('a block that went to one run and came back to several starts again, marking nothing', () => {
+  const p = page();
+  const [rent, tax] = two(p);
+  runs(p, [rent], [tax]);
+  p.clock(100);
+  assert.equal(p.writes.keptSegment(0, { ...p.block, rows: [rent, tax, AGENT] }, p.block).rows.some((r) => r.arrived), false, 'the first look as one run is a baseline');
+  p.clock(200);
+  assert.deepEqual(marks(runs(p, [rent], [tax, AGENT])), [[false], [false, false]]);
+});
+
 test('a look before the live answer is in is no baseline, so the answer marks nothing', () => {
   const live: { now: number | null } = { now: null };
   const p = page('todo', live);

@@ -22,7 +22,7 @@
  * window, the columns and the order cannot drift; and because it is read from Money, an edit there moves this use
  * case's fingerprint, which `usecase-versions.test.ts` then asks a version for.
  */
-import { SERVICE_NUMBERS, SERVICE_NUMBERS_BACK, SERVICE_NUMBERS_SHOWN, SERVICE_NUMBERS_WHERE } from '../modules/estate.ts';
+import { SERVICE_NUMBERS, SERVICE_NUMBERS_BACK, SERVICE_NUMBERS_SHOWN, SERVICE_NUMBERS_UNTIL, SERVICE_NUMBERS_WHERE } from '../modules/estate.ts';
 import { DUE_THIS_WEEK } from '../modules/money.ts';
 import { DUE_WINDOW, LATE_MONEY, LATE_WINDOW } from '../modules/money/pages/shared.ts';
 import { projectTemplate } from '../modules/portfolio.ts';
@@ -343,7 +343,11 @@ export const FOUNDER = {
      organisation: a reading about a server had no project and nothing tying it to the service it was about. Those
      readings are counted (`service-numbers`) and drawn on Estate's Renewals in a block this pack lays there, "Server
      and provider numbers", six measures at most over ninety days, only while there is one. A field, a figure and a block
-     laid on another pack's page added, nothing taken away, so still the one minor step from 2.5.0. */
+     laid on another pack's page added, nothing taken away, so still the one minor step from 2.5.0.
+
+     AND IN THE SAME UNRELEASED 2.6.0, THE COUNTS OF NUMBERS END TODAY (batch 66): `datapoints-7d`, `datapoints-30d`,
+     `datapoints-reported` and `project-numbers-7d` leave out a reading dated after today, by the clause the service
+     numbers already end on. Four clauses narrowed, nothing added. */
   version: '2.6.0',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
@@ -427,7 +431,8 @@ export const FOUNDER = {
         metric: 'datapoints-30d',
         name: 'Numbers reported, 30 days',
         source: 'register.datapoints',
-        where: 'at after -30d, source is not example',
+        /* Up to today and no further (`SERVICE_NUMBERS_UNTIL`), as the three counts of numbers below. */
+        where: `at after -30d, source is not example, ${SERVICE_NUMBERS_UNTIL}`,
         value: { count: 'id' },
         format: 'int',
         target: { gte: 1 },
@@ -441,13 +446,19 @@ export const FOUNDER = {
       /* WHAT IS ALREADY LATE, SINCE 2.6.0, over the Late table's own clauses (`LATE_MONEY`). */
       counted('late-money', 'Late', 'register.obligations', LATE_WINDOW),
       /* AND SINCE 1.16.0: the week Numbers this week draws, every number a project ever sent, and what Lapsing lists,
-         each over its block's own clauses. */
-      counted('datapoints-7d', 'Numbers reported, 7 days', 'register.datapoints', 'at after -7d, source is not example'),
-      counted('datapoints-reported', 'Numbers reported', 'register.datapoints', 'source is not example'),
+         each over its block's own clauses.
+
+         A NUMBER DATED AFTER TODAY IS NOT ONE REPORTED (`SERVICE_NUMBERS_UNTIL`, Estate's own clause, read and not
+         copied): `back:` draws a block's days up to today, and these said only where the days start, so a reading an
+         import or a mistyped year dated tomorrow was counted and not drawn. Numbers this week stood over nothing, and
+         the ways to start were hidden from a record with no number to its name yet. */
+      counted('datapoints-7d', 'Numbers reported, 7 days', 'register.datapoints', `at after -7d, source is not example, ${SERVICE_NUMBERS_UNTIL}`),
+      counted('datapoints-reported', 'Numbers reported', 'register.datapoints', `source is not example, ${SERVICE_NUMBERS_UNTIL}`),
       counted('lapsing-30d', 'Lapsing within 30 days', 'register.services', LAPSING_SOON),
       /* THE NUMBERS ONE PROJECT SENT THIS WEEK, SINCE 2.5.0 (REC-C16 part b), the example left out: the third thing a
-         project page's Where it stands says while nobody has said, beside what changed and when it was last worked. */
-      counted('project-numbers-7d', 'Numbers this week', 'register.datapoints', 'thing is {{it}}, at after -7d, source is not example'),
+         project page's Where it stands says while nobody has said, beside what changed and when it was last worked.
+         The week ends today, as above. */
+      counted('project-numbers-7d', 'Numbers this week', 'register.datapoints', `thing is {{it}}, at after -7d, source is not example, ${SERVICE_NUMBERS_UNTIL}`),
       /* THE NUMBERS ABOUT A SERVICE, SINCE 2.6.0 (REC-C12), over the clauses and the ninety days of the block Renewals
          draws them in (`SERVICE_NUMBERS` in `modules/estate.ts`), so that block is drawn only while it has one. The
          clauses end the ninety days today (`SERVICE_NUMBERS_UNTIL`), and this says where they start: a reading dated

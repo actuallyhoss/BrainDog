@@ -605,9 +605,9 @@ first, block keys `kind heading area span source register row where when columns
 the rest alphabetically; a scalar prints bare when it reads back as itself and would not be read as another type,
 otherwise as a JSON string; a column with only `field` prints bare (`columns: [client, amount]`); a string with a
 newline prints as a `|` block. A CLI pull, edit and check round-trips through this format (`braindog page pull`,
-`braindog page check`); pushing one back is `braindog page push`, and it is refused to a bearer token under ADR-060
-(§10) unamended: a `.dog` push needs a browser session, the same as any other write to a declaration a person did
-not type into a form.
+`braindog page check`); pushing one back is `braindog page push`. A bearer token still applies nothing, under ADR-060
+(§10) unamended: from a token the push is proposed as one change and waits on Decide, and the page changes when a
+person accepts it there, the same as any other write to a declaration a person did not type into a form.
 
 **The page reader, after the split** (`apps/web/src/lib/page/`). `PageView.svelte` takes
 `{ slug, got, mode?: 'page' | 'home' | 'preview', showSource?, reread?, was? }`. `page` is everything: head, source,

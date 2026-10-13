@@ -3,6 +3,9 @@
  * said as who changed it and how long ago ("You, 2h ago"), and each with a Put back and a Save as a file. "It is a file
  * somebody can keep, diff, send and edit": the earlier texts are files too, and one press from being the page again.
  *
+ * A VERSION THE RECORD CUT FOR ITS READER IS NEVER CALLED THE PAGE. Its file holds the part this reader may open, so
+ * the button, its spoken name and the line under the version all say a part, and none of them says "the page".
+ *
  * WHO IS A NAME AND WHEN IS A DISTANCE. The record signs a version with whoever wrote it, which may be an id; `actor`
  * (`record/names.ts`) says it as a person reads it, and the instant goes through the one formatter every cell uses
  * (`since`), so a line here and the same change on Home read alike. Nothing here prints an id or a timestamp.
@@ -32,7 +35,8 @@ export type PageVersion = {
   /**
    * How many parts of this version the record left out because they use a list this reader may not open (`pageVersions`
    * cuts every version to its reader). Absent on a version answered whole. A CUT VERSION IS NEVER PUT BACK: its body is
-   * the part this reader may see, and applying it would take the left-out blocks off the page for everybody.
+   * the part this reader may see, and applying it would take the left-out blocks off the page for everybody. AND ITS
+   * FILE IS SAID AS A PART, since that body is all a Save can write.
    */
   cut?: number | undefined;
 };
@@ -51,8 +55,13 @@ export type VersionLine = {
   putBack: string | null;
   /** The one line under a version the record cut for this reader, `null` on one answered whole. */
   cut: string | null;
-  /** What Save as a file saves on this line, for a screen reader. */
+  /**
+   * What Save as a file saves on this line, for a screen reader. On a version the record cut it says the part this
+   * reader can open, never "the page".
+   */
   save: string;
+  /** The words on the Save button: "Save as a file", and "Save your part as a file" on a version the record cut. */
+  saveWord: string;
 };
 
 export const historyWords = {
@@ -61,6 +70,8 @@ export const historyWords = {
   putBack: 'Put back',
   puttingBack: 'Putting back',
   save: 'Save as a file',
+  /** On the button of a version the record cut: the file is the part this reader can open, and the button says so. */
+  savePart: 'Save your part as a file',
   said: (who: string, when: string) => `${who}, ${when}`,
   /** Under the heading: how many times the page has changed, and what Put back does. */
   summary: (versions: number) =>
@@ -70,9 +81,13 @@ export const historyWords = {
   putBackThe: (left: string) => `Put the page back as ${left}`,
   saveThe: (left: string) => `Save the page as ${left} as a file`,
   saveNow: 'Save the page as it is now as a file',
+  savePartThe: (left: string) => `Save the part you can open of the page as ${left} as a file`,
+  savePartNow: 'Save the part you can open of the page as it is now as a file',
+  /** Said once a cut version's file is saved: the file's name, and that it is a part. */
+  savedPart: (file: string) => `${file} is in your downloads. It holds only the part of the page you can open.`,
   left: (who: string, when: string | null) => `${who} left it${when === null ? '' : ` ${when}`}`,
   /** Under a version the record cut to what this reader may open. It names no list: the reader may not see which. */
-  cut: 'Some of this version is left out because it uses lists you cannot open, so it cannot be put back from here.',
+  cut: 'Some of this version is left out because it uses lists you cannot open, so it cannot be put back from here, and a file saved from it holds only the part you can open.',
   you: 'you',
 } as const;
 
@@ -137,7 +152,18 @@ export function versionLines(
       state: current ? historyWords.now : null,
       putBack: current || cut ? null : historyWords.putBackThe(left),
       cut: cut ? historyWords.cut : null,
-      save: current ? historyWords.saveNow : historyWords.saveThe(left),
+      /* A CUT VERSION SAVES A PART AND SAYS SO, the live one too: the record cuts the page now as it cuts the rest. */
+      save: cut ? (current ? historyWords.savePartNow : historyWords.savePartThe(left)) : current ? historyWords.saveNow : historyWords.saveThe(left),
+      saveWord: cut ? historyWords.savePart : historyWords.save,
     };
   });
+}
+
+/**
+ * THE FILE A CUT VERSION IS SAVED AS: the page's own file name with `-part` before its ending (`money-part.dog`), so a
+ * file that holds less than the page is not named as the page, and is not taken for it when it is opened or pushed.
+ */
+export function partFile(file: string): string {
+  const dot = file.lastIndexOf('.');
+  return dot > 0 ? `${file.slice(0, dot)}-part${file.slice(dot)}` : `${file}-part`;
 }

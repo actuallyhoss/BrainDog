@@ -1,0 +1,8 @@
+{
+  "gate": "catalogue-immutable",
+  "rule": "a released version changed in place",
+  "expect": "was changed in place",
+  "findings": 1,
+  "total": 1,
+  "why": "One add-on with one released version, and the working index gives that version another checksum under the same number. Its size and its date are as released, so the one finding is the checksum and nothing else. A planted tree has no history, so the released index is the file released.json at its root."
+}

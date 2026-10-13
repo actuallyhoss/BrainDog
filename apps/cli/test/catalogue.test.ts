@@ -110,7 +110,7 @@ test('install --from holds the file to its checksum, then only asks the owner', 
   const asked = h.seen.filter((s) => s.method !== 'context');
   assert.deepEqual(asked.map((s) => s.method), ['propose']);
   assert.equal(asked[0]?.args.body_kind, 'pack');
-  assert.match(h.out.at(-1) ?? '', /Asked the owner: Install Club 1\.0\.0 from a catalogue\? Unsigned.* Nothing is installed until they accept it: .*\/decide\/SG7$/u);
+  assert.match(h.out.at(-1) ?? '', /Asked the owner: Install Club 1\.0\.0 from a catalogue\? Unsigned.* Nothing is installed until they accept it\. Open Decide in the app\.$/u);
 
   /* A file changed after it was published is refused, and nothing more is sent. */
   const path = join(h.dir, 'catalogue', 'usecases', 'club', '1.0.0.usecase.json');
@@ -366,7 +366,7 @@ test('pack install <file> --dry-run says the plan and sends nothing; without it 
   const body = asked[0]?.args.body as { install: string; doc: Record<string, unknown> };
   assert.equal(body.install, 'project-brief');
   assert.deepEqual(body.doc, JSON.parse(readFileSync(PROJECT_BRIEF, 'utf8')));
-  assert.match(h.out.at(-1) ?? '', /^Asked the owner: Install Project brief 2\.0\.0\? .*\/decide\/SG7$/u);
+  assert.match(h.out.at(-1) ?? '', /^Asked the owner: Install Project brief 2\.0\.0\? Nothing is installed until they accept it\. Open Decide in the app\.$/u);
 
   /* A USE CASE IS NOT AN ADD-ON, and a file that is neither is refused before anything is sent. */
   assert.equal(await usecase(['new', 'club', '--author', 'Halden'], h.io), 0);

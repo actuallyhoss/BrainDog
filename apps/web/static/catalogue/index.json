@@ -519,9 +519,9 @@
       "versions": [
         {
           "version": "1.4.0",
-          "checksum": "b26272cfeb1bd114c2e1e98b9970f325b9aee09843e60be75110c398a1eea203",
-          "bytes": 9325,
-          "published_at": "2026-10-13T14:02:01.215Z",
+          "checksum": "2707fb9029929b13a606e735f9add9baa5eaca15fd1b3037f3f8d5c09229d915",
+          "bytes": 11332,
+          "published_at": "2026-10-13T15:17:38.879Z",
           "bump": "minor",
           "reach": {
             "modules": [
@@ -540,7 +540,7 @@
             "skills": [],
             "calls_out": []
           },
-          "notes": "A holding can have a price, \"Worth each now\", and the day it was priced. Holdings value adds up what each is worth at its price, or what it cost when it has none, and says how many stand at what they cost. The value reads in your home currency, or the one your holdings are in.",
+          "notes": "A holding can have a price, \"Worth each now\", and the day it was priced. Holdings value adds up what each is worth at its price, or what it cost when it has none, and says how many stand at what they cost. A price written with no day is dated the day it was written, the page says the oldest day a price was said, and warns once that day is over 30 days ago. The value reads in your home currency, or the one your holdings are in.",
           "preview": true
         },
         {

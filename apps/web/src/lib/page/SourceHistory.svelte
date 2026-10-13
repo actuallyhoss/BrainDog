@@ -75,7 +75,7 @@
               </Button>
             {/if}
             <Button weight="quiet" size="sm" disabled={waits} aria-label={line.save} onclick={() => onsave(line.version)}>
-              {historyWords.save}
+              {line.saveWord}
             </Button>
           </div>
         </li>

@@ -904,6 +904,13 @@ const TONES = ['good', 'warn', 'bad', 'info'] as const;
 const SOURCE = /^(?:register\.[a-z][a-z0-9_-]{0,31}|metric\.[a-z][a-z0-9_-]{0,31}(?::\S.{0,199})?)$/u;
 const BLOCK_SOURCE = /^block\.\d{1,2}$/u;
 
+/**
+ * Whether `source` is one this build knows how to read: a list, a figure, another block of the page, or a part of the
+ * code that answers by name (`sourceModule`). The one test a block's `source` is held to at install, said on its own so
+ * a reader of an old version of a page can tell a source since taken out of the code (`pageVersions` in the record).
+ */
+export const sourceKnown = (source: string): boolean => SOURCE.test(source) || BLOCK_SOURCE.test(source) || sourceModule(source) !== undefined;
+
 /** A metric id as a page says it: `project-owed:Kiln` is one document read about one project. */
 const metricNamed = (said: string): string => said.split(':')[0] ?? '';
 const METRIC_ID = /^[a-z][a-z0-9_-]{0,31}$/u;
@@ -1696,7 +1703,7 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
       const source = block.source;
       if (
         typeof source !== 'string' ||
-        !(SOURCE.test(source) || BLOCK_SOURCE.test(source) || sourceModule(source) !== undefined)
+        !sourceKnown(source)
       )
         return bad(
           'DECLARATION_INVALID',

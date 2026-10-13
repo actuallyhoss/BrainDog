@@ -662,6 +662,15 @@ test('WHAT THE AUDIT OF BATCH 63 TYPED AS A STRANGER: a "used to" taken up again
   const both = propose('I used to take orders and invoices and now track them here', CAIRO);
   assert.ok(lit(both, /invoices/iu), 'a run taken up again is kept whole');
   assert.ok(lit(propose('I used to run a small shop and now run it online', CAIRO), /shop/iu), 'a shop run online now is a shop');
+  /* "NO LONGER" IS TAKEN UP AGAIN AS "USED TO" IS, and with nothing pointing back it has stopped. */
+  for (const s of ['I no longer take orders and now track them here', 'We no longer take orders but now we track them here']) {
+    const p = propose(s, CAIRO);
+    assert.ok(lit(p, /orders/iu) && orders(p), s);
+  }
+  for (const s of ['I no longer take orders', 'I no longer take orders and now send invoices', 'I no longer take orders and now I do not take them']) {
+    const p = propose(`I'm a freelance designer. ${s}`, CAIRO);
+    assert.ok(!lit(p, /orders/iu) && !orders(p), s);
+  }
   /* NOTHING POINTS BACK, or what does is refused or stopped again: the thing is still stopped. */
   for (const s of [
     'I used to take orders and now send invoices',

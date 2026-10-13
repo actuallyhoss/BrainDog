@@ -11,6 +11,7 @@
 import type { SeedRule } from '../base.ts';
 import { CLOSE_ACCOUNT_SCRIPT } from './scripts/close-account.js';
 import { LAST_DAY_SCRIPT } from './scripts/last-day.js';
+import { PLANS_FROM_NAMES_SCRIPT } from './scripts/plans-from-names.js';
 import { SETTLE_SCRIPT } from './scripts/settle.js';
 
 /**
@@ -246,6 +247,23 @@ export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
     steps: [{ script: { id: 'settle', as: 'settling', input: { payment: '{{trigger.entry}}', item: '{{trigger.row.settles}}' } } }],
   },
   SETTLE_SCRIPT,
+  /**
+   * A PLAN IS A ROW OF ITS OWN, AND EACH PART SAYS WHAT IS LEFT AFTER IT (REC-B12 jobs 1 and 2): an instalment made, or
+   * one whose plan, amount, day, status or number changed, starts `script.plans_from_names` for that part's plan
+   * (`scripts/plans-from-names.js`). The script also runs once a day over every plan, which is how a record that held
+   * plans only as names gets its rows, and how a plan made in one run has its parts linked in the next.
+   *
+   * NOT ON `plan_row` OR `left_after`, the two fields the script itself writes, or the rule would start itself. NO
+   * `input`: a script a rule starts is handed the row's list and number, which is how the script finds the part.
+   */
+  {
+    rule: 'part-counts-plan',
+    name: 'Count what is left of a plan',
+    pack: 'money-core',
+    on: { written: { register: 'installments', op: ['create', 'update'], fields: ['plan', 'amount', 'due', 'state', 'number'] } },
+    steps: [{ script: { id: 'plans_from_names', as: 'counting', input: {} } }],
+  },
+  PLANS_FROM_NAMES_SCRIPT,
 ];
 
 /**

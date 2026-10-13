@@ -218,7 +218,8 @@ test('EVERY FIRST-PARTY LIST A PERSON NAMES HAS ITS WORDS, and each word table n
   /* AND `organisations`, People's since 3.0.0: words for it would give every use case with People two more settings and
      a version to bump, so it keeps its own. */
   /* AND `filing_rules`, Money's since 3.17.0: a list a person keeps and no use case renames, for the same reason. */
-  assert.deepEqual(lists.filter((l) => !Object.hasOwn(MODULE_WORDS, l)).sort(), ['balances', 'filing_rules', 'fx', 'organisations', 'snapshots']);
+  /* AND `plans`, Money's since plans-list-66 in the same unreleased step: made by Money's script from the name its parts share. */
+  assert.deepEqual(lists.filter((l) => !Object.hasOwn(MODULE_WORDS, l)).sort(), ['balances', 'filing_rules', 'fx', 'organisations', 'plans', 'snapshots']);
   assert.deepEqual(Object.keys(MODULE_WORDS).filter((l) => !lists.includes(l)), []);
 });
 

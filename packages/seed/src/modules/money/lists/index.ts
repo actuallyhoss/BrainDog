@@ -11,6 +11,7 @@ import { FILING_RULES_REGISTER } from './filing-rules.ts';
 import { FX_REGISTER } from './fx.ts';
 import { INSTALLMENTS_REGISTER } from './installments.ts';
 import { OBLIGATIONS_REGISTER } from './obligations.ts';
+import { PLANS_REGISTER } from './plans.ts';
 import { RECURRING_REGISTER } from './recurring.ts';
 import type { MoneyRegister } from './shared.ts';
 import { SNAPSHOTS_REGISTER } from './snapshots.ts';
@@ -29,6 +30,8 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
   filing_rules: FILING_RULES_REGISTER,
   transactions: TRANSACTIONS_REGISTER,
   recurring: RECURRING_REGISTER,
+  /* BEFORE INSTALMENTS, SINCE REC-B12 (folded into the unreleased money-core 3.17.0): a part links to its plan. */
+  plans: PLANS_REGISTER,
   installments: INSTALLMENTS_REGISTER,
   balances: BALANCES_REGISTER,
   snapshots: SNAPSHOTS_REGISTER,

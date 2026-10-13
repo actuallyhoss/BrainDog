@@ -3,8 +3,9 @@
 import { BOOK, type MoneyRegister } from './shared.ts';
 
 /**
- * SOMETHING PAID IN PARTS, one row a part. The plan is a name the rows share rather than a row of its
- * own, so the total is the sum of the parts and cannot disagree with them.
+ * SOMETHING PAID IN PARTS, one row a part. The total is the sum of the parts and is written nowhere else, so nothing
+ * can disagree with them. The plan is the name the parts share (`plan`), which Cash ahead groups by, and since REC-B12
+ * a row of its own on Plans as well (`plan_row`), which holds no amount for the same reason.
  */
 export const INSTALLMENTS_REGISTER: MoneyRegister = {
   id: 'installments',
@@ -20,6 +21,10 @@ export const INSTALLMENTS_REGISTER: MoneyRegister = {
   fields: [
     { id: 'what', label: 'Description', type: 'text', required: true, search: true },
     { id: 'plan', type: 'text', index: true, required: true, search: true },
+    /* THE PLAN AS A ROW, SINCE REC-B12, beside the text above and never in its place. Written by Money's
+       `plans_from_names` script, which makes one plan for each distinct text and links its parts, so nobody fills it
+       by hand. Not indexed, as `book` is not: the text is, and a plan's parts are found by it. */
+    { id: 'plan_row', label: 'Part of', type: 'ref', to: 'plans' },
     { id: 'number', label: 'Instalment', type: 'int', min: 1 },
     { id: 'parts', label: 'Of', type: 'int', min: 1 },
     {
@@ -41,6 +46,10 @@ export const INSTALLMENTS_REGISTER: MoneyRegister = {
        where a bill keeps "Settles" on each of its several. Written by Money's `settle` script with the state and the
        day, so paid is what a payment did and not a status somebody remembered to set. Not indexed, as `book` is not. */
     { id: 'paid_by', label: 'Paid by', type: 'ref', to: 'transactions' },
+    /* WHAT IS LEFT OF THE PLAN ONCE THIS PART IS PAID (REC-B12): the plan's open parts due after this one, added up
+       in this part's currency, so the last part reads nought. Written by the same script for every part of a plan
+       when any part of it is written, and each night. Never typed, and nothing sums it. */
+    { id: 'left_after', label: 'Left after', type: 'money' },
     { id: 'party', label: 'Who', type: 'ref', to: 'people' },
     { id: 'account', type: 'ref', to: 'accounts', index: true },
     { id: 'category', type: 'ref', to: 'categories', index: true },

@@ -155,37 +155,70 @@ export function costOf(bodyKind: string, body: unknown, rows?: CostRows): Cost {
     /* A RULE THAT WILL ADD ROWS, which is the rowset it writes every time it matches from here on. */
     case 'pattern':
       return 'rows';
-    /* AN OPTION THAT WRITES (`patches`, govern-47) IS A ROWSET ON THE PICK, so it is weighed as rows; one that only says
-       a choice is a call. AN OPTION ITS PROPOSER MARKED `hard: true` IS ONE THAT CANNOT BE TAKEN BACK ONCE PICKED, AND IT
-       IS THAT OPTION THAT IS HARD, NOT THE QUESTION (audit 62, claim 6). Batches 60 to 63 weighed the question by its
-       worst option, so a pack update that offered "Keep my pages" beside "Take the update's page" was counted and
-       ranked as the worst kind, and keeping was worded as hard. `optionCost` and `pickCost` say each option's own band.
+    /* AN OPTION THAT WRITES (`patches`, govern-47) IS A ROWSET ON THE PICK, so it is weighed as one (`optionCost`); one
+       that only says a choice is a call.
+       AN OPTION ITS PROPOSER MARKED `hard: true` IS ONE THAT CANNOT BE TAKEN BACK ONCE PICKED, AND IT IS THAT OPTION
+       THAT IS HARD, NOT THE QUESTION (audit 62, claim 6). Batches 60 to 63 weighed the question by its worst option,
+       so a pack update that offered "Keep my pages" beside "Take the update's page" was counted and ranked as the worst
+       kind, and keeping was worded as hard. `optionCost` and `pickCost` say each option's own band.
        THE QUESTION IS `undo` ONLY WHEN NO PICK AVOIDS IT: every option it offers is marked. Otherwise it is weighed by
-       what the options that can be taken back would do. Only the boolean `true` marks an option. */
+       what the options that can be taken back would do. Only the boolean `true` marks an option.
+       AND AN OPTION THAT MOVES MONEY, OR PATCHES A VALUE THE HISTORY WITHHOLDS, IS HARD BY WHAT IT WRITES (batch 66), so
+       it counts with the marked ones here: a question that offers nothing else has no pick that avoids it. */
     case 'options': {
-      const offered = arr(b.options);
-      if (offered.length > 0 && offered.every((o) => optionCost(o) === 'undo')) return 'undo';
-      return offered.some((o) => optionCost(o) === 'rows') ? 'rows' : 'call';
+      const offered = arr(b.options).map((o) => optionCost(o, rows));
+      if (offered.length > 0 && offered.every((c) => c === 'undo')) return 'undo';
+      return offered.includes('rows') ? 'rows' : 'call';
     }
     default:
       return 'call';
   }
 }
 
+/** An entry by its spoken id, `recurring#5`, whose list is the part before the `#`, as `govern.ts` reads one. */
+const SPOKEN_AT = /^([a-z][a-z0-9_-]{0,31})#[1-9]\d*$/u;
+
+/** The list one of an option's patches is about: its `register`, or else the list its spoken `at` names (`govern.ts`, `patchLists`). */
+const patchList = (p: Record<string, unknown>): string | null =>
+  typeof p.register === 'string' ? p.register : typeof p.at === 'string' ? (SPOKEN_AT.exec(p.at)?.[1] ?? null) : null;
+
+/**
+ * What an option's `patches` weigh, which is what `rowsetCost` says of the same writes filed as a rowset: `undo` when
+ * one of them writes a money value, or patches a field its list's history withholds, and `rows` otherwise. One such
+ * patch is enough, since a pick applies them all or none (`govern.ts`, `applyPatches`). The patches name their own
+ * lists, so they are read a list at a time; one that does not say which list it is in is weighed by what it says alone.
+ * An option carries no more than a rowset may, and its pick is one press, so twenty of them are not raised to `shape`.
+ */
+function patchesCost(patches: unknown[], rows?: CostRows): Cost {
+  if (movesMoney({ rows: patches })) return 'undo';
+  if (rows === undefined) return 'rows';
+  const lists = new Map<string, unknown[]>();
+  for (const p of patches) {
+    const list = patchList(obj(p));
+    if (list !== null) lists.set(list, [...(lists.get(list) ?? []), p]);
+  }
+  for (const [register, of] of lists) if (patchesWithheld({ register, rows: of }, rows)) return 'undo';
+  return 'rows';
+}
+
 /**
  * What it would cost to have picked this one option of an `options` question, which is the band its own line on the
- * card wears: `undo` when its proposer marked it `hard: true`, `rows` when it writes on the pick, and `call` when it
- * only says a choice. Hard stands above what its patches say. Lenient as `costOf` is: what is not an option is `call`.
+ * card wears: `undo` when its proposer marked it `hard: true`, what its patches weigh when it writes on the pick
+ * (`patchesCost`: `undo` or `rows`), and `call` when it only says a choice. Hard stands above what its patches say.
+ * Lenient as `costOf` is: what is not an option is `call`.
+ *
+ * `rows` is the record, as `costOf` takes it. Without it money is still read, since the patch itself says it, and a
+ * withheld field is not, since only the list's declarations say that.
  */
-export function optionCost(option: unknown): Cost {
+export function optionCost(option: unknown, rows?: CostRows): Cost {
   const o = obj(option);
   if (o.hard === true) return 'undo';
-  return Array.isArray(o.patches) ? 'rows' : 'call';
+  return Array.isArray(o.patches) ? patchesCost(o.patches, rows) : 'call';
 }
 
 /** Every option an `options` question offers, by its id, with its own band, in the order they are offered. */
-export function optionCosts(body: unknown): { id: string; cost: Cost }[] {
-  return arr(obj(body).options).flatMap((o) => (typeof obj(o).id === 'string' ? [{ id: obj(o).id as string, cost: optionCost(o) }] : []));
+export function optionCosts(body: unknown, rows?: CostRows): { id: string; cost: Cost }[] {
+  return arr(obj(body).options).flatMap((o) => (typeof obj(o).id === 'string' ? [{ id: obj(o).id as string, cost: optionCost(o, rows) }] : []));
 }
 
 /**
@@ -195,19 +228,22 @@ export function optionCosts(body: unknown): { id: string; cost: Cost }[] {
  */
 export function pickCost(bodyKind: string, body: unknown, option: string, rows?: CostRows): Cost {
   if (bodyKind !== 'options') return option === 'accept' ? costOf(bodyKind, body, rows) : 'call';
-  return optionCosts(body).find((o) => o.id === option)?.cost ?? 'call';
+  return optionCosts(body, rows).find((o) => o.id === option)?.cost ?? 'call';
 }
 
-/**
- * `movesMoney` as SQL over a `suggestion` row. It stands above `COST_SQL` and `WAIT_SQL`, which both read it, and
- * `kernel/index.ts`'s `BAND_SQL` is `COST_SQL`; its caller has already seen that `$.rows` is an array.
- */
-const MOVES_MONEY_SQL = `EXISTS (SELECT 1 FROM json_each(body, '$.rows') AS r, json_each(CASE
+/** `movesMoney` as SQL over the array at `path` of the JSON `src` names; its caller has already seen that it is an array. */
+const movesMoneySql = (src: string, path: string): string => `EXISTS (SELECT 1 FROM json_each(${src}, '${path}') AS r, json_each(CASE
       WHEN r.type <> 'object' THEN NULL
       WHEN json_type(r.value, '$.at') IS NULL THEN r.value
       WHEN json_type(r.value, '$.patch') = 'object' THEN json_extract(r.value, '$.patch') END) AS f
     WHERE f.type = 'object' AND json_type(f.value, '$.amount') = 'integer' AND json_type(f.value, '$.currency') = 'text'
       AND json_extract(f.value, '$.currency') GLOB '[A-Z][A-Z][A-Z]' AND length(json_extract(f.value, '$.currency')) = 3)`;
+
+/**
+ * `movesMoney` as SQL over a `suggestion` row. It stands above `COST_SQL` and `WAIT_SQL`, which both read it, and
+ * `kernel/index.ts`'s `BAND_SQL` is `COST_SQL`; its caller has already seen that `$.rows` is an array.
+ */
+const MOVES_MONEY_SQL = movesMoneySql('body', '$.rows');
 
 /**
  * What `costOf` reads of the record: the fields of a list whose values the history withholds, and whether a list
@@ -290,6 +326,29 @@ const PATCHES_WITHHELD_SQL = `EXISTS (SELECT 1 FROM json_each(body, '$.register'
       WHEN r.type = 'object' AND json_type(r.value, '$.at') IS NOT NULL AND json_type(r.value, '$.patch') = 'object' THEN json_extract(r.value, '$.patch') END) AS f
     WHERE json_type(body, '$.register') = 'text' AND f.key IN (${withheldIdsSql('g.value')}))`;
 
+/** The `at` of one of an option's patches, `p`. */
+const PATCH_AT_SQL = `json_extract(p.value, '$.at')`;
+
+/**
+ * `patchList` as SQL over one of an option's patches, `p`, which its caller has seen is an object: its `register`, or
+ * the list its spoken `at` names, or NULL. The four GLOBs are `SPOKEN_AT`.
+ */
+const PATCH_LIST_SQL = `(CASE
+      WHEN json_type(p.value, '$.register') = 'text' THEN json_extract(p.value, '$.register')
+      WHEN json_type(p.value, '$.at') = 'text' AND instr(${PATCH_AT_SQL}, '#') BETWEEN 2 AND 33
+        AND ${PATCH_AT_SQL} GLOB '[a-z]*#[1-9]*' AND substr(${PATCH_AT_SQL}, 1, instr(${PATCH_AT_SQL}, '#') - 1) NOT GLOB '*[^a-z0-9_-]*'
+        AND substr(${PATCH_AT_SQL}, instr(${PATCH_AT_SQL}, '#') + 1) GLOB '[1-9]*' AND substr(${PATCH_AT_SQL}, instr(${PATCH_AT_SQL}, '#') + 1) NOT GLOB '*[^0-9]*'
+        THEN substr(${PATCH_AT_SQL}, 1, instr(${PATCH_AT_SQL}, '#') - 1) END)`;
+
+/**
+ * Whether one option, `o`, is `undo` in `optionCost` handed `costRows`, as SQL; its caller has seen that `o` is an
+ * object. Never NULL, so its caller may say NOT of it.
+ */
+const OPTION_UNDO_SQL = `(COALESCE(json_type(o.value, '$.hard'), '') = 'true' OR (COALESCE(json_type(o.value, '$.patches'), '') = 'array' AND (${movesMoneySql('o.value', '$.patches')}
+      OR EXISTS (SELECT 1 FROM json_each(o.value, '$.patches') AS p, json_each(CASE WHEN p.type <> 'object' THEN NULL
+        WHEN json_type(p.value, '$.at') IS NOT NULL AND json_type(p.value, '$.patch') = 'object' THEN json_extract(p.value, '$.patch') END) AS f
+      WHERE f.key IN (${withheldIdsSql(PATCH_LIST_SQL)})))))`;
+
 /**
  * `costOf` as SQL over a `suggestion` row's `body_kind` and `body` columns, so a queue counts and ranks every open
  * question without reading one body into this process (audit 16, M5). Each arm is `costOf`'s own, in its order, and
@@ -324,9 +383,9 @@ export const COST_SQL = `(CASE
     WHEN 'pattern' THEN 'rows'
     WHEN 'options' THEN (CASE
       WHEN json_type(body, '$.options') = 'array' AND json_array_length(body, '$.options') > 0
-        AND NOT EXISTS (SELECT 1 FROM json_each(body, '$.options') o WHERE o.type <> 'object' OR COALESCE(json_type(o.value, '$.hard'), '') <> 'true') THEN 'undo'
-      WHEN json_type(body, '$.options') = 'array' AND EXISTS (SELECT 1 FROM json_each(body, '$.options') o WHERE o.type = 'object'
-        AND COALESCE(json_type(o.value, '$.hard'), '') <> 'true' AND json_type(o.value, '$.patches') = 'array') THEN 'rows'
+        AND NOT EXISTS (SELECT 1 FROM json_each(body, '$.options') o WHERE CASE WHEN o.type <> 'object' THEN 1 ELSE NOT ${OPTION_UNDO_SQL} END) THEN 'undo'
+      WHEN json_type(body, '$.options') = 'array' AND EXISTS (SELECT 1 FROM json_each(body, '$.options') o WHERE CASE WHEN o.type <> 'object' THEN 0
+        ELSE json_type(o.value, '$.patches') = 'array' AND NOT ${OPTION_UNDO_SQL} END) THEN 'rows'
       ELSE 'call' END)
     ELSE 'call' END)
   ELSE (CASE body_kind WHEN 'rowset' THEN 'rows' WHEN 'change' THEN 'shape' WHEN 'pack' THEN 'shape' WHEN 'settings' THEN 'shape'
