@@ -693,6 +693,27 @@ const withoutBatch77 = (doc: Body): Body => ({
     return { ...d, steps };
   }),
 });
+/**
+ * AND BATCH 78'S, folded into the same unreleased step and undone first. Money's line of what there is draws again on
+ * one book alone, and the same line ending on the year goes (money-lasts-line-78, REC-B07); the Heads up line on
+ * categories that Money gave up for it was never in a released version and is taken off by `withoutDirection`, so it
+ * is not put back. A book's line that its money lasts the year goes (book-lasts-year-78, REC-A09 step 2). And the
+ * search for what a payment paid goes whole: its script, the rule that starts it and the rule that marks an
+ * instalment paid by the payment it names (match-payment-78, REC-B11 step 3). `repeating-overdue`, whose `where` and
+ * count batch 78 changed, is dropped whole with the other signs (`SIGNS_ADDED`).
+ */
+const BEYOND = (c: unknown): boolean => (c as Body | undefined)?.metric === 'runway-days' && typeof (c as Body).beyond === 'boolean';
+const withoutBatch78 = (doc: Body): Body => {
+  const lasts = (b: Body): Body[] => {
+    const all = (b.when as Body | undefined)?.all;
+    if (b.kind !== 'note' || !Array.isArray(all) || !all.some(BEYOND)) return [b];
+    /* The line of what there is carries `beyond: false` and goes back to its one condition; the other is the new line. */
+    return all.some((c) => (c as Body).beyond === true) ? [] : [{ ...b, when: all.find((c) => !BEYOND(c)) as Body }];
+  };
+  const money = withPage(doc, 'money', (now) => now.flatMap(lasts));
+  const book = withPage(money, 'money-book', (now) => now.filter((b) => !(b.kind === 'note' && (b.when as Body | undefined)?.metric === 'book-lasts-until:{{name}}')));
+  return { ...book, declarations: (book.declarations as Body[]).filter((d) => d.script !== 'match_payment' && d.rule !== 'payment-matches' && d.rule !== 'instalment-settles') };
+};
 /** Batch 63's four figures of this month's spending against last (spend-figures-63), new in the unreleased money-core 3.17.0. */
 const SPEND_VS_LAST: ReadonlySet<string> = new Set(['spent-last-month', 'spent-by-category-last-month', 'spent-by-category-to-date-last-month', 'spent-vs-last-month']);
 const LATEST: Record<string, { version: string; released: string; undo: (doc: Body) => Body }> = {
@@ -701,7 +722,7 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
     version: '3.13.0',
     released: '2e09983b40aba73e',
     undo: (raw) => {
-      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(withoutPlanLeads(withoutBatch73(withoutBatch74(withoutBatch75(withoutBatch76(withoutBatch77(raw)))))))))))))))));
+      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(withoutPlanLeads(withoutBatch73(withoutBatch74(withoutBatch75(withoutBatch76(withoutBatch77(withoutBatch78(raw))))))))))))))))));
       return {
       ...doc,
       /* AND THE SCRIPT THAT MARKS A BILL PAID, WITH THE RULE THAT STARTS IT (settle-rule-60), both newer than 3.13.0. */

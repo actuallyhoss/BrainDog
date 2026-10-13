@@ -345,6 +345,13 @@
   });
 
   /**
+   * THE BLOCKS THE PAGE DECLARES, without what the reader added under them (the note about rates out of date,
+   * `page-live.ts` `footed`). Arrange and Pin this were handed every block drawn, so Done counted one more than the page
+   * stores and the record refused it as a page somebody had changed. The note is always last, so each block keeps its place.
+   */
+  const declaredOnly = (blocks: readonly LiveBlock[]): LiveBlock[] => blocks.filter((b) => !b.synthetic);
+
+  /**
    * The blocks the page is laid out from: the home's body while it is arranged, else what the record answered.
    *
    * AS THIS READER IS DRAWN THEM, wherever the page is read rather than previewed (`home-arrange.ts`): a house heading
@@ -352,14 +359,23 @@
    * list this reader may not add to. Each block stays at its place, so every write still finds it.
    */
   const laidFrom = $derived.by<LiveBlock[]>(() => {
-    const blocks = toArrange ? toArrange.blocks : (live?.page.blocks ?? []);
+    const blocks = declaredOnly(toArrange ? toArrange.blocks : (live?.page.blocks ?? []));
     if (mode === 'preview') return blocks;
     /* A SCREEN WHOSE SHELL NAMES NO READER keeps every line, as it drew them before, and the record answers a press. */
     return heldTo(inVoice(blocks, said), (list) => !shell?.me || may(shell, 'append', list));
   });
 
-  /** Declared, then added. One list, so ordering and spans do not care which is which. */
-  const all = $derived<LiveBlock[]>(live ? [...laidFrom, ...extra.map((b) => added(b, laidFrom))] : []);
+  /** Declared, then added. One list, so ordering and spans do not care which is which. This is what Arrange moves. */
+  const own = $derived<LiveBlock[]>(live ? [...laidFrom, ...extra.map((b) => added(b, laidFrom))] : []);
+
+  /** What the reader added under the page it read. A home being arranged is its body read again, which has none. */
+  const feet = $derived<LiveBlock[]>(toArrange ? [] : (live?.page.blocks ?? []).filter((b) => b.synthetic));
+
+  /**
+   * Every block drawn: the page's own, then the reader's note. NOT WHILE AN ARRANGEMENT IS IN FORCE, where a block added
+   * in the mode takes the next place after the declared ones and the note is nothing a person can move or save.
+   */
+  const all = $derived<LiveBlock[]>(arrangement.editing || arrangement.slots !== null ? own : [...own, ...feet]);
 
   /* ── the line a page opens on ──────────────────────────────────────────────
      A PAGE WHOSE MAIN COLUMN OPENS ON A LONE LINE TO TYPE INTO KEEPS IT IN ITS HEADER, as Today does (`layout.ts`
@@ -409,7 +425,7 @@
    * holding nothing is still placed (`arranged`), so a list empty today keeps its place for the day it holds something.
    */
   function drawnKeys(): string[] {
-    const blocks = arranged(live?.page.blocks ?? []);
+    const blocks = arranged(declaredOnly(live?.page.blocks ?? []));
     const keyed = blockKeys(blocks);
     return lookOrder(
       blocks.map((b, i) => placedOf(b, keyed[i]!)),
@@ -535,7 +551,7 @@
         <ShareMenu {slug} />
         <ChangePage {slug} title={live.page.page.title} {showSource} {reread} onarrange={arranger?.entry() ?? null} {look} keys={drawnKeys} />
       {/if}
-      <Arrange bind:this={arranger} {arrangement} {slug} page={live.page.page} declared={live.page.blocks} {all} bind:extra {showSource} {reread} />
+      <Arrange bind:this={arranger} {arrangement} {slug} page={live.page.page} declared={declaredOnly(live.page.blocks)} all={own} bind:extra {showSource} {reread} />
     {/snippet}
   </PageHead>
 
@@ -609,7 +625,7 @@
           slug={kept.id}
           page={toArrange?.page ?? live.page.page}
           declared={laidFrom}
-          {all}
+          all={own}
           bind:extra
           showSource={false}
           {reread}
@@ -738,8 +754,9 @@
      `.page-said`, then Home's page and body with nothing before them), the ⋯ is raised to the end of that sentence, as
      it is raised over the body at a pointer, and the sentence keeps it a tap's room so no word runs under it.
 
-     ONLY THERE. Under a line to type into, a first-run card or a screen that wraps its head (Decide), what is over the
-     body is not a sentence with room at its end, and the ⋯ keeps the row it had. From 601px a touch screen keeps the
+     ONLY THERE. Under a line to type into, a first-run card or a screen that wraps its head, what is over the body is
+     not a sentence with room at its end, and the ⋯ keeps the row it had. (Decide draws its head bare since batch 78,
+     so the rule reaches it when its questions stand first under the sentence.) From 601px a touch screen keeps the
      row too: the head has the width for it. */
   @media (hover: none) and (width <= 600px) {
     :global(.page-said + .page > .body:first-child) > .home-page:not([data-arranging]) > .home-tools {

@@ -31,8 +31,9 @@ const CONCRETE = Object.entries(METRICS).filter(([, d]) => !isTemplate(d));
 /* ── nothing moved ───────────────────────────────────────────────────────── */
 
 /* A COUNT PER A DISTINCT OF ITS OWN ROWS READS NO VALUE WHILE IT COUNTS NO ROW, by its declaration and not by a gap:
-   money-core's `repeating-overdue` is written so since batch 74, so a record with no matched line past its day is not
-   shown a nought it met. The sample holds no such line, so it has no reading to hold here. */
+   money-core's `repeating-overdue` is written so since batch 74, and since batch 78 it counts its matched lines (the
+   late among them with `past`), so only a record with no matched line at all reads no value; one with matched lines and
+   none late reads 0 and met. The sample holds no matched line, so it has no reading to hold here. */
 const silentWhenNone = (d: MetricDecl): boolean => {
   const ratio = (d.value as { ratio?: { per?: object } } | undefined)?.ratio;
   return ratio !== undefined && ratio.per !== undefined && 'distinct' in ratio.per;

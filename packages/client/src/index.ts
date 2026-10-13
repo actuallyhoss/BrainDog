@@ -465,6 +465,12 @@ export type Met = Answer<'meet'>;
  */
 export type SameOne = Answer<'sameOne'>;
 
+/**
+ * `heldTwice`: the people of a list who may be on the record twice, each by their number in the list, lowest first, or
+ * `null` when the list is not where this record keeps people. See `HeldTwice` in `@braindog/record`.
+ */
+export type HeldTwice = Answer<'heldTwice'>;
+
 /** `packs`: one pack, on or off. `version` is `null` for a pack the seed owns by its bodies. See `PackState` in `@braindog/kernel`. */
 export type PackState = { id: string; version: string | null; disabled_at: string | null; registers: string[] };
 
@@ -1670,6 +1676,11 @@ export function createClient(options: ClientOptions) {
      * picked, two to twelve. It opens one question on Decide and merges nothing. Anybody who may write to the list.
      */
     sameOne: (args: { register: string; rows: readonly string[] }) => call<SameOne>('sameOne', args as Record<string, unknown>),
+    /**
+     * Which people of `register` may be on the record twice, as `{ seqs }`, so a list can be narrowed to them. `null`
+     * when that list is not where the record keeps people. It reads and changes nothing. READ+.
+     */
+    heldTwice: (args: { register: string }) => call<HeldTwice>('heldTwice', args as Record<string, unknown>),
 
     /* THE SCHEDULED ACTIONS. `actions` is READ+; `resumeAction` is ADMIN, so a browser session, and it is the only
        thing that starts a paused action again. */

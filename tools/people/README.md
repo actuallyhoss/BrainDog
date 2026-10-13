@@ -77,7 +77,9 @@ in that file.
 
 Each line is the step's number and name, then `green`, `red` or `not walked`, then what the walk saw. Red says what
 was wrong. The walk keeps going after a red step wherever it can, so one run names every broken step. It exits 1 if
-any step is red.
+any step is red, was never said or was left not walked (day 15 alone may be left, on a host that keeps the real
+clock), and when the walk stops on a throw, which it says in red on the error stream. Read through a pipe
+(`| tail`), the shell answers with the pipe's exit code, not the walk's: read `$?` of the command itself.
 
 | Step | What green means | Who builds it |
 | --- | --- | --- |

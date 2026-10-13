@@ -287,17 +287,16 @@
   <!-- THE LINE SAYS HOW MANY WAIT, in words with the first question's suggestion, so the title carries no count; on a
        page with nothing at all to draw the cleared mark under it says that, once. Asking yourself a question is the one
        ink pill, and only for somebody who may answer. -->
-  <!-- THE PAGE'S NAME AND ITS LINE, the header every page draws (DIRECTION §39). `display: contents`, so the sticky head
-       still sticks. -->
-  <div class="decide-head">
-    <PageHead icon="decide" title={said('decide')} sentence={headLine} needs={cleared ? undefined : shaped?.sentence.needs || undefined}>
-      {#snippet actions()}
-        {#if answerable}<Button weight="primary" onclick={() => (asking = true)}>{WORDS.ask}</Button>{/if}
-      {/snippet}
-    </PageHead>
-  </div>
-
-  <AskSheet open={asking} onclose={() => (asking = false)} onfiled={filed} />
+  <!-- THE PAGE'S NAME AND ITS LINE, the header every page draws (DIRECTION §39), and THE SIBLING BEFORE THE PAGE, as
+       Home draws it: no element of its own round it and nothing between its sentence and `.page`. The sticky head
+       sticks inside this screen's own box either way, and on a phone the page's menu is raised to the end of the
+       sentence only where the sentence is the sibling before the page (`PageView`, look fault N). So the sheet for
+       asking a question is drawn after the page, not here. -->
+  <PageHead icon="decide" title={said('decide')} sentence={headLine} needs={cleared ? undefined : shaped?.sentence.needs || undefined}>
+    {#snippet actions()}
+      {#if answerable}<Button weight="primary" onclick={() => (asking = true)}>{WORDS.ask}</Button>{/if}
+    {/snippet}
+  </PageHead>
 
   <div class="page">
     {#if !answerable && (shaped?.open ?? 0) > 0}
@@ -373,13 +372,11 @@
       </Tile>
     {/if}
   </div>
+
+  <AskSheet open={asking} onclose={() => (asking = false)} onfiled={filed} />
 {/if}
 
 <style>
-  .decide-head {
-    display: contents;
-  }
-
   /* ONE COLUMN, the page's own: its blocks carry their spans, and Decide adds no column of its own beside them. */
   .page {
     display: flex;
@@ -583,6 +580,15 @@
   @media (width < 900px) {
     .page {
       padding: var(--sp-2) var(--gutter) var(--sp-8);
+    }
+  }
+
+  /* WHERE THE MENU IS RAISED TO THE SENTENCE (a phone, the questions first under the head), the page keeps the room
+     Home keeps over its body. The menu is a tap tall and stands on the body's top edge, so with less room under the
+     sentence it would reach up into the name's row and lie over the foot of Ask a question. */
+  @media (hover: none) and (width <= 600px) {
+    .page:has(> .body:first-child) {
+      padding-block-start: var(--sp-4);
     }
   }
 </style>

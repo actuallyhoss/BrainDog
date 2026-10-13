@@ -180,3 +180,16 @@ export function ledBy(title: string, said: string): { name: string; said: string
   const opens = said.toLowerCase().startsWith(title.toLowerCase()) && !/[\p{L}\p{N}]/u.test(said.charAt(title.length));
   return { name: title !== '' && opens ? '' : title, said };
 }
+
+/** A line the card draws: the page's name where it leads the line, what is said, and a key that is its own. */
+export type CardLine = { key: string; name: string; said: string };
+
+/**
+ * WHAT THE CARD LISTS, IN THE ORDER IT GOES IN (`ordered`), one line an update: the card said Money then Personal and
+ * Accept took Personal first, so what was read and what happened disagreed. The order is the one Accept runs.
+ */
+export const cardLines = (updates: readonly Improved[]): CardLine[] => ordered(updates).map((u) => ({ key: u.key, ...ledBy(u.title, changeLine(u)) }));
+
+/** Every change of every update, folded under "See each change": the same order, an update's own notes kept together. */
+export const cardNotes = (updates: readonly Improved[]): CardLine[] =>
+  ordered(updates).flatMap((u) => u.notes.map((note, i) => ({ key: `${u.key}:${i}`, ...ledBy(u.title, note) })));

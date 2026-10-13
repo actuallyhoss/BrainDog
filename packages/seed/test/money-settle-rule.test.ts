@@ -131,13 +131,16 @@ test('an entry that gains Settles later starts it then, and an edit to its words
   const theBill = m.bill();
   const pay = m.paid(150_000, '2026-09-28');
   await m.turn();
-  assert.deepEqual(m.queued(), [], 'a payment that names no bill started the script');
+  /* `settle` ALONE IS COUNTED: since match-payment-78 a cleared payment that names no bill starts the search for one
+     (`payment-matches`, measured in `money-match-rule.test.ts`), which finds none here, the bill being named otherwise. */
+  const settles = () => m.queued().filter((q) => q.script === 'settle');
+  assert.deepEqual(settles(), [], 'a payment that names no bill started the script');
   value(m.k.update('transactions', pay.id, { settles: theBill.id }, OWNER));
   await m.turn();
-  assert.equal(m.queued().length, 1);
+  assert.equal(settles().length, 1);
   value(m.k.update('transactions', pay.id, { what: 'NORTHGATE ESTATES LTD' }, OWNER));
   await m.turn();
-  assert.equal(m.queued().length, 1, 'an edit to the words started the script again');
+  assert.equal(settles().length, 1, 'an edit to the words started the script again');
 });
 
 test('money that has not cleared pays nothing, and pays the day it clears', async () => {

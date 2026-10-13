@@ -25,8 +25,9 @@
  *   (repeating-sign-fix-69, audit 67 claim 1) it counts only a line a payment was matched to before, so a line just
  *   added is not judged by a day nothing could have moved. And it is named for that, "Matched repeating lines past
  *   their day" (repeating-sign-72, audit 69 finding 5): a line nothing was matched to is not counted, so its nought is
- *   no word on those. And it no longer says nought at all (audit 72 finding 5): with no matched line past its day it
- *   reads no value, so a record whose lines were never matched is not shown a mark it met.
+ *   no word on those. And with no matched line to read it says no value (audit 72 finding 5), so a record whose lines
+ *   were never matched is not shown a mark it met; with matched lines and none past its day it says 0 and met, since
+ *   the day is counted (`past`) and no longer in the `where` (signs-metric-75-76, repeating-overdue-past-78).
  */
 
 import type { SeedMetric } from '../../base.ts';
@@ -127,8 +128,9 @@ export const SIGNS_FIGURES: Record<string, SeedMetric> = {
   /**
    * HOW MANY LIVE REPEATING LINES HAVE A NEXT MORE THAN THREE DAYS GONE. Money's `settle` script moves "Next" one cycle
    * on when a payment is matched to the line, so a day left behind is a payment that did not come, came unmatched, or a
-   * line nobody ended. `next_due before -3d` leaves out the third day itself: three days is what a payment takes to land
-   * and be matched, the same three the Ledger's own age is allowed.
+   * line nobody ended. `{ past: 'next_due', by: '3d' }` counts what `next_due before -3d` selects, so it leaves out the
+   * third day itself: three days is what a payment takes to land and be matched, the same three the Ledger's own age is
+   * allowed.
    *
    * ONLY A LINE A PAYMENT WAS MATCHED TO BEFORE, `last_paid is set`. Nothing links an arriving payment to a repeating
    * line by itself: "Settles" points at Bills alone, and a line is matched when a person or an agent runs `settle` on
@@ -147,22 +149,27 @@ export const SIGNS_FIGURES: Record<string, SeedMetric> = {
    * `settle` (`scripts/settle.js`), which nobody runs by itself. On a record where no payment was ever matched to a
    * line, every line is left out and this reads 0 whatever stopped: it is blind there, not clean. Under its first
    * name, which said repeating lines and nothing of matched, that 0 read as every line watched, which it never was. It
-   * counts the matched lines and is named for them; the id, the `where` and the value are as they were, so nothing
-   * that reads it moves. (The first name is spelled in the test alone, which holds that the seed never writes it.)
+   * counts the matched lines and is named for them; the id was left as it was, so nothing that reads it moves. (The first name is spelled in the test
+   * alone, which holds that the seed never writes it.)
    * A page that draws it says matched too, and never offers it as a watch on every repeating line.
    *
-   * AND WITH NONE TO COUNT IT READS NO VALUE, NEVER NOUGHT (audit 72 finding 5). The name was not enough: the blind
+   * AND WITH NONE TO READ IT SAYS NO VALUE, NEVER NOUGHT (audit 72 finding 5). The name was not enough: the blind
    * record still read 0 and met its mark, a clean answer from a sign that saw none of its lines. So the count is read
    * per the states its lines are in, the way `uncategorised-share-30d` above reads nothing for a month of nothing. The
-   * `where` keeps live lines alone, so that is one state when a line is counted, and the figure is the count itself, a
-   * whole number; with no line counted it is none, a ratio over nought answers no value, and no value has no verdict.
+   * `where` keeps live lines alone, so that is one state when a line is read, and the figure is the count itself, a
+   * whole number; with no line read it is none, a ratio over nought answers no value, and no value has no verdict.
    *
-   * THAT SILENCES THE CLEAN RECORD TOO, and it is said here because it is a loss: lines matched and none past its day
-   * reads no value as well, where it read 0 and met. The two halves of a ratio share the one `where`, and no reading
-   * tests a day against today, so nothing a figure can declare tells "every matched line is on time" from "no line was
-   * ever matched": both are no line under this `where`. Of the two ways to be wrong, saying nothing of a kept record
-   * is the smaller. The nought comes back when the kernel can count the lines past a day inside a wider `where`
-   * (`state is live, last_paid is set`), which is its own job in `packages/kernel/src/metrics.ts`.
+   * AND THE KEPT RECORD GETS ITS NOUGHT BACK (signs-metric-75-76, repeating-overdue-past-78). While the day sat in the
+   * `where` beside the rest, the two halves of the ratio shared it, so "every matched line is on time" and "no line
+   * was ever matched" were both no line, and the sign said nothing of a record that was kept. Now the `where` says WHO
+   * IS JUDGED, the live lines a payment was matched to before, and the count says HOW MANY OF THOSE ARE LATE (`past`,
+   * `packages/kernel/src/metrics.ts`). Matched lines and none past its day is 0 over one state: 0, and met. No matched
+   * line is still nought over nothing: no value, no verdict, so the blind record is as silent as before. A matched
+   * line with no "Next" is not late.
+   *
+   * `past` IS WRITTEN FIRST AND READ BY NAME. A record keeps a declaration's keys in order, so this comes back
+   * `{ by, past }`, and the kernel finds the kind by the key that is an aggregation, wherever it sits. The test reads
+   * the figure both ways, as written here and as a record holds it, and holds them to one answer.
    *
    * A paused or ended line is not waiting for anything and is left out. A COUNT, NEVER A SUM, so no two currencies meet
    * in it. None is still the mark, so one stuck line misses it; a record with no repeating lines is not judged.
@@ -171,8 +178,8 @@ export const SIGNS_FIGURES: Record<string, SeedMetric> = {
     metric: 'repeating-overdue',
     name: 'Matched repeating lines past their day',
     source: 'register.recurring',
-    where: 'state is live, next_due before -3d, last_paid is set',
-    value: { ratio: { of: { count: 'id' }, per: { distinct: 'state' } } },
+    where: 'state is live, last_paid is set',
+    value: { ratio: { of: { past: 'next_due', by: '3d' }, per: { distinct: 'state' } } },
     format: 'int',
     target: { lte: 0 },
     window: '30d',

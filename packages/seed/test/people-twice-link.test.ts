@@ -1,12 +1,11 @@
 /**
  * The note over somebody held twice gives something to press (audit 69, finding 3): it said how many and stopped, so
- * the person read a number and had nowhere to go. It links the list of people now, sorted by name, where two of one
- * name sit side by side.
+ * the person read a number and had nowhere to go.
  *
- * THE LIST, AND NOT THE PEOPLE HELD TWICE ALONE: a list's address narrows by a field's value, a search and an order
- * (`chipsOf` in `apps/web/src/lib/record/api.ts`), and "held twice" is a pair the kernel works out, not a value any
- * field holds. So the note says what to look for. The last test here holds that down, and comes off the day a list
- * can be opened at them.
+ * THE PEOPLE HELD TWICE, AND NOT THE WHOLE LIST (audit 74, claim 4): the link opened everyone in order of name and told
+ * the reader to look for the same person listed twice, which is the work the record had already done. The list of
+ * people now opens at them alone, by the word `twice` in its address (`apps/web/src/lib/record/`), so the note says
+ * "See them" and leaves the looking out. The last test here holds the address down.
  */
 
 import { test } from 'node:test';
@@ -75,7 +74,7 @@ const holdTwice = (k: Kernel): void => {
   }
 };
 
-test('SOMEBODY HELD TWICE CAN BE PRESSED: the note links the list of people, by name', async () => {
+test('SOMEBODY HELD TWICE CAN BE PRESSED: the note links the list of people, at the ones held twice', async () => {
   const k = await seeded();
   holdTwice(k);
   const note = noteOn(k);
@@ -86,15 +85,12 @@ test('SOMEBODY HELD TWICE CAN BE PRESSED: the note links the list of people, by 
   const links = linksOf(nodes);
   assert.equal(links.length, 1, `one thing to press, and the note holds ${links.length}`);
   const at = new URL(links[0]!.href, 'https://record.example');
-  /* THE LIST OF PEOPLE, where a person is merged or deleted, and by a field it holds. */
+  /* THE LIST OF PEOPLE, where a person is merged or deleted, narrowed to the ones the note counted. */
   assert.equal(at.pathname, '/r/people');
   assert.ok(REGISTERS.people, 'the seed holds no list at that address');
-  const [field, dir] = (at.searchParams.get('sort') ?? '').split(':');
-  assert.equal(field, 'name', 'two of one name sit together only when the list is in order of name');
-  assert.ok(dir === undefined || dir === 'asc');
-  assert.ok(REGISTERS.people.fields.some((f) => f.id === field), `People has no field called ${field}`);
-  /* THE WORDS ON THE LINK SAY WHERE IT GOES, never "here" or "this". */
-  assert.match(text(links[0]!.body), /name/iu);
+  assert.equal(at.searchParams.get('twice'), '1');
+  /* THE WORDS ON THE LINK SAY WHAT IT SHOWS, never "here" or "this". */
+  assert.equal(text(links[0]!.body), 'See them');
   assert.doesNotMatch(text(links[0]!.body), /^(?:here|this|click)\b/iu);
 });
 
@@ -116,13 +112,16 @@ test('NOBODY HELD TWICE: no note and so no link, as before', async () => {
   assert.deepEqual(declared[0]!.when, { metric: 'held-twice', gt: 0 });
 });
 
-test('THE LINK NARROWS BY NOTHING, since no address opens a list at the people held twice', () => {
+test('THE LINK NARROWS BY THE ONE WORD `twice`, and the note no longer sets the reader looking', () => {
   const [note] = (PAGES.people!.blocks as unknown as Note[]).filter((b) => b.kind === 'note' && String(b.body).includes('{{held-twice}}'));
   const [link] = linksOf(drawn(String(note!.body), 2));
   assert.ok(link);
+  assert.equal(link.href, '/r/people?twice=1');
   const at = new URL(link.href, 'https://record.example');
-  /* A FILTER THAT LOOKED LIKE THE ANSWER AND WAS NOT would be worse than the whole list: `f=` chips and `q` stay out
-     until the list can be asked for the pairs themselves. */
-  assert.deepEqual([...at.searchParams.keys()], ['sort']);
-  assert.match(text(drawn(String(note!.body), 2)), /same person/iu);
+  /* NOTHING ELSE NARROWS IT: an `f=` chip or a `q` beside the word would hide one of a pair and show the other. */
+  assert.deepEqual([...at.searchParams.keys()], ['twice']);
+  /* THE LIST SHOWS THEM, so the words that sent the reader down everyone's names are gone. */
+  const said = text(drawn(String(note!.body), 2));
+  assert.equal(said, 'People who may be on this record twice: 2. See them.');
+  assert.doesNotMatch(said, /same person|by name|look for/iu);
 });

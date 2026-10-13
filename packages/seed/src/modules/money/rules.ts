@@ -13,6 +13,7 @@ import { OBLIGATIONS_REGISTER } from './lists/obligations.ts';
 import { BOOK_FROM_ACCOUNT_SCRIPT } from './scripts/book-from-account.js';
 import { CLOSE_ACCOUNT_SCRIPT } from './scripts/close-account.js';
 import { LAST_DAY_SCRIPT } from './scripts/last-day.js';
+import { MATCH_PAYMENT_SCRIPT } from './scripts/match-payment.js';
 import { PLANS_FROM_NAMES_SCRIPT } from './scripts/plans-from-names.js';
 import { SETTLE_SCRIPT } from './scripts/settle.js';
 
@@ -305,6 +306,48 @@ export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
     steps: [{ script: { id: 'settle', as: 'settling', input: { payment: '{{trigger.entry}}', item: '{{trigger.row.settles}}' } } }],
   },
   SETTLE_SCRIPT,
+  /**
+   * A PAYMENT THAT NAMES NOTHING FINDS WHAT IT PAID (REC-B11 step 3, match-payment-78): a cleared Ledger entry with
+   * nothing in "Settles" starts `script.match_payment`, which looks among the open bills, instalments and repeating
+   * lines for the one it paid (`scripts/match-payment.js`). Exactly one for the same money is linked; several, or an
+   * amount further off, is a question on Decide whose answers carry the link, so picking one writes it and needs no
+   * second rule.
+   *
+   * THE LINK IS ALL THE SCRIPT WRITES, AND THE TWO RULES ROUND IT DO THE REST. "Settles" written on the payment starts
+   * `payment-settles` above, which marks the bill. "Paid by" written on an instalment starts `instalment-settles`
+   * below, which marks the instalment. Both are `settle`'s own writes, so the amount is never changed here.
+   *
+   * ON A WRITE TO THE STATUS OR TO "Settles", as `payment-settles` is, so an edit to an entry's words starts nothing
+   * and a payment that clears later is looked for the day it clears. No `once_per`: a second run for an entry already
+   * linked finds the link and looks no further, and a question asked again joins the one open by its cause.
+   *
+   * A REPEATING LINE IS FOUND AND NOT YET MARKED. It holds no link, so the script writes nothing for it and says the
+   * line in its run; the step that would run `settle` with the line and its next day needs a step to read the answer
+   * of the one before it, which is not measured, and an answer picked on Decide starts nothing while a script's
+   * question reaches `onDecided` with no `about` (see `CLOSE_ACCOUNT_AUTOMATIONS` below). Both wait.
+   *
+   * SO NO QUESTION IS ASKED WHILE ONE OF ITS ANSWERS WOULD BE A REPEATING LINE (`asks: 'linked'`). Measured: an answer
+   * that names a bill or an instalment writes its link and the thing is marked paid, and one that names a repeating
+   * line writes nothing at all. Several things that fit with a line among them is left as it is, said in the run, until
+   * the rule for an answer exists; several bills or instalments is still asked.
+   */
+  {
+    rule: 'payment-matches',
+    name: 'Find what a payment paid',
+    pack: 'money-core',
+    on: { written: { register: 'transactions', op: ['create', 'update'], fields: ['state', 'settles'] } },
+    when: 'state is cleared, settles is empty',
+    steps: [{ script: { id: 'match_payment', as: 'matching', input: { payment: '{{trigger.entry}}', asks: 'linked' } } }],
+  },
+  MATCH_PAYMENT_SCRIPT,
+  {
+    rule: 'instalment-settles',
+    name: 'Mark an instalment paid by its payment',
+    pack: 'money-core',
+    on: { written: { register: 'installments', op: ['create', 'update'], fields: ['paid_by'] } },
+    when: 'paid_by is set',
+    steps: [{ script: { id: 'settle', as: 'settling', input: { payment: '{{trigger.row.paid_by}}', item: '{{trigger.entry}}' } } }],
+  },
   /**
    * A THING ON AN ACCOUNT IS IN THAT ACCOUNT'S BOOK (REC-A09 job 1): a Ledger entry, a bill, a repeating line or an instalment
    * written with an account and no book starts `script.book_from_account`, which fills the book from the account

@@ -1465,8 +1465,9 @@ const DECLARED: Record<string, Version> = {
       metric.budgets-set rule.bill-takes-book metric.book-owed-to metric.book-owed-by
       metric.book-in-by-month metric.book-out-by-month metric.book-net-by-month
       metric.book-lasts-until
+      rule.payment-matches rule.instalment-settles script.match_payment
     `,
-    declares: '426776efc21d2e82',
+    declares: 'a133f3e25555de89',
     history: [
       "`cash-cross-check` is declared (cash-check-52, REC-A17): Cash now worked out a second way, each cash account walked entry by entry from its newest statement, less Cash now, a currency at a time; no value while no balance is typed -> 73738171ae2405ba",
       'The Money page draws the check (cash-page-54, REC-A17): one tile, Cash now does not add up, while `cash-cross-check` is not nought, and one line while no balance is typed -> e4a453d69795fe22',
@@ -1491,6 +1492,7 @@ const DECLARED: Record<string, Version> = {
       "Folded into the unreleased 3.17.0 (batch 75, integrate 75; commit 63423720, the deployed build, holds 3.16.0), one change, no id added or taken away: `register.obligations` gains `chase_draft`, a text labelled Draft to send, not indexed, and `rule.invoice-chased` gains a third step that writes it where it is empty, 'The invoice for {{short:amount}} was due on {{on:due}}. Could you tell me when it will be paid?', so answering Chase it leaves a message ready to send and never writes over words somebody changed (money-chase-draft-75, REC-B22 step 1) -> 58f8ae62408fdbb6",
       "Folded into the unreleased 3.17.0 (batch 76, integrate 76; commit 63423720, the deployed build, holds 3.16.0), one change, one id added and none taken away: `metric.book-lasts-until`, the day one book's money runs out, walked from book-cash:{{it}} over that book's bills, repeating lines, instalments and money on its way; `page.money-book` gains the cell Money lasts until (book-lasts-until-76, REC-A09 step 2). Money's seeds also carry the starter set of eight categories (ruling 341, money-starter-categories-76), which this fingerprint does not read -> 7e2c23ed9096f0f6",
       "Folded into the unreleased 3.17.0 (batch 77, integrate 77; commit 63423720, the deployed build, holds 3.16.0), one change, no id added or taken away: `rule.invoice-chased` holds two draft steps where it held one, whose conditions never hold together. An invoice paid in part that says what was paid is drafted for what is left, 'The invoice for {{short:amount}} was due on {{on:due}}, and {{short:amount-paid_so_far}} of it is still to pay. Could you tell me when the rest will be paid?', and every other invoice keeps batch 75's sentence, each written only where Draft to send is empty (chase-part-paid-77, REC-B22) -> 426776efc21d2e82",
+      "Folded into the unreleased 3.17.0 (batch 78, integrate 78; commit 63423720, the deployed build, holds 3.16.0), one fingerprint for four changes, three ids added and none taken away: `metric.repeating-overdue` keeps live matched lines in its where (`state is live, last_paid is set`) and counts the late with past (`{ past: 'next_due', by: '3d' }`), so matched lines and none late reads 0 and met, and no matched line still reads no value (repeating-overdue-past-78, signs-metric-75-76#1); `page.money` opens on three lead notes where it held two, the line of what there is now waiting on `runway-days` not carrying beyond and the same line ending 'and on what is due it lasts the year.' drawn while it does, and Heads up gives up its note on `categories-against-direction`, whose figure stays declared, so the page still declares 24 blocks (money-lasts-line-78, REC-B07); `page.money-book` gains one note under What is due, 'Its money lasts the year on what is due.', drawn on book-lasts-until carrying beyond (book-lasts-year-78, REC-A09 step 2); and a cleared Ledger entry with nothing in Settles finds what it paid, `script.match_payment` started by `rule.payment-matches` on a write to its status or Settles, writing Settles for a bill or Paid by on an instalment, with `rule.instalment-settles` running `settle` once an instalment names its payment (match-payment-78, REC-B11 step 3), and the rule hands `asks: 'linked'`, so several things that fit with a repeating line among them is no question, since an answer naming a line would link nothing; `rule.payment-matches`, `rule.instalment-settles` and `script.match_payment` gained -> a133f3e25555de89",
     ],
   },
   'work@1.17.0': {
@@ -1546,10 +1548,11 @@ const DECLARED: Record<string, Version> = {
       register.organisations register.people
       rule.meet-payees rule.meet-sender-organisations rule.meet-senders
     `,
-    declares: '900ff4486ed1626e',
+    declares: '13e503218e568749',
     history: [
       "`page.people` says how many people may be on the record twice, in one note under its two lead notes, from the built-in figure held-twice and drawn only above nought; a note added, nothing taken away -> 3c1698b71103bfe4",
       "Folded into the unreleased 3.4.0 (people-twice-link-74; integrate 74; commit 63423720, the deployed build, holds 3.3.0): `page.people`'s note of people who may be held twice links the list of everyone in order of name (`/r/people?sort=name`) and says what to look for; no id added or taken away -> 900ff4486ed1626e",
+      "Folded into the unreleased 3.4.0 (twice-link-78; integrate 78; commit 63423720, the deployed build, holds 3.3.0): `page.people`'s note of people who may be held twice links the list at those people (`/r/people?twice=1`) and says See them, where it linked everyone by name and said what to look for; no id added or taken away -> 13e503218e568749",
     ],
   },
   /* A PROJECT OTHERS POINT AT STAYS, AND WHERE IT STANDS IS SAID (batch 46, REC-C08 and REC-C16). 1.15.0 IS RELEASED. */

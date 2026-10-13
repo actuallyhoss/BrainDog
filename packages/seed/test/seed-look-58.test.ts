@@ -186,7 +186,9 @@ test('MONEY WITH TWO BOOKS OPENS ON WHERE THE MONEY IS KEPT, two counts and no s
 
   const own = book('Household');
   account('Everyday', own, 'GBP');
-  assert.deepEqual(leads().map((b) => b.body), ['Cash is {{cash-now}} across {{cash-accounts}} account(s), {{cash-now.change}} on a month ago.']);
+  /* ONE ACCOUNT WITH MONEY ON IT AND NOTHING DUE LASTS THE YEAR, and since money-core 3.17.0 the line says so
+     (`HEADLINE_LASTS`): one lead still, the line of what there is stepping aside for it. */
+  assert.deepEqual(leads().map((b) => b.body), ['Cash is {{cash-now}} across {{cash-accounts}} account(s), {{cash-now.change}} on a month ago, and on what is due it lasts the year.']);
 
   account('Studio dollars', book('Studio'), 'USD');
   const two = leads();

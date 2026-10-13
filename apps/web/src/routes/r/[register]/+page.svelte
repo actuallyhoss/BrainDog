@@ -25,9 +25,10 @@
   import * as pref from '$lib/pref.ts';
   import { covered, silenced, typing as isTyping } from '$lib/a11y/keys.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { chipsOf, columnsFor, currencyFor, display, DOM_CAP, iconFor, joinOf, labelOf, toRows, type Filter, whereOf } from '$lib/record/api.ts';
+  import { chipsOf, columnsFor, currencyFor, display, DOM_CAP, heldTwiceOn, iconFor, isRows, joinOf, labelOf, toRows, TWICE, twiceOf, twiceWords, type Filter, whereOf } from '$lib/record/api.ts';
+  import { createClient } from '@braindog/client';
   /* Type only, so the client's route table stays out of this chunk. */
-  import { joinNames, type Names } from '$lib/record/remote.ts';
+  import { joinNames, rowsHeldTwice, type Names } from '$lib/record/remote.ts';
   import { open, read, tally, type Boot, type Refusal, type Tally } from '$lib/data/record.ts';
   import { live } from '$lib/data/live.svelte.ts';
   import { searchable } from '$lib/record/find.ts';
@@ -151,6 +152,18 @@
   const join = $derived(joinOf(page.url.searchParams));
   /** The chips really are an "or": the word, and more than one chip for it to join. */
   const either = $derived(join === 'any' && filters.length > 1);
+  /* AND THE WORD THAT NARROWS A LIST OF PEOPLE TO THE ONES WHO MAY BE HELD TWICE, `twice=1` (`twiceOf`). The record says
+     who they are, once a question (`ask`), and `twiceHeld` keeps its answer for the list it was asked of: the numbers as a
+     filter that rides beside the chips to the list, its next page and its recheck, and is never drawn as a chip. On a
+     list that is not the people one the word is ignored, so nothing is asked and `twiceHeld` stays empty. */
+  const twiceAsked = $derived(twiceOf(page.url.searchParams));
+  let twiceHeld = $state<{ register: string; rows: Filter } | null>(null);
+  const twice = $derived(twiceAsked && twiceHeld?.register === id ? twiceHeld.rows : null);
+  /** The chips as the list is asked them: with the people held twice, while the word is on. */
+  const asking = $derived(twice ? [...filters, twice] : filters);
+  /** Something narrows the list: a chip, or the word. The search box is asked beside it where it matters. */
+  const narrowed = $derived(filters.length > 0 || twice !== null);
+  const clearTwice = () => setParam((p) => p.delete(TWICE));
 
   /* The columns actually drawn: the register's projection minus whatever the reader has hidden. */
   let createOpen = $state(false);
@@ -449,7 +462,7 @@
   const bySeq = $derived(new Map(pages.flat().map((e) => [e.seq, e] as const)));
   const rowAt = (seq: number): Entry | undefined => bySeq.get(seq);
 
-  const question = $derived(JSON.stringify([id, filters, q, sort ?? null, join ?? null]));
+  const question = $derived(JSON.stringify([id, filters, q, sort ?? null, join ?? null, twiceAsked]));
 
   $effect(() => {
     const said = question;
@@ -468,7 +481,7 @@
     }
     refusal = null;
     stale = false;
-    void ask(said, id, filters, q, sort, join);
+    void ask(said, id, filters, q, sort, join, twiceAsked);
     /* AND THE RECEIPTS GO WITH THE ANSWER THEY WERE ABOUT. A chip saying `archived` beside a row
        the reader has just filtered TO is a chip about a different screen: the receipt exists to
        hold a row in place through one action, not to follow it around the product.
@@ -519,7 +532,7 @@
     const said = asked;
     const from = cursor;
     const register = id;
-    const chips = filters;
+    const chips = asking;
     const text = q;
     const order = sort;
     const joined = join;
@@ -555,7 +568,7 @@
    * AND AN ANSWER FOR A QUESTION THAT HAS MOVED ON IS DROPPED, whole, which is why the state is
    * written at the end rather than as each part arrives.
    */
-  async function ask(said: string, register: string, chips: Filter[], text: string, order: typeof sort, joined: typeof join): Promise<void> {
+  async function ask(said: string, register: string, typed: Filter[], text: string, order: typeof sort, joined: typeof join, wantsTwice = false): Promise<void> {
     busy = true;
     await read(async () => {
       const src = await open();
@@ -564,6 +577,18 @@
       if (!b.ok) return refuse(b.refusal);
       booted = b.value;
       if (!s.ok) return refuse(s.refusal);
+      /* WHO MAY BE HELD TWICE, ASKED ONCE A QUESTION and only of a list of people (`heldTwiceOn` reads the role the
+         list declares). The answer narrows the list, its counts and every later page of it. A refusal is drawn as one:
+         everyone, under a line saying these are the people held twice, is the one wrong answer nobody could see. */
+      let rows: Filter | null = null;
+      if (wantsTwice && heldTwiceOn(page.url.searchParams, s.value)) {
+        const client = createClient({ base: apiBase() });
+        const who = await rowsHeldTwice((name, args) => client.call(name, args), register);
+        if (asked !== said) return true;
+        if (!who.ok) return refuse(who.refusal);
+        rows = who.value;
+      }
+      const chips = rows ? [...typed, rows] : typed;
       const size = b.value.registers.find((r) => r.id === register)?.count ?? 0;
       const bar = size >= ENOUGH_TO_SIFT || text !== '' || chips.length > 0;
       const [answer, facets] = await Promise.all([
@@ -573,6 +598,7 @@
       if (asked !== said) return true;
       if (!answer.ok) return refuse(answer.refusal);
       declared = { register, decl: s.value };
+      twiceHeld = rows ? { register, rows } : null;
       pages = [answer.value.entries];
       named = answer.value.names;
       cursor = answer.value.cursor;
@@ -665,7 +691,7 @@
     const mine = ++rechecks;
     const said = asked;
     const register = id;
-    const chips = filters;
+    const chips = asking;
     const text = q;
     const order = sort;
     const joined = join;
@@ -701,7 +727,7 @@
   /** The stale mark's control: the question asked again from the top, as a question the reader chose to ask. */
   function refresh() {
     stale = false;
-    void ask(asked, id, filters, q, sort, join);
+    void ask(asked, id, filters, q, sort, join, twiceAsked);
   }
 
   /**
@@ -725,7 +751,9 @@
           .filter((f) => f.type === 'enum')
           .map(async (f) => {
             /* "or" ONLY WITH MORE THAN ONE CHIP, as `either` reads it: one chip joined by "or" still narrows the list. */
-            const others = joined === 'any' && chips.length > 1 ? [] : chips.filter((x) => x.field !== f.id);
+            /* THE PEOPLE HELD TWICE ARE KEPT WHATEVER JOINS THE CHIPS: they say whose counts these are. */
+            const typed = chips.filter((x) => !isRows(x));
+            const others = [...chips.filter(isRows), ...(joined === 'any' && typed.length > 1 ? [] : typed.filter((x) => x.field !== f.id))];
             return [f.id, await src.counts(register, { filters: others, q: text }, f.id, f.values ?? [])] as const;
           }),
       ),
@@ -938,7 +966,7 @@
    * of them is wrong wherever they are both visible — which is exactly at the cap, the one place the
    * cap line exists for.
    */
-  const denominator = $derived(filters.length || q ? result.matched : result.total);
+  const denominator = $derived(narrowed || q ? result.matched : result.total);
 
   /**
    * AND WHAT IS ACTUALLY DRAWN, WHICH IS NEITHER OF THE OTHER TWO.
@@ -1058,7 +1086,7 @@
    * (`readingOf`). It counts the rows in hand, so it says nothing while the list is still being paged.
    */
   const reading = $derived(
-    readingOf(decl, standing, now, { whole, filtered: filters.length > 0 || q !== '', matched: result.matched, total: result.total }),
+    readingOf(decl, standing, now, { whole, filtered: narrowed || q !== '', matched: result.matched, total: result.total }),
   );
 
   /** A row's title as the list says it, for the summary tile's largest rows. */
@@ -1086,7 +1114,7 @@
    * the archived ones. It read 2,614 over 2,611 rows.
    */
   const settled = $derived(whole || truncated || drawn >= DOM_CAP);
-  const rowCount = $derived(settled ? result.matched : filters.length || q ? -1 : result.matched);
+  const rowCount = $derived(settled ? result.matched : narrowed || q ? -1 : result.matched);
 
   /**
    * THE SENTINEL, AND THE OBSERVER `50 §5.2` STEP 4 SPECIFIES.
@@ -2382,7 +2410,7 @@
   });
 
   const emptyKind = $derived(
-    result.total === 0 ? 'no-data-yet' : q || filters.length ? 'no-results' : 'cleared',
+    result.total === 0 ? 'no-data-yet' : q || narrowed ? 'no-results' : 'cleared',
   );
 
   /**
@@ -2514,7 +2542,7 @@
          And only on a list long enough to sift: five rows are read faster than a chart of them, and the tile would be
          the figure of what the eye already has. -->
     {#if whole && !arriving && siftable && standing.length > 0}
-      <ListSummary {decl} entries={standing} {now} byState={view !== 'board' && filters.length === 0 && q === ''} headSaid={reading !== null} titleOf={titleSaid} />
+      <ListSummary {decl} entries={standing} {now} byState={view !== 'board' && !narrowed && q === ''} headSaid={reading !== null} titleOf={titleSaid} />
     {/if}
 
     <!--
@@ -2524,6 +2552,15 @@
       since a tile never holds a tile.
     -->
     <Tile class="list-tile" data-view={view}>
+      <!-- THE PEOPLE WHO MAY BE HELD TWICE, AND ONLY THEM (`twice=1`): what is being shown, in words, and the way back
+           to everyone beside it. The list's first line, since it changes what every line under it means. The button
+           takes the word out of the address and leaves the chips, the search and the order as they are. -->
+      {#if twice}
+        <p class="held-twice" data-held-twice role="status">
+          <span>{twiceWords.showing}</span>
+          <Button data-held-twice-clear onclick={clearTwice}>{twiceWords.clear}</Button>
+        </p>
+      {/if}
       <div class="list-tools" data-uncounted={unsaid ? '' : undefined}>
         <!-- THE SEARCH AND THE FILTERS, which draw themselves only while there is something to sift, and the phone's
              filter sheet behind its one button. Which filters are on is the address, read and written here. -->
@@ -2568,7 +2605,10 @@
         <CaptureLine one={decl.one} bind:value={capture} bind:open={captureOpen} {captureRow} allFields={() => (createOpen = true)} />
       {/if}
 
-      {#if rows.length === 0}
+      {#if rows.length === 0 && twice && filters.length === 0 && q === '' && result.total > 0}
+        <!-- NOBODY IS HELD TWICE, said as that and not as a search that found nothing. -->
+        <p class="held-none" data-held-twice-none>{twiceWords.none}</p>
+      {:else if rows.length === 0}
         <ListEmpty kind={emptyKind} register={id} {decl} size={result.total} {q} {filters} {searched} />
       {:else if picked.length > 0}
         <!-- THE VERBS BELONG TO THE LIST, NOT TO ONE OF ITS BODIES, so the bar is drawn here for every view. It floats
@@ -2910,6 +2950,28 @@
     font-size: var(--fs-body);
     line-height: 1.4;
     overflow-wrap: anywhere;
+  }
+
+  /* THE LINE THAT SAYS THE LIST IS OF THE PEOPLE HELD TWICE: the sentence in ink, its way out at the end, wrapping under
+     it on a phone. The button is the shared one, which keeps its own height on a coarse pointer. */
+  .held-twice {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 16px;
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--fs-body);
+    line-height: 1.4;
+  }
+
+  /* NOBODY IS HELD TWICE: one plain sentence where the people would be. */
+  .held-none {
+    margin: 0;
+    padding: 24px 0;
+    color: var(--ink2);
+    font-size: var(--fs-body);
   }
 
   /* WHY THERE IS NO CAPTURE LINE, one dim sentence where the line would stand. */

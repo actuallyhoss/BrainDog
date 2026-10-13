@@ -10,12 +10,10 @@
  *
  * RED FIRST: on a one-book record with GBP 5,000 and a GBP 1,000 bill, the lead read the cash and no word of the year.
  *
- * DECLARED AND NOT PLACED, SO THE FIRST TEST IS TODO. Money is at twenty-four blocks, the most a page declares, and the
- * split is a third lead note: placed, Money was refused at install ("page.money declares 25 blocks"). `HEADLINE_LASTS`
- * holds the three, and every test but the first reads them on a page of their own, installed beside Money in the same
- * pack, so the sentences are proven on a real record and wait only on a block being given up. The first test reads
- * Money itself and goes green the day `MONEY_PAGE` spreads `HEADLINE_LASTS`; seen green on 2026-10-13 with the line
- * for two books set aside for the run.
+ * PLACED ON MONEY (money-lasts-line-78). Money is at twenty-four blocks, the most a page declares, and the split is a
+ * third lead note, so it waited on a block being given up: Heads up's line on categories marked the other way went,
+ * its figure still declared. The first tests read Money itself; the rest read `HEADLINE_LASTS` on a page of their own,
+ * installed beside Money in the same pack, as they did while the line waited.
  */
 
 import { test } from 'node:test';
@@ -26,6 +24,7 @@ import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.t
 import { NOW, firstPartyManifest } from '../src/index.ts';
 import { modulesFor, useCase } from '../src/usecases/index.ts';
 import { carriedDocument, dayOf, moduleDocument } from '../src/usecases/install.ts';
+import { MONEY_PAGE } from '../src/modules/money/pages/money.ts';
 import { HEADLINE_LASTS } from '../src/modules/money/pages/parts/headline.ts';
 
 const TODAY = dayOf(NOW);
@@ -96,17 +95,23 @@ const LASTS = 'Cash is {{cash-now}} across {{cash-accounts}} account(s), {{cash-
 const BOOKS = 'Your money is kept in {{books-held}} books, across {{cash-accounts}} account(s).';
 const bodies = (k: Kernel, page = LINE): (string | undefined)[] => leads(k, page).map((b) => b.body);
 
-test('ON MONEY ITSELF, a one-book record whose walk never goes under reads that it lasts the year', { todo: 'Money is at 24 blocks, the ceiling: place HEADLINE_LASTS once a block is given up' }, async () => {
+test('ON MONEY ITSELF, a one-book record whose walk never goes under reads that it lasts the year', async () => {
   const k = await record();
   account(k, 'Current account', gbp(500_000));
   bill(k, 100_000, 12);
   assert.deepEqual(bodies(k, 'money'), [LASTS]);
 });
 
-test('MONEY AS PLACED STILL SAYS WHAT THERE IS, once, on that record: the split has changed nothing a person reads yet', async () => {
+test('MONEY GAVE UP ONE BLOCK FOR THE LINE: twenty-four still, no word on categories marked the other way, and its figure still declared', async () => {
+  const blocks = MONEY_PAGE.blocks as Record<string, unknown>[];
+  assert.equal(blocks.length, 24, 'the most a page declares');
+  assert.deepEqual(blocks.filter((b) => JSON.stringify(b).includes('categories-against-direction')), []);
+  assert.equal(blocks.filter((b) => b.lead === true).length, 3, 'what there is, that it lasts, and the line for two books');
   const k = await record();
+  assert.ok(k.metricDecl('categories-against-direction'), 'the figure is still there to be read');
+  /* A BILL PAST THE CASH TAKES THE YEAR BACK OUT OF MONEY'S LINE, and the cash is still said once. */
   account(k, 'Current account', gbp(500_000));
-  bill(k, 100_000, 12);
+  bill(k, 900_000, 30);
   assert.deepEqual(bodies(k, 'money'), [WHAT_THERE_IS]);
 });
 

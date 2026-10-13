@@ -686,6 +686,9 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
   assert.deepEqual(headings, [
     /* THE HEADLINE LINE, which carries no heading: it is the sentence in the page's headline tile. */
     undefined,
+    /* THE SAME LINE ENDING ON THE YEAR, SINCE money-core 3.17.0 (money-lasts-line-78): drawn in its place while the
+       money lasts, so one of the two is read. */
+    undefined,
     /* AND THE LINE A RECORD WITH TWO BOOKS OPENS ON, SINCE money-core 3.17.0: how many books and accounts, and no sum. */
     undefined,
     'What you have, by book',
@@ -711,8 +714,6 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
     'Last confirmed',
     'What it holds today',
     undefined,
-    undefined,
-    /* SINCE money-core 3.16.0 (REC-A13 job 2): a category marked one way that holds money going the other. */
     undefined,
     /* WHAT COMES IN AND GOES OUT IS OPEN, ONE TILE, SINCE money-core 3.11.0, and what already happened is folded under
        History. One view of the month is kept of three (3.4.0). */
@@ -809,8 +810,9 @@ test("MONEY HOLDS NO MORE BLOCKS THAN A PAGE MAY, and this month's spending and 
 
   /* NOTHING THAT LEADS THE PAGE MOVED: the line, the walk, the side column, the check and the Ledger, then Heads up. */
   assert.deepEqual(
-    blocks.slice(0, 11).map((b) => [b.kind, b.heading, b.area]),
+    blocks.slice(0, 12).map((b) => [b.kind, b.heading, b.area]),
     [
+      ['note', undefined, undefined],
       ['note', undefined, undefined],
       ['note', undefined, undefined],
       ['bar', 'What you have, by book', undefined],
@@ -824,7 +826,7 @@ test("MONEY HOLDS NO MORE BLOCKS THAN A PAGE MAY, and this month's spending and 
       ['section', 'Heads up', undefined],
     ],
   );
-  assert.deepEqual([blocks[0]!.lead, blocks[1]!.lead], [true, true]);
+  assert.deepEqual([blocks[0]!.lead, blocks[1]!.lead, blocks[2]!.lead], [true, true, true]);
 
   /* AND THE RECORD TAKES THE PAGE AND DRAWS BOTH ON THE SAMPLE WITHOUT A REFUSAL. */
   const k = await seeded();

@@ -45,6 +45,16 @@ export const words = {
   planning: 'Reading the plan',
   updateAll: 'Update all',
   updated: (n: number) => (n === 1 ? '1 add-on is updated.' : `${n} add-ons are updated.`),
+  /* ONE PASSED OVER IS NAMED: an earlier update of the same run already brought it to its version. */
+  alreadyIn: (names: readonly string[]) => `${joined(names)} ${names.length === 1 ? 'was' : 'were'} already in.`,
+  /**
+   * What "Update all" says when it ends, or `null` when there is nothing to add to what each install said for itself:
+   * one update that went in alone stays quiet. One passed over is always said, so the count never reads one short.
+   */
+  updatedAll(done: number, passed: readonly string[]): string | null {
+    if (passed.length === 0) return done > 1 ? this.updated(done) : null;
+    return done > 0 ? `${this.updated(done)} ${this.alreadyIn(passed)}` : this.alreadyIn(passed);
+  },
   asked: 'Asked on Decide. The owner reads the same plan there.',
   openDecide: 'Open it on Decide',
   fromTo: (from: string, to: string) => `${from} to ${to}`,

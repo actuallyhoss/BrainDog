@@ -13,7 +13,7 @@ import { firstPartyModules } from '@braindog/seed/packs/modules';
 import { USE_CASES } from '@braindog/seed/usecases';
 
 import { compareVersion } from '../../lib/market/listing.ts';
-import { changeLine, declarationName, firstPartyUpdates, inTurn, ledBy, ordered, readFirst, readInOrder, type Improved } from './improved.ts';
+import { cardLines, cardNotes, changeLine, declarationName, firstPartyUpdates, inTurn, ledBy, ordered, readFirst, readInOrder, type Improved } from './improved.ts';
 import { words } from './words.ts';
 
 const shipped = (id: string): string => {
@@ -214,4 +214,29 @@ test('the card orders what waits before it plans, and installs in turn', () => {
   assert.match(accept, /for \(const u of run\)/u);
   assert.match(accept, /readInOrder\(run, /u, 'Accept reads a conflict the run clears as a stop');
   assert.match(card.slice(to), /inTurn\(plans, /u, 'the card keeps its own loop of installs');
+});
+
+test('the card lists what waits in the order it goes in, Personal before the Money it hands to', () => {
+  const money = { ...moneyU, notes: ['Budgets show what is left this month.', 'Bills due this week are listed first.'] };
+  const personal = { ...personalU, notes: ['Sets a budget for each month.', 'Counts what was spent on the house.'] };
+  assert.deepEqual(cardLines([money, personal]).map((l) => [l.key, l.name, l.said]), [
+    ['usecase:personal', 'Personal', 'Sets a budget for each month.'],
+    ['module:money-core', 'Money', 'Budgets show what is left this month.'],
+  ]);
+  /* EVERY CHANGE, FOLDED UNDER "See each change", in the same order, each update's notes kept together. */
+  assert.deepEqual(cardNotes([money, personal]).map((l) => [l.name, l.said]), [
+    ['Personal', 'Sets a budget for each month.'],
+    ['Personal', 'Counts what was spent on the house.'],
+    ['Money', 'Budgets show what is left this month.'],
+    ['Money', 'Bills due this week are listed first.'],
+  ]);
+  assert.equal(new Set(cardNotes([money, personal]).map((l) => l.key)).size, 4, 'two folded lines share a key');
+  /* WITH NOBODY TO WAIT FOR, the lines stay as they came in, and the name is still said once (`ledBy`). */
+  assert.deepEqual(cardLines([money, workU]).map((l) => l.key), ['module:money-core', 'module:work']);
+  assert.equal(cardLines([{ ...workU, notes: ['Work opens on the task that has been late longest.'] }])[0]?.name, '');
+  /* THE CARD DRAWS THOSE, and never the updates as they came in. */
+  const card = source('./Improved.svelte');
+  assert.doesNotMatch(card, /\{#each updates as /u, 'the card draws its lines in the order the updates came in');
+  assert.match(card, /\{#each cardLines\(updates\) as line \(line\.key\)\}/u);
+  assert.match(card, /\{#each cardNotes\(updates\) as line \(line\.key\)\}/u);
 });

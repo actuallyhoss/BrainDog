@@ -513,15 +513,16 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
            the kernel) is called by nothing yet, so a line promising a question would promise one that never comes.
            No intent: it is a thing to look at, not a thing gone wrong.
 
-           AND SOMETHING TO PRESS (audit 69, finding 3), where the line said a number and stopped: the list of people in
-           order of name, since two of one name sit side by side there and that is where one is merged into the other.
-           THE WHOLE LIST AND NOT THE PAIRS ALONE, because a list's address narrows by a field's value, a search and an
-           order, and "held twice" is a pair the kernel works out and no value a field holds. So the words say what to
-           look for, and a chip that looked like the answer and was not stays out. */
+           AND SOMETHING TO PRESS (audit 69, finding 3), where the line said a number and stopped: the list of people,
+           opened at the ones this figure counted. THE PEOPLE HELD TWICE AND NOT THE WHOLE LIST (audit 74, claim 4): the
+           link used to open everyone in order of name and tell the reader to look for the same person listed twice,
+           since a list's address narrowed by a field's value, a search and an order, and "held twice" is a pair the
+           kernel works out and no value a field holds. The list takes the word `twice` in its address now and asks
+           the record for those people itself, so the note says "See them" and the looking is the record's. */
         kind: 'note',
         span: 12,
         when: { metric: 'held-twice', gt: 0 },
-        body: 'People who may be on this record twice: {{held-twice}}. [See everyone by name](/r/people?sort=name) and look for the same person listed twice.',
+        body: 'People who may be on this record twice: {{held-twice}}. [See them](/r/people?twice=1).',
       },
       {
         /* CARDS, with a face for each person, rather than a table of four columns read

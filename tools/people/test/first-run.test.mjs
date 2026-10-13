@@ -9,9 +9,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { createServer } from 'node:http';
 
 import { checkPerson } from '../check-files.mjs';
-import { expect, lineOf, notMine, selfHost, STEPS, walk } from '../expect/first-run.mjs';
+import { expect, lineOf, notMine, redOf, selfHost, STEPS, walk } from '../expect/first-run.mjs';
 import { propose } from '../../../apps/web/src/lib/start/propose.ts';
 import { answer, oneQuestion } from '../../../apps/web/src/lib/start/question.ts';
 import { browserCurrencyEnv, zoneCurrency } from '../../../apps/web/src/routes/start/building.ts';
@@ -238,4 +240,83 @@ test('it never writes to a record it did not make', async () => {
   assert.equal(keep.pass, false);
   assert.match(keep.saw, /nothing was written to it/u);
   for (const r of results.slice(4)) assert.match(r.saw, /^not reached: /u);
+});
+
+/* ── run as a command: what it leaves with ───────────────────────────────────────────────────────────── */
+
+const COMMAND = new URL('../expect/first-run.mjs', import.meta.url).pathname;
+
+/** The command run to its end, not through a pipe: `{ status, stdout, stderr }`. Never `spawnSync`, which would hold
+    this process still while the stub host below has to answer. */
+function run(args) {
+  return new Promise((done, broke) => {
+    const child = spawn(process.execPath, [COMMAND, ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
+    const said = { stdout: '', stderr: '' };
+    child.stdout.on('data', (d) => (said.stdout += d));
+    child.stderr.on('data', (d) => (said.stderr += d));
+    child.on('error', broke);
+    child.on('close', (status) => done({ status, ...said }));
+  });
+}
+
+/** A host that is there and has none of the doors: every request is answered 404, so sign-up is refused at step 4. */
+async function noDoors() {
+  const server = createServer((_, res) => void res.writeHead(404, { 'content-type': 'application/json' }).end('{}'));
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  return { origin: `http://127.0.0.1:${server.address().port}`, close: () => new Promise((r) => server.close(r)) };
+}
+
+/* AUDIT 75 CLAIM 8 said the command left with 0 on a red walk. It never did: the 0 was the exit code of the pipe the
+   run was read through. These pin what it leaves with, each way it can end. */
+test('RUN AS A COMMAND ON A HOST WITH NO SIGN-UP: step 4 is red, the three after it are red, and it exits 1', { timeout: 60_000 }, async () => {
+  const host = await noDoors();
+  let r;
+  try {
+    r = await run(['--base', host.origin]);
+  } finally {
+    await host.close();
+  }
+  assert.match(r.stdout, /^4\. Keep it: red\. sign-up refused/mu);
+  for (const n of [5, 6, 7]) assert.match(r.stdout, new RegExp(`^${n}\\. .+: red\\. not reached: `, 'mu'));
+  assert.equal(r.stdout.split('\n').filter((l) => /^\d\. /u.test(l)).length, STEPS.length);
+  assert.equal(r.status, 1);
+});
+
+test('RUN AS A COMMAND ON A FRESH SELF-HOST: seven green lines and it exits 0', { timeout: 120_000 }, async () => {
+  const r = await run([]);
+  assert.equal(r.stdout.split('\n').filter((l) => /^\d\. .+: green\. /u.test(l)).length, STEPS.length, r.stdout + r.stderr);
+  assert.doesNotMatch(r.stdout, /: (red|not walked)\. /u);
+  assert.equal(r.status, 0);
+});
+
+test('RUN AS A COMMAND, A THROW IS RED TOO: a person file the walk cannot read exits 1 and says why in red', { timeout: 60_000 }, async () => {
+  const host = await noDoors();
+  let thrown, missing;
+  try {
+    /* package.json is JSON and no person: the walk throws on its first read of her. */
+    thrown = await run([new URL('../../../package.json', import.meta.url).pathname, '--base', host.origin]);
+    missing = await run([new URL('../nobody-here.json', import.meta.url).pathname, '--base', host.origin]);
+  } finally {
+    await host.close();
+  }
+  for (const r of [thrown, missing]) {
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stderr, /^red\. the walk stopped: .+/mu);
+    assert.doesNotMatch(r.stdout, /: green\. /u);
+  }
+});
+
+test('WHAT COUNTS AS RED: a red step, a step never said, and a step left not walked where it could have been', () => {
+  const green = STEPS.map((s) => ({ id: s.id, pass: true, saw: 'seen' }));
+  const withStep = (id, pass) => green.map((r) => (r.id === id ? { ...r, pass } : r));
+  assert.equal(redOf(green, { advance() {} }), false);
+  assert.equal(redOf(withStep('tell', false), { advance() {} }), true);
+  assert.equal(redOf(green.slice(0, 4), { advance() {} }), true, 'three steps were never said');
+  assert.equal(redOf([], {}), true, 'nothing was said at all');
+  /* DAY 15 ON THE REAL CLOCK is the one step a walk may leave not walked. */
+  assert.equal(redOf(withStep('offer', null), {}), false);
+  assert.equal(redOf(withStep('offer', null), { advance() {} }), true, 'this host can move its clock');
+  /* A build that did not happen and a step that says "not walked" for it is no pass. */
+  assert.equal(redOf(withStep('keep', null), {}), true);
+  assert.equal(redOf(withStep('today', undefined), {}), true);
 });

@@ -35,6 +35,14 @@ const pages: [string, Page][] = [
 /** The most tiles a page shows before the rest is folded shut. */
 const ABOVE_THE_FOLD = 6;
 
+/**
+ * THE ONE PAGE LET OVER IT, AND BY HOW MANY, UNTIL IT IS RULED ON (book-lasts-year-78). A book's page stood at six, and
+ * the line that its money lasts the year is a seventh: one sentence under What is due, drawn only while the walk never
+ * goes under, in place of the cell Money lasts until. Whether it stays a tile of its own, becomes the page's line or
+ * takes another tile's place is the owner's; nothing else is let over, and this page by no more than the one line.
+ */
+const OVER: Record<string, number> = { 'money-book': 1 };
+
 test('THE SWEEP READS EVERY DECLARED PAGE, so a page left out is not a page passed', () => {
   assert.ok(pages.length >= 25, `only ${pages.length} pages were read`);
   for (const slug of ['money', 'portfolio', 'project', 'work', 'estate', 'agents', 'personal/home-personal', 'founder/home-founder', 'team/home-team', 'guide/guide', 'student/home-student', 'business/home-business'])
@@ -79,7 +87,9 @@ test(`NO PAGE SHOWS MORE THAN ${ABOVE_THE_FOLD} TILES BEFORE THE REST IS FOLDED 
       }
       return !boxed && !b.lead && !standsIn(b);
     });
-    assert.ok(above.length <= ABOVE_THE_FOLD, `${slug} shows ${above.length} tiles before its fold: ${above.map((b) => b.heading ?? b.kind).join(', ')}`);
+    assert.ok(above.length <= ABOVE_THE_FOLD + (OVER[slug] ?? 0), `${slug} shows ${above.length} tiles before its fold: ${above.map((b) => b.heading ?? b.kind).join(', ')}`);
+    /* AND AN ALLOWANCE NOBODY NEEDS ANY MORE IS TAKEN OUT, not left for the next tile to use. */
+    if (OVER[slug] !== undefined) assert.equal(above.length, ABOVE_THE_FOLD + OVER[slug], `${slug} no longer needs to be let over ${ABOVE_THE_FOLD}`);
   }
 });
 

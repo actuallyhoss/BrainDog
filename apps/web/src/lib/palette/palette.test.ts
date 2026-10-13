@@ -208,7 +208,8 @@ test('AND IT REACHES THE FIGURES, which no search could reach before', () => {
      to know which page it was a tile on. The palette lists the ones that can be read, drawn with
      the reading and the target beside the name so the row answers without being opened. */
   /* A COUNT PER A DISTINCT OF ITS OWN ROWS reads no value while it counts no row (money-core's `repeating-overdue`,
-     batch 74), and the sample holds no such row: a figure with nothing to say has no row here, as it has no door. */
+     batch 74; since batch 78 its rows are the matched lines, so it reads no value only with no matched line at all),
+     and the sample holds no matched line: a figure with nothing to say has no row here, as it has no door. */
   const silentWhenNone = (d: { value?: unknown }): boolean => {
     const ratio = (d.value as { ratio?: { per?: object } } | undefined)?.ratio;
     return ratio !== undefined && ratio.per !== undefined && 'distinct' in ratio.per;

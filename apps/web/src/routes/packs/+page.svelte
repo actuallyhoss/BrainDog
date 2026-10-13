@@ -402,7 +402,8 @@
    *
    * A HOLDER GOES IN BEFORE THE ONE IT HANDS TO (`inOrder`), and the one that waits is drawn as going in after it
    * rather than as a stop (`marked`): by the time it is planned again the holder has landed. One the holder's own plan
-   * already brought to its version is passed over, since there is nothing left of it to install.
+   * already brought to its version is passed over, since there is nothing left of it to install, and is named in the
+   * line the run ends on so the count never reads one short of what was pressed.
    */
   async function showAll() {
     const all = inOrder(updates ?? []);
@@ -421,13 +422,17 @@
         diff: plans.map(({ p }) => marked(diffOf(p), all, plans.map((x) => x.u))),
         then: async () => {
           let done = 0;
+          const passed: string[] = [];
           for (const { u, p } of plans) {
             const fresh = done === 0 ? { ok: true as const, planned: p } : await planOf(u);
             if (!fresh.ok) {
               said = { ...said, [u.key]: { fix: fresh.fix, code: fresh.code } };
               break;
             }
-            if (done > 0 && landed(fresh.planned)) continue;
+            if (done > 0 && landed(fresh.planned)) {
+              passed.push(u.title);
+              continue;
+            }
             const asks = fresh.planned.kind === 'pack' ? fresh.planned.approve : fresh.planned.plan.approve;
             if (asks.some((line) => !shown.has(line))) {
               const again = fresh.planned;
@@ -437,7 +442,8 @@
             if (!(await installOne(fresh.planned, u.title, u))) break;
             done += 1;
           }
-          if (done > 1) toasts.push(words.updated(done), { intent: 'good' });
+          const ended = words.updatedAll(done, passed);
+          if (ended) toasts.push(ended, { intent: 'good' });
           await reread();
         },
       };

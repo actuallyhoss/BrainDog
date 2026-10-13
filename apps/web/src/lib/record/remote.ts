@@ -23,7 +23,7 @@
 
 import { KERNEL_FIELDS, parseWhere, quoteValue } from '@braindog/where';
 
-import { identityOfRow, whereOf, type Identity } from './api.ts';
+import { identityOfRow, isRows, rowsFilter, whereOf, type Identity } from './api.ts';
 import { FINISHED, leftOut, REGISTERS, seqTitled, TITLES } from './held.ts';
 import { searchable, terms } from './find.ts';
 import type { Entry, Fields, Filter, RegisterDecl } from './schema.ts';
@@ -343,6 +343,20 @@ function leafOf(register: string, f: Filter, refs: Refs): Tree {
 }
 
 /**
+ * The entries a list is narrowed to by their numbers (`rowsFilter` in `api.ts`), as one leaf.
+ *
+ * NUMBERS AND NOT THE WORDS A CHIP CARRIES, since the number is a whole number in the record and a leaf is not parsed.
+ * One number is still `in`, so the shape is one shape.
+ *
+ * NO NUMBERS IS NOBODY, AND AN EMPTY `in` IS A REFUSAL (`VALUE_MALFORMED`), so nobody is asked for as a number below
+ * one, which no entry has: the list comes back empty and counted, rather than refused or, worse, whole.
+ */
+function numbersLeaf(f: Filter): Tree {
+  const seqs = f.values.map(Number).filter((n) => Number.isInteger(n) && n > 0);
+  return seqs.length === 0 ? { field: f.field, lt: 1 } : { field: f.field, in: seqs };
+}
+
+/**
  * The chips and the search box as one `where` tree, or `undefined` when nothing narrows the list.
  *
  * THE BOX IS A SUBSTRING TEST, AND THE MOCK'S IS A WORD PREFIX. Each word must appear in one of the
@@ -363,8 +377,11 @@ function leafOf(register: string, f: Filter, refs: Refs): Tree {
  * joins this `where` with another under `all`, which a sentence cannot sit inside.
  */
 export function treeOf(register: string, filters: readonly Filter[], q: string, refs: Refs, join?: 'any'): Tree | undefined {
-  const chips: Tree[] = filters.map((f) => leafOf(register, f, refs));
+  const chips: Tree[] = filters.filter((f) => !isRows(f)).map((f) => leafOf(register, f, refs));
   const nodes: Tree[] = join === 'any' && chips.length > 1 ? [{ any: chips }] : chips;
+  /* THE ENTRIES NAMED BY NUMBER STAND OUTSIDE THE "or", as the search box's words do: they say which entries the list
+     is of, and the chips narrow inside them however the chips are joined. */
+  for (const f of filters) if (isRows(f)) nodes.unshift(numbersLeaf(f));
   const words = terms(q);
   if (words) {
     const fields = searchable(register);
@@ -418,7 +435,31 @@ export function sentenceOf(register: string, filters: readonly Filter[], refs: R
  * box, which is every link, tile and saved address, the chips go as words and the record parses them.
  */
 export function whereFor(register: string, filters: readonly Filter[], q: string, refs: Refs, join?: 'any'): string | Tree | undefined {
-  return terms(q) ? treeOf(register, filters, q, refs, join) : sentenceOf(register, filters, refs, join);
+  /* AND THE TREE WHEN THE LIST IS NARROWED TO ENTRIES BY NUMBER (the people held twice, `rowsFilter`): a sentence has no
+     word for them, and they are ANDed with chips that may be joined by "or". */
+  return terms(q) || filters.some(isRows) ? treeOf(register, filters, q, refs, join) : sentenceOf(register, filters, refs, join);
+}
+
+/** A call's answer as far as this file reads one: a value, or the record's refusal. */
+type Called = { ok: true; value: unknown } | { ok: false; refusal?: { code: string; fix: string } };
+
+/**
+ * Who may be on the record twice, as the filter the list is asked with: the record's `heldTwice`, asked once.
+ *
+ * `call` IS THE CLIENT'S OWN, handed in so this is driven without a record. The answer is the numbers of the people the
+ * `held-twice` figure counts; `null` is a record with no list of people, read as nobody.
+ *
+ * A REFUSAL IS HANDED BACK AS ONE AND NEVER AS EVERYONE. A list that drew every person under a line saying these are
+ * the ones held twice would be wrong in the one way nobody could see.
+ */
+export async function rowsHeldTwice(
+  call: (name: string, args: Record<string, unknown>) => Promise<Called>,
+  register: string,
+): Promise<{ ok: true; value: Filter } | { ok: false; refusal: { code: string; fix: string } }> {
+  const out = await call('heldTwice', { register });
+  if (!out.ok) return { ok: false, refusal: out.refusal ?? { code: 'UNREACHABLE', fix: 'Could not ask who is held twice. Try again.' } };
+  const seqs = (out.value as { seqs?: unknown } | null)?.seqs;
+  return { ok: true, value: rowsFilter(Array.isArray(seqs) ? seqs.filter((n): n is number => typeof n === 'number') : []) };
 }
 
 /**

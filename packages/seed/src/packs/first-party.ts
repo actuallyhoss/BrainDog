@@ -597,11 +597,23 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   together, so an invoice paid in part that says what was paid is drafted for what is left of it
  *   (`{{short:amount-paid_so_far}}`) and every other invoice keeps its sentence (chase-part-paid-77, REC-B22). No id
  *   added or taken away.
+ *   And batch 78's, in the same unreleased step (commit 63423720, the deployed build, holds 3.16.0), four changes and
+ *   three ids added: `repeating-overdue` now counts the late with `past` inside `state is live, last_paid is set`, so
+ *   a kept record reads 0 and met and a record with no matched line still reads no value (repeating-overdue-past-78,
+ *   signs-metric-75-76). Money's line is split in two, one drawn, so a record whose money lasts reads that it lasts
+ *   the year, and Heads up gives up its line on categories marked the other way so the page stays at twenty-four
+ *   blocks, the figure still declared (money-lasts-line-78, REC-B07). A book's page gains one line under What is due,
+ *   that its money lasts the year, drawn on `book-lasts-until` carrying `beyond` (book-lasts-year-78, REC-A09 step 2).
+ *   And a cleared payment that names nothing finds what it paid: `script.match_payment`, `rule.payment-matches` that
+ *   starts it, and `rule.instalment-settles` that runs `settle` once an instalment names its payment
+ *   (match-payment-78, REC-B11 step 3). A repeating line is found and not yet marked: that step waits, and while it
+ *   does no question is asked that has a repeating line among its answers.
  * - people 3.4.0: the People page says how many people may be on the record twice (people-held-twice-69), one note under
  *   its two lead notes, from the built-in figure held-twice and drawn only above nought. 3.3.0 is released (commit
  *   63423720 holds it), so a version of its own. A note added, nothing taken away, so a minor step that reaches a record
  *   on its own and asks no question. Still unreleased, it takes batch 74's link with no version of its own: the note
- *   links the list of everyone in order of name (people-twice-link-74).
+ *   links the list of everyone in order of name (people-twice-link-74). And batch 78's: the link opens the list at the
+ *   people held twice, `/r/people?twice=1`, and says See them (twice-link-78).
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.17.0',

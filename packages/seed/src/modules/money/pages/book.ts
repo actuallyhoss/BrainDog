@@ -22,6 +22,8 @@ import { BOOK_LEGS, DUE_30D, MOVED_COLUMNS } from './shared.ts';
  * true, because a book's few accounts are the page's subject and Cash now by account is a figure of the whole record.
  * SINCE money-core 3.4.0 the month ahead and what moved are folded under the accounts, as Money's are.
  *
+ * SINCE money-core 3.17.0 a book whose money never goes under in the year reads one line that it lasts (`lastsNote`).
+ *
  * A BLOCK IS ON THE PAGE ONCE EVERY FIGURE IT READS IS DECLARED (REC-A09 step 3, second half). What a book is owed and
  * its months are read from figures of one book (`figures/books.ts`), and those are declared by their own jobs: a cell
  * naming a figure nobody declared is refused where it is read, and a chart's `when:` naming one draws nothing for ever.
@@ -83,6 +85,7 @@ export const bookPage = (declared: (figure: string) => boolean): SeedPage => ({
       when: { metric: 'book-net-month:{{name}}', empty: false },
     },
     ...owedRow(declared),
+    ...lastsNote(declared),
     ...monthsChart(declared),
     {
       kind: 'cards',
@@ -199,6 +202,24 @@ function owedRow(declared: (figure: string) => boolean): Record<string, unknown>
   const cells = OWED_CELLS.filter(([figure]) => declared(figure)).map(([figure, label]) => ({ metric: `${figure}:{{name}}`, label }));
   if (cells.length === 0) return [];
   return [{ kind: 'stat', heading: 'What is due', icon: 'scale', span: 12, cells }];
+}
+
+/**
+ * THAT THE MONEY LASTS THE YEAR IS A LINE, BECAUSE NO CELL SAYS IT (REC-A09 step 2). `book-lasts-until` holds a day only
+ * while the walk goes under (`figures/books.ts`), so on a book whose money lasts the cell Money lasts until is left
+ * out, and the row with it where nothing else is due: the good news read as nothing at all. One line under What is due
+ * says it, as Home's line of what there is does (`usecases/founder.ts`).
+ *
+ * DRAWN ON THE READING CARRYING `beyond`, the walk having reached its last day above zero, and never on the figure
+ * being empty: a book nobody has put money in has no day either, and it is not money that lasts. So exactly one of the
+ * cell and the line is drawn, and neither on an empty book. "The year" and not "for good": the walk looks 365 days and
+ * knows no further. "On what is due": the walk counts no everyday spending (`EVERYDAY` in `legs.ts`).
+ *
+ * ONLY ONCE THE FIGURE IS DECLARED, as its cell is: a `when:` naming a figure nobody declared draws nothing for ever.
+ */
+function lastsNote(declared: (figure: string) => boolean): Record<string, unknown>[] {
+  if (!declared('book-lasts-until')) return [];
+  return [{ kind: 'note', span: 12, when: { metric: 'book-lasts-until:{{name}}', beyond: true }, body: 'Its money lasts the year on what is due.' }];
 }
 
 /** The figures the chart reads: its two lines, and what was left each month, which it is drawn on. */

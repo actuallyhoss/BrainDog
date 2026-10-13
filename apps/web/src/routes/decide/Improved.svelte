@@ -23,7 +23,7 @@
   import '$lib/decide/form.css';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { diffOf, install, planFor, type OfferClient, type Planned } from '../packs/browse/[id]/offer.ts';
-  import { changeLine, inTurn, landed, ledBy, ordered, readInOrder, type Improved } from './improved.ts';
+  import { cardLines, cardNotes, inTurn, landed, ordered, readInOrder, type Improved } from './improved.ts';
   import { words } from './words.ts';
 
   let {
@@ -118,11 +118,10 @@
   <p class="queue-by"><Face name={words.by} kind="system" size="s" /><span class="queue-who">{words.by}</span></p>
   <h3 class="queue-question" id="improved-title">{words.improved(updates.length)}</h3>
   <p class="queue-why">{words.improvedKeeps}</p>
-  <!-- WHAT CHANGES, one line a page: its name, then the newest thing it does, the name said once where the line opens
-       with it (`ledBy`). -->
+  <!-- WHAT CHANGES, one line a page, in the order Accept takes them (`cardLines`): its name, then the newest thing it
+       does, the name said once where the line opens with it (`ledBy`). -->
   <ul class="queue-does improved-lines">
-    {#each updates as u (u.key)}
-      {@const line = ledBy(u.title, changeLine(u))}
+    {#each cardLines(updates) as line (line.key)}
       <li class="queue-does-line">{#if line.name}<span class="improved-name">{line.name}</span>{' '}{/if}{line.said}</li>
     {/each}
   </ul>
@@ -135,11 +134,8 @@
     <details class="queue-ways queue-reasons">
       <summary class="queue-ways-toggle">{words.seeEach}</summary>
       <ul class="queue-reasons-list">
-        {#each updates as u (u.key)}
-          {#each u.notes as note, i (i)}
-            {@const line = ledBy(u.title, note)}
-            <li class="queue-reason">{#if line.name}<span class="queue-reason-label">{line.name}</span>{' '}{/if}{line.said}</li>
-          {/each}
+        {#each cardNotes(updates) as line (line.key)}
+          <li class="queue-reason">{#if line.name}<span class="queue-reason-label">{line.name}</span>{' '}{/if}{line.said}</li>
         {/each}
       </ul>
     </details>

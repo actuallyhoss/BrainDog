@@ -7,7 +7,7 @@ import { BUDGET } from './parts/budget.ts';
 import { BY_BOOK } from './parts/by-book.ts';
 import { CROSS_CHECK } from './parts/cross-check.ts';
 import { FORECAST } from './parts/forecast.ts';
-import { HEADLINE } from './parts/headline.ts';
+import { HEADLINE_LASTS } from './parts/headline.ts';
 import { HEADS_UP } from './parts/heads-up.ts';
 import { HISTORY } from './parts/history.ts';
 import { INSTALMENTS } from './parts/instalments.ts';
@@ -71,6 +71,14 @@ import { SPENDING } from './parts/spending.ts';
  * lead. TWENTY-FOUR BLOCKS, THE MOST A PAGE DECLARES (`BLOCK_CEILING` in `packages/kernel/src/declare.ts`): the line
  * took the place of the one that said no balance had been typed (`parts/cross-check.ts`).
  *
+ * THAT THE MONEY LASTS THE YEAR, IN THE LINE (REC-B07, DIRECTION §42). The tile of when it runs out is drawn only while
+ * the walk has a day it goes under on, so a record whose money lasts read nothing of how long. The line for one book
+ * is now two, one drawn (`HEADLINE_LASTS` in `parts/headline.ts`): what there is, and the same ending "it lasts the
+ * year" while the walk reaches its last day above zero. That is a third lead note on a page at twenty-four, so one
+ * block went and the page is twenty-four still: Heads up's line on categories holding money going the other way from
+ * how they are marked (`parts/heads-up.ts`, declared there and not placed), empty on nearly every record like Being
+ * chased before it. Its figure stays declared, for a check that reads it off the page.
+ *
  * THE LEDGER, OPEN (REC-B15: "Ledger, add, edit, delete", "I hate this tabs"). The six newest entries stand in a tile
  * of their own under the walk and the accounts beside it, each line opening its entry (`parts/ledger.ts`), where
  * twelve were folded shut under History. History gave them up, so the page is still twenty-four blocks and says what
@@ -99,7 +107,8 @@ export const MONEY_PAGE: SeedPage = {
      in it, and the main column then takes the page. */
   layout: { rail: 4 },
   blocks: [
-    ...HEADLINE,
+    /* The line, split so a record whose money lasts reads that it lasts the year (see above). */
+    ...HEADLINE_LASTS,
     ...BY_BOOK,
     ...ADD_ACCOUNT,
     ...FORECAST,
@@ -108,7 +117,8 @@ export const MONEY_PAGE: SeedPage = {
     ...QUEUE,
     ...CROSS_CHECK,
     ...LEDGER,
-    ...HEADS_UP,
+    /* Every line of it but the one on categories marked the other way, given up for the line above. */
+    ...HEADS_UP.filter((b) => (b.when as { metric?: string } | undefined)?.metric !== 'categories-against-direction'),
     ...NEXT_30,
     ...INSTALMENTS,
     ...SPENDING,

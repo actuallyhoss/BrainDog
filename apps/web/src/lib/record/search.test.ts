@@ -269,7 +269,7 @@ test('THE HEAD AND THE CAP LINE COUNT AGAINST THE SAME NUMBER', () => {
      row this tab typed is held apart from `result.total`. */
   assert.match(
     REGISTER,
-    /const denominator = \$derived\(filters\.length \|\| q \? result\.matched : result\.total\)/u,
+    /const denominator = \$derived\(narrowed \|\| q \? result\.matched : result\.total\)/u,
   );
   assert.match(REGISTER, /total=\{denominator\}/u);
   assert.doesNotMatch(REGISTER, /total=\{result\.total\}/u, 'the head counts against the register again');

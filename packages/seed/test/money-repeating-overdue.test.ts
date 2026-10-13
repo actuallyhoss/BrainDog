@@ -24,6 +24,15 @@
  * count is now read per the one state its lines are in, so with no matched line past its day there is nothing to divide
  * by and the reading is no value and no verdict. RED FIRST: as a plain count, every test below that asks for no value
  * reads 0, and every one that asks for no verdict reads met.
+ *
+ * AND THE NOUGHT IS BACK WHERE IT WAS READ (signs-metric-75-76, repeating-overdue-past-78). Counting per the state
+ * silenced the kept record too: lines matched and none past its day was no line under a `where` that held the day, the
+ * same as no line ever matched. The day is out of the `where` now and in the count (`past`), so the `where` says who is
+ * judged, the live lines a payment was matched to, and the count says how many of those are late. A record with such
+ * lines and none late reads 0 and meets its mark; a record with none of them still reads no value. And the figure is
+ * read both ways here, as Money declares it and as a record holds it, because a record keeps a declaration's keys in
+ * order and `{ past, by }` comes back `{ by, past }`. RED FIRST: with the day in the `where`, every test below that
+ * asks for 0 and met reads no value.
  */
 
 import { test } from 'node:test';
@@ -70,11 +79,34 @@ async function moneyCore(): Promise<Kernel> {
   return k;
 }
 
-/** The sign as the record holds it, read now. */
+/** The sign as Money declares it, read now. */
 const stuck = (k: Kernel) => {
   const read = k.metric(METRICS['repeating-overdue'] as never);
   assert.ok(read.ok, sayOf(read));
   return read.value;
+};
+
+/** The sign as the record installed it, its keys in the order a record keeps them. */
+const heldSign = (k: Kernel) => {
+  const held = k.declarations().find((d) => d.id === 'metric.repeating-overdue');
+  assert.ok(held, 'money-core installed without repeating-overdue');
+  return JSON.parse(held.body) as { name?: string; where?: string; value?: unknown };
+};
+
+/** The same sign read from what the record holds, which is what a page and an agent are answered from. */
+const stuckHeld = (k: Kernel) => {
+  const read = k.metric(heldSign(k) as never);
+  assert.ok(read.ok, sayOf(read));
+  return read.value;
+};
+
+/** Read both ways, and held to one answer: what Money declares and what a record stores must not part. */
+const both = (k: Kernel) => {
+  const declared = stuck(k);
+  const held = stuckHeld(k);
+  assert.equal(held.value, declared.value, 'the figure a record holds reads another number than the one Money declares');
+  assert.equal(held.met, declared.met, 'and another verdict');
+  return declared;
 };
 
 /** A repeating line with its "Next" so many days from today, live unless said, and with no payment matched to it yet. */
@@ -94,8 +126,12 @@ test('MONEY DECLARES THE SIGN FOR A STUCK REPEATING LINE, and the record install
   const sign = METRICS['repeating-overdue'];
   assert.ok(sign, 'Money does not declare repeating-overdue');
   assert.equal(sign.source, 'register.recurring');
-  assert.equal(sign.where, 'state is live, next_due before -3d, last_paid is set', 'live, more than three days gone, and matched to a payment before');
-  assert.deepEqual(sign.value, { ratio: { of: { count: 'id' }, per: { distinct: 'state' } } }, 'a count per the one state, so no two currencies can meet in it');
+  assert.equal(sign.where, 'state is live, last_paid is set', 'who is judged: live, and matched to a payment before. The day is the count\'s');
+  assert.deepEqual(
+    sign.value,
+    { ratio: { of: { past: 'next_due', by: '3d' }, per: { distinct: 'state' } } },
+    'the late among them, per the one state, so no two currencies can meet in it',
+  );
   assert.deepEqual(sign.target, { lte: 0 }, 'none stuck is the mark');
   assert.equal(sign.format, 'int');
   assert.equal(sign.compare, 'none');
@@ -115,7 +151,7 @@ test('THE NAME SAYS IT COUNTS MATCHED LINES, so nought is not read as every repe
 
   /* The name is what the record holds, so what a page or an agent is shown. */
   const k = await moneyCore();
-  const held = JSON.parse(k.declarations().find((d) => d.id === 'metric.repeating-overdue')!.body) as { name?: string };
+  const held = heldSign(k);
   assert.equal(held.name, sign.name, 'the record installed another name than Money declares');
 
   /* And the number under it is what the name says: a line Money watch wrote, never matched, is not in it. */
@@ -145,7 +181,7 @@ test('A LINE PAID BEFORE WHOSE NEXT IS FOUR DAYS GONE COUNTS, and one three days
   paid(k, 'Rent', -4, -34);
   paid(k, 'Phone', -3, -33);
 
-  const read = stuck(k);
+  const read = both(k);
   assert.equal(read.value, 1, 'the fourth day gone is stuck; the third is still inside the days a payment takes to land');
   assert.equal(read.met, false, 'one stuck line misses the mark');
 });
@@ -155,7 +191,7 @@ test('A LINE MONEY WATCH JUST ADDED IS NOT RED, though its Next has gone by with
   /* The fields `packs/money-watch/repeats.js` writes after a yes, and no others: no payment was ever matched to it. */
   line(k, 'Netflix', -4, { amount: { amount: 1_099, currency: 'GBP' }, day_of_month: '12', note: 'Added by Money watch from three payments about a month apart.' });
 
-  const read = stuck(k);
+  const read = both(k);
   assert.equal(read.value, null, 'nothing was ever matched to it, so the record cannot say a payment is missing, nor that none is');
   assert.equal(read.met, null, 'a line just added does not miss the mark, and does not meet it either');
 });
@@ -166,19 +202,19 @@ test('A LINE NOBODY EVER MATCHED A PAYMENT TO IS NOT JUDGED, however long ago it
   line(k, 'Salary', -200, { direction: 'in' });
   paid(k, 'Hosting', -9, -39);
 
-  assert.equal(stuck(k).value, 1, 'the one line a payment was matched to before, and neither of the two it never was');
+  assert.equal(both(k).value, 1, 'the one line a payment was matched to before, and neither of the two it never was');
 });
 
-test('A LINE WHOSE PAYMENT WAS MATCHED IS NOT STUCK: its Next moved on with the match', async () => {
+test('A LINE WHOSE PAYMENT WAS MATCHED IS NOT STUCK: its Next moved on with the match, and the sign says nought and met', async () => {
   const k = await moneyCore();
   /* As `settle` leaves a monthly line paid two days ago: "Last paid" then, "Next" a cycle ahead. */
   paid(k, 'Rent', 28, -2);
   /* And one matched on its day, which a yearly line's "Next" then left a year off. */
   paid(k, 'Hosting', 365, 0, { every: 'yearly' });
 
-  const read = stuck(k);
-  assert.equal(read.value, null, 'no line is stuck, and the sign does not say nought');
-  assert.equal(read.met, null);
+  const read = both(k);
+  assert.equal(read.value, 0, 'two matched lines were read and neither is stuck, which is a nought that was counted');
+  assert.equal(read.met, true, 'none stuck is the mark, and it is met');
 });
 
 test('A PAUSED OR ENDED LINE IS NOT STUCK, however long ago its Next was', async () => {
@@ -186,18 +222,24 @@ test('A PAUSED OR ENDED LINE IS NOT STUCK, however long ago its Next was', async
   paid(k, 'Gym', -40, -70, { state: 'paused' });
   paid(k, 'Old lease', -200, -230, { state: 'ended' });
 
-  assert.equal(stuck(k).value, null);
+  const read = both(k);
+  assert.equal(read.value, null, 'neither is waiting for anything, so neither is judged, late or not');
+  assert.equal(read.met, null);
+
+  /* Beside a live line that is on time they are still left out: the nought is the live line's alone. */
+  paid(k, 'Rent', 12, -18);
+  assert.equal(both(k).value, 0);
 });
 
-test('A LINE WHOSE NEXT IS TODAY OR AHEAD IS NOT STUCK, and with none stuck the sign says nothing', async () => {
+test('A LINE WHOSE NEXT IS TODAY OR AHEAD IS NOT STUCK, and with none stuck the sign reads 0 and met', async () => {
   const k = await moneyCore();
   paid(k, 'Rent', 12, -18);
   paid(k, 'Salary', 0, -30, { direction: 'in' });
   paid(k, 'Insurance', -1, -31);
 
-  const read = stuck(k);
-  assert.equal(read.value, null);
-  assert.equal(read.met, null, 'lines are held and none is stuck, which the sign leaves unsaid');
+  const read = both(k);
+  assert.equal(read.value, 0, 'three matched lines, the latest a day gone, and none past the three days');
+  assert.equal(read.met, true, 'lines are held and none is stuck, which the sign now says');
 });
 
 test('EVERY STUCK LINE COUNTS ONCE, in any currency and either way', async () => {
@@ -207,11 +249,13 @@ test('EVERY STUCK LINE COUNTS ONCE, in any currency and either way', async () =>
   paid(k, 'Salary', -9, -39, { direction: 'in', amount: { amount: 5_000_000, currency: 'EGP' }, last_amount: { amount: 4_900_000, currency: 'EGP' } });
   paid(k, 'Water', 3, -27);
 
-  assert.equal(stuck(k).value, 3);
+  const read = both(k);
+  assert.equal(read.value, 3, 'three late of four, and the count is the late ones, never a share of the four');
+  assert.ok(Number.isInteger(read.value));
 });
 
 test('A RECORD WITH NO REPEATING LINES IS NOT JUDGED', async () => {
-  const read = stuck(await moneyCore());
+  const read = both(await moneyCore());
   assert.equal(read.value, null);
   assert.equal(read.met, null, 'none held, so nothing to say');
 });
@@ -225,14 +269,60 @@ test('A RECORD NOBODY MATCHES PAYMENTS ON READS NO VALUE, never a clean nought f
   line(k, 'Rent', -12, watched);
   line(k, 'Salary', -200, { ...watched, direction: 'in', amount: { amount: 5_000_000, currency: 'EGP' } });
 
-  const blind = stuck(k);
+  const blind = both(k);
   assert.equal(blind.value, null, 'three lines past their day and none counted is not nought stuck');
   assert.equal(blind.met, null, 'and a sign with no reading meets no mark');
 
   /* The day one of them is matched and its "Next" then goes by, the sign has a line to see and says so as a whole number. */
   paid(k, 'Hosting', -9, -39);
-  const seen = stuck(k);
+  const seen = both(k);
   assert.equal(seen.value, 1, 'the count itself, since every line it reads is live');
   assert.ok(Number.isInteger(seen.value), 'a count, never a share');
   assert.equal(seen.met, false);
+});
+
+test('A KEPT RECORD READS 0 AND MET, and the day one matched line goes past its day it reads 1 and missed', async () => {
+  const k = await moneyCore();
+  paid(k, 'Rent', 12, -18);
+  paid(k, 'Hosting', 200, -165, { every: 'yearly' });
+  paid(k, 'Salary', -2, -32, { direction: 'in' });
+
+  const kept = both(k);
+  assert.equal(kept.value, 0, 'every matched line is on time, and the sign has read them');
+  assert.equal(kept.met, true);
+
+  /* A line Money watch wrote and nobody matched does not spoil the nought, however long gone its "Next". */
+  line(k, 'Netflix', -40, { note: 'Added by Money watch from three payments about a month apart.' });
+  assert.equal(both(k).value, 0, 'a line nothing was matched to is not among the judged');
+
+  /* And one of the matched goes by with nothing matched since. */
+  paid(k, 'Phone', -5, -35);
+  const late = both(k);
+  assert.equal(late.value, 1);
+  assert.equal(late.met, false);
+});
+
+test('WHAT A RECORD STORES READS AS WHAT MONEY DECLARES, whichever way round the count keeps its two keys', async () => {
+  const k = await moneyCore();
+  const held = heldSign(k);
+  assert.equal(held.where, METRICS['repeating-overdue']!.where, 'the record installed another where than Money declares');
+  assert.deepEqual(held.value, METRICS['repeating-overdue']!.value, 'the same count, whatever order its keys came back in');
+
+  paid(k, 'Rent', 12, -18);
+  paid(k, 'Phone', -4, -34);
+  paid(k, 'Water', -3, -33);
+
+  /* Both orders written out, so the test does not lean on how this record happens to keep them. */
+  const base = { ...METRICS['repeating-overdue']! };
+  const orders = [
+    { past: 'next_due', by: '3d' },
+    { by: '3d', past: 'next_due' },
+  ];
+  for (const of of orders) {
+    const read = k.metric({ ...base, value: { ratio: { of, per: { distinct: 'state' } } } } as never);
+    assert.ok(read.ok, `${Object.keys(of).join(', ')}: ${sayOf(read)}`);
+    assert.equal(read.value.value, 1, `${Object.keys(of).join(', ')}: the fourth day gone and not the third`);
+    assert.equal(read.value.met, false);
+  }
+  assert.equal(stuckHeld(k).value, 1, 'and so does the figure as the record holds it');
 });

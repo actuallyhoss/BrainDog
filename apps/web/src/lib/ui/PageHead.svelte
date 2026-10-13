@@ -27,7 +27,8 @@
   A NAME BREAKS BETWEEN ITS WORDS, never inside one: "Invoice 2026-041" broke after the hyphen, as "2026-" and "041".
 
   `below` IS WHAT GOES UNDER THE SENTENCE: the line a task is typed into on a phone (`home/HeadCapture.svelte`), which
-  stood between the name and its sentence when it wrapped out of the name's row.
+  stood between the name and its sentence when it wrapped out of the name's row. On a phone that row keeps a tap's room
+  at its end for the ⋯ of the page under it, where the page has one.
 
   `led` AND `over` ARE KEPT FOR THE PAGES THAT PASS THEM, and change nothing: the header is the same on every page.
 -->
@@ -665,6 +666,28 @@
     /* AND THE SHORTCUT HINT GOES, because below 900px there is no keyboard to press it with. */
     .head-actions :global(kbd) {
       display: none;
+    }
+  }
+
+  /**
+   * ON A PHONE THE PAGE'S ⋯ HAS A PLACE AT THE END OF THE HEAD'S LAST ROW (look fault N). Home's body brings its own
+   * menu (`PageView`'s `.home-tools`), and where the head ends on its sentence that screen raises it to the sentence's
+   * end. Where the head ends on `below` (the line a task is typed into, the default Today), there was no room: the ⋯
+   * kept a row of its own, about 60px of nothing over the first tile. So that row keeps a tap's room at its end, and
+   * the ⋯ is raised into it: over the body's top by the `--sp-4` a page leaves under its head, level with the row.
+   *
+   * ONLY WHERE A MENU IS THERE TO TAKE IT, and not while the page is being arranged, when the mode's controls are a
+   * row of their own. From 601px a touch screen keeps the row it had: the head has the width for it.
+   */
+  @media (hover: none) and (width <= 600px) {
+    :global(.head-below:has(+ .page > .body:first-child > .home-page:not([data-arranging]) > .home-tools :is(button, a))) {
+      padding-inline-end: calc(var(--gutter) + var(--tap) + var(--sp-2));
+    }
+
+    :global(.head-below + .page > .body:first-child > .home-page:not([data-arranging]) > .home-tools) {
+      position: absolute;
+      margin: 0;
+      inset-block-end: calc(100% + var(--sp-4));
     }
   }
 

@@ -657,26 +657,45 @@ export function deployed(origin, linkFile) {
   };
 }
 
+/**
+ * Is this walk red? Yes on a red step, on a step the walk never said, and on a step left not walked. One step may be
+ * left: day 15, on a host that keeps the real clock (`deployed`, which has no `advance`). So a build that did not
+ * happen can never leave the command at 0 by saying "not walked".
+ */
+export function redOf(results, host) {
+  const said = new Map(results.map((r) => [r.id, r.pass]));
+  return STEPS.some((s) => said.get(s.id) !== true && !(s.id === 'offer' && said.get(s.id) === null && !host.advance));
+}
+
 /*
  * `node tools/people/expect/first-run.mjs [person.json]`: Mariam by default, on a fresh self-host.
- * `--base <origin> --link-file <path>`: on a host already running, the mailed link read from that file. Red exits 1.
+ * `--base <origin> --link-file <path>`: on a host already running, the mailed link read from that file.
+ *
+ * IT LEAVES WITH 0 ONLY ON A WALK THAT IS NOT RED (`redOf`), AND WITH 1 ON ANYTHING ELSE, a throw among them, which is
+ * said in red on the error stream. Read through a pipe (`| tail`), the shell answers with the pipe's exit code, not
+ * this one: that, and nothing here, was the "exit 0 while red" of audit 75.
  */
 if (import.meta.url === `file://${process.argv[1]}`) {
   const { readFileSync } = await import('node:fs');
   const args = process.argv.slice(2);
   const flag = (name) => (args.includes(name) ? args[args.indexOf(name) + 1] : undefined);
   const file = args.find((a, i) => !a.startsWith('--') && !args[i - 1]?.startsWith('--')) ?? new URL('../mariam.json', import.meta.url).pathname;
-  const person = JSON.parse(readFileSync(file, 'utf8'));
-  const base = flag('--base');
-  const host = base ? deployed(base, flag('--link-file')) : await selfHost(person);
-  let red = false;
+  const said = [];
+  let host = null;
+  let red = true;
   try {
+    const person = JSON.parse(readFileSync(file, 'utf8'));
+    const base = flag('--base');
+    host = base ? deployed(base, flag('--link-file')) : await selfHost(person);
     await walk(person, host, (r) => {
-      if (r.pass === false) red = true;
+      said.push(r);
       console.log(lineOf(r, process.stdout.isTTY === true));
     });
+    red = redOf(said, host);
+  } catch (e) {
+    console.error(`red. the walk stopped: ${e instanceof Error ? (e.stack ?? e.message) : String(e)}`);
   } finally {
-    await host.close();
+    await host?.close();
   }
   process.exit(red ? 1 : 0);
 }

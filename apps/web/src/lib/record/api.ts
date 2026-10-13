@@ -861,6 +861,42 @@ export const chipsOf = (params: URLSearchParams): Filter[] =>
 export const joinOf = (params: URLSearchParams): 'any' | undefined => (params.get('join') === 'any' ? 'any' : undefined);
 
 /**
+ * The address word that narrows a list of people to the ones who may be held twice: `twice=1`.
+ *
+ * THE FIGURE SAID HOW MANY AND ITS LINK OPENED EVERYONE, sorted by name, to be looked through by eye. The record names
+ * them (`heldTwice`), so the address carries this one word and the list asks who they are. It is a word of its own and
+ * not an `f=` chip because it names no field: who is held twice is the record's answer, not a value a person holds.
+ *
+ * ANY OTHER SPELLING IS NO WORD AT ALL, as `joinOf` reads its own, so an address written before this opens what it
+ * always opened.
+ */
+export const TWICE = 'twice';
+export const twiceOf = (params: URLSearchParams): boolean => params.get(TWICE) === '1';
+
+/**
+ * Whether the word narrows THIS list: only the one that keeps the people a record meets, said by the role it declares
+ * (`meets:`) and never by its name. On any other list, and on one whose declaration has not arrived, the word is ignored.
+ */
+export const heldTwiceOn = (params: URLSearchParams, decl: RegisterDecl | undefined): boolean =>
+  twiceOf(params) && (decl as { meets?: unknown } | undefined)?.meets !== undefined;
+
+/**
+ * The numbers the record answered, as a filter the list is asked with. It rides beside the chips and is never one: no
+ * address spells it and the bar draws none for it. `whereFor` and `treeOf` in `remote.ts` read it as a tree over the
+ * number every entry carries, since a sentence has no word for a set of numbers this long.
+ */
+const NUMBER = 'seq';
+export const rowsFilter = (seqs: readonly number[]): Filter => ({ field: NUMBER, op: 'in', values: seqs.map(String) });
+export const isRows = (f: Filter): boolean => f.field === NUMBER && f.op === 'in';
+
+/** What the list says while the word is on: what is shown, the way back to everyone, and that nobody is held twice. */
+export const twiceWords = {
+  showing: 'Showing the people who may be on this record twice',
+  clear: 'Show everyone',
+  none: 'Nobody is on this record twice.',
+} as const;
+
+/**
  * The URL's filter chips, as a `where` sentence.
  *
  * There were two filter languages in this product and they disagreed. `where.ts` resolves dates,

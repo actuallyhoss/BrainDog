@@ -51,6 +51,7 @@ import { methods as countBy } from './count-by.ts';
 import { methods as trust } from './trust.ts';
 import { methods as sameOne } from './same-one.ts';
 import { methods as offered } from './offered.ts';
+import { methods as heldTwice } from './held-twice.ts';
 /* END METHODS */
 
 /**
@@ -161,6 +162,7 @@ export function methods(deps: RecordDeps) {
     ...trust(deps),
     ...sameOne(deps),
     ...offered(deps),
+    ...heldTwice(deps),
     /* END METHODS */
   };
 }
