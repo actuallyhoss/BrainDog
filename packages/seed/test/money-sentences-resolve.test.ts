@@ -75,6 +75,9 @@ export function unresolved(doc: { declarations: Decl[] }): string[] {
         if (each !== undefined && rowHoles.has(body)) continue;
         const colon = body.indexOf(':');
         const form = colon > 0 ? body.slice(0, colon).trim() : '';
+        /* A `{{bad:words}}` PHRASE IS WORDS IN THE DANGER COLOUR AND NOT A NAME (bad-phrase-59). A token inside one is
+           still matched on its own by the same pattern. */
+        if (form === 'bad') continue;
         const path = TYPED.has(form) ? body.slice(colon + 1).trim() : body;
         /* A TYPED FORM'S LITERAL IS THE AUTHOR'S VALUE, `{{money:GBP 40}}`, and not a name. */
         if (TYPED.has(form) && !/^[A-Za-z]/.test(path)) continue;

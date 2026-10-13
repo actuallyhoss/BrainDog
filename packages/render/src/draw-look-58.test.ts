@@ -211,7 +211,7 @@ test('C. ON A PHONE THE FIGURE ENDS THE LINE ITS NAME IS ON, with a gap, and the
 const trends = (html: string): number => html.match(/class="cards-trend"/gu)?.length ?? 0;
 
 test('J. A CARDS TREND WITH NO NAME IS NOT DRAWN, in either drawer', () => {
-  const src = '```cards\ntitle | trend\nEncore | 5 3 4 6\nBake | 1 2 3\n```';
+  const src = '```cards\ntitle | trend\nLanternfish | 5 3 4 6\nCopperleaf | 1 2 3\n```';
   const html = mirror(src);
   assert.equal(trends(html), 0, 'a bare line says nothing');
   assert.doesNotMatch(html, /cards-body/u, 'and a card left with only its name has no empty body');
@@ -219,7 +219,7 @@ test('J. A CARDS TREND WITH NO NAME IS NOT DRAWN, in either drawer', () => {
 });
 
 test('J. A NAMED TREND IS DRAWN WITH ITS NEWEST VALUE AND ITS NAME beside the line', () => {
-  const src = '```cards\ntitle | trend: Done per week\nEncore | 5 3 - 6\n```';
+  const src = '```cards\ntitle | trend: Done per week\nLanternfish | 5 3 - 6\n```';
   const html = mirror(src);
   assert.equal(trends(html), 1);
   assert.match(html, /<\/svg><span class="cards-value num">6<\/span><span class="cards-label">Done per week<\/span><\/span>/u);
@@ -228,16 +228,16 @@ test('J. A NAMED TREND IS DRAWN WITH ITS NEWEST VALUE AND ITS NAME beside the li
 });
 
 test('J. ONE COUNT AMONG NOUGHTS IS NOT A TREND, and neither is a run of noughts or one point: nothing is drawn', () => {
-  const src = '```cards\ntitle | trend: Done per week\nEncore | 0 0 0 4\nBake | 5 0\nMarsh | 0 0 0\nNook |7\nOtters | 1 2 3\n```';
+  const src = '```cards\ntitle | trend: Done per week\nLanternfish | 0 0 0 4\nCopperleaf | 5 0\nQuietcart | 0 0 0\nOxbow | 7\nBrightwell | 1 2 3\n```';
   const html = mirror(src);
   assert.equal(trends(html), 1, 'only the run with more than one real count');
-  assert.match(html, /<h3 class="cards-title">Otters<\/h3><\/div><div class="cards-body">/u);
+  assert.match(html, /<h3 class="cards-title">Brightwell<\/h3><\/div><div class="cards-body">/u);
   assert.equal(drawer(src), html);
 });
 
 test('J. A GRID OF CARDS THAT ARE ONLY NAMES IS SET CLOSE, the whole grid and never one card of it', () => {
   const sheet = css('kinds/cards.css');
   assert.match(sheet, /\.cards-grid:not\(:has\(> \.cards-item > :not\(\.cards-head\)\)\) > \.cards-item \{\s*padding-block: var\(--sp-2\);/u);
-  const html = mirror('```cards\nmark | title\nB | Crumb.gg\nB | BrainDog\n```');
+  const html = mirror('```cards\nmark | title\nB | Brightwell site\nB | BrainDog\n```');
   assert.doesNotMatch(html.replace(/<div class="cards-head">.*?<\/div>/gu, ''), /<(div|p|dl|span|img)/u, 'a card of a name holds its head and nothing else');
 });

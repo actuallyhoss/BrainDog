@@ -480,6 +480,11 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   own filler. Money is at the most blocks a page declares, so it took the place of the line for no balance typed,
  *   which stood under the box to add an account and was untrue with accounts and none of them cash. A block swapped
  *   for another inside the unreleased step, so no version of its own.
+ *   The Ledger, open (ledger-tile-59, REC-B15): the six newest entries stand in a tile of their own on Money, headed
+ *   Ledger, before Heads up, each line its entry, drawn once an entry has cleared. History gives up What moved, its
+ *   twelve lines folded shut, so the page still declares twenty-four blocks and says what moved once. And the two late
+ *   lines on Heads up say "past their due date" in the danger colour (bad-phrase-59), the words unchanged. Blocks
+ *   swapped and two sentences marked inside the unreleased step, so no version of its own.
  * - portfolio 1.16.0 and work 1.18.0 (batch 46, REC-C08's remainder and REC-C16): a project others point at stays. Projects
  *   declares `delete: refuse_while_referenced`, as Accounts does, so a project a task, a bill, a service or a person names
  *   is not deleted out from under them, and the refusal names the lists and how many. Under What each one earns, one

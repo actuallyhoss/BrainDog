@@ -1178,6 +1178,8 @@ export type Metric = {
   tone?: 'good' | 'warn' | 'bad' | 'info' | undefined;
   /** Where the figure came from, so pressing it opens the rows behind it. */
   href?: string | undefined;
+  /** The entries the figure was added up from, by handle, where the record says. */
+  backs?: string[] | undefined;
   /**
    * A figure that adds up a field no row in its list has filled in: its zero is no answer, and a page being read does not
    * draw it (`lib/page/home.ts` `unsaid`).

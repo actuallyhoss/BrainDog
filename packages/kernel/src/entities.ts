@@ -18,18 +18,31 @@
  * of the chain it points into, and an unfold takes its keys back from wherever along that chain they went, or undoing
  * A's merge after B's left A answering to nothing and C answering to A's address.
  *
+ * A PROJECT HOLDS KEYS TOO, AND SHARES THEM (ENG-B02). The one list declaring `scopes:` is the third entity list. A
+ * project's keys are the places and sites its row lists (`remote:`, `folder:`, `domain:`) and what it is called
+ * (`name:`, a weak key). They are held beside the others' and never in their place, because none of them is a project's
+ * alone: a company and its project live at one domain, a monorepo's two projects list one repository, and two projects
+ * are both called Web. So a project's claim is kept as the key and the row together (`sharedKey`), every project that
+ * lists a place holds it, and `holderOf('domain:…')` still answers the organisation and nothing else. `claimed` reads
+ * them back, and `settledBy` says whether what was found decides: one project by a place or a site, never by a name.
+ *
  * NOTHING HERE WRITES A ROW. It reads rows and writes the two derived tables; who becomes whom is `people.ts`'s.
  */
 
 import type { Sql } from '@braindog/ports';
 
-import { keysOf } from './identity-keys.ts';
+import { isWeakKey, keysOf, nameWords } from './identity-keys.ts';
 import { meetsRole, orgRole, type MeetsFields, type OrgFields, type Role, type RoleList } from './roles.ts';
+import { isFolderPlace } from './scope.ts';
 
 /** A list whose rows carry keys: the one playing `meets:`, and the one playing `org:`. */
 export type KeyedList = { register: string; role: 'meets' | 'org'; fields: MeetsFields | OrgFields };
 
-/** The lists whose rows carry keys, read from the record's lists. At most two. */
+/**
+ * The lists whose rows hold a key ALONE, read from the record's lists: people and organisations, at most two. These are
+ * the lists whose rows are merged and where a second row with a held key is refused (`index.ts`'s merge door), which is
+ * why the project list is not among them: see `entityLists`.
+ */
 export function keyedLists(lists: Iterable<RoleList>): KeyedList[] {
   const all = [...lists];
   const out: KeyedList[] = [];
@@ -40,23 +53,95 @@ export function keyedLists(lists: Iterable<RoleList>): KeyedList[] {
   return out;
 }
 
+/** The fields of a project's row that carry its keys. Any may be missing: a list of projects need only declare `scopes:`. */
+export type ProjectFields = { name?: string; repos?: string; folders?: string; domains?: string };
+
+/** The list of projects, the one declaring `scopes:`, as a list whose rows carry keys they share. */
+export type ProjectList = { register: string; role: 'project'; fields: ProjectFields };
+
+/** Any list whose rows are entities with keys: a person's, an organisation's, a project's. */
+export type EntityList = KeyedList | ProjectList;
+
+/** A list as `entityLists` reads it: a role's list, and what makes one the list of projects. */
+export type EntityDecl = RoleList & { title?: unknown; scopes?: unknown };
+
+const fieldNamed = (list: EntityDecl, id: unknown, types?: readonly string[]): string | undefined => {
+  if (typeof id !== 'string') return undefined;
+  const field = list.fields?.find((f) => f.id === id && f.retired !== true);
+  return field !== undefined && (types === undefined || types.includes(field.type)) ? field.id : undefined;
+};
+
+/**
+ * The list of projects: the ONE list declaring `scopes:`, as `resolveProject` reads it (`scope.ts`), so two declaring
+ * it are no list of projects here either. Its repositories and folders are the fields `scopes:` names, its name is its
+ * title, and its domains are the field `scopes.domains` names or, with none named, the one called `domains` or
+ * `domain`, as the nightly walk finds it (`backfill.ts`).
+ */
+export function projectList(lists: Iterable<EntityDecl>): ProjectList | null {
+  const homes = [...lists].filter((l) => typeof l.scopes === 'object' && l.scopes !== null);
+  const home = homes.length === 1 ? homes[0]! : undefined;
+  if (home === undefined) return null;
+  const scopes = home.scopes as { repos?: unknown; folders?: unknown; domains?: unknown };
+  const fields: ProjectFields = {};
+  const set = (part: keyof ProjectFields, field: string | undefined): void => void (field !== undefined && (fields[part] = field));
+  set('name', fieldNamed(home, home.title, ['text']) ?? fieldNamed(home, 'name', ['text']));
+  set('repos', fieldNamed(home, scopes.repos));
+  set('folders', fieldNamed(home, scopes.folders));
+  set('domains', fieldNamed(home, scopes.domains) ?? fieldNamed(home, 'domains', ['list']) ?? fieldNamed(home, 'domain', ['text', 'url']));
+  return { register: home.id, role: 'project', fields };
+}
+
+/**
+ * Every list whose rows are entities with keys: the two of `keyedLists`, and the list of projects. A list already
+ * playing `meets:` or `org:` is that and not also the projects, so a row's keys are kept one way.
+ */
+export function entityLists(lists: Iterable<EntityDecl>): EntityList[] {
+  const all = [...lists];
+  const out: EntityList[] = keyedLists(all);
+  const projects = projectList(all);
+  if (projects && !out.some((l) => l.register === projects.register)) out.push(projects);
+  return out;
+}
+
 const listOf = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
 const textOf = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() !== '' ? v : undefined);
 
+/** One text or a list of them, as the texts it holds. */
+const textsOf = (v: unknown): string[] => (typeof v === 'string' ? [v] : listOf(v)).filter((x) => x.trim() !== '');
+
+/** Whether a place a project lists is a bare repository name, with no host, owner or folder (`portage`), as `scope.ts` reads one. */
+const bareName = (place: string): boolean => !/[\\/:]/u.test(place.trim().replace(/\.git$/iu, ''));
+
 /**
  * The keys a row's fields carry. A person: the email, every handle, every key. An organisation: every key and its
- * domain. A field the list does not name is not read.
+ * domain. A project: every domain, every whole remote and every folder it lists, then what it is called. A field the
+ * list does not name is not read.
+ *
+ * A PROJECT'S PLACES ARE READ AS `scope.ts` READS THEM (`candidateOf`): a folder listed among the repositories is a
+ * folder. A BARE REPOSITORY NAME IS A NAME, weak like the project's own: `portage` is every fork's and every other
+ * checkout's name too, so it proposes the project and a whole remote decides.
  */
-export function rowKeys(list: KeyedList, fields: Readonly<Record<string, unknown>>): string[] {
+export function rowKeys(list: EntityList, fields: Readonly<Record<string, unknown>>): string[] {
   const at = list.fields as Partial<Record<string, string>>;
   const read = (part: string): unknown => (at[part] === undefined ? undefined : fields[at[part]!]);
+  if (list.role === 'project') {
+    const repos = textsOf(read('repos'));
+    return keysOf({
+      domains: textsOf(read('domains')).map((d) => d.trim().replace(/^\*\./u, '')),
+      remotes: repos.filter((r) => !isFolderPlace(r) && !bareName(r)),
+      folders: [...textsOf(read('folders')), ...repos.filter(isFolderPlace)],
+      names: [...textsOf(read('name')), ...repos.filter((r) => !isFolderPlace(r) && bareName(r)).map((r) => r.trim().replace(/\.git$/iu, ''))],
+    });
+  }
+  /* A WEAK KEY IS HELD BY NOBODY ALONE: a `name:` written among a person's keys would make everyone of that name them. */
+  const alone = (keys: string[]): string[] => keys.filter((k) => !isWeakKey(k));
   if (list.role === 'meets')
-    return keysOf({ email: textOf(read('email')), handles: listOf(read('handles')), keys: listOf(read('keys')) });
-  return keysOf({ keys: listOf(read('keys')), domain: textOf(read('domain')) });
+    return alone(keysOf({ email: textOf(read('email')), handles: listOf(read('handles')), keys: listOf(read('keys')) }));
+  return alone(keysOf({ keys: listOf(read('keys')), domain: textOf(read('domain')) }));
 }
 
-/** The field a list says a row was folded into, or `undefined`. */
-export const mergeFieldOf = (list: KeyedList): string | undefined => (list.fields as { merged_into?: string }).merged_into;
+/** The field a list says a row was folded into, or `undefined`. A project is never folded. */
+export const mergeFieldOf = (list: EntityList): string | undefined => (list.fields as { merged_into?: string }).merged_into;
 
 /** A row as `rekey` reads it. */
 export type KeyedRow = { id: string; register: string; fields: Readonly<Record<string, unknown>>; deleted_at: string | null };
@@ -105,8 +190,69 @@ function claim(sql: Pick<Sql, 'one' | 'exec'>, key: string, register: string, ro
 }
 
 /**
+ * What parts a shared claim's key from the row that holds it: the unit separator, which no key holds and which sorts
+ * below every character one does, so the claims on one key are one range of the table's own index.
+ */
+const SHARED = '\u001f';
+
+/** A project's claim on a key, as `entity_key` keeps it: the key and the row together, so two rows hold one key. */
+const sharedKey = (key: string, row: string): string => `${key}${SHARED}${row}`;
+
+/** A project's keys, from nothing: what it held goes, and what its fields carry now is held, unless it is deleted. */
+function rekeyShared(sql: Pick<Sql, 'exec'>, list: ProjectList, after: KeyedRow, source: string, at: string): void {
+  sql.exec('DELETE FROM entity_key WHERE row_id = ? AND register = ?', after.id, list.register);
+  if (after.deleted_at !== null) return;
+  /* A key holding the separator itself would be read back as another key's claim, so it is not held. */
+  for (const key of rowKeys(list, after.fields).filter((k) => !k.includes(SHARED)))
+    sql.exec(
+      'INSERT INTO entity_key (key, register, row_id, source, at) VALUES (?, ?, ?, ?, ?) ON CONFLICT (key) DO UPDATE SET register = excluded.register, row_id = excluded.row_id, source = excluded.source, at = excluded.at',
+      sharedKey(key, after.id),
+      list.register,
+      after.id,
+      source,
+      at,
+    );
+}
+
+/** A row of `claimed`: a project, the keys asked for that it holds, and whether every one of them is weak. */
+export type Claimed = { id: string; keys: string[]; weak: boolean };
+
+/**
+ * The live rows of the project list `register` that hold any of `keys`, oldest first, each with the keys it answered
+ * to. EVERY project holding a key is found, since a project shares its keys; which of them it is, if any, is
+ * `settledBy`'s to say. One short range of the key's index per key, so the list is never read whole.
+ */
+export function claimed(sql: Pick<Sql, 'all'>, register: string, keys: readonly string[]): Claimed[] {
+  const found = new Map<string, { seq: number | null; keys: string[] }>();
+  for (const key of new Set(keys)) {
+    const rows = sql.all<{ row_id: string; seq: number | null }>(
+      `SELECT k.row_id, e.seq FROM entity_key k JOIN entry e ON e.id = k.row_id
+        WHERE k.key > ? AND k.key < ? AND k.register = ? AND e.deleted_at IS NULL`,
+      `${key}${SHARED}`,
+      `${key}${String.fromCharCode(SHARED.charCodeAt(0) + 1)}`,
+      register,
+    );
+    for (const r of rows) found.set(r.row_id, { seq: r.seq, keys: [...(found.get(r.row_id)?.keys ?? []), key] });
+  }
+  return [...found]
+    .sort(([a, x], [b, y]) => (x.seq ?? Infinity) - (y.seq ?? Infinity) || (a < b ? -1 : a > b ? 1 : 0))
+    .map(([id, f]) => ({ id, keys: f.keys, weak: f.keys.every(isWeakKey) }));
+}
+
+/**
+ * The one project what was found decides, or `null`. A PLACE OR A SITE DECIDES, AND ONLY WHEN ONE PROJECT HOLDS IT:
+ * two holding one repository are a choice for the person, as `matchProject` leaves them. A NAME NEVER DECIDES, alone or
+ * among several: the projects found by name only are candidates to propose, and are passed over here.
+ */
+export const settledBy = (found: readonly Claimed[]): string | null => {
+  const strong = found.filter((f) => !f.weak);
+  return strong.length === 1 ? strong[0]!.id : null;
+};
+
+/**
  * Bring `entity_key` up to one row as it now is, from what it was. In the write's transaction.
  *
+ *   - A project: its shared claims are written again from its fields (`rekeyShared`), and none of the rest applies.
  *   - Folded into another (its `merged_into` set): every key it holds, and every one its fields carry that nobody
  *     holds, moves to the end of the chain it points into (`foldEnd`), the one row of it still standing.
  *   - Deleted, and not folded: its keys go, so they are free for whoever is met with them next.
@@ -114,7 +260,8 @@ function claim(sql: Pick<Sql, 'one' | 'exec'>, key: string, register: string, ro
  *     was folded into, since a later merge may have moved them on.
  *   - Live: the keys it lost go, and the ones it gained are claimed.
  */
-export function rekey(sql: Pick<Sql, 'one' | 'all' | 'exec'>, list: KeyedList, before: KeyedRow | null, after: KeyedRow, source: string, at: string): void {
+export function rekey(sql: Pick<Sql, 'one' | 'all' | 'exec'>, list: EntityList, before: KeyedRow | null, after: KeyedRow, source: string, at: string): void {
+  if (list.role === 'project') return rekeyShared(sql, list, after, source, at);
   const field = mergeFieldOf(list);
   const into = field === undefined ? undefined : textOf(after.fields[field]);
   const was = field === undefined || before === null ? undefined : textOf(before.fields[field]);
@@ -155,12 +302,12 @@ export function rekey(sql: Pick<Sql, 'one' | 'all' | 'exec'>, list: KeyedList, b
  */
 export function rebuildKeys(sql: Pick<Sql, 'one' | 'all' | 'exec'>, at: string): number {
   if (!sql.one("SELECT 1 AS n FROM sqlite_master WHERE type = 'table' AND name = 'entity_key'")) return 0;
-  const lists = keyedLists(
+  const lists = entityLists(
     sql
       .all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'register' AND superseded_at IS NULL AND retired = 0")
       .flatMap(({ body }) => {
         try {
-          return [JSON.parse(body) as RoleList];
+          return [JSON.parse(body) as EntityDecl];
         } catch {
           return [];
         }
@@ -168,6 +315,12 @@ export function rebuildKeys(sql: Pick<Sql, 'one' | 'all' | 'exec'>, at: string):
   );
   sql.exec('DELETE FROM entity_key');
   for (const list of lists) {
+    if (list.role === 'project') {
+      /* A PROJECT SHARES ITS KEYS, so there is no first to claim and nothing folded: every live one holds its own. */
+      const live = sql.all<{ id: string; fields: string }>('SELECT id, fields FROM entry WHERE register = ? AND deleted_at IS NULL ORDER BY seq, id', list.register);
+      for (const r of live) rekeyShared(sql, list, { id: r.id, register: list.register, deleted_at: null, fields: parsed(r.fields) }, 'rebuilt', at);
+      continue;
+    }
     const field = mergeFieldOf(list);
     const rows = sql
       .all<{ id: string; fields: string; deleted_at: string | null }>('SELECT id, fields, deleted_at FROM entry WHERE register = ? ORDER BY seq, id', list.register)
@@ -232,14 +385,11 @@ export function sourceKeys(sql: Pick<Sql, 'exec'>, row: string, keys: readonly s
   for (const key of keys) sql.exec('UPDATE entity_key SET source = ? WHERE key = ? AND row_id = ?', source, key, row);
 }
 
-/** A name as two mentions of one share it: trimmed, spaces collapsed, lower case, and no punctuation but `-` and `'`. */
-export const nameKey = (name: string): string =>
-  name
-    .normalize('NFKC')
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s'-]/gu, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+/**
+ * A name as two mentions of one share it: trimmed, spaces collapsed, lower case, and no punctuation but `-` and `'`.
+ * The one reading a `name:` key is made with (`identity-keys.ts`), so a mention and a project's name key agree.
+ */
+export const nameKey = (name: string): string => nameWords(name);
 
 /**
  * Keep a name met with nothing that identifies it. One line per name, kind, project and source, so the same commit

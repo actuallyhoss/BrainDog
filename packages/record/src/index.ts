@@ -221,6 +221,9 @@ export { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, 
 export type { UsedBy, UsedByRun } from './methods/agents.ts';
 export type { AutomationVersion, Checked as AutomationChecked, Switched as AutomationSwitched } from './methods/automations.ts';
 export type { PenItem } from './emergent.ts';
+/* THE ENGINE'S READINGS, THE ARITHMETIC ALONE (engine-readings-59): what was asked, answered, kept and refused, the
+   mentions not attached and the open questions by cause, from rows a caller hands in. No method reads them yet. */
+export { engineReadings, OTHER as READINGS_OTHER, UNSAID as READINGS_UNSAID, type EngineReadings, type AskReading, type LedgerCall, type OwedRead, type ReadingsOf } from './engine-readings.ts';
 export { PREVIEW_DECLARATIONS_MOST, PREVIEW_SAMPLE_ROWS_A_LIST, PREVIEW_SAMPLE_ROWS_MOST, type ChangePreviewed, type PreviewChangeArgs, type PreviewedPage } from './preview-change.ts';
 export { SAMPLE_ROWS_MOST, SLASH_REPAIRS_MOST, type DescribedDraft, type SlashDecl, type SlashDrafted, type SlashPreview, type SlashPreviewedPage, type SlashPreviewer, type SlashRows } from './slash.ts';
 export { SKILL_DRAFTS_A_DAY, skillBearings, skillDraftOf, type SkillBearing, type SkillDraftInput } from './slash.ts';

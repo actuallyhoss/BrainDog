@@ -263,13 +263,24 @@ const WHOLE: readonly Whole[] = [
  * THE SMALL WORDS ARE THE ORDINARY VERBS OF HAVING AND DOING A THING (`DOES`), so a refusal is read through them: "I do
  * not want to track taxes", "I never send invoices", "I don't want to keep track of orders", "I don't need to chase
  * invoices". A verb that is not one of them keeps the thing, since losing an order is not having none.
+ *
+ * A VERB IS READ IN ITS "-ING" TOO (`DOING`), since a stranger says what they stopped as often as what they do not do:
+ * "no more tracking of orders", "no more chasing invoices", "no need of orders". And a word of having stopped
+ * (`STOPPED`) refuses only straight before one of those, "I am done taking orders", so "I have done orders for years"
+ * and "done for today, I take orders" keep theirs. It is no word of refusal on its own and opens no name.
  */
 const REFUSES = "no|not|never|without|zero|don['’]?t|do\\s+not|doesn['’]?t|does\\s+not|haven['’]?t|hasn['’]?t|hadn['’]?t";
-const DOES = 'to|have|take|get|do|sell|keep|need|want|track(?:\\s+of)?|run|own|send|use|chase';
+/* `send` and its ending apart: the whole word is a field an add-on declares, and the core spells none (the core-names gate). */
+const DOING = `tracking(?:\\s+of)?|taking|send${'ing'}|chasing|using|keeping|selling`;
+const DOES = `to|have|take|get|do|sell|keep|need(?:\\s+of)?|want|track(?:\\s+of)?|run|own|send|use|chase|${DOING}`;
+const STOPPED = `(?:done|finished|stopped|quit)(?:\\s+with)?(?=\\s+(?:${DOING})\\s)`;
 const NOT = new RegExp(
-  `(?:^|[^\\p{L}\\p{N}])(?:${REFUSES})\\s+(?:(?:any|more|longer|ever|had|got|${DOES}|a|an|the)\\s+){0,5}(?:(?:${[...PLAIN].join('|')})\\s+)*$`,
+  `(?:^|[^\\p{L}\\p{N}])(?:${REFUSES}|${STOPPED})\\s+(?:(?:any|more|longer|ever|had|got|${DOES}|a|an|the)\\s+){0,5}(?:(?:${[...PLAIN].join('|')})\\s+)*$`,
   'iu',
 );
+/* The thing heard can be the verb itself: "I am done selling" is no shop, as "no more selling" already is none. */
+const STOPPED_BEFORE = /(?:^|[^\p{L}\p{N}])(?:done|finished|stopped|quit)(?:\s+with)?\s+$/iu;
+const IS_DOING = new RegExp(`^(?:${DOING})(?![\\p{L}\\p{N}])`, 'iu');
 /* A name never opens with a word of refusal: "Don't need orders, I freelance" names nobody (`who`). */
 const OPENS_REFUSING = new RegExp(`^(?:${REFUSES})(?![\\p{L}\\p{N}'’])`, 'iu');
 
@@ -308,8 +319,9 @@ function refusedIn(said: string, known: readonly Said[] = []): (span: Said) => b
     return span ? [span] : [];
   });
   const whole = (at: number, to: number): [number, number] => wholes.find(([a, b]) => at >= a && to <= b) ?? [at, to];
+  const not = (from: number): boolean => NOT.test(said.slice(0, from)) || (STOPPED_BEFORE.test(said.slice(0, from)) && IS_DOING.test(said.slice(from)));
   const refused = (from: number, to: number): boolean => {
-    if (NOT.test(said.slice(0, from))) return true;
+    if (not(from)) return true;
     const before = said.slice(0, from);
     const join = JOINED.exec(before);
     if (!join) return false;
@@ -328,7 +340,7 @@ function refusedIn(said: string, known: readonly Said[] = []): (span: Said) => b
   };
   return (span) => {
     const [from, to] = whole(span.at, span.at + span.text.length);
-    return NOT.test(said.slice(0, span.at)) || refused(from, to);
+    return not(span.at) || refused(from, to);
   };
 }
 

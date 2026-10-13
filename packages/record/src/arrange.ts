@@ -459,6 +459,8 @@ export function arrangeUnion(open: Record<string, unknown>, next: Record<string,
     ...maps(next.rows).map((r) => (isMap(r.links) ? { ...r, links: Object.fromEntries(Object.entries(r.links).map(([f, to]) => [f, typeof to === 'number' ? to + first : to])) } : r)),
   ]);
   set('calls', once([...maps(open.calls), ...maps(next.calls)], (c) => `${String(c.part)} ${String(c.host)} ${String(c.every)}`));
+  /* AND EACH AS DECIDE'S SENTENCE READS IT, once: the later reading of a call both make. */
+  set('calls_out', once([...maps(open.calls_out), ...maps(next.calls_out)], (c) => `${String(c.part)} ${String(c.host)} ${String(c.every)} ${String(c.trigger)} ${String(c.grant)}`));
   /* A PART BOTH HOLD IS ONE, needing what either said it needs. */
   const parts = new Map<string, Body>();
   for (const p of [...maps(open.parts), ...maps(next.parts)]) {
@@ -1476,6 +1478,7 @@ export function arranger(d: ArrangeDeps) {
     /* EACH PART'S OWN LINES AND CALLS, so a key and a call out are said beside the part that makes them (F67). */
     const lines = new Map<string, string[]>();
     const heard: Call[] = [];
+    const heardSent: Body[] = [];
     const sentFor = new Map<string, Body>();
     for (const s of settings) if (!order.value.install.includes(String(s.pack))) sentFor.set(String(s.pack), { ...(sentFor.get(String(s.pack)) ?? {}), ...(s.values as Body) });
     for (const [pack, values] of sentFor) {
@@ -1486,6 +1489,7 @@ export function arranger(d: ArrangeDeps) {
       calls.push(...one.value.approve);
       lines.set(`setting:${pack}`, one.value.approve);
       heard.push(...(one.value.calls.get(pack)?.out ?? []).map((c) => ({ ...c, part: `setting:${pack}` })));
+      heardSent.push(...(one.value.calls.get(pack)?.sent ?? []).map((c) => ({ part: `setting:${pack}`, ...c })));
     }
     if (body.voice !== undefined) {
       const said = voiceOf(body.voice, 'body.voice', order.value.install, lead);
@@ -1515,6 +1519,14 @@ export function arranger(d: ArrangeDeps) {
     for (const id of enable) lines.set(`enable:${id}`, kernel.callsWhenEnabled(id));
     for (const [part, said] of declared.value.lines) lines.set(part, said);
     const listedCalls = [...planned.value.order.flatMap((id) => planned.value.calls.get(id)?.out ?? []), ...heard, ...declared.value.calls];
+    /* THE SAME CALLS AS THE KERNEL'S `doesOf('install', body)` READS THEM, with the key's label and what runs each, which
+       `calls` does not keep: Decide's one sentence had nothing to say of an add-on that sends a key out. Each names its
+       part, as `calls` does, so what is left of a question says only what is left to arm. */
+    const sentCalls: Body[] = [
+      ...planned.value.order.flatMap((id) => (planned.value.calls.get(id)?.sent ?? []).map((c) => ({ part: `install:${id}`, ...c }))),
+      ...heardSent,
+      ...declared.value.sent,
+    ];
     /* WHAT IT NEEDS IS THE RECORD'S TO SAY, from what it calls out, with the parts that need each; a `needs` the proposer
        sent is not read. */
     const needs = needsByPart(approve, lines);
@@ -1550,6 +1562,7 @@ export function arranger(d: ArrangeDeps) {
       ...(placed.value.skipped.length === 0 ? {} : { skipped: placed.value.skipped }),
       ...(declared.value.filed.length === 0 ? {} : { declarations: declared.value.filed }),
       ...(listedCalls.length === 0 ? {} : { calls: listedCalls }),
+      ...(sentCalls.length === 0 ? {} : { calls_out: sentCalls }),
       ...(parts.length === 0 ? {} : { parts }),
       ...(Object.keys(names).length === 0 ? {} : { names }),
     });
@@ -1563,8 +1576,8 @@ export function arranger(d: ArrangeDeps) {
    * drawn as one. Each is filed with `was`, the version it replaces (`0` for none), so a press after somebody else moved
    * it lands nothing.
    */
-  function declarationsOf(raw: unknown, state: Installed): Result<{ filed: Body[]; lines: Map<string, string[]>; calls: Call[] }> {
-    const out = { filed: [] as Body[], lines: new Map<string, string[]>(), calls: [] as Call[] };
+  function declarationsOf(raw: unknown, state: Installed): Result<{ filed: Body[]; lines: Map<string, string[]>; calls: Call[]; sent: Body[] }> {
+    const out = { filed: [] as Body[], lines: new Map<string, string[]>(), calls: [] as Call[], sent: [] as Body[] };
     if (raw === undefined) return ok(out);
     const shape = 'A declaration is {"id":"<kind>.<name>","kind":"<kind>","body":{...}}, as a change installs one.';
     if (!Array.isArray(raw) || raw.length === 0 || raw.length > 12) return refuse('VALUE_MALFORMED', `declarations is a list of one to 12. ${shape}`, 'body.declarations');
@@ -1592,6 +1605,7 @@ export function arranger(d: ArrangeDeps) {
       const part = `declaration:${String(x.id)}`;
       out.lines.set(part, approvalLines([e]));
       out.calls.push(callAt(part, e.host, e.every, e.per_day));
+      out.sent.push({ part, host: e.host, every: e.every, trigger: e.trigger, per_day: e.per_day, grant: e.key, change: live.has(String(x.id)) ? 'changed' : 'new' });
     }
     return ok(out);
   }

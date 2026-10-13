@@ -138,6 +138,20 @@ test('a day outside the twelve weeks is counted and said, never placed, and a he
   sql.close();
 });
 
+test('forty entries on one old day are one day outside, and the ones with no day are entries and never days', async () => {
+  const { k, sql } = await record(pageOf({ ...HEAT, columns: [{ field: 'on' }] }), [
+    { what: 'Today', on: day(0), state: 'done' },
+    ...Array.from({ length: 40 }, (_, n) => ({ what: `Old ${n}`, on: day(-400), state: 'done' })),
+    ...Array.from({ length: 3 }, (_, n) => ({ what: `No day ${n}`, state: 'open' })),
+  ]);
+  const w = wholeOf(first(k));
+  assert.deepEqual(w.rows, [{ label: day(0), rows: 1, value: 1 }]);
+  assert.equal(w.total, 44);
+  assert.equal(w.outside, 43, 'entries: what the cells fall short of the total by');
+  assert.equal(w.outsideDays, 1, 'forty entries on one old day are one day, and no day is no day');
+  sql.close();
+});
+
 /* A HEAT'S `of:` (D25.32): each day's wash is the share of that day's whole that the `where` admits. */
 const SHARED = [
   { what: 'A', on: day(0), hours: 2, state: 'done' },

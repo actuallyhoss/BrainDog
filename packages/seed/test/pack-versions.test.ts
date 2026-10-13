@@ -1452,7 +1452,7 @@ const DECLARED: Record<string, Version> = {
       setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
       setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category setting.rest_days
     `,
-    declares: '24bb2fb8ce5c5a98',
+    declares: '741a7d2695f49170',
     history: [
       "`cash-cross-check` is declared (cash-check-52, REC-A17): Cash now worked out a second way, each cash account walked entry by entry from its newest statement, less Cash now, a currency at a time; no value while no balance is typed -> 73738171ae2405ba",
       'The Money page draws the check (cash-page-54, REC-A17): one tile, Cash now does not add up, while `cash-cross-check` is not nought, and one line while no balance is typed -> e4a453d69795fe22',
@@ -1460,6 +1460,7 @@ const DECLARED: Record<string, Version> = {
       "Folded into the unreleased 3.17.0 (pay-links-57, REC-B11; integrate 57): a payment marks what it paid. `obligations` gains `paid_so_far`, `installments` gains `paid_by` (a link to the Ledger), `recurring` gains `last_paid` and `last_amount`, none indexed, and `transactions` declares `delete: refuse_while_referenced` so a payment an instalment names is not deleted from under it; no id added or taken away -> c238f926c22cb938",
       "Folded into the unreleased 3.17.0 (filedby-use-57-58; integrate 58): `txn-categorise` files by each text in one link step that writes the rule's category and, with it, the rule into `filed_by` (`also`), so a rule whose category is retired or gone writes neither -> ccdc10025b479aee",
       "Folded into the unreleased 3.17.0 (seed-58, the look of 13 October, fault F; integrate 58): `page.money` gains a lead line for a record with two books or more, how many books and accounts the money is kept in, and loses the line for no balance typed, which was added in this same unreleased step, so the page still declares 24 blocks; no id added or taken away -> 24bb2fb8ce5c5a98",
+      "Folded into the unreleased 3.17.0 (ledger-tile-59, REC-B15; bad-phrase-59; integrate 59): the Ledger tile on Money, six newest entries open on the page before Heads up, drawn once `ledger-newest-days` has a value, and History gives up What moved, so the page still declares 24 blocks; the two late lines on Heads up say `{{bad:past their due date}}`, the same words in the danger colour; no id added or taken away -> 741a7d2695f49170",
     ],
   },
   'work@1.17.0': {

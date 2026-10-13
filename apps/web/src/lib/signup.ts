@@ -376,12 +376,17 @@ function keptHere(storage: Pick<Storage, 'getItem' | 'removeItem'> | null | unde
  *
  * THE SENTENCE IS NO YOUNGER FOR IT: its day still runs from when it was said. NOTHING KEPT, NOTHING WRITTEN: a key
  * with no sentence builds nothing, so a link opened on a phone (which keeps none) is as it was.
+ *
+ * THE FIRST KEY STAYS (audit 57, claim 3). A Try again of an answered press goes out under a new key, for what is left
+ * alone, and that one is the page's: a reload builds the whole plan from the sentence again, and under a key the record
+ * never held it would write every entry a second time. Under the first it passes over what that press wrote. A new
+ * sentence is kept without a key (`keepSaid`), and so its build keeps its own first one.
  */
 export function keepKey(storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null | undefined, key: string, now: number = Date.now()): void {
   if (keyOf(key) === null || keptHere(storage, now) === null) return;
   try {
     const kept: unknown = JSON.parse(storage?.getItem(SAID_KEY) ?? 'null');
-    if (isObj(kept)) storage?.setItem(SAID_KEY, JSON.stringify({ ...kept, key }));
+    if (isObj(kept) && keyOf(kept.key) === null) storage?.setItem(SAID_KEY, JSON.stringify({ ...kept, key }));
   } catch {
     /* Storage off or full: a reload presses under a new key, which is what happened before there was this. */
   }

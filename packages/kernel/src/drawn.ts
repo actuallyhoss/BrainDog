@@ -212,10 +212,46 @@ const columnField = (b: Drawable, n: number): string | null => {
 };
 
 /**
+ * THE COLUMNS OF A CARD THAT DRAW NOTHING OF THEIR OWN: `hue` tints the card and `quiet` dims it (`packages/render`
+ * `cards.ts`), so a row that holds only these still draws a card that says nothing.
+ */
+const UNDRAWN = new Set(['hue', 'quiet']);
+
+/** The fields a cards block draws: every column that names one, but those that only colour or dim the card. */
+function cardFields(b: Drawable): string[] {
+  return list(b.columns).flatMap((c, n) => {
+    const field = isObj(c) && !(typeof c.as === 'string' && UNDRAWN.has(c.as)) ? columnField(b, n) : null;
+    return field === null ? [] : [field];
+  });
+}
+
+/**
+ * What a row holds under a column's name: its field, or what the record stamps on the row itself (`updated_at`), which
+ * a column may name as well and which is never among the fields.
+ */
+const held = (row: unknown, field: string): unknown => {
+  const fields = fieldsOf(row);
+  return Object.hasOwn(fields, field) ? fields[field] : isObj(row) && field !== 'fields' && Object.hasOwn(row, field) ? row[field] : undefined;
+};
+
+/**
+ * WHETHER EVERY CARD OF A CARDS BLOCK SAYS NOTHING: it read rows, and not one of them holds a value in any column the
+ * block draws, so each card is a dash under the block's heading. "Where it stands" is titled by the health, and on a
+ * project nobody had described it was a heading over a dash. ONE VALUE ON ONE ROW KEEPS THE BLOCK AND EVERY CARD IN IT,
+ * so a card with a name is never left out: a service imported with no cost is still what the project runs on.
+ */
+function cardsUnsaid(b: Drawable): boolean {
+  const rows = matchedRows(b);
+  const fields = cardFields(b);
+  return rows.length > 0 && fields.length > 0 && !rows.some((r) => fields.some((f) => isSet(held(r, f))));
+}
+
+/**
  * WHETHER A BLOCK READS WHAT NO ROW HAS SAID: a chart over rows of which not one holds a column the chart is made of, a
- * figure's parts when no row the figure read sits in any part, or a row of figures every one of which adds up a field
- * nobody filled in. Each draws only that a field is empty on every row: "How they are going" was one grey track of
- * eleven over "Not said yet" on the founder's Projects (`loop/research-real-record.md`).
+ * figure's parts when no row the figure read sits in any part, a row of figures every one of which adds up a field
+ * nobody filled in, or cards of which not one says anything (`cardsUnsaid`). Each draws only that a field is empty on
+ * every row: "How they are going" was one grey track of eleven over "Not said yet" on the founder's Projects
+ * (`loop/research-real-record.md`).
  *
  * A COLUMN THAT NAMES NO FIELD IS NOT ASKED ABOUT, and a block the record refused, a registered kind's, or one whose
  * author keeps its nought, is not this rule's to judge.
@@ -231,6 +267,7 @@ export function unsaid(b: Drawable): boolean {
   }
   const figures = figuresOf(b);
   if (figures.length > 0) return figures.every(unsaidFigure);
+  if (b.kind === 'cards') return cardsUnsaid(b);
   const at = b.kind === 'progress' && b.range === true ? BANDS : PICTURED[b.kind];
   const rows = matchedRows(b);
   if (!at || rows.length === 0) return false;

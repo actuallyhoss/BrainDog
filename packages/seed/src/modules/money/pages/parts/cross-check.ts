@@ -31,13 +31,13 @@ export const CROSS_CHECK: Record<string, unknown>[] = [
     ],
     when: { metric: 'cash-cross-check', not: 0 },
   },
-  /* NO LINE FOR "NO BALANCE HAS BEEN TYPED YET", THOUGH ONE STOOD HERE WHILE 3.17.0 WAS BEING MADE. With no balance typed
-     the check has no value and its reading says why (`readCrosscheck` in `packages/kernel/src/money-figures.ts`); the
-     page said the same in a line of its own, drawn while Cash now held nothing. It went for three reasons. It stood
-     under the box to add an account, drawn on the same day, which already says there is no account to read. It was
-     untrue on the one other day it was drawn: with accounts and none of them counted as cash a balance HAS been typed,
-     and the reading says "No account counts as cash yet" there. And Money was at the most blocks a page declares, so
-     it held the place of the line a record with two books opens on (`headline.ts`). The reading still says why to
-     whoever asks the figure, and `packages/seed/test/cash-cross-page.test.ts` holds that the page draws nothing about
-     the check on that day. */
+  /* NO LINE OF ITS OWN FOR NOTHING TO CHECK, THOUGH ONE STOOD HERE WHILE 3.17.0 WAS BEING MADE. It said "No balance has
+     been typed yet", drawn while Cash now held nothing, and it was untrue with accounts and none of them counted as
+     cash, where a balance HAS been typed. It went for the lead a record with two books opens on (`headline.ts`), Money
+     being at the most blocks a page declares, and it stood under the box to add an account, which says as much.
+
+     ONE SENTENCE NOW, TRUE OF BOTH DAYS: "No account counts as cash yet". The check's reading says it as its why
+     (`CROSSCHECK_NOTHING` in `packages/kernel/src/money-figures.ts`), and the page says the same words where it
+     already spoke of cash with nothing to draw, What you have, by book (`by-book.ts`). So this file declares nothing
+     for that day, and `packages/seed/test/cash-cross-page.test.ts` holds the two to one sentence. */
 ];

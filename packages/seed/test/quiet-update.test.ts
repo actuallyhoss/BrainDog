@@ -503,6 +503,40 @@ const withoutPaid = (doc: Body): Body => ({
     return gone && Array.isArray(d.fields) ? { ...d, fields: (d.fields as Body[]).filter((f) => !gone.has(String(f.id))) } : d;
   }),
 });
+/**
+ * AND 3.17.0'S LEDGER TILE AND ITS BAD PHRASE (ledger-tile-59, bad-phrase-59), folded into the same unreleased step: the
+ * tile leaves the Money page and History takes back What moved, twelve lines and the last block, and the two late
+ * lines on Heads up say "past their due date" as plain words again.
+ */
+const WHAT_MOVED: Body = {
+  kind: 'timeline',
+  heading: 'What moved',
+  icon: 'receipt',
+  span: 12,
+  source: 'register.transactions',
+  where: 'state is not void',
+  columns: [{ field: 'on' }, { field: 'what' }, { field: 'amount', sign: { field: 'direction', minus: 'out' } }],
+  order: [{ field: 'on', dir: 'desc' }],
+  limit: 12,
+  when: { metric: 'cash-accounts', gt: 0 },
+  empty: 'Nothing has moved yet. Add what left the bank and this page starts from it.',
+};
+const withoutLedgerTile = (doc: Body): Body => ({
+  ...doc,
+  declarations: (doc.declarations as Body[]).map((d) =>
+    d.page !== 'money' || !Array.isArray(d.blocks)
+      ? d
+      : {
+          ...d,
+          blocks: [
+            ...(d.blocks as Body[])
+              .filter((b) => b.heading !== 'Ledger')
+              .map((b) => (typeof b.body === 'string' && b.body.includes('{{bad:past their due date}}') ? { ...b, body: b.body.replace('{{bad:past their due date}}', 'past their due date') } : b)),
+            WHAT_MOVED,
+          ],
+        },
+  ),
+});
 const withoutCashStale = (doc: Body): Body => ({ ...doc, declarations: (doc.declarations as Body[]).filter((d) => d.rule !== 'cash-stale') });
 const LATEST: Record<string, { version: string; released: string; undo: (doc: Body) => Body }> = {
   /* AN ACCOUNT'S DIGITS SAID THE LAST FOUR. */
@@ -510,7 +544,7 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
     version: '3.13.0',
     released: '2e09983b40aba73e',
     undo: (raw) => {
-      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(raw))))));
+      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(raw)))))));
       return {
       ...doc,
       declarations: (doc.declarations as Body[]).filter((d) => !SIGNS_ADDED.has(String(d.metric)) && !WEEK_IN.has(String(d.metric)) && d.script !== 'last_day').map((d) =>

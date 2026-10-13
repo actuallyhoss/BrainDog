@@ -21,8 +21,15 @@
 import { remoteKey } from './scope.ts';
 
 /** The kinds a key may be. A handle of any other provider is kept as `provider:name`, lower-cased, and is still a key. */
-export const KEY_KINDS = ['email', 'github', 'discord', 'slack', 'phone', 'bank', 'domain', 'remote', 'folder'] as const;
+export const KEY_KINDS = ['email', 'github', 'discord', 'slack', 'phone', 'bank', 'domain', 'remote', 'folder', 'name'] as const;
 export type KeyKind = (typeof KEY_KINDS)[number];
+
+/**
+ * The kinds that are WEAK: a key of one proposes a candidate and never decides alone. A name is the only one. Two
+ * projects are both called Web, and every `api` and `app` is somebody else's too, so a name says "it may be this one"
+ * and a place or a site says "it is" (`entities.ts`'s `settledBy`).
+ */
+export const WEAK_KINDS: ReadonlySet<string> = new Set(['name']);
 
 /**
  * Mail hosts anybody can sign up to, whose domain says nothing about who someone works for. A domain key is an
@@ -530,6 +537,24 @@ function folderKey(raw: string): string | null {
   return said.startsWith('/') && said.length > 1 ? `folder:${said}` : null;
 }
 
+/**
+ * A name as two mentions of one share it: trimmed, spaces collapsed, lower case, and no punctuation but `-` and `'`.
+ * Empty for a name of no letters or digits.
+ */
+export const nameWords = (name: string): string =>
+  name
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s'-]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+/** A name as its weak key, or `null` when nothing in it is a letter or a digit. */
+function nameKeyOf(raw: string): string | null {
+  const words = nameWords(raw);
+  return /[\p{L}\p{N}]/u.test(words) ? `name:${words}` : null;
+}
+
 /** A remote as `host/owner/name`, by scope's own reading, so a project's remote and a key are one string. */
 function remoteKeyOf(raw: string): string | null {
   const key = remoteKey(raw);
@@ -562,6 +587,8 @@ export function keyOf(kind: string, raw: string): string | null {
       return remoteKeyOf(raw);
     case 'folder':
       return folderKey(raw);
+    case 'name':
+      return nameKeyOf(raw);
     default:
       return /^[a-z][a-z0-9.-]*$/.test(k) ? handleKey(k, raw) : null;
   }
@@ -606,6 +633,10 @@ export type KeyInput = {
   remote?: string | null | undefined;
   remotes?: readonly string[] | undefined;
   folder?: string | null | undefined;
+  folders?: readonly string[] | undefined;
+  /** What it is called: a weak key (`WEAK_KINDS`), read last so the keys that decide come first. */
+  name?: string | null | undefined;
+  names?: readonly string[] | undefined;
   phone?: string | null | undefined;
   bank?: string | null | undefined;
 };
@@ -623,14 +654,18 @@ export function keysOf(input: KeyInput): string[] {
   each(null, input.keys, keyFrom);
   each(input.domain, input.domains, (s) => keyOf('domain', s));
   each(input.remote, input.remotes, (s) => keyOf('remote', s));
-  each(input.folder, null, (s) => keyOf('folder', s));
+  each(input.folder, input.folders, (s) => keyOf('folder', s));
   each(input.phone, null, (s) => keyOf('phone', s));
   each(input.bank, null, (s) => keyOf('bank', s));
+  each(input.name, input.names, (s) => keyOf('name', s));
   return [...out];
 }
 
 /** The kind of a key, `email` of `email:ada@x.com`. */
 export const kindOfKey = (key: string): string => key.slice(0, key.indexOf(':'));
+
+/** Whether a key is weak: one that proposes a candidate and never decides alone. */
+export const isWeakKey = (key: string): boolean => WEAK_KINDS.has(kindOfKey(key));
 
 /** The value of a key, `ada@x.com` of `email:ada@x.com`. */
 export const valueOfKey = (key: string): string => key.slice(key.indexOf(':') + 1);

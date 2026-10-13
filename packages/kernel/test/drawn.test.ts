@@ -130,6 +130,60 @@ test('ARRANGING STILL DRAWS EVERY BLOCK, but one whose when said no', () => {
   assert.deepEqual(whys(emptyHidden(marked, true)), whys(marked));
 });
 
+/* THE PROJECT PAGE'S OWN BLOCKS (`packages/seed/src/modules/portfolio.ts`): "Where it stands" is cards titled by the
+   health, and "Keeping it alive" and the keys, tools and skills a project runs on are cards titled by the name. A card
+   holds the row it read, so `holdsNothing` kept each one, and a row with nothing said in it drew a heading over a dash. */
+const STANDS = [
+  { field: 'health', as: 'title' },
+  { field: 'progress', label: '', as: 'ring' },
+  { field: 'aim', label: 'Aiming for', as: 'fact' },
+  { field: 'agent', label: 'Agent', as: 'who' },
+];
+const cards = (rows: PageRow[], over: Partial<BlockResult> = {}): BlockResult =>
+  block({ kind: 'cards', heading: 'Where it stands', source: 'register.things', columns: STANDS, rows, matched: rows.length, ...over });
+
+test('CARDS WHOSE EVERY CARD SAYS NOTHING are unsaid: no value in any column the block draws, on any row', () => {
+  const dash = cards([row({ name: 'Sketchpad', health: null, progress: null, aim: '', agent: null })]);
+  assert.equal(unsaid(dash), true);
+  /* A FIELD THE ROW NEVER HELD reads as one nobody filled in, and so do two such rows. */
+  assert.equal(unsaid(cards([row({ name: 'Sketchpad' }), row({ name: 'Other', aim: '' })])), true);
+  const lead = block({ kind: 'table', rows: [row({ title: 'a' })], matched: 1 });
+  assert.deepEqual(whys(markDrawn([lead, dash])), ['drawn', 'unsaid']);
+  /* ITS HEADING GOES WITH IT, as a section over nothing does. */
+  assert.deepEqual(whys(markDrawn([lead, block({ kind: 'section', heading: 'More about it' }), dash])), ['drawn', 'empty', 'unsaid']);
+});
+
+test('A CARD WITH ANYTHING SAID IS DRAWN, and every card beside it: a name, a nought, or one fact on one row', () => {
+  assert.equal(unsaid(cards([row({ health: 'at_risk' })])), false);
+  assert.equal(unsaid(cards([row({ progress: 0 })])), false, 'nought is a value');
+  assert.equal(unsaid(cards([row({ health: null }), row({ aim: '2026-12-01' })])), false, 'one card said is the block said');
+  /* A CARD WITH A NAME IS NEVER LEFT OUT: a service imported with no cost is still what the project runs on. */
+  const alive = cards([row({ name: 'sketchpad.com', cost: null, cycle: null, note: '', renews: null })], {
+    heading: 'Keeping it alive',
+    columns: [{ field: 'name', as: 'title' }, { field: 'cost', as: 'figure' }, { field: 'cycle', as: 'fact' }, { field: 'note', as: 'fact' }, { field: 'renews', as: 'when' }],
+  });
+  assert.equal(unsaid(alive), false);
+});
+
+test('CARDS NOT THIS RULE\'S TO JUDGE: a kept nought, a refusal, no row, no named column, and a column off the row itself', () => {
+  const nothing = row({ health: null });
+  assert.equal(unsaid(cards([nothing], { empty: 'keep' })), false);
+  assert.equal(unsaid(cards([nothing], { refusals: [{ code: 'DECLARATION_INVALID', fix: 'Name a list.' }] })), false);
+  /* NO ROW is a block that holds nothing, which keeps its empty line where it leads the page. */
+  assert.equal(unsaid(cards([])), false);
+  assert.equal(bare(cards([])), true);
+  assert.equal(unsaid(cards([nothing], { columns: [] })), false);
+  /* A COLUMN THAT ONLY COLOURS OR DIMS A CARD draws nothing, so it is not what a card says. */
+  assert.equal(unsaid(cards([row({ tint: 210, old: 'yes' })], { columns: [{ field: 'health', as: 'title' }, { field: 'tint', as: 'hue' }, { field: 'old', as: 'quiet' }] })), true);
+  /* THE DAY THE RECORD STAMPED A ROW is on the row and not in its fields, and every row has one. */
+  assert.equal(unsaid(cards([nothing], { columns: [{ field: 'health', as: 'title' }, { field: 'updated_at', as: 'when' }] })), false);
+});
+
+test('A LIST DRAWS ITS NAMES WHATEVER ELSE IS EMPTY, so a table or a to-do of empty cells is never unsaid', () => {
+  const empty = [row({ title: null, due: null })];
+  for (const kind of ['table', 'todo', 'list']) assert.equal(unsaid(block({ kind, columns: [{ field: 'title' }, { field: 'due' }], rows: empty, matched: 1 })), false, kind);
+});
+
 /* A BLOCK DRAWN FROM ITS OWN WRITTEN-OUT CELLS holds them (rule-sheet-pack, batch 40): Layout's three-wide ring of
    `authored: [{ cells: ['Done', '3', '5'] }]` read no row and was answered empty, so it never showed. */
 test('A BLOCK WRITTEN OUT IN THE PAGE HOLDS WHAT ITS AUTHOR WROTE, and one with no cells written is still empty', () => {

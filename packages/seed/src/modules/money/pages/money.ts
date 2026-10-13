@@ -11,6 +11,7 @@ import { HEADLINE } from './parts/headline.ts';
 import { HEADS_UP } from './parts/heads-up.ts';
 import { HISTORY } from './parts/history.ts';
 import { INSTALMENTS } from './parts/instalments.ts';
+import { LEDGER } from './parts/ledger.ts';
 import { NEXT_30 } from './parts/next30.ts';
 import { QUEUE } from './parts/queue.ts';
 import { RUNWAY } from './parts/runway.ts';
@@ -68,6 +69,13 @@ import { RUNWAY } from './parts/runway.ts';
  * accounts its money is kept in (`parts/headline.ts`), where the app said its own filler because no block was the
  * lead. TWENTY-FOUR BLOCKS, THE MOST A PAGE DECLARES (`BLOCK_CEILING` in `packages/kernel/src/declare.ts`): the line
  * took the place of the one that said no balance had been typed (`parts/cross-check.ts`).
+ *
+ * THE LEDGER, OPEN (REC-B15: "Ledger, add, edit, delete", "I hate this tabs"). The six newest entries stand in a tile
+ * of their own under the walk and the accounts beside it, each line opening its entry (`parts/ledger.ts`), where
+ * twelve were folded shut under History. History gave them up, so the page is still twenty-four blocks and says what
+ * moved once. It stands before Heads up because a boxed section takes every block after it up to the next section,
+ * and the Ledger is no line of a warning. The box that adds a movement is declared there and waits for room on the
+ * page and for a capture that can ask for an account.
  */
 export const MONEY_PAGE: SeedPage = {
   page: 'money',
@@ -89,6 +97,7 @@ export const MONEY_PAGE: SeedPage = {
     ...ACCOUNTS_TILE,
     ...QUEUE,
     ...CROSS_CHECK,
+    ...LEDGER,
     ...HEADS_UP,
     ...NEXT_30,
     ...INSTALMENTS,

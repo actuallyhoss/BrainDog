@@ -133,7 +133,7 @@ test('the declared page says the same sentence from a count, how many are hard t
   assert.deepEqual(countSentence(0, 0, 'Yes'), null);
   assert.deepEqual(countSentence(2, 0, 'Per seat', 'Claude'), { text: 'Two questions wait on you. Claude suggests “Per seat” for the first.', needs: '' });
   assert.deepEqual(countSentence(1, 1, undefined), { text: 'One question waits on you. It is hard to undo.', needs: '' });
-  assert.deepEqual(countSentence(5, 2, 'Yes'), { text: 'Five questions wait on you. Two of them are hard to undo, and they come first.', needs: '' });
+  assert.deepEqual(countSentence(5, 2, 'Yes'), { text: 'Five questions wait on you. Two of them are hard to undo.', needs: '' });
   assert.equal(countSentence(2, 2, 'Yes')?.text, 'Two questions wait on you. Both are hard to undo.');
   assert.deepEqual(countSentence(1, 0, undefined, '', 1, LATE), { text: 'One question waits on you, for over two weeks.', needs: 'for over two weeks' });
   assert.equal(countSentence(1, 0, undefined, '', 1)?.needs, 'for too long', 'a late count from a host that named no days');

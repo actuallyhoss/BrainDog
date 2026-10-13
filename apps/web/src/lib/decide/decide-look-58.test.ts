@@ -81,12 +81,12 @@ test('A VALUE WHERE THERE WAS NONE IS SAID IN WORDS, never a struck "nothing" an
   assert.match(page, /\{#if how === 'set'\}\s*<span class="arr-will"><span class="arr-tag">\{copy\.arrangeSetTo\}/u);
 });
 
-test('THE LEAD SAYS HOW MANY ARE HARD TO UNDO AS A COUNT, and then that they come first', () => {
-  assert.match(countSentence(14, 10, undefined)?.text ?? '', / questions wait on you\. Ten of them are hard to undo, and they come first\.$/u);
-  assert.equal(countSentence(5, 2, 'Yes')?.text, 'Five questions wait on you. Two of them are hard to undo, and they come first.');
+test('THE LEAD SAYS HOW MANY ARE HARD TO UNDO AS A COUNT, and never that they come first: the queue ranks by the wait before the band', () => {
+  assert.match(countSentence(14, 10, undefined)?.text ?? '', / questions wait on you\. Ten of them are hard to undo\.$/u);
+  assert.equal(countSentence(5, 2, 'Yes')?.text, 'Five questions wait on you. Two of them are hard to undo.');
   assert.equal(
     countSentence(12, 4, undefined, '', 3, 14)?.text,
-    '12 questions wait on you, three of them for over two weeks. Four are hard to undo, and they come first.',
+    '12 questions wait on you, three of them for over two weeks. Four are hard to undo.',
     '"of them" is said twice in one sentence',
   );
   assert.equal(countSentence(8, 1, undefined)?.text, 'Eight questions wait on you. The first one is hard to undo.');

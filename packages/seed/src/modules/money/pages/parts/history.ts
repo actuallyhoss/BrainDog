@@ -1,11 +1,9 @@
-/** History: the months behind and what already moved, folded. */
-
-import { MOVED_COLUMNS } from '../shared.ts';
+/** History: the months behind, folded. */
 
 export const HISTORY: Record<string, unknown>[] = [
   {
-    /* WHAT ALREADY HAPPENED, FOLDED SHUT, SINCE money-core 3.11.0: the months behind and what moved, a tap away, so
-       the page a person reads each morning is what there is, how long it lasts and what is coming. */
+    /* WHAT ALREADY HAPPENED, FOLDED SHUT, SINCE money-core 3.11.0: the months behind, a tap away, so the page a person
+       reads each morning is what there is, how long it lasts and what is coming. */
     kind: 'section',
     heading: 'History',
     /* A GLYPH THE APP DRAWS ON A FOLDED HEADING, as a project's History and notes wore. */
@@ -35,19 +33,7 @@ export const HISTORY: Record<string, unknown>[] = [
     when: { metric: 'out-by-month', gt: 0 },
     empty: 'Nothing moved or due in these months.',
   },
-  {
-    /* WHAT MOVED, NEWEST FIRST, AS A CALM LIST (`MOVED_COLUMNS`). Twelve, so the page stays a page; the list holds the
-       rest, and the block's own link opens it. Drawn once there is an account, whose first payment it waits for. */
-    kind: 'timeline',
-    heading: 'What moved',
-    icon: 'receipt',
-    span: 12,
-    source: 'register.transactions',
-    where: 'state is not void',
-    columns: MOVED_COLUMNS,
-    order: [{ field: 'on', dir: 'desc' }],
-    limit: 12,
-    when: { metric: 'cash-accounts', gt: 0 },
-    empty: 'Nothing has moved yet. Add what left the bank and this page starts from it.',
-  },
+  /* WHAT MOVED IS NOT HERE, SINCE THE LEDGER TILE (REC-B15, `parts/ledger.ts`): its twelve lines were folded shut under
+     this heading, where the owner went looking for them. The six newest stand open on the page now, and a page that
+     drew them twice would be saying one thing in two places. */
 ];

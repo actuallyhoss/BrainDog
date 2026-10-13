@@ -835,9 +835,23 @@ const saysMany = (name: string): boolean => {
   return last.length >= 4 && /s$/iu.test(last) && !NOT_MANY.test(last);
 };
 
+/** The plurals English does not build from the singular, by the singular's last word (audit 58, claim 4: "5 childs"). */
+const ODD_MANY: ReadonlyMap<string, string> = new Map([
+  ['child', 'children'],
+  ['life', 'lives'],
+  ['man', 'men'],
+  ['woman', 'women'],
+  ['leaf', 'leaves'],
+  ['knife', 'knives'],
+]);
+
 /** Many of a declared singular, where English says how: transaction, transactions; log entry, log entries; box, boxes. */
 const manyOf = (one: string): string => {
   const word = one.trim();
+  const end = /\p{L}+$/u.exec(word)?.[0] ?? '';
+  const odd = ODD_MANY.get(end.toLowerCase());
+  /* In the word's own capital, as the rest are. */
+  if (odd !== undefined) return `${word.slice(0, word.length - end.length)}${/^\p{Lu}/u.test(end) ? `${odd.charAt(0).toUpperCase()}${odd.slice(1)}` : odd}`;
   /* The one plural English does not build from its singular, kept in the word's own capitals. */
   if (/(?:^|\s)person$/iu.test(word)) return word.replace(/(pe)rson$/iu, '$1ople');
   if (/[^aeiou]y$/iu.test(word)) return `${word.slice(0, -1)}ies`;

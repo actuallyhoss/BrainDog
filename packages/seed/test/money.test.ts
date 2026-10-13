@@ -697,6 +697,9 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
     /* THE CHECK, DRAWN SINCE cash-page-54 (REC-A17): one tile while the two ways of adding cash up disagree. The line
        it drew while no balance is typed went for the lead above: Money is at the most blocks a page declares. */
     'Cash now does not add up',
+    /* THE LEDGER, OPEN, SINCE ledger-tile-59 (REC-B15): the six newest entries in a tile of their own, before the boxed
+       Heads up, where twelve were folded under History as What moved. */
+    'Ledger',
     /* ONE TILE OF THREE LINES, SINCE money-core 3.5.0: an old balance, money late coming in and money late going out,
        each a note with no heading of its own under one boxed section. */
     'Heads up',
@@ -720,7 +723,6 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
     'Being chased',
     'History',
     'In and out, by month',
-    'What moved',
   ]);
   /* WHAT STANDS BESIDE THE WALK, AND WHAT IS FOLDED. */
   const blocks = page.blocks as { heading?: string; area?: string; fold?: boolean; box?: boolean }[];
@@ -932,7 +934,7 @@ test('THE ACCOUNTS ADD UP TO CASH NOW, the calendar is the next thirty days, and
   }
 
   /* NEWEST FIRST, AND THE AMOUNT AS THE ROW HOLDS IT: a ledger keeps every minor unit. */
-  const moved = blockOf(k, 'money', 'What moved');
+  const moved = blockOf(k, 'money', 'Ledger');
   const days = moved.rows.map((r) => String(r.fields.on));
   assert.deepEqual(days, [...days].sort().reverse());
   assert.ok(moved.rows.every((r) => Number.isInteger((r.fields.amount as { amount: number }).amount)));

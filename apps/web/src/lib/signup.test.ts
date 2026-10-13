@@ -138,10 +138,14 @@ test('THE BUILD\'S KEY IS KEPT WITH THE SENTENCE, so a reload between the call a
   assert.deepEqual(old, { said: MARIAM, currency: 'EGP', usecase: null });
   assert.equal(old !== null && 'key' in old, false);
   /* A KEY THAT IS NOT ONE IS LEFT OUT, and the sentence is still built. */
-  for (const bad of [7, '', 'has space', 'k'.repeat(101), null]) {
+  for (const bad of [7, '', 'has space', 'k'.repeat(65), 'k'.repeat(101), null]) {
     before.map.set(SAID_KEY, JSON.stringify({ said: MARIAM, currency: null, usecase: null, key: bad, at: 1 }));
     assert.deepEqual(saidKept(before, 2, null), { said: MARIAM, currency: null, usecase: null }, String(bad));
   }
+  /* AS LONG AS THE RECORD TAKES, AND NO LONGER: 64 is kept, and the page's own key is well inside it. */
+  before.map.set(SAID_KEY, JSON.stringify({ said: MARIAM, currency: null, usecase: null, key: 'k'.repeat(64), at: 1 }));
+  assert.equal(saidKept(before, 2, null)?.key, 'k'.repeat(64));
+  assert.equal(KEY.length <= 64, true);
   /* DROPPED WITH THE DRAFT once all of it is in the record. */
   keepSaid(desk, null);
   assert.equal(desk.map.has(SAID_KEY), false);
@@ -154,19 +158,45 @@ test('A KEY IS PUT BESIDE A SENTENCE ALREADY KEPT, without making the sentence a
   keepKey(desk, 'first-run-one', 5000);
   assert.deepEqual(saidKept(desk, 5000, null), { said: MARIAM, currency: 'EGP', usecase: 'shop', reply: { about: 'currency', value: 'EGP' }, key: 'first-run-one' });
   assert.equal((JSON.parse(desk.map.get(SAID_KEY) ?? '{}') as { at?: number }).at, 1000, 'its day still runs from when it was said');
-  /* A NEW KEY TAKES THE OLD ONE'S PLACE, as a Try again of an answered press takes a new one. */
+  /* THE FIRST KEY STAYS: a Try again of an answered press takes a new one, and that one is the page's alone. */
   keepKey(desk, 'first-run-two', 6000);
-  assert.equal(saidKept(desk, 6000, null)?.key, 'first-run-two');
+  assert.equal(saidKept(desk, 6000, null)?.key, 'first-run-one');
   /* NOTHING KEPT, NOTHING WRITTEN: a key alone builds nothing, and a key that is not one changes nothing. */
   const phone = storage();
   keepKey(phone, 'first-run-one', 1);
   assert.equal(phone.map.has(SAID_KEY), false);
   keepKey(desk, 'not a key', 7000);
-  assert.equal(saidKept(desk, 7000, null)?.key, 'first-run-two');
+  assert.equal(saidKept(desk, 7000, null)?.key, 'first-run-one');
   /* STORAGE OFF: no throw, and the page presses under the key it holds in memory. */
   const blocked = { getItem: () => { throw new Error('off'); }, setItem: () => { throw new Error('off'); }, removeItem: () => { throw new Error('off'); } };
   assert.doesNotThrow(() => keepKey(blocked, 'first-run-one'));
   assert.doesNotThrow(() => keepSaid(blocked, { said: MARIAM, currency: null, usecase: null, key: 'first-run-one' }));
+});
+
+test('A RELOAD AFTER A PRESS THAT ANSWERED IN PART builds under the first key, so the plan is not written twice', () => {
+  const desk = storage();
+  keepSaid(desk, { said: MARIAM, currency: 'EGP', usecase: 'shop' }, 1000);
+  /* THE FIRST PRESS, as the page's `write` keeps it before the call goes out. */
+  keepKey(desk, 'first-run-one', 2000);
+  /* IT ANSWERED IN PART: what is left goes under a new key, and Try again passes that one through `write` too. */
+  keepKey(desk, 'first-run-two', 3000);
+  /* THE RELOAD: a new page with nothing in memory reads the sentence and its key off the device, as `build` does. */
+  const reloaded = saidKept(desk, 4000, null);
+  assert.equal(reloaded?.key, 'first-run-one', 'the whole plan goes under the key the record holds');
+  assert.equal(reloaded?.said, MARIAM);
+  /* AND AGAIN, after that press answered in part and a second reload: still the first. */
+  keepKey(desk, reloaded!.key!, 5000);
+  keepKey(desk, 'first-run-three', 6000);
+  assert.equal(saidKept(desk, 7000, null)?.key, 'first-run-one');
+  /* A NEW SENTENCE IS A NEW BUILD: kept without a key, and its first press keeps its own. */
+  keepSaid(desk, { said: `${MARIAM} And candles.`, currency: 'EGP', usecase: 'shop' }, 8000);
+  assert.equal(saidKept(desk, 8000, null)?.key, undefined);
+  keepKey(desk, 'first-run-four', 9000);
+  assert.equal(saidKept(desk, 9000, null)?.key, 'first-run-four');
+  /* ALL OF IT IN: the key goes with the sentence, and the next sign-up on this device starts clean. */
+  keepSaid(desk, null);
+  keepKey(desk, 'first-run-five', 10000);
+  assert.equal(desk.map.has(SAID_KEY), false);
 });
 
 test('THE KEY NEVER RIDES IN THE LINK: it is this device\'s handle on its own press', () => {

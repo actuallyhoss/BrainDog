@@ -194,13 +194,13 @@ test('a difference under nought is a miss, whatever the target says', async () =
   assert.deepEqual([read(k, CHECK).value, read(k, { ...CHECK, target: { gte: -5 } }).met], [-1, false]);
 });
 
-test('with no balance typed it has no value, and says so', async () => {
+test('with no account it has no value, and says no account counts as cash', async () => {
   const k = await record();
   const check = read(k, CHECK);
-  assert.deepEqual([check.value, check.unit, check.met, check.why], [null, null, null, 'No balance has been typed yet']);
+  assert.deepEqual([check.value, check.unit, check.met, check.why], [null, null, null, 'No account counts as cash yet']);
 });
 
-test('with an account and none of them cash it has no value, and says that and not that no balance was typed', async () => {
+test('with an account and none of them cash it has no value, and says the same sentence', async () => {
   const k = await record();
   make(k, 'accounts', { name: 'Deposit', liquid: false, balance: money(900_000, 'GBP'), as_of: day(-30) });
   const check = read(k, CHECK);

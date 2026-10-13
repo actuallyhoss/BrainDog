@@ -364,6 +364,16 @@ export type Reading = {
    * figure, and on a rolled one with nothing stated.
    */
   as_of?: string;
+  /**
+   * ON A SUM, THE ENTRIES IT ADDED, by handle (`transactions#2`), oldest first and fifty at most (`BACKS_CAP`), so a
+   * reader can tell two figures of one amount from one entry read twice: the amounts being equal never says so. An entry
+   * the `where` chose that leaves the summed field empty was not added and is not here. Absent on a sum of nothing, on
+   * every figure that is not a plain sum, and on a list that numbers nothing (`series`). A sum in more than one currency
+   * names the entries of every currency it read, the ones no rate reached among them (`parts`, `noRate`).
+   */
+  backs?: string[];
+  /** How many more entries the sum added than `backs` names. Absent when it names them all. */
+  backsMore?: number;
 };
 
 /** A target converted into the currency a figure was added up in: the bound, and the rate's day. */
@@ -1485,6 +1495,7 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
   const unsaid = now.value.rows === 0 && inScope > 0 && requiresFilled(said.predicate, reduced);
   return ok({
     ...now.value,
+    ...backsOf(sql, schema, decl.value, current),
     held: inScope,
     ...(unsaid ? { unsaid: true as const } : {}),
     delta,
@@ -1493,6 +1504,33 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
     ...(targetIn ? { targetIn } : {}),
     ...(grouped ? grouped.value : {}),
   });
+}
+
+/** How many entries a sum names in `backs`; the rest are counted in `backsMore`. */
+export const BACKS_CAP = 50;
+
+/**
+ * The entries a plain sum added, for `Reading.backs`: the ones its `where` chose that hold the summed field, read once
+ * for the figure itself and never for its comparison window or its groups, which are the same entries under a narrower
+ * `where`. Two short reads on the list the figure has just scanned.
+ */
+function backsOf(sql: Sql, schema: Schema, value: Value, predicate: Predicate | undefined): Pick<Reading, 'backs' | 'backsMore'> {
+  if (!('sum' in value)) return {};
+  const field = typeof value.sum === 'string' ? value.sum : value.sum.product[0];
+  const w = compile(predicate, schema);
+  if (w.bad.length) return {};
+  /* THE SUM'S OWN TEST OF WHAT IT ADDS (`one`): the amount of a money, the value of a quantity, never the pair. */
+  const type = schema.fields[field]?.type;
+  const held = `${jsonPath(field)}${type === 'money' ? '.amount' : type === 'quantity' ? '.value' : ''}`;
+  const where = `register = ? AND deleted_at IS NULL AND ${w.sql} AND json_extract(fields, ?) IS NOT NULL`;
+  const params = [schema.register, ...w.params, held];
+  const added = Number(sql.one<{ n: number }>(`SELECT count(*) AS n FROM entry WHERE ${where}`, ...params)?.n ?? 0);
+  if (added === 0) return {};
+  const backs = sql
+    .all<{ seq: number }>(`SELECT seq FROM entry WHERE ${where} AND seq IS NOT NULL ORDER BY seq LIMIT ${BACKS_CAP}`, ...params)
+    .map((r) => `${schema.register}#${r.seq}`);
+  if (backs.length === 0) return {};
+  return { backs, ...(added > backs.length ? { backsMore: added - backs.length } : {}) };
 }
 
 /**

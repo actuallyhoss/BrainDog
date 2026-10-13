@@ -59,6 +59,12 @@ test('MANY OF A LIST, where its name does not say it: the declared singular turn
   assert.equal(manySaid('Log', 'log entry'), 'log entries');
   assert.equal(manySaid('Put by', 'saving'), 'savings');
   assert.equal(manySaid('Stock', 'box'), 'boxes');
+  /* THE PLURALS ENGLISH DOES NOT BUILD (audit 58, claim 4): never "5 childs" or "4 lifes". */
+  assert.equal(manySaid('Children', 'child'), 'children');
+  assert.equal(manySaid('Lives', 'life'), 'lives');
+  assert.equal(manySaid('Staff', 'woman'), 'women');
+  assert.equal(manySaid('Tools', 'paring knife'), 'paring knives');
+  assert.equal(weekSaid(5, 'Children', 'child', false), `5 children this week. ${ASK}`);
   assert.equal(manySaid('HSBC cards', 'card'), 'HSBC cards');
   /* A NAME THAT ONLY LOOKS LIKE MANY GIVES WAY TO THE SINGULAR THE LIST DECLARES. */
   assert.equal(manySaid('Finances', 'transaction'), 'transactions');

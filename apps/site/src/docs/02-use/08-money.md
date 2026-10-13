@@ -15,7 +15,7 @@ Money is one page, read from the same lists from top to bottom:
 - **Coming up**, **Being chased**, and what is late to you and late to pay.
 - **In and out, by month**: money in and money out, what has moved and what is due.
 - **Every month**: what repeats, in and out.
-- **What moved**: the ledger's latest lines, with account, category and date.
+- **Ledger**: the six newest lines of the ledger in a tile of their own, each opening its entry. They are no longer under History.
 - **What agents and rules did**: every change they made to your money, with who made it.
 
 Cash now is read from your accounts, rolled forward from each account's newest balance through what has moved since. Every figure after it reads the same walk, so no two of them disagree.

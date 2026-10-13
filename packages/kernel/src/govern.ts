@@ -2148,6 +2148,8 @@ function narrowArrangement(body: Record<string, unknown>, keep: ReadonlySet<stri
       }),
     );
   if (Array.isArray(body.calls)) set('calls', body.calls.filter((c) => !isMap(c) || typeof c.part !== 'string' || keep.has(c.part)));
+  /* THE SENTENCE'S CALLS GO WITH THEIR PART TOO (calls-out-59): a partial yes leaves only the calls still to arm. */
+  if (Array.isArray(body.calls_out)) set('calls_out', body.calls_out.filter((c) => !isMap(c) || typeof c.part !== 'string' || keep.has(c.part)));
   return out;
 }
 
@@ -2169,7 +2171,7 @@ function mergeArrangement(rest: Record<string, unknown>, taken: Record<string, u
     if (ids.length > 0) packs[verb] = ids;
   }
   if (taken.packs !== undefined || rest.packs !== undefined) out.packs = packs;
-  for (const key of ['plan', 'pages', 'settings', 'declarations', 'parts', 'calls']) set(key, both(key));
+  for (const key of ['plan', 'pages', 'settings', 'declarations', 'parts', 'calls', 'calls_out']) set(key, both(key));
   /* A NEED BY ITS LABEL, with the union of the parts each half named it for. */
   const needs = new Map<string, Record<string, unknown>>();
   const loose: unknown[] = [];

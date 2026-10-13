@@ -38,6 +38,7 @@ import { parseArgs } from 'node:util';
 import { satisfies } from '@braindog/declare';
 import type { KnownKeys } from '@braindog/declare/catalogue';
 import { coerce, isPublicMail, looksLikeCredential, type FieldDecl } from '@braindog/kernel';
+import * as kernel from '@braindog/kernel';
 import { no, ok, refused, type Result } from '@braindog/ports';
 
 import { budgetOf, hostsPath, target, type Target } from './http.ts';
@@ -286,6 +287,11 @@ export type Report = {
   /** Every row tonight's read saw in the bin (`InBin`). Optional for the same reason as `questions`. */
   bin?: InBin[];
   /**
+   * How many planned pictures named nothing the set draws and were left out: see `pictures` in `applyPlan`. A count and
+   * no names, because the word left out is the old tool's and says nothing to him. Absent when there were none.
+   */
+  pictures?: number;
+  /**
    * Each row written without a row it names, because the row named is one he deleted here (`deleted`): the task a new
    * export files under a project he threw away. Optional for the same reason.
    */
@@ -335,6 +341,18 @@ const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object
 const fixOf = (r: Result<unknown>): string => (refused(r) ? `${r.refusal.fix} (${r.refusal.code})` : 'Somebody else changed it at the same moment. Run the import again.');
 /** The field types whose values a dry run puts to the kernel's coercion: see `textRefusal` in `applyPlan`. */
 const TEXTS = new Set(['text', 'document']);
+/**
+ * WHETHER A WORD NAMES A PICTURE THE SET DRAWS, as the kernel answers it (`isMarkGlyph` in `packages/kernel/src/marks.ts`):
+ * its list and no copy of it here, so a glyph drawn tomorrow is a picture this import carries tomorrow.
+ *
+ * READ OFF THE KERNEL'S ENTRY BY NAME AND NOT IMPORTED BY NAME, because the entry does not hand it out yet and a named
+ * import of something missing stops the whole command line from loading. `null` until it does, and then the import
+ * leaves every picture as it came, which is what it did before. Once the entry exports it this is a named import.
+ */
+const KNOWN_MARK: ((name: unknown) => boolean) | null = (() => {
+  const is = (kernel as Record<string, unknown>)['isMarkGlyph'];
+  return typeof is === 'function' ? (is as (name: unknown) => boolean) : null;
+})();
 const unreachable = (r: Result<unknown>) => refused(r) && r.refusal.code === 'UNREACHABLE';
 
 /**
@@ -584,6 +602,8 @@ export async function applyPlan(
      * see `Unreachable` in `importCommand`.
      */
     progress?: { report: Report | null };
+    /** Whether a word names a picture the set draws. Without it, the kernel's own answer (`KNOWN_MARK`). */
+    isMark?: (name: unknown) => boolean;
   },
 ): Promise<Report> {
   let plan = given;
@@ -650,6 +670,8 @@ export async function applyPlan(
   const closed = new Map<string, Map<string, Set<string>>>();
   /** The lists that play People's `meets:` or the organisations' `org:`, with the field each part names: see `resolveRole`. */
   const roles = new Map<string, Role>();
+  /** The field each list keeps its rows' picture in, its `identity.mark`, where the record's answer says: see `pictures` below. */
+  const marks = new Map<string, string>();
   for (const register of [...registers, ...spare] as string[]) {
     const has = await door.schema(register);
     if (has.ok) answered.add(register);
@@ -665,6 +687,8 @@ export async function applyPlan(
     const fields = isObj(has.value) && Array.isArray(has.value.fields) ? has.value.fields : null;
     const role = isObj(has.value) ? roleOf(has.value) : null;
     if (role !== null) roles.set(register, role);
+    const identity = isObj(has.value) ? has.value.identity : null;
+    if (isObj(identity) && typeof identity.mark === 'string') marks.set(register, identity.mark);
     if (fields !== null) {
       declared.set(register, new Set(fields.flatMap((f) => (isObj(f) && typeof f.id === 'string' && f.retired !== true ? [f.id] : []))));
       texts.set(
@@ -827,6 +851,36 @@ export async function applyPlan(
         })),
       ],
     };
+    report.plan = plan;
+  }
+
+  /**
+   * A PICTURE THE SET DOES NOT DRAW IS LEFT OUT, AND COUNTED (REC-C17).
+   *
+   * Measured on a real record: the old tool's word for each project's picture was carried across as it stood, nothing
+   * here drew it, and the Projects page showed the first letter of that word where the picture should be, H, I and P
+   * beside eleven projects. A list says which field holds its picture in its `identity.mark`, so the question is asked of
+   * that field alone and of no field by its name. Sent without the word, a new project takes a picture the way any new
+   * one does, and one already here keeps the picture it has. A button's name is left out by the same question, and
+   * that one used to cost the whole project (`MARK_IS_CONTROL`).
+   *
+   * AN EMPTY WORD IS NOTHING CHOSEN and is sent as it came. ONLY AGAINST A SCHEMA ANSWER THAT NAMES THE FIELD: a list
+   * with no `identity` keeps a field called mark as any other text.
+   */
+  const isMark = o.isMark ?? KNOWN_MARK;
+  let pictures = 0;
+  if (isMark !== null && marks.size > 0) {
+    plan = {
+      ...plan,
+      rows: plan.rows.map((row) => {
+        const field = marks.get(row.register);
+        const word = field === undefined ? undefined : row.fields[field];
+        if (field === undefined || typeof word !== 'string' || word.trim() === '' || isMark(word)) return row;
+        pictures++;
+        return { ...row, fields: Object.fromEntries(Object.entries(row.fields).filter(([f]) => f !== field)) };
+      }),
+    };
+    if (pictures > 0) report.pictures = pictures;
     report.plan = plan;
   }
 
@@ -1863,6 +1917,14 @@ export function said(report: Report, o: { dryRun: boolean; file: string }): stri
   if ((report.deleted ?? []).length > 0)
     lines.push('', `Deleted in this BrainDog, so ${o.dryRun ? 'it would not be' : 'not'} added again: ${deletedSaid(report.deleted ?? [], name)}. To have one back, put it back here; the import then keeps it up to date.`);
   if ((report.unfiled ?? []).length > 0) lines.push('', ...unfiledSaid(report.unfiled ?? [], name, o.dryRun));
+  /* THE PICTURES LEFT OUT, as a count and never the words: see `pictures` in `applyPlan`. */
+  if ((report.pictures ?? 0) > 0)
+    lines.push(
+      '',
+      report.pictures === 1
+        ? `One picture was not known, so it ${o.dryRun ? 'would be left out and take' : 'was left out and takes'} one the way a new one does.`
+        : `${String(report.pictures)} pictures were not known, so each of those ${o.dryRun ? 'would be left out and take' : 'was left out and takes'} one the way a new one does.`,
+    );
   if (report.refused.length > 0) {
     /* A DRY RUN SENT NOTHING, so the record refused nothing yet: these are the rows the kernel's coercion says it will. */
     lines.push('', o.dryRun ? 'Would be refused by the record:' : 'Refused by the record:');

@@ -444,6 +444,55 @@ test('A REFUSAL IS READ THROUGH WANT, NEED, TRACK, SEND, TAKE, KEEP, USE AND CHA
   for (const s of ["I don't want to lose my orders", "I can't keep up with my orders", 'I never forget orders']) assert.ok(lit(propose(s, CAIRO), /orders/iu), s);
 });
 
+test('A REFUSAL IS READ THROUGH THE "-ING" OF A VERB: no more tracking of orders, done taking orders, no more chasing invoices', () => {
+  const lit = (p: ReturnType<typeof propose>, word: RegExp): boolean => p.heard.some((h) => word.test(h.phrase)) || p.places.some((x) => x.phrase !== null && word.test(x.phrase));
+  const shop = (p: ReturnType<typeof propose>): boolean => p.usecase === 'shop' || p.also.includes('shop') || p.places.some((x) => x.name === 'Orders');
+
+  /* THE SENTENCE THE AUDIT OF BATCH 56 TYPED AS A STRANGER. */
+  const tasks = propose('No more tracking of orders, just tasks', CAIRO);
+  assert.deepEqual(linesOf(tasks), ['tasks > Work']);
+  assert.ok(!shop(tasks) && !tasks.modules.includes('money-core'), 'the orders turned no part on');
+
+  /* "DONE" BEFORE A VERB IN "-ING" IS A REFUSAL, and so are finished, stopped and quit. */
+  for (const s of ['I am done taking orders', "I'm done with taking orders", 'I stopped taking orders', 'I quit taking any orders', 'I finished selling orders']) {
+    const p = propose(`I'm a freelance designer, ${s}`, CAIRO);
+    assert.ok(!lit(p, /orders/iu) && !shop(p), s);
+  }
+  const alone = propose('I am done taking orders', CAIRO);
+  assert.ok(!lit(alone, /orders/iu) && !shop(alone), 'said alone');
+  /* THE VERB IN "-ING" CAN BE THE THING HEARD: done selling is no shop. */
+  const sold = propose("I'm a freelance designer, I am done selling candles", CAIRO);
+  assert.ok(!lit(sold, /selling/iu) && !shop(sold), 'done selling');
+  assert.ok(shop(propose('I am selling candles', CAIRO)), 'selling, with no word of having stopped, is a shop');
+
+  const chased = propose("I'm a student, no more chasing invoices", CAIRO);
+  assert.ok(!lit(chased, /invoices/iu) && !chased.modules.includes('money-core'), 'no Money from invoices nobody chases');
+
+  /* EVERY VERB IN "-ING" BETWEEN THE REFUSAL AND THE THING, and "need of". */
+  for (const s of [
+    'no more taking orders',
+    'no sending orders',
+    'I am not using orders',
+    'never keeping track of orders',
+    'no more selling orders',
+    'no need of orders',
+    'I have no need of any orders',
+    'not tracking orders',
+  ]) {
+    const p = propose(`I'm a freelance designer, ${s}`, CAIRO);
+    assert.ok(!lit(p, /orders/iu) && !shop(p), s);
+  }
+
+  /* A VERB IN "-ING" AFTER "OR" IS CARRIED PAST, as its plain form is. */
+  assert.ok(!lit(propose("I'm a student, no more chasing invoices or taking orders", CAIRO), /invoices|orders/iu));
+
+  /* WHAT THE PERSON DOES DO IS KEPT: no refusal before the verb, or "done" with no verb in "-ing" after it. */
+  for (const s of ['I track orders', 'I am tracking orders', 'I love taking orders', 'I have done orders for years', 'I am done for today, I take orders']) {
+    assert.ok(lit(propose(s, CAIRO), /orders/iu), s);
+  }
+  assert.ok(lit(propose('no invoices and taking orders', CAIRO), /^orders$/iu), '"and taking orders" is kept');
+});
+
 test("A SENTENCE THAT OPENS WITH A REFUSAL NAMES NOBODY: Don't need orders, I freelance as a designer", () => {
   const typed = "Don't need orders, I freelance as a designer";
   const p = propose(typed, CAIRO);

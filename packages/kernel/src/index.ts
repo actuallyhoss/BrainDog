@@ -251,7 +251,7 @@ import {
 import { slashMayWrite } from './slash.ts';
 import { answeredOnly, askOwnRows, fileVerdicts, joinOrganisation, meet as meetPerson, resolveJob, type MeetArgs, type Met, type PeopleDeps } from './people.ts';
 import { meetsRole, orgRole, ratesRole, type MeetsFields, type OrgFields } from './roles.ts';
-import { foldChain, foldEnd, foldedCarry, holderOf, keyedLists, mergeFieldOf, rebuildKeys, rekey, rowKeys, type KeyedList } from './entities.ts';
+import { entityLists, foldChain, foldEnd, foldedCarry, holderOf, keyedLists, mergeFieldOf, rebuildKeys, rekey, rowKeys, type KeyedList } from './entities.ts';
 import { builtInFigure, openSteps } from './built-in-figures.ts';
 import { beatRun, workingRuns } from './presence.ts';
 import { agentOf as ladderAgentOf, keysOfStamp, kindOfEvent, kindsOfProposal, madeByIn, personOf, recordReader, shapeIn, tokenOfRun } from './change-kind.ts';
@@ -422,7 +422,7 @@ export { farRates, pointSaid, RATE_QUIET_DAYS } from './metrics.ts';
 export { SESSIONS_WORKING, readRunsWorking } from './built-in-figures.ts';
 export { HANDOFFS_OPEN, openSteps, readHandoffsOpen, type OpenStep } from './built-in-figures.ts';
 export { KEYS_IN_TEXT, RECORD_KEY_SCAN, keysInText, placeOf, readKeysInText, scanKeys, type KeyFinding, type KeyScan } from './key-scan.ts';
-export { CROSSCHECK_ENTRIES_MOST, CROSSCHECK_TOO_MANY, ROLLED_ACCOUNTS_MOST, ROLLED_CHECKS_MOST, WALKS, WALK_SOURCE, figureLists } from './money-figures.ts';
+export { CROSSCHECK_ENTRIES_MOST, CROSSCHECK_NOTHING, CROSSCHECK_TOO_MANY, ROLLED_ACCOUNTS_MOST, ROLLED_CHECKS_MOST, WALKS, WALK_SOURCE, figureLists } from './money-figures.ts';
 export type { Crosscheck, Rolled, RolledCheck, RolledMoves, Walked } from './money-figures.ts';
 export { HOME_CURRENCY_SETTING, across, convertMinor, dayFieldOf, homeFrom, isAtLeast, pairParts, partsOf, rateFor, ratesFrom, reduceOf } from './fx.ts';
 export type { Across, Amount, Part, Rate, Reduce } from './fx.ts';
@@ -479,9 +479,12 @@ export type { MeetArgs, Met, MetRow, ResolveJob, ResolveSide } from './people.ts
 export type { MeetsFields, OrgFields, RatesFields } from './roles.ts';
 /* THE IDENTITY KEYS (`identity-keys.ts`), for every door that reads who something is about: one normaliser, so a key
    the CLI harvests from a commit and one the record holds are the same string. */
-export { KEY_KINDS, PUBLIC_MAIL, bankKey, githubOfAddress, isMachineIdentity, isOrganisationAddress, isPublicMail, keyFrom, keyOf, keyOfAny, keysOf, kindOfKey, parseFrom, payeeName, registrable, valueOfKey } from './identity-keys.ts';
+export { KEY_KINDS, PUBLIC_MAIL, WEAK_KINDS, bankKey, githubOfAddress, isMachineIdentity, isOrganisationAddress, isPublicMail, isWeakKey, keyFrom, keyOf, keyOfAny, keysOf, kindOfKey, nameWords, parseFrom, payeeName, registrable, valueOfKey } from './identity-keys.ts';
 export type { IdentitySaid, KeyInput, KeyKind } from './identity-keys.ts';
-export { nameKey, noteMention } from './entities.ts';
+export { claimed, entityLists, nameKey, noteMention, projectList, settledBy } from './entities.ts';
+/* `Claimed` is the scheduler's name here already (`schedule.ts`), so the keys' one goes out as `KeyClaimed`. */
+export type { Claimed as KeyClaimed, EntityList, ProjectList } from './entities.ts';
+export { isMarkGlyph, isUnknownMark } from './marks.ts';
 export { CEILING, CLIENT_KINDS, SCOPES, ceilingOf, DEFAULT_DAYS as TOKEN_DAYS } from './token.ts';
 export { cutOffReadable, endedByCutOff, isBuild } from './token.ts';
 export { AGENTS_KEY, agentCap, agentsFull, liveAgents, type AgentCap } from './token.ts';
@@ -5261,7 +5264,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * The source is who wrote it; `meet` says where it came from once the write is back (`sourceKeys`).
    */
   function rekeyEntry(before: Entry | null, after: Entry, w: WriteContext): void {
-    const list = keyedOf(after.register);
+    /* EVERY LIST THAT HOLDS KEYS, a project's among them (entity-keys-59): `keyedOf` is the merge door's, people and
+       organisations alone, and the door must not see the project list. */
+    const list = entityLists(registers.values()).find((l) => l.register === after.register);
     if (list) rekey(sql, list, before, after, w.actor, instant(clock.now()));
   }
 

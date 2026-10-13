@@ -125,6 +125,12 @@ export const CROSSCHECK_ENTRIES_MOST = 50_000;
 /** What a cross-check says, as its `why`, of a figure over more entries than it reads. */
 export const CROSSCHECK_TOO_MANY = 'too many to check';
 
+/**
+ * What the check says while it has nothing to check, with no account and with accounts none of which is counted: the
+ * one sentence true of both. It has no full stop, as a reading's `why` has none; a page that says it adds one.
+ */
+export const CROSSCHECK_NOTHING = 'No account counts as cash yet';
+
 /** `value: { walk, within }` over `source: forecast.runway` (`modules.md` C4). */
 export type Walked = { walk: (typeof WALKS)[number]; within?: string };
 
@@ -607,10 +613,11 @@ export function readCrosscheck(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
   const apart: Part[] = [...new Set([...figure.keys(), ...walk.keys()])].sort().map((currency) => ({ currency, amount: (figure.get(currency) ?? 0) - (walk.get(currency) ?? 0) }));
   const home = ctx.fx?.() ?? { home: null, rates: [] };
   if (apart.length === 0) {
-    /* NOTHING TO CHECK IS ONE OF TWO DAYS, AND EACH IS SAID AS ITSELF: with accounts and none of them counted, a balance
-       has been typed and "No balance has been typed yet" was untrue of it. With no account at all it is still the truth. */
-    const uncounted = held.length === 0 && sql.one<{ n: number }>('SELECT 1 AS n FROM entry WHERE register = ? AND deleted_at IS NULL LIMIT 1', register) !== undefined;
-    return ok(empty(decl, uncounted ? 'No account counts as cash yet' : 'No balance has been typed yet', home.rates, on));
+    /* NOTHING TO CHECK IS ONE OF TWO DAYS, AND ONE SENTENCE IS TRUE OF BOTH: with no account at all, and with accounts
+       and none of them counted. "No balance has been typed yet" was untrue of the second, which has one; telling the
+       two apart took a read of the list for a second sentence nobody needed. The words are the ones Money's own cash
+       tile says when it has nothing to draw (`by-book.ts` in the seed), so the reading and the page say one thing. */
+    return ok(empty(decl, CROSSCHECK_NOTHING, home.rates, on));
   }
   const out = apart.filter((p) => p.amount !== 0);
   /* SEVERAL CURRENCIES OUT IS NO ONE NUMBER: each is said as its own part, and nothing is added. */

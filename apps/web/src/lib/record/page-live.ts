@@ -97,6 +97,8 @@ type Reading = {
   held?: number;
   met: boolean | null;
   refusals: Said[];
+  /** The entries the figure was added up from, by handle, where the record says; narrowed by `backsOf`, never trusted. */
+  backs?: unknown;
   /**
    * A grouped figure's parts, and how many past the cap were not drawn. `label` is what the record calls a part where its
    * key is not words: the title of the row a ref points at, an enum's declared label. Unchecked, so it is narrowed where
@@ -667,6 +669,16 @@ function overUnsaidField(decl: MetricDecl): boolean {
 const isTarget = (v: unknown): v is { lte: number } | { gte: number } =>
   typeof v === 'object' && v !== null && (typeof (v as { lte?: unknown }).lte === 'number' || typeof (v as { gte?: unknown }).gte === 'number');
 
+/**
+ * The entries behind a reading, by handle, as a tile carries them: only where the record named at least one, so a figure
+ * from a record that sends none says nothing rather than "backed by nothing". Home reads it to say two figures of one
+ * amount once where a single entry backs both (`lib/home/default-home.ts` `oneBacks`).
+ */
+function backsOf(r: Reading): { backs?: string[] } {
+  const held = Array.isArray(r.backs) ? r.backs.filter((h): h is string => typeof h === 'string' && h !== '') : [];
+  return held.length ? { backs: held } : {};
+}
+
 export function tileOf(cell: NonNullable<Answered['readings']>[number], values?: Record<string, unknown>, missed: 'warn' | 'bad' = 'warn'): Metric {
   const at = cell.metric.indexOf(':');
   const template = METRICS[at < 0 ? cell.metric : cell.metric.slice(0, at)];
@@ -688,7 +700,7 @@ export function tileOf(cell: NonNullable<Answered['readings']>[number], values?:
         })
       : fallback;
   if (r && r.parts && !cell.refusal && r.refusals.length === 0)
-    return { id: cell.metric, label, value: partsShown(decl?.format, r.parts), note: [said(''), across].filter(Boolean).join(' · ') };
+    return { id: cell.metric, label, value: partsShown(decl?.format, r.parts), note: [said(''), across].filter(Boolean).join(' · '), ...backsOf(r) };
   if (!r || r.value === null || cell.refusal || r.refusals.length)
     return { id: cell.metric, label, value: MISSING, note: copy.figureUnavailable, tone: 'warn' };
   const empty = (r.held ?? r.rows) === 0;
@@ -746,6 +758,8 @@ export function tileOf(cell: NonNullable<Answered['readings']>[number], values?:
     /* AND A FIGURE OVER A LIST THAT HOLDS NOTHING SAYS THAT TOO, only where the record counted it (`held`): an empty Work
        drew "Done in 7 days 0" under eight tiles each saying the list held nothing. */
     ...(r.held === 0 ? { nothingHeld: true } : {}),
+    /* AND WHAT BACKS IT, so two figures of one entry are said once and two of one amount are not. */
+    ...backsOf(r),
   };
 }
 

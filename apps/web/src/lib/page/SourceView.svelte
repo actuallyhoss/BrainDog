@@ -20,12 +20,21 @@
 
   THE SOURCE IS A FILE, not a box to read. A format nobody can hold is a viewer: the file is named as the declaration's
   own first line names it, and it is the bytes the box holds now, typed changes included.
+
+  AND A FILE COMES BACK. "Open a file" reads a `.dog` somebody kept, edited elsewhere or was sent into the box
+  (`lib/dog/open.ts`). It writes nothing: the page is drawn from it, what differs from the record's text is listed under
+  the box by the `diff` kind's drawer, and Apply is still the one write. A file that does not read as this page is
+  refused in a sentence and the box is left as it was.
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
   import { apiBase } from '../at.ts';
   import { read } from '$lib/data/read.svelte.ts';
   import { sourceOf } from '$lib/dog/read.ts';
+  /* `Diff` is drawn here outside a declared page, so its kind's sheet comes with it (`kinds/diff.css`). */
+  import '@braindog/skin/kinds/diff.css';
+  import { Diff } from 'braindog-render/svelte';
+  import { OPEN_ACCEPT, diffBlock, diffLines, openText, openWords } from '$lib/dog/open.ts';
   import { dogName, dogText, saveDog, type PageBody as Body } from '$lib/dog/source.ts';
   import { copy } from '$lib/copy.ts';
   import type { Opened } from '$lib/record/page-live.ts';
@@ -97,6 +106,13 @@
   let busy = $state<'apply' | 'back' | null>(null);
   let box = $state<HTMLTextAreaElement>();
 
+  /** The file input the button presses. A browser opens its file window only from an input. */
+  let picker = $state<HTMLInputElement>();
+  /** The file whose text is in the box, said until the text is typed over, applied or discarded. */
+  let opened = $state<{ name: string; text: string } | null>(null);
+  /** The file that was not opened, and why. The line is the file's own, which the box does not hold. */
+  let unopened = $state<{ name: string; fix: string; line: number | null } | null>(null);
+
   /* A NEW READ STARTS THE TEXT AGAIN from what the record holds. Only a read does: an Apply or a Put back sets `held`
      itself, and neither must throw away what is in the box. */
   $effect(() => {
@@ -108,6 +124,8 @@
       text = printed;
       before = null;
       fault = null;
+      opened = null;
+      unopened = null;
     });
   });
 
@@ -127,6 +145,35 @@
     saveDog(file, text);
     toasts.push(copy.exported(file), { intent: 'good' });
   }
+
+  /* ── a file, opened into the box ─────────────────────────────────────── */
+
+  /* THE BOX IS FILLED ONLY BY A FILE THAT READS AS THIS PAGE. A refused file changes nothing but the sentence under the
+     buttons, so what was typed is still there. The input is emptied either way, or choosing the same file again after
+     mending it would not be a change and nothing would happen. */
+  async function open(e: Event & { currentTarget: HTMLInputElement }) {
+    const input = e.currentTarget;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file || !held) return;
+    const page = typeof held.body.page === 'string' ? held.body.page : undefined;
+    const got = await openText(file, page);
+    if (!got.ok) {
+      opened = null;
+      unopened = { name: got.name, fix: got.fix, line: got.line };
+      return;
+    }
+    unopened = null;
+    fault = null;
+    text = got.text;
+    opened = { name: got.name, text: got.text };
+    box?.focus();
+  }
+
+  /* WHAT DIFFERS FROM THE RECORD'S TEXT, line by line, whether it was typed or opened. A text that differs only by the
+     line break at its end differs in no line, and draws nothing. */
+  const differs = $derived(held !== null && changed && diffLines(held.text, text).length > 0);
+  const difference = $derived(held !== null && differs ? diffBlock(held.text, text) : null);
 
   /* ── the page as it will be ──────────────────────────────────────────── */
 
@@ -236,6 +283,8 @@
     if (!held) return;
     text = held.text;
     fault = null;
+    opened = null;
+    unopened = null;
   }
 </script>
 
@@ -244,11 +293,26 @@
     <!-- The file sits above its own text, so it reads as an action ON the source rather than as part of the page the
          source describes. -->
     <div class="source-file">
+      <input type="file" accept={OPEN_ACCEPT} hidden tabindex="-1" bind:this={picker} onchange={open} />
+      <Button weight="quiet" disabled={busy !== null} onclick={() => picker?.click()}>
+        <Icon name="doc" size="s" />
+        {openWords.open}
+      </Button>
       <Button weight="quiet" onclick={save}>
         <Icon name="download" size="s" />
         {copy.pageSourceSave(fileOf(held.body))}
       </Button>
     </div>
+    {#if unopened}
+      <!-- WHY THE FILE WAS NOT OPENED, in the reader's own sentence, with the box untouched. -->
+      <p class="source-unopened" role="alert">
+        <strong>{openWords.refused(unopened.name)}</strong>
+        {#if unopened.line !== null}<span>{openWords.lineOfFile(unopened.line)}</span>{/if}
+        <span>{unopened.fix}</span>
+      </p>
+    {:else if opened && text === opened.text && changed}
+      <p class="source-note" role="status">{openWords.opened(opened.name)}</p>
+    {/if}
     {#if source.value.template || list}
       <!-- A PAGE DRAWN FOR EACH ROW OF A LIST IS ONE TEXT, and this is that text: a reader who changes it changes every
            page drawn from it, and is told so before they do. -->
@@ -295,6 +359,14 @@
             {busy === 'apply' ? sourceWords.applying : list ? sourceWords.applyTemplate(list) : sourceWords.apply}
           </Button>
         </div>
+        {#if difference}
+          <!-- UNDER THE BOX AND ITS BUTTONS, QUIET: the lines taken out and put in against what the record holds, each
+               with its mark and its word, the long shared runs folded. -->
+          <section class="source-diff" aria-labelledby="{uid}-diff">
+            <h2 class="source-label" id="{uid}-diff">{openWords.differs}</h2>
+            <Diff block={difference} />
+          </section>
+        {/if}
       </div>
 
       <section class="source-preview" aria-labelledby="{uid}-preview" aria-busy={drawing}>
@@ -339,8 +411,20 @@
 
   .source-file {
     display: flex;
+    flex-wrap: wrap;
     justify-content: flex-end;
+    gap: var(--sp-3);
     min-inline-size: 0;
+  }
+
+  .source-unopened {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: var(--sp-2);
+    margin: 0;
+    max-inline-size: var(--measure);
+    color: var(--danger-text);
+    font-size: var(--t-sm);
   }
 
   .source-note {
@@ -439,6 +523,23 @@
     flex-wrap: wrap;
     justify-content: flex-end;
     gap: var(--sp-3);
+  }
+
+  /* THE DIFFERENCE IS THE TEXT'S, so its lines are in the text's face and run the box's width, where the kind's own
+     sheet sets prose at a reading measure. */
+  .source-diff {
+    display: grid;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+  }
+
+  .source-diff .source-label {
+    margin: 0;
+  }
+
+  .source-diff :global(.diff-text) {
+    max-inline-size: none;
+    font-family: var(--font-id);
   }
 
   .source-preview {

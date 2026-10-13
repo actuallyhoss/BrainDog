@@ -782,7 +782,8 @@
     /* ONE HANDLE FOR THE BUILD, set here once and kept through every Try again of a press nobody answered: a call that
        went in and never answered is told from a new press by it, so its entries are not written a second time. */
     const asked: Accepting = given.key === undefined ? { ...given, key: pressKey() } : given;
-    /* KEPT BESIDE THE SENTENCE, so a reload presses under this key and not a new one (`keepKey`). */
+    /* KEPT BESIDE THE SENTENCE, so a reload presses under this key and not a new one. Only the build's first key is
+       kept: a Try again's new one passes through here too, and `keepKey` leaves the first where it is. */
     keepKey(localStore(), asked.key!);
     /* THE NEW RECORD BY ITS NAME: this page is under no slug, so its own base is the host's, and the record's is under it. */
     const client = createClient({ base: apiBase({ origin: apiBase(), pathname: `${BASE}/${name}/` }) });
@@ -820,9 +821,9 @@
        (`pressAgain`). */
     again = { name, asked: pressAgain(asked, out) };
     /* THE KEY KEPT BESIDE THE SENTENCE STAYS THE FIRST ONE. An answered press hands back a new key for what is left,
-       and that one is this page's alone: a reload builds the whole plan from the kept sentence again, and under a key
-       the record never held it would write every entry a second time. Under the first key the record passes over
-       what that press wrote, so a reload writes nothing twice. */
+       and that one is this page's alone, now and when Try again sends it (`keepKey` keeps the first): a reload builds
+       the whole plan from the kept sentence again, and under a key the record never held it would write every entry a
+       second time. Under the first key the record passes over what that press wrote, so a reload writes nothing twice. */
     /* THE PART-MADE STATE IS THE CALL'S OWN ANSWER: what it said it could not make, and why, and nothing guessed. */
     missed = out === null ? [] : out.failed;
     watched = null;
