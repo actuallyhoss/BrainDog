@@ -1018,6 +1018,7 @@ function charted(block: BlockResult): Split | null {
           ...block,
           walk,
           walks: undefined,
+          ...(walk.sells ? { sells: walk.sells } : {}),
           ...(walk.past ? { past: walk.past } : {}),
           ...(walks.length > 1 ? { walkGroup: { id, key: walk.currency ?? String(i) }, ...(i === walks.length - 1 ? {} : { knobs: [] }) } : {}),
           ...walkTable(walk, whole ? walk.steps.length : block.limit, today, false),

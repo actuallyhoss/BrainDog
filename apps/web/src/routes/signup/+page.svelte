@@ -154,6 +154,8 @@
   let free = $state(false);
   let busy = $state(false);
   let said = $state<string | null>(null);
+  /* WHY THE MAILED LINK DID NOT WORK, when the answer said: null is a link spent or a day old, the screen's own line. */
+  let linkWhy = $state<string | null>(null);
   /* A FREE RECORD REFUSED FOR ITS PLAN, not its name: the person has theirs, so the name is not offered again. */
   let paidOnly = $state(false);
   /* WHETHER THE ACCOUNT SAYS A RECORD CAN BE MADE NOW, asked when making one was refused: no means no "make it again". */
@@ -613,6 +615,8 @@
     step = 'verifying';
     const out = await verifySignup(token);
     if (!out.ok) {
+      /* THE HOST'S OWN SENTENCE when it refused with one, the wait when it locked, and never "expired" for a lost line. */
+      linkWhy = out.kind === 'refused' ? out.fix : out.kind === 'locked' ? copy.signupLocked(Math.ceil(out.retryAfter / 60)) : words.linkUnreached;
       step = 'link-failed';
       return;
     }
@@ -1136,7 +1140,7 @@
         <div class="go"><Button weight="quiet" onclick={otherAddress}>{copy.signupOtherAddress}</Button></div>
       {:else if step === 'link-failed'}
         <h1 class="title">{copy.signupLinkFailed}</h1>
-        <p class="lede">{copy.signupLinkFailedWhy}</p>
+        <p class="lede" role="alert">{linkWhy ?? copy.signupLinkFailedWhy}</p>
         <div class="go"><Button weight="primary" onclick={() => void ask()}>{copy.signupStartAgain}</Button></div>
       {:else if step === 'making'}
         <h1 class="title">{words.making}</h1>

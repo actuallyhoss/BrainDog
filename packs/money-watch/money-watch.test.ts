@@ -36,6 +36,10 @@
  * of one or two digits ends the name when a month or a day with a stroke follows it, and a day with a stroke ends it
  * itself. The live catalogue held no Money watch on 14 October 2026, so 1.3.0 is changed in place.
  *
+ * STILL 1.3.0 (batch 81's left). A day joined to its month, `12OCT` and `12-OCT`, and a month before its day,
+ * `OCT 12`, stayed in the name too, so those banks' charges were a new payee each month. Both end the name now.
+ * Whether 1.3.0 is released by then is the integrator's to check on the live catalogue before it ships.
+ *
  * RED FIRST, MEASURED: with no `twice.js` and no `money-watch.pack.json` this file failed at its first read, ENOENT,
  * before a single test ran.
  */
@@ -553,6 +557,58 @@ test('LOOKS LIKE IT REPEATS READS THE SAME PAYEE EVERY MONTH: three months of SP
     await paid('SPOTIFY 12 AUG', '2026-08-12', 9_900);
     await paid('SPOTIFY 12 SEP', '2026-09-12', 9_900);
     await paid('SPOTIFY 12 OCT', '2026-10-12', 9_900);
+    await r.nextDay();
+    assert.deepEqual(r.open().map((q) => q.question), ['Add Spotify to Repeating, E£99 around the 12th?']);
+  } finally {
+    await r.close();
+  }
+});
+
+test('A DAY JOINED TO ITS MONTH, OR WRITTEN AFTER IT, IS NOT THE NAME EITHER: SPOTIFY 12OCT, SPOTIFY 12-OCT and SPOTIFY OCT 12 are one payee, and Marina and Mayfair are no month', async () => {
+  /* RED FIRST, MEASURED on 1.3.0 as batch 81 left it (the files copied aside before the edit): `SPOTIFY 12OCT` read
+     { key: 'words:spotify12oct', name: 'Spotify 12oct' }, `SPOTIFY 12-OCT` "Spotify 12-Oct" and `SPOTIFY OCT 12`
+     { key: 'words:spotifyoct12', name: 'Spotify Oct 12' }, so a charge was a new payee each month. */
+  const r = await fresh();
+  try {
+    const paid = (words: string, on: string, amount: number) => r.charge(words, on, amount, { counterparty_text: words });
+    await paid('SPOTIFY 12OCT', '2026-10-12', 9_900);
+    await paid('SPOTIFY 12-OCT', '2026-10-12', 9_900);
+    assert.deepEqual(r.open().map((q) => q.question), ['Spotify E£99 twice on 12 Oct. Both real?']);
+    assert.deepEqual(r.flags().map((f) => f.payee), ['Spotify']);
+    /* THE MONTH FIRST, with a stop or a comma and a year after it, is the same payee as the day first. */
+    await paid('NETFLIX OCT 9', '2026-10-09', 21_900);
+    await paid('NETFLIX 9 OCT', '2026-10-09', 21_900);
+    await paid('ANGHAMI October 5, 2026', '2026-10-05', 4_900);
+    await paid('ANGHAMI 5-Oct.', '2026-10-05', 4_900);
+    assert.deepEqual(r.flags().map((f) => f.payee).sort(), ['Anghami', 'Netflix', 'Spotify']);
+    /* A SHORT NUMBER THAT IS THE SHOP'S STAYS, and a word that only starts like a month is no month: with a number
+       after it (Marina 5, Mayfair 12) or joined to one (12Marina), each pair is two payees. */
+    await paid('Studio 54 Cafe', '2026-10-07', 12_000);
+    await paid('Studio 54 Bar', '2026-10-07', 12_000);
+    await paid('Cafe Marina 5', '2026-10-08', 12_000);
+    await paid('Cafe Marina 6', '2026-10-08', 12_000);
+    await paid('Mayfair 12', '2026-10-08', 13_000);
+    await paid('Mayfair 14', '2026-10-08', 13_000);
+    await paid('Cafe 12Marina', '2026-10-08', 14_000);
+    await paid('Cafe 14Marina', '2026-10-08', 14_000);
+    assert.deepEqual(r.flags().map((f) => f.payee).sort(), ['Anghami', 'Netflix', 'Spotify'], 'no two of these eight are one payee');
+    await paid('Studio 54 Cafe', '2026-10-08', 12_000);
+    await paid('Mayfair 12', '2026-10-09', 13_000);
+    assert.deepEqual(r.flags().map((f) => f.payee).sort(), ['Anghami', 'Mayfair 12', 'Netflix', 'Spotify', 'Studio 54 Cafe']);
+  } finally {
+    await r.close();
+  }
+});
+
+test('LOOKS LIKE IT REPEATS READS THE SAME PAYEE HOWEVER THE DAY IS WRITTEN: SPOTIFY 12AUG, SPOTIFY 12-SEP and SPOTIFY OCT 12 are one offer', async () => {
+  /* RED FIRST, MEASURED as above: the three were "Spotify 12aug", "Spotify 12-Sep" and "Spotify Oct 12", three
+     payees paid once each, so nothing was offered. */
+  const r = await fresh();
+  try {
+    const paid = (words: string, on: string, amount: number) => r.charge(words, on, amount, { counterparty_text: words });
+    await paid('SPOTIFY 12AUG', '2026-08-12', 9_900);
+    await paid('SPOTIFY 12-SEP', '2026-09-12', 9_900);
+    await paid('SPOTIFY OCT 12', '2026-10-12', 9_900);
     await r.nextDay();
     assert.deepEqual(r.open().map((q) => q.question), ['Add Spotify to Repeating, E£99 around the 12th?']);
   } finally {

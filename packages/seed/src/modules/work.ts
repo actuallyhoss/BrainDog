@@ -1055,6 +1055,16 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         body: '{{open-tasks}} open task(s), {{tasks-waiting}} to check or blocked, {{tasks-with-agents}} with an agent',
       },
       {
+        /* ADD IN PLACE, SINCE work 1.19.0: the same line as Work's, first after the sentence and before the board, so a
+           task thought of while moving cards is written where the cards are. It is To do with no day, so it lands in
+           the board's To do column. Same prompt as Work's, because it is the same question. */
+        kind: 'capture',
+        heading: 'What needs doing?',
+        icon: 'plus',
+        span: 12,
+        register: 'tasks',
+      },
+      {
         kind: 'board',
         span: 12,
         /* A CARD SAYS WHEN IT IS DUE AND WHO HOLDS IT, SINCE work 1.17.0, where it named its project: a board is read

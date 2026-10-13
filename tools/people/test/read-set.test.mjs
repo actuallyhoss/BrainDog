@@ -1,5 +1,5 @@
 /**
- * The forty sentences of `sets/read-set.json`, each read the way the first screen reads it (the rules in
+ * The forty-two sentences of `sets/read-set.json`, each read the way the first screen reads it (the rules in
  * `apps/web/src/lib/start/propose.ts`, then the one question of `start/question.ts`), and held to the reading written
  * beside it.
  *
@@ -34,8 +34,8 @@ export function differs(want, got) {
   return out;
 }
 
-test('forty sentences, six of them the traps the brief names', () => {
-  assert.equal(SET.sentences.length, 40);
+test('forty-two sentences, six of them the traps the brief names', () => {
+  assert.equal(SET.sentences.length, 42);
   assert.deepEqual(SET.sentences.filter((s) => s.trap).map((s) => s.trap).sort(), [...TRAPS].sort());
   for (const s of SET.sentences) {
     assert.equal(typeof s.said, 'string', JSON.stringify(s));
@@ -47,14 +47,15 @@ test('forty sentences, six of them the traps the brief names', () => {
 
 test('each person file has its plain and hard sentence in the set', () => {
   const said = new Set(SET.sentences.map((s) => s.said));
-  for (const id of ['layla', 'omar', 'sam', 'nour', 'mona', 'yara', 'salma']) {
+  /* Hana (didnt-shop.json, refusing-person-walk-83) refuses a shop and expects none; no standing record uses her. */
+  for (const id of ['layla', 'omar', 'sam', 'nour', 'mona', 'yara', 'salma', 'didnt-shop']) {
     const p = JSON.parse(readFileSync(new URL(`../${id}.json`, import.meta.url), 'utf8'));
     assert.ok(said.has(p.says.plain), `${p.name}'s plain sentence is not in the set`);
     assert.ok(said.has(p.says.hard), `${p.name}'s hard sentence is not in the set`);
     assert.equal(p.said, p.says.plain, `${p.name}'s said is not her plain sentence`);
     /* The brief's fields check-files does not hold yet (its line is in this unit's blocked): refused here meanwhile. */
     assert.match(p.expects ?? '', /^([a-z][a-z-]*|none)$/u, `${p.name}'s expects is not a use case or none`);
-    assert.equal(p.standing, !['yara', 'salma'].includes(id), `${p.name}'s standing is wrong`);
+    assert.equal(p.standing, !['yara', 'salma', 'didnt-shop'].includes(id), `${p.name}'s standing is wrong`);
     assert.equal(p.answers?.name, p.name, `${p.name}'s answers carry no name`);
     assert.match(p.answers?.currency ?? '', /^[A-Z]{3}$/u, `${p.name}'s answers carry no currency`);
     assert.equal(typeof p.file?.text === 'string', ['omar', 'nour'].includes(id), `${p.name}'s file is wrong`);

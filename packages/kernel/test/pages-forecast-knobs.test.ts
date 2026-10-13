@@ -182,13 +182,85 @@ test('A WALK THAT READS A SELL FIGURE READS THAT FIGURE’S LIST, so a reader wh
   assert.deepEqual(k.blockRegisters(walk({ sell: { metric: 'store-value' } })).sort(), ['accounts', 'bills', 'store']);
 });
 
-test('ONE WALK A CURRENCY CARRIES NO SELLS, since each walk is drawn with the block’s keys and a figure has one currency', async () => {
+test('ONE WALK A CURRENCY CARRIES NO SELLS ON THE BLOCK, since each walk is drawn with the block’s keys and a figure has one currency', async () => {
   const k = await record();
   value(k.create('bills', { what: 'Hosting', amount: { amount: 1_000, currency: 'USD' }, due: '2026-09-20' }, OWNER));
   const out = k.block(walk({ sell: { metric: 'store-value' } }));
   assert.deepEqual(out.refusals, []);
   assert.equal(out.walks?.length, 2);
   assert.equal(out.sells, undefined);
+  /* THE FIGURE IS IN POUNDS, so it is the pound walk's and never the dollar walk's (`walkSells`). */
+  assert.deepEqual(out.walks?.map((w) => [w.currency, w.sells]), [['GBP', [{ label: 'Store value', value: 249_976 }]], ['USD', []]]);
+});
+
+/** A second store of value, held in dollars, so a record holds one sellable figure in each of two currencies. */
+const VAULT: Declaration = { id: 'register.vault', kind: 'register', body: { ...(STORE.body as object), id: 'vault', name: 'Vault' } } as never;
+
+/** A figure a sell knob may offer without a page naming it: `sellable: true` beside the rest. */
+const sellable = (metric: string, name: string, source: string, format: string): Declaration => {
+  const decl = figure(metric, name, source, 'worth', format);
+  return { ...decl, body: { ...(decl.body as object), sellable: true } } as never;
+};
+
+/** Accounts in pounds and dollars with no rate between them, a bill in each, and one holding in each. */
+async function twoMoneys(): Promise<Kernel> {
+  const k = await openRecord(openSqlite(), fixedClock(NOW));
+  value(
+    await k.install([
+      ACCOUNTS,
+      BILLS,
+      STORE,
+      VAULT,
+      figure('cash-now', 'Cash now', 'register.accounts', 'balance', 'money'),
+      sellable('coins-value', 'Coins', 'register.store', 'money.GBP'),
+      sellable('bonds-value', 'Bonds', 'register.vault', 'money.USD'),
+    ]),
+  );
+  value(k.create('accounts', { name: 'Current', balance: { amount: 412_345, currency: 'GBP' } }, OWNER));
+  value(k.create('accounts', { name: 'Dollar account', balance: { amount: 90_010, currency: 'USD' } }, OWNER));
+  value(k.create('bills', { what: 'Rent', amount: { amount: 600_000, currency: 'GBP' }, due: '2026-10-01' }, OWNER));
+  value(k.create('bills', { what: 'Hosting', amount: { amount: 1_000, currency: 'USD' }, due: '2026-09-20' }, OWNER));
+  value(k.create('store', { what: 'Coins', worth: { amount: 150_075, currency: 'GBP' } }, OWNER));
+  value(k.create('vault', { what: 'Bond', worth: { amount: 99_901, currency: 'USD' } }, OWNER));
+  return k;
+}
+
+test('EACH WALK OF A GROUP IS OFFERED ITS OWN HOLDING ONLY, the one in its own currency, and the block itself none', async () => {
+  const k = await twoMoneys();
+  const out = k.block(walk({ knobs: ['sell'] }));
+  assert.deepEqual(out.refusals, []);
+  /* EACH FIGURE READS, so a walk that is not offered one is not offered it for its currency. */
+  const read = (id: string) => (({ value: v, unit }) => ({ v, unit }))(value<{ value: number; unit: string }>(k.metric(k.metricDecl(id)!)));
+  assert.deepEqual(read('coins-value'), { v: 150_075, unit: 'GBP' });
+  assert.deepEqual(read('bonds-value'), { v: 99_901, unit: 'USD' });
+  assert.deepEqual(
+    out.walks?.map((w) => ({ currency: w.currency, from: w.from, sells: w.sells })),
+    [
+      { currency: 'GBP', from: 412_345, sells: [{ label: 'Coins', value: 150_075 }] },
+      { currency: 'USD', from: 90_010, sells: [{ label: 'Bonds', value: 99_901 }] },
+    ],
+  );
+  assert.equal(out.sells, undefined, 'one list on the block would be written under both walks');
+  /* AND NO WALK IS MOVED BY WHAT IT MAY SELL, nor offered anything when the block has no sell control. */
+  const plain = k.block(walk());
+  assert.deepEqual(plain.walks?.map((w) => w.sells), [undefined, undefined]);
+  assert.deepEqual(out.walks?.map(({ sells: _sells, ...w }) => w), plain.walks);
+});
+
+test('A WALK OF A GROUP THAT HOLDS NOTHING TO SELL IS OFFERED AN EMPTY LIST, and a `sell:` figure goes to its own walk', async () => {
+  const k = await twoMoneys();
+  /* `sell:` NAMES THE POUND FIGURE: the dollar walk is offered nothing, rather than GBP 1,500.75 as dollars. */
+  const named = k.block(walk({ knobs: ['sell'], sell: { metric: 'coins-value' } }));
+  assert.deepEqual(named.refusals, []);
+  assert.deepEqual(named.walks?.map((w) => [w.currency, w.sells]), [['GBP', [{ label: 'Coins', value: 150_075 }]], ['USD', []]]);
+  /* THE BOND IS SOLD FOR REAL, so the dollar walk has nothing left to offer and the pound walk is as it was. */
+  value(k.create('vault', { what: 'Bond sold', worth: { amount: -99_901, currency: 'USD' } }, OWNER));
+  const after = k.block(walk({ knobs: ['sell'] }));
+  assert.deepEqual(after.walks?.map((w) => [w.currency, w.sells]), [['GBP', [{ label: 'Coins', value: 150_075 }]], ['USD', []]]);
+  /* A `sell:` NOBODY DECLARED IS STILL SAID ONCE, by the block, and no walk is drawn. */
+  const unknown = k.block(walk({ sell: { metric: 'store-later' } }));
+  assert.equal(unknown.refusals[0]?.code, 'METRIC_UNKNOWN');
+  assert.equal(unknown.walks, undefined);
 });
 
 test('A WALK SAYS THE PAGE’S LINE SAYS WHEN IT RUNS OUT only while that line is drawn, and `headline:` takes one word', async () => {

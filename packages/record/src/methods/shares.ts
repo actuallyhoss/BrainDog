@@ -161,7 +161,7 @@ const walkShown = (walk: unknown) => {
   if (!isRecord(walk)) return null;
   const steps = Array.isArray(walk.steps) ? walk.steps.map(stepShown).filter((s) => s !== null) : [];
   const kept: Record<string, unknown> = { steps, crossed: walk.crossed === null ? null : stepShown(walk.crossed), refusals: [] };
-  for (const key of ['from', 'currency', 'mixed', 'converted', 'missing', 'days', 'horizon', 'past'] as const)
+  for (const key of ['from', 'currency', 'mixed', 'converted', 'missing', 'days', 'horizon', 'past', 'sells'] as const)
     if (walk[key] !== undefined) kept[key] = walk[key];
   return kept;
 };

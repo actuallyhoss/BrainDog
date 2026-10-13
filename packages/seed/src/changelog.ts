@@ -204,7 +204,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   work: [
     {
       version: '1.19.0',
-      notes: "A thread can be an idea or planned before it is open, and moves only where it makes sense: an idea cannot be marked done in one step. A thread can say the day it aims for, and shows in Due this week. A follow-up takes its task's project, thread and owner where it names none. A step an agent adds under its own task stays with that agent. A thread that is held up can be marked done.",
+      notes: "A thread can be an idea or planned before it is open, and moves only where it makes sense: an idea cannot be marked done in one step. A thread can say the day it aims for, and shows in Due this week. A follow-up takes its task's project, thread and owner where it names none. A step an agent adds under its own task stays with that agent. A thread that is held up can be marked done. Board has a line to add a task where the cards are.",
     },
     {
       version: '1.18.0',

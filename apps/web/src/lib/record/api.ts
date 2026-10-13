@@ -1547,6 +1547,8 @@ export type Walk = {
   horizon?: number | undefined;
   /** How many days the record walked, when that is further than `horizon`, so the length control can offer more. */
   reach?: number | undefined;
+  /** On a walk drawn once per currency: what this walk may count as sold, in its own currency. */
+  sells?: readonly { label: string; value: number }[] | undefined;
 };
 
 /** Where a step's row opens: this build's `href`, or the record's `register#seq` as that row's address. */

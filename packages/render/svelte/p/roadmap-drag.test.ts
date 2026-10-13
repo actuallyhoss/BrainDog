@@ -8,7 +8,7 @@
  *
  * WHAT IS PROVED HERE, AND WHAT IS NOT. A server render has no pointer, so the markup is proved two ways: with no
  * callback it is the chart it was, which is what keeps `roadmap-parity.test.ts` meaning something, and with one every
- * bar and every date is a grip. The pointer's arithmetic is proved as functions, and the one property that matters
+ * bar and every date the record holds is a grip, and a line typed into the fence is not. The pointer's arithmetic is proved as functions, and the one property that matters
  * most is proved over every shape: the bar drawn under the pointer is the bar the record will draw after the write.
  */
 
@@ -45,6 +45,11 @@ const drag = async () => import('./roadmap-drag.ts');
 const NOW = Date.UTC(2026, 8, 22, 12);
 const FENCE = '```roadmap | Autumn\nBuild the kiln page | 2026-09-10 | 10\nRegate window | 2026-10-05 | 3 | warn\nLaunch | 2026-09-30\n```';
 const block = (): Block => parse(FENCE)[0] as Block;
+/** The same chart as a page draws it from the record: every line a task the record holds, so each carries its `ref`. */
+const held = (): Block => {
+  const b = block();
+  return { ...b, rows: b.rows.map((r, i) => ({ ...r, ref: { register: 'tasks', seq: i + 1, version: 1 } })) };
+};
 
 test('with no callback the chart is the picture it was: no grip, no cursor, nothing a pointer can take', async () => {
   const html = render(await Roadmap(), { props: { block: block(), opts: { now: NOW } } }).body;
@@ -52,8 +57,8 @@ test('with no callback the chart is the picture it was: no grip, no cursor, noth
   assert.doesNotMatch(html, /data-grip|cursor=|touch-action/u);
 });
 
-test('with a callback every window and every date is a grip, and a date is taken whole because it has no edges', async () => {
-  const html = render(await Roadmap(), { props: { block: block(), opts: { now: NOW }, onreschedule: () => {} } }).body;
+test('with a callback every window and every date the record holds is a grip, and a date is taken whole because it has no edges', async () => {
+  const html = render(await Roadmap(), { props: { block: held(), opts: { now: NOW }, onreschedule: () => {} } }).body;
   const bars = html.match(/<span[^>]*class="roadmap-bar"[^>]*>/gu) ?? [];
   assert.equal(bars.length, 3, 'two windows and a date');
   for (const bar of bars) {
@@ -64,6 +69,27 @@ test('with a callback every window and every date is a grip, and a date is taken
   }
   /* The date is a dot on its day, and the dot is the grip: it has no edges, so the whole of it moves the date. */
   assert.match(html, /<li class="roadmap-item" data-date=""[^>]*>[\s\S]*?class="roadmap-bar" data-grip=""/u);
+});
+
+test('a line typed into the fence has no grip beside the held ones, because a drop on it would write nothing', async () => {
+  /* `reschedule` in the web's `roadmap-write.ts` answers null for a row with no `ref`, so a grip there was a hand that
+     took the bar, moved it, and put it back with nothing said. The first line is held; the other two are typed. */
+  const b = block();
+  const mixed: Block = { ...b, rows: b.rows.map((r, i) => (i === 0 ? { ...r, ref: { register: 'tasks', seq: 7, version: 2 } } : r)) };
+  const html = render(await Roadmap(), { props: { block: mixed, opts: { now: NOW }, onreschedule: () => {} } }).body;
+  const items = html.match(/<li class="roadmap-item"[\s\S]*?<\/li>/gu) ?? [];
+  assert.equal(items.length, 3);
+  const gripped = items.filter((i) => /data-grip/u.test(i));
+  assert.equal(gripped.length, 1, 'only the held line');
+  assert.match(gripped[0]!, /Build the kiln page/u);
+  for (const item of items.filter((i) => !/data-grip/u.test(i))) {
+    assert.match(item, /<span class="roadmap-bar"><\/span>/u, 'the plain bar, as with no callback');
+    assert.doesNotMatch(item, /cursor|touch-action|data-dragging/u);
+  }
+  /* All of it typed: the picture with no callback, mark for mark. */
+  const typed = render(await Roadmap(), { props: { block: block(), opts: { now: NOW }, onreschedule: () => {} } }).body;
+  const plain = render(await Roadmap(), { props: { block: block(), opts: { now: NOW } } }).body;
+  assert.equal(typed, plain);
 });
 
 test('the edge a pointer lands on picks the mode, and a bar too narrow for three parts is mostly its middle', async () => {

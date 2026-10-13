@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { against, axisFit, baseKnobs, countsOf, forecastAverage, forecastModel, forecastPlan, horizonChoices, knobsIn, knobsMoved, largest, pairsOf, readoutAt, scenario, streamsOf, underNote, type ForecastModel } from './forecast.ts';
+import { walkKnobs, pairsAcross, sellRows, soldName, type Group } from '../svelte/forecast-group.svelte.ts';
 import { parse } from './parse.ts';
 import { toHTML } from './html.ts';
 
@@ -590,4 +591,34 @@ test('A LENGTH PAST THE WALK IS OFFERED WHERE THE HOST CAN WALK IT, with the len
   const cut = forecastModel([...ROWS.filter((r) => r[0] !== 'horizon'), ['horizon', '90', '', ''], ['reach', '110', '', ''], ['horizons', '90 last', '', '']])!;
   assert.equal(horizonChoices(cut, true).at(-1)!.walk, 'last');
   assert.equal(horizonChoices(cut).at(-1)!.walk, undefined, 'a host that cannot walk further is asked nothing');
+});
+
+test('A GROUP OFFERS EVERY WALK’S PAIRS AND HOLDINGS, and selling the first walk’s moves the first walk only', () => {
+  const walk = (key: string, extra: string[][]): ForecastModel =>
+    forecastModel([...ROWS.filter((r) => r[0] !== 'knobs'), ['knobs', 'horizon drift sell', '', ''], ['group', 'cash-ahead', key, ''], ...extra])!;
+  /* Two walks the record could not convert between, a holding in each under ONE name, and a bill converted into the first. */
+  const first = walk('GBP', [['sell', '', 'Gold', '£2,000.00'], ['step', '2026-10-01', 'Hosting', '−£80.00'], ['of', '', 'USD to GBP', '']]);
+  const second = walk('EGP', [['sell', '', 'Gold', '£900.00'], ['sell', '', 'Bonds', '£100.00']]);
+  assert.deepEqual(pairsOf(first), ['USD to GBP']);
+  assert.deepEqual(pairsOf(second), []);
+  const told = ([first, second] as const).map((m) => [m.group!.key, { pairs: pairsOf(m), sells: m.sells.map((x) => x.label) }] as const);
+  /* The controls sit under the second walk, and list what both walks told them. */
+  assert.deepEqual(pairsAcross(told), ['USD to GBP'], 'the one pair, though the walk the controls sit under has none');
+  const rows = sellRows(told);
+  assert.deepEqual(rows, [{ key: 'GBP', names: ['Gold'] }, { key: 'EGP', names: ['Gold', 'Bonds'] }], 'one name in two currencies stays two controls');
+  assert.deepEqual(rows.map((r) => soldName(r, rows.length > 1)), ['Gold (British pound) sold on', 'Gold, Bonds (Egyptian pound) sold on']);
+  assert.equal(soldName(rows[0]!, false), 'Gold sold on', 'a lone control needs no currency');
+  assert.deepEqual(sellRows([['EGP', { pairs: [], sells: [] }]]), [], 'a walk with nothing to sell is no control');
+
+  const group: Pick<Group, 'knobs' | 'sold'> = { knobs: { horizon: null, late: 0, spend: {}, leave: [] }, sold: {} };
+  const balances = (m: ForecastModel): number[] => scenario(m, walkKnobs(m, group, m.group!.key)).days.map((d) => d.balance);
+  const rest = [balances(first), balances(second)];
+  assert.equal(knobsMoved(first, walkKnobs(first, group, 'GBP')), false, 'nothing sold, nothing moved');
+  group.sold.GBP = '2026-10-05';
+  assert.notDeepEqual(balances(first), rest[0], 'the first walk has its gold from the day it is sold');
+  assert.equal(scenario(first, walkKnobs(first, group, 'GBP')).steps.find((s) => s.label === 'Gold')?.delta, 2_000);
+  assert.deepEqual(balances(second), rest[1], 'and the second walk, holding gold of its own, does not move');
+  assert.equal(knobsMoved(second, walkKnobs(second, group, 'EGP')), false);
+  /* A day held by the group's shared knobs from before is not read by a walk of a group: its own key's day is. */
+  assert.equal(walkKnobs(second, { knobs: { ...group.knobs, sell: '2026-10-05' }, sold: {} }, 'EGP').sell, null);
 });

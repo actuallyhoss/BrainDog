@@ -1,0 +1,51 @@
+{
+  "id": "hana-no-shop",
+  "name": "Hana",
+  "who": "Paints at home in Cairo and posts what she makes on Instagram. She names a shop only to say she has none, so no shop is built for her: she wants one place for what she has to do.",
+  "expects": "none",
+  "standing": false,
+  "said": "I'm Hana. I didn't run a shop; I only post on Instagram, and I want one place for my tasks.",
+  "says": {
+    "plain": "I'm Hana. I didn't run a shop; I only post on Instagram, and I want one place for my tasks.",
+    "hard": "I'm Hana. I post what I paint on Instagram and forget what I said I would do this week."
+  },
+  "answers": {
+    "name": "Hana",
+    "currency": "EGP",
+    "kind": "tasks",
+    "things": ["Tasks"]
+  },
+  "email": "hana@people.braindog.test",
+  "slug": "hanas-tasks",
+  "zone": "Africa/Cairo",
+  "locale": "en-EG",
+  "languages": ["en-EG", "ar-EG"],
+  "start": "2026-10-12T08:00:00Z",
+  "first": "Varnish the blue canvas before Friday",
+  "later": [
+    { "day": 3, "said": ["Buy cold-pressed paper next week"] },
+    { "day": 7, "said": ["Photograph the three new paintings", "Answer Nadia about the portrait"] },
+    { "day": 30, "said": ["Renew the studio key"] }
+  ],
+  "expect": {
+    "who": {
+      "question": "Who are you?",
+      "chips": 5,
+      "promises": [
+        { "says": "free, with no card", "match": "free\\b.{0,24}\\bno card" },
+        { "says": "nothing is saved until you keep it", "match": "nothing (is )?saved until you keep" },
+        { "says": "yours to export or move", "match": "yours to (export|move|take)" }
+      ]
+    },
+    "heard": {
+      "usecase": "none",
+      "title": "Hana",
+      "lit": ["Hana", "tasks"],
+      "places": ["Today", "People", "Work"]
+    },
+    "keep": { "lists": ["tasks", "people"], "currency": "EGP" },
+    "tell": { "lists": ["tasks"] },
+    "today": { "first": "source", "lists": ["tasks"] },
+    "offer": { "id": "week:tasks", "before": 13, "after": 30 }
+  }
+}

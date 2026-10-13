@@ -65,6 +65,18 @@
     border-radius: 10px;
   }
 
+  /* THE CARD'S MENU SITS IN ITS TOP CORNER, off the flow: the card is a flex column, so in flow the control would be a
+     row of its own under the card's last line. The title keeps clear of it only on a card that has one. */
+  .board-col .card > .card-more {
+    position: absolute;
+    inset-block-start: var(--sp-2);
+    inset-inline-end: var(--sp-2);
+  }
+
+  .board-col .card:has(> .card-more) .card-title {
+    padding-inline-end: calc(28px + var(--sp-1));
+  }
+
   /* A long word (an invoice number, an address) breaks rather than widening its lane past the others. */
   .board-col .card-title {
     color: var(--ink);

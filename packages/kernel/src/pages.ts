@@ -308,8 +308,9 @@ export type BlockResult = PageBlock & {
   /**
    * A cash walk over money in several currencies that could not be converted: one walk a currency, each starting from
    * that currency's part of the opening, in code order, and why it is not one walk (`home`, and each `missing` pair).
+   * A walk's `sells` is what that walk may count as sold, in its own currency, when the block offers the sell control.
    */
-  walks?: (Runway & { past?: { at: string; value: number }[] })[];
+  walks?: (Runway & { past?: { at: string; value: number }[]; sells?: { label: string; value: number }[] })[];
   walkFx?: { home: string | null; missing: string[] };
   /** On a block that inherits: how many of `rows`, at the end, apply everywhere rather than to the project. */
   inherited?: number;
@@ -433,7 +434,8 @@ export type BlockResult = PageBlock & {
   late_name?: string;
   /**
    * A forecast's `sell:` figure, read: what it is called and what it holds, in minor units of the walk's currency. Empty
-   * when the figure reads nothing or reads another currency, and only ever on a block drawn as one walk.
+   * when the figure reads nothing or reads another currency, and only ever on a block drawn as one walk: a block drawn
+   * as a group carries each walk's own on that walk (`walks`).
    */
   sells?: { label: string; value: number }[];
   /**
@@ -2102,7 +2104,7 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
      says why in its own file. BUT A REGISTERED KIND WHOSE `across` NAMES THE SOURCE READS IT ITSELF (`kinds/index.ts`):
      a calendar over `deadlines` reads its own months, where the source would hand it a table's days and no window. */
   const early = sourceModule(block.source);
-  if (early?.first && !kindModule(block.kind)?.across?.includes(block.source ?? '')) return early.read(deps, block, base, also, sourceKit(deps));
+  if (early?.first && !kindModule(block.kind)?.across?.includes(block.source ?? '')) return walkSells(deps, block, early.read(deps, block, base, also, sourceKit(deps)));
 
   /* A REGISTERED KIND READS ITSELF, AND IT IS ASKED BEFORE ANY ARM BELOW (`kinds/index.ts`). What every block shares is
      already done by here: the keys nobody reads, `when:` and the page's `{{path}}` values. So a kind module is only the
@@ -2178,7 +2180,8 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
      over several lists, the record's events, its runs or its questions, rather than a query against one list. What every
      block shares is already done by here, and a registered kind was asked first, above. */
   const computed = sourceModule(block.source);
-  if (computed) return computed.read(deps, block, base, also, sourceKit(deps));
+  /* A GROUP OF WALKS IS OFFERED WHAT IT MAY SELL BY WALK (`walkSells`), which a source that answers one walk leaves be. */
+  if (computed) return walkSells(deps, block, computed.read(deps, block, base, also, sourceKit(deps)));
   /* A BAR OR A SPLIT OVER A GROUPED FIGURE draws the figure's parts, so a part may be a monthly share of a yearly
      cost, which a sum over the rows cannot be. The host adds what no part holds as its `unset:` row. */
   if (block.source.startsWith('metric.')) return metricBlock(deps, block, block.source.slice('metric.'.length), base, also);
@@ -4766,26 +4769,62 @@ const mayRead = (deps: PageDeps, decl: MetricDecl): boolean => {
 /** How many figures a sell knob with no `sell:` reads at most, so a record with many sellable figures reads a few. */
 const SELLS_MOST = 8;
 
+/** A figure a walk may count as sold, and the currency it is written in, before any one walk is asked about. */
+type Sellable = { label: string; value: number; unit: string | null };
+
 /**
- * Every figure a sell knob with no `sell:` may count as sold: each the record declares `sellable: true` and the reader
- * may read, that holds more than nothing in the walk's own money, called by the name it is declared with.
+ * Every figure a sell knob with no `sell:` may count as sold, in whatever money each is: each the record declares
+ * `sellable: true` and the reader may read, that holds more than nothing, called by the name it is declared with.
+ * `null` when the block offers no sell knob, and then nothing was read.
  *
- * NOTHING HERE IS REFUSED. `sell:` names one figure, and its author is told when it cannot be read; a sellable figure
- * this page never named that cannot be read, or is in another currency, is left off the knob, and the walk is right
- * without it. A walk drawn once per currency has no one currency (`null`) and offers none, as `sellsOf` says why.
+ * READ ONCE FOR A GROUP OF WALKS, since each walk of a group takes its own from the one reading (`walkSells`).
  */
-function sellables(deps: PageDeps, block: PageBlock, currency: string | null): { sells?: { label: string; value: number }[] } {
-  if (currency === null || !deps.metrics || !Array.isArray(block.knobs) || !block.knobs.includes('sell')) return {};
-  const sells: { label: string; value: number }[] = [];
+function sellableFigures(deps: PageDeps, block: PageBlock): Sellable[] | null {
+  if (!deps.metrics || !Array.isArray(block.knobs) || !block.knobs.includes('sell')) return null;
+  const held: Sellable[] = [];
   const offered = deps.metrics().filter((d) => d.sellable === true && mayRead(deps, d));
   for (const decl of offered.slice(0, SELLS_MOST)) {
     const read = deps.read(decl);
     if (!read.ok || read.value.refusals.length) continue;
     const worth = read.value.value;
-    if (read.value.unit === currency && typeof worth === 'number' && Number.isFinite(worth) && worth > 0)
-      sells.push({ label: typeof decl.name === 'string' && decl.name.trim() !== '' ? decl.name : decl.metric, value: worth });
+    if (typeof worth === 'number' && Number.isFinite(worth) && worth > 0)
+      held.push({ label: typeof decl.name === 'string' && decl.name.trim() !== '' ? decl.name : decl.metric, value: worth, unit: read.value.unit ?? null });
   }
-  return { sells };
+  return held;
+}
+
+/**
+ * Every figure a sell knob with no `sell:` may count as sold in one walk: those of `sellableFigures` in the walk's own
+ * money.
+ *
+ * NOTHING HERE IS REFUSED. `sell:` names one figure, and its author is told when it cannot be read; a sellable figure
+ * this page never named that cannot be read, or is in another currency, is left off the knob, and the walk is right
+ * without it. A block drawn once per currency has no one currency (`null`) and is offered none on the block itself:
+ * each of its walks is offered its own (`walkSells`).
+ */
+function sellables(deps: PageDeps, block: PageBlock, currency: string | null, figures?: Sellable[] | null): { sells?: { label: string; value: number }[] } {
+  if (currency === null) return {};
+  const held = figures === undefined ? sellableFigures(deps, block) : figures;
+  return held ? { sells: held.filter((f) => f.unit === currency).map(({ label, value }) => ({ label, value })) } : {};
+}
+
+/**
+ * A block drawn as a group of walks, with what each walk may count as sold written on that walk, in that walk's money.
+ *
+ * ONE `sells` ON THE BLOCK WOULD BE EVERY WALK'S, since a host draws each walk with the block's keys spread over it, and
+ * a holding in dollars would then be sold out of the pound walk as pounds. So the answer is by walk: a holding is
+ * offered under the walk of its own currency and no other, and a walk nothing is held in is offered an empty list. A
+ * walk with no currency is offered nothing. A `sell:` that could not be read was already refused by the source.
+ */
+function walkSells(deps: PageDeps, block: PageBlock, out: BlockResult): BlockResult {
+  if (!out.walks || out.walks.length === 0) return out;
+  const figures = block.sell === undefined ? sellableFigures(deps, block) : undefined;
+  if (figures === null) return out;
+  const walks = out.walks.map((w) => {
+    const sold = figures === undefined ? sellsOf(deps, block, w.currency) : sellables(deps, block, w.currency, figures);
+    return 'refusal' in sold || sold.sells === undefined ? w : { ...w, sells: sold.sells };
+  });
+  return { ...out, walks };
 }
 
 /** How many figures Home pins at most. */

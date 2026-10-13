@@ -1098,6 +1098,7 @@
     [data-calm][aria-expanded='true'],
     .list > .item:is(:hover, :focus-within, [data-focused]) > [data-calm],
     .feed-row:is(:hover, :focus-within, [data-focused]) > [data-calm],
+    .board-col .card:is(:hover, :focus-within) > [data-calm],
     .feed-group:is(:hover, :focus-within) > .feed-head > [data-calm],
     .queue-card:is(:hover, :focus-within, [data-focused]) [data-calm] {
       opacity: 1;

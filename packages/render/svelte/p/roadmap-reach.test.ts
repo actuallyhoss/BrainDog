@@ -47,7 +47,10 @@ const load = async (path: string): Promise<Component<Props>> =>
 
 const NOW = Date.UTC(2026, 8, 22, 12);
 const FENCE = '```roadmap | Autumn\nBuild the kiln page | 2026-09-10 | 10\nRegate window | 2026-10-05 | 3 | warn\nLaunch | 2026-09-30\n```';
-const block = (): Block => parse(FENCE)[0] as Block;
+const block = (): Block => {
+  const b = parse(FENCE)[0] as Block;
+  return { ...b, rows: b.rows.map((r, i) => ({ ...r, ref: { register: 'tasks', seq: i + 1, version: 1 } })) };
+};
 
 /**
  * The marks a pointer can take: the windows and the dates, each its row's bar or dot. The fence has two windows and

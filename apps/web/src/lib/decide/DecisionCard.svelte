@@ -666,7 +666,7 @@
              replaces another is struck, with the arrow to what it becomes. -->
         {#if changesSaid}
           <div class="dc-part dc-part-changes" role="group" aria-labelledby="{uid}-changes">
-            <h4 class="dc-h" id="{uid}-changes">{cardWords.changes}</h4>
+            <h4 class="dc-h" id="{uid}-changes" dir="auto">{#if card.list}{cardWords.changesIn(card.list)}{:else}{cardWords.changes}{/if}</h4>
             {#if card.does}<p class="dc-does" dir="auto">{card.does}</p>{/if}
             {#if card.money || card.lines.length > 0}
               <ul class="dc-moves">

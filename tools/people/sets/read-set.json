@@ -1,5 +1,5 @@
 {
-  "about": "Forty sentences typed at \"Who are you?\" and the reading each must get from the rules (apps/web/src/lib/start/propose.ts, then start/question.ts). `reads.usecase` is a use case id or none; `reads.modules`, where given, is the exact set installed; `reads.question` is the one question due on the sentence as typed, or null. An `answer` is given to that question and the rest is read after it. A sentence marked `until` names the unit that makes it true and may fail until then; one that passes while still marked is red, so the mark is lifted the day the unit lands.",
+  "about": "Forty-two sentences typed at \"Who are you?\" and the reading each must get from the rules (apps/web/src/lib/start/propose.ts, then start/question.ts). `reads.usecase` is a use case id or none; `reads.modules`, where given, is the exact set installed; `reads.question` is the one question due on the sentence as typed, or null. An `answer` is given to that question and the rest is read after it. A sentence marked `until` names the unit that makes it true and may fail until then; one that passes while still marked is red, so the mark is lifted the day the unit lands.",
   "ctx": { "zone": "Europe/London", "locale": "en-GB" },
   "sentences": [
     { "who": "layla-student", "said": "I'm Layla, a pharmacology student at Cairo University. I keep missing assignments and exam dates.", "reads": { "usecase": "student", "modules": ["people"], "name": "Layla", "currency": null, "question": null } },
@@ -18,6 +18,8 @@
     { "who": "yara-own", "said": "I'm Yara. Eleven boxes at the bottom of the garden, and I never remember which one I opened last.", "reads": { "usecase": "none", "modules": ["people"], "name": "Yara", "currency": null, "question": null } },
     { "who": "salma-arabic", "said": "أنا سلمى، عندي محل حلويات صغير في القاهرة وبنسى مين طلب إيه ومين دفع.", "reads": { "usecase": "none", "modules": [], "name": null, "currency": null, "question": "name" }, "why": "The rules read English and say so; a model reads her as a shop (USE-B05)." },
     { "who": "salma-arabic", "said": "أنا سلمى، بعمل كيك في البيت والناس بتطلب مني على واتساب.", "reads": { "usecase": "none", "modules": [], "name": null, "currency": null, "question": "name" }, "why": "The rules read English and say so." },
+    { "who": "hana-no-shop", "said": "I'm Hana. I didn't run a shop; I only post on Instagram, and I want one place for my tasks.", "reads": { "usecase": "none", "modules": ["people", "work"], "name": "Hana", "currency": null, "question": null }, "why": "A shop she says she has none of is not built for her." },
+    { "who": "hana-no-shop", "said": "I'm Hana. I post what I paint on Instagram and forget what I said I would do this week.", "reads": { "usecase": "none", "modules": ["people"], "name": "Hana", "currency": null, "question": null } },
 
     { "said": "I run a small shop", "reads": { "usecase": "shop", "modules": ["people"], "name": null, "currency": null, "question": "arrivesBy" } },
     { "said": "I freelance", "reads": { "usecase": "business", "name": null, "currency": null, "question": "name" } },

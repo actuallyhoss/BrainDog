@@ -71,6 +71,7 @@
   import { resolverOf, shownOf } from '$lib/record/row-values.ts';
   import { rowWriter, type RowWriter } from '$lib/record/rows-write.ts';
   import { rowHref } from '$lib/record/row-href.ts';
+  import { dayHref } from '$lib/record/day-href.ts';
   import Hole from '$lib/page/Hole.svelte';
   import { linkReader, type Linked, type LinkReader } from '$lib/record/links-live.ts';
   import type { Entry, FieldDecl, Fields } from '$lib/record/schema.ts';
@@ -812,6 +813,10 @@
   /* THE ONE HELPER A DECLARED PAGE ASKS TOO (`row-href.ts`): the row's own page where its list made one, else its screen. */
   const link = rowHref;
 
+  /* A DATE IN A NOTE OPENS THAT DAY ON THE CALENDAR, as it does on a declared page (`BlockSlot.svelte`): the record's
+     Calendar page where `boot` listed one, else `null` and the renderer draws the date plain (`day-href.ts`). */
+  const dayLink = (iso: string) => dayHref((page.data as unknown as Partial<Shell>).pages, iso);
+
   /**
    * WHAT A PRESSED HOLE DOES (`Hole.svelte`). A value this row does not hold is filled HERE, so a path that names one
    * of its fields opens that field's box; any other hole is `Hole`'s: the place the value lives, or "Find this out".
@@ -1245,11 +1250,11 @@
                 {#if problem}<p class="edit-why">{problem}</p>{/if}
               {:else}
                 <!-- `hole` IS WHAT MAKES A HOLE PRESSABLE. Without it the renderer draws a marked span rather than a
-                     `<button>` nobody wrote a handler for, and with it a press goes to `Hole` below. No `dayHref`: no
-                     page of this record draws a calendar, so a date stays a plain figure. -->
+                     `<button>` nobody wrote a handler for, and with it a press goes to `Hole` below. `dayHref` IS THE
+                     RECORD'S CALENDAR PAGE where it holds one; on a record without one a date stays a plain figure. -->
                 <Document
                   src={shownOf(docs?.[f.id], String(row.fields[f.id]))}
-                  opts={{ resolve: resolverOf(docs?.[f.id], String(row.fields[f.id])), link, hole: (path: string | null) => holes?.press(path), now: clock, href: at, home: homeCurrency() }}
+                  opts={{ resolve: resolverOf(docs?.[f.id], String(row.fields[f.id])), link, dayHref: dayLink, hole: (path: string | null) => holes?.press(path), now: clock, href: at, home: homeCurrency() }}
                 />
               {/if}
             </article>

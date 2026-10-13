@@ -305,6 +305,11 @@
     }
   }
 
+  /** A run refused part way still put updates in: they are named beside the refusal, so nobody finds one moved unsaid. */
+  function wentIn(out: { fix: string; first?: readonly string[]; stopped?: string }) {
+    if (out.first && out.first.length > 0) toasts.push(turnWords.stoppedAfter(out.first, out.fix, out.stopped), { intent: 'warn' });
+  }
+
   async function approve() {
     if (!listing || !client || !states || !planned) return;
     const p = planned;
@@ -318,11 +323,13 @@
         toasts.push(out.first ? turnWords.installedAfter(listing.title, out.first) : copy.shareInstalled(listing.title), { intent: 'good' });
         planned = null;
       } else if (entry && notOwner(out.code)) {
+        wentIn(out);
         planned = null;
         const asked = await askOnDecide(client, entry, action?.kind === 'update' ? action.from : null);
         if (asked.ok) filed = asked.id;
         else refused = asked;
       } else {
+        wentIn(out);
         planned = null;
         refused = out;
       }

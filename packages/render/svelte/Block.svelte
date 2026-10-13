@@ -102,7 +102,7 @@
     /**
      * A TASK'S TWO VERBS, READS OF THE HOST'S AND NOT WRITES: open the row (a docked panel), and its menu, anchored to
      * the control pressed. Handed to the list primitive, whose `todo` rows draw a title button and a quiet trailing
-     * control only when each is passed.
+     * control only when each is passed, and to the grid, whose `board` cards draw the same two the same way.
      */
     onopen?: ((row: Row) => void) | undefined;
     onmenu?: ((row: Row, anchor: HTMLElement) => void) | undefined;
@@ -195,7 +195,7 @@
   {:else if spec.primitive === 'grid'}
     <!-- BY NAME rather than through `Draw`, because the callback belongs to one primitive: handed
          to the union the other six are in, it is a prop none of them declares. -->
-    <Grid {block} {opts} {onmove} />
+    <Grid {block} {opts} {onmove} {onopen} {onmenu} />
   {:else if spec.primitive === 'list'}
     <List bind:this={list} {block} {opts} {ontick} {onact} {onreschedule} {cursor} {onrowfocus} {onopen} {onmenu} {onselect} {selected} />
   {:else if spec.primitive === 'panel'}

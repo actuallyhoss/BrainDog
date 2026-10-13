@@ -526,7 +526,9 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   follow-up), and a thread that is holding may be marked
  *   done (work-moves-62-63, batch 63, inside the unreleased step). WORK 1.18.0 IS RELEASED (commit 63423720), so this is a
  *   version of its own. Two values, their labels and the moves on one field, one field added and one script's title
- *   and source changed, nothing taken away, so a minor step.
+ *   and source changed, nothing taken away, so a minor step. And the Board page takes Work's capture line, first after
+ *   its sentence (board-capture-line-83, batch 83, inside the unreleased step): one block added to a page that is
+ *   there, nothing taken away.
  * - money-core 3.17.0, still unreleased, takes three more things of batch 61 with no version of its own: the Ledger
  *   pairs a move between two currencies at the rate of the day it left, within 2% (`pairs.across_currency`,
  *   pairs-fx-61); two figures over who made each Ledger entry, `filed-for-you-30d` and `filed-today`, read from

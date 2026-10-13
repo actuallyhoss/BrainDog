@@ -276,9 +276,10 @@
   let unverified = $state.raw<string[]>([]);
   /**
    * What the last press on a row said: a refusal, or where it was filed on Decide. `first` is the update to take before
-   * this one, by its key, when this one waits on what that one hands over (`update-order.ts`).
+   * this one, by its key, when this one waits on what that one hands over (`update-order.ts`). `went` is the updates
+   * a run put in before it stopped here, by title: they are in the record, so the row says so beside what it says.
    */
-  let said = $state<Record<string, { fix: string; code: string | null; first?: string } | { filed: string }>>({});
+  let said = $state<Record<string, ({ fix: string; code: string | null; first?: string } | { filed: string }) & { went?: readonly string[] }>>({});
 
   $effect(() => {
     const held = states;
@@ -396,6 +397,10 @@
    * plan that now asks for a line nobody was shown (`turnWords.unread`) is read again from the row, since the holder
    * is in by then; a refusal that says this person may not install here files the refused one on Decide, and this
    * row says what it goes in after.
+   *
+   * A HOLDER THAT WENT IN IS NAMED WHATEVER STOPPED THE RUN (the refusal's `first`, `offer.ts`): its own row leaves on
+   * the reread, so this row is the only place left to say the record moved. A refusal is said in the listing page's
+   * sentence (`turnWords.stoppedAfter`); one filed on Decide keeps its own words and the row says who is in before them.
    */
   async function installTurn(p: Planned, u: Update): Promise<boolean> {
     if (!client || p.kind !== 'pack' || !p.after) return false;
@@ -424,10 +429,13 @@
       return true;
     }
     const stopped = (updates ?? []).find((o) => o.key === at.key) ?? u;
+    const went = out.first ?? [];
     if (notOwner(out.code)) {
       await askOwner(stopped, read);
       if (stopped.key !== u.key) said = { ...said, [u.key]: waitsOn(p, u, stopped) };
-    } else said = { ...said, [u.key]: { fix: out.fix, code: out.code } };
+      const mine = said[u.key];
+      if (mine && went.length > 0) said = { ...said, [u.key]: { ...mine, went } };
+    } else said = { ...said, [u.key]: { fix: went.length > 0 ? turnWords.stoppedAfter(went, out.fix, out.stopped) : out.fix, code: out.code } };
     return false;
   }
 
@@ -766,6 +774,7 @@
       <ul class="ledger addons">
         {#each updates as u (u.key)}
           {@const s = said[u.key]}
+          {@const went = (s?.went ?? []).map((t) => words.installed(t)).join(' ')}
           <li class="addon-row">
             <div class="line addon update">
               <span class="line-mark"><IconWell name="refresh" size="l" /></span>
@@ -775,11 +784,11 @@
               </span>
               <Button size="sm" disabled={busy !== null || !client} onclick={() => void showPlan(u)}>{busy === u.key ? words.planning : words.seePlan}</Button>
               {#if s && 'filed' in s}
-                <p class="addon-said" role="status">{words.asked}{#if s.filed}{' '}<a class="tap" href={at(`/decide/${s.filed}`)}>{words.openDecide}</a>{/if}</p>
+                <p class="addon-said" role="status">{went}{went ? ' ' : ''}{words.asked}{#if s.filed}{' '}<a class="tap" href={at(`/decide/${s.filed}`)}>{words.openDecide}</a>{/if}</p>
               {:else if s}
                 {@const first = s.first ? updates.find((o) => o.key === s.first) : undefined}
                 <p class="addon-said" role="status" title={s.code ? copy.refusalCode(s.code) : undefined}>
-                  {s.fix}
+                  {went}{went ? ' ' : ''}{s.fix}
                   {#if first}{' '}<Button size="sm" disabled={busy !== null || !client} onclick={() => void showPlan(first)}>{orderWords.first(first.title)}</Button>{/if}
                 </p>
               {/if}

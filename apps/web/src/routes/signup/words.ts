@@ -97,6 +97,8 @@ export const words = {
   payInstead: 'Pay for a record instead',
   /** Sign-up refused, in this screen's words where the host sent none. */
   sendFailed: 'That did not go through. Check the address, then send it again.',
+  /** The mailed link opened while the host could not be reached: the link is not spent, so it is not called expired. */
+  linkUnreached: 'We could not reach BrainDog. Open the link again in a minute.',
   haveOne: 'Already have a BrainDog? Sign in',
   /** Sign-up by invitation, reached with no code: the closed page's own line, and the way to sign in under it. */
   inviteTitle: 'Sign-up is by invitation',

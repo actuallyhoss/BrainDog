@@ -18,6 +18,9 @@
   WITH NO CALLBACK THERE IS NOTHING TO TAKE: no grip and no cursor, so the timeline is the one `toHTML` draws and
   `roadmap-parity.test.ts` still compares like with like. That is `19 §6`: a control that cannot act is absent. A
   keyboard does not drag a bar; the row's own page sets the same two fields.
+
+  NOR IS THERE ANYTHING TO TAKE ON A LINE THE RECORD DOES NOT HOLD. A line typed into the fence has no `ref`, so the
+  host has no task to write the drop to; its bar is the plain one, beside the grips of the lines that are held.
 -->
 <script lang="ts">
   import { inline, text, TONES, type Block, type RenderOptions, type Row } from '../../src/index.ts';
@@ -158,7 +161,7 @@
     <ol class="roadmap-list" aria-label={roadmapSentence(plan)}>
       {#each lines as p}
         {@const date = p.from === MISSING}
-        <li class="roadmap-item" data-intent={p.tone} data-date={date ? '' : undefined} data-flip={roadmapFlip(p) ? '' : undefined} style={placeOf(p)}><span class="roadmap-item-title" title={p.title || undefined}>{p.title}{@render mark(p.tone)}</span> <span class="roadmap-item-when num">{p.when}</span><span class="roadmap-item-track" aria-hidden="true">{#if onreschedule}<!-- A BAR IS A PICTURE THAT A POINTER CAN MOVE, inside a track no screen reader enters: the list says every row's days, and the row's own page sets them. --><!-- svelte-ignore a11y_no_static_element_interactions --><span
+        <li class="roadmap-item" data-intent={p.tone} data-date={date ? '' : undefined} data-flip={roadmapFlip(p) ? '' : undefined} style={placeOf(p)}><span class="roadmap-item-title" title={p.title || undefined}>{p.title}{@render mark(p.tone)}</span> <span class="roadmap-item-when num">{p.when}</span><span class="roadmap-item-track" aria-hidden="true">{#if onreschedule && block.rows[p.row]?.ref}<!-- A BAR IS A PICTURE THAT A POINTER CAN MOVE, inside a track no screen reader enters: the list says every row's days, and the row's own page sets them. A LINE TYPED INTO THE FENCE IS NOBODY'S TO MOVE: it carries no `ref`, a drop on it writes nothing, so it keeps the plain bar. --><!-- svelte-ignore a11y_no_static_element_interactions --><span
                 class="roadmap-bar"
                 data-grip=""
                 data-dragging={drag?.row === p.row ? '' : undefined}

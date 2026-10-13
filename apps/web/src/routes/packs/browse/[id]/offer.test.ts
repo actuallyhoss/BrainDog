@@ -163,6 +163,46 @@ test('two holders are named in the order they went in, and one passed over is le
   assert.deepEqual(skipped.ok ? skipped.first : null, ['Personal']);
 });
 
+test('a run refused part way names the holder that went in, the one that stopped and the fix', async () => {
+  const first = await afterOthers(moneyPlan(true), money, [personal], async () => ({ ok: true, planned: { kind: 'usecase', plan: personalPlan } }));
+  /* Personal goes in, then Money's own install is refused. */
+  const out = await installInTurn(first, {
+    replan: async () => ({ ok: true, planned: moneyPlan(false, 'h2') }),
+    install: async (p) => (p.kind === 'usecase' ? { ok: true, nav: null } : { ok: false, fix: 'The record changed. Read the plan again.', code: 'PLAN_STALE' }),
+  });
+  assert.deepEqual(out, { ok: false, fix: 'The record changed. Read the plan again.', code: 'PLAN_STALE', first: ['Personal'], stopped: 'Money' });
+  assert.equal(!out.ok && out.first ? turnWords.stoppedAfter(out.first, out.fix, out.stopped) : '', 'Personal is installed. Money stopped: The record changed. Read the plan again.');
+
+  /* So does a plan that cannot be read again, and one that now asks for a line nobody was shown. */
+  const unplanned = await installInTurn(first, { replan: async () => ({ ok: false, fix: 'Not reachable.', code: 'UNREACHABLE' }), install: async () => ({ ok: true, nav: null }) });
+  assert.deepEqual(unplanned, { ok: false, fix: 'Not reachable.', code: 'UNREACHABLE', first: ['Personal'], stopped: 'Money' });
+  const asking: Planned = { ...(moneyPlan(false, 'h5') as Extract<Planned, { kind: 'pack' }>), approve: ['a line nobody was shown'] };
+  const unread = await installInTurn(first, { replan: async () => ({ ok: true, planned: asking }), install: async () => ({ ok: true, nav: null }) });
+  assert.deepEqual(unread, { ok: false, fix: turnWords.unread, code: null, first: ['Personal'], stopped: 'Money' });
+});
+
+test('a refusal before any holder went in names none, and two that went in are both named', async () => {
+  const first = await afterOthers(moneyPlan(true), money, [personal], async () => ({ ok: true, planned: { kind: 'usecase', plan: personalPlan } }));
+  const out = await installInTurn(first, { replan: async () => assert.fail('never reached'), install: async () => ({ ok: false, fix: 'Only the owner installs.', code: 'FORBIDDEN' }) });
+  assert.equal(out.ok, false);
+  assert.equal('first' in out, false);
+  assert.equal('stopped' in out, false);
+
+  /* The second holder is the one that stops: only the first is named as in, and the holder as stopped. */
+  const work: Offered = { ...personal, key: 'usecase:work', id: 'work', title: 'Work' };
+  const both: Planned = { ...(moneyPlan(false) as Extract<Planned, { kind: 'pack' }>), after: { self: money, first: [personal, work].map((of) => ({ of, planned: { kind: 'usecase', plan: personalPlan } })), shown: null } };
+  let n = 0;
+  const mid = await installInTurn(both, { replan: async () => ({ ok: true, planned: { kind: 'usecase', plan: personalPlan } }), install: async () => (n++ === 0 ? { ok: true, nav: null } : { ok: false, fix: 'No.', code: null }) });
+  assert.deepEqual(mid, { ok: false, fix: 'No.', code: null, first: ['Personal'], stopped: 'Work' });
+  assert.equal(turnWords.stoppedAfter(['Personal', 'Work'], 'No.', 'Money'), 'Personal and Work are installed. Money stopped: No.');
+  assert.equal(turnWords.stoppedAfter(['Personal'], 'No.'), 'Personal is installed. The next one stopped: No.');
+
+  /* The page says it in a toast beside the refusal it already draws, on both refused branches. */
+  const page = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
+  assert.match(page, /if \(out\.first && out\.first\.length > 0\) toasts\.push\(turnWords\.stoppedAfter\(out\.first, out\.fix, out\.stopped\), \{ intent: 'warn' \}\)/);
+  assert.equal(page.match(/\n\s+wentIn\(out\);/g)?.length, 2);
+});
+
 test('the listing hands its plan what else waits, so the wait is read where the update is pressed', () => {
   const page = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
   assert.match(page, /planFor\(client, listing, file, held, copy\.writeRaced, \(\) => waitingOf\(fetch, kennel, held\)\)/u);

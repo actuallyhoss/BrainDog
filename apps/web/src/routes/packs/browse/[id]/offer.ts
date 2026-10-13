@@ -54,7 +54,11 @@ export type Turn = { of: Offered; planned: Planned };
  */
 export type After = { self: Offered; first: readonly Turn[]; shown: unknown };
 
-export type Refused = { ok: false; fix: string; code: string | null };
+/**
+ * A refusal. From a run in turn it also carries `first`, the updates that really went in before the stop, by title
+ * and in order, and `stopped`, the title of the one the run stopped at: neither is there when nothing went in.
+ */
+export type Refused = { ok: false; fix: string; code: string | null; first?: readonly string[]; stopped?: string };
 
 const isMap = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const refusedOf = (r: Wire<unknown>, fallback: string): Refused => (r.ok ? { ok: false, fix: fallback, code: null } : { ok: false, fix: r.refusal?.fix ?? fallback, code: r.refusal?.code ?? null });
@@ -65,11 +69,13 @@ export const diffOf = (p: Planned): unknown => (p.kind === 'pack' ? (p.after?.sh
 /**
  * What a run in turn says. `unread`: the plan read again, once the one before it is in, asks for something the sheet
  * did not show. `installedAfter`: the run is done and took other updates in first, so the page names them beside
- * this one. KEPT HERE AND NOT IN `lib/copy/packs.ts`, which `lib/copy.ts` spreads into what every screen loads.
+ * this one. `stoppedAfter`: the run was refused part way, so what did go in is named beside the refusal, and the one
+ * it stopped at when its name is known. KEPT HERE AND NOT IN `lib/copy/packs.ts`, which `lib/copy.ts` spreads into what every screen loads.
  */
 export const turnWords = {
-  unread: 'The first update is in. This one now asks for something its plan did not show, so read its plan again.',
+  unread: 'This one now asks for something its plan did not show, so read its plan again.',
   installedAfter: (title: string, first: readonly string[]) => `${title} is installed, after ${and(first)}.`,
+  stoppedAfter: (first: readonly string[], fix: string, stopped = '') => `${and(first)} ${first.length > 1 ? 'are' : 'is'} installed. ${stopped === '' ? 'The next one stopped' : `${stopped} stopped`}: ${fix}`,
 } as const;
 
 /** The words over what waits on the sheet, kept with the market's other words. */
@@ -201,7 +207,9 @@ const asksOf = (p: Planned): readonly string[] => (p.kind === 'pack' ? p.approve
  * nothing is installed as it is. `by` is the record's own plan and install; a test hands in names.
  *
  * `first` IS WHO REALLY WENT IN BEFORE THIS ONE, by title and in order, for the page to say. One passed over is not
- * in it, and a plan that waited on nothing carries none.
+ * in it, and a plan that waited on nothing carries none. A RUN REFUSED PART WAY CARRIES IT TOO, with the title of the
+ * one it stopped at, because those updates are in the record whatever the refusal says. A refusal before anything
+ * went in carries neither.
  */
 export async function installInTurn(
   planned: Planned,
@@ -232,7 +240,8 @@ export async function installInTurn(
     },
     unread: turnWords.unread,
   });
-  return out.fix === '' ? { ok: true, nav, ...(first.length > 0 ? { first } : {}) } : { ok: false, fix: out.fix, code };
+  if (out.fix === '') return { ok: true, nav, ...(first.length > 0 ? { first } : {}) };
+  return { ok: false, fix: out.fix, code, ...(first.length > 0 ? { first, ...(at.title !== '' ? { stopped: at.title } : {}) } : {}) };
 }
 
 /**

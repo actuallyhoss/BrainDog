@@ -89,13 +89,22 @@ const TERMINAL_LEAD = /^(?:[Pp][Oo][Ss]\s+\d{2,}\s+|POS\s+)/;
 const MONTH_WORD = /^(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)[.,]?$/i;
 /** A day written with a stroke, however short: `5/9`, `12/10`, `12/10/26`. */
 const STROKE_DAY = /^\d{1,2}\/\d{1,2}(?:\/\d{2,4})?$/;
+/** The day at the front of a word that joins it to its month: the `12` of `12OCT`, the `12-` of `12-OCT`. What is left must be a month. */
+const JOINED_DAY = /^\d{1,2}-?(?=\p{L})/u;
+/** A day of one or two digits written after its month: the `12` of `OCT 12`. */
+const SHORT_DAY = /^\d{1,2}[.,]?$/;
 /**
  * Whether a word ends the name: a branch, a day or a reference holds three digits or more. A shorter number may be the
  * shop's own (Studio 54 Cafe), unless it is the day of a date: a number of one or two digits with a month or a day
- * with a stroke after it (`SPOTIFY 12 OCT`), or a day with a stroke itself (`5/9`). `next` is the word after it.
+ * with a stroke after it (`SPOTIFY 12 OCT`), or a day with a stroke itself (`5/9`). A day joined to its month ends it
+ * too (`12OCT`, `12-OCT`), and so does a month with its day after it (`OCT 12`). `next` is the word after it.
  */
 const endsName = (w, next) =>
-  (w.match(/\d/g) ?? []).length >= 3 || STROKE_DAY.test(w) || (/^\d{1,2}$/.test(w) && next !== undefined && (MONTH_WORD.test(next) || STROKE_DAY.test(next)));
+  (w.match(/\d/g) ?? []).length >= 3 ||
+  STROKE_DAY.test(w) ||
+  (/^\d{1,2}$/.test(w) && next !== undefined && (MONTH_WORD.test(next) || STROKE_DAY.test(next))) ||
+  (JOINED_DAY.test(w) && MONTH_WORD.test(w.replace(JOINED_DAY, ''))) ||
+  (MONTH_WORD.test(w) && next !== undefined && SHORT_DAY.test(next));
 
 /** The bank's words without the card and the terminal they lead with, which name neither shop nor payee. */
 function shopWords(text) {

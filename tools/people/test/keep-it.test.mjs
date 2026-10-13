@@ -12,9 +12,14 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
 import { foundIn, joined, judge, keepIt, PASSKEY, tracesOf } from '../expect/keep-it.mjs';
+import { checkPerson } from '../check-files.mjs';
+import { propose } from '../../../apps/web/src/lib/start/propose.ts';
 
 const MARIAM = JSON.parse(readFileSync(new URL('../mariam.json', import.meta.url), 'utf8'));
 const TITLE = MARIAM.expect.heard.title;
+/** Hana names a shop only to say she has none (`didnt-shop.json`): the one person here whose sentence refuses a thing. */
+const HANA = JSON.parse(readFileSync(new URL('../didnt-shop.json', import.meta.url), 'utf8'));
+const readAs = (said, person) => propose(said, { zone: person.zone, locale: person.locale });
 
 /** A tab whose calls to `path` have their JSON body changed by `change` before the Worker reads it. */
 const meddle = (path, change) => (fetch) => async (url, init = {}) =>
@@ -152,4 +157,40 @@ test('the judge says a stall alone', () => {
   assert.equal(r.pass, false);
   assert.match(r.saw, /no answer in 30 s/u);
   assert.doesNotMatch(r.saw, /refused|undefined/u);
+});
+
+/* A SHOP SHE SAID SHE NEVER RAN IS NOT BUILT, AND HER RECORD IS NOT NAMED FOR IT (audit 80, claim 3). The walk sends
+   the page's own reading of her sentence as the record's name (`titleSent`), so a "didn't" read as a yes opens
+   "Hana's Shop" here and this goes red. */
+test('HANA KEEPS IT: "I didn\'t run a shop" opens "Hana", never a shop, and the sentence is kept nowhere', async () => {
+  assert.deepEqual(checkPerson(HANA), []);
+  assert.equal(HANA.expects, 'none');
+  assert.match(HANA.said, /didn't run a shop/u);
+  const r = await keepIt(HANA);
+  assert.equal(r.pass, true, r.saw);
+  assert.equal(r.seen.carried, HANA.said);
+  assert.equal(r.seen.name, HANA.expect.heard.title, r.saw);
+  assert.doesNotMatch(r.seen.name, /shop/iu);
+  assert.deepEqual(r.seen.kept, []);
+});
+
+test('HER SENTENCE READS AS NO USE CASE, and the same words without the "didn\'t" read as a shop', () => {
+  const heard = readAs(HANA.said, HANA);
+  assert.equal(heard.usecase, null);
+  assert.equal(heard.title, null);
+  assert.deepEqual(heard.heard.map((h) => h.phrase), HANA.expect.heard.lit);
+  /* THE CHECK HAS TEETH: it is her "didn't" alone that keeps the shop away. */
+  const yes = readAs(HANA.said.replace("didn't run", 'run'), HANA);
+  assert.equal(yes.usecase, 'shop');
+  assert.equal(yes.title, "Hana's Shop");
+  /* WITH EITHER APOSTROPHE OR NONE, as a phone types it. */
+  for (const typed of ['didn’t', 'didnt']) assert.equal(readAs(HANA.said.replace("didn't", typed), HANA).usecase, null, typed);
+});
+
+/* A SHOP REFUSED BESIDE A THING SHE DOES DO: "sell" is heard, so she gets Orders and Products by that word, and the
+   shop she refused lights nothing and names nothing. */
+test('"I didn\'t run a shop; I only sell on Instagram" is read by "sell", never by the shop', () => {
+  const heard = readAs("I'm Hana. I didn't run a shop; I only sell on Instagram", HANA);
+  assert.deepEqual(heard.heard.map((h) => h.phrase).filter((p) => /shop/iu.test(p)), []);
+  assert.equal(heard.title, null);
 });

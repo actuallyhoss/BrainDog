@@ -10897,7 +10897,17 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         });
       }
       const { id, email, name } = args.person;
-      return tail(await kernel.acceptInvitation(args.token, { person: id, email, ...(name ? { name } : {}) }));
+      const joined = await kernel.acceptInvitation(args.token, { person: id, email, ...(name ? { name } : {}) });
+      /* WHOEVER JOINS IS A PERSON ON THE RECORD (USE-A18), met by the address the host has just verified, as `setup` meets
+         the one who signs up: the entry already holding that address is matched, so the same address joining again makes
+         no second one, and one is made when nobody holds it, under the name they gave. Never when no list plays `meets`
+         (nobody is put back into a list its owner switched off), and NEVER MARKED AS THE OWNER'S OWN: `self` says whose
+         record this is, which joining does not change. They are met as themselves at their own keyboard, so the address
+         is believed. A meeting that will not land leaves them a member all the same. NOR BY A SHARED INBOX'S ADDRESS
+         (`office@`), which no person can hold (`markOwnRow`): `meet` reads it as an organisation's and would write one. */
+      if (joined.ok && kernel.meetsList() !== null && !isOrganisationAddress(email))
+        kernel.meet({ ...(name ? { name } : {}), email, where: 'accepted an invitation' }, { actor: id, principal: { kind: 'person' } });
+      return tail(joined);
     },
 
     /** Take somebody off. Never the last owner, and every register they held is revoked out loud. */

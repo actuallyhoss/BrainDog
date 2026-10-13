@@ -69,6 +69,8 @@ export const cardWords = {
   /** THE CARD'S SIDE, ON A WIDE TILE (DIRECTION §39): why it is asked and what it changes, each under a quiet heading. */
   why: 'Why it’s asked',
   changes: 'What it changes',
+  /** The same heading where the changes are drawn as lines and the record's sentence, which named the list, is not. */
+  changesIn: (list: string) => `What it changes in ${list}`,
 } as const;
 
 /** Who asked, as the by-line says it: the face and name, the app it ran in, the run, each only where it is a name. */
@@ -106,6 +108,11 @@ export type Card = {
    * list holds whose every change is one of `lines`, which already say it.
    */
   does: string;
+  /**
+   * The name of the list the change is in ("Projects"), only where `does` is left out because the lines say it: the
+   * lines name fields, and the sentence was the one place the card said which list they are of. Empty everywhere else.
+   */
+  list: string;
   /** How many things a joined question changes, or 0. */
   joined: number;
   /** The record's band for it (`call`, `undo`, ...). */
@@ -327,6 +334,20 @@ function shiftsRead(q: QueueQuestion, home?: string | null): { lines: ShiftLine[
 }
 
 /**
+ * THE LIST A CHANGE IS IN, BY ITS NAME, read off the end of the record's sentence of it ("... in Projects."), which is
+ * the one thing a question carries that names its list in words (`list` is its id, and no card says an id). The last
+ * " in " is taken, since a value may hold the word ("Live in Leeds in Places."). Empty where the sentence ends any
+ * other way: a change that also adds or deletes ("... in Projects and adds 2."), one with no list ("your things"), a
+ * name that is no name (`nameOrNull`).
+ */
+function listSaid(sentence: string): string {
+  const m = /^.+ in (.+)\.$/u.exec(sentence.trim());
+  const name = m ? nameOrNull(spoken(m[1]!)) : null;
+  if (name === null || name === 'your things' || name.length > 40) return '';
+  return /(?:,| and) (?:adds|deletes|brings|changes|sets|clears) /u.test(name) ? '' : name;
+}
+
+/**
  * WHO ASKED: the signer as every screen says one (`proposer`), the app it ran in and the run it asked from, each only
  * where the record gave it a name. A run that is an object names itself (`name` or `title`) and may carry its app.
  */
@@ -418,6 +439,9 @@ export function cardOf(q: QueueQuestion, ctx: CardContext): Card {
      a field's own name ("Changes Due on.") lost its last word to `spoken`, which reads it as a word left hanging. */
   const line = says && typeof q.does === 'string' ? saidOf(q.does) : '';
   const does = arranged !== '' ? arranged : spoken(`${line} ·`) === line ? line : spoken(line);
+  /* THE LIST'S NAME STAYS ON THE CARD (audit 81, claims 3 and 4): the sentence left out above was the one place that
+     said "in Projects", and the lines under the heading say only fields. The heading says it in the sentence's place. */
+  const list = drawn && arranged === '' && typeof q.does === 'string' ? listSaid(saidOf(q.does)) : '';
   const cost = typeof q.cost === 'string' ? q.cost : '';
   return {
     id: q.id,
@@ -428,6 +452,7 @@ export function cardOf(q: QueueQuestion, ctx: CardContext): Card {
     when: since(q.at, ctx.now),
     later: laterLine(q, ctx.now),
     does,
+    list,
     joined: joinedOf(q, merge),
     cost,
     band: cost && cost !== 'call' ? queueCost(cost) : '',

@@ -785,8 +785,9 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
       );
       const doc = { ...raw, declarations: threads.filter((d) => d.metric !== 'project-moved-7d' && d.metric !== 'project-last-worked') };
       const linked = (doc.declarations as Body[]).some((d) => d.register === 'tasks' && (d.fields as Body[]).some((f) => f.id === 'thing'));
+      /* AND THE BOARD'S CAPTURE LINE comes off too, added inside the unreleased 1.19.0 (board-capture-line-83). */
       return withPage(doc, 'work-board', (now) =>
-        now.map((b) => (b.kind === 'board' ? { ...b, columns: [{ field: 'state' }, { field: 'what' }, ...(linked ? [{ field: 'thing' }] : [])] } : b)),
+        now.filter((b) => b.kind !== 'capture').map((b) => (b.kind === 'board' ? { ...b, columns: [{ field: 'state' }, { field: 'what' }, ...(linked ? [{ field: 'thing' }] : [])] } : b)),
       );
     },
   },

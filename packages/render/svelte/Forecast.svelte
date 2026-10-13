@@ -9,7 +9,7 @@
   host made, which is exactly what `toHTML` draws, so the parity tests hold the two equal.
 
   A KNOB WITH NOTHING TO MOVE IS NOT DRAWN: drift with no converted step, What counts with nothing to
-  count, the sell day with no holdings figure in this walk's money, and Show in with no rate into another
+  count, the sell day with no holdings figure in a walk's own money, and Show in with no rate into another
   currency. A slider that changes nothing reads as a forecast that ignored it.
 
   THE KNOBS ARE CLOSED BEHIND ONE QUIET "Adjust" AT EVERY WIDTH, a disclosure (`aria-expanded`, `aria-controls`).
@@ -63,7 +63,6 @@
     forecastPerYear,
     forecastPlan,
     forecastRateOf,
-    forecastSold,
     forecastSpendIn,
     horizonChoices,
     forecastFigure,
@@ -84,7 +83,7 @@
     type Scenario,
     type SpendRange,
   } from '../src/forecast.ts';
-  import { groupNamed, leaveGroup, type Group, type GroupMember } from './forecast-group.svelte.ts';
+  import { groupNamed, leaveGroup, pairsAcross, sellRows, soldName, walkKnobs, type Group, type GroupMember, type SellRow } from './forecast-group.svelte.ts';
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
 
@@ -121,7 +120,8 @@
   );
 
   const spendOf = (k: string): number => held.spend[k] ?? 0;
-  const knobs = $derived(drawn ? { ...knobsIn(drawn, held, key), spend: spendOf(key) * rate } : null);
+  /* A WALK OF A GROUP READS THE SELL DAY OF ITS OWN KEY (`walkKnobs`), so selling one walk's holdings moves that walk only. */
+  const knobs = $derived(drawn ? { ...(group ? walkKnobs(drawn, group, key) : knobsIn(drawn, held, key)), spend: spendOf(key) * rate } : null);
   const base = $derived(drawn ? scenario(drawn, baseKnobs(drawn)) : null);
   const shown = $derived(drawn && knobs ? scenario(drawn, knobs) : null);
   const moved = $derived(drawn && knobs ? knobsMoved(drawn, knobs) : false);
@@ -170,7 +170,13 @@
   const spends = $derived<[string, Money, SpendRange][]>(
     group ? members.map(([k, m]) => [k, m.money, m.range]) : drawn ? [['', drawn, spendRange(drawn)]] : [],
   );
-  const pairs = $derived(drawn ? pairsOf(drawn) : []);
+  /* THE PAIRS TO DRIFT AND THE HOLDINGS TO SELL ARE EVERY WALK'S, as the streams are: the controls sit under one walk
+     and move them all. A pair is one slider wherever it was converted; what is sold is a control for each walk. */
+  const pairs = $derived(group ? pairsAcross(members) : drawn ? pairsOf(drawn) : []);
+  const selling = $derived<SellRow[]>(group ? sellRows(members) : sellRows([['', { pairs: [], sells: (drawn?.sells ?? []).map((x) => x.label) }]]));
+  const soldOn = (k: string): string => (group ? group.sold[k] : held.sell) ?? '';
+  /* A SELL DAY SET FOR ANOTHER WALK IS STILL SOMETHING TO RESET, though it leaves the walk these controls sit under alone. */
+  const resettable = $derived(moved || selling.some((r) => soldOn(r.key) !== ''));
   const sellEnd = $derived(drawn && shown ? addDays(drawn.today, shown.horizon) : '');
   const soon = $derived(drawn && shown ? underNote(drawn, shown) : '');
   const readout = $derived(drawn && shown && plan && scrub !== null ? readoutAt(drawn, shown, plan, scrub) : null);
@@ -190,7 +196,7 @@
   $effect(() => {
     if (!group || !model) return;
     const mine = countsOf(model, held.horizon ?? model.horizon);
-    const member: Member = { money: { currency: model.currency, home: model.home, template: model.template }, heavy: [...mine.in, ...mine.out], counts: mine, range: spendRange(model) };
+    const member: Member = { money: { currency: model.currency, home: model.home, template: model.template }, heavy: [...mine.in, ...mine.out], pairs: pairsOf(model), sells: model.sells.map((x) => x.label), counts: mine, range: spendRange(model) };
     group.members[key] = member;
   });
 
@@ -203,6 +209,7 @@
     held.grow = { in: 0, out: 0 };
     held.drift = {};
     held.sell = null;
+    if (group) group.sold = {};
   };
   /* THE LATER KNOBS ARE SET BY REPLACING THE WHOLE VALUE, because a group made before them holds none of them and a
      `bind:` on a field of nothing has nowhere to write. */
@@ -214,9 +221,11 @@
   const setDrift = (pair: string, e: Event) => {
     held.drift = { ...held.drift, [pair]: Number((e.currentTarget as HTMLInputElement).value) };
   };
-  const setSell = (e: Event) => {
+  const setSell = (k: string, e: Event) => {
     const v = (e.currentTarget as HTMLInputElement).value;
-    held.sell = v === '' ? null : v;
+    if (!group) held.sell = v === '' ? null : v;
+    else if (v === '') delete group.sold[k];
+    else group.sold[k] = v;
   };
   const toggle = (label: string) => {
     held.leave = held.leave.includes(label) ? held.leave.filter((l) => l !== label) : [...held.leave, label];
@@ -479,14 +488,16 @@
         </label>
       {/each}
     {/if}
-    {#if m.knobs.includes('sell') && m.sells.length}
-      <label class="forecast-knob">
-        <span class="forecast-knob-name">{forecastSold(m.sells.map((x) => x.label))}</span>
-        <input class="forecast-date" type="date" min={m.today} max={sellEnd} value={held.sell ?? ''} onchange={setSell} />
-        <span class="forecast-knob-note">{FORECAST_SELL_NOTE}</span>
-      </label>
+    {#if m.knobs.includes('sell')}
+      {#each selling as row (row.key)}
+        <label class="forecast-knob">
+          <span class="forecast-knob-name">{soldName(row, selling.length > 1)}</span>
+          <input class="forecast-date" type="date" min={m.today} max={sellEnd} value={soldOn(row.key)} onchange={(e) => setSell(row.key, e)} />
+          <span class="forecast-knob-note">{FORECAST_SELL_NOTE}</span>
+        </label>
+      {/each}
     {/if}
-    {#if moved}
+    {#if resettable}
       <button type="button" class="forecast-reset" onclick={reset}>{FORECAST_RESET}</button>
     {/if}
   {/if}

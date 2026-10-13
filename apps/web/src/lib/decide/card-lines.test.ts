@@ -175,3 +175,32 @@ test('ANOTHER KIND OF QUESTION KEEPS ITS LINE ON THE LEAD: it may say what the l
   assert.equal(cardOf(page, { now, lead: true }).does, does);
   assert.equal(cardOf(page, { now }).does, '');
 });
+
+test('THE LIST KEEPS ITS NAME ON THE CARD where the sentence that said it is left out (audit 81, claims 3 and 4)', () => {
+  for (const lead of [true, false]) {
+    const card = cardOf(ask([STAGE, DUE]), { now, lead });
+    assert.equal(card.does, '');
+    assert.equal(card.list, 'Projects', 'the lines say fields, and nothing else says which list they are of');
+  }
+  /* A value may hold the word, and a value with a stroke in it is a line now: the list is what the sentence ends on. */
+  const inWords = ask([{ field: 'city', label: 'City', before: 'York', after: 'Live in Leeds' }], { does: 'Changes City from York to Live in Leeds in Places.' });
+  assert.equal(cardOf(inWords, { now }).list, 'Places');
+  const stroke = ask([{ field: 'status', label: 'Status', before: 'N/A', after: 'Q3/Q4' }], { does: 'Changes Status from N/A to Q3/Q4 in Projects.' });
+  assert.deepEqual(cardOf(stroke, { now }).lines[0], { what: 'Status', before: 'N/A', after: 'Q3/Q4', said: null });
+  assert.equal(cardOf(stroke, { now }).list, 'Projects');
+  /* SAID ONCE: where the sentence is drawn it names the list itself, and the heading stays as it was. */
+  const kept = cardOf(ask([STAGE, LEAD], { does: 'Changes Stage from Building to Live, changes Led by in Projects.' }), { now });
+  assert.notEqual(kept.does, '');
+  assert.equal(kept.list, '');
+  /* NO NAME IS BETTER THAN A WRONG ONE: a sentence that ends another way, no list, an id where a name belongs. */
+  for (const does of ['Changes Stage from Building to Live in Projects and adds 2.', 'Changes Stage from Building to Live in your things.', 'Changes Stage from Building to Live in tasks#8.', 'Changes Stage.', undefined]) {
+    assert.equal(cardOf(ask([STAGE], { does }), { now }).list, '', String(does));
+  }
+  assert.equal(cardWords.changesIn('Projects'), 'What it changes in Projects');
+  assert.doesNotMatch(cardWords.changesIn('Projects'), /—/u);
+});
+
+test('THE CARD SAYS THE LIST IN ITS HEADING, in the sentence’s place, and the plain heading everywhere else', () => {
+  const drawn = readFileSync(new URL('./DecisionCard.svelte', import.meta.url), 'utf8');
+  assert.match(drawn, /\{#if card\.list\}\{cardWords\.changesIn\(card\.list\)\}\{:else\}\{cardWords\.changes\}\{\/if\}<\/h4>/u);
+});

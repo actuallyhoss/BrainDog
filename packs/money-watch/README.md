@@ -52,4 +52,9 @@ two digits ends the name when a month follows it (three letters or the whole wor
 a day with a stroke ends it itself (`5/9`). Both are Spotify. With no month after it the number stays, so
 `KFC 12 CAIRO` reads as before, and a shop whose name holds a number and then a month (`Studio 54 May Fair`) is cut
 at the number.
+A day joined to its month ends the name as well (`SPOTIFY 12OCT`, `SPOTIFY 12-OCT`), and so does a month with a day
+of one or two digits after it (`SPOTIFY OCT 12`), so a bank that writes the day either way gives one payee every
+month. Only after the first word of the name, so `MAY 5 CAFE` is read whole, and a word that only starts like a month
+(`Cafe Marina 5`, `Mayfair 12`) is no month. A month with a year and no day (`SPOTIFY OCT 2026`) still reads
+"Spotify Oct", and a shop named for a date (`Cafe March 8`) is cut at the month.
 After an edit to a script, copy its text into the matching `source` in `money-watch.pack.json`.

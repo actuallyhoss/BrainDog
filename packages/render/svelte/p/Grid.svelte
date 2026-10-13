@@ -30,6 +30,8 @@
     block,
     opts = {},
     onmove,
+    onopen,
+    onmenu,
   }: {
     block: Block;
     opts?: RenderOptions;
@@ -43,6 +45,14 @@
      * control that moves a card and tells nobody is worse than either.
      */
     onmove?: ((row: Row, to: string) => void) | undefined;
+    /**
+     * A CARD'S TWO VERBS, the ones a `todo` row takes in `List.svelte`, and reads of the host's as they are there: open
+     * the card (its title becomes a button) and its menu, anchored to the control pressed. Each is drawn only when it
+     * is passed, and neither needs `onmove`: a board the host cannot move may still open a card. With neither a card is
+     * the markup it always was, which is what `toHTML` draws.
+     */
+    onopen?: ((row: Row) => void) | undefined;
+    onmenu?: ((row: Row, anchor: HTMLElement) => void) | undefined;
   } = $props();
 
   /* Local, because `packages/render` is MIT, embeddable and imports nothing, and `copy.ts` lives in
@@ -51,6 +61,10 @@
   const BOARD = 'Board';
   /** The name of each card's lane control, which says what choosing a lane in it does. */
   const MOVE_TO = 'Move to';
+  /** The menu control's name, with the card's title after it, as a task's says it in `List.svelte`. */
+  const MORE = 'More for';
+  /** What a card with no title is called there. */
+  const CARD = 'this card';
 
   const live = $derived(Boolean(onmove));
   const columns = $derived(columnsOf(block.rows));
@@ -189,6 +203,17 @@
        and the board taking them would move the card and the caret while the reader was only looking through the list. */
     if (e.target instanceof HTMLSelectElement) return;
 
+    /* `↵` ON A CARD OPENS IT, where the host opens one. On the card itself only: on its title or its menu the key is
+       already that button's press, and answering it here too would open the card twice or open it under its menu. */
+    if (e.key === 'Enter' && onopen && !e.shiftKey && !e.altKey && e.target instanceof HTMLElement && e.target.hasAttribute('data-at')) {
+      const row = block.rows[Number(e.target.getAttribute('data-at'))];
+      if (!row) return;
+      e.preventDefault();
+      e.stopPropagation();
+      onopen(row);
+      return;
+    }
+
     const shift = e.shiftKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight');
     const alt = e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown');
     if (shift || alt) {
@@ -264,15 +289,29 @@
   const left = $derived(emptied(block, opts));
 </script>
 
-{#snippet cardBody(row: Row, unsaved: boolean)}
+{#snippet cardBody(row: Row, unsaved: boolean, stop: 0 | -1 | undefined)}
   <!-- `working: true`'s dot, on the cell the kind calls the card by, which `workingCell` settles for
        both sides of the convention. Read off that cell and no other: a dot found on the detail and
        drawn on the title would be this drawer disagreeing with `html.ts`, which draws each cell where
        it found it, and the two are held equal by `src/parity.test.ts`. -->
   {@const title = takeWorking(row.cells[1] ?? null)}
-  <span class="card-title">
-    {#if title.working}<span role="img" aria-label={WORKING_LABEL} title={WORKING_LABEL}>{WORKING_GLYPH}</span>{' '}{/if}<Text nodes={inline(title.text ?? '', opts)} {opts} />
-  </span>
+  {#if onopen}
+    <!-- THE TITLE OPENS THE CARD, as a button inside the title's own span and in the class a task's title wears
+         (`item-open`), so the card keeps its face. A link in the title is drawn as its words: two targets on one line
+         is a press that lands on the wrong one. On a live board it is a tab stop only on the card that holds the
+         board's one, as the lane control is. -->
+    <span class="card-title"
+      ><button type="button" class="item-open" tabindex={stop} onclick={() => onopen?.(row)}
+        >{#if title.working}<span role="img" aria-label={WORKING_LABEL} title={WORKING_LABEL}>{WORKING_GLYPH}</span>{' '}{/if}{text(
+          inline(title.text ?? '', opts),
+        )}</button
+      ></span
+    >
+  {:else}
+    <span class="card-title">
+      {#if title.working}<span role="img" aria-label={WORKING_LABEL} title={WORKING_LABEL}>{WORKING_GLYPH}</span>{' '}{/if}<Text nodes={inline(title.text ?? '', opts)} {opts} />
+    </span>
+  {/if}
   <!-- THE FOURTH CELL JOINS THE THIRD ON THE ONE LINE, by the dot a `todo`'s two facts are joined with, and a
        card without one draws the line it always drew. -->
   {#if (row.cells[3] ?? '').trim() !== ''}
@@ -377,6 +416,9 @@
           {@render laneHead(lane.name, lane.cards.length)}
         {/if}
         {#each lane.cards as card (card.at)}
+          <!-- The card's controls are tab stops only on the card that holds the board's one; on a board nothing moves,
+               each is its own stop. -->
+          {@const stop = live ? (card.at === focus ? 0 : -1) : undefined}
           <div
             class="card"
             data-arrived={card.row.arrived ? '' : undefined}
@@ -394,7 +436,7 @@
                 }
               : undefined}
           >
-            {@render cardBody(card.row, card.moved)}
+            {@render cardBody(card.row, card.moved, stop)}
             {#if live}
               <!--
                 THE TOUCH PATH. HTML drag and drop does nothing under a finger, so on a phone the board's one action did
@@ -418,6 +460,22 @@
                   <option value={col} selected={col === lane.name}>{valueWord(col, true)}</option>
                 {/each}
               </select>
+            {/if}
+            {#if onmenu}
+              <!-- LAST, AND QUIET: the three dots a task's row ends on (`item-more`), waiting for the pointer or the
+                   keyboard to reach the card (`data-calm`), named for the card, with the 44px hit box `tap` gives. -->
+              <button
+                type="button"
+                class="card-more item-more tap"
+                data-calm=""
+                aria-haspopup="menu"
+                aria-label="{MORE} {text(inline(takeWorking(card.row.cells[1] ?? null).text ?? '', opts)) || CARD}"
+                tabindex={stop}
+                onclick={(e) => onmenu?.(card.row, e.currentTarget)}
+                ><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"
+                  ><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg
+                ></button
+              >
             {/if}
           </div>
         {/each}

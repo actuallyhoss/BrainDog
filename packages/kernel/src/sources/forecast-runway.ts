@@ -75,9 +75,10 @@ function forecastBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also
         if ('refusal' in recorded) return { ...base, refusals: also(recorded.refusal) };
         const late = latenessOf(deps, block);
         if ('refusal' in late) return { ...base, refusals: also(late.refusal) };
-        /* A SELL FIGURE IS CHECKED HERE AND NOT OFFERED. The host draws each walk with the block's own keys spread over
-           it (`charted` in `apps/web/src/lib/record/blocks.ts`), so one `sells` on this block would be written under
-           the dollar walk and the pound walk alike, each time as that walk's money. */
+        /* A SELL FIGURE IS CHECKED HERE AND OFFERED BY WALK, in `walkSells` (`pages.ts`). The host draws each walk with
+           the block's own keys spread over it (`charted` in `apps/web/src/lib/record/blocks.ts`), so one `sells` on
+           this block would be written under the dollar walk and the pound walk alike, each time as that walk's money.
+           The call below stays, since it is what refuses a bad `sell:`. */
         const sold = sellsOf(deps, block, null);
         if ('refusal' in sold) return { ...base, refusals: also(sold.refusal) };
         const missing = [...new Set([...(opened.missing ?? []), ...(moving?.missing ?? [])])].sort();

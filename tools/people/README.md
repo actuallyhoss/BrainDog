@@ -23,6 +23,9 @@ here for one person, Mariam. The other seven people of USE-B01 and their nightly
 - `layla, omar, sam, nour, mona, yara, salma.json`: the other seven people of USE-B01 (Mariam stands in for Karim).
   `said` is the plain sentence; `says.plain`/`says.hard` are the sentence with and without a keyword; `expects` is the
   use case or none; `standing` is false for Yara and Salma; Omar and Nour carry an export in `file`.
+- `didnt-shop.json`: Hana, who names a shop only to say she has none ("I didn't run a shop; I only post on
+  Instagram"). She expects none, her `standing` is false, and `test/keep-it.test.mjs` walks her to see that no shop
+  is built and her record opens under her own name.
 - `expect/first-screen.mjs`: the day-0 screen checks over a rig's snapshot { path, width, text, roles, counts }; UNITS
   names the unit that turns each one green (no-count, nothing-before-press, no-example, team-no-task: USE-B07;
   people-only-them: USE-B06; rail-has-rows: USE-B02; no-tour: USE-B01). A snapshot may also hold `behind` (what each
@@ -35,7 +38,7 @@ here for one person, Mariam. The other seven people of USE-B01 and their nightly
   bar), judged by the seven and by pages-line (PGS-C30), signs-line (PRF-A05) and own-lines-you (USE-B06: Today never
   calls the owner "Someone on this record" where nobody else writes on it). A check answers green, red, not seen (it
   applies and read nothing) or does not apply.
-- `sets/read-set.json` and `test/read-set.test.mjs`: forty sentences and the reading each must get; a sentence marked
+- `sets/read-set.json` and `test/read-set.test.mjs`: forty-two sentences and the reading each must get; a sentence marked
   until may read wrong until that unit lands, and goes red if it reads right while still marked.
 - `test/first-run.test.mjs`: checks the file, then one case a step: each check goes green on what that step shows
   when it works and red on what it shows when it breaks. Then it walks Mariam on a fresh self-host and fails on the
