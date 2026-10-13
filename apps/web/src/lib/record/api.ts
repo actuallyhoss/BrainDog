@@ -20,7 +20,7 @@ import { agentDoing, day as fmtDay, diffRows, money, relative, shortDay, since, 
 import type { Column, TableRow } from 'braindog-render/svelte';
 import { asPartOf, namesSaid, ruleAsked, ruleDone, ruleFolded, useCaseName } from '@braindog/seed/usecases/names';
 import { firstPartyModule as moduleOf } from '@braindog/seed/packs/modules';
-import { QUIET_MS, type Bars, type MeasureSeries, type Part, type QueueQuestion, type Rate } from '@braindog/kernel';
+import { PEOPLE, QUIET_MS, type Bars, type MeasureSeries, type Part, type QueueQuestion, type Rate } from '@braindog/kernel';
 import type { BlockResult as Answer } from '@braindog/kernel';
 
 import { amountOf, currencyOf } from './money.ts';
@@ -875,10 +875,18 @@ export const twiceOf = (params: URLSearchParams): boolean => params.get(TWICE) =
 
 /**
  * Whether the word narrows THIS list: only the one that keeps the people a record meets, said by the role it declares
- * (`meets:`) and never by its name. On any other list, and on one whose declaration has not arrived, the word is ignored.
+ * (`meets:`) and never by a name written here. On any other list, and on one whose declaration has not arrived, the
+ * word is ignored.
+ *
+ * AND THE LIST THE RECORD READ BY NAME BEFORE THE ROLE, as the kernel still reads it while no list declares one
+ * (`LEGACY` and `roleOf` in `packages/kernel/src/roles.ts`; `PEOPLE` is that name, the kernel's own). On a record whose
+ * add-on is older than the key the figure counted, its note linked here, and the list opened everyone: the record
+ * answered who they are and this never asked. One declaration cannot say whether ANOTHER list has taken the role since,
+ * and it need not: the record answers nobody for a list that is not where it keeps people (`heldTwice`), so the worst
+ * this can do is say nobody is held twice, never show everyone as if they were.
  */
 export const heldTwiceOn = (params: URLSearchParams, decl: RegisterDecl | undefined): boolean =>
-  twiceOf(params) && (decl as { meets?: unknown } | undefined)?.meets !== undefined;
+  twiceOf(params) && decl !== undefined && ((decl as { meets?: unknown }).meets !== undefined || decl.id === PEOPLE);
 
 /**
  * The numbers the record answered, as a filter the list is asked with. It rides beside the chips and is never one: no

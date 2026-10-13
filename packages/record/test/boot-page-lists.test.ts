@@ -127,7 +127,7 @@ test('A PLANTED LIST IS LEFT OUT UNTIL SOMEBODY MAKES IT THEIRS', async () => {
   /* `list` is the one list a page draws, planted or not, since a saved view sits under it. `lists` is what counts. */
   const before = await pageOf(api, owner, 'topics');
   assert.equal(before.list, 'topics');
-  assert.deepEqual(before.lists, [], 'two planted topics counted as hers');
+  assert.equal(before.lists, null, 'two planted topics counted as hers');
 
   value(await api.create({ register: 'topics', fields: { name: 'Lab reports' } }, owner));
   assert.deepEqual((await pageOf(api, owner, 'topics')).lists, ['topics']);
@@ -139,7 +139,7 @@ test('AND A PLANTED ROW SOMEBODY CHANGED IS THEIRS', async () => {
   const { api, sql, clock } = await record();
   /* A day on: a change in the moment a row is made is folded into its making, and nobody renames a topic that fast. */
   /* Asked once before the change too: the planted count is kept between writes, and the change has to move it. */
-  assert.deepEqual((await pageOf(api, owner, 'topics')).lists, []);
+  assert.equal((await pageOf(api, owner, 'topics')).lists, null);
   clock.advance(86_400_000);
   value(await api.update({ register: 'topics', seq: 1, patch: { name: 'Set reading' } }, owner));
   assert.deepEqual((await pageOf(api, owner, 'topics')).lists, ['topics']);
@@ -167,7 +167,7 @@ test('AND SO IS THE STARTER SET MONEY SHIPS, on its own list, which declares no 
 
   const before = await pageOf(api, owner, 'what-for');
   assert.equal(before.list, 'categories');
-  assert.deepEqual(before.lists, [], 'the starter set counted as hers');
+  assert.equal(before.lists, null, 'the starter set counted as hers');
 
   value(await api.create({ register: 'categories', fields: { name: 'Childcare', direction: 'out', state: 'live' } }, owner));
   assert.deepEqual((await pageOf(api, owner, 'what-for')).lists, ['categories']);

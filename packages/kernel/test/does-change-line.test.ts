@@ -125,7 +125,48 @@ test('a link is said by the title the record reads it as, and never as where it 
   const read: DoesNames = { value: (_list, field, raw) => (field === 'thing' && typeof raw === 'string' ? TITLES[raw] : raw) };
   assert.equal(doesOf('rowset', body, names(held, read)), 'Changes Project from Kiln to Portage in Tasks.');
   assert.equal(doesOf('rowset', body, names(held)), 'Changes Project in Tasks.');
-  assert.equal(doesOf('rowset', one('things', 'things#1', { folder: 'work/kiln' }), names({ 'things#1.folder': 'kiln' })), 'Changes Folder in Projects.');
+  assert.equal(doesOf('rowset', one('things', 'things#1', { folder: 'work/kiln/site' }), names({ 'things#1.folder': 'kiln' })), 'Changes Folder in Projects.');
+});
+
+/* AUDIT 79, CLAIM 6. Any text with a slash in it was held back as a path, so a stage of "Q3/Q4" said no value. */
+test('a path is told by its shape and never quoted, and words with a slash between them are said', () => {
+  const said = (now: string, was: string | null = 'Raw') => doesOf('rowset', one('tasks', 'tasks#4', { stage: now }), names(was === null ? {} : { 'tasks#4.stage': was }));
+  const PATHS = ['/Users/sam/notes', '~/notes', '~', './build', '../build', 'C:\\Work\\Kiln', 'D:/Work', '\\\\share\\kiln', 'https://example.com/a', 'see ftp://files', 'docs/review.md', 'docs\\review.md', 'src/lib/kiln', 'work/', 'example.com/pricing', '/My Files/plan one'];
+  for (const path of PATHS) assert.equal(said(path), 'Changes Stage in Tasks.', path);
+  const WORDS = ['Q3/Q4', 'N/A', '24/7', 'and/or', 'Rent / bills', '13/10/2026', 'Paid 1/2 now', 'AC\\DC', '~5 minutes', 'Yes/no. Ask'];
+  for (const words of WORDS) assert.equal(said(words), `Changes Stage from Raw to ${words} in Tasks.`, words);
+  assert.equal(said('Q3/Q4', null), 'Sets Stage to Q3/Q4 in Tasks.');
+});
+
+/* A SENTENCE THAT NAMES A FILE. Only a text with no space was read for a path, so a note was quoted with its file. */
+test('a sentence that names a file or a folder is not quoted either, and one with a slash between words still is', () => {
+  const said = (now: string) => doesOf('rowset', one('tasks', 'tasks#4', { stage: now }), names({}));
+  const NAMES_ONE = ['Read docs/plan.md first.', 'Approve the review (see docs/review.md)', 'Moved to src/lib/kiln, as agreed', 'Look in ~/notes today', 'It is at "C:\\Work\\Kiln".', 'Priced on example.com/pricing now'];
+  for (const text of NAMES_ONE) assert.equal(said(text), 'Changes Stage in Tasks.', text);
+  const WORDS = ['Rent / bills and food', 'Paid 1/2 now', 'Yes/no. Ask', 'Open 24/7 from May', 'Due 13/10/2026 at noon', 'About 5 ~ 6 days', 'Either and/or both.'];
+  for (const text of WORDS) assert.equal(said(text), `Sets Stage to ${text} in Tasks.`, text);
+});
+
+/* AUDIT 79, CLAIM 4. A field the list lacks was named by its id read as words, "Changes Zzz internal in Tasks.", under
+   a question whose title left it out. Writing it is refused, so the yes changes nothing there. */
+test('a field the list does not have is not named, and a field it has with no label still is', () => {
+  const HAS = new Set(['stage', 'due', 'effort_hours']);
+  const held: DoesNames = { holds: (_list, field) => HAS.has(field) };
+  const line = doesOf('rowset', one('tasks', 'tasks#4', { zzz_internal: 'x', stage: 'Live' }), names({ 'tasks#4.stage': 'Raw' }, held));
+  assert.equal(line, 'Changes Stage from Raw to Live in Tasks.');
+  assert.ok(!/zzz/iu.test(line));
+  /* NOTHING BUT FIELDS IT LACKS keeps the count, as a patch of nothing does: the line never says an id. */
+  assert.equal(doesOf('rowset', one('tasks', 'tasks#4', { zzz_internal: 'x' }), names({}, held)), 'Changes 1 in Tasks.');
+  /* A FIELD THE LIST HOLDS AND GAVE NO LABEL is still named, by its id read as words: no label is not no field. */
+  assert.equal(doesOf('rowset', one('tasks', 'tasks#4', { effort_hours: 3 }), names({ 'tasks#4.effort_hours': 2 }, held)), 'Changes Effort hours from 2 to 3 in Tasks.');
+  /* SEVERAL ENTRIES: the field is left out of each, and is not read of any. */
+  let reads = 0;
+  const counted = names({}, { ...held, before: () => ((reads += 1), 'Raw') });
+  const rows = { register: 'tasks', rows: [4, 5].map((n) => ({ at: `tasks#${n}`, patch: { stage: 'Live', zzz_internal: n } })) };
+  assert.equal(doesOf('rowset', rows, counted), 'Sets Stage to Live on 2 in Tasks.');
+  assert.equal(reads, 1);
+  /* WITHOUT `holds` every field a patch sends is named, as before. */
+  assert.equal(doesOf('rowset', one('tasks', 'tasks#4', { zzz_internal: 'x' }), names()), 'Sets Zzz internal to x in Tasks.');
 });
 
 test('without what the entry holds now, the fields are named and no value is said', () => {

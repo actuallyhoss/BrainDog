@@ -419,6 +419,46 @@ test('A PLACE THAT SAYS ITS LISTS IS JUDGED BY ALL OF THEM: off the rail while e
   assert.deepEqual(before(0, 1), ['/p/ms']);
 });
 
+test('A PLACE WHOSE LISTS ARE ALL A STARTER SET (`lists: null`) IS OUT OF THE RAIL UNTIL THE FIRST ROW OF THE PERSON\'S OWN', () => {
+  /* Money on its first day: Categories reads one list, and the eight rows in it were planted. The record leaves a
+     starter set out of `lists`, and says `null` where that left none, so the page is not read as one that reads no list. */
+  const planted = { slug: 'categories', title: 'Categories', nav: { section: 'Money', order: 10 }, icon: null, list: 'categories', lists: null };
+  const several = { slug: 'budget', title: 'Budget', nav: { section: 'Money', order: 20 }, icon: null, list: null, lists: null };
+  /* Reads no list and says so: `[]` is still never judged. */
+  const none = { slug: 'about', title: 'About', nav: { section: 'Money', order: 30 }, icon: null, list: null, lists: [] };
+  const registers = [{ id: 'categories', name: 'Categories', count: 8 }];
+  const first = layoutOf({ ...BOOT, registers, pages: [planted, several, none] } as never).nav.map((n) => n.href);
+  assert.deepEqual(first, ['/p/about'], 'a place over nothing but a starter set is in the rail, though its list counts eight');
+
+  /* THE FIRST ROW OF THEIR OWN: the record says the list by name again, and the place comes. */
+  const own = layoutOf({
+    ...BOOT,
+    registers: [{ id: 'categories', name: 'Categories', count: 9 }],
+    pages: [{ ...planted, lists: ['categories'] }, { ...several, lists: ['categories'] }, none],
+  } as never).nav.map((n) => n.href);
+  assert.deepEqual(own, ['/p/categories', '/p/budget', '/p/about']);
+
+  /* A list named as the page's section is not asked either: `null` is the record's word, and no name is guessed at. */
+  const guessed = { ...several, nav: { section: 'Categories', order: 20 } };
+  assert.deepEqual(layoutOf({ ...BOOT, registers, pages: [guessed] } as never).nav, []);
+
+  /* A saved view over the list is somebody's own page and stays. */
+  const view = { slug: 'categories-mine', title: 'Mine', nav: { section: 'Views', order: 900 }, icon: null, list: 'categories', lists: null };
+  assert.ok(layoutOf({ ...BOOT, registers, pages: [view] } as never).nav.some((n) => n.href === '/p/categories-mine'));
+});
+
+test('A COLLEAGUE\'S OWN LIST KEEPS ITS PLACE WHEN ALL IT HOLDS IS A STARTER SET, and a place over no list of theirs still waits', () => {
+  const planted = { slug: 'categories', title: 'Categories', nav: { section: 'Money', order: 10 }, icon: null, list: 'categories', lists: null };
+  const several = { slug: 'budget', title: 'Budget', nav: { section: 'Money', order: 20 }, icon: null, list: null, lists: null };
+  const theirs = layoutOf({
+    registers: [{ id: 'categories', name: 'Categories', count: 8 }],
+    me: { kind: 'person', person: 'p_9', name: null, level: null },
+    pages: [planted, several],
+    now: '2026-09-22T09:00:00.000Z',
+  } as never);
+  assert.deepEqual(theirs.nav.map((n) => n.href), ['/p/categories']);
+});
+
 test('AN IMPORT IS ONE LINE OF THE FEED with its counts and a link to that day in the log, and a few writes by hand keep their own lines', () => {
   const at = (s: number) => new Date(Date.parse('2026-09-15T09:00:00.000Z') - s * 1000).toISOString();
   /* Newest first: eight questions, then fifty-two rows, a second apart, by the reader on an open self-host. */

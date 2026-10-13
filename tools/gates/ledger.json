@@ -101,6 +101,12 @@
         { "at": 10000, "on": "2026-10-09", "why": "How long a screen has to say what it settled into; absence past it is a finding, never a skip.", "by": "52 section 5" }
       ]
     },
+    "firstScreen.walkTimeoutMs": {
+      "kind": "ceiling",
+      "lines": [
+        { "at": 120000, "on": "2026-10-14", "why": "How long one person's walk through the first run may take before it is a finding: about three seconds on a quiet machine, with room for a loaded runner.", "by": "first-screen.mjs" }
+      ]
+    },
     "cssRules.waiverLookbehindChars": {
       "kind": "ceiling",
       "lines": [
@@ -451,6 +457,7 @@
     "tools/gates/commits.mjs": { "owes": "proof", "file": "tools/gates/commits.mjs", "lines": [ { "at": 4, "on": "2026-10-09", "why": "COULD_NOT_RUN = 3, the exit of a gate that could not run, as no-transcript.mjs writes it; and the five fields of one commit as git log prints them, said three times." } ] },
     "tools/gates/hygiene.mjs": { "owes": "proof", "file": "tools/gates/hygiene.mjs", "lines": [ { "at": 1, "on": "2026-10-09", "why": "COULD_NOT_RUN = 3, the exit of a gate that could not run, as no-transcript.mjs writes it." } ] },
     "tools/gates/catalogue-immutable.mjs": { "owes": "proof", "file": "tools/gates/catalogue-immutable.mjs", "lines": [ { "at": 1, "on": "2026-10-13", "why": "The twelve characters of a checksum a finding says, enough to tell the released one from the one in the tree. No budget holds it." } ] },
+    "tools/gates/first-screen.mjs": { "owes": "proof", "file": "tools/gates/first-screen.mjs", "lines": [ { "at": 2, "on": "2026-10-14", "why": "The 1000 that says the walk's wait in seconds in a finding, and exit 3 for a tree that holds no people, as no-transcript.mjs writes it." } ] },
     "tools/gates/no-shape-files.mjs": { "owes": "proof", "file": "tools/gates/no-shape-files.mjs", "lines": [ { "at": 7, "on": "2026-10-09", "why": "The 4096 bytes of a file's head the mark is looked for in, the 8000 bytes read to tell a binary file, the four lines the mark may sit on, git's 64 MiB listing buffer, and exit 3 for a gate that read nothing." } ] },
     "tools/gates/rulings.mjs": { "owes": "proof", "file": "tools/gates/rulings.mjs", "lines": [ { "at": 1, "on": "2026-10-09", "why": "The two characters of the section heading's line break the page is sliced past." } ] },
     "tools/gates/layout/acts.mjs": { "owes": "proof", "file": "tools/gates/layout/acts.mjs", "lines": [ { "at": 4, "on": "2026-10-13", "why": "Numbers above 1 that came out of tools/gates/layout.mjs with the split by rule (PRF-B04 job 8): the acts a screen is put through. Each one moves to budgets.json, and this line falls with it." } ] },

@@ -85,8 +85,17 @@ const CARD_LEAD = /^((?:[\p{L}-]+\s+){0,2})card\s+(?:no\.?\s*)?(?:(?:[x*#]{4}[\s
 /** The terminal it was paid at, written before the shop: `POS 55`. One digit is left, since it may be the shop's (7 Eleven). */
 const TERMINAL_LEAD = /^(?:[Pp][Oo][Ss]\s+\d{2,}\s+|POS\s+)/;
 
-/** Whether a word ends the name: a branch, a day or a reference holds three digits or more. A shorter number may be the shop's own (Studio 54 Cafe). */
-const endsName = (w) => (w.match(/\d/g) ?? []).length >= 3;
+/** A month as a bank writes it after the day it posted: `OCT`, `Oct.`, `October`. Three letters or the whole word, never more of a word (Marina, Mayfair). */
+const MONTH_WORD = /^(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)[.,]?$/i;
+/** A day written with a stroke, however short: `5/9`, `12/10`, `12/10/26`. */
+const STROKE_DAY = /^\d{1,2}\/\d{1,2}(?:\/\d{2,4})?$/;
+/**
+ * Whether a word ends the name: a branch, a day or a reference holds three digits or more. A shorter number may be the
+ * shop's own (Studio 54 Cafe), unless it is the day of a date: a number of one or two digits with a month or a day
+ * with a stroke after it (`SPOTIFY 12 OCT`), or a day with a stroke itself (`5/9`). `next` is the word after it.
+ */
+const endsName = (w, next) =>
+  (w.match(/\d/g) ?? []).length >= 3 || STROKE_DAY.test(w) || (/^\d{1,2}$/.test(w) && next !== undefined && (MONTH_WORD.test(next) || STROKE_DAY.test(next)));
 
 /** The bank's words without the card and the terminal they lead with, which name neither shop nor payee. */
 function shopWords(text) {
@@ -104,15 +113,15 @@ function shopWords(text) {
 /**
  * A payee from the bank's words: `GEIDEA*CHILLOUT 0418 CAIRO` reads Chillout, `NETFLIX.COM` reads Netflix, and
  * `HSBC CARD 7731 POS 55 KFC` reads Kfc, so two shops paid with one card are two payees. `Studio 54 Cafe` keeps its
- * number, so it is not the payee Studio.
+ * number, so it is not the payee Studio, and `SPOTIFY 12 OCT` loses its day, so it is Spotify every month.
  */
 function fromWords(text) {
   const said = shopWords(text);
   const words = (said.includes('*') ? said.slice(said.indexOf('*') + 1) : said).split(/\s+/).filter(Boolean);
   const kept = [];
-  for (const w of words) {
-    if (endsName(w) && kept.length > 0) break;
-    kept.push(w);
+  for (let i = 0; i < words.length; i += 1) {
+    if (endsName(words[i], words[i + 1]) && kept.length > 0) break;
+    kept.push(words[i]);
   }
   let cut = kept.join(' ').replace(/\.(?:com|net|org|io|co|app|eg)\b.*$/i, '').replace(/^[\s,;:._\-/]+|[\s,;:._\-/]+$/g, '');
   if (!/[\p{L}\p{N}]/u.test(cut)) cut = said;

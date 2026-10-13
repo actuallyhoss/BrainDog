@@ -1319,9 +1319,9 @@
       "versions": [
         {
           "version": "1.3.0",
-          "checksum": "d1c3fe0870ad1283c26473bc596cb3276ed898943e5e6cc9555682635031470f",
-          "bytes": 43071,
-          "published_at": "2026-10-13T20:05:20.830Z",
+          "checksum": "46025f97345ce6f2ce47f3a64d1ea4c9ae6afae4e1f73310ad53fbce40c74aa1",
+          "bytes": 44913,
+          "published_at": "2026-10-13T21:53:36.200Z",
           "bump": "patch",
           "reach": {
             "modules": [
@@ -1345,7 +1345,7 @@
             "skills": [],
             "calls_out": []
           },
-          "notes": "Charged twice and Looks like it repeats keep a short number that is part of a shop's name. Studio 54 Cafe was read as Studio, so two shops that start alike were one payee and a question could name the wrong shop. A number of one or two digits now stays in the name, and a longer one still ends it. A card number written in groups, as in CARD 1234 5678 NETFLIX, is cut whole, so the payee is Netflix.",
+          "notes": "Charged twice and Looks like it repeats keep a short number that is part of a shop's name. Studio 54 Cafe was read as Studio, so two shops that start alike were one payee. A number of one or two digits now stays in the name unless it is the day of a date, so SPOTIFY 12 OCT and SPOTIFY 12 NOV are both Spotify. A card number written in groups, as in CARD 1234 5678 NETFLIX, is cut whole.",
           "preview": true
         },
         {

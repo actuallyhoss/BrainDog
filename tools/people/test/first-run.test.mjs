@@ -13,7 +13,8 @@ import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 
 import { checkPerson } from '../check-files.mjs';
-import { expect, lineOf, notMine, redOf, selfHost, STEPS, walk } from '../expect/first-run.mjs';
+import { endOf, expect, lineOf, notMine, redOf, refusedWhy, selfHost, STEPS, walk } from '../expect/first-run.mjs';
+import { words as signupWords } from '../../../apps/web/src/routes/signup/words.ts';
 import { propose } from '../../../apps/web/src/lib/start/propose.ts';
 import { answer, oneQuestion } from '../../../apps/web/src/lib/start/question.ts';
 import { browserCurrencyEnv, zoneCurrency } from '../../../apps/web/src/routes/start/building.ts';
@@ -277,6 +278,12 @@ test('RUN AS A COMMAND ON A HOST WITH NO SIGN-UP: step 4 is red, the three after
     await host.close();
   }
   assert.match(r.stdout, /^4\. Keep it: red\. sign-up refused/mu);
+  /* AUDIT 78 CLAIM 7: it read "sign-up refused: refused", a kind where a reason belongs. It says the step, that the
+     host sent no reason, what the sign-up page shows her then, and the kind last. */
+  const four = r.stdout.split('\n').find((l) => l.startsWith('4. '));
+  assert.doesNotMatch(four, /sign-up refused: refused/u);
+  assert.ok(four.includes(`sign-up refused: asking for the link: the host sent no reason, and the page says "${signupWords.sendFailed}" (refused)`), four);
+  assert.match(r.stdout, /^red\. 3 of 7 steps green$/mu);
   for (const n of [5, 6, 7]) assert.match(r.stdout, new RegExp(`^${n}\\. .+: red\\. not reached: `, 'mu'));
   assert.equal(r.stdout.split('\n').filter((l) => /^\d\. /u.test(l)).length, STEPS.length);
   assert.equal(r.status, 1);
@@ -286,6 +293,7 @@ test('RUN AS A COMMAND ON A FRESH SELF-HOST: seven green lines and it exits 0', 
   const r = await run([]);
   assert.equal(r.stdout.split('\n').filter((l) => /^\d\. .+: green\. /u.test(l)).length, STEPS.length, r.stdout + r.stderr);
   assert.doesNotMatch(r.stdout, /: (red|not walked)\. /u);
+  assert.equal(r.stdout.trimEnd().split('\n').at(-1), 'green. all 7 steps walked');
   assert.equal(r.status, 0);
 });
 
@@ -319,4 +327,34 @@ test('WHAT COUNTS AS RED: a red step, a step never said, and a step left not wal
   /* A build that did not happen and a step that says "not walked" for it is no pass. */
   assert.equal(redOf(withStep('keep', null), {}), true);
   assert.equal(redOf(withStep('today', undefined), {}), true);
+});
+
+test('WHY A SIGN-UP CALL WAS REFUSED: the host\'s sentence where it sent one, and never the kind alone where it sent none', () => {
+  assert.equal(refusedWhy('send', { ok: false, kind: 'refused', fix: 'That address is taken.' }), 'That address is taken.');
+  assert.equal(refusedWhy('send', { ok: false, kind: 'refused', fix: null }), `the host sent no reason, and the page says "${signupWords.sendFailed}" (refused)`);
+  assert.equal(refusedWhy('make', { ok: false, kind: 'refused', fix: null }), `the host sent no reason, and the page says "${signupWords.makeFailed}" (refused)`);
+  /* The page has no sentence of its own for a link or an opening refused, so none is put in its mouth. */
+  assert.equal(refusedWhy('verify', { ok: false, kind: 'refused', fix: null }), 'the host sent no reason (refused)');
+  assert.equal(refusedWhy('open', { ok: false, kind: 'unreachable' }), 'the host sent no reason (unreachable)');
+  assert.equal(refusedWhy('send', { ok: false, kind: 'locked', retryAfter: 60 }), `the host sent no reason, and the page says "${signupWords.sendFailed}" (locked)`);
+  for (const step of ['send', 'verify', 'make', 'open']) for (const kind of ['refused', 'locked', 'unreachable']) assert.notEqual(refusedWhy(step, { ok: false, kind, fix: null }), kind);
+});
+
+test('THE LAST LINE: a green hosted run says day 15 was not walked, so it cannot read as whole', () => {
+  const green = STEPS.map((s) => ({ id: s.id, pass: true, saw: 'seen' }));
+  const withStep = (id, pass) => green.map((r) => (r.id === id ? { ...r, pass } : r));
+  const hosted = {};
+  const moves = { advance() {} };
+  assert.equal(endOf(green, moves), 'green. all 7 steps walked');
+  /* The hosted run that leaves with 0: not red, and a step short. */
+  assert.equal(redOf(withStep('offer', null), hosted), false);
+  assert.match(endOf(withStep('offer', null), hosted), /^green as far as it went, with day 15 not walked: .+ 6 of 7 steps walked, so this is not the whole first run$/u);
+  assert.doesNotMatch(endOf(withStep('offer', null), hosted), /all 7/u);
+  /* Red says red, whatever was left: the same step left on a host that can move its clock, and a red step on either. */
+  assert.equal(endOf(withStep('offer', null), moves), 'red. 6 of 7 steps green');
+  assert.equal(endOf(withStep('tell', false), hosted), 'red. 6 of 7 steps green');
+  assert.equal(endOf(green.slice(0, 4), moves), 'red. 4 of 7 steps green');
+  assert.equal(endOf([], hosted), 'red. 0 of 7 steps green');
+  /* And the line never disagrees with what the command leaves with. */
+  for (const r of [green, withStep('offer', null), withStep('keep', null), withStep('today', undefined), []]) for (const h of [hosted, moves]) assert.equal(endOf(r, h).startsWith('red. '), redOf(r, h));
 });

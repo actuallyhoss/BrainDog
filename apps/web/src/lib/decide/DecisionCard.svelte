@@ -681,6 +681,8 @@
                     {/if}
                   </li>
                 {/each}
+                <!-- PAST THE THIRD CHANGE, how many more there are and where they are said, in place of nothing. -->
+                {#if card.more > 0}<li class="dc-more">{cardWords.more(card.more)}</li>{/if}
               </ul>
             {/if}
             {#if seeWhole}<a class="qa-see tap" href={at(card.href)}>{queueWords.seeWhole}</a>{/if}
@@ -947,6 +949,11 @@
   }
 
   .dc-what {
+    color: var(--dim);
+  }
+
+  /* HOW MANY MORE CHANGES WAIT ON THE QUESTION'S PAGE: the quiet ink of a field's name, under the last line. */
+  .dc-more {
     color: var(--dim);
   }
 

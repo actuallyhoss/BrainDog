@@ -46,4 +46,10 @@ NETFLIX`, or masked, `CARD XXXX XXXX XXXX 7731`) is cut whole, where the second 
 A line already in Money watch under the shorter name stays as it is and matches no shop: "Both real" said about
 Studio quiets nothing about Studio 54 Cafe, which is asked about once more. A branch number of one or two digits
 (`KFC 12 CAIRO`) now stays in the name with the words after it, so two branches are two payees.
+A day the bank wrote after the payee is not part of the name. `SPOTIFY 12 OCT` and `SPOTIFY 12 NOV` kept their day
+as a short number, so each month was a payee of its own and Looks like it repeats never saw three. A number of one or
+two digits ends the name when a month follows it (three letters or the whole word) or a day written with a stroke, and
+a day with a stroke ends it itself (`5/9`). Both are Spotify. With no month after it the number stays, so
+`KFC 12 CAIRO` reads as before, and a shop whose name holds a number and then a month (`Studio 54 May Fair`) is cut
+at the number.
 After an edit to a script, copy its text into the matching `source` in `money-watch.pack.json`.

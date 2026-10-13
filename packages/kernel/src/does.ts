@@ -38,6 +38,13 @@ export type DoesNames = {
    * `undefined` for one that cannot be said. Without it a value is said as it is held.
    */
   value?: (list: string, field: string, raw: unknown) => unknown;
+  /**
+   * Whether `list` has a field of this id at all. A patch that sends one it lacks is refused when it is written, so
+   * the yes changes nothing there and the line does not name it: it read "Changes Zzz internal in Tasks.", an id
+   * read as words, under a question whose own title left the field out (audit 79, claim 4). Asked apart from `field`,
+   * which is `null` for a field the list holds and gave no label. Without it every field a patch sends is named.
+   */
+  holds?: (list: string, field: string) => boolean;
 };
 
 /** An id read as words: `usecase-student` is "Usecase student". */
@@ -111,6 +118,29 @@ const HANDLE = /[\w.-]+#\d+|^[0-9A-HJKMNP-TV-Z]{26}$/u;
 const ADDRESS = /@|^(?:[a-z0-9-]+\.)+[a-z]{2,}$/iu;
 
 /**
+ * A text that is where a file or a page is, which a line never says. Any text with a slash in it was held back, so a
+ * stage of "Q3/Q4" or a status of "N/A" read as its field alone (audit 79, claim 6). A path is told by its shape:
+ * it starts at a root, a home, a dot or a drive; it holds `://`; or it has no space in it and either ends in a slash,
+ * starts with a host's name, ends in a file's name ("docs/review.md"), or runs three parts deep with a letter in it
+ * ("src/lib/kiln", where "13/10/2026" is a day somebody typed). Two plain words with a slash between them are said.
+ */
+const PATH_START = /^(?:[/\\]|~(?:[/\\]|$)|\.{1,2}[/\\]|[a-z]:[/\\])/iu;
+const PATH_WHOLE = /[/\\]$|^(?:[a-z0-9-]+\.)+[a-z]{2,}[/\\]|[/\\][^/\\]*\.[a-z][a-z0-9]{0,5}$|^(?=.*[a-z])[^/\\]+(?:[/\\][^/\\]+){2,}$/iu;
+const pathAlone = (text: string): boolean => PATH_START.test(text) || (/[/\\]/u.test(text) && PATH_WHOLE.test(text));
+/**
+ * AND A SENTENCE THAT NAMES ONE IS HELD BACK WITH IT. Only a text with no space was read for a path's shape, so a note
+ * of "Read docs/plan.md first." was quoted whole, file and all, and the card over it cut the file out and said the
+ * rest as the value. Each word of a text is read by the same shape, the marks around it taken off first, and a word
+ * of one or two letters is never a path ("Rent / bills", "5 ~ 6"). "Paid 1/2 now" and "Yes/no. Ask" are still said.
+ */
+const WORD_EDGES = /^[("'\u201C\u2018[]+|[)"'\u201D\u2019\].,;:!?]+$/gu;
+const isPath = (text: string): boolean =>
+  PATH_START.test(text) ||
+  text.includes('://') ||
+  (/[/\\]/u.test(text) &&
+    (/\s/u.test(text) ? text.split(/\s+/u).some((w) => ((word) => word.length > 2 && pathAlone(word))(w.replace(WORD_EDGES, ''))) : PATH_WHOLE.test(text)));
+
+/**
  * One short value as a person reads it, `null` for none, and `undefined` for one a line cannot say: a handle, a path or
  * an address, a text too long to quote, or a shape it does not know. Money is said in its own currency, a day as a day.
  *
@@ -128,7 +158,7 @@ function shortSaid(v: unknown): string | null | undefined {
     const day = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(text);
     if (day && MONTH_NAMES[Number(day[2]) - 1] !== undefined) return `${Number(day[3])} ${MONTH_NAMES[Number(day[2]) - 1]!} ${day[1]!}`;
     if (/^\d{4}-\d{2}-\d{2}T[\d:.]+(?:Z|[+-]\d{2}:\d{2})?$/u.test(text)) return undefined;
-    return text.length > SHORT || /[\n/\\]/u.test(text) || HANDLE.test(text) || ADDRESS.test(text) ? undefined : text;
+    return text.length > SHORT || text.includes('\n') || isPath(text) || HANDLE.test(text) || ADDRESS.test(text) ? undefined : text;
   }
   const money = obj(v);
   if (Number.isInteger(money.amount) && typeof money.currency === 'string' && /^[A-Za-z]{3}$/u.test(money.currency)) return moneyText(money.amount as number, money.currency);
@@ -221,7 +251,8 @@ function changesSaid(rows: readonly unknown[], names: DoesNames, list: string): 
     else if (obj(row.patch).deleted_at === null) restores += 1;
     else deletes += 1;
   }
-  const fields = [...new Set(patched.flatMap((p) => Object.keys(p.patch)))];
+  /* A FIELD THE LIST LACKS IS NOT NAMED (`DoesNames.holds`). With none left the line keeps its count, "changes 1". */
+  const fields = [...new Set(patched.flatMap((p) => Object.keys(p.patch)))].filter((f) => names.holds?.(list, f) !== false);
   const full: string[] = [];
   const bare: string[] = [];
   for (const field of fields) {

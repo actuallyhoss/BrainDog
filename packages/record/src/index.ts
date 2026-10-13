@@ -1037,8 +1037,12 @@ export type Boot = {
      * place back until one of them has something in it. Never the name for a read across the whole record, and never
      * a list holding only what an add-on planted and nobody has touched (a starter set), whose count is not the
      * person's own. `list` beside it is the one list a page draws, planted or not.
+     *
+     * `null` WHEN THE PAGE READS LISTS AND EVERY ONE OF THEM IS SUCH A STARTER SET: nothing in them is the person's yet,
+     * so the place waits. `[]` is a page that reads no list this caller reads, which is never held back. The two
+     * arrived alike as `[]`, and a page over an untouched starter set was drawn on the first day because of it.
      */
-    lists: string[];
+    lists: string[] | null;
     /**
      * `updated_at` is when that row last changed, so the rail can draw the rows touched last while tabs keep their order.
      * `hue` is the row's own frozen colour, the whole degree its list's `identity.accent` field holds, so a project's
@@ -6941,9 +6945,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
   /**
    * HOW MANY UNTOUCHED PLANTED ROWS EACH LIST HOLDS, counted once per state of the record and kept until a write moves
-   * it. The kernel reads the log for every planted row and looks through every row for one that names it, which on a
-   * record of twenty thousand rows with a starter set of eight was 39 of `boot`'s 52 milliseconds, on every screen. The
-   * key is the last event and the last row, both read off an index.
+   * it. The kernel read the log for every planted row and looked through every row once for each of them, which on a
+   * record of twenty thousand rows with a starter set of eight was 39 of `boot`'s 52 milliseconds, on every screen. It
+   * answers in one pass over the rows now (`untouchedExamples`), and the count is still kept between writes. The key
+   * is the last event and the last row, both read off an index.
    */
   let plantedAt: string | null = null;
   let plantedHeld: Record<string, number> = {};
@@ -7031,7 +7036,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           icon: page.icon,
           list: page.registers.length === 1 && /^[a-z]/u.test(page.registers[0]!) && !readable(ctx, page.registers[0]!) ? page.registers[0]! : null,
           /* EVERY LIST IT READS, held to what this caller reads, for a rail that waits on them (`Boot.pages`). */
-          lists: [...new Set(page.registers)].filter((id) => /^[a-z]/u.test(id) && !readable(ctx, id) && theirs(id)),
+          /* `null` AND NOT `[]` WHEN IT READS SOME AND ALL OF THEM ARE STARTER SETS NOBODY TOUCHED, so the rail can tell a
+             place that waits from a page that reads no list at all. */
+          lists: ((read) => ((mine) => (read.length > 0 && mine.length === 0 ? null : mine))(read.filter(theirs)))(
+            [...new Set(page.registers)].filter((id) => /^[a-z]/u.test(id) && !readable(ctx, id)),
+          ),
           /* AND WHICH ROW IT GREW OUT OF, the key the rail's cap is written against (`railRoom`). This
              map copied four keys and dropped the kernel's fifth, so on a large record 72 of 72 rail pages arrived with no
              `about` and the shell drew one entry per project, service and skill where the sample, which has the key,

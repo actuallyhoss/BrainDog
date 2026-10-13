@@ -7,12 +7,16 @@
  *
  * THE WORD IS READ BY THE LIST'S ROLE AND NEVER BY ITS NAME: a list that declares `meets:` is the people one, whatever
  * it is called, and any other list opens as it always did.
+ *
+ * AND BY THE ONE NAME THE KERNEL STILL READS, on a record whose add-on is older than the role: the list `meet` wrote by
+ * name before any list declared `meets:`. That name is the kernel's (`PEOPLE`), imported and never written in `api.ts`.
  */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
+import { PEOPLE as LEGACY_PEOPLE } from '@braindog/kernel';
 import { compile, evaluate, type Predicate } from '@braindog/where';
 
 import { heldTwiceOn, isRows, rowsFilter, twiceOf, twiceWords } from './api.ts';
@@ -28,6 +32,10 @@ const params = (href: string): URLSearchParams => new URL(href, 'http://x').sear
 
 /** A list of people as a record declares one: the sample's, with the role the record's own carries. */
 const PEOPLE = { ...REGISTERS.people!, meets: { name: 'name' } } as RegisterDecl;
+
+/** The same list as an add-on older than the role declared it: under the name the kernel still reads, saying no `meets:`. */
+const { meets: _unsaid, ...BEFORE } = PEOPLE as RegisterDecl & { meets?: unknown };
+const LEGACY = { ...BEFORE, id: LEGACY_PEOPLE } as RegisterDecl;
 
 /** The numbers of the sample's people a `where` admits, by the engine the record compiles with. */
 const admitted = (where: unknown): number[] => {
@@ -54,10 +62,37 @@ test('a list that is not the people one ignores the word', () => {
     assert.ok(decl, `the sample no longer has ${id}`);
     assert.equal(heldTwiceOn(params(`/r/${id}?twice=1`), decl), false, id);
   }
-  /* It is the role that is read and not the name: the same list without it, and a list still being read. */
-  const { meets: _, ...unsaid } = PEOPLE as RegisterDecl & { meets?: unknown };
-  assert.equal(heldTwiceOn(params('/r/people?twice=1'), unsaid as RegisterDecl), false);
+  /* A list still being read. */
   assert.equal(heldTwiceOn(params('/r/people?twice=1'), undefined), false);
+});
+
+/* THE RECORD ON AN ADD-ON OLDER THAN THE ROLE (People 2.0.0 and before). Its list declares no `meets:` and the kernel
+   reads it by the name it had (`LEGACY` in `packages/kernel/src/roles.ts`), so the figure counts and its note links
+   here. The word must narrow this list too, or the link opens everyone. */
+test('the list the kernel reads by name, declaring no role, narrows', () => {
+  assert.equal(LEGACY_PEOPLE, 'people', 'the kernel no longer reads the list by this name');
+  const legacy = LEGACY;
+  assert.equal((legacy as { meets?: unknown }).meets, undefined);
+  assert.equal(heldTwiceOn(params('/r/people?twice=1'), legacy), true);
+  assert.equal(heldTwiceOn(params('/r/people?sort=name&twice=1'), legacy), true);
+  /* The word is still the word: without it the list opens as it always did. */
+  for (const href of ['/r/people', '/r/people?twice=0', '/r/people?f=twice:in:1']) assert.equal(heldTwiceOn(params(href), legacy), false, href);
+});
+
+test('another list declaring no role still ignores the word, whatever it holds', () => {
+  /* The same fields under any other id: it is the kernel's one name that is read, never the shape. */
+  for (const id of ['contacts', 'person', 'People', 'people2', 'organisations', 'fx']) {
+    const other = { ...LEGACY, id } as RegisterDecl;
+    assert.equal(heldTwiceOn(params(`/r/${id}?twice=1`), other), false, id);
+  }
+});
+
+test('a list that declares the role narrows under any name', () => {
+  for (const id of ['people', 'contacts', 'clients']) {
+    const said = { ...PEOPLE, id } as RegisterDecl;
+    assert.equal(heldTwiceOn(params(`/r/${id}?twice=1`), said), true, id);
+    assert.equal(heldTwiceOn(params(`/r/${id}`), said), false, id);
+  }
 });
 
 test('the list is asked with a tree over the numbers heldTwice answers', () => {

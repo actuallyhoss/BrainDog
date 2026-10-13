@@ -592,7 +592,9 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   that book's cash over its own bills, repeating lines, instalments and money on its way, and the cell Money lasts
  *   until on a book's What is due (book-lasts-until-76, REC-A09 step 2); and Money's seeds carry a starter set of
  *   eight categories, in and out, in place of one of the sample's (ruling 341, money-starter-categories-76), which no
- *   fingerprint reads and only a record installing Money afresh is given. One id added, none taken away.
+ *   fingerprint reads. NO RECORD IS GIVEN IT AS ITS OWN YET: nothing that installs asks for `starters`, so the set
+ *   reaches a record only among the sample's rows, tagged as examples, and the change notes do not promise it (audit
+ *   80, finding 1). One id added, none taken away.
  *   And batch 77's, in the same unreleased step: `invoice-chased` holds two draft steps whose conditions never hold
  *   together, so an invoice paid in part that says what was paid is drafted for what is left of it
  *   (`{{short:amount-paid_so_far}}`) and every other invoice keeps its sentence (chase-part-paid-77, REC-B22). No id

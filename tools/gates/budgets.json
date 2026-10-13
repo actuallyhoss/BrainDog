@@ -101,5 +101,10 @@
     "//": "WAY-B02, his \"stop making overly detailed git commits\" (W.25). `commits.mjs` reads it, and the commit-msg hook through it.",
     "//subjectMax": "A subject is one sentence of at most 72 characters, the width git's own tools and every log viewer show whole.",
     "subjectMax": 72
+  },
+  "firstScreen": {
+    "//": "`first-screen.mjs`, which runs `tools/people/expect/first-screen.mjs` once a person.",
+    "//walkTimeoutMs": "How long one person's walk through the first run may take before it is a finding and not a wait. A walk takes about three seconds on a quiet machine; two minutes is room for a loaded runner, and a walk that is still going by then is hung.",
+    "walkTimeoutMs": 120000
   }
 }

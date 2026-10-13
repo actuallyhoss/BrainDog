@@ -19,6 +19,10 @@ const IP = /\b\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?\b/gu;
 /* A FILE PATH: from the root, the home folder or a drive, or three or more parts of a relative one. A date is no path. */
 const ROOTED = /(?<=^|[\s("'\u201C\u2018])(?:(?:~|[A-Za-z]:)[\\/]|[\\/][^\s"'()\u201D\u2019\\/]+[\\/])[^\s"'()\u201D\u2019]*/gu;
 const RELATIVE = /(?<=^|[\s("'\u201C\u2018])[\w.-]*[A-Za-z][\w.-]*(?:\/[\w.-]+){2,}/gu;
+/* A SHORT ONE, of two parts, is a path only when the last part is a file's name: it ends in an extension that starts
+   with a letter ("docs/review.md"). So "and/or", "24/7", "w/o" and "1.5/2.0" stay words. The extension is in one case,
+   so a stop with no space after it ("50/50.Then") starts no file's name. */
+const SHORT = /(?<=^|[\s("'\u201C\u2018])[\w.-]+\/[\w.-]*\.(?:[a-z][a-z0-9]*|[A-Z][A-Z0-9]*)(?![\w\/-])/gu;
 /* AN ID: a ULID, a row's handle (`tasks#8`), a commit's hash (two digits and a letter, so "defaced", "face2face" and
    "20261001" stay), a question's own (`SG14`), a person's (`p_…`) and a signer's (`agent:claude`, `rule:late`). */
 const IDS = [
@@ -58,7 +62,8 @@ export function spoken(text: string): string {
     .replace(LOCAL, gone)
     .replace(IP, gone)
     .replace(ROOTED, gone)
-    .replace(RELATIVE, (m) => (/^[\d/.-]+$/u.test(m) ? m : gone(m)));
+    .replace(RELATIVE, (m) => (/^[\d/.-]+$/u.test(m) ? m : gone(m)))
+    .replace(SHORT, gone);
   t = IDS.reduce((x, re) => x.replace(re, GONE), t);
   /* A BRACKET LEFT HOLDING NOTHING goes too, the commas between what went with it, so the word before it is read
      against what follows ("changed in (a.ts, b.ts)" is "changed", not "changed in (, )"). */

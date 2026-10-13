@@ -313,13 +313,13 @@ const WHOLE: readonly Whole[] = [
  * takes a never back as "I" does ("my friend and I are opening one", `ME`). MORE OF A THING IS A THING HAD ("I wish I
  * had more clients"), and somebody else carrying on takes nothing up ("They still do").
  */
-const REFUSES = "no|not|never|without|zero|don['’]?t|do\\s+not|doesn['’]?t|does\\s+not|haven['’]?t|hasn['’]?t|hadn['’]?t";
+const REFUSES = "no|not|never|without|zero|don['’]?t|do\\s+not|doesn['’]?t|does\\s+not|haven['’]?t|hasn['’]?t|hadn['’]?t|didn['’]?t";
 /* `send` and its ending apart: the whole word is a field an add-on declares, and the core spells none (the core-names gate). */
 const DOING = `tracking(?:\\s+of)?|taking|send${'ing'}|chasing|using|keeping|selling`;
 const DOES = `to|have|take|get|do|sell|keep|need(?:\\s+of)?|want|track(?:\\s+of)?|run|own|send|use|chase|${DOING}`;
 /* The words that deny a stopping: those of refusal, and the ones only a verb takes. At most three words between, none
    of them a join or somebody new, so "I won't ever have to quit" is denied and "No, I'm done" and "no staff so I quit" are not. */
-const DENIES = `${REFUSES}|didn['’]?t|did\\s+not|won['’]?t|will\\s+not|can['’]?t|cannot|wouldn['’]?t|isn['’]?t|aren['’]?t|wasn['’]?t`;
+const DENIES = `${REFUSES}|did\\s+not|won['’]?t|will\\s+not|can['’]?t|cannot|wouldn['’]?t|isn['’]?t|aren['’]?t|wasn['’]?t`;
 const SOMEBODY = "(?:i|we|you|they|he|she|it)(?:['’]\\p{L}+)?";
 const UNDENIED = `(?<!(?:^|[^\\p{L}\\p{N}'’])(?:${DENIES})\\s+(?:(?!(?:${SOMEBODY}|and|or|nor|but|so|because|since|then|now)(?![\\p{L}\\p{N}'’]))[\\p{L}'’]+\\s+){0,3})`;
 /* A denial reaches past somebody new only through a word of thinking or saying: "I do not think I have stopped",
@@ -479,7 +479,11 @@ const STARTED_HERE = new RegExp(`^${BEFORE_NOW}${THEN}${WILL_START}${CLAUSE_END}
 const SOMEWHERE = new RegExp(`^\\s+(?:in|near|by|at)(?:\\s+(?!(?:and|or|nor|but|so|because|since)(?![\\p{L}\\p{N}]))[\\p{L}\\p{N}'’-]+){1,3}${CLAUSE_END}`, 'iu');
 /* What may follow one had before, and end the clause: how long, or until when ("for ten years", "until last year").
    Never what was done to it ("I had the stall repainted") or what went on then ("for a year I hired help"). */
-const HAD_UNTIL = new RegExp(`^\\s+(?:until|till|before|for|back\\s+in|up\\s+to)(?:\\s+(?!(?:and|or|nor|but|so|because|since)(?![\\p{L}\\p{N}]))[\\p{L}\\p{N}'’-]+){1,3}${CLAUSE_END}`, 'iu');
+const HOW_LONG = `^\\s+(?:until|till|before|for|back\\s+in|up\\s+to)(?:\\s+(?!(?:and|or|nor|but|so|because|since)(?![\\p{L}\\p{N}]))[\\p{L}\\p{N}'’-]+){1,3}`;
+const HAD_UNTIL = new RegExp(`${HOW_LONG}${CLAUSE_END}`, 'iu');
+/* The how long alone, so what comes after it can take the thing back as it does with no how long said: "I had the
+   shop for years and I run it" is somebody with a shop, as "I had a shop and I run it" is. */
+const HAD_SO_LONG = new RegExp(HOW_LONG, 'iu');
 const ENDS = new RegExp(`^${CLAUSE_END}`, 'iu');
 const ITSELF_ENDED = new RegExp(`^\\s+(?:(?:was|got)\\s+)?(?:closed|shut|sold)(?:\\s+(?:down|up))?${CLAUSE_END}`, 'iu');
 /* After the verb itself, what was sold or kept comes first: "done selling candles", never "selling candles on paper". */
@@ -589,7 +593,8 @@ function refusedIn(said: string, known: readonly Said[] = []): (span: Said) => b
     if (ENDED.test(before)) return ends(to) ? 'stopped' : null;
     /* One thing had before, wherever it was and until whenever, unless it is still had or had again. */
     const after = said.slice(to);
-    if (HAD_ONCE.test(before) && !many(from, to) && (ends(to) || SOMEWHERE.test(after) || HAD_UNTIL.test(after)) && !again(from, to) && !back(from, to)) return 'stopped';
+    const past = HAD_UNTIL.test(after) ? after.slice(HAD_SO_LONG.exec(after)?.[0].length ?? 0) : '';
+    if (HAD_ONCE.test(before) && !many(from, to) && (ends(to) || SOMEWHERE.test(after) || HAD_UNTIL.test(after)) && !again(from, to) && !back(from, to) && !TAKEN_BACK.test(past)) return 'stopped';
     if (ENDED_ITSELF.test(before) && ITSELF_ENDED.test(said.slice(to))) return 'stopped';
     /* One thing sold, and nothing takes it up again: whoever sold a stall does not run it. */
     const one = said.slice(from, to);

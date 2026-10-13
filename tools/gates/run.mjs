@@ -250,6 +250,10 @@ const GATES = [
      CANARY_PASSKEY, so it runs on a fresh self-host and says "self-host only"; `after-deploy.yml` runs it against
      the deployed host. Its own ephemeral port, for the reason `passkey` has one. */
   ['signin-live', call(join(here, 'signin-live.mjs'))],
+  /* AND THE FIRST SCREENS OF A NEW RECORD, FOR TWO PEOPLE: it walks Mariam and Sam through the first run on a fresh
+     self-host and judges the drawn rail and Today (no tour, nobody in People but them, no empty place, one "New page").
+     No browser and no build: the walk draws the web's own source. It judges nothing itself; the command does. */
+  ['first-screen', call(join(here, 'first-screen.mjs'))],
   /* AFTER EVERYTHING, BECAUSE IT IS THE ONLY ONE THAT MEASURES SOMETHING OUTSIDE THIS REPOSITORY
      (52 §3; 51 §5.17). The thirty above ask whether the tree is right; this asks whether the
      tree is what the internet is serving, which is a question only `deploy.yml` is in a position to

@@ -62,7 +62,9 @@ node --test tools/people/test/read-set.test.mjs
 checks as Mariam and as Sam, none of them not seen, and the same answer under Node 26.10 and Node 24.13. An earlier
 note said Node 24 reads only 42 checks and leaves with 1 and 8 not seen; that did not happen here on either Node.
 `first-screen-drawn.test.mjs` walks Mariam, Sam, Nour and Layla and fails if any of them has a place in the first rail
-with nothing to show, or if the command would leave with anything but 0.
+with nothing to show, or if the command would leave with anything but 0. The gates run the command too: `first-screen`
+(`tools/gates/first-screen.mjs`) runs it as Mariam and as Sam on every run and is red on anything but 0, naming who and
+the first check that did not pass.
 
 A green walk with no `--base` is a fresh self-host, with step 4 walked on the hosted service's own code run in one
 process: its mail is a stub, sign-up is open, there is no bot check and the clock is the walk's own. Step 4's line says
@@ -84,7 +86,9 @@ in that file.
 Each line is the step's number and name, then `green`, `red` or `not walked`, then what the walk saw. Red says what
 was wrong. The walk keeps going after a red step wherever it can, so one run names every broken step. It exits 1 if
 any step is red, was never said or was left not walked (day 15 alone may be left, on a host that keeps the real
-clock), and when the walk stops on a throw, which it says in red on the error stream. Read through a pipe
+clock), and when the walk stops on a throw, which it says in red on the error stream. After the seven, one last line
+says how much was walked: `green. all 7 steps walked`, `red.` with how many were green, or `green as far as it went,
+with day 15 not walked` on a hosted run, which leaves with 0 and is not the whole first run. Read through a pipe
 (`| tail`), the shell answers with the pipe's exit code, not the walk's: read `$?` of the command itself.
 
 | Step | What green means | Who builds it |

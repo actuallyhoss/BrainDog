@@ -61,7 +61,7 @@
   import { hostedHere } from '../settings/billing.ts';
   import InstallShared from './InstallShared.svelte';
   import { browserStore, catalogueTitles, fileProposal, keepFirstKey, readHostCatalogue, trustForEntry, updatesFor } from './browse/catalogue.ts';
-  import { askOnDecide, diffOf, install, notOwner, planFor, type OfferClient, type Planned } from './browse/[id]/offer.ts';
+  import { askOnDecide, diffOf, install, installInTurn, notOwner, planFor, turnWords, type Offered, type OfferClient, type Planned } from './browse/[id]/offer.ts';
   import { words } from './words.ts';
   import { glyphOf } from './glyph.ts';
   /* WHAT BRAINDOG ITSELF HAS IMPROVED, read from the one place Decide reads it too, so the Updates tab and the card on
@@ -313,31 +313,40 @@
     return [...bundled.filter((u) => !taken.has(u.key)), ...fromKennel];
   }
 
-  /** The record's plan for one update, read now, so what is approved is what this record would do now. */
-  async function planOf(u: Update): Promise<{ ok: true; planned: Planned } | { ok: false; fix: string; code: string | null }> {
+  /**
+   * The record's plan for one update, read now, so what is approved is what this record would do now. `among` is what
+   * else waits: handed in, a plan that waits on one of them comes back with that one's plan beside it (`afterOthers`).
+   */
+  async function planOf(u: Pick<Offered, 'kind' | 'id' | 'source' | 'file'> & { title?: string }, among?: readonly Update[]): Promise<{ ok: true; planned: Planned } | { ok: false; fix: string; code: string | null }> {
     if (!client) return { ok: false, fix: copy.recordNotReached, code: null };
-    return planFor(client, { kind: u.kind, id: u.id, source: u.source }, u.file, installed, copy.writeRaced);
+    const listing = { kind: u.kind, id: u.id, source: u.source, ...(u.title === undefined ? {} : { title: u.title }) };
+    return planFor(client, listing, u.file, installed, copy.writeRaced, among && (() => Promise.resolve(among)));
   }
 
   /**
    * See the plan for one update, on the sheet, with Approve installing that plan.
    *
-   * AN UPDATE THAT WAITS ON ANOTHER OPENS NO SHEET IT CANNOT APPROVE. When the record would refuse it over something
-   * another waiting update hands to it, the row says so and offers that update's plan instead.
+   * AN UPDATE THAT WAITS ON ANOTHER TAKES IT ALONG, as "Update all" and the listing's own page do: the holder's plan and
+   * this one are the one sheet, this one said as going in after it, and Approve puts them in in turn (`installTurn`).
+   *
+   * IT OPENS NO SHEET IT CANNOT APPROVE. A holder that cannot be taken along, one from the Kennel or one whose plan
+   * cannot be read, is named on the row as the step to take first, with the press that opens its plan.
    */
   async function showPlan(u: Update) {
     if (busy !== null) return;
     busy = u.key;
     try {
-      const out = await planOf(u);
+      const out = await planOf(u, updates ?? []);
       if (!out.ok) return void (said = { ...said, [u.key]: { fix: out.fix, code: out.code } });
       const p = out.planned;
-      const holder = holderFirst(diffOf(p), (updates ?? []).filter((o) => o.key !== u.key));
+      const along = p.kind === 'pack' && p.after !== undefined && p.after.first.length > 0;
+      const holder = along || p.kind !== 'pack' ? null : holderFirst(p.diff, (updates ?? []).filter((o) => o.key !== u.key));
       if (holder) return void (said = { ...said, [u.key]: waitsOn(p, u, holder) });
       sheet = {
         diff: diffOf(p),
         then: async () => {
-          await installOne(p, u.title, u);
+          if (along) await installTurn(p, u);
+          else await installOne(p, u.title, u);
           await reread();
         },
       };
@@ -375,6 +384,50 @@
     if (u && notOwner(out.code)) await askOwner(u, p);
     else if (u) said = { ...said, [u.key]: { fix: out.fix, code: out.code } };
     else toasts.push(out.fix, { intent: 'warn' });
+    return false;
+  }
+
+  /**
+   * Install an update and the ones it goes in after, in turn, on the one press (`offer.ts` `installInTurn`): each
+   * holder, then this one planned again, because only once the holder is in does this plan read clean.
+   *
+   * WHAT IT ENDS ON IS WHAT HAPPENED. Whole, it names this one and who went in before it, in the listing page's own
+   * sentence (`turnWords.installedAfter`). Stopped, the row says what stopped it and nothing is said as good news: a
+   * plan that now asks for a line nobody was shown (`turnWords.unread`) is read again from the row, since the holder
+   * is in by then; a refusal that says this person may not install here files the refused one on Decide, and this
+   * row says what it goes in after.
+   */
+  async function installTurn(p: Planned, u: Update): Promise<boolean> {
+    if (!client || p.kind !== 'pack' || !p.after) return false;
+    const c = client;
+    const first = p.after.first;
+    /* WHOSE TURN IT IS, and the plan it was last handed: the first holder's as shown, then each as it is planned again. */
+    let at: Offered = first[0]?.of ?? p.after.self;
+    let read: Planned = first[0]?.planned ?? p;
+    const out = await installInTurn(p, {
+      replan: async (o) => {
+        at = o;
+        const fresh = await planOf(o);
+        if (fresh.ok) read = fresh.planned;
+        return fresh;
+      },
+      install: (q) => {
+        read = q;
+        return install(c, q, installed, pref.read().nav ?? [], copy.writeRaced);
+      },
+    });
+    sheet = null;
+    if (out.ok) {
+      if (out.nav) pref.write({ nav: out.nav });
+      if (u.entry && u.trust) await keepFirstKey(browserStore(), u.key, u.trust);
+      toasts.push(out.first ? turnWords.installedAfter(u.title, out.first) : words.installed(u.title), { intent: 'good' });
+      return true;
+    }
+    const stopped = (updates ?? []).find((o) => o.key === at.key) ?? u;
+    if (notOwner(out.code)) {
+      await askOwner(stopped, read);
+      if (stopped.key !== u.key) said = { ...said, [u.key]: waitsOn(p, u, stopped) };
+    } else said = { ...said, [u.key]: { fix: out.fix, code: out.code } };
     return false;
   }
 

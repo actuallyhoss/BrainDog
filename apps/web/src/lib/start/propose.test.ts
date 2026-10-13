@@ -1183,6 +1183,26 @@ test('WHAT WAS LEFT OPEN SINCE BATCH 69, each sentence word for word: "I never u
   kept('I am used to taking orders', /orders/iu);
   kept('I never used to chase people, now I send invoices', /invoices/iu);
 
+  /* "DIDN'T" REFUSES AS "DID NOT" DOES (audit 80, claim 3): whoever says "I didn't run a shop" was handed a shop. */
+  none("I didn't send invoices", /invoices/iu);
+  none('I didn’t take orders', /orders/iu);
+  none("I didn't run a shop", /shop/iu);
+  none('I didnt run a shop', /shop/iu);
+  none('I did not send invoices', /invoices/iu);
+  kept("I didn't run a shop before but I just opened one", /shop/iu);
+  kept("I didn't like spreadsheets, I send invoices", /invoices/iu);
+  kept("I didn't quit my shop", /shop/iu);
+  kept("I didn't stop taking orders", /orders/iu);
+
+  /* ONE HAD FOR YEARS AND RUN NOW IS HAD (audit 80, claim 4), as one had and run is with no how long said. */
+  kept('I had the shop for years and I run it', /shop/iu);
+  kept('I had the shop for years and I have it', /shop/iu);
+  kept('I had the shop for years and I still run it', /shop/iu);
+  kept('I had a shop and I run it', /shop/iu);
+  none('I had the shop for years', /shop/iu);
+  none('I had the shop until 2020 and I sold it', /shop/iu);
+  none('I had the shop for years and my brother runs it', /shop/iu);
+
   /* ONE THING SOMEBODY WOULD LOVE TO HAVE IS NOT HAD. What there is more than one of is started in here, so it is kept. */
   none('I would love to have a shop', /shop/iu);
   none("I'd like a shop one day", /shop/iu);

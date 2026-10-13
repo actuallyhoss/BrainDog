@@ -135,6 +135,7 @@ test('SPOKEN LEAVES WORDS ALONE and takes out only what is an address or an id',
   assert.equal(spoken('Renew the face2face plan.'), 'Renew the face2face plan.', 'a word of hex letters is no hash');
   assert.equal(spoken('Ask Jo (jo@x.io) about it.'), 'Ask Jo about it.', 'an address beside its name goes whole');
   assert.equal(spoken('Changed in (apps/web/src/a.ts, apps/web/src/b.ts)'), 'Changed', 'no bracket of commas is left');
+  assert.equal(spoken('Approve the review (see docs/review.md)'), 'Approve the review', 'a file two parts deep goes with its bracket');
 });
 
 test('WHAT CHANGES IS SAID FROM WHAT TO WHAT, and an id is never a value', () => {

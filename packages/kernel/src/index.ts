@@ -1605,8 +1605,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       }
       return typeof v === 'string' ? v.replace(/^[a-z][a-z0-9_]*#(?=[0-9A-HJKMNP-TV-Z]{26}$)/u, '') : null;
     };
-    const untouched: Entry[] = [];
-    let touched = 0;
+    /* WHAT THE LOG SAYS FIRST, of every live example: whether it arrived as one and has only been linked since. */
+    const live: { id: string; clean: boolean }[] = [];
     for (const { id, deleted_at } of tagged) {
       if (deleted_at !== null) continue;
       const events = sql.all<{ kind: string; to_v: string | null }>('SELECT kind, to_v FROM event WHERE target = ? ORDER BY rowid', `entry:${id}`);
@@ -1631,12 +1631,47 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         return examples.has(idOf(raw) ?? '');
       };
       const onlyLinked = events.slice(1).every((e) => (e.kind === 'edit' || e.kind === 'link') && linkedTo(e.to_v));
-      /* ASKED LAST, AND ONLY OF A ROW THE LOG HAS NOT ALREADY CALLED TOUCHED: it looks through every row of the record. */
-      const named = () =>
-        sql
-          .all<{ id: string }>('SELECT id FROM entry WHERE deleted_at IS NULL AND id <> ? AND instr(fields, ?) > 0', id, id)
-          .some((r) => !examples.has(r.id));
-      const row = arrived && onlyLinked && !named() ? byId(id) : null;
+      live.push({ id, clean: arrived && onlyLinked });
+    }
+    /* ASKED LAST, ONLY OF THE ROWS THE LOG HAS NOT ALREADY CALLED TOUCHED, AND IN ONE PASS FOR ALL OF THEM: which of
+       them a live row that is not an example names. It was one look through every row of the record for each of them
+       (about 40 ms at 20,000 rows on the first boot after a write). Rows planted together were minted together, so
+       their ids open with the same few letters: the record is looked through once for those openings, in SQLite, and
+       only a row that holds one is read here. Every run of id letters in it is slid over 26 at a time, so an id is
+       found wherever `instr` found it: alone, in a handle, in a list, or inside a longer word. An id of any other shape
+       is looked for as it is. Examples minted at many times have too many openings to ask for, and every live row is
+       read then. The pass stops once every one of them is named. */
+    const asked = live.filter((one) => one.clean).map((one) => one.id);
+    const shaped = new Set(asked.filter((id) => /^[0-9A-Z]{26}$/u.test(id)));
+    const odd = asked.filter((id) => !shaped.has(id));
+    const openings = [...new Set(asked.map((id) => id.slice(0, 6)))];
+    const holds = openings.length <= 4 ? ` AND (${openings.map(() => 'instr(fields, ?) > 0').join(' OR ')})` : '';
+    const named = new Set<string>();
+    const PAGE = 500;
+    for (let after = 0, more = asked.length > 0; more && named.size < asked.length; ) {
+      const page = sql.all<{ at: number; id: string; fields: string | null }>(
+        `SELECT rowid AS at, id, fields FROM entry WHERE deleted_at IS NULL AND rowid > ?${holds} ORDER BY rowid LIMIT ?`,
+        after,
+        ...(holds === '' ? [] : openings),
+        PAGE,
+      );
+      for (const { id, fields } of page) {
+        if (examples.has(id) || typeof fields !== 'string') continue;
+        if (shaped.size > 0)
+          for (const [run] of fields.matchAll(/[0-9A-Z]{26,}/gu))
+            for (let at = 0; at + 26 <= run.length; at++) {
+              const found = run.slice(at, at + 26);
+              if (shaped.has(found)) named.add(found);
+            }
+        for (const other of odd) if (fields.includes(other)) named.add(other);
+      }
+      more = page.length === PAGE;
+      after = page.at(-1)?.at ?? after;
+    }
+    const untouched: Entry[] = [];
+    let touched = 0;
+    for (const { id, clean } of live) {
+      const row = clean && !named.has(id) ? byId(id) : null;
       if (row) untouched.push(row);
       else touched++;
     }
@@ -5970,6 +6005,10 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       row: titleOfRow,
       /* A FIELD BY THE LABEL THE RECORD SHOWS, so what leaves with a call reads "Due on" from the list and not from its id. */
       field: (list, field) => specOf(list, field)?.label ?? null,
+      /* A FIELD THE LIST LACKS IS NOT NAMED: the write refuses it, so the yes changes nothing there (`DoesNames.holds`).
+         `tags` is the one field every list takes without declaring it (`withTags`); `deleted_at` never reaches here,
+         since a patch holding it is a delete or a bring back and names no field. */
+      holds: (list, field) => field === 'tags' || specOf(list, field) !== undefined,
       /* WHAT THE ENTRY HOLDS NOW, for the line of what a change changes, and never a secret or a file (`does.ts`). */
       before: (at, field) => {
         const row = get(at, { includeDeleted: true });

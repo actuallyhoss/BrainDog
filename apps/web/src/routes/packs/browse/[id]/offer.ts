@@ -62,8 +62,15 @@ const refusedOf = (r: Wire<unknown>, fallback: string): Refused => (r.ok ? { ok:
 /** What the plan sheet draws: the record's `Diff`, or the use case's plan whole. */
 export const diffOf = (p: Planned): unknown => (p.kind === 'pack' ? (p.after?.shown ?? p.diff) : p.plan);
 
-/** What is said when the plan read again, once the one before it is in, asks for something the sheet did not show. */
-export const turnWords = { unread: 'The first update is in. This one now asks for something its plan did not show, so read its plan again.' } as const;
+/**
+ * What a run in turn says. `unread`: the plan read again, once the one before it is in, asks for something the sheet
+ * did not show. `installedAfter`: the run is done and took other updates in first, so the page names them beside
+ * this one. KEPT HERE AND NOT IN `lib/copy/packs.ts`, which `lib/copy.ts` spreads into what every screen loads.
+ */
+export const turnWords = {
+  unread: 'The first update is in. This one now asks for something its plan did not show, so read its plan again.',
+  installedAfter: (title: string, first: readonly string[]) => `${title} is installed, after ${and(first)}.`,
+} as const;
 
 /** The words over what waits on the sheet, kept with the market's other words. */
 export const sheetWords = { waits: words.waits, waitsNote: words.waitsNote } as const;
@@ -182,6 +189,9 @@ export async function waitingOf(fetcher: typeof fetch, index: CatalogueIndex | n
   }
 }
 
+/** An install that went through: the arrangement to keep, and the updates a run in turn took in first, by title. */
+export type Installed = { ok: true; nav: string[] | null; first?: readonly string[] };
+
 const asksOf = (p: Planned): readonly string[] => (p.kind === 'pack' ? p.approve : p.plan.approve);
 
 /**
@@ -189,17 +199,24 @@ const asksOf = (p: Planned): readonly string[] => (p.kind === 'pack' ? p.approve
  * planned again, because the holder moved the record and only now does this plan read clean. One the holder already
  * brought in is passed over, and one that now asks for a line nobody was shown stops there. A plan that waits on
  * nothing is installed as it is. `by` is the record's own plan and install; a test hands in names.
+ *
+ * `first` IS WHO REALLY WENT IN BEFORE THIS ONE, by title and in order, for the page to say. One passed over is not
+ * in it, and a plan that waited on nothing carries none.
  */
 export async function installInTurn(
   planned: Planned,
   by: { replan: (u: Offered) => Promise<{ ok: true; planned: Planned } | Refused>; install: (p: Planned) => Promise<{ ok: true; nav: string[] | null } | Refused> },
-): Promise<{ ok: true; nav: string[] | null } | Refused> {
+): Promise<Installed | Refused> {
   if (planned.kind !== 'pack' || !planned.after || planned.after.first.length === 0) return by.install(planned);
   const { after, ...own } = planned;
   let nav: string[] | null = null;
   let code: string | null = null;
+  /* `inTurn` installs the first plan as it stands and plans every later one again, so the one in hand is the last planned. */
+  let at: Offered = after.first[0]!.of;
+  const first: string[] = [];
   const out = await inTurn<Offered, Planned>([...after.first.map((t) => ({ u: t.of, p: t.planned })), { u: after.self, p: own }], {
     replan: async (u) => {
+      at = u;
       const fresh = await by.replan(u);
       if (!fresh.ok) code = fresh.code;
       return fresh;
@@ -210,11 +227,12 @@ export async function installInTurn(
       const went = await by.install(p);
       if (went.ok) nav = went.nav ?? nav;
       else code = went.code;
+      if (went.ok && at !== after.self && at.title !== '') first.push(at.title);
       return went;
     },
     unread: turnWords.unread,
   });
-  return out.fix === '' ? { ok: true, nav } : { ok: false, fix: out.fix, code };
+  return out.fix === '' ? { ok: true, nav, ...(first.length > 0 ? { first } : {}) } : { ok: false, fix: out.fix, code };
 }
 
 /**
@@ -227,7 +245,7 @@ export async function install(
   states: readonly PackState[],
   arrangement: readonly string[],
   fallback: string,
-): Promise<{ ok: true; nav: string[] | null } | Refused> {
+): Promise<Installed | Refused> {
   if (planned.kind === 'pack' && planned.after && planned.after.first.length > 0) {
     return installInTurn(planned, { replan: (u) => planFor(client, u, u.file, states, fallback), install: (p) => install(client, p, states, arrangement, fallback) });
   }

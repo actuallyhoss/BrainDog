@@ -361,6 +361,18 @@ async function leadOn(t, base, slug, now, home) {
 const dayOf = (ms) => new Date(ms).toISOString().slice(0, 10);
 
 /* ── the walk ─────────────────────────────────────────────────────────────────────────────────────────── */
+/**
+ * WHY A SIGN-UP CALL WAS REFUSED, AS A REASON AND NEVER AS THE REFUSAL'S KIND ALONE (audit 78 claim 7: a host that
+ * answers 404 read "sign-up refused: refused"). The host's own sentence where it sent one. Where it sent none, that is
+ * said, with what the sign-up page shows a person at that moment (`send` and `makeFree` in its +page.svelte) and the
+ * kind kept as the last word.
+ */
+export function refusedWhy(step, out) {
+  if (typeof out.fix === 'string' && out.fix !== '') return out.fix;
+  const page = { send: signupWords.sendFailed, make: signupWords.makeFailed }[step];
+  return `the host sent no reason${page ? `, and the page says "${page}"` : ''} (${out.kind})`;
+}
+
 
 /**
  * Step 4's doors: sign up with the mailed link as the sign-up page does (`routes/signup/+page.svelte` `verify` and
@@ -382,14 +394,14 @@ async function keepIt(host, person, sent, title) {
     const token = new URLSearchParams(new URL(link).hash.slice(1)).get('verify');
     if (!token) return refused('the mail held a sign-in link, not a new record\'s, so this address already has an account');
     const verified = await verifySignup(token, t.web);
-    if (!verified.ok) return refused(`the link was refused: ${verified.fix ?? verified.kind}`);
+    if (!verified.ok) return refused(`the link was refused: ${refusedWhy('verify', verified)}`);
     const made = await checkout({ slug: verified.value.slug, name: verified.value.name, tz: verified.value.tz, plan: 'free' }, t.web);
-    if (!made.ok) return refused(`the free record was not made: ${made.fix ?? made.kind}`);
+    if (!made.ok) return refused(`the free record was not made: ${refusedWhy('make', made)}`);
     const opened = await openOwned(verified.value.slug, t.web);
-    if (!opened.ok) return refused(`the new record did not open: ${opened.fix ?? opened.kind}`);
+    if (!opened.ok) return refused(`the new record did not open: ${refusedWhy('open', opened)}`);
     return { t, door: 'signup', base: apiBase({ origin: host.origin, pathname: `${BASE}/${verified.value.slug}/` }) };
   }
-  if (!host.owner) return refused(started.fix ?? started.kind);
+  if (!host.owner) return refused(`asking for the link: ${refusedWhy('send', started)}`);
   const opened = await host.owner(t, person, title);
   return opened === true ? { t, door: 'self-host', base: host.origin } : refused(`the owner door: ${opened}`);
 }
@@ -667,12 +679,25 @@ export function redOf(results, host) {
   return STEPS.some((s) => said.get(s.id) !== true && !(s.id === 'offer' && said.get(s.id) === null && !host.advance));
 }
 
+/**
+ * The walk's last line, said after the steps. A WALK THAT IS NOT RED IS NOT ALWAYS WHOLE: on a host that keeps the real
+ * clock day 15 is left, `redOf` lets it by, and the command leaves with 0. So that run says "day 15 not walked" here,
+ * and only a walk with every step green says it walked them all.
+ */
+export function endOf(results, host) {
+  const green = results.filter((r) => r.pass === true).length;
+  if (redOf(results, host)) return `red. ${green} of ${STEPS.length} steps green`;
+  if (green === STEPS.length) return `green. all ${STEPS.length} steps walked`;
+  return `green as far as it went, with day 15 not walked: this host keeps the real clock. ${green} of ${STEPS.length} steps walked, so this is not the whole first run`;
+}
+
 /*
  * `node tools/people/expect/first-run.mjs [person.json]`: Mariam by default, on a fresh self-host.
  * `--base <origin> --link-file <path>`: on a host already running, the mailed link read from that file.
  *
  * IT LEAVES WITH 0 ONLY ON A WALK THAT IS NOT RED (`redOf`), AND WITH 1 ON ANYTHING ELSE, a throw among them, which is
- * said in red on the error stream. Read through a pipe (`| tail`), the shell answers with the pipe's exit code, not
+ * said in red on the error stream. ITS LAST LINE SAYS HOW MUCH WAS WALKED (`endOf`): 0 with "day 15 not walked" is a
+ * hosted run that stopped a step short of the whole. Read through a pipe (`| tail`), the shell answers with the pipe's exit code, not
  * this one: that, and nothing here, was the "exit 0 while red" of audit 75.
  */
 if (import.meta.url === `file://${process.argv[1]}`) {
@@ -692,6 +717,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       console.log(lineOf(r, process.stdout.isTTY === true));
     });
     red = redOf(said, host);
+    console.log(endOf(said, host));
   } catch (e) {
     console.error(`red. the walk stopped: ${e instanceof Error ? (e.stack ?? e.message) : String(e)}`);
   } finally {

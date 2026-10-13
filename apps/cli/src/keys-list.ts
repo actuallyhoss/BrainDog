@@ -249,6 +249,12 @@ const dayBy =
  * answer that is not empty: the keys whose day is after three days ago (`RECENT`). No zone is more than a day from
  * UTC, so every near key is among them wherever the record's clock is, and the record is believed when its answer
  * holds each of them and no key without a day. A host that refuses the count of days is left to this machine's date.
+ *
+ * AND A HOST THAT READS THE WORD AFTER THE FIELD AS TEXT PASSES ALL THREE. A day is written in digits, and digits sort
+ * before `today` and after `-3d`, so such a host calls every dated key before today, none after it and every one after
+ * three days ago, which is the honest record's answer to the letter. The three questions lean one way. So a fourth
+ * leans the other: the keys whose day is before three days from now (`SOON`). Every near key is among them in every
+ * zone, and as text no day is before `+3d`, so that host answers no key and is left to this machine's date.
  */
 function heard(after: Result<unknown[]>, past: ReadonlySet<string>, expires: string): boolean {
   if (!after.ok) return false;
@@ -257,20 +263,26 @@ function heard(after: Result<unknown[]>, past: ReadonlySet<string>, expires: str
 }
 
 const RECENT = 'after -3d';
+const SOON = 'before +3d';
+
+/** Whether an answer holds every near key and no key without a day: what the third and the fourth answer must both do. */
+function names(read: Result<unknown[]>, near: readonly string[], expires: string): boolean {
+  if (!read.ok) return false;
+  const dayIn = dayBy(expires);
+  const got = new Set<string>();
+  for (const r of read.value) {
+    if (!isObject(r) || typeof r.id !== 'string' || dayIn(r) === '') return false;
+    got.add(r.id);
+  }
+  return near.every((id) => got.has(id));
+}
 
 async function answered(client: Reader, said: { ids: ReadonlySet<string>; near: readonly string[] }, expires: string): Promise<boolean> {
   const after = await readAll(client, KEYS, `${expires} after today`);
   if (!heard(after, said.ids, expires)) return false;
   if (after.ok && after.value.length > 0) return true;
-  const recent = await readAll(client, KEYS, `${expires} ${RECENT}`);
-  if (!recent.ok) return false;
-  const dayIn = dayBy(expires);
-  const got = new Set<string>();
-  for (const r of recent.value) {
-    if (!isObject(r) || typeof r.id !== 'string' || dayIn(r) === '') return false;
-    got.add(r.id);
-  }
-  return said.near.every((id) => got.has(id));
+  if (!names(await readAll(client, KEYS, `${expires} ${RECENT}`), said.near, expires)) return false;
+  return names(await readAll(client, KEYS, `${expires} ${SOON}`), said.near, expires);
 }
 
 /** The sentence for a record that will not answer, by why. */
@@ -358,7 +370,7 @@ async function read(host: string | undefined, wanted: string | undefined, everyw
     where = names.get([...ids][0]!) ?? SOME_PROJECT;
   }
 
-  /* THE SECOND QUESTION, AND THE THIRD BEHIND IT, ARE PUT ONLY WHEN THE FIRST ANSWER COULD BE EITHER, so a record that plainly answered is read once. */
+  /* THE SECOND QUESTION, AND THE THIRD AND FOURTH BEHIND IT, ARE PUT ONLY WHEN THE FIRST ANSWER COULD BE EITHER, so a record that plainly answered is read once. */
   const said = pastOf(late, held.value, shape.expires, now);
   const past: Past | null = said === null ? null : said.near.length === 0 || (await answered(client, said, shape.expires)) ? said.ids : null;
   const keys = printable(readKeys(rows, names, past ?? dayHere(now), shape));

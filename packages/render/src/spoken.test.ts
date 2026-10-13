@@ -36,6 +36,31 @@ test('SPOKEN TAKES OUT WHAT A PERSON CANNOT READ, in a sentence somebody else wr
   assert.equal(spoken('Fix the sign-in in apps/web/src/login.ts'), 'Fix the sign-in');
 });
 
+test('A SHORT PATH GOES TOO, when its last part is a file by its extension, and two words with a slash stay', () => {
+  assert.equal(spoken('Approve the review (see docs/review.md)'), 'Approve the review', 'the bracket goes with it');
+  assert.equal(spoken('Approve the review (see docs/review.md).'), 'Approve the review.');
+  assert.equal(spoken('Read docs/review.md, then src/card.ts and data/rates.json.'), 'Read, then and.');
+  assert.equal(spoken('Fix it in src/card.ts.'), 'Fix it.', 'the stop that ended the sentence stays');
+  assert.equal(spoken('Open ./README.MD first'), 'Open first');
+  const same = [
+    'Renew it and/or cancel.',
+    'Open 24/7 all year.',
+    'Ask whether he/she agrees.',
+    'Ship it w/o the logo.',
+    'Compare Q3/Q4 spend.',
+    'Rate it 1.5/2.0 or better.',
+    'Pay by 10/06/2026.',
+    'Due 10/06.',
+    'Split it 50/50.Then send it.',
+    'Either/or.',
+  ];
+  for (const s of same) assert.equal(spoken(s), s, s);
+  /* Three parts or more read as they did before the short rule. */
+  assert.equal(spoken('Fix the sign-in in apps/web/src/login.ts'), 'Fix the sign-in');
+  assert.equal(spoken('Changed in (apps/web/src/a.ts, apps/web/src/b.ts)'), 'Changed');
+  assert.equal(showsOf('figure:docs/review.md'), null, 'a figure that is a path is not drawn');
+});
+
 test('A FIGURE THAT SAYS ITSELF IS DRAWN AS WRITTEN', () => {
   for (const said of ['EGP 1,200', '£12.98', '3 of 5', '12 days', 'Due 10/06/2026', '40%'])
     assert.deepEqual(showsOf(`figure:${said}`), { figure: said }, said);

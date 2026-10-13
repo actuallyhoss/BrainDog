@@ -62,6 +62,8 @@ export const cardWords = {
   adds: (value: string) => `Adds ${value}`,
   /** A value taken away, leaving nothing in its place. */
   removes: (value: string) => `Removes ${value}`,
+  /** Under the three changes a card draws, where the question makes more: how many wait on the question's own page. */
+  more: (n: number) => `and ${n} more, on its page`,
   /** Said to a screen reader before who asked, on the line over the question; the question's own page heads its side with it. */
   askedBy: 'Asked by',
   /** THE CARD'S SIDE, ON A WIDE TILE (DIRECTION §39): why it is asked and what it changes, each under a quiet heading. */
@@ -98,7 +100,11 @@ export type Card = {
   when: string;
   /** When a question put off comes back, and why, or `null`. */
   later: string | null;
-  /** What accepting does, in one line, or empty: on the lead, on every card that changes what a list holds, and where a change was left out of `lines`; an arrangement's own summary on every card that is one. */
+  /**
+   * What accepting does, in one line, or empty: on the lead, on every card that changes what a list holds, and where a
+   * change was left out of `lines`; an arrangement's own summary on every card that is one. Empty on a change to what a
+   * list holds whose every change is one of `lines`, which already say it.
+   */
   does: string;
   /** How many things a joined question changes, or 0. */
   joined: number;
@@ -114,6 +120,8 @@ export type Card = {
   shifts: Shift[];
   /** The same changes as the card draws them: a value where there was none is a phrase, never a struck "nothing". */
   lines: ShiftLine[];
+  /** How many more changes could be drawn and were not, past the three a card draws: said under them, or 0. */
+  more: number;
   /** The ways to answer, in the record's order; Accept names its amount and Reject says Decline. */
   ways: Way[];
   /** The answer Enter gives, or `null` where a key must not answer (hard to undo, or money moves). */
@@ -197,6 +205,28 @@ export function movesOf(v: unknown): Moved[] {
 const emptyValue = (v: unknown): boolean =>
   v === null || v === undefined || (typeof v === 'string' && v.trim() === '') || (Array.isArray(v) && v.every(emptyValue));
 
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+/**
+ * A DAY AS THE RECORD HOLDS ONE, SAID AS A DAY (DIRECTION §40, no raw timestamp): `2026-10-20` is "20 October 2026",
+ * the kernel's own wording in the sentence over these lines (`does.ts` `shortSaid`), year kept. With a time and no
+ * zone it is that day on the wall. With a zone it is an instant, whose day is whichever one the reader's clock puts it
+ * in: the kernel knows no zone and leaves such a value unsaid, and the card is drawn where the reader is. `null` for
+ * a text that is no day.
+ */
+function daySaid(text: string): string | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?)?$/u.exec(text);
+  if (!m) return null;
+  let [year, month, day] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  if (m[4] !== undefined) {
+    const at = new Date(text.replace(' ', 'T').replace(/([+-]\d{2})(\d{2})$/u, '$1:$2'));
+    if (Number.isNaN(at.getTime())) return null;
+    [year, month, day] = [at.getFullYear(), at.getMonth() + 1, at.getDate()];
+  }
+  const name = MONTHS[month - 1];
+  return name === undefined || day < 1 || day > 31 ? null : `${day} ${name} ${year}`;
+}
+
 /**
  * A value from before or after a change, in words: money in its currency, a list joined, an empty value said as nothing.
  * `null` for a value that is an id or a handle, which no card says, so the change it belongs to is left to its page.
@@ -212,6 +242,11 @@ function valueSaid(v: unknown, home: string | null | undefined): string | null {
   if (typeof v === 'boolean') return v ? 'yes' : 'no';
   if (typeof v === 'number') return Number.isFinite(v) ? v.toLocaleString('en-GB') : null;
   if (typeof v === 'string') {
+    const day = daySaid(v.trim());
+    if (day !== null) return day;
+    /* A TEXT A PATH WAS TAKEN OUT OF IS NOT THE VALUE: `spoken` cuts "docs/review.md" from a note and leaves the rest
+       reading whole, and a line drawn from that says the field holds what it does not. It is left to its page. */
+    if (/[\\/]/u.test(v)) return null;
     const said = spoken(saidOf(v.trim()));
     if (said === '' || ULID.test(said) || /^[a-z][\w-]*#\d+$/u.test(said) || /[\\/]/u.test(said)) return null;
     return said.length > 60 ? `${said.slice(0, 59).trimEnd()}…` : said;
@@ -244,18 +279,25 @@ export function shiftLinesOf(q: QueueQuestion, home?: string | null): ShiftLine[
   return shiftsRead(q, home).lines;
 }
 
+/** Whether two values a change carries are the same value, whatever their words. */
+const sameValue = (a: unknown, b: unknown): boolean => (emptyValue(a) && emptyValue(b)) || JSON.stringify(a) === JSON.stringify(b);
+
 /**
  * THE LINES, AND WHETHER ONE WAS LEFT OUT. A change whose value is an id, a handle or a path is no line (`valueSaid`),
  * and a long text nearly always holds a path, so the card would say nothing of the one thing it changes. `left` says
- * so, and the card says the record's own line of the change in its place (`cardOf`).
+ * so, and the card says the record's own line of the change in its place (`cardOf`). So is a change whose two values
+ * read alike in words and are not alike: two long texts that part after the cut, two times on one day.
+ *
+ * AT MOST THREE ARE DRAWN, AND `more` COUNTS THE REST that could have been, so the card says how many wait on the
+ * question's own page instead of saying nothing of them.
  */
-function shiftsRead(q: QueueQuestion, home?: string | null): { lines: ShiftLine[]; left: boolean } {
+function shiftsRead(q: QueueQuestion, home?: string | null): { lines: ShiftLine[]; left: boolean; more: number } {
   const out: ShiftLine[] = [];
   let left = false;
   const push = (label: unknown, before: unknown, after: unknown) => {
     const b = valueSaid(before, home);
     const a = valueSaid(after, home);
-    if (a === null || b === null) left = true;
+    if (a === null || b === null || (a === b && !sameValue(before, after))) left = true;
     if (a === null || b === null || a === b) return;
     const what = fieldSaid(label);
     const said = emptyValue(before) ? (what ? cardWords.setTo(a) : cardWords.adds(a)) : emptyValue(after) ? cardWords.removes(b) : null;
@@ -278,7 +320,7 @@ function shiftsRead(q: QueueQuestion, home?: string | null): { lines: ShiftLine[
       for (const k of new Set([...Object.keys(b), ...Object.keys(a)])) push(k, b[k], a[k]);
     } else if (before !== undefined || after !== undefined) push('', before, after);
   }
-  return { lines: out.slice(0, 3), left };
+  return { lines: out.slice(0, 3), left, more: Math.max(0, out.length - 3) };
 }
 
 /**
@@ -360,8 +402,15 @@ export function cardOf(q: QueueQuestion, ctx: CardContext): Card {
   const read = shiftsRead(q, ctx.home);
   /* THE RECORD'S LINE OF WHAT ACCEPTING CHANGES, ON EVERY CARD THAT CHANGES WHAT A LIST HOLDS, the lead's or not: it
      says which fields move and by how much, and a card further down the queue said nothing under "What it changes".
-     Any other kind keeps it for the lead, unless a change was left out of the lines above, where it is all there is. */
-  const says = ctx.lead === true || filed === 'rowset' || read.left;
+     Any other kind keeps it for the lead, unless a change was left out of the lines above, where it is all there is.
+
+     NOT SAID TWICE (integrate 79, his to rule; this takes back change-line-card-79's choice to say it on every such
+     card). The record's line of one entry's change is its fields from what to what, and so are the lines under it: where
+     every change is one of those lines, none left out and none past the third, the sentence says nothing more and is
+     not drawn, on the lead as below it. It stays wherever a change could not be drawn or was cut, since there it is
+     the only place that change is named. Another kind's line may say what the lines do not, and is left as it was. */
+  const drawn = filed === 'rowset' && read.lines.length > 0 && !read.left && read.more === 0;
+  const says = !drawn && (ctx.lead === true || filed === 'rowset' || read.left);
   /* SAID WHOLE WHERE THERE IS NOTHING TO TAKE OUT, as an arrangement's summary is (`arrangementOf`): a line that ends on
      a field's own name ("Changes Due on.") lost its last word to `spoken`, which reads it as a word left hanging. */
   const line = says && typeof q.does === 'string' ? saidOf(q.does) : '';
@@ -383,6 +432,7 @@ export function cardOf(q: QueueQuestion, ctx: CardContext): Card {
     money: said === '' ? '' : cardWords.moves(said),
     shifts: read.lines.map(({ what, before, after }) => ({ what, before, after })),
     lines: read.lines,
+    more: read.more,
     ways,
     enter: acceptKey({ options: keyed.options, band: cost }, moves.length > 0),
     decline: declineKey(keyed),

@@ -113,7 +113,7 @@ test('Decide and Add-ons read what waits from one place', () => {
   const addons = source('../packs/+page.svelte');
   assert.match(addons, /import \{ declarationName, firstPartyUpdates \} from '\.\.\/decide\/improved\.ts';/u, 'Add-ons reads its own list of what waits again');
   const from = addons.indexOf('async function updatesOf(');
-  const to = addons.indexOf("/** The record's plan for one update");
+  const to = addons.indexOf("The record's plan for one update");
   assert.ok(from >= 0 && to > from, 'the Updates tab no longer reads the way this test assumes');
   const updatesOf = addons.slice(from, to);
   assert.match(updatesOf, /firstPartyUpdates\(held\)/u, 'the Updates tab builds its first-party half without the card’s source');

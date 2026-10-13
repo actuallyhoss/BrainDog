@@ -59,7 +59,7 @@
   import Preview from '../Preview.svelte';
   import { browserStore, catalogueText, keepFirstKey, readHostCatalogue, signedWords, trustForEntry, trustWords } from '../catalogue.ts';
   import { FIXABLE, hasTheme, stageFix } from '$lib/theme/staged.ts';
-  import { askOnDecide, diffOf, install, notOwner, planFor, sheetWords, turnOn, waitingOf, waitsOf, type OfferClient, type Planned } from './offer.ts';
+  import { askOnDecide, diffOf, install, notOwner, planFor, sheetWords, turnOn, turnWords, waitingOf, waitsOf, type OfferClient, type Planned } from './offer.ts';
 
   const KINDS: readonly ListingKind[] = ['module', 'usecase', 'pack'];
   const kind = $derived<ListingKind>(KINDS.find((k) => k === page.url.searchParams.get('kind')) ?? 'usecase');
@@ -314,7 +314,8 @@
       if (out.ok) {
         if (out.nav) pref.write({ nav: out.nav });
         if (entry && trust) await keepFirstKey(browserStore(), `${entry.kind}:${entry.id}`, trust);
-        toasts.push(copy.shareInstalled(listing.title), { intent: 'good' });
+        /* A run that took other updates in first names them (`offer.ts` `installInTurn`), so nobody finds one moved unsaid. */
+        toasts.push(out.first ? turnWords.installedAfter(listing.title, out.first) : copy.shareInstalled(listing.title), { intent: 'good' });
         planned = null;
       } else if (entry && notOwner(out.code)) {
         planned = null;

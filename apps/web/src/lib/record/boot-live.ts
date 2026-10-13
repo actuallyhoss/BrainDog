@@ -844,12 +844,19 @@ export function layoutOf(b: Boot, implied: Implied | undefined = IMPLIED.get(b))
      guess: Work reads tasks and milestones and no list is called Work, so it sat in a fresh rail with nothing in it.
      It waits while every one of its lists is empty, and comes with the first row in any. A list this caller was sent
      no count for is not held against the page, since nothing says it is empty. A page that says it reads none is never
-     judged, and a host that sends no `lists` reads as before. */
+     judged, and a host that sends no `lists` reads as before.
+
+     AND `lists: null` IS A PAGE THAT READS LISTS, EVERY ONE OF THEM A STARTER SET NOBODY HAS TOUCHED. The record leaves
+     such a list out of `lists`, so the page arrived saying `[]`, which is "reads none" and is never judged: an add-on's
+     page sat in a fresh rail over nothing of the person's. It waits until the first row of their own, when the record
+     says the list by name again. Its count is not read here, since what it counts was planted. A colleague's own list
+     keeps the page, as above. */
   const rows = new Map(b.registers.map((r) => [r.id, r.count]));
   const named = new Map(b.registers.map((r) => [r.name.trim().toLowerCase(), r.id]));
   const waiting = (p: NonNullable<Boot['pages']>[number]) => {
     if (!p.nav || p.nav.section === copy.viewsSection) return false;
-    const said = p.lists;
+    const said: readonly unknown[] | null | undefined = p.lists;
+    if (said === null) return !(typeof p.list === 'string' && theirs.has(p.list));
     if (Array.isArray(said)) {
       return said.length > 0 && said.every((l) => typeof l === 'string' && !theirs.has(l) && rows.get(l) === 0);
     }

@@ -31,6 +31,11 @@
  * "5678 Netflix". A word ends the name only when it holds three digits or more, and every group of the card's number
  * goes with the card. 1.2.0 is published, so this is a version above it.
  *
+ * STILL 1.3.0, NOT YET RELEASED (audit of batch 77, claim 3). A day the bank wrote after the payee, `SPOTIFY 12 OCT`,
+ * stayed in the name as a short number does, so each month was a payee of its own and nothing ever repeated. A number
+ * of one or two digits ends the name when a month or a day with a stroke follows it, and a day with a stroke ends it
+ * itself. The live catalogue held no Money watch on 14 October 2026, so 1.3.0 is changed in place.
+ *
  * RED FIRST, MEASURED: with no `twice.js` and no `money-watch.pack.json` this file failed at its first read, ENOENT,
  * before a single test ran.
  */
@@ -502,6 +507,54 @@ test('A SHORT NUMBER IN A SHOP\'S NAME IS THE SHOP\'S: Studio 54 Cafe and Studio
     await paid('GEIDEA*CHILLOUT 0418 CAIRO EG', '2026-10-10', 9_000);
     await paid('GEIDEA*CHILLOUT 12/10 CAIRO EG', '2026-10-10', 9_000);
     assert.deepEqual(r.flags().map((f) => f.payee).sort(), ['Chillout', 'Netflix', 'Studio 54 Cafe']);
+  } finally {
+    await r.close();
+  }
+});
+
+test('A DAY THE BANK WROTE AFTER THE PAYEE IS NOT ITS NAME: SPOTIFY 12 OCT and SPOTIFY 12 NOV are one payee, and a short number with no month after it stays', async () => {
+  /* RED FIRST, MEASURED on 1.3.0 as batch 77 left it: `SPOTIFY 12 OCT` read { key: 'words:spotify12oct', name:
+     'Spotify 12 Oct' }, so the two charges below were two payees and no question opened. */
+  const r = await fresh();
+  try {
+    const paid = (words: string, on: string, amount: number) => r.charge(words, on, amount, { counterparty_text: words });
+    await paid('SPOTIFY 12 OCT', '2026-10-12', 9_900);
+    await paid('SPOTIFY 12 OCT', '2026-10-12', 9_900);
+    assert.deepEqual(r.open().map((q) => q.question), ['Spotify E£99 twice on 12 Oct. Both real?']);
+    assert.deepEqual(r.flags().map((f) => f.payee), ['Spotify']);
+    /* THE WHOLE MONTH, A YEAR AFTER IT, AND A DAY WITH A STROKE, however short, are the same payee. */
+    await paid('NETFLIX 9 October 2026', '2026-10-09', 21_900);
+    await paid('NETFLIX 9/10', '2026-10-09', 21_900);
+    await paid('ANGHAMI 5/9', '2026-10-05', 4_900);
+    await paid('ANGHAMI 5 9/26', '2026-10-05', 4_900);
+    assert.deepEqual(r.flags().map((f) => f.payee).sort(), ['Anghami', 'Netflix', 'Spotify']);
+    /* A SHORT NUMBER WITH NO MONTH AFTER IT IS STILL THE SHOP'S, as 1.3.0 read it: a branch is not told from a name,
+       and a word that only starts like a month (Marina) is no month. */
+    await paid('KFC 12 CAIRO', '2026-10-06', 12_000);
+    await paid('KFC 14 CAIRO', '2026-10-06', 12_000);
+    await paid('Studio 54 Cafe', '2026-10-07', 12_000);
+    await paid('Studio 54 Bar', '2026-10-07', 12_000);
+    await paid('Cafe 5 Marina', '2026-10-08', 12_000);
+    await paid('Cafe 5 Maadi', '2026-10-08', 12_000);
+    assert.deepEqual(r.flags().map((f) => f.payee).sort(), ['Anghami', 'Netflix', 'Spotify'], 'no two of these six are one payee');
+    await paid('KFC 12 CAIRO', '2026-10-07', 12_000);
+    assert.deepEqual(r.flags().map((f) => f.payee).sort(), ['Anghami', 'Kfc 12 Cairo', 'Netflix', 'Spotify']);
+  } finally {
+    await r.close();
+  }
+});
+
+test('LOOKS LIKE IT REPEATS READS THE SAME PAYEE EVERY MONTH: three months of SPOTIFY with the day after it are one offer, by the name alone', async () => {
+  /* RED FIRST, MEASURED as above: the three were "Spotify 12 Aug", "Spotify 12 Sep" and "Spotify 12 Oct", three
+     payees paid once each, so nothing was offered. */
+  const r = await fresh();
+  try {
+    const paid = (words: string, on: string, amount: number) => r.charge(words, on, amount, { counterparty_text: words });
+    await paid('SPOTIFY 12 AUG', '2026-08-12', 9_900);
+    await paid('SPOTIFY 12 SEP', '2026-09-12', 9_900);
+    await paid('SPOTIFY 12 OCT', '2026-10-12', 9_900);
+    await r.nextDay();
+    assert.deepEqual(r.open().map((q) => q.question), ['Add Spotify to Repeating, E£99 around the 12th?']);
   } finally {
     await r.close();
   }

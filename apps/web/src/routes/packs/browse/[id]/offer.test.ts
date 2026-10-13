@@ -10,7 +10,7 @@ import { readFileSync } from 'node:fs';
 
 import type { SharedPlan } from '../../sharing.ts';
 import { sheetOf } from '../../../../lib/market/plan.ts';
-import { afterOthers, diffOf, installInTurn, sheetWords, waitsOf, type Offered, type Planned } from './offer.ts';
+import { afterOthers, diffOf, installInTurn, sheetWords, turnWords, waitsOf, type Offered, type Planned } from './offer.ts';
 
 const planned = (diff: Record<string, unknown>, planHash = 'h'): Planned => ({ kind: 'pack', doc: {}, diff, planHash, approve: [] });
 
@@ -112,7 +112,9 @@ test('Approve puts Personal in first, then plans Money again and installs that p
     },
   });
   assert.deepEqual(went, ['install Personal', 'plan Money', 'install Money h2']);
-  assert.deepEqual(out, { ok: true, nav: ['home'] });
+  assert.deepEqual(out, { ok: true, nav: ['home'], first: ['Personal'] });
+  /* The page says who went in with it, by name. */
+  assert.equal(out.ok && out.first ? turnWords.installedAfter('Money', out.first) : '', 'Money is installed, after Personal.');
 });
 
 test('a refusal on the way keeps its code, and Money already brought in by Personal is passed over', async () => {
@@ -130,7 +132,35 @@ test('a refusal on the way keeps its code, and Money already brought in by Perso
     },
   });
   assert.deepEqual(went, ['usecase']);
-  assert.equal(out.ok, true);
+  assert.deepEqual(out, { ok: true, nav: null, first: ['Personal'] }, 'Personal went in; Money, passed over, is not named as going first');
+});
+
+test('a run that took nothing in first names nobody, and the page says the old sentence', async () => {
+  const went: string[] = [];
+  const out = await installInTurn(moneyPlan(false), {
+    replan: async () => assert.fail('nothing to plan again'),
+    install: async (p) => {
+      went.push(p.kind);
+      return { ok: true, nav: null };
+    },
+  });
+  assert.deepEqual(went, ['pack']);
+  assert.deepEqual(out, { ok: true, nav: null });
+  const page = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
+  assert.match(page, /out\.first \? turnWords\.installedAfter\(listing\.title, out\.first\) : copy\.shareInstalled\(listing\.title\)/);
+});
+
+test('two holders are named in the order they went in, and one passed over is left out', async () => {
+  const work: Offered = { ...personal, key: 'usecase:work', id: 'work', title: 'Work' };
+  const plain = moneyPlan(false);
+  const both: Planned = { ...(plain as Extract<Planned, { kind: 'pack' }>), after: { self: money, first: [personal, work].map((of) => ({ of, planned: { kind: 'usecase', plan: personalPlan } })), shown: null } };
+  const fresh: Planned = { kind: 'usecase', plan: personalPlan };
+  const ran = await installInTurn(both, { replan: async (u) => ({ ok: true, planned: u === money ? moneyPlan(false, 'h2') : fresh }), install: async () => ({ ok: true, nav: null }) });
+  assert.equal(ran.ok && ran.first ? turnWords.installedAfter('Money', ran.first) : '', 'Money is installed, after Personal and Work.');
+
+  const brought = planned({ pack: { id: 'work', version: '2.0.0' }, planHash: 'h4', installed_version: '2.0.0' });
+  const skipped = await installInTurn(both, { replan: async (u) => ({ ok: true, planned: u === work ? brought : moneyPlan(false, 'h2') }), install: async () => ({ ok: true, nav: null }) });
+  assert.deepEqual(skipped.ok ? skipped.first : null, ['Personal']);
 });
 
 test('the listing hands its plan what else waits, so the wait is read where the update is pressed', () => {
