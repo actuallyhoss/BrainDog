@@ -34,6 +34,7 @@
   import { draw, saidPlainly, walkTables } from '$lib/record/blocks.ts';
   import { joinsWithOr, registerHref } from '$lib/record/where.ts';
   import { rowHref } from '$lib/record/row-href.ts';
+  import { dayHref } from '$lib/record/day-href.ts';
   import { may } from '$lib/record/may.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
   import { fileAt, namedResolverOf, type LiveBlock, type Walked } from '$lib/record/page-live.ts';
@@ -193,8 +194,11 @@
     /* EVERY LINK THE RENDERER DRAWS, under the app: the record writes `/decide`, and the tab is on `/app/<slug>`. */
     href: inApp,
     /* `{{ref:tasks#241}}` IS A LINK TO THAT ROW: its own page where its list made one, else its screen (`row-href.ts`).
-       Record-relative, and `href` above puts it under the app. No `dayHref`: no page of this record draws a calendar. */
+       Record-relative, and `href` above puts it under the app. */
     link: rowHref,
+    /* `{{date:2026-11-03}}` IS A LINK TO THAT DAY ON THE CALENDAR, on a record whose pages hold one (`day-href.ts`);
+       on any other the renderer is answered `null` and draws the date plain. */
+    dayHref: (iso: string) => dayHref((route.data as unknown as Partial<Shell>).pages, iso),
     /* A HOLE IS A BUTTON only where something answers the press. */
     ...(writes ? { hole: (path: string | null) => holes?.press(path) } : {}),
     icon,

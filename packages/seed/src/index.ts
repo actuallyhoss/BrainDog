@@ -33,7 +33,7 @@ export { PROJECTS_SAID, THINGS } from './modules/portfolio.ts';
 export { ORGANISATIONS, PEOPLE } from './modules/people.ts';
 export { RUNS, TASKS, TRACKS, UPDATES, openTasksSeries } from './modules/work.ts';
 
-import { NOW, day, hours, type Fields, type SeedMetric, type SeedPage, type SeedRegister, type SeedRule } from './modules/base.ts';
+import { BASE_PAGES, NOW, day, hours, type Fields, type SeedMetric, type SeedPage, type SeedRegister, type SeedRule } from './modules/base.ts';
 import {
   ACCOUNTS,
   CATEGORIES,
@@ -171,7 +171,7 @@ export const METRICS: Record<string, SeedMetric> = { ...MONEY_METRICS, ...ESTATE
 
 /* ── the pages it ships with ────────────────────────────────────── */
 
-export const PAGES: Record<string, SeedPage> = { ...MONEY_PAGES, ...ESTATE_PAGES, ...PORTFOLIO_PAGES, ...WORK_PAGES, ...PEOPLE_PAGES, ...HEALTH_PAGES };
+export const PAGES: Record<string, SeedPage> = { ...MONEY_PAGES, ...ESTATE_PAGES, ...PORTFOLIO_PAGES, ...WORK_PAGES, ...PEOPLE_PAGES, ...HEALTH_PAGES, ...BASE_PAGES };
 
 /* ── installing it ────────────────────────────────────────────────────────── */
 

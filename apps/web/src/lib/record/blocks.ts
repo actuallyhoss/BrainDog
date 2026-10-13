@@ -998,8 +998,7 @@ type Charted = { currency: string | null; block: BlockResult }[];
 /**
  * `stale` IS SAID BESIDE THE DAY, where a list's own money was converted here: the day alone could not say its rates were
  * out of date, so a bar or a split over a list's entries could never ask a page for its foot (rates-foot-note-80).
- * NOTHING READS IT YET (audit 80, claim 5): the page's foot (`page-live.ts` `oldestStale`) asks only a figure's
- * readings and a sentence's `values_fx`, so a bar or a split over a list's own entries still asks for no foot.
+ * The page's foot reads it through `staleOf` below, beside a figure's readings and a sentence's `values_fx`.
  */
 type Split = { charts: Charted; converted: string | null; stale?: boolean; note?: string | null };
 
@@ -1151,6 +1150,16 @@ function linkedCharted(block: BlockResult, of: string): Split | null {
     })),
     converted: null,
   };
+}
+
+/**
+ * The day a bar or a split over a list's own money was converted at out of date rates, or `null`: for the page's foot
+ * (`page-live.ts` `oldestStale`), which could not ask before (audit 80, claim 5). It reads what `toSegments` is about
+ * to draw and changes none of it, so the day is the one the line under the chart says.
+ */
+export function staleOf(block: BlockResult): string | null {
+  const split = charted(block);
+  return split?.stale === true && split.converted ? split.converted : null;
 }
 
 export function toSegments(block: BlockResult, kinds?: Readonly<Record<string, KindSpec>>): ReturnType<typeof parse> {

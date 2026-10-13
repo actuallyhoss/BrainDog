@@ -51,6 +51,15 @@ test('twice=1 on the list of people reads as the held-twice filter', () => {
   assert.equal(heldTwiceOn(params('/r/people?sort=name&twice=1&f=trust:in:known'), PEOPLE), true);
 });
 
+test('the sample declares the role itself, and its list narrows as it stands', () => {
+  /* `PEOPLE` above says the role again, which would hide a sample that stopped saying it. */
+  const own = REGISTERS.people;
+  assert.ok(own, 'the sample no longer has a list of people');
+  assert.equal((own as { meets?: { name?: string } }).meets?.name, 'name', 'the sample no longer declares the role');
+  assert.equal(heldTwiceOn(params('/r/people?twice=1'), own), true);
+  assert.equal(heldTwiceOn(params('/r/people'), own), false);
+});
+
 test('any other spelling, and no word, is the list as it always opened', () => {
   for (const href of ['/r/people', '/r/people?twice=', '/r/people?twice=0', '/r/people?twice=yes', '/r/people?f=twice:in:1'])
     assert.equal(heldTwiceOn(params(href), PEOPLE), false, href);

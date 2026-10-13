@@ -351,10 +351,11 @@ test('SOMEBODY HELD TWICE IS SAID UNDER THE PAGE\'S LINE, by how many and never 
   const note = twiceOn(page);
   assert.ok(note, 'People says nothing of somebody held twice');
   assert.notEqual(note.drawn, false);
-  assert.equal(note.body, 'Some people may be on this record twice. Too many: {{held-twice}}. [See them](/r/people?twice=1).');
+  assert.equal(note.body, '{{held-twice-shown}} people may be on this record twice, {{held-twice}} too many. [See them](/r/people?twice=1).');
   /* NO QUESTION IS PROMISED: nothing asks about a plain pair by night yet, so the note says the number and stops. */
   assert.doesNotMatch(String(note.body), /Decide/u);
   assert.equal((note as { values?: Record<string, unknown> }).values?.['held-twice'], 1);
+  assert.equal((note as { values?: Record<string, unknown> }).values?.['held-twice-shown'], 2);
   /* AFTER THE PAGE'S LINE AND BEFORE THE CARDS, and not a second headline: a page opens on one sentence. */
   const at = page.blocks.indexOf(note);
   assert.equal(at, 2);
@@ -362,7 +363,7 @@ test('SOMEBODY HELD TWICE IS SAID UNDER THE PAGE\'S LINE, by how many and never 
   assert.equal(page.blocks[at + 1]?.heading, 'Everyone');
   assert.notEqual(note.lead, true);
   /* NO ID, NO LIST'S NUMBER: the count and plain words. */
-  assert.doesNotMatch(String(note.body).replace('{{held-twice}}', '1'), /people#|#\d|\b[0-9A-HJKMNP-TV-Z]{26}\b|—/u);
+  assert.doesNotMatch(String(note.body).replace('{{held-twice-shown}}', '2').replace('{{held-twice}}', '1'), /people#|#\d|\b[0-9A-HJKMNP-TV-Z]{26}\b|—/u);
 });
 
 test('NOBODY HELD TWICE SAYS NOTHING, and the rest of the page is as it was', async () => {

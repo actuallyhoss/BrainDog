@@ -51,6 +51,11 @@ export type KindModule = {
    */
   keys: readonly string[];
   /**
+   * The sources this kind reads itself though each says `first` (`sources/index.ts`). `pages.ts` answers a `first`
+   * source before any kind is asked, and asks the kind instead when the block's source is named here.
+   */
+  across?: readonly string[];
+  /**
    * What is wrong with this block as this kind reads it, or `null`. The sentence is about the block alone: the
    * install puts the page's id and the block's place in front of it, and `at` is the key inside the block.
    *

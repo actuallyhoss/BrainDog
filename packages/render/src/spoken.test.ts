@@ -53,8 +53,14 @@ test('A SHORT PATH GOES TOO, when its last part is a file by its extension, and 
     'Due 10/06.',
     'Split it 50/50.Then send it.',
     'Either/or.',
+    /* Two words that hold a stop are no file in a folder (audit 81, claim 2): each lost words before. */
+    'Use e.g./i.e. forms',
+    'Fix a/b.test please',
+    'try v1/v2.beta',
+    'See Node.js/Deno.land now',
   ];
   for (const s of same) assert.equal(spoken(s), s, s);
+  assert.equal(spoken('Keep docs/.env out of it'), 'Keep out of it', 'a file that is all extension is still a file');
   /* Three parts or more read as they did before the short rule. */
   assert.equal(spoken('Fix the sign-in in apps/web/src/login.ts'), 'Fix the sign-in');
   assert.equal(spoken('Changed in (apps/web/src/a.ts, apps/web/src/b.ts)'), 'Changed');

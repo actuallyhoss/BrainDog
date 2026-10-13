@@ -10,6 +10,10 @@
  * THE NUMBER IS HOW MANY TOO MANY (audit 78, claim 1): the figure counts the ones that would go if each pair were one
  * person, and the list the link opens shows every one of each pair, so "twice: 1" stood over a list of two. The note
  * says "Too many" now, and the last test reads the figure and the people the link shows from one real record.
+ *
+ * AND THE PEOPLE SHOWN ARE SAID FIRST (batch 82): the kernel counts them as `held-twice-shown`, so the note reads
+ * "2 people may be on this record twice, 1 too many", and the last test holds the first number to the list the link
+ * opens and the second to the figure.
  */
 
 import { test } from 'node:test';
@@ -70,8 +74,9 @@ const noteOn = (k: Kernel): Note | undefined => {
 /** Every link a line of prose holds, at any depth. */
 const linksOf = (nodes: Inline[]): Extract<Inline, { type: 'link' }>[] =>
   nodes.flatMap((n) => (n.type === 'link' ? [n, ...linksOf(n.body)] : 'body' in n ? linksOf(n.body) : []));
-/** The note as the page draws it, with the figure read as `count`. */
-const drawn = (body: string, count: number): Inline[] => inline(body, { resolve: (path) => (path === 'held-twice' ? String(count) : null) });
+/** The note as the page draws it, with the figure read as `count` and the people the link shows as `shown` (one pair unless said). */
+const drawn = (body: string, count: number, shown = count + 1): Inline[] =>
+  inline(body, { resolve: (path) => (path === 'held-twice' ? String(count) : path === 'held-twice-shown' ? String(shown) : null) });
 
 /** Two of one name, neither with an address: the plain rule's pair. */
 const holdTwice = (k: Kernel, name = 'Odile Farrow', times = 2): void => {
@@ -101,11 +106,11 @@ test('SOMEBODY HELD TWICE CAN BE PRESSED: the note links the list of people, at 
   assert.doesNotMatch(text(links[0]!.body), /^(?:here|this|click)\b/iu);
 });
 
-test('THE NOTE STILL READS AS PLAIN WORDS: what the number counts, then the number, no id, no dash, no promise of a question', async () => {
+test('THE NOTE STILL READS AS PLAIN WORDS: the people, then how many too many, no id, no dash, no promise of a question', async () => {
   const k = await seeded();
   holdTwice(k);
   const said = text(drawn(String(noteOn(k)!.body), 1));
-  assert.match(said, /^Some people may be on this record twice\. Too many: 1\./u);
+  assert.match(said, /^2 people may be on this record twice, 1 too many\./u);
   assert.doesNotMatch(said, /people#|#\d|\b[0-9A-HJKMNP-TV-Z]{26}\b|—|\/r\/|Decide/u);
   /* NOTHING LEFT UNREAD: no token the drawer could not resolve, so no dotted text on the page. */
   assert.ok(drawn(String(noteOn(k)!.body), 1).every((n) => n.type !== 'unresolved'));
@@ -129,36 +134,56 @@ test('THE LINK NARROWS BY THE ONE WORD `twice`, and the note no longer sets the 
   assert.deepEqual([...at.searchParams.keys()], ['twice']);
   /* THE LIST SHOWS THEM, so the words that sent the reader down everyone's names are gone. */
   const said = text(drawn(String(note!.body), 2));
-  assert.equal(said, 'Some people may be on this record twice. Too many: 2. See them.');
+  assert.equal(said, '3 people may be on this record twice, 2 too many. See them.');
   assert.doesNotMatch(said, /same person|by name|look for/iu);
 });
 
-test('THE NUMBER IS HOW MANY TOO MANY, AND THE LIST SHOWS EVERY ONE OF THEM: the words never call the figure the people shown', async () => {
+test('THE PEOPLE SAID ARE THE PEOPLE THE LIST SHOWS, AND THE TOO-MANY IS THE FIGURE: two numbers, each called what it counts', async () => {
   const { k, sql } = await seededOn();
-  /** The figure the note is handed, and how many people the list behind its link is narrowed to. */
-  const read = (): { said: number; shown: number; words: string } => {
+  /** The two figures the note is handed, and how many people the list behind its link is narrowed to. */
+  const read = (): { said: number; people: number; shown: number; words: string } => {
     const note = noteOn(k);
     assert.ok(note && note.drawn !== false, 'People says nothing of somebody held twice');
-    const said = (note as { values?: Record<string, unknown> }).values?.['held-twice'];
+    const values = (note as { values?: Record<string, unknown> }).values;
+    const said = values?.['held-twice'];
+    const people = values?.['held-twice-shown'];
     assert.equal(typeof said, 'number');
+    assert.equal(typeof people, 'number', 'the note is handed no count of the people its link shows');
     const ids = peopleTwiceIdsIn(sql);
     assert.ok(ids, 'the record keeps no people');
-    return { said: said as number, shown: new Set(ids).size, words: text(drawn(String(note.body), said as number)) };
+    return { said: said as number, people: people as number, shown: new Set(ids).size, words: text(drawn(String(note.body), said as number, people as number)) };
   };
 
-  /* ONE PAIR: two people on the list, one too many. The old line said "twice: 1" over a list of two. */
+  /* ONE PAIR: two people on the list, one too many. The first line said "twice: 1" over a list of two. */
   holdTwice(k);
   const pair = read();
-  assert.deepEqual([pair.said, pair.shown], [1, 2]);
-  assert.equal(pair.words, 'Some people may be on this record twice. Too many: 1. See them.');
+  assert.deepEqual([pair.said, pair.people, pair.shown], [1, 2, 2]);
+  assert.equal(pair.words, '2 people may be on this record twice, 1 too many. See them.');
 
   /* AND THREE OF ANOTHER NAME: five on the list, three too many. */
   holdTwice(k, 'Ansel Brandt', 3);
   const more = read();
-  assert.deepEqual([more.said, more.shown], [3, 5]);
-  assert.match(more.words, /Too many: 3\./u);
+  assert.deepEqual([more.said, more.people, more.shown], [3, 5, 5]);
+  assert.equal(more.words, '5 people may be on this record twice, 3 too many. See them.');
 
-  /* THE LIST IS ALWAYS LONGER THAN THE NUMBER, so the number is never said as the people held twice. */
+  /* THE LIST IS ALWAYS LONGER THAN THE TOO-MANY, and the number beside "people" is the list's and never the figure's. */
   assert.ok(more.shown > more.said);
-  assert.doesNotMatch(more.words, /twice: \d|\b\d+ (?:people|of them)\b/iu);
+  assert.match(more.words, new RegExp(`^${more.shown} people\\b`, 'u'));
+  assert.doesNotMatch(more.words, new RegExp(`\\b${more.said} (?:people|of them)\\b|twice: \\d`, 'iu'));
+});
+
+test('BOTH NUMBERS ARE READ, AND THE NOTE IS DRAWN BY THE TOO-MANY AS BEFORE', async () => {
+  const k = await seeded();
+  const [declared] = (PAGES.people!.blocks as unknown as Note[]).filter((b) => b.kind === 'note' && String(b.body).includes('{{held-twice}}'));
+  assert.ok(declared);
+  /* THE SAME `when`: the people shown are nought exactly when nobody is too many, so one figure decides. */
+  assert.deepEqual(declared.when, { metric: 'held-twice', gt: 0 });
+  assert.deepEqual(String(declared.body).match(/\{\{[^}]+\}\}/gu), ['{{held-twice-shown}}', '{{held-twice}}']);
+  /* BOTH ARE FIGURES OF THIS RECORD, so neither is left as dotted text on the page. */
+  for (const metric of ['held-twice', 'held-twice-shown']) assert.ok(k.metricDecl(metric), `${metric} is not a figure of this record`);
+  holdTwice(k);
+  const note = noteOn(k)!;
+  assert.deepEqual(note.refusals, []);
+  /* NEVER "1 people": a pair is two, so the plural always holds. */
+  assert.ok(Number((note as { values?: Record<string, unknown> }).values?.['held-twice-shown']) >= 2);
 });

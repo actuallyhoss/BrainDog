@@ -49,6 +49,8 @@
  * AND `held-twice`, THE PEOPLE HELD MORE THAN ONCE (AGT-D05): how many would go if every plain pair he has not answered
  * were one person, and each one marked as the record's own person beyond the first. His own record held him twice and
  * nothing could say so. `people.ts` counts, by the rules its nightly questions ask by, so the two never disagree.
+ * AND `held-twice-shown`, THE PEOPLE THAT COUNT IS ABOUT: two of one name are 1 too many and 2 people to look at, so a note
+ * can say both ("3 people, 2 too many"). Read from the same pass, and nothing at all where nobody is held twice.
  *
  * `signs.ts` IS NOT IMPORTED, only its types. It reaches `flow.ts` and `digest.ts`, which import `metrics.ts`, which
  * imports this, and the loop that made broke the kernel's own load (`flow.ts` read a pattern before it was set). So the
@@ -369,6 +371,21 @@ const PEOPLE_TWICE: MetricDecl = {
   format: 'int',
 };
 
+/**
+ * The people `held-twice` is about, each once: both of a pair, all three of three who share a name. Always more than
+ * `held-twice` says, which counts only how many would go. It carries the same target, since both fall to nought together.
+ */
+const PEOPLE_TWICE_SHOWN: MetricDecl = {
+  metric: 'held-twice-shown',
+  name: 'People who may be held more than once',
+  source: RECORD_PEOPLE,
+  value: { count: 'id' },
+  target: { lte: 0 },
+  window: '30d',
+  compare: 'none',
+  format: 'int',
+};
+
 /* ── what the night counts (REC-A17 job 3, REC-A13 job 1) ────────────── */
 
 /** The source of `lists-shrunk`: the night's counts of each list (`night-counts.ts`, `countLists`). */
@@ -430,6 +447,7 @@ export const BUILT_IN_FIGURES: Readonly<Record<string, MetricDecl>> = {
   'keys-in-text': KEYS_IN_TEXT,
   'marks-unknown': MARKS_UNKNOWN,
   'held-twice': PEOPLE_TWICE,
+  'held-twice-shown': PEOPLE_TWICE_SHOWN,
   'lists-shrunk': LISTS_SHRUNK,
   'documents-dead-paths': DOCUMENTS_DEAD_PATHS,
 };
@@ -745,18 +763,32 @@ export function readMarksUnknown(sql: Sql, _ctx: unknown, decl: MetricDecl): Res
   return judged(decl, n, 'pictures that name nothing the set draws');
 }
 
-/** The count `held-twice` reads, handed in by the module that owns it when it loads, so this file imports no list's module. */
+/**
+ * The counts `held-twice` and `held-twice-shown` read, handed in by the module that owns them when it loads, so this
+ * file imports no list's module. `shown` is the people the first count is about, from the same pass.
+ */
 let heldTwice: ((sql: Sql) => number | null) | null = null;
-export function countHeldTwiceBy(count: (sql: Sql) => number | null): void {
+let heldTwiceShown: ((sql: Sql) => number | null) | null = null;
+export function countHeldTwiceBy(count: (sql: Sql) => number | null, shown?: (sql: Sql) => number | null): void {
   heldTwice = count;
+  if (shown !== undefined) heldTwiceShown = shown;
 }
 
 /**
  * `held-twice`: the people held more than once, on the list that plays `meets:` (`peopleTwiceIn` in `people.ts`, the
  * count the nightly questions are asked by). Never somebody another member added, never a pair he answered, and nobody
  * counted twice. NOTHING, NEVER NOUGHT, on a record with no people list.
+ *
+ * AND `held-twice-shown`, read here too since it shares the source: how many people that count is about. NOTHING where
+ * nobody is held twice, so a note that says both numbers is not drawn as "0 people, 0 too many".
  */
 export function readPeopleTwice(sql: Sql, _ctx: unknown, decl: MetricDecl): Result<Reading> {
+  if (decl.metric === PEOPLE_TWICE_SHOWN.metric) {
+    const shown = heldTwiceShown ? heldTwiceShown(sql) : null;
+    if (shown === null) return judged(decl, null, 'no list on this record holds people');
+    if (shown === 0) return judged(decl, null, 'nobody is held more than once');
+    return judged(decl, shown, 'people who may be held more than once, by name or marked as you');
+  }
   const n = heldTwice ? heldTwice(sql) : null;
   if (n === null) return judged(decl, null, 'no list on this record holds people');
   return judged(decl, n, 'people held more than once, by name or marked as you');

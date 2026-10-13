@@ -2099,9 +2099,10 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
 
   /* A SOURCE THAT SAYS `first` IS ANSWERED BEFORE ANY KIND READS THE BLOCK (`sources/index.ts` `Source.first`): the figures
      pinned to Home, which a `stat` names no cells for, and what falls due, which is one answer whatever draws it. Each
-     says why in its own file. */
+     says why in its own file. BUT A REGISTERED KIND WHOSE `across` NAMES THE SOURCE READS IT ITSELF (`kinds/index.ts`):
+     a calendar over `deadlines` reads its own months, where the source would hand it a table's days and no window. */
   const early = sourceModule(block.source);
-  if (early?.first) return early.read(deps, block, base, also, sourceKit(deps));
+  if (early?.first && !kindModule(block.kind)?.across?.includes(block.source ?? '')) return early.read(deps, block, base, also, sourceKit(deps));
 
   /* A REGISTERED KIND READS ITSELF, AND IT IS ASKED BEFORE ANY ARM BELOW (`kinds/index.ts`). What every block shares is
      already done by here: the keys nobody reads, `when:` and the page's `{{path}}` values. So a kind module is only the

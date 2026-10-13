@@ -1465,9 +1465,9 @@ const DECLARED: Record<string, Version> = {
       metric.budgets-set rule.bill-takes-book metric.book-owed-to metric.book-owed-by
       metric.book-in-by-month metric.book-out-by-month metric.book-net-by-month
       metric.book-lasts-until
-      rule.payment-matches rule.instalment-settles script.match_payment script.settle_matched_line
+      rule.payment-matches rule.instalment-settles script.match_payment
     `,
-    declares: '990763af3a240bcb',
+    declares: '62831e8550843210',
     history: [
       "`cash-cross-check` is declared (cash-check-52, REC-A17): Cash now worked out a second way, each cash account walked entry by entry from its newest statement, less Cash now, a currency at a time; no value while no balance is typed -> 73738171ae2405ba",
       'The Money page draws the check (cash-page-54, REC-A17): one tile, Cash now does not add up, while `cash-cross-check` is not nought, and one line while no balance is typed -> e4a453d69795fe22',
@@ -1494,6 +1494,7 @@ const DECLARED: Record<string, Version> = {
       "Folded into the unreleased 3.17.0 (batch 77, integrate 77; commit 63423720, the deployed build, holds 3.16.0), one change, no id added or taken away: `rule.invoice-chased` holds two draft steps where it held one, whose conditions never hold together. An invoice paid in part that says what was paid is drafted for what is left, 'The invoice for {{short:amount}} was due on {{on:due}}, and {{short:amount-paid_so_far}} of it is still to pay. Could you tell me when the rest will be paid?', and every other invoice keeps batch 75's sentence, each written only where Draft to send is empty (chase-part-paid-77, REC-B22) -> 426776efc21d2e82",
       "Folded into the unreleased 3.17.0 (batch 78, integrate 78; commit 63423720, the deployed build, holds 3.16.0), one fingerprint for four changes, three ids added and none taken away: `metric.repeating-overdue` keeps live matched lines in its where (`state is live, last_paid is set`) and counts the late with past (`{ past: 'next_due', by: '3d' }`), so matched lines and none late reads 0 and met, and no matched line still reads no value (repeating-overdue-past-78, signs-metric-75-76#1); `page.money` opens on three lead notes where it held two, the line of what there is now waiting on `runway-days` not carrying beyond and the same line ending 'and on what is due it lasts the year.' drawn while it does, and Heads up gives up its note on `categories-against-direction`, whose figure stays declared, so the page still declares 24 blocks (money-lasts-line-78, REC-B07); `page.money-book` gains one note under What is due, 'Its money lasts the year on what is due.', drawn on book-lasts-until carrying beyond (book-lasts-year-78, REC-A09 step 2); and a cleared Ledger entry with nothing in Settles finds what it paid, `script.match_payment` started by `rule.payment-matches` on a write to its status or Settles, writing Settles for a bill or Paid by on an instalment, with `rule.instalment-settles` running `settle` once an instalment names its payment (match-payment-78, REC-B11 step 3), and the rule hands `asks: 'linked'`, so several things that fit with a repeating line among them is no question, since an answer naming a line would link nothing; `rule.payment-matches`, `rule.instalment-settles` and `script.match_payment` gained -> a133f3e25555de89",
       'Folded into the unreleased 3.17.0 (repeating-settle-79-80; integrate 80; commit 63423720, the deployed build, holds 3.16.0): `rule.payment-matches` gains a second step that starts `script.settle_matched_line`, which marks the repeating line a payment paid; one id added and none taken away -> 990763af3a240bcb',
+      "Folded into the unreleased 3.17.0 (batch 82, integrate 82; commit 63423720, the deployed build, holds 3.16.0), one fingerprint for two changes, one id taken away from an unreleased version and none added: `script.match_payment` catches a fold its host refuses and compares every name plainly for that payment, saying so in its log, where the run failed whole (fold-fallback-82); and `rule.payment-matches` is one step again and `script.settle_matched_line`, which batch 80 added inside this same unreleased step and no released version ever held, is held out of the pack, since it kept a payment on a line whose Next it could not move (repeat-next-80b-82) -> 62831e8550843210",
     ],
   },
   'work@1.17.0': {
@@ -1540,21 +1541,23 @@ const DECLARED: Record<string, Version> = {
       "Folded into the unreleased 3.3.0 (figures-47): `page.health` says how many signs are not read yet under its first line, from the new built-in figure signs-unread, and its green-days lines say every watched sign was green, where they said nothing was red -> a2e56f28aecca9ca",
     ],
   },
-  /* PEOPLE SAYS WHO MAY BE HELD TWICE (people-held-twice-69). 3.3.0 IS RELEASED (commit 63423720 holds it). The same ids. */
+  /* PEOPLE SAYS WHO MAY BE HELD TWICE (people-held-twice-69). 3.3.0 IS RELEASED (commit 63423720 holds it). The same ids, and
+   `page.calendar` since batch 82 (calendar-page-82), added while 3.4.0 is still unreleased. */
   'people@3.4.0': {
     holds: `
       metric.organisations-count metric.people-count metric.people-in-touch-12w metric.people-in-touch-30d metric.people-in-touch-90d
       metric.people-quiet
-      page.health page.people page.relation page.someone
+      page.calendar page.health page.people page.relation page.someone
       register.organisations register.people
       rule.meet-payees rule.meet-sender-organisations rule.meet-senders
     `,
-    declares: 'd7d82263a138b702',
+    declares: '69d90b1f513c065d',
     history: [
       "`page.people` says how many people may be on the record twice, in one note under its two lead notes, from the built-in figure held-twice and drawn only above nought; a note added, nothing taken away -> 3c1698b71103bfe4",
       "Folded into the unreleased 3.4.0 (people-twice-link-74; integrate 74; commit 63423720, the deployed build, holds 3.3.0): `page.people`'s note of people who may be held twice links the list of everyone in order of name (`/r/people?sort=name`) and says what to look for; no id added or taken away -> 900ff4486ed1626e",
       "Folded into the unreleased 3.4.0 (twice-link-78; integrate 78; commit 63423720, the deployed build, holds 3.3.0): `page.people`'s note of people who may be held twice links the list at those people (`/r/people?twice=1`) and says See them, where it linked everyone by name and said what to look for; no id added or taken away -> 13e503218e568749",
       "Folded into the unreleased 3.4.0 (people-note-count-79-80; integrate 80; commit 63423720, the deployed build, holds 3.3.0): `page.people`'s note of people who may be held twice says the number is how many too many ('Too many: N'), where it read as the number of people the link shows; the link is unchanged; no id added or taken away -> d7d82263a138b702",
+      "Folded into the unreleased 3.4.0 (batch 82, integrate 82; commit 63423720, the deployed build, holds 3.3.0), one fingerprint for two changes, a page added and nothing taken away: `page.people`'s note of people who may be held twice says the people the link shows and then how many too many ('N people may be on this record twice, M too many'), from the built-in figures held-twice-shown and held-twice, the link and the when unchanged (people-twice-note-82); and `page.calendar`, its line and one calendar over the computed deadlines, this month and the two after it, off the rail (calendar-page-82) -> 69d90b1f513c065d",
     ],
   },
   /* A PROJECT OTHERS POINT AT STAYS, AND WHERE IT STANDS IS SAID (batch 46, REC-C08 and REC-C16). 1.15.0 IS RELEASED. */

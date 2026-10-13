@@ -2331,7 +2331,11 @@ export function peopleTwiceIdsIn(sql: Sql): string[] | null {
   const deps = twiceDepsIn(sql);
   return deps === null ? null : peopleTwiceIds(deps);
 }
-countHeldTwiceBy(peopleTwiceIn);
+/* BOTH COUNTS FROM THE SAME PASS: how many too many, and the people that is about (`held-twice-shown`), nobody twice. */
+countHeldTwiceBy(peopleTwiceIn, (sql) => {
+  const ids = peopleTwiceIdsIn(sql);
+  return ids === null ? null : new Set(ids).size;
+});
 
 /* ── the nightly question to a model ─────────────────────────────────── */
 

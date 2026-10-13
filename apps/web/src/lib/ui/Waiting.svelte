@@ -13,6 +13,10 @@
 
   `head` draws the title's bar too, for a screen whose head waits on the same answer. `role="status"`
   and one hidden word, so a screen reader hears that something is on its way and not a list of shapes.
+
+  `aria-busy="true"` for as long as it stands: it is never switched off here, because the skeleton is
+  taken off the screen when the answer lands. The bars stay hidden, so busy adds to the word and does
+  not replace it.
 -->
 <script lang="ts">
   import { copy } from '$lib/copy.ts';
@@ -23,7 +27,7 @@
   const WIDTHS = ['62%', '48%', '71%', '39%', '56%', '44%', '66%', '52%'];
 </script>
 
-<div class="waiting" class:head role="status">
+<div class="waiting" class:head role="status" aria-busy="true">
   <span class="said">{copy.waiting}</span>
   {#if head}<span class="bar title" aria-hidden="true"></span>{/if}
   {#each { length: rows } as _, i}

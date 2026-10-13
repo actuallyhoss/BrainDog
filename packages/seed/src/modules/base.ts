@@ -218,3 +218,48 @@ export type SeedPage = Record<string, unknown> & { page: string };
 
 /** A rule as a pack writes it: the register it watches, when it fires, what it does, and once per what. */
 export type SeedRule = { rule: string; pack?: string; register: string; when: string; then: Record<string, unknown>[]; once_per: string[] };
+
+/**
+ * Calendar: every day the record is waiting on, a month grid a date anywhere on the record can open (PGS-B14 job e).
+ *
+ * ONE CALENDAR, OVER THE COMPUTED DEADLINES. `source: deadlines` is the kernel's own reading of every list that declares a
+ * deadline day, finished rows left out, so the page names no list and no field of one, leans on no register, and draws whatever
+ * a record's add-ons hold. A record with no list holding a deadline opens on the one line under `empty:`.
+ *
+ * THIS MONTH AND THE TWO AFTER IT (`back: 0`, `ahead: 2`), because the page is opened from a day AHEAD: a date in a
+ * note links here with `?day=`, and a host draws the link only for a record that holds this page.
+ *
+ * NO HEADING ON THE BLOCK. The page's name is already Calendar, and a tile headed Calendar under it says it twice.
+ *
+ * IT OPENS ON ITS LINE, AS EVERY PAGE DOES (DIRECTION §39, held by `calm-pages.test.ts`): one sentence of what the
+ * months hold, in plain words and with no figure, since nothing counts what falls due in three months yet.
+ *
+ * NOT ON THE RAIL, so no `nav:`. The rail is the seven places (DIRECTION §39), and this page is reached from a date.
+ *
+ * IN PEOPLE, FOR THE REASON HEALTH IS (`modules/health.ts`): no add-on is held by every record, and People is the one
+ * nearly every record holds. It is declared here, beside the shapes every module shares, because it belongs to no
+ * module's lists, and moving it is one `pack:` and a version.
+ */
+export const CALENDAR_SOURCE = 'deadlines';
+
+export const BASE_PAGES: Record<string, SeedPage> = {
+  calendar: {
+    page: 'calendar',
+    title: 'Calendar',
+    icon: 'calendar',
+    pack: 'people',
+    blocks: [
+      { kind: 'note', lead: true, span: 12, body: 'Everything with a day it is due, this month and the next two.' },
+      {
+        kind: 'calendar',
+        span: 12,
+        source: CALENDAR_SOURCE,
+        /* THE SOURCE'S OWN TWO NAMES, what falls due and its day, whatever each list calls its fields. */
+        columns: [{ field: 'title' }, { field: 'day' }],
+        back: 0,
+        ahead: 2,
+        empty: 'Nothing is due in these three months.',
+      },
+    ],
+  },
+};

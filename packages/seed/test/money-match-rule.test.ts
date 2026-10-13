@@ -18,7 +18,7 @@ import { sayOf } from '@braindog/ports';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 import { NOW, firstPartyDocument, gbp } from '../src/index.ts';
-import { MONEY_AUTOMATIONS, SETTLE_LINE_SCRIPT } from '../src/modules/money/rules.ts';
+import { MONEY_AUTOMATIONS } from '../src/modules/money/rules.ts';
 import { MATCH_PAYMENT_SCRIPT } from '../src/modules/money/scripts/match-payment.js';
 
 type Fields = Record<string, unknown>;
@@ -109,7 +109,7 @@ test('a cleared payment that names nothing is linked to the one bill it paid, an
   const theBill = m.bill();
   const pay = m.paid(400_000, '2026-09-28');
   await m.k.drain();
-  assert.deepEqual(m.queued().map((q) => q.script), ['match_payment', 'settle_matched_line']);
+  assert.deepEqual(m.queued().map((q) => q.script), ['match_payment']);
   await m.turn();
   assert.equal(m.k.get(pay.id)!.fields.settles, theBill.id, m.log.join(' | '));
   const f = m.k.get(theBill.id)!.fields;
@@ -126,7 +126,7 @@ test('a payment that names its bill already starts no search, and one not cleare
   assert.deepEqual(m.queued().map((q) => q.script), ['settle']);
   value(m.k.update('transactions', pending.id, { state: 'cleared' }, OWNER));
   await m.k.drain();
-  assert.deepEqual(m.queued().map((q) => q.script), ['settle', 'match_payment', 'settle_matched_line']);
+  assert.deepEqual(m.queued().map((q) => q.script), ['settle', 'match_payment']);
 });
 
 test('a payment that fits one instalment writes Paid by, and the instalment is marked paid', async () => {
@@ -160,49 +160,11 @@ test('two bills it could have paid is one question, signed by the script, whose 
   assert.equal(m.asked().length, 1);
 });
 
-/* THE SECOND STEP (repeating-settle-79-80): `settle_matched_line` finds the repeating line the first step found and
-   marks it paid by the payment. The line holds no link, so nothing else could. */
+/* A REPEATING LINE IS FOUND AND SAID, AND NOT MARKED: the second step is held (repeat-next-80b-82), and what it would
+   do handed a day is read in `money-line-next.test.ts`. */
 const LINE = { what: 'Northgate Estates', direction: 'out', amount: gbp(400_000), every: 'monthly', next_due: '2026-10-01', state: 'live' };
 
-test('the second step and its script are Money\'s own, and go into its pack document together', () => {
-  assert.ok(MONEY_AUTOMATIONS.includes(SETTLE_LINE_SCRIPT), 'the script is in no pack document');
-  assert.deepEqual(RULE!.steps.map((s) => s.script.id), [MATCH_PAYMENT_SCRIPT.script, SETTLE_LINE_SCRIPT.script]);
-  assert.deepEqual(RULE!.steps[1]!.script.input, { payment: '{{trigger.entry}}' });
-  assert.deepEqual(SETTLE_LINE_SCRIPT.writes, ['recurring']);
-});
-
-test('a repeating line a payment fits is marked paid by the second step: Last paid and Last amount are the payment\'s, and Next stays', async () => {
-  const m = await money();
-  const line = m.made('recurring', LINE);
-  const pay = m.paid(400_000, '2026-09-28');
-  await m.k.drain();
-  assert.deepEqual(m.queued().map((q) => q.script), ['match_payment', 'settle_matched_line']);
-  await m.turn();
-  const f = m.k.get(line.id)!.fields;
-  assert.deepEqual([f.next_due, f.last_paid, f.last_amount], ['2026-10-01', '2026-09-28', gbp(400_000)], m.log.join(' | '));
-  assert.equal(m.k.get(pay.id)!.fields.settles ?? null, null);
-  assert.deepEqual(m.asked(), []);
-  /* SAID ONCE BY EACH STEP, and the second never says the line has no later day. */
-  assert.equal(m.log.join('\n').split('This payment is for Northgate Estates, due 1 October.').length - 1 >= 1, true);
-  assert.ok(m.log.some((l) => l.includes('Northgate Estates is paid for 1 October. Its Next stays where it is, for you to move.')), m.log.join(' | '));
-  assert.ok(!m.log.some((l) => l.includes('has no later day')), m.log.join(' | '));
-  assert.ok(!m.log.some((l) => /[0-9A-HJKMNP-TV-Z]{26}|recurring#|transactions#/.test(l)), m.log.join(' | '));
-});
-
-test('the same payment written again marks the line once', async () => {
-  const m = await money();
-  const line = m.made('recurring', LINE);
-  const pay = m.paid(400_000, '2026-09-28');
-  await m.turn();
-  const v = m.k.get(line.id)!.version;
-  value(m.k.update('transactions', pay.id, { state: 'pending' }, OWNER));
-  value(m.k.update('transactions', pay.id, { state: 'cleared' }, OWNER));
-  await m.turn();
-  assert.equal(m.k.get(line.id)!.version, v);
-  assert.equal(m.log.filter((l) => l.includes('Its Next stays where it is')).length, 1, m.log.join(' | '));
-});
-
-test('a bill is still marked by its link alone: the second step writes nothing for it and says nothing', async () => {
+test('a bill is marked by its link alone', async () => {
   const m = await money();
   const theBill = m.bill();
   const pay = m.paid(400_000, '2026-09-28');
@@ -221,16 +183,6 @@ test('a line among several that fit is still left as it is: nothing asked, nothi
   await m.turn();
   assert.deepEqual(m.asked(), []);
   assert.equal(m.k.get(line.id)!.fields.last_paid ?? null, null);
-});
-
-test('a payment within the same money of the line is marked as it came: Last amount is the payment\'s and the line\'s amount stays', async () => {
-  const m = await money();
-  const line = m.made('recurring', LINE);
-  m.paid(404_000, '2026-09-28');
-  await m.turn();
-  const f = m.k.get(line.id)!.fields;
-  assert.deepEqual([f.amount, f.last_paid, f.last_amount], [gbp(400_000), '2026-09-28', gbp(404_000)]);
-  assert.deepEqual(m.asked(), []);
 });
 
 test('an answer that names a bill writes Settles through the gate, and the bill is marked paid with no rule for the answer', async () => {

@@ -398,8 +398,11 @@ export function lineOf(r, colour = false) {
  * since a list nobody read and a rail nobody drew prove nothing. Only the words were asked for, so there the code is
  * left alone and UNCHECKED says how little was read. A SCREEN HANDED IN is judged by the seven and by the three that
  * read the shell as drawn (`drawnScreen`).
+ *
+ * `strict` is for a caller that will not take the words alone for an answer: with no screen it leaves with 1 when
+ * any check read nothing, as a screen handed in always does. Without it the words-only code is as it was.
  */
-export function report(screens, person, colour = false) {
+export function report(screens, person, colour = false, strict = false) {
   const out = [];
   const all = [];
   for (const snap of screens ?? [wordsScreen()]) {
@@ -423,7 +426,7 @@ export function report(screens, person, colour = false) {
   const n = (v) => all.filter((r) => r.pass === v).length;
   const blind = all.filter(unread).length;
   const apart = n(null) - blind;
-  const code = n(false) > 0 || (screens !== null && blind > 0) ? 1 : 0;
+  const code = n(false) > 0 || ((screens !== null || strict) && blind > 0) ? 1 : 0;
   /* NOT SEEN IS NOT A PASS: the last line says so in a word a nightly reader cannot take for green, and names how many. */
   const unchecked = blind > 0 ? ` UNCHECKED: ${blind} of ${all.length} read nothing, which is not a pass.` : '';
   out.push(`${all.length} checks: ${n(true)} green, ${n(false)} red, ${blind} not seen${apart > 0 ? `, ${apart} that do not apply` : ''}.${unchecked} Exit code ${code}.`);
@@ -463,14 +466,15 @@ export async function drawnScreens(person) {
 }
 
 /**
- * `node tools/people/expect/first-screen.mjs [screen.json] [person.json] [--as <person.json>] [--words] [--write <file>]`.
+ * `node tools/people/expect/first-screen.mjs [screen.json] [person.json] [--as <person.json>] [--words] [--strict] [--write <file>]`.
  *
  * `screen.json` is one snapshot or a list of them, as a rig writes them. WITH NONE, the screens are drawn here: a fresh
  * self-host, the walk of `first-run.mjs`, and the web's own rail and Today rendered at its two moments (`--write` keeps
  * them as a file that can be handed back in). `--words` judges only the first run's own words, with nothing drawn and
- * no host started. Mariam by default; `--as` names somebody else with no screen file before it. Exit 0 when every
- * check that applies to a screen read something and none is red, 1 when one is red or one read nothing, 2 when a file
- * could not be read or the screens could not be drawn (said in a line, never in silence).
+ * no host started, and leaves with 0 however little was read unless `--strict` is given, which makes a check that
+ * read nothing a 1 there too. Mariam by default; `--as` names somebody else with no screen file before it. Exit 0
+ * when every check that applies to a screen read something and none is red, 1 when one is red or one read nothing, 2
+ * when a file could not be read or the screens could not be drawn (said in a line, never in silence).
  */
 if (import.meta.url === `file://${process.argv[1]}`) {
   const { readFileSync, writeFileSync } = await import('node:fs');
@@ -506,7 +510,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     const keep = flag('--write');
     if (keep !== undefined) writeFileSync(keep, `${JSON.stringify(screens, null, 1)}\n`);
   }
-  const { lines, code } = report(screens, person, process.stdout.isTTY === true);
+  const { lines, code } = report(screens, person, process.stdout.isTTY === true, args.includes('--strict'));
   for (const line of lines) console.log(line);
   process.exit(code);
 }

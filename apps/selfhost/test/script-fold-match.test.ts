@@ -1,12 +1,10 @@
 /**
- * Money's two payment scripts, run in the self-host's own sandbox with the fold a host hands (`scriptFold`).
+ * Money's payment script, run in the self-host's own sandbox with the fold a host hands (`scriptFold`).
  *
  * WHY HERE. `match_payment` asks for `ctx.fold` and falls back to comparing letters and digits, and until the sandbox
  * carried the call no host handed one, so a payment a bank wrote with its processor and its city never met the bill
  * that names the payee plainly. The seed's own tests run each script's text as a plain module with a `ctx` they build;
- * this runs the text Money's pack document declares through `runInQuickJs`, the frozen `ctx` of the prelude and all,
- * which is also the first run of `settle_matched_line` there (it wraps that `ctx` to hold back the first search's
- * writes and words).
+ * this runs the text Money's pack document declares through `runInQuickJs`, the frozen `ctx` of the prelude and all.
  *
  * THE RECORD IS A DOUBLE: rows in memory, answered through `list` and `get` as a script asks them. What a real record
  * does with the writes is `packages/seed/test/money-match-rule.test.ts`'s to say.
@@ -77,7 +75,6 @@ const writesOf = (a: ScriptAnswer) => {
 
 const BANK = row('transactions', 12, { what: 'Card payment', counterparty_text: 'GEIDEA*CHILLOUT 0423 CAIRO EG', direction: 'out', amount: gbp(400_000), on: '2026-10-01', state: 'cleared' });
 const BILL = row('obligations', 4, { what: 'Chill Out', direction: 'owed_by_me', amount: gbp(400_000), due: '2026-10-01', state: 'open' });
-const LINE = row('recurring', 7, { what: 'Chill Out', direction: 'out', amount: gbp(400_000), every: 'monthly', next_due: '2026-10-03', state: 'live' });
 
 test('A BANK SPELLING WITH ITS PROCESSOR AND ITS CITY MEETS THE BILL THAT NAMES THE PAYEE PLAINLY, in the sandbox, with the host fold', async () => {
   const h = hostOver([BANK, BILL], 'match_payment', { payment: 'transactions#12', asks: 'linked' }, true);
@@ -93,20 +90,4 @@ test('HANDED NO FOLD, the same payment meets nothing: letters and digits alone c
   const h = hostOver([BANK, BILL], 'match_payment', { payment: 'transactions#12', asks: 'linked' }, false);
   const a = await runInQuickJs(declared('match_payment'), h);
   assert.deepEqual(writesOf(a), []);
-});
-
-test('THE SECOND STEP RUNS IN THE SANDBOX TOO: the repeating line the bank spelling fits is marked with the payment, and Next stays', async () => {
-  const h = hostOver([BANK, LINE], 'settle_matched_line', { payment: 'transactions#12' }, true);
-  const a = await runInQuickJs(declared('settle_matched_line'), h);
-  assert.deepEqual(writesOf(a), [{ op: 'update', spoken: 'recurring#7', patch: { last_paid: '2026-10-01', last_amount: gbp(400_000) }, version: 3 }]);
-  /* THE FIRST SEARCH'S WORDS ARE HELD BACK, so the run says the line once, and never that it has no later day. */
-  assert.match(a.log, /Chill Out is paid for 3 October\. Its Next stays where it is, for you to move\./u);
-  assert.doesNotMatch(a.log, /has no later day|This payment is for/u);
-});
-
-test('AND IT WRITES NOTHING FOR A BILL, which the first step links: the line script ends without a word', async () => {
-  const h = hostOver([BANK, BILL], 'settle_matched_line', { payment: 'transactions#12' }, true);
-  const a = await runInQuickJs(declared('settle_matched_line'), h);
-  assert.deepEqual(writesOf(a), []);
-  assert.equal(a.log, '');
 });

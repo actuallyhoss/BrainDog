@@ -44,7 +44,7 @@ import {
   type WalkStep,
 } from './api.ts';
 import { REGISTERS } from './held.ts';
-import { linkOf, REST_MARK } from './blocks.ts';
+import { linkOf, REST_MARK, staleOf } from './blocks.ts';
 import { bylineOf } from './byline.ts';
 import { METRICS } from './declared.ts';
 import { readBoot } from './boot-live.ts';
@@ -1974,14 +1974,16 @@ export function footed(answered: readonly Answered[], drawn: LiveBlock[], now: n
  *
  * EVERY PLACE A PAGE DRAWS A CONVERTED FIGURE ASKS (audit 77, claim 6), where only tiles did: a bar or a split over a
  * figure is that figure in its parts (`parts`), and a sentence with a figure in it says the same amount in words
- * (`staleSaid`). A block this build could not draw says no figure, so it asks nothing.
+ * (`staleSaid`). A bar or a split over a list's own money is converted here, on the drawn block, and says its day
+ * through `staleOf` (audit 80, claim 5). A block this build could not draw says no figure, so it asks nothing.
  */
 function oldestStale(answered: readonly Answered[], drawn: readonly LiveBlock[]): string | null {
   const days = answered.flatMap((b, i) => {
     const d = drawn[i];
     if (!d || d.drawn === false || d.cannot !== undefined) return [];
     const read = d.metrics || d.parts ? (b.readings ?? []).flatMap((c) => (staleRead(c.reading) ? [c.reading.fx.asOf] : [])) : [];
-    return [...read, ...staleSaid(b)];
+    const own = d.kind === 'bar' || d.kind === 'split' ? staleOf(d) : null;
+    return [...read, ...staleSaid(b), ...(own === null ? [] : [own])];
   });
   return days.length === 0 ? null : days.reduce((a, b) => (b < a ? b : a));
 }

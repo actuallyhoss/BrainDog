@@ -523,11 +523,16 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
            THE NUMBER IS HOW MANY TOO MANY, AND SAYS SO (audit 78, claim 1). The figure counts the ones that would go
            if each pair were one person, and the link shows every one of each pair, so "twice: 1" stood over a list of
            two and "twice: 2" over three of one name. The figure is the kernel's and stays as it is; the words now say
-           what it counts, so a list longer than the number is what the line promised. */
+           what it counts, so a list longer than the number is what the line promised.
+
+           AND THE PEOPLE THE LINK SHOWS ARE COUNTED TOO (batch 82): the kernel's `held-twice-shown` is every one of
+           each pair, from the pass `held-twice` is counted in, so the line opens on the number the list behind
+           "See them" holds and then says how many of them are too many. Never fewer than two, so "people" is always
+           right. Drawn by `held-twice` as before: the two are nought together. */
         kind: 'note',
         span: 12,
         when: { metric: 'held-twice', gt: 0 },
-        body: 'Some people may be on this record twice. Too many: {{held-twice}}. [See them](/r/people?twice=1).',
+        body: '{{held-twice-shown}} people may be on this record twice, {{held-twice}} too many. [See them](/r/people?twice=1).',
       },
       {
         /* CARDS, with a face for each person, rather than a table of four columns read

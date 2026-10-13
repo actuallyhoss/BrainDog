@@ -6,6 +6,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 import { checkScreen, firstScreen, report, UNITS } from '../expect/first-screen.mjs';
 
@@ -137,4 +139,24 @@ test('a tour on a screen handed in is red and the code is 1', () => {
   const { lines, code } = report([{ ...START, text: ['Take the tour'] }], LAYLA);
   assert.equal(code, 1);
   assert.ok(lines.some((l) => /no-tour: red\. .*tour/u.test(l)));
+});
+
+test('strict makes the words-only run a 1 when a check read nothing, and the default stays 0', () => {
+  assert.equal(report(null, LAYLA).code, 0);
+  const { lines, code } = report(null, LAYLA, false, true);
+  assert.equal(code, 1);
+  assert.match(lines.at(-1), /UNCHECKED: 5 of 7 read nothing, which is not a pass\. Exit code 1\.$/u);
+  /* Strict changes nothing where a screen was handed in: the same lines and the same code either way. */
+  const drawn = [{ ...START, text: ['Take the tour'] }];
+  assert.deepEqual(report(drawn, LAYLA, false, true), report(drawn, LAYLA));
+});
+
+test('the command itself: --words leaves with 0, --words --strict with 1', () => {
+  const run = (...flags) => spawnSync(process.execPath, [fileURLToPath(new URL('../expect/first-screen.mjs', import.meta.url)), '--words', ...flags], { encoding: 'utf8' });
+  const plain = run();
+  assert.equal(plain.status, 0, plain.stdout + plain.stderr);
+  assert.match(plain.stdout, /Exit code 0\.\n$/u);
+  const strict = run('--strict');
+  assert.equal(strict.status, 1, strict.stdout + strict.stderr);
+  assert.match(strict.stdout, /UNCHECKED: .* Exit code 1\.\n$/u);
 });

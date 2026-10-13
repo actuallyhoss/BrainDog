@@ -124,6 +124,21 @@ test('A CHANGE THE LINES SAY WHOLE IS NOT SAID AGAIN AS A SENTENCE, on the lead 
   }
 });
 
+test('A STROKE ALONE IS NO PATH: a value with one is said, and a text a path was cut from is still held back', () => {
+  /* Audit 81, claim 3: the record's sentence says "Q3/Q4", and the card dropped every value that held a stroke. */
+  const said = cardOf(ask([{ field: 'status', label: 'Status', before: 'N/A', after: 'Q3/Q4' }]), { now });
+  assert.deepEqual(said.lines[0], { what: 'Status', before: 'N/A', after: 'Q3/Q4', said: null });
+  for (const text of ['Paid 50/50', 'Open 24/7 from May', 'Either and/or both']) {
+    const card = cardOf(ask([{ field: 'notes', label: 'Notes', before: 'Old', after: text }]), { now });
+    assert.equal(card.lines[0]?.after, text, text);
+  }
+  /* What `spoken` changes is not the value: a file, a folder three deep, a home folder, a site's page. */
+  for (const text of ['Read docs/plan.md first.', 'apps/web/src/login.ts', 'Moved to ~/Developer/old', 'See https://example.com/pricing']) {
+    const card = cardOf(ask([STAGE, { field: 'notes', label: 'Notes', before: 'Old', after: text }]), { now });
+    assert.deepEqual(card.lines.map((l) => l.what), ['Stage'], text);
+  }
+});
+
 test('THE SENTENCE STAYS WHEREVER A CHANGE IS NOT ONE OF THE LINES', () => {
   const does = 'Changes Stage from Building to Live, changes Led by in Projects.';
   for (const lead of [true, false]) {

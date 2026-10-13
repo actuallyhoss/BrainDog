@@ -51,7 +51,7 @@ node tools/people/check-files.mjs                      # every person file: "ok"
 node tools/people/expect/first-run.mjs                 # Mariam on a fresh self-host, seven lines
 node --test tools/people/test/first-run.test.mjs       # the same walk as a test
 node tools/people/expect/keep-it.mjs                    # step 4 on the hosted service, in one process: the mailed link, her sentence kept nowhere; it ends in 30 seconds with a red line naming the step
-node tools/people/expect/first-screen.mjs [screen.json] [person.json] [--as person.json] [--words] [--write file]   # with no screen, a fresh self-host and three screens drawn at each of two moments (1440 Today, 1440 list, 390 Today over the tab bar); it exits 1 when a check is red or when a check that applies read nothing; --words judges only the first run's own words
+node tools/people/expect/first-screen.mjs [screen.json] [person.json] [--as person.json] [--words] [--strict] [--write file]   # with no screen, a fresh self-host and three screens drawn at each of two moments (1440 Today, 1440 list, 390 Today over the tab bar); it exits 1 when a check is red or when a check that applies read nothing; --words judges only the first run's own words, and leaves with 0 however little was read unless --strict is given
 node --test tools/people/test/first-screen.test.mjs
 node --test tools/people/expect/first-screen-drawn.test.mjs
 node --test tools/people/expect/first-screen-teeth.test.mjs

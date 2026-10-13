@@ -222,8 +222,14 @@ export default async function run(ctx) {
   if (typeof ctx.fold === 'function') {
     const keys = new Map();
     const texts = [payment.fields.payee, payment.fields.counterparty_text, payment.fields.what, ...items.flatMap((i) => [i.fields.what, i.fields.plan])];
-    for (const text of texts) if (typeof text === 'string' && !keys.has(text)) keys.set(text, await ctx.fold(text));
-    opts.fold = (text) => keys.get(text) ?? null;
+    /* A HOST THAT REFUSES A FOLD (it answers only so many a run) leaves the whole compare plain, as a host that hands
+       none does: keys for some names and not for others would be two ideas of a payee in one decision. It is said. */
+    try {
+      for (const text of texts) if (typeof text === 'string' && !keys.has(text)) keys.set(text, await ctx.fold(text));
+      opts.fold = (text) => keys.get(text) ?? null;
+    } catch {
+      ctx.log('The names were compared by their letters and digits for this payment, since the fuller compare could not be finished.');
+    }
   }
 
   const out = matchPayment(payment, items, opts);

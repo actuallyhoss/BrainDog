@@ -245,10 +245,13 @@ function valueSaid(v: unknown, home: string | null | undefined): string | null {
     const day = daySaid(v.trim());
     if (day !== null) return day;
     /* A TEXT A PATH WAS TAKEN OUT OF IS NOT THE VALUE: `spoken` cuts "docs/review.md" from a note and leaves the rest
-       reading whole, and a line drawn from that says the field holds what it does not. It is left to its page. */
-    if (/[\\/]/u.test(v)) return null;
-    const said = spoken(saidOf(v.trim()));
-    if (said === '' || ULID.test(said) || /^[a-z][\w-]*#\d+$/u.test(said) || /[\\/]/u.test(said)) return null;
+       reading whole, and a line drawn from that says the field holds what it does not. It is left to its page. A
+       STROKE ALONE IS NO PATH (audit 81, claim 3): "Q3/Q4", "N/A" and "Paid 50/50" come through `spoken` as they went
+       in and are said, as the record's own sentence says them; only a text `spoken` changed is held back. */
+    const words = saidOf(v.trim());
+    const said = spoken(words);
+    if (/[\\/]/u.test(v) && said !== words) return null;
+    if (said === '' || ULID.test(said) || /^[a-z][\w-]*#\d+$/u.test(said)) return null;
     return said.length > 60 ? `${said.slice(0, 59).trimEnd()}…` : said;
   }
   if (Array.isArray(v)) {

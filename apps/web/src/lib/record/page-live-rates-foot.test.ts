@@ -11,6 +11,8 @@ import assert from 'node:assert/strict';
 import './fixtures/fill.ts';
 import { copy } from '../copy.ts';
 import { ratesPreset } from './action-draft.ts';
+import { REGISTERS } from './api.ts';
+import { toSegments } from './blocks.ts';
 import { blockOf, footWords, footed, pageReader, ratesActionOf, tileOf, type Fetch, type LiveBlock } from './page-live.ts';
 
 const NOW = Date.parse('2026-10-13T09:00:00Z');
@@ -245,4 +247,68 @@ test('the reader looks for a rates action when rates are out of date, and only t
   const plain = await read(current.io);
   assert.equal(plain.length, 1);
   assert.equal(current.sent.includes('actions'), false, 'a page with nothing out of date asks nothing more');
+});
+
+/* A BAR OR A SPLIT OVER A LIST'S OWN MONEY IS CONVERTED HERE, NOT BY THE RECORD (audit 80, claim 5): it carries no
+   reading and no `values_fx`, so it asked for no foot however old the rates it was drawn with. */
+const HOLDINGS = { id: 'holdings', name: 'Holdings', one: 'holding', title: 'name', fields: [{ id: 'name', type: 'text' }, { id: 'balance', type: 'money' }] };
+
+/** A bar or split over a list of holdings, as the record answers one: its entries, and the home currency and rates beside them. */
+const held = (kind: 'bar' | 'split', asOf: string | null, money: [string, number, string][] = [['Till', 250_000, 'GBP'], ['Quartz', 100_000, 'USD']]) => {
+  REGISTERS.holdings = HOLDINGS as never;
+  return {
+    kind,
+    heading: 'Held',
+    source: 'register.holdings',
+    columns: [{ field: 'name' }, { field: 'balance' }],
+    rows: money.map(([name, amount, currency], i) => ({ id: `h${i + 1}`, seq: i + 1, fields: { name, balance: { amount, currency } }, version: 1, created_at: '2026-09-01T09:00:00.000Z' })),
+    matched: money.length,
+    refusals: [],
+    fx: { home: 'GBP', rates: asOf === null ? [] : [{ currency: 'USD', base: 'GBP', rate: 0.8, as_of: asOf }] },
+  } as never;
+};
+
+test('a bar and a split over a list holding pounds and dollars ask for the foot when the rates are a month old', () => {
+  for (const kind of ['bar', 'split'] as const) {
+    const out = page(held(kind, '2026-09-13'));
+    assert.equal(out.length, 2, kind);
+    assert.equal(out[0]!.parts, undefined, 'over the list itself, and no figure');
+    assert.equal(out[1]!.body, footWords.ratesStale('13 Sep 2026', 'none'));
+    assert.equal(out[1]!.synthetic, true);
+    /* The bar is drawn as it was: converted into pounds, with the day of its rates under it. */
+    const said = JSON.stringify(toSegments(out[0]!));
+    assert.match(said, /converted from USD/u);
+    assert.match(said, /13 Sep/u);
+  }
+});
+
+test('the same bar with rates a day old, or all in the home currency, asks for nothing', () => {
+  for (const kind of ['bar', 'split'] as const) {
+    assert.equal(page(held(kind, '2026-10-12')).length, 1, `${kind}, a day old`);
+    const home = held(kind, '2026-09-13', [['Till', 250_000, 'GBP'], ['Safe', 90_000, 'GBP']]);
+    assert.equal(page(home).length, 1, `${kind}, all in pounds, however old the rates beside it`);
+    assert.equal(page(held(kind, null)).length, 1, `${kind}, no rate at all: drawn once a currency, and nothing converted`);
+  }
+});
+
+test('two bars over lists say the foot once, with the oldest day, and a bar that is not drawn asks nothing', () => {
+  const out = page(held('bar', '2026-09-13'), held('split', '2026-08-30'), tiles(reading({ fx: fx() })));
+  assert.equal(out.length, 4);
+  assert.equal(out[3]!.body, footWords.ratesStale('30 Aug 2026', 'none'));
+  assert.equal(out.filter((b) => b.synthetic).length, 1);
+
+  const answered = [held('bar', '2026-09-13')];
+  const drawn = answered.map((b) => blockOf(b, new Map(), NOW));
+  assert.equal(footed(answered, drawn.map((b) => ({ ...b, drawn: false })), NOW, []).length, 1);
+  assert.equal(footed(answered, drawn.map((b) => ({ ...b, cannot: 'This cannot be drawn yet.' })), NOW, []).length, 1);
+});
+
+test('the reader looks for a rates action for a bar over a list too', async () => {
+  const stale = host([held('bar', '2026-09-13')], json(200, { ok: true, value: [{ ingest: RATES, channel: 'poll', state: 'pending' }] }));
+  assert.equal((await read(stale.io)).at(-1)!.body, footWords.ratesStale('13 Sep 2026', 'held'));
+  assert.equal(stale.sent.filter((m) => m === 'actions').length, 1);
+
+  const current = host([held('bar', '2026-10-12')], json(200, { ok: true, value: [] }));
+  assert.equal((await read(current.io)).length, 1);
+  assert.equal(current.sent.includes('actions'), false);
 });

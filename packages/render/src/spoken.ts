@@ -21,8 +21,11 @@ const ROOTED = /(?<=^|[\s("'\u201C\u2018])(?:(?:~|[A-Za-z]:)[\\/]|[\\/][^\s"'()\
 const RELATIVE = /(?<=^|[\s("'\u201C\u2018])[\w.-]*[A-Za-z][\w.-]*(?:\/[\w.-]+){2,}/gu;
 /* A SHORT ONE, of two parts, is a path only when the last part is a file's name: it ends in an extension that starts
    with a letter ("docs/review.md"). So "and/or", "24/7", "w/o" and "1.5/2.0" stay words. The extension is in one case,
-   so a stop with no space after it ("50/50.Then") starts no file's name. */
-const SHORT = /(?<=^|[\s("'\u201C\u2018])[\w.-]+\/[\w.-]*\.(?:[a-z][a-z0-9]*|[A-Z][A-Z0-9]*)(?![\w\/-])/gu;
+   so a stop with no space after it ("50/50.Then") starts no file's name.
+   AND IT IS TOLD FROM TWO WORDS THAT HAPPEN TO HOLD A STOP (audit 81, claim 2), which went with their sentence's words:
+   the folder is more than one letter and holds no stop before a letter ("e.g./i.e.", "a/b.test", "Node.js/Deno.land"
+   stay), and the file's name starts with two letters or is all extension ("v1/v2.beta" stays, "docs/.env" goes). */
+const SHORT = /(?<=^|[\s("'\u201C\u2018])(?!\w\/)(?![\w.-]*\.[A-Za-z])[\w.-]+\/(?:[A-Za-z]{2}[\w.-]*)?\.(?:[a-z][a-z0-9]*|[A-Z][A-Z0-9]*)(?![\w\/-])/gu;
 /* AN ID: a ULID, a row's handle (`tasks#8`), a commit's hash (two digits and a letter, so "defaced", "face2face" and
    "20261001" stay), a question's own (`SG14`), a person's (`p_…`) and a signer's (`agent:claude`, `rule:late`). */
 const IDS = [

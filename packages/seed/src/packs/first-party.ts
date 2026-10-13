@@ -608,9 +608,14 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   that its money lasts the year, drawn on `book-lasts-until` carrying `beyond` (book-lasts-year-78, REC-A09 step 2).
  *   And a cleared payment that names nothing finds what it paid: `script.match_payment`, `rule.payment-matches` that
  *   starts it, and `rule.instalment-settles` that runs `settle` once an instalment names its payment
- *   (match-payment-78, REC-B11 step 3). A repeating line found is marked by a second step,
- *   `script.settle_matched_line` (repeating-settle-79-80): Last paid and Last amount are the payment's and Next
- *   stays; no question is asked that has a repeating line among its answers. One id added, none taken away.
+ *   (match-payment-78, REC-B11 step 3). A repeating line found is said in the run and not marked
+ *   (repeat-next-80b-82: the step that kept the payment on it could not move its Next, so it is held); no question
+ *   is asked that has a repeating line among its answers.
+ * - money-core 3.17.0, still unreleased (commit 63423720, the deployed build, holds 3.16.0), takes batch 82's changes
+ *   with no version of its own: `match_payment` falls back to the plain compare when its host refuses a fold, and
+ *   logs that it did (fold-fallback-82); and `rule.payment-matches` is one step again, `script.settle_matched_line`
+ *   held out of the pack until a run can be handed the day Next moves to (repeat-next-80b-82). One id taken away
+ *   from an unreleased version, none added.
  * - people 3.4.0: the People page says how many people may be on the record twice (people-held-twice-69), one note under
  *   its two lead notes, from the built-in figure held-twice and drawn only above nought. 3.3.0 is released (commit
  *   63423720 holds it), so a version of its own. A note added, nothing taken away, so a minor step that reaches a record
@@ -618,7 +623,11 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   links the list of everyone in order of name (people-twice-link-74). And batch 78's: the link opens the list at the
  *   people held twice, `/r/people?twice=1`, and says See them (twice-link-78). And batch 80's: the note says the number
  *   is how many too many ("Too many: N"), since the list the link opens shows every one of each pair
- *   (people-note-count-79-80).
+ *   (people-note-count-79-80). And batch 82's: the note says the people the link shows first, from the built-in figure
+ *   held-twice-shown, and then how many too many ("N people may be on this record twice, M too many")
+ *   (people-twice-note-82). And Calendar is a new page, `page.calendar` (calendar-page-82): this month and the next
+ *   two, with everything that has a day it is due, from every list; one calendar over the computed deadlines, off
+ *   the rail. A page added, nothing taken away.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.17.0',
