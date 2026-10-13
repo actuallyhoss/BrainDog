@@ -26,6 +26,7 @@
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import Section from '$lib/ui/Section.svelte';
+  import Segmented from '$lib/ui/Segmented.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
   import { untrack } from 'svelte';
@@ -178,18 +179,18 @@
     <div class="choices">
       <div class="choice">
         <span class="choice-name" id="choice-scheme">{copy.scheme}</span>
-        <div class="segmented" role="group" aria-labelledby="choice-scheme">
+        <Segmented role="group" aria-labelledby="choice-scheme">
           {#each SCHEMES as [v, label, icon] (v)}
             <button type="button" class="segment" aria-pressed={scheme === v} data-on={scheme === v ? '' : undefined} onclick={() => pickScheme(v)}
               ><Icon name={icon} size="s" />{label}</button
             >
           {/each}
-        </div>
+        </Segmented>
       </div>
 
       <div class="choice">
         <span class="choice-name" id="choice-text">{copy.textSize}</span>
-        <div class="segmented" role="group" aria-labelledby="choice-text">
+        <Segmented role="group" aria-labelledby="choice-text">
           {#each TEXTS as [v, label] (v)}
             <button
               type="button"
@@ -199,12 +200,12 @@
               onclick={() => ((text = v), set('text', v))}><span class="aa" data-size={v} aria-hidden="true">Aa</span>{label}</button
             >
           {/each}
-        </div>
+        </Segmented>
       </div>
 
       <div class="choice">
         <span class="choice-name" id="choice-density">{copy.density}</span>
-        <div class="segmented" role="group" aria-labelledby="choice-density">
+        <Segmented role="group" aria-labelledby="choice-density">
           {#each DENSITIES as [v, label] (v)}
             <button
               type="button"
@@ -215,7 +216,7 @@
               ><span class="spacing" data-density={v} aria-hidden="true"><span></span><span></span><span></span></span>{label}</button
             >
           {/each}
-        </div>
+        </Segmented>
       </div>
 
       <!--

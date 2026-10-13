@@ -257,8 +257,34 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.3.0",
+      "latest": "1.3.1",
       "versions": [
+        {
+          "version": "1.3.1",
+          "checksum": "b1cffbbf320df5aa93084fb94b6aa0611dd81f563f179afd563376eb0edb87c2",
+          "bytes": 14368,
+          "published_at": "2026-10-13T17:02:16.582Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Cash counts"
+            ],
+            "pages": [
+              "Cash counts"
+            ],
+            "rules": [
+              "Write the difference of each count"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "A count that was not compared because its account holds an entry in another currency now says the way out under What happened: type the account's balance, then count again. Before, it said only that it was not compared, and the account went on reading as uncounted. Nothing else changed: still no balance check and no difference are written for such a count.",
+          "preview": true
+        },
         {
           "version": "1.3.0",
           "checksum": "d96b5d3701ee5936d29a8bc272d63b0ca24ae009b92dbedff7c0695e1a106c2e",

@@ -151,6 +151,7 @@ test('a block that HAS something to draw refuses nothing', () => {
     /* Every key a block can carry its content in: a table has rows, a chips or bar block has
        entries, a stat has its read metrics, a forecast has a walk, a series has its bars, a queue its questions, a
        capture the list it writes into, a kind drawn from the record's own answer (a calendar) the rows in that answer,
+       a progress over two figures by plan the tracks it was handed as authored rows (Money's Instalments),
        and everything else has the fenced text it was written with. */
     const held = block as unknown as Record<string, unknown>;
     const many = (key: string) => Array.isArray(held[key]) && (held[key] as unknown[]).length > 0;
@@ -159,6 +160,7 @@ test('a block that HAS something to draw refuses nothing', () => {
       many('entries') ||
       many('metrics') ||
       many('readings') ||
+      many('authored') ||
       many('queue') ||
       (held.kind === 'capture' && typeof held.register === 'string' && held.register !== '') ||
       ((held.answer as { rows?: unknown[] } | undefined)?.rows?.length ?? 0) > 0 ||

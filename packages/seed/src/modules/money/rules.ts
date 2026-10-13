@@ -84,9 +84,9 @@ export const MONEY_RULES: Record<string, SeedRule> = {
    * ladder: the whole text, how it starts, anywhere in it, a pattern, and on one rung the longest. Two that fit
    * equally file nothing, because no category is better than a wrong one.
    *
-   * ONE STEP FOR EACH TEXT A RULE MAY READ, TWO IN ALL. The description is tried first and "Paid to or
-   * from" after it, and a later step that finds a rule writes over the earlier one, so a rule on "Paid to or from"
-   * wins where both fit. An entry with no "Paid to or from" is left to the rules that read the description. Each is
+   * ONE STEP FOR EACH TEXT A RULE MAY READ, TWO IN ALL. The description is tried first and "As the bank
+   * wrote it" after it, and a later step that finds a rule writes over the earlier one, so a rule on "As the bank wrote
+   * it" wins where both fit. An entry with no "As the bank wrote it" is left to the rules that read the description. Each is
    * one lookup that writes the rule's category and, with it, the rule itself into `filed_by` (`filedBy`).
    *
    * AND A CATEGORY'S OWN "Matches" STILL FILES, FOR THE ONE VERSION THAT FIELD STAYS. It is the first step, so any

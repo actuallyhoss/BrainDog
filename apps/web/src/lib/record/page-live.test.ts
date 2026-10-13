@@ -1562,3 +1562,12 @@ test('A HEAT SAYS HOW MANY DAYS FALL OUTSIDE ITS TWELVE WEEKS, since no cell dra
   /* AND A HEAT WHOSE CELLS WITH WHAT FELL OUTSIDE DO NOT MAKE ITS COUNT IS NOT DRAWN. */
   assert.equal(blockOf({ ...heat, wholeRead: { ...days, total: 7 } } as never, new Map(), AT).cannot, liveWords.cannot);
 });
+
+test('a day figure answered as its ISO day is said as the day, with its parameter or without', () => {
+  assert.equal(METRICS['plan-last-due']?.format, 'day');
+  const counted = resolverOf({ 'plan-last-due:Flat': 20970 })('plan-last-due:Flat');
+  assert.equal(resolverOf({ 'plan-last-due:Flat': '2027-06-01' })('plan-last-due:Flat'), counted, 'the ISO day and the count of days are one day, said one way');
+  assert.doesNotMatch(counted ?? '', /2027-06-01|20,?970/u);
+  assert.match(counted ?? '', /1 Jun/u);
+  assert.equal(resolverOf({ note: '2027-06-01' })('note'), '2027-06-01', 'a word that is no day figure is said as written');
+});

@@ -405,8 +405,9 @@
      *
      * AND THERE IS NO `--earn-wash` OR `--danger-wash`, ON PURPOSE. Nothing paints one. An element
      * that declares its intent gets all four through `--tone-wash`, and the only reason
-     * `--warn-wash` is named is `.prop-row[data-hole]`, which is warn by construction and has no
-     * attribute for an intent to hang on. This file already argues, over `--raise`, that a value
+     * `--warn-wash` is named is the line that says the app is offline (`Pull.svelte`), which is warn
+     * by construction and has no attribute for an intent to hang on. A chart's hole row was the
+     * other, until it took the neutral field fill. This file already argues, over `--raise`, that a value
      * nobody paints is the same defect as a flag nothing reads. The day a second construction-warn
      * element appears it gets a token beside this one, not a tenth percentage.
      */

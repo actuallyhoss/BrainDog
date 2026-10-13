@@ -328,6 +328,37 @@ test('A RECORD THAT CANNOT SAY WHICH KEYS ARE PAST is said so once, and each key
   }
 });
 
+/* RED BEFORE (audit 69, finding 7): a host that answers every key was caught only by a key whose day is still to come.
+   With every day today or earlier nothing caught it, and a key whose day is today read "expired". */
+test('AN ANSWER THAT HOLDS EVERY KEY IS NOT BELIEVED when a day in it is too near to be past everywhere, or a key in it has no day', async (t) => {
+  const zone = process.env.TZ;
+  t.after(() => void (zone === undefined ? delete process.env.TZ : (process.env.TZ = zone)));
+  process.env.TZ = 'UTC';
+  const unsaid = 'Your record did not say which keys are past their day, so each is judged by the date on this machine.';
+  const dated = [row(1, { label: 'Ends today', opens: 'A service', expires: '2026-10-13' }), row(2, { label: 'Ended on the 1st', opens: 'A service', expires: '2026-10-01' })];
+
+  /* Every key has a day and none is ahead: the answer is the whole list, and today's key is not past on this machine. */
+  const all = await host(t, dated, null, { today: '2026-10-14', deaf: true });
+  const one = io(all.base);
+  assert.equal(await keys(['list'], one), 0, one.said.join('\n'));
+  assert.deepEqual(one.lines.map((l) => l.split(' · ').at(-1)), ['expired 1 October 2026', 'expires 13 October 2026']);
+  assert.deepEqual(one.said, [unsaid, '2 keys: 2 kept elsewhere.']);
+
+  /* A key with no day is past no day, so an answer that holds one was not picked by the filter. */
+  const blind = await host(t, [...dated, row(3, { label: 'No day', opens: 'A service' })], null, { today: '2026-10-14', deaf: true });
+  const two = io(blind.base);
+  assert.equal(await keys(['list'], two), 0, two.said.join('\n'));
+  assert.ok(two.lines.some((l) => l.endsWith('expires 13 October 2026')), two.lines.join('\n'));
+  assert.equal(two.said[0], unsaid);
+
+  /* A record that does read the filter is still believed: every key long past, and the whole list is the true answer. */
+  const old = [row(1, { label: 'Ended on the 1st', opens: 'A service', expires: '2026-10-01' }), row(2, { label: 'Ended in June', opens: 'A service', expires: '2026-06-01' })];
+  const honest = await host(t, old, null, { today: '2026-10-13' });
+  const three = io(honest.base);
+  assert.equal(await keys(['list'], three), 0, three.said.join('\n'));
+  assert.deepEqual(three.said, ['2 keys: 2 kept elsewhere.'], 'nothing is said of the clock when the record answered');
+});
+
 /* RED BEFORE: a value in code marks kept its mark, so the question was asked of "`sk-live-..." and a short one passed;
    and a character nobody sees inside a value hid its shape from the question, then was taken out for printing, which
    put the value on the line whole. */

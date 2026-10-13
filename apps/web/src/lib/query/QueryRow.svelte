@@ -140,11 +140,11 @@
     min-inline-size: 0;
   }
 
-  /* A PROPOSAL IS QUIETER THAN WHAT IS KEPT, and says so in words beside it, never by the shade alone. */
+  /* A PROPOSAL IS QUIETER THAN WHAT IS KEPT, and says so in words beside it, never by the shade alone. A flat quiet
+     fill and no edge: a broken line is kept for a chart and for a place to drop while dragging. */
   .q-row[data-proposed] {
     padding: var(--sp-2);
     background: var(--s1);
-    border: 1px dashed var(--edge);
     border-radius: var(--r-md);
   }
 

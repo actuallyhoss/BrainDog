@@ -554,6 +554,15 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   `plan-paid`, `plan-left`, `plan-next-due` and `plan-last-due`, and two by plan, `installments-paid-by-plan` and
  *   `installments-total-by-plan` (plan-page-68, REC-B12); and `budget-passed-on`, the day a category's spending
  *   reached its budget, a running total with a stop (budget-passed-on-68, REC-B19 step 4).
+ * - money-core 3.17.0, still unreleased (commit 63423720, the deployed build, holds 3.16.0), takes batch 70's change with
+ *   no version of its own: the cash walk's leg of everyday spending (everyday-leg-69-70, audit 68 finding 4), measured
+ *   over the Ledger and moved a week at a time, on Cash ahead, its bridge and the four figures over the walk.
+ * - money-core 3.17.0, still unreleased, takes batch 70's page changes too, each a block changed and no id added or
+ *   taken away: Money's Instalments tile reads each plan's paid of total from its two figures by plan
+ *   (instalments-tile-70, REC-B12 job 5); Money places This month's spending and Budgets after Instalments, and the
+ *   History heading and Being chased leave the page (money-wire-70, REC-B19 jobs 3 and 4); a plan's page is led by
+ *   one sentence (plan-lead-sentence-70); and a filing rule's Reads choice `payee` is labelled As the bank wrote it
+ *   (filing-reads-words-70).
  * - people 3.4.0: the People page says how many people may be on the record twice (people-held-twice-69), one note under
  *   its two lead notes, from the built-in figure held-twice and drawn only above nought. 3.3.0 is released (commit
  *   63423720 holds it), so a version of its own. A note added, nothing taken away, so a minor step that reaches a record

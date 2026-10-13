@@ -237,6 +237,8 @@ export const shell = {
      figure, quoting a document number and a JSON literal at somebody with no control that edits a
      metric. The author's sentence still prints on the page block, beside the declaration. */
   figureUnavailable: 'This figure cannot be worked out yet. The add-on that owns it says why.',
+  /* A WALK AHEAD THAT NEVER WENT UNDER: the last day it looked at, said where the day the money runs out would be. */
+  lastsPast: (day: string) => `Lasts past ${day}`,
   figureConverted: (day: string) => `Converted at rates as of ${day}.`,
   /* A BAR'S OWN NOTE, beside the bar and not under the chart: what its money was kept in before it was said in home. */
   convertedFrom: (codes: string) => `converted from ${codes}`,

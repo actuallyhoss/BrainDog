@@ -33,11 +33,18 @@
  * such an entry out filed a difference equal to it, money the Ledger already held. So an account that holds one since
  * its last statement is not compared: the count is kept, it says so in What happened, and no check and no
  * difference are written. This lasts until a script can read the record's own figure for a day.
+ *
+ * THE WAY OUT IS SAID ON THE COUNT (1.3.1). The sentence under What happened ends by naming it: type the account's
+ * balance, then count again. Without it a box with one sale in another currency read as uncounted for good.
  */
 
 const WHAT = 'Cash count difference';
-/** What a count says when its account was not compared. The account's name is in the run's log beside it. */
-const NOT_COMPARED = 'This account holds an entry in another currency, so it was not compared.';
+/**
+ * What a count says when its account was not compared, and the way out (1.3.1): a balance typed on the account after
+ * the entry is a newer statement, so the next count rolls from it and is compared. The account's name is in the run's
+ * log beside it.
+ */
+const NOT_COMPARED = "This account holds an entry in another currency, so it was not compared. Type the account's balance, then count again.";
 
 /** The most rows one `ctx.record.list` answers, the record's own page. A full page may have left rows out. */
 const PAGE = 50;

@@ -22,6 +22,7 @@ import { AGENTS_PACK, FIRST_PARTY_VERSIONS, NOW, agentsPackDocument, firstPartyD
 import { keptLists, modulesFor, useCase, useCaseDocument } from '../src/usecases/index.ts';
 import { carriedDocument, dayOf, moduleDocument } from '../src/usecases/install.ts';
 import { peopleBefore3 } from './people-before-3.ts';
+import { CHASING } from '../src/modules/money/pages/parts/chasing.ts';
 
 type Body = Record<string, unknown>;
 const TODAY = dayOf(NOW);
@@ -555,11 +556,44 @@ const withoutPayee = (doc: Body): Body => ({
       : d,
   ),
 });
+/** AND BATCH 70'S (everyday-leg-69-70, audit 68 finding 4), folded into the same unreleased step: 3.17.0's leg of everyday spending comes off the cash walk, on the figures over it and on Money's Cash ahead and bridge. */
+const withoutEveryday = (doc: Body): Body => {
+  const dated = (legs: unknown): Body[] => (legs as Body[]).filter((leg) => leg.everyday === undefined);
+  return {
+    ...doc,
+    declarations: (doc.declarations as Body[]).map((d) =>
+      Array.isArray(d.legs) ? { ...d, legs: dated(d.legs) } : Array.isArray(d.blocks) ? { ...d, blocks: (d.blocks as Body[]).map((b) => (Array.isArray(b.from) ? { ...b, from: dated(b.from) } : b)) } : d,
+    ),
+  };
+};
+/** AND BATCH 70'S (instalments-tile-70, REC-B12 job 5): Money's Instalments tile counts the list's own parts again, as it did before it read the two figures by plan. */
+const INSTALMENTS_BY_PARTS: Body = {
+  kind: 'progress',
+  heading: 'Instalments',
+  icon: 'credit-card',
+  span: 12,
+  source: 'register.installments',
+  where: 'direction is out, state is not cancelled',
+  columns: [{ field: 'plan' }, { field: 'state' }],
+  limit: 6,
+  when: { metric: 'installments-left', gt: 0 },
+  empty: 'Nothing is being paid in parts.',
+};
+/**
+ * AND BATCH 70'S (money-wire-70, REC-B19 jobs 3 and 4): This month's spending and Budgets leave Money, Being chased
+ * stands straight after Instalments again, and the folded History heading is back over In and out, by month.
+ */
+const HISTORY_FOLD: Body = { kind: 'section', heading: 'History', icon: 'history', span: 12, fold: true, when: { metric: 'cash-accounts', gt: 0 } };
+const moneyBeforeSpending = (blocks: Body[]): Body[] =>
+  blocks
+    .filter((b) => b.heading !== "This month's spending" && b.heading !== 'Budgets')
+    .flatMap((b) => (b.heading === 'Instalments' ? [b, CHASING[0] as Body] : b.heading === 'In and out, by month' ? [HISTORY_FOLD, b] : [b]));
 const withoutPlans = (doc: Body): Body => ({
   ...doc,
   declarations: (doc.declarations as Body[])
     .filter((d) => d.register !== 'plans' && d.rule !== 'part-counts-plan' && d.rule !== 'plan-links-parts' && d.script !== 'plans_from_names' && d.page !== 'money-plan' && !PLAN_FIGURES_68.has(String(d.metric)))
-    .map((d) => (d.register === 'installments' && Array.isArray(d.fields) ? { ...d, fields: (d.fields as Body[]).filter((f) => !PLAN_FIELDS.has(String(f.id))) } : d)),
+    .map((d) => (d.register === 'installments' && Array.isArray(d.fields) ? { ...d, fields: (d.fields as Body[]).filter((f) => !PLAN_FIELDS.has(String(f.id))) } : d))
+    .map((d) => (d.page === 'money' && Array.isArray(d.blocks) ? { ...d, blocks: moneyBeforeSpending((d.blocks as Body[]).map((b) => (b.kind === 'progress' && b.heading === 'Instalments' ? INSTALMENTS_BY_PARTS : b))) } : d)),
 });
 const withoutCashStale = (doc: Body): Body => ({ ...doc, declarations: (doc.declarations as Body[]).filter((d) => d.rule !== 'cash-stale') });
 /** Work as 1.18.0 released it, the frozen document (`fixtures/released/`), which holds the follow-up script as it was. */
@@ -572,7 +606,7 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
     version: '3.13.0',
     released: '2e09983b40aba73e',
     undo: (raw) => {
-      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(raw)))))))));
+      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(raw))))))))));
       return {
       ...doc,
       /* AND THE SCRIPT THAT MARKS A BILL PAID, WITH THE RULE THAT STARTS IT (settle-rule-60), both newer than 3.13.0. */

@@ -1,7 +1,9 @@
 /**
  * A payee's name as a person reads it: the bank's text with the same cuts its key makes (the processor's prefix, the
- * place, the reference numbers, the web suffix) and the bank's capitals turned to plain case. The key is what joins two
- * spellings and the name is what is shown, so the name always folds back to the key the text had, and no key changes.
+ * place, the reference numbers, a web address after the name, the web suffix) and the bank's capitals turned to plain
+ * case. The key is what joins two spellings and the name is what is shown, so the name always folds back to the key the
+ * text had. ONE KIND OF KEY MOVED WITH THE ADDRESS CUT: a text that ends in a web address after its name now has the
+ * key the name alone has (`UBER *TRIP HELP.UBER.COM` is `bank:ubertrip`). Every other key is as it was.
  */
 
 import { test } from 'node:test';
@@ -76,4 +78,49 @@ test('NO KEY CHANGED: the keys the bank pack and the key tests hold are the ones
   ];
   for (const [said, key] of held) assert.equal(bankKey(said), key, said);
   assert.equal(bankKey('   '), null);
+});
+
+test('THE FIVE BANK TEXTS A FIRST PEOPLE PAGE READ BADLY each read as a name', () => {
+  assert.equal(payeeName('UBER *TRIP HELP.UBER.COM'), 'Uber Trip');
+  assert.equal(payeeName('IKEA'), 'IKEA');
+  assert.equal(payeeName('CIB TRANSFER'), 'CIB Transfer');
+  assert.equal(payeeName('1234 5678'), '1234 5678');
+  assert.equal(payeeName("McDONALD'S #12"), "McDonald's");
+});
+
+test('A WEB ADDRESS AFTER THE NAME IS CUT from the name and from the key alike, and one that is the name stays', () => {
+  assert.equal(payeeName('NETFLIX AMSTERDAM NL NETFLIX.COM/HELP'), 'Netflix');
+  assert.equal(payeeName('GOOGLE *YOUTUBE G.CO/HELPPAY#'), 'Google Youtube');
+  assert.equal(payeeName('NETFLIX.COM'), 'Netflix');
+  assert.equal(payeeName('talabat.com'), 'Talabat');
+  assert.equal(bankKey('UBER *TRIP HELP.UBER.COM'), 'bank:ubertrip');
+  assert.equal(bankKey('UBER *TRIP'), 'bank:ubertrip');
+  /* A PLACE OR A KIND OF SHOP BEFORE AN ADDRESS IS NO NAME, so the address is the payee and stays. */
+  assert.equal(bankKey('WWW AMAZON.CO.UK'), bankKey('www amazon.co.uk'));
+  assert.notEqual(bankKey('WWW AMAZON.CO.UK'), 'bank:www');
+  assert.notEqual(bankKey('SHOP ZARA.COM'), 'bank:shop');
+});
+
+test('SHORT CAPITALS STAY ONLY WHERE THEY READ AS INITIALS: a whole name, or a first word of two or three letters', () => {
+  assert.equal(payeeName('XO TELECOM EGYPT'), 'XO Telecom');
+  assert.equal(payeeName('UBER'), 'UBER');
+  assert.equal(payeeName('JOHN SMITH'), 'John Smith');
+  assert.equal(payeeName('CEDAR LANE BAKERY'), 'Cedar Lane Bakery');
+  assert.equal(payeeName('CAFE'), 'Cafe');
+  assert.equal(payeeName('BAR 12'), 'Bar 12');
+  assert.equal(payeeName('AL AHLY CLUB'), 'Al Ahly Club');
+  assert.equal(payeeName('THE GRANARY'), 'The Granary');
+  assert.equal(payeeName('ikea'), 'Ikea');
+});
+
+test('A WORD SOMEBODY WROTE KEEPS ITS OWN CAPITALS, and only the capitals a bank ran to its end are lowered', () => {
+  assert.equal(payeeName('iPHONE STORE'), 'iPhone STORE');
+  assert.equal(payeeName('JPMorgan'), 'JPMorgan');
+  assert.equal(payeeName('ChatGPT'), 'ChatGPT');
+  assert.equal(payeeName('OpenAI'), 'OpenAI');
+});
+
+test('THE NAME STILL FOLDS TO ITS TEXT\'S KEY for every text above', () => {
+  for (const said of ['UBER *TRIP HELP.UBER.COM', 'IKEA', 'CIB TRANSFER', '1234 5678', "McDONALD'S #12", 'NETFLIX AMSTERDAM NL NETFLIX.COM/HELP', 'GOOGLE *YOUTUBE G.CO/HELPPAY#', 'NETFLIX.COM', 'WWW AMAZON.CO.UK', 'SHOP ZARA.COM', 'iPHONE STORE'])
+    assert.equal(bankKey(payeeName(said)), bankKey(said), `${said} read as ${payeeName(said)}`);
 });

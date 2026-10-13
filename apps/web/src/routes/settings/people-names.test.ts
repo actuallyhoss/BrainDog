@@ -36,7 +36,7 @@ const PAGE = readFileSync(new URL('./[area]/areas/People.svelte', import.meta.ur
 const ROW = (() => {
   const from = PAGE.indexOf('{#each people as p (p.id)}');
   assert.ok(from >= 0, 'the People area no longer draws one row per person');
-  const to = PAGE.indexOf('class="segmented levels"', from);
+  const to = PAGE.indexOf('<Segmented class="levels"', from);
   assert.ok(to > from, 'the row has no level control after its head');
   return PAGE.slice(from, PAGE.indexOf('>', to));
 })();

@@ -202,17 +202,27 @@ const UNSAID = 'Your record did not say which keys are past their day, so each i
  * AN ANSWER IS BELIEVED ONLY IF IT COULD BE TRUE. No zone is more than a day from UTC, so a key the record calls past
  * while its day is tomorrow's UTC date or later was not picked by the filter: the host answered every key. That, and a
  * host that refuses the sentence, leave the day on this machine, which is the reader's own, and one sentence saying so.
+ *
+ * AND A HOST THAT ANSWERED EVERY KEY IS NOT ALWAYS CAUGHT BY A DAY TO COME: when no key's day is ahead, that test passes
+ * and every key read "expired", one whose day is today among them. Two more tells, read against the whole list (`held`).
+ * A key with no day is past no day, so one in the answer was not picked by the filter. And an answer holding every
+ * dated key says nothing the filter could not have been ignored to say, so it is believed only when each of those days
+ * is past in every zone on earth (before yesterday's UTC date); one nearer than that is left to this machine's day.
  */
-function pastOf(asked: Result<unknown[]>, expires: string, now: number): Past | null {
+function pastOf(asked: Result<unknown[]>, held: readonly unknown[], expires: string, now: number): Past | null {
   if (!asked.ok) return null;
   const ceiling = new Date(now + DAY_MS).toISOString().slice(0, 10);
+  const floor = new Date(now - DAY_MS).toISOString().slice(0, 10);
+  const dayIn = (r: unknown): string => (isObject(r) && isObject(r.fields) ? text(r.fields[expires]).slice(0, 10) : '');
   const ids = new Set<string>();
   for (const r of asked.value) {
     if (!isObject(r) || typeof r.id !== 'string') continue;
-    const day = isObject(r.fields) ? text(r.fields[expires]).slice(0, 10) : '';
-    if (day !== '' && !(day < ceiling)) return null;
+    const day = dayIn(r);
+    if (day === '' || !(day < ceiling)) return null;
     ids.add(r.id);
   }
+  const dated = held.filter((r) => isObject(r) && typeof r.id === 'string' && dayIn(r) !== '');
+  if (dated.length > 0 && dated.every((r) => ids.has((r as { id: string }).id)) && dated.some((r) => !(dayIn(r) < floor))) return null;
   return ids;
 }
 
@@ -301,7 +311,7 @@ async function read(host: string | undefined, wanted: string | undefined, everyw
     where = names.get([...ids][0]!) ?? SOME_PROJECT;
   }
 
-  const past = pastOf(late, shape.expires, now);
+  const past = pastOf(late, held.value, shape.expires, now);
   const keys = printable(readKeys(rows, names, past ?? dayHere(now), shape));
   sinks.answer?.({ value: { keys } });
   for (const k of keys) sinks.out(keyLine(k));

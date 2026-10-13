@@ -15,6 +15,7 @@
 <script lang="ts">
   import SheetCharts from '$lib/design/SheetCharts.svelte';
   import SheetControls from '$lib/design/SheetControls.svelte';
+  import Segmented from '$lib/ui/Segmented.svelte';
   import type { AreaProps } from '../settings-state.svelte.ts';
 
   /* EVERY AREA TAKES THE SAME PROPS. The charts sheet reads the record's pages through the shell; the controls sheet reads nothing. */
@@ -44,11 +45,11 @@
 
 <div class="look">
   <p class="look-lead">{words.lead}</p>
-  <div class="segmented look-which" role="group" aria-label={words.which}>
+  <Segmented class="look-which" role="group" aria-label={words.which}>
     {#each SHEETS as s (s)}
       <button type="button" class="segment" aria-pressed={sheet === s} data-on={sheet === s ? '' : undefined} onclick={() => choose(s)}>{words[s]}</button>
     {/each}
-  </div>
+  </Segmented>
 
   {#if sheet === 'charts'}
     <SheetCharts shell={props.shell} />
@@ -73,7 +74,8 @@
     line-height: 1.4;
   }
 
-  .look-which {
+  /* The track is `Segmented`'s own element, so the rule reaches it by this area's name for it. */
+  .look :global(.look-which) {
     justify-self: start;
   }
 </style>

@@ -8,6 +8,11 @@
  * draws it, a void one alone does not, and it carries its own empty line. The add is declared beside it and is NOT on
  * the page yet, for the two reasons `parts/ledger.ts` gives; the last test fails the day either reason is gone, so the
  * box is not forgotten.
+ *
+ * WHO WAS PAID, AND NOT YET ON THE TILE (REC-B16 step 5). The record keeps a payee by the name a person reads beside the
+ * bank's own line, and the tile still says the bank's line. The three tests at the foot say what is wanted (a `todo`,
+ * red until it is built), what must not move with it (the day, the signed amount, the order), and why it waits: a
+ * column names one field, and a field with no value is an empty cell.
  */
 
 import { test } from 'node:test';
@@ -21,7 +26,8 @@ import { NOW, REGISTERS, TRANSACTIONS, day, declarations, installSeed, metricDec
 import { MONEY_PAGE } from '../src/modules/money/pages/money.ts';
 import { ADD_MOVEMENT, LEDGER, LEDGER_LINES } from '../src/modules/money/pages/parts/ledger.ts';
 
-type Drawn = { kind?: string; heading?: string; drawn?: boolean; refusals: readonly unknown[]; rows?: readonly { id: string; seq: number; fields: Record<string, unknown> }[] };
+type Column = { field: string; sign?: { field: string; minus: string } };
+type Drawn = { kind?: string; heading?: string; drawn?: boolean; refusals: readonly unknown[]; columns?: readonly Column[]; rows?: readonly { id: string; seq: number; fields: Record<string, unknown> }[] };
 
 const drawn = (k: Kernel): Drawn[] => {
   const out = k.page('money');
@@ -36,7 +42,7 @@ test('THE LEDGER IS A TILE ON MONEY, under the accounts and above the fold, and 
   assert.ok(at >= 0, 'Money declares no Ledger tile');
   assert.deepEqual(declared[at], LEDGER[0]);
   assert.ok(at > declared.findIndex((b) => b.heading === 'Accounts'), 'the Ledger is above the accounts');
-  assert.ok(at < declared.findIndex((b) => b.fold === true), 'the Ledger is under a fold, where he went looking for it');
+  assert.ok(declared.every((b, i) => b.fold !== true || at < i), 'the Ledger is under a fold, where he went looking for it');
   assert.equal(declared[at]!.area, undefined, 'the Ledger is in the side column, which is too narrow for a day, a name and an amount');
   /* ONE READING OF THE LEDGER ON THE PAGE: History gave up the twelve it folded, which were these six and six more. */
   assert.deepEqual(declared.filter((b) => b.source === 'register.transactions').map((b) => b.heading), ['Ledger']);
@@ -156,4 +162,79 @@ test('ADD A MOVEMENT IS DECLARED AND WAITS: one line cannot say an amount, an ac
   assert.match(sayOf(typed), /account/iu);
   assert.equal(declared.length, 24, 'Money has room now: place ADD_MOVEMENT under the Ledger once a capture can ask for an account');
   assert.ok(!declared.some((b) => b.kind === 'capture' && b.register === 'transactions'), 'Add a movement is on the page: say so here and in parts/ledger.ts');
+});
+
+/**
+ * What a line of a timeline says for its name: its second cell, the value of the second column's field
+ * (`packages/render/src/html.ts`, and `cells` in the app's `record/api.ts`). A field holding nothing is an empty cell.
+ */
+const named = (tile: Drawn, row: { fields: Record<string, unknown> }): string => {
+  const said = row.fields[tile.columns?.[1]?.field ?? ''];
+  return typeof said === 'string' ? said : '';
+};
+
+/** A record with one account and two entries: one a bank door filed, with its payee, and one a person typed. */
+async function paidAndTyped(extra: unknown[] = []): Promise<Kernel> {
+  const k = await openRecord(openSqlite(), fixedClock(NOW));
+  const installed = await k.install([...declarations(), ...pageDeclarations(), ...metricDeclarations(), ...(extra as never[])]);
+  assert.ok(installed.ok, sayOf(installed));
+  const account = k.create('accounts', { name: 'Current account', kind: 'bank', balance: { amount: 250_000, currency: 'GBP' }, as_of: day(0), liquid: true } as never, { actor: 'p_test' });
+  assert.ok(account.ok, sayOf(account));
+  const move = (fields: Record<string, unknown>) => {
+    const made = k.create('transactions', { direction: 'out', account: account.value.id, state: 'cleared', ...fields } as never, { actor: 'p_test' });
+    assert.ok(made.ok, sayOf(made));
+  };
+  /* AS THE BANK WROTE IT, with the processor's reference on its tail, and the name the record read out of it. */
+  move({ what: 'CHILLOUT CAFE 4471 REF 99812', payee: 'Chillout', on: day(0), amount: { amount: 4_500, currency: 'GBP' } });
+  move({ what: 'Rent', on: day(-1), amount: { amount: 90_000, currency: 'GBP' } });
+  return k;
+}
+
+/* WANTED, AND RED UNTIL IT IS BUILT (a `todo`, so it is counted and fails no run). "Strips a trailing processor
+   reference" (the owner): he reads who he paid, and the bank's own line only where nothing better is known. */
+test('A LINE SAYS WHO WAS PAID, and an entry a person typed, with no payee, says its description', { todo: 'a column cannot fall back yet' }, async () => {
+  const k = await paidAndTyped();
+  const tile = drawn(k).find((b) => b.heading === 'Ledger');
+  assert.ok(tile, 'the page draws no Ledger');
+  assert.deepEqual(tile.refusals, []);
+  assert.deepEqual((tile.rows ?? []).map((r) => named(tile, r)), ['Chillout', 'Rent']);
+});
+
+test('THE DAY, THE SIGNED AMOUNT AND THE ORDER ARE THE LEDGER\'S, whatever its name comes to say', async () => {
+  const k = await paidAndTyped();
+  const tile = drawn(k).find((b) => b.heading === 'Ledger');
+  assert.ok(tile, 'the page draws no Ledger');
+  const columns = tile.columns ?? [];
+  /* THREE CELLS, which is all a timeline draws: a fourth column for the payee would never be on the page. */
+  assert.equal(columns.length, 3);
+  assert.deepEqual(columns[0], { field: 'on' });
+  assert.deepEqual(columns[2], { field: 'amount', sign: { field: 'direction', minus: 'out' } });
+  assert.deepEqual((LEDGER[0] as { order?: unknown }).order, [{ field: 'on', dir: 'desc' }]);
+  assert.deepEqual((tile.rows ?? []).map((r) => String(r.fields.on)), [day(0), day(-1)]);
+  assert.deepEqual((tile.rows ?? []).map((r) => (r.fields.amount as { amount: number }).amount), [4_500, 90_000]);
+});
+
+/* WHY IT WAITS, MEASURED. The same Ledger with the payee as its name: the line a bank door filed reads well, and the
+   line a person typed says nothing at all, which is worse than the bank's words. THE DAY THIS FAILS, a column can fall
+   back: give `LEDGER` columns of its own in `parts/ledger.ts` and take the `todo` off the test above. */
+test('A PAYEE COLUMN SAYS NOTHING FOR AN ENTRY WITH NO PAYEE, so the tile keeps the description until a column can fall back', async () => {
+  const probe = {
+    id: 'page.ledger-payee-probe',
+    kind: 'page',
+    body: {
+      page: 'ledger-payee-probe',
+      title: 'Probe',
+      blocks: [{ ...LEDGER[0], body: undefined, columns: [{ field: 'on' }, { field: 'payee' }, { field: 'amount', sign: { field: 'direction', minus: 'out' } }] }],
+    },
+  };
+  const k = await paidAndTyped([probe]);
+  const out = k.page('ledger-payee-probe');
+  assert.ok(out.ok, sayOf(out));
+  const tile = (out.value as unknown as { blocks: Drawn[] }).blocks[0]!;
+  assert.deepEqual(tile.refusals, []);
+  assert.deepEqual((tile.rows ?? []).map((r) => named(tile, r)), ['Chillout', ''], 'a payee column falls back now: draw it on the Ledger');
+  /* AND THE TILE AS IT SHIPS says the bank's line for both, reference and all. */
+  const shipped = drawn(k).find((b) => b.heading === 'Ledger');
+  assert.ok(shipped, 'the page draws no Ledger');
+  assert.deepEqual((shipped.rows ?? []).map((r) => named(shipped, r)), ['CHILLOUT CAFE 4471 REF 99812', 'Rent']);
 });

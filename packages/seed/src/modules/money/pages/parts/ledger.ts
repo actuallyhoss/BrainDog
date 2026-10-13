@@ -39,6 +39,12 @@ export const LEDGER: Record<string, unknown>[] = [
        THE APP DRAWS THIS LINE ABOVE THE MOVEMENTS when the record answered both figures (`writtenLine` in the app's
        `apps/web/src/lib/record/blocks.ts`), and draws none while either is unanswered.
 
+       THE NAME IS STILL WHAT THE BANK CALLED IT, AND NOT YET WHO WAS PAID (REC-B16 step 5). The record keeps the payee
+       by the name a person reads (`payee`, filled where a bank door read one), and an entry a person typed holds none.
+       A column names one field and a field holding nothing is an empty cell, so a payee column would say `Chillout`
+       on one line and nothing at all on the line under it. Until a column can fall back to a second field, the tile
+       keeps `MOVED_COLUMNS`; `test/money-ledger-tile.test.ts` measures it and goes red the day one can.
+
        NO GATE OF ITS OWN: a line is not a thing a tile holds, so a Ledger nothing has moved on is still not drawn. */
     kind: 'timeline',
     heading: 'Ledger',

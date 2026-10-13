@@ -41,6 +41,9 @@ type Block = {
   readings?: Cell[];
   columns?: { field: string; label?: string }[];
   refusals?: unknown[];
+  /** What the record answers for each `{{figure:plan}}` in the block's words, by the words in the braces. */
+  values?: Record<string, unknown>;
+  unnamed?: string[];
   wholeRead?: { total: number; of: number; rows: { label: string; value: number; of: number }[] };
 };
 
@@ -116,6 +119,24 @@ function cellOf(blocks: Block[], id: string): Cell {
   return cell;
 }
 const read = (blocks: Block[], id: string): Reading => cellOf(blocks, id).reading!;
+/** The sentence a plan with parts is led by, with the plan's name filled in and every figure of it still to be written. */
+const sentenceOf = (name: string): string => `{{plan-parts-paid:${name}}} of {{plan-parts:${name}}} paid. {{plan-left:${name}}} left, the last part on {{plan-last-due:${name}}}.`;
+/** The block that leads the page, which is one block and no more. */
+function leadOf(blocks: Block[]): Block {
+  const lead = drawn(blocks).filter((b) => b.lead === true);
+  assert.equal(lead.length, 1, 'one block leads');
+  return lead[0]!;
+}
+/** One figure of the lead sentence as the record answered it, by the first word of its id. */
+function said(blocks: Block[], id: string): unknown {
+  const lead = leadOf(blocks);
+  assert.deepEqual(lead.unnamed ?? [], [], 'every figure the sentence asks for is one the record has');
+  const key = Object.keys(lead.values ?? {}).find((k) => k.startsWith(`${id}:`));
+  assert.ok(key, `${id} is in the sentence, and has a value`);
+  return lead.values![key];
+}
+/** A day in the sentence as whole days since 1970, whether the record answers it as that count or as the day written out. */
+const dayOf = (v: unknown): number => (typeof v === 'string' ? daysOf(v) : (v as number));
 const tableOf = (blocks: Block[]): Block => blocks.find((b) => b.kind === 'table')!;
 
 test('the page is one page a plan, under Money, and needs the list of plans', () => {
@@ -144,14 +165,13 @@ test('a plan of six parts with two paid reads 2 of 6 paid, and left is its open 
   write(k, 'Flat', SIX);
   const blocks = pageOf(k, 'Flat');
 
-  assert.deepEqual([read(blocks, 'plan-parts-paid').value, read(blocks, 'plan-parts').value], [2, 6]);
-  assert.deepEqual([cellOf(blocks, 'plan-parts-paid').label, cellOf(blocks, 'plan-parts').label], ['Parts paid', 'Parts in all']);
-  const left = read(blocks, 'plan-left');
-  assert.deepEqual([left.value, left.unit, left.rows], [4 * PART, 'EGP', 4]);
+  /* THE SENTENCE'S FOUR FIGURES, each answered for this plan: 2 of 6 paid, E£176,500 left, the last part on 1 Jun 2027. */
+  assert.deepEqual([said(blocks, 'plan-parts-paid'), said(blocks, 'plan-parts')], [2, 6]);
+  assert.deepEqual(said(blocks, 'plan-left'), egp(4 * PART));
   const paid = read(blocks, 'plan-paid');
   assert.deepEqual([paid.value, paid.unit], [2 * PART, 'EGP']);
   /* THE NEXT IS THE FIRST PART STILL OPEN, the third, and the last is the sixth. */
-  assert.deepEqual([read(blocks, 'plan-next-due').value, read(blocks, 'plan-last-due').value], [daysOf(due(3)), daysOf(due(6))]);
+  assert.deepEqual([read(blocks, 'plan-next-due').value, dayOf(said(blocks, 'plan-last-due'))], [daysOf(due(3)), daysOf(due(6))]);
 
   /* AND THE TRACK DRAWS THE SAME TWO OF SIX, one track, counted from the parts' own status. */
   const track = drawn(blocks).find((b) => b.kind === 'progress')!;
@@ -164,11 +184,11 @@ test('a cancelled part counts in neither side', async () => {
   write(k, 'Flat', ['paid', 'paid', 'open', 'cancelled', 'open', 'cancelled']);
   const blocks = pageOf(k, 'Flat');
 
-  assert.deepEqual([read(blocks, 'plan-parts-paid').value, read(blocks, 'plan-parts').value], [2, 4]);
-  assert.equal(read(blocks, 'plan-left').value, 2 * PART);
+  assert.deepEqual([said(blocks, 'plan-parts-paid'), said(blocks, 'plan-parts')], [2, 4]);
+  assert.deepEqual(said(blocks, 'plan-left'), egp(2 * PART));
   assert.equal(read(blocks, 'plan-paid').value, 2 * PART);
   /* THE LAST PART IS THE LAST ONE THAT STANDS: the sixth is cancelled, so the plan ends on the fifth. */
-  assert.equal(read(blocks, 'plan-last-due').value, daysOf(due(5)));
+  assert.equal(dayOf(said(blocks, 'plan-last-due')), daysOf(due(5)));
   assert.deepEqual([drawn(blocks).find((b) => b.kind === 'progress')!.wholeRead!.total, drawn(blocks).find((b) => b.kind === 'progress')!.wholeRead!.of], [2, 4]);
   /* IT IS STILL LISTED, under its own word, so nobody wonders where a part went. */
   assert.equal(tableOf(blocks).matched, 6);
@@ -179,9 +199,11 @@ test('one plan reads only its own parts', async () => {
   write(k, 'Flat', SIX);
   write(k, 'Car, the red one', ['paid', 'open', 'open']);
   const car = pageOf(k, 'Car, the red one');
-  assert.deepEqual([read(car, 'plan-parts-paid').value, read(car, 'plan-parts').value, read(car, 'plan-left').value], [1, 3, 2 * PART]);
+  /* A NAME WITH A COMMA IN IT IS ONE PLAN, in the sentence as in the list. */
+  assert.equal(leadOf(car).body, sentenceOf('Car, the red one'));
+  assert.deepEqual([said(car, 'plan-parts-paid'), said(car, 'plan-parts'), said(car, 'plan-left')], [1, 3, egp(2 * PART)]);
   assert.equal(tableOf(car).matched, 3);
-  assert.equal(read(pageOf(k, 'Flat'), 'plan-parts').value, 6);
+  assert.equal(said(pageOf(k, 'Flat'), 'plan-parts'), 6);
 
   /* AND MONEY'S TWO COUNTS SAY EVERY PLAN AT ONCE, one count a plan. */
   const by = (id: string) => Object.fromEntries((value<Reading>(k.metric(PLANS_FIGURES[id] as never)).groups ?? []).map((g) => [g.key, g.value]));
@@ -246,7 +268,7 @@ test('the parts are listed with day, amount, status and what is left after each,
   assert.deepEqual(rows[2]!.fields.left_after, egp(3 * PART));
   assert.deepEqual(rows[5]!.fields.left_after, egp(0));
   /* WHAT IS LEFT AFTER THE FIRST OPEN PART AND THAT PART ARE WHAT THE PAGE SAYS IS LEFT. */
-  assert.equal((rows[2]!.fields.left_after as Money).amount + PART, read(pageOf(k, 'Flat'), 'plan-left').value);
+  assert.equal((rows[2]!.fields.left_after as Money).amount + PART, (said(pageOf(k, 'Flat'), 'plan-left') as Money).amount);
 });
 
 test('a plan with no parts says so in a sentence, and draws no figure about nothing', async () => {
@@ -266,18 +288,31 @@ test('a plan with no parts says so in a sentence, and draws no figure about noth
   assert.match(table.empty!, /^[A-Z].*Desk.*\.$/, 'the empty list is a sentence that names the plan');
 });
 
-test('a plan with parts is led by its figures, and a plan all paid says no next part', async () => {
+test('a plan with parts is led by one sentence, and a plan all paid says no next part', async () => {
   const k = await moneyCore();
   write(k, 'Flat', SIX);
   write(k, 'Desk', ['paid', 'paid']);
-  const lead = drawn(pageOf(k, 'Flat')).filter((b) => b.lead === true);
-  assert.deepEqual(lead.map((b) => b.kind), ['stat']);
-  /* THE SENTENCE'S FOUR FIGURES, IN THE SENTENCE'S ORDER: "2 of 6 paid. E£176,500 left, the last part on 1 Jun 2027." */
-  assert.deepEqual(lead[0]!.readings!.map((c) => c.metric.split(':')[0]), ['plan-parts-paid', 'plan-parts', 'plan-left', 'plan-last-due']);
+  const flat = pageOf(k, 'Flat');
+  const lead = leadOf(flat);
+  /* ONE LINE AND NOT FOUR FIGURES UNDER FOUR WORDS: "2 of 6 paid. E£176,500 left, the last part on 1 Jun 2027." */
+  assert.equal(lead.kind, 'note');
+  assert.equal(lead.body, sentenceOf('Flat'));
+  /* EVERY FIGURE OF IT IS ANSWERED, by the words in its braces, so no brace is left for a person to read. */
+  assert.deepEqual(Object.keys(lead.values ?? {}).sort(), ['plan-last-due:Flat', 'plan-left:Flat', 'plan-parts-paid:Flat', 'plan-parts:Flat']);
+  assert.deepEqual([said(flat, 'plan-parts-paid'), said(flat, 'plan-parts'), said(flat, 'plan-left')], [2, 6, egp(4 * PART)]);
+  assert.equal(dayOf(said(flat, 'plan-last-due')), daysOf('2027-06-01'));
+  /* AND THE FOUR ARE SAID ONCE: no tile repeats the sentence under it. */
+  const cells = drawn(flat).flatMap((b) => b.readings ?? []).map((c) => c.metric.split(':')[0]);
+  assert.deepEqual(cells, ['plan-paid', 'plan-next-due']);
 
-  const desk = drawn(pageOf(k, 'Desk'));
-  assert.equal(desk.some((b) => b.heading === 'Next part'), false, 'nothing is next once every part is paid');
-  assert.deepEqual([read(desk, 'plan-parts-paid').value, read(desk, 'plan-parts').value, read(desk, 'plan-paid').value], [2, 2, 2 * PART]);
+  const desk = pageOf(k, 'Desk');
+  assert.equal(drawn(desk).some((b) => b.heading === 'Next part'), false, 'nothing is next once every part is paid');
+  assert.equal(leadOf(desk).body, sentenceOf('Desk'));
+  /* ALL PAID READS 2 OF 2 AND 0 LEFT: no part is open, so nothing is added up and the nought has no currency to be
+     written in. The sentence still ends on the day the plan ended. */
+  assert.deepEqual([said(desk, 'plan-parts-paid'), said(desk, 'plan-parts'), read(desk, 'plan-paid').value], [2, 2, 2 * PART]);
+  assert.equal(said(desk, 'plan-left'), 0);
+  assert.equal(dayOf(said(desk, 'plan-last-due')), daysOf(due(2)));
 });
 
 test('nothing a person reads on the page is an id, a dash or a word about the list', () => {
@@ -287,7 +322,8 @@ test('nothing a person reads on the page is an id, a dash or a word about the li
   for (const said of copy) {
     assert.doesNotMatch(said, /[—–]/, said);
     assert.doesNotMatch(said, /\b(row|rows|list item|entity|record)\b/i, said);
-    assert.doesNotMatch(said, /\{\{(?!name\}\})/, `${said}: only the plan's name is filled`);
+    /* ONLY THE PLAN'S NAME IS FILLED, alone or as the plan a figure of the plan is asked about. */
+    assert.equal(said.replace(/\{\{plan-[a-z-]+:\{\{name\}\}\}\}/g, '').replace(/\{\{name\}\}/g, '').includes('{{'), false, said);
   }
   /* AND IT IS A SHORT PAGE: Money's own holds twenty-four blocks, and this adds none to it. */
   assert.ok(blocks.length <= 8);

@@ -47,15 +47,18 @@ export const FILING_RULES_REGISTER: MoneyRegister = {
       default: 'starts',
       required: true,
     },
-    /* WHICH TEXT OF THE ENTRY IS READ. A bank message names the shop in "Paid to or from" and puts a reference in the
-       description, and an entry typed by hand often has the description alone. A rule that reads "Paid to or from" is
-       tried first, and one that reads the description files only where none of those fits. */
+    /* WHICH TEXT OF THE ENTRY IS READ. A bank message names the shop in "As the bank wrote it" and puts a reference in
+       the description, and an entry typed by hand often has the description alone. A rule that reads "As the bank
+       wrote it" is tried first, and one that reads the description files only where none of those fits.
+
+       THE CHOICE CARRIES THE LEDGER'S OWN WORDS FOR THE FIELD IT READS (`counterparty_text`), and not "Paid to or
+       from", which the Ledger now says of another field. The value stays `payee`, so no rule already written moves. */
     {
       id: 'reads',
       label: 'Reads',
       type: 'enum',
       values: ['payee', 'description'],
-      labels: { payee: 'Paid to or from', description: 'The description' },
+      labels: { payee: 'As the bank wrote it', description: 'The description' },
       default: 'payee',
       required: true,
     },

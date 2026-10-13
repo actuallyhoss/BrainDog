@@ -23,6 +23,8 @@ import { refused, sayOf } from '@braindog/ports';
 
 import { ACCOUNTS, CATEGORIES, INSTALLMENTS, LOOKUPS, METRICS, NOW, OBLIGATIONS, PAGES, REGISTERS, RECURRING_ITEMS, RULES, SNAPSHOTS, cashPoints, cashSeries, day, firstPartyDocument, firstPartyManifest, installSeed } from '../src/index.ts';
 import { MONEY_METRICS, MONEY_PAGES, MONEY_TARGET_SETTINGS, nightOf } from '../src/modules/money.ts';
+import { BUDGET } from '../src/modules/money/pages/parts/budget.ts';
+import { SPENDING } from '../src/modules/money/pages/parts/spending.ts';
 import { USE_CASES } from '../src/usecases/index.ts';
 
 function openSqlite(): Sql {
@@ -720,15 +722,19 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
     undefined,
     'Due in the next 30 days',
     'Instalments',
-    'Being chased',
-    'History',
+    /* WHERE THE MONEY WENT, SINCE money-wire-70 (REC-B19 jobs 3 and 4): this month against last by category, then
+       what is left of each budget, straight after what is being paid in parts. */
+    "This month's spending",
+    'Budgets',
+    /* THE MONTHS BEHIND, OPEN UNDER COMING AND GOING: the folded History heading stood over this one chart and went
+       to make room, and Being chased went with it. */
     'In and out, by month',
   ]);
   /* WHAT STANDS BESIDE THE WALK, AND WHAT IS FOLDED. */
   const blocks = page.blocks as { heading?: string; area?: string; fold?: boolean; box?: boolean }[];
   assert.deepEqual((page as { layout?: unknown }).layout, { rail: 4 });
   assert.deepEqual(blocks.filter((b) => b.area === 'rail').map((b) => b.heading), ['Runs out', 'Accounts', 'Waiting on you']);
-  assert.deepEqual(blocks.filter((b) => b.fold === true).map((b) => b.heading), ['History']);
+  assert.deepEqual(blocks.filter((b) => b.fold === true).map((b) => b.heading), [], 'a folded heading over one chart is back');
   assert.deepEqual(blocks.filter((b) => b.box === true).map((b) => b.heading), ['Heads up', 'Coming and going']);
   /* ONE HEADING OVER COMING AND GOING, SINCE money-core 3.13.0: the block straight under the boxed heading is the walk
      of the next thirty days, and it wears neither a heading nor a glyph of its own. */
@@ -775,6 +781,54 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
   const target = runs.readings?.[0]?.target as { gte: number };
   assert.ok(on < target.gte, 'a day the money runs out on meets its target');
   assert.equal((METRICS['runs-out-on'] as { format?: string }).format, 'day');
+});
+
+/**
+ * ROOM FOR WHERE THE MONEY WENT (REC-B19 jobs 3 and 4, money-wire-70). A page declares twenty-four blocks at the most
+ * (`BLOCK_CEILING` in `packages/kernel/src/declare.ts`) and Money stood at twenty-four, so the two tiles came in for two
+ * that went: the folded History heading, which stood over one chart, and Being chased. Nothing above Heads up moved,
+ * because that is the page a person reads each morning.
+ */
+test("MONEY HOLDS NO MORE BLOCKS THAN A PAGE MAY, and this month's spending and the budgets stand after Instalments", async () => {
+  const blocks = MONEY_PAGES.money!.blocks as readonly { kind: string; heading?: string; span?: number; lead?: boolean; area?: string }[];
+  assert.ok(blocks.length <= 24, `Money declares ${blocks.length} blocks, and a page declares 24 at the most`);
+
+  /* THE TILES THEIR OWN FILES DECLARE, AND NOT A COPY OF THEM: the one tile of spending, then the budgets' tile. */
+  const parts = blocks.findIndex((b) => b.heading === 'Instalments');
+  assert.ok(parts >= 0, 'Money draws no Instalments to stand them after');
+  assert.equal(SPENDING.length, 1);
+  assert.equal(blocks[parts + 1], SPENDING[0], "this month's spending is not straight after Instalments");
+  assert.equal(blocks[parts + 2], BUDGET[0], 'the budgets are not straight after the spending');
+  assert.deepEqual([blocks[parts + 1]!.heading, blocks[parts + 2]!.heading], ["This month's spending", 'Budgets']);
+  /* INSIDE COMING AND GOING, and each the whole width, as every tile drawn on its own figure is. */
+  assert.ok(blocks.findIndex((b) => b.heading === 'Coming and going') < parts);
+  assert.deepEqual([blocks[parts + 1]!.span, blocks[parts + 2]!.span], [12, 12]);
+  /* THE LINE A PASSED BUDGET WRITES IS NOT PLACED YET: no page writes it (budget-tile-70), and a block that draws
+     nothing would cost a tile that does. When this fails the page reader has learnt it or somebody placed it early. */
+  assert.ok(!blocks.includes(BUDGET[1] as never), "the passed-budget line is on Money before a page can write it");
+
+  /* NOTHING THAT LEADS THE PAGE MOVED: the line, the walk, the side column, the check and the Ledger, then Heads up. */
+  assert.deepEqual(
+    blocks.slice(0, 11).map((b) => [b.kind, b.heading, b.area]),
+    [
+      ['note', undefined, undefined],
+      ['note', undefined, undefined],
+      ['bar', 'What you have, by book', undefined],
+      ['capture', 'Add an account', undefined],
+      ['forecast', 'Cash ahead', undefined],
+      ['stat', 'Runs out', 'rail'],
+      ['split', 'Accounts', 'rail'],
+      ['queue', 'Waiting on you', 'rail'],
+      ['stat', 'Cash now does not add up', undefined],
+      ['timeline', 'Ledger', undefined],
+      ['section', 'Heads up', undefined],
+    ],
+  );
+  assert.deepEqual([blocks[0]!.lead, blocks[1]!.lead], [true, true]);
+
+  /* AND THE RECORD TAKES THE PAGE AND DRAWS BOTH ON THE SAMPLE WITHOUT A REFUSAL. */
+  const k = await seeded();
+  for (const heading of ["This month's spending", 'Budgets']) blockOf(k, 'money', heading);
 });
 
 /**
@@ -849,7 +903,8 @@ test('EVERY MONEY TILE WEARS A GLYPH, the headline sits beside its walk, and no 
 
     /* WHAT A PERSON READS, AND ONLY THAT: a `where:` is the record's grammar, and `direction is owed to me` is an id. */
     const read = blocks.flatMap((b) => [b.heading, b.body, b.empty, b.unset, ...(b.cells ?? []).flatMap((c) => [c.label, c.note])]).filter((t): t is string => typeof t === 'string');
-    assert.ok(read.length > 10, `${slug}: the sweep read almost nothing, so it proves nothing`);
+    /* A PLAN'S PAGE READS TEN SINCE ITS LEAD BECAME ONE SENTENCE (plan-lead-sentence-70), where four figures had a label each. */
+    assert.ok(read.length >= 10, `${slug}: the sweep read almost nothing, so it proves nothing`);
     for (const t of read) assert.doesNotMatch(t, /\bowe[ds]?\b|\byou owe\b|\bowing\b/iu, `${slug} says "${t}"`);
   }
 
@@ -893,12 +948,13 @@ test('MONEY OPENS WITH ONE LINE OF WHAT THE MONEY IS DOING, and what is paid in 
   for (const metric of ['cash-now', 'runway-days'])
     assert.equal((MONEY_METRICS[metric] as { snapshot?: { into: string } }).snapshot?.into, `series.${metric}`, `${metric} remembers no night`);
 
-  /* ONE TRACK A PLAN: the parts that go out and are not cancelled, which the host counts paid against all by `plan`. */
-  const parts = blockOf(k, 'money', 'Instalments');
+  /* ONE TRACK A PLAN, EACH FROM THE TWO COUNTS BY PLAN: the parts that go out and are not cancelled, and the paid of them. */
+  const parts = blockOf(k, 'money', 'Instalments') as Omit<DrawnBlock, 'readings'> & { readings?: readonly { metric: string; reading: { groups?: { key: string; value: number | null }[] } | null }[] };
   const leaving = INSTALLMENTS.filter((r) => r.direction === 'out' && r.state !== 'cancelled');
-  assert.equal(parts.matched, leaving.length);
-  assert.deepEqual([...new Set(parts.rows.map((r) => String(r.fields.plan)))], [...new Set(leaving.map((r) => String(r.plan)))]);
-  assert.equal(parts.rows.filter((r) => r.fields.state === 'paid').length, leaving.filter((r) => r.state === 'paid').length, 'the paid parts are what the track fills with');
+  const counted = (rows: typeof leaving) => Object.fromEntries([...new Set(rows.map((r) => String(r.plan)))].map((p) => [p, rows.filter((r) => String(r.plan) === p).length]));
+  const byPlan = (id: string) => Object.fromEntries((parts.readings?.find((c) => c.metric === id)?.reading?.groups ?? []).map((g) => [g.key, g.value]));
+  assert.deepEqual(byPlan('installments-total-by-plan'), counted(leaving));
+  assert.deepEqual(byPlan('installments-paid-by-plan'), counted(leaving.filter((r) => r.state === 'paid')), 'the paid parts are what each track fills with');
 });
 
 /**

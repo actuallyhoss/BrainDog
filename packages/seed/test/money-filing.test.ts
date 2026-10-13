@@ -76,6 +76,13 @@ test('THE LIST IS DECLARED, and the Ledger says which rule filed an entry withou
     ['match', 'match_by', 'reads', 'direction', 'category', 'account', 'rank', 'state', 'note'],
   );
   assert.deepEqual(field('filing_rules', 'match_by')?.values, ['exact', 'starts', 'contains', 'pattern']);
+  /* THE CHOICE SAYS THE FIELD IT READS. A rule that reads `payee` is tried on the Ledger's `counterparty_text`, which
+     the Ledger labels "As the bank wrote it", so the choice carries those words and not the name of another field.
+     The value it stores stays `payee`, so no rule already written moves. */
+  assert.deepEqual(field('filing_rules', 'reads')?.values, ['payee', 'description']);
+  assert.equal(field('filing_rules', 'reads')?.default, 'payee');
+  assert.equal(field('transactions', 'counterparty_text')?.label, 'As the bank wrote it');
+  assert.deepEqual(field('filing_rules', 'reads')?.labels, { payee: 'As the bank wrote it', description: 'The description' });
   assert.deepEqual(field('filing_rules', 'direction')?.values, ['in', 'out', 'either']);
   assert.deepEqual(field('filing_rules', 'state')?.values, ['on', 'off']);
   assert.equal(field('filing_rules', 'account')?.required, undefined);
@@ -152,7 +159,7 @@ test('A RULE THAT NAMES AN ACCOUNT FILES ON THAT ACCOUNT ALONE', async () => {
   assert.equal(filed.fields.filed_by, onCard.id);
 });
 
-test('"PAID TO OR FROM" IS READ FIRST, and a rule on the description files where no such rule fits', async () => {
+test('"AS THE BANK WROTE IT" IS READ FIRST, and a rule on the description files where no such rule fits', async () => {
   const { k, outing, clients, card } = await fresh();
   const byDescription = rule(k, { match: 'Lunch', match_by: 'starts', reads: 'description', direction: 'out', category: clients.id });
   const byPayee = rule(k, { match: 'Talabat', match_by: 'starts', direction: 'out', category: outing.id });

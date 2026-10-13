@@ -111,6 +111,8 @@ type Reading = {
   fx?: FxRead;
   /** A figure converted out of its declared currency: its target, converted at the latest rate. */
   targetIn?: TargetIn;
+  /** A walk to zero that never went under: the last day it looked at. Beside a null value; narrowed by `beyondOf`, never trusted. */
+  beyond?: unknown;
 };
 
 /* `group` IS A GROUPED CARD'S, the row its link points at by handle and title (`PageRow.group`), narrowed by `groupsOf`. */
@@ -679,6 +681,21 @@ function backsOf(r: Reading): { backs?: string[] } {
   return held.length ? { backs: held } : {};
 }
 
+/**
+ * How far a walk looked without going under, as the day it is said with, or `null`.
+ *
+ * NO VALUE IS TWO THINGS AND ONLY ONE OF THEM IS A FAILURE. A walk whose balance stays above zero has no day to answer
+ * with, and the record sends the last day it looked at beside the empty value (`Beyond` in the kernel's
+ * `money-figures.ts`). Only a calendar day and a whole count of days is taken for one.
+ */
+function beyondOf(r: Reading): string | null {
+  const b = r.beyond;
+  if (typeof b !== 'object' || b === null) return null;
+  const { day, days } = b as { day?: unknown; days?: unknown };
+  if (typeof day !== 'string' || !/^\d{4}-\d{2}-\d{2}$/u.test(day) || Number.isNaN(Date.parse(day))) return null;
+  return typeof days === 'number' && Number.isInteger(days) ? fmtDay(day) : null;
+}
+
 export function tileOf(cell: NonNullable<Answered['readings']>[number], values?: Record<string, unknown>, missed: 'warn' | 'bad' = 'warn'): Metric {
   const at = cell.metric.indexOf(':');
   const template = METRICS[at < 0 ? cell.metric : cell.metric.slice(0, at)];
@@ -701,6 +718,11 @@ export function tileOf(cell: NonNullable<Answered['readings']>[number], values?:
       : fallback;
   if (r && r.parts && !cell.refusal && r.refusals.length === 0)
     return { id: cell.metric, label, value: partsShown(decl?.format, r.parts), note: [said(''), across].filter(Boolean).join(' · '), ...backsOf(r) };
+  /* MONEY THAT OUTLASTS THE WALK IS AN ANSWER, not a figure nobody could work out: no dash, no warning, and no verdict,
+     because nothing was measured against a target. The cell's own note is left out: it names the same walk's other
+     figure, which has no value either. */
+  const lasts = r && r.value === null && !cell.refusal && r.refusals.length === 0 ? beyondOf(r) : null;
+  if (lasts !== null) return { id: cell.metric, label, value: copy.lastsPast(lasts), note: '' };
   if (!r || r.value === null || cell.refusal || r.refusals.length)
     return { id: cell.metric, label, value: MISSING, note: copy.figureUnavailable, tone: 'warn' };
   const empty = (r.held ?? r.rows) === 0;
@@ -1340,6 +1362,17 @@ export function blockOf(
     if (typeof into !== 'string' || into === '' || !text) return cannot;
     return { ...shell, register: into, fills: { ...(filled as Record<string, string>) } };
   }
+  /* A PROGRESS OVER TWO FIGURES BY ONE WORD draws a track a part of the second: what the first counted against it,
+     `label | value | target`, the rows a progress is written in by hand. Money's Instalments is the one: the parts paid
+     by plan against the parts in all by plan. A part the first figure does not hold has nothing counted, and reads nought.
+     Six tracks, the most the tile ever drew, and the count of all of them is kept so the page can say what it left out.
+     A figure that was refused, or that came with no parts at all, falls through to the tiles below, which say why. */
+  if (kind === 'progress' && b.cells?.length === 2 && readings?.length === 2 && readings.every((c) => Array.isArray(c.reading?.groups))) {
+    const [first, second] = readings.map((c) => c.reading!.groups!);
+    const done = new Map(first!.map((g) => [String(g.key), typeof g.value === 'number' ? g.value : 0]));
+    const tracks = second!.map((g) => ({ cells: [labelled(g) ?? String(g.key), String(done.get(String(g.key)) ?? 0), String(typeof g.value === 'number' ? g.value : 0)] }));
+    return { ...shell, authored: tracks.slice(0, 6), shown: Math.min(tracks.length, 6), total: tracks.length };
+  }
   /* A STAT OVER A REGISTER AND NO FIGURES draws a tile a measure from the rows (`measures.ts`), as the kernel answers it. */
   if (b.cells || (kind === 'stat' && !registerOf(b))) return { ...shell, metrics: (readings ?? []).map((cell) => tileOf(cell, values, b.tone === 'bad' ? 'bad' : 'warn')) };
   /* A BAR OR A SPLIT OVER A FIGURE draws the parts the record read, EACH BY ITS NAME: a part keyed by a ref is the row
@@ -1727,12 +1760,16 @@ export function resolverOf(values: Record<string, unknown> | undefined): (path: 
     /* `<figure>.since` IS A DAY, said as the month a person would: "quiet since April", and the year only when it is not
        this one. */
     if (path.endsWith('.since') && typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(v)) return monthOf(v);
+    /* BY THE FIGURE'S OWN NAME, a parameter taken off (`cash-as-of:hsbc` is `cash-as-of`), so a figure read for one
+       group of a grouped day figure is a day too: "3 Sep", never 20,699. */
+    const figure = path.includes(':') ? path.slice(0, path.indexOf(':')) : path;
+    const dayFigure = Object.hasOwn(METRICS, figure) && METRICS[figure]?.format === 'day';
+    /* A DAY FIGURE THE RECORD ANSWERED AS ITS ISO DAY (`pages.ts` `valueAt`) is said as the same figure is said from its
+       count of days, so "the last part on 1 Jun" and never "on 2027-06-01". */
+    if (dayFigure && typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(v) && !Number.isNaN(Date.parse(v))) return format('day', Date.parse(v) / 86_400_000);
     if (typeof v === 'string') return v;
     if (typeof v === 'number') {
-      /* BY THE FIGURE'S OWN NAME, a parameter taken off (`cash-as-of:hsbc` is `cash-as-of`), so a figure read for one
-         group of a grouped day figure is a day too: "3 Sep", never 20,699. */
-      const figure = path.includes(':') ? path.slice(0, path.indexOf(':')) : path;
-      if (Object.hasOwn(METRICS, figure) && METRICS[figure]?.format === 'day') return format('day', v);
+      if (dayFigure) return format('day', v);
       return Number.isInteger(v) ? integer(v) : String(v);
     }
     if (typeof v === 'boolean') return v ? 'yes' : 'no';

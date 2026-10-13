@@ -10,7 +10,7 @@
   /* ── proportional: bar, gauge ───────────────────────────────────────────── */
 
   /* Every chart kind is this primitive and starts on the heading's edge. A bar's ROWS HANG THEIR PADDING INTO THE
-     TILE'S, as every list of rows does (`.rows`), so the label starts on that edge and the hole's dashed box and the
+     TILE'S, as every list of rows does (`.rows`), so the label starts on that edge and the hole's fill and the
      hover wash have room round it. */
   .prop {
     display: flex;
@@ -98,14 +98,18 @@
 
   /* The hole is the only row that is a button: it opens the register filtered to exactly those
      rows, because an unknown is a task somebody has to close (05 §7.5). */
+  /* A QUIET FILL MARKS IT, NOT AN EDGE (DIRECTION §39): it wore a dashed border, and nothing on the board has a
+     border. The field is the step a control sits on, one rung off the tile, and a hole draws no track, so nothing of
+     its own is lost against it. Its hover is the field's own, the ink washed over the field: `--hover-wash` alone is
+     see-through and would have made the row paler under the pointer. */
   .prop-row[data-hole] {
     cursor: pointer;
-    border: 1px dashed var(--edge);
+    background: var(--field);
     transition: background var(--d-state) var(--ease-out);
   }
 
   .prop-row[data-hole]:hover {
-    background: var(--hover-wash);
+    background: var(--field-hover);
   }
 
   /* AND IT IS 44 UNDER A THUMB. `--row-h` is 34 comfortable and 30 compact, and this is the only

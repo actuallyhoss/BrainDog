@@ -3,8 +3,8 @@
 import type { SeedPage } from '../../base.ts';
 import { ACCOUNTS_TILE } from './parts/accounts.ts';
 import { ADD_ACCOUNT } from './parts/add-account.ts';
+import { BUDGET } from './parts/budget.ts';
 import { BY_BOOK } from './parts/by-book.ts';
-import { CHASING } from './parts/chasing.ts';
 import { CROSS_CHECK } from './parts/cross-check.ts';
 import { FORECAST } from './parts/forecast.ts';
 import { HEADLINE } from './parts/headline.ts';
@@ -15,6 +15,7 @@ import { LEDGER } from './parts/ledger.ts';
 import { NEXT_30 } from './parts/next30.ts';
 import { QUEUE } from './parts/queue.ts';
 import { RUNWAY } from './parts/runway.ts';
+import { SPENDING } from './parts/spending.ts';
 
 /**
  * MONEY IS A FINANCE PAGE, NOT A LEDGER OF WHO OWES WHOM. It leads with the money there is, then how long it lasts, then what comes in and goes out;
@@ -76,6 +77,15 @@ import { RUNWAY } from './parts/runway.ts';
  * moved once. It stands before Heads up because a boxed section takes every block after it up to the next section,
  * and the Ledger is no line of a warning. The box that adds a movement is declared there and waits for room on the
  * page and for a capture that can ask for an account.
+ *
+ * WHERE THE MONEY WENT, ON MONEY ITSELF (REC-B19 jobs 3 and 4): this month's spending against last month by category
+ * (`parts/spending.ts`), then what is left of each budget (`parts/budget.ts`), straight after Instalments under Coming
+ * and going. The page was at twenty-four, so two blocks went to let the two in, and the page is twenty-four still:
+ * the folded History heading, which stood over one chart once the Ledger took What moved, so In and out, by month
+ * now closes Coming and going, open; and Being chased (`parts/chasing.ts`, not placed), a table empty on nearly every
+ * record, whose invoices still say since when on their own list. THE LINE A PASSED BUDGET WRITES IS DECLARED AND NOT
+ * PLACED: no page writes a note once an entry yet, so it would take a block and draw nothing. It comes in when the
+ * page reader learns it, and it needs one more block given up then.
  */
 export const MONEY_PAGE: SeedPage = {
   page: 'money',
@@ -101,7 +111,10 @@ export const MONEY_PAGE: SeedPage = {
     ...HEADS_UP,
     ...NEXT_30,
     ...INSTALMENTS,
-    ...CHASING,
-    ...HISTORY,
+    ...SPENDING,
+    /* The tile, and not yet the line under it (see above). */
+    ...BUDGET.filter((b) => b.kind === 'progress'),
+    /* The chart, and no folded heading over it alone. */
+    ...HISTORY.filter((b) => b.kind !== 'section'),
   ],
 };

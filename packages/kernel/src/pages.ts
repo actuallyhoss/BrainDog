@@ -4290,7 +4290,7 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
       addFigure(at < 0 ? block.when.metric : block.when.metric.slice(0, at));
     }
     /* AND SO DOES A `{{path}}` IN ITS PROSE, which the page answer now fills from the record. */
-    for (const path of pathsOf(block)) {
+    for (const path of pathsOf(block, (id) => (metric?.(id) ?? builtInFigure(id)) !== null, true)) {
       const said = pathOf(path);
       if (!said) continue;
       if ('metric' in said) addFigure(said.metric);
@@ -4313,6 +4313,24 @@ const LIST_ID = /^[a-z][a-z0-9_]*$/;
 /** Lexically a path, `05 §7.1`, as the renderer reads one. */
 const PATH = /^[A-Za-z][A-Za-z0-9_-]*(?:#\d+)?(?:\.[A-Za-z][A-Za-z0-9_-]*(?:#\d+)?)*$/;
 
+/**
+ * A figure asked with its parameter, `plan-left:Flat`, or null for words that are not one.
+ *
+ * THE FIRST COLON SEPARATES, as it does in a figure cell (`project-owed:Kiln`), and everything after it is the
+ * parameter: a plan called `C:\Repos` or `Flat 2.0` is one plan. The parameter is read without the spaces round it,
+ * so `{{plan-left: Flat}}` asks what `{{plan-left:Flat}}` asks.
+ */
+function figureAsked(path: string): { id: string; param: string } | null {
+  const at = path.indexOf(':');
+  if (at <= 0) return null;
+  const id = path.slice(0, at).trim();
+  const param = path.slice(at + 1).trim();
+  return param !== '' && /^[a-z][a-z0-9_-]*$/.test(id) ? { id, param } : null;
+}
+
+/** The forms a renderer reads before it reads a path, whose words after the colon are never a parameter. */
+const NOT_A_FIGURE = new Set(['icon', 'bad']);
+
 /** The eight typed forms of `05 §7.2`, whose argument may be a path. */
 const TYPED = new Set(['date', 'day', 'until', 'ago', 'money', 'quantity', 'pct', 'ref']);
 
@@ -4325,8 +4343,17 @@ const FIGURES = new Set(['text', 'url', 'email', 'enum', 'int', 'number', 'decim
 /**
  * Every `{{path}}` a reader would see in a block, each once: in its heading, body, empty sentence, authored
  * cells and column labels, outside code spans, as a bare path or as a typed form's path argument.
+ *
+ * A FIGURE WITH ITS PARAMETER IS A PATH ONLY TO A CALLER WHO CAN SAY THE FIGURE EXISTS (`figure`), REC-B12:
+ * `{{plan-left:Flat}}` in a plan's lead sentence is asked, keyed as written. Words before a colon are not a figure by
+ * their shape alone (`{{config:book}}`, `{{bad:three days late}}`), so with nobody to ask, and for a name no figure
+ * has, the hole is the author's text, as every hole with a colon was before a note could ask.
+ *
+ * AND A TEMPLATE'S, BEFORE ITS ROW FILLS IT (`unfilled`): `{{plan-left:{{name}}}}` is asked too, as a figure cell's
+ * `plan-left:{{name}}` is, so the lists a template reads are named from its declaration and not only from a page
+ * made of it. Only `registersOf` asks: there is no value to read until the row is in.
  */
-export function pathsOf(block: PageBlock): string[] {
+export function pathsOf(block: PageBlock, figure?: (id: string) => boolean, unfilled = false): string[] {
   const authored = (block as { authored?: unknown }).authored;
   const cells = Array.isArray(authored)
     ? authored.flatMap((r) => (r !== null && typeof r === 'object' && Array.isArray((r as { cells?: unknown }).cells) ? (r as { cells: unknown[] }).cells : []))
@@ -4340,7 +4367,9 @@ export function pathsOf(block: PageBlock): string[] {
   for (const text of [block.heading, (block as { body?: unknown }).body, block.empty, ...cells, ...notes, ...labels]) {
     if (typeof text !== 'string') continue;
     /* CODE SPANS FIRST, as the renderer lifts them: a `{{…}}` in backticks is text, not a question. */
-    for (const m of text.replace(/`[^`]*`/g, ' ').matchAll(/\{\{([^{}]*)\}\}/g)) {
+    const spanless = text.replace(/`[^`]*`/g, ' ');
+    const nested = unfilled && figure !== undefined ? spanless.matchAll(/\{\{((?:[^{}]|\{\{\w+\}\})*)\}\}/g) : [];
+    for (const m of [...spanless.matchAll(/\{\{([^{}]*)\}\}/g), ...nested]) {
       const body = (m[1] ?? '').trim();
       const colon = body.indexOf(':');
       const form = colon > 0 ? body.slice(0, colon).trim() : '';
@@ -4348,6 +4377,10 @@ export function pathsOf(block: PageBlock): string[] {
       /* A typed form's literal is the author's value; `ref`'s `tasks#241` is a literal and not a path. */
       if (TYPED.has(form) && (!/^[A-Za-z]/.test(raw) || (form === 'ref' && /^[a-z][a-z0-9_]*#\d+$/.test(raw)))) continue;
       if (PATH.test(raw)) out.add(raw);
+      else if (figure !== undefined) {
+        const asked = figureAsked(raw);
+        if (asked && !NOT_A_FIGURE.has(asked.id) && figure(asked.id)) out.add(raw);
+      }
     }
   }
   return [...out];
@@ -4368,7 +4401,7 @@ function pathOf(
   path: string,
   own?: Schema['fields'],
 ):
-  | { metric: string }
+  | { metric: string; param?: string }
   | { change: string }
   | { rowsOf: string; part: RowPart; field?: string }
   | { register: string; seq: number; field: string }
@@ -4376,6 +4409,9 @@ function pathOf(
   | { register: string; state: string }
   | { own: string; count?: true }
   | null {
+  /* A FIGURE WITH ITS PARAMETER, before the path is cut at its full stops: the parameter is a name and may hold one. */
+  const asked = figureAsked(path);
+  if (asked) return { metric: asked.id, param: asked.param };
   const parts = path.split('.');
   /* THE ENTRY THE TEXT SITS ON IS READ FIRST (PGS-B03): one word its list declares is its field, and `<field>.count` over
      one of its list fields is how many that field holds. A word it does not declare reads as it always has. */
@@ -4451,12 +4487,17 @@ function valueAt(deps: PageDeps, path: string): Json | undefined {
         : parsed;
   if (!said) return undefined;
   if ('metric' in said) {
-    const decl = deps.metric(said.metric);
+    const named = deps.metric(said.metric);
+    /* The declaration with its parameter filled, as a figure cell reads `project-owed:Kiln`. */
+    const decl = named && said.param !== undefined ? (fill(named, null, said.param) as MetricDecl) : named;
     const read = decl ? deps.read(decl) : null;
     if (!read?.ok) return undefined;
     /* A FIGURE IN SEVERAL CURRENCIES IS EACH OF ITS AMOUNTS, which the host writes one after another. */
     if (read.value.parts) return read.value.parts.map((p) => ({ amount: p.amount, currency: p.currency }));
     if (read.value.value === null) return undefined;
+    /* A FIGURE THAT IS A DAY (the latest `due`) is held as whole days since 1970, and a sentence says the day: the
+       ISO day goes out, which a host writes as it writes any other day. */
+    if (decl?.format === 'day') return new Date(read.value.value * 86_400_000).toISOString().slice(0, 10);
     return read.value.unit ? { amount: read.value.value, currency: read.value.unit } : read.value.value;
   }
   const schema = deps.schemaOf(said.register);
@@ -4646,7 +4687,7 @@ function rowNamed(deps: PageDeps, row: Entry | undefined, read: BlockResult): Bl
 function valuesOf(deps: PageDeps, block: PageBlock): { values?: Record<string, Json>; unnamed?: string[] } {
   const out: Record<string, Json> = {};
   const unnamed: string[] = [];
-  for (const path of pathsOf(block)) {
+  for (const path of pathsOf(block, (id) => figureNamed(deps, id))) {
     const v = valueAt(deps, path);
     if (v !== undefined) out[path] = v;
     else if (!namedAt(deps, path)) unnamed.push(path);

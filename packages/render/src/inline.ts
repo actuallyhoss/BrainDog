@@ -183,6 +183,13 @@ function braced(body: string, opts: InlineOptions): Inline {
     }
   }
   const path = body.trim();
+  /* A FIGURE ASKED WITH ITS PARAMETER, `{{plan-left:Flat}}`, is not lexically a path, and the record answers it keyed
+     by the hole as written. The first colon separates, as it does in a figure cell, so a parameter may hold a colon
+     or a full stop. Only an answer makes it a path: words nobody answered (`{{config:book}}`) stay the author's text. */
+  if (colon > 0 && /^[a-z][a-z0-9_-]*$/.test(body.slice(0, colon).trim()) && body.slice(colon + 1).trim() !== '') {
+    const asked = opts.resolve?.(path);
+    if (typeof asked === 'string') return { type: 'path', path, resolved: asked };
+  }
   if (!PATH.test(path)) return { type: 'unresolved', text: path };
   const value = opts.resolve?.(path);
   if (value === UNNAMED) return { type: 'path', path, resolved: null, named: false };

@@ -692,7 +692,12 @@ function daysAhead(walked: Walked): number | string {
  * `out` IS A MAGNITUDE, the money leaving as a positive amount, because a tile reading "Going out" says the direction
  * in its words. `net` is signed. `days_to_zero` walks from the figure `opening` names, and has no value when the
  * balance stays above zero inside the span: the reading then carries `beyond`, how far the walk looked (`Beyond`). An
- * opening already below zero is day 0, today.
+ * opening already below zero is day 0, today. With nothing held and nothing coming inside the span it looked at
+ * nothing: no value, no `beyond`, and a sentence that says so.
+ *
+ * WHAT IS HELD IS WHATEVER THE OPENING FIGURE ADDS UP, and this reads it as it is declared. An account that owes, a
+ * card say, takes its balance off the opening when that figure counts it, and a record whose counted accounts owe more
+ * than they hold opens below zero and is day 0. Which accounts count is the figure's own `where`, never a rule here.
  *
  * `zero_on` IS THE SAME CROSSING AS A DAY, for a tile that says "Runs out 30 Oct" where a count of days goes stale by
  * morning. It walks from the same `opening`, has no value in the same cases and carries the same `beyond`. A reading's value is a number, so the
@@ -796,8 +801,12 @@ export function readWalk(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result<R
   const under = toZero && opening < 0;
   const total = under ? (walked.walk === 'zero_on' ? Math.round(Date.parse(`${today}T00:00:00Z`) / DAY) : 0) : totalOf(walk.value, walked.walk);
   /* NEVER UNDER INSIDE THE SPAN: no value still, and beside it the last day the walk looked at (`Beyond`). A WALK WITH
-     NOTHING HELD AND NOTHING COMING LOOKED AT NOTHING: a record nobody has put money in is not money that lasts. */
-  const beyond: Beyond | null = toZero && total === null && (opening > 0 || walk.value.steps.length > 0) ? { day: new Date(Date.parse(`${today}T00:00:00Z`) + horizon * DAY).toISOString().slice(0, 10), days: horizon } : null;
+     NOTHING HELD AND NOTHING COMING LOOKED AT NOTHING: a record nobody has put money in is not money that lasts, so it
+     carries no `beyond` and its sentence says nothing is there, never that a balance stays above zero. Something held
+     is an opening above nought (one below it is day 0, above), and something coming is a step the walk took inside its
+     span: a movement dated past the last day is not one. */
+  const looked = opening > 0 || walk.value.steps.length > 0;
+  const beyond: Beyond | null = toZero && total === null && looked ? { day: new Date(Date.parse(`${today}T00:00:00Z`) + horizon * DAY).toISOString().slice(0, 10), days: horizon } : null;
   const verdict = verdictOf(decl, total, unit, home.rates, today);
   const converted = walk.value.converted;
   return ok<WalkReading>({
@@ -808,7 +817,9 @@ export function readWalk(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result<R
     delta: null,
     why:
       total === null
-        ? `the balance stays above zero for the ${horizon} days this walks`
+        ? looked
+          ? `the balance stays above zero for the ${horizon} days this walks`
+          : `nothing is held and nothing is coming in the ${horizon} days this walks`
         : decl.compare === 'none'
           ? 'no comparison asked for'
           : 'a walk ahead has no window before it to compare with',

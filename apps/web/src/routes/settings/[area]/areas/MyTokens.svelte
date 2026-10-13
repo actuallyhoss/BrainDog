@@ -23,6 +23,7 @@
   import { createClient, type TokenRow } from '@braindog/client';
   import { TONES, relative, since } from 'braindog-render';
   import Section from '$lib/ui/Section.svelte';
+  import Segmented from '$lib/ui/Segmented.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import ReadState from '$lib/ui/ReadState.svelte';
@@ -122,11 +123,11 @@
         <Button type="submit" disabled={minting}>{words.make}</Button>
       </div>
       <p class="setting-help">{words.nameHelp}</p>
-      <div class="segmented" role="group" aria-label={words.scopeLabel}>
+      <Segmented role="group" aria-label={words.scopeLabel}>
         {#each OWN_SCOPES as s (s)}
           <button type="button" class="segment" aria-pressed={scope === s} data-on={scope === s ? '' : undefined} onclick={() => (scope = s)}>{SCOPE_WORDS[s]}</button>
         {/each}
-      </div>
+      </Segmented>
       <p class="mine-said" id="own-key-said" role="status" data-intent={refusal ? 'bad' : undefined}>
         {#if refusal}<span role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span> {refusal}{/if}
       </p>

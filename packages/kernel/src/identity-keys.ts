@@ -261,6 +261,12 @@ const PLACES = new Set([
 /** A web suffix a payee is sometimes spelled with: `talabat.com` is Talabat. */
 const WEB_SUFFIX = /\.(?:com|net|org|io|co|app|ai|xyz|eg|co\.uk|com\.eg)$/;
 
+/**
+ * A whole word that is a web address, with or without a page after it: `HELP.UBER.COM`, `AMZN.COM/BILL`. A bank text
+ * writes one after the merchant as where to ask about the charge, and it names no other shop than the words before it.
+ */
+const WEB_WORD = new RegExp(`^(?:[\\p{L}\\p{N}-]+\\.)+${WEB_SUFFIX.source.slice(2, -1)}(?:/\\S*)?$`, 'u');
+
 const lower = (s: string): string => s.trim().toLowerCase();
 
 /** The address's two halves, or `null` when it is not one address. */
@@ -446,9 +452,10 @@ function phoneKey(raw: string): string | null {
 }
 
 /**
- * A payee as a bank text writes it, folded so its spellings are one: the processor's prefix gone, then a place and
- * any word holding a digit from the end, a web suffix, punctuation, and the spaces, all lower case.
- * `GEIDEA*CHILLOUT 0423 CAIRO EG`, `Chill Out` and `CHILLOUT` are all `bank:chillout`.
+ * A payee as a bank text writes it, folded so its spellings are one: the processor's prefix gone, then a place, a web
+ * address and any word holding a digit from the end, a web suffix, punctuation, and the spaces, all lower case.
+ * `GEIDEA*CHILLOUT 0423 CAIRO EG`, `Chill Out` and `CHILLOUT` are all `bank:chillout`, and `UBER *TRIP HELP.UBER.COM`
+ * is `bank:ubertrip` as `UBER *TRIP` is.
  *
  * A PAYEE KEEPS A WORD THAT NAMES IT. The end is trimmed only while what is left still says which shop, not just what
  * kind: `CAFE 22` stays `bank:cafe22` and `Pharmacy Giza` stays `bank:pharmacygiza`, because `bank:cafe` would make
@@ -470,9 +477,16 @@ function payeeWords(raw: string): { words: string[]; shown: string[] } {
     const bare = bareOf(w);
     return bare !== '' && bare !== 'the' && !GENERIC_PAYEES.has(bare);
   });
+  /* AND WHETHER THEY NAME ONE WITHOUT A PLACE'S HELP. An address is cut only then: `WWW AMAZON.CO.UK` and `SHOP
+     ZARA.COM` have the payee in the address, and cut they would be `www` and every shop. */
+  const namesAlone = (n: number): boolean => words.slice(0, n).some((w) => {
+    const bare = bareOf(w);
+    return /\p{L}/u.test(bare) && bare !== 'the' && !GENERIC_PAYEES.has(bare) && !PLACES.has(bare);
+  });
   while (words.length > 1) {
     const last = words[words.length - 1]!;
     const bare = bareOf(last);
+    const address = WEB_WORD.test(last) && namesAlone(words.length - 1);
     /* TWO WORDS FIRST, so `NEW CAIRO` goes whole and does not leave `new` behind as part of the payee. */
     const pair = words.length > 2 ? `${bareOf(words[words.length - 2]!)}${bare}` : '';
     /* A COUNTRY JOINED TO THE NAME BY A WORD LIKE `of` is the name's own, not where it was paid: dropped, `BANK OF
@@ -480,7 +494,7 @@ function payeeWords(raw: string): { words: string[]; shown: string[] } {
     const joined = (n: number): boolean => CONNECTIVES.has(bareOf(words[words.length - 1 - n] ?? ''));
     const place2 = pair !== '' && (PLACES.has(pair) || (COUNTRIES.has(pair) && words.length > 3 && !joined(2)));
     const country = COUNTRIES.has(bare) && words.length > 2 && !joined(1);
-    const drop = place2 ? 2 : /\d/.test(last) || PLACES.has(bare) || country || bare === '' ? 1 : 0;
+    const drop = place2 ? 2 : address || /\d/.test(last) || PLACES.has(bare) || country || bare === '' ? 1 : 0;
     if (drop === 0 || (bare !== '' && !names(words.length - drop))) break;
     words.splice(-drop, drop);
     shown.splice(-drop, drop);
@@ -500,32 +514,57 @@ const SMALL_WORDS = new Set(['of', 'and', 'the', 'for']);
 /**
  * One word of a bank's capitals in plain case: `CHILLOUT` is `Chillout` and `COCA-COLA` is `Coca-Cola`. A short
  * word with no vowel is initials and stays as it is (`KFC`, `HSBC`), since nobody says it as a word.
+ *
+ * SHORT CAPITALS WITH A VOWEL STAY ONLY WHERE THEY READ AS INITIALS, since no rule tells `CIB` from `CAT`: a name
+ * that is one word of two to four letters (`IKEA`), and the first word of a longer name when it has two or three
+ * (`CIB Transfer`, `XO Telecom`). Four letters before another word are far more often a word or somebody's first name
+ * (`John Smith`, `Cedar Lane Bakery`), and so is any short word later in a name. A kind of shop and a joining word
+ * are words wherever they stand (`Cafe`, `Bar 12`, `Al Ahly`), and only capitals are kept: `ikea` is `Ikea`.
  */
-function plainWord(word: string, first: boolean): string {
+function plainWord(word: string, first: boolean, only: boolean): string {
   const letters = word.replace(/[^\p{L}]/gu, '');
   if (letters.length > 1 && letters.length < 6 && !/[aeiouy]/i.test(letters.normalize('NFKD'))) return word.toUpperCase();
   const low = word.toLowerCase();
+  const short = letters.length > 1 && letters.length <= (only ? 4 : first ? 3 : 0);
+  if (short && word === word.toUpperCase() && !GENERIC_PAYEES.has(low) && !CONNECTIVES.has(low) && !SMALL_WORDS.has(low)) return word;
   if (!first && SMALL_WORDS.has(low)) return low;
   return low.replace(/(^|[^\p{L}\p{M}\p{N}'’])(\p{L})/gu, (_all, before: string, letter: string) => `${before}${letter.toUpperCase()}`);
 }
 
 /**
+ * A word somebody wrote, with the capitals a bank ran to its end lowered: `McDONALD'S` is `McDonald's` and `iPHONE`
+ * is `iPhone`. Only a run of three letters or more that reaches the end of the word and holds a vowel is the bank's;
+ * capitals inside a word, a pair at its end, and initials are how the name is written (`JPMorgan`, `OpenAI`,
+ * `ChatGPT`).
+ */
+function writtenWord(word: string): string {
+  const run = /\p{Ll}(\p{Lu}(?:['’]?\p{Lu}){2,})$/u.exec(word);
+  if (!run || !/[aeiouy]/i.test(run[1]!.normalize('NFKD'))) return word;
+  const at = word.length - run[1]!.length;
+  return `${word.slice(0, at + 1)}${word.slice(at + 1).toLowerCase()}`;
+}
+
+/**
  * A payee's name as a person reads it: the bank's text with the cuts its key makes (the processor's prefix, then the
- * place and the reference numbers from the end, and a web suffix), in plain case. `TALABAT CAIRO 4471 EG` reads
- * `Talabat`, and `GEIDEA*CHILLOUT 0418 CAIRO EG` reads `Chillout`.
+ * place, the web address and the reference numbers from the end, and a web suffix), in plain case. `TALABAT CAIRO 4471
+ * EG` reads `Talabat`, `GEIDEA*CHILLOUT 0418 CAIRO EG` reads `Chillout`, and `UBER *TRIP HELP.UBER.COM` reads
+ * `Uber Trip`.
  *
  * ONLY A BANK'S CAPITALS ARE RECASED. A text in one case throughout is the bank's printing; one in mixed case is how
- * somebody wrote the name (`Vodafone Cash`, `iHerb`), and it is kept as written.
+ * somebody wrote the name (`Vodafone Cash`, `iHerb`), and it is kept as written, but for the capitals a bank ran to
+ * the end of a word of it (`writtenWord`).
  *
- * NEVER EMPTY, AND NEVER ANOTHER PAYEE: when the cuts leave nothing to read, the name is the text itself, and a name
- * folds to the key its text had, so showing the name and joining on the key never disagree.
+ * NEVER EMPTY, NEVER ONLY A NUMBER, AND NEVER ANOTHER PAYEE: when the cuts leave nothing to read, or no letter (`1234
+ * 5678` cut to `1234` is half a reference, and reads as a name less than the whole of it does), the name is the text
+ * itself, and a name folds to the key its text had, so showing the name and joining on the key never disagree.
  */
 export function payeeName(text: string): string {
   const whole = text.trim();
   const cut = payeeWords(text).shown.join(' ').replace(new RegExp(WEB_SUFFIX.source, 'i'), '').replace(/^[\s,;:._\-/]+|[\s,;:._\-/]+$/g, '');
-  if (!/[\p{L}\p{N}]/u.test(cut)) return whole;
+  if (!/\p{L}/u.test(cut)) return whole;
   const mixed = /\p{Lu}/u.test(cut) && /\p{Ll}/u.test(cut);
-  const name = mixed ? cut : cut.split(' ').map((word, i) => plainWord(word, i === 0)).join(' ');
+  const parts = cut.split(' ');
+  const name = parts.map((word, i) => (mixed ? writtenWord(word) : plainWord(word, i === 0, parts.length === 1))).join(' ');
   /* THE KEY IS THE CHECK: a name that would join another payee than its text is not shown in its place. */
   return bankKey(name) === bankKey(text) ? name : whole;
 }

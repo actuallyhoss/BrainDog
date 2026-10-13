@@ -13,14 +13,15 @@ const HAS_PARTS = { metric: 'plan-parts:{{name}}', gte: 1 };
  * a book's page is (`book.ts`): one declaration, one page for each plan, every `{{name}}` filled from it. A record
  * that keeps no plan has none of these pages and loses nothing, and Money's own page gains no block for it.
  *
- * WHAT IT SAYS IS "10 of 23 paid. E£176,500 left, the last part on 5 Oct 2036.", AS FOUR FIGURES IN THAT ORDER AND
- * NOT YET AS ONE LINE. A note's `{{figure}}` cannot name which plan it is asked about (`pathsOf` in
- * `packages/kernel/src/pages.ts` reads no parameter, where a tile's figure does), so the line would be drawn with its
- * braces showing. The four are the lead tile, each under its own word, until a note can ask.
+ * WHAT IT SAYS IS "10 of 23 paid. E£176,500 left, the last part on 5 Oct 2036.", AS ONE LINE. It was four figures
+ * under four words while a note's `{{figure}}` could not name which plan it was asked about; a note's hole now takes
+ * the plan after a colon, as a tile's figure does (`figureAsked` in `packages/kernel/src/pages.ts`), and `{{name}}` is
+ * filled before the figure is asked, so the sentence is the lead and the four are said once.
  *
  * EVERY FIGURE IS COUNTED FROM THE PARTS (`figures/plans.ts`), so the page cannot disagree with Instalments, and a
  * cancelled part is in neither side. A tile is drawn only while its figures have something to say: a plan with no
- * part reads one sentence, and a plan all paid has no next part to show.
+ * part reads one sentence, and a plan all paid has no next part to show. THE LEAD SENTENCE WAITS FOR A PART TOO
+ * (`HAS_PARTS`): a figure of a plan that holds no value is not answered at all, so its braces would be left showing.
  */
 export const MONEY_PLAN_PAGE: SeedPage = {
   page: 'money-plan',
@@ -41,22 +42,16 @@ export const MONEY_PLAN_PAGE: SeedPage = {
       body: 'No part of {{name}} is on Instalments yet. Add its parts there with {{name}} as the plan, and this page counts them.',
     },
     {
-      kind: 'stat',
+      /* WHERE IT STANDS, IN THE OWNER'S OWN ORDER: how many are paid, what is left, and when it ends. */
+      kind: 'note',
       lead: true,
-      heading: 'Where it stands',
-      icon: 'calendar',
       span: 12,
       when: HAS_PARTS,
-      cells: [
-        { metric: 'plan-parts-paid:{{name}}', label: 'Parts paid' },
-        { metric: 'plan-parts:{{name}}', label: 'Parts in all' },
-        { metric: 'plan-left:{{name}}', label: 'Left to pay' },
-        { metric: 'plan-last-due:{{name}}', label: 'Last part' },
-      ],
+      body: '{{plan-parts-paid:{{name}}}} of {{plan-parts:{{name}}}} paid. {{plan-left:{{name}}}} left, the last part on {{plan-last-due:{{name}}}}.',
     },
     {
-      /* ONE TRACK, THE PARTS PAID AGAINST EVERY PART THAT STANDS, read off the list's own status as Money's
-         Instalments tile reads it (`parts/instalments.ts`), so "2 of 6" here is "2 of 6" there. */
+      /* ONE TRACK, THE PARTS PAID AGAINST EVERY PART THAT STANDS, read off the list's own status; Money's
+         Instalments tile reads the same two counts from its two figures by plan, so "2 of 6" here is "2 of 6" there. */
       kind: 'progress',
       heading: 'Parts paid',
       icon: 'credit-card',

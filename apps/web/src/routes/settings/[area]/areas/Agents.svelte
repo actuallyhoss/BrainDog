@@ -45,6 +45,7 @@
   import { methods, passkeySignIn, support } from '$lib/auth.ts';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
   import Section from '$lib/ui/Section.svelte';
+  import Segmented from '$lib/ui/Segmented.svelte';
   import SlashAsks from '$lib/ui/SlashAsks.svelte';
   import SlashModel from '$lib/ui/SlashModel.svelte';
   import SlashDaily from '$lib/ui/SlashDaily.svelte';
@@ -547,11 +548,11 @@
         <h3 class="door-title"><IconWell name="session" />{copy.doorSetup}</h3>
         <p class="hint">{copy.doorSetupHint}</p>
         <p class="step">{copy.doorInstall}</p>
-        <div class="segmented" role="group" aria-label={copy.doorOs}>
+        <Segmented role="group" aria-label={copy.doorOs}>
           {#each OSES as o (o)}
             <button type="button" class="segment" aria-pressed={os === o} data-on={os === o ? '' : undefined} onclick={() => (os = o)}>{copy.osNames[o]}</button>
           {/each}
-        </div>
+        </Segmented>
         {@render copyable(INSTALL_LINES[os], copy.copyCommand, copy.lineCopied)}
         <p class="step">{copy.doorSetupRun}</p>
         {@render copyable(lines.setup, copy.copyCommand, copy.lineCopied)}

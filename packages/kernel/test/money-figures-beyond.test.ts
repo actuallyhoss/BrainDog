@@ -23,6 +23,8 @@ const ACCOUNTS = register('accounts', 'Accounts', 'name', [
   { id: 'name', type: 'text', required: true },
   { id: 'balance', type: 'money' },
   { id: 'as_of', type: 'day', index: true },
+  { id: 'kind', type: 'enum', values: ['bank', 'card'] },
+  { id: 'counts', type: 'bool', default: true },
 ]);
 
 const TRANSACTIONS = register('transactions', 'Transactions', 'what', [
@@ -76,12 +78,13 @@ const money = (amount: number, currency = 'EGP') => ({ amount, currency });
 const dayNumber = (iso: string): number => Date.parse(`${iso}T00:00:00Z`) / 86_400_000;
 
 /** A record holding one account, stated today, and what is to come. */
-async function record(held: { amount: number; currency: string }, coming: Record<string, unknown>[]): Promise<{ k: Kernel; sql: NodeSql }> {
+async function record(held: { amount: number; currency: string } | null, coming: Record<string, unknown>[]): Promise<{ k: Kernel; sql: NodeSql }> {
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));
   const installed = await k.install([ACCOUNTS, TRANSACTIONS, RECURRING, metric(CASH)]);
   assert.ok(installed.ok, JSON.stringify(installed));
-  assert.ok(k.create('accounts', { name: 'Current', balance: held, as_of: '2026-09-20' }, { actor: 'p_1' }).ok);
+  /* NO ACCOUNT AT ALL, when `held` is null: the record as it is the day it is made. */
+  if (held) assert.ok(k.create('accounts', { name: 'Current', balance: held, as_of: '2026-09-20' }, { actor: 'p_1' }).ok);
   for (const row of coming) {
     const made = k.create('recurring', row, { actor: 'p_1' });
     assert.ok(made.ok, JSON.stringify(made));
@@ -148,6 +151,72 @@ test('NOTHING HELD AND NOTHING COMING is a walk that looked at nothing: no value
   paid.sql.close();
 });
 
+/** The sentence a walk that looked at nothing says, where one that looked says the balance stays above zero. */
+const NOTHING = 'nothing is held and nothing is coming in the 365 days this walks';
+
+test('AN EMPTY RECORD, with no account and nothing coming, has no value, no beyond, no verdict and says so', async () => {
+  const { k, sql } = await record(null, []);
+  for (const kind of ['days_to_zero', 'zero_on']) {
+    const r = read(k, walk(kind, { walk: kind }));
+    assert.equal(r.value, null);
+    assert.equal(r.unit, null);
+    assert.equal('beyond' in r, false);
+    assert.equal(beyondOf(r), null);
+    /* NOTHING WAS WALKED, so nothing is counted, nothing is judged and nothing is refused. */
+    assert.deepEqual([r.rows, r.held, r.met, r.refusals], [0, 0, null, []]);
+    /* NEVER "the balance stays above zero": there is no balance, and that sentence is the one money that lasts says. */
+    assert.equal(r.why, NOTHING);
+  }
+  /* ITS OWN SPAN IS IN THE SENTENCE, as it is in the other one. */
+  assert.equal(read(k, walk('lasts', { walk: 'days_to_zero', within: '10d' })).why, 'nothing is held and nothing is coming in the 10 days this walks');
+  /* THE FIGURES THAT ADD MONEY UP are nought over nothing, as they were, and carry no beyond. */
+  const net = read(k, walk('net', { walk: 'net', within: '30d' }, { opening: undefined }));
+  assert.equal(net.value, 0);
+  assert.equal(beyondOf(net), null);
+  sql.close();
+});
+
+test('AN ACCOUNT HOLDING NOTHING reads as no account does, and the first thing held or coming is a walk that looked', async () => {
+  const bare = await record(money(0), []);
+  const none = await record(null, []);
+  for (const kind of ['days_to_zero', 'zero_on']) assert.deepEqual(read(bare.k, walk(kind, { walk: kind })), read(none.k, walk(kind, { walk: kind })));
+  bare.sql.close();
+
+  /* MONEY COMING IN AND NO ACCOUNT: a leg was walked, so it looked to its end. */
+  assert.ok(none.k.create('recurring', COMING[0]!, { actor: 'p_1' }).ok);
+  const paid = read(none.k, walk('lasts', { walk: 'days_to_zero' }));
+  assert.deepEqual(beyondOf(paid), { day: '2027-09-20', days: 365 });
+  assert.equal(paid.why, 'the balance stays above zero for the 365 days this walks');
+  none.sql.close();
+
+  /* MONEY LEAVING AND NO ACCOUNT goes under the day it leaves: a value, and so no beyond. */
+  const owed = await record(null, COMING.slice(1, 2));
+  const out = read(owed.k, walk('runs-out', { walk: 'zero_on' }));
+  assert.equal(out.value, dayNumber('2026-10-01'));
+  assert.equal(beyondOf(out), null);
+  owed.sql.close();
+
+  /* THE SMALLEST AMOUNT HELD IS HELD: one piastre and nothing coming lasts the walk. */
+  const piastre = await record(money(1), []);
+  assert.deepEqual(beyondOf(read(piastre.k, walk('lasts', { walk: 'days_to_zero' }))), { day: '2027-09-20', days: 365 });
+  piastre.sql.close();
+});
+
+test('SOMETHING COMING ONLY AFTER THE WALK ENDS is nothing coming inside it: no beyond while nothing is held', async () => {
+  /* A payment two years off is past a walk of a year, so the walk has no step and looked at nothing. */
+  const far = [{ what: 'Bond', direction: 'in', amount: money(1_000_000), every: 'none', next_due: '2028-09-20' }];
+  const { k, sql } = await record(null, far);
+  const r = read(k, walk('lasts', { walk: 'days_to_zero' }));
+  assert.equal(r.value, null);
+  assert.equal(beyondOf(r), null);
+  assert.equal(r.why, NOTHING);
+  sql.close();
+  /* AND WITH MONEY HELD it lasts, whatever is or is not coming. */
+  const held = await record(money(100_000), far);
+  assert.deepEqual(beyondOf(read(held.k, walk('lasts', { walk: 'days_to_zero' }))), { day: '2027-09-20', days: 365 });
+  held.sql.close();
+});
+
 test('A WALK THAT GOES UNDER IS UNCHANGED: its value is the crossing and it carries no beyond', async () => {
   /* 168,000.00 held, +10,000.00 on the 25th, -4,000.00 on the 1st, -200,000.00 on the 10th: under on 10 October. */
   const { k, sql } = await record(money(16_800_000), COMING);
@@ -193,6 +262,46 @@ test('A WALK THAT OPENS BELOW ZERO is under today: day 0, whatever comes later',
   const none = await record(money(0), COMING.slice(1));
   assert.equal(read(none.k, walk('runs-out', { walk: 'zero_on' })).value, dayNumber('2026-10-01'));
   none.sql.close();
+});
+
+test('A CARD THAT OWES COUNTS TOWARD DAY 0 exactly when the figure the walk opens from counts it', async () => {
+  /* Cash as the money pack declares it: the accounts marked as counting, and a new account is marked so unless told. */
+  const COUNTED = { ...CASH, metric: 'counted', where: 'counts is true' };
+  const opened = (id: string) => walk(id, { walk: 'days_to_zero' }, { opening: { metric: 'counted' } });
+  const card = (counts?: boolean) => ({ name: 'Card', kind: 'card', balance: money(-500_000), as_of: '2026-09-20', ...(counts === undefined ? {} : { counts }) });
+
+  /* A CARD AND NOTHING ELSE, LEFT AS IT IS MADE: 5,000.00 owed is the whole opening, so the money ran out today. */
+  const only = await record(null, []);
+  assert.ok((await only.k.install([metric(COUNTED)])).ok);
+  assert.ok(only.k.create('accounts', card(), { actor: 'p_1' }).ok);
+  assert.equal(read(only.k, opened('lasts')).value, 0);
+  assert.equal(beyondOf(read(only.k, opened('lasts'))), null);
+  only.sql.close();
+
+  /* THE SAME CARD MARKED AS NOT COUNTING is out of the opening: nothing held, nothing coming, and no day 0. */
+  const out = await record(null, []);
+  assert.ok((await out.k.install([metric(COUNTED)])).ok);
+  assert.ok(out.k.create('accounts', card(false), { actor: 'p_1' }).ok);
+  const quiet = read(out.k, opened('lasts'));
+  assert.equal(quiet.value, null);
+  assert.equal(beyondOf(quiet), null);
+  assert.equal(quiet.why, NOTHING);
+  out.sql.close();
+
+  /* BESIDE A BANK ACCOUNT THAT HOLDS MORE, a counted card only lowers the opening: 1,000.00 less 5,000.00 owed is under,
+     and 10,000.00 less 5,000.00 lasts. */
+  const short = await record(money(100_000), []);
+  assert.ok((await short.k.install([metric(COUNTED)])).ok);
+  assert.ok(short.k.create('accounts', card(), { actor: 'p_1' }).ok);
+  assert.equal(read(short.k, opened('lasts')).value, 0);
+  short.sql.close();
+  const flush = await record(money(1_000_000), []);
+  assert.ok((await flush.k.install([metric(COUNTED)])).ok);
+  assert.ok(flush.k.create('accounts', card(), { actor: 'p_1' }).ok);
+  const lasts = read(flush.k, opened('lasts'));
+  assert.equal(lasts.value, null);
+  assert.deepEqual(beyondOf(lasts), { day: '2027-09-20', days: 365 });
+  flush.sql.close();
 });
 
 test('A FIGURE THAT ADDS MONEY UP carries no beyond: only the crossing has a day to be past', async () => {

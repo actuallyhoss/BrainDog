@@ -26,6 +26,7 @@
   import { untrack } from 'svelte';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
   import Section from '$lib/ui/Section.svelte';
+  import Segmented from '$lib/ui/Segmented.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Face from '$lib/ui/Face.svelte';
@@ -554,7 +555,7 @@
               and reading left to right the row now says *nothing on the record, then these
               lists*, which is the sentence "invite the bookkeeper" makes.
             -->
-            <div class="segmented levels" role="group" aria-label={copy.levelFor(said(p))}>
+            <Segmented class="levels" role="group" aria-label={copy.levelFor(said(p))}>
               <!-- THE SIXTH OPTION IS NOT A LEVEL, AND ONLY THE COMMENT SAID SO. It rendered as
                    the first of six identical chips with the same `aria-pressed`, inside a group
                    labelled "What <name> can do", so a screen reader heard six equivalent levels
@@ -578,7 +579,7 @@
                   onclick={() => levelChange(p, level)}
                 >{levelSaid(level)}</button>
               {/each}
-            </div>
+            </Segmented>
             <!-- BELOW 520PX THE LADDER IS A SELECT. Six segments wrap to three lines on a phone and the chosen one lands
                  wherever the wrap put it; one select is one line, 44px tall, with the same six answers and the same
                  ones disabled. Both are drawn and CSS shows one, so each keeps its own accessible name. -->
@@ -767,7 +768,7 @@
         bind:value={inviteTo}
       />
     </div>
-    <div class="segmented reach" role="group" aria-label={copy.inviteReachLabel}>
+    <Segmented class="reach" role="group" aria-label={copy.inviteReachLabel}>
       {#each REACHES as r (r.reach)}
         <button
           type="button"
@@ -777,7 +778,7 @@
           onclick={() => (inviteReach = r.reach)}
         >{r.said}</button>
       {/each}
-    </div>
+    </Segmented>
     {#if inviteReach === 'record'}
       <label class="ex-field">
         <span class="ex-label">{copy.inviteLevelLabel}</span>
@@ -1009,7 +1010,7 @@
   /* The ladder is five levels and a sixth answer, so its segments take the least padding in the
      product, and the track wraps rather than scrolling, which `controls.css` decided for this reason:
      five 44px segments measured 342px inside a 320px screen. */
-  .levels .segment {
+  :global(.levels) .segment {
     padding-inline: var(--sp-2);
   }
 
@@ -1224,8 +1225,10 @@
     inline-size: 100%;
   }
 
-  .invite-form .segmented {
+  .invite-form :global(.segmented) {
     margin-block-end: 0;
+    inline-size: fit-content;
+    max-inline-size: 100%;
   }
 
   /* A ROW PER LIST: its name, and its select at the end of the line. The name takes the slack and
@@ -1272,7 +1275,7 @@
   }
 
   @media (width < 520px) {
-    .levels {
+    .who-level :global(.levels) {
       display: none;
     }
 
@@ -1291,8 +1294,9 @@
   }
 
   /* THE SHARED PILLS FROM `controls.css`, with the two things `Appearance.svelte` explains beside the
-     same rule: the track hugs its options, and a segment is 44 on both axes under a thumb. */
-  .segmented {
+     same rule: the track hugs its options, and a segment is 44 on both axes under a thumb. The track is `Segmented`'s
+     own element, so the rule reaches it from the row that holds it; the invitation's track has its own rule above. */
+  .who-level :global(.segmented) {
     margin-block-end: var(--sp-3);
     inline-size: fit-content;
     max-inline-size: 100%;

@@ -21,7 +21,7 @@ import { LOOKUPS, OPEN } from '../base.ts';
  * salary typed into `recurring` out of every walk. So a bill is walked once, on its day, and a stream is walked where it
  * is a stream.
  */
-export const CASH_LEGS: Leg[] = [
+const DATED: Leg[] = [
   {
     register: 'obligations',
     on: 'due',
@@ -91,6 +91,40 @@ export const CASH_LEGS: Leg[] = [
     every: { field: 'cycle', months: { monthly: 1, yearly: 12, two_yearly: 24 } },
   },
 ];
+
+/**
+ * EVERYDAY SPENDING, SINCE money-core 3.17.0: the money that went out through the accounts in the last three full
+ * months, a week's share of it moved every week to the horizon (`Leg.everyday` in `packages/kernel/src/forecast.ts`).
+ *
+ * THE WALK HELD ONLY WHAT HAS A DAY AHEAD OF IT, so a record with a salary line and a card it lives on climbed by the
+ * salary for ever, and the days its money lasts read longer than they are. Food and fuel have no row ahead of them.
+ *
+ * CLEARED AND NOT A TRANSFER, as every figure of spending says it: money moved between two of the person's own accounts
+ * was not spent, and a card's bill paid from the bank is such a move, so what the card bought is counted once, where it
+ * was bought.
+ *
+ * WHAT IS ALREADY WALKED IS THE BILLS LEGS ABOVE, so rent written as a repeating line and also paid through the bank is
+ * not walked twice: the monthly worth of what those legs hold comes off what was measured, and only the rest is moved.
+ * THEY ARE NOT WRITTEN OUT AGAIN UNDER `already`, AND THAT IS ON PURPOSE. Left unsaid it is every other leg of the walk
+ * the leg is in, which is the same legs: bills, repeating lines, a plan's parts and subscriptions take money off, and
+ * money on its way into an account is money in and takes nothing off. Written out, the subscriptions leg would ride
+ * inside this one onto a record that holds no such list, where `firstPartyDocument` leaves a leg out by the top of the
+ * array and does not look inside a leg, and every figure over the walk was then refused: "There is no register called
+ * services". Unsaid, a walk that lost a leg measures against the legs it kept.
+ *
+ * NOT IN A BOOK'S WALK (`BOOK_LEGS`), because the leg is over the moves and `BOOKED` does not list them.
+ */
+const EVERYDAY: Leg = {
+  register: 'transactions',
+  on: 'on',
+  amount: 'amount',
+  where: 'state is cleared, transfer is false',
+  incoming: { field: 'direction', is: 'in' },
+  everyday: { months: 3 },
+};
+
+/** THE ONE ARRAY EVERYTHING WALKS: the lists that hold a dated amount, and after them what is spent with no day ahead of it. */
+export const CASH_LEGS: Leg[] = [...DATED, EVERYDAY];
 
 /**
  * THE REPEATING LINES A MONTHLY FIGURE COUNTS: live, going the one way, and not past their last day.

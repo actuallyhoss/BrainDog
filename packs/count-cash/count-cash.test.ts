@@ -92,8 +92,9 @@ test('THE PACK CARRIES count.js AS ITS SOURCE, byte for byte; it fetches nothing
   const file = await readPackFile(TEXT);
   assert.ok(file.ok, fixOf(file));
   assert.equal(file.value.pack.manifest.pack, 'count-cash');
-  /* 1.3.0 BESIDE THE RELEASED 1.2.0: a count can say why it was not compared, a field added and none taken away. */
-  assert.equal(file.value.pack.manifest.version, '1.3.0');
+  /* 1.3.0 BESIDE THE RELEASED 1.2.0: a count can say why it was not compared, a field added and none taken away.
+     1.3.1 BESIDE THE PUBLISHED 1.3.0: the same sentence, now naming the way out. Words only, so a patch. */
+  assert.equal(file.value.pack.manifest.version, '1.3.1');
   const counts = PACK.declarations.find((d) => d.register === 'cash_counts') as { fields: { id: string }[] };
   assert.deepEqual(counts.fields.map((f) => f.id), ['account', 'counted', 'on', 'difference', 'said', 'note']);
 });
@@ -162,7 +163,9 @@ const hostWith = (count: Row, account: Row, rows: Row[]): CtxHost => ({
 const moved = (seq: number, on: string, amount: number, currency: string, more: Record<string, Json> = {}): Row =>
   row(`01K5TXN00000000000000000${String(seq).padStart(2, '0')}`, 'transactions', seq, { what: 'Paid out', on, direction: 'out', amount: { amount, currency }, account: BOX.id, state: 'cleared', ...more });
 
-const NOT_COMPARED = 'This account holds an entry in another currency, so it was not compared.';
+/* 1.3.1 NAMES THE WAY OUT. The sentence alone left a box with one foreign sale uncounted for good and never said that
+   a newer balance on the account is what lets the next count through. */
+const NOT_COMPARED = "This account holds an entry in another currency, so it was not compared. Type the account's balance, then count again.";
 
 test('AN ACCOUNT HOLDING A CLEARED ENTRY IN ANOTHER CURRENCY SINCE ITS STATEMENT IS NOT COMPARED, and the count says so', async () => {
   /* THE FAULT, MEASURED ON 1.2.0: the box was said to hold 500.00 on the 20th, 20.00 went out in pounds and 87.50 in
@@ -171,7 +174,20 @@ test('AN ACCOUNT HOLDING A CLEARED ENTRY IN ANOTHER CURRENCY SINCE ITS STATEMENT
   const count = row('01K5CNT0000000000000000003', 'cash_counts', 3, { account: BOX.id, counted: { amount: 39_250, currency: 'GBP' }, on: '2026-09-25' }, 2);
   const a = await runInQuickJs(decl(), hostWith(count, BOX, [moved(11, '2026-09-22', 2_000, 'GBP'), moved(12, '2026-09-23', 8_750, 'EUR')]));
   assert.deepEqual(writesOf(a), [{ op: 'update', spoken: 'cash_counts#3', patch: { said: NOT_COMPARED }, version: 2 }]);
-  assert.match(a.log, /Cash box holds an entry in another currency/);
+  /* THE LOG LINE IS THE ONE 1.3.0 WROTE, whole: the way out is for the person reading the count, not for the run's log. */
+  assert.equal(a.log.trim(), 'Cash box holds an entry in another currency than GBP since it was last stated, so this count was not compared and no difference was written.');
+});
+
+test('THE SENTENCE NAMES THE WAY OUT, AND THE WAY OUT WORKS: the balance typed after the foreign entry, and the next count is compared', async () => {
+  assert.match(NOT_COMPARED, /Type the account's balance, then count again\.$/);
+  assert.match(SOURCE, /const NOT_COMPARED = "This account holds an entry in another currency, so it was not compared\. Type the account's balance, then count again\.";/);
+  /* SHE TYPES 392.50 AS OF THE 24TH, after the euros of the 23rd, and counts 390.00 on the 25th: out by 2.50, written. */
+  const typed = row(BOX.id, 'accounts', 4, { ...BOX.fields, balance: { amount: 39_250, currency: 'GBP' }, as_of: '2026-09-24' }, 7);
+  const count = row('01K5CNT0000000000000000005', 'cash_counts', 5, { account: BOX.id, counted: { amount: 39_000, currency: 'GBP' }, on: '2026-09-25' });
+  const a = await runInQuickJs(decl(), hostWith(count, typed, [moved(11, '2026-09-22', 2_000, 'GBP'), moved(12, '2026-09-23', 8_750, 'EUR')]));
+  const writes = writesOf(a) as unknown as { op: string; register?: string; patch?: Record<string, Json> }[];
+  assert.deepEqual(writes.map((w) => [w.op, w.register ?? null]), [['create', 'transactions'], ['create', 'balances'], ['update', null]]);
+  assert.deepEqual(writes[2]!.patch, { difference: { amount: -250, currency: 'GBP' } });
 });
 
 test('THE SAME ACCOUNT WITH ITS ENTRIES IN ONE CURRENCY IS COMPARED AS IT WAS, and so is one whose foreign entry is older than its statement', async () => {
