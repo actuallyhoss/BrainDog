@@ -39,6 +39,7 @@
   {:else if node.type === 'strong'}<strong><Self nodes={node.body} {opts} /></strong>
   {:else if node.type === 'em'}<em><Self nodes={node.body} {opts} /></em>
   {:else if node.type === 'link'}<a href={hrefFor(opts, node.href)}><Self nodes={node.body} {opts} /></a>
+  {:else if node.type === 'bad'}<span class="bad"><Self nodes={node.body} {opts} /></span>
   {:else if node.type === 'path'}
     <!-- A path that names nothing is the author's text, dotted: no value will come, so no hole and no dash. -->
     {#if node.named === false}<span class="unresolved">{node.path}</span>

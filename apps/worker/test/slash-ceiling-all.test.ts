@@ -26,6 +26,13 @@
  * ceiling does not bind and only the share does; a skill draft is counted the same way. RED BEFORE `background`, measured:
  * 0 `look` rows after the look ran, and `meter.background` undefined in the two cases that ask the meter itself.
  *
+ * THE BACKGROUND'S ASKS AND HIS ARE HELD TO THE CEILING APART (ceiling-split-55-56). One count held both, so at a ceiling
+ * of three the look took one of a person's three, and five background asks left the palette refusing a person who had
+ * asked nothing. The last case asks five of them (look, headline, skill, the reading of who is who, look) and then the
+ * palette: three are held and two turned away at the background's own count, his count reads 0, and his read answers.
+ * RED BEFORE THE SPLIT, measured with the one count put back: "five background asks spent 3 of his asks", and the look
+ * after his three reads turned away.
+ *
  * THE CLOCK IS MOCKED, because a press on a record younger than two weeks asks no model at all, and the Worker's clock
  * is `Date.now()`. The binding is a local function and no test here spends a neuron.
  */
@@ -33,8 +40,11 @@
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { openSqlite } from '../../../packages/kernel/test/sqlite.ts';
-import { workerSlashMeter } from '../src/slash-meter.ts';
+import { createRecordApi } from '@braindog/record';
+
+import { fixedClock, openSqlite } from '../../../packages/kernel/test/sqlite.ts';
+import { workerSlashDoor } from '../src/slash.ts';
+import { slashDays, workerSlashMeter, workerUnderstandLedger } from '../src/slash-meter.ts';
 import { cloud } from './cloud-harness.ts';
 
 const REC = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAF';
@@ -176,7 +186,8 @@ test("UNDER THE CEILING THE DAILY LOOK ASKS THE BINDING ONCE, and its row spends
 });
 
 const INCLUDED = { AI: fakeAi().AI, AI_GATEWAY: 'braindog', SLASH_INCLUDED: 'yes' };
-const noGrants = () => ({ kernel: { grants: () => [] } }) as never;
+/* A RECORD WITH NO GRANTS AND NO PREF SET, which is the switch for Slash reading on its own left on (`slash.reads`). */
+const noGrants = () => ({ kernel: { grants: () => [], prefsOf: () => ({}) } }) as never;
 const clock = { now: () => T0 + 20 * DAY };
 
 test("ON HIS OWN KEY ONLY THE SHARE BINDS: a ceiling of 0 turns the included model's look away and not his key's", async () => {
@@ -209,4 +220,212 @@ test("A SKILL DRAFT IS A BACKGROUND ASK TOO: held under the ceiling, turned away
   const none = workerSlashMeter({ ...INCLUDED, SLASH_INCLUDED_MONTH_NEURONS: '0' }, noGrants, { sql: openSqlite(), clock });
   const turned = await none.background?.('skill');
   assert.equal(turned !== undefined && !turned.ok && turned.refusal.code, 'SLASH_BUDGET_SPENT', JSON.stringify(turned));
+});
+
+/* THE PALETTE'S ENGINE AND THE BACKGROUND'S METER OVER ONE LEDGER, as `Record$.#open` builds them over one object's storage. */
+const OWNER_CTX = { principal: { kind: 'person' as const, id: 'p_owner', level: 'owner' as const } };
+const PREDICATE = '{"registers":["tasks"],"where":{"field":"state","is":"open"},"q":null}';
+const TASKS = {
+  id: 'register.tasks',
+  kind: 'register' as const,
+  body: {
+    id: 'tasks',
+    name: 'Tasks',
+    title: 'what',
+    search: ['what'],
+    fields: [
+      { id: 'what', type: 'text', required: true },
+      { id: 'state', type: 'enum', values: ['open', 'done'] },
+    ],
+    state: 'state',
+    done: ['done'],
+  } as never,
+};
+
+type Refused = { ok: boolean; refusal?: { code: string; fix: string } };
+type Status = { asks: { used: number; cap: number } };
+
+async function paletteAndBackground(neurons: string) {
+  let runs = 0;
+  const AI = {
+    run: async () => {
+      runs++;
+      return { choices: [{ message: { role: 'assistant', content: PREDICATE }, finish_reason: 'stop' }], usage: { prompt_tokens: 700, completion_tokens: 60 } };
+    },
+  };
+  const env = { SLASH_ENDPOINT: '', AI, AI_GATEWAY: 'braindog', SLASH_INCLUDED: 'yes', SLASH_INCLUDED_MONTH_NEURONS: neurons };
+  const at = fixedClock(T0 + 20 * DAY);
+  const sql = openSqlite();
+  const own = openSqlite();
+  const api = await createRecordApi({ sql, clock: at });
+  assert.ok((await api.kernel.install([TASKS])).ok);
+  assert.ok((await api.create({ register: 'tasks', fields: { what: 'Invoice Acme', state: 'open' } }, OWNER_CTX)).ok);
+  const deps = { sql: own, clock: at };
+  const engine = (await workerSlashDoor(env, () => api, deps, new Set()).engine!())!;
+  assert.ok(engine, 'the door built no engine over the included model');
+  const meter = workerSlashMeter(env, () => api, deps);
+  const understand = workerUnderstandLedger(env, () => api, deps);
+  /** One background ask, settled as a model that answered where it was held. */
+  const background = async (kind: 'look' | 'headline' | 'skill' | 'understand', unreached = false): Promise<Refused> => {
+    const held = kind === 'understand' ? await understand.background(kind) : await meter.background!(kind);
+    if (held.ok) held.value.settle(unreached ? { usage: { in: 0, out: 0 }, code: 'UNREACHABLE' } : { usage: { in: 100, out: 10 } });
+    return held;
+  };
+  return { engine, background, own, at, api, runs: () => runs, done: () => (sql.close(), own.close()) };
+}
+
+test('A CEILING OF THREE ASKS, FIVE BACKGROUND ASKS, AND THE PALETTE STILL ANSWERS: the two are counted and held apart', async () => {
+  const { engine, background, own, at, runs, done } = await paletteAndBackground('696');
+  try {
+    /* FIVE OF THE RECORD'S OWN: the look, the headlines, a skill draft, the reading of who is who, and the look again. */
+    const asked: Refused[] = [];
+    for (const kind of ['look', 'headline', 'skill', 'understand', 'look'] as const) asked.push(await background(kind));
+    /* THE BACKGROUND IS HELD TO THE CEILING OVER ITS OWN COUNT: three held, and the two past it turned away unheld. */
+    assert.deepEqual(asked.map((a) => a.ok), [true, true, true, false, false], JSON.stringify(asked));
+    for (const a of asked.slice(3)) assert.equal(a.refusal?.code, 'SLASH_BUDGET_SPENT', JSON.stringify(a));
+    const spends = own.all<{ spends: string; n: number }>("SELECT spends, COUNT(*) AS n FROM slash_call WHERE model <> '-' GROUP BY spends").map((r) => ({ ...r }));
+    assert.deepEqual(spends, [{ spends: 'background', n: 3 }]);
+
+    /* AND NONE OF IT WAS HIS: the palette reads no asks used, and a person's read reaches the model. */
+    const before = engine.status() as Status;
+    assert.deepEqual([before.asks.used, before.asks.cap], [0, 3], `five background asks spent ${before.asks.used} of his asks`);
+    const read = (await engine.read('What is still open?', OWNER_CTX)) as Refused;
+    assert.ok(read.ok, JSON.stringify(read));
+    assert.equal(runs(), 1, 'the read after five background asks never reached the binding');
+
+    /* HIS THREE ARE STILL THREE, and the fourth is the ceiling's refusal. */
+    for (let i = 0; i < 2; i++) assert.ok(((await engine.read(`open tasks ${i}`, OWNER_CTX)) as Refused).ok);
+    const fourth = (await engine.read('one more', OWNER_CTX)) as Refused;
+    assert.equal(fourth.refusal?.code, 'SLASH_BUDGET_SPENT', JSON.stringify(fourth));
+    assert.equal(runs(), 3);
+    assert.deepEqual((engine.status() as Status).asks, { ...(engine.status() as Status).asks, used: 3, cap: 3 });
+
+    /* THE ACCOUNT'S COPY SAYS THE SAME TWO NUMBERS, one day of three asks of his and three of the record's own. */
+    const days = slashDays(own, at.now());
+    assert.deepEqual(
+      days.map((d) => [d.day, d.asks, d.background]),
+      [['2026-09-21', 3, 3]],
+      JSON.stringify(days),
+    );
+    assert.ok(days[0]!.neurons > 0, JSON.stringify(days));
+  } finally {
+    done();
+  }
+});
+
+test('HIS ASKS SPENT DO NOT TURN THE BACKGROUND AWAY: three reads at a ceiling of three, and the daily look is still held', async () => {
+  const { engine, background, done } = await paletteAndBackground('696');
+  try {
+    for (let i = 0; i < 3; i++) assert.ok(((await engine.read(`open tasks ${i}`, OWNER_CTX)) as Refused).ok);
+    assert.equal(((await engine.read('one more', OWNER_CTX)) as Refused).refusal?.code, 'SLASH_BUDGET_SPENT');
+    const look = await background('look');
+    assert.ok(look.ok, JSON.stringify(look));
+    assert.equal((engine.status() as Status).asks.used, 3, 'the look after his asks moved his count');
+  } finally {
+    done();
+  }
+});
+
+test('A BACKGROUND ASK NO MODEL ANSWERED IS STILL THE BACKGROUND\'S: three looks that never reached a model leave his three asks whole', async () => {
+  const { engine, own, at, done } = await paletteAndBackground('696');
+  try {
+    const env = { SLASH_ENDPOINT: '', AI: { run: async () => ({}) }, AI_GATEWAY: 'braindog', SLASH_INCLUDED: 'yes', SLASH_INCLUDED_MONTH_NEURONS: '696' };
+    const meter = workerSlashMeter(env, noGrants, { sql: own, clock: at });
+    /* THE ROW KEEPS ITS MODEL'S NAME AND SAYS `none` (`@braindog/host` `settled`), so only its purpose says whose it was. */
+    for (let i = 0; i < 3; i++) {
+      const held = await meter.background!('look');
+      assert.ok(held.ok, JSON.stringify(held));
+      held.value.settle({ usage: { in: 0, out: 0 }, code: 'UNREACHABLE' });
+    }
+    const rows = own.all<{ spends: string; purpose: string }>("SELECT spends, purpose FROM slash_call WHERE model <> '-'").map((r) => ({ ...r }));
+    assert.deepEqual(rows, Array(3).fill({ spends: 'none', purpose: 'look' }));
+    assert.equal((engine.status() as Status).asks.used, 0, 'three looks no model answered were counted as his asks');
+    assert.ok(((await engine.read('What is still open?', OWNER_CTX)) as Refused).ok);
+    /* AND THE CEILING STILL COUNTS THEM, as the background's: the fourth look is turned away. */
+    const fourth = await meter.background!('look');
+    assert.equal(!fourth.ok && fourth.refusal.code, 'SLASH_BUDGET_SPENT', JSON.stringify(fourth));
+    assert.deepEqual(slashDays(own, at.now()).map((d) => [d.asks, d.background]), [[1, 3]]);
+  } finally {
+    done();
+  }
+});
+
+test("THE LOOK, A HEADLINE AND THE READING OF WHO IS WHO EACH LEAVE HIS MONTH WHOLE, answered or not: six of the record's own and his asks read 0", async () => {
+  /* A CEILING OF TEN, so nothing here is turned away and every one of the six leaves its row. */
+  const { engine, background, own, at, done } = await paletteAndBackground('2320');
+  try {
+    for (const kind of ['look', 'headline', 'understand'] as const) {
+      const answered = await background(kind);
+      assert.ok(answered.ok, `${kind}: ${JSON.stringify(answered)}`);
+      assert.equal((engine.status() as Status).asks.used, 0, `a ${kind} ask the model answered spent one of his asks`);
+      const unreached = await background(kind, true);
+      assert.ok(unreached.ok, `${kind}: ${JSON.stringify(unreached)}`);
+      assert.equal((engine.status() as Status).asks.used, 0, `a ${kind} ask no model answered spent one of his asks`);
+    }
+    /* NOT ONE ROW SAYS IT SPENT HIS, and each kind is on the ledger under its own purpose, once answered and once not. */
+    const rows = own.all<{ purpose: string; spends: string }>("SELECT purpose, spends FROM slash_call WHERE model <> '-' ORDER BY rowid").map((r) => ({ ...r }));
+    assert.deepEqual(
+      rows,
+      ['look', 'headline', 'understand'].flatMap((purpose) => [
+        { purpose, spends: 'background' },
+        { purpose, spends: 'none' },
+      ]),
+      JSON.stringify(rows),
+    );
+    /* THE ACCOUNT'S COPY SAYS NONE OF HIS AND SIX OF THE RECORD'S OWN, and his first read is his first ask. */
+    assert.deepEqual(slashDays(own, at.now()).map((d) => [d.asks, d.background]), [[0, 6]]);
+    assert.ok(((await engine.read('What is still open?', OWNER_CTX)) as Refused).ok);
+    assert.equal((engine.status() as Status).asks.used, 1);
+    assert.deepEqual(slashDays(own, at.now()).map((d) => [d.asks, d.background]), [[1, 6]]);
+  } finally {
+    done();
+  }
+});
+
+test('WITH SLASH READING ON ITS OWN SWITCHED OFF NOTHING OF THE BACKGROUND IS HELD, and his own ask is answered: no row, no model, and on again it is held', async () => {
+  const { engine, background, own, api, runs, done } = await paletteAndBackground('2320');
+  try {
+    api.kernel.setPref('slash', 'slash.reads', false);
+    for (const kind of ['look', 'headline', 'skill', 'understand'] as const) {
+      const off = await background(kind);
+      assert.equal(off.refusal?.code, 'FORBIDDEN', `${kind}: ${JSON.stringify(off)}`);
+      assert.match(off.refusal?.fix ?? '', /switched off/u);
+    }
+    assert.equal(own.all('SELECT 1 FROM slash_call').length, 0, 'a background ask switched off left a row');
+    /* HIS OWN ASK IS HIS OWN ACT, and the switch is never read for it. */
+    assert.ok(((await engine.read('What is still open?', OWNER_CTX)) as Refused).ok);
+    assert.equal(runs(), 1);
+    assert.equal((engine.status() as Status).asks.used, 1);
+    /* ON AGAIN IS READ AT THE NEXT ASK, with no meter rebuilt. */
+    api.kernel.setPref('slash', 'slash.reads', true);
+    assert.ok((await background('look')).ok);
+  } finally {
+    done();
+  }
+});
+
+const SAMPLES = [1, 2, 3].map((n) => ({ id: `raw_${n}`, channel: 'email' as const, ts: '2026-09-20T10:00:00.000Z', from: 'billing@acme.test', subject: `Invoice ${n}`, body: `Invoice ${n} for 120.00 EUR` }));
+
+test("THE RECORD'S OWN DRAFT IS HELD OVER THE BACKGROUND'S COUNT: asked after his three are spent, turned away after the background's three", async () => {
+  const { engine, background, own, runs, done } = await paletteAndBackground('696');
+  /* THE DOOR'S TYPE NAMES WHAT A PERSON ASKS; the draft is the model-jobs pass's, on the same engine object. */
+  const drafts = engine as unknown as { draftPattern: (samples: typeof SAMPLES) => Promise<unknown> };
+  try {
+    for (let i = 0; i < 3; i++) assert.ok(((await engine.read(`open tasks ${i}`, OWNER_CTX)) as Refused).ok);
+    assert.equal(runs(), 3);
+    /* HIS MONTH IS SPENT AND THE DRAFT STILL REACHES THE MODEL, whatever it makes of the reply. */
+    await drafts.draftPattern(SAMPLES);
+    assert.equal(runs(), 4, 'a draft of the record\'s own was turned away because his asks were spent');
+    assert.equal((engine.status() as Status).asks.used, 3, 'the draft moved his count');
+    /* TWO MORE OF THE BACKGROUND'S REACH ITS THREE, and the next draft asks nothing. */
+    assert.ok((await background('look')).ok);
+    assert.ok((await background('headline')).ok);
+    const turned = (await drafts.draftPattern(SAMPLES)) as Refused;
+    assert.equal(turned.refusal?.code, 'SLASH_BUDGET_SPENT', JSON.stringify(turned));
+    assert.equal(runs(), 4, 'a draft past the background\'s three reached the binding');
+    const n = own.one<{ n: number }>("SELECT COUNT(*) AS n FROM slash_call WHERE model <> '-' AND spends = 'background'")?.n;
+    assert.equal(n, 3);
+  } finally {
+    done();
+  }
 });

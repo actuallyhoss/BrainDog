@@ -21,6 +21,11 @@
  *
  * A ROW COUNTS ONCE, however many of its fields point here: a transfer whose `from` and `to` both name one account is
  * one row to move, and the sentence counts rows a person would open.
+ *
+ * THE WAY OUT, WHERE THE LIST HAS ONE. A list that declares finished states (`state:` and `done:`) has somewhere for
+ * such a row to go that strands nothing, so its refusal ends "Mark it Closed instead." in place of the advice to move
+ * or delete what points here. The word is the label of the list's first finished value, the list's own, and a row
+ * that is finished already gets the older sentence, because it has taken that way out and still cannot go.
  */
 
 import type { Refusal } from '@braindog/ports';
@@ -46,6 +51,28 @@ const FIELD_ID = /^[a-z][a-z0-9_]{0,31}$/u;
 
 /** How many entries, said as a person says it (never "row" in copy a person reads). */
 const rows = (n: number): string => `${n} ${n === 1 ? 'entry' : 'entries'}`;
+
+/** A state's id as words, where its field declares no label for it: `written_off` is "Written off". */
+const words = (id: string): string => {
+  const said = id.replace(/[._-]+/gu, ' ').trim();
+  return said.slice(0, 1).toUpperCase() + said.slice(1);
+};
+
+/**
+ * How each sentence ends: the list's first finished state as the way out, or `otherwise` where there is none to offer.
+ *
+ * `otherwise` IS KEPT for a list with no `state:` or no `done:`, and for a row already in a finished state, whichever
+ * one. The row's state is read off the column the write path mirrors it onto, once, and only when a delete is refused.
+ */
+function wayOut(parts: KernelParts, decl: NonNullable<ReturnType<KernelParts['register']>>, entry: string, otherwise: string): string {
+  const done = decl.done ?? [];
+  const first = done[0];
+  if (decl.state === undefined || first === undefined) return otherwise;
+  const now = parts.sql.one<{ state: string | null }>('SELECT state FROM entry WHERE id = ?', entry)?.state;
+  if (typeof now === 'string' && done.includes(now)) return otherwise;
+  const label = decl.fields.find((f) => f.id === decl.state)?.labels?.[first];
+  return `. Mark it ${label ?? words(first)} instead.`;
+}
 
 /**
  * The refusal for deleting `entry` from `register` while live rows point at it, or `null` when the delete may go ahead.
@@ -103,7 +130,7 @@ export function referencedBy(parts: KernelParts, register: string, entry: string
   if (held.length === 0)
     return {
       code: 'DELETE_WHILE_REFERENCED',
-      fix: 'Entries you cannot open still point at this one, so it cannot be deleted: somebody who can open them has to point them elsewhere or delete them first.',
+      fix: `Entries you cannot open still point at this one, so it cannot be deleted${wayOut(parts, decl, entry, ': somebody who can open them has to point them elsewhere or delete them first.')}`,
       at: 'delete',
     };
 
@@ -114,7 +141,7 @@ export function referencedBy(parts: KernelParts, register: string, entry: string
   if (only !== undefined)
     return {
       code: 'DELETE_WHILE_REFERENCED',
-      fix: `${rows(only.n)} in ${only.name} still ${only.n === 1 ? 'points' : 'point'} at this one, so it cannot be deleted: point ${only.n === 1 ? 'that entry' : 'those entries'} elsewhere or delete ${only.n === 1 ? 'it' : 'them'} first.`,
+      fix: `${rows(only.n)} in ${only.name} still ${only.n === 1 ? 'points' : 'point'} at this one, so it cannot be deleted${wayOut(parts, decl, entry, `: point ${only.n === 1 ? 'that entry' : 'those entries'} elsewhere or delete ${only.n === 1 ? 'it' : 'them'} first.`)}`,
       at: 'delete',
     };
 
@@ -127,7 +154,7 @@ export function referencedBy(parts: KernelParts, register: string, entry: string
   const where = named.length === 0 ? last : `${named.join(', ')} and ${last}`;
   return {
     code: 'DELETE_WHILE_REFERENCED',
-    fix: `${hidden ? 'Entries' : rows(total)} still point at this one (${where}), so it cannot be deleted: point those entries elsewhere or delete them first.`,
+    fix: `${hidden ? 'Entries' : rows(total)} still point at this one (${where}), so it cannot be deleted${wayOut(parts, decl, entry, ': point those entries elsewhere or delete them first.')}`,
     at: 'delete',
   };
 }

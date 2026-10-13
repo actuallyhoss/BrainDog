@@ -10,6 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { labelSetting, normaliseUseCase, useCasePack } from '@braindog/declare';
+import { doesOf } from '@braindog/kernel';
 
 import { createRecordApi, type CallContext, type CatalogueEntry } from '../src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
@@ -606,6 +607,36 @@ test('TURNING A PACK BACK ON SHOWS WHAT IT WILL CALL OUT AGAIN, and is refused w
   const stale = refusal(await api.decide(accept(arranged.id), owner));
   assert.equal(stale.code, 'PLAN_STALE');
   assert.deepEqual(api.kernel.actionOrigins(), []);
+  sql.close();
+});
+
+test('AN INSTALL THAT CALLS OUT FILES WHAT IT ARMS, so Decide says where it calls and how often, and one that calls nothing files none', async () => {
+  const { api, sql } = await record([]);
+  const base = { version: '1.0.0', author: 'BrainDog', license: 'MIT', requires: { format: 1, primitives: 1, packs: {} } };
+  const POINTS = { ...base, pack: 'points', summary: 'Points.', declarations: [{ register: 'datapoints', name: 'Datapoints', title: 'name', fields: [{ id: 'name', type: 'text', required: true }, { id: 'value', type: 'decimal' }, { id: 'at', type: 'instant' }] }] };
+  const POLL = {
+    ...base,
+    pack: 'poll-northwind',
+    summary: 'Polls api.example.com.',
+    declarations: [
+      { ingest: 'poll_northwind', channel: 'poll', url: 'https://api.example.com/metrics', every: '1h', map: { name: { value: 'MRR' }, value: { path: 'mrr', type: 'decimal' }, at: { arrived: true } }, writes: { register: 'datapoints' } },
+    ],
+  };
+  type Filed = { body: { install?: string; calls_out?: Record<string, unknown>[] } };
+  const quiet = value<{ id: string }>(await api.propose({ question: 'Add Points?', body_kind: 'pack', body: { install: 'points', doc: POINTS } } as never, agent));
+  const none = value<Filed>(await api.governance({ id: quiet.id }, owner));
+  assert.equal(none.body.install, 'points');
+  assert.equal('calls_out' in none.body, false, 'an install that calls nothing filed calls');
+  assert.equal(doesOf('install', none.body), '');
+  value(await api.decide(accept(quiet.id), owner));
+
+  const filed = value<{ id: string }>(await api.propose({ question: 'Add the poll?', body_kind: 'pack', body: { install: 'poll-northwind', doc: POLL } } as never, agent));
+  const row = value<Filed>(await api.governance({ id: filed.id }, owner));
+  assert.deepEqual(row.body.calls_out, [{ host: 'api.example.com', every: '1h', trigger: 'schedule', per_day: null, grant: null, change: 'new' }]);
+  assert.equal(doesOf('install', row.body), 'Calls api.example.com every hour.');
+  /* AND THE BODY AS FILED IS STILL THE ONE THE PRESS INSTALLS. */
+  value(await api.decide(accept(filed.id), owner));
+  assert.deepEqual(api.kernel.actionOrigins(), ['https://api.example.com']);
   sql.close();
 });
 

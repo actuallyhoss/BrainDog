@@ -63,7 +63,7 @@ export const MONEY_BOOK_PAGE: SeedPage = {
       icon: 'landmark',
       span: 8,
       source: 'register.accounts',
-      where: 'book is {{name}}',
+      where: 'book is {{name}}, state is not closed',
       columns: [
         { field: 'name', as: 'title' },
         { field: 'balance', as: 'figure' },

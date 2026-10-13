@@ -20,6 +20,14 @@ export const ACCOUNTS_REGISTER: MoneyRegister = {
    * the kernel learned the key.
    */
   delete: 'refuse_while_referenced',
+  /**
+   * AN ACCOUNT CLOSES (REC-B15), which is the way out the refusal above had none of: one money moved through cannot
+   * be deleted, so it stayed in Cash now and in every form for good. Closed is the list's finished status, so a form
+   * leaves it out of the accounts it offers, and the figures of cash leave it out of the count, of Cash now and of its
+   * parts (`figures/cash.ts`, `HELD`). Its payments stay its own, so every month it was open reads as it did.
+   */
+  state: 'state',
+  done: ['closed'],
   pack: 'money-core',
   fields: [
     { id: 'name', type: 'text', required: true, search: true },
@@ -52,5 +60,8 @@ export const ACCOUNTS_REGISTER: MoneyRegister = {
     { id: 'arrives', label: 'Arrives', type: 'day' },
     /* INDEXED, because Cash now by book groups the accounts by it and a book's page filters them by it. */
     { ...BOOK, index: true },
+    /* NOT REQUIRED, because an account typed before the field was there holds none, and that account is open: every
+       reader asks for `state is not closed`, never for `state is open`. `Status`, the word the other lists say. */
+    { id: 'state', label: 'Status', type: 'enum', values: ['open', 'closed'], labels: { open: 'Open', closed: 'Closed' }, default: 'open', index: true },
   ],
 };

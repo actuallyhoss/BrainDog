@@ -1084,6 +1084,8 @@ export class Record$ extends DurableObject<Env> {
         store: this.#jobsStore,
         /* WHETHER SLASH'S MODEL ANSWERS: while it does not, the jobs wait with their attempts kept (`model-jobs.ts`). */
         health: this.#engineHealth,
+        /* HIS SWITCH FOR SLASH READING ON ITS OWN (ENG-A09): off, nothing is leased and no model is asked or tested. */
+        reads: () => api.kernel.prefsOf('slash')['slash.reads'] !== false,
         log: (line) => op({ op: 'slash.jobs', rec, ok: false, error: line }),
       });
     } catch (e) {

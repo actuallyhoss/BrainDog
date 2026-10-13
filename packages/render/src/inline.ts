@@ -8,6 +8,9 @@
  * The distinction that carries the most weight in this file: `{{path}}` is not `{verified: path}`.
  * The tag says somebody checked this figure against that path ONCE; the double brace says go and
  * read it NOW. A figure you interpolate needs no tag — the path is its provenance (05 §7.3).
+ *
+ * `{{bad:words}}` IS THE ONE FORM THAT HOLDS OTHER TOKENS, so it is the one form that does not close
+ * on the first `}}` after it. See `pairs`.
  */
 
 import { MISSING, TYPED, formatTyped, magnitudeOf, type TypedForm } from './format.ts';
@@ -20,6 +23,14 @@ export type Inline =
   | { type: 'strong'; body: Inline[] }
   | { type: 'em'; body: Inline[] }
   | { type: 'link'; href: string; body: Inline[] }
+  /**
+   * A phrase in the danger colour, `{{bad:three days overdue}}` (H.202). Its words are inline text, so a path, a
+   * typed value and a bold run inside read as they do outside; one `bad` never holds another.
+   *
+   * `bad` IS THE ONLY COLOUR WITH A FORM, and it is a word about the thing and not a paint: there is no `good`, no
+   * `red`, no `warn`. The words carry the meaning and the colour repeats it, so a phrase is never colour alone.
+   */
+  | { type: 'bad'; body: Inline[] }
   /**
    * A live figure. `resolved` is null when the record holds no value; the renderer draws an em dash.
    *
@@ -235,8 +246,46 @@ const seeker = (text: string, needle: string) => {
   };
 };
 
-/** One pass over a run of text, after code spans have been lifted out of it. */
-function tokens(text: string, opts: InlineOptions): Inline[] {
+/** `{{bad:`, with the space `{{ icon: rocket }}` is allowed. Sticky, so it is asked at one place and scans nothing. */
+const BAD = /\{\{\s*bad\s*:/y;
+
+/**
+ * Where each `{{` closes, counting the ones inside it: the opener's place to the place of its `}}`.
+ *
+ * ONLY `{{bad:` ASKS, because it is the only form whose body holds tokens: `{{bad:{{tasks.late}} late}}` read to
+ * the first `}}` is `bad:{{tasks.late`, which is how it drew before there was a form. Every other token still
+ * closes on the first `}}`, so no tree that parsed before this parses differently.
+ *
+ * ONE PASS, ASKED FOR ONCE A RUN and only by a run that holds a `{{bad:`, for the reason `seeker` gives: counting
+ * depth afresh from each opener is the square of the length on a text of nothing but openers.
+ *
+ * AN ODD RUN OF `}` GIVES ITS FIRST ONE AWAY. `{{bad:late {estimate}}}` ends on three: the tag's one and the
+ * form's two. Read left to right the form would close a brace early and leave `}` on the page.
+ */
+function pairs(text: string): Map<number, number> {
+  const closes = new Map<number, number>();
+  const open: number[] = [];
+  for (let i = 0; i < text.length; ) {
+    if (text.startsWith('{{', i)) {
+      open.push(i);
+      i += 2;
+    } else if (text[i] === '}') {
+      let end = i;
+      while (text[end] === '}') end++;
+      for (let at = i + ((end - i) % 2); at < end && open.length > 0; at += 2) closes.set(open.pop()!, at);
+      i = end;
+    } else i++;
+  }
+  return closes;
+}
+
+/**
+ * One pass over a run of text, after code spans have been lifted out of it.
+ *
+ * `held` is true for the words of a `{{bad:…}}` and everything inside them. A `bad` in there is the author's
+ * text, so the reader goes one level down and no further, whatever it is handed.
+ */
+function tokens(text: string, opts: InlineOptions, held = false): Inline[] {
   const out: Inline[] = [];
   let buf = '';
   const push = () => {
@@ -250,9 +299,23 @@ function tokens(text: string, opts: InlineOptions): Inline[] {
   const endOfEm = seeker(text, '*');
   const endOfLabel = seeker(text, ']');
   const endOfHref = seeker(text, ')');
+  let closes: Map<number, number> | undefined;
 
   for (let i = 0; i < text.length; ) {
     if (text.startsWith('{{', i)) {
+      BAD.lastIndex = i;
+      if (!held && BAD.test(text)) {
+        const from = BAD.lastIndex;
+        const close = (closes ??= pairs(text)).get(i);
+        // No words is no phrase: `{{bad:}}` falls through and is the author's text, dotted.
+        const words = close === undefined ? '' : text.slice(from, close).trim();
+        if (close !== undefined && words) {
+          push();
+          out.push({ type: 'bad', body: tokens(words, opts, true) });
+          i = close + 2;
+          continue;
+        }
+      }
       const close = endOfPath(i + 2);
       if (close !== -1) {
         push();
@@ -284,7 +347,7 @@ function tokens(text: string, opts: InlineOptions): Inline[] {
       const close = endOfStrong(i + 2);
       if (close !== -1) {
         push();
-        out.push({ type: 'strong', body: tokens(text.slice(i + 2, close), opts) });
+        out.push({ type: 'strong', body: tokens(text.slice(i + 2, close), opts, held) });
         i = close + 2;
         continue;
       }
@@ -293,7 +356,7 @@ function tokens(text: string, opts: InlineOptions): Inline[] {
       const close = endOfEm(i + 1);
       if (close !== -1) {
         push();
-        out.push({ type: 'em', body: tokens(text.slice(i + 1, close), opts) });
+        out.push({ type: 'em', body: tokens(text.slice(i + 1, close), opts, held) });
         i = close + 1;
         continue;
       }
@@ -315,7 +378,7 @@ function tokens(text: string, opts: InlineOptions): Inline[] {
           const href = safeHref(raw);
           push();
           // A link the host cannot resolve is plain text, not a dead anchor (36 §13 D16).
-          if (href) out.push({ type: 'link', href, body: tokens(label, opts) });
+          if (href) out.push({ type: 'link', href, body: tokens(label, opts, held) });
           else out.push({ type: 'text', text: label });
           i = end + 1;
           continue;
@@ -392,6 +455,7 @@ export function text(nodes: Inline[]): string {
         case 'strong':
         case 'em':
         case 'link':
+        case 'bad':
           return text(n.body);
         case 'path':
           /* The author's text for a path that names nothing, as it is drawn: there is no value to be missing. */

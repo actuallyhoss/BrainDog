@@ -148,6 +148,10 @@ export const TRANSACTIONS_REGISTER: MoneyRegister = {
     /* REQUIRED, because a movement with no account is a number nobody can reconcile. */
     { id: 'account', type: 'ref', to: 'accounts', index: true, required: true },
     { id: 'category', type: 'ref', to: 'categories', index: true },
+    /* WHICH RULE FILED IT, SINCE money-core 3.17.0 (REC-B10), written by `txn-categorise` in the step that writes the
+       category, and empty on an entry a person filed. Not indexed: the eight below are spent, and what counts entries
+       by rule groups on it without one. */
+    { id: 'filed_by', label: 'Filed by', type: 'ref', to: 'filing_rules' },
     /* Not indexed, and this register is at the ceiling. `declare.ts`'s `INDEX_CEILING` is 8 and
        counts `index: true` and `unique: true` alike; the eight spent here are `on`, `direction`,
        `account`, `category`, `thing`, `state`, `transfer` and `settles`, which are the eight every

@@ -62,6 +62,7 @@ import { METRICS } from '../declared.ts';
 import { fxNote, meetsTarget, offTarget, targetLine, targetSaid, windowMs, type MetricDecl, type Reading } from '../metrics.ts';
 import { blockOf, tileOf as pageTile } from '../page-live.ts';
 import { entryOf, refMapOf, sentenceOf, type RefMap } from '../remote.ts';
+import { learnRowPages } from '../row-href.ts';
 import type { Entry, Filter, Job, PageBlock, PageDecl } from '../schema.ts';
 
 /* A SENTENCE ONLY THIS FILE SAYS, so it is kept here and not in `copy.ts`, where a sentence no screen draws is a dead
@@ -527,7 +528,7 @@ export function figureTile(id: string, decl: MetricDecl, reading: Reading): Metr
 
   /* A FIGURE CONVERTED OUT OF ITS DECLARED CURRENCY IS JUDGED AGAINST ITS TARGET CONVERTED, and has no verdict without a rate. */
   const off = offTarget(decl, reading.unit);
-  const met = empty || unsaid ? null : off ? (reading.targetIn ? meetsTarget({ ...decl, target: reading.targetIn.target }, reading.value) : null) : meetsTarget(decl, reading.value);
+  const met = empty || unsaid ? null : off ? (reading.targetIn ? meetsTarget({ ...decl, target: reading.targetIn.target }, reading.value, reading) : null) : meetsTarget(decl, reading.value, reading);
   /* The delta reads as a MOVEMENT and not as a sign: "up 18% on the 30d before" is a sentence, and
      `+18%` beside a target is two numbers a reader has to tell apart. */
   /* AND AN ABSENT COMPARISON SAYS SO. `19 §6`: a surface showing nothing must never be
@@ -664,6 +665,8 @@ export function boot() {
   /* ONE LIST OF PAGES, READ TWICE: the rail below and the pen at the bottom of this function, which the two lists a
      `boot` hands the shell should not be able to disagree about. */
   const resolved = Object.values(pages());
+  /* THE ROWS A TEMPLATE MADE A PAGE FOR, as the live boot learns them, so the sample opens a project's own page too. */
+  learnRowPages(RECORD.pages());
 
   /**
    * ONE PAGE PER ROW IS A PAGE RULE AND IT WAS ALSO THE RAIL'S, which nothing had ever counted.

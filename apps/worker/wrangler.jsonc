@@ -370,7 +370,8 @@
            shown fit well inside it. It was the record owner's `ask_cap` alone, with no upper limit, and an owner saved a
            billion; `ask_cap` can now only lower this. It is per record
            and not per account. `INCLUDED_MONTH_NEURONS` in `apps/worker/src/slash.ts` is what an unset or mistyped
-           value falls back to; `0` turns every ask away. */
+           value falls back to; `0` turns every ask away. THE CEILING HOLDS A PERSON'S ASKS AND THE RECORD'S OWN
+           BACKGROUND ASKS APART, each to this number, so neither spends the other's. */
         "SLASH_INCLUDED_MONTH_NEURONS": "300000",
         "BRAINDOG_BUILD": "",
         /* EMPTY IS NO SIGN-IN LINKS. The sender, on a domain Email Service sends for, switches them on
@@ -586,7 +587,8 @@
            neurons (about $0.03) before it is stopped, and one record's asks at most the ceiling below in a month. */
         "SLASH_INCLUDED": "yes",
         /* THE OPERATOR'S CEILING ON ONE RECORD'S ASKS OF Slash, as alpha's comment says: 300,000 neurons, about $3.30 a
-           record a month, which `ask_cap` can only lower. */
+           record a month, which `ask_cap` can only lower. It holds a person's asks and the record's own background asks
+           apart, each to this number. */
         "SLASH_INCLUDED_MONTH_NEURONS": "300000",
         "BRAINDOG_BUILD": "",
         /* EMPTY IS NO SIGN-IN LINKS. The sender, on a domain Email Service sends for, switches them on

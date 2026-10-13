@@ -1443,7 +1443,7 @@ const DECLARED: Record<string, Version> = {
       metric.project-out-month metric.project-owed metric.received-30d metric.received-7d metric.runs-out-on metric.runway-days metric.settled-in-7d metric.spent-30d
       metric.spent-by-category-month metric.statement-oldest-days metric.txn-uncategorised metric.uncategorised-share-30d
       page.money page.money-book
-      register.accounts register.balances register.books register.categories register.fx register.installments register.obligations
+      register.accounts register.balances register.books register.categories register.filing_rules register.fx register.installments register.obligations
       register.recurring register.snapshots register.transactions
       rule.installment-due-soon rule.invoice-chased rule.invoice-late rule.recurring-ended rule.recurring-missed
       rule.recurring-stopped rule.txn-categorise
@@ -1452,10 +1452,11 @@ const DECLARED: Record<string, Version> = {
       setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
       setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category setting.rest_days
     `,
-    declares: 'e4a453d69795fe22',
+    declares: 'f3d700ae322b0ea0',
     history: [
       "`cash-cross-check` is declared (cash-check-52, REC-A17): Cash now worked out a second way, each cash account walked entry by entry from its newest statement, less Cash now, a currency at a time; no value while no balance is typed -> 73738171ae2405ba",
       'The Money page draws the check (cash-page-54, REC-A17): one tile, Cash now does not add up, while `cash-cross-check` is not nought, and one line while no balance is typed -> e4a453d69795fe22',
+      "Folded into the unreleased 3.17.0 (filing-list-56, REC-B10 job 3; account-state-56; integrate 56): the list Filing rules (`filing_rules`), the Ledger's `filed_by`, `pattern` on a category's How it matches, and `txn-categorise` links through the list by which way, account and on or off; an account's Status, open or closed, with closed its finished state, and the cash figures, `statement-oldest-days`, the Last confirmed cards and a book's Accounts cards leave a closed account out (`liquid is true, state is not closed`) -> f3d700ae322b0ea0",
     ],
   },
   'work@1.17.0': {

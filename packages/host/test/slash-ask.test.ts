@@ -434,7 +434,8 @@ test('THE DOOR IS NOT A METHOD, which is what keeps it out of the record surface
      about what is in it. `slashDraft` drafts a page or a list from a description and files nothing. */
   assert.deepEqual(
     ROUTES.filter((r) => r.name.startsWith('slash')).map((r) => r.name),
-    ['slash', 'slashPropose', 'slashDaily', 'slashForm', 'slashDraft'],
+    /* AND `slashReads` (ENG-A09), the one switch for Slash reading on its own: a pref kept, and no question answered. */
+    ['slash', 'slashPropose', 'slashDaily', 'slashForm', 'slashDraft', 'slashReads'],
   );
   assert.equal(servesSlash('/api/slashAsk'), null);
   assert.equal(servesSlash('/api/slash/read'), 'read');

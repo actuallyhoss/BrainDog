@@ -1036,8 +1036,14 @@ export type EngineHealth = {
  * `Standing` in `packages/record/src/ladder.ts`.
  */
 export type TrustStanding = {
-  agents: { agent: string; kinds: { kind: string; rung: 'ask' | 'tell' | 'quiet'; since: string; lifted: boolean; dropped: { at: string; why: string | null } | null }[] }[];
+  agents: { agent: string; connected: string | null; kinds: { kind: string; rung: 'ask' | 'tell' | 'quiet'; since: string; lifted: boolean; dropped: { at: string; why: string | null } | null }[] }[];
 };
+
+/**
+ * `slashReads`'s answer (ENG-A09): whether Slash reads in the background. On unless the owner turned it off. See
+ * `SlashReads` in `packages/record/src/methods/engine.ts`.
+ */
+export type SlashReads = { on: boolean };
 
 /**
  * `doorHealth`'s answer (AGT-A02), the owner's: every connection that can act on the record and the agent door's seven
@@ -1694,6 +1700,8 @@ export function createClient(options: ClientOptions) {
     /* WHETHER THE ENGINE'S MODEL ANSWERS (ENG-A02), at read level, so a read token, the command line and the daily
        vital-sign read can ask. `null` from a host that hands the record no engine. */
     engineHealth: () => call<AnswerOr<'engineHealth', EngineHealth | null>>('engineHealth'),
+    /** The one switch for Slash's background reading: with nothing, the state as it stands. An owner's in a browser. */
+    slashReads: (on?: boolean) => call<SlashReads>('slashReads', on === undefined ? {} : { on }),
     /* THE DOOR'S HEALTH (AGT-A02). ADMIN, so a browser session at owner: every connection, its app, build and last tool
        call, and the seven signs. It takes nothing and changes nothing. */
     doorHealth: () => call<AnswerOr<'doorHealth', DoorHealth>>('doorHealth'),

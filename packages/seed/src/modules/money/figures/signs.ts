@@ -93,7 +93,7 @@ export const SIGNS_FIGURES: Record<string, SeedMetric> = {
     metric: 'statement-oldest-days',
     name: 'Oldest balance',
     source: 'register.accounts',
-    where: 'liquid is true',
+    where: 'liquid is true, state is not closed',
     value: { rolled: { ...ROLLED.rolled, read: 'age' } },
     format: 'days',
     target: { lte: 7 },

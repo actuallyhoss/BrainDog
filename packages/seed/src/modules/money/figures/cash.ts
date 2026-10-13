@@ -4,6 +4,16 @@ import type { SeedMetric } from '../../base.ts';
 import { ROLLED } from '../legs.ts';
 import { MONEY } from './shared.ts';
 
+/**
+ * THE ACCOUNTS CASH NOW IS A SUM OF: the ones that count as cash and are not closed (REC-B15).
+ *
+ * A CLOSED ACCOUNT IS OUT OF EVERY FIGURE OF TODAY'S CASH, AND OF NOTHING ELSE. It holds no money anybody can spend,
+ * and nobody confirms its balance again, so left in it sat in the count and the bars and read out of date for good.
+ * The figures of spending read the Ledger and never ask which account, so a month it was open in reads as it did.
+ * `is not closed` AND NOT `is open`: an account typed before it had a status holds none, and it is open.
+ */
+const HELD = 'liquid is true, state is not closed';
+
 export const CASH_FIGURES: Record<string, SeedMetric> = {
   /**
    * WHAT IS IN THE BANK, the headline the owner asked for: "the money i have, not the money im
@@ -20,7 +30,7 @@ export const CASH_FIGURES: Record<string, SeedMetric> = {
     metric: 'cash-now',
     name: 'Cash now',
     source: 'register.accounts',
-    where: 'liquid is true',
+    where: HELD,
     value: ROLLED,
     format: MONEY,
     target: { gte: 0 },
@@ -65,7 +75,7 @@ export const CASH_FIGURES: Record<string, SeedMetric> = {
     metric: 'cash-by-book',
     name: 'Cash now, by book',
     source: 'register.accounts',
-    where: 'liquid is true',
+    where: HELD,
     value: ROLLED,
     group_by: 'book',
     format: MONEY,
@@ -85,7 +95,7 @@ export const CASH_FIGURES: Record<string, SeedMetric> = {
     metric: 'cash-by-account',
     name: 'Cash now, by account',
     source: 'register.accounts',
-    where: 'liquid is true',
+    where: HELD,
     value: ROLLED,
     group_by: 'name',
     format: MONEY,
@@ -102,7 +112,7 @@ export const CASH_FIGURES: Record<string, SeedMetric> = {
     metric: 'book-cash',
     name: 'Cash now in one book',
     source: 'register.accounts',
-    where: 'liquid is true, book is {{it}}',
+    where: `${HELD}, book is {{it}}`,
     value: ROLLED,
     format: MONEY,
     target: { gte: 0 },
@@ -146,7 +156,7 @@ export const CASH_FIGURES: Record<string, SeedMetric> = {
     metric: 'cash-accounts',
     name: 'Accounts counted as cash',
     source: 'register.accounts',
-    where: 'liquid is true',
+    where: HELD,
     value: { count: 'id' },
     format: 'int',
     target: { gte: 1 },
@@ -165,7 +175,7 @@ export const CASH_FIGURES: Record<string, SeedMetric> = {
     metric: 'cash-as-of',
     name: 'Oldest balance',
     source: 'register.accounts',
-    where: 'liquid is true',
+    where: HELD,
     value: { rolled: { ...ROLLED.rolled, read: 'as_of' } },
     format: 'day',
     target: { gte: 0 },
@@ -183,7 +193,7 @@ export const CASH_FIGURES: Record<string, SeedMetric> = {
     metric: 'balances-stale',
     name: 'Balances over a week old',
     source: 'register.accounts',
-    where: 'liquid is true',
+    where: HELD,
     value: { rolled: { ...ROLLED.rolled, read: 'stale', after: '7d' } },
     format: 'int',
     target: { lte: 0 },

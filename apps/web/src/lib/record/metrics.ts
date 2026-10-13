@@ -156,6 +156,12 @@ export type Reading = {
   parts?: Part[];
   /** How a figure across currencies was read, as the record's `fx` says it. */
   fx?: FxRead;
+  /**
+   * A sum that converted what it could (REC-B05), as the record's `atLeast` and `noRate` say it: `parts[0]` is the least
+   * the whole can be and `noRate` is what no rate reached. `value` is `null`, and it is held to no target.
+   */
+  atLeast?: true;
+  noRate?: Part[];
   /** A figure converted out of its declared currency: its target converted too, as the record's `targetIn` says it. */
   targetIn?: TargetIn;
 };
@@ -210,12 +216,22 @@ export function targetSaid(
 }
 
 /**
- * What a figure across currencies says under itself: why it is in parts, or as of which day's rates it was converted.
+ * What a figure across currencies says under itself: why it is in parts, that it is only at least, or as of which day's
+ * rates it was converted.
  * `null` for a figure in one currency. Read from the record's reading or a tile's `Reading`, which carry the same keys.
  */
-export function fxNote(r: { parts?: readonly Part[] | undefined; fx?: FxRead | undefined }): string | null {
+export function fxNote(r: {
+  parts?: readonly Part[] | undefined;
+  fx?: FxRead | undefined;
+  atLeast?: true | undefined;
+  noRate?: readonly Part[] | undefined;
+}): string | null {
   if (!r.fx) return null;
   if (r.parts) {
+    /* A SUM THAT CONVERTED WHAT IT COULD (REC-B05): the first part is the least the whole can be, and `noRate` is what
+       no rate reached. It says so, and names each pair, where it used to say nothing was added up. */
+    const least = r.atLeast && r.noRate?.length ? r.parts[0] : undefined;
+    if (least && r.fx.missing.length) return copy.figureAtLeast(money(Math.round(least.amount), least.currency), r.fx.missing);
     if (r.fx.home !== null && r.fx.missing.length) return copy.figureNoRate(r.fx.missing.join(', '));
     /* ONE CURRENCY AND NO HOME CURRENCY IS NOT A PROBLEM TO REPORT: the amount is said in the currency it is in. */
     return r.parts.length > 1 ? copy.figureNoHome : null;
@@ -728,9 +744,12 @@ export const spokenWindow = (window: string): string => {
   return `${n} ${noun}${n === '1' ? '' : 's'}`;
 };
 
-/** Is the figure on the right side of what was declared as good? */
-export function meetsTarget(decl: MetricDecl, value: number | null): boolean | null {
-  if (value === null) return null;
+/**
+ * Is the figure on the right side of what was declared as good? `null` when there is no figure to hold to it, and for a
+ * sum that is only at least (REC-B05): a lower bound is not the figure, so it is neither on its target nor off it.
+ */
+export function meetsTarget(decl: MetricDecl, value: number | null, r?: { atLeast?: true | undefined }): boolean | null {
+  if (value === null || r?.atLeast) return null;
   return 'lte' in decl.target ? value <= decl.target.lte : value >= decl.target.gte;
 }
 

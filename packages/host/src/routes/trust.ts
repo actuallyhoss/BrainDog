@@ -14,6 +14,6 @@
 import type { Route } from '../index.ts';
 
 export const ROUTES: readonly Route[] = [
-  { name: 'trust', group: 'READ+', writes: false, what: 'How far each agent is trusted with each kind of change: Ask, Do and tell or Do quietly, since when, and whether it was put back to Ask. It changes nothing.',
+  { name: 'trust', group: 'READ+', writes: false, what: 'How far each agent is trusted with each kind of change: Ask, Do and tell or Do quietly, since when, and whether it was put back to Ask. It changes nothing. Only the owner of the record reads it.',
     takes: {} },
 ];

@@ -7,6 +7,7 @@ import { ACCOUNTS_REGISTER } from './accounts.ts';
 import { BALANCES_REGISTER } from './balances.ts';
 import { BOOKS_REGISTER } from './books.ts';
 import { CATEGORIES_REGISTER } from './categories.ts';
+import { FILING_RULES_REGISTER } from './filing-rules.ts';
 import { FX_REGISTER } from './fx.ts';
 import { INSTALLMENTS_REGISTER } from './installments.ts';
 import { OBLIGATIONS_REGISTER } from './obligations.ts';
@@ -23,6 +24,9 @@ export const MONEY_REGISTERS: Record<string, MoneyRegister> = {
      `packs/holdings/holdings.pack.json`, and its reasons went with it: what one person holds is not what everybody's Money is for. */
   fx: FX_REGISTER,
   categories: CATEGORIES_REGISTER,
+  /* AFTER CATEGORIES AND BEFORE THE LEDGER, SINCE money-core 3.17.0: a rule links to a category, and a Ledger entry
+     links to the rule that filed it. */
+  filing_rules: FILING_RULES_REGISTER,
   transactions: TRANSACTIONS_REGISTER,
   recurring: RECURRING_REGISTER,
   installments: INSTALLMENTS_REGISTER,

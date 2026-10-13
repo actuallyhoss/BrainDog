@@ -22,10 +22,10 @@ import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 9, 13, 12);
 
-const list = (id: string, name: string, title: string, fields: unknown[]): Declaration => ({
+const list = (id: string, name: string, title: string, fields: unknown[], more: Record<string, unknown> = {}): Declaration => ({
   id: `register.${id}`,
   kind: 'register',
-  body: { id, name, title, fields } as never,
+  body: { id, name, title, fields, ...more } as never,
 });
 
 const CATEGORIES = list('categories', 'Categories', 'name', [
@@ -34,7 +34,7 @@ const CATEGORIES = list('categories', 'Categories', 'name', [
   { id: 'match_by', type: 'enum', values: ['exact', 'starts', 'contains'], default: 'exact' },
   { id: 'direction', type: 'enum', values: ['in', 'out', 'either'], default: 'either' },
   { id: 'state', type: 'enum', values: ['live', 'retired'], default: 'live' },
-]);
+], { state: 'state', done: ['retired'] });
 
 const FILING = list('filing', 'Filing rules', 'match', [
   { id: 'match', type: 'text', required: true },
@@ -151,6 +151,18 @@ test('`take` LINKS WHAT THE ROW FOUND POINTS AT, so a filing rule files under it
   sql.exec('UPDATE entry SET deleted_at = ? WHERE id = ?', new Date(NOW).toISOString(), outing.id);
   assert.equal(make(k, 'ledger', { what: 'TALABAT' }).fields.category, undefined, 'a deleted category filed a row');
   assert.ok(would(k, to).includes('link category: the category of the one found is gone'), would(k, to).join(' | '));
+  sql.close();
+});
+
+test('`take` LINKS NOTHING THE ROW\'S OWN LIST CALLS DONE, so a retired category is not filed under', async () => {
+  const to = { register: 'filing', by: 'match', value: '{{what}}', where: { field: 'state', is: 'on' }, take: 'category' };
+  const { k, sql } = await record(to);
+  const outing = make(k, 'categories', { name: 'Outing' });
+  make(k, 'filing', { match: 'TALABAT', category: outing.id });
+  assert.equal(make(k, 'ledger', { what: 'TALABAT' }).fields.category, outing.id);
+  value(k.update('categories', outing.id, { state: 'retired' }, { actor: 'p_1' }));
+  assert.equal(make(k, 'ledger', { what: 'TALABAT' }).fields.category, undefined, 'a retired category filed a row');
+  assert.ok(would(k, to).includes('link category: the category of the one found is retired'), would(k, to).join(' | '));
   sql.close();
 });
 

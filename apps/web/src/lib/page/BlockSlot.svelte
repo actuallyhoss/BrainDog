@@ -33,6 +33,7 @@
   import { symbolText } from '$lib/record/money.ts';
   import { draw, saidPlainly, walkTables } from '$lib/record/blocks.ts';
   import { joinsWithOr, registerHref } from '$lib/record/where.ts';
+  import { rowHref } from '$lib/record/row-href.ts';
   import { may } from '$lib/record/may.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
   import { fileAt, namedResolverOf, type LiveBlock, type Walked } from '$lib/record/page-live.ts';
@@ -53,6 +54,7 @@
   import type { Picked } from './picked.svelte.ts';
   import type { Row } from 'braindog-render';
   import AddStep from './AddStep.svelte';
+  import Hole from './Hole.svelte';
   import { foldOf } from './home.ts';
   import { headCount, headIcon, headTone } from './tile-head.ts';
   import HomeRows from '$lib/home/HomeRows.svelte';
@@ -120,8 +122,8 @@
   } = $props();
 
   /* A `{{path}}` IS ANSWERED BY THE RECORD on the block's `values`; a missing value is marked. `now` is the clock the
-     rows were read against, so `{{ago:}}` agrees with the dates beside it. No `hole` is handed over, so a value the
-     record cannot answer is marked and not pressable: nobody can supply a declared figure from this screen. */
+     rows were read against, so `{{ago:}}` agrees with the dates beside it. A HOLE IS PRESSABLE WHERE THE PAGE WRITES
+     (`Hole.svelte`): it opens the place the value lives, or offers to find it out. On an inert page it stays a mark. */
   /* A FIGURE IN A SENTENCE READS AS MONEY, `£7,200.00` and not `GBP 7,200.00`, as the cells beside it do. */
   /* THE PAGE'S HEADLINE LINE SAYS WHOLE UNITS: "Cash is EGP 1,086,213", the way a person says it,
      where it said "EGP 1,086,213.41" (`money.ts` `symbolText`, DIRECTION §37). */
@@ -167,6 +169,9 @@
   /* THE HEADING AS A TABLE'S ACCESSIBLE NAME: its words without a glyph's braces (`text` drops an icon to nothing). */
   const headingText = $derived(block.heading ? text(inline(block.heading)).trim() : undefined);
 
+  /* What a pressed hole does, drawn below where the page writes; nothing of it is on screen until one is pressed. */
+  let holes = $state<{ press: (path: string | null) => void }>();
+
   /* Where each file the block holds is served, record-relative (`page-live.ts` `fileAt`), read by `opts.file` below. */
   const filed = $derived(fileAt(block));
 
@@ -184,6 +189,11 @@
     ...(walk ? { walk: walkFor } : {}),
     /* EVERY LINK THE RENDERER DRAWS, under the app: the record writes `/decide`, and the tab is on `/app/<slug>`. */
     href: inApp,
+    /* `{{ref:tasks#241}}` IS A LINK TO THAT ROW: its own page where its list made one, else its screen (`row-href.ts`).
+       Record-relative, and `href` above puts it under the app. No `dayHref`: no page of this record draws a calendar. */
+    link: rowHref,
+    /* A HOLE IS A BUTTON only where something answers the press. */
+    ...(writes ? { hole: (path: string | null) => holes?.press(path) } : {}),
     icon,
     iconSet: glyphSet,
     /* A BLOCK LEFT WITH NOTHING IS NOT DRAWN (`emptied`), unless its author wrote `empty: keep`: a ledger wants its
@@ -512,6 +522,9 @@
     {/if}
   {/each}
 {/if}
+
+<!-- WHAT A PRESSED HOLE DOES (`opts.hole`), where the page writes. Nothing is drawn until one is pressed. -->
+{#if writes}<Hole bind:this={holes} row={param ? { register: param.register, seq: param.seq } : null} />{/if}
 
 <!-- THE PANEL THE HOST DRAWS UNDER A SECTION THAT NAMES ONE (`panel-of.ts`), for the row the page is about, and only
      the one it names: the project's scheduled actions under `panel: actions`, the key its numbers are sent with under

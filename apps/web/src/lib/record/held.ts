@@ -58,6 +58,12 @@ export function seqTitled(register: string, said: string, same: (a: string, b: s
 }
 
 /**
+ * The rows of each list that are in one of its finished states (`state:` and `done:`), by number, as `refMapOf` last
+ * walked them. A picker leaves them out: a closed account is not offered for a new entry.
+ */
+export const FINISHED = new Map<string, ReadonlySet<number>>();
+
+/**
  * The rows a ref into `register` can point at, as a picker offers them: by name, or as its kind and number for a row
  * with none, "Book #2", as `unnamed` in `api.ts` says it. It said `books#2`, the id an agent passes, which is never what
  * a person reads (DIRECTION §37).
@@ -65,10 +71,14 @@ export function seqTitled(register: string, said: string, same: (a: string, b: s
  * EMPTY UNTIL THE LIST HAS BEEN WALKED, and that is the honest answer. The new-row form offered the sample's rows here,
  * so on a record whose projects are Harbour Lane and Tidewater a new service could only be pointed at Kiln, Marlow & Co,
  * Portage and a fourth project the record never held, and the number sent was a real row of the record's.
+ *
+ * A ROW ITS OWN LIST CALLS FINISHED IS LEFT OUT (`FINISHED`), except `keep`, the row the form already points at, so
+ * an entry on an account closed since still shows where it is.
  */
-export const refOptions = (register: string): { value: number; label: string }[] => {
+export const refOptions = (register: string, keep?: number | null): { value: number; label: string }[] => {
   const kind = REGISTERS[register]?.one ?? register.replace(/_/g, ' ');
-  return [...(TITLES.get(register) ?? [])].map(([seq, title]) => ({ value: seq, label: title || `${kind.charAt(0).toUpperCase()}${kind.slice(1)} #${seq}` }));
+  const over = FINISHED.get(register);
+  return [...(TITLES.get(register) ?? [])].filter(([seq]) => seq === keep || !over?.has(seq)).map(([seq, title]) => ({ value: seq, label: title || `${kind.charAt(0).toUpperCase()}${kind.slice(1)} #${seq}` }));
 };
 
 /**

@@ -766,7 +766,7 @@ export function arranger(d: ArrangeDeps) {
     config: Map<string, Record<string, ConfigDecl>>;
     packs: Map<string, Pack>;
     kept: Map<string, string>;
-    calls: Map<string, { approve: string[]; out: Call[] }>;
+    calls: Map<string, { approve: string[]; out: Call[]; sent: Body[] }>;
   };
 
   /**
@@ -883,7 +883,14 @@ export function arranger(d: ArrangeDeps) {
         ...(diff.seeds.count === 0 ? {} : { examples: diff.seeds.count }),
       });
       out.approve.push(...diff.approve.filter((line) => !out.approve.includes(line)));
-      out.calls.set(id, { approve: [...diff.approve], out: diff.calls_out.filter((c) => c.change !== 'same').map((c) => callAt(`install:${id}`, c.host, c.every || null, c.per_day)) });
+      /* `sent` IS EACH NEW OR CHANGED CALL AS THE KERNEL'S `doesOf` READS IT, with the key's label and what runs it, which
+         `out` (a part's host and how often) does not keep. An install's body files it as `calls_out`. */
+      const arms = diff.calls_out.filter((c) => c.change !== 'same');
+      out.calls.set(id, {
+        approve: [...diff.approve],
+        out: arms.map((c) => callAt(`install:${id}`, c.host, c.every || null, c.per_day)),
+        sent: arms.map((c) => ({ host: c.host, every: c.every, trigger: c.trigger, per_day: c.per_day, grant: c.grant, change: c.change })),
+      });
       out.config.set(id, pack.manifest.config ?? {});
       out.packs.set(id, pack);
       /* THE RECORD AS THE INSTALL LEAVES IT, from `declare`, which stages it. The fold this replaced carried
@@ -1351,6 +1358,8 @@ export function arranger(d: ArrangeDeps) {
       const speaker = speakerNow();
       const keeps = target.startsWith(USE_CASE) && !on(target) && speaker !== null && speaker !== target ? speaker : null;
       const names = namesFor(planned.value, keeps ?? (target.startsWith(USE_CASE) && !on(target) ? target : speaker));
+      /* WHAT THE PRESS ARMS, key by label and host, for Decide's one sentence (the kernel's `doesOf('install', body)`). */
+      const callsOut = planned.value.order.flatMap((id) => planned.value.calls.get(id)?.sent ?? []);
       return ok({
         install: target,
         /* A FILE IS SAID BY ITS OWN TITLE, even over a catalogue use case with the same id: it is what the owner was asked about. */
@@ -1365,6 +1374,7 @@ export function arranger(d: ArrangeDeps) {
         packs: { install: planned.value.order, ...(order.value.enable.length === 0 ? {} : { enable: order.value.enable }) },
         plan: planned.value.plan,
         approve: planned.value.approve,
+        ...(callsOut.length === 0 ? {} : { calls_out: callsOut }),
         ...((needs) => (needs.length === 0 ? {} : { needs }))(needsOf(planned.value.approve)),
         ...(Object.keys(names).length === 0 ? {} : { names }),
         ...(isMap(body.doc) ? { doc: body.doc } : {}),

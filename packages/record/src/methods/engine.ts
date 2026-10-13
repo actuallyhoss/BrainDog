@@ -9,6 +9,10 @@
  *
  * READ LEVEL, SO A READ TOKEN, THE COMMAND LINE AND THE DAILY VITAL-SIGN READ CAN ALL CALL IT. It holds no row of the
  * record and no person's words: a state, two instants and a sentence with no model id, job name or code in it.
+ *
+ * AND THE ONE SWITCH FOR SLASH'S BACKGROUND READING: `slashReads`, ADMIN (ENG-A09). The consent rule: his own ask is his
+ * own act, and what Slash reads on its own is on until the owner says otherwise. Kept as Slash's own pref beside the
+ * daily look's (`slash.daily` in `index.ts`), for the reason that one is: local to this copy, no event, no migration.
  */
 
 import type { Result } from '@braindog/ports';
@@ -29,8 +33,17 @@ export type EngineSaid = { text: string; whose: 'ours' | 'yours' | null };
 /** What the host's read answers, and what `engineHealth` answers a caller. */
 export type EngineHealthRead = { health: EngineHealth; said: EngineSaid };
 
+/** Slash's person, whose prefs hold its switches, and the pref this one is: absent for on, `false` for off. */
+const SLASH = 'slash';
+const SLASH_READS = 'slash.reads';
+
+/** What `slashReads` answers: whether Slash may read in the background, and nothing of who or which record. */
+export type SlashReads = { on: boolean };
+
 export function methods(deps: RecordDeps) {
-  const { scoped } = deps;
+  const { scoped, admin, kernel, no } = deps;
+
+  const reads = (): SlashReads => ({ on: kernel.prefsOf(SLASH)[SLASH_READS] !== false });
 
   return {
     /** Whether Slash's model answers, read from its own ledger, with the sentence a person reads. `null` where the host wired no engine. READ+. */
@@ -40,6 +53,24 @@ export function methods(deps: RecordDeps) {
       const read = deps.engineHealth;
       if (read === undefined) return { ok: true, value: null };
       return { ok: true, value: await read() };
+    },
+
+    /**
+     * Whether Slash reads in the background, and the owner's switch for it: `{ on }` sets it, no argument reads it.
+     *
+     * AN OWNER'S, IN A BROWSER, as the daily look's switch is: it is the consent to send what the record holds to a
+     * model without a press each time. Off stops the background jobs, never his own ask. ADMIN.
+     */
+    async slashReads(args: { on?: unknown } | undefined, ctx: CallContext): Promise<Result<SlashReads>> {
+      const stop = admin(ctx, 'choose whether Slash reads in the background');
+      if (stop) return { ok: false, refusal: stop };
+      const said = (args ?? {}) as Record<string, unknown>;
+      const extra = Object.keys(said).find((k) => k !== 'on');
+      if (extra !== undefined) return { ok: false, refusal: { code: 'FIELD_UNKNOWN', fix: `${extra} is not something this call takes. It takes on.`, at: extra, allowed: ['on'] } };
+      if (said.on === undefined) return { ok: true, value: reads() };
+      if (typeof said.on !== 'boolean') return no('VALUE_MALFORMED', 'on is true to let Slash read in the background, or false to have it wait for you to ask.', { at: 'on' });
+      kernel.setPref(SLASH, SLASH_READS, said.on ? null : false);
+      return { ok: true, value: reads() };
     },
   };
 }

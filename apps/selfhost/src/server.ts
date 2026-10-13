@@ -1330,6 +1330,8 @@ export async function start(options: {
         throw e;
       })),
     model: 'glm-5.3-flash',
+    /* HIS SWITCH FOR SLASH READING ON ITS OWN (ENG-A09), read each time a background ask is about to be held. */
+    reads: () => api.kernel.prefsOf('slash')['slash.reads'] !== false,
   });
   /* AND WHAT ANSWERS THE RECORD'S MODEL JOBS, a pattern's draft and a digest's prose, from the same config and the same
      Slash SQLite, whose `slash_call` table the background allowance is counted out of (`@braindog/host/model-jobs`).
@@ -1527,6 +1529,8 @@ export async function start(options: {
           store: slashSql,
           /* WHETHER SLASH'S MODEL ANSWERS: while it does not, the jobs wait with their attempts kept (`model-jobs.ts`). */
           health: engineHealth,
+          /* HIS SWITCH FOR SLASH READING ON ITS OWN (ENG-A09): off, nothing is leased and no model is asked or tested. */
+          reads: () => api.kernel.prefsOf('slash')['slash.reads'] !== false,
           log: (line) => console.error('slash jobs:', line),
         });
       } catch (e) {

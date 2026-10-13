@@ -136,7 +136,7 @@
    *
    * THEY WERE THE SAMPLE'S, on every record. `held.ts` says what was offered and what the number then pointed at.
    */
-  const options = (f: FieldDecl): { value: number; label: string }[] => (f.to ? refOptions(f.to) : []);
+  const options = (f: FieldDecl): { value: number; label: string }[] => (f.to ? refOptions(f.to, typed[f.id] === '' || typed[f.id] === undefined ? null : Number(typed[f.id])) : []);
 
   const id = (f: FieldDecl) => `new-${register}-${f.id}`;
   /* The label needs an id of its own now that the segmented control points at it rather than at an

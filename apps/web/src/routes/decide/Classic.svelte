@@ -59,6 +59,7 @@
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   /* Imported here and nowhere in the layout, so the client stays out of the entry chunk. */
   import { createClient } from '@braindog/client';
+  import { doesOf as sendsSaid } from '@braindog/kernel';
   import type { Question } from '$lib/record/schema.ts';
   import { CapLine } from 'braindog-render/svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -296,6 +297,10 @@
    * WHAT ACCEPTING THE OPEN QUESTION DOES, in a line each: the arrangement's lead, what a proposal puts in place, or the
    * rows it changes; then what deciding late costs, as whoever asked wrote it. The whole of each is the tile under the
    * lead; these are its headlines, above the options that approve it.
+   *
+   * AN INSTALL THAT SENDS A KEY OUT SAYS SO HERE, in the sentence the plan sheet says before an install: the key by its
+   * label, the host and how often (the kernel's `doesOf` over the body's `calls_out` or `egress`). Turning an add-on on
+   * or off arms nothing new, and a body that carries no calls adds no line.
    */
   function doesOf(q: Question): { icon: IconName; text: string }[] {
     const out: { icon: IconName; text: string }[] = [];
@@ -306,6 +311,9 @@
     if (story) out.push({ icon: 'settings', text: story.summary ? copy.arrangeLeadSummary(story.lead, story.summary) : story.lead });
     else if (preview) for (const a of preview.appears.slice(0, 3)) out.push({ icon: 'doc', text: `${a.kind}: ${a.title}` });
     else if (set && updates.length) out.push({ icon: 'rows', text: copy.decideRows(updates.length, listName(set.register)) });
+    const about = aboutFor(q);
+    const sends = about?.kind === 'pack' && typeof about.body.install === 'string' ? sendsSaid('install', about.body) : '';
+    if (sends) out.push({ icon: 'key', text: sends });
     if (q.cost) out.push({ icon: 'clock', text: symbolText(q.cost) });
     return out;
   }

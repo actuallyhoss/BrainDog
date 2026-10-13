@@ -70,6 +70,8 @@
   import { rowReader, type Docs, type Got, type RowReader } from '$lib/record/row-live.ts';
   import { resolverOf, shownOf } from '$lib/record/row-values.ts';
   import { rowWriter, type RowWriter } from '$lib/record/rows-write.ts';
+  import { rowHref } from '$lib/record/row-href.ts';
+  import Hole from '$lib/page/Hole.svelte';
   import { linkReader, type Linked, type LinkReader } from '$lib/record/links-live.ts';
   import type { Entry, FieldDecl, Fields } from '$lib/record/schema.ts';
   import { closed, drew, opened } from '../../../../lib/ui/screen.svelte.ts';
@@ -807,10 +809,21 @@
   });
   /** A link the host cannot resolve is plain text, never a dead anchor (36 §13 D16). */
 
-  const link = (spoken: string) => {
-    const m = /^([a-z][a-z0-9_]*)#(\d+)$/.exec(spoken);
-    return m && REGISTERS[m[1]!] ? `/r/${m[1]}/${m[2]}` : null;
-  };
+  /* THE ONE HELPER A DECLARED PAGE ASKS TOO (`row-href.ts`): the row's own page where its list made one, else its screen. */
+  const link = rowHref;
+
+  /**
+   * WHAT A PRESSED HOLE DOES (`Hole.svelte`). A value this row does not hold is filled HERE, so a path that names one
+   * of its fields opens that field's box; any other hole is `Hole`'s: the place the value lives, or "Find this out".
+   */
+  let holes = $state<{ press: (path: string | null) => void }>();
+  function fillHere(path: string): boolean {
+    const head = path.trim().split('.')[0] ?? '';
+    const f = readable.find((x) => x.id === head);
+    if (!f || !row || !changes || !editable(f)) return false;
+    startEdit(f);
+    return true;
+  }
 
   /**
    * `y` COPIES THE ID AND `⇧Y` THE LINK, which is what the grid does; "Copy link" in the head's "…" copies
@@ -1232,9 +1245,12 @@
                 {#if problem}<p class="edit-why">{problem}</p>{/if}
               {:else}
                 <!-- `hole` IS WHAT MAKES A HOLE PRESSABLE. Without it the renderer draws a marked span rather than a
-                     `<button>` nobody wrote a handler for. No `dayHref`: there is no calendar in this build. A value the
-                     record cannot answer is not pressable: nobody can supply a declared figure from this screen. -->
-                <Document src={shownOf(docs?.[f.id], String(row.fields[f.id]))} opts={{ resolve: resolverOf(docs?.[f.id], String(row.fields[f.id])), link, now: clock, href: at }} />
+                     `<button>` nobody wrote a handler for, and with it a press goes to `Hole` below. No `dayHref`: no
+                     page of this record draws a calendar, so a date stays a plain figure. -->
+                <Document
+                  src={shownOf(docs?.[f.id], String(row.fields[f.id]))}
+                  opts={{ resolve: resolverOf(docs?.[f.id], String(row.fields[f.id])), link, hole: (path: string | null) => holes?.press(path), now: clock, href: at }}
+                />
               {/if}
             </article>
           </Tile>
@@ -1318,6 +1334,8 @@
       </aside>
     </div>
   </div>
+  <!-- NOTHING OF IT IS DRAWN UNTIL A HOLE IS PRESSED. Named by the row, for the link back a task it adds keeps. -->
+  <Hole bind:this={holes} row={row.seq === null ? null : { register: id, seq: row.seq }} name={String(row.fields[decl?.title ?? ''] ?? '')} mine={fillHere} />
 {/if}
 
 <style>

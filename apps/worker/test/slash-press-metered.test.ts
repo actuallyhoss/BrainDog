@@ -1,6 +1,6 @@
 /**
- * Slash's press on the Worker, held and settled in the ledger every other ask is spent from, and under the operator's
- * ceiling, carried from the record to the host that ships it.
+ * Slash's press on the Worker, held and settled in the ledger every other ask of his is spent from, and under the operator's
+ * ceiling, carried from the record to the host that ships it. The daily look it wakes is the background's and spends none of his.
  *
  * WHY THIS FILE EXISTS AFTER `packages/record/test/slash-press-cap.test.ts`. `d16d9d35` taught the record to hold a press
  * and a first plan through a `slashMeter`, and proved it with the host's `slashRecordMeter` over the package's own
@@ -89,7 +89,7 @@ test('A PRESS ON THE WORKER WRITES A LEDGER ROW AND IS REFUSED PAST THE OPERATOR
      answer), which drafts through the same `slashFile` and so is the same unmetered call. RED BEFORE THE METER WAS
      PASSED, measured: 6 binding calls under a ceiling of 3, one per press and one for the look, and the
      `call` table not even created, because nothing had built the engine that owns it. */
-  assert.equal(ai.runs(), 3, `5 presses and the daily look under a ceiling of three asks made ${ai.runs()} included calls`);
+  assert.equal(ai.runs(), 4, `5 presses and the daily look under a ceiling of three asks made ${ai.runs()} included calls`);
   const rows = c.storages
     .get(REC)!
     .sql.exec('SELECT kind, model, tokens_in, tokens_out, neurons, status, code, question FROM slash_call ORDER BY id')
@@ -98,10 +98,11 @@ test('A PRESS ON THE WORKER WRITES A LEDGER ROW AND IS REFUSED PAST THE OPERATOR
   const turned = rows.filter((r) => r.model === '-');
   assert.ok(turned.length > 0 && turned.every((r) => r.status === 'refused' && r.code === 'SLASH_BUDGET_SPENT' && r.neurons === 0), JSON.stringify(turned));
   const calls = rows.filter((r) => r.model !== '-');
-  assert.equal(calls.length, 3, JSON.stringify(rows));
-  /* ONE OF THE THREE IS THE DAILY LOOK (cloud-background-54): the Worker counts a background ask now, so the look asks
-     a model on the first press of the day and takes one of the three the ceiling lets through. */
-  assert.deepEqual(calls.map((r) => r.question).sort(), ["Slash's daily look", "Slash's press", "Slash's press"], JSON.stringify(calls));
+  assert.equal(calls.length, 4, JSON.stringify(rows));
+  /* THE THREE ARE HIS PRESSES, AND THE DAILY LOOK IS BESIDE THEM AND NOT ONE OF THEM (ceiling-split-55-56). The look asks
+     a model on the first press of the day (cloud-background-54) and was counted as one of the three the ceiling lets
+     through, so a person got two. It is a background ask, held to the ceiling over the background's own count. */
+  assert.deepEqual(calls.map((r) => r.question).sort(), ["Slash's daily look", "Slash's press", "Slash's press", "Slash's press"], JSON.stringify(calls));
   for (const r of calls) {
     assert.deepEqual([r.kind, r.model, r.status, r.code], [r.question === "Slash's daily look" ? 'pattern' : 'read', 'glm-5.3-flash', 'ok', null]);
     /* PRICED AT THE INCLUDED MODEL'S RATE, the one the package prices the door's asks at, never 0. */
@@ -117,5 +118,5 @@ test('A PRESS ON THE WORKER WRITES A LEDGER ROW AND IS REFUSED PAST THE OPERATOR
   /* AND ONE NUMBER FOR BOTH: the presses spent the month a person's read at the palette is spent from. */
   const read = (await (await c.ask('/api/slash/read', { method: 'POST', cookie, body: JSON.stringify({ question: 'What is still open?' }) })).json()) as Out;
   assert.equal(read.refusal?.code, 'SLASH_BUDGET_SPENT', JSON.stringify(read));
-  assert.equal(ai.runs(), 3, 'the read after the presses reached the binding');
+  assert.equal(ai.runs(), 4, 'the read after the presses reached the binding');
 });

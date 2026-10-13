@@ -74,10 +74,11 @@
  */
 
 import { ulids } from '@braindog/kernel';
-import type { Refusal, Result, Sql } from '@braindog/ports';
+import { codeOf, fixOf, type Refusal, type Result, type Sql } from '@braindog/ports';
 import type { SlashBackground, SlashMeter } from '@braindog/record';
 
 import { httpStatus } from './index.ts';
+import { mayThink, type Reads } from './infer.ts';
 import { backgroundMeter, BACKGROUND_JOBS_MONTH, HEADLINE_ASK, UNDERSTAND_ASK, type AskPurpose, type AskSpends } from './model-jobs.ts';
 import { slashBaseUrlOf, slashKeySave } from './slash.ts';
 import { VAULT_HEADERS } from './vault.ts';
@@ -613,6 +614,11 @@ export type SlashLedgerDeps = {
   model: string;
   /** Neurons per million tokens where this host's own account pays for that model. Absent, the row is priced at 0. */
   rate?: { in: number; out: number } | undefined;
+  /**
+   * His switch for background reading (`infer.ts` `mayThink`), read before a background ask is held. Absent is on. His
+   * own press and first plan never read it.
+   */
+  reads?: Reads | undefined;
 };
 
 /**
@@ -790,8 +796,14 @@ export function slashRecordMeter(deps: SlashLedgerDeps): SlashRecordMeter {
      * held to the headlines' share, and the look and a skill draft to the rest, which the model-jobs pass spends too. So a
      * month of drafts and digests cannot leave the pages without their line, nor the headlines the digests without prose.
      * `ask` is optional because a record a release behind calls `background()` for its skill drafts alone.
+     *
+     * AND ONLY WHILE HE LETS IT READ: all four are behind his one switch, asked first (`mayThink`).
      */
     async background(ask: SlashBackgroundAsk = 'skill') {
+      /* THE CONSENT RULE BEFORE THE LEDGER (ENG-A09): off, the record reads the refusal as "the rules speak" and no row
+         is written, held or turned away, because nothing was asked and no month was spent. */
+      const may = await mayThink(ask in BACKGROUND_PURPOSE ? ask : 'skill', deps.reads);
+      if (!may.ok) return { ok: false, refusal: { code: codeOf(may), fix: fixOf(may) } };
       const engine = await deps.engine();
       if (engine === undefined) return { ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'Slash has no ledger on this host to count the draft in.' } };
       const status = engine.status() as { tier?: unknown; model?: unknown } | undefined;

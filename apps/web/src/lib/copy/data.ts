@@ -44,6 +44,10 @@ export const data = {
      and once it is added up, as of which day's rates. */
   figureNoHome: 'In more than one currency. Choose a home currency in Money’s settings to add them up.',
   figureNoRate: (pairs: string) => `Not added up yet: there is no rate from ${pairs}. Add one to Exchange rates.`,
+  /* PART OF IT WAS ADDED UP, so this never says none of it was: the least the whole can be, and each pair the rest
+     waits on, the last after "or". */
+  figureAtLeast: (amount: string, pairs: readonly string[]) =>
+    `At least ${amount} here; no rate from ${pairs.length > 1 ? `${pairs.slice(0, -1).join(', ')} or ${pairs[pairs.length - 1]}` : (pairs[0] ?? '')} for the rest.`,
   figureConvertedForward: (day: string) => `Converted at rates as of ${day}, the first after some of these amounts.`,
   figureConvertedStale: (day: string) => `Converted at rates as of ${day}. Update the rates for a current figure.`,
   /** A target declared in one currency, said in the one the figure was converted into. */

@@ -213,6 +213,9 @@ function renderInline(nodes: Inline[], opts: RenderOptions): string {
           return `<em>${renderInline(n.body, opts)}</em>`;
         case 'link':
           return `<a href="${escape(hrefFor(opts, n.href))}">${renderInline(n.body, opts)}</a>`;
+        case 'bad':
+          // The words say what is wrong and the class repeats it in the danger colour: never colour alone.
+          return `<span class="bad">${renderInline(n.body, opts)}</span>`;
         case 'path':
           /* A PATH THAT NAMES NOTHING IS THE AUTHOR'S TEXT, DOTTED, like any token that was not one: no value will
              ever come, so it is no hole and has no dash (P.252). Only prose reaches here with one; a chip, a tile and

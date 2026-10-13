@@ -26,6 +26,7 @@ import { hueOf, iconFor, setupSaid, whoDid, type NavEntry } from './api.ts';
 import { homeOf, learnHome, learnMoney } from './api.ts';
 import { currencyOf } from './money.ts';
 import { learnPages, REGISTERS } from './held.ts';
+import { learnRowPages } from './row-href.ts';
 import { copy } from '../copy.ts';
 import type { Answer, SwitcherRow } from './switcher.ts';
 import { declaredOf, noteOf } from './history-live.ts';
@@ -791,6 +792,8 @@ export function layoutOf(b: Boot, implied: Implied | undefined = IMPLIED.get(b))
   /* EVERY CURRENCY THE RECORD'S MONEY IS IN, kept beside the home one (`learnHome` below), so the rates preset quotes
      them all; a shell over a refusal holds none, so the last record's are forgotten. */
   learnMoney(drawn ? (drawn.money ?? implied?.held ?? []) : []);
+  /* AND THE PAGES A TEMPLATE MADE FOR A ROW, so a `ref:` opens the row's own page where it has one (`row-href.ts`). */
+  learnRowPages(drawn ? b.pages : []);
   const waits = waitsOf(b);
   const person = b.me?.person ?? null;
   const level = b.me?.level ?? 'read';

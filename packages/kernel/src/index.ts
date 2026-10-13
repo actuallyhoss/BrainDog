@@ -479,7 +479,7 @@ export type { MeetArgs, Met, MetRow, ResolveJob, ResolveSide } from './people.ts
 export type { MeetsFields, OrgFields, RatesFields } from './roles.ts';
 /* THE IDENTITY KEYS (`identity-keys.ts`), for every door that reads who something is about: one normaliser, so a key
    the CLI harvests from a commit and one the record holds are the same string. */
-export { KEY_KINDS, PUBLIC_MAIL, githubOfAddress, isMachineIdentity, isOrganisationAddress, isPublicMail, keyFrom, keyOf, keyOfAny, keysOf, kindOfKey, parseFrom, registrable, valueOfKey } from './identity-keys.ts';
+export { KEY_KINDS, PUBLIC_MAIL, bankKey, githubOfAddress, isMachineIdentity, isOrganisationAddress, isPublicMail, keyFrom, keyOf, keyOfAny, keysOf, kindOfKey, parseFrom, payeeName, registrable, valueOfKey } from './identity-keys.ts';
 export type { IdentitySaid, KeyInput, KeyKind } from './identity-keys.ts';
 export { nameKey, noteMention } from './entities.ts';
 export { CEILING, CLIENT_KINDS, SCOPES, ceilingOf, DEFAULT_DAYS as TOKEN_DAYS } from './token.ts';
@@ -6592,6 +6592,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     note: (entry, actor, text, batch) =>
       void appendEvent({ kind: 'note', target: entry.id, register: entry.register, actor, note: text, at: instant(clock.now()), batch }),
     stateOf: (register) => registers.get(register)?.state ?? null,
+    doneOf: (register) => registers.get(register)?.done ?? [],
     schedule: (key, payload, pending) => marker(sql, mint, clock.now(), key, payload, pending),
     /* A RULE THAT RUNS A CALL QUEUES IT HERE, inside the write's transaction, so a write that rolls back sends nothing. */
     call: (ingest, f) =>

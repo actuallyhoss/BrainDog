@@ -48,6 +48,7 @@
   import SlashAsks from '$lib/ui/SlashAsks.svelte';
   import SlashModel from '$lib/ui/SlashModel.svelte';
   import SlashDaily from '$lib/ui/SlashDaily.svelte';
+  import SlashReads from '$lib/ui/SlashReads.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
@@ -609,6 +610,8 @@
 <SlashModel owner={anOwner} />
 <!-- SLASH LOOKING ON ITS OWN is the owner's choice, beside the agents they let in. -->
 <SlashDaily link />
+<!-- WHAT SLASH READS ON ITS OWN, and what a model is sent: the one switch for it, and the paragraph that says so. -->
+<SlashReads />
 
 <style>
   /* THE CONNECTED TILE'S ROWS: the face or the 32px well, the name over what is known about it, what it can

@@ -135,7 +135,7 @@ export function feedCased(text: string): string {
 export function feedCasedNodes(nodes: readonly Inline[]): Inline[] {
   return nodes.map((n) => {
     if (n.type === 'text') return { ...n, text: feedCased(n.text) };
-    if (n.type === 'strong' || n.type === 'em' || n.type === 'link') return { ...n, body: feedCasedNodes(n.body) };
+    if (n.type === 'strong' || n.type === 'em' || n.type === 'link' || n.type === 'bad') return { ...n, body: feedCasedNodes(n.body) };
     return n;
   });
 }

@@ -1199,6 +1199,16 @@
     cursor: pointer;
   }
 
+  /* THE RED PHRASE (`{{bad:...}}`): the words in a sentence that say something is late or wrong. It is the deeper
+     red solved for words, `--danger-text`, the same one `bad`'s `--tone` reads above, and never the working accent.
+     AND IT IS HEAVIER, because working and late are both red now (DIRECTION §42) and colour is never the only mark:
+     the weight is what someone who cannot tell the two reds apart reads. No wash and no underline, so it is not
+     taken for a hole or a link. */
+  .bad {
+    color: var(--danger-text);
+    font-weight: 600;
+  }
+
   .evidence {
     padding: 1px var(--sp-1);
     border-radius: 3px;

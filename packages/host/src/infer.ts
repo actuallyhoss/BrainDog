@@ -17,7 +17,8 @@
  * it: a question he sent to his provider is not sent on to the operator's model because his provider was slow.
  */
 
-import { no, type Clock, type Refusal, type Result, type Sql } from '@braindog/ports';
+import { looksLikeCredential } from '@braindog/kernel';
+import { no, ok, type Clock, type Refusal, type Result, type Sql } from '@braindog/ports';
 
 /** Whose monthly allowance a row spends; `@braindog/slash`'s `Spends`, restated because this package imports no engine. */
 export type InferSpends = 'person' | 'background' | 'none';
@@ -46,6 +47,87 @@ export const PURPOSES = {
 } as const satisfies Record<string, { spends: InferSpends; class: ModelClass }>;
 
 export type InferPurpose = keyof typeof PURPOSES;
+
+/* ── The consent rule (ENG-A09) ───────────────────────────────────────────────────────────────── */
+
+/**
+ * The one switch for all background reading, as the host hands it in: his own pref, `slash.reads`, read when it is asked
+ * and never kept. ABSENT IS ON, which is the default he was told and the record's own.
+ */
+export type Reads = () => boolean | Promise<boolean>;
+
+/** The pref the switch is, named on the refusal so a screen can point at it. */
+export const READS_PREF = 'slash.reads';
+
+/* IN THE SWITCH'S OWN WORDS (`apps/web/src/lib/record/slash-reads.ts`): Slash reads on its own, or it does not. */
+const READS_OFF = 'Slash reading on its own is switched off, so nothing was sent to a model and its rules do the work. Turn it on in Settings, under Agents.';
+const READS_UNREAD = 'Whether Slash may read on its own could not be read, so nothing was sent to a model and its rules do the work.';
+
+/**
+ * Whether an ask for `purpose` may be sent, asked BEFORE anything is held in the ledger or leased from the queue.
+ *
+ * HIS OWN ASK IS HIS OWN ACT. A purpose that spends `person`, or nobody's month, is answered yes without the switch being
+ * read, so no fault in reading it can hold a question he pressed Enter on. Every purpose that spends `background` is his
+ * to switch off, all of them by the one switch (RQ-ENG-168: a switch per job is this switch, listed).
+ *
+ * A SWITCH THAT CANNOT BE READ SENDS NOTHING. Consent that is not known is not consent, and the rules do the work until
+ * the read mends.
+ */
+export const mayThink = async (purpose: InferPurpose, reads?: Reads): Promise<Result<true>> => {
+  if (PURPOSES[purpose].spends !== 'background' || reads === undefined) return ok(true as const);
+  let on: boolean;
+  try {
+    on = await reads();
+  } catch {
+    return no<true>('FORBIDDEN', READS_UNREAD, { at: READS_PREF });
+  }
+  return on ? ok(true as const) : no<true>('FORBIDDEN', READS_OFF, { at: READS_PREF });
+};
+
+/** What is never sent to a model, whoever asks and whatever the switch says. */
+export type NeverSent = 'sealed' | 'key' | 'bytes';
+
+/** A file's bytes written as text: a `data:` address in base64, alone or inside a longer text (a picture in a mail's body). */
+const DATA_BYTES = /\bdata:[\w/+.;=-]{0,120};base64,[A-Za-z0-9+/]{16}/u;
+/** How deep a payload is walked. A digest is three levels and a sample two; deeper than this is not a job's fields. */
+const WALK_DEPTH = 12;
+
+/**
+ * The first thing in `what` that is never sent, or `null` when it holds none: the fields a job needs and nothing else.
+ *
+ * `sealed` IS A SECRET FIELD AS THE RECORD READS ONE (`{ sealed: true, opened, ... }`, what is known of its grant) or a
+ * safe's `ciphertext`. `key` is a text the kernel would refuse to store as a key (`looksLikeCredential`), so the two can
+ * never disagree about what one looks like. `bytes` is a buffer, a view of one, or a `data:` address.
+ *
+ * IT ANSWERS WHICH AND NEVER WHERE OR WHAT, so no caller can quote the value into a log by quoting the answer.
+ */
+export const neverSent = (what: unknown, depth = 0): NeverSent | null => {
+  if (typeof what === 'string') return DATA_BYTES.test(what) ? 'bytes' : looksLikeCredential(what) ? 'key' : null;
+  if (typeof what !== 'object' || what === null) return null;
+  if (what instanceof ArrayBuffer || ArrayBuffer.isView(what)) return 'bytes';
+  /* TOO DEEP TO BE READ IS NOT SENT: a payload this file cannot vouch for is treated as the worst it could hold. */
+  if (depth >= WALK_DEPTH) return 'sealed';
+  if (!Array.isArray(what) && ((what as { sealed?: unknown }).sealed === true || 'ciphertext' in what)) return 'sealed';
+  for (const value of Array.isArray(what) ? what : Object.values(what)) {
+    const found = neverSent(value, depth + 1);
+    if (found !== null) return found;
+  }
+  /* A NAME IS READ AS A VALUE IS, as the kernel's own walk reads one (`coerce.ts` `holdsKey`): a key filed as a field's name. */
+  if (!Array.isArray(what) && Object.keys(what).some(looksLikeCredential)) return 'key';
+  return null;
+};
+
+const NEVER_SENT: Record<NeverSent, string> = {
+  sealed: 'It holds a sealed field, and a sealed field is never sent to a model, so nothing was asked.',
+  key: 'It holds what looks like a key, and a key is never sent to a model, so nothing was asked.',
+  bytes: "It holds a file's bytes, and a file's bytes are never sent to a model, so nothing was asked.",
+};
+
+/** `what`, where all of it may be sent, and a refusal that says which rule held it where it may not. */
+export const sendable = <T>(what: T): Result<T> => {
+  const found = neverSent(what);
+  return found === null ? ok(what) : no<T>('FORBIDDEN', NEVER_SENT[found], { at: found });
+};
 
 /** `@braindog/slash`'s `Tier`, as the ledger's CHECK spells it: `a` the included model, `b` his key, `byo` a self-host's endpoint. */
 export type InferTier = 'a' | 'b' | 'byo';
@@ -249,6 +331,8 @@ export type InferDeps = {
   ledger: InferLedger;
   /** Told once when a candidate is marked down for a day, so the host can mail its operator. Never awaited. */
   notServed?: ((candidate: Candidate, raw: string | undefined) => void) | undefined;
+  /** His switch for background reading (`mayThink`). Absent is on. */
+  reads?: Reads | undefined;
 };
 
 /** One attempt, in the order they were made. */
@@ -287,6 +371,8 @@ const USED_UP = {
  * AN ASK IS COUNTED ONCE. The first attempt a model served is charged to the purpose's allowance, and every attempt
  * after it says `none`; an attempt no model answered spends nothing by the ledger's own rule.
  *
+ * A BACKGROUND ASK IS HIS TO SWITCH OFF (`mayThink`), and a refused one walks no route and writes no row.
+ *
  * A KEY THAT WILL NOT OPEN IS THROWN ON AS THE HOST THREW IT, with the hold given back and no row: nothing was sent, and
  * the callers that already say so in their own words keep doing it (`engine-health.ts` reads that from the vault).
  */
@@ -302,6 +388,9 @@ export const infer = async <T extends Reply>(purpose: InferPurpose, call: InferC
     tries,
     whose,
   });
+  /* THE CONSENT RULE FIRST (ENG-A09): off, no candidate is asked and no row is held, and nobody has anything to fix. */
+  const may = await mayThink(purpose, deps.reads);
+  if (!may.ok) return end(may as Result<never>, null, null, null);
   if (route.candidates.length === 0)
     return end(
       no<T>('NOT_IN_THIS_BUILD', 'This host has no model for this, so nothing was asked. The repair is a deploy of a host that serves one, not an edit.', { at: 'model' }),

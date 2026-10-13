@@ -44,7 +44,7 @@ const agent = (): CallContext => ({
 });
 
 type Standing = {
-  agents: { agent: string; kinds: { kind: string; rung: string; since: string; lifted: boolean; dropped: { at: string; why: string | null } | null }[] }[];
+  agents: { agent: string; connected: string | null; kinds: { kind: string; rung: string; since: string; lifted: boolean; dropped: { at: string; why: string | null } | null }[] }[];
 };
 
 /** A record whose clock the test moves, with three grants: one at work, one connected and unused, one revoked. */
@@ -106,7 +106,7 @@ test('TRUST ANSWERS EACH AGENT BY NAME WITH ITS KINDS IN WORDS: one climbed, one
     { kind: 'mark tasks done', rung: 'ask', since: iso(NOW + 3 * HOUR), lifted: false, dropped: { at: iso(NOW + 3 * HOUR), why: 'A change like this was undone.' } },
   ]);
   /* AN AGENT WITH NO RUNG YET HAS NO KIND TO NAME: everything it does asks. */
-  assert.deepEqual(said.agents[1], { agent: 'Cursor', kinds: [] });
+  assert.deepEqual(said.agents[1], { agent: 'Cursor', connected: '2026-10-01T00:00:00.000Z', kinds: [] });
   sql.close();
 });
 
@@ -131,7 +131,7 @@ test('THREE DECLINES IN A ROW SAY SO, and reading where agents stand writes noth
   sql.close();
 });
 
-test('TRUST IS THE WHOLE RECORD\'S: a caller held to some lists is refused, and an agent that reads everything may ask', async () => {
+test('TRUST IS THE WHOLE RECORD\'S: a caller held to some lists is refused, and the owner\'s own agent that reads everything may ask', async () => {
   const { api, sql } = await record();
   const member: CallContext = { principal: { kind: 'person', id: 'p_2', level: 'read' }, registers: ['tasks'] };
   const refused = (await api.trust(undefined, member)) as { ok: boolean; refusal?: { code: string } };
@@ -153,5 +153,82 @@ test('A KEY THAT IS NOT AN AGENT IS NOT LISTED: a running job\'s bearer and a re
     ['Claude Code', 'Cursor'],
   );
   assert.doesNotMatch(JSON.stringify(said), /job:|report:|01JZ8QK3/u, 'no id reaches what a person reads');
+  sql.close();
+});
+
+test('TRUST IS THE OWNER\'S: a colleague who reads or decides over every list is refused, and so is a grant of theirs', async () => {
+  const { api, sql } = await record();
+  const refused = async (ctx: CallContext, why: string, code = 'FORBIDDEN') => {
+    const out = (await api.trust(undefined, ctx)) as { ok: boolean; refusal?: { code: string; fix: string } };
+    assert.equal(out.ok, false, why);
+    assert.equal(out.refusal?.code, code, why);
+    return out.refusal!.fix;
+  };
+  /* EVERY LEVEL UNDER OWNER, WITH NOTHING NARROWING IT: the whole record is read, and the agents are still not theirs. */
+  for (const level of ['read', 'write', 'decide'] as const) {
+    const fix = await refused({ principal: { kind: 'person', id: 'p_2', level }, credentialed: true }, `a person invited to ${level}`);
+    assert.match(fix, /owner/u, 'the sentence says whose it is');
+    assert.doesNotMatch(fix, /part of it|—/u, 'and does not say they are held to part of a record they read whole');
+  }
+  /* A LEVEL THAT DOES NOT READ AT ALL is stopped a step earlier, by the read every method of this group asks for. */
+  await refused({ principal: { kind: 'person', id: 'p_2', level: 'append' }, credentialed: true }, 'a person invited to add only', 'LEVEL_REQUIRED');
+  assert.equal(((await api.trust(undefined, { principal: { kind: 'person', id: 'p_2', level: null } })) as { ok: boolean }).ok, false, 'a person with no level on the record');
+  await refused({ principal: { kind: 'token', id: 't_theirs', scope: 'write', person: 'p_2', level: 'decide' } }, 'a grant a colleague made');
+  /* AN OWNER HELD TO SOME LISTS IS STILL HELD TO PART OF IT, and is told that. */
+  assert.match(await refused({ principal: { kind: 'person', id: 'p_1', level: 'owner' }, registers: ['tasks'] }, 'an owner narrowed to one list'), /part of it/u);
+  /* THE OWNER, EVERY LIST: in person, named as every list, and through a grant of their own. */
+  assert.equal(value<Standing>(await api.trust(undefined, owner)).agents.length, 2);
+  assert.equal(value<Standing>(await api.trust(undefined, { ...owner, registers: '*' })).agents.length, 2);
+  assert.equal(value<Standing>(await api.trust(undefined, agent())).agents.length, 2);
+  sql.close();
+});
+
+test('TWO GRANTS OF ONE NAME ARE TOLD APART: the later one carries a number, and each keeps its own kinds', async () => {
+  const { api, sql } = await record();
+  const grant = (id: string, label: string | null, at: string) =>
+    sql.exec("INSERT INTO token (id, person_id, hash, scope, label, created_at) VALUES (?, 'p_1', ?, 'write', ?, ?)", id, `h_${id}`, label, at);
+  grant('t_laptop', 'claude  code', '2026-10-03T00:00:00.000Z');
+  grant('t_named', 'Claude Code 2', '2026-10-04T00:00:00.000Z');
+  grant('t_third', 'Claude Code', '2026-10-05T00:00:00.000Z');
+  grant('t_slash', 'Slash', '2026-10-05T01:00:00.000Z');
+  grant('t_bare', null, '2026-10-05T02:00:00.000Z');
+  grant('t_blank', '  ', '2026-10-05T03:00:00.000Z');
+  const since = '2026-10-05T12:00:00.000Z';
+  sql.exec("INSERT INTO ladder (agent, kind, rung, accepted_unchanged, since) VALUES ('t_claude', 'tasks:add', 'tell', 0, ?)", since);
+  sql.exec("INSERT INTO ladder (agent, kind, rung, accepted_unchanged, since) VALUES ('t_laptop', 'tasks:edit', 'ask', 0, ?)", since);
+
+  const said = value<Standing>(await api.trust(undefined, owner));
+  assert.deepEqual(
+    said.agents.map((a) => [a.agent, a.connected]),
+    [
+      ['Claude Code', '2026-10-01T00:00:00.000Z'],
+      ['Cursor', '2026-10-01T00:00:00.000Z'],
+      /* THE SAME NAME HOWEVER IT WAS TYPED, numbered past the grant that is named "Claude Code 2" itself. */
+      ['claude  code 3', '2026-10-03T00:00:00.000Z'],
+      ['Claude Code 2', '2026-10-04T00:00:00.000Z'],
+      ['Claude Code 4', '2026-10-05T00:00:00.000Z'],
+      /* SLASH IS SLASH'S NAME, whether or not Slash is listed yet. */
+      ['Slash 2', '2026-10-05T01:00:00.000Z'],
+      ['Your agent', '2026-10-05T02:00:00.000Z'],
+      ['Your agent 2', '2026-10-05T03:00:00.000Z'],
+    ],
+  );
+  const names = said.agents.map((a) => a.agent.replace(/\s+/gu, ' ').toLowerCase());
+  assert.equal(new Set(names).size, names.length, 'no two agents read alike');
+  const kinds = (name: string) => said.agents.find((a) => a.agent === name)!.kinds.map((k) => `${k.kind}: ${k.rung}`);
+  assert.deepEqual(kinds('Claude Code'), ['add tasks: tell'], 'the first keeps its own rung');
+  assert.deepEqual(kinds('claude  code 3'), ['change tasks: ask'], 'and the second keeps its own');
+  assert.doesNotMatch(JSON.stringify(said), /t_laptop|t_third|t_claude/u, 'told apart by a number and a date, never a grant id');
+
+  /* SLASH WITH A RUNG IS LISTED LAST UNDER ITS OWN NAME, and the grant named after it keeps the number it had. */
+  sql.exec("INSERT INTO ladder (agent, kind, rung, accepted_unchanged, since) VALUES ('slash', 'tasks:add', 'tell', 0, ?)", since);
+  const withSlash = value<Standing>(await api.trust(undefined, owner)).agents;
+  assert.equal(withSlash.length, said.agents.length + 1);
+  assert.deepEqual({ agent: withSlash.at(-1)!.agent, connected: withSlash.at(-1)!.connected }, { agent: 'Slash', connected: null });
+  assert.deepEqual(
+    withSlash.slice(0, -1).map((a) => a.agent),
+    said.agents.map((a) => a.agent),
+    'no grant changed its name when Slash arrived',
+  );
   sql.close();
 });

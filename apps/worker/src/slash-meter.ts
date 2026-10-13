@@ -10,8 +10,9 @@
  *
  * THE ENGINE IS `workerSlashEngine`, SO THE OPERATOR'S CEILING IS WHAT `status()` READS. On the included model that engine
  * is wrapped in `operatorCeiling`, whose `status()` names the ceiling's count and cap wherever the ceiling binds, and whose
- * count is every `call` row this month with a model's name: the meter's hold row carries `glm-5.3-flash`, so a press
- * spends the same asks a read and an automation's question do. One more engine over the same two tables, as the door and
+ * count is every `call` row of his this month with a model's name: the meter's hold row carries `glm-5.3-flash`, so a press
+ * spends the same asks a read and an automation's question do. A background ask's row is not one of his and is counted
+ * apart (`slash.ts` `callsMade`). One more engine over the same two tables, as the door and
  * `workerSlashAnswers` already are; it holds nothing of its own between asks.
  *
  * PRICED ONLY WHERE THE OPERATOR PAYS. On the included model every call is Workers AI on his account, so the row is
@@ -32,7 +33,7 @@ import type { Result, Sql } from '@braindog/ports';
 import type { RecordApi, SlashMeter } from '@braindog/record';
 import { SLASH_DAYS, type SlashDay, type SlashTally } from '@braindog/record/directory';
 
-import { includedCeilingReached, includedInference, workerSlashEngine, type SlashEngineDeps, type SlashEnv } from './slash.ts';
+import { HIS_CALL, includedCeilingReached, includedInference, workerSlashEngine, type SlashEngineDeps, type SlashEnv } from './slash.ts';
 
 /** The routing name the package's own tier `a` rows carry, and so the one the ceiling and `status()` count under. */
 const INCLUDED_MODEL = 'glm-5.3-flash';
@@ -45,7 +46,16 @@ function meterBuilder(env: SlashEnv, api: () => RecordApi, deps: SlashEngineDeps
       const engine = await workerSlashEngine(env, api, deps);
       const included = includedInference(env) !== undefined;
       const rate = engine !== undefined && included ? (await import('@braindog/slash')).MODELS[INCLUDED_MODEL] : undefined;
-      return slashRecordMeter({ sql: deps.sql, clock: deps.clock, engine: async () => engine, model: INCLUDED_MODEL, rate });
+      return slashRecordMeter({
+        sql: deps.sql,
+        clock: deps.clock,
+        engine: async () => engine,
+        model: INCLUDED_MODEL,
+        rate,
+        /* HIS SWITCH FOR SLASH READING ON ITS OWN (ENG-A09), read each time a background ask is about to be held: off,
+           no row is written and no model is asked. The record keeps it as Slash's own pref (`slashReads`). */
+        reads: () => api().kernel.prefsOf('slash')['slash.reads'] !== false,
+      });
     })().catch((e: unknown) => {
       built = null;
       throw e;
@@ -76,8 +86,10 @@ const WAITS = {
  * AND UNDER THE OPERATOR'S CEILING FIRST, which that `background` does not read: it counts the month's own allowance, so
  * handed to the record bare it let the daily look reach the binding at a ceiling of 0 (`test/slash-ceiling-all.test.ts`),
  * and for that the meter once had no `background` at all and the record answered that this host could not count one, on
- * every Cloud record. Where the ceiling has turned the month's calls on the included model away, nothing is held and
- * nothing is asked, as `workerUnderstandLedger` does for its own kind. On his own key there is no ceiling of the
+ * every Cloud record. THE CEILING IS HELD AGAINST THE BACKGROUND'S OWN CALLS (`includedCeilingReached`), never his and
+ * never his against these: a look once took one of the three asks a ceiling of three gave a person, and his asks spent
+ * turned the look away. Where the background's calls have reached the ceiling, nothing is held and nothing is asked, as
+ * `workerUnderstandLedger` does for its own kind. On his own key there is no ceiling of the
  * operator's, and only the share binds. A call it lets through is still held to the worst ask the ceiling counts it at (`slash.ts` `recordAskMost`).
  */
 export function workerSlashMeter(env: SlashEnv, api: () => RecordApi, deps: SlashEngineDeps): SlashMeter {
@@ -96,8 +108,8 @@ export function workerSlashMeter(env: SlashEnv, api: () => RecordApi, deps: Slas
  * The ledger the model-jobs pass's reading of who is who is held in (`slash-jobs.ts`, `understandingOver`): one
  * background ask under `UNDERSTAND_ASK`, from the understanding share of the month.
  *
- * AND UNDER THE OPERATOR'S CEILING TOO, which `background` alone does not read. Where it has turned the month's calls on
- * the included model away, nothing is held and nothing is asked. His own `ask_cap` does not bind it, as it binds no
+ * AND UNDER THE OPERATOR'S CEILING TOO, which `background` alone does not read, counted over the background's own calls.
+ * Where they have reached it, nothing is held and nothing is asked. His own `ask_cap` does not bind it, as it binds no
  * background ask: on his own key there is no ceiling of the operator's, and only the share binds.
  */
 export function workerUnderstandLedger(env: SlashEnv, api: () => RecordApi, deps: SlashEngineDeps): UnderstandLedger {
@@ -116,35 +128,50 @@ export function workerUnderstandLedger(env: SlashEnv, api: () => RecordApi, deps
 const DAY_MS = 86_400_000;
 const dayOf = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
 
+/** One day of this record's asks with the background's counted beside his: `SlashDay`, and how many of the day's calls were the record's own. */
+export type SlashDayApart = SlashDay & { background: number };
+
 /**
  * This record's Slash asks by UTC day, over the last `SLASH_DAYS` days up to today, from its own `slash_call`: the rows
  * the Directory's `meterSlash` takes.
  *
- * AN ASK IS A CALL SLASH MADE TO A MODEL, of any kind and on any tier, as the record's own ledger counts it, and not an
- * embedding, which answers nothing anybody asked. `model <> '-'` passes over the rows that reached no model, as the
- * package's `asksUsed` does, and a hold still `SLASH_PENDING` waits for the night after it settles. The neurons are what
- * each row was priced at, which is 0 on the owner's own key, where nothing of the operator's is spent.
+ * AN ASK IS A CALL A PERSON OR HIS AUTOMATIONS HAD SLASH MAKE TO A MODEL, on any tier, and not an embedding, which answers
+ * nothing anybody asked. `model <> '-'` passes over the rows that reached no model, as the package's `asksUsed` does, and
+ * a hold still `SLASH_PENDING` waits for the night after it settles.
+ *
+ * THE BACKGROUND'S CALLS ARE COUNTED APART, in `background`: the daily look, a skill draft, the pages' headlines and the
+ * reading of who is who, which the row says itself (`slash.ts` `HIS_CALL`: `spends`, and `purpose` where an attempt spent nobody's). They were summed into `asks`, so the
+ * account showed a person asks he never made. THE NEURONS ARE STILL BOTH, because that is what the day cost the operator:
+ * what each row was priced at, which is 0 on the owner's own key, where nothing of the operator's is spent.
  *
  * NO `slash_call` IS NO ASKS. A record whose Slash never ran has no table, and that is an empty list, not a failure; any
- * other error is thrown for the caller to say. One read, walking this record's rows since the window began.
+ * other error is thrown for the caller to say. A LEDGER WITH NO `spends` YET, which an older build wrote and no engine
+ * has opened since, holds no background row at all (the column and the background ask came together), so every call in
+ * it is his. One read, walking this record's rows since the window began.
  */
-export function slashDays(sql: Pick<Sql, 'all'>, now: number): SlashDay[] {
+export function slashDays(sql: Pick<Sql, 'all'>, now: number): SlashDayApart[] {
   const from = dayOf(now - (SLASH_DAYS - 1) * DAY_MS);
   const to = dayOf(now);
-  try {
-    return sql
-      .all<{ day: string; asks: number | null; neurons: number | null }>(
-        `SELECT substr(ts, 1, 10) AS day, SUM(CASE WHEN kind <> 'embed' THEN 1 ELSE 0 END) AS asks, SUM(neurons) AS neurons
+  const read = (background: string): SlashDayApart[] =>
+    sql
+      .all<{ day: string; asks: number | null; background: number | null; neurons: number | null }>(
+        `SELECT substr(ts, 1, 10) AS day,
+                SUM(CASE WHEN kind <> 'embed' AND NOT (${background}) THEN 1 ELSE 0 END) AS asks,
+                SUM(CASE WHEN kind <> 'embed' AND (${background}) THEN 1 ELSE 0 END) AS background,
+                SUM(neurons) AS neurons
          FROM slash_call
          WHERE ts >= ? AND substr(ts, 1, 10) <= ? AND model <> '-' AND (code IS NULL OR code <> 'SLASH_PENDING')
          GROUP BY substr(ts, 1, 10) ORDER BY day`,
         from,
         to,
       )
-      .map((r) => ({ day: r.day, asks: Number(r.asks ?? 0), neurons: Number(r.neurons ?? 0) }));
+      .map((r) => ({ day: r.day, asks: Number(r.asks ?? 0), neurons: Number(r.neurons ?? 0), background: Number(r.background ?? 0) }));
+  try {
+    return read(`NOT ${HIS_CALL}`);
   } catch (e) {
-    if (/no such table/iu.test(e instanceof Error ? e.message : String(e))) return [];
-    throw e;
+    if (/no such table/iu.test(said(e))) return [];
+    if (!/no such column: (spends|purpose)/iu.test(said(e))) throw e;
+    return read('0');
   }
 }
 

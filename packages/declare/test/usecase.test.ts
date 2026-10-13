@@ -217,7 +217,8 @@ test('EVERY FIRST-PARTY LIST A PERSON NAMES HAS ITS WORDS, and each word table n
   const lists = Object.values(MODULE_LISTS).flatMap((m) => m.lists);
   /* AND `organisations`, People's since 3.0.0: words for it would give every use case with People two more settings and
      a version to bump, so it keeps its own. */
-  assert.deepEqual(lists.filter((l) => !Object.hasOwn(MODULE_WORDS, l)).sort(), ['balances', 'fx', 'organisations', 'snapshots']);
+  /* AND `filing_rules`, Money's since 3.17.0: a list a person keeps and no use case renames, for the same reason. */
+  assert.deepEqual(lists.filter((l) => !Object.hasOwn(MODULE_WORDS, l)).sort(), ['balances', 'filing_rules', 'fx', 'organisations', 'snapshots']);
   assert.deepEqual(Object.keys(MODULE_WORDS).filter((l) => !lists.includes(l)), []);
 });
 

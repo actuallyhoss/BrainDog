@@ -256,22 +256,34 @@ const WHOLE: readonly Whole[] = [
 
 /*
  * A THING SAID NOT TO BE HAD: "no orders", "not a shop", "without invoices", "I don't take orders", "I never had
- * orders", "I no longer take any orders", "I haven't got invoices". The word of refusal comes straight before the phrase,
- * with at most three small words between, and then only words that say how big a place is (`PLAIN`), so "no late
- * orders" and "I don't want to lose my orders" are still orders.
+ * orders", "I no longer take any orders", "I haven't got invoices". The word of refusal comes before the phrase, with at
+ * most five small words between, and then only words that say how big a place is (`PLAIN`), so "no late orders" and
+ * "I don't want to lose my orders" are still orders.
+ *
+ * THE SMALL WORDS ARE THE ORDINARY VERBS OF HAVING AND DOING A THING (`DOES`), so a refusal is read through them: "I do
+ * not want to track taxes", "I never send invoices", "I don't want to keep track of orders", "I don't need to chase
+ * invoices". A verb that is not one of them keeps the thing, since losing an order is not having none.
  */
+const REFUSES = "no|not|never|without|zero|don['’]?t|do\\s+not|doesn['’]?t|does\\s+not|haven['’]?t|hasn['’]?t|hadn['’]?t";
+const DOES = 'to|have|take|get|do|sell|keep|need|want|track(?:\\s+of)?|run|own|send|use|chase';
 const NOT = new RegExp(
-  `(?:^|[^\\p{L}\\p{N}])(?:no|not|never|without|zero|don['’]?t|do\\s+not|doesn['’]?t|does\\s+not|haven['’]?t|hasn['’]?t|hadn['’]?t)\\s+(?:(?:any|more|longer|ever|have|had|got|take|get|do|sell|keep|need|want|track|run|own|a|an|the)\\s+){0,3}(?:(?:${[...PLAIN].join('|')})\\s+)*$`,
+  `(?:^|[^\\p{L}\\p{N}])(?:${REFUSES})\\s+(?:(?:any|more|longer|ever|had|got|${DOES}|a|an|the)\\s+){0,5}(?:(?:${[...PLAIN].join('|')})\\s+)*$`,
   'iu',
 );
+/* A name never opens with a word of refusal: "Don't need orders, I freelance" names nobody (`who`). */
+const OPENS_REFUSING = new RegExp(`^(?:${REFUSES})(?![\\p{L}\\p{N}'’])`, 'iu');
 
 type Said = { at: number; text: string };
 
 /*
  * WHAT JOINS THE NEXT THING TO THE ONE BEFORE: a comma, "and", "or", "nor", then at most a small word and words of size.
- * `AND_OR` is the "and" or "or" a run of commas ends in, looked for after a thing that follows a bare comma.
+ * `AND_OR` is the "and" or "or" a run of commas ends in, looked for after a thing that follows a bare comma. The third
+ * group is the verbs of having and doing said after the join ("or take orders"), which only "or" and "nor" carry past.
  */
-const JOINED = new RegExp(`(?:\\s*,\\s*(?:(and|or|nor)\\s+)?|\\s+(and|or|nor)\\s+)(?:(?:any|a|an|the|my|our)\\s+)?(?:(?:${[...PLAIN].join('|')})\\s+)*$`, 'iu');
+const JOINED = new RegExp(
+  `(?:\\s*,\\s*(?:(and|or|nor)\\s+)?|\\s+(and|or|nor)\\s+)((?:(?:${DOES})\\s+){1,4})?(?:(?:any|a|an|the|my|our)\\s+)?(?:(?:${[...PLAIN].join('|')})\\s+)*$`,
+  'iu',
+);
 const AND_OR = /^(?:\s*,\s*(?!(?:and|or|nor)\s)[\p{L}\p{N}'’-]+(?:\s+(?!(?:and|or|nor)\s)[\p{L}\p{N}'’-]+){0,2})*\s*,?\s*(and|or|nor)\s/iu;
 /* More than one of a thing, as far as its last letters say: "invoices" and "taxes", never "business". */
 const MANY = /[\p{L}]s$/iu;
@@ -285,8 +297,10 @@ const MANY = /[\p{L}]s$/iu;
  * thing in "no orders, invoices or products". "or" always carries. "and" carries to a thing there is more than one of,
  * so "I don't take orders and invoices" refuses both and "not a shop and freelance as a designer" keeps the
  * freelancing. A bare comma carries only inside a run that ends in "and" or "or", read as that word, so "no shop,
- * freelance designer" keeps the designer. Words between ("no orders, I send invoices") end the carry. `known` is every
- * phrase heard, so the thing before the join is found whole ("no study sessions or courses").
+ * freelance designer" keeps the designer. Words between ("no orders, I send invoices") end the carry, but for a verb of
+ * having or doing after "or" or "nor": "I never send invoices or take orders" refuses both, and "no invoices and take
+ * orders" keeps the orders, since "and" there starts what the person does do. `known` is every phrase heard, so the
+ * thing before the join is found whole ("no study sessions or courses").
  */
 function refusedIn(said: string, known: readonly Said[] = []): (span: Said) => boolean {
   const wholes = WHOLE.flatMap((w) => {
@@ -304,7 +318,7 @@ function refusedIn(said: string, known: readonly Said[] = []): (span: Said) => b
       word = AND_OR.exec(said.slice(to))?.[1]?.toLowerCase();
       if (word === undefined) return false;
     }
-    if (word === 'and' && (!MANY.test(said.slice(from, to)) || /ss$/iu.test(said.slice(from, to)))) return false;
+    if (word === 'and' && (join[3] !== undefined || !MANY.test(said.slice(from, to)) || /ss$/iu.test(said.slice(from, to)))) return false;
     /* THE THING BEFORE THE JOIN: a phrase heard that ends there, or failing one the single word that does. */
     const end = join.index;
     const last = /[\p{L}\p{N}'’-]+$/u.exec(before.slice(0, end));
@@ -316,6 +330,19 @@ function refusedIn(said: string, known: readonly Said[] = []): (span: Said) => b
     const [from, to] = whole(span.at, span.at + span.text.length);
     return NOT.test(said.slice(0, span.at)) || refused(from, to);
   };
+}
+
+/**
+ * WHO THE SENTENCE NAMES, and the rest of it. `who.ts` reads the words before a first comma as a name, and "Don't need
+ * orders, I freelance as a designer" names nobody: words that open with a refusal are read with the rest, so the orders
+ * are refused and nobody is called "Don't need orders". `shift` is how far the rest then starts before where `who.ts`
+ * says it does (`heardAt`), and 0 for every other sentence.
+ */
+function who(sentence: string): { name: string | null; bio: string; shift: number } {
+  const h = hear(sentence);
+  if (h.name === null || !OPENS_REFUSING.test(h.name)) return { ...h, shift: 0 };
+  const line = sentence.replace(/\s+/gu, ' ').trim();
+  return { name: null, bio: line, shift: h.bio.length - line.length };
 }
 
 /** The reading with every refused phrase taken out, and each module left with no phrase behind it gone with them. */
@@ -467,9 +494,9 @@ export function placesOf(p: Pick<Proposal, 'usecase' | 'also' | 'modules' | 'hea
 
 /** What one sentence proposes. `ctx.locale` is carried for the catalogue's reading; these rules read English. */
 export function propose(sentence: string, ctx: ProposeContext): Proposal {
-  const who = hear(sentence);
+  const name = who(sentence);
   /* THE REST OF THE SENTENCE IS READ WITHOUT THE NAME, so "Kiln, I run a studio" is not a project called Kiln. */
-  const said = who.bio;
+  const said = name.bio;
   const today = todayIn(ctx.zone);
   /* THE CATALOGUE'S SIGNALS: the bundled modules' own, and those of any other pack the caller can offer. */
   const offers = [...BUNDLED, ...(ctx.catalogue ?? []).filter((o) => !BUNDLED.some((b) => b.id === o.id))];
@@ -481,13 +508,13 @@ export function propose(sentence: string, ctx: ProposeContext): Proposal {
   const arranged = unrefusedCases(turns, no);
   const u = read.declined === 'language' ? null : arranged.pick;
   const beside = u ? alongside(arranged, u) : [];
-  const modules = modulesOf(read, said, who.name !== null, u, beside, offers);
+  const modules = modulesOf(read, said, name.name !== null, u, beside, offers);
 
   const where = heardAt(sentence);
   const heard: { at: number; line: HeardLine }[] = [];
   const line = (at: number, phrase: string, became: string, loose?: true): { at: number; line: HeardLine } => ({
     at,
-    line: { phrase, became, at: where.bio(at, phrase.length), ...(loose ? { loose } : {}) },
+    line: { phrase, became, at: where.bio(at + name.shift, phrase.length), ...(loose ? { loose } : {}) },
   });
   const phrases = read.declined === null ? read.heard : [];
   /* A PHRASE THE USE CASE CLAIMS IS THE USE CASE'S, as it is for the modules (`modulesOf`), and it is said as the lists
@@ -517,7 +544,7 @@ export function propose(sentence: string, ctx: ProposeContext): Proposal {
   }
   /* THE NAME IS THE FIRST LINE, AND IT BECOMES THEM: the first entry in People. It always comes before the rest. */
   const lines: HeardLine[] = [
-    ...(who.name !== null && where.name !== null ? [{ phrase: who.name, became: YOU, at: where.name, you: true as const }] : []),
+    ...(name.name !== null && where.name !== null ? [{ phrase: name.name, became: YOU, at: where.name, you: true as const }] : []),
     /* TWO PHRASES THAT BECAME THE SAME THING ARE ONE LINE (`fold`), before the currency is said on it. */
     ...fold(heard.filter((h) => h.line.became !== '').map((h) => h.line), sentence),
   ];
@@ -549,7 +576,7 @@ export function propose(sentence: string, ctx: ProposeContext): Proposal {
   const typed = read.declined === null ? read.currency : null;
   const currency = currencyFor(typed, modules, ctx, lines.some((h) => h.loose === true));
   const out = {
-    name: who.name,
+    name: name.name,
     usecase: u?.usecase ?? null,
     also: beside.map((b) => b.usecase),
     modules,
@@ -561,7 +588,7 @@ export function propose(sentence: string, ctx: ProposeContext): Proposal {
     currency,
     ...(typed === null && currency !== null ? { currencyBy: 'device' as const } : {}),
     rows,
-    title: titleOf(said, who.name, rows),
+    title: titleOf(said, name.name, rows),
     places: placesOf(out),
     by: 'rules',
   };
@@ -606,7 +633,7 @@ export function fromModel(reply: SetupReply, sentence: string, ctx: ProposeConte
   const known = new Set(offers.map((o) => o.id));
   const u = reply.usecase === null ? null : (useCase(reply.usecase) ?? null);
   const beside = u ? reply.also.flatMap((id) => (id === u.usecase ? [] : (useCase(id) ?? []))).slice(0, 2) : [];
-  const name = reply.name !== null && reply.name.length <= 60 && at(sentence, reply.name) >= 0 ? reply.name : rules.name;
+  const name = reply.name !== null && reply.name.length <= 60 && at(sentence, reply.name) >= 0 && !OPENS_REFUSING.test(reply.name.trim()) ? reply.name : rules.name;
   const asked = reply.modules.filter((id) => known.has(id));
   /* AN ANSWER THAT CHOSE NOTHING AND DRAFTED NOTHING IS NO READING: the rules' stands, and where they read nothing either
      the words are the brief Slash drafts from (`outsideCatalogue`), as before there was a model. */
@@ -622,9 +649,12 @@ export function fromModel(reply: SetupReply, sentence: string, ctx: ProposeConte
   /* EACH PHRASE IS LOOKED FOR IN THE SENTENCE AS TYPED, and lit where it was found; the name is not a phrase of the
      model's, it is the first line, which becomes them. */
   const nameAt = name === null ? -1 : at(sentence, name);
-  const said = reply.heard
-    .map((h) => ({ phrase: h.phrase.trim(), became: h.became.trim().slice(0, 80), at: at(sentence, h.phrase.trim()) }))
-    .filter((h, i, all) => h.at >= 0 && h.became !== '' && h.at !== nameAt && all.findIndex((x) => x.at === h.at) === i)
+  const found = reply.heard.map((h) => ({ phrase: h.phrase.trim(), became: h.became.trim().slice(0, 80), at: at(sentence, h.phrase.trim()) })).filter((h) => h.at >= 0);
+  /* A PHRASE THE PERSON REFUSED IS NEVER SAID AS HEARD, whoever read it: "orders" in "I don't take orders" is not a
+     line that became Orders. The same reading the rules give (`refusedIn`), over the sentence as typed. */
+  const no = refusedIn(sentence, found.map((h) => ({ at: h.at, text: h.phrase })));
+  const said = found
+    .filter((h, i, all) => h.became !== '' && h.at !== nameAt && all.findIndex((x) => x.at === h.at) === i && !no({ at: h.at, text: h.phrase }))
     .sort((a, b) => a.at - b.at)
     .map(({ phrase, became, at: from }): HeardLine => ({ phrase: sentence.slice(from, from + phrase.length), became, at: [from, from + phrase.length] }));
   const you: HeardLine[] = name === null || nameAt < 0 ? [] : [{ phrase: sentence.slice(nameAt, nameAt + name.length), became: YOU, at: [nameAt, nameAt + name.length], you: true }];
@@ -668,7 +698,7 @@ export function fromModel(reply: SetupReply, sentence: string, ctx: ProposeConte
     currency,
     ...(!typed && ruled === null && currency !== null ? { currencyBy: 'device' as const } : {}),
     rows: kept,
-    title: titleOf(hear(sentence).bio, name, kept),
+    title: titleOf(who(sentence).bio, name, kept),
     places: placesOf(out),
     by: reply.by === '' || reply.by === 'rules' ? 'model' : reply.by,
     summary: summary === '' ? null : summary,

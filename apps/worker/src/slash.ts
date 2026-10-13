@@ -751,21 +751,44 @@ const monthOf = (ms: number, add: number): string => {
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const grouped = (n: number): string => String(n).replace(/\B(?=([0-9]{3})+(?![0-9]))/gu, ',');
 
-/* EVERY CALL BUT HIS OWN KEY'S. A call on tier `b` went to his provider on his bill and spent none of the operator's
-   neurons, so it is not counted here, and while he is on it the ceiling does not apply at all (`agents.md` §5 item 7). */
+/* EVERY CALL OF HIS BUT HIS OWN KEY'S. A call on tier `b` went to his provider on his bill and spent none of the operator's
+   neurons, so it is not counted here, and while he is on it the ceiling does not apply at all (`agents.md` §5 item 7).
+
+   AND NEVER A BACKGROUND ASK. The daily look, a skill draft, the pages' headlines and the reading of who is who say
+   `spends = 'background'` on their own rows (`@braindog/host` `slashRecordMeter.background`), and were counted here beside
+   his: under a ceiling of three asks the look took one, and a month of headlines could leave the palette refusing a
+   person who had asked nothing. They are counted apart (`backgroundMade`) and held apart (`includedCeilingReached`). */
+/* WHOSE A CALL IS, WHERE ITS ROW SPENDS NOBODY'S MONTH. An attempt no model answered and a question's second call settle
+   `spends = 'none'` and keep their model's name and their neurons (`@braindog/slash` `unspent`), so the ceiling still
+   counts them, and the row's `purpose` says whose they were: a look or a headline the model never answered is the
+   background's, and read as "not background" a week of them took a person's asks at the palette. */
+const HIS = "(spends = 'person' OR (spends = 'none' AND purpose IN ('ask', 'automation', 'plan')))";
+/** The SQL test for a `slash_call` row that is a person's own or his automations', for `slashDays` to count by the same rule. */
+export const HIS_CALL = HIS;
+
 const callsMade = (deps: { sql: Sql; clock: Clock }): number =>
-  deps.sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM slash_call WHERE model <> '-' AND tier <> 'b' AND ts >= ?", monthOf(deps.clock.now(), 0))?.n ?? 0;
+  deps.sql.one<{ n: number }>(`SELECT COUNT(*) AS n FROM slash_call WHERE model <> '-' AND tier <> 'b' AND ${HIS} AND ts >= ?`, monthOf(deps.clock.now(), 0))?.n ?? 0;
+
+/* THE BACKGROUND'S OWN CALLS ON THE INCLUDED MODEL THIS MONTH, held and settled, as `callsMade` counts his: every call that is not his. */
+const backgroundMade = (deps: { sql: Sql; clock: Clock }): number =>
+  deps.sql.one<{ n: number }>(`SELECT COUNT(*) AS n FROM slash_call WHERE model <> '-' AND tier <> 'b' AND NOT ${HIS} AND ts >= ?`, monthOf(deps.clock.now(), 0))?.n ?? 0;
 
 /**
- * Whether the operator's ceiling has turned this month's calls on the included model away, for a background ask no engine
- * method carries (`slash-meter.ts` `workerUnderstandLedger`). `false` on his own key and where the included model is off.
+ * Whether the operator's ceiling has turned this month's BACKGROUND calls on the included model away, for an ask no engine
+ * method carries (`slash-meter.ts` `workerSlashMeter`, `workerUnderstandLedger`). `false` on his own key and where the
+ * included model is off.
+ *
+ * THE BACKGROUND'S OWN COUNT AGAINST THE CEILING, NEVER HIS. The ceiling is one number of asks, and each of the two
+ * allowances is held to it apart: his asks by `operatorCeiling`, the background's here. So neither spends the other's,
+ * a ceiling of 0 still turns every ask of both away, and the most one record costs the operator in a month is twice the
+ * ceiling, which is reached only where the ceiling is set below the background's own share (`BACKGROUND_JOBS_MONTH`).
  *
  * THE CEILING ITSELF AND NOT `status()`, which says his own `ask_cap` wherever that is the lower: read there, a Free record
  * whose month of asks was spent at the palette lost its reading of who is who, which is the background's and never his.
  */
 export async function includedCeilingReached(env: SlashEnv, deps: { sql: Sql; clock: Clock }): Promise<boolean> {
   if (includedInference(env) === undefined || onOwnKey(deps.sql)) return false;
-  return callsMade(deps) >= Math.floor(includedMonthNeurons(env) / (await recordAskMost()));
+  return backgroundMade(deps) >= Math.floor(includedMonthNeurons(env) / (await recordAskMost()));
 }
 
 /**
@@ -773,7 +796,8 @@ export async function includedCeilingReached(env: SlashEnv, deps: { sql: Sql; cl
  *
  * IT COUNTS CALLS AND NOT NEURONS, AND THAT IS WHAT MAKES IT EXACT. The package writes a hold row for each call before its
  * first `await` (`core.reserve`), with the model's name and 0 neurons, and a call settled under `-` reached no model. So
- * `model <> '-'` this month is every call already made and every call in flight, on any tier but his own key's and of any kind,
+ * `model <> '-'` this month is every call already made and every call in flight, on any tier but his own key's and of any kind
+ * a person or his automations asked for (a background ask is the background's, counted apart: `callsMade`),
  * and a check taken synchronously before the engine's own sees them all: the lesson of
  * `packages/slash/test/cap-concurrent.test.ts`, where a check and a count with a model between them let ten asks through
  * a cap of two. A sum of `neurons` would miss every hold in flight, which is priced 0 until it settles.
@@ -788,6 +812,9 @@ export async function includedCeilingReached(env: SlashEnv, deps: { sql: Sql; cl
 function operatorCeiling(engine: Slash, deps: { sql: Sql; clock: Clock }, asks: number): Slash {
   const made = (): number => callsMade(deps);
   const spent = (): boolean => !onOwnKey(deps.sql) && made() >= asks;
+  /* THE RECORD'S OWN JOBS ARE HELD OVER THE BACKGROUND'S COUNT (`infer.draft`, `infer.prose`): their rows say `background`,
+     so held over his they went on past the ceiling while he had asks left and stopped the day his were spent. */
+  const backgroundSpent = (): boolean => !onOwnKey(deps.sql) && backgroundMade(deps) >= asks;
   const until = (): string => monthOf(deps.clock.now(), 1);
   const refused = <T>(kind: 'read' | 'propose' | 'pattern' = 'read'): Result<T> => {
     /* THE ASK TURNED AWAY LEAVES ITS ROW (`@braindog/host/slash` `turnedAway`, model-sign-49). */
@@ -800,8 +827,8 @@ function operatorCeiling(engine: Slash, deps: { sql: Sql; clock: Clock }, asks: 
   capped.propose = (question, ctx, byok, askId, inference) =>
     spent() ? Promise.resolve(refused('propose')) : engine.propose(question, ctx, byok, askId, inference);
   capped.proposePattern = (samples, ctx, inference) => (spent() ? Promise.resolve(refused('pattern')) : engine.proposePattern(samples, ctx, inference));
-  capped.draftPattern = (samples) => (spent() ? Promise.resolve(refused('pattern')) : engine.draftPattern(samples));
-  capped.digestProse = (digest) => (spent() ? Promise.resolve(ok({ text: '' })) : engine.digestProse(digest));
+  capped.draftPattern = (samples) => (backgroundSpent() ? Promise.resolve(refused('pattern')) : engine.draftPattern(samples));
+  capped.digestProse = (digest) => (backgroundSpent() ? Promise.resolve(ok({ text: '' })) : engine.digestProse(digest));
   capped.proposeSetup = (ask, ctx, inference) => (spent() ? Promise.resolve(refused()) : engine.proposeSetup(ask, ctx, inference));
   capped.proposeMapping = (ask, ctx, inference) => (spent() ? Promise.resolve(refused()) : engine.proposeMapping(ask, ctx, inference));
   /* THE RUN'S OWN SENTENCE, NAMING THE RULE AND THE STEP, as the package's own cap refusal does. Any code but

@@ -31,7 +31,7 @@ export const AGES: Record<string, unknown>[] = [
     icon: 'clock',
     span: 12,
     source: 'register.accounts',
-    where: 'liquid is true',
+    where: 'liquid is true, state is not closed',
     columns: [{ field: 'name', as: 'title' }, CONFIRMED_COLUMN],
     order: [{ field: 'seq', dir: 'asc' }],
     stale: CONFIRMED_STALE,

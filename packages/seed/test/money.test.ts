@@ -1185,7 +1185,7 @@ test('THE LISTS SAY WHAT 3.0.0 PROMISED, and nothing a record holds is renamed',
   assert.equal(field('balances', 'account')?.to, 'accounts');
   assert.equal(field('transactions', 'balance_after')?.type, 'money');
   assert.equal(field('accounts', 'arrives')?.type, 'day');
-  assert.deepEqual(field('categories', 'match_by')?.values, ['exact', 'starts', 'contains']);
+  assert.deepEqual(field('categories', 'match_by')?.values, ['exact', 'starts', 'contains', 'pattern']);
   assert.equal(field('categories', 'match_by')?.default, 'exact');
   assert.deepEqual(field('recurring', 'every')?.values, ['weekly', 'fortnightly', 'twice_monthly', 'monthly', 'quarterly', 'yearly']);
 

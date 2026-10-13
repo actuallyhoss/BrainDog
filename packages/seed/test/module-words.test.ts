@@ -43,5 +43,6 @@ test('EVERY MODULE LIST WITHOUT WORDS IS ONE NOBODY RENAMES, and every list with
   assert.deepEqual(lists.filter((l) => !manifests.has(l)), [], 'MODULE_LISTS names a list no manifest declares');
   /* `organisations` SINCE People 3.0.0, which took it from Founder: words for it would give every use case holding People
      two more settings, and each of them a version, for a list no use case has asked to rename. */
-  assert.deepEqual(lists.filter((l) => !Object.hasOwn(MODULE_WORDS, l)).sort(), ['balances', 'fx', 'organisations', 'snapshots']);
+  /* AND `filing_rules` SINCE money-core 3.17.0 (filing-list-56): a list a person keeps and no use case renames, for the same reason. */
+  assert.deepEqual(lists.filter((l) => !Object.hasOwn(MODULE_WORDS, l)).sort(), ['balances', 'filing_rules', 'fx', 'organisations', 'snapshots']);
 });

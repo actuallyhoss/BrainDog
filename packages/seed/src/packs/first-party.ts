@@ -464,6 +464,12 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   MONEY-CORE 3.16.0 IS RELEASED (`test/fixtures/released/money-core-3.16.0.json`), so this is a version of its own. One
  *   figure added, nothing taken away or retyped, so a minor step that reaches a record on its own. The Money page draws it (cash-page-54): one tile under the walk while it is not nought, and one line while no
  *   balance is typed.
+ *   Filing rules (filing-list-56, REC-B10 job 3): a list of its own, a text, how it matches, which way and the category
+ *   it files under; the Ledger says which rule filed an entry (`filed_by`); a rule for money in never files money out,
+ *   and a category's own Matches files for this one version more, live and the right way only.
+ *   A closed account (account-state-56): Accounts gains Status, open or closed, with closed its finished state, and
+ *   today's cash, the oldest balance, the Last confirmed cards and a book's Accounts cards leave a closed one out. An
+ *   account typed before the field counts as open. A list, fields and a state added, nothing taken away, still minor.
  * - portfolio 1.16.0 and work 1.18.0 (batch 46, REC-C08's remainder and REC-C16): a project others point at stays. Projects
  *   declares `delete: refuse_while_referenced`, as Accounts does, so a project a task, a bill, a service or a person names
  *   is not deleted out from under them, and the refusal names the lists and how many. Under What each one earns, one

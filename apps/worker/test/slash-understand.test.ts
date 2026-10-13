@@ -30,7 +30,8 @@ const fakeAi = (answers: string[]) => {
   };
 };
 
-const noGrants = () => ({ kernel: { grants: () => [] } }) as never;
+/* NO GRANTS, AND NO PREF SET: the switch for Slash reading on its own (`slash.reads`) left on, as a new record has it. */
+const noGrants = () => ({ kernel: { grants: () => [], prefsOf: () => ({}) } }) as never;
 const clock = { now: () => Date.UTC(2026, 9, 6, 9) };
 
 const PAIRS = {

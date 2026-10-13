@@ -38,6 +38,7 @@ import { codeOf, fixOf, type Result, type Scheduler, type Sql } from '@braindog/
 import type { CallContext, RecordApi } from '@braindog/record';
 
 import type { EngineHealthRead } from './engine-health.ts';
+import { mayThink, neverSent, type NeverSent, type Reads } from './infer.ts';
 import type { DraftSample, ModelJobInference } from './slash-answers.ts';
 import { slashSamplesOf } from './slash.ts';
 import { serveNotes, serveOffers, settleResolve, UNDERSTAND_ASKS_MONTH, type OffersKernel, type UnderstandStore } from './understand.ts';
@@ -163,6 +164,11 @@ export type ModelJobsDeps = {
    * ABSENT, or a read that throws, and the pass leases as it always did.
    */
   health?: (() => Promise<Pick<EngineHealthRead, 'health'>>) | undefined;
+  /**
+   * His switch for background reading (`infer.ts` `mayThink`), asked before anything is leased. Off, every job waits
+   * `pending` with its attempts as they were and the model is neither asked nor tested. ABSENT IS ON.
+   */
+  reads?: Reads | undefined;
 };
 
 /**
@@ -245,6 +251,19 @@ export function backgroundSpent(sql: Pick<Sql, 'one'>, since: string): { all: nu
     return /no such table/iu.test(said(e)) ? { all: 0, headlines: 0, understand: 0 } : null;
   }
 }
+
+/** The meters whose pass has said background reading is off, so the line is said once and not on every alarm. */
+const waiting = new WeakSet<ModelJobMeter>();
+
+/** What a withheld thing is called in a line about it. The value itself is never quoted. */
+const WITHHELD: Record<NeverSent, string> = { sealed: 'a sealed field', key: 'what looks like a key', bytes: "a file's bytes" };
+
+/**
+ * What stands in a batch for a text that is not sent. THE BATCH KEEPS ITS LENGTH because the kernel matches vectors to
+ * rows by position (`packages/kernel/src/embed.ts`) and refuses a batch one short, which would hold every other row of it
+ * out of the index for as long as the one row holds its key.
+ */
+const NOT_SENT_TEXT = 'not sent';
 
 /** The months a meter has already said it is spent in, so the line is said once a month and not on every alarm. */
 const told = new WeakMap<ModelJobMeter, string>();
@@ -436,7 +455,16 @@ async function settleDraft(api: ModelJobsApi, inference: ModelJobInference, job:
   }
   if (samples.value.length === 0) return { state: 'done' };
 
-  const out = await inference.draft(samples.value);
+  /* NEVER A SEALED FIELD, A KEY OR A FILE'S BYTES (ENG-A09): an arrival holding one is left out whole, and the pattern
+     is drafted from the others. With none left there is nothing to draft from, and a retry reads the same arrivals. */
+  const clean = samples.value.filter((sample) => neverSent(sample) === null);
+  if (clean.length < samples.value.length) {
+    const held = neverSent(samples.value.find((sample) => neverSent(sample) !== null)) ?? 'key';
+    log(`model job ${job.id}: ${samples.value.length - clean.length} of its ${samples.value.length} arrivals held ${WITHHELD[held]} and were not sent to the model.`);
+  }
+  if (clean.length === 0) return { state: 'done' };
+
+  const out = await inference.draft(clean);
   if (out.ok) return { state: 'done', result: out.value };
   /* A DRAFT THE ENGINE'S CHECKS REFUSED IS NOT RETRIED: the same samples would draft the same refusal, billed twice. */
   log(`model job ${job.id}: ${fixOf(out)}`);
@@ -444,11 +472,17 @@ async function settleDraft(api: ModelJobsApi, inference: ModelJobInference, job:
 }
 
 /** What one digest's prose comes to. A refusal no retry mends sends the figures alone, as `46 §5` says a digest ships. */
-async function settleProse(inference: ModelJobInference, job: OutboxRow): Promise<Settled> {
+async function settleProse(inference: ModelJobInference, job: OutboxRow, log: (line: string) => void): Promise<Settled> {
   let digest: unknown;
   try {
     digest = JSON.parse(job.payload);
   } catch {
+    return { state: 'done', result: { text: '' } };
+  }
+  /* A DIGEST HOLDING WHAT IS NEVER SENT GOES OUT AS ITS FIGURES (ENG-A09), as one the model refused does. */
+  const held = neverSent(digest);
+  if (held !== null) {
+    log(`model job ${job.id}: its digest held ${WITHHELD[held]} and was not sent to the model, so it goes out as its figures.`);
     return { state: 'done', result: { text: '' } };
   }
   const out = await inference.prose(digest);
@@ -460,11 +494,16 @@ async function settleProse(inference: ModelJobInference, job: OutboxRow): Promis
  * What one embedding job comes to: the vectors for its texts, in their order, which the kernel writes to `entry_vec` by
  * position. A refusal no retry mends writes nothing, and the next sweep queues the same rows again from the record's text.
  */
-async function settleEmbed(embed: NonNullable<ModelJobEmbed['embed']>, job: OutboxRow): Promise<Settled> {
+async function settleEmbed(embed: NonNullable<ModelJobEmbed['embed']>, job: OutboxRow, log: (line: string) => void): Promise<Settled> {
   const texts = payloadOf(job)?.texts;
   /* A JOB NOBODY CAN READ HAS NOTHING TO EMBED, and a retry reads the same bytes: done, with nothing on it. */
   if (!Array.isArray(texts) || texts.length === 0 || !texts.every((t) => typeof t === 'string')) return { state: 'done' };
-  const out = await embed(texts as string[]);
+  /* A TEXT HOLDING WHAT IS NEVER SENT IS NOT EMBEDDED (ENG-A09): its place is kept by `NOT_SENT_TEXT`, so the rows
+     beside it are still indexed and it is found by none of its own words. */
+  const sent = (texts as string[]).map((t) => (neverSent(t) === null ? t : NOT_SENT_TEXT));
+  const kept = sent.filter((t, i) => t !== texts[i]).length;
+  if (kept > 0) log(`model job ${job.id}: ${kept} of its ${texts.length} texts held what looks like a key or a file's bytes and were not sent to the model.`);
+  const out = await embed(sent);
   if (out.ok) return { state: 'done', result: { model: out.value.model, dims: out.value.dims, vectors: out.value.vectors } };
   return refusedAck(out, { state: 'done' });
 }
@@ -481,8 +520,8 @@ async function settle(
     if (job.kind === RESOLVE)
       return inference.resolve ? await settleResolve(inference.resolve, job, store, now, log) : { state: 'failed', error: 'This host has no model to judge pairs with.' };
     if (job.kind === 'infer.embed')
-      return inference.embed ? await settleEmbed(inference.embed, job) : { state: 'failed', error: 'This host has no model to embed with.' };
-    if (job.kind === 'infer.prose') return await settleProse(inference, job);
+      return inference.embed ? await settleEmbed(inference.embed, job, log) : { state: 'failed', error: 'This host has no model to embed with.' };
+    if (job.kind === 'infer.prose') return await settleProse(inference, job, log);
     return await settleDraft(api, inference, job, log);
   } catch (e) {
     return { state: 'failed', error: said(e) };
@@ -506,6 +545,8 @@ async function settle(
  * one call that is no job tests the model every `MODEL_TEST_EVERY_MS`, and the pass runs as before once it is answered. A
  * job that fails for any other cause, while the model answers, still climbs its own ladder.
  *
+ * AND NOTHING AT ALL WHILE HE HAS BACKGROUND READING OFF (`mayThink`): the offers, which ask no model, still run.
+ *
  * AN ACK THAT WILL NOT LAND IS LOGGED AND NOT A REASON TO ABANDON THE REST: the lease expires and the job is reclaimed.
  */
 export async function serveModelJobs(api: ModelJobsApi, deps: ModelJobsDeps): Promise<boolean> {
@@ -524,6 +565,21 @@ export async function serveModelJobs(api: ModelJobsApi, deps: ModelJobsDeps): Pr
   }
 
   if (inference === undefined) return false;
+
+  /* THE CONSENT RULE BEFORE THE QUEUE (ENG-A09). Every job this pass serves spends `background`, so one answer covers
+     the drafts, the prose, the pairs, the embeddings and the notes, and it is asked before the meter, the health and
+     the model's test, none of which a pass that may not think has any use for. Said once, and again after he turns it
+     back on and off. */
+  const may = await mayThink('look', deps.reads);
+  if (!may.ok) {
+    if (!waiting.has(meter)) {
+      waiting.add(meter);
+      /* THE REFUSAL'S OWN SENTENCE, so a switch that could not be read is not logged as one he turned off. */
+      log(`${fixOf(may)} The record's model jobs wait with their attempts kept.`);
+    }
+    return false;
+  }
+  waiting.delete(meter);
 
   const now = deps.now();
   const month = monthOf(now, 0);

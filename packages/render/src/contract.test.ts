@@ -45,7 +45,7 @@ const Degraded = await drawer('Degraded');
 
 /** The write-up: one line of prose with every inline form, then one of each block the contract names a part of. */
 const SPECIMEN = [
-  'Due {{date:2026-10-01}}, {{money:500 UYW}}, loosely {{pct:12 %}}, {{nope.path}}, {verified: bank} {{icon:sun}} `x`.',
+  'Due {{date:2026-10-01}}, {{money:500 UYW}}, loosely {{pct:12 %}}, {{nope.path}}, {verified: bank} {{icon:sun}} `x`, {{bad:two weeks late}}.',
   '```note | Heads up\nPlain words.\n```',
   '```stat\nCash | GBP 12.00 | in 2 accounts | | good\nCash now | EGP 43,700.00 · £24,800.00\n```',
   '```chips\nLate | 2 | late\n```',

@@ -34,20 +34,24 @@ export const CATEGORIES_REGISTER: MoneyRegister = {
       index: true,
       required: true,
     },
-    /* THE COUNTERPARTY AS THE BANK WRITES IT, which is what `txn-categorise` links on. */
+    /* THE COUNTERPARTY AS THE BANK WRITES IT, which is what `txn-categorise` linked on until money-core 3.17.0. */
     { id: 'match', label: 'Matches', type: 'text', index: true },
     /**
      * HOW MUCH OF A DESCRIPTION `match` MUST BE, SINCE money-core 3.0.0: the whole of it, how it starts, or anywhere
      * in it. A bank writes one shop as `FENWICK CLOUD` on Monday and `FENWICK CLOUD LTD 4471` on Friday, and an
      * equality files the first and leaves the second for a person. `exact` is the default and what every category
      * before this meant, so nothing a record already files moves.
+     *
+     * `pattern`, SINCE money-core 3.17.0, is the ladder's fourth rung: `match` is then a regular expression, read
+     * without regard to case, so `TALABAT|TLBT` is one shop. The filing itself reads `filing_rules` from that version
+     * (`./filing-rules.ts`), and this field and `match` stay for one version so each can become a rule.
      */
     {
       id: 'match_by',
       label: 'How it matches',
       type: 'enum',
-      values: ['exact', 'starts', 'contains'],
-      labels: { exact: 'The whole description', starts: 'How it starts', contains: 'Anywhere in it' },
+      values: ['exact', 'starts', 'contains', 'pattern'],
+      labels: { exact: 'The whole description', starts: 'How it starts', contains: 'Anywhere in it', pattern: 'A pattern' },
       default: 'exact',
     },
     /* `Most a month`, AND IT WAS `No more than, a month`. A page prints its own `where:` back using

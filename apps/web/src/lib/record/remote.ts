@@ -24,7 +24,7 @@
 import { KERNEL_FIELDS, parseWhere, quoteValue } from '@braindog/where';
 
 import { identityOfRow, whereOf, type Identity } from './api.ts';
-import { REGISTERS, seqTitled, TITLES } from './held.ts';
+import { FINISHED, REGISTERS, seqTitled, TITLES } from './held.ts';
 import { searchable, terms } from './find.ts';
 import type { Entry, Fields, Filter, RegisterDecl } from './schema.ts';
 import { declaredValue, schemaOf } from './where.ts';
@@ -139,10 +139,16 @@ export function refMapOf(register: string, rows: readonly Pick<RecordRow, 'id' |
   const titleOf = new Map<number, string>();
   const markOf = new Map<number, Identity>();
   const title = REGISTERS[register]?.title;
+  /* WHICH OF THEM ARE FINISHED, by the list's own `state:` and `done:`, for the picker to leave out (`held.ts`). */
+  const state = REGISTERS[register]?.state;
+  const done = REGISTERS[register]?.done ?? [];
+  const over = new Set<number>();
   for (const r of rows) {
     if (r.seq === null) continue;
     seqOf.set(r.id, r.seq);
     idOf.set(r.seq, r.id);
+    const now = state === undefined ? undefined : r.fields?.[state];
+    if (typeof now === 'string' && done.includes(now)) over.add(r.seq);
     const said = title === undefined ? undefined : r.fields?.[title];
     if (typeof said === 'string' && said !== '') titleOf.set(r.seq, said);
     const mark = identityOfRow(register, r.fields ?? {});
@@ -163,6 +169,7 @@ export function refMapOf(register: string, rows: readonly Pick<RecordRow, 'id' |
     if (mark) markOf.set(was, mark);
   }
   TITLES.set(register, new Map([...idOf.keys()].map((seq) => [seq, titleOf.get(seq) ?? ''])));
+  FINISHED.set(register, over);
   return { seqOf, idOf, titleOf, markOf };
 }
 

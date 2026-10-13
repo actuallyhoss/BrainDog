@@ -24,6 +24,7 @@ export const CLASSES = {
      nothing, an evidence tag, an inline icon, a tone's mark, a currency's code and any figure set in tabular digits. */
   typed: 'typed',
   unresolved: 'unresolved',
+  bad: 'bad',
   hole: 'hole',
   evidence: 'evidence',
   glyphInline: 'glyph-inline',

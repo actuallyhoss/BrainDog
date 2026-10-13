@@ -451,6 +451,35 @@ const withoutCrossCheck = (doc: Body): Body => ({
     /* AND THE TWO BLOCKS THE MONEY PAGE DRAWS IT WITH (cash-page-54): the tile and the line for no balance. */
     .map((d) => (d.page !== 'money' || !Array.isArray(d.blocks) ? d : { ...d, blocks: (d.blocks as Body[]).filter((b) => b.heading !== 'Cash now does not add up' && b.body !== 'No balance has been typed yet.') })),
 });
+/**
+ * AND 3.17.0'S FILING RULES AND CLOSED ACCOUNTS (filing-list-56, account-state-56), folded into the same unreleased step:
+ * the list Filing rules and the Ledger's `filed_by` go, a category's How it matches loses `pattern`, `txn-categorise`
+ * links a category by its Matches alone, Accounts loses its Status, and nothing leaves a closed account out.
+ */
+const NOT_CLOSED = ', state is not closed';
+const open = (b: Body): Body => (typeof b.where === 'string' && b.where.includes(NOT_CLOSED) ? { ...b, where: b.where.replace(NOT_CLOSED, '') } : b);
+const withoutFiling = (doc: Body): Body => ({
+  ...doc,
+  declarations: (doc.declarations as Body[])
+    .filter((d) => d.register !== 'filing_rules')
+    .map((d) => {
+      if (d.register === 'transactions' && Array.isArray(d.fields)) return { ...d, fields: (d.fields as Body[]).filter((f) => f.id !== 'filed_by') };
+      if (d.register === 'categories' && Array.isArray(d.fields))
+        return {
+          ...d,
+          fields: (d.fields as Body[]).map((f) =>
+            f.id === 'match_by'
+              ? { ...f, values: (f.values as string[]).filter((v) => v !== 'pattern'), labels: Object.fromEntries(Object.entries(f.labels as Body).filter(([v]) => v !== 'pattern')) }
+              : f,
+          ),
+        };
+      if (d.register === 'accounts' && Array.isArray(d.fields))
+        return (({ state: _state, done: _done, ...rest }) => ({ ...rest, fields: (d.fields as Body[]).filter((f) => f.id !== 'state') }))(d);
+      if (d.rule === 'txn-categorise') return { ...d, then: [{ link: { field: 'category', to: { register: 'categories', by: 'match', value: '{{what}}' } } }] };
+      if (Array.isArray(d.blocks)) return { ...d, blocks: (d.blocks as Body[]).map(open) };
+      return open(d);
+    }),
+});
 const withoutCashStale = (doc: Body): Body => ({ ...doc, declarations: (doc.declarations as Body[]).filter((d) => d.rule !== 'cash-stale') });
 const LATEST: Record<string, { version: string; released: string; undo: (doc: Body) => Body }> = {
   /* AN ACCOUNT'S DIGITS SAID THE LAST FOUR. */
@@ -458,7 +487,7 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
     version: '3.13.0',
     released: '2e09983b40aba73e',
     undo: (raw) => {
-      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(raw))));
+      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(raw)))));
       return {
       ...doc,
       declarations: (doc.declarations as Body[]).filter((d) => !SIGNS_ADDED.has(String(d.metric)) && !WEEK_IN.has(String(d.metric)) && d.script !== 'last_day').map((d) =>

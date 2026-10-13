@@ -97,3 +97,16 @@ test("no shipped file reads the sample's clock, its declarations or its row name
     if (imported(code(join(SRC, at)), 'ROWS')) offenders.push(`${at} ROWS`);
   assert.deepEqual(offenders, []);
 });
+
+test('a picker leaves out a row its own list calls finished, and keeps the one a form already points at', () => {
+  const accounts = held.REGISTERS.accounts!;
+  assert.equal(accounts.state, 'state');
+  assert.ok(accounts.done?.includes('closed'), 'accounts has no finished state to leave out');
+  const row = (seq: number, name: string, state?: string): RecordRow => ({ id: `01JLIVEACCOUNT00000000000${seq}`, seq, fields: { name, ...(state ? { state } : {}) }, version: 1, created_at: '2026-09-20T10:00:00Z' });
+  refMapOf('accounts', [row(1, 'Card'), row(2, 'Old card', 'closed'), row(3, 'Savings', 'open')]);
+  assert.deepEqual(held.refOptions('accounts').map((o) => o.label), ['Card', 'Savings']);
+  assert.deepEqual(held.refOptions('accounts', 2).map((o) => o.label), ['Card', 'Old card', 'Savings']);
+  /* THE NAME IS STILL KNOWN, so an entry on the closed account is drawn by its name. */
+  assert.equal(held.TITLES.get('accounts')?.get(2), 'Old card');
+  refMapOf('accounts', []);
+});

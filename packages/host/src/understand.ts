@@ -45,6 +45,7 @@ import {
 } from '@braindog/kernel';
 import { codeOf, fixOf, type Result, type Sql } from '@braindog/ports';
 
+import { neverSent } from './infer.ts';
 import type { ModelJobMeter } from './model-jobs.ts';
 
 /** The understanding share of the background allowance: `infer.resolve` and the notes pass together, a month. */
@@ -349,6 +350,8 @@ export async function settleResolve(
     const b = sideShown(p.b);
     /* A SIDE THAT CANNOT BE SHOWN IS NOT GUESSED ABOUT, and is asked about again once it can be. */
     if (a === null || b === null) continue;
+    /* NOR IS ONE THAT HOLDS WHAT IS NEVER SENT (`infer.ts` `neverSent`: a sealed field, a key, a file's bytes). */
+    if (neverSent(a) !== null || neverSent(b) !== null) continue;
     /* A PERSON BESIDE AN ORGANISATION IS NEVER ONE (`contract-17`): said so for nothing and kept, so it is not queued again. */
     if (a.kind !== b.kind) {
       never.push({ hash: p.hash, same: false, confidence: 0 });
@@ -681,7 +684,8 @@ export async function serveNotes(kernel: NotesKernel, deps: NotesDeps): Promise<
     const text = scrubbed(f.text);
     /* A RUN WITH NO PROJECT IS ABOUT NOTHING NAMED, and is handed as a run. */
     const about = f.kind === 'run' && f.about === '' ? 'a run' : scrubbed(f.about, 120);
-    if (text === null || about === null) continue;
+    /* AND WHAT IS NEVER SENT IS LEFT OUT (`infer.ts` `neverSent`), after the scrub and whatever the switch says. */
+    if (text === null || about === null || neverSent(text) !== null || neverSent(about) !== null) continue;
     const id = `n${notes.length + 1}`;
     notes.push({ id, about, kind: f.kind, text });
     handed.set(id, { about, text, found: f });

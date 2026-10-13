@@ -52,7 +52,7 @@ import { observe } from './observe.ts';
  *
  * `take` NAMES A FIELD OF THE ROW FOUND, and what that field holds is linked in the row's place: a filing rule is
  * found by its text and the ledger row is given the rule's category. A row found that holds nothing there links
- * nothing.
+ * nothing, and neither does one that points at a row deleted or in a state its own list calls done (`done:`).
  */
 export type LinkTo = { register: string; by: string; value: string; where?: Predicate; take?: string };
 
@@ -229,6 +229,8 @@ export type RulesDeps = {
    * the version did not change, and the receipt reported `move live` while the dry run previewed it.
    */
   stateOf: (register: string) => string | null;
+  /** The states a list calls finished (`done:`), or none. A `take` links no row its own list calls done. */
+  doneOf: (register: string) => readonly string[];
   ctx: EvalContext;
   /** The write path, re-entered. `cascade: false` is what makes a rule one step. */
   write: (register: string, spoken: string | null, patch: Record<string, unknown>, actor: string, batch: string) => Result<Entry>;
@@ -683,7 +685,7 @@ const RUNG_SAID: Record<LinkRung, string> = { exact: '', starts: ', matched by h
  *
  * `where` AND `take` ARE `LinkTo`'s, and say there what they do.
  */
-function linkOf(deps: Pick<RulesDeps, 'sql' | 'schemaOf' | 'ctx'>, to: Pick<LinkTo, 'register' | 'by' | 'where' | 'take'>, value: string): Linked {
+function linkOf(deps: Pick<RulesDeps, 'sql' | 'schemaOf' | 'doneOf' | 'ctx'>, to: Pick<LinkTo, 'register' | 'by' | 'where' | 'take'>, value: string): Linked {
   /* THE FILTER IS COMPILED ONCE AND ASKED ON EVERY RUNG, in the SQL that reads the candidates, so a row it leaves out
      is never counted: it cannot win, and it cannot make a tie with the one row that passes. A filter that cannot be
      read links nothing, since the other direction is a link the rule's author ruled out. */
@@ -711,7 +713,11 @@ function linkOf(deps: Pick<RulesDeps, 'sql' | 'schemaOf' | 'ctx'>, to: Pick<Link
   if (typeof taken !== 'string' || taken === '') return { none: `the one found has no ${to.take}` };
   /* WHAT IS TAKEN IS A ROW THAT IS STILL THERE. The ladder reads live rows only, and a deleted category reached
      through a filing rule that still points at it would file under something nobody can open. */
-  if (!deps.sql.one<{ x: number }>('SELECT 1 AS x FROM entry WHERE id = ? AND deleted_at IS NULL', taken)) return { none: `the ${to.take} of the one found is gone` };
+  const there = deps.sql.one<{ register: string; state: string | null }>('SELECT register, state FROM entry WHERE id = ? AND deleted_at IS NULL', taken);
+  if (!there) return { none: `the ${to.take} of the one found is gone` };
+  /* NOR ONE ITS OWN LIST CALLS FINISHED. A retired category is still there to open, and filing under it is what
+     retiring it was for stopping. The filter cannot ask this, since it reads the list the rule is found in. */
+  if (typeof there.state === 'string' && deps.doneOf(there.register).includes(there.state)) return { none: `the ${to.take} of the one found is ${there.state.replace(/[._-]+/gu, ' ')}` };
   return { id: taken, rung: found.rung };
 }
 

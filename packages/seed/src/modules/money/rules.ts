@@ -4,6 +4,37 @@ import type { SeedRule } from '../base.ts';
 import { LAST_DAY_SCRIPT } from './scripts/last-day.js';
 
 /**
+ * WHICH FILING RULES MAY FILE AN ENTRY, as `link.to.where` over `filing_rules`, filled from the entry being filed: the
+ * rule is on, it goes the entry's way or either way, and it names the entry's account or no account.
+ *
+ * NOT WHETHER THE RULE'S CATEGORY IS STILL LIVE. That is a question about the row the rule points at, and this filter
+ * reads one list. The record leaves out a category that was deleted; one that was retired is the kernel's to leave out.
+ */
+const FILED = (reads: 'payee' | 'description') => ({
+  all: [
+    { field: 'state', is: 'on' },
+    { field: 'reads', is: reads },
+    { field: 'direction', in: ['{{direction}}', 'either'] },
+    { any: [{ field: 'account', empty: true }, { field: 'account', is: '{{account}}' }] },
+  ],
+});
+
+/** Which categories may file an entry by their own "Matches": a live one that goes the entry's way or either way. */
+const NAMED = { all: [{ field: 'state', is: 'live' }, { field: 'direction', in: ['{{direction}}', 'both'] }] };
+
+/**
+ * The two steps that file by one text of the entry: the rule's category into `category`, the rule into `filed_by`.
+ *
+ * TWO LOOKUPS, AND ONLY THE FIRST ASKS ABOUT THE CATEGORY. Where the first finds a rule and links nothing, because the
+ * rule's category is gone, the second still writes that rule into `filed_by`, beside whatever category an earlier
+ * step filed. One step that writes both, or neither, is the kernel's to give.
+ */
+const filedBy = (reads: 'payee' | 'description', value: string): Record<string, unknown>[] => {
+  const to = { register: 'filing_rules', by: 'match', value, where: FILED(reads) };
+  return [{ link: { field: 'category', to: { ...to, take: 'category' } } }, { link: { field: 'filed_by', to } }];
+};
+
+/**
  * The rules Money ships with. A rule asks where a person has a choice to make, and tells or acts where there is none.
  *
  * A QUESTION IN DECIDE ONLY WHERE THERE IS A CHOICE. An invoice more than a week late is a thing somebody chooses to
@@ -29,19 +60,29 @@ export const MONEY_RULES: Record<string, SeedRule> = {
   /**
    * THE ONE RULE HERE THAT ACTS, and it acts because there is nothing to decide.
    *
-   * A row whose description is a merchant a category already names has its category filed by the
-   * record rather than asked about, which is the difference between a ledger somebody keeps and a
-   * ledger somebody abandons: the third time `FENWICK CLOUD` arrives, being asked what it is for is an
-   * insult. What the rule cannot reach is what the figure counts, so nothing is hidden by it.
+   * An entry whose text a filing rule already names has its category filed by the record rather than asked about,
+   * which is the difference between a ledger somebody keeps and a ledger somebody abandons: the third time
+   * `FENWICK CLOUD` arrives, being asked what it is for is an insult. What the rule cannot reach is what the figure
+   * counts, so nothing is hidden by it.
    *
-   * IT MATCHES THE WHOLE DESCRIPTION, EXACTLY, until `link:` reads how each category asks to be matched.
-   * `link:` is an equality against one stored value, so a category's `match` is the counterparty as the
-   * bank writes it, and a merchant that arrives under two spellings needs two categories or a person.
-   * `categories.match_by` (since money-core 3.0.0) is where a category says "how it starts" or "anywhere
-   * in it", and a rule that files by it reads it there; until then every category is matched whole,
-   * which is what `exact`, its default, says.
+   * IT LINKS THROUGH `filing_rules`, SINCE money-core 3.17.0 (REC-B10), AND IT LINKED A CATEGORY BY ITS "Matches".
+   * That link read neither which way the category goes nor anything else about it, so a category for money in was put
+   * on money going out. Now the rule found is one that is on, goes the entry's way or either, and names the entry's
+   * account or none (`FILED`), and the entry is given that rule's category (`take`). Which rule fits is the record's
+   * ladder: the whole text, how it starts, anywhere in it, a pattern, and on one rung the longest. Two that fit
+   * equally file nothing, because no category is better than a wrong one.
    *
-   * `once_per: [entry]` means once a row, ever. A category cleared by hand afterwards stays cleared,
+   * FOUR STEPS, TWO FOR EACH TEXT A RULE MAY READ. The description is tried first and "Paid to or from" after it, and
+   * a later step that finds a rule writes over the earlier one, so a rule on "Paid to or from" wins where both fit. An
+   * entry with no "Paid to or from" is left to the rules that read the description. Each pair is one lookup made
+   * twice: once for the rule's category, once for the rule itself, which goes into `filed_by`.
+   *
+   * AND A CATEGORY'S OWN "Matches" STILL FILES, FOR THE ONE VERSION THAT FIELD STAYS. It is the first step, so any
+   * filing rule that fits writes over it, and it now reads the category too (`NAMED`): a live one that goes the entry's
+   * way. A record that updates files as it did the day before, less the entries it was filing the wrong way, until each
+   * "Matches" has become a rule. An entry filed this way has no `filed_by`.
+   *
+   * `once_per: [entry]` means once an entry, ever. A category cleared by hand afterwards stays cleared,
    * which is `32-PARITY` §3.2's rule that a field a person set is never overwritten by a rule.
    */
   'txn-categorise': {
@@ -49,7 +90,11 @@ export const MONEY_RULES: Record<string, SeedRule> = {
     pack: 'money-core',
     register: 'transactions',
     when: 'state is cleared, transfer is false, category is empty',
-    then: [{ link: { field: 'category', to: { register: 'categories', by: 'match', value: '{{what}}' } } }],
+    then: [
+      { link: { field: 'category', to: { register: 'categories', by: 'match', value: '{{what}}', where: NAMED } } },
+      ...filedBy('description', '{{what}}'),
+      ...filedBy('payee', '{{counterparty_text}}'),
+    ],
     once_per: ['entry'],
   },
   /**

@@ -73,7 +73,11 @@ const UNDO_WINDOW_MS = 5_000;
 /** Where one agent stands on one kind, as a person reads it: the kind in words, never its key. */
 export type StandingKind = { kind: string; rung: Rung; since: string; lifted: boolean; dropped: { at: string; why: string | null } | null };
 /** Where every agent stands: each by its name, never a grant's id. */
-export type Standing = { agents: { agent: string; kinds: StandingKind[] }[] };
+/**
+ * `agent` is said once in an answer: a second grant under a name already said carries a number after it, in the order
+ * the two were connected. `connected` is when the grant was made, and `null` for Slash, which no grant connects.
+ */
+export type Standing = { agents: { agent: string; connected: string | null; kinds: StandingKind[] }[] };
 
 /** The rungs in order, lowest first, and the one above each. */
 const ORDER: readonly Rung[] = ['ask', 'tell', 'quiet'];
@@ -375,6 +379,11 @@ export function ladder(deps: LadderDeps) {
    * (`report:`), each labelled by code with an id and never named by its owner. A grant the operator's cut-off ended
    * (`validFrom`) is refused like a revoked one, so it is not listed either.
    *
+   * TWO GRANTS OF ONE NAME ARE TOLD APART, since a name is all a person reads and two lines saying "Claude Code" with
+   * different rungs say nothing about which is which. The older keeps the name and each later one carries its number
+   * ("Claude Code 2"), counted past any name already said, so a grant named "Slash" never reads as Slash itself. Names
+   * are compared as a person reads them, whatever their case or spacing. `connected` says when each was made.
+   *
    * THE RUNG IS THE ONE A WRITE WOULD MEET: Ask once dropped, and never above the grant's scope (`ceilingOf`).
    *
    * `lifted` IS DATED, NOT STORED. The lift (`seedLadder`) sets Do and tell in the pass that made the table, so a rung
@@ -419,9 +428,28 @@ export function ladder(deps: LadderDeps) {
         at,
       )
       .filter((t) => !endedByCutOff(validFrom, t.created_at))
-      .map((t) => ({ agent: (t.label ?? '').trim() || 'Your agent', kinds: kindsOf(t.id, t.scope as Scope) }));
+      .map((t) => ({ agent: (t.label ?? '').trim() || 'Your agent', connected: t.created_at, kinds: kindsOf(t.id, t.scope as Scope) }));
     const slash = kindsOf(SLASH, null);
-    if (slash.length > 0) agents.push({ agent: 'Slash', kinds: slash });
+    /* SLASH'S NAME IS TAKEN FIRST, listed or not, so a grant's name does not move the day Slash earns a rung. A number
+       another grant already has for its own name is passed over. */
+    const fold = (name: string): string => name.replace(/\s+/gu, ' ').toLowerCase();
+    const said = new Set([fold('Slash')]);
+    const owned = new Set(agents.map((a) => fold(a.agent)));
+    const met = new Map<string, number>();
+    for (const a of agents) {
+      const base = a.agent;
+      let n = (met.get(fold(base)) ?? 0) + 1;
+      let name = base;
+      if (n > 1 || said.has(fold(base))) {
+        n = Math.max(n, 2);
+        while (said.has(fold(`${base} ${n}`)) || owned.has(fold(`${base} ${n}`))) n += 1;
+        name = `${base} ${n}`;
+      }
+      met.set(fold(base), n);
+      said.add(fold(name));
+      a.agent = name;
+    }
+    if (slash.length > 0) agents.push({ agent: 'Slash', connected: null, kinds: slash });
     return { agents };
   };
 

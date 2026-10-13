@@ -18,6 +18,7 @@
 
   // `opts` is read for the glyph's drawing and the figure: a chip is a glyph, a figure and a word, and the figure is
   // read through the inline reader as a bar's is, so `{{tasks.open}}` prints the count and never its braces.
+  // `Text` draws it, so a figure in `{{bad:…}}` is the same `<span class="bad">` here as in a sentence and in `toHTML`.
   let { block, opts = {} }: { block: Block; opts?: RenderOptions | undefined } = $props();
 
   // A chip whose figure is the dash a reader prints for null is dropped as well (`drawnRows`), as `toHTML` drops it.

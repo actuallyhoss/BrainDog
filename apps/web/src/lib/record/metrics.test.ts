@@ -18,7 +18,7 @@ import { MISSING } from 'braindog-render';
 
 import { METRICS } from './declared.ts';
 import { mixedFix } from './money.ts';
-import { BARE, currenciesRead, format, hrefFor, isTemplate, meetsTarget, spokenWindow, targetLine, unreadable, windowMs, type MetricDecl } from './metrics.ts';
+import { BARE, currenciesRead, format, fxNote, hrefFor, isTemplate, meetsTarget, spokenWindow, targetLine, unreadable, windowMs, type MetricDecl } from './metrics.ts';
 import { metric } from './fixtures/readers.ts';
 import { REGISTERS } from './held.ts';
 /* THE SAMPLE'S LISTS, which a live tab learns from the record and the refusal test below asks the mirror about. */
@@ -263,4 +263,24 @@ test('a figure that is a day is said as one, with its year only when that is not
   assert.equal(format('day', 'soon', now), 'soon', 'text that is no day is said as it came, never as a date made up for it');
   /* A number that arrives as text is the number, under every other format. */
   assert.equal(format('int', '1234', now), '1,234');
+});
+
+test('A SUM THAT CONVERTED WHAT IT COULD SAYS AT LEAST, names the pair it lacks, and is never held to a target', () => {
+  const fx = { into: 'EGP', home: 'EGP', asOf: '2026-10-01', forward: false, stale: false, missing: ['USD to EGP'] };
+  const usd = { currency: 'USD', amount: 30000 };
+  const least = { value: null, parts: [{ currency: 'EGP', amount: 420000 }, usd], atLeast: true as const, noRate: [usd], fx };
+  const note = fxNote(least);
+  assert.equal(note, 'At least EGP 4,200.00 here; no rate from USD to EGP for the rest.');
+  assert.doesNotMatch(note!, /Not added up/u, 'part of it was added up, so it never says none of it was');
+  /* EACH PAIR IT LACKS IS NAMED, the last after "or", because the rest has no rate from one or from the other. */
+  const aed = { currency: 'AED', amount: 5000 };
+  const two = { ...least, parts: [...least.parts, aed], noRate: [usd, aed], fx: { ...fx, missing: ['AED to EGP', 'USD to EGP'] } };
+  assert.equal(fxNote(two), 'At least EGP 4,200.00 here; no rate from AED to EGP or USD to EGP for the rest.');
+  /* A SUM NO RATE REACHED ANY OF keeps the sentence it had. */
+  const none = { value: null, parts: [{ currency: 'EGP', amount: 420000 }, usd], fx: { ...fx, asOf: null } };
+  assert.equal(fxNote(none), 'Not added up yet: there is no rate from USD to EGP. Add one to Exchange rates.');
+  /* A LOWER BOUND IS NOT THE FIGURE, so it is neither on its target nor off it, whichever way the target runs. */
+  assert.equal(meetsTarget({ ...METRICS.overdue!, target: { gte: 100 } }, 420000, least), null);
+  assert.equal(meetsTarget({ ...METRICS.overdue!, target: { lte: 100 } }, 420000, least), null);
+  assert.equal(meetsTarget({ ...METRICS.overdue!, target: { gte: 100 } }, 420000, {}), true, 'a figure that is not at least is held as before');
 });

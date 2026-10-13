@@ -446,11 +446,17 @@ function phoneKey(raw: string): string | null {
  * A PAYEE KEEPS A WORD THAT NAMES IT. The end is trimmed only while what is left still says which shop, not just what
  * kind: `CAFE 22` stays `bank:cafe22` and `Pharmacy Giza` stays `bank:pharmacygiza`, because `bank:cafe` would make
  * every café one payee. Two spellings that fold the same are then the same payee and nothing wider.
+ *
+ * THE WORDS COME BACK TWICE: each as the key folds it, and beside it as the bank wrote it, so the key (`bankKey`) and
+ * the name a person reads (`payeeName`) are cut at the same word.
  */
-function bankKey(raw: string): string | null {
+function payeeWords(raw: string): { words: string[]; shown: string[] } {
   let said = raw.trim();
   for (let i = 0; i < 3 && PROCESSORS.test(said); i++) said = said.replace(PROCESSORS, '');
   const words = lower(said).replace(/[*#]/g, ' ').split(/\s+/).filter(Boolean);
+  const written = said.trim().replace(/[*#]/g, ' ').split(/\s+/).filter(Boolean);
+  /* LOWER CASE NEVER MOVES A SPACE, so the two lists are word for word; were they not, the folded words are shown. */
+  const shown = written.length === words.length ? written : [...words];
   const bareOf = (w: string): string => w.replace(/[^\p{L}\p{N}]/gu, '');
   /* WHETHER THE FIRST n WORDS NAME A SHOP: one of them is neither a kind of shop nor `the`. */
   const names = (n: number): boolean => words.slice(0, n).some((w) => {
@@ -470,9 +476,51 @@ function bankKey(raw: string): string | null {
     const drop = place2 ? 2 : /\d/.test(last) || PLACES.has(bare) || country || bare === '' ? 1 : 0;
     if (drop === 0 || (bare !== '' && !names(words.length - drop))) break;
     words.splice(-drop, drop);
+    shown.splice(-drop, drop);
   }
-  const folded = words.join('').replace(WEB_SUFFIX, '').replace(/[^\p{L}\p{N}]/gu, '');
+  return { words, shown };
+}
+
+/** The payee's key of a bank text, or `null` when nothing of it is a payee. `keyOf('bank', text)` is this. */
+export function bankKey(raw: string): string | null {
+  const folded = payeeWords(raw).words.join('').replace(WEB_SUFFIX, '').replace(/[^\p{L}\p{N}]/gu, '');
   return folded === '' ? null : `bank:${folded}`;
+}
+
+/** Small words a name writes in lower case after its first word: `Royal Bank of Canada`. */
+const SMALL_WORDS = new Set(['of', 'and', 'the', 'for']);
+
+/**
+ * One word of a bank's capitals in plain case: `CHILLOUT` is `Chillout` and `COCA-COLA` is `Coca-Cola`. A short
+ * word with no vowel is initials and stays as it is (`KFC`, `HSBC`), since nobody says it as a word.
+ */
+function plainWord(word: string, first: boolean): string {
+  const letters = word.replace(/[^\p{L}]/gu, '');
+  if (letters.length > 1 && letters.length < 6 && !/[aeiouy]/i.test(letters.normalize('NFKD'))) return word.toUpperCase();
+  const low = word.toLowerCase();
+  if (!first && SMALL_WORDS.has(low)) return low;
+  return low.replace(/(^|[^\p{L}\p{M}\p{N}'’])(\p{L})/gu, (_all, before: string, letter: string) => `${before}${letter.toUpperCase()}`);
+}
+
+/**
+ * A payee's name as a person reads it: the bank's text with the cuts its key makes (the processor's prefix, then the
+ * place and the reference numbers from the end, and a web suffix), in plain case. `TALABAT CAIRO 4471 EG` reads
+ * `Talabat`, and `GEIDEA*CHILLOUT 0418 CAIRO EG` reads `Chillout`.
+ *
+ * ONLY A BANK'S CAPITALS ARE RECASED. A text in one case throughout is the bank's printing; one in mixed case is how
+ * somebody wrote the name (`Vodafone Cash`, `iHerb`), and it is kept as written.
+ *
+ * NEVER EMPTY, AND NEVER ANOTHER PAYEE: when the cuts leave nothing to read, the name is the text itself, and a name
+ * folds to the key its text had, so showing the name and joining on the key never disagree.
+ */
+export function payeeName(text: string): string {
+  const whole = text.trim();
+  const cut = payeeWords(text).shown.join(' ').replace(new RegExp(WEB_SUFFIX.source, 'i'), '').replace(/^[\s,;:._\-/]+|[\s,;:._\-/]+$/g, '');
+  if (!/[\p{L}\p{N}]/u.test(cut)) return whole;
+  const mixed = /\p{Lu}/u.test(cut) && /\p{Ll}/u.test(cut);
+  const name = mixed ? cut : cut.split(' ').map((word, i) => plainWord(word, i === 0)).join(' ');
+  /* THE KEY IS THE CHECK: a name that would join another payee than its text is not shown in its place. */
+  return bankKey(name) === bankKey(text) ? name : whole;
 }
 
 /** An absolute path, with `\` as `/`, no trailing `/`, and a drive letter in lower case. */

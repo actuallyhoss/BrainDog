@@ -408,6 +408,90 @@ test('A REFUSAL IS CARRIED ACROSS "OR", "AND" AND COMMAS, and past had, longer, 
   }
 });
 
+test('A REFUSAL IS READ THROUGH WANT, NEED, TRACK, SEND, TAKE, KEEP, USE AND CHASE', () => {
+  const lit = (p: ReturnType<typeof propose>, word: RegExp): boolean => p.heard.some((h) => word.test(h.phrase)) || p.places.some((x) => x.phrase !== null && word.test(x.phrase));
+
+  /* THE SENTENCES THE AUDIT OF BATCH 54 TYPED AS A STRANGER. */
+  const tasks = propose('I do not want to track taxes or orders, just my tasks', CAIRO);
+  assert.deepEqual(linesOf(tasks), ['tasks > Work']);
+  assert.ok(!tasks.modules.includes('money-core') && !tasks.modules.includes('portfolio') && tasks.usecase !== 'shop', 'neither taxes nor orders turned a part on');
+
+  const credit = propose('I run a shop but I never send invoices or take orders on credit', CAIRO);
+  assert.deepEqual(linesOf(credit), ['a shop > Orders and Products']);
+  assert.ok(!credit.modules.includes('money-core') && credit.also.length === 0, 'no Money, and nothing taken beside the shop');
+
+  const owes = propose('no invoices, I just take orders and track who owes me', CAIRO);
+  assert.deepEqual(linesOf(owes), ['orders > Orders', 'who owes me > Money, in EGP'], 'what the person does do is kept');
+
+  /* EVERY VERB OF HAVING OR DOING BETWEEN THE REFUSAL AND THE THING, up to five small words. */
+  for (const s of [
+    "I don't want to keep track of orders",
+    'I do not need to take any orders',
+    "I don't use orders",
+    'I never chase orders',
+    "I don't want to send orders",
+    'I never want to have to take orders',
+  ]) {
+    const p = propose(`I'm a freelance designer, ${s}`, CAIRO);
+    assert.ok(!lit(p, /orders/iu) && p.also.length === 0 && !p.places.some((x) => x.name === 'Orders'), s);
+  }
+
+  /* A VERB AFTER "OR" IS CARRIED PAST, a verb after "and" starts what the person does do. */
+  assert.ok(!lit(propose("I'm a student, I don't use invoices or chase orders", CAIRO), /invoices|orders/iu));
+  assert.ok(lit(propose('I run a shop, no invoices and take orders', CAIRO), /^orders$/iu), '"and take orders" is kept');
+
+  /* A VERB THAT IS NOT ONE OF HAVING OR DOING KEEPS THE THING. */
+  for (const s of ["I don't want to lose my orders", "I can't keep up with my orders", 'I never forget orders']) assert.ok(lit(propose(s, CAIRO), /orders/iu), s);
+});
+
+test("A SENTENCE THAT OPENS WITH A REFUSAL NAMES NOBODY: Don't need orders, I freelance as a designer", () => {
+  const typed = "Don't need orders, I freelance as a designer";
+  const p = propose(typed, CAIRO);
+  assert.equal(p.name, null, 'nobody is called "Don\'t need orders"');
+  assert.deepEqual(linesOf(p), ['freelance as a designer > Clients and Invoices, in EGP']);
+  assert.ok(p.also.length === 0 && !p.places.some((x) => x.name === 'Orders'), 'the orders are refused');
+  /* THE WORDS ARE LIT WHERE THEY WERE TYPED, after a greeting and a run of spaces too. */
+  for (const s of [typed, "Hi, don't need   orders, I freelance as a designer", 'Never had invoices; I run a small candle shop']) {
+    const q = propose(s, CAIRO);
+    assert.equal(q.name, null, s);
+    for (const h of q.heard) assert.equal(h.at && s.slice(h.at[0], h.at[1]), h.phrase, s);
+    assert.ok(!q.heard.some((h) => /orders|invoices/iu.test(h.phrase)), s);
+  }
+  /* A NAME BEFORE A COMMA IS STILL A NAME. */
+  assert.equal(propose('Tom, I run a shop', CAIRO).name, 'Tom');
+});
+
+test('A REFUSED PHRASE IS NEVER OFFERED AS HEARD, by the rules or by the model', () => {
+  const typed = "I'm Mariam. I freelance as a designer and I don't want to keep track of orders or products";
+  const rules = propose(typed, CAIRO);
+  assert.ok(!rules.heard.some((h) => /orders|products/iu.test(h.phrase)));
+
+  /* THE MODEL HEARD THE WORD AND NOT THE "DON'T": its line is dropped, and the lines it got right stand. */
+  const p = fromModel(
+    reply({
+      usecase: 'business',
+      heard: [
+        { phrase: 'freelance as a designer', became: 'Clients and Invoices' },
+        { phrase: 'orders', became: 'Orders' },
+        { phrase: 'products', became: 'Products' },
+      ],
+    }),
+    typed,
+    CAIRO,
+    rules,
+  );
+  assert.ok(p.heard.some((h) => h.phrase === 'freelance as a designer'));
+  assert.ok(!p.heard.some((h) => /orders|products/iu.test(h.phrase)), 'neither refused phrase is a line');
+
+  /* WHERE EVERY LINE OF THE MODEL'S WAS REFUSED, the rules' lines are said, and they hold no refused phrase either. */
+  const only = fromModel(reply({ usecase: 'business', heard: [{ phrase: 'orders', became: 'Orders' }] }), typed, CAIRO, rules);
+  assert.ok(only.heard.length > 1 && !only.heard.some((h) => /orders|products/iu.test(h.phrase)));
+
+  /* A NAME THE MODEL TOOK FROM A REFUSAL IS NOT A NAME. */
+  const opened = "Don't need orders, I freelance as a designer";
+  assert.equal(fromModel(reply({ usecase: 'business', name: "Don't need orders" }), opened, CAIRO, propose(opened, CAIRO)).name, null);
+});
+
 test('ONE LINE FOR ONE THING: a second phrase that became the same is folded into the first', () => {
   const p = propose("I'm Mariam. I run a small candle shop and freelance as a designer. I want to track orders, who owes me, and taxes.", CAIRO);
   assert.deepEqual(linesOf(p), [
