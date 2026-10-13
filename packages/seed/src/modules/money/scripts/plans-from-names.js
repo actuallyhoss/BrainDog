@@ -9,7 +9,8 @@
  *   - each part is linked to the plan its text names ("Part of");
  *   - each part holds what is left once it is paid ("Left after"): the plan's open parts due after it, added up, so
  *     the last part reads nought;
- *   - a plan with no part still open is paid, and open again when one is. Cancelled is a person's word and stays.
+ *   - a plan with no part still open is paid. A plan that reads paid or cancelled stays as it reads, whatever its parts
+ *     say: closing one may be a person's word, and opening it again is theirs alone.
  *
  * THE TEXT IS MATCHED AS IT IS WRITTEN, letter for letter, because Cash ahead groups parts by the same text
  * (`CASH_LEGS`, `group: 'plan'`) and a plan's name is unique the same way. "Desk" and "desk" are two plans in both
@@ -24,6 +25,9 @@
  *
  * TWO RUNS MAKE A PLAN WHOLE, AND A THIRD WRITES NOTHING. What a script writes is in the record only once its run is
  * over, so a plan made in this run has no id to link to yet: `waiting` counts the parts whose link is the next run's.
+ * The next run is not the night's: a plan made starts the script again for that plan (`run`, handed a plan), so the
+ * first part of a new plan does not show an empty "Part of" until tomorrow. The plan's number is not guessed and
+ * written in the same run, because a plan somebody else made in between would take the number and the part with it.
  * Every change is written only where the record holds something else, at the version the part was read at.
  *
  * NOTHING OUTSIDE ITSELF IS READ BY `plansFromNames`, AND NOTHING BUT `plansFromNames` BY `run`: the two texts together
@@ -64,7 +68,9 @@ export function plansFromNames(parts, plans) {
       };
       out.plans.push({ name, state, ...agreed('party'), ...agreed('account') });
       out.waiting += group.length;
-    } else if (plan.fields.state !== state && plan.fields.state !== 'cancelled' && state !== 'cancelled') {
+    } else if (plan.fields.state !== state && plan.fields.state !== 'paid' && plan.fields.state !== 'cancelled' && state !== 'cancelled') {
+      /* A CLOSED PLAN IS NEVER OPENED HERE. No read says who closed it, and a plan somebody marked paid by hand while a
+         part was still open was opened again that night, with a line saying so. */
       out.writes.push({ id: plan.spoken, version: plan.version, fields: { state } });
     }
 
@@ -101,6 +107,9 @@ export function plansFromNames(parts, plans) {
  * nothing, as the clock hands it each night and an update does once, it does every plan there is. A part moved to
  * another plan leaves its old plan's figures as they were until that night.
  *
+ * HANDED ONE PLAN, IT DOES THAT PLAN ALONE, the same way (`{ id, register: 'plans', seq }`, or "plans#3" under `plan`):
+ * what a rule starts when a plan is made, by this script a moment ago or by a person, so its parts are linked then.
+ *
  * A SCRIPT'S LIST IS ONE PAGE OF FIFTY, THE NEWEST MADE FIRST, and a plan that runs ten years is 120 parts. So each
  * list is read a page at a time, each next page asking for numbers below the lowest one read, until a page comes back
  * short. A figure counted from the first page alone would be wrong and look right.
@@ -130,6 +139,8 @@ export default async function run(ctx) {
       : input.register === 'installments' && Number.isSafeInteger(input.seq)
         ? `installments#${input.seq}`
         : null;
+  const handedPlan =
+    typeof input.plan === 'string' && /^plans#\d+$/.test(input.plan) ? input.plan : input.register === 'plans' && Number.isSafeInteger(input.seq) ? `plans#${input.seq}` : null;
   let name = null;
   if (handed) {
     const row = await ctx.record.get(handed);
@@ -142,6 +153,16 @@ export default async function run(ctx) {
       ctx.log('The part names no plan, so no plan was counted.');
       return null;
     }
+  } else if (handedPlan) {
+    /* THE SECOND PASS: the plan is in the record now, so its parts can be linked to it. A plan nobody's part names
+       reads no part and writes nothing. */
+    const row = await ctx.record.get(handedPlan);
+    if (!row) {
+      ctx.log('The plan is no longer in the record, so no part was linked.');
+      return null;
+    }
+    name = row.fields.name;
+    if (typeof name !== 'string' || name.trim() === '') return null;
   }
   const parts = await every('installments', name === null ? undefined : { field: 'plan', is: name });
   const plans = await every('plans', name === null ? undefined : { field: 'name', is: name });
@@ -171,7 +192,7 @@ export default async function run(ctx) {
     sentences.push(`${said[0].toUpperCase()}${said.slice(1)}.`);
   }
   const byId = new Map(plans.map((p) => [p.spoken, p.fields.name]));
-  for (const w of writes) if (byId.has(w.id)) sentences.push(`${byId.get(w.id)} is ${w.fields.state === 'paid' ? 'paid' : 'open again'}.`);
+  for (const w of writes) if (byId.has(w.id)) sentences.push(`${byId.get(w.id)} is ${w.fields.state === 'paid' ? 'paid' : 'open'}.`);
   if (more) sentences.push('The rest waits for the next run.');
   ctx.log(sentences.join(' '));
   return { plans: made.length, parts: ofParts.length, more };

@@ -351,7 +351,7 @@ test('A CARD CHARGE MEETS ITS SHOP AS ONE ORGANISATION, and a second charge ther
   await k.drain();
   const orgs = value<{ rows: { fields: Record<string, unknown> }[] }>(k.list({ register: 'organisations' })).rows.filter((r) => listed(r.fields.keys).includes('bank:cedarlanebakery'));
   assert.equal(orgs.length, 1, 'the shop is met once, or not at all');
-  assert.equal(orgs[0]!.fields.name, 'CEDAR LANE BAKERY');
+  assert.equal(orgs[0]!.fields.name, 'Cedar Lane Bakery');
   assert.ok(!value<{ rows: { fields: Record<string, unknown> }[] }>(k.list({ register: 'people' })).rows.some((r) => /cedar/i.test(String(r.fields.name))), 'the shop was made a person');
   sql.close();
 });
@@ -374,7 +374,7 @@ test('A TRANSFER FROM AN INSTAPAY ADDRESS MEETS NOBODY, and one to a named payee
   await k.drain();
   const names = value<{ rows: { fields: Record<string, unknown> }[] }>(k.list({ register: 'organisations' })).rows.map((r) => String(r.fields.name));
   assert.ok(!names.some((n) => n.includes('@')), `an organisation is named by an address: ${names.join(', ')}`);
-  assert.ok(names.includes('MARLOW JOINERY'), 'the named payee was not met');
+  assert.ok(names.includes('Marlow Joinery'), 'the named payee was not met');
   sql.close();
 });
 

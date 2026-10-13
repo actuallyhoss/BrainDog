@@ -123,7 +123,14 @@ test('with no screen only the words are judged', () => {
   assert.equal(code, 0);
   assert.ok(lines.some((l) => /no-tour: green\./u.test(l)));
   assert.ok(lines.some((l) => /rail-has-rows: not seen\./u.test(l)));
-  assert.match(lines.at(-1), /7 checks: 2 green, 0 red, 5 not seen\. Exit code 0\./u);
+  assert.match(lines.at(-1), /^7 checks: 2 green, 0 red, 5 not seen\. UNCHECKED: 5 of 7 read nothing, which is not a pass\. Exit code 0\.$/u);
+});
+
+test('a screen where every check read something says nothing of UNCHECKED', () => {
+  const { lines } = report([{ ...START, text: ['Take the tour'] }], LAYLA);
+  const unseen = lines.filter((l) => /: not seen\./u.test(l)).length;
+  assert.equal(/UNCHECKED/u.test(lines.at(-1)), unseen > 0, lines.at(-1));
+  if (unseen > 0) assert.ok(lines.at(-1).includes(`UNCHECKED: ${unseen} of `), lines.at(-1));
 });
 
 test('a tour on a screen handed in is red and the code is 1', () => {

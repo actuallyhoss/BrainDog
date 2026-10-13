@@ -114,6 +114,10 @@ function write(k: Kernel, side: Side, kiln: { book: string; thing: string; categ
   make('recurring', { what: `Rent in ${side.word}`, direction: 'out', amount: at(40_000), every: 'monthly', next_due: day(6), state: 'live', category: kiln.category });
   make('recurring', { what: `Retainer in ${side.word}`, direction: 'in', amount: at(7_000), every: 'monthly', next_due: day(12), state: 'live' });
   make('installments', { what: `Laptop in ${side.word}`, plan: `Laptop in ${side.word}`, direction: 'out', amount: at(1_200), due: day(8), state: 'open' });
+  /* AND TWO PARTS OF THE PLAN CALLED KILN, one paid and one open, for the figures of one plan (`plan-paid`, `plan-left`,
+     money-core 3.17.0). */
+  make('installments', { what: `Kiln, part 1 in ${side.word}`, plan: KILN, number: 1, direction: 'out', amount: at(900), due: day(-20), state: 'paid' });
+  make('installments', { what: `Kiln, part 2 in ${side.word}`, plan: KILN, number: 2, direction: 'out', amount: at(900), due: day(200), state: 'open' });
 }
 
 /** A record holding the rows of each side, standing as `stands` says. */
@@ -135,13 +139,13 @@ type Answer = { value: number | null; unit: string | null; rows: number; parts?:
 type Read = Answer & { groups?: (Answer & { key: string; label?: string })[] };
 type Figure = { metric: string; format?: string; source?: string; value?: unknown; where?: unknown };
 
-/** Every figure money-core installed on this record, a figure of one book or one project asked about Kiln. */
+/** Every figure money-core installed on this record, a figure of one book or one project asked about Kiln, and a figure of one category about Software, the one category `write` files under (`budget-passed-on`, money-core 3.17.0). */
 const figuresOf = (k: Kernel): Figure[] =>
   (k.declarations() as { kind: string; pack_id: string; body: string }[])
     .filter((d) => d.kind === 'metric' && d.pack_id === 'money-core')
     .map((d) => {
       const body = JSON.parse(d.body) as Figure;
-      return (JSON.stringify(body).includes('{{it}}') ? fill(body, null, KILN) : body) as Figure;
+      return (JSON.stringify(body).includes('{{it}}') ? fill(body, null, JSON.stringify(body).includes('category is {{it}}') ? 'Software' : KILN) : body) as Figure;
     });
 
 /** What every figure answers, by id. A refusal is a fault of its own: a figure the record cannot read answers nothing. */

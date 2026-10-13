@@ -11,7 +11,9 @@ import { DIRECTION_FIGURES } from './direction.ts';
 import { DUE_FIGURES } from './due.ts';
 import { FILING_FIGURES } from './filing.ts';
 import { FLOW_FIGURES } from './flow.ts';
+import { BUDGET_FIGURES } from './budgets.ts';
 import { INSTALMENTS_FIGURES } from './instalments.ts';
+import { PLAN_FIGURES, PLANS_FIGURES } from './plans.ts';
 import { RUNWAY_FIGURES } from './runway.ts';
 import { SIGNS_FIGURES } from './signs.ts';
 import { SPEND_VS_LAST_FIGURES, SPENDING_FIGURES } from './spending.ts';
@@ -51,6 +53,15 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
      place in the document. */
 
   ...SPEND_VS_LAST_FIGURES,
+
+  /* THE DAY A CATEGORY PASSED ITS BUDGET, SINCE money-core 3.17.0 (REC-B19 step 4, budget-passed-on-68): one running
+     total with a stop. After the spend figures, so every figure above keeps its place in the document. */
+  ...BUDGET_FIGURES,
+
+  /* A PLAN'S OWN FIGURES AND THE TWO BY PLAN, SINCE money-core 3.17.0 (REC-B12, plan-page-68): what the page of one plan
+     reads. LAST, so every figure above keeps its place in the document. */
+  ...PLAN_FIGURES,
+  ...PLANS_FIGURES,
 };
 
 /* EACH FIGURE WHOSE TARGET A PERSON CHANGES LATER NAMES ITS SETTING (`MONEY_TARGET_SETTINGS`), wherever Money is declared. */

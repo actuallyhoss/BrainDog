@@ -8,10 +8,16 @@
  * its agent and the person it works for. This gathers them across a page's blocks by the row each is about, and keeps
  * what this reader has seen.
  *
+ * THE RECORD'S WORD CAN ONLY TAKE A TINT AWAY. It says a change is `unseen` while it is newer than the reader's read
+ * mark, the one Home's news moves and nothing on a page does. So a row is new here only when the record does not say it
+ * was seen AND it changed after this device's own mark for the page or the row.
+ *
  * SEEN IS THIS READER'S, ON THIS DEVICE, where the record does not say it itself. A row is unseen while its change is
  * newer than the last time the reader left the page it is on, or opened that row; both are kept in the browser's
- * storage. A page never left on this device has seen nothing, so the week's changes the record sends are all new on it,
- * until it is left. That is a tint, never a loss: the line and its Undo are in the row's panel whatever this says.
+ * storage. A PAGE WITH NO MARK ON THIS DEVICE IS SEEN AS IT OPENS: the first visit starts the mark at that moment
+ * (`seenOn`), so a plain load tints nothing and only a change that lands after it is new. Reading "no mark" as "seen
+ * nothing" tinted every row of a 261-row ledger on a new device, which says nothing. The tint is never a loss: the line
+ * and its Undo are in the row's panel whatever this says.
  *
  * PURE, AND NODE LOADS IT (relative `.ts` imports, no runes). Storage is handed in, so a test drives it.
  */
@@ -28,7 +34,7 @@ export type Changed = { register?: string | undefined; entries: readonly { seq: 
 /**
  * EVERY CHANGE A PAGE'S BLOCKS CARRY, by the row's key (`tasks#3`), the newest where two blocks draw one row. A block
  * that answers no `changes`, or one not aligned with its rows, gives none. `seen` is what this reader has seen on the
- * page; a row opened since its change is not new, whatever the page's mark says.
+ * page; a page left or a row opened since its change makes it not new, whatever the record says.
  */
 export function bylinesIn(
   blocks: readonly Changed[],
@@ -45,11 +51,13 @@ export function bylinesIn(
       const key = `${b.register}#${e.seq}`;
       const mark = Math.max(seen.page, seen.rows[key] ?? 0);
       /* WHO THE RUN IS, where the record says it on the change (`run_by`), is read there by `bylineOf`: "Claude Code". */
-      const line = bylineOf(changes[n], me, names, now, new Date(mark).toISOString());
+      /* NO MARK IS NO CLAIM (`record/byline.ts` `unseenOf`): only the record's own word can call the change new then. */
+      const line = bylineOf(changes[n], me, names, now, mark > 0 ? new Date(mark).toISOString() : null);
       if (line === null) return;
-      /* OPENED SINCE IT CHANGED: seen, even where the record's own word says it is new. */
-      const opened = seen.rows[key];
-      const said = line.unseen && opened !== undefined && opened >= Date.parse(line.at) ? { ...line, unseen: false } : line;
+      /* THE PAGE LEFT OR THE ROW OPENED SINCE IT CHANGED: seen, even where the record's own word says it is new. The
+         record's word is the reader's read mark, which only Home's news moves (`markRead`), so a ledger an import wrote
+         stayed tinted on every load, all 261 rows of it, however often the page was read. */
+      const said = line.unseen && mark > 0 && mark >= Date.parse(line.at) ? { ...line, unseen: false } : line;
       const was = out.get(key);
       if (!was || Date.parse(said.at) > Date.parse(was.at)) out.set(key, said);
     });
@@ -127,17 +135,20 @@ export function storeOf(): Store | null {
   }
 }
 
-/** What the reader has seen on `slug`, or nothing yet. A mark that does not read is nothing. */
-export function seenOn(slug: string, store: Store | null): Seen {
+/**
+ * What the reader has seen on `slug`. A page with no mark kept (never left on this device, or a mark that does not
+ * read) starts one at `now`, the moment it is opened: what is already there is seen, and what lands after is new.
+ */
+export function seenOn(slug: string, store: Store | null, now: number = Date.now()): Seen {
   try {
     const raw = store?.getItem(KEY(slug));
     const v: unknown = raw ? JSON.parse(raw) : null;
-    if (!isObject(v)) return { page: 0, rows: {} };
+    if (!isObject(v)) return { page: now, rows: {} };
     const rows: Record<string, number> = {};
     if (isObject(v.rows)) for (const [k, t] of Object.entries(v.rows)) if (typeof t === 'number' && Number.isFinite(t)) rows[k] = t;
-    return { page: typeof v.page === 'number' && Number.isFinite(v.page) ? v.page : 0, rows };
+    return { page: typeof v.page === 'number' && Number.isFinite(v.page) && v.page > 0 ? v.page : now, rows };
   } catch {
-    return { page: 0, rows: {} };
+    return { page: now, rows: {} };
   }
 }
 

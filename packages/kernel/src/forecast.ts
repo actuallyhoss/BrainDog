@@ -20,7 +20,7 @@
 
 import type { Refusal, Result, Sql } from '@braindog/ports';
 import { no } from '@braindog/ports';
-import { compile, resolveDay, type Schema } from '@braindog/where';
+import { compile, jsonPath, resolveDay, type Schema } from '@braindog/where';
 
 import type { Entry } from './index.ts';
 import { convertMinor, homeFrom, rateFor, rateIsStale } from './fx.ts';
@@ -94,6 +94,35 @@ export type Leg = {
    * `leave` it, the working day `before`, or the working day `after`. Empty is `leave`, which is a line as imported.
    */
   weekend?: string;
+  /**
+   * Set, this leg is EVERYDAY SPENDING: it walks none of its rows. It measures the money that went out of them in the
+   * last full calendar months and moves a week's share of that each week to the horizon (`everydayOf`).
+   *
+   * THE WALK HELD ONLY ROWS WITH A DATE, so a record with a salary line and no bills climbed by the salary for ever.
+   * What a card spends on food has no row ahead of it, and the only honest figure for it is what it has been.
+   *
+   * `register` is the list of moves, `on` the day a move happened, `amount` its money, `where` the filter (cleared, not
+   * a transfer) and `incoming` what marks money in, which is left out. `months` is how many calendar months back to
+   * measure, 3 when nobody says. `already` names the legs whose rows are in the walk already, so rent written as a
+   * repeating line and also paid through the bank is not walked twice; absent, it is every other leg of this walk.
+   */
+  everyday?: { months?: number; already?: readonly Leg[] };
+};
+
+/**
+ * What an everyday leg measured in one currency. `spent` is the average money out of the months counted, `planned` what
+ * the walk already holds of it, and `monthly` what is moved: `spent` less `planned`, never under nought.
+ */
+export type Everyday = {
+  /** `null` only when the list holds no dated money at all, so there is no currency to name. */
+  currency: string | null;
+  /** The months counted, oldest first, as `2026-07`: full months with money out in them. */
+  months: string[];
+  spent: number;
+  planned: number;
+  monthly: number;
+  /** Set when nothing is moved: the sentence that says why. It is not a refusal, because the walk is whole without it. */
+  why?: string;
 };
 
 export type Runway = {
@@ -115,6 +144,8 @@ export type Runway = {
    * the walk is the length it opens on.
    */
   reach?: number;
+  /** Set when a leg is everyday spending: what it measured, one for each currency, in the currency's own money. */
+  everyday?: Everyday[];
   refusals: Refusal[];
 };
 
@@ -134,6 +165,8 @@ export type Step = {
   from?: string;
   /** What the movement is part of, from the leg's `group` field, set only when the leg names one and the row fills it. */
   of?: string;
+  /** Set on a week's share of everyday spending, which is measured and has no row of its own (`Leg.everyday`). */
+  kind?: 'everyday';
 };
 
 export type ForecastDeps = {
@@ -194,6 +227,14 @@ const SKIP_CAP = EVERY_CAP + 1_200;
 
 /** How far a walk looks when nobody said, and when `'last'` finds no dated end to walk to. */
 const HORIZON_DEFAULT = 180;
+
+/** How many calendar months an everyday leg measures when it does not say, and the most it may ask for. */
+const EVERYDAY_MONTHS = 3;
+const EVERYDAY_MONTHS_CAP = 24;
+/** What a week's share of everyday spending is called in the walk. */
+const EVERYDAY_LABEL = 'Everyday spending';
+const EVERYDAY_NO_MONTH = 'There is no full month of spending to measure yet, so everyday spending is not in this walk.';
+const EVERYDAY_COVERED = 'What is already planned covers the spending measured, so nothing more is moved for everyday spending.';
 
 /**
  * The furthest ahead a walk may be asked to look, in days.
@@ -305,30 +346,30 @@ export function runway(
   /* THE ROWS ARE READ BEFORE ANY IS WALKED, because `'last'` is a horizon only the rows can say: the walk cannot know
      where it ends until it has seen the last dated movement of every leg. Each leg's sentences still come out in the
      leg's own order below, as they did when reading and walking were one loop. */
-  const reads: LegRead[] = [];
-  for (const leg of legs) {
+  /* ONE LEG READ, into the set of currencies it is told to count: the walk's own for a leg of the walk, and a set
+     nobody reads for a leg an everyday leg names as already walked, whose rows are measured and not moved. */
+  const readLeg = (leg: Leg, counted: Set<string>): LegRead => {
     const read: LegRead = { leg, stopped: null, rows: [], unreadable: 0, unreadableEnd: 0, notMoney: 0, unreadableDays: 0, daysOff: 0 };
-    reads.push(read);
     const schema = deps.schemaOf(leg.register);
     if (!schema) {
       read.stopped = { code: 'REGISTER_UNKNOWN', fix: `There is no register called ${leg.register}.`, at: 'from' };
-      continue;
+      return read;
     }
     const said = predicateOf(leg.where, schema, deps.ctx);
     if (said.bad.length) {
       read.stopped = said.bad[0]!;
-      continue;
+      return read;
     }
     const w = compile(said.predicate, schema);
     if (w.bad.length) {
       read.stopped = w.bad[0]!;
-      continue;
+      return read;
     }
 
     const wrong = cyclesWrong(leg);
     if (wrong) {
       read.stopped = wrong;
-      continue;
+      return read;
     }
 
     const title = deps.titleOf(leg.register) ?? leg.on;
@@ -346,7 +387,7 @@ export function runway(
         fix: `${leg.register} matches more than ${CAP.toLocaleString('en-GB')} rows, which is more than one walk can carry. Narrow what this leg reads.`,
         at: 'where',
       };
-      continue;
+      return read;
     }
 
     for (const { id } of rows) {
@@ -362,7 +403,7 @@ export function runway(
         continue;
       }
       if (!isMoney(money) || money.amount === 0) continue;
-      seen.add(money.currency);
+      counted.add(money.currency);
 
       const first = String(entry.fields[leg.on] ?? '');
       if (!first) continue;
@@ -404,6 +445,13 @@ export function runway(
         shift: leg.weekend ? shiftOf(entry.fields[leg.weekend]) : 'leave',
       });
     }
+    return read;
+  };
+  const reads: LegRead[] = [];
+  const spending: Leg[] = [];
+  for (const leg of legs) {
+    if (leg.everyday) spending.push(leg);
+    else reads.push(readLeg(leg, seen));
   }
 
   /* A FLOOR UNDER `last` WALKS THE LONGER OF THE TWO, and with nothing dated it walks the floor rather than the default. */
@@ -516,6 +564,38 @@ export function runway(
       });
   }
 
+  /* EVERYDAY SPENDING, ONCE THE HORIZON IS KNOWN: a week's share of each currency's monthly figure, every seventh day
+     from today to the horizon. A YEAR IS 52 WEEKS AND TWELVE MONTHS, and each week is what the running total has reached
+     less what it had, so the shares add up to the months walked to the unit and no rounding gathers over ten years. */
+  const everyday: Everyday[] = [];
+  for (const leg of spending) {
+    const named = leg.everyday!.already?.filter((l) => !l.everyday).map((l) => readLeg(l, new Set<string>()));
+    /* A LEG NAMED AS ALREADY WALKED THAT CANNOT BE READ SAYS SO ONCE, and not again when the walk reads it too. */
+    for (const r of named ?? []) if (r.stopped && !refusals.some((x) => x.fix === r.stopped!.fix)) refusals.push(r.stopped);
+    const measured = everydayOf(deps, leg, named ?? reads, today, until);
+    if (!Array.isArray(measured)) {
+      refusals.push(measured);
+      continue;
+    }
+    for (const e of measured) {
+      everyday.push(e);
+      if (e.currency === null || e.monthly <= 0) continue;
+      seen.add(e.currency);
+      const share = (week: number): number => Math.round((e.monthly * 12 * week) / 52);
+      for (let week = 1; week <= EVERY_CAP; week++) {
+        const day = iso(noon(today) + week * 7 * DAY_MS);
+        const at = noon(day);
+        if (at > until) break;
+        movements.push({
+          at,
+          currency: e.currency,
+          step: { day, label: EVERYDAY_LABEL, delta: share(week - 1) - share(week), source: leg.register, spoken: 'everyday', kind: 'everyday' },
+        });
+      }
+    }
+  }
+  const measure = spending.length ? { everyday } : {};
+
   /* MOVEMENTS IN ANOTHER CURRENCY ARE CONVERTED INTO THE HOME ONE, OR THE ONE `into` ASKS FOR, each at the rate as of
      the day it happens, a day ahead at the newest rate there is (`fx.ts`). A walk that cannot convert one of them says
      which rate it lacks. */
@@ -570,6 +650,7 @@ export function runway(
           crossed: null,
           days: null,
           horizon,
+          ...measure,
           refusals: [
             {
               code: 'MIXED_CURRENCY',
@@ -591,6 +672,7 @@ export function runway(
         crossed: null,
         days: null,
         horizon,
+        ...measure,
         refusals: [
           {
             code: 'MIXED_CURRENCY',
@@ -627,9 +709,108 @@ export function runway(
       crossed,
       days: crossed ? Math.round((noon(crossed.day) - deps.ctx.nowMs) / DAY_MS) : null,
       horizon,
+      ...measure,
       refusals,
     },
   };
+}
+
+/**
+ * What an everyday leg measures, one answer for each currency its list holds, or the sentence that stopped it.
+ *
+ * FULL MONTHS ONLY (`bucketState` in `metrics.ts` is the same rule for a chart's bars): a month counts when it has ended
+ * and the list's first dated money in that currency is in a month before it. The month a ledger began in holds only the
+ * days after its first row, and this month is not over, so an average over either reads low.
+ *
+ * A MONTH WITH NO MONEY OUT IS LEFT OUT, NOT COUNTED AS NOUGHT. A month nothing was imported for is a month the record
+ * does not know, and averaging it in as no spending is a runway too long, the one direction this walk must never be
+ * wrong in.
+ *
+ * ADDED UP IN SQL, NOT ROW BY ROW, because three months of a card is more rows than the `CAP` a walked leg may carry and
+ * nothing here needs a row: only a sum for each month and currency.
+ */
+function everydayOf(deps: ForecastDeps, leg: Leg, already: readonly LegRead[], today: string, until: number): Everyday[] | Refusal {
+  const want = leg.everyday?.months ?? EVERYDAY_MONTHS;
+  if (!Number.isInteger(want) || want < 1 || want > EVERYDAY_MONTHS_CAP)
+    return {
+      code: 'OUT_OF_BOUNDS',
+      fix: `The months everyday spending is measured over is a whole number from 1 to ${EVERYDAY_MONTHS_CAP}, and this one is ${JSON.stringify(want)}.`,
+      at: 'everyday',
+    };
+  const schema = deps.schemaOf(leg.register);
+  if (!schema) return { code: 'REGISTER_UNKNOWN', fix: `There is no register called ${leg.register}.`, at: 'from' };
+  /* A FIELD IS CHECKED BEFORE IT BECOMES A JSON PATH, which is the one place a name a declaration typed reaches SQL. */
+  for (const [at, field] of [['on', leg.on], ['amount', leg.amount], ['incoming', leg.incoming?.field]] as const)
+    if (field !== undefined && !schema.fields[field]) return { code: 'FIELD_UNKNOWN', fix: `${leg.register} has no field called ${field}.`, at };
+  if (schema.fields[leg.amount]!.type !== 'money')
+    return { code: 'VALUE_MALFORMED', fix: `${leg.register}.${leg.amount} is not money, and a walk adds money. Point this leg at an amount.`, at: 'amount' };
+  const said = predicateOf(leg.where, schema, deps.ctx);
+  if (said.bad.length) return said.bad[0]!;
+  const w = compile(said.predicate, schema);
+  if (w.bad.length) return w.bad[0]!;
+
+  const day = `json_extract(fields, '${jsonPath(leg.on)}')`;
+  const amount = `json_extract(fields, '${jsonPath(leg.amount)}.amount')`;
+  const currency = `json_extract(fields, '${jsonPath(leg.amount)}.currency')`;
+  const dated = `register = ? AND deleted_at IS NULL AND ${day} IS NOT NULL AND ${day} <> '' AND typeof(${amount}) IN ('integer', 'real') AND ${currency} IS NOT NULL`;
+  /* WHERE EACH CURRENCY BEGAN, over every dated row of the list and not only the ones the filter keeps: a ledger whose
+     first row is a deposit began that day. */
+  const began = new Map<string, string>();
+  for (const r of deps.sql.all<{ c: string; m: string }>(`SELECT ${currency} AS c, min(substr(${day}, 1, 7)) AS m FROM entry WHERE ${dated} GROUP BY c`, leg.register))
+    began.set(String(r.c), String(r.m));
+  if (began.size === 0) return [{ currency: null, months: [], spent: 0, planned: 0, monthly: 0, why: EVERYDAY_NO_MONTH }];
+
+  /* THE MONTHS BEFORE THIS ONE, oldest first. Today is the record's local day, so the month that is not over is too. */
+  const year = Number(today.slice(0, 4));
+  const month = Number(today.slice(5, 7));
+  const months: string[] = [];
+  for (let back = want; back >= 1; back--) months.push(iso(Date.UTC(year, month - 1 - back, 1, 12)).slice(0, 7));
+  const out = leg.incoming ? ` AND ${`json_extract(fields, '${jsonPath(leg.incoming.field)}')`} IS NOT ?` : '';
+  const spent = new Map<string, number>();
+  for (const r of deps.sql.all<{ c: string; m: string; total: number }>(
+    `SELECT ${currency} AS c, substr(${day}, 1, 7) AS m, sum(${amount}) AS total FROM entry WHERE ${dated} AND (${w.sql}) AND ${day} >= ? AND ${day} < ?${out} GROUP BY c, m`,
+    leg.register,
+    ...w.params,
+    `${months[0]!}-01`,
+    `${today.slice(0, 7)}-01`,
+    ...(leg.incoming ? [leg.incoming.is] : []),
+  ))
+    spent.set(`${String(r.c)} ${String(r.m)}`, Number(r.total));
+
+  return [...began.keys()].sort().map((c): Everyday => {
+    const counted = months.filter((m) => began.get(c)! < m && spent.has(`${c} ${m}`));
+    if (counted.length === 0) return { currency: c, months: [], spent: 0, planned: 0, monthly: 0, why: EVERYDAY_NO_MONTH };
+    const average = Math.round(counted.reduce((sum, m) => sum + spent.get(`${c} ${m}`)!, 0) / counted.length);
+    const planned = plannedOf(already, c, counted, today, until);
+    const monthly = Math.max(0, average - planned);
+    return { currency: c, months: counted, spent: average, planned, monthly, ...(monthly === 0 ? { why: EVERYDAY_COVERED } : {}) };
+  });
+}
+
+/**
+ * What the walk already holds of one currency's monthly spending, so it is not walked twice: the monthly worth of every
+ * live repeating line of money out, and the monthly average of the one-off money out that fell due in the months counted.
+ *
+ * RENT WRITTEN AS A REPEATING LINE IS ALSO PAID THROUGH THE BANK, so the measure holds it and so does the walk. A line
+ * that has ended, or does not start inside this walk, moves nothing in it and takes nothing off.
+ */
+function plannedOf(already: readonly LegRead[], currency: string, months: readonly string[], today: string, until: number): number {
+  let repeating = 0;
+  let once = 0;
+  for (const { stopped, rows } of already) {
+    if (stopped) continue;
+    for (const row of rows) {
+      if (row.incoming || row.currency !== currency || (row.last !== null && row.first > row.last)) continue;
+      if (row.cadence === null) {
+        if (months.includes(row.first.slice(0, 7))) once += row.amount;
+        continue;
+      }
+      if ((row.last !== null && row.last < today) || noon(row.first) > until) continue;
+      repeating +=
+        row.cadence.kind === 'months' ? row.amount / row.cadence.months : row.cadence.kind === 'weeks' ? (row.amount * 52) / (12 * row.cadence.weeks) : row.amount * 2;
+    }
+  }
+  return Math.round(repeating + once / months.length);
 }
 
 /**

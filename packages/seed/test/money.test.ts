@@ -676,7 +676,7 @@ const blockOf = (k: Kernel, slug: string, heading: string): DrawnBlock => {
  * what is coming up and the feed of what agents did are gone, each said once elsewhere on the page or in History.
  */
 test('MONEY IS ONE PAGE, and every block on it answers on the sample without a refusal', async () => {
-  assert.deepEqual(Object.keys(MONEY_PAGES), ['money', 'money-book'], 'money-core declares a page besides Money and one a book');
+  assert.deepEqual(Object.keys(MONEY_PAGES), ['money', 'money-book', 'money-plan'], 'money-core declares a page besides Money, one a book and one a plan');
   const page = MONEY_PAGES.money!;
   assert.equal(page.title, 'Money');
   assert.ok(!(page.requires as string[]).includes('register.people'), 'Money needs People again');
@@ -825,7 +825,10 @@ test('EVERY MONEY TILE WEARS A GLYPH, the headline sits beside its walk, and no 
     const walk = blocks.findIndex((b) => b.kind === 'forecast');
     /* MONEY'S, SINCE money-core 3.11.0: the walk the whole main column, and the figure first in the side column beside
        it, straight after it. */
-    if ((page as { layout?: unknown }).layout !== undefined) {
+    /* A PLAN'S PAGE WALKS NO CASH (`money-plan`, money-core 3.17.0): it has no headline row to hold to. */
+    if (walk < 0) {
+      assert.equal(slug, 'money-plan', `${slug}: the page draws no Cash ahead`);
+    } else if ((page as { layout?: unknown }).layout !== undefined) {
       assert.equal(blocks[walk]!.span, 12, `${slug}: Cash ahead is not the whole main column`);
       assert.equal((blocks[stat] as { area?: string }).area, 'rail', `${slug}: the figure is not in the side column`);
       assert.equal(stat, walk + 1, `${slug}: something stands between the walk and the figure beside it`);

@@ -17,10 +17,15 @@
  * missing rates named (`fx.ts`, `08 §2.5`). A total across two added as they are is a number of the
  * right size in the wrong unit, and there is no screen on which anybody notices.
  *
- * WHAT IS NOT HERE IS REFUSED BY NAME. `running`, `trend`, `last` and `median` are published shapes
- * with no consumer in this build. `group_by` and `bucket` are read (`groupsOf`). Reading one and
- * quietly returning the ungrouped figure would be a number under a heading that says it is grouped,
- * which is worse than an em dash.
+ * WHAT IS NOT HERE IS REFUSED BY NAME. `last` and `median` are published shapes with no consumer in
+ * this build. `group_by` and `bucket` are read (`groupsOf`). Reading one and quietly returning the
+ * ungrouped figure would be a number under a heading that says it is grouped, which is worse than
+ * an em dash.
+ *
+ * A RUNNING TOTAL AND A MEASURED TREND ARE READ (REC-B09). `{ running: { sum, order, until } }` walks
+ * the entries in order and answers the total at the end or at its stop, with the entry that reached
+ * the line (`crossedAt`). `{ trend: { of, ahead } }` reads another figure in its buckets and answers
+ * what `trend.ts` says of them (`readTrend`). Neither is half of a ratio or a difference.
  */
 
 import type { Refusal, Result, Sql } from '@braindog/ports';
@@ -64,6 +69,7 @@ import type { VitalSign } from './signs.ts';
 import { across, convertMinor, dayFieldOf, isAtLeast, pairParts, partsOf, rateFor, rateIsStale, type Across as Added, type Amount, type Part, type Rate, type Reduce } from './fx.ts';
 /* THE TWO FIGURES THAT ARE NOT A SUM OVER ONE LIST, read in their own file, which imports this one back (it says why that is safe). */
 import { isCrosscheck, isRolled, isWalked, readCrosscheck, readRolled, readWalk } from './money-figures.ts';
+import { TREND_POINTS, trendOf, type Trend } from './trend.ts';
 
 /** The six this build reads. The other five are `08` §2.2's and are refused by name. */
 export const AGGREGATIONS = ['sum', 'count', 'avg', 'min', 'max', 'distinct', 'age', 'currencies', 'empty'] as const;
@@ -406,7 +412,30 @@ export type Reading = {
   backs?: string[];
   /** How many more entries the sum added than `backs` names. Absent when it names them all. */
   backsMore?: number;
+  /**
+   * ON A RUNNING TOTAL WITH A STOP (`running.until`), THE FIRST ENTRY THAT REACHED THE LINE: its id, what it holds in the
+   * field the walk is in order of, and the total as it stood there, which is the figure's `value`. Absent when nothing
+   * reached the line, when there is no stop, and when two currencies gave no one total to walk.
+   */
+  crossed?: Crossed;
+  /** ON A TREND (`{ trend: { of, ahead } }`): what `trendOf` said of the figure's buckets, and `value` is its rate. */
+  trend?: TrendSaid;
+  /** How far a walk to zero looked when it never went under: its last day and the days to it. Beside value, never in it (`Beyond` in money-figures.ts). */
+  beyond?: { day: string; days: number };
 };
+
+/** The entry a running total reached its line at. `at` is a day or an instant as it is kept, or a number. */
+export type Crossed = { id: string; at: string | number | null; value: number };
+
+/** A trend with a `t` JSON can carry: one that is not a finite number is left out, never sent as `null`. */
+type Untimed<T> = T extends { t: number } ? Omit<T, 't'> & { t?: number } : T;
+
+/**
+ * A trend as a reading says it: `bucket` is what one step of it is, and `unit` the currency the buckets ahead are in,
+ * `null` for a plain number. The buckets ahead of a figure in whole numbers leave as whole numbers, which is minor
+ * units for money.
+ */
+export type TrendSaid = Untimed<Trend> & { bucket: Bucket; unit: string | null };
 
 /** A target converted into the currency a figure was added up in: the bound, and the rate's day. */
 export type TargetIn = {
@@ -508,7 +537,9 @@ export function windowMs(text: string): number | null {
 }
 
 /** The published shapes with no consumer here, each named rather than ignored. */
-const UNREAD = ['last', 'delta', 'median', 'group_by', 'bucket', 'running', 'trend'] as const;
+const UNREAD = ['last', 'delta', 'median', 'group_by', 'bucket'] as const;
+/** The two shapes that are a figure of their own (REC-B09): read at the top of a value, refused by name inside one. */
+const WHOLE_SHAPES = ['running', 'trend'] as const;
 
 /**
  * The same clock, one year earlier.
@@ -1324,6 +1355,11 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
     if (refusals.length) return { ok: false, refusal: refusals[0]! };
     return readCrosscheck(sql, decl, ctx);
   }
+  /* AND A TREND (REC-B09), which reads the figure it is of back through here and hands its buckets to `trend.ts`. */
+  if (isShape(decl.value, 'trend')) {
+    if (refusals.length) return { ok: false, refusal: refusals[0]! };
+    return readTrend(sql, decl, ctx);
+  }
 
   const register = decl.source.startsWith('register.') ? decl.source.slice('register.'.length) : null;
   /* A WORD NO READER HOLDS IS REFUSED BY NAME, with the words this build does read, so `record.dor` is told it is not a
@@ -1365,9 +1401,19 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
   if (lifted.said) at('NOT_IN_THIS_BUILD', lifted.said, 'group_by');
   decl = lifted.decl;
 
-  for (const word of keysOf(decl.value))
+  /* A RUNNING TOTAL IS A SUM, WALKED (REC-B09). From here on the figure is the sum of the field it names, so the
+     field, the `where`, the currencies and the as-of day are checked and read by everything a sum is read by, and the
+     walk is one more read at the end (`crossedAt`). */
+  const run = runningOf(decl, schema, register, at, ctx.schemaOf);
+  if (run) decl = { ...decl, value: { sum: run.sum } };
+
+  for (const word of keysOf(decl.value)) {
     if ((UNREAD as readonly string[]).includes(word))
       at('NOT_IN_THIS_BUILD', `${word} is a published shape this build does not read, so its figure would be the ungrouped one`, 'value');
+    /* Read above when it is the whole value, so one met here is inside a ratio or a difference. */
+    if ((WHOLE_SHAPES as readonly string[]).includes(word))
+      at('NOT_IN_THIS_BUILD', `${word} is a figure of its own in this build, never half of a ratio or a difference; declare it as its own figure`, 'value');
+  }
 
   /**
    * THE GROUPING, WHICH IS READ NOW, AND CHECKED AGAINST THE REGISTER IT GROUPS.
@@ -1560,6 +1606,27 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
       { at: 'format', allowed: [now.value.unit] },
     );
 
+  /* A RUNNING TOTAL ANSWERS HERE: the sum just read, or the total as it stood at the first entry to reach its line.
+     It has no window before, because the walk is over every entry the `where` chose and a moved clock moves the stop. */
+  if (run) {
+    const stop = lineAt(sql, schema, run, said.predicate, now.value, fx, ctx);
+    if ('fault' in stop) return no<Reading>('DECLARATION_INVALID', `${decl.metric}: ${stop.fault}`, { at: 'value' });
+    const crossed = crossedAt(sql, schema, run, stop.line, current, now.value, fx);
+    const value = crossed ? crossed.value : now.value.value;
+    const verdict = verdictOf(decl, value, now.value.unit, fx.rates, fx.today);
+    const inScope = heldBy(sql, schema, scope.predicate);
+    return ok({
+      ...now.value,
+      value,
+      held: inScope,
+      delta: null,
+      why: decl.compare === 'none' ? 'no comparison asked for' : 'a running total is not compared with a window before',
+      met: heldVerdict(verdict.met, inScope),
+      ...(verdict.targetIn ? { targetIn: verdict.targetIn } : {}),
+      ...(crossed ? { crossed } : {}),
+    });
+  }
+
   /* THE COMPARISON IS THE SAME PREDICATE AGAINST A MOVED CLOCK, which is why a predicate with no
      dated clause compares a set with itself: the delta is then structurally zero, and reporting that
      as "no change" would be a fact about the arithmetic dressed as a fact about the business. */
@@ -1652,6 +1719,241 @@ function backsOf(sql: Sql, schema: Schema, value: Value, predicate: Predicate | 
     .map((r) => `${schema.register}#${r.seq}`);
   if (backs.length === 0) return {};
   return { backs, ...(added > backs.length ? { backsMore: added - backs.length } : {}) };
+}
+
+/* ── a running total and a trend (REC-B09) ─────────────────────── */
+
+/** Whether a value is the shape called `word` at its top: `{ running: … }`, `{ trend: … }`. */
+const isShape = (value: unknown, word: string): value is Record<string, unknown> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value) && Object.hasOwn(value, word);
+
+/**
+ * A running total as declared: the field added up, the field walked in order of, and the line it stops at. The line is
+ * a number (`until`), or what one row holds (`from`): `field` of the row the figure's `where` holds its ref `of` to.
+ */
+type Running = { sum: string; order: string; until: number | null; from: { field: string; of: string } | null };
+
+/** What a running total adds up and what it is walked in order of, by field type: the two lists install checks by (`declare.ts`). */
+const SUMMED: ReadonlySet<string> = new Set(['money', 'int', 'decimal', 'duration', 'quantity']);
+const ORDERED: ReadonlySet<string> = new Set(['day', 'instant', 'int', 'decimal']);
+
+/**
+ * The running total a figure declares, or `null` when it declares none or one that cannot be read, each fault said
+ * through `at`. The field it adds up is not checked here: the figure becomes that field's sum, and a sum's own checks
+ * name a field that is not there or is not a number.
+ */
+function runningOf(
+  decl: MetricDecl,
+  schema: Schema | null,
+  register: string | null,
+  at: (code: string, fix: string, key?: string) => void,
+  schemaOf: EvalContext['schemaOf'],
+): Running | null {
+  if (!isShape(decl.value, 'running')) return null;
+  const body = (decl.value as unknown as { running: unknown }).running;
+  const shape = body !== null && typeof body === 'object' && !Array.isArray(body) ? (body as { sum?: unknown; order?: unknown; until?: unknown }) : null;
+  const stop = shape?.until as { gte?: unknown } | null | undefined;
+  const lined = stop !== null && typeof stop === 'object' && !Array.isArray(stop) && Object.keys(stop).join() === 'gte';
+  const line = lined && typeof stop.gte === 'number' && Number.isFinite(stop.gte) ? stop.gte : null;
+  /* OR A FIELD OF THE ROW A PARAMETER NAMES: `{ gte: { field: budget, of: category } }`, a category's own budget. */
+  const row = lined && stop.gte !== null && typeof stop.gte === 'object' && !Array.isArray(stop.gte) ? (stop.gte as { field?: unknown; of?: unknown }) : null;
+  const from = row && Object.keys(row).sort().join() === 'field,of' && typeof row.field === 'string' && row.field !== '' && typeof row.of === 'string' && row.of !== '' ? { field: row.field, of: row.of } : null;
+  let good = true;
+  const bad = (code: string, fix: string, key = 'value'): void => {
+    good = false;
+    at(code, fix, key);
+  };
+  if (!shape || typeof shape.sum !== 'string' || shape.sum === '') bad('VALUE_MALFORMED', 'a running total takes sum: the money or number field it adds up, as { running: { sum: amount, order: due } }');
+  if (!shape || typeof shape.order !== 'string' || shape.order === '') bad('VALUE_MALFORMED', 'a running total takes order: the day or number field it walks in order of, as { running: { sum: amount, order: due } }');
+  if (shape && shape.until !== undefined && !lined)
+    bad('VALUE_MALFORMED', "the line a running total stops at is until: { gte: 500000 }, a number in the figure's own units");
+  /* A line read off a setting installs and has no reader yet. */
+  if (shape && shape.until !== undefined && lined && line === null && from === null)
+    bad('NOT_IN_THIS_BUILD', "this build reads the line a running total stops at as a number, until: { gte: 500000 }, or as a field of the row its where names, until: { gte: { field: budget, of: category } }, and not yet as a setting");
+  if (!good || !shape) return null;
+  const order = shape.order as string;
+  if (schema) {
+    const type = Object.hasOwn(schema.fields, order) || isStamped(schema, order) ? typeOf(schema, order) : undefined;
+    if (type === undefined) at('FIELD_UNKNOWN', `${register} has no field called ${order}`, 'value');
+    else if (!ORDERED.has(type)) at('VALUE_MALFORMED', `a running total walks in order of a day or a number, and ${order} is a ${type}`, 'value');
+    const summed = Object.hasOwn(schema.fields, shape.sum as string) ? schema.fields[shape.sum as string]?.type : undefined;
+    if (summed !== undefined && !SUMMED.has(summed)) at('VALUE_MALFORMED', `a running total adds up money or a number, and ${String(shape.sum)} is a ${summed}`, 'value');
+    if (from) {
+      const spec = Object.hasOwn(schema.fields, from.of) ? schema.fields[from.of] : undefined;
+      const to = spec?.type === 'ref' && typeof spec.to === 'string' && spec.to !== '' ? spec.to : null;
+      const there = to === null ? null : schemaOf(to);
+      const held = there && Object.hasOwn(there.fields, from.field) ? there.fields[from.field]?.type : undefined;
+      if (spec === undefined) at('FIELD_UNKNOWN', `${register} has no field called ${from.of}`, 'value');
+      else if (to === null) at('VALUE_MALFORMED', `the line is a field of the row ${from.of} points at, and ${from.of} is a ${spec.type} that points at none`, 'value');
+      else if (there && held === undefined) at('FIELD_UNKNOWN', `${to} has no field called ${from.field}`, 'value');
+      else if (held !== undefined && !SUMMED.has(held)) at('VALUE_MALFORMED', `the line a running total stops at is money or a number, and ${from.field} is a ${held}`, 'value');
+    }
+  }
+  if (decl.group_by !== undefined || decl.bucket !== undefined)
+    at('DECLARATION_INVALID', 'a running total is one walk through its entries and is never cut in parts: leave group_by and bucket out', decl.group_by !== undefined ? 'group_by' : 'bucket');
+  return { sum: shape.sum as string, order, until: line, from };
+}
+
+/**
+ * THE LINE A RUNNING TOTAL STOPS AT, in the units its total is in: the number it declares, or what one row holds.
+ *
+ * `{ field: budget, of: category }` IS THE BUDGET OF THE ONE CATEGORY THE FIGURE'S `where` HOLDS IT TO, which is how a
+ * figure filled for each row of a list (`category is {{it}}`) stops at that row's own line. A `where` that holds the
+ * ref to no one row has no line to read and says so. A row that leaves the field empty has none either, and that is
+ * not a fault: a category with no budget passed none, and the figure is its total. Money in another currency than the
+ * total is converted at today's rate, and with no rate there is no line: two currencies are never compared as they are.
+ */
+function lineAt(sql: Sql, schema: Schema, run: Running, predicate: Predicate | undefined, total: Read, fx: Across, ctx: Pick<EvalContext, 'reads'>): { line: number | null } | { fault: string } {
+  if (run.from === null) return { line: run.until };
+  const { field, of } = run.from;
+  const to = String(schema.fields[of]?.to ?? '');
+  const held = new Set<string>();
+  for (const leaf of predicate === undefined ? [] : conjuncts(predicate)) {
+    if (leaf.field !== of) continue;
+    const one = typeof leaf.is === 'string' ? leaf.is : Array.isArray(leaf.in) && leaf.in.length === 1 && typeof leaf.in[0] === 'string' ? leaf.in[0] : null;
+    if (one !== null) held.add(one);
+  }
+  if (held.size !== 1) return { fault: `the line is ${field} of one row, and where holds ${of} to ${held.size === 0 ? 'none' : 'more than one'}: write ${of} is {{it}}` };
+  if (ctx.reads !== undefined && !ctx.reads(to)) return { line: null };
+  const row = sql.one<{ v: string | null }>("SELECT json_extract(fields, ?) AS v FROM entry WHERE register = ? AND id = ? AND deleted_at IS NULL", jsonPath(field), to, [...held][0]!);
+  const said: unknown = typeof row?.v === 'string' ? JSON.parse(row.v) : (row?.v ?? null);
+  if (typeof said === 'number') return { line: Number.isFinite(said) ? said : null };
+  if (said === null || typeof said !== 'object') return { line: null };
+  const { amount, currency, value } = said as { amount?: unknown; currency?: unknown; value?: unknown };
+  if (typeof amount !== 'number') return { line: typeof value === 'number' ? value : null };
+  if (total.unit === null || currency === total.unit) return { line: amount };
+  const rate = typeof currency === 'string' ? rateFor(fx.rates, currency, total.unit, fx.today.slice(0, 10)) : null;
+  return { line: rate ? convertMinor(amount, currency as string, total.unit, rate.rate) : null };
+}
+
+/**
+ * The first entry a running total reached its line at, or `null`: no line, no one total to walk, or nothing reached it.
+ *
+ * WALKED IN ORDER OF THE FIELD AND THEN OF WHEN EACH WAS WRITTEN, so two instalments due the same day keep one order
+ * from read to read. An entry with nothing in the order field has no place in the walk and goes last, since the total
+ * at the end still holds it.
+ *
+ * TWO CURRENCIES FOLLOW THE SUM. `total` is the sum as `one` read it. Where it has no one number (parts, or an at-least)
+ * there is no total to walk and nothing crossed. Where it converted, each amount is converted on its way in at the rate
+ * the sum used for it: the rate as of the day its row is about (`across`).
+ */
+function crossedAt(sql: Sql, schema: Schema, run: Running, line: number | null, predicate: Predicate | undefined, total: Read, fx: Across): Crossed | null {
+  if (line === null || total.value === null) return null;
+  const w = compile(predicate, schema);
+  if (w.bad.length) return null;
+  const type = schema.fields[run.sum]?.type;
+  const money = type === 'money';
+  const held = `json_extract(fields, '${jsonPath(run.sum)}${money ? '.amount' : type === 'quantity' ? '.value' : ''}')`;
+  const unit = money ? `json_extract(fields, '${jsonPath(run.sum)}.currency')` : 'NULL';
+  const order = isStamped(schema, run.order) ? run.order : `json_extract(fields, '${jsonPath(run.order)}')`;
+  const dated = money && fx.day ? `json_extract(fields, '${jsonPath(fx.day)}')` : 'NULL';
+  const rows = sql.all<{ id: string; v: number; u: string | null; o: string | number | null; d: string | null }>(
+    `SELECT id, ${held} AS v, ${unit} AS u, ${order} AS o, ${dated} AS d FROM entry WHERE register = ? AND deleted_at IS NULL AND ${w.sql} AND ${held} IS NOT NULL ORDER BY (${order} IS NULL), ${order}, rowid`,
+    schema.register,
+    ...w.params,
+  );
+  let sum = 0;
+  for (const r of rows) {
+    let amount = Number(r.v);
+    if (money && r.u !== total.unit) {
+      /* The sum converted this one, so there is a rate; with none there is no walk to answer from. Nought with no rate
+         is the one amount a sum adds without one (`acrossSaid`), and it moves the walk nowhere. */
+      const rate = typeof r.u === 'string' && total.unit !== null ? rateFor(fx.rates, r.u, total.unit, (typeof r.d === 'string' ? r.d : fx.today).slice(0, 10)) : null;
+      if (!rate && amount === 0) continue;
+      if (!rate) return null;
+      amount = convertMinor(amount, r.u as string, total.unit as string, rate.rate);
+    }
+    sum += amount;
+    if (sum >= line) return { id: r.id, at: r.o, value: sum };
+  }
+  return null;
+}
+
+/** The most buckets ahead a trend is asked for: a year of months, the bound install holds it to (`declare.ts`). */
+export const TREND_AHEAD_MOST = 12;
+
+/** Why a trend is flat, in the words a page can say. */
+const flatSaid = (why: string, n: number, bucket: Bucket): string =>
+  why === 'few'
+    ? `${n} full ${bucket}${n === 1 ? ' is' : 's is'} too few to say: a trend is read from ${TREND_POINTS} or more`
+    : why === 'nought'
+      ? `a full ${bucket} of nought or less, or one in two currencies, has no rate of growth`
+      : `the ${bucket}s do not tell growth from flat`;
+
+/**
+ * A TREND: what `trendOf` says of another figure's buckets (REC-B09).
+ *
+ * THE FIGURE IT IS OF IS READ THROUGH `evaluateMetric`, AS ANY PAGE READS IT, so its `where`, its currencies, its as-of
+ * day and which bucket is unfinished are that figure's own and are decided in one place. It is read off its stored
+ * declaration, as a cross-check reads the figure it checks, and it adds up the same source, which is what says who may
+ * read it.
+ *
+ * `value` IS THE RATE, a share a bucket, so a target holds it as it holds any figure: `{ gte: 0 }` is "not falling".
+ * Flat is no rate and no verdict, and `why` says which flat. A steady rise is an amount a bucket and no share, so it
+ * too has no `value` and no verdict, and is said whole in `trend`, as any other answer `trend.ts` gives is.
+ *
+ * WHAT LEAVES IS WHAT JSON CAN CARRY AND WHAT MONEY IS KEPT IN. A `t` that is not a finite number is left out, because
+ * `JSON.stringify` sends it as `null` and a reader would take that for "no t". The buckets ahead of a figure in whole
+ * numbers are rounded to whole numbers, which for money is minor units: a line through logarithms answers fractions of
+ * a piastre, and an amount with a fraction is not an amount this record keeps.
+ */
+function readTrend(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result<Reading> {
+  /* Each refusal is `no(` and its code, written out, because the gate that counts emitted codes reads them there. */
+  const mine = (fix: string): string => `${decl.metric}: ${fix}`;
+  const body = (decl.value as unknown as { trend: unknown }).trend;
+  /* `08 §2.2` publishes a trend over a series' own field, and that form has no reader here. */
+  if (body === null || typeof body !== 'object' || Array.isArray(body))
+    return no<Reading>('NOT_IN_THIS_BUILD', mine('this build reads a trend of a figure in buckets, as { trend: { of: in-by-month, ahead: 3 } }, and a trend over a field is a published shape it does not read'), { at: 'value' });
+  const { of, ahead } = body as { of?: unknown; ahead?: unknown };
+  if (typeof of !== 'string' || of === '') return no<Reading>('VALUE_MALFORMED', mine('a trend takes of: the figure it reads, by its id, as { trend: { of: in-by-month, ahead: 3 } }'), { at: 'value' });
+  /* LEFT OUT, NOTHING IS READ AHEAD: the trend alone. Install lets it be left out, and a default would be a forecast nobody asked for. */
+  if (ahead !== undefined && (typeof ahead !== 'number' || !Number.isInteger(ahead) || ahead < 1 || ahead > TREND_AHEAD_MOST))
+    return no<Reading>('OUT_OF_BOUNDS', mine(`a trend takes ahead: how many buckets past the last full one it reads, a whole number from 1 to ${TREND_AHEAD_MOST}`), { at: 'value' });
+  if (decl.group_by !== undefined || decl.bucket !== undefined)
+    return no<Reading>('DECLARATION_INVALID', mine(`a trend is one answer about ${of}'s buckets and has none of its own: leave group_by and bucket out`), { at: decl.group_by !== undefined ? 'group_by' : 'bucket' });
+  if (of === decl.metric) return no<Reading>('DECLARATION_INVALID', mine(`a trend is of another figure, and ${of} names itself`), { at: 'value' });
+  const stored = sql.one<{ body: string }>("SELECT body FROM declaration WHERE id = ? AND kind = 'metric' AND superseded_at IS NULL AND retired = 0", `metric.${of}`);
+  if (!stored) return no<Reading>('METRIC_UNKNOWN', mine(`there is no figure called ${of} to read a trend of`), { at: 'value' });
+  const read = JSON.parse(stored.body) as MetricDecl;
+  const named = typeof read.name === 'string' && read.name !== '' ? `${read.name} (${of})` : of;
+  if (isShape(read.value, 'trend')) return no<Reading>('DECLARATION_INVALID', mine(`a trend is of a figure in buckets, and ${named} is a trend itself`), { at: 'value' });
+  if (read.bucket === undefined || !isBucket(read.bucket) || read.group_by === undefined)
+    return no<Reading>('DECLARATION_INVALID', mine(`${named} is one number, and a trend is read from buckets: give it a group_by on a day and bucket: month, or name a figure that has them`), { at: 'value' });
+  if (read.source !== decl.source) return no<Reading>('DECLARATION_INVALID', mine(`${named} adds up ${read.source}, so that is the source of its trend too`), { at: 'source' });
+  const bucket = read.bucket;
+
+  const shown = evaluateMetric(sql, { ...read, compare: 'none' }, ctx);
+  if (!shown.ok) return shown;
+  const buckets = (shown.value.groups ?? []).map((g) => ({ key: g.key, value: g.value, state: g.state }));
+  const said = trendOf(buckets, ahead ?? 0, bucket) as Trend & { t?: number; ahead?: { value: number; low: number; high: number }[]; cap?: number };
+
+  /* ROUNDED WHERE THE FIGURE IS IN WHOLE NUMBERS: minor units, or a count. An average in fractions keeps its fractions. */
+  const whole = buckets.every((b) => b.value === null || Number.isInteger(b.value));
+  const round = (n: number): number => (whole ? Math.round(n) : n);
+  const { t, ...rest } = said;
+  const trend = {
+    ...rest,
+    ...(typeof t === 'number' && Number.isFinite(t) ? { t } : {}),
+    ...(said.ahead ? { ahead: said.ahead.map((a) => ({ ...a, value: round(a.value), low: round(a.low), high: round(a.high) })) } : {}),
+    ...(typeof said.cap === 'number' ? { cap: round(said.cap) } : {}),
+    bucket,
+    unit: shown.value.unit,
+  } as TrendSaid;
+
+  const value = said.kind === 'growth' ? said.rate : null;
+  const { met } = verdictOf({ format: decl.format, target: decl.target }, value, null, [], new Date(clockOf(ctx)).toISOString().slice(0, 10));
+  return ok({
+    value,
+    unit: null,
+    rows: shown.value.rows,
+    held: shown.value.held,
+    delta: null,
+    why: said.kind === 'flat' ? flatSaid(said.why, said.n, bucket) : 'a trend is its own comparison, with no window before',
+    met: heldVerdict(met, shown.value.held),
+    refusals: [],
+    ...(shown.value.fx ? { fx: shown.value.fx } : {}),
+    trend,
+  });
 }
 
 /**

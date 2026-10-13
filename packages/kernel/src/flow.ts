@@ -267,11 +267,13 @@ export type RunTrigger = {
   entry?: string;
   register?: string;
   op?: string;
+  /** The fields a write moved, comma separated, read as `{{trigger.changed}}`. Absent on a delete and on a write that moved none. */
+  changed?: string;
   arrival?: string;
   channel?: string;
   ingest?: string | null;
   /**
-   * The payee a bank door's pattern read, as it was printed, kept whatever became of the row (`Arrived.counterparty`),
+   * The payee a bank door's pattern read, by the name a person reads (`payeeName`), kept whatever became of the row (`Arrived.counterparty`),
    * so `{{trigger.counterparty}}` meets the organisation by its `bank:` key on a list with no field for it.
    */
   counterparty?: string;
@@ -883,6 +885,7 @@ export function onWritten(
       entry: w.entry.id,
       register: w.register,
       op: w.op,
+      ...(w.op === 'delete' || w.changed.length === 0 ? {} : { changed: w.changed.join(',') }),
       ...(w.op === 'delete' ? { deleted: true as const } : {}),
       ...(chain !== null && chain.seen.length > 0 ? { chain: chain.seen } : {}),
     };

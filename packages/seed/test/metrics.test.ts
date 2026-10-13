@@ -280,6 +280,9 @@ test('EVERY DECLARED METRIC READS THE SAME IN SQL AND IN TYPESCRIPT', async () =
     if ((decl.value as { diff?: { before?: unknown } }).diff?.before !== undefined) continue;
     /* A FIGURE READ ONCE PER BOOK has no book to be read about: the sample keeps none (money-core 3.1.0's `books`). */
     if (JSON.stringify(decl).includes('book is {{it}}')) continue;
+    /* NOR OF A FIGURE READ ONCE PER CATEGORY (`budget-passed-on`, money-core 3.17.0): a project's name is no category, and
+       a running total with a stop is not a sum this walk works out by hand. `money-budget-passed.test.ts` holds it. */
+    if (JSON.stringify(decl).includes('category is {{it}}')) continue;
     const params = JSON.stringify(decl).includes('{{it}}') ? THINGS.map((t) => String(t.name)) : [null];
     for (const it of params) {
       const one = it === null ? (decl as MetricDecl) : filled(decl, it);
@@ -363,6 +366,8 @@ test('THE NINE ARE ALL READABLE, so the record ships with no tile it cannot answ
   const unreadable: string[] = [];
   for (const decl of Object.values(METRICS)) {
     if (JSON.stringify(decl).includes('book is {{it}}')) continue;
+    /* NOR ONE READ ONCE PER CATEGORY, which a project's name does not fill (`money-budget-passed.test.ts` reads it). */
+    if (JSON.stringify(decl).includes('category is {{it}}')) continue;
     const one = JSON.stringify(decl).includes('{{it}}') ? filled(decl, String(THINGS[0]!.name)) : (decl as MetricDecl);
     const read = k.metric(one);
     if (!read.ok) unreadable.push(`${one.metric}: ${sayOf(read)}`);

@@ -135,6 +135,7 @@ Roughly from the simplest to the most involved, each with what it shows you how 
 | `rates-poll` | What one currency is worth in each other currency the record holds, every day. | A poll of a public address on a schedule. |
 | `live-feed` | Figures polled from a stats address every hour. | The same, as the smallest example of a poll. |
 | `launch-desk` | A desk for launching a thing in parts, with each part's next step, a calendar and a price check. | A whole set of pages and example rows for one use case, built on other add-ons. |
+| `task-tiers` | Four numbers on a task, and its priority worked out with the sum as the reason. | Optional fields laid on another add-on's list by `extends`, and a script that writes two fields its own automation does not watch. |
 
 ## How the packs here reach a record
 

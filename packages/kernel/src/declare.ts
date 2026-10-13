@@ -62,7 +62,7 @@ import { panelFault, roadmapFault, shortFault } from './kinds/words.ts';
 import type { FlowDecl } from './rules.ts';
 import { alsoFault, linkFault } from './rule-link.ts';
 /* THE FORMAT, THE WINDOW AND THE TWO FIGURES THAT ARE NOT A SUM, checked here by the same functions that read them. */
-import { clockOf, isMoneyFormat, windowMs, type EvalContext } from './metrics.ts';
+import { clockOf, isMoneyFormat, TREND_AHEAD_MOST, windowMs, type EvalContext } from './metrics.ts';
 import { WALKS, WALK_SOURCE, crosscheckFault, isCrosscheck, isRolled, rolledFault, walksToZero, type Rolled } from './money-figures.ts';
 import { INDEX_CEILING } from './observe.ts';
 import { SOURCE_MODULES, sourceModule } from './sources/index.ts';
@@ -331,6 +331,50 @@ const HOME_PLACE_MOST = 9;
 
 /** The most legs one figure over the walk may name: each is a list read whole, up to the walk's own row cap. */
 const WALK_LEGS_MOST = 12;
+
+/**
+ * What a running total adds up, and what it walks in order of, by field type. The sums are the types `metrics.ts`'s
+ * `sum` reads as a number, less a yes or no: a length of time and a quantity add up as an `int` does.
+ */
+const RUNNING_SUMS: readonly string[] = ['money', 'int', 'decimal', 'duration', 'quantity'];
+const RUNNING_ORDERS: readonly string[] = ['day', 'instant', 'int', 'decimal'];
+
+/**
+ * A RUNNING TOTAL'S OR A TREND'S OWN SHAPE, which needs no record to check (REC-B09).
+ *
+ * `running: { sum, order, until: { gte } }` and `trend: { of, ahead }` are the two shapes `metrics.ts` reads that name
+ * their parts inside one object, so `valueFields` reads nothing out of them and every part went unasked. Each refusal
+ * says the part and writes the shape out, because the author has the reference open and a word out of place in it.
+ *
+ * `ahead` IS BOUNDED HERE AND NOT BY THE READER. `trendOf` holds every bucket ahead at ten times the last full one, so
+ * a trend asked a hundred buckets ahead is ninety of the same capped number, drawn as a forecast.
+ */
+function shapeFault(id: string, value: unknown, groupBy?: unknown): Refusal | null {
+  const v = value as { running?: unknown; trend?: unknown };
+  if (v.running !== undefined) {
+    const r = v.running as { sum?: unknown; order?: unknown; until?: unknown } | null;
+    const written = `running: { sum: <a money or number field>, order: <a day or number field> }`;
+    if (r === null || typeof r !== 'object' || Array.isArray(r))
+      return bad('VALUE_MALFORMED', `${id}'s running total names what it adds up and the order it walks in: ${written}.`, 'value');
+    for (const part of ['sum', 'order'] as const)
+      if (typeof r[part] !== 'string' || r[part] === '')
+        return bad('VALUE_MALFORMED', `${id}'s running total has no ${part}, the field it ${part === 'sum' ? 'adds up' : 'walks in order of'}. Write ${written}.`, 'value');
+    const until = r.until as Record<string, unknown> | null | undefined;
+    if (until !== undefined && (until === null || typeof until !== 'object' || Array.isArray(until) || Object.keys(until).join() !== 'gte' || until.gte === null || until.gte === ''))
+      return bad('VALUE_MALFORMED', `${id}'s running total stops at the first entry that reaches a line, written until: { gte: <n> }. Leave until out to add up to the end.`, 'value');
+    /* ONE TOTAL, WALKED ONCE. Cut into parts it would be a total for each, and the reader answers one. */
+    if (groupBy !== undefined)
+      return bad('DECLARATION_INVALID', `${id} is a running total grouped by ${String(groupBy)}, and a running total is one number walked in one order. Leave group_by out, and narrow it with where.`, 'group_by');
+  }
+  if (v.trend !== undefined) {
+    const t = v.trend as { of?: unknown; ahead?: unknown } | null;
+    if (t === null || typeof t !== 'object' || Array.isArray(t) || typeof t.of !== 'string' || !METRIC_ID.test(t.of))
+      return bad('VALUE_MALFORMED', `${id}'s trend has no of, the figure it is read from, named by its id: trend: { of: <a figure cut by month>, ahead: 3 }.`, 'value');
+    if (Object.hasOwn(t, 'ahead') && !(Number.isInteger(t.ahead) && (t.ahead as number) >= 1 && (t.ahead as number) <= TREND_AHEAD_MOST))
+      return bad('OUT_OF_BOUNDS', `${id}'s trend reads ${JSON.stringify(t.ahead ?? null)} ahead, and ahead is a whole number of buckets from 1 to ${TREND_AHEAD_MOST}. Write ahead: 3.`, 'value');
+  }
+  return null;
+}
 
 /** Every `{ lookup: name }` inside a metric's value, however deep the operand sits. */
 function lookupsNamed(value: unknown, out = new Set<string>()): Set<string> {
@@ -611,8 +655,58 @@ function metricBody(decl: Declaration, installed?: Known): Refusal | null {
 
   /* THE GROUPING IS READ (`metrics.ts`'s `groupsOf`), so a well-formed one installs. Whether the
      field is a date, and so whether it takes a bucket, is the evaluator's to say: it has the schema. */
+  const shape = shapeFault(id, body.value, body.group_by);
+  if (shape) return shape;
   if (installed === undefined) return null;
-  return figureListsFault(id, body, installed) ?? metricFieldFault(id, body.source, body.value, body.group_by, installed);
+  return figureListsFault(id, body, installed) ?? metricFieldFault(id, body.source, body.value, body.group_by, installed) ?? shapeReadsFault(id, body.source, body.value, installed);
+}
+
+/**
+ * WHAT A RUNNING TOTAL OR A TREND NAMES, ASKED OF THE RECORD (REC-B09).
+ *
+ * A running total over a name adds nothing up, and one walked in order of a name stops at a row no one would call
+ * first. A trend is a line fitted to a figure's buckets (`trend.ts`), so a figure that is one number has no line: the
+ * reader refuses it by name on every read, and this refuses it once, where the author can still change it. A list or
+ * a figure the record does not hold is left to the checks that already name it, except the figure a trend is of,
+ * which nothing else at install looks at.
+ */
+function shapeReadsFault(id: string, source: unknown, value: unknown, installed: Known): Refusal | null {
+  const v = value as { running?: { sum: string; order: string }; trend?: { of: string } };
+  if (v.running !== undefined && typeof source === 'string' && source.startsWith('register.')) {
+    const register = source.slice('register.'.length);
+    const fields = (listFields(installed, register) ?? []).filter((f) => (f as { retired?: unknown }).retired !== true);
+    if (fields.length > 0)
+      for (const [part, field, takes, kinds] of [
+        ['adds up', v.running.sum, RUNNING_SUMS, 'money or a number'],
+        ['walks in order of', v.running.order, RUNNING_ORDERS, 'a day or a number'],
+      ] as const) {
+        const could = fields.filter((f) => takes.includes(String(f.type))).map((f) => String(f.id));
+        const held = fields.find((f) => f.id === field);
+        if (held === undefined) return bad('FIELD_UNKNOWN', `${id}'s running total ${part} ${field}, and ${register} has no field called ${field}.`, 'value', could);
+        if (!takes.includes(String(held.type)))
+          return bad(
+            'VALUE_MALFORMED',
+            `${id}'s running total ${part} ${field}, which is ${String(held.type)}, and a running total ${part} ${kinds}.${could.length > 0 ? ` Name one of ${could.join(', ')}.` : ''}`,
+            'value',
+            could,
+          );
+      }
+  }
+  if (v.trend !== undefined) {
+    const of = v.trend.of;
+    if (`metric.${of}` === id) return bad('DECLARATION_INVALID', `${id} is a trend of itself. Name the figure it is read from: trend: { of: <a figure cut by month> }.`, 'value');
+    const read = installed.get(`metric.${of}`);
+    if (read === undefined) return bad('METRIC_UNKNOWN', `${id} is a trend of ${of}, and there is no metric called ${of}.`, 'value');
+    if ((read.value as { trend?: unknown } | null)?.trend !== undefined)
+      return bad('DECLARATION_INVALID', `${id} is a trend of ${of}, which is itself a trend. Name the figure ${of} is read from.`, 'value');
+    if (read.bucket === undefined || read.group_by === undefined)
+      return bad(
+        'DECLARATION_INVALID',
+        `${id} is a trend of ${of}, and ${of} is one number with no buckets to fit a line to. Cut ${of} by its day, group_by: <a day field> and bucket: month, or name a figure that is.`,
+        'value',
+      );
+  }
+  return null;
 }
 
 /** Every field a metric's value names, as `metrics.ts`'s `aggregationsOf` reads them: the first key of each aggregation. */

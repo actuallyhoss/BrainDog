@@ -347,7 +347,17 @@ export const FOUNDER = {
 
      AND IN THE SAME UNRELEASED 2.6.0, THE COUNTS OF NUMBERS END TODAY (batch 66): `datapoints-7d`, `datapoints-30d`,
      `datapoints-reported` and `project-numbers-7d` leave out a reading dated after today, by the clause the service
-     numbers already end on. Four clauses narrowed, nothing added. */
+     numbers already end on. Four clauses narrowed, nothing added.
+
+     AND `datapoints-held`, WHICH THAT LEFT (batch 68): the count Latest numbers is drawn on ends today too, and so does
+     the table, by the same clause. A reading dated after today was counted, and listed first, newest first. A clause on
+     a figure and one on a block, nothing added.
+
+     WHAT HOME SAYS WHEN THE MONEY LASTS IS NOT IN THIS VERSION (REC-B07, batch 68). `runway-days` has no value when the
+     walk stays above zero, and none either when cash is in two currencies with no rate or when there is no account, so
+     a line chosen by `when: { metric: 'runway-days', empty: true }` would say "it does not run out" over a bill nobody
+     can say is covered. The line still says the days only while there are days
+     (`packages/seed/test/founder-runway-words.test.ts` holds the three records it must stay silent on). */
   version: '2.6.0',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
@@ -439,8 +449,9 @@ export const FOUNDER = {
         window: '30d',
         compare: 'none',
       },
-      /* WHAT THE FOUNDER'S PAGES ARE DRAWN ON, SINCE 1.11.0, each over its list's own clauses. */
-      counted('datapoints-held', 'Numbers', 'register.datapoints'),
+      /* WHAT THE FOUNDER'S PAGES ARE DRAWN ON, SINCE 1.11.0, each over its list's own clauses. The numbers end today
+         (`SERVICE_NUMBERS_UNTIL`), as Latest numbers does: a reading dated after today has not been reported. */
+      counted('datapoints-held', 'Numbers', 'register.datapoints', SERVICE_NUMBERS_UNTIL),
       counted('organisations-held', 'Organisations', 'register.organisations'),
       counted('due-this-week', 'Due this week', 'register.obligations', DUE_WINDOW),
       /* WHAT IS ALREADY LATE, SINCE 2.6.0, over the Late table's own clauses (`LATE_MONEY`). */
@@ -602,6 +613,9 @@ export const FOUNDER = {
             icon: 'list',
             span: 12,
             source: 'register.datapoints',
+            /* UP TO TODAY, AS ITS COUNT IS (`datapoints-held`): newest first put a reading dated next year, a mistyped
+               year or an import's, at the head of the table, over every number that was reported. */
+            where: SERVICE_NUMBERS_UNTIL,
             when: { metric: 'datapoints-held', gt: 0 },
             columns: [
               { field: 'name', label: 'Measure', width: 'minmax(16ch,1fr)' },

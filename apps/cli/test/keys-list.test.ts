@@ -16,7 +16,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { keys, type KeysIo } from '../src/keys.ts';
-import { KEYS_PAGE, keyLine, keysList, type KeyRead } from '../src/keys-list.ts';
+import { KEYS_PAGE, keyLine, keysList, withoutKeys, type KeyRead } from '../src/keys-list.ts';
 
 const scratch = mkdtempSync(join(tmpdir(), 'braindog-keys-list-'));
 after(() => rmSync(scratch, { recursive: true, force: true }));
@@ -25,7 +25,7 @@ after(() => rmSync(scratch, { recursive: true, force: true }));
 const PLANTED = 'sk_live_PLANTED0SECRET0NEVER0PRINTED';
 const GRANT = '01JGRANTGRANTGRANTGRANTGR';
 const BAKE = '01JTHINGBAKEBAKEBAKEBAKEBA';
-const ENCORE = '01JTHINGENCOREENCOREENCORE';
+const LANTERN = '01JTHINGLANTERNLANTERNLANT';
 
 const KEYS_LIST = {
   id: 'credentials',
@@ -44,7 +44,7 @@ const KEYS_LIST = {
 };
 const PROJECTS = [
   { id: BAKE, seq: 1, fields: { name: 'Crumb.gg' } },
-  { id: ENCORE, seq: 2, fields: { name: 'Encore' } },
+  { id: LANTERN, seq: 2, fields: { name: 'Lanternfish' } },
 ];
 
 type Row = { id: string; seq: number; fields: Record<string, unknown> };
@@ -54,7 +54,7 @@ const row = (seq: number, fields: Record<string, unknown>): Row => ({ id: `01JKE
 const FIVE: Row[] = [
   row(1, { label: 'Stripe live', opens: 'Payments for Crumb.gg', project: BAKE, value: GRANT, expires: '2026-11-02', token: PLANTED }),
   row(2, { label: 'Cloudflare deploy', opens: 'Deploys of every site', value: { sealed: true, opened: 4, last_opened: null }, note: PLANTED }),
-  row(3, { label: 'Apple developer', opens: 'The Encore app in the store', project: ENCORE, where: 'the password manager, under Apple', expires: '2026-10-01' }),
+  row(3, { label: 'Apple developer', opens: 'The Lanternfish app in the store', project: LANTERN, where: 'the password manager, under Apple', expires: '2026-10-01' }),
   row(4, { label: 'Old mail relay', opens: 'Mail sent by an old site' }),
   row(5, { label: 'Gone', opens: 'Nothing any more', value: GRANT, state: 'retired' }),
 ];
@@ -123,7 +123,7 @@ test('ONE LINE A KEY: its name, what it opens, where it applies, sealed or where
   assert.equal(await keys(['list'], one), 0, one.said.join('\n'));
   /* By name, as the Vault orders them, and the retired key is not among them. */
   assert.deepEqual(one.lines, [
-    'Apple developer · opens The Encore app in the store · Encore · kept at the password manager, under Apple · expired 1 October 2026',
+    'Apple developer · opens The Lanternfish app in the store · Lanternfish · kept at the password manager, under Apple · expired 1 October 2026',
     'Cloudflare deploy · opens Deploys of every site · Everywhere · sealed · no expiry day',
     'Old mail relay · opens Mail sent by an old site · Everywhere · kept nowhere named · no expiry day',
     'Stripe live · opens Payments for Crumb.gg · Crumb.gg · sealed · expires 2 November 2026',
@@ -145,6 +145,31 @@ test('NEVER A VALUE AND NEVER A GRANT: nothing a row holds beyond the five facts
   }
 });
 
+/* RED BEFORE: what a key opens and where it is kept are words a person typed, and a value typed there was said back
+   whole. The planted values are made here from parts, so no file holds one. */
+test('A VALUE TYPED WHERE A KEY IS KEPT OR IN WHAT IT OPENS IS NOT SAID BACK, in the line or in the document', async (t) => {
+  const typed = ['sk', 'live', 'Zq7Rw2xT9bLm4KpV'].join('-');
+  const long = `${'h7Gk2'.repeat(4)}x`;
+  const h = await host(t, [
+    row(1, { label: 'Pasted', opens: `The shop, with ${long}`, where: `kept at ${typed}. Ask the owner` }),
+    row(2, { label: 'Plain', opens: 'Payments (the live account)', where: 'the password manager, under Stripe; https://vault.example.com/items' }),
+  ]);
+  for (const args of [['list'], ['list', '--json']]) {
+    const one = io(h.base);
+    assert.equal(await keys(args, one), 0, one.said.join('\n'));
+    const all = everything(one);
+    assert.ok(!all.includes(typed) && !all.includes(long), `${args.join(' ')} said a typed value back`);
+  }
+  const one = io(h.base);
+  await keys(['list'], one);
+  assert.deepEqual(one.lines, [
+    'Pasted · opens The shop, with [hidden] · Everywhere · kept at kept at [hidden] Ask the owner · no expiry day',
+    'Plain · opens Payments (the live account) · Everywhere · kept at the password manager, under Stripe; https://vault.example.com/items · no expiry day',
+  ]);
+  /* Plain words, a path and a version keep every piece. */
+  for (const words of ['1Password, the Work vault', 'C:/Users/me/keys.txt', 'Node v24.13.0 on the Mac mini', '']) assert.equal(withoutKeys(words), words);
+});
+
 test('--project KEEPS THE KEYS OF ONE PROJECT, by its name in any case, and --everywhere the keys of no project', async (t) => {
   const h = await host(t, FIVE);
   const bake = io(h.base);
@@ -160,13 +185,13 @@ test('--project KEEPS THE KEYS OF ONE PROJECT, by its name in any case, and --ev
   const none = io(h.base);
   assert.equal(await keys(['list', '--project', 'Glaze'], none), 1);
   assert.deepEqual(none.lines, []);
-  assert.equal(none.said[0], 'No project of yours has that name. Yours are Crumb.gg and Encore.');
+  assert.equal(none.said[0], 'No project of yours has that name. Yours are Crumb.gg and Lanternfish.');
   assert.ok(!none.said.join(' ').includes('Glaze'));
 
   /* The two flags name two different sets, so both at once is refused before anything is read. */
   const both = io(h.base);
   const before = h.seen.length;
-  assert.equal(await keys(['list', '--project', 'Encore', '--everywhere'], both), 1);
+  assert.equal(await keys(['list', '--project', 'Lanternfish', '--everywhere'], both), 1);
   assert.match(both.said[0]!, /^braindog keys list takes/u);
   assert.equal(h.seen.length, before);
 });
@@ -177,7 +202,7 @@ test('--json GIVES THE SAME KEYS: one row a key with the five facts, in the orde
   assert.equal(await keys(['list', '--json'], one), 0, one.said.join('\n'));
   assert.equal(one.answered.length, 1);
   const { keys: rows } = one.answered[0]!.value as { keys: KeyRead[] };
-  assert.deepEqual(rows[0], { name: 'Apple developer', opens: 'The Encore app in the store', applies: 'Encore', sealed: false, kept: 'the password manager, under Apple', expires: '2026-10-01' });
+  assert.deepEqual(rows[0], { name: 'Apple developer', opens: 'The Lanternfish app in the store', applies: 'Lanternfish', sealed: false, kept: 'the password manager, under Apple', expires: '2026-10-01' });
   assert.deepEqual(rows[1], { name: 'Cloudflare deploy', opens: 'Deploys of every site', applies: 'Everywhere', sealed: true, kept: null, expires: null });
   /* The lines are made from these rows and nothing else. */
   assert.deepEqual(rows.map((k) => keyLine(k, '2026-10-13')), one.lines);

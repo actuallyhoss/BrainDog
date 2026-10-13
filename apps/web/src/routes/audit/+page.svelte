@@ -56,7 +56,7 @@
   /* WHO, IN WORDS. This screen's three person-shaped slots (the actor on a line, the `by` filter, and
      the target of an access row) all printed raw `p_` ids on a record with more than one person on
      it. `who.ts` holds the reason and the measurement. */
-  import { actorSaid, offeredActors, targetSaid } from './who.ts';
+  import { actorSaid, offeredActors, runsIn, targetSaid } from './who.ts';
   /* WHAT THE LOG SAYS, IN WORDS AND IN FIGURES: the sentence, the bands, a row by its title and list, a burst as one
      line, and the three tiles' counts and readings. `lines.ts` holds each rule and why. */
   import {
@@ -389,7 +389,9 @@
      is in the toolbar from the first paint rather than arriving with the log. */
   const offerAll = $derived(everything || bookkept > 0 || keepsBooks(route.data.index?.registers));
 
-  const actors = $derived(offeredActors([...new Set(kept.map((e) => e.by))], me, names));
+  /* WHO EACH RUN IN THE LOG IS, by its handle, so the filter says a run as its line does. */
+  const runs = $derived(runsIn(kept));
+  const actors = $derived(offeredActors([...new Set(kept.map((e) => e.by))], me, names, runs));
   const kinds = $derived([...new Set(kept.map((e) => e.kind))]);
   const perKind = $derived(kept.reduce((m, e) => m.set(e.kind, (m.get(e.kind) ?? 0) + 1), new Map<EventKind, number>()));
 
@@ -554,14 +556,14 @@
           <Menu label={copy.auditWho} align="end">
             {#snippet trigger()}
               <span class="segment seg-menu" data-on={who ? '' : undefined}>
-                <span class="seg-word">{who ? actorSaid(who, me, names).name : historyWords.everyone}</span><Icon name="chevronDown" size="s" />
+                <span class="seg-word">{who ? actorSaid(who, me, names, runs.get(who) ?? null).name : historyWords.everyone}</span><Icon name="chevronDown" size="s" />
               </span>
             {/snippet}
             <button type="button" class="mi" role="menuitem" aria-current={who === '' ? 'true' : undefined} onclick={() => setParam('by', '')}>
               <Icon name="people" size="s" /><span class="mi-name">{historyWords.everyone}</span>{#if who === ''}<Icon name="check" size="s" />{/if}
             </button>
             {#each actors as a (a)}
-              {@const by = actorSaid(a, me, names)}
+              {@const by = actorSaid(a, me, names, runs.get(a) ?? null)}
               <button type="button" class="mi" role="menuitem" aria-current={who === a ? 'true' : undefined} onclick={() => setParam('by', a)}>
                 <Face name={by.name} you={by.you} kind={by.kind} size="s" /><span class="mi-name">{by.name}</span>{#if who === a}<Icon name="check" size="s" />{/if}
               </button>
@@ -604,7 +606,7 @@
 
 {#snippet entry(t: Told, first?: string)}
   {@const e = t.e}
-  {@const by = actorSaid(e.by, me, names)}
+  {@const by = actorSaid(e.by, me, names, e.run_by ?? null)}
   <!-- ONE PASS OF BRAINDOG'S OWN UPDATE (`passOf`) says the record's sentence as its whole line, and names nothing of its own. -->
   {@const pass = passOf(e)}
   {@const declared = pass === null && e.kind === 'declare' ? declaredOf(e.target, e.note) : null}
@@ -744,7 +746,7 @@
           title={LOG.length === 0 ? copy.auditNone : copy.noneMatching(kept.length, 'entries')}
           query={LOG.length === 0
             ? undefined
-            : [who ? actorSaid(who, me, names).name : '', isEventKind(what) ? kindOf(what).word : what].filter(Boolean).join(' · ')}
+            : [who ? actorSaid(who, me, names, runs.get(who) ?? null).name : '', isEventKind(what) ? kindOf(what).word : what].filter(Boolean).join(' · ')}
           body={LOG.length === 0 ? copy.auditHolds : undefined}
         >
           {#snippet actions()}

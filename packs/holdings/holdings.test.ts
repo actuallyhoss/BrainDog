@@ -607,3 +607,94 @@ test('A PRICE OVER THIRTY DAYS OLD TURNS THE DAY INTO A WARNING, and thirty days
   assert.deepEqual([gone.tile, gone.warning, gone.day], [true, false, epochDay('2026-09-20')]);
   close();
 });
+
+/* ── a price said again ──────────────────────────────────────────────────────────────────────────────────────────────
+   A price typed again on a holding that already had a day kept the old day, so the warning stayed over a price said
+   that morning. The script is handed the row and never what moved, and reads no history, so it cannot tell a new
+   price from an old one by itself: the rule hands it `changed`, the fields the write moved, from `{{trigger.changed}}`.
+   The first test holds it end to end on a record, and the script's own half is held below with the input the path
+   hands it. */
+
+const SIXTY_AGO = '2026-07-27';
+const priced = (api: Api): string =>
+  hold(api, { label: 'Silver, ten grams', kind: 'commodity', qty: 10, unit_cost: egp(300_000), price: egp(410_000), priced_on: SIXTY_AGO });
+const dayOf = (api: Api, id: string): unknown => api.kernel.get(id)!.fields.priced_on;
+
+test('A PRICE CHANGED ON A HOLDING PRICED SIXTY DAYS AGO IS DATED TODAY, and the warning goes', async () => {
+  const { api, close } = await inPounds();
+  const id = priced(api);
+  await settle(api);
+  assert.equal(dayOf(api, id), SIXTY_AGO);
+  assert.equal((await pricedOn(api)).warning, true);
+  said(api.kernel.update('holdings', id, { price: egp(455_000) } as never, { actor: 'p_1' }));
+  await settle(api);
+  assert.equal(dayOf(api, id), TODAY, 'a price said today kept the day of the price it replaced');
+  assert.equal((await pricedOn(api)).warning, false);
+  close();
+});
+
+test('A COUNT THAT MOVES LEAVES THE DAY THE PRICE WAS SAID, since nobody priced anything', async () => {
+  const { api, close } = await inPounds();
+  const id = priced(api);
+  await settle(api);
+  said(api.kernel.update('holdings', id, { qty: 4 } as never, { actor: 'p_1' }));
+  await settle(api);
+  assert.equal(dayOf(api, id), SIXTY_AGO, 'a change to the count dated the price today');
+  assert.deepEqual(api.kernel.get(id)!.fields.value, egp(1_640_000));
+  close();
+});
+
+test('A PRICE TAKEN AWAY TAKES ITS DAY WITH IT, so no day stands beside no price', async () => {
+  const { api, close } = await inPounds();
+  const id = priced(api);
+  await settle(api);
+  said(api.kernel.update('holdings', id, { price: null } as never, { actor: 'p_1' }));
+  await settle(api);
+  assert.equal(dayOf(api, id) ?? null, null, 'the day stayed on a holding with no price');
+  assert.deepEqual(api.kernel.get(id)!.fields.value, egp(3_000_000));
+  close();
+});
+
+test('A DAY WRITTEN WITH THE PRICE IN ONE GO IS NEVER WRITTEN OVER, on a holding that had a day and on one that had none', async () => {
+  const { api, close } = await inPounds();
+  const had = priced(api);
+  const none = hold(api, { label: 'Term deposit', kind: 'certificate', qty: 1, unit_cost: egp(5_000_000) });
+  await settle(api);
+  said(api.kernel.update('holdings', had, { price: egp(455_000), priced_on: '2026-09-18' } as never, { actor: 'p_1' }));
+  said(api.kernel.update('holdings', none, { price: egp(5_200_000), priced_on: '2026-09-18' } as never, { actor: 'p_1' }));
+  await settle(api);
+  assert.deepEqual([dayOf(api, had), dayOf(api, none)], ['2026-09-18', '2026-09-18'], 'the day somebody wrote with the price was written over');
+  close();
+});
+
+/**
+ * The script by itself, handed what a rule whose `{{trigger.changed}}` is filled would hand it. No record: one row in,
+ * and what the script asks to be written out. The first test above holds the same end to end.
+ */
+async function handed(changed: string | undefined, fields: Body): Promise<Body | null> {
+  const run = ((await import(new URL('./cost.js', import.meta.url).href)) as { default: (ctx: unknown) => Promise<void> }).default;
+  let wrote: Body | null = null;
+  await run({
+    input: { id: 'x', ...(changed === undefined ? {} : { changed }) },
+    today: () => TODAY,
+    record: { get: async () => ({ seq: 1, version: 1, fields: { qty: 10, unit_cost: egp(300_000), cost: egp(3_000_000), ...fields } }) },
+    update: (_at: string, next: Body) => void (wrote = next),
+  });
+  return wrote;
+}
+
+test('THE SCRIPT, TOLD THE PRICE MOVED, DATES IT TODAY, and told the day moved with it, or told nothing, keeps the day', async () => {
+  const old = { price: egp(455_000), value: egp(4_550_000), priced_on: SIXTY_AGO };
+  assert.deepEqual(await handed('price', old), { priced_on: TODAY });
+  assert.equal(await handed('price,priced_on', old), null, 'a day written with the price was written over');
+  assert.equal(await handed('priced_on,price', old), null);
+  assert.equal(await handed('qty', old), null, 'a count that moved dated the price');
+  /* NOT TOLD: no `changed` (the clock's run), and the dash a record that does not fill the path hands on. */
+  assert.equal(await handed(undefined, old), null);
+  assert.equal(await handed('—', old), null);
+  /* A PRICE SAID TWICE IN A DAY writes nothing the second time, and a price with no day is dated whatever moved. */
+  assert.equal(await handed('price', { ...old, priced_on: TODAY }), null);
+  assert.deepEqual(await handed('qty', { price: egp(455_000), value: egp(4_550_000) }), { priced_on: TODAY });
+  /* TAKEN AWAY: the worth goes back to the cost and the day goes with the price. */
+  assert.deepEqual(await handed('price', { value: egp(4_550_000), priced_on: SIXTY_AGO }), { value: egp(3_000_000), priced_on: null });
+});

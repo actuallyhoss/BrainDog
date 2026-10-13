@@ -46,6 +46,7 @@ import { SESSION_PREFIX } from './session.ts';
 import { SLASH, slashMayWrite } from './slash.ts';
 import { parseAnswer, readRow, type Mapping } from './map.ts';
 import { startAtDoor } from './script.ts';
+import { payeeName } from './identity-keys.ts';
 
 export const CHANNELS = ['email', 'webhook', 'pull', 'paste', 'api'] as const;
 export type Channel = (typeof CHANNELS)[number];
@@ -359,7 +360,8 @@ export type Arrived = {
    */
   sender?: Sender;
   /**
-   * The payee a pattern read into `counterparty_text`, as it was printed, kept on the arrival whatever became of the
+   * The payee a pattern read into `counterparty_text`, by the name a person reads (`payeeName`: `Chillout` for
+   * `GEIDEA*CHILLOUT 0423 CAIRO EG`, and the text itself where nothing of it is a name), kept on the arrival whatever became of the
    * row: written, held for a person, or on a list that declares no field for it. It is what the record's rule meets an
    * organisation by, through its `bank:` key, and the key is the record's to make (`keyOf`), not this file's.
    */
@@ -705,6 +707,12 @@ export const UNVERIFIED = 'nothing verified this arrival, so no pattern was offe
 export const COUNTERPARTY = 'counterparty_text';
 
 /**
+ * The field a list keeps the payee's name in as a person reads it (`payeeName`): `Chillout` beside the bank's
+ * `GEIDEA*CHILLOUT 0423 CAIRO EG`, which `counterparty_text` keeps word for word.
+ */
+export const PAYEE = 'payee';
+
+/**
  * One payload through the pipeline.
  *
  * THE RAW IS STORED FIRST AND ALWAYS. Whatever happens after it, the bytes are in the record — which
@@ -734,7 +742,7 @@ export function arrive(deps: IngestDeps, arrival: Arrival, transaction: <T>(fn: 
   return said(attempt(deps.sql, transaction, () => runArrival(deps, arrival, null, heard)));
 }
 
-/** What one run of the pipeline heard on the way, for the answer `arrive` hands back: the payee as printed. */
+/** What one run of the pipeline heard on the way, for the answer `arrive` hands back: the payee by its name. */
 type Heard = { counterparty?: string };
 
 /** The arrival's verdict, written on its inbox row. */
@@ -1067,7 +1075,7 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
     const register = routed.to;
 
     /**
-     * A BANK DOOR'S PAYEE IS KEPT ON THE ARRIVAL, as it was printed (`Arrived.counterparty`), so the record's rule can
+     * A BANK DOOR'S PAYEE IS KEPT ON THE ARRIVAL, by its name (`Arrived.counterparty`), so the record's rule can
      * meet the organisation by its `bank:` key whatever happens to the row: filed, held for a person, or near another.
      *
      * AND IT NEVER COSTS THE ROW. A pattern fills `counterparty_text` the moment its add-on knows the field, and the list
@@ -1076,8 +1084,18 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
      * here alone, out of the row and out of what could not be read.
      */
     const payee = extracted[COUNTERPARTY];
-    if (typeof payee === 'string' && payee.trim() !== '') heard.counterparty = payee.trim().replace(/\s+/g, ' ');
+    const printed = typeof payee === 'string' ? payee.trim().replace(/\s+/g, ' ') : '';
+    /* THE ARRIVAL CARRIES THE NAME AS A PERSON READS IT, because it is what the organisation is named by. The `bank:`
+       key is the same from either (`payeeName` answers the text itself where its name would fold to another payee),
+       so a payee met under the bank's words before this is the same one after. */
+    const clean = printed === '' ? '' : payeeName(printed);
+    if (printed !== '') heard.counterparty = clean;
     const declaredFields = deps.schemaOf(register)?.fields;
+    /* AND THE ROW KEEPS THAT NAME BESIDE THE BANK'S WORDS, only on a list that declares a text field for it and only
+       where the pattern read none itself: another list's `payee` may be a link to somebody, and a name written into
+       one would refuse the whole charge. */
+    if (clean !== '' && declaredFields?.[PAYEE]?.type === 'text' && Object.hasOwn(declaredFields, PAYEE) && !Object.hasOwn(extracted, PAYEE))
+      extracted[PAYEE] = clean;
     if (declaredFields !== undefined && !Object.hasOwn(declaredFields, COUNTERPARTY)) {
       delete extracted[COUNTERPARTY];
       for (const list of [missed, soft, invalid]) if (list.includes(COUNTERPARTY)) list.splice(list.indexOf(COUNTERPARTY), 1);

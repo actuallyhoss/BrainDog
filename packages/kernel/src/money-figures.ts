@@ -636,6 +636,24 @@ export function readCrosscheck(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
   });
 }
 
+/**
+ * How far a walk to zero looked when it never went under: the last day it walked, and how many days that is from today.
+ *
+ * BESIDE THE VALUE, NEVER IN IT. No crossing was no value and nothing more, so a tile over a record whose money outlasts
+ * the walk drew a dash where "past 20 Sep 2027" was known. Written into `value` instead, the length of the walk would be
+ * read as the day the money runs out, by a target, a chart and every reader that takes a number for the answer.
+ */
+export type Beyond = { day: string; days: number };
+
+/** A reading of the walk, which is a reading: `Reading` carries `beyond` itself, for a walk to zero that never went under. */
+export type WalkReading = Reading;
+
+/** How far a reading's walk looked without going under, or `null` when it went under, has no walk or could not say. */
+export function beyondOf(reading: Reading): Beyond | null {
+  const b = (reading as WalkReading).beyond;
+  return b && typeof b.day === 'string' && Number.isInteger(b.days) ? { day: b.day, days: b.days } : null;
+}
+
 /** Whether a figure reads the walk ahead rather than a list. */
 export const isWalked = (decl: Pick<MetricDecl, 'source'>): boolean => decl.source === WALK_SOURCE;
 
@@ -673,10 +691,11 @@ function daysAhead(walked: Walked): number | string {
  *
  * `out` IS A MAGNITUDE, the money leaving as a positive amount, because a tile reading "Going out" says the direction
  * in its words. `net` is signed. `days_to_zero` walks from the figure `opening` names, and has no value when the
- * balance stays above zero inside the span.
+ * balance stays above zero inside the span: the reading then carries `beyond`, how far the walk looked (`Beyond`). An
+ * opening already below zero is day 0, today.
  *
  * `zero_on` IS THE SAME CROSSING AS A DAY, for a tile that says "Runs out 30 Oct" where a count of days goes stale by
- * morning. It walks from the same `opening` and has no value in the same cases. A reading's value is a number, so the
+ * morning. It walks from the same `opening`, has no value in the same cases and carries the same `beyond`. A reading's value is a number, so the
  * day is held as the whole days since 1970 that name it, which is what `format: day` already means for the earliest or
  * latest of a day field (`metrics.ts`), and the reader writes it as a date.
  *
@@ -771,10 +790,16 @@ export function readWalk(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result<R
       at: 'opening',
       allowed: [walk.value.currency],
     });
-  const total = totalOf(walk.value, walked.walk);
+  /* A WALK THAT OPENS BELOW ZERO IS UNDER TODAY. The crossing is the first step that leaves the balance under, so an
+     overdrawn opening went under on the next movement, a pay day included, and with nothing coming never did, which
+     read as money that lasts. Day 0 is today, as a count and as the day itself. */
+  const under = toZero && opening < 0;
+  const total = under ? (walked.walk === 'zero_on' ? Math.round(Date.parse(`${today}T00:00:00Z`) / DAY) : 0) : totalOf(walk.value, walked.walk);
+  /* NEVER UNDER INSIDE THE SPAN: no value still, and beside it the last day the walk looked at (`Beyond`). */
+  const beyond: Beyond | null = toZero && total === null ? { day: new Date(Date.parse(`${today}T00:00:00Z`) + horizon * DAY).toISOString().slice(0, 10), days: horizon } : null;
   const verdict = verdictOf(decl, total, unit, home.rates, today);
   const converted = walk.value.converted;
-  return ok({
+  return ok<WalkReading>({
     value: total,
     unit,
     rows: walk.value.steps.length,
@@ -791,6 +816,7 @@ export function readWalk(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result<R
     refusals: [],
     ...(verdict.targetIn ? { targetIn: verdict.targetIn } : {}),
     ...(converted ? { fx: { into: home.home, home: home.home, asOf: converted.asOf, forward: converted.forward, stale: converted.stale, missing: [] } } : {}),
+    ...(beyond ? { beyond } : {}),
   });
 }
 

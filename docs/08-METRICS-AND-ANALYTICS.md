@@ -122,7 +122,7 @@ language, and a language in YAML is the failure this whole platform is built to 
 
 | | |
 |---|---|
-| Aggregations | `sum` · `count` · `avg` · `min` · `max` · `delta` · `median` · `distinct` · `last` · **`running`** · **`trend`**. **Eleven, counted.** *(An earlier draft said "ten" over a list of nine — the exact miscount this corpus keeps making; adding `running` and `trend` is what makes a number true.)* `last` exists for `series.<id>` sources. `median` is computed by the evaluator, not by SQL — SQLite has no `median` aggregate. `running` and `trend` are §2.3. `count` takes a field and counts the rows where it is present; `count: id` counts rows, `id` being one of the six kernel fields any `where:` or aggregation may name ([02-DATA-MODEL](02-DATA-MODEL.md) §6). *(Amended 9 October 2026, as built for money-core 3.16.0's signs: three more words read how a list is kept rather than what it adds up to. `age` is today less the latest day of a `day` or `instant` field, in whole days, and nothing over no row; `currencies` is how many currencies a `money` field is kept in, the code alone, where `distinct` counts amount and currency together; `empty` counts the rows where a field is not filled, so a ratio of it over `count: id` is the share left blank. Any other field type is refused at install, and with them the list is fourteen.)* |
+| Aggregations | `sum` · `count` · `avg` · `min` · `max` · `delta` · `median` · `distinct` · `last` · **`running`** · **`trend`**. **Eleven, counted.** *(An earlier draft said "ten" over a list of nine — the exact miscount this corpus keeps making; adding `running` and `trend` is what makes a number true.)* `last` exists for `series.<id>` sources. `median` is computed by the evaluator, not by SQL — SQLite has no `median` aggregate. `running` and `trend` are §2.3, and both are built in the shapes §2.3 gives under "As built" (13 October 2026), no longer published only. `count` takes a field and counts the rows where it is present; `count: id` counts rows, `id` being one of the six kernel fields any `where:` or aggregation may name ([02-DATA-MODEL](02-DATA-MODEL.md) §6). *(Amended 9 October 2026, as built for money-core 3.16.0's signs: three more words read how a list is kept rather than what it adds up to. `age` is today less the latest day of a `day` or `instant` field, in whole days, and nothing over no row; `currencies` is how many currencies a `money` field is kept in, the code alone, where `distinct` counts amount and currency together; `empty` counts the rows where a field is not filled, so a ratio of it over `count: id` is the share left blank. Any other field type is refused at install, and with them the list is fourteen.)* |
 | Combinators | `ratio` (a ÷ b) · `diff` (a − b) · `product` (a × b) |
 | Depth | **one, in either direction**: a combinator over two aggregations (`ratio: { of, per }`), **or** one aggregation over a row-level `product`/`diff` of two fields, one of which may be a `lookup` (§2.5). Never a combinator over a combinator |
 
@@ -221,6 +221,27 @@ forbidding it.)*
 \|t\| ≥ 2.1 with n ≥ 6 it returns compound growth with a low/high band, else it returns *flat* and
 says why. A projection compounds the last complete bucket forward, **capped at 10× with the cap
 reported** — because an uncapped exponential on six points is a number that will be quoted.
+
+*(As built, 13 October 2026, REC-B09.)* **Both are read, in these shapes, and the two drafts above are the published
+idea and not what a declaration writes.**
+
+```yaml
+value: { running: { sum: amount, order: day, until: { gte: 500000 } } }
+value: { running: { sum: amount, order: day, until: { gte: { field: budget, of: category } } } }
+value: { trend: { of: in-by-month, ahead: 3 } }
+```
+
+- **`running`** adds `sum` up in the order of the field `order` names. With no `until` it answers the total at the end.
+  With `until: { gte: n }`, a number in the figure's own units, it answers the total at the stop and `crossed: { id, at,
+  value }`: the first entry whose running total is at or over the line, the day it fell on, and the total there. With
+  `until: { gte: { field, of } }` the line is that field of the row the figure's `where` names through the reference
+  field `of` (a category's budget, for spending in that category). A total that stays under the line, or a named row
+  that holds nothing in the field, answers the total at the end and no `crossed`. `from:` and `stop:` are not read, a
+  line kept as a setting is refused `NOT_IN_THIS_BUILD`, and a running total with `group_by` is refused at install.
+- **`trend`** reads another figure in its buckets, named by its id in `of`, and `ahead` is how many buckets past the
+  last full one it reads, a whole number from 1 to 12. It answers growth with `rate`, `low`, `high` and `n`; or steady,
+  the same amount each bucket, with its own band; or flat with why (`few`, `nought`, `unsure`). Each bucket ahead is
+  capped at ten times the last full one and held at nought below, and says so. A trend over a field is not read.
 
 ## 2.4 · Rules that make a comparison honest
 

@@ -493,6 +493,8 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   alone. A rule and a script added inside the unreleased step, so no version of its own.
  *   One more sign of life (repeating-overdue-67, REC-B11 step 8): `repeating-overdue`, how many live repeating lines
  *   have a Next more than three days gone, with nought the target. A figure added inside the unreleased step.
+ *   A name beside the bank's words (payee-field-68, REC-B16 step 2): the Ledger gains `payee`, Paid to or from,
+ *   searchable and not indexed, and `counterparty_text` is labelled As the bank wrote it.
  * - portfolio 1.16.0 and work 1.18.0 (batch 46, REC-C08's remainder and REC-C16): a project others point at stays. Projects
  *   declares `delete: refuse_while_referenced`, as Accounts does, so a project a task, a bill, a service or a person names
  *   is not deleted out from under them, and the refusal names the lists and how many. Under What each one earns, one
@@ -542,7 +544,15 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   with no version of its own (`e84778f2db7564d6`): a plan is a thing of its own (plans-list-66, REC-B12 jobs 1 and
  *   2). The list `plans`, declared before Instalments, which gains `plan_row` and `left_after`; the script
  *   `plans_from_names`, once a day and when `part-counts-plan` hands it a part made or changed. A record updating
- *   holds its plans as rows after the script's first run and its parts linked after the second.
+ *   holds its plans as rows after the script's first run and its parts linked after the second. `plan-links-parts`
+ *   starts that second run when the plan is made, handing the script the plan, and the script never opens a closed
+ *   plan (plans-calm-67-68).
+ * - money-core 3.17.0, still unreleased (commit 63423720, the deployed build, holds 3.16.0), takes batch 68's changes
+ *   with no version of its own: the Ledger's `payee` (payee-field-68, above); `rule.plan-links-parts` (plans-calm-67-68,
+ *   above); the page `money-plan`, one plan's page, with six figures of one plan, `plan-parts-paid`, `plan-parts`,
+ *   `plan-paid`, `plan-left`, `plan-next-due` and `plan-last-due`, and two by plan, `installments-paid-by-plan` and
+ *   `installments-total-by-plan` (plan-page-68, REC-B12); and `budget-passed-on`, the day a category's spending
+ *   reached its budget, a running total with a stop (budget-passed-on-68, REC-B19 step 4).
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.17.0',

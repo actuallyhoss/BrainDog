@@ -207,7 +207,7 @@ export function lineOf(r, colour = false) {
 /**
  * Everything the command prints and the code it leaves with, from the screens it was handed (`null` for none) and the
  * person: a heading a screen, a line a check, and a last line that counts them and says the exit code. 1 when any
- * check is red, 0 when none is.
+ * check is red, 0 when none is. A check that read nothing leaves the code alone and is said as UNCHECKED on that line.
  *
  * WITH NO SCREEN, only the checks that read words are judged, on the first run's own words; the rest say "not seen",
  * since a list nobody read and a rail nobody drew prove nothing.
@@ -223,7 +223,10 @@ export function report(screens, person, colour = false) {
   }
   const n = (v) => all.filter((r) => r.pass === v).length;
   const code = n(false) > 0 ? 1 : 0;
-  out.push(`${all.length} checks: ${n(true)} green, ${n(false)} red, ${n(null)} not seen. Exit code ${code}.`);
+  /* NOT SEEN IS NOT A PASS, and the code is 0 with five of seven unread: the last line says so in a word a nightly
+     reader cannot take for green, and names how many. */
+  const unread = n(null) > 0 ? ` UNCHECKED: ${n(null)} of ${all.length} read nothing, which is not a pass.` : '';
+  out.push(`${all.length} checks: ${n(true)} green, ${n(false)} red, ${n(null)} not seen.${unread} Exit code ${code}.`);
   return { lines: out, code };
 }
 

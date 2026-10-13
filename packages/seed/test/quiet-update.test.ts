@@ -541,12 +541,24 @@ const withoutLedgerTile = (doc: Body): Body => ({
 /**
  * AND 3.17.0'S PLANS (plans-list-66, REC-B12 jobs 1 and 2), folded into the same unreleased step: the list Plans goes,
  * an instalment loses Part of and Left after, and the script that makes and counts plans goes with the rule that starts it.
+ * AND BATCH 68'S, folded into the same unreleased step: the rule a new plan starts the script by (plans-calm-67-68), the
+ * page of one plan with its eight figures (plan-page-68), and the day a category passed its budget (budget-passed-on-68).
  */
 const PLAN_FIELDS: ReadonlySet<string> = new Set(['plan_row', 'left_after']);
+const PLAN_FIGURES_68: ReadonlySet<string> = new Set(['plan-parts-paid', 'plan-parts', 'plan-paid', 'plan-left', 'plan-next-due', 'plan-last-due', 'installments-paid-by-plan', 'installments-total-by-plan', 'budget-passed-on']);
+/** AND 3.17.0'S PAYEE (payee-field-68, REC-B16 step 2), folded into the same unreleased step: the Ledger loses `payee`, and `counterparty_text` is labelled Paid to or from again. */
+const withoutPayee = (doc: Body): Body => ({
+  ...doc,
+  declarations: (doc.declarations as Body[]).map((d) =>
+    d.register === 'transactions' && Array.isArray(d.fields)
+      ? { ...d, fields: (d.fields as Body[]).filter((f) => f.id !== 'payee').map((f) => (f.id === 'counterparty_text' ? { ...f, label: 'Paid to or from' } : f)) }
+      : d,
+  ),
+});
 const withoutPlans = (doc: Body): Body => ({
   ...doc,
   declarations: (doc.declarations as Body[])
-    .filter((d) => d.register !== 'plans' && d.rule !== 'part-counts-plan' && d.script !== 'plans_from_names')
+    .filter((d) => d.register !== 'plans' && d.rule !== 'part-counts-plan' && d.rule !== 'plan-links-parts' && d.script !== 'plans_from_names' && d.page !== 'money-plan' && !PLAN_FIGURES_68.has(String(d.metric)))
     .map((d) => (d.register === 'installments' && Array.isArray(d.fields) ? { ...d, fields: (d.fields as Body[]).filter((f) => !PLAN_FIELDS.has(String(f.id))) } : d)),
 });
 const withoutCashStale = (doc: Body): Body => ({ ...doc, declarations: (doc.declarations as Body[]).filter((d) => d.rule !== 'cash-stale') });
@@ -560,7 +572,7 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
     version: '3.13.0',
     released: '2e09983b40aba73e',
     undo: (raw) => {
-      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(raw))))))));
+      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(raw)))))))));
       return {
       ...doc,
       /* AND THE SCRIPT THAT MARKS A BILL PAID, WITH THE RULE THAT STARTS IT (settle-rule-60), both newer than 3.13.0. */
@@ -911,7 +923,11 @@ const numbersBefore = (doc: Body, id: string): Body =>
         ...(Array.isArray(doc.adds) ? { adds: (doc.adds as Body[]).filter((a) => (a.block as Body | undefined)?.key !== 'earning-silent' && (a.block as Body | undefined)?.heading !== 'Server and provider numbers') } : {}),
         declarations: (doc.declarations as Body[]).filter((d) => d.metric !== 'project-numbers-7d' && d.metric !== 'projects-earning-silent' && d.metric !== 'service-numbers').map((d) =>
           typeof d.metric === 'string' && d.metric.startsWith('datapoints-') && typeof d.where === 'string'
-            ? { ...d, where: d.where.replace(', at before tomorrow', '') }
+            ? d.where === 'at before tomorrow'
+              ? (({ where: _where, ...held }) => held)(d)
+              : { ...d, where: d.where.replace(', at before tomorrow', '') }
+            : d.page === 'dashboard'
+            ? (dropAmount({ ...d, blocks: (d.blocks as Body[]).map((b) => (b.heading === 'Latest numbers' ? (({ where: _where, ...table }) => table)(b) : b)) }) as Body)
             : d.register === 'datapoints'
             ? { ...d, fields: (d.fields as Body[]).flatMap((f) => (f.id === 'amount' || f.id === 'about_service' ? [] : f.id === 'value' ? [{ ...f, required: true }] : [f])) }
             : (dropAmount(d) as Body),

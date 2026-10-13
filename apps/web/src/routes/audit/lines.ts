@@ -629,6 +629,10 @@ export type AgentLane = { label: string; spans: Stretch[] };
  *
  * AN AGENT IS SAID AS `actor` SAYS IT, so every run the record cannot put a name to (`S42`) is one lane, "An agent",
  * rather than a lane per run named by a number.
+ *
+ * A RUN THE RECORD CAN NAME IS A LANE BY THAT NAME: the app it ran in, else its kind of agent (the line's `run_by`), so
+ * a Claude Code run and a Codex run are two lanes. A LANE IS KEYED BY THE WORDS IT IS LABELLED WITH, so two runs of one
+ * app share a lane and no two lanes ever carry one name.
  */
 export function lanesOf(events: readonly AuditEvent[], clock: number, me: string | null, names: ReadonlyMap<string, string>): AgentLane[] {
   const start = clock - LANE_SPAN_MS;
@@ -636,7 +640,7 @@ export function lanesOf(events: readonly AuditEvent[], clock: number, me: string
   for (const e of events) {
     const t = Date.parse(e.at);
     if (!(t >= start && t <= clock)) continue;
-    const who = actor(e.by, me, names);
+    const who = actor(e.by, me, names, e.run_by ?? null);
     if (!isAgent(who.kind)) continue;
     const held = times.get(who.name);
     if (held) held.push(t);
@@ -691,7 +695,7 @@ export function tallyOf(events: readonly AuditEvent[], me: string | null, names:
   const groups = new Map<Group, number>();
   const kinds = new Map<EventKind, { kind: EventKind; count: number; agents: number }>();
   for (const e of events) {
-    const group = groupOf(actor(e.by, me, names).kind);
+    const group = groupOf(actor(e.by, me, names, e.run_by ?? null).kind);
     groups.set(group, (groups.get(group) ?? 0) + 1);
     const k = kinds.get(e.kind) ?? { kind: e.kind, count: 0, agents: 0 };
     k.count++;

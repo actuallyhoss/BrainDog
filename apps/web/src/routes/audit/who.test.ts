@@ -14,7 +14,8 @@ import assert from 'node:assert/strict';
 
 import { copy } from '../../lib/copy.ts';
 import { actorOf } from '../../lib/record/api.ts';
-import { actorSaid, offeredActors, personIn, targetSaid } from './who.ts';
+import type { AuditEvent } from '../../lib/record/schema.ts';
+import { actorSaid, offeredActors, personIn, runsIn, targetSaid } from './who.ts';
 
 /** The decider on the driven record, the id the screen printed raw. */
 const DECIDER = 'p_01M1KJ7RG0TYYA0AX15QPGJJ4';
@@ -113,4 +114,41 @@ test('NOBODY IS LINKED TO A PAGE THAT DOES NOT EXIST, which is what the screen a
      that keeps that true. */
   assert.notEqual(targetSaid(DECIDER, null, NO_NAMES), null);
   assert.notEqual(targetSaid(`person:${OWNER}`, null, NO_NAMES), null);
+});
+
+/* WHO A RUN IS (history-run-by-web-68): a line a run signed carries run_by, and the screen says the app it ran in. */
+const RUN_NOW = new Date(2026, 8, 29, 9, 40).getTime();
+const runAgo = (min: number): string => new Date(RUN_NOW - min * 60_000).toISOString();
+const CODE = { run: 'S42', agent: 'claude', client: 'claude-code 2.1.4', parent: null };
+const CODEX = { run: 'S43', agent: 'codex', client: 'codex-mcp-client', parent: null };
+let runSeq = 100;
+const runEv = (at: string, by: string, run_by?: AuditEvent['run_by']): AuditEvent => ({
+  seq: runSeq--, at, by, kind: 'edit', note: '', version: runSeq + 1, ...(run_by === undefined ? {} : { run_by }),
+});
+
+test('A RUN IS SAID BY THE APP IT RAN IN, and one the record sent nothing for is still An agent', () => {
+  assert.equal(actorSaid('S42', null, NO_NAMES, CODE).name, 'Claude Code');
+  assert.equal(actorSaid('S42', null, NO_NAMES, CODE).kind, 'agent');
+  assert.equal(actorSaid('S42', null, NO_NAMES, CODE).person, false);
+  assert.equal(actorSaid('S42', null, NO_NAMES).name, 'An agent');
+  assert.equal(actorSaid('S42', null, NO_NAMES, null).name, 'An agent');
+  /* ANOTHER RUN'S run_by NAMES NOBODY HERE. */
+  assert.equal(actorSaid('S42', null, NO_NAMES, CODEX).name, 'An agent');
+});
+
+test('A PERSON AND A RULE READ AS THEY DID, whatever run_by is handed over beside them', () => {
+  const names = new Map([['p_01M1KJ7RG0TYYA0AX15QPGJJ4', 'Mona']]);
+  assert.equal(actorSaid('p_01M1KJ7RG0TYYA0AX15QPGJJ4', null, names, CODE).name, 'Mona');
+  assert.equal(actorSaid('you', null, NO_NAMES, CODE).you, true);
+  assert.equal(actorSaid('rule.renewal', null, NO_NAMES, CODE).name, 'A rule: Renewal');
+  assert.equal(actorSaid('agent:claude', null, NO_NAMES, CODE).name, 'Claude');
+});
+
+test('THE FILTER OFFERS A RUN IT CAN NAME, and says it as the line does', () => {
+  const log = [runEv(runAgo(2), 'S43', CODEX), runEv(runAgo(20), 'S42', CODE), runEv(runAgo(30), 'S7')];
+  const runs = runsIn(log);
+  assert.deepEqual([...runs.keys()].sort(), ['S42', 'S43']);
+  assert.deepEqual(offeredActors(['S42', 'S43', 'system'], null, NO_NAMES, runs), ['S42', 'S43', 'system']);
+  assert.deepEqual(offeredActors(['S42', 'S43', 'system'], null, NO_NAMES), ['system'], 'with no run_by both are An agent');
+  assert.equal(actorSaid('S42', null, NO_NAMES, runs.get('S42') ?? null).name, 'Claude Code');
 });

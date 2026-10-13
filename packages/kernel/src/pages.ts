@@ -617,7 +617,7 @@ export type PageFilter = {
 };
 
 /** One event, as the activity source reads it. */
-export type ActivityEvent = { ts: string; actor: string; kind: string; target: string | null; note: string | null; thing?: string | null; rows?: number };
+export type ActivityEvent = { ts: string; actor: string; kind: string; target: string | null; note: string | null; thing?: string | null; rows?: number; run_by?: RunBy | null };
 
 /**
  * Who changed a row last, for the byline a page draws under it: the kind of actor and who it was, when, and the batch

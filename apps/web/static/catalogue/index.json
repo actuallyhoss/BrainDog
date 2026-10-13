@@ -545,9 +545,9 @@
       "versions": [
         {
           "version": "1.4.0",
-          "checksum": "2707fb9029929b13a606e735f9add9baa5eaca15fd1b3037f3f8d5c09229d915",
-          "bytes": 11332,
-          "published_at": "2026-10-13T15:17:38.879Z",
+          "checksum": "37c0a58b2ff473a89a0584baa6cb4b44b559bd3219cc129237ab144d5c714623",
+          "bytes": 12480,
+          "published_at": "2026-10-13T16:24:22.295Z",
           "bump": "minor",
           "reach": {
             "modules": [
@@ -566,7 +566,7 @@
             "skills": [],
             "calls_out": []
           },
-          "notes": "A holding can have a price, \"Worth each now\", and the day it was priced. Holdings value adds up what each is worth at its price, or what it cost when it has none, and says how many stand at what they cost. A price written with no day is dated the day it was written, the page says the oldest day a price was said, and warns once that day is over 30 days ago. The value reads in your home currency, or the one your holdings are in.",
+          "notes": "A holding can have a price, \"Worth each now\", and the day it was priced. Holdings value adds up what each is worth at its price, or what it cost when it has none, and says how many stand at what they cost. A price written with no day is dated the day it was written, a price taken away takes its day with it, the page says the oldest day a price was said, and warns once that day is over 30 days ago. The value reads in your home currency, or the one your holdings are in.",
           "preview": true
         },
         {
@@ -2027,6 +2027,48 @@
       ],
       "categories": [
         "connectors",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      }
+    },
+    {
+      "kind": "pack",
+      "id": "task-tiers",
+      "title": "Task tiers",
+      "summary": "Give a task four numbers, what it brings in, what it unblocks, whether it has a clock on it and how cheap it is, and the record works out its priority and writes the sum as the reason.",
+      "author": "BrainDog",
+      "license": "Apache-2.0",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "349068b30592c5ea6fea089d497078cae04d316869a641d2ff6c194436c8e09a",
+          "bytes": 5096,
+          "published_at": "2026-10-13T16:24:22.295Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "work"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [
+              "Work out a task's priority from its four numbers"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The first version."
+        }
+      ],
+      "categories": [
+        "automations",
         "made-by-braindog"
       ],
       "publisher": {

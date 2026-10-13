@@ -23,6 +23,7 @@ import { METRICS } from './declared.ts';
 import { noteOf } from './history-live.ts';
 import { format, fxNote, hrefFor, offTarget, partsText, targetLine } from './metrics.ts';
 import { moneyInText } from './money.ts';
+import { runByIn } from './names.ts';
 import type { AuditEvent } from './schema.ts';
 
 /**
@@ -164,6 +165,7 @@ export async function readLog(base: string, me: string | null, io?: Fetch, befor
       seq: at,
       at: e.ts,
       by: actorFor(e.actor, me),
+      ...(e.run_by === undefined ? {} : { run_by: runByIn(e.run_by) }),
       kind,
       ...(target === undefined ? {} : { target }),
       note: moneyInText(e.note ?? (e.register !== null ? noteOf(e.register, e) : '')),

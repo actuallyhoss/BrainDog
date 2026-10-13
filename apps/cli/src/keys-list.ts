@@ -22,6 +22,7 @@ import { fixOf, refused, type Result } from '@braindog/ports';
 
 import { printable } from './clip.ts';
 import { budgetOf, clientFor, target, type Target } from './http.ts';
+import { looksLikeToken } from './install.ts';
 import { machine, refuse, type Saying } from './json.ts';
 import type { KeysIo } from './keys.ts';
 
@@ -79,6 +80,20 @@ export function shapeOf(decl: unknown): Shape {
  */
 const sealedIn = (v: unknown): boolean => (isObject(v) ? v.sealed === true : typeof v === 'string' && v !== '');
 
+/**
+ * WORDS A PERSON TYPED, WITH ANYTHING SHAPED LIKE A KEY LEFT OUT. What a key opens and where it is kept are free text,
+ * and "kept at sk-live-..." typed there was said back whole, in the line and in the document: `printable` takes out
+ * control characters only. Each piece between the marks a sentence, a path or a URL puts around one is asked the
+ * question `install` and `doctor` ask (`looksLikeToken`), and a piece that is one is said as `[hidden]`. A long word
+ * that mixes letters and digits is hidden too, which is the side to be wrong on.
+ */
+const HIDDEN = '[hidden]';
+export const withoutKeys = (words: string): string =>
+  words
+    .split(/([\\/=:?&"',;\s()[\]{}<>]+)/)
+    .map((piece, i) => (i % 2 === 1 || piece === '' || !looksLikeToken(piece.replace(/[.!]+$/, '')) ? piece : HIDDEN))
+    .join('');
+
 /** The keys as they are handed on: retired ones left out, by name. `names` is each project's name by its row. */
 export function readKeys(rows: readonly unknown[], names: ReadonlyMap<string, string>, shape: Shape = AGENTS): KeyRead[] {
   return rows
@@ -91,10 +106,10 @@ export function readKeys(rows: readonly unknown[], names: ReadonlyMap<string, st
       return [
         {
           name: text(f[shape.title]) || 'A key with no name',
-          opens: text(f[shape.opens]),
+          opens: withoutKeys(text(f[shape.opens])),
           applies: project === '' ? EVERYWHERE : (names.get(project) ?? SOME_PROJECT),
           sealed,
-          kept: sealed ? null : text(f[shape.where]) || null,
+          kept: sealed ? null : withoutKeys(text(f[shape.where])) || null,
           expires: text(f[shape.expires]) || null,
         },
       ];
@@ -118,7 +133,7 @@ export function keyLine(k: KeyRead, today: string): string {
   return [k.name, k.opens === '' ? 'opens nothing named' : `opens ${k.opens}`, k.applies, kept, day].join(' · ');
 }
 
-/** "Crumb.gg", "Crumb.gg and Encore", "Crumb.gg, Encore and Glaze". */
+/** "Crumb.gg", "Crumb.gg and Lanternfish", "Crumb.gg, Lanternfish and Glaze". */
 const listed = (names: readonly string[]): string => (names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)!}`);
 
 /** The one sentence for the whole: how many, and how many of them are sealed here. `where` is "" for every key. */

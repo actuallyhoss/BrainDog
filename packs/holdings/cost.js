@@ -9,6 +9,13 @@
  *
  * A PRICE WRITTEN WITH NO DAY IS STAMPED WITH TODAY, the record's own day, in `priced_on`: a price nobody dated was taken
  * as it is, and then nothing could say it had gone old. A day somebody wrote is never written over.
+ *
+ * A PRICE SAID AGAIN IS DATED AGAIN, WHEN THE RULE SAYS THE PRICE MOVED. The row alone cannot say it: a price typed this
+ * morning beside a day sixty days old reads the same as one nobody touched. So the rule hands `changed`, the fields the
+ * write moved, comma separated. `price` in it and `priced_on` not in it is a new price nobody dated, stamped today;
+ * both in it is a day somebody wrote with the price, kept. With no `changed`, or one that names no field (a run the
+ * clock started, or a record that does not fill it), the day is kept, since keeping an old day warns and writing a new
+ * one would hide it. A PRICE TAKEN AWAY TAKES ITS DAY WITH IT: a day beside no price says nothing.
  */
 export default async function run(ctx) {
   const id = ctx.input && ctx.input.id;
@@ -16,6 +23,8 @@ export default async function run(ctx) {
   const today = typeof ctx.today === 'function' ? ctx.today() : ctx.now().slice(0, 10);
   const amount = (m) => m && typeof m.amount === 'number' && typeof m.currency === 'string';
   const same = (a, b) => amount(a) && a.amount === b.amount && a.currency === b.currency;
+  const moved = ctx.input && typeof ctx.input.changed === 'string' ? ctx.input.changed.split(',') : [];
+  const repriced = moved.includes('price') && !moved.includes('priced_on');
   for (const row of rows) {
     if (!row) continue;
     const qty = row.fields.qty;
@@ -27,7 +36,8 @@ export default async function run(ctx) {
     const next = {};
     if (!same(row.fields.cost, cost)) next.cost = cost;
     if (!same(row.fields.value, value)) next.value = value;
-    if (amount(now) && !row.fields.priced_on) next.priced_on = today;
+    if (amount(now) && (!row.fields.priced_on || repriced) && row.fields.priced_on !== today) next.priced_on = today;
+    if (!amount(now) && row.fields.priced_on) next.priced_on = null;
     if (Object.keys(next).length === 0) continue;
     ctx.update('holdings#' + row.seq, next, row.version);
   }

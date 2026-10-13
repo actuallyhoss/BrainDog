@@ -398,3 +398,28 @@ test('September is Sep down the whole screen, and the dot between two parts of a
   assert.match(markup, /<span class="note" title=\{note\}>\{' · '\}\{note\}<\/span>/u);
   assert.match(markup, /<span class="where-inline"\s*>\{' · '\}\{thing\.list\}<\/span/u);
 });
+
+/* WHO A RUN IS (history-run-by-web-68): a line a run signed carries run_by, and the screen says the app it ran in. */
+const runAgo = (min: number): string => new Date(NOW - min * 60_000).toISOString();
+const CODE = { run: 'S42', agent: 'claude', client: 'claude-code 2.1.4', parent: null };
+const CODEX = { run: 'S43', agent: 'codex', client: 'codex-mcp-client', parent: null };
+let runSeq = 100;
+const runEv = (at: string, by: string, run_by?: AuditEvent['run_by']): AuditEvent => ({
+  seq: runSeq--, at, by, kind: 'edit', note: '', version: runSeq + 1, ...(run_by === undefined ? {} : { run_by }),
+});
+
+test('TWO NAMED RUNS ARE TWO LANES, and the runs the record cannot name share one', () => {
+  const log = [runEv(runAgo(2), 'S43', CODEX), runEv(runAgo(20), 'S42', CODE), runEv(runAgo(25), 'S42', CODE), runEv(runAgo(50), 'S7'), runEv(runAgo(55), 'S8', null)];
+  const lanes = lanesOf(log, NOW, null, NO_NAMES);
+  assert.deepEqual(lanes.map((l) => l.label), ['Codex', 'Claude Code', 'An agent']);
+  assert.equal(lanes[2]!.spans.length, 1, 'S7 and S8 are one lane');
+  assert.equal(lanesSaid(lanes), 'Codex ran 1 stretch, Claude Code 1 and An agent 1. Codex is working now.');
+  /* TWO RUNS OF ONE APP ARE ONE LANE, never two lanes under one name. */
+  const twice = lanesOf([runEv(runAgo(2), 'S43', { ...CODE, run: 'S43' }), runEv(runAgo(5), 'S42', CODE)], NOW, null, NO_NAMES);
+  assert.deepEqual(twice.map((l) => l.label), ['Claude Code']);
+});
+
+test('A NAMED RUN IS STILL COUNTED AS AN AGENT', () => {
+  const t = tallyOf([runEv(runAgo(2), 'S42', CODE), runEv(runAgo(3), 'you')], null, NO_NAMES);
+  assert.deepEqual(t.groups, [{ group: 'agent', count: 1 }, { group: 'you', count: 1 }]);
+});

@@ -151,7 +151,7 @@ import { isMechanism, loadLeg, markPinned, neighboursOf, pairsReads, passOf, set
 import { COST_SQL, COSTS, WAIT_RANK_SQL, WAIT_SQL, costOf, costRank, costRows, optionCost, waitParams, waitRank, type Cost } from './weigh.ts';
 import { recheck } from './cause.ts';
 import { evaluateMetric, predicateOf, readDeclaredSigns, scorePrediction, snapshot, unaggregatableIn, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
-import { STALE_DAYS, readBlock, readPage, registersOf, registersOfBlock, resolvePages, runByOf, staleAt, type ActivityEvent, type BlockResult, type ListsBeside, type PageBlock, type PageDecl, type PageDeps, type LastChange, type PageResult, type QueueCandidate, type QueueQuestion, type QuestionFacts } from './pages.ts';
+import { STALE_DAYS, readBlock, readPage, registersOf, registersOfBlock, resolvePages, runByOf, staleAt, type ActivityEvent, type BlockResult, type ListsBeside, type PageBlock, type PageDecl, type PageDeps, type LastChange, type PageResult, type QueueCandidate, type QueueQuestion, type QuestionFacts, type RunBy } from './pages.ts';
 import { doesOf } from './does.ts';
 import { additionsOf } from './page-adds.ts';
 import { SETUP_KIND, setupCollapser, type FeedLine } from './feed.ts';
@@ -410,8 +410,8 @@ export { MEASURES_MOST, MEASURE_BACK, MEASURE_BUCKETS, localDays, measureBucket,
 export type { MeasureBucket, MeasureLatest, MeasureLines, MeasureSeries, RawReading } from './measures.ts';
 import type { RawReading } from './measures.ts';
 export type { Bucket } from './buckets.ts';
-export { TREND_BAND, TREND_CAP, TREND_POINTS, trendOf } from './trend.ts';
-export type { Trend, TrendAhead, TrendBucket, TrendFlat, TrendGrowth } from './trend.ts';
+export { TREND_BAND, TREND_CAP, TREND_POINTS, TREND_T_MOST, trendOf } from './trend.ts';
+export type { Trend, TrendAhead, TrendBucket, TrendFlat, TrendGrowth, TrendSteady } from './trend.ts';
 export { dayIn, stampFinished, type FinishedDecl } from './finished.ts';
 export { stepsPercent, tallySteps, type StepsDecl } from './steps.ts';
 /* THE COST BAND, exported because `/decide` computes it in the browser off the same raw rows: it
@@ -428,8 +428,8 @@ export type { Before, Halves } from './metrics.ts';
 export { SESSIONS_WORKING, readRunsWorking } from './built-in-figures.ts';
 export { HANDOFFS_OPEN, openSteps, readHandoffsOpen, type OpenStep } from './built-in-figures.ts';
 export { KEYS_IN_TEXT, RECORD_KEY_SCAN, keysInText, placeOf, readKeysInText, scanKeys, type KeyFinding, type KeyScan } from './key-scan.ts';
-export { CROSSCHECK_ENTRIES_MOST, CROSSCHECK_NOTHING, CROSSCHECK_TOO_MANY, ROLLED_ACCOUNTS_MOST, ROLLED_CHECKS_MOST, WALKS, WALK_SOURCE, figureLists } from './money-figures.ts';
-export type { Crosscheck, Rolled, RolledCheck, RolledMoves, Walked } from './money-figures.ts';
+export { CROSSCHECK_ENTRIES_MOST, CROSSCHECK_NOTHING, CROSSCHECK_TOO_MANY, ROLLED_ACCOUNTS_MOST, ROLLED_CHECKS_MOST, WALKS, WALK_SOURCE, beyondOf, figureLists } from './money-figures.ts';
+export type { Beyond, Crosscheck, Rolled, RolledCheck, RolledMoves, Walked, WalkReading } from './money-figures.ts';
 export { HOME_CURRENCY_SETTING, across, convertMinor, dayFieldOf, homeFrom, isAtLeast, pairParts, partsOf, rateFor, ratesFrom, reduceOf } from './fx.ts';
 export type { Across, Amount, Part, Rate, Reduce } from './fx.ts';
 export { RAIL_PAGES, REDUCES, ROW_TEXT_MOST, SEED_ACTOR, WITHHELD_CODES, byOf, fill, pathsOf, railRoom, readBlock, readPage, resolvePages, slugify, whollyWithheld } from './pages.ts';
@@ -562,7 +562,7 @@ export type { DryRun, Fired, LinkTo, RuleAction, RuleDecl, RulesDeps, RulesOutco
 export type { Assembled, Channel, DigestDecl, DigestDeps, DigestPart, DigestSection, Sent } from './digest.ts';
 export type { BlockResult, DecidedQuestion, PageBlock, PageDecl, PageDeps, PageFilter, PageResult, PageRow, LastChange, RowChange, QueueCandidate, QueueOption, QueueQuestion, QuestionFacts } from './pages.ts';
 export { doesOf, type DoesNames } from './does.ts';
-export type { Aggregation, DeclaredSign, EvalContext, FxRead, Group, Lookups, MetricDecl, Reading, Scored, Snapshot, TargetIn, Value } from './metrics.ts';
+export type { Aggregation, Crossed, DeclaredSign, EvalContext, FxRead, Group, Lookups, MetricDecl, Reading, Scored, Snapshot, TargetIn, TrendSaid, Value } from './metrics.ts';
 export type { BindGrantArgs, GrantKind, GrantRow, LeasedSeal, SealedGrant } from './vault.ts';
 export type { Claimed, Drained, Handler, ScheduleKind } from './schedule.ts';
 export type { Hit } from './fts.ts';
@@ -954,6 +954,11 @@ export type EventLine = {
   note: string | null;
   /** The write that caused it: every line one write made shares it, and `null` for a line written on its own. */
   batch: string | null;
+  /**
+   * On a line a run signed, who that run is (as a feed line's `run_by` in `pages.ts`), or `null` for a handle no run
+   * holds. Absent where the actor is a person, a rule or anybody else, so a host calls only a run by its agent.
+   */
+  run_by?: RunBy | null;
 };
 
 /**
@@ -4597,6 +4602,21 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   }
 
   /**
+   * WHO SIGNED A LINE OF THE LOG, FOR ONE READ OF IT: `run_by` where the actor is a run's handle, ended or removed runs
+   * included, and nothing where it is anybody else. EACH RUN IS READ ONCE, since a run that worked for an hour signed
+   * most of a page of history, so make one of these for a page and ask it of every line.
+   */
+  function runsSaid(): (actor: string) => { run_by?: RunBy | null } {
+    const read = new Map<string, RunBy | null>();
+    const prefix = registers.get(SESSION)?.seq_prefix ?? 'S';
+    return (actor) => {
+      if (!isRunName(actor)) return {};
+      if (!read.has(actor)) read.set(actor, runByOf(actor, bySeq(SESSION, Number(actor.slice(prefix.length)), true)));
+      return { run_by: read.get(actor) ?? null };
+    };
+  }
+
+  /**
    * A run's first proposal names it, while the name it has is still the record's own, BY THE TITLE THE AGENT GAVE IT and
    * never by the question's own words (audit M7): a question such as "Merge Sara into Sarah?" copied into the run's name
    * was readable on the Agents board by anybody who can read runs and not People. In place, as `learnRun` writes. A
@@ -6498,14 +6518,16 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         said.push(...setup.push(line));
       }
       said.push(...setup.flush());
+      /* A RUN'S EVENT SAYS WHO THE RUN IS, as a line of the log does (`eventsBefore`), each run read once for the read. */
+      const signed = runsSaid();
       return {
         events: said.map((e): ActivityEvent => {
-          if (e.kind === SETUP_KIND) return { ts: e.ts, actor: e.actor, kind: e.kind, target: e.target, note: null, rows: typeof e.to === 'number' ? e.to : 0 };
+          if (e.kind === SETUP_KIND) return { ts: e.ts, actor: e.actor, kind: e.kind, target: e.target, note: null, rows: typeof e.to === 'number' ? e.to : 0, ...signed(e.actor) };
           const id = e.target?.startsWith('entry:') ? e.target.slice('entry:'.length) : null;
           const row = e.row;
           if (!row) {
             const thing = id === null ? governedThing(e.target) : null;
-            return { ts: e.ts, actor: e.actor, kind: e.kind, target: id === null ? e.target : null, note: e.note === '--erased--' ? null : e.note, ...(thing ? { thing } : {}) };
+            return { ts: e.ts, actor: e.actor, kind: e.kind, target: id === null ? e.target : null, note: e.note === '--erased--' ? null : e.note, ...(thing ? { thing } : {}), ...signed(e.actor) };
           }
           const title = registers.get(row.register)?.title;
           const named = title ? row.fields[title] : undefined;
@@ -6516,6 +6538,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
             target: `${row.register}#${row.seq}`,
             note: e.note === '--erased--' ? null : e.note,
             thing: typeof named === 'string' && named !== '' ? named : `${row.register}#${row.seq}`,
+            ...signed(e.actor),
           };
         }),
         seen: null,
@@ -8438,8 +8461,10 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * UNFILTERED ON PURPOSE. Which of these a caller may see is the record's question, and it is asked
      * of each row there, so the kernel hands over the log in order and nothing else.
      */
-    eventsBefore: (before: number | null, limit: number): EventLine[] =>
-      sql
+    eventsBefore: (before: number | null, limit: number): EventLine[] => {
+      /* A LINE A RUN SIGNED SAYS WHO THE RUN IS, so History names its agent where it drew "An agent" for every run. */
+      const said = runsSaid();
+      return sql
         .all<{
           rowid: number;
           id: string;
@@ -8471,7 +8496,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           to: read(e.to_v),
           note: e.note,
           batch: e.batch,
-        })),
+          ...said(e.actor),
+        }));
+    },
 
     /**
      * The first event after this person's read mark, or one past the newest when nothing is after it.

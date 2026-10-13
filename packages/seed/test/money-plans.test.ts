@@ -166,12 +166,14 @@ test('run again on what it left, it makes nothing and changes nothing', () => {
   assert.deepEqual(two.plans.map((p) => p.fields.name), ['Desk', 'Car']);
 });
 
-test('a plan is paid once no part of it is open, open again when one is, and a cancelled plan is left as it is', () => {
+test('a plan is paid once no part of it is open, and a plan that reads paid or cancelled is left as it is', () => {
   const paid = () => desk(() => ({ state: 'paid' }));
   assert.deepEqual(plansFromNames(paid(), []).plans, [{ name: 'Desk', state: 'paid' }]);
   assert.deepEqual(plansFromNames(desk(() => ({ state: 'cancelled' })), []).plans, [{ name: 'Desk', state: 'cancelled' }]);
   assert.deepEqual(written(plansFromNames(paid(), [planRow(1, 'Desk')]), 'plans#1'), { state: 'paid' });
-  assert.deepEqual(written(plansFromNames(desk(), [planRow(1, 'Desk', { state: 'paid' })]), 'plans#1'), { state: 'open' });
+  /* A CLOSED PLAN IS NOT OPENED BY A COUNT: he marked it paid with parts still open, and it stays paid. */
+  assert.equal(written(plansFromNames(desk(), [planRow(1, 'Desk', { state: 'paid' })]), 'plans#1'), undefined);
+  assert.equal(written(plansFromNames(desk((n) => (n === 1 ? { state: 'paid' } : {})), [planRow(1, 'Desk', { state: 'paid' })]), 'plans#1'), undefined);
   /* CANCELLED IS A PERSON'S WORD ABOUT THE PLAN, and no count of its parts takes it back. */
   assert.equal(written(plansFromNames(desk(), [planRow(1, 'Desk', { state: 'cancelled' })]), 'plans#1'), undefined);
   assert.equal(written(plansFromNames(desk(() => ({ state: 'cancelled' })), [planRow(1, 'Desk')]), 'plans#1'), undefined);
@@ -290,6 +292,42 @@ test('handed one part by a rule, the script reads and writes that part\'s plan a
   assert.equal(record.lists(), 2);
   const gone = await record.run({ register: 'installments', seq: 999 });
   assert.deepEqual([gone.out, gone.updates, gone.log], [null, [], ['The part is no longer in the record, so no plan was counted.']]);
+});
+
+test('a plan closed by hand with parts still open stays closed night after night, and nothing is said', async () => {
+  const record = recordOf([...desk((n) => ({ plan_row: 'e_plans_1', left_after: gbp((3 - n) * 10_000) })), planRow(1, 'Desk', { state: 'paid' })]);
+  for (const night of [1, 2, 3]) {
+    const { out, updates, added, log } = await record.run();
+    assert.deepEqual([out, updates, added, log], [null, [], [], []], `night ${night}`);
+  }
+  assert.equal(record.rows('plans')[0]!.fields.state, 'paid');
+  /* AND A PART WRITTEN UNDER IT DOES NOT OPEN IT EITHER, which is what a rule hands the script. */
+  const handed = await record.run({ register: 'installments', seq: 2 });
+  assert.deepEqual([handed.out, handed.updates], [null, []]);
+});
+
+test('handed the plan a run made, the script links that plan\'s parts and reads no other plan', async () => {
+  const record = recordOf(TEN_YEARS());
+  const first = await record.run({ register: 'installments', seq: 121 });
+  assert.deepEqual(first.added, [{ list: 'plans', fields: { name: 'Desk', state: 'open' } }]);
+  for (const p of record.rows('installments')) assert.equal(p.fields.plan_row, undefined, 'a plan made in a run has no id to link to yet');
+
+  /* THE SECOND PASS, as a rule on Plans hands it: the plan by its list and number. */
+  const before = record.lists();
+  const second = await record.run({ id: 'e_plans_1', register: 'plans', seq: 1 });
+  assert.deepEqual(second.updates.map((u) => [u.spoken, u.patch]).sort(), [121, 122, 123].map((n) => [`installments#${n}`, { plan_row: 'e_plans_1' }]));
+  assert.deepEqual([second.out, second.log], [{ plans: 0, parts: 3, more: false }, ['Linked 3 parts to their plans.']]);
+  assert.equal(record.lists() - before, 2, 'one page of parts and one of plans');
+  assert.deepEqual((await record.run({ plan: 'plans#1' })).out, null, 'a third run writes nothing');
+
+  const gone = await record.run({ register: 'plans', seq: 999 });
+  assert.deepEqual([gone.out, gone.updates, gone.log], [null, [], ['The plan is no longer in the record, so no part was linked.']]);
+});
+
+test('handed a plan no part names, the script writes nothing and says nothing', async () => {
+  const record = recordOf([...desk(), planRow(1, 'Holiday')]);
+  const { out, updates, added, log } = await record.run({ register: 'plans', seq: 1 });
+  assert.deepEqual([out, updates, added, log], [null, [], [], []]);
 });
 
 test('a run stops short of the writes it may make and says the rest waits, and later runs finish', async () => {

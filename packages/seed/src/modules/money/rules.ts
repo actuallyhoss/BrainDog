@@ -251,7 +251,8 @@ export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
    * A PLAN IS A ROW OF ITS OWN, AND EACH PART SAYS WHAT IS LEFT AFTER IT (REC-B12 jobs 1 and 2): an instalment made, or
    * one whose plan, amount, day, status or number changed, starts `script.plans_from_names` for that part's plan
    * (`scripts/plans-from-names.js`). The script also runs once a day over every plan, which is how a record that held
-   * plans only as names gets its rows, and how a plan made in one run has its parts linked in the next.
+   * plans only as names gets its rows. A PLAN MADE STARTS THE SCRIPT AGAIN, handed the plan (`plan-links-parts`), so
+   * its parts are linked then and not that night.
    *
    * NOT ON `plan_row` OR `left_after`, the two fields the script itself writes, or the rule would start itself. NO
    * `input`: a script a rule starts is handed the row's list and number, which is how the script finds the part.
@@ -262,6 +263,13 @@ export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
     pack: 'money-core',
     on: { written: { register: 'installments', op: ['create', 'update'], fields: ['plan', 'amount', 'due', 'state', 'number'] } },
     steps: [{ script: { id: 'plans_from_names', as: 'counting', input: {} } }],
+  },
+  {
+    rule: 'plan-links-parts',
+    name: 'Link the parts of a new plan',
+    pack: 'money-core',
+    on: { written: { register: 'plans', op: ['create'] } },
+    steps: [{ script: { id: 'plans_from_names', as: 'linking', input: {} } }],
   },
   PLANS_FROM_NAMES_SCRIPT,
 ];

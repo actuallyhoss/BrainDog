@@ -182,8 +182,16 @@ export const TRANSACTIONS_REGISTER: MoneyRegister = {
        the words a match was made on are never lost. MONEY'S AND NOT EACH BANK'S: three bank add-ons laying a field of
        this one id on this one list (`extends`) is `PROVIDES_CONFLICT` for the second of them on any record that keeps
        two banks, so the list declares it once and every door writes it. Searchable, because it is what a person
-       remembers off a statement. */
-    { id: 'counterparty_text', label: 'Paid to or from', type: 'text', search: true },
+       remembers off a statement.
+
+       LABELLED AS WHAT IT IS, SINCE money-core 3.17.0 (REC-B16): it was "Paid to or from", which promised a name and
+       showed a statement line. The id stays, since every bank add-on and the filing rules write and read it. */
+    { id: 'counterparty_text', label: 'As the bank wrote it', type: 'text', search: true },
+    /* WHO IT WAS PAID TO OR FROM, IN A PERSON'S WORDS, SINCE money-core 3.17.0 (REC-B16): `Bridge Street Coffee`
+       beside the bank's `GEIDEA*BRIDGE ST COFFEE`, so a name can be put right without losing the words a match was
+       made on. Optional, because most ways an entry arrives say only what the bank wrote. Searchable, as the bank's
+       words are. NOT INDEXED, FOR THE REASON `party` IS NOT: the list's eight are spent, and nothing filters on it. */
+    { id: 'payee', label: 'Paid to or from', type: 'text', search: true },
     { id: 'thing', label: 'Project', type: 'ref', to: 'things', index: true },
     /* NOT INDEXED, FOR THE REASON `party` IS NOT: the list's eight are spent, and a ninth is refused at the door. A
        book's page reads it with the day and the state beside it. */

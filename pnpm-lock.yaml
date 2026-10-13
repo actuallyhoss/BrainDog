@@ -432,6 +432,8 @@ importers:
 
   packs/stripe: {}
 
+  packs/task-tiers: {}
+
   packs/week-in-money: {}
 
   packs/worked-numbers: {}

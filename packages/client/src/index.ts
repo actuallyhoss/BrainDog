@@ -230,6 +230,8 @@ export type EventLine = {
   seq: number | null;
   /** What the thing is called: a row's title, or a question. */
   title: string | null;
+  /** On a line a run signed, who that run is, or `null` for a run the record does not hold. Absent from an older host. */
+  run_by?: { run: string; agent: string; client: string | null; parent: string | null } | null;
   /** On a `decide` line, the question it settled (`SG4`): the `resolve` beside it targets `suggestion:<settles>`. */
   settles?: string;
   /** On the one line a pass of BrainDog's own update is said as (kind `update`, SHL-A21): its sentence and counts. */

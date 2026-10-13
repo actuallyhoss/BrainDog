@@ -132,3 +132,43 @@ test('parts made on a record get their plan, their link and what is left after e
   const after = m.rowsOf('installments').sort((a, b) => Number(a.fields.number) - Number(b.fields.number));
   assert.deepEqual(after.map((p) => p.fields.left_after), [gbp(10_000), gbp(10_000), gbp(0)]);
 });
+
+test('the first part of a new plan is linked to it without a second part or the night', async () => {
+  const m = await money();
+  m.part(1);
+  await m.turn(4);
+  const plans = m.rowsOf('plans');
+  assert.deepEqual(plans.map((p) => p.fields.name), ['Desk'], m.log.join(' '));
+  assert.deepEqual(m.rowsOf('installments').map((p) => [p.fields.plan_row, p.fields.left_after]), [[plans[0]!.id, gbp(0)]], m.log.join(' '));
+  /* TWO RUNS AND NO MORE: the part made started one, the plan it made started the other, handed the plan. */
+  const mine = m.queued().filter((q) => q.script === 'plans_from_names');
+  assert.deepEqual(mine.map((q) => q.input.register), ['installments', 'plans']);
+  const before = m.queued().length;
+  await m.turn(3);
+  assert.equal(m.queued().length, before, 'the script started itself');
+});
+
+test('a plan made by hand has the parts that already name it linked at once', async () => {
+  const m = await money();
+  value(m.k.create('plans', { name: 'Desk', state: 'open' }, OWNER));
+  await m.turn(2);
+  assert.deepEqual(m.rowsOf('installments'), []);
+  m.part(1);
+  await m.turn(2);
+  assert.equal(m.rowsOf('installments')[0]!.fields.plan_row, m.rowsOf('plans')[0]!.id);
+});
+
+test('a plan closed by hand while a part is open stays closed when a part of it is written', async () => {
+  const m = await money();
+  m.part(1);
+  m.part(2);
+  await m.turn(4);
+  const plan = m.rowsOf('plans')[0]!;
+  value(m.k.update('plans', plan.id, { state: 'paid' }, OWNER));
+  await m.turn(2);
+  const second = m.rowsOf('installments').find((p) => p.fields.number === 2)!;
+  value(m.k.update('installments', second.id, { due: '2027-06-01' }, OWNER));
+  await m.turn(3);
+  assert.equal(m.rowsOf('plans')[0]!.fields.state, 'paid', m.log.join(' '));
+  assert.equal(m.log.some((l) => /open again|is open/.test(l)), false, m.log.join(' '));
+});

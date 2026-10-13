@@ -608,12 +608,19 @@ export type Credential = {
  */
 import type { EventKind } from '@braindog/kernel';
 import type { CallOut } from './actions.ts';
+import type { RunBy } from './names.ts';
 export type { EventKind };
 
 export type AuditEvent = {
   seq: number;
   at: string;
   by: string;
+  /**
+   * On a line a run signed (`by` is its handle, `S42`), who that run is as the record answers it: the app it ran in and
+   * the kind of agent. `null` for a run the record does not hold, and absent on every other line and from a record that
+   * answers none, which both read "An agent" as before.
+   */
+  run_by?: RunBy | null;
   kind: EventKind;
   /**
    * OPTIONAL, because `target` is nullable in the DDL and the ledger had no kind that used the

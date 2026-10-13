@@ -12,6 +12,13 @@
  * were republished in batch 64. `RELEASED` moves forward when a deploy does, never back, and
  * `BRAINDOG_CATALOGUE_BASE` (or the second argument) names another commit for one run, as a branch's merge base.
  *
+ * WHERE THE COMMIT IS READ FROM, first found: the commit asked for; then `RELEASED_FILE`, a tracked file the deploy
+ * writes with the commit it shipped; then the constant `RELEASED`. THE CONSTANT WAS MOVED BY HAND, which nothing did
+ * after a deploy, so every version shipped since it stayed open to a change in place. THE FILE CAN ONLY HOLD MORE: it
+ * is read only if its commit has `RELEASED` in its history and is in the history of this checkout, so a file that
+ * names an older commit, or another line's, is red. A file that is there and does not read is red too, never a
+ * quiet fall back to the constant. No file is the constant, which is the tree as it was before the deploy wrote one.
+ *
  * TWO READS AGAINST THAT COMMIT, and the catalogue is only ever read:
  *   1. THE INDEX. `git show <base>:apps/web/static/catalogue/index.json` beside the working one. Every version there
  *      is still here, once, with the same checksum, size and publish date. A version or an add-on that went is red.
@@ -33,8 +40,17 @@ import { fileURLToPath } from 'node:url';
 
 import { isRepository } from './public-clean.mjs';
 
-/** The commit the deployed build was made from. A version in its catalogue is released. ONLY EVER MOVED FORWARD. */
+/**
+ * The commit the deployed build was made from, WHEN NO FILE SAYS A LATER ONE, and the floor under the file: a version
+ * in its catalogue is released whatever the file says. ONLY EVER MOVED FORWARD.
+ */
 export const RELEASED = '63423720';
+
+/**
+ * The tracked file the deploy writes: `{ "commit": "<the commit that was deployed>" }`. Anything else in it is the
+ * deploy's own note and is not read.
+ */
+export const RELEASED_FILE = 'tools/gates/released-commit.json';
 
 /** Where the catalogue lives, its index and its version files. */
 export const CATALOGUE = 'apps/web/static/catalogue';
@@ -120,6 +136,38 @@ const parse = (text) => {
   }
 };
 
+const isCommit = (root, name) => git(root, ['rev-parse', '--verify', '-q', `${name}^{commit}`]) !== null;
+const within = (root, older, newer) => git(root, ['merge-base', '--is-ancestor', older, newer]) !== null;
+const shallowNote = (root) => (git(root, ['rev-parse', '--is-shallow-repository'])?.trim() === 'true' ? ' (this checkout is shallow: fetch the whole history, fetch-depth 0)' : '');
+
+/**
+ * The released commit of the repository at `root` and where it was read: `{ commit, from }` with `from` the file's
+ * path or `'constant'`, or `{ error }` when the file is there and cannot be trusted. Exported so a test asks the gate
+ * what it reads, and holds no second copy of the rule.
+ */
+export function releasedCommit(root) {
+  const file = join(root, RELEASED_FILE);
+  if (!existsSync(file)) return { commit: RELEASED, from: 'constant' };
+  let commit = null;
+  try {
+    commit = JSON.parse(readFileSync(file, 'utf8'))?.commit;
+  } catch {
+    /* A file that does not parse is the same finding as one with no commit in it. */
+  }
+  if (typeof commit !== 'string' || !/^[0-9a-f]{8,40}$/u.test(commit)) {
+    return { error: `${RELEASED_FILE} does not read as { "commit": "<8 to 40 hex digits>" }` };
+  }
+  if (!isCommit(root, commit)) return { error: `${RELEASED_FILE} names commit ${commit}, and there is no such commit here${shallowNote(root)}` };
+  /* THE FLOOR. A planted repository does not hold this repository's history, so there the floor has nothing to say. */
+  if (isCommit(root, RELEASED) && !within(root, RELEASED, commit)) {
+    return { error: `${RELEASED_FILE} names commit ${commit}, which does not hold ${RELEASED} in its history. The released commit only moves forward` };
+  }
+  if (!within(root, commit, 'HEAD')) {
+    return { error: `${RELEASED_FILE} names commit ${commit}, which is not in the history of this checkout, so it was never released from this line` };
+  }
+  return { commit, from: RELEASED_FILE };
+}
+
 /** The released index and where it was read from: the base commit in a repository, `released.json` in a planted tree. */
 function readReleased(ROOT, asked) {
   if (!isRepository(ROOT)) {
@@ -128,15 +176,21 @@ function readReleased(ROOT, asked) {
     const was = parse(readFileSync(file, 'utf8'));
     return was ? { where: 'released.json', was, base: null } : { where: 'released.json', error: 'released.json does not read as a catalogue index' };
   }
-  const base = asked?.trim() || RELEASED;
-  if (git(ROOT, ['rev-parse', '--verify', '-q', `${base}^{commit}`]) === null) {
-    const shallow = git(ROOT, ['rev-parse', '--is-shallow-repository'])?.trim() === 'true';
-    return { where: base, error: `there is no commit ${base} here${shallow ? ' (this checkout is shallow: fetch the whole history, fetch-depth 0)' : ''}` };
+  let base = asked?.trim();
+  /* The line a pass prints says who named the commit, when it was the file and not the constant. */
+  let where = base;
+  if (!base) {
+    const pin = releasedCommit(ROOT);
+    if (pin.error) return { where: RELEASED_FILE, error: pin.error };
+    base = pin.commit;
+    /* The commit as the file wrote it, whole: a number to cut it at would be a number written in a gate (`ledger`). */
+    where = pin.from === 'constant' ? base : `${base} (from ${pin.from})`;
   }
+  if (!isCommit(ROOT, base)) return { where, error: `there is no commit ${base} here${shallowNote(ROOT)}` };
   const text = git(ROOT, ['show', `${base}:${INDEX}`]);
-  if (text === null) return { where: base, error: `commit ${base} holds no ${INDEX}` };
+  if (text === null) return { where, error: `commit ${base} holds no ${INDEX}` };
   const was = parse(text);
-  return was ? { where: base, was, base } : { where: base, error: `${INDEX} at ${base} does not read as a catalogue index` };
+  return was ? { where, was, base } : { where, error: `${INDEX} at ${base} does not read as a catalogue index` };
 }
 
 /**

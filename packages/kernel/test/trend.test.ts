@@ -5,6 +5,10 @@
  * WHAT WAS MEASURED BEFORE IT: nothing read a trend. `trend` was a published shape refused by name, so the money a
  * person took in each month could be drawn and never said to be growing, and no forecast of it was measured.
  *
+ * WHAT WAS MEASURED BEFORE `steady`: one more every month, 1 2 3 up to 8, answered a growth of about a third a month
+ * with a band clear of nought, and ran ahead compounding (13.0, 17.1 and 22.5 for the three months after 8). Sitting on
+ * a line exactly answered a t of `Infinity`, which is written down as `null`.
+ *
  * THE FITS ARE WORKED BY HAND. Six buckets sit at x = 0..5, so the mean of x is 2.5 and the spread of x about it is
  * 6.25 + 2.25 + 0.25 + 0.25 + 2.25 + 6.25 = 17.5. Each test says its own sums beside the numbers it asserts.
  */
@@ -12,7 +16,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { TREND_BAND, TREND_CAP, TREND_POINTS, trendOf, type TrendBucket } from '../src/trend.ts';
+import { TREND_BAND, TREND_CAP, TREND_POINTS, TREND_T_MOST, trendOf, type TrendBucket } from '../src/trend.ts';
 
 const MONTHS = ['2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09'];
 
@@ -22,6 +26,12 @@ const full = (values: (number | null)[]): TrendBucket[] =>
 
 const near = (got: number, want: number, say: string): void =>
   assert.ok(Math.abs(got - want) <= 1e-9 * Math.max(1, Math.abs(want)), `${say}: ${got} is not ${want}`);
+
+function steady(t: ReturnType<typeof trendOf>) {
+  assert.equal(t.kind, 'steady', JSON.stringify(t));
+  if (t.kind !== 'steady') throw new Error('unreachable');
+  return t;
+}
 
 function growth(t: ReturnType<typeof trendOf>) {
   assert.equal(t.kind, 'growth', JSON.stringify(t));
@@ -40,6 +50,7 @@ test('the numbers the gate stands on are the published ones', () => {
   assert.equal(TREND_POINTS, 6);
   assert.equal(TREND_BAND, 2.1);
   assert.equal(TREND_CAP, 10);
+  assert.equal(TREND_T_MOST, 1e6);
 });
 
 test('six full buckets above nought with a sure slope answer growth, with its rate and its band', () => {
@@ -182,4 +193,58 @@ test('the buckets handed in are not changed', () => {
   const before = JSON.stringify(six);
   trendOf(six, 3, 'month');
   assert.equal(JSON.stringify(six), before);
+});
+
+/* 1 2 3 4 5 6 7 8 at x = 0..7: the mean of x is 3.5 and its spread 42. The amounts sit on a straight line exactly, so
+   it explains all of their spread, and the curve through their logarithms (0, 0.69, 1.10 ... 2.08) cannot. */
+test('one more every month is steady, by one a month, and runs ahead on the straight line', () => {
+  const t = steady(trendOf(full([1, 2, 3, 4, 5, 6, 7, 8]), 3, 'month'));
+  assert.equal(t.n, 8);
+  near(t.step, 1, 'step');
+  near(t.low, 1, 'low');
+  near(t.high, 1, 'high');
+  assert.deepEqual(t.ahead.map((a) => a.key), ['2026-09', '2026-10', '2026-11']);
+  [9, 10, 11].forEach((want, i) => near(t.ahead[i]!.value, want, `${i + 1} ahead`));
+  assert.equal(t.capped, false);
+  assert.equal(t.cap, 80);
+});
+
+test('t is a number that can be written down, on an exact fit of either line and either way', () => {
+  const lines = [
+    trendOf(full([1, 2, 3, 4, 5, 6, 7, 8]), 2),
+    trendOf(full([8, 7, 6, 5, 4, 3, 2, 1]), 2),
+    trendOf(full([1, 3, 9, 27, 81, 243]), 2),
+    trendOf(full([243, 81, 27, 9, 3, 1]), 2),
+    trendOf(full([0, 1, 2, 3, 4, 5, 6, 7].map((i) => 1000 * 1.05 ** i)), 2),
+  ];
+  assert.deepEqual(lines.map((t) => (t.kind === 'flat' ? null : t.t)), [TREND_T_MOST, -TREND_T_MOST, TREND_T_MOST, -TREND_T_MOST, TREND_T_MOST]);
+  for (const t of lines) assert.deepEqual(JSON.parse(JSON.stringify(t)), t, 'it comes back from being written down whole');
+});
+
+/* 100 205 290 410 500 595. From the first they are 0 105 190 310 400 495, mean 250. The cross sum is
+   625 + 217.5 + 30 + 30 + 225 + 612.5 = 1740, so the step is 1740/17.5, about 99.43. The line reads the last month as
+   100 + (250 - 2.5 x 1740/17.5) + 5 x 1740/17.5 = 598.57, and the month after as 698 exactly. */
+test('about the same amount more each month is steady, with a band about the step that leaves nought out', () => {
+  const t = steady(trendOf(full([100, 205, 290, 410, 500, 595]), 2));
+  near(t.step, 1740 / 17.5, 'step');
+  assert.ok(0 < t.low && t.low < t.step && t.step < t.high, JSON.stringify(t));
+  assert.ok(Math.abs(t.t) >= TREND_BAND && t.t < TREND_T_MOST, `t is ${t.t}`);
+  near(t.ahead[0]!.value, 698, 'one ahead');
+  near(t.ahead[1]!.value, 698 + 1740 / 17.5, 'two ahead');
+  for (const a of t.ahead) assert.ok(a.low < a.value && a.value < a.high, JSON.stringify(a));
+});
+
+test('a steady fall stops at nought, and the stop is said', () => {
+  const t = steady(trendOf(full([8, 7, 6, 5, 4, 3, 2, 1]), 3));
+  near(t.step, -1, 'step');
+  assert.deepEqual(t.ahead.map((a) => a.value), [0, 0, 0]);
+  /* The line reads nought for the first month ahead, which is no hold. The two after it read below nought. */
+  assert.deepEqual(t.ahead.map((a) => a.capped), [false, true, true]);
+  assert.equal(t.capped, true);
+});
+
+test('the same share each month stays growth: the straight line explains less of it than the curve', () => {
+  assert.equal(trendOf(full([1, 3, 9, 27, 81, 243]), 0).kind, 'growth');
+  assert.equal(trendOf(full([1000, 1050, 1103, 1158, 1216, 1276, 1340, 1407]), 0).kind, 'growth');
+  assert.equal(trendOf(full(LOGS.map(Math.exp)), 0).kind, 'growth');
 });

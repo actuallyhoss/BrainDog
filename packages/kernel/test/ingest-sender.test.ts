@@ -140,7 +140,7 @@ test('A PAYEE A PATTERN READ IS KEPT ON THE ARRIVAL, and written to the row only
   const bare = await record(ACCOUNTS(), TRANSACTIONS(false), CARD());
   const filed = arrive(bare.k, said('GEIDEA*Halden Coffee'), 'c1');
   assert.equal(filed.state, 'matched', filed.reason ?? '');
-  assert.equal(filed.counterparty, 'GEIDEA*Halden Coffee', 'the payee as printed, for the record to make its bank key from');
+  assert.equal(filed.counterparty, 'Halden Coffee', 'the payee by its name');
   const row = fieldsOf(bare.sql, filed.wrote[0]!);
   assert.equal(row.merchant, 'Halden Coffee');
   assert.equal(Object.hasOwn(row, 'counterparty_text'), false, 'a field the list does not declare was written');
@@ -150,7 +150,7 @@ test('A PAYEE A PATTERN READ IS KEPT ON THE ARRIVAL, and written to the row only
   const kept = await record(ACCOUNTS(), TRANSACTIONS(true), CARD());
   const both = arrive(kept.k, said('GEIDEA*Halden Coffee'), 'c2');
   assert.equal(both.state, 'matched', both.reason ?? '');
-  assert.equal(both.counterparty, 'GEIDEA*Halden Coffee');
+  assert.equal(both.counterparty, 'Halden Coffee');
   assert.equal(fieldsOf(kept.sql, both.wrote[0]!).counterparty_text, 'GEIDEA*Halden Coffee');
   kept.sql.close();
 });
@@ -179,7 +179,7 @@ test('A HELD CHARGE KEEPS ITS PAYEE, and its question is joined only by charges 
   const { k, sql } = await record(ACCOUNTS(), TRANSACTIONS(true), CARD({ writes: { register: 'transactions', confidence: 'needs-review' } }));
   const first = arrive(k, said('GEIDEA*Halden Coffee'), 'h1');
   assert.equal(first.state, 'review');
-  assert.equal(first.counterparty, 'GEIDEA*Halden Coffee', 'a held arrival lost its payee');
+  assert.equal(first.counterparty, 'Halden Coffee', 'a held arrival lost its payee');
   const same = arrive(k, said('geidea*halden  coffee', '12.00'), 'h2');
   assert.equal(same.suggestion, first.suggestion);
   const other = arrive(k, said('PAYMOB-Nile Books', '12.00'), 'h3');

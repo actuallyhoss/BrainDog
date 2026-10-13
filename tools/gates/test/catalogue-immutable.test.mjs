@@ -4,7 +4,7 @@
  *   node --test tools/gates/test/catalogue-immutable.test.mjs
  *
  * EACH CASE PLANTS A REPOSITORY WITH ONE COMMIT, the released catalogue, in the loop's scratch folder, then changes the
- * working tree and asks the gate with that commit as its base. Nothing here writes under this repository, and the
+ * working tree and asks the gate with that commit as its base. The cases on the tracked file plant a second commit. Nothing here writes under this repository, and the
  * repository's own catalogue is only read.
  */
 
@@ -15,7 +15,7 @@ import { dirname, join } from 'node:path';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { CATALOGUE, RELEASED, verdict } from '../catalogue-immutable.mjs';
+import { CATALOGUE, RELEASED, RELEASED_FILE, releasedCommit, verdict } from '../catalogue-immutable.mjs';
 
 const gates = join(import.meta.dirname, '..');
 const scratch = join(tmpdir(), 'braindog-loop', 'W066', 'catalogue-immutable-66');
@@ -195,10 +195,79 @@ test('a planted tree with no history is judged against its released.json', (t) =
 });
 
 test('the repository is green against the released commit', () => {
-  const r = run(join(gates, '..', '..'));
+  const root = join(gates, '..', '..');
+  /* The commit the gate itself reads, the tracked file's once a deploy has written one, so this holds on that day too. */
+  const pin = releasedCommit(root);
+  assert.equal(pin.error, undefined, pin.error);
+  const r = run(root);
   assert.equal(r.status, 0, r.out);
-  assert.match(r.out, new RegExp(`against ${RELEASED}\\b.*0 finding\\(s\\)`, 'u'));
+  assert.match(r.out, new RegExp(`against ${pin.commit}\\b.*0 finding\\(s\\)`, 'u'));
   assert.match(RELEASED, /^[0-9a-f]{8,40}$/u);
+});
+
+/** A planted repository with a second commit, a new version beside the released ones. Returns both commits. */
+function plantTwo(t) {
+  const { at, base: first } = plant(t);
+  const index = released();
+  index.entries[1].versions.unshift(version('2.1.0', 'd'.repeat(64)));
+  index.entries[1].latest = '2.1.0';
+  putIndex(at, index);
+  put(at, fileOf('hello', '2.1.0'), '{"pack":"hello","version":"2.1.0"}\n');
+  git(at, 'add', CATALOGUE);
+  git(at, 'commit', '-q', '-m', 'A new version.');
+  return { at, first, second: git(at, 'rev-parse', 'HEAD') };
+}
+
+const pinTo = (at, text) => put(at, RELEASED_FILE, text);
+
+test('the released commit is read from the tracked file, and the line says so', (t) => {
+  const { at, first, second } = plantTwo(t);
+  /* No file, and a planted repository does not hold the constant's commit. */
+  assert.deepEqual(releasedCommit(at), { commit: RELEASED, from: 'constant' });
+  pinTo(at, `${JSON.stringify({ commit: first, deployed: '2026-10-13' })}\n`);
+  assert.deepEqual(releasedCommit(at), { commit: first, from: RELEASED_FILE });
+  const r = run(at);
+  assert.equal(r.status, 0, r.out);
+  assert.ok(r.out.includes(`against ${first} (from ${RELEASED_FILE})`), r.out);
+  assert.match(r.out, /\b3 released version\(s\) of 2 add-on\(s\).*, 1 new version\(s\) beside them, 0 finding\(s\)/u);
+  /* Moved forward to the second commit, its version is released too. */
+  pinTo(at, JSON.stringify({ commit: second }));
+  const later = run(at);
+  assert.equal(later.status, 0, later.out);
+  assert.match(later.out, /\b4 released version\(s\) of 2 add-on\(s\).*, 0 new version\(s\) beside them/u);
+});
+
+test('a file that cannot be trusted is red, never a quiet fall back to the constant', (t) => {
+  const { at, first } = plantTwo(t);
+  /* A commit that is real and on another line: the first commit's child, which HEAD does not hold. */
+  const aside = git(at, 'commit-tree', `${first}^{tree}`, '-p', first, '-m', 'Another line.');
+  const cases = [
+    ['not JSON', '{ "commit": ', /does not read as/u],
+    ['no commit in it', '{"deployed":"2026-10-13"}', /does not read as/u],
+    ['a branch name', JSON.stringify({ commit: git(at, 'branch', '--show-current') }), /does not read as/u],
+    ['an unknown commit', JSON.stringify({ commit: '0123456789abcdef0123456789abcdef01234567' }), /there is no such commit here/u],
+    ['a commit on another line', JSON.stringify({ commit: aside }), /not in the history of this checkout/u],
+  ];
+  for (const [what, text, why] of cases) {
+    pinTo(at, text);
+    const r = run(at);
+    assert.equal(r.status, 1, `${what}: ${r.out}`);
+    assert.match(r.out, /could not read the released catalogue/u, what);
+    assert.match(r.out, why, what);
+    assert.ok(releasedCommit(at).error, what);
+  }
+});
+
+test('a commit asked for wins over the file, even a file that does not read', (t) => {
+  const { at, first, second } = plantTwo(t);
+  pinTo(at, JSON.stringify({ commit: second }));
+  const r = run(at, first);
+  assert.equal(r.status, 0, r.out);
+  assert.ok(r.out.includes(`against ${first},`), r.out);
+  assert.ok(!r.out.includes('(from '), r.out);
+  assert.match(r.out, /\b3 released version\(s\).*, 1 new version\(s\)/u);
+  pinTo(at, 'not a file the gate can read');
+  assert.equal(run(at, first).status, 0);
 });
 
 test('the verdict by itself: a second copy of a released version is red, and nothing new is', () => {

@@ -33,7 +33,8 @@
  * further change here.
  */
 
-import { actor, type ActorKind } from '../../lib/record/names.ts';
+import { actor, type ActorKind, type RunBy } from '../../lib/record/names.ts';
+import type { AuditEvent } from '../../lib/record/schema.ts';
 
 /** The words this file says of its own: a rule is named as one, beside the rule glyph its face wears. */
 export const whoWords = {
@@ -72,8 +73,8 @@ export type Said = {
 };
 
 /** `actor`'s answer as this screen holds it. */
-function saidOf(by: string, me: string | null, names: ReadonlyMap<string, string>): Said {
-  const said = actor(by, me, names);
+function saidOf(by: string, me: string | null, names: ReadonlyMap<string, string>, run_by: RunBy | null = null): Said {
+  const said = actor(by, me, names, run_by);
   const you = said.kind === 'you';
   return { name: said.name, you, person: you || said.kind === 'person', kind: said.kind };
 }
@@ -92,9 +93,12 @@ const lead = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
  * `by` IS ALREADY `actorFor`'s ANSWER: `news-live.ts` turns the reader's own id into `you` before
  * the screen sees it, and `actor` takes `you` as itself, so the sample and a live record go through
  * one call.
+ *
+ * `run_by` IS THE LINE'S OWN (`AuditEvent.run_by`), so a run reads as the app it ran in ("Claude Code") where the record
+ * said which, and "An agent" where it did not. `actor` reads it for a run's handle and for nobody else.
  */
-export function actorSaid(by: string, me: string | null, names: ReadonlyMap<string, string>): Said {
-  const said = saidOf(by, me, names);
+export function actorSaid(by: string, me: string | null, names: ReadonlyMap<string, string>, run_by: RunBy | null = null): Said {
+  const said = saidOf(by, me, names, run_by);
   if (said.person) return said;
   return { ...said, name: said.kind === 'rule' ? whoWords.rule(lead(said.name)) : lead(said.name) };
 }
@@ -129,11 +133,15 @@ export function targetSaid(target: string, me: string | null, names: ReadonlyMap
  * THE FILTER ITSELF IS UNTOUCHED, and that is deliberate: `19 §5` says what defines which rows you
  * are looking at must be shareable, so a `?by=p_…` somebody already pasted still narrows the log.
  * What is withheld is the offer, not the ability.
+ *
+ * `runs` IS `runsIn`'s ANSWER, so two runs the record can name apart ("Claude Code", "Codex") are each offered; with
+ * none handed over every run is "An agent" and none is, as before.
  */
 export function offeredActors(
   all: readonly string[],
   me: string | null,
   names: ReadonlyMap<string, string>,
+  runs: ReadonlyMap<string, RunBy> = new Map(),
 ): string[] {
   /* THE SEED AND THE RECORD ITSELF ARE BOTH SAID "BrainDog" (`actor`), so a live record whose log holds both offered
      neither. They are one actor to a reader, so the record's own chip (`system`) stands for both and the seed's is not
@@ -141,8 +149,21 @@ export function offeredActors(
   const offered = all.includes('system') ? all.filter((by) => by !== 'p_seed') : all;
   const seen = new Map<string, number>();
   for (const by of offered) {
-    const said = actorSaid(by, me, names).name;
+    const said = actorSaid(by, me, names, runs.get(by) ?? null).name;
     seen.set(said, (seen.get(said) ?? 0) + 1);
   }
-  return offered.filter((by) => seen.get(actorSaid(by, me, names).name) === 1);
+  return offered.filter((by) => seen.get(actorSaid(by, me, names, runs.get(by) ?? null).name) === 1);
+}
+
+/**
+ * WHO EACH RUN IN THE LOG IS, by the handle its lines are signed with, so the `by` filter can say a run as its lines do.
+ *
+ * The filter holds a handle and no line, so it has no `run_by` of its own to read: this is the one the run's lines
+ * carry. A run the record sent nothing for is left out, and reads "An agent" in the filter as it does on the line. Two
+ * runs of one app are said alike, so `offeredActors` offers neither, as it does two people with no name.
+ */
+export function runsIn(events: readonly AuditEvent[]): Map<string, RunBy> {
+  const runs = new Map<string, RunBy>();
+  for (const e of events) if (e.run_by && !runs.has(e.by)) runs.set(e.by, e.run_by);
+  return runs;
 }

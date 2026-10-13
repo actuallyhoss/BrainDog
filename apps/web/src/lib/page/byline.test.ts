@@ -30,7 +30,43 @@ test('A ROW AN AGENT CHANGED CARRIES ITS BYLINE BY NAME, and a row the reader ch
   assert.equal(one?.said, 'Claude for Mara · 2h ago');
   assert.equal(one?.batch, 'b_1', 'its Undo puts back that batch');
   assert.equal(one?.run, 'S42', 'the run is a handle beside the name, never the name');
-  assert.equal(one?.unseen, true, 'a page never left has seen nothing');
+  assert.equal(one?.unseen, false, 'no mark is no claim: nothing is called new without one');
+});
+
+test('A PLAIN LOAD TINTS NO ROW: a page with no mark on this device is seen as it opens, and only a later change is new', () => {
+  const held = new Map<string, string>();
+  const store: Store = { getItem: (k) => held.get(k) ?? null, setItem: (k, v) => void held.set(k, v) };
+  /* A LEDGER AN IMPORT WROTE THIS WEEK, every change newer than the read mark only Home moves, so the record calls each
+     `unseen`. Opened on a device with no mark for the page: 261 rows, none of them new. */
+  const ledger = {
+    register: 'transactions',
+    entries: Array.from({ length: 261 }, (_, i) => ({ seq: i + 1 })),
+    changes: Array.from({ length: 261 }, (_, i) => ({ by: 'agent', who: 'S7', agent: 'claude', at: hoursAgo(1 + (i % 100)), batch: `b_${i}`, unseen: true })),
+  };
+  const first = seenOn('money', store, now);
+  assert.equal(first.page, now, 'the first visit starts the mark at the moment it opens');
+  const drawn = bylinesIn([ledger], first, null, names, now);
+  assert.equal(drawn.size, 261, 'every row still carries its byline, for the panel and its Undo');
+  assert.equal([...drawn.values()].filter((b) => b.unseen).length, 0, 'and none of them is tinted');
+
+  /* A ROW THAT ARRIVES AFTER THE PAGE WAS OPENED is new, on that same first visit. */
+  const after = new Date(now + 60_000).toISOString();
+  const arrived = { ...ledger, entries: [{ seq: 262 }, ...ledger.entries], changes: [{ by: 'agent', who: 'S7', agent: 'claude', at: after, batch: 'b_new', unseen: true }, ...ledger.changes] };
+  const later = bylinesIn([arrived], first, null, names, now + 120_000);
+  assert.deepEqual([...later].filter(([, b]) => b.unseen).map(([k]) => k), ['transactions#262']);
+
+  /* LEFT AND COME BACK TO: what changed before the page was left is seen, whatever the record still says. */
+  const left: Seen = { page: now - 30 * 60_000, rows: {} };
+  const back = bylinesIn([{ ...ledger, changes: [{ ...ledger.changes[0]!, at: hoursAgo(0.25) }, ...ledger.changes.slice(1)] }], left, null, names, now);
+  assert.deepEqual([...back].filter(([, b]) => b.unseen).map(([k]) => k), ['transactions#1'], 'only the change since');
+
+  /* AND THE RECORD'S WORD TAKES A TINT AWAY: read on Home on another device, it is not new here either. */
+  const read = { register: 'tasks', entries: [{ seq: 9 }], changes: [{ by: 'agent', who: 'S7', agent: 'claude', at: hoursAgo(0.25), unseen: false }] };
+  assert.equal(bylinesIn([read], left, null, names, now).get('tasks#9')?.unseen, false);
+
+  /* A MARK KEPT BY A ROW OPENED BEFORE THE PAGE WAS EVER LEFT (`page: 0`) is no page mark either. */
+  held.set('braindog.seen.old', JSON.stringify({ page: 0, rows: { 'tasks#1': 7 } }));
+  assert.deepEqual(seenOn('old', store, now), { page: now, rows: { 'tasks#1': 7 } });
 });
 
 test('SEEN ONCE THE PAGE WAS LEFT AFTER IT, OR THE ROW OPENED; a change since is new again', () => {
@@ -55,7 +91,7 @@ test('WHAT WAS SEEN IS KEPT PER PAGE, the newest rows only, and a store that ref
   const store: Store = { getItem: (k) => held.get(k) ?? null, setItem: (k, v) => void held.set(k, v) };
   keepSeen('work', { page: 5, rows: { 'tasks#1': 7 } }, store);
   assert.deepEqual(seenOn('work', store), { page: 5, rows: { 'tasks#1': 7 } });
-  assert.deepEqual(seenOn('money', store), none, 'another page has seen nothing');
+  assert.deepEqual(seenOn('money', store, now), { page: now, rows: {} }, 'another page starts its own mark as it opens');
 
   const rows = Object.fromEntries(Array.from({ length: 250 }, (_, i) => [`tasks#${i}`, i]));
   keepSeen('work', { page: 1, rows }, store);
@@ -64,7 +100,7 @@ test('WHAT WAS SEEN IS KEPT PER PAGE, the newest rows only, and a store that ref
   assert.equal(kept['tasks#249'], 249, 'the newest are the ones kept');
 
   held.set('braindog.seen.odd', '{not json');
-  assert.deepEqual(seenOn('odd', store), none);
+  assert.deepEqual(seenOn('odd', store, now), { page: now, rows: {} });
   const refusing: Store = {
     getItem: () => {
       throw new Error('blocked');
@@ -73,9 +109,9 @@ test('WHAT WAS SEEN IS KEPT PER PAGE, the newest rows only, and a store that ref
       throw new Error('full');
     },
   };
-  assert.deepEqual(seenOn('work', refusing), none);
+  assert.deepEqual(seenOn('work', refusing, now), { page: now, rows: {} });
   assert.doesNotThrow(() => keepSeen('work', { page: 1, rows: {} }, refusing));
-  assert.deepEqual(seenOn('work', null), none);
+  assert.deepEqual(seenOn('work', null, now), { page: now, rows: {} });
 });
 
 /* ── the line at the foot of the board (DIRECTION §39) ────────────────────── */
