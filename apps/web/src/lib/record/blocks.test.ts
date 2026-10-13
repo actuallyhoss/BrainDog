@@ -482,3 +482,58 @@ test('THE TONE IS THE SECTION ROW`S FOURTH CELL, written only where there is one
   /* THE COUNT KEEPS ITS CELL, and the tone comes after the fold whether or not the section folds. */
   assert.deepEqual(sectionCells(sectionOf({ register: 'tasks', total: 7, fold: false, heads: [{ kind: 'spec', late: true }] })), ['clock', '7', '', 'danger']);
 });
+
+/* ── a list's written line ────────────────────────────────────────────────── */
+
+/** Money's Ledger in small: a timeline over a list, with the line its author wrote and the figures the record answered for it. */
+const ledgerOf = (rows: unknown[], more: Record<string, unknown> = {}) =>
+  liveBlockOf(
+    {
+      kind: 'timeline',
+      source: 'register.things',
+      heading: 'Ledger',
+      body: '{{filed-today}} filed today. {{filed-for-you-30d}} filed for you in 30 days.',
+      values: { 'filed-today': 6, 'filed-for-you-30d': 41 },
+      columns: [{ field: 'name' }],
+      rows: rows as never,
+      matched: rows.length,
+      refusals: [],
+      ...more,
+    } as never,
+    new Map(),
+    Date.UTC(2026, 9, 7, 12),
+  );
+
+/** What a block draws, in order: a written line as its words, a fence as its kind and how many rows it holds. */
+const drawnIn = (block: Parameters<typeof toSegments>[0]): string[] =>
+  toSegments(block).map((s) => (s.type === 'block' ? `${s.kind}:${s.rows.length}` : s.type === 'markdown' ? s.text.trim() : s.code));
+
+test('A LIST THAT HOLDS LINES SAYS ITS WRITTEN LINE ONCE, ABOVE THEM, and only when the record answered every figure in it', () => {
+  const rows = [project(1, 'Kiln', null), project(2, 'Tallow', null)];
+  const line = '{{filed-today}} filed today. {{filed-for-you-30d}} filed for you in 30 days.';
+  assert.deepEqual(drawnIn(ledgerOf(rows)), [line, 'timeline:2'], 'the line is plain text above the fence, its figures left for the page to write');
+  assert.equal(draw(ledgerOf(rows)).refusal, null);
+  assert.equal(draw(ledgerOf(rows)).segments.length, 2, 'and the tile draws both');
+
+  /* A FIGURE THE RECORD DID NOT ANSWER, or one that names nothing it has, takes the whole line away: half a sentence
+     with a dash in it says less than no sentence. */
+  assert.deepEqual(drawnIn(ledgerOf(rows, { values: { 'filed-today': 6 } })), ['timeline:2']);
+  assert.deepEqual(drawnIn(ledgerOf(rows, { values: undefined })), ['timeline:2']);
+  assert.deepEqual(drawnIn(ledgerOf(rows, { values: { 'filed-today': 6, 'filed-for-you-30d': null } })), ['timeline:2']);
+  assert.deepEqual(drawnIn(ledgerOf(rows, { values: { 'filed-today': 6 }, unnamed: ['filed-for-you-30d'] })), ['timeline:2']);
+
+  /* WORDS WITH NO FIGURE IN THEM ARE A LINE TOO, and a line of spaces is none. */
+  assert.deepEqual(drawnIn(ledgerOf(rows, { body: 'Newest first.', values: undefined })), ['Newest first.', 'timeline:2']);
+  assert.deepEqual(drawnIn(ledgerOf(rows, { body: '   ' })), ['timeline:2']);
+
+  /* NO LINES, NO LINE: a list nothing is on says its `empty:` and nothing over it, as it did. */
+  assert.deepEqual(drawnIn(ledgerOf([])), ['timeline:0']);
+  assert.ok(draw(ledgerOf([])).refusal, 'an empty list is still the tile`s nothing');
+});
+
+test('A BLOCK WITH NO LINES OF ITS OWN STILL DRAWS ITS BODY AS IT DID, inside its own fence and once', () => {
+  const note = liveBlockOf({ kind: 'note', body: '{{filed-today}} filed today.', values: { 'filed-today': 6 }, refusals: [] } as never, new Map(), Date.UTC(2026, 9, 7, 12));
+  const segments = toSegments(note);
+  assert.equal(segments.length, 1);
+  assert.deepEqual(drawnRows(note).map((r) => r.cells), [['{{filed-today}} filed today.']]);
+});

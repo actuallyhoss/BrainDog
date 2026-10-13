@@ -22,7 +22,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { openRecord, type Declaration, type Entry, type Kernel } from '../src/index.ts';
-import { crossAsks, crossKey, loadLeg, neighboursOf, newestRate, partnerOf, passOf, settle, ASK_RATE_DAYS, PAIR_RATE_DAYS, type PairsDecl, type Pairing } from '../src/pairs.ts';
+import { crossAsks, crossKey, crossLegs, crossStill, loadLeg, neighboursOf, newestRate, partnerOf, passOf, ruledOf, settle, ASK_RATE_DAYS, ASK_SPREAD, PAIR_RATE_DAYS, type PairsDecl, type Pairing } from '../src/pairs.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 23, 12);
@@ -453,4 +453,143 @@ test('A RATE OLDER THAN TWO DAYS IS A QUESTION WITH ITS AGE IN IT: two days pair
   const { sql } = await record(ACROSS, []);
   assert.equal(newestRate(sql, DAY(0)), null, 'no rate at all');
   sql.close();
+});
+
+/* ─────────────── where a person is asked (`Pairing.asks`): the audit of batch 63, claim 3 ─────────────── */
+
+/** The pairing of a caller that puts `crossAsks` to a person, as the kernel will build it once it does. */
+const asking = (sql: NodeSql, ruled?: ReadonlyMap<string, boolean>): Pairing => ({ ...pairingOf(sql, ruled), asks: true });
+const both = (a: Entry, b: Entry) => [[a.id, b.id], [b.id, a.id]].sort();
+/** Who a row is paired with as this pairing reads the ledger, whatever is written on it now (`settle` says only what changes). */
+const partner = (p: Pairing, e: Entry): string | null => partnerOf(p, loadLeg(p, e.id)!);
+
+test('A LONE NEAR MATCH IS A QUESTION WHERE SOMEBODY IS ASKED: the day’s rate and no rival is still not proof, and the answer decides', async () => {
+  const { k, sql } = await record();
+  /* THE AUDIT'S TWO ROWS: each the other's one candidate, the rate of the day, 1.04% apart. Nothing says they are one
+     move but their sizes. The kernel asks nobody yet, so it pairs them, as it did. */
+  const out = leg(k, 'CARD PURCHASE', 0, 'out', SENT, 'usd-current');
+  const back = leg(k, 'DEPOSIT', 1, 'in', LANDED, 'egp-current');
+  const ids = [out.id, back.id];
+  paired(k, out, back, 'with nobody asked, a lone match pairs as before');
+  assert.equal(partnerOf(pairingOf(sql), loadLeg(pairingOf(sql), out.id)!), back.id);
+  assert.deepEqual(crossAsks(pairingOf(sql), ids), [], 'and nothing is asked');
+
+  /* ASKED, THE PAIR IS TAKEN BACK (both rows counted again) and it is one question. */
+  const p = asking(sql);
+  assert.deepEqual(settle(p, ids).map((g) => [g.leg.id, g.to]).sort(), [[back.id, null], [out.id, null]].sort());
+  assert.deepEqual(settle(p, ids, passOf(p)).map((g) => g.to), [null, null], 'a pass answers as a write does');
+  for (const asks of [crossAsks(p, ids), crossAsks(p, [back.id]), crossAsks(p, ids, passOf(p))]) {
+    assert.equal(asks.length, 1);
+    const a = asks[0]!;
+    assert.deepEqual([a.key, a.first.id, a.second.id, a.why], [crossKey(out.id, back.id), out.id, back.id, ['lone']]);
+    assert.deepEqual([a.from, a.to, a.rate, a.rate_days, a.converted, a.landed], ['USD', 'EGP', 48.5, 0, 4_850_000, 4_800_000]);
+  }
+
+  const key = crossKey(out.id, back.id);
+  const yes = asking(sql, ruledOf([{ key, one: true }]));
+  assert.deepEqual([partner(yes, out), partner(yes, back)], [back.id, out.id], 'a yes pairs them');
+  assert.deepEqual(settle(yes, ids), [], 'which is what the ledger already says, so nothing is written');
+  assert.deepEqual(crossAsks(yes, ids), []);
+  const no = asking(sql, ruledOf([{ a: back.id, b: out.id, one: false }]));
+  assert.deepEqual([partner(no, out), partner(no, back)], [null, null], 'a no leaves both counted');
+  assert.equal(settle(no, ids).length, 2, 'and the pair made before anybody was asked is taken back');
+  assert.deepEqual(crossAsks(no, ids), [], 'and is not asked again');
+  sql.close();
+});
+
+test('A LONE MATCH ASKED ABOUT GIVES WAY TO THE SAME MONEY IN ONE CURRENCY, and is `lone` only while each is the other’s nearest', async () => {
+  const { k, sql } = await record();
+  const out = leg(k, 'TRANSFER TO EGP', 0, 'out', SENT, 'usd-current');
+  const back = leg(k, 'TRANSFER FROM USD', 1, 'in', LANDED, 'egp-current');
+  /* A second receipt as near: neither is taken, each is a question, and neither is `lone`. */
+  const client = leg(k, 'DEPOSIT', 1, 'in', egp(4_830_000), 'egp-savings');
+  const p = asking(sql);
+  const asks = crossAsks(p, [out.id]);
+  assert.deepEqual(asks.map((a) => [a.key, a.why]).sort(), [[crossKey(out.id, back.id), ['not_only']], [crossKey(out.id, client.id), ['not_only']]].sort());
+  /* The dollars arrive in another dollar account: a pair to the cent, asked of nobody, and both questions are gone. */
+  const landed = leg(k, 'FROM CURRENT', 0, 'in', SENT, 'usd-savings');
+  assert.deepEqual([partner(p, out), partner(p, landed)], [landed.id, out.id]);
+  assert.deepEqual(crossAsks(p, [out.id, back.id, client.id]), []);
+  assert.deepEqual([...crossStill(p, asks.map((a) => a.key))], [], 'the caller closes what it held open');
+  sql.close();
+});
+
+test('A WIDER SPREAD THAN THE TOLERANCE IS A QUESTION UP TO 10%, never a pair: 3% is asked, a yes pairs it, and 11% is two sizes that only look alike', async () => {
+  const { k, sql } = await record();
+  /* AN EXCHANGE DESK TOOK 3.19%. The list says 2%, so the two were neither paired nor asked about, and Spent and
+     Received both read high by the move. */
+  const out = leg(k, 'TRANSFER TO EGP', 0, 'out', SENT, 'usd-current');
+  const back = leg(k, 'TRANSFER FROM USD', 1, 'in', TOO_FEW, 'egp-current');
+  const ids = [out.id, back.id];
+  apart(k, [out, back], '3.19% apart paired');
+  assert.deepEqual(crossAsks(pairingOf(sql), ids), [], 'nobody asked, nothing asked');
+
+  const p = asking(sql);
+  assert.deepEqual(answers(settle(p, ids)), [], 'a wider spread is never paired on its own word');
+  for (const asks of [crossAsks(p, [out.id]), crossAsks(p, [back.id]), crossAsks(p, ids, passOf(p))]) {
+    assert.equal(asks.length, 1);
+    const a = asks[0]!;
+    assert.deepEqual([a.key, a.first.id, a.second.id, a.why, a.converted, a.landed], [crossKey(out.id, back.id), out.id, back.id, ['spread'], 4_850_000, 4_700_000]);
+  }
+  const key = crossKey(out.id, back.id);
+  assert.deepEqual(crossLegs(key).sort(), [...ids].sort());
+  assert.deepEqual([...crossStill(p, [key, crossKey(out.id, 'gone')])], [key], 'a question whose rows are still there stands, and one about a row that is gone does not');
+
+  /* YES pairs them, in a write's settle and in a pass over the list, and with nobody asked too: the answer is the
+     person's, whoever reads it. NO leaves them counted and unasked. */
+  const yes = ruledOf([{ key, one: true }]);
+  assert.deepEqual(answers(settle(asking(sql, yes), ids)), both(out, back));
+  assert.deepEqual(answers(settle(asking(sql, yes), ids, passOf(asking(sql, yes)))), both(out, back));
+  assert.deepEqual(answers(settle(pairingOf(sql, yes), ids)), both(out, back));
+  assert.deepEqual(crossAsks(asking(sql, yes), ids), []);
+  assert.deepEqual([...crossStill(asking(sql, yes), [key])], []);
+  const no = asking(sql, ruledOf([{ key, one: true }, { a: out.id, b: back.id, one: false }]));
+  assert.deepEqual(answers(settle(no, ids)), [], 'the later answer about the same two is the one that holds');
+  assert.deepEqual(crossAsks(no, ids), []);
+
+  /* THE EDGE, to the piastre: EGP 48,500.00 against 44,090.91 is 10% of what landed, and one piastre less is past it. */
+  assert.equal(ASK_SPREAD, 10);
+  made(k.update('ledger', back.id, { amount: egp(4_409_091) }, BANK));
+  assert.deepEqual(crossAsks(p, ids).map((a) => a.why), [['spread']]);
+  made(k.update('ledger', back.id, { amount: egp(4_409_090) }, BANK));
+  assert.deepEqual(crossAsks(p, ids), [], 'past 10% was asked about');
+  assert.deepEqual(answers(settle(asking(sql, yes), ids)), [], 'and a yes given at 3% does not reach past 10%');
+  sql.close();
+});
+
+test('A WIDER SPREAD STANDS IN NOBODY’S WAY: beside a match inside the tolerance it is a second question, and on an old rate it says both', async () => {
+  const { k, sql } = await record();
+  const out = leg(k, 'TRANSFER TO EGP', 0, 'out', SENT, 'usd-current');
+  const back = leg(k, 'TRANSFER FROM USD', 1, 'in', LANDED, 'egp-current');
+  const other = leg(k, 'DEPOSIT', 2, 'in', TOO_FEW, 'egp-savings');
+  paired(k, out, back, 'a row outside the tolerance is no rival');
+  const p = asking(sql);
+  const every = [out.id, back.id, other.id];
+  assert.deepEqual(
+    crossAsks(p, every).map((a) => [a.key, a.why]).sort(),
+    [[crossKey(out.id, back.id), ['lone']], [crossKey(out.id, other.id), ['spread', 'not_only']]].sort(),
+  );
+  /* A yes to the nearer one pairs it and closes the other question with it. */
+  const yes = asking(sql, ruledOf([{ a: out.id, b: back.id, one: true }]));
+  assert.deepEqual([partner(yes, out), partner(yes, back), partner(yes, other)], [back.id, out.id, null]);
+  assert.deepEqual(crossAsks(yes, every), []);
+  sql.close();
+
+  const old = await record(ACROSS, [[DAY(-5), 48.5]]);
+  const sent = leg(old.k, 'TRANSFER TO EGP', 0, 'out', SENT, 'usd-current');
+  const few = leg(old.k, 'TRANSFER FROM USD', 1, 'in', TOO_FEW, 'egp-current');
+  const pending = leg(old.k, 'DEPOSIT', 1, 'in', TOO_FEW, 'egp-savings', 'pending');
+  const asks = crossAsks(asking(old.sql), [sent.id, few.id, pending.id]);
+  assert.deepEqual(asks.map((a) => [a.key, a.why, a.rate_days]), [[crossKey(sent.id, few.id), ['spread', 'rate_old'], 5]], 'a row still pending is not asked about');
+  old.sql.close();
+
+  /* A row of the other currency that is already one move with a row of its own is taken, and is no second candidate. */
+  const own = await record();
+  const gone = leg(own.k, 'TRANSFER TO EGP', 0, 'out', SENT, 'usd-current');
+  const short = leg(own.k, 'TRANSFER FROM USD', 1, 'in', TOO_FEW, 'egp-current');
+  const into = leg(own.k, 'TO SAVINGS', 1, 'in', LANDED, 'egp-savings');
+  const from = leg(own.k, 'TO SAVINGS', 1, 'out', LANDED, 'egp-current');
+  paired(own.k, into, from, 'the same pounds between two pound accounts pair to the piastre');
+  assert.deepEqual(crossAsks(asking(own.sql), [gone.id, short.id, into.id, from.id]).map((a) => [a.key, a.why]), [[crossKey(gone.id, short.id), ['spread']]]);
+  own.sql.close();
 });

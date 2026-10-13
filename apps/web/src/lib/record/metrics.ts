@@ -10,19 +10,22 @@
  * reading with: its format, its target as a sentence, its note, its door and the sentence under a
  * figure in several currencies.
  *
+ * ONE READING IS STILL MADE HERE, over entries a tab already holds: a difference in parts and against the window before
+ * (`diffRead`). Its predicate, its moved clock and its gate are the record's own, imported, so nothing is said twice.
+ *
  * AND THE LINK IS DERIVED. A tile's href used to be typed beside its predicate, so the two drifted:
  * a tile counting five states whose link listed three, and a figure excluding cancelled services whose
  * link included them. One predicate produces both the figure and the URL, so they cannot disagree.
  */
 
-import type { Bucket, FxRead, Group, Part, Rate, TargetIn } from '@braindog/kernel';
-import { clausesOf, quoteValue } from '@braindog/where';
+import { BEFORE, GROUP_CAP, comparisonOf, monthBefore, yearBefore, type Before, type Bucket, type FxRead, type Group, type Halves, type Part, type Rate, type TargetIn } from '@braindog/kernel';
+import { clausesOf, evaluate, parseWhere, quoteValue, type Predicate } from '@braindog/where';
 import { UNNAMED, day as longDay, integer, money, shortDay } from 'braindog-render';
 
 import { copy } from '../copy.ts';
 import { REGISTERS } from './held.ts';
-import { BARE, amountOf, currencyOf } from './money.ts';
-import { joinsWithOr, registerHref } from './where.ts';
+import { BARE, amountOf, currencyOf, mixedFix } from './money.ts';
+import { joinsWithOr, registerHref, schemaOf } from './where.ts';
 import type { Entry } from './schema.ts';
 
 /* ── the document ────────────────────────────────────────────────────────── */
@@ -54,7 +57,11 @@ export type Operand = string | { product: [string, { lookup: string; by: string 
 export type Value =
   | Aggregation
   | { ratio: { of: Aggregation; per: Aggregation } }
-  | { diff: { of: Aggregation; per: Aggregation } };
+  /**
+   * `before` IS THE WINDOW THE SECOND HALF IS READ FROM (REC-B19), one of the record's three words (`BEFORE`): the same
+   * `where` at the clock moved back, ended at that clock's day. Without it both halves read the same entries.
+   */
+  | { diff: { of: Aggregation; per: Aggregation; before?: Before | undefined } };
 
 export type MetricDecl = {
   metric: string;
@@ -146,6 +153,8 @@ export type Reading = {
   href?: string;
   /** A grouped figure's parts, as the record's `groupsOf` returns them. */
   groups?: Group[];
+  /** On a difference against the window before: what each half read, as the record's `halves` says it. */
+  halves?: Halves;
   /** On a kept series with gaps: the days that have no point for want of a rate (the kernel's `Reading.noRateDays`). */
   noRateDays?: string[];
   /** The bucket the clock is in, on a figure bucketed by date. */
@@ -338,14 +347,19 @@ function currenciesOf(rows: Entry[], agg: Aggregation): Set<string> {
 export { BARE };
 
 /** Every currency any operand of this value expression reads. */
-export function currenciesRead(rows: Entry[], value: Value): Set<string> {
-  if ('ratio' in value) return pairCurrencies(rows, value.ratio);
-  if ('diff' in value) return pairCurrencies(rows, value.diff);
+export function currenciesRead(rows: Entry[], value: Value, before: Entry[] = rows): Set<string> {
+  if ('ratio' in value) return pairCurrencies(rows, value.ratio, rows);
+  if ('diff' in value) return pairCurrencies(rows, value.diff, before);
   return currenciesOf(rows, value);
 }
 
-const pairCurrencies = (rows: Entry[], pair: { of: Aggregation; per: Aggregation }): Set<string> =>
-  new Set([...currenciesOf(rows, pair.of), ...currenciesOf(rows, pair.per)]);
+/**
+ * EACH HALF OVER ITS OWN ENTRIES. Both were read over one list, which is right for a ratio and for a difference of two
+ * fields, and wrong for a difference against the window before (`diff.before`), whose second half holds other entries:
+ * pounds this month against dollars last month read as one currency. `before` is that window's entries.
+ */
+const pairCurrencies = (rows: Entry[], pair: { of: Aggregation; per: Aggregation }, before: Entry[]): Set<string> =>
+  new Set([...currenciesOf(rows, pair.of), ...currenciesOf(before, pair.per)]);
 
 /**
  * A day as a figure says it: `30 Oct`, and `30 Oct 2027` when it is not in the year the clock is in, because a day
@@ -505,11 +519,21 @@ export function unreadable(decl: MetricDecl): string[] {
     if (!named.some((k) => READS_AGGREGATION.includes(k)))
       out.push(`value: ${named.join(', ') || 'nothing'} is not an aggregation this build reads. It reads ${READS_AGGREGATION.join(' · ')}`);
   } else {
-    const pair = ('ratio' in value ? value.ratio : value.diff) as { of?: object; per?: object } | undefined;
+    const pair = ('ratio' in value ? value.ratio : value.diff) as { of?: object; per?: object; before?: unknown } | undefined;
     for (const side of ['of', 'per'] as const) {
       const agg = pair?.[side];
       if (!agg || !Object.keys(agg).some((k) => READS_AGGREGATION.includes(k)))
         out.push(`value.${side}: this build reads ${READS_AGGREGATION.join(' · ')}`);
+    }
+    /* A DIFFERENCE IN PARTS AND AGAINST THE WINDOW BEFORE (REC-B19), in the sentences the record refuses each with at
+       install: a ratio is still not grouped, a difference is grouped by one field, the window before is one of three
+       words, and such a difference is never cut by date. */
+    if ('ratio' in value && decl.group_by !== undefined) out.push('group_by: a ratio is not grouped in this build; group each half as its own figure');
+    const grouping = 'diff' in value ? halvesGrouping(decl) : null;
+    if (grouping?.said) out.push(`group_by: ${grouping.said}`);
+    if ('diff' in value && pair?.before !== undefined) {
+      if (!(BEFORE as readonly unknown[]).includes(pair.before)) out.push(`value: ${String(pair.before)} is not a window before: write ${BEFORE.join(', ')}`);
+      if (decl.bucket !== undefined) out.push('bucket: a difference against the window before is grouped by a field and never cut by date, because its halves hold different dates');
     }
   }
 
@@ -553,6 +577,195 @@ function unaggregatable(decl: MetricDecl): string[] {
     }
   }
   return out;
+}
+
+/* ── a difference in parts, and against the window before (REC-B19) ──────── */
+
+/**
+ * A difference whose halves name the grouping, as one whose figure does: the record's `liftedGrouping`, in its words.
+ *
+ * BOTH HALVES NAME THE SAME FIELD, OR IT IS TWO QUESTIONS. `said` is the sentence for halves that disagree with each
+ * other or with the figure's own `group_by`, and `by` is the one field the difference is read per value of.
+ */
+function halvesGrouping(decl: MetricDecl): { of: Aggregation; per: Aggregation; by: string | undefined; said: string | null } | null {
+  const diff = (decl.value as { diff?: { of?: unknown; per?: unknown } | null } | undefined)?.diff;
+  const held = (half: unknown): half is Record<string, unknown> => half !== null && typeof half === 'object' && !Array.isArray(half);
+  if (!diff || !held(diff.of) || !held(diff.per)) return null;
+  const a = diff.of.group_by;
+  const b = diff.per.group_by;
+  const bare = (half: Record<string, unknown>): Aggregation => Object.fromEntries(Object.entries(half).filter(([key]) => key !== 'group_by')) as Aggregation;
+  const word = (by: unknown): string => (by === undefined ? 'nothing' : String(by));
+  const said =
+    a === undefined && b === undefined
+      ? null
+      : a !== b
+        ? `a difference is grouped by one field, and its halves are grouped by ${word(a)} and ${word(b)}; group both by the same field`
+        : decl.group_by !== undefined && decl.group_by !== a
+          ? `its halves are grouped by ${word(a)} and the figure by ${String(decl.group_by)}; a difference is grouped by one field`
+          : null;
+  return { of: bare(diff.of), per: bare(diff.per), by: decl.group_by ?? (typeof a === 'string' ? a : undefined), said };
+}
+
+/** The operators that start a window and the ones that end it, as the record's `endedAt` lists them. */
+const LOWER = ['after', 'gt', 'gte'] as const;
+const UPPER = ['before', 'lt', 'lte', 'between', 'is', 'in'] as const;
+
+const conjuncts = (p: Predicate): Record<string, unknown>[] =>
+  (Array.isArray((p as { all?: unknown }).all) ? (p as { all: Predicate[] }).all : [p]) as Record<string, unknown>[];
+
+const dayAfter = (iso: string): string => new Date(Date.parse(`${iso.slice(0, 10)}T00:00:00Z`) + DAY_MS).toISOString().slice(0, 10);
+
+/**
+ * The window before, ended at the moved clock's day: the record's `endedAt`, for a window that writes only its start.
+ *
+ * `on at least bom` READ A MONTH BACK IS `on at least 1 September`, WHICH STILL RUNS TO TODAY, so it holds this month
+ * too. Every dated field given a start and no end is ended the day after the moved clock's, since `before` leaves its
+ * own day out, and never past the day the current window starts, so no entry is in both.
+ */
+function endedAt(shifted: Predicate | undefined, current: Predicate | undefined, register: string, thenMs: number): Predicate | undefined {
+  if (!shifted || current === undefined) return shifted;
+  const fields = REGISTERS[register]?.fields ?? [];
+  const dated = (field: unknown): field is string => typeof field === 'string' && fields.some((f) => f.id === field && (f.type === 'day' || f.type === 'instant'));
+  const clauses = conjuncts(shifted);
+  const started = new Set(clauses.filter((c) => dated(c.field) && LOWER.some((op) => op in c)).map((c) => c.field as string));
+  for (const c of clauses) if (dated(c.field) && UPPER.some((op) => op in c)) started.delete(c.field as string);
+  if (started.size === 0) return shifted;
+  /* THE FIRST DAY A WINDOW HOLDS: `gte` names it, `after` names the day before it. */
+  const startOf = (of: readonly Record<string, unknown>[], field: string): string | undefined =>
+    of
+      .filter((c) => c.field === field)
+      .flatMap((c) => LOWER.filter((op) => typeof c[op] === 'string').map((op) => (op === 'gte' ? (c[op] as string).slice(0, 10) : dayAfter(c[op] as string))))
+      .sort()
+      .at(-1);
+  const clock = dayAfter(new Date(thenMs).toISOString());
+  const ends = [...started].map((field) => {
+    const begins = startOf(conjuncts(current), field);
+    return { field, before: begins !== undefined && begins < clock ? begins : clock } as Predicate;
+  });
+  return { all: [...(clauses as Predicate[]), ...ends] } as Predicate;
+}
+
+/**
+ * The entries of each half: this window's, and the window before's when the difference names one.
+ *
+ * THE RECORD'S OWN PARSER, CLOCK AND TEST OF A ROW (`parseWhere`, `monthBefore`, `evaluate`), so the two windows are the
+ * record's and nothing about a predicate is said twice. A year back is the same day last year; `previous` is the
+ * figure's own `window`. `moved` is whether the words name a day at all, and `noise` a window under seven days.
+ */
+function halvesOf(decl: MetricDecl, register: string, rows: readonly Entry[], now: number): { bad: string[]; of: Entry[]; per: Entry[]; then: { moved: boolean; noise: boolean } | null } {
+  const schema = schemaOf(register);
+  const nothing = (bad: string[]) => ({ bad, of: [], per: [], then: null });
+  const said = parseWhere(decl.where, schema, { nowMs: now });
+  if (said.bad.length) return nothing(said.bad.map((b) => b.fix));
+  /* The row goes beside its fields, for words about what the record keeps in a column (`created_at`). */
+  const admits = (p: Predicate | undefined) => rows.filter((e) => evaluate(p, e.fields as Record<string, unknown>, schema, { id: e.id, seq: e.seq, version: e.version, created_at: e.created }));
+  const of = admits(said.predicate);
+  const word = 'diff' in decl.value ? decl.value.diff.before : undefined;
+  if (word === undefined) return { bad: [], of, per: of, then: null };
+  const shift = windowMs(decl.window ?? '');
+  if (word === 'previous' && shift === null) return nothing([`window: ${String(decl.window)} is not a window, so there is no window before it`]);
+  const moveTo = word === 'year_ago' ? yearBefore(now) : word === 'month_ago' ? monthBefore(now) : now - shift!;
+  const shifted = parseWhere(decl.where, schema, { nowMs: moveTo });
+  if (shifted.bad.length) return nothing(shifted.bad.map((b) => b.fix));
+  const moved = JSON.stringify(shifted.predicate) !== JSON.stringify(said.predicate);
+  return { bad: [], of, per: admits(endedAt(shifted.predicate, said.predicate, register, moveTo)), then: { moved, noise: word === 'previous' && shift! < 7 * DAY_MS } };
+}
+
+/** What one half read: its number, or `null` when it holds no one number, and what it added in each currency. */
+type HalfRead = { value: number | null; rows: number; amounts: Map<string, number>; refusal?: string };
+
+/** One half over the entries of its window. A bare number is kept under `BARE`, beside what is in a currency. */
+function halfOf(agg: Aggregation, rows: readonly Entry[]): HalfRead {
+  const amounts = new Map<string, number>();
+  const none = (refusal: string): HalfRead => ({ value: null, rows: rows.length, amounts, refusal });
+  if ('age' in agg) return none('value: the age of the newest day is read by the record, and not inside a difference here');
+  const op = 'count' in agg ? agg.count : 'distinct' in agg ? agg.distinct : 'sum' in agg ? agg.sum : 'avg' in agg ? agg.avg : 'min' in agg ? agg.min : 'max' in agg ? agg.max : 'currencies' in agg ? agg.currencies : agg.empty;
+  if (typeof op !== 'string') return none('value: a figure multiplied by a factor is read by the record, and not inside a difference here');
+  const said = rows.map((e) => (op === 'id' ? e.seq : e.fields[op])).filter((v) => v !== null && v !== undefined && v !== '');
+  if ('count' in agg) return { value: said.length, rows: rows.length, amounts };
+  if ('empty' in agg) return { value: rows.length - said.length, rows: rows.length, amounts };
+  if ('distinct' in agg) return { value: new Set(said.map((v) => JSON.stringify(v))).size, rows: rows.length, amounts };
+  if ('currencies' in agg) return { value: new Set(said.map(currencyOf).filter(Boolean)).size, rows: rows.length, amounts };
+  const numbers: number[] = [];
+  for (const v of said) {
+    const n = amountOf(v);
+    if (n === null) continue;
+    numbers.push(n);
+    const unit = currencyOf(v) ?? BARE;
+    amounts.set(unit, (amounts.get(unit) ?? 0) + n);
+  }
+  /* MONEY IS ADDED IN ONE CURRENCY OR NOT AT ALL, and a minimum across two is no amount either. */
+  if (amounts.size > 1) return { value: null, rows: rows.length, amounts };
+  if ('sum' in agg) return { value: numbers.reduce((a, n) => a + n, 0), rows: rows.length, amounts };
+  if (numbers.length === 0) return { value: null, rows: rows.length, amounts };
+  const value = 'avg' in agg ? numbers.reduce((a, n) => a + n, 0) / numbers.length : 'min' in agg ? Math.min(...numbers) : Math.max(...numbers);
+  return { value, rows: rows.length, amounts };
+}
+
+/** A difference as this file reads one: the whole, its parts, and what the record's reading carries beside them. */
+export type DiffRead = Required<Pick<Reading, 'value' | 'rows' | 'delta' | 'why' | 'refusals' | 'unit'>> & Pick<Reading, 'parts' | 'halves' | 'groups' | 'more'>;
+
+/**
+ * A difference over the entries a tab holds: `of` less `per`, the whole and each part (REC-B19).
+ *
+ * THE RECORD READS THE FIGURE, AND THIS IS FOR ENTRIES ALREADY IN HAND: a draft before it is sent, and a list a page
+ * holds whole. It answers what the record's `groupsOf` answers for the same entries. A grouped difference is one
+ * difference for each part, over that part's entries alone. With `diff.before`, `per` is read over the same words at
+ * the clock moved back and ended at that clock's day (`halvesOf`); the reading and each part then carry `halves`, and
+ * a `delta` and `why` through the record's own gate, `comparisonOf(now, before, true)`, asked of each part by itself.
+ * A part only one window holds counts the other as nought.
+ *
+ * NOTHING IS CONVERTED HERE. Two currencies are one amount for each (`parts`) and no number, so no change is said
+ * across them; the record converts into a home currency, and a reading of its own is what a tile draws when it has one.
+ */
+export function diffRead(decl: MetricDecl, rows: readonly Entry[], now: number = Date.now()): DiffRead {
+  const refused = (refusals: string[]): DiffRead => ({ value: null, rows: 0, delta: null, why: '', refusals, unit: null });
+  const register = registerOf(decl.source ?? '');
+  const pair = halvesGrouping(decl);
+  if (register === null || pair === null) return refused(['value: this reads a difference over a list, and the record reads every other figure']);
+  const named = unreadable(decl);
+  if (named.length) return refused(named);
+  if (isTemplate(decl)) return refused(['where: a figure with a name still to fill is read once it has one']);
+  const windows = halvesOf(decl, register, rows, now);
+  if (windows.bad.length) return refused(windows.bad);
+  const then = windows.then;
+  const change = (a: { value: number | null; rows: number }, b: { value: number | null; rows: number }): { delta: number | null; why: string } =>
+    then?.noise
+      ? { delta: null, why: 'a window under seven days is noise' }
+      : then && !then.moved
+        ? { delta: null, why: 'the predicate does not mention time, so the window moves nothing' }
+        : comparisonOf(a, b, true);
+
+  /** One difference: the whole, or one part. `apiece` is the whole being in two currencies, which puts every part in parts. */
+  const one = (ofRows: readonly Entry[], perRows: readonly Entry[], apiece: boolean) => {
+    const of = halfOf(pair.of, ofRows);
+    const per = halfOf(pair.per, perRows);
+    const units = [...new Set([...of.amounts.keys(), ...per.amounts.keys()])].sort();
+    const mixed = units.length > 1;
+    const parts: Part[] = units.map((currency) => ({ currency, amount: (of.amounts.get(currency) ?? 0) - (per.amounts.get(currency) ?? 0) }));
+    const halves: Halves = mixed ? { of: null, per: null, perRows: per.rows } : { of: of.rows === 0 ? 0 : of.value, per: per.rows === 0 ? 0 : per.value, perRows: per.rows };
+    const value = mixed || apiece || (then ? halves.of === null || halves.per === null : of.value === null || per.value === null) ? null : then ? halves.of! - halves.per! : of.value! - per.value!;
+    return { value, rows: of.rows, units, refusal: of.refusal ?? per.refusal, ...(mixed || apiece ? { parts } : {}), ...(then ? { halves, ...change({ value: halves.of, rows: of.rows }, { value: halves.per, rows: per.rows }) } : {}) };
+  };
+
+  const whole = one(windows.of, windows.per, false);
+  if (whole.refusal) return refused([whole.refusal]);
+  /* MONEY BESIDE A BARE NUMBER IS REFUSED, as the record refuses it, in `money.ts`'s sentence. */
+  if (whole.units.includes(BARE) && whole.units.length > 1) return refused([mixedFix(whole.units)]);
+  const { units, refusal: _, ...said } = whole;
+  const reading: DiffRead = { delta: null, why: '', ...said, refusals: [], unit: units.length === 1 && units[0] !== BARE ? units[0]! : null };
+  if (pair.by === undefined) return reading;
+
+  /* EVERY PART EITHER WINDOW HOLDS, the largest difference first and the name breaking a tie; past fifty they are
+     counted and not drawn. An entry with nothing in the field is in no part, as the record leaves it out. */
+  const keyOf = (e: Entry): string | null => (e.fields[pair.by!] === null || e.fields[pair.by!] === undefined || e.fields[pair.by!] === '' ? null : String(e.fields[pair.by!]));
+  const keys = [...new Set([...windows.of, ...(then ? windows.per : [])].map(keyOf).filter((k): k is string => k !== null))];
+  const groups: Group[] = keys.map((key) => {
+    const { units: __, refusal: ___, ...part } = one(windows.of.filter((e) => keyOf(e) === key), then ? windows.per.filter((e) => keyOf(e) === key) : windows.of.filter((e) => keyOf(e) === key), units.length > 1);
+    return { key, ...part, value: !then && part.rows === 0 ? null : part.value, state: 'full' };
+  });
+  groups.sort((a, b) => (b.value ?? -Infinity) - (a.value ?? -Infinity) || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+  return { ...reading, groups: groups.slice(0, GROUP_CAP), more: Math.max(0, groups.length - GROUP_CAP) };
 }
 
 /**

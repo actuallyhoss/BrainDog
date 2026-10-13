@@ -20,13 +20,20 @@
  *
  * ONLY TYPES COME FROM `signs.ts`. It spreads `SIGNS_VITALS` into `VITAL_SIGNS` at load, so a value imported back from
  * it would be read before it exists whenever this file is the one loaded first. Nothing from `migrate.ts` is read at
- * load either, for the same reason.
+ * load either, for the same reason. `pairs.ts` and `finished.ts` are read at load and neither reaches `signs.ts`
+ * (`test/signs-rate-age.test.ts` loads this file first to hold that).
+ *
+ * AND ONE BESIDE THE THREE (pairs-fx-guard-62-63): `rate-age`, how old the newest rate is. Two currencies pair by
+ * themselves only on a rate at most `PAIR_RATE_DAYS` old (`pairs.ts`); past that both halves of a move stay counted and
+ * a person is asked, and nothing on the record said why until this did.
  */
 
 import type { Sql } from '@braindog/ports';
 
 import { isCurrencyCode } from './coerce.ts';
+import { dayIn } from './finished.ts';
 import { FORMAT_VERSION, KERNEL_MIGRATION } from './migrate.ts';
+import { newestRate, PAIR_RATE_DAYS } from './pairs.ts';
 import type { SignReader, SignReading, SignState } from './signs.ts';
 
 const HOUR = 3_600_000;
@@ -41,6 +48,8 @@ export const UNAUTHORED_MOST = 0;
 export const FORMAT_BEHIND_MOST = 0;
 /** Red when more than this many amounts are not whole or have no currency. */
 export const AMOUNTS_BROKEN_MOST = 0;
+/** Red when the newest rate is more than this many days old: the pairing's own limit, so the two cannot drift apart. */
+export const RATE_DAYS_MOST = PAIR_RATE_DAYS;
 
 /** The kinds of line that change a list's items. Every other kind signed `system` is the kernel's own work by grammar. */
 export const ITEM_WRITES: readonly string[] = ['create', 'edit', 'state', 'link', 'tag', 'untag', 'delete', 'restore'];
@@ -225,16 +234,55 @@ function readAmounts(sql: Sql): SignReading {
   return reading('red', broken.length, `${count(broken.length, 'amount')} ${broken.length === 1 ? 'is' : 'are'} not whole or ${broken.length === 1 ? 'has' : 'have'} no currency, in ${names(at)}.`, facts);
 }
 
+/* ── rate-age ──────────────────────────────────────────────────────────── */
+
+/** A stored day as a person reads it: `6 October`, with the year when it is not `today`'s. */
+function daySaid(day: string, today: string): string {
+  const opts: Intl.DateTimeFormatOptions = { timeZone: 'UTC', day: 'numeric', month: 'long', ...(day.slice(0, 4) === today.slice(0, 4) ? {} : { year: 'numeric' }) };
+  return new Intl.DateTimeFormat('en-GB', opts).format(Date.parse(`${day}T00:00:00Z`));
+}
+
+/** The names of the lists that match a move between two currencies (`pairs.across_currency`). */
+function crossing(sql: Sql): string[] {
+  const out: string[] = [];
+  for (const d of sql.all<{ id: string; body: string }>("SELECT id, body FROM declaration WHERE kind = 'register' AND superseded_at IS NULL AND retired = 0 ORDER BY id")) {
+    const body = parsed(d.body);
+    const pairs = body?.pairs;
+    if (pairs === null || typeof pairs !== 'object' || (pairs as { across_currency?: unknown }).across_currency === undefined) continue;
+    out.push(typeof body?.name === 'string' && body.name.trim() !== '' ? body.name.trim() : plain(d.id.slice('register.'.length)));
+  }
+  return out;
+}
+
+/**
+ * NOTHING TO JUDGE BY WHERE NO LIST PAIRS ACROSS CURRENCIES, however old the rates: an old rate there stops nothing, and
+ * a figure converted on one says so beside itself (`fx.ts`). And none again with no rate at all, in its own words,
+ * since then nothing was ever matched and nothing stopped. THE DAY IS THE RECORD'S, as a pairing reads a leg's day.
+ */
+function readRateAge(sql: Sql, nowMs: number, tz: string): SignReading {
+  const at = crossing(sql);
+  if (at.length === 0) return reading('none', null, 'No list on this record matches a move between two currencies.');
+  const facts = [`${names(at)} ${at.length === 1 ? 'matches' : 'match'} a move between two currencies.`];
+  const today = dayIn(nowMs, tz);
+  const newest = newestRate(sql, today);
+  if (newest === null) return reading('none', null, 'This record holds no rate yet, so a move between two currencies is not matched by itself.', facts);
+  const said = `The newest rate is from ${daySaid(newest.as_of, today)}, ${newest.days === 0 ? 'today' : `${count(newest.days, 'day')} old`}.`;
+  if (newest.days <= RATE_DAYS_MOST) return reading('green', newest.days, said, facts);
+  facts.push('Until a newer rate arrives, both sides of such a move stay counted as money out and money in, and you are asked.');
+  return reading('red', newest.days, `${said} A move between two currencies is matched by itself only on a rate at most ${count(RATE_DAYS_MOST, 'day')} old.`, facts);
+}
+
 /* ── the list ──────────────────────────────────────────────────────────── */
 
 const kernel = (sign: string, name: string, thresholds: Record<string, number>, read: NonNullable<SignReader['read']>): SignReader => ({ sign, name, hand: 'kernel', version: 1, thresholds, read });
 
 /**
- * THE THREE, in SHL-A06's order. `signs.ts` joins them to `VITAL_SIGNS` with `...SIGNS_VITALS`. The ids are kebab case,
- * as PRF-A01's are; a person reads the names.
+ * THE THREE, in SHL-A06's order, then `rate-age`. `signs.ts` joins them to `VITAL_SIGNS` with `...SIGNS_VITALS`. The
+ * ids are kebab case, as PRF-A01's are; a person reads the names.
  */
 export const SIGNS_VITALS: readonly SignReader[] = [
   kernel('writes-authored', 'Every write has an author', { AUTHORED_WINDOW_HOURS, UNAUTHORED_MOST }, (sql, nowMs) => readAuthored(sql, nowMs)),
   kernel('format-current', 'The record is in the current format', { FORMAT_BEHIND_MOST }, (sql) => readFormat(sql)),
   kernel('amounts-whole', 'Every amount is whole', { AMOUNTS_BROKEN_MOST }, (sql) => readAmounts(sql)),
+  kernel('rate-age', 'How old is the newest rate', { RATE_DAYS_MOST }, readRateAge),
 ];

@@ -279,6 +279,9 @@ export const handlesIn = (said: string): string[] => {
 /** A row of an answer as the tools shape one: `compact` and `listed` in `index.ts`. */
 export type Shaped = { spoken: string; version?: number; state?: string; fields?: Record<string, unknown>; deleted_at?: string; clipped?: boolean };
 
+/** How long a text in a row's line runs before it is cut, at a word: a project's one line, whole or nearly. */
+const LINE_TEXT = 90;
+
 /**
  * One row on one line: its words and handle, then the short form a person reads on a phone.
  *
@@ -304,7 +307,14 @@ export function rowLine(row: Shaped, register: string, look: Look): string {
     if (f?.retired === true) return;
     /* A REF THE CALLER CANNOT NAME IS LEFT OFF A LINE, where it said "one you cannot open" on every row of a page. */
     if (typeof fields[id] === 'string' && ULID.test(fields[id])) return;
-    const words = said(f, fields[id], look, 48);
+    /* A LIST OF TEXT IS ITS LABEL AND HOW MANY, "In the way 3", never its items: three things in the way of a
+       project ran to a line's worth of words, on every line of a portfolio, where the reader wanted the count. */
+    if (f?.type === 'list' && (f.of ?? 'text') === 'text' && Array.isArray(fields[id])) {
+      const count = fields[id].filter((v) => (typeof v === 'string' ? v.trim() !== '' : v !== null && v !== undefined)).length;
+      if (count > 0) parts.push({ said: `${labelOf(f, id)} ${grouped(count)}` });
+      return;
+    }
+    const words = said(f, fields[id], look, LINE_TEXT);
     if (words === null || (f?.type === 'bool' && fields[id] !== true)) return;
     if (moneyIn(fields[id]) !== null) {
       parts.push({ said: words, amount: labelOf(f, id).toLowerCase() });
@@ -464,6 +474,9 @@ export function searchBrief(args: Record<string, unknown>, page: Page, look: Loo
   return [head, ...lines, ...(more ? [more] : [])].join('\n');
 }
 
+/** The longest value a log line says whole. A longer text is said as how many characters it is. */
+const SAID_WHOLE = 60;
+
 /** A log line's verb and what it moved, in words. */
 export function eventSaid(e: Record<string, unknown>, decl: Decl | undefined, look: Look): string {
   const kind = typeof e.kind === 'string' ? e.kind : 'change';
@@ -472,16 +485,38 @@ export function eventSaid(e: Record<string, unknown>, decl: Decl | undefined, lo
   const short = (v: unknown): string | null => {
     /* A REF'S NEW VALUE IS A ROW ID ON THE LOG, which says nothing a person can read, and not "one you cannot open". */
     if (f?.type === 'ref' || (f?.type === 'list' && f.of === 'ref') || (typeof v === 'string' && ULID.test(v))) return null;
-    const words = said(f, v, look, 60);
-    return words !== null && words.length <= 60 ? words : null;
+    const words = said(f, v, look, SAID_WHOLE);
+    return words !== null && words.length <= SAID_WHOLE ? words : null;
+  };
+  const isRef = f?.type === 'ref';
+  /* A FREE TEXT, which is the one kind of value that outgrows a line: a choice, a day and an amount are short said. */
+  const isText = !isRef && f?.type !== 'enum' && f?.type !== 'secret' && f?.type !== 'day' && f?.type !== 'instant';
+  /**
+   * A row a link pointed at, in words. The log holds a row id, which the answer names before it is said (`look.title`
+   * by row id is the row's words with its handle); a row it could not name is `null`, and is left off the line.
+   */
+  const linked = (v: unknown): string | null => {
+    if (typeof v !== 'string' || v === '') return null;
+    return ULID.test(v) ? (look.title(v) ?? null) : refSaid(v, look);
   };
   const note = typeof e.note === 'string' && e.note !== '' ? clip(e.note, 120) : null;
   switch (kind) {
     case 'create':
       return note && !/^opened: /u.test(note) ? `added: ${note}` : 'added';
     case 'edit': {
-      const to = short(e.to);
-      return `changed ${label || 'a field'}${to ? ` to ${to}` : ''}`;
+      const what = label || 'a field';
+      const gone = e.to === null || e.to === undefined || e.to === '';
+      /* A TEXT TOO LONG FOR A LINE SAYS HOW LONG IT WAS AND IS, where it said nothing of either. */
+      const size = (v: unknown): number | null => (isText && typeof v === 'string' && v !== '' ? [...v].length : null);
+      const [was, is] = [size(e.from), size(e.to)];
+      if (Math.max(was ?? 0, is ?? 0) > SAID_WHOLE) {
+        if (is === null) return gone ? `cleared ${what}, which was ${grouped(was!)} characters` : `changed ${what}`;
+        return was === null ? `changed ${what} (${grouped(is)} characters now)` : `changed ${what} (${grouped(was)} characters before, ${grouped(is)} now)`;
+      }
+      /* THE OLD VALUE BESIDE THE NEW, "changed Holder from Sam to Ada": the log has always carried both. */
+      const [from, to] = isRef ? [linked(e.from), linked(e.to)] : [short(e.from), short(e.to)];
+      if (from && gone) return `cleared ${what}, which was ${from}`;
+      return `changed ${what}${from && from !== to ? ` from ${from}` : ''}${to ? ` to ${to}` : ''}`;
     }
     case 'state': {
       const to = typeof e.to === 'string' ? (f?.labels?.[e.to] ?? e.to) : null;

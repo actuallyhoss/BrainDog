@@ -19,7 +19,7 @@ import { env } from 'node:process';
 
 import {
   grantAad, grantKey, openSealed,
-  engineHealthRead, engineLedgerRead, handlersFor, hintsOf, httpStatus, serveApi, serveIngest, serveKeys, serveSlash, serveVault, servesKeys, servesSlash, servesVault, sessionOf, slashRecordMeter, withSession,
+  engineHealthRead, engineLedgerRead, handlersFor, hintsOf, mentionsAttached, httpStatus, serveApi, serveIngest, serveKeys, serveSlash, serveVault, servesKeys, servesSlash, servesVault, sessionOf, slashRecordMeter, withSession,
   type Handler, type IngestDoor, type KeysDoor, type SlashAskDoor, type VaultDoor,
 } from '@braindog/host';
 import {
@@ -1350,10 +1350,11 @@ export async function start(options: {
   });
   /* AND WHAT THAT LEDGER HOLDS, for the record's `engineReadings` (ENG-B01), as the Worker hands it: the same Slash
      SQLite, so the calls it counts are the ones the health above was read from, beside the questions still open, each
-     by its cause. Handed whether or not a model is set, since the open questions are the record's own. No mention is
-     handed yet: nothing reads which of them are attached, so that count stays 0. */
+     by its cause. Handed whether or not a model is set, since the open questions are the record's own. The mentions are
+     the record's own, each attached or not, read from the record's SQLite and never Slash's. */
   const engineLedger = engineLedgerRead({
     sql: slashSql,
+    mentions: mentionsAttached(sql),
     questions: () => {
       const open = api.kernel.openSuggestions();
       return open.ok ? open.value : [];

@@ -20,7 +20,7 @@ import assert from 'node:assert/strict';
 
 import { fixOf } from '@braindog/ports';
 
-import { openRecord, type Declaration, type Entry, type Kernel } from '../src/index.ts';
+import { openRecord, type Declaration, type Entry, type Kernel, type WriteContext } from '../src/index.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 24, 12);
@@ -244,5 +244,26 @@ test('A SECRET FIELD NEVER RIDES IN A SCRIPT INPUT, even from a rule stored past
   assert.match(run?.say ?? '', /\{\{trigger\.row\.pin\}\}/);
   assert.doesNotMatch(run?.say ?? '', /hunter2/);
   assert.equal(queued(sql).length, 0);
+  sql.close();
+});
+
+test('A SCRIPT IS HANDED WHO MADE THE ROW WHEN A RUN DID, as made_by, and nothing of the kind for a person or by a rule’s own word', async () => {
+  const { k, sql } = await record(script('close_children', { rule: true }), onDone('close_children', 'close_children', { input: { made_by: 'claude' } }));
+  const run: WriteContext = { actor: 'p_1', principal: { kind: 'token', token: 't_1' }, session: { client_id: 'cc-1', agent: 'claude', client: 'claude-code', host: 'h', repo: 'studio' } };
+
+  /* A RUN MADE IT AND A PERSON FINISHED IT: the maker is read from the row's own first line, not from who wrote last. */
+  const made = k.create('items', { what: 'Cut the italics' }, run);
+  assert.ok(made.ok, why(made));
+  await done(k, made.value);
+  const [first] = queued(sql);
+  const by = first!.payload.input.made_by as { run: string; agent: string; client: string | null; parent: string | null };
+  assert.match(by.run, /^S\d+$/u);
+  assert.deepEqual({ agent: by.agent, client: by.client, parent: by.parent }, { agent: 'claude', client: 'claude-code', parent: null });
+
+  /* A PERSON MADE IT: no made_by at all, whatever the rule's input says under that name. */
+  await done(k, item(k, { what: 'Cut the bold' }));
+  const jobs = queued(sql);
+  assert.equal(jobs.length, 2);
+  assert.equal('made_by' in jobs[1]!.payload.input, false, JSON.stringify(jobs[1]!.payload.input));
   sql.close();
 });

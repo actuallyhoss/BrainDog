@@ -139,7 +139,7 @@ export function pageWrites(deps: WritesDeps) {
    * and the hold was taken back, went on drawing the tick it no longer had, as "Not saved". Only a hold that wears
    * something counts: a moved bar wears nothing, and its roadmap keeps its drag until the page is read again.
    */
-  function keptSegment<S extends { rows: Row[] }>(at: number, segment: S, block?: LiveBlock): S {
+  function keptSegment<S extends { rows: Row[] }>(at: number, segment: S, block?: LiveBlock, several = false): S {
     const { module, kept, added } = stored();
     const on = deps.slug();
     const hold = kept.slug === on ? kept.blocks.get(at) : undefined;
@@ -158,7 +158,7 @@ export function pageWrites(deps: WritesDeps) {
       const now = (out as { raw?: unknown }).raw;
       if (typeof now === 'string') out = { ...out, raw: `${now}\u0000+${typed.length}` };
     }
-    return marked(at, out, block);
+    return marked(at, out, block, several);
   }
 
   /**
@@ -173,12 +173,18 @@ export function pageWrites(deps: WritesDeps) {
     return new Set([...(hold?.held ?? [])].flatMap(([key, k]) => (k.done === true && key.startsWith(lead) ? [Number(key.slice(lead.length))] : [])));
   }
 
-  /** The rows of `segment` that arrived since block `at` was last drawn, marked. Rows the page drew from no record row are never marked. */
-  function marked<S extends { rows: Row[] }>(at: number, segment: S, block?: LiveBlock): S {
+  /**
+   * The rows of `segment` that arrived since block `at` was last drawn, marked. Rows the page drew from no record row are never marked.
+   *
+   * A BLOCK DRAWN AS SEVERAL RUNS OF ROWS MARKS NONE (`several`). Every run of one block is the same list here
+   * (`listOf`), so each run's rows were new against the run drawn before it, and a block of two runs stood marked for
+   * as long as it kept drawing. Its look is no baseline and marks nothing, as a block the record did not answer.
+   */
+  function marked<S extends { rows: Row[] }>(at: number, segment: S, block?: LiveBlock, several = false): S {
     const seen = deps.arrivals;
     if (!seen) return segment;
     const key = (row: Row): string | null => (row.ref ? `${row.ref.register}#${row.ref.seq}` : null);
-    const on = seen.see(listOf(at, block), segment.rows.flatMap((r) => key(r) ?? []), answered(block));
+    const on = seen.see(listOf(at, block), segment.rows.flatMap((r) => key(r) ?? []), !several && answered(block));
     if (on.size === 0) return segment;
     return { ...segment, rows: segment.rows.map((r) => (on.has(key(r) ?? '') ? { ...r, arrived: true } : r)) };
   }

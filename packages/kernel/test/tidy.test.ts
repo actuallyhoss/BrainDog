@@ -13,7 +13,7 @@ import { ulids } from '../src/ids.ts';
 import { openRecord } from '../src/index.ts';
 import { EXPIRED_NOTE } from '../src/handoff.ts';
 import { SWEPT_NOTE } from '../src/schedule.ts';
-import { TIDY_OPTIONS, causeOfFinder, finderOf, finders, registerFinder, tidy, type Finder, type TidyDeps } from '../src/tidy.ts';
+import { TIDY_OPTIONS, causeOfFinder, finderOf, finders, registerFinder, tidy, tidyDays, tidyHour, type Finder, type TidyDay, type TidyDeps } from '../src/tidy.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 9, 13, 9);
@@ -234,4 +234,99 @@ test('a finder another part registers is run with the rest, and asks at most one
   /* A finder that offers a question with nothing stale asks nothing. */
   const idle: Finder = { id: 'idle-things', find: () => ({ stale: 0, did: 0, ask: { question: 'Nothing. Delete it?', does: 'Nothing.' } }) };
   assert.deepEqual(tidy(deps, [idle]), [{ finder: 'idle-things', stale: 0, did: 0, asked: null }]);
+});
+
+/* ── the hourly pass (AGT-C18, the direction audit's claim 2) ───────────── */
+
+const HOUR = 3_600_000;
+const kept = (sql: NodeSql, finder: string) =>
+  sql.all<TidyDay>('SELECT finder, day, stale, did, low, at FROM tidy_line WHERE finder = ? ORDER BY day', finder).map((l) => ({ ...l }));
+/** The person picks one of a tidy question's answers, as `decide` leaves it: the question addressed, and a decision under its cause. */
+function answer(sql: NodeSql, id: string | null, option: string, at: number): void {
+  assert.ok(id);
+  sql.exec("UPDATE suggestion SET status = 'resolved', resolved_as = 'addressed' WHERE id = ?", id);
+  sql.exec(
+    "INSERT INTO decision (id, question, answer, reason, decided_by, ts, supersedes, cause) VALUES (?, 'Delete them?', ?, '', 'p_owner', ?, NULL, (SELECT cause FROM suggestion WHERE id = ?))",
+    `DQ${++planted}`,
+    option,
+    new Date(at).toISOString(),
+    id,
+  );
+}
+const asks = (sql: NodeSql): number => sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM suggestion WHERE cause = 'tidy#runs-empty'")!.n;
+
+test('the hourly pass keeps one line a finder a day, the day\'s last count and its lowest, 90 days deep', async () => {
+  const { sql, deps } = await record();
+  assert.deepEqual(tidyDays(sql, NOW), []); // a record the pass has not run on
+  run(sql, 'done', 31 * DAY, { wrote: 0 });
+  const first = tidyHour(deps);
+  assert.deepEqual(first.map((l) => l.finder), finders().map((f) => f.id));
+  assert.deepEqual(tidyHour(deps), first); // twice in an hour: the same lines, and nothing more filed
+  run(sql, 'done', 45 * DAY, { wrote: 0 });
+  tidyHour({ ...deps, nowMs: NOW + HOUR });
+  assert.deepEqual(kept(sql, 'runs-empty'), [{ finder: 'runs-empty', day: '2026-10-13', stale: 2, did: 0, low: 1, at: new Date(NOW + HOUR).toISOString() }]);
+  assert.equal(sql.one<{ n: number }>('SELECT COUNT(*) AS n FROM tidy_line')?.n, finders().length);
+  assert.equal(asks(sql), 1);
+  /* The next day is a new line, and the table is in no section, so a copy of the record does not carry it. */
+  tidyHour({ ...deps, nowMs: NOW + DAY });
+  assert.deepEqual(kept(sql, 'runs-empty').map((l) => [l.day, l.stale, l.low]), [['2026-10-13', 2, 1], ['2026-10-14', 2, 2]]);
+  assert.equal(sql.one("SELECT 1 AS n FROM dog_section WHERE table_name = 'tidy_line'"), undefined);
+  assert.deepEqual(tidyDays(sql, NOW + DAY, 1).map((l) => l.day), finders().map(() => '2026-10-14'));
+  assert.equal(tidyDays(sql, NOW + DAY).length, 2 * finders().length);
+  /* Ninety days on, the old lines are gone and the last 90 days are kept. */
+  tidyHour({ ...deps, nowMs: NOW + 89 * DAY });
+  assert.deepEqual(kept(sql, 'runs-empty').map((l) => l.day), ['2026-10-13', '2026-10-14', '2027-01-10']);
+  tidyHour({ ...deps, nowMs: NOW + 90 * DAY });
+  assert.deepEqual(kept(sql, 'runs-empty').map((l) => l.day), ['2026-10-14', '2027-01-10', '2027-01-11']);
+});
+
+test('after a plain Do it the hourly pass asks again when more went stale, and not for the same ones', async () => {
+  const { sql, deps } = await record();
+  run(sql, 'done', 31 * DAY, { wrote: 0 });
+  run(sql, 'done', 32 * DAY, { wrote: 0 });
+  const first = line(tidyHour(deps), 'runs-empty').asked;
+  answer(sql, first, 'do', NOW + 60_000);
+  /* Nothing acts on the answer yet, so the same two are still there: not asked again, hour after hour or day after day. */
+  for (const later of [HOUR, 2 * HOUR, DAY, 3 * DAY]) assert.equal(line(tidyHour({ ...deps, nowMs: NOW + later }), 'runs-empty').asked, null);
+  assert.equal(asks(sql), 1);
+  /* A third went stale: one new question, about all three, and it is the finder's only open one. */
+  run(sql, 'done', 40 * DAY, { wrote: 0 });
+  const second = line(tidyHour({ ...deps, nowMs: NOW + 4 * DAY }), 'runs-empty').asked;
+  assert.ok(second && second !== first);
+  assert.equal((JSON.parse(sql.one<{ body: string }>('SELECT body FROM suggestion WHERE id = ?', second)!.body) as { count: number }).count, 3);
+  assert.equal(line(tidyHour({ ...deps, nowMs: NOW + 4 * DAY + HOUR }), 'runs-empty').asked, second);
+  assert.equal(sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM suggestion WHERE cause = 'tidy#runs-empty' AND status = 'open'")?.n, 1);
+  assert.equal(asks(sql), 2);
+});
+
+test('Do it that cleared everything asks again at the first new one, the same day', async () => {
+  const { sql, deps } = await record();
+  const a = run(sql, 'done', 31 * DAY, { wrote: 0 });
+  const b = run(sql, 'done', 32 * DAY, { wrote: 0 });
+  tidyHour({ ...deps, nowMs: NOW - HOUR }); // an earlier pass the same day, before the answer
+  const first = line(tidyHour(deps), 'runs-empty').asked;
+  answer(sql, first, 'do', NOW + 60_000);
+  sql.exec('DELETE FROM entry WHERE id IN (?, ?)', a, b); // what acting on the answer will do
+  assert.equal(line(tidyHour({ ...deps, nowMs: NOW + HOUR }), 'runs-empty').asked, null);
+  assert.deepEqual(kept(sql, 'runs-empty').map((l) => [l.stale, l.low]), [[0, 0]]);
+  run(sql, 'done', 33 * DAY, { wrote: 0 });
+  const second = line(tidyHour({ ...deps, nowMs: NOW + 2 * HOUR }), 'runs-empty').asked;
+  assert.ok(second && second !== first);
+  assert.equal(asks(sql), 2);
+});
+
+test('Always do this, Leave them, a decline and tidy by itself are never asked again', async () => {
+  for (const said of ['always', 'leave', 'wont-fix', 'do-but-tidy-alone']) {
+    const { sql, deps } = await record();
+    run(sql, 'done', 31 * DAY, { wrote: 0 });
+    const first = line(tidyHour(deps), 'runs-empty').asked;
+    if (said === 'wont-fix') sql.exec("UPDATE suggestion SET status = 'resolved', resolved_as = 'wont-fix' WHERE id = ?", first);
+    else answer(sql, first, said === 'do-but-tidy-alone' ? 'do' : said, NOW + 60_000);
+    run(sql, 'done', 40 * DAY, { wrote: 0 });
+    run(sql, 'done', 41 * DAY, { wrote: 0 });
+    const later = { ...deps, nowMs: NOW + DAY };
+    const out = line(said === 'do-but-tidy-alone' ? tidy(later) : tidyHour(later), 'runs-empty');
+    assert.deepEqual([out.stale, out.asked], [3, null], said);
+    assert.equal(asks(sql), 1, said);
+  }
 });

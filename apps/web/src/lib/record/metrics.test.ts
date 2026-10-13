@@ -14,11 +14,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { BEFORE, comparisonOf, monthBefore } from '@braindog/kernel';
 import { MISSING } from 'braindog-render';
 
 import { METRICS } from './declared.ts';
 import { mixedFix } from './money.ts';
-import { BARE, currenciesRead, format, fxNote, hrefFor, isTemplate, meetsTarget, spokenWindow, targetLine, unreadable, windowMs, type MetricDecl } from './metrics.ts';
+import { BARE, currenciesRead, diffRead, format, fxNote, hrefFor, isTemplate, meetsTarget, spokenWindow, targetLine, unreadable, windowMs, type MetricDecl } from './metrics.ts';
 import { metric } from './fixtures/readers.ts';
 import { REGISTERS } from './held.ts';
 /* THE SAMPLE'S LISTS, which a live tab learns from the record and the refusal test below asks the mirror about. */
@@ -283,4 +284,190 @@ test('A SUM THAT CONVERTED WHAT IT COULD SAYS AT LEAST, names the pair it lacks,
   assert.equal(meetsTarget({ ...METRICS.overdue!, target: { gte: 100 } }, 420000, least), null);
   assert.equal(meetsTarget({ ...METRICS.overdue!, target: { lte: 100 } }, 420000, least), null);
   assert.equal(meetsTarget({ ...METRICS.overdue!, target: { gte: 100 } }, 420000, {}), true, 'a figure that is not at least is held as before');
+});
+
+/* ── a difference in parts, and against the window before (REC-B19) ──────── */
+
+/** 13 October 2026, midday: the clock and the entries of the record's own test, so both readers hold the same answers. */
+const DIFF_NOW = Date.UTC(2026, 9, 13, 12);
+
+REGISTERS.outgoings = {
+  id: 'outgoings',
+  name: 'Outgoings',
+  title: 'what',
+  fields: [
+    { id: 'what', type: 'text', required: true },
+    { id: 'on', type: 'day' },
+    { id: 'amount', type: 'money', required: true },
+    { id: 'refund', type: 'money' },
+    { id: 'category', type: 'text' },
+    { id: 'shop', type: 'text' },
+  ],
+} as unknown as (typeof REGISTERS)[string];
+
+/** [category, day, amount]. What is dated after 13 September, or in August, is in neither half. */
+const SPENT: [string, string, number][] = [
+  ['Outing', '2026-10-02', 700], ['Outing', '2026-10-05', 700],
+  ['Outing', '2026-09-03', 500], ['Outing', '2026-09-13', 500], ['Outing', '2026-09-20', 5000],
+  ['Food', '2026-10-01', 300], ['Food', '2026-10-03', 300], ['Food', '2026-10-10', 400],
+  ['Food', '2026-09-02', 600], ['Food', '2026-09-12', 600], ['Food', '2026-08-05', 9990],
+  ['Gift', '2026-10-06', 500],
+  ['Rent', '2026-09-01', 9000],
+  ['Taxi', '2026-10-04', 100],
+  ['Taxi', '2026-09-01', 100], ['Taxi', '2026-09-02', 100], ['Taxi', '2026-09-03', 100], ['Taxi', '2026-09-04', 100], ['Taxi', '2026-09-05', 100],
+  ['Books', '2026-10-07', 200], ['Books', '2026-10-08', 200], ['Books', '2026-10-09', 200],
+  ['Books', '2026-09-04', 200],
+];
+
+type Held = Parameters<typeof diffRead>[1];
+const held = (spent: readonly (readonly [string, string, number, string?])[]): Held =>
+  spent.map(([category, on, amount, currency = 'EGP'], i) => ({
+    seq: i + 1,
+    version: 1,
+    created: `${on}T09:00:00.000Z`,
+    by: 'p_1',
+    fields: { what: `${category} ${on}`, on, amount: { amount, currency }, refund: { amount: amount / 10, currency }, category, shop: on < '2026-10-01' ? 'Old' : 'New' },
+  })) as unknown as Held;
+
+const DIFF_BASE = { source: 'register.outgoings', format: 'money', target: { gte: 0 }, window: '30d', compare: 'none' } as const;
+
+/** This month so far less last month up to the same day number, by category. */
+const VS_LAST: MetricDecl = {
+  ...DIFF_BASE,
+  metric: 'spent-vs-last-month',
+  name: 'Spent against last month',
+  where: 'on at least bom',
+  value: { diff: { of: { sum: 'amount' }, per: { sum: 'amount' }, before: 'month_ago' } },
+  group_by: 'category',
+};
+
+const partOf = (r: ReturnType<typeof diffRead>, key: string) => {
+  const g = (r.groups ?? []).find((x) => x.key === key);
+  assert.ok(g, `no part called ${key} in ${JSON.stringify(r.groups)}`);
+  return g;
+};
+
+test('A DIFFERENCE GROUPED BY ONE FIELD READS EACH PART AS OF LESS PER, over the entries of that part alone', () => {
+  const net: MetricDecl = { ...DIFF_BASE, metric: 'net-by-category', name: 'Net, by category', where: 'on at least bom', value: { diff: { of: { sum: 'amount' }, per: { sum: 'refund' } } }, group_by: 'category' };
+  const r = diffRead(net, held(SPENT), DIFF_NOW);
+  assert.deepEqual(r.refusals, []);
+  assert.equal(r.value, 3600 - 360);
+  assert.equal(r.unit, 'EGP');
+  assert.deepEqual(
+    (r.groups ?? []).map((g) => [g.key, g.value, g.rows]),
+    [['Outing', 1260, 2], ['Food', 900, 3], ['Books', 540, 3], ['Gift', 450, 1], ['Taxi', 90, 1]],
+  );
+  /* No window before was asked for, so no part says a change and the reading carries no halves. */
+  assert.ok((r.groups ?? []).every((g) => g.delta === undefined && g.halves === undefined));
+  assert.equal(r.halves, undefined);
+
+  /* THE HALVES MAY NAME THE FIELD THEMSELVES, when both name the same one, and the answer is the same. */
+  const { group_by: _, ...bare } = net;
+  const own = diffRead({ ...bare, value: { diff: { of: { sum: 'amount', group_by: 'category' }, per: { sum: 'refund', group_by: 'category' } } } } as never, held(SPENT), DIFF_NOW);
+  assert.deepEqual(own.groups, r.groups);
+});
+
+test('AGAINST A MONTH AGO, PER IS READ OVER THE SAME WORDS AT THE CLOCK MOVED BACK, ended at that clock’s day', () => {
+  const r = diffRead(VS_LAST, held(SPENT), DIFF_NOW);
+  assert.deepEqual(r.refusals, []);
+
+  /* THE WHOLE: 3,600 this month so far against 11,900 to 13 September. The 20th and August are in neither. */
+  assert.equal(r.value, 3600 - 11_900);
+  assert.deepEqual(r.halves, { of: 3600, per: 11_900, perRows: 11 });
+  assert.equal(r.rows, 10);
+  assert.equal(r.unit, 'EGP');
+  /* THROUGH THE RECORD'S OWN GATE AND CLOCK, so the two cannot drift. */
+  assert.deepEqual({ delta: r.delta, why: r.why }, comparisonOf({ value: 3600, rows: 10 }, { value: 11_900, rows: 11 }, true));
+  assert.equal(new Date(monthBefore(DIFF_NOW)).toISOString().slice(0, 10), '2026-09-13');
+
+  /* "Outings up 40%": 1,400 against 1,000, two entries each side. The 13th is last month's, the 20th is not. */
+  const outing = partOf(r, 'Outing');
+  assert.equal(outing.value, 400);
+  assert.deepEqual(outing.halves, { of: 1400, per: 1000, perRows: 2 });
+  assert.ok(Math.abs(outing.delta! - 0.4) < 1e-12);
+  assert.equal(outing.why, '');
+
+  /* ONLY THIS MONTH, AND ONLY LAST MONTH: the other side is nought, and the difference is still said. */
+  const gift = partOf(r, 'Gift');
+  assert.deepEqual([gift.value, gift.rows, gift.halves], [500, 1, { of: 500, per: 0, perRows: 0 }]);
+  const rent = partOf(r, 'Rent');
+  assert.deepEqual([rent.value, rent.rows, rent.halves], [-9000, 0, { of: 0, per: 9000, perRows: 1 }]);
+
+  /* Every part either month holds, the largest difference first, and the name breaking a tie at 400. */
+  assert.deepEqual((r.groups ?? []).map((g) => g.key), ['Gift', 'Books', 'Outing', 'Food', 'Taxi', 'Rent']);
+});
+
+test('EACH PART PASSES THE GATE ON ITS OWN, and a window under half the entries of the one before says no change', () => {
+  const r = diffRead(VS_LAST, held(SPENT), DIFF_NOW);
+  const why = (key: string): [number | null | undefined, string | undefined] => [partOf(r, key).delta, partOf(r, key).why];
+
+  /* The whole figure passes the gate, ten entries against eleven, and these parts do not. */
+  assert.notEqual(r.delta, null);
+  assert.deepEqual(why('Gift'), [null, 'one of the two windows is empty']);
+  assert.deepEqual(why('Rent'), [null, 'one of the two windows is empty']);
+  assert.deepEqual(why('Books'), [null, 'the window before has under half the rows']);
+  /* One taxi this month against five by this day last month: the first week of a month is not good news. */
+  assert.deepEqual(why('Taxi'), [null, 'this window has under half the rows of the one before']);
+  assert.equal(partOf(r, 'Taxi').value, 100 - 500);
+  for (const g of r.groups ?? []) assert.deepEqual({ delta: g.delta, why: g.why }, comparisonOf({ value: g.halves!.of, rows: g.rows }, { value: g.halves!.per, rows: g.halves!.perRows }, true), g.key);
+});
+
+test('THE WINDOW BEFORE IS ONE OF THE RECORD’S THREE WORDS, and words that name no day move nothing', () => {
+  const said = (before: string): MetricDecl => ({ ...VS_LAST, value: { diff: { of: { sum: 'amount' }, per: { sum: 'amount' }, before } } }) as never;
+  /* Thirty days before 13 October is 13 September too, so `previous` under a 30d window reads the same halves. */
+  assert.deepEqual(diffRead(said('previous'), held(SPENT), DIFF_NOW).halves, { of: 3600, per: 11_900, perRows: 11 });
+  /* A year before holds nothing, so every part is this month's alone. */
+  const year = diffRead(said('year_ago'), held(SPENT), DIFF_NOW);
+  assert.deepEqual([year.value, year.halves, year.delta, year.why], [3600, { of: 3600, per: 0, perRows: 0 }, null, 'one of the two windows is empty']);
+
+  /* A WINDOW UNDER SEVEN DAYS IS NOISE, and a window that is no window has none before it. */
+  assert.equal(diffRead({ ...said('previous'), window: '3d' }, held(SPENT), DIFF_NOW).why, 'a window under seven days is noise');
+  assert.match(diffRead({ ...said('previous'), window: 'a while' }, held(SPENT), DIFF_NOW).refusals.join(), /no window before/u);
+
+  /* A WORD THE RECORD DOES NOT READ IS NAMED BEFORE IT WOULD INSTALL, and read as nothing. */
+  assert.deepEqual([...BEFORE], ['previous', 'month_ago', 'year_ago']);
+  assert.match(unreadable(said('last_week')).join(), /month_ago/u);
+  assert.match(diffRead(said('last_week'), held(SPENT), DIFF_NOW).refusals.join(), /month_ago/u);
+  assert.equal(diffRead(said('last_week'), held(SPENT), DIFF_NOW).value, null);
+  assert.match(unreadable({ ...VS_LAST, group_by: 'on', bucket: 'week' }).join(), /never cut by date/u);
+  assert.deepEqual(unreadable(VS_LAST), [], 'the figure the record installs was named as unreadable');
+
+  /* WORDS THAT NAME NO DAY MOVE NOTHING: both halves are the same entries, and no change is claimed of any part. */
+  const { where: _, ...undated } = VS_LAST;
+  const still = diffRead(undated, held(SPENT), DIFF_NOW);
+  assert.equal(still.delta, null);
+  assert.match(still.why, /does not mention time/u);
+  assert.ok((still.groups ?? []).every((g) => g.delta === null && g.value === 0));
+});
+
+test('TWO HALVES GROUPED BY TWO FIELDS, AND A RATIO IN PARTS, are named as the record refuses them', () => {
+  const two = { ...DIFF_BASE, metric: 'two-ways', name: 'Two ways', value: { diff: { of: { sum: 'amount', group_by: 'category' }, per: { sum: 'refund', group_by: 'shop' } } } } as never;
+  assert.match(unreadable(two).join(), /category and shop/u);
+  assert.match(diffRead(two, held(SPENT), DIFF_NOW).refusals.join(), /category and shop/u);
+  const one = { ...DIFF_BASE, metric: 'one-way', name: 'One way', value: { diff: { of: { sum: 'amount', group_by: 'category' }, per: { sum: 'refund' } } } } as never;
+  assert.match(unreadable(one).join(), /category and nothing/u);
+  const against = { ...DIFF_BASE, metric: 'against', name: 'Against', group_by: 'category', value: { diff: { of: { sum: 'amount', group_by: 'shop' }, per: { sum: 'refund', group_by: 'shop' } } } } as never;
+  assert.match(unreadable(against).join(), /the figure by category/u);
+  const share: MetricDecl = { ...DIFF_BASE, metric: 'share', name: 'Share', format: 'pct', value: { ratio: { of: { sum: 'refund' }, per: { sum: 'amount' } } }, group_by: 'category' };
+  assert.match(unreadable(share).join(), /a ratio is not grouped/u);
+});
+
+test('ONE CURRENCY THIS MONTH AND ANOTHER LAST MONTH IS NO CHANGE THAT MAY BE SAID, of the whole or of a part', () => {
+  const rows = held([['Food', '2026-10-02', 100, 'EGP'], ['Food', '2026-09-02', 70, 'USD'], ['Gift', '2026-09-03', 50, 'USD'], ['Taxi', '2026-10-03', 5, 'EGP']]);
+  const r = diffRead(VS_LAST, rows, DIFF_NOW);
+
+  /* E£105 now against $120 then: one amount for each currency, and never a percentage across the two. */
+  assert.deepEqual([r.value, r.parts], [null, [{ currency: 'EGP', amount: 105 }, { currency: 'USD', amount: -120 }]]);
+  assert.deepEqual([r.halves, r.delta, r.why], [{ of: null, per: null, perRows: 2 }, null, 'the window before has nothing to compare against']);
+  const food = partOf(r, 'Food');
+  assert.deepEqual([food.value, food.parts], [null, [{ currency: 'EGP', amount: 100 }, { currency: 'USD', amount: -70 }]]);
+  assert.deepEqual([food.halves, food.delta], [{ of: null, per: null, perRows: 1 }, null]);
+  /* A part one month alone holds is in one currency, and says it. */
+  assert.deepEqual([partOf(r, 'Gift').parts, partOf(r, 'Gift').halves], [[{ currency: 'USD', amount: -50 }], { of: 0, per: 50, perRows: 1 }]);
+
+  /* AND THE CURRENCIES A DIFFERENCE READS ARE EACH HALF'S OWN: `per` over the entries of the window before. */
+  const now = rows.filter((e) => String(e.fields.on) >= '2026-10-01');
+  const then = rows.filter((e) => String(e.fields.on) < '2026-10-01');
+  assert.deepEqual([...currenciesRead(now, VS_LAST.value)], ['EGP'], 'one window alone holds one currency');
+  assert.deepEqual([...currenciesRead(now, VS_LAST.value, then)].sort(), ['EGP', 'USD']);
 });

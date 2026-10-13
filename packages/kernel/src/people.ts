@@ -200,7 +200,7 @@ export type PeopleDeps = {
   remote?: () => string | null;
   /**
    * The address the record's own person signs in with, or `null`. When more than one row is marked as him, the one
-   * holding it is the one kept. Left out, the one holding any address is.
+   * holding it is the one kept. Left out or `null`, the addresses the record mirrors for its owners are read instead.
    */
   ownAddress?: () => string | null;
 };
@@ -1688,18 +1688,49 @@ function evidence(deps: Pick<PeopleDeps, 'titleOf'>, list: DeclaredList<MeetsFie
 const listed = (names: readonly string[]): string => (names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`);
 
 /**
+ * The addresses the record's own people sign in with, as keys: the one the caller hands (`ownAddress`), else every
+ * owner's as the record itself mirrors it (`person` and `member`, written when the record is made and whenever an
+ * owner joins). Empty only on a record that holds no owner's address at all.
+ *
+ * READ FROM THE RECORD, so the rule holds for a caller that hands nothing: the nightly pass and a write that marks a row
+ * have no session to take an address from.
+ */
+function signIns(deps: Pick<PeopleDeps, 'sql' | 'ownAddress'>): string[] {
+  const handed = keyOf('email', deps.ownAddress?.() ?? '');
+  if (handed !== null) return [handed];
+  const owners = deps.sql.all<{ email: string | null }>("SELECT p.email FROM person p JOIN member m ON m.person_id = p.id WHERE m.level = 'owner' AND p.email IS NOT NULL");
+  return [...new Set(owners.map((o) => keyOf('email', o.email ?? '')).filter((k): k is string => k !== null && kindOfKey(k) === 'email'))];
+}
+
+/** A person's addresses, as keys. */
+const mailsOf = (list: DeclaredList<MeetsFields>, row: Row): string[] => keysOfRow(list, row).filter((k) => kindOfKey(k) === 'email');
+
+/**
  * Which of a cluster is kept, oldest first as given: the record's own person always, then the older (`order`).
  *
- * MORE THAN ONE MARKED AS HIM: the one holding the address he signs in with, since that is the row the record marked
- * for a reason and the one every later sign-in lands on; else the oldest that holds any address; else the oldest.
+ * MORE THAN ONE MARKED AS HIM: the one holding an address an owner signs in with (`signIns`), since that is the row the
+ * record marked for a reason and the one every later sign-in lands on; else the oldest that holds any address; else the
+ * oldest. A row holding a sign-in address is never one of the folded while another marked row holds none.
  */
-function keptOf(deps: Pick<PeopleDeps, 'ownAddress'>, list: DeclaredList<MeetsFields>, sorted: readonly Row[]): Row {
+function keptOf(deps: Pick<PeopleDeps, 'sql' | 'ownAddress'>, list: DeclaredList<MeetsFields>, sorted: readonly Row[]): Row {
   const self = list.fields.self;
   const own = self === undefined ? [] : sorted.filter((r) => r.fields[self] === true);
   if (own.length < 2) return sorted.reduce((k, r) => order(list, k, r)[0], sorted[0]!);
-  const mails = (r: Row): string[] => keysOfRow(list, r).filter((k) => kindOfKey(k) === 'email');
-  const signIn = keyOf('email', deps.ownAddress?.() ?? '');
-  return (signIn === null ? undefined : own.find((r) => mails(r).includes(signIn))) ?? own.find((r) => mails(r).length > 0) ?? own[0]!;
+  const signs = signIns(deps);
+  return own.find((r) => mailsOf(list, r).some((m) => signs.includes(m))) ?? own.find((r) => mailsOf(list, r).length > 0) ?? own[0]!;
+}
+
+/**
+ * Whether nobody can say which of his marked rows is the one he signs in with, so asking would offer to keep a guess.
+ *
+ * TWO CASES, and in both the question waits. The record knows no owner's address and more than one marked row holds
+ * one: either may be the row he signs in with, and the oldest is only a guess. Or two marked rows hold two different
+ * sign-in addresses: a record with two owners has two people marked, and they are not one.
+ */
+function unsureWhichSignsIn(deps: Pick<PeopleDeps, 'sql' | 'ownAddress'>, list: DeclaredList<MeetsFields>, own: readonly Row[]): boolean {
+  const signs = signIns(deps);
+  if (signs.length === 0) return own.filter((r) => mailsOf(list, r).length > 0).length > 1;
+  return new Set(own.flatMap((r) => mailsOf(list, r).filter((m) => signs.includes(m)))).size > 1;
 }
 
 /**
@@ -1709,7 +1740,7 @@ function keptOf(deps: Pick<PeopleDeps, 'ownAddress'>, list: DeclaredList<MeetsFi
  * THE FOLDS COME FIRST IN THE BODY, the kept row last, so an address moving to the kept row is free by the time it
  * arrives (the email field is unique among live rows).
  */
-function clusterBody(deps: Pick<PeopleDeps, 'nameOf' | 'titleOf' | 'nowMs' | 'ownAddress'>, list: DeclaredList<MeetsFields>, rows: readonly Row[]): { body: Record<string, unknown>; sorted: Row[]; keep: Row; folds: Row[] } | null {
+function clusterBody(deps: Pick<PeopleDeps, 'sql' | 'nameOf' | 'titleOf' | 'nowMs' | 'ownAddress'>, list: DeclaredList<MeetsFields>, rows: readonly Row[]): { body: Record<string, unknown>; sorted: Row[]; keep: Row; folds: Row[] } | null {
   const sorted = [...rows].sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0));
   const keep = keptOf(deps, list, sorted);
   const folds = sorted.filter((r) => r.id !== keep.id);
@@ -1773,7 +1804,7 @@ function selfRows(deps: Pick<PeopleDeps, 'sql'>, list: DeclaredList<MeetsFields>
  *
  * MORE THAN ONE ROW MARKED AS HIM is the same question about those rows, "Are Kas and Kas both you?", keeping the one
  * that holds the address he signs in with (`keptOf`). The mark is the record's or his own, so no name is compared and
- * nothing else is searched until they are one.
+ * nothing else is searched until they are one. Asked only while that row can be told (`unsureWhichSignsIn`).
  */
 function askSelf(deps: PeopleDeps, list: DeclaredList<MeetsFields>): Result<string | null> {
   const self = list.fields.self;
@@ -1781,6 +1812,8 @@ function askSelf(deps: PeopleDeps, list: DeclaredList<MeetsFields>): Result<stri
   const marked = selfRows(deps, list);
   const own = marked.filter((r) => deps.othersRow?.(r.id) !== true);
   if (own.length > 1) {
+    /* NEVER A GUESS AT WHICH ROW HE SIGNS IN WITH: a yes would fold that row into another (`unsureWhichSignsIn`). */
+    if (unsureWhichSignsIn(deps, list, own)) return ok(null);
     const kept = keptOf(deps, list, own);
     return askAsOne(deps, list, kept, own.filter((r) => r.id !== kept.id && !refused(deps, list, kept, r)).slice(0, CLUSTER_MOST - 1));
   }
@@ -2159,6 +2192,40 @@ export function askTwice(deps: PeopleDeps, max = PLAIN_PAIRS_NIGHT): Result<stri
   const pairs = askPlainPairs(deps, list, max);
   if (!pairs.ok) return pairs;
   return ok([...new Set([...(own.value === null ? [] : [own.value]), ...pairs.value])]);
+}
+
+/**
+ * SOMEBODY LOOKING AT THE SAME PERSON TWICE SAYS SO (`sameOne` in the record): the question the nightly pass and a
+ * model's answer file, for exactly the people picked and nobody like them, since a pick is a person's own word about
+ * who. Nothing is folded: the answer on Decide does that, and Undo takes it back. Picked again while it waits, the
+ * question already open is the answer, and when one waits on some of them the others join it.
+ *
+ * Answers the question and whether this call opened it or added somebody to it; `null` when there is no people list,
+ * fewer than two of them, or a question waits on some and the others were said to be somebody else. Somebody gone or
+ * folded already is `ROW_UNKNOWN`, and a row another member made is theirs to merge, as everywhere here.
+ */
+export function askSame(deps: PeopleDeps, ids: readonly string[]): Result<{ id: string; asked: boolean } | null> {
+  const list = deps.list;
+  if (!list) return ok(null);
+  const rows: Row[] = [];
+  for (const id of new Set(ids)) {
+    const r = deps.sql.one<{ id: string; seq: number | null; version: number; fields: string }>(
+      `SELECT id, seq, version, fields FROM entry WHERE id = ? AND ${LIVE}`,
+      id,
+      ...live(list.register, list.fields.merged_into),
+    );
+    if (!r) return no('ROW_UNKNOWN', 'One of the people picked is no longer there. Pick again from the list as it is now.', { at: 'rows' });
+    const row = hydrate(r);
+    if (deps.othersRow?.(row.id) === true)
+      return no('FORBIDDEN', `${nameOfRow(list, row) || 'One of them'} was added by somebody else here, so whether they are the same person is theirs to say. Ask them.`, { at: 'rows' });
+    rows.push(row);
+  }
+  if (rows.length < 2) return ok(null);
+  const q = askOrExtend(deps, list, rows.slice(0, CLUSTER_MOST), undefined, () => false);
+  if (!q.ok) return q as Result<never>;
+  if (q.value !== null) return ok({ id: q.value, asked: true });
+  const waiting = openAsked(deps, list).find((w) => w.offer === null && rows.every((r) => w.members.some((m) => m.id === r.id)));
+  return ok(waiting === undefined ? null : { id: waiting.id, asked: false });
 }
 
 /**

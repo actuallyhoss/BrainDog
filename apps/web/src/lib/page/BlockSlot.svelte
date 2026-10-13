@@ -393,6 +393,8 @@
       : null,
   );
   const drawing = $derived<Opening<(typeof drawn.segments)[number]>[]>(grouped ?? drawn.segments.map((segment) => ({ kind: 'segment', segment })));
+  /* WHETHER THE BLOCK IS DRAWN AS MORE THAN ONE RUN OF ROWS, which marks no row as arrived (`marked` in `page-writes.ts`). */
+  const several = $derived(drawing.filter((item) => item.kind === 'segment' && item.segment.type === 'block').length > 1);
 </script>
 
 {#if block.heading}
@@ -496,7 +498,7 @@
            HANDED, so a board, a checklist, a roadmap and a queue are each read-only exactly where `writes` is null. -->
       <!-- `w` IS A CONSTANT so each callback below keeps the narrowing it was built under. -->
       {@const w = writes}
-      {@const shown = w ? w.keptSegment(i, segment, block) : segment}
+      {@const shown = w ? w.keptSegment(i, segment, block, several) : segment}
       {@const more = fold ? foldOf(segment.kind, shown.rows.length, open) : null}
       <Block
         cursor={rows?.cursor ?? null}

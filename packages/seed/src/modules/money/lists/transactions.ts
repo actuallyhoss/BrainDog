@@ -105,6 +105,9 @@ export const TRANSACTIONS_REGISTER: MoneyRegister = {
    * says which two rows a person should be asked about, with the rate's age (`crossAsks` in `packages/kernel/src/pairs.ts`).
    * NOBODY IS ASKED YET: the record does not file that question until it is wired, so until then a doubtful match is
    * counted twice until a person marks it. Past a month old, or with no rate, nothing pairs and nothing is to be asked.
+   * A PAIR BETWEEN TWO CURRENCIES IS MADE IN SILENCE ONLY WHERE NOBODY IS ASKED: where the record puts `crossAsks` to a
+   * person (`asks` on the pairing), every such match is a question, for one of four reasons (lone, spread, rate_old,
+   * not_only).
    */
   pairs: {
     on: ['abs(amount)'],

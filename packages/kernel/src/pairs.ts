@@ -371,6 +371,11 @@ export type Leg = {
  * `ruled` IS WHAT A PERSON ANSWERED ABOUT TWO ROWS IN TWO CURRENCIES, by `crossKey`: `true` makes them one move
  * whatever the rate's age and whoever else stands near, `false` takes each out of the other's candidates for good.
  * Left out, nobody has answered anything, and a doubtful match waits as a question (`crossAsks`).
+ *
+ * `asks` IS THE CALLER SAYING IT PUTS `crossAsks` TO A PERSON. Only then is a match with nothing against it but its
+ * being a near one (`lone`) held back for an answer, and a wider spread than the list declares (`spread`) asked about.
+ * Left out, nobody would be asked, so the matching pairs what it paired before: a row held back for a question no one
+ * puts is only money counted twice.
  */
 export type Pairing = {
   sql: Sql;
@@ -380,6 +385,7 @@ export type Pairing = {
   state: string | undefined;
   done: readonly string[] | undefined;
   ruled?: ReadonlyMap<string, boolean>;
+  asks?: boolean;
 };
 
 const LEG_COLUMNS = 'id, seq, version, created_at, updated_at, deleted_at, fields';
@@ -873,9 +879,11 @@ type Windows = {
   ledger: Ledger | null;
   /** The same for a move between two currencies (`crossAround`), and the rates it converts by, read when first needed. */
   crossed: Map<string, ReturnType<typeof around>>;
+  /** The rows of another currency farther off than the tolerance and inside `ASK_SPREAD`, by leg: a question only. */
+  wide: Map<string, Leg[]>;
   fx: { rates: readonly Rate[]; at: Map<string, Held | null> } | null;
 };
-const windowsOf = (ledger: Ledger | null = null): Windows => ({ seen: new Map(), ledger, crossed: new Map(), fx: null });
+const windowsOf = (ledger: Ledger | null = null): Windows => ({ seen: new Map(), ledger, crossed: new Map(), wide: new Map(), fx: null });
 
 /**
  * `around`, asked once per leg for as long as the ledger does not change: one `partnerOf`, or one `settle`, which
@@ -1137,6 +1145,12 @@ function sameOf(p: Pairing, leg: Leg, known: Map<string, string | null>, windows
 export const PAIR_RATE_DAYS = 2;
 export const ASK_RATE_DAYS = 31;
 
+/* HOW FAR APART TWO AMOUNTS MAY BE AND STILL BE ASKED ABOUT, in percent: the most a declaration may call the same money
+   (`TOLERANCE_MOST`). A card or an exchange desk takes more than the list's tolerance often enough, and such a move was
+   neither paired nor asked about: Spent and Received both read high by it and nobody was told. Past this, two sizes
+   only look alike. A PERSON'S YES REACHES AS FAR, since the question did. */
+export const ASK_SPREAD = TOLERANCE_MOST;
+
 /** A rate as a pairing holds it: the number, the day it is of, and how many days before the leg's day that is. */
 type Held = { rate: number; as_of: string; days: number };
 
@@ -1209,41 +1223,52 @@ function crossRead(p: Pairing, x: Shape, y: Shape, windows: Windows): { first: S
 }
 
 /**
- * Whether two rows in two currencies are the two legs of one move by every part of the declaration but `where` and the
- * pin: `mirrors`, with "the same amount" read as the earlier leg at the rate of its own day, within the tolerance.
- * Every other `on` entry still has to agree as it does in one currency.
+ * How far apart two rows in two currencies are as one move, or `null` when they are not the two legs of one by every
+ * other part of the declaration but `where` and the pin: `mirrors`, with "the same amount" read as the earlier leg at
+ * the rate of its own day. Every other `on` entry still has to agree as it does in one currency.
+ *
+ * `diff` is between the earlier leg converted and the later, in the later's minor units, `size` the later's, and
+ * `most` the percent these two may differ by and be one move: whole numbers, so the edge of a tolerance is exact.
+ * `most` IS THE LIST'S TOLERANCE, AND `ASK_SPREAD` FOR TWO ROWS A PERSON SAID ARE ONE MOVE.
  *
  * TWO ROWS A PERSON SAID ARE NOT ONE MOVE NEVER ARE (`Pairing.ruled`), so neither stands in the other's way again.
  */
-function crossMirrors(p: Pairing, a: Leg, b: Leg, shape: (leg: Leg) => Shape | null, windows: Windows): boolean {
+function crossGap(p: Pairing, a: Leg, b: Leg, shape: (leg: Leg) => Shape | null, windows: Windows): { diff: number; size: number; most: number } | null {
   const said = p.pairs.across_currency;
   const x = shape(a);
   const y = shape(b);
-  if (said === undefined || x === null || y === null) return false;
-  if (p.ruled?.get(crossKey(a.id, b.id)) === false) return false;
-  if (signOf(x.way) !== null ? signOf(y.way) !== -signOf(x.way)! : same(y.way, x.way)) return false;
-  if (same(x.across, y.across)) return false;
+  if (said === undefined || x === null || y === null) return null;
+  const ruled = p.ruled?.get(crossKey(a.id, b.id));
+  if (ruled === false) return null;
+  if (signOf(x.way) !== null ? signOf(y.way) !== -signOf(x.way)! : same(y.way, x.way)) return null;
+  if (same(x.across, y.across)) return null;
   for (const entry of p.pairs.on) {
     const e = entryOf(entry)!;
-    if (!e.abs && (b.fields[e.field] === undefined || !same(b.fields[e.field], a.fields[e.field]))) return false;
+    if (!e.abs && (b.fields[e.field] === undefined || !same(b.fields[e.field], a.fields[e.field]))) return null;
   }
-  if (!inside(p.pairs.within, x.at, y.at) || !inside(p.pairs.within, y.at, x.at)) return false;
+  if (!inside(p.pairs.within, x.at, y.at) || !inside(p.pairs.within, y.at, x.at)) return null;
   const read = crossRead(p, x, y, windows);
-  if (read === null) return false;
-  return Math.abs(convertMinor(read.first.amount.size, read.from, read.to, read.held.rate) - read.second.amount.size) * 100 <= said.tolerance * read.second.amount.size;
+  if (read === null) return null;
+  return {
+    diff: Math.abs(convertMinor(read.first.amount.size, read.from, read.to, read.held.rate) - read.second.amount.size),
+    size: read.second.amount.size,
+    most: ruled === true ? Math.max(said.tolerance, ASK_SPREAD) : said.tolerance,
+  };
 }
 
 /**
  * `around` for a move between two currencies: the rows of another currency that could be `leg`'s other leg, and how
  * near the nearest such row still `waiting` stands. Asked once per leg for as long as the ledger does not change.
  *
- * THE WINDOW IS EVERY ROW OF ANOTHER CURRENCY IN IT, since no one size finds the other leg; `crossMirrors` decides each.
+ * THE WINDOW IS EVERY ROW OF ANOTHER CURRENCY IN IT, since no one size finds the other leg; `crossGap` decides each.
  */
 function crossAround(p: Pairing, leg: Leg, windows: Windows): ReturnType<typeof around> {
   const seen = windows.crossed.get(leg.id);
   if (seen !== undefined) return seen;
   const out: ReturnType<typeof around> = { near: [], waitsAt: Infinity };
+  const wide: Leg[] = [];
   windows.crossed.set(leg.id, out);
+  windows.wide.set(leg.id, wide);
   const ledger = windows.ledger;
   const window = windowSql(p);
   const read = ledger === null ? (l: Leg) => shapeOf(p, l) : (l: Leg) => shapeIn(p, ledger, l);
@@ -1268,7 +1293,13 @@ function crossAround(p: Pairing, leg: Leg, windows: Windows): ReturnType<typeof 
       .map(legOf);
   } else rows = inWindow(ledger.all, lo, hi).filter((other) => other.id !== leg.id);
   for (const other of rows) {
-    if (!crossMirrors(p, leg, other, read, windows)) continue;
+    const far = crossGap(p, leg, other, read, windows);
+    if (far === null) continue;
+    if (far.diff * 100 > far.most * far.size) {
+      /* TOO FAR APART TO BE A CANDIDATE, NEAR ENOUGH TO ASK ABOUT, where somebody is asked. It stands in nobody's way. */
+      if (p.asks === true && far.diff * 100 <= ASK_SPREAD * far.size && canPair(p, other, ledger)) wide.push(other);
+      continue;
+    }
     const gap = Math.abs(read(other)!.at - shape.at);
     if (canPair(p, other, ledger)) out.near.push({ leg: other, gap });
     else if (gap < out.waitsAt && waitsIn(p, other, ledger)) out.waitsAt = gap;
@@ -1301,7 +1332,7 @@ function saidOf(p: Pairing, leg: Leg, windows: Windows): Leg | null {
 }
 
 /** Why two rows in two currencies are a question and not a pair. */
-export type CrossWhy = 'rate_old' | 'not_only';
+export type CrossWhy = 'rate_old' | 'not_only' | 'lone' | 'spread';
 
 /** Whether `leg` has one row of another currency it could be one move with, and no more: none pending, none besides. */
 function onlyOne(p: Pairing, leg: Leg, known: Map<string, string | null>, windows: Windows): boolean {
@@ -1318,6 +1349,8 @@ function onlyOne(p: Pairing, leg: Leg, known: Map<string, string | null>, window
  * and Received with nothing said. One currency agrees to the unit; two agree only nearly, so a near match is taken on
  * its own word only when the rate is the day's (`PAIR_RATE_DAYS`) AND each row is the other's one candidate. A second
  * row that fits either leg, cleared or still pending, or an older rate, makes it a question (`crossAsks`).
+ *
+ * AND NOT ON ITS OWN WORD AT ALL WHERE A PERSON IS ASKED (`Pairing.asks`): `crossOf` holds that match back as `lone`.
  */
 function crossDoubt(p: Pairing, a: Leg, b: Leg, known: Map<string, string | null>, windows: Windows): CrossWhy[] {
   const ledger = windows.ledger;
@@ -1345,7 +1378,10 @@ function crossOf(p: Pairing, leg: Leg, known: Map<string, string | null>, window
   const to = crossHeld(p, leg, windows);
   if (to === null || saidOf(p, to, windows) !== null || sameOf(p, to, known, windows).to !== null) return null;
   if (crossHeld(p, to, windows)?.id !== leg.id) return null;
-  return crossDoubt(p, leg, to, known, windows).length === 0 ? to.id : null;
+  /* WITH NOTHING AGAINST IT, IT IS STILL ONLY A NEAR MATCH, and where somebody is asked (`Pairing.asks`) it is theirs to
+     say: the audit of batch 63 found two unrelated rows, each the other's one candidate on the day's rate, paired with
+     nothing said. Where nobody is asked it pairs, as it did. */
+  return crossDoubt(p, leg, to, known, windows).length === 0 && p.asks !== true ? to.id : null;
 }
 
 /** `partnerOf`, with the legs of the set it read: a partner of its own currency first, and only then one of another. */
@@ -1461,8 +1497,13 @@ export function passOf(p: Pairing): Pass {
  * Two rows in two currencies that could be one move and were not paired: the question a person answers.
  *
  * `first` IS THE LEG THAT WENT FIRST, the one the rate converts; `converted` is its amount in `to`'s minor units at
- * `rate`, which is of `rate_as_of`, `rate_days` days before the leg's own day. `key` goes back into `Pairing.ruled`
- * with the answer.
+ * `rate`, which is of `rate_as_of`, `rate_days` days before the leg's own day, and `landed` is what the second leg
+ * holds, in the same units, so the two can be said side by side. `key` goes back into `Pairing.ruled` with the answer
+ * (`ruledOf`).
+ *
+ * `why`, each one a reason it is not a pair already: `rate_old`, the rate is more than `PAIR_RATE_DAYS` old;
+ * `not_only`, another row could be either leg's other half; `spread`, the two amounts are farther apart than the list's
+ * tolerance (and inside `ASK_SPREAD`); `lone`, nothing is against it and it is still only a near match.
  */
 export type CrossAsk = {
   key: string;
@@ -1474,6 +1515,7 @@ export type CrossAsk = {
   rate_as_of: string;
   rate_days: number;
   converted: number;
+  landed: number;
   why: readonly CrossWhy[];
 };
 
@@ -1484,10 +1526,14 @@ export type CrossAsk = {
  *
  * A QUESTION, NOT A WRITE. `settle` leaves both rows counted; what this returns is for the caller to put to a person,
  * and their answer comes back as `Pairing.ruled`. A question that is no longer returned for its rows has gone: one of
- * them paired, left the window, was pinned or deleted.
+ * them paired, left the window, was pinned or deleted (`crossStill`).
  *
- * `why` IS NEVER EMPTY. Where neither the rate nor a second candidate is in doubt, a row of the leg's own currency
- * stands as near (`crossHeld`), and that is another candidate.
+ * THE CALLER THAT PUTS THESE TO A PERSON SAYS SO ON THE `Pairing` IT SETTLES AND ASKS WITH (`asks`). Then a match with
+ * nothing against it is asked too (`lone`), and so is a wider spread than the tolerance (`spread`); without it this
+ * returns the doubtful matches only, as it did.
+ *
+ * `why` IS NEVER EMPTY. Where neither the rate nor a second candidate is in doubt and the two are not each other's
+ * nearest, a row of the leg's own currency stands as near (`crossHeld`), and that is another candidate.
  */
 export function crossAsks(p: Pairing, seeds: readonly string[], pass?: Pass): CrossAsk[] {
   if (p.pairs.across_currency === undefined) return [];
@@ -1496,19 +1542,33 @@ export function crossAsks(p: Pairing, seeds: readonly string[], pass?: Pass): Cr
   const ledger = windows.ledger;
   const shape = (l: Leg): Shape | null => (ledger === null ? shapeOf(p, l) : shapeIn(p, ledger, l));
   const free = (l: Leg): boolean => answerOf(p, l, known, windows).to === null;
+  const farOf = (l: Leg): readonly Leg[] => (crossAround(p, l, windows), windows.wide.get(l.id) ?? []);
+  /* How many rows of another currency stand near a leg, inside the tolerance or only inside `ASK_SPREAD`. A ROW WITH A
+     PARTNER OF ITS OWN CURRENCY IS TAKEN, as it is for `onlyOne`, and is no second candidate to tell a person about. */
+  const open = (l: Leg): boolean => sameOf(p, l, known, windows).to === null;
+  const crowd = (l: Leg): number => crossAround(p, l, windows).near.filter((c) => open(c.leg)).length + farOf(l).filter(open).length;
   const out = new Map<string, CrossAsk>();
   for (const id of new Set(seeds)) {
     const leg = loadLeg(p, id);
     if (!leg || leg.deleted_at !== null || !canPair(p, leg, ledger) || !free(leg)) continue;
     const x = shape(leg);
     if (x === null) continue;
-    for (const { leg: other } of crossAround(p, leg, windows).near) {
+    const near = crossAround(p, leg, windows).near.map((c) => ({ other: c.leg, far: false }));
+    for (const { other, far } of [...near, ...farOf(leg).map((l) => ({ other: l, far: true }))]) {
       const key = crossKey(leg.id, other.id);
       if (out.has(key) || p.ruled?.has(key) || !free(other)) continue;
       const y = shape(other);
       const read = y === null ? null : crossRead(p, x, y, windows);
       if (read === null) continue;
-      const why = crossDoubt(p, leg, other, known, windows);
+      let why: CrossWhy[];
+      if (far) {
+        why = ['spread'];
+        if (read.held.days > PAIR_RATE_DAYS) why.push('rate_old');
+        if (crowd(leg) > 1 || crowd(other) > 1) why.push('not_only');
+      } else {
+        why = crossDoubt(p, leg, other, known, windows);
+        if (why.length === 0) why = [p.asks === true && crossHeld(p, leg, windows)?.id === other.id && crossHeld(p, other, windows)?.id === leg.id ? 'lone' : 'not_only'];
+      }
       const [first, second] = read.first === x ? [leg, other] : [other, leg];
       out.set(key, {
         key,
@@ -1520,11 +1580,40 @@ export function crossAsks(p: Pairing, seeds: readonly string[], pass?: Pass): Cr
         rate_as_of: read.held.as_of,
         rate_days: read.held.days,
         converted: convertMinor(read.first.amount.size, read.from, read.to, read.held.rate),
-        why: why.length > 0 ? why : ['not_only'],
+        landed: read.second.amount.size,
+        why,
       });
     }
   }
   return [...out.values()];
+}
+
+/** The two rows a question is about, from its `key`: the seeds to `settle` again once a person has answered it. */
+export const crossLegs = (key: string): [string, string] => {
+  const at = key.indexOf('+');
+  return [key.slice(0, at), key.slice(at + 1)];
+};
+
+/**
+ * `Pairing.ruled` from the answers a caller kept: `one` is "these two are one move". Either order of the two rows,
+ * and a later answer about the same two replaces an earlier one, so a person may change their mind.
+ */
+export function ruledOf(answers: Iterable<{ a: string; b: string; one: boolean } | { key: string; one: boolean }>): Map<string, boolean> {
+  const ruled = new Map<string, boolean>();
+  for (const said of answers) ruled.set('key' in said ? crossKey(...crossLegs(said.key)) : crossKey(said.a, said.b), said.one);
+  return ruled;
+}
+
+/**
+ * Which of the questions a caller holds open still stand, by `key`: the rest are closed without an answer, since
+ * their rows paired, left the window, were pinned or deleted, or a newer rate settled them.
+ *
+ * ASKED OF BOTH ROWS OF EACH, so a question is found whichever of the two a write moved.
+ */
+export function crossStill(p: Pairing, keys: Iterable<string>, pass?: Pass): Set<string> {
+  const open = new Set(keys);
+  const asked = crossAsks(p, [...open].flatMap(crossLegs), pass);
+  return new Set(asked.map((ask) => ask.key).filter((key) => open.has(key)));
 }
 
 /** The rows that could be `leg`'s partner, by id: `settle`'s seeds for a row as it was, or as it is. */

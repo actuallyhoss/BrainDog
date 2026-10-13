@@ -150,7 +150,7 @@ import { isMechanism, loadLeg, markPinned, neighboursOf, pairsReads, passOf, set
 import { COST_SQL, COSTS, WAIT_RANK_SQL, WAIT_SQL, costOf, costRank, costRows, optionCost, waitParams, waitRank, type Cost } from './weigh.ts';
 import { recheck } from './cause.ts';
 import { evaluateMetric, predicateOf, readDeclaredSigns, scorePrediction, snapshot, unaggregatableIn, type EvalContext, type MetricDecl, type Reading } from './metrics.ts';
-import { STALE_DAYS, readBlock, readPage, registersOf, registersOfBlock, resolvePages, staleAt, type ActivityEvent, type BlockResult, type ListsBeside, type PageBlock, type PageDecl, type PageDeps, type LastChange, type PageResult, type QueueCandidate, type QueueQuestion, type QuestionFacts } from './pages.ts';
+import { STALE_DAYS, readBlock, readPage, registersOf, registersOfBlock, resolvePages, runByOf, staleAt, type ActivityEvent, type BlockResult, type ListsBeside, type PageBlock, type PageDecl, type PageDeps, type LastChange, type PageResult, type QueueCandidate, type QueueQuestion, type QuestionFacts } from './pages.ts';
 import { doesOf } from './does.ts';
 import { additionsOf } from './page-adds.ts';
 import { SETUP_KIND, setupCollapser, type FeedLine } from './feed.ts';
@@ -249,7 +249,7 @@ import {
   type VaultDeps,
 } from './vault.ts';
 import { slashMayWrite } from './slash.ts';
-import { answeredOnly, askOwnRows, fileVerdicts, joinOrganisation, meet as meetPerson, resolveJob, type MeetArgs, type Met, type PeopleDeps } from './people.ts';
+import { answeredOnly, askOwnRows, askSame, fileVerdicts, joinOrganisation, meet as meetPerson, resolveJob, type MeetArgs, type Met, type PeopleDeps } from './people.ts';
 import { meetsRole, orgRole, ratesRole, type MeetsFields, type OrgFields } from './roles.ts';
 import { entityLists, foldChain, foldEnd, foldedCarry, holderOf, keyedLists, mergeFieldOf, rebuildKeys, rekey, rowKeys, type KeyedList } from './entities.ts';
 import { builtInFigure, openSteps } from './built-in-figures.ts';
@@ -420,7 +420,7 @@ export { clockOf, isMoneyFormat, verdictOf } from './metrics.ts';
 export { readDeclaredSigns, vitalOf } from './metrics.ts';
 export { farRates, pointSaid, RATE_QUIET_DAYS } from './metrics.ts';
 /* A DIFFERENCE AGAINST THE WINDOW BEFORE (`diff.before`), for the seed and the browser's reader: the clock moved back a month, the gate a change passes, and the words a declaration may say. */
-export { BEFORE, comparisonOf, monthBefore } from './metrics.ts';
+export { BEFORE, comparisonOf, monthBefore, yearBefore } from './metrics.ts';
 export type { Before, Halves } from './metrics.ts';
 export { SESSIONS_WORKING, readRunsWorking } from './built-in-figures.ts';
 export { HANDOFFS_OPEN, openSteps, readHandoffsOpen, type OpenStep } from './built-in-figures.ts';
@@ -6705,6 +6705,13 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     note: (actor, text) => noteEvent(sql, mint, clock.now(), actor, text),
     projectOf: projectOfRow,
     tz: recordIdentity(sql)?.tz ?? 'UTC',
+    /* THE RUN THAT MADE A ROW, by the actor of its `create` line, which a run signs with its handle; anybody else is
+       `null`. Read as a feed's `run_by` is (`runByOf`), ended or removed runs included. */
+    madeBy: (row) => {
+      const actor = sql.one<{ a: string }>("SELECT actor AS a FROM event WHERE target = ? AND kind = 'create' ORDER BY rowid LIMIT 1", `entry:${row.id}`)?.a;
+      if (actor === undefined || !isRunName(actor)) return null;
+      return runByOf(actor, bySeq(SESSION, Number(actor.slice((registers.get(SESSION)?.seq_prefix ?? 'S').length)), true));
+    },
     /* THROUGH THE GATE'S OWN `propose`, as a rule's `suggest` goes, so a run's question is a suggestion like any other:
        the same checks, the same `suggest` event, the same queue. The run and the step ride on the body, which is what
        `decide` below reads to find the run it answers. */
@@ -8987,6 +8994,24 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      */
     askOwnRows: (actor: string = 'system'): Result<string | null> =>
       attempt(sql, transaction, () => askOwnRows(peopleDeps({ actor }, () => null, (p) => openSuggestion(governDeps(), actor, p)))),
+
+    /**
+     * SOMEBODY SAYS THESE PEOPLE MAY BE ONE, asked about now (`people.ts` `askSame`): the cluster question for exactly
+     * the rows picked, signed as the caller. Nothing is merged. Answers the question and whether this call opened it or
+     * added to it, or `null` when nothing could be asked. For the record's `sameOne`.
+     */
+    askSame: (w: WriteContext, args: { rows: readonly string[] }): Result<{ id: string; asked: boolean } | null> => {
+      const barred = schemaRefusal(state);
+      if (barred) return barred;
+      const as: WriteContext = {
+        actor: w.actor,
+        ...(w.principal === undefined ? {} : { principal: w.principal }),
+        ...(w.session === undefined ? {} : { session: w.session }),
+      };
+      const theirs = foreignRun<{ id: string; asked: boolean } | null>(as);
+      if (theirs) return theirs;
+      return attempt(sql, transaction, () => askSame(peopleDeps(as, () => null, (p) => openSuggestion(governDeps(), () => signedBy(as), p)), args.rows));
+    },
 
     /** Put one back in the queue, for the change the gate accepted and could not land. */
     reopen: (id: string, why?: string): Result<null> => transaction(() => reopen(governDeps(), id, why)),

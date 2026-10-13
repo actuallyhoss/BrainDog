@@ -187,6 +187,23 @@ test(
   },
 );
 
+test('A STEP AN AGENT ADDS UNDER ITS OWN TASK STAYS WITH THAT AGENT, and one a person adds under it is given to nobody', async () => {
+  const s = await selfhost(['work']);
+  try {
+    /* A RUN OF CLAUDE'S, as a token's write is signed: the record opens the run and the row's first line is its handle. */
+    const run = { actor: s.as.actor, principal: { kind: 'token' as const, token: 't_1' }, session: { client_id: 'cc-1', agent: 'claude', client: 'claude-code', host: 'h', repo: 'studio' } };
+    const parent = said<Entry>(s.k.create('tasks', { what: 'Master the italics', state: 'doing', agent: 'claude' }, run));
+
+    const own = said<Entry>(s.k.create('tasks', { what: 'Master the bold italics', parent: parent.id }, run));
+    const his = s.task({ what: 'Check the kerning', parent: parent.id });
+    await s.settle();
+    assert.equal(s.k.get(own.id)?.fields.agent, 'claude', 'the agent’s own step was given to nobody');
+    assert.equal(s.k.get(his.id)?.fields.agent ?? null, null, 'a person’s step was handed to the agent with nobody saying so');
+  } finally {
+    await s.close();
+  }
+});
+
 /* THE DRY RUN MUST NOT CALL THE STEP UNBUILT: with the runner taking the step, the dry run the owner and an agent read
    before installing still ended it with "Not in this build: a run stops here, after the steps before it", because
    `WAITS_ON_OTHERS` and the step's line in `packages/record/src/automations.ts` still named `script`. Measured here

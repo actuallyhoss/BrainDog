@@ -4,13 +4,19 @@
  * WHY THIS FILE EXISTS. The record's `engineReadings` answered `null` on every host, because no host handed it a ledger:
  * what the model was asked and what it answered was counted by arithmetic nothing fed. The read built here is what a host
  * hands the record as `engineLedger`, so each case runs it over a ledger `createSlash` built, the way both hosts open one.
+ *
+ * AND THE MENTIONS (audit 63 claim 5). `understanding.unattached` read 0 on every record, because no host handed the
+ * mentions: nothing read which of them point at something. `mentionsAttached` is that read, over the record's own
+ * `entity_mention` as the kernel's migration 23 makes it, and as ENG-B03 will widen it.
  */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { engineLedgerRead, handlersFor, ROUTES, type EngineLedger, type RecordSurface } from '../src/index.ts';
+import { mentionsAttached } from '../src/engine-ledger.ts';
 import { createSlash } from '../../slash/src/index.ts';
+import migration23 from '../../kernel/src/migrations/0023_entity_key.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 const T0 = Date.UTC(2026, 9, 6, 2);
@@ -65,6 +71,52 @@ test('THE OPEN QUESTIONS BY THEIR CAUSE AND THE MENTIONS BY attached, and nothin
   assert.deepEqual(out.questions, [{ cause: 'bank:statement' }, { cause: null }, { cause: null }]);
   assert.deepEqual(out.mentions, [{ attached: true }, { attached: false }]);
   assert.deepEqual(out.calls, []);
+});
+
+/** The record's mentions table, in the kernel's own words: cut out of migration 23, so this reads what a record holds. */
+const MENTIONS = /CREATE TABLE IF NOT EXISTS entity_mention \([^;]+\);/u.exec(migration23)?.[0] ?? '';
+
+const mention = (sql: ReturnType<typeof openSqlite>, name: string, more: Record<string, string | null> = {}): void => {
+  const cols = ['name_key', 'name', 'kind', 'source', 'at', ...Object.keys(more)];
+  sql.exec(`INSERT INTO entity_mention (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`, name.toLowerCase(), name, 'person', 'a note', at(T0), ...Object.values(more));
+};
+
+test('A MENTION AS THE RECORD KEEPS IT TODAY POINTS AT NOTHING: each is read as not attached, and its name is not read', async () => {
+  const sql = openSqlite();
+  sql.exec(MENTIONS);
+  mention(sql, 'Mona');
+  mention(sql, 'A stranger');
+  const seen = mentionsAttached(sql)();
+  assert.deepEqual(seen, [{ attached: false }, { attached: false }]);
+  /* Handed to the ledger as a host hands it, beside a ledger no engine has built: the record's own are still read. */
+  assert.deepEqual((await engineLedgerRead({ sql: openSqlite(), mentions: mentionsAttached(sql) })(at(T0))).mentions, seen);
+  /* A new look at every ask: a mention kept since is in the next one. */
+  const read = engineLedgerRead({ sql: openSqlite(), mentions: mentionsAttached(sql) });
+  mention(sql, 'Omar');
+  assert.equal((await read(at(T0))).mentions.length, 3);
+});
+
+test('A MENTION THAT NAMES ITS HOLDER IS ATTACHED, and one whose attach was undone is not', () => {
+  /* The table once ENG-B03 has widened it (`loop/scope/area-engine-b.md`, decision 2). */
+  const sql = openSqlite();
+  sql.exec(MENTIONS);
+  sql.exec('ALTER TABLE entity_mention ADD COLUMN holder TEXT');
+  mention(sql, 'Mona', { holder: 'row-1' });
+  mention(sql, 'A stranger', { holder: null });
+  mention(sql, 'Nobody', { holder: '' });
+  const flags = (): boolean[] => mentionsAttached(sql)().map((m) => m.attached);
+  assert.deepEqual(flags().sort(), [false, false, true]);
+  sql.exec('ALTER TABLE entity_mention ADD COLUMN undone_at TEXT');
+  assert.deepEqual(flags().sort(), [false, false, true]);
+  sql.exec("UPDATE entity_mention SET undone_at = ? WHERE name = 'Mona'", at(T0));
+  assert.deepEqual(flags(), [false, false, false]);
+});
+
+test('A RECORD WITH NO MENTIONS TABLE, or none in it, has no mention', () => {
+  assert.deepEqual(mentionsAttached(openSqlite())(), []);
+  const sql = openSqlite();
+  sql.exec(MENTIONS);
+  assert.deepEqual(mentionsAttached(sql)(), []);
 });
 
 test('A STORE NO ENGINE HAS BUILT YET answers empty, and so does a ledger older than its purpose column', async () => {

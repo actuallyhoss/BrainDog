@@ -20,7 +20,7 @@
 
 import { DurableObject } from 'cloudflare:workers';
 
-import { engineHealthRead, engineLedgerRead, handlersFor, hintsOf, httpStatus, serveApi, serveIngest, serveSlash, servesSlash, withSession, type EngineHealthRead, type SessionHints, type SlashAskDoor, type VaultGrantSeen } from '@braindog/host';
+import { engineHealthRead, engineLedgerRead, handlersFor, mentionsAttached, hintsOf, httpStatus, serveApi, serveIngest, serveSlash, servesSlash, withSession, type EngineHealthRead, type SessionHints, type SlashAskDoor, type VaultGrantSeen } from '@braindog/host';
 import { deriveSessionKey, relyingParty, serveAccount, serveAuth, type DeviceDoor, type EmailDoor, type InviteDoor, type Provisioned } from '@braindog/host/auth';
 /* SIGN-UP: its three routes are answered in `signIn()` before `serveAuth`. */
 import { clearCookie, cookieMode, mirrorEverywhere, readSid, renameAsked, renamedName, sameKey, sameOrigin, sessionCookie } from '@braindog/host/auth';
@@ -773,10 +773,11 @@ export class Record$ extends DurableObject<Env> {
     this.#engineHealth = engineHealth;
     /* AND WHAT THAT LEDGER HOLDS, for the record's `engineReadings` (ENG-B01): the same storage again, so the calls it
        counts are the ones the health above was read from, beside the questions still open, each by its cause. Handed
-       whether or not a model is set, since the open questions are the record's own. No mention is handed yet: nothing
-       reads which of them are attached, so that count stays 0. */
+       whether or not a model is set, since the open questions are the record's own. The mentions are the record's own,
+       each attached or not. */
     const engineLedger = engineLedgerRead({
       sql,
+      mentions: mentionsAttached(sql),
       questions: () => {
         const open = api.kernel.openSuggestions();
         return open.ok ? open.value : [];

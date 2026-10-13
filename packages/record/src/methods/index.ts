@@ -49,6 +49,8 @@ import { methods as capture } from './capture.ts';
 import { methods as shape } from './shape.ts';
 import { methods as countBy } from './count-by.ts';
 import { methods as trust } from './trust.ts';
+import { methods as sameOne } from './same-one.ts';
+import { methods as offered } from './offered.ts';
 /* END METHODS */
 
 /**
@@ -119,6 +121,12 @@ export type RecordDeps = {
   validFrom?: (() => string | undefined) | undefined;
   /** The record's own checks on a new entry that `create` makes (`mergeShaped`, `keyHeld`, `huedOf` in `index.ts`), which `capture` asks of each entry. Absent, `capture` refuses only a merge. */
   createDoor?: import('./capture.ts').CreateDoor | undefined;
+  /**
+   * Whether every block of one page, drawn for this caller, is held from her (`drawnWithheld` in `index.ts`), which
+   * `offered` asks only for somebody who does not read every list. Absent, such a caller is offered no page at all,
+   * because a page nobody checked may open onto nothing.
+   */
+  withheld?: ((ctx: CallContext, slug: string) => boolean) | undefined;
 };
 
 export function methods(deps: RecordDeps) {
@@ -151,6 +159,8 @@ export function methods(deps: RecordDeps) {
     ...shape(deps),
     ...countBy(deps),
     ...trust(deps),
+    ...sameOne(deps),
+    ...offered(deps),
     /* END METHODS */
   };
 }

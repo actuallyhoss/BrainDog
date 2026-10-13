@@ -515,7 +515,8 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   words are the same. PORTFOLIO 1.16.0 IS RELEASED, so this is a version of its own. One `when` changed on the two
  *   keyed copies of a block that is there, nothing added or taken away, so a minor step.
  * - work 1.19.0 (W061, REC-C10): a thread has six states and declared moves, a day it aims for, and a follow-up takes
- *   its parent's project, thread and owner one by one (never the agent), and a thread that is holding may be marked
+ *   its parent's project, thread and owner one by one (and the agent, when the agent holding the parent made the
+ *   follow-up), and a thread that is holding may be marked
  *   done (work-moves-62-63, batch 63, inside the unreleased step). WORK 1.18.0 IS RELEASED (commit 63423720), so this is a
  *   version of its own. Two values, their labels and the moves on one field, one field added and one script's title
  *   and source changed, nothing taken away, so a minor step.

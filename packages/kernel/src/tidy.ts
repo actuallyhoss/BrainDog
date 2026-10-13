@@ -14,6 +14,9 @@
  * AT MOST ONE QUESTION A FINDER, held by its cause, `tidy#<finder>`. `tidy` files it the first time the finder has
  * something stale and a question to ask, and never again: an open one is found and kept to its count, and an answered
  * one is the person's answer. Ten finders can so ask ten questions and no more, which is the risk this part names.
+ *
+ * THE HOURLY PASS IS `tidyHour`: the same run, one line a finder a day kept in `tidy_line` for 90 days, and a question
+ * answered with a plain "Do it" asked again when more things went stale than that answer was about.
  */
 
 import type { Sql } from '@braindog/ports';
@@ -210,6 +213,12 @@ function bodyOf(finder: string, found: Found & { ask: TidyAsk }): Record<string,
   };
 }
 
+/** The newest question a finder's cause ever held, open or closed. */
+type Was = { id: string; status: string; body: string; resolved_as: string | null; opened_at: string };
+
+/** Whether a closed question may be asked again now. `tidy` alone never does; the hourly pass knows the floor. */
+type Again = (finder: Finder, found: Found, was: Was) => boolean;
+
 /**
  * Run every finder once and answer one line each. Run it inside the caller's transaction: `allocate` is the record's
  * counter, which gives a number only there.
@@ -217,23 +226,26 @@ function bodyOf(finder: string, found: Found & { ask: TidyAsk }): Record<string,
  * THE QUESTION, AT MOST ONE A FINDER. Filed when the finder has something stale, offers a question, and no question
  * with its cause was ever asked. One still open is kept to the count it would act on and is the line's `asked`. One
  * the person answered is their answer, so nothing is filed and `asked` is `null`: "Leave them" is not asked again an
- * hour later, and what "Do it" and "Always do this" then do is the part that acts on answers.
+ * hour later. Called by itself it never asks twice; `tidyHour` is the pass that asks again after a plain "Do it".
  *
  * FILED AS THE RECORD'S OWN (`system`), the way an arrival's question is filed: straight into `suggestion`, with the
  * question's words on its `suggest` line, which is where every question's words are read from.
  */
 export function tidy(deps: TidyDeps, list: readonly Finder[] = finders()): TidyLine[] {
+  return pass(deps, list, () => false);
+}
+
+function pass(deps: TidyDeps, list: readonly Finder[], again: Again): TidyLine[] {
   const at = iso(deps.nowMs);
   return list.map((finder) => {
     const found = finder.find(deps.sql, deps.nowMs);
     const cause = causeOfFinder(finder.id);
-    const was = deps.sql.one<{ id: string; status: string; body: string }>(
-      'SELECT id, status, body FROM suggestion WHERE cause = ? ORDER BY rowid DESC LIMIT 1',
+    const was = deps.sql.one<Was>(
+      'SELECT id, status, body, resolved_as, opened_at FROM suggestion WHERE cause = ? ORDER BY rowid DESC LIMIT 1',
       cause,
     );
     const line = { finder: finder.id, stale: found.stale, did: found.did };
-    if (was !== undefined) {
-      if (was.status !== 'open') return { ...line, asked: null };
+    if (was?.status === 'open') {
       if (found.ask !== null && found.stale > 0) {
         const body = JSON.stringify(bodyOf(finder.id, { ...found, ask: found.ask }));
         if (body !== was.body) deps.sql.exec('UPDATE suggestion SET body = ? WHERE id = ?', body, was.id);
@@ -241,6 +253,7 @@ export function tidy(deps: TidyDeps, list: readonly Finder[] = finders()): TidyL
       return { ...line, asked: was.id };
     }
     if (found.ask === null || found.stale <= 0) return { ...line, asked: null };
+    if (was !== undefined && !again(finder, found, was)) return { ...line, asked: null };
     const id = `SG${deps.allocate('suggestion')}`;
     deps.sql.exec(
       "INSERT INTO suggestion (id, body_kind, body, status, opened_by, opened_at, cause) VALUES (?, 'options', ?, 'open', 'system', ?, ?)",
@@ -258,4 +271,94 @@ export function tidy(deps: TidyDeps, list: readonly Finder[] = finders()): TidyL
     );
     return { ...line, asked: id };
   });
+}
+
+/* ── the hourly pass, and its line a finder a day ───────────────────────── */
+
+/** How many days of lines are kept. */
+export const KEEP_DAYS = 90;
+
+/**
+ * The tidy's own table: one line a finder a day. `stale` and `did` are the day's last pass, so `did` (the last 24
+ * hours, as the finder counts it) read at the end of a day is that day's. `low` is the fewest any pass counted that
+ * day, and on a day the person answers the finder's question it is counted from the answer on. `at` is the last pass.
+ *
+ * LOCAL, AND MADE BY THE PASS. It has no line in `dog_section`, so a copy of the record does not carry it: it is what
+ * this record counted about itself, and a restored record starts counting again. `IF NOT EXISTS`, so the pass can make
+ * it and a migration that later runs these same words changes nothing.
+ */
+export const TIDY_LINE_DDL =
+  'CREATE TABLE IF NOT EXISTS tidy_line (finder TEXT NOT NULL, day TEXT NOT NULL, stale INTEGER NOT NULL, did INTEGER NOT NULL, low INTEGER NOT NULL, at TEXT NOT NULL, PRIMARY KEY (finder, day)) WITHOUT ROWID';
+
+/** One finder's kept line for one day. */
+export type TidyDay = { finder: string; day: string; stale: number; did: number; low: number; at: string };
+
+/** The day a line is kept under: the UTC date, the one day every reader of the table agrees on. */
+const dayOf = (ms: number): string => iso(ms).slice(0, 10);
+
+/** What the person last said to a finder's question, when they picked one of its answers: the answer and when. */
+function saidTo(sql: Sql, cause: string): { answer: string; ts: string } | undefined {
+  return sql.one<{ answer: string; ts: string }>('SELECT answer, ts FROM decision WHERE cause = ? ORDER BY ts DESC, rowid DESC LIMIT 1', cause);
+}
+
+/**
+ * The tidy as the hourly tick calls it: every finder once, its question kept or filed, and today's line written. Run
+ * it inside the caller's transaction, as `tidy` is. Calling it twice in an hour is safe: the second call writes the
+ * same line and files nothing new.
+ *
+ * ASKED AGAIN AFTER A PLAIN "DO IT", WHEN NEW THINGS WENT STALE. "Do it" is for the things the question counted, so
+ * more of them later are a new question; "Always do this" and "Leave them" are answers for good and are never asked
+ * again, and neither is a question the person declined or the record withdrew. NEW is more than the floor: the fewest
+ * the finder has counted since the answer, starting from the count the answered question was about. So an answer that
+ * cleared everything asks again at the first new one, and an answer nothing has acted on yet asks again only when
+ * there are more than it was about, never every hour for the same ones.
+ *
+ * WHAT IT CANNOT SEE: things cleared and as many new ones turning up between two passes read as no change.
+ */
+export function tidyHour(deps: TidyDeps, list: readonly Finder[] = finders()): TidyLine[] {
+  const { sql, nowMs } = deps;
+  sql.exec(TIDY_LINE_DDL);
+  const lines = pass(deps, list, (finder, found, was) => {
+    const said = saidTo(sql, causeOfFinder(finder.id));
+    if (was.resolved_as !== 'addressed' || said?.answer !== 'do' || Date.parse(said.ts) < Date.parse(was.opened_at)) return false;
+    const about = Number((JSON.parse(was.body) as { count?: unknown }).count);
+    const low = sql.one<{ n: number | null }>(
+      'SELECT MIN(low) AS n FROM tidy_line WHERE finder = ? AND julianday(at) > julianday(?)',
+      finder.id,
+      said.ts,
+    )?.n;
+    const floor = Math.min(Number.isFinite(about) ? about : found.stale, low ?? Infinity);
+    return found.stale > floor;
+  });
+  const at = iso(nowMs);
+  for (const line of lines) {
+    /* A line last written before the person's answer starts its `low` again, so the floor is counted from the answer. */
+    sql.exec(
+      `INSERT INTO tidy_line (finder, day, stale, did, low, at) VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT (finder, day) DO UPDATE SET stale = excluded.stale, did = excluded.did, at = excluded.at,
+         low = CASE WHEN julianday(tidy_line.at) < julianday(?) THEN excluded.low ELSE min(tidy_line.low, excluded.low) END`,
+      line.finder,
+      dayOf(nowMs),
+      line.stale,
+      line.did,
+      line.stale,
+      at,
+      saidTo(sql, causeOfFinder(line.finder))?.ts ?? null,
+    );
+  }
+  sql.exec('DELETE FROM tidy_line WHERE day <= ?', dayOf(nowMs - KEEP_DAYS * DAY_MS));
+  return lines;
+}
+
+/**
+ * The kept lines of the last `days` days, today included, oldest first and by finder within a day. Empty on a
+ * record the pass has not run on yet. What a figure a finder and the "Tidied this week" line read.
+ */
+export function tidyDays(sql: Sql, nowMs: number, days = 7): TidyDay[] {
+  if (sql.one("SELECT 1 AS n FROM sqlite_master WHERE type = 'table' AND name = 'tidy_line'") === undefined) return [];
+  return sql.all<TidyDay>(
+    'SELECT finder, day, stale, did, low, at FROM tidy_line WHERE day > ? AND day <= ? ORDER BY day, finder',
+    dayOf(nowMs - Math.max(1, days) * DAY_MS),
+    dayOf(nowMs),
+  );
 }

@@ -3586,7 +3586,7 @@ type RunReader = NonNullable<PageDeps['runOf']>;
 const saidText = (v: Json | undefined): string | null => (typeof v === 'string' && v !== '' ? v : null);
 
 /** Who the run `run` is, from its own row: `agentOf` reads the kind of agent from its app where the run said none. */
-function runByOf(run: string, entry: Entry | null): RunBy | null {
+export function runByOf(run: string, entry: Entry | null): RunBy | null {
   if (!entry) return null;
   const agent = saidText(entry.fields.agent);
   const client = saidText(entry.fields.client);

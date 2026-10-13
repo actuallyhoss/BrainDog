@@ -184,6 +184,28 @@ test('the first row into a list the record answered empty is marked as arrived',
   assert.equal(p.drawn().rows.some((r) => r.arrived), false);
 });
 
+test('a block drawn as two runs of rows, one of them empty, marks no row however often it is drawn', () => {
+  const p = page();
+  const open = p.block;
+  const done = { ...p.block, rows: [] as Row[] };
+  for (let look = 1; look <= 3; look += 1) {
+    p.clock(look * 100);
+    const first = p.writes.keptSegment(0, open, open, true);
+    const second = p.writes.keptSegment(0, done, open, true);
+    assert.equal([...first.rows, ...second.rows].some((r) => r.arrived), false, `look ${String(look)} marked the rows the block already held`);
+  }
+  /* AND WITHOUT THE WORD, the same three looks mark both rows from the second on, which is the fault. */
+  const q = page();
+  const marks: boolean[] = [];
+  for (let look = 1; look <= 3; look += 1) {
+    q.clock(look * 100);
+    const first = q.writes.keptSegment(0, q.block, q.block);
+    q.writes.keptSegment(0, { ...q.block, rows: [] as Row[] }, q.block);
+    marks.push(first.rows.some((r) => r.arrived));
+  }
+  assert.deepEqual(marks, [false, true, true]);
+});
+
 test('a look before the live answer is in is no baseline, so the answer marks nothing', () => {
   const live: { now: number | null } = { now: null };
   const p = page('todo', live);

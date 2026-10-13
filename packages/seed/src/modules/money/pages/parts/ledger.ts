@@ -29,14 +29,15 @@ export const LEDGER: Record<string, unknown>[] = [
        were installed and drawn nowhere, and this line reads both: how many entries were made today, and how many
        anything but a person made in 30 days.
 
-       HOW MANY, AND NOT YET WHO, for three reasons that are none of them this file's, each held by
+       HOW MANY, AND NOT YET WHO, for two reasons that are neither of them this file's, each held by
        `test/money-ledger-by.test.ts`, which goes red the day one moves:
        - A SENTENCE READS A FIGURE'S COUNT AND NEVER ITS PARTS BY NAME (`pathOf` in `packages/kernel/src/pages.ts`), so
          "Harbour Bank filed 6 today" cannot be written from `filed-today`, whose parts hold exactly that.
        - A TIMELINE DRAWS THREE CELLS, and these three are the day, the name and the amount. The record does hand over,
          beside the lines, the rule on each entry (`filed_by`) and who changed it last, as ids and handles with no name.
-       - A HOST DRAWS A `body` ONLY WHERE A BLOCK HAS NO LINES OF ITS OWN (`drawSegments` in the app's `blocks.ts`), so
-         this line is filled by the record and drawn by no tile yet.
+
+       THE APP DRAWS THIS LINE ABOVE THE MOVEMENTS when the record answered both figures (`writtenLine` in the app's
+       `apps/web/src/lib/record/blocks.ts`), and draws none while either is unanswered.
 
        NO GATE OF ITS OWN: a line is not a thing a tile holds, so a Ledger nothing has moved on is still not drawn. */
     kind: 'timeline',

@@ -1579,10 +1579,11 @@ const DECLARED: Record<string, Version> = {
       metric.tasks-week-yours metric.tasks-with-agents page.work page.work-board register.tasks register.tracks
       register.updates rule.close_follow_ups rule.start_with_parent script.close_follow_ups script.start_with_parent
     `,
-    declares: '424cfe3512924e3b',
+    declares: '061458f472bc1a99',
     history: [
       "`register.tracks`: Status has six values (idea and planned before open) with their labels and the declared moves between them, and gains `target`, the day a thread aims for, a deadline reminded on the day; `script.start_with_parent` copies each of project, thread, owner and agent the follow-up left empty, and is titled Start a follow-up where its parent is; no id added or taken away -> 8299f07c756e0e85",
       "Inside the unreleased 1.19.0 (work-moves-62-63, audit 61 claim 6; integrate 63; commit 63423720, the deployed build, holds 1.18.0): on `register.tracks` holding leads to done, and `script.start_with_parent` no longer copies the agent; no id added or taken away -> 424cfe3512924e3b",
+      "Inside the unreleased 1.19.0 (work-agent-follow-up-65, audit 63 claim 8; integrate 65; commit 63423720, the deployed build, holds 1.18.0): `script.start_with_parent` copies the parent's agent when the agent holding the parent made the follow-up, read from input.made_by; no id added or taken away -> 061458f472bc1a99",
     ],
   },
 };

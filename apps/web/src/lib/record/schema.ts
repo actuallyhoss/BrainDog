@@ -77,6 +77,11 @@ export type FieldDecl = {
   values?: readonly string[];
   /** `enum` only: the words a person reads for some of its values. The column holds the id. */
   labels?: Readonly<Record<string, string>>;
+  /**
+   * `enum` only: the moves out of each value, as the kernel declares the same key. The record holds a change to them
+   * on a list's state, so a row's panel offers only these (`ui/row-form-moves.ts`). A value with no entry is free.
+   */
+  transitions?: Readonly<Record<string, { to: readonly string[]; requires?: readonly string[]; by?: 'decide' }>>;
   /** What a new row holds when nobody says, as the record fills it on create. An enum's form opens on it. */
   default?: unknown;
   /** Only indexed fields may be filtered on, and only eight are offered (50 §5.2). */

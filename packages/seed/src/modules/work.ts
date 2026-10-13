@@ -631,16 +631,26 @@ const CLOSE_FOLLOW_UPS = `export default async function run(ctx) {
 
 /**
  * The script that starts a new follow-up where its parent is: a task created `Part of` another takes, one by one, each
- * of the parent's project, thread and owner that it left empty.
+ * of the parent's project, thread and owner that it left empty, and its agent where that agent made the follow-up.
  *
  * EACH OF THE THREE ON ITS OWN, SINCE work 1.19.0. Until then it copied the project and the thread and never whose the
  * work is, and it stopped altogether when the follow-up named a project, so that one took no thread either. What the
  * follow-up says for itself is never written over.
  *
- * NEVER THE AGENT. The first cut of 1.19.0 copied it too, so a step a person added under a task an agent holds was
- * handed to that agent without anybody saying so, and giving work to an agent is a person's call. A script is handed
- * the task and not who wrote it, so it cannot tell a person's follow-up from an agent's, and it gives no step to
- * anybody: an agent that splits its own task names itself on each step, as it names itself on the task.
+ * THE AGENT ONLY FOR AN AGENT'S OWN STEP. The first cut of 1.19.0 copied it onto every follow-up, so a step a person
+ * added under a task an agent holds was handed to that agent without anybody saying so, and giving work to an agent is
+ * a person's call. The second copied it onto none, because a script was handed the task and not who wrote it. Now the
+ * script reads who made the follow-up from its input, `made_by`, in the shape the record says a run in everywhere else
+ * (`RunBy` in `packages/kernel/src/pages.ts`: `{ run, agent, client, parent }`, and nothing for a person, a rule or an
+ * import), and a step takes its parent's agent when THE AGENT THAT HOLDS THE PARENT made it: Claude splitting its own
+ * task keeps each step. A step Codex adds under Claude's task is given to nobody, as a person's is, since one agent
+ * handing work to another is no more a person's call than the first cut was. Names are compared without case or
+ * outer spaces, and what is written is the parent's own spelling. `other`, the word for a run of no known kind, is
+ * nobody's name and is never matched.
+ *
+ * A HOST THAT SAYS NOTHING GIVES NOTHING. Where `made_by` is not handed (a kernel older than the one that hands it) or
+ * is not that shape, no agent is copied and the rest is placed as before, so the script is right on every host and
+ * only less helpful on an old one.
  *
  * ONE LEVEL, AS `parent` HOLDS ONE. The copy is made once, at the create, and never again: moving the parent to another
  * project later does not move its steps, because by then somebody may have placed a step somewhere on purpose.
@@ -657,6 +667,10 @@ const START_WITH_PARENT = `export default async function run(ctx) {
   const patch = {};
   for (const field of ['thing', 'track', 'owner'])
     if (!task.fields[field] && parent.fields[field]) patch[field] = parent.fields[field];
+  const name = (v) => (typeof v === 'string' ? v.trim().toLowerCase() : '');
+  const by = ctx.input.made_by;
+  const maker = by !== null && typeof by === 'object' ? name(by.agent) : '';
+  if (!task.fields.agent && maker !== '' && maker !== 'other' && maker === name(parent.fields.agent)) patch.agent = parent.fields.agent;
   if (Object.keys(patch).length > 0) ctx.update('tasks#' + task.seq, patch, task.version);
 }`;
 

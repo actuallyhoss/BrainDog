@@ -7,6 +7,10 @@
  *
  * TWO THINGS THE FIRST CUT OF 1.19.0 GOT WRONG ARE HELD HERE TOO: a thread held up could not be marked done, and a
  * follow-up took its parent's agent, so a step a person added under an agent's task was handed to that agent.
+ *
+ * AND THE AGENT COMES BACK FOR AN AGENT'S OWN STEP (batch 65): the script reads who made the follow-up, `made_by`, and
+ * a step takes its parent's agent when that same agent made it. The kernel does not hand `made_by` yet, so these run
+ * the script with the input a host will give it, and every test above them is a host that says nothing.
  */
 
 import { test } from 'node:test';
@@ -181,12 +185,13 @@ async function scriptOf(id: string): Promise<Run> {
 /**
  * The script run for one new task, over the record itself: `ctx.record.get` is the record's own read and `ctx.update`
  * its own write. A host queues the run and runs it in its sandbox (`apps/selfhost/test/follow-ups.test.ts`); here it
- * is run where the rule would have started it.
+ * is run where the rule would have started it. `madeBy` is who made the task, as the record says a run (`RunBy`); left
+ * out, the input is what a host hands today.
  */
-async function placed(k: Kernel, run: Run, id: string): Promise<void> {
+async function placed(k: Kernel, run: Run, id: string, madeBy?: unknown): Promise<void> {
   const writes: [string, Record<string, unknown>, number][] = [];
   await run({
-    input: { id },
+    input: madeBy === undefined ? { id } : { id, made_by: madeBy },
     record: { get: async (spoken: string) => k.get(spoken) },
     update: (spoken: string, patch: Record<string, unknown>, version: number) => void writes.push([spoken, patch, version]),
   });
@@ -224,7 +229,7 @@ test('A PERSON’S FOLLOW-UP OF AN AGENT’S TASK IS ON NO AGENT’S LIST, and t
   assert.equal(k.get(`tasks#${step.seq}`)!.fields.track, idOf(k, 'tracks#1'), 'the step lost its thread with the agent');
 });
 
-test('AN AGENT THAT NAMES ITSELF ON ITS OWN STEP KEEPS IT, since the script gives a step to nobody and takes it from nobody', async () => {
+test('AN AGENT THAT NAMES ITSELF ON ITS OWN STEP KEEPS IT, on a host that does not say who made the step', async () => {
   const k = await seeded();
   const run = await scriptOf('start_with_parent');
   const parent = made(k.create('tasks', { what: 'Master the italics', state: 'doing', track: 'tracks#1', agent: 'claude' }, { actor: 'agent:claude' }));
@@ -261,4 +266,76 @@ test('WHAT A FOLLOW-UP ALREADY SAYS IS LEFT AS IT SAID IT, each field on its own
     { thing: now.thing, track: now.track, owner: now.owner, agent: now.agent },
     { thing: idOf(k, 'things#1'), track: idOf(k, 'tracks#3'), owner: idOf(k, 'people#2'), agent: 'codex' },
   );
+});
+
+/* ── the agent, for an agent's own step ──────────────────────────────────── */
+
+/** A run as the record says one: Claude Code's run 7, and what `made_by` holds when it made the task. */
+const CLAUDE = { run: 'S7', agent: 'claude', client: 'Claude Code', parent: null };
+const CODEX = { run: 'S8', agent: 'codex', client: 'Codex', parent: null };
+
+/** A task Claude holds and one step under it that names no agent, placed as made by `madeBy`; the step's fields after. */
+async function stepUnderClaude(madeBy?: unknown, holder = 'claude'): Promise<Record<string, unknown>> {
+  const k = await seeded();
+  const run = await scriptOf('start_with_parent');
+  const parent = made(k.create('tasks', { what: 'Master the italics', state: 'doing', track: 'tracks#1', agent: holder }, OWNER));
+  const step = made(k.create('tasks', { what: 'Master the bold italics', state: 'open', parent: `tasks#${parent.seq}` }, OWNER));
+  await placed(k, run, step.id, madeBy);
+  const now = k.get(`tasks#${step.seq}`)!.fields;
+  assert.equal(now.track, idOf(k, 'tracks#1'), 'the step lost its thread');
+  return now;
+}
+
+test('AN AGENT THAT SPLITS ITS OWN TASK KEEPS EACH STEP, without naming itself on it', async () => {
+  assert.equal((await stepUnderClaude(CLAUDE)).agent, 'claude');
+});
+
+test('A HELPER OF THE AGENT THAT HOLDS THE TASK IS THAT AGENT, so its step stays with it', async () => {
+  assert.equal((await stepUnderClaude({ ...CLAUDE, run: 'S9', parent: 'S7' })).agent, 'claude');
+});
+
+test('THE AGENT IS WRITTEN AS THE PARENT SPELLS IT, whatever case the run says it in', async () => {
+  assert.equal((await stepUnderClaude({ ...CLAUDE, agent: ' Claude ' }, 'claude')).agent, 'claude');
+  assert.equal((await stepUnderClaude(CLAUDE, 'Claude')).agent, 'Claude');
+});
+
+test('A STEP ANOTHER AGENT ADDS UNDER AN AGENT’S TASK IS GIVEN TO NOBODY, as a person’s is', async () => {
+  assert.equal((await stepUnderClaude(CODEX)).agent ?? null, null, 'Codex handed Claude a step with nobody saying so');
+});
+
+test('A PERSON, A RULE OR AN IMPORT MADE IT, AND NO AGENT IS COPIED: nothing said, null, or not a run at all', async () => {
+  for (const madeBy of [undefined, null, 'claude', true, ['claude'], {}, { agent: null }, { agent: '' }, { person: 'people#1' }])
+    assert.equal((await stepUnderClaude(madeBy)).agent ?? null, null, `copied for made_by ${JSON.stringify(madeBy)}`);
+});
+
+test('A RUN OF NO KNOWN KIND IS NOBODY’S NAME, even under a task that says the same word', async () => {
+  assert.equal((await stepUnderClaude({ run: 'S9', agent: 'other', client: null, parent: null }, 'other')).agent ?? null, null);
+});
+
+test('AN AGENT THAT NAMES ANOTHER ON ITS STEP IS LEFT AS IT SAID, and one under a task nobody holds takes nobody', async () => {
+  const k = await seeded();
+  const run = await scriptOf('start_with_parent');
+  const held = made(k.create('tasks', { what: 'Master the italics', state: 'doing', track: 'tracks#1', agent: 'claude' }, OWNER));
+  const given = made(k.create('tasks', { what: 'Proof the italics', state: 'open', parent: `tasks#${held.seq}`, agent: 'codex' }, OWNER));
+  await placed(k, run, given.id, CLAUDE);
+  assert.equal(k.get(`tasks#${given.seq}`)!.fields.agent, 'codex', 'the agent the step named was written over');
+  const free = made(k.create('tasks', { what: 'Order the proofs', state: 'open', track: 'tracks#1' }, OWNER));
+  const under = made(k.create('tasks', { what: 'Pick the paper', state: 'open', parent: `tasks#${free.seq}` }, OWNER));
+  await placed(k, run, under.id, CLAUDE);
+  assert.equal(k.get(`tasks#${under.seq}`)!.fields.agent ?? null, null, 'a step took the agent that made it, which its parent never had');
+});
+
+test('AN AGENT’S OWN STEP IS ON ITS LIST AND A PERSON’S IS NOT, read as the Overview reads With an agent', async () => {
+  const k = await seeded();
+  const run = await scriptOf('start_with_parent');
+  const parent = made(k.create('tasks', { what: 'Master the italics', state: 'doing', track: 'tracks#1', agent: 'claude' }, OWNER));
+  const own = made(k.create('tasks', { what: 'Master the bold italics', state: 'doing', parent: `tasks#${parent.seq}` }, OWNER));
+  const yours = made(k.create('tasks', { what: 'Ring the foundry about the italics', state: 'doing', parent: `tasks#${parent.seq}` }, OWNER));
+  await placed(k, run, own.id, CLAUDE);
+  await placed(k, run, yours.id, null);
+  const withAgent = k.list({ register: 'tasks', where: 'agent is set, state is not done or dropped', limit: 200 });
+  assert.ok(withAgent.ok, sayOf(withAgent));
+  const names = withAgent.value.rows.map((r) => r.fields.what);
+  assert.ok(names.includes('Master the bold italics'), 'the agent’s own step is on no agent’s list');
+  assert.ok(!names.includes('Ring the foundry about the italics'), 'the person’s step is listed as with an agent');
 });

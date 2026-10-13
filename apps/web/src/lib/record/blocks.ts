@@ -1163,7 +1163,34 @@ export function toSegments(block: BlockResult, kinds?: Readonly<Record<string, K
   /* DAYS WHERE THE RECORD COUNTED DAYS (`outsideDays`), and with none of them, as when every entry outside holds no day,
      nothing is said of days. A record that sends no such count is read as before. */
   const outside = block.kind === 'heat' ? outsideSaid(keyOf(block, 'outsideDays') ?? keyOf(block, 'outside')) : null;
-  return outside === null ? drawn : [...drawn, ...parse(outside, { page: true })];
+  return [...writtenLine(block, kinds), ...drawn, ...(outside === null ? [] : parse(outside, { page: true }))];
+}
+
+/**
+ * A LIST'S WRITTEN LINE, its `body`, said once above the lines it holds: Money's Ledger says "6 filed today. 41 filed
+ * for you in 30 days." over its movements. Before this a `body` was drawn only where a block had no lines of its own
+ * (`drawSegments`), so a list that declared one had it filled by the record and drawn nowhere.
+ *
+ * PLAIN TEXT, and no kind of its own: the page writes each `{{path}}` in it as it writes any sentence's. ONLY WHEN THE
+ * RECORD ANSWERED EVERY ONE (`values`), because half a sentence with a dash in it says less than no sentence, and a
+ * path the record holds nothing for is not asked about from a tile's caption. ONLY OVER LINES: a list nothing is on
+ * says its `empty:` and nothing else. ONLY A LIST'S (the `list` primitive, read from the record): a note's body is the
+ * note, and a chart split by currency would say the line once a chart.
+ */
+function writtenLine(block: BlockResult, kinds?: Readonly<Record<string, KindSpec>>): ReturnType<typeof parse> {
+  const body = (block.body ?? '').trim();
+  if (body === '' || block.entries.length === 0 || !block.register || block.columns.length === 0) return [];
+  if (block.authored?.length || block.metrics || kindSpec(block.kind, kinds)?.primitive !== 'list') return [];
+  /* THE FIGURES THE RECORD ANSWERED, which the live reader puts on the block (`page-live.ts` `values`) and this file's
+     type of a block does not name. A block read from anything else carries none, and says no line with a figure in it. */
+  const sent = keyOf(block, 'values');
+  const values = sent !== null && typeof sent === 'object' ? (sent as Record<string, unknown>) : undefined;
+  const held = (path: string): boolean => {
+    const v = values && Object.hasOwn(values, path) ? values[path] : null;
+    return v !== null && v !== undefined && v !== '';
+  };
+  for (const [, path] of body.matchAll(/\{\{([^{}]*)\}\}/gu)) if (!held(path!.trim())) return [];
+  return parse(body, { page: true });
 }
 
 /**

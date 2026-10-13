@@ -1,5 +1,5 @@
 /**
- * The three vitals of the record itself (SHL-A06), each read red on a record planted to fail it, then green once the
+ * The four vitals of the record itself (SHL-A06, and the newest rate's age beside them), each read red on a record planted to fail it, then green once the
  * plant is gone, with names and no ids in what a person reads.
  *
  * THE RECORDS ARE BUILT THROUGH THE KERNEL'S OWN VERBS: a list with an amount installed, rows created by a person. The
@@ -84,10 +84,10 @@ function line(sql: NodeSql, e: { actor: string; kind: string; target?: string | 
   return id;
 }
 
-test('THE THREE, in order, with names and no ids, read by the kernel', () => {
+test('THE FOUR, in order, with names and no ids, read by the kernel', () => {
   assert.deepEqual(
     SIGNS_VITALS.map((s) => s.sign),
-    ['writes-authored', 'format-current', 'amounts-whole'],
+    ['writes-authored', 'format-current', 'amounts-whole', 'rate-age'],
   );
   for (const s of SIGNS_VITALS) {
     assert.ok(!/[a-z]+-[a-z]+/.test(s.name), `${s.sign}'s name is an id`);
@@ -96,7 +96,7 @@ test('THE THREE, in order, with names and no ids, read by the kernel', () => {
   }
 });
 
-test('AN EMPTY RECORD READS NONE ON ALL THREE, never green, as `signs-read` and `signs-daily` hold of every sign', async () => {
+test('AN EMPTY RECORD READS NONE ON ALL FOUR, never green, as `signs-read` and `signs-daily` hold of every sign', async () => {
   const sql = openSqlite();
   await openRecord(sql, fixedClock(NOW));
   for (const s of SIGNS_VITALS) {
@@ -264,6 +264,6 @@ test('AMOUNT FAULT: what one stored amount is short of', () => {
 
 const wired = SIGNS_VITALS.every((s) => VITAL_SIGNS.some((v) => v.sign === s.sign));
 
-test('WIRED: the three are on the closed list, once each', { skip: wired ? false : 'signs.ts does not spread SIGNS_VITALS yet' }, () => {
+test('WIRED: the four are on the closed list, once each', { skip: wired ? false : 'signs.ts does not spread SIGNS_VITALS yet' }, () => {
   for (const s of SIGNS_VITALS) assert.equal(VITAL_SIGNS.filter((v) => v.sign === s.sign).length, 1, `${s.sign} is on the list once`);
 });

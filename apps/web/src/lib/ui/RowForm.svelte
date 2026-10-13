@@ -23,6 +23,7 @@
   import type { FieldDecl, Fields } from '../record/schema.ts';
   import { exponentOf } from 'braindog-render';
   import { amountWrong, currencyTypedIn, moneyTyped } from './money-typed.ts';
+  import { movesFrom } from './row-form-moves.ts';
   import { copy } from '../copy.ts';
   import { valueSaid } from '../voice.ts';
   import { firstAsks } from '../first-run.ts';
@@ -176,6 +177,18 @@
   const firstOf = (f: FieldDecl): string =>
     typeof f.default === 'string' && f.values?.includes(f.default) ? f.default : (f.values?.[0] ?? '');
   const pick = (f: FieldDecl): string => typed[f.id] ?? firstOf(f);
+
+  /**
+   * THE VALUES AN ENUM OFFERS: on a row that is there, what its state holds and the moves the list declares out of that
+   * (`row-form-moves.ts`), and every value otherwise. Both arms drew every value, so a thread's panel offered six states
+   * and the record refused the ones it had not declared a move to.
+   *
+   * ONLY THE LIST'S STATE, because that is the one field the record holds moves on, and BY WHAT THE ROW HELD WHEN THE
+   * FORM OPENED (`values`), never by what is typed: a press can then be taken back before it is saved. A new row and
+   * the first run hold nothing, and may start anywhere.
+   */
+  const offered = (f: FieldDecl): readonly string[] =>
+    movesFrom(f, !first && f.id === decl?.state ? values?.[f.id] : undefined);
 
   /**
    * WHAT A PERSON TYPES INTO A MONEY FIELD IS HELD AS TEXT AND CHECKED AS THEY TYPE IT. The input
@@ -369,7 +382,7 @@
           is one press from every other, so there is nothing to protect a reader from.
         -->
         <div class="segmented" role="radiogroup" aria-labelledby={labelId(f)}>
-          {#each f.values ?? [] as value, i}
+          {#each offered(f) as value, i}
             <button
               type="button"
               class="segment"
@@ -379,7 +392,7 @@
               aria-checked={pick(f) === value ? 'true' : 'false'}
               onclick={() => (typed = { ...typed, [f.id]: value })}
               onkeydown={(e) => {
-                const values = f.values ?? [];
+                const values = offered(f);
                 const step = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
                 if (step === 0) return;
                 e.preventDefault();
@@ -397,7 +410,7 @@
         </div>
       {:else if f.type === 'enum'}
         <select class="row-input" id={id(f)} required={f.required} bind:value={typed[f.id]}>
-          {#each f.values ?? [] as value}<option value={value}>{valueSaid(f, value)}</option>{/each}
+          {#each offered(f) as value}<option value={value}>{valueSaid(f, value)}</option>{/each}
         </select>
       {:else if f.type === 'ref'}
         <select class="row-input" id={id(f)} required={f.required} bind:value={typed[f.id]}>

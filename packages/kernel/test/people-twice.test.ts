@@ -281,3 +281,75 @@ test('HIS OWN ROWS AND ONE MORE OF HIS NAME ARE COUNTED ONCE EACH, never a row t
   assert.deepEqual(value<string[]>(askTwice(d)), []);
   sql.close();
 });
+
+/** An owner as the record mirrors one when it is made or they join: a person with the address they sign in with. */
+const owner = (sql: NodeSql, id: string, email: string | null): void => {
+  sql.exec('INSERT OR REPLACE INTO person (id, email, name, suspended_at) VALUES (?, ?, NULL, NULL)', id, email);
+  sql.exec("INSERT OR REPLACE INTO member (person_id, register, level, seen_at) VALUES (?, '*', 'owner', NULL)", id);
+};
+
+test('THE ROW HE SIGNS IN WITH IS NEVER THE ONE FOLDED, with no address handed: the record reads its own owner', async () => {
+  const { k, sql } = await record();
+  owner(sql, 'p_owner', 'Kas@Example.com');
+  /* The audit's case: an older marked row holds another address, and the newer one is the row he signs in with. */
+  const old = person(k, { name: 'Kas', email: 'kas@old.example', self: true });
+  const signed = person(k, { name: 'Kas B', email: 'other@example.com', keys: ['email:kas@example.com'], self: true });
+  /* The nightly pass, as the record would call it: nobody hands an address. */
+  const [asked, ...more] = value<string[]>(askTwice(deps(k, sql)));
+  assert.ok(asked, 'two rows marked as him asked nothing');
+  assert.deepEqual(more, []);
+  assert.deepEqual(card(k, asked).candidates.map((c) => [c.at, c.kept === true]), [[k.nameOf(old.id), false], [k.nameOf(signed.id), true]]);
+  assert.match(k.question(asked) ?? '', /both you\? Yes keeps Kas B and carries over the other's /u);
+  /* The record's own call, at a mark or a meeting, keeps the same row and asks nothing more. */
+  assert.equal(value<string | null>(k.askOwnRows()), null);
+  assert.deepEqual(open(sql), [asked]);
+  value(k.decide(asked, { decide: { option: 'accept', reason: 'both me' } }, 'p_owner'));
+  assert.equal(k.get(signed.id)!.fields.self, true, 'the row he signs in with was folded');
+  assert.equal(k.get(old.id, { includeDeleted: true })!.fields.merged_into, signed.id);
+  assert.equal(k.count('people'), 1);
+  sql.close();
+
+  /* None of his rows holds it: none is the row he signs in with, so the oldest holding any address is kept. */
+  const two = await record();
+  owner(two.sql, 'p_owner', 'kas@example.com');
+  person(two.k, { name: 'Kas', self: true });
+  const first = person(two.k, { name: 'Kas', email: 'kas@old.example', self: true });
+  person(two.k, { name: 'Kas', email: 'kas@new.example', self: true });
+  const q = value<string | null>(two.k.askOwnRows());
+  assert.deepEqual(card(two.k, q!).candidates.filter((c) => c.kept === true).map((c) => c.at), [two.k.nameOf(first.id)]);
+  two.sql.close();
+});
+
+test('NO GUESS AT WHICH ROW HE SIGNS IN WITH: with no address known and two rows holding one, nothing is asked until it is', async () => {
+  const { k, sql } = await record();
+  const old = person(k, { name: 'Kas', email: 'kas@old.example', self: true });
+  const signed = person(k, { name: 'Kas', email: 'kas@example.com', self: true });
+  assert.equal(value<string | null>(k.askOwnRows()), null);
+  assert.deepEqual(value<string[]>(askTwice(deps(k, sql))), []);
+  /* An owner the record holds no address for says no more than no owner. */
+  owner(sql, 'p_owner', null);
+  assert.deepEqual(value<string[]>(askTwice(deps(k, sql, { ownAddress: () => null }))), []);
+  assert.deepEqual(open(sql), []);
+  assert.equal(k.count('people'), 2);
+  assert.equal(peopleTwice(deps(k, sql)), 1, 'he is still counted as held twice while nothing can be asked');
+
+  /* The night the record knows his address, the question comes, and keeps the row that holds it. */
+  owner(sql, 'p_owner', 'kas@example.com');
+  const [asked] = value<string[]>(askTwice(deps(k, sql)));
+  assert.ok(asked);
+  assert.deepEqual(card(k, asked).candidates.map((c) => [c.at, c.kept === true]), [[k.nameOf(old.id), false], [k.nameOf(signed.id), true]]);
+  sql.close();
+});
+
+test('TWO OWNERS, EACH MARKED ON THE ROW THEY SIGN IN WITH, are two people and are never asked about as one', async () => {
+  const { k, sql } = await record();
+  owner(sql, 'p_owner', 'kas@example.com');
+  owner(sql, 'p_second', 'mona@example.com');
+  person(k, { name: 'Kas', email: 'kas@example.com', self: true });
+  person(k, { name: 'Mona', email: 'mona@example.com', self: true });
+  assert.equal(value<string | null>(k.askOwnRows()), null);
+  assert.deepEqual(value<string[]>(askTwice(deps(k, sql))), []);
+  assert.deepEqual(open(sql), []);
+  assert.equal(k.count('people'), 2);
+  sql.close();
+});

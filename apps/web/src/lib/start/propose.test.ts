@@ -637,6 +637,63 @@ test('WHAT THE AUDIT OF BATCH 61 TYPED AS A STRANGER: used to, no longer, my old
   }
 });
 
+test('WHAT THE AUDIT OF BATCH 63 TYPED AS A STRANGER: a "used to" taken up again carries on, and a stopping that says when it happened stops', () => {
+  const lit = (p: ReturnType<typeof propose>, word: RegExp): boolean => p.heard.some((h) => word.test(h.phrase)) || p.places.some((x) => x.phrase !== null && word.test(x.phrase));
+  const orders = (p: ReturnType<typeof propose>): boolean => p.places.some((x) => x.name === 'Orders');
+
+  /* THE TWO SENTENCES, word for word: the first keeps its orders, the second has none. */
+  const carries = propose('I used to take orders and now track them here', CAIRO);
+  assert.ok(lit(carries, /orders/iu) && orders(carries), 'orders tracked here now are orders');
+  const closed = propose('I stopped taking orders when I closed the shop', CAIRO);
+  assert.ok(!lit(closed, /orders/iu) && !orders(closed), 'orders stopped when the shop closed are no orders');
+  assert.ok(!lit(closed, /shop/iu) && closed.usecase !== 'shop', 'and a shop that was closed is no shop');
+  assert.ok(lit(propose('I closed the shop early on Friday', CAIRO), /shop/iu), 'a shop closed for the day is a shop');
+
+  /* TAKEN UP AGAIN is a word of now and a word that points back, "them" at many and "it" at one. */
+  for (const s of [
+    'I used to take orders but now I track them here',
+    'I used to take orders, and I now keep them in a notebook',
+    'We used to take orders last year and these days we track them online',
+    'I used to take orders and invoices and now track them here',
+    'I used to keep orders; now I want those here',
+  ]) {
+    assert.ok(lit(propose(s, CAIRO), /orders/iu), s);
+  }
+  const both = propose('I used to take orders and invoices and now track them here', CAIRO);
+  assert.ok(lit(both, /invoices/iu), 'a run taken up again is kept whole');
+  assert.ok(lit(propose('I used to run a small shop and now run it online', CAIRO), /shop/iu), 'a shop run online now is a shop');
+  /* NOTHING POINTS BACK, or what does is refused or stopped again: the thing is still stopped. */
+  for (const s of [
+    'I used to take orders and now send invoices',
+    'I used to take orders and now I freelance',
+    'I used to take orders and now I do not take them',
+    'I used to take orders and now I have stopped taking them',
+    'I used to take orders and now it is all invoices',
+    'I used to take orders and track them here',
+  ]) {
+    const p = propose(`I'm a freelance designer. ${s}`, CAIRO);
+    assert.ok(!lit(p, /orders/iu) && !orders(p), s);
+  }
+  assert.ok(!lit(propose("I'm a freelance designer. I used to sell candles and now I teach", CAIRO), /sell/iu), 'selling that nothing points back at has stopped');
+  assert.ok(lit(propose('I used to sell candles and now sell them online', CAIRO), /sell/iu), 'candles sold online now are sold');
+
+  /* WHEN IT STOPPED is somebody and a verb of the past after "when", "after" or "once". */
+  for (const s of [
+    'I stopped taking orders after we moved',
+    'I quit taking orders once the lease ran out',
+    'I stopped taking orders last year when my partner left',
+    'I used to take orders when I had the van',
+    'I no longer take orders after I sold the van',
+  ]) {
+    const p = propose(`I'm a freelance designer. ${s}`, CAIRO);
+    assert.ok(!lit(p, /orders/iu) && !orders(p), s);
+  }
+  /* What goes on is how it is done, and keeps the thing. */
+  for (const s of ['I stopped taking orders after hours', 'I stopped taking orders when I am busy', 'I stopped taking orders once a week']) {
+    assert.ok(lit(propose(s, CAIRO), /orders/iu), s);
+  }
+});
+
 test("A SENTENCE THAT OPENS WITH A REFUSAL NAMES NOBODY: Don't need orders, I freelance as a designer", () => {
   const typed = "Don't need orders, I freelance as a designer";
   const p = propose(typed, CAIRO);

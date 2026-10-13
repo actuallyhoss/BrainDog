@@ -34,6 +34,7 @@ import { ROUTES as door } from './door.ts';
 import { ROUTES as engine } from './engine.ts';
 import { ROUTES as capture } from './capture.ts';
 import { ROUTES as trust } from './trust.ts';
+import { ROUTES as sameOne } from './same-one.ts';
 /* END ROUTES */
 
 export const EXTRA_ROUTES: readonly Route[] = [
@@ -59,5 +60,6 @@ export const EXTRA_ROUTES: readonly Route[] = [
   ...engine,
   ...capture,
   ...trust,
+  ...sameOne,
   /* END ROUTES */
 ];

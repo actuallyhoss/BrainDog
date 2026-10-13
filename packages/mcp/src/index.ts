@@ -452,6 +452,9 @@ export const TOOLS: readonly Tool[] = [
            AND THE CEILING IS 100 NOW, THIS TOOL'S AND NOT THE RECORD'S. A page of 500 rows is an answer no host
            shows a model whole (Claude Code holds a tool result to 25,000 tokens by default), so a call asking more is
            answered 100 and a cursor, and `mcp.test.ts` holds both figures to what this says. */
+        /* A LIST OF SIXTY ROWS OR FEWER IS ANSWERED WHOLE WHEN NO LIMIT IS NAMED (`LIST_WHOLE`), and that is not said
+           here: twenty is still the page of a longer list, the words would pass the 2,760 `budget.test.ts` holds, and an
+           agent that reads a whole list with no cursor has nothing to ask for. */
         limit: int('1 to 100. Default 20.'),
         cursor: { type: 'string' },
         /* THE ONE WAY PAST THE CUT, said where it is used. A row's long text stops at 280 characters and the row says
@@ -787,8 +790,10 @@ export function compact(row: Entry, prefix = ''): Record<string, unknown> {
   };
 }
 
-/** The rows `list` answers when the call names no limit. */
+/** The rows `list` answers when the call names no limit and the list holds more than `LIST_WHOLE`. */
 const LIST_PAGE = 20;
+/** The most rows a list may hold and still be answered whole when the call names no limit: a portfolio is one read. */
+const LIST_WHOLE = 60;
 /** The characters of one text a `list` row carries before it is cut, unless the call names its field in `fields`. */
 const CLIP = 280;
 
@@ -1900,6 +1905,22 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
   };
 
   /**
+   * The rows a line of the log moved a link from and to, by the row ids the log holds, each once: what `handlesNamed`
+   * names before a history or the log is said, so a changed link reads "from Sam (people#1) to Ada (people#2)". A
+   * line's list is asked of the caller, since a spoken line no longer carries it.
+   */
+  const linksIn = (events: readonly Record<string, unknown>[], listOf: (e: Record<string, unknown>, i: number) => string | undefined): string[] => [
+    ...new Set(
+      events.flatMap((e, i) => {
+        if (e.kind !== 'edit' || typeof e.field !== 'string') return [];
+        const list = listOf(e, i);
+        const field = list === undefined ? undefined : decls.get(list)?.fields.find((f) => f.id === e.field);
+        return field?.type === 'ref' ? [e.from, e.to].filter((v): v is string => typeof v === 'string' && v !== '') : [];
+      }),
+    ),
+  ];
+
+  /**
    * The record's `context` as an agent reads it: the card, and the briefing cut to what bears on this caller.
    *
    * WHAT THE CARD NEEDS THAT THE BRIEFING DOES NOT SAY, read beside it and at once: `boot`, for whom the questions wait
@@ -2134,10 +2155,9 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
      */
     list: async (args, ctx, turn) => {
       const register = String(args.register);
-      const limit = limitOf(args.limit, LIST_PAGE, LIST_MOST);
       const whole = new Set(Array.isArray(args.fields) ? args.fields.map(String) : []);
-      const out = await fitted(limit, async (n) => {
-        const got = await surface.list(
+      const pageOf = (n: number) =>
+        surface.list(
           {
             register,
             ...(args.where === undefined ? {} : { where: args.where }),
@@ -2146,6 +2166,17 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
           },
           ctx,
         );
+      /**
+       * A SMALL LIST IS ANSWERED WHOLE (AGT-B11, "about 700 tokens for his whole portfolio"). With no limit named, a list
+       * of 27 projects was twenty rows and a cursor, so reading a portfolio took two calls. The first read asks for
+       * sixty: an answer with no cursor is the whole list, and one with a cursor is a longer list, read as a page of
+       * twenty as before. A call that names a limit or carries a cursor is a page, as it asked.
+       */
+      const first = args.limit === undefined && args.cursor === undefined ? await pageOf(LIST_WHOLE) : undefined;
+      const small = first !== undefined && !(first.ok && isObject(first.value) && cursorOut((first.value as { cursor?: unknown }).cursor) !== undefined);
+      const limit = small ? LIST_WHOLE : limitOf(args.limit, LIST_PAGE, LIST_MOST);
+      const out = await fitted(limit, async (n) => {
+        const got = small && n === LIST_WHOLE && first !== undefined ? first : await pageOf(n);
         if (!got.ok || !isObject(got.value) || !Array.isArray(got.value.rows)) return got as Result<{ rows: unknown[] }>;
         const entries = got.value.rows.filter(isEntry);
         /* NO READ FOR AN EMPTY PAGE'S NAME: a list with no rows is said by its id, so one `list` is still one request. */
@@ -2229,6 +2260,8 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       if (!turn.text) return { result: { ok: true, value } };
       const spoken = typeof args.spoken === 'string' && PREFIXED.test(args.spoken.trim()) ? args.spoken.trim() : spokenOf(at.value.register, at.value.seq);
       const words = row.ok && isEntry(row.value) ? titleOf(row.value.fields, decls.get(at.value.register)) : '';
+      /* A LINK THAT CHANGED IS SAID BY THE TWO ROWS' NAMES, so they are named before the lines are said. */
+      await handlesNamed(linksIn(events, () => at.value.register), ctx, turn);
       return {
         result: { ok: true, value },
         say: (look) => historyBrief(spoken, at.value.register, words, value, look),
@@ -2272,6 +2305,8 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       });
       if (!out.ok) return { result: out };
       const page = out.value as Page;
+      /* AND A CHANGED LINK IS SAID AS A HISTORY SAYS IT, each line by its own list. */
+      if (turn.text) await handlesNamed(linksIn(page.rows.filter(isObject), (_e, i) => lists[i]), ctx, turn);
       return { result: out, say: (look) => cutSaid('activity', args, ACTIVITY_MOST, page, (p) => activityBrief(args, p, look, lists)), names: { people: peopleIn(page.rows), runs: actorsIn(page.rows) } };
     },
 
@@ -2785,6 +2820,34 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
   }
 
   /**
+   * `title` or `name` written to a list that has no such field, answered with the list's own title field: the refusal
+   * with one more sentence, "This list's title is its <label> field.", and the call with that field as its `try`.
+   *
+   * `title` IS THE WORD AN AGENT REACHES FOR, and it is a reserved field id, so no list has it and the record's sentence
+   * names no field to use in its place. The list is read as the caller may read it, so a list it cannot open is told
+   * nothing more than a missing one. No call is handed where the title field was sent as well: one value would go.
+   */
+  async function titleFor(name: string, args: Args, refusal: Refusal, ctx: C): Promise<Refusal> {
+    if (refusal.code !== 'FIELD_UNKNOWN' || (refusal.at !== 'title' && refusal.at !== 'name')) return refusal;
+    const key = name === 'update' ? 'patch' : name === 'create' || name === 'triage' ? 'fields' : null;
+    const fields = key === null ? null : args[key];
+    if (key === null || !isObject(fields) || !Object.hasOwn(fields, refusal.at)) return refusal;
+    const at = name === 'update' ? await locate(args.spoken, ctx) : null;
+    const register = at === null ? args.register : at.ok ? at.value.register : undefined;
+    if (typeof register !== 'string') return refusal;
+    if (!decls.has(register)) await learnPrefix(register, ctx);
+    const decl = decls.get(register);
+    const title = decl?.title;
+    const field = title === undefined ? undefined : decl?.fields.find((f) => f.id === title);
+    if (title === undefined || field === undefined || title === refusal.at) return refusal;
+    const label = field.label ?? title.replace(/_/gu, ' ');
+    const told = { ...refusal, fix: `${refusal.fix} This list's title is its ${label.slice(0, 1).toUpperCase() + label.slice(1)} field.` } as Refusal;
+    if (Object.hasOwn(fields, title)) return told;
+    const { [refusal.at]: was, ...rest } = fields;
+    return taught(told, callOf(name, { ...args, [key]: { [title]: was, ...rest } }));
+  }
+
+  /**
    * One tool's answer, whole: the record's answer shaped as the full JSON, which travels as `structuredContent`, and the
    * text an agent reads, plain labelled lines unless `format: "full"` asks for the JSON there as well.
    *
@@ -2823,6 +2886,9 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     const done = await tool(sent, ctx, turn);
     let result = done.result;
     if (refused(result)) {
+      /* THE LIST'S TITLE FIRST: `name` is otherwise handed the field spelled most like it, which is rarely the title. */
+      const titled = await titleFor(name, sent, result.refusal, ctx);
+      if (titled !== result.refusal) result = { ok: false, refusal: titled };
       const fix = await tryFor(name, sent, result.refusal, ctx, turn);
       /* A `try` THAT IS THE CALL JUST MADE IS NO TRY: the instructions say never to send a call again unchanged. */
       if (fix !== undefined && fix !== callOf(name, sent) && (result.refusal as { try?: unknown }).try === undefined)

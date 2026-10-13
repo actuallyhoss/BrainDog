@@ -74,6 +74,7 @@ import { instant } from './migrate.ts';
 import { evaluateMetric, predicateOf, type EvalContext, type MetricDecl } from './metrics.ts';
 import { FIGURE, WITHHELD } from './figure.ts';
 import { enqueue } from './outbox.ts';
+import type { RunBy } from './pages.ts';
 import type { MeetArgs, Met } from './people.ts';
 import { intervalMs } from './pull.ts';
 import {
@@ -194,6 +195,12 @@ export type FlowDeps = {
    * the step with a sentence rather than parking a run on a call nobody queued.
    */
   call?: ((ingest: string, a: { rule: string; entry: Entry | null; run: string; step: number }) => CallQueued) | undefined;
+  /**
+   * The run that made a row, read from the row's own `create` line and that run's row (`RunBy` in `pages.ts`), or
+   * `null` where a person, a rule, an import or the record made it. What a script a rule starts is handed as `made_by`.
+   * OPTIONAL: a runner built without it hands no `made_by`, and a script then reads a row as made by nobody it knows.
+   */
+  madeBy?: ((row: Entry) => RunBy | null) | undefined;
   /**
    * Meet one person as the rule: `people.ts`'s `meet` over the list that plays `meets:`, writing as `actor` (`rule:<id>`)
    * and linking the person to the run's `project`, so the match, the dated line saying where they were met and the
@@ -1756,7 +1763,12 @@ function startScript(
       ok: false,
       say: `rule.${rule}'s script at step ${n + 1} hands on ${handed.secret}, which holds what a secret or file field holds, and a script's input never carries one. Nothing was queued; the steps before it were taken.`,
     };
-  const input = { ...(row ? { id: row.id, register: row.register, seq: row.seq } : {}), ...handed.action };
+  /* WHO MADE THE ROW, WHEN A RUN DID, AS `made_by`: the maker by the row's own `create` line and never the run's actor,
+     so it is the maker on an update too. THE RECORD'S WORD AND NEVER THE RULE'S: a rule's own `input:` cannot say it,
+     since what the rule wrote under that name is dropped and the key is there only when a run made the row. */
+  const { made_by: _said, ...own } = handed.action;
+  const maker = row ? (deps.madeBy?.(row) ?? null) : null;
+  const input = { ...(row ? { id: row.id, register: row.register, seq: row.seq } : {}), ...own, ...(maker === null ? {} : { made_by: maker }) };
   /* COMPARED AS JSON TEXT IN THIS PROCESS, not by `json_extract` in SQL: both sides are `JSON.stringify` of an object
      this function built in the same key order, and SQLite's own rendering of an object is not promised to match it. */
   const same = JSON.stringify(input);

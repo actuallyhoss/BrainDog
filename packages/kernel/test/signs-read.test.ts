@@ -41,7 +41,7 @@ test('AN EMPTY RECORD READS NONE ON EVERY SIGN, never green, and the list is the
     ['arrivals-filed', 'numbers-arrive', 'model-answers', 'tools-listed', 'briefing-true', 'questions-by-cause', 'oldest-question', 'runs-true', 'pages-clean', 'arrived',
      'scripts-paused', 'scripts-refused', 'scripts-sourceless', 'automations-failed', 'automations-parked', 'automations-idle', 'automations-stopped-chains',
      'actions-paused', 'actions-held', 'schedule-failed', 'doors-silent', 'arrivals-unverified',
-     'writes-authored', 'format-current', 'amounts-whole'],
+     'writes-authored', 'format-current', 'amounts-whole', 'rate-age'],
   );
   for (const s of signs) {
     assert.equal(s.state, 'none', `${s.sign} read ${s.state} on an empty record`);
@@ -50,7 +50,7 @@ test('AN EMPTY RECORD READS NONE ON EVERY SIGN, never green, and the list is the
     assert.ok(!/[a-z]+-[a-z]+/.test(s.name), `${s.sign}'s name is an id`);
     assert.equal(s.days.length, 14);
   }
-  assert.equal(VITAL_SIGNS.filter((s) => s.read !== null).length, 20);
+  assert.equal(VITAL_SIGNS.filter((s) => s.read !== null).length, 21);
   sql.close();
 });
 

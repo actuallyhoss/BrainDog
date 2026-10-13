@@ -526,6 +526,9 @@ test('THE OWNER’S NAME IN A MAIL IS NOBODY’S EVIDENCE, a no is never asked a
   sql.close();
 
   const two = await record();
+  /* The record mirrors its owner, so which of the two marked rows he signs in with can be told. */
+  two.sql.exec("INSERT OR REPLACE INTO person (id, email, name, suspended_at) VALUES ('p_owner', 'kas@kas.example', NULL, NULL)");
+  two.sql.exec("INSERT OR REPLACE INTO member (person_id, register, level, seen_at) VALUES ('p_owner', '*', 'owner', NULL)");
   value(two.k.create('people', { name: 'Kas', email: 'kas@kas.example', self: true }, OWNER));
   value(two.k.create('people', { name: 'Kas', email: 'kas@other.example', self: true }, OWNER));
   value(two.k.meet({ name: 'Ada Lovelace', email: 'ada@example.com', where: 'commit 1 in braindog' }, AGENT));
