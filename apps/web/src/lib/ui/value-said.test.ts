@@ -33,5 +33,6 @@ test('A VALUE IS OFFERED BY THE LABEL THE RECORD GIVES IT, and by its own word w
 
 test('THE FORM DRAWS BOTH ITS ENUM CONTROLS THROUGH IT, the segmented one and the select', () => {
   assert.equal(FORM.includes('copy.valueWord(value)'), false, 'an option is still drawn without its label');
-  assert.equal(FORM.match(/valueSaid\(f, value\)/gu)?.length, 2);
+  /* The select draws a move (`move.value`) since a move began saying what it asks for; the segmented control still draws `value`. */
+  assert.equal(FORM.match(/valueSaid\(f, (?:move\.)?value\)/gu)?.length, 2);
 });

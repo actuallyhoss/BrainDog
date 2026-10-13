@@ -297,3 +297,38 @@ test('THE ENVELOPE IS THE EXIT CODE READ BACK: four answers, and the order they 
   c.answer({ conflict: { version: 4, current: { id: 'x' }, actor: 'someone' } });
   assert.deepEqual(c.envelope(2), { ok: false, conflict: { version: 4, current: { id: 'x' }, actor: 'someone' } });
 });
+
+test('keys list TAKES THE FLAG AS keys put DOES: one document, and a refusal is in it', async (t) => {
+  const h = await setup(t);
+  const out = await ran(['keys', 'list', '--json'], h.env, h.dir);
+  assert.equal(out.code, 1, out.stderr);
+  /* One line and one document: the verb's own lines and its own envelope are not printed beside main's. */
+  assert.equal(out.stdout.trim().split('\n').length, 1, out.stdout);
+  assert.equal(document(out).ok, false);
+});
+
+test('doctor PRINTS ITS LINES, OR ITS REPORT AS THE DOCUMENT, and exits 1 when anything is listed', async (t) => {
+  const h = await setup(t);
+  const { mkdirSync, writeFileSync } = await import('node:fs');
+  /* A home with one profile that holds neither BrainDog's server nor a hook, so one thing at least is listed. */
+  mkdirSync(join(h.dir, '.claude'), { recursive: true });
+  writeFileSync(join(h.dir, '.claude', 'settings.json'), '{}\n');
+  const env = { ...h.env, HOME: h.dir, USERPROFILE: h.dir, CLAUDE_CONFIG_DIR: '' };
+
+  const plain = await ran(['doctor'], env, h.dir);
+  assert.equal(plain.code, 1, plain.stderr);
+  assert.match(plain.stdout, /BrainDog's server is not registered/);
+
+  const doc = await ran(['doctor', '--json'], env, h.dir);
+  assert.equal(doc.code, 1, doc.stderr);
+  const report = document(doc) as { ok: boolean; value: { places: { kind: string }[]; profiles: unknown[] } };
+  assert.equal(report.ok, true);
+  assert.equal(report.value.profiles.length, 1);
+  assert.ok(report.value.places.some((p) => p.kind === 'profile'));
+
+  /* An argument it does not take is one sentence and nothing on stdout. */
+  const wrong = await ran(['doctor', '--apply'], env, h.dir);
+  assert.equal(wrong.code, 1);
+  assert.equal(wrong.stdout, '');
+  assert.match(wrong.stderr, /braindog doctor takes --replaced/);
+});

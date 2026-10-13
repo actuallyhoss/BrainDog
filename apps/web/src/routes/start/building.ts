@@ -72,8 +72,9 @@ export const words = {
   alsoHere: 'More it can keep',
   /** What an entry from the sentence is, beside its name. */
   project: 'A project you are building',
-  owedToYou: 'Owed to you',
-  owedByYou: 'You owe it',
+  /** Which way a bill's money goes, in the words Money's own list says it (`direction` on its bills). */
+  moneyIn: 'Money in',
+  moneyOut: 'Money out',
   due: (day: string) => `due ${day}`,
   /** The one question, its heading and what is said beside it. */
   oneQuestion: 'One question',
@@ -146,7 +147,7 @@ export type PartState = 'heard' | 'held' | 'hand' | 'waiting' | 'off';
 export type Entry = {
   key: string;
   title: string;
-  kind: 'project' | 'person' | 'owed';
+  kind: 'project' | 'person' | 'money';
   /** A person's role, a project's state or which way the money goes. */
   detail: string;
   amount: { minor: number; currency: string } | null;
@@ -184,8 +185,8 @@ export function entryOf(row: Proposal['rows'][number]): Entry {
     return {
       key: `${row.register}:${title}`,
       title,
-      kind: 'owed',
-      detail: f.direction === 'owed_to_me' ? words.owedToYou : words.owedByYou,
+      kind: 'money',
+      detail: f.direction === 'owed_to_me' ? words.moneyIn : words.moneyOut,
       amount,
       due: typeof f.due === 'string' ? f.due : null,
     };

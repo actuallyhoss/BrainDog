@@ -703,6 +703,70 @@ test('WHAT THE AUDIT OF BATCH 63 TYPED AS A STRANGER: a "used to" taken up again
   }
 });
 
+test('A THING STOPPED AND TAKEN UP AGAIN CARRIES ON, whichever word stopped it: "stopped", "no longer", "used to", with "now", "still" or "instead"', () => {
+  const lit = (p: ReturnType<typeof propose>, word: RegExp): boolean => p.heard.some((h) => word.test(h.phrase)) || p.places.some((x) => x.phrase !== null && word.test(x.phrase));
+  const orders = (p: ReturnType<typeof propose>): boolean => p.places.some((x) => x.name === 'Orders');
+
+  /* THE THREE SENTENCES, word for word: each keeps its orders. */
+  for (const s of ['I no longer take orders and now track them here', 'I stopped taking orders and now track them here', 'I used to take orders and still track them']) {
+    const p = propose(s, CAIRO);
+    assert.ok(lit(p, /orders/iu) && orders(p), s);
+  }
+  /* AND THE THREE THAT STAY STOPPED: nothing points back, or the clause says when it ended. */
+  for (const s of ['I stopped taking orders as the shop closed', 'I stopped taking orders when I closed the shop']) {
+    const p = propose(`I'm a freelance designer. ${s}`, CAIRO);
+    assert.ok(!lit(p, /orders/iu) && !orders(p), s);
+  }
+  /* The cakes point back at nothing, so the selling of before has stopped: what is heard is the bread sold now. */
+  const bread = 'I used to sell cakes and now sell bread';
+  assert.deepEqual(propose(bread, CAIRO).heard.filter((h) => h.phrase === 'sell').map((h) => h.at?.[0]), [bread.lastIndexOf('sell')], bread);
+  assert.ok(!lit(propose("I'm a freelance designer. I used to sell cakes and now bake bread", CAIRO), /sell/iu), 'cakes sold before and bread baked now is no selling');
+
+  /* "STILL" AND "INSTEAD" ARE WORDS OF NOW, after any of the three ways of stopping. */
+  for (const s of [
+    'I stopped taking orders but I still track them',
+    'I quit taking orders by phone, and instead take them here',
+    'I am done taking orders and invoices and now track them here',
+    'I no longer take orders and still keep them in a notebook',
+    'I no longer take orders but instead track them here',
+    'I used to take orders and instead track them here',
+    'We used to take orders, and we still take them',
+  ]) {
+    assert.ok(lit(propose(s, CAIRO), /orders/iu), s);
+  }
+  assert.ok(lit(propose('I am done taking orders and invoices and now track them here', CAIRO), /invoices/iu), 'a stopped run taken up again is kept whole');
+  assert.ok(lit(propose('I stopped selling candles and now sell them online', CAIRO), /sell/iu), 'candles sold online now are sold');
+  assert.ok(lit(propose('I stopped running my shop and now run it online', CAIRO), /shop/iu), 'a shop run online now is a shop');
+
+  /* NOTHING POINTS BACK, no word of now, or what points back is refused or stopped again: still stopped. */
+  for (const s of [
+    'I stopped taking orders and now send invoices',
+    'I stopped taking orders and track them here',
+    'I stopped taking orders and now I do not take them',
+    'I stopped taking orders and still do not want them',
+    'I stopped taking orders and instead I quit taking them',
+    'I used to take orders and still freelance',
+    'I no longer take orders and instead send invoices',
+    'I stopped taking orders as my shop shut',
+    'I quit taking orders as we moved',
+  ]) {
+    const p = propose(`I'm a freelance designer. ${s}`, CAIRO);
+    assert.ok(!lit(p, /orders/iu) && !orders(p), s);
+  }
+  /* THE THING THAT ENDED IS GONE WITH IT, said as what closed and not as what somebody closed. */
+  for (const s of ['I stopped taking orders as the shop closed', 'I stopped taking orders once the stall shut', 'I quit taking orders after my old shop was sold']) {
+    const p = propose(`I'm a freelance designer. ${s}`, CAIRO);
+    assert.ok(!lit(p, /shop|stall/iu) && p.usecase !== 'shop', s);
+  }
+  for (const s of ['My shop closed early on Friday', 'I take orders when the shop is shut', 'I pack orders after the shop closed on Friday', 'The shop closed']) {
+    assert.ok(lit(propose(s, CAIRO), /shop/iu), s);
+  }
+  /* "AS" BEFORE HOW IT IS DONE keeps the thing, as "after hours" does. */
+  for (const s of ['I stopped taking orders as a favour', 'I stopped taking orders as often']) {
+    assert.ok(lit(propose(s, CAIRO), /orders/iu), s);
+  }
+});
+
 test("A SENTENCE THAT OPENS WITH A REFUSAL NAMES NOBODY: Don't need orders, I freelance as a designer", () => {
   const typed = "Don't need orders, I freelance as a designer";
   const p = propose(typed, CAIRO);

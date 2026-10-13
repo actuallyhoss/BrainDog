@@ -257,8 +257,34 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.2.0",
+      "latest": "1.3.0",
       "versions": [
+        {
+          "version": "1.3.0",
+          "checksum": "d96b5d3701ee5936d29a8bc272d63b0ca24ae009b92dbedff7c0695e1a106c2e",
+          "bytes": 13934,
+          "published_at": "2026-10-13T15:55:29.833Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Cash counts"
+            ],
+            "pages": [
+              "Cash counts"
+            ],
+            "rules": [
+              "Write the difference of each count"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "An account that holds a cleared entry in another currency since it was last stated is no longer compared. The count is kept and says so under What happened, and no balance check and no difference are written, where before the entry was left out and a difference equal to it could be filed. An account whose entries are all in one currency is counted as before.",
+          "preview": true
+        },
         {
           "version": "1.2.0",
           "checksum": "3eeb23e56548a5f8430552608d89c14c2be661d2b2c1e0e017bfff7063b8fa01",
@@ -1195,6 +1221,59 @@
       ],
       "categories": [
         "connectors",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      }
+    },
+    {
+      "kind": "pack",
+      "id": "money-watch",
+      "title": "Money watch",
+      "summary": "Reads the Ledger for a charge made twice and a payment that repeats, and asks you once about each. A flag you say no to three times in a row switches itself off.",
+      "author": "BrainDog",
+      "license": "Apache-2.0",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "de447fe8387492a49229af7cb3836063e8c58085e82e441848f62eba2099c684",
+          "bytes": 34485,
+          "published_at": "2026-10-13T15:55:29.833Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Money watch"
+            ],
+            "pages": [
+              "Money watch"
+            ],
+            "rules": [
+              "Look for a charge made twice when an entry clears",
+              "Ask about a charge made twice",
+              "Act on an answer about a charge made twice",
+              "Look for a payment that repeats when an entry clears",
+              "Ask about a payment that repeats",
+              "Act on an answer about a payment that repeats"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The first version: Charged twice and Looks like it repeats, each with its own switch.",
+          "preview": true
+        }
+      ],
+      "categories": [
+        "modules",
+        "automations",
         "made-by-braindog"
       ],
       "publisher": {

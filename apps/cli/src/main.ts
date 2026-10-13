@@ -48,6 +48,7 @@ import { understandCommand } from './understand.ts';
 import { signsCommand } from './signs.ts';
 import { AGENTS, isAgent, positionOf, sessionHeaders, type ClientInfo } from './position.ts';
 import { context } from './context.ts';
+import { doctor } from './doctor.ts';
 import { session } from './session.ts';
 import { skills } from './skills.ts';
 import { signedOutFix, signedOutSurface } from './signed-out.ts';
@@ -175,6 +176,8 @@ const usage = () =>
     '  With --vault it asks for a grant that opens the keys of one project, or with * the keys of no project.',
     'braindog logout [<host>] [--host <host>]',
     "  Remove this machine's token, runner token and vault grants for one host from the hosts file. Nothing is sent, and the host is not told.",
+    'braindog keys list [--project <name>] [--everywhere] [--json] [--host <host>]',
+    '  The keys your record holds, one line each: what each opens, where it applies, whether it is sealed, and the day it expires. Never a value.',
     'braindog keys put <label> [--opens <what>] [--kind <kind>] [--vault <project>] [--host <host>]',
     '  Deposit the value on standard input as a key. The host seals it, and it is never an argument.',
     'braindog keys exec <label | credentials#n> [--as <ENV_NAME>] [--vault <project>] [--host <host>] -- <command> [args...]',
@@ -275,6 +278,8 @@ const usage = () =>
     '  What Claude Code runs when a session starts and ends, with its event on standard input. Once a day the start hook also says when this command is older than the host needs; it never updates by itself.',
     'braindog install [--apply] [--replace <replace.json>] [--config-dir <folder>] [--settings <file>] [--mcp-json <file>]',
     "  Show the two hooks it would add to Claude Code's settings (a profile folder, or one settings file such as a project's .claude/settings.local.json), and write them only with --apply. It also places BrainDog's Agent Skill in each profile's skills/braindog/. With --replace it also takes out the hooks, MCP servers and skills the replace file names as an old tool's, and says which, and from a .mcp.json only when it is named with --mcp-json and is outside any repository.",
+    'braindog doctor [--replaced <replace.json>] [--under <folder>] [--config-dir <folder>] [--json]',
+    "  Read this machine and list, by file and entry, what still names a tool BrainDog replaced, what holds something shaped like a key, and each profile missing BrainDog's server or a hook. It changes nothing and shows no value, and exits 1 when anything is listed.",
     'braindog verify <file> [--key <pubkey|url>]',
     "  Check a .brainl file on this machine: its format, every table against its manifest, and its signature, against the key you name when you name one. Nothing is sent, but for fetching a key from an address.",
     'braindog runner enrol <host>',
@@ -406,7 +411,7 @@ async function signIn(args: string[]): Promise<void> {
   setTimeout(() => process.exit(code), 1_000).unref();
 }
 
-/** `braindog keys put|exec|headers`, over the real terminal, and the exit code `keys` decides. */
+/** `braindog keys list|put|exec|headers`, over the real terminal, and the exit code `keys` decides. */
 async function keysCommand(args: string[]): Promise<void> {
   const cwd = process.cwd();
   const code = await keys(args, {
@@ -422,6 +427,8 @@ async function keysCommand(args: string[]): Promise<void> {
       }
     },
     say: json ? json.say : say,
+    /* `list` alone prints lines: kept for the one document under `--json`, and `keys`'s own stdout line otherwise. */
+    out: json ? json.out : undefined,
     answer: json?.answer,
     spawn: spawnInherit,
     /* The run the session file names, sent only to the host that wrote it and only while it is the caller's, as `mcp` does. */
@@ -612,6 +619,23 @@ async function hook(args: string[]): Promise<void> {
   setTimeout(() => process.exit(0), 1_000).unref();
 }
 
+/**
+ * `braindog doctor`: what on this machine still names a replaced tool, holds something shaped like a key, or lacks
+ * BrainDog's server or a hook. IT READS AND CHANGES NOTHING, and exits 1 when anything is listed, which is an answer and
+ * no failure: under `--json` the document is the report either way.
+ */
+function doctorCommand(args: string[]): void {
+  let result: ReturnType<typeof doctor>;
+  try {
+    result = doctor(args);
+  } catch (e) {
+    return stop(e instanceof Error ? e.message : String(e));
+  }
+  if (json) emit({ ok: true, value: result.report });
+  else process.stdout.write(`${result.lines.join('\n')}\n`);
+  process.exitCode = result.code;
+}
+
 function install(args: string[]): void {
   let values: { apply?: boolean | undefined; replace?: string | undefined; 'config-dir'?: string[] | undefined; settings?: string[] | undefined; 'mcp-json'?: string[] | undefined };
   try {
@@ -691,14 +715,14 @@ function install(args: string[]): void {
  * program reads from stdout, and the first prints for a person while its first step may wait for six digits
  * (`setupCommand`, `48 §5.15`, `§5.16`). Both refuse the flag through their own strict `parseArgs`.
  */
-const JSON_COMMANDS = new Set(['--version', '-v', 'help', '--help', '-h', 'login', 'logout', 'skills', 'tools', 'page', 'usecase', 'pack', 'kennel', 'import', 'export', 'token', 'context', 'session', 'automations', 'scripts', 'install', 'verify', 'runner', 'people', 'understand', 'signs', 'private-terms']);
+const JSON_COMMANDS = new Set(['--version', '-v', 'help', '--help', '-h', 'login', 'logout', 'skills', 'tools', 'page', 'usecase', 'pack', 'kennel', 'import', 'export', 'token', 'context', 'session', 'automations', 'scripts', 'install', 'verify', 'runner', 'people', 'understand', 'signs', 'private-terms', 'doctor']);
 
 const [command, ...rest] = process.argv.slice(2);
 /* ONE DECISION, TAKEN BEFORE DISPATCH (`48 §4.5`, `json.ts`): the flag is answered here and removed,
    so no command's own `parseArgs` has to know a global exists. */
 const cut = takeJson(rest);
-/* `keys put` IS THE ONE VERB OF ITS COMMAND THAT HAS AN ANSWER: it deposits a key and reports which
-   credential row it became. `keys exec` hands stdout to a child process and takes no envelope (§4.5),
+/* `keys put` AND `keys list` ARE THE TWO VERBS OF THEIR COMMAND THAT HAVE AN ANSWER: the first deposits a key and reports which
+   credential row it became, and the second reads the keys the record holds, never a value. `keys exec` hands stdout to a child process and takes no envelope (§4.5),
    and `keys headers` prints the one header document a program reads there, so the flag is offered on
    the verb rather than on the command. */
 /* `usecase preview`, AND `pack preview` BESIDE IT, IS A SEVENTH COMMAND WITH NOTHING TO PUT IN AN ENVELOPE, for the reason §4.5 gives
@@ -708,7 +732,7 @@ const cut = takeJson(rest);
    it, and `JSON.parse` over that buffer throws. Left out of the flag, the verb's own strict
    `parseArgs` refuses `--json` in its own words, exactly as `keys exec` does. */
 const noEnvelope = (command === 'usecase' || command === 'pack') && rest[0] === 'preview';
-const takesJson = !noEnvelope && (JSON_COMMANDS.has(command ?? '') || (command === 'keys' && rest[0] === 'put'));
+const takesJson = !noEnvelope && (JSON_COMMANDS.has(command ?? '') || (command === 'keys' && (rest[0] === 'put' || rest[0] === 'list')));
 const args = takesJson ? cut.rest : rest;
 if (takesJson && cut.json) json = machine(say);
 try {
@@ -741,6 +765,7 @@ try {
   else if (command === 'skills' || command === 'tools' || command === 'page' || command === 'usecase' || command === 'pack' || command === 'kennel' || command === 'import' || command === 'context' || command === 'session' || command === 'automations' || command === 'scripts' || command === 'verify' || command === 'people' || command === 'understand' || command === 'signs' || command === 'feed' || command === 'private-terms') await agentCommand(command, args);
   else if (command === 'hook') await hook(rest);
   else if (command === 'install') install(args);
+  else if (command === 'doctor') doctorCommand(args);
   /* THE FILE IT REPLACES IS THIS ONE: in the bundle every module is the one file, and from a checkout `build()` says
      `dev+0000000` and `update` refuses before it touches anything. */
   else if (command === 'update') process.exitCode = await update(rest, { file: fileURLToPath(import.meta.url), build: build(), env: process.env, out: (line) => process.stdout.write(`${line}\n`), err: say });

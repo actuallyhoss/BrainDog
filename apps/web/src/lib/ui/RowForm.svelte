@@ -23,7 +23,7 @@
   import type { FieldDecl, Fields } from '../record/schema.ts';
   import { exponentOf } from 'braindog-render';
   import { amountWrong, currencyTypedIn, moneyTyped } from './money-typed.ts';
-  import { movesFrom } from './row-form-moves.ts';
+  import { moveWord, movesWith, type Move } from './row-form-moves.ts';
   import { copy } from '../copy.ts';
   import { valueSaid } from '../voice.ts';
   import { firstAsks } from '../first-run.ts';
@@ -187,8 +187,25 @@
    * FORM OPENED (`values`), never by what is typed: a press can then be taken back before it is saved. A new row and
    * the first run hold nothing, and may start anywhere.
    */
-  const offered = (f: FieldDecl): readonly string[] =>
-    movesFrom(f, !first && f.id === decl?.state ? values?.[f.id] : undefined);
+  const offered = (f: FieldDecl): readonly Move[] =>
+    movesWith(f, !first && f.id === decl?.state ? values?.[f.id] : undefined);
+
+  /**
+   * THE WORD BESIDE A MOVE: "needs a reason", or "asks Decide" for one only a decision makes. They were offered bare,
+   * and the record's refusal was the first anybody heard of either.
+   *
+   * A REASON ALREADY GIVEN IS NOT ASKED FOR AGAIN. The record wants the field filled, on the row or in this save, so
+   * the word goes once it is: said by the list's own label for it, never by its id.
+   */
+  const filled = (field: string): boolean => (typed[field] ?? '').trim() !== '' || (values?.[field] ?? '') !== '';
+  const word = (m: Move): string => {
+    if (!m.byDecision && m.needs !== undefined && filled(m.needs)) return '';
+    return moveWord(m, (field) => {
+      const named = fields.find((f) => f.id === field);
+      /* A field this form does not draw has no label here, and an id is never the word. */
+      return named ? labelOf(named) : copy.anotherField;
+    });
+  };
 
   /**
    * WHAT A PERSON TYPES INTO A MONEY FIELD IS HELD AS TEXT AND CHECKED AS THEY TYPE IT. The input
@@ -382,7 +399,8 @@
           is one press from every other, so there is nothing to protect a reader from.
         -->
         <div class="segmented" role="radiogroup" aria-labelledby={labelId(f)}>
-          {#each offered(f) as value, i}
+          {#each offered(f) as move, i}
+            {@const value = move.value}
             <button
               type="button"
               class="segment"
@@ -400,17 +418,20 @@
                    with ends, and stopping at one would make the last value the expensive one. */
                 const next = values[(i + step + values.length) % values.length];
                 if (next === undefined) return;
-                typed = { ...typed, [f.id]: next };
+                typed = { ...typed, [f.id]: next.value };
                 (e.currentTarget.parentElement?.children[(i + step + values.length) % values.length] as HTMLElement | undefined)?.focus();
               }}
             >
-              {valueSaid(f, value)}
+              {valueSaid(f, value)}{#if word(move)}<span class="move-word">{word(move)}</span>{/if}
             </button>
           {/each}
         </div>
       {:else if f.type === 'enum'}
         <select class="row-input" id={id(f)} required={f.required} bind:value={typed[f.id]}>
-          {#each offered(f) as value}<option value={value}>{valueSaid(f, value)}</option>{/each}
+          {#each offered(f) as move}
+            <!-- An option cannot hold muted text, so the word follows the value after a comma. -->
+            <option value={move.value}>{valueSaid(f, move.value)}{word(move) ? `, ${word(move)}` : ''}</option>
+          {/each}
         </select>
       {:else if f.type === 'ref'}
         <select class="row-input" id={id(f)} required={f.required} bind:value={typed[f.id]}>
@@ -502,6 +523,14 @@
     margin-block: var(--sp-1) 0;
     color: var(--danger-text);
     font-size: var(--t-sm);
+  }
+
+  /* WHAT A MOVE ASKS FOR, muted beside its value: said in words, so it reads the same on the chosen segment. */
+  .move-word {
+    margin-inline-start: var(--sp-2);
+    color: var(--dim);
+    font-size: var(--t-sm);
+    font-weight: 400;
   }
 
   .row-required {

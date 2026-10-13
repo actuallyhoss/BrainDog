@@ -491,6 +491,8 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   ids, which the script reads as well as a handle. The bill is part paid with the sum so far, or paid with the day;
  *   only cleared money is counted. Nothing starts it for an instalment or a repeating line: Settles points at Bills
  *   alone. A rule and a script added inside the unreleased step, so no version of its own.
+ *   One more sign of life (repeating-overdue-67, REC-B11 step 8): `repeating-overdue`, how many live repeating lines
+ *   have a Next more than three days gone, with nought the target. A figure added inside the unreleased step.
  * - portfolio 1.16.0 and work 1.18.0 (batch 46, REC-C08's remainder and REC-C16): a project others point at stays. Projects
  *   declares `delete: refuse_while_referenced`, as Accounts does, so a project a task, a bill, a service or a person names
  *   is not deleted out from under them, and the refusal names the lists and how many. Under What each one earns, one

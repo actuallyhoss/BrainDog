@@ -8,6 +8,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
 import { foundIn, joined, judge, keepIt, PASSKEY, tracesOf } from '../expect/keep-it.mjs';
@@ -25,6 +26,9 @@ const thenDo = (after) => (fetch, c) => async (url, init) => {
   if (String(url).endsWith('/auth/signup/start')) after(c);
   return res;
 };
+
+/** A tab whose calls to `path` are never answered: the door the walk's own limit must end. */
+const never = (path) => (fetch) => (url, init) => (String(url).endsWith(path) ? new Promise(() => {}) : fetch(url, init));
 
 test('MARIAM KEEPS IT: the link carries her sentence, opens "Mariam\'s Candles", and the sentence is kept nowhere', async () => {
   let c = null;
@@ -120,4 +124,32 @@ test('first-run\'s step 4 takes this walk only where it said "not walked"', () =
   assert.equal(joined(selfHost, { ...hosted, pass: false }).pass, false);
   const red = { id: 'keep', pass: false, saw: 'no orders on the record' };
   assert.equal(joined(red, hosted), red);
+});
+
+for (const [path, step] of [
+  ['/auth/signup/start', /starting sign-up/u],
+  ['/auth/signup/verify', /mailed link/u],
+  ['/account/billing/checkout', /free record/u],
+]) {
+  test('A DOOR THAT NEVER ANSWERS IS RED BY ITS STEP: ' + path, { timeout: 10_000 }, async () => {
+    const r = await keepIt(MARIAM, { wrap: never(path), limit: 600 });
+    assert.equal(r.pass, false);
+    assert.match(r.saw, /the walk stopped at/u);
+    assert.match(r.saw, step);
+  });
+}
+
+/* RED BEFORE: run as a command the file left in a second with Node's exit code 13 and no line, each of it and
+   first-run.mjs waiting on the other at the top of the file. */
+test('RUN AS A COMMAND, keep-it prints step 4 and exits 0 or 1', { timeout: 70_000 }, () => {
+  const r = spawnSync(process.execPath, [new URL('../expect/keep-it.mjs', import.meta.url).pathname], { encoding: 'utf8', timeout: 60_000 });
+  assert.match(r.stdout, /^4\. .+: (green|red)\. /mu);
+  assert.equal(r.status, /: green\. /u.test(r.stdout) ? 0 : 1);
+});
+
+test('the judge says a stall alone', () => {
+  const r = judge({ stalled: { step: 'opening the new record', ms: 30_000 }, started: { ok: true }, link: 'https://x/#verify=a', carried: MARIAM.said.trim(), verified: { ok: false }, made: { ok: false }, opened: { ok: false }, name: null, kept: [] }, MARIAM, TITLE);
+  assert.equal(r.pass, false);
+  assert.match(r.saw, /no answer in 30 s/u);
+  assert.doesNotMatch(r.saw, /refused|undefined/u);
 });

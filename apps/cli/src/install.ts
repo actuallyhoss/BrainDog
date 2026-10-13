@@ -691,7 +691,7 @@ const HIDDEN = '[hidden]';
  * run. A key of letters alone, eight or more, still shows; nothing in a name's shape tells it from a word, which is
  * why `describe` shows no argument at all.
  */
-const looksLikeToken = (piece: string) =>
+export const looksLikeToken = (piece: string) =>
   /^(?:hb|sk|pk|rk|ghp|gho|ghs|ghu|github_pat|glpat|xox[a-z]|rec|AKIA)[_-]/i.test(piece) ||
   piece.length >= 32 ||
   (piece.length >= 16 && /\d/.test(piece) && /[a-z]/i.test(piece)) ||
@@ -755,11 +755,11 @@ function describe(server: Record<string, unknown>): string {
 }
 
 /* The command and its arguments split into words, since an entry may give the whole command as one string. */
-const wordsOf = (server: Record<string, unknown>): string[] =>
+export const wordsOf = (server: Record<string, unknown>): string[] =>
   [server.command, ...(Array.isArray(server.args) ? server.args : [])].filter((s): s is string => typeof s === 'string').flatMap((s) => s.split(/\s+/).filter(Boolean));
 
 /* One of the old tool's hosts, with or without the trailing dot a fully qualified name may carry. */
-function isOldUrl(text: string, r: Replace): boolean {
+export function isOldUrl(text: string, r: Replace): boolean {
   try {
     const url = new URL(text.replace(/^["']+|["']+$/g, ''));
     return (url.protocol === 'https:' || url.protocol === 'http:') && r.hosts.includes(url.hostname.toLowerCase().replace(/\.$/, ''));
@@ -774,7 +774,7 @@ function isOldUrl(text: string, r: Replace): boolean {
  * server from a client older than the HTTP transport. Measured before it was looked for, a profile
  * whose only entry of the old tool's was proxied was reported as registering none, and kept it.
  */
-function isOldServer(server: unknown, r: Replace): server is Record<string, unknown> {
+export function isOldServer(server: unknown, r: Replace): server is Record<string, unknown> {
   if (!isObject(server)) return false;
   if (typeof server.url === 'string' && isOldUrl(server.url, r)) return true;
   const strings = [server.command, ...(Array.isArray(server.args) ? server.args : [])].filter((s): s is string => typeof s === 'string');

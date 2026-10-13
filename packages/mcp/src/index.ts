@@ -452,14 +452,16 @@ export const TOOLS: readonly Tool[] = [
            AND THE CEILING IS 100 NOW, THIS TOOL'S AND NOT THE RECORD'S. A page of 500 rows is an answer no host
            shows a model whole (Claude Code holds a tool result to 25,000 tokens by default), so a call asking more is
            answered 100 and a cursor, and `mcp.test.ts` holds both figures to what this says. */
-        /* A LIST OF SIXTY ROWS OR FEWER IS ANSWERED WHOLE WHEN NO LIMIT IS NAMED (`LIST_WHOLE`), and that is not said
-           here: twenty is still the page of a longer list, the words would pass the 2,760 `budget.test.ts` holds, and an
-           agent that reads a whole list with no cursor has nothing to ask for. */
-        limit: int('1 to 100. Default 20.'),
+        /* A LIST OF SIXTY ROWS OR FEWER IS ANSWERED WHOLE WHEN NO LIMIT IS NAMED (`LIST_WHOLE`), AND THAT IS SAID HERE
+           NOW. "Default 20." was true of a longer list alone, so an agent that asked for none and counted sixty rows
+           had been told twenty. The four tokens it costs are 2,761 against the 2,760 `budget.test.ts` holds, so one
+           came off `fields` below ("answered" became "kept"), and the two together measure 2,760. `search` keeps
+           "Default 20.", which is still the whole truth of it. */
+        limit: int('1 to 100. Up to 60 whole, else 20.'),
         cursor: { type: 'string' },
         /* THE ONE WAY PAST THE CUT, said where it is used. A row's long text stops at 280 characters and the row says
            `clipped: true`, so an agent that needs the whole write-up names its field here or reads the row with `get`. */
-        fields: { type: 'array', items: { type: 'string' }, description: 'Text fields answered whole.' },
+        fields: { type: 'array', items: { type: 'string' }, description: 'Text fields kept whole.' },
         format: FORMAT,
       },
       ['register'],

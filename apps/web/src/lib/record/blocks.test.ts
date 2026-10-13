@@ -525,6 +525,11 @@ test('A LIST THAT HOLDS LINES SAYS ITS WRITTEN LINE ONCE, ABOVE THEM, and only w
   /* EVERY FIGURE NOUGHT IS NO LINE, as over payments typed by hand; one above nought and it is said whole. */
   assert.deepEqual(drawnIn(ledgerOf(rows, { values: { 'filed-today': 0, 'filed-for-you-30d': 0 } })), ['timeline:2']);
   assert.deepEqual(drawnIn(ledgerOf(rows, { values: { 'filed-today': 0, 'filed-for-you-30d': 3 } })), [line, 'timeline:2']);
+  /* A NOUGHT IS A NOUGHT HOWEVER THE RECORD SENT IT, and a nought beside a word is still no figure above nought. */
+  assert.deepEqual(drawnIn(ledgerOf(rows, { values: { 'filed-today': '0', 'filed-for-you-30d': '0.0' } })), ['timeline:2']);
+  assert.deepEqual(drawnIn(ledgerOf(rows, { values: { 'filed-today': 0, 'filed-for-you-30d': 'nobody' } })), ['timeline:2']);
+  assert.deepEqual(drawnIn(ledgerOf(rows, { values: { 'filed-today': '2', 'filed-for-you-30d': 0 } })), [line, 'timeline:2']);
+  assert.deepEqual(drawnIn(ledgerOf(rows, { values: { 'filed-today': 'Dana', 'filed-for-you-30d': 'Kiln' } })), [line, 'timeline:2'], 'answers that are all words are a line as before');
 
   /* WORDS WITH NO FIGURE IN THEM ARE A LINE TOO, and a line of spaces is none. */
   assert.deepEqual(drawnIn(ledgerOf(rows, { body: 'Newest first.', values: undefined })), ['Newest first.', 'timeline:2']);

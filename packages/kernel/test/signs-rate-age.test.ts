@@ -191,6 +191,33 @@ test('NONE, in its own words, with no rate on the record', async () => {
   bare.sql.close();
 });
 
+test('NONE, saying the day, where every rate the record holds is dated ahead', async () => {
+  /* A RATE DATED AHEAD IS HELD BUT NOT IN FORCE: "holds no rate yet" would be untrue of a record that holds one. */
+  const r = await record([LEDGER(ACROSS), FX], [AGO(-3), AGO(-1)]);
+  const got = sign(r.sql);
+  assert.equal(got.state, 'none', got.said);
+  assert.equal(got.value, null);
+  assert.equal(got.said, 'The newest rate is dated 12 October, in 3 days, so none is in force yet and a move between two currencies is not matched by itself.');
+  assert.ok((got.facts ?? []).some((f) => f.includes('Ledger')), `no fact names the list: ${JSON.stringify(got.facts)}`);
+  assert.equal(newestRate(r.sql, AGO(0)), null, 'the pairing reads none either');
+  r.sql.close();
+
+  /* ONE DAY AHEAD IS ONE DAY, and a day in another year says its year. */
+  const one = await record([LEDGER(ACROSS), FX], [AGO(-1)]);
+  assert.match(sign(one.sql).said, /^The newest rate is dated 10 October, in 1 day, /);
+  one.sql.close();
+  const far = await record([LEDGER(ACROSS), FX], ['2027-01-04']);
+  assert.match(sign(far.sql).said, /^The newest rate is dated 4 January 2027, in 87 days, /);
+  far.sql.close();
+
+  /* THE DAY IT COMES INTO FORCE the sign reads it as any other rate. */
+  const due = await record([LEDGER(ACROSS), FX], [AGO(-1)]);
+  const then = sign(due.sql, NOW + 24 * 3_600_000);
+  assert.equal(then.state, 'green', then.said);
+  assert.equal(then.said, 'The newest rate is from 10 October, today.');
+  due.sql.close();
+});
+
 test('NONE, in other words, where no list matches a move between two currencies, however old its rates are', async () => {
   const said = 'No list on this record matches a move between two currencies.';
   for (const decls of [[LEDGER(PAIRS), FX], [LEDGER(), FX], [FX]]) {

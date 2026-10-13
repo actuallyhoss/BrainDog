@@ -41,6 +41,7 @@ import { parseArgs } from 'node:util';
 
 import { hostKey, inTheClear, readHosts, target } from './http.ts';
 import type { Answering } from './json.ts';
+import { keysList } from './keys-list.ts';
 
 /** A key in the clear. */
 type Plaintext = string & { readonly brand: 'Plaintext' };
@@ -57,6 +58,8 @@ export type KeysIo = {
   env: Record<string, string | undefined>;
   /** Standard input read whole, or `null` when it is a terminal and nobody piped anything in. */
   stdin: () => string | null;
+  /** One line to stdout, which `list` alone prints: `process.stdout` unless a test or `--json` keeps the lines. */
+  out?: ((line: string) => void) | undefined;
   /** One line to stderr. */
   say: (line: string) => void;
   /**
@@ -403,11 +406,13 @@ const USAGE_PUT = 'braindog keys put takes one label, --opens, --kind, --vault a
 const USAGE_EXEC = 'braindog keys exec takes one label or spoken id, --as, --vault and --host, then -- and the command to run.';
 const USAGE_HEADERS = 'braindog keys headers takes one spoken id or label, --as with the header name, --vault and --host, and nothing else.';
 
-/** `braindog keys put|exec|headers`, and the exit code: for `exec`, the command's own once it has run. */
+/** `braindog keys list|put|exec|headers`, and the exit code: for `exec`, the command's own once it has run. */
 export async function keys(args: string[], io: KeysIo): Promise<number> {
   const [verb, ...all] = args;
+  /* `list` READS THE INDEX AND OPENS NOTHING, so it has a file and a path of its own (`keys-list.ts`). */
+  if (verb === 'list') return keysList(all, io);
   if (verb !== 'put' && verb !== 'exec' && verb !== 'headers') {
-    io.say('braindog keys takes put <label>, with the value on standard input, exec <label> -- <command>, or headers <credential> --as <Header>.');
+    io.say('braindog keys takes put <label>, with the value on standard input, exec <label> -- <command>, headers <credential> --as <Header>, or list.');
     return REFUSED;
   }
   const usage = verb === 'put' ? USAGE_PUT : verb === 'exec' ? USAGE_EXEC : USAGE_HEADERS;

@@ -92,6 +92,10 @@ test('THE PACK CARRIES count.js AS ITS SOURCE, byte for byte; it fetches nothing
   const file = await readPackFile(TEXT);
   assert.ok(file.ok, fixOf(file));
   assert.equal(file.value.pack.manifest.pack, 'count-cash');
+  /* 1.3.0 BESIDE THE RELEASED 1.2.0: a count can say why it was not compared, a field added and none taken away. */
+  assert.equal(file.value.pack.manifest.version, '1.3.0');
+  const counts = PACK.declarations.find((d) => d.register === 'cash_counts') as { fields: { id: string }[] };
+  assert.deepEqual(counts.fields.map((f) => f.id), ['account', 'counted', 'on', 'difference', 'said', 'note']);
 });
 
 /* ── The script, in QuickJS ────────────────────────────────────────────────────────────────────── */
@@ -132,6 +136,60 @@ test('A COUNT DATED BEFORE THE BALANCE IT WOULD CORRECT IS KEPT AND CHANGES NOTH
   const a = await runInQuickJs(decl(), hostOf(count, BOX));
   assert.deepEqual(writesOf(a), []);
   assert.match(a.log, /Cash box's balance is from 2026-09-20, after this count of 2026-09-18/);
+});
+
+/* ── An entry in another currency (1.3.0) ──────────────────────────────────────────────────────── */
+
+type Leaf = { field: string; is?: Json; gt?: string; lte?: string; present?: boolean };
+
+/** The same double with the lists a count reads: `ctx.record.list` answered from `rows` by the leaves the script asks. */
+const hostWith = (count: Row, account: Row, rows: Row[]): CtxHost => ({
+  ...hostOf(count, account),
+  list: async (register, where) => {
+    const leaves = (where as { all: Leaf[] }).all;
+    const fits = (r: Row, l: Leaf): boolean => {
+      const v = r.fields[l.field];
+      if (l.present === true) return v !== undefined && v !== null;
+      if (l.is !== undefined) return v === l.is;
+      if (l.gt !== undefined) return typeof v === 'string' && v > l.gt;
+      if (l.lte !== undefined) return typeof v === 'string' && v <= l.lte;
+      return true;
+    };
+    return rows.filter((r) => r.register === register && leaves.every((l) => fits(r, l))) as unknown as Json[];
+  },
+});
+
+const moved = (seq: number, on: string, amount: number, currency: string, more: Record<string, Json> = {}): Row =>
+  row(`01K5TXN00000000000000000${String(seq).padStart(2, '0')}`, 'transactions', seq, { what: 'Paid out', on, direction: 'out', amount: { amount, currency }, account: BOX.id, state: 'cleared', ...more });
+
+const NOT_COMPARED = 'This account holds an entry in another currency, so it was not compared.';
+
+test('AN ACCOUNT HOLDING A CLEARED ENTRY IN ANOTHER CURRENCY SINCE ITS STATEMENT IS NOT COMPARED, and the count says so', async () => {
+  /* THE FAULT, MEASURED ON 1.2.0: the box was said to hold 500.00 on the 20th, 20.00 went out in pounds and 87.50 in
+     euros, and a count of 480.00 was "right" to the pound because the script left the euros out, while the record's
+     own roll converts them. A count of 392.50 filed 87.50, a difference equal to the foreign charge. */
+  const count = row('01K5CNT0000000000000000003', 'cash_counts', 3, { account: BOX.id, counted: { amount: 39_250, currency: 'GBP' }, on: '2026-09-25' }, 2);
+  const a = await runInQuickJs(decl(), hostWith(count, BOX, [moved(11, '2026-09-22', 2_000, 'GBP'), moved(12, '2026-09-23', 8_750, 'EUR')]));
+  assert.deepEqual(writesOf(a), [{ op: 'update', spoken: 'cash_counts#3', patch: { said: NOT_COMPARED }, version: 2 }]);
+  assert.match(a.log, /Cash box holds an entry in another currency/);
+});
+
+test('THE SAME ACCOUNT WITH ITS ENTRIES IN ONE CURRENCY IS COMPARED AS IT WAS, and so is one whose foreign entry is older than its statement', async () => {
+  const count = row('01K5CNT0000000000000000004', 'cash_counts', 4, { account: BOX.id, counted: { amount: 47_500, currency: 'GBP' }, on: '2026-09-25' });
+  /* A PENDING ENTRY IN EUROS MOVED NOTHING, and one cleared before the 20th is already inside what the box was said to hold. */
+  const rows = [moved(11, '2026-09-22', 2_000, 'GBP'), moved(12, '2026-09-23', 8_750, 'EUR', { state: 'pending' }), moved(13, '2026-09-19', 900, 'EUR')];
+  const a = await runInQuickJs(decl(), hostWith(count, BOX, rows));
+  const writes = writesOf(a) as unknown as { op: string; register?: string; fields?: Record<string, Json>; patch?: Record<string, Json> }[];
+  assert.deepEqual(
+    writes.map((w) => [w.op, w.register ?? null]),
+    [
+      ['create', 'transactions'],
+      ['create', 'balances'],
+      ['update', null],
+    ],
+  );
+  assert.deepEqual([writes[0]!.fields!.direction, writes[0]!.fields!.amount], ['out', { amount: 500, currency: 'GBP' }]);
+  assert.deepEqual(writes[2]!.patch, { difference: { amount: -500, currency: 'GBP' } });
 });
 
 /* ── The whole path ────────────────────────────────────────────────────────────────────────────── */
@@ -228,14 +286,26 @@ test('THE WHOLE PATH ON A SELF-HOST: a person writes a count, and the record wri
     assert.deepEqual(ledger().map((t) => t.what), ['Cash count difference', 'Cash count difference', 'Stamps']);
     assert.deepEqual(checks().at(-1)?.slice(1, 4), [41_000, 'GBP', '2026-09-29']);
 
-    /* A PERSON EDITS AN OLD COUNT'S NOTE, AND NOTHING RUNS. Four counts, four runs. Checked the other way:
+    /* AN ENTRY IN ANOTHER CURRENCY, AND THE NEXT COUNT IS NOT COMPARED (1.3.0). The record's roll converts the euros and
+       this script cannot, so the count is kept and says why, and the Ledger and the checks stand as they were. */
+    said(await api.create({ register: 'transactions', fields: { what: 'Paper from Lyon', on: '2026-09-30', direction: 'out', amount: { amount: 8_750, currency: 'EUR' }, account: box.id, state: 'cleared' } }, owner));
+    const apart = said<{ id: string }>(await api.create({ register: 'cash_counts', fields: { account: box.id, counted: { amount: 33_000, currency: 'GBP' }, on: '2026-10-01' } }, owner));
+    await settle();
+    assert.deepEqual(ledger().map((t) => t.what), ['Cash count difference', 'Cash count difference', 'Stamps', 'Paper from Lyon']);
+    assert.equal(checks().length, 4);
+    assert.deepEqual(
+      [api.kernel.get(apart.id)?.fields.said, api.kernel.get(apart.id)?.fields.difference ?? null],
+      [NOT_COMPARED, null],
+    );
+
+    /* A PERSON EDITS AN OLD COUNT'S NOTE, AND NOTHING RUNS. Five counts, five runs. Checked the other way:
        with the rule widened to `op: [create, update]`, this edit was one run more. The script's own
        write of the difference was never one, rule or no rule, because the kernel does not start a rule twice on one row
        in one chain; the edit is what `op: [create]` is for. */
     said(await api.update({ register: 'cash_counts', seq: api.kernel.get(short.id)!.seq!, patch: { note: 'Recounted with the till roll.' } }, owner));
     await settle();
     const runs = running.sql.one<{ n: number }>('SELECT count(*) AS n FROM automation_run WHERE rule = ?', RULE.rule)?.n;
-    assert.equal(runs, 4);
+    assert.equal(runs, 5);
   } finally {
     await running.close();
     rmSync(dir, { recursive: true, force: true });

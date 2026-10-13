@@ -9,7 +9,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
@@ -216,4 +216,28 @@ test('the verdict by itself: a second copy of a released version is red, and not
   const other = released();
   other.entries[1].kind = 'usecase';
   assert.equal(verdict(was, other).findings.length, 1);
+});
+
+/*
+ * RED BEFORE: gates.yml's parts and tag.yml's verify job checked out one commit and ran this gate, which cannot read the
+ * released commit there and is red by design. Read as lines at the indents the files are written in, as the workflow
+ * tests under apps/worker/scripts do: no YAML parser is a dependency of this repository.
+ */
+test('EVERY WORKFLOW JOB THAT RUNS THIS GATE CHECKS OUT THE WHOLE HISTORY', () => {
+  const dir = new URL('../../../.github/workflows/', import.meta.url);
+  const running = [];
+  for (const file of readdirSync(dir).filter((f) => f.endsWith('.yml'))) {
+    const jobs = readFileSync(new URL(file, dir), 'utf8').split(/^(?= {2}[a-z][a-z0-9-]*:\s*$)/mu);
+    for (const job of jobs) {
+      /* A run of the gates that could hold this one: not the built selection, and not an `--only` list without it. */
+      const runs = job.split('\n').filter((l) => !/^\s*#/u.test(l) && /pnpm gates|tools\/gates\/run\.mjs/u.test(l) && /\brun:/u.test(l));
+      const holds = runs.some((l) => !/--built\b/u.test(l) && (!/--only\s/u.test(l) || /--only\s+\S*catalogue-immutable/u.test(l)) && !/--except\s+\S*catalogue-immutable/u.test(l));
+      if (!holds) continue;
+      const name = `${file} ${/^ {2}([a-z][a-z0-9-]*):/u.exec(job)?.[1] ?? '?'}`;
+      running.push(name);
+      assert.match(job, /uses: actions\/checkout@[^\n]+\n\s+with:\n\s+fetch-depth: 0\n/u, `${name} runs catalogue-immutable on a shallow checkout`);
+    }
+  }
+  /* The three that run it today, so a pattern that stopped matching anything is red and not a quiet pass. */
+  assert.deepEqual(running.sort(), ['ci.yml gates', 'gates.yml gates-shard', 'tag.yml verify']);
 });

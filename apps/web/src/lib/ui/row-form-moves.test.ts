@@ -75,3 +75,59 @@ test('THE STORED VALUE IS THE ONE READ, so pressing a move does not change what 
   assert.ok(offered.includes('waiting') && offered.includes('done'));
   assert.deepEqual(moves.movesFrom(STATE, 'waiting'), offered);
 });
+
+/* ── the word beside a move ──
+   A MOVE WAS OFFERED WITH NOTHING BESIDE IT, so the way to learn that leaving Holding wants a note, or that only a
+   decision brings a done thread back, was to press it and read the refusal. The record keeps both on the state a row
+   LEAVES (`requires`, `by: 'decide'`), so every move out of that state carries the word and what the row holds does not. */
+
+test('A MOVE THAT ASKS FOR A FIELD SAYS WHICH, on every move out of the state and not on what the row holds', () => {
+  assert.equal(typeof moves.movesWith, 'function', 'row-form-moves.ts exports no movesWith');
+  assert.deepEqual(moves.movesWith(STATE, 'holding'), [
+    { value: 'open', needs: 'note' },
+    { value: 'holding' },
+    { value: 'done', needs: 'note' },
+  ]);
+});
+
+test('A MOVE ONLY A DECISION MAKES SAYS SO', () => {
+  assert.deepEqual(moves.movesWith(STATE, 'done'), [{ value: 'open', byDecision: true }, { value: 'done' }]);
+});
+
+test('A MOVE THAT ASKS FOR NOTHING CARRIES NO WORD, and neither does a row that makes no move', () => {
+  assert.deepEqual(moves.movesWith(STATE, 'waiting'), [{ value: 'open' }, { value: 'waiting' }, { value: 'done' }]);
+  assert.deepEqual(moves.movesWith(STATE, 'dropped'), [{ value: 'dropped' }]);
+  /* A new row starts anywhere, and a state the moves do not name is left free: the record checks neither. */
+  const bare = STATE.values!.map((value) => ({ value }));
+  assert.deepEqual(moves.movesWith(STATE, undefined), bare);
+  assert.deepEqual(moves.movesWith(STATE, ''), bare);
+  assert.deepEqual(moves.movesWith(STATE, 'archived'), bare);
+});
+
+test('BOTH AT ONCE, AND A DECLARATION THAT IS NOT ONE: the first field asked for is named, and junk asks for nothing', () => {
+  const both: FieldDecl = {
+    ...STATE,
+    values: ['a', 'b'],
+    transitions: { a: { to: ['b'], requires: ['why', 'note'], by: 'decide' }, b: { to: ['a'], requires: [] } },
+  };
+  assert.deepEqual(moves.movesWith(both, 'a'), [{ value: 'a' }, { value: 'b', needs: 'why', byDecision: true }]);
+  assert.deepEqual(moves.movesWith(both, 'b'), [{ value: 'a' }, { value: 'b' }]);
+  const junk = { ...both, transitions: { a: { to: ['b'], requires: 'why', by: 7 } } } as unknown as FieldDecl;
+  assert.deepEqual(moves.movesWith(junk, 'a'), [{ value: 'a' }, { value: 'b' }]);
+});
+
+test('WHAT movesWith OFFERS IS WHAT movesFrom OFFERS, value for value', () => {
+  for (const stored of [undefined, null, '', ...STATE.values!, 'parked'])
+    assert.deepEqual(moves.movesWith(STATE, stored).map((m) => m.value), moves.movesFrom(STATE, stored));
+});
+
+test('THE WORD A PERSON READS: a reason by its name, any other field by its label, a decision by the page that makes it', () => {
+  assert.equal(typeof moves.moveWord, 'function', 'row-form-moves.ts exports no moveWord');
+  const label = (id: string) => (id === 'note' ? 'Note' : id);
+  assert.equal(moves.moveWord({ value: 'open' }, label), '');
+  assert.equal(moves.moveWord({ value: 'open', needs: 'why' }, label), 'needs a reason');
+  assert.equal(moves.moveWord({ value: 'open', needs: 'note' }, label), 'needs note');
+  assert.equal(moves.moveWord({ value: 'open', byDecision: true }, label), 'asks Decide');
+  /* A move that wants both is only made by the decision, and the proposal is where the reason goes. */
+  assert.equal(moves.moveWord({ value: 'open', needs: 'why', byDecision: true }, label), 'asks Decide');
+});

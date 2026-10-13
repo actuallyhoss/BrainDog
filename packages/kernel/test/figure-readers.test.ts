@@ -40,6 +40,7 @@ test('EVERY SOURCE THAT IS NO LIST’S HAS ONE READER BY ITS WORD, the door’s 
     'record.keys',
     'record.lists',
     'record.marks',
+    'record.meets',
     'record.paths',
     'record.places',
     'record.rates',

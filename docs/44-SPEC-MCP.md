@@ -935,7 +935,7 @@ order already says and `get` still answers; no `state` beside a field that holds
 text or document field past 280 characters cut there, with `clipped: true` on the row, unless the call names the field
 in `fields`. That took the seed's four projects from 1,624 tokens to 822, because one project's note is 2,368
 characters. It was not enough for 25 rows: counted as a transport sends it, every quote escaped inside the text
-block, 25 seeded tasks cost 2,094. So the tool sends `limit: 20` when the call names none, and says "Default 20"; the
+block, 25 seeded tasks cost 2,094. So the tool sends `limit: 20` when the call names none, and says "Up to 60 whole, else 20" (a list of sixty or fewer is answered whole); the
 record's own default stays 50 and its ceiling 500. Twenty `obligations` still cost 2,287, because each carries a money
 object, a ref and two days: a register of rows that dense wants a smaller `limit` from the agent, and a page projected
 to its title and state is the next step if one is ever needed.

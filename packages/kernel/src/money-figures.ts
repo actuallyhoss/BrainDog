@@ -25,7 +25,7 @@ import { no, ok } from '@braindog/ports';
 import { compile, jsonPath, type Schema } from '@braindog/where';
 
 import { GROUP_CAP } from './buckets.ts';
-import { GOVERNANCE_OPEN, HANDOFFS_OPEN, RECORD_DOOR, RECORD_KEYS, RECORD_LISTS, RECORD_MARKS, RECORD_PATHS, RECORD_PLACES, RECORD_SIGNS, RECORD_VITALS, SESSIONS_WORKING } from './built-in-figures.ts';
+import { GOVERNANCE_OPEN, HANDOFFS_OPEN, RECORD_DOOR, RECORD_KEYS, RECORD_LISTS, RECORD_MARKS, RECORD_PATHS, RECORD_PEOPLE, RECORD_PLACES, RECORD_SIGNS, RECORD_VITALS, SESSIONS_WORKING } from './built-in-figures.ts';
 import { runway, type Leg, type Runway } from './forecast.ts';
 import { RECORD_KEY_SCAN } from './key-scan.ts';
 import { across, type Amount, type Part } from './fx.ts';
@@ -851,6 +851,7 @@ export function figureLists(
     decl.source === RECORD_KEY_SCAN ||
     decl.source === RECORD_LISTS ||
     decl.source === RECORD_MARKS ||
+    decl.source === RECORD_PEOPLE ||
     decl.source === RECORD_PATHS ||
     decl.source === RECORD_PLACES ||
     decl.source === RECORD_VITALS

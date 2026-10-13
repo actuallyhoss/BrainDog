@@ -343,7 +343,7 @@ const QUIETEST_FIRST: Body[] = [
  */
 /** And the two halves of Today's money this week (uc6-money-47), folded into the same unreleased 3.16.0. */
 const WEEK_IN = new Set(['received-7d', 'settled-in-7d']);
-const SIGNS_ADDED = new Set(['ledger-rows-7d', 'ledger-newest-days', 'currencies-held', 'uncategorised-share-30d', 'statement-oldest-days', 'nights-missed-30d']);
+const SIGNS_ADDED = new Set(['ledger-rows-7d', 'ledger-newest-days', 'currencies-held', 'uncategorised-share-30d', 'statement-oldest-days', 'nights-missed-30d', 'repeating-overdue']);
 
 /**
  * AND 3.16.0'S PAYDAYS (REC-B13), folded into the same unreleased step: Repeating's `day_of_month` and `weekend` and

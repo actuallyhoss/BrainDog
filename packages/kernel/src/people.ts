@@ -55,15 +55,18 @@
  * EVERY FIELD'S PATH IS A BOUND PARAMETER, `json_extract(fields, ?)`, since the field ids come from a declaration.
  */
 
+import { countHeldTwiceBy } from './built-in-figures.ts';
 import type { Result, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 
+/* `change-kind.ts` IMPORTS ONLY `roles.ts`, `session.ts` AND `slash.ts`, so it adds no load ring. */
+import { madeByIn } from './change-kind.ts';
 import { instant } from './coerce.ts';
 import { FOLD_HOPS, holderOf, holders, nameKey, noteMention, sourceKeys } from './entities.ts';
 import type { Proposal } from './govern.ts';
 import { UNVERIFIED } from './ingest.ts';
 import { githubOfAddress, isOrganisationAddress, isPublicMail, keyFrom, keyOf, keysOf, kindOfKey, parseFrom, registrable, valueOfKey } from './identity-keys.ts';
-import { LEGACY, PARTS, plays, type MeetsFields, type OrgFields, type Role } from './roles.ts';
+import { LEGACY, PARTS, meetsRole, plays, type MeetsFields, type OrgFields, type Role, type RoleList } from './roles.ts';
 
 /**
  * The list `meet` wrote by name before any list declared `meets:`, and still does while none does. The record's `meet`
@@ -2232,7 +2235,7 @@ export function askSame(deps: PeopleDeps, ids: readonly string[]): Result<{ id: 
  * How many people the record holds more than once, as far as the plain rules can tell: the rows that would go if every
  * plain pair he has not answered were one person (three rows of one name are two), and each row marked as the record's
  * own person beyond the first. A row is counted once: his two rows and a third of his name are two, not three. What the
- * `people-twice` figure counts; nought on a record with no people list.
+ * `held-twice` figure counts; nought on a record with no people list.
  */
 export function peopleTwice(deps: Pick<PeopleDeps, 'sql' | 'list' | 'nameOf' | 'othersRow'>): number {
   const list = deps.list;
@@ -2256,6 +2259,42 @@ export function peopleTwice(deps: Pick<PeopleDeps, 'sql' | 'list' | 'nameOf' | '
   for (const [a, b] of plainPairs(deps, list, false)) join(a.id, b.id);
   return surplus;
 }
+
+/**
+ * `peopleTwice` FOR A READER THAT HOLDS ONLY THE DATABASE, which is all a figure is read with (`readPeopleTwice` in
+ * `built-in-figures.ts`). The three parts the record hands the nightly pass are read here as the record reads them: the
+ * people list from the live declarations (`meetsRole`, so two lists declaring it are none), a row's spoken name from its
+ * list's prefix and number, and another member's row from who its create line names. `null`, never nought, on a record
+ * with no people list: nobody was looked for.
+ */
+export function peopleTwiceIn(sql: Sql): number | null {
+  type Body = RoleList & { seq_prefix?: unknown; fields?: readonly FieldShape[] };
+  const lists = sql
+    .all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'register' AND superseded_at IS NULL AND retired = 0 AND json_valid(body)")
+    .map((r) => JSON.parse(r.body) as Body)
+    .filter((b) => typeof b?.id === 'string');
+  const people = meetsRole(lists);
+  if (people === null) return null;
+  const body = lists.find((b) => b.id === people.register);
+  const prefix = typeof body?.seq_prefix === 'string' && body.seq_prefix !== '' && body.seq_prefix !== '#' ? body.seq_prefix : null;
+  return peopleTwice({
+    sql,
+    list: { ...people, declaredFields: Array.isArray(body?.fields) ? body.fields : [] },
+    /* A PERSON AS A QUESTION'S BODY NAMES THEM (`nameOf` in the record), so a pair he answered is found again. */
+    nameOf: (id) => {
+      const seq = sql.one<{ seq: number | null }>('SELECT seq FROM entry WHERE id = ?', id)?.seq;
+      return seq === undefined || seq === null ? id : prefix === null ? `${people.register}#${seq}` : `${prefix}${seq}`;
+    },
+    /* A MEMBER WHO IS NO OWNER MADE IT (`othersRow` in the record): theirs to merge, so never counted as his to answer. */
+    othersRow: (id) => {
+      const by = madeByIn(sql, id);
+      if (by === null) return false;
+      const levels = sql.all<{ level: string }>('SELECT level FROM member WHERE person_id = ?', by).map((m) => m.level);
+      return levels.length > 0 && !levels.includes('owner');
+    },
+  });
+}
+countHeldTwiceBy(peopleTwiceIn);
 
 /* ── the nightly question to a model ─────────────────────────────────── */
 

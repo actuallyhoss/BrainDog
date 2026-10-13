@@ -1441,7 +1441,7 @@ const DECLARED: Record<string, Version> = {
       metric.ledger-newest-days metric.ledger-rows-7d metric.nights-missed-30d
       metric.net-by-month metric.out-30d metric.out-by-month metric.out-due-by-month metric.overdue metric.owed-by-you
       metric.owed-to-you metric.project-in-by-month metric.project-in-month metric.project-kept-month metric.project-out-by-month
-      metric.project-out-month metric.project-owed metric.received-30d metric.received-7d metric.runs-out-on metric.runway-days metric.settled-in-7d metric.spent-30d
+      metric.project-out-month metric.project-owed metric.received-30d metric.received-7d metric.repeating-overdue metric.runs-out-on metric.runway-days metric.settled-in-7d metric.spent-30d
       metric.spent-by-category-month metric.statement-oldest-days metric.txn-uncategorised metric.uncategorised-share-30d
       page.money page.money-book
       register.accounts register.balances register.books register.categories register.filing_rules register.fx register.installments register.obligations
@@ -1456,7 +1456,7 @@ const DECLARED: Record<string, Version> = {
       metric.spent-last-month metric.spent-by-category-last-month metric.spent-by-category-to-date-last-month metric.spent-vs-last-month
       register.plans rule.part-counts-plan script.plans_from_names
     `,
-    declares: 'e84778f2db7564d6',
+    declares: '6811e7a441a592fa',
     history: [
       "`cash-cross-check` is declared (cash-check-52, REC-A17): Cash now worked out a second way, each cash account walked entry by entry from its newest statement, less Cash now, a currency at a time; no value while no balance is typed -> 73738171ae2405ba",
       'The Money page draws the check (cash-page-54, REC-A17): one tile, Cash now does not add up, while `cash-cross-check` is not nought, and one line while no balance is typed -> e4a453d69795fe22',
@@ -1470,6 +1470,7 @@ const DECLARED: Record<string, Version> = {
       "Folded into the unreleased 3.17.0 (settle-reopen-62, audit 60 claim 2; integrate 62; commit 63423720, the deployed build, holds 3.16.0): a payment made void, or put back to pending, reopens the bill it had paid. `rule.payment-settles` starts on any status (`when: settles is set`), and `script.settle` counts cleared money alone, holds a pending or void payment to paying nothing, and writes a bill back to open or part paid with what its other cleared payments come to; a bill marked paid by hand, with no Paid so far, is left. One rule's `when` and one script's source changed; no id added or taken away -> 0696e982958e4019",
       "Folded into the unreleased 3.17.0 (batch 63, integrate 63; commit 63423720, the deployed build, holds 3.16.0), one fingerprint for five changes: four figures of this month's spending against last, `metric.spent-last-month`, `metric.spent-by-category-last-month`, `metric.spent-by-category-to-date-last-month` and `metric.spent-vs-last-month`, a difference by category against the month before (spend-figures-63, REC-B19 job 2); the Ledger tile reads filed-today and filed-for-you-30d in its written line, a `body` on one block of `page.money` (ledger-by-63, REC-B20 job 3); `metric.filed-for-you-30d` counts an agent, a bank add-on or a rule, not anything but a person, one `where` changed (filing-figures-draw-62-63, audit 61 claim 8); and `script.settle` leaves a Paid so far somebody typed when a pending or void payment paid none of it (audit 62 claim 1); four ids added, none taken away -> 2c10a714a36d7c85",
       "Folded into the unreleased 3.17.0 (plans-list-66, REC-B12 jobs 1 and 2; integrate 66; commit 63423720, the deployed build, holds 3.16.0): a plan is a thing of its own. The list `register.plans` is added before Instalments, `register.installments` gains `plan_row` (Part of, a link to its plan) and `left_after` (Left after, money), `script.plans_from_names` makes one plan for each plan text, links the parts and writes what is left after each, once a day and when `rule.part-counts-plan` hands it a part made or changed -> e84778f2db7564d6",
+      "Folded into the unreleased 3.17.0 (repeating-overdue-67, REC-B11 step 8; integrate 67; commit 63423720, the deployed build, holds 3.16.0): `metric.repeating-overdue`, how many live repeating lines have a Next more than three days gone; a figure added, nothing taken away -> 6811e7a441a592fa",
     ],
   },
   'work@1.17.0': {

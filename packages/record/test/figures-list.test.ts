@@ -67,9 +67,10 @@ test('EVERY FIGURE A PACK DECLARES IS LISTED, late-in among them, each with its 
      3.16.0's categories-against-direction, categories holding money going the other way, made it 77, and money-core 3.17.0's
      cash-cross-check, the cash figure against the ledger, made it 78, and filed-for-you-30d and filed-today, who filed the
      Ledger, made it 80 (filing-figures-61), and the same 3.17.0's four figures of this month's spending against last made
-     it 84 (spend-figures-63). The number is
+     it 84 (spend-figures-63), and the same 3.17.0's repeating-overdue, the repeating lines whose next day has gone by
+     more than three days, made it 85 (repeating-overdue-67). The number is
      asserted so that a pack shipping fewer figures is noticed here rather than read as the gap closing on its own. */
-  assert.equal(declared.length, 84);
+  assert.equal(declared.length, 85);
   const late = listed.find((f) => f.id === 'late-in');
   assert.deepEqual(late, { id: 'late-in', name: 'Late receivables', format: 'money', list: 'obligations', pack: 'money-core', param: false });
   /* AND THE TEMPLATES, which `metric` refuses bare (`REF_UNKNOWN`, "thing is {{it}}") and answers named, as `project-owed:Kiln`:
@@ -161,7 +162,7 @@ test('AND IT IS ROUTED: the client asks the host, READ+, and gets the same list 
   const client = createClient({ base: 'https://braindog.example', fetch });
   const listed = value<Figure[]>(await client.figures());
   assert.deepEqual(listed, value<Figure[]>(await api.figures(owner)));
-  assert.equal(listed.length, 84);
+  assert.equal(listed.length, 85);
   assert.deepEqual(sent, ['GET /api/figures']);
   sql.close();
 });

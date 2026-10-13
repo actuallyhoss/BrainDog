@@ -243,6 +243,12 @@ function daySaid(day: string, today: string): string {
   return new Intl.DateTimeFormat('en-GB', opts).format(Date.parse(`${day}T00:00:00Z`));
 }
 
+/** The last day a stored day can be: asked for the newest rate "on" it, `newestRate` answers the newest dated at all. */
+const DAY_LAST = '9999-12-31';
+
+/** Whole days from `today` to a later stored day. */
+const daysAhead = (today: string, day: string): number => Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
+
 /** The names of the lists that match a move between two currencies (`pairs.across_currency`). */
 function crossing(sql: Sql): string[] {
   const out: string[] = [];
@@ -259,6 +265,8 @@ function crossing(sql: Sql): string[] {
  * NOTHING TO JUDGE BY WHERE NO LIST PAIRS ACROSS CURRENCIES, however old the rates: an old rate there stops nothing, and
  * a figure converted on one says so beside itself (`fx.ts`). And none again with no rate at all, in its own words,
  * since then nothing was ever matched and nothing stopped. THE DAY IS THE RECORD'S, as a pairing reads a leg's day.
+ * A RATE DATED AHEAD IS HELD BUT NOT IN FORCE (`newestRate` leaves it out, as `rateAt` does): where those are all the
+ * record holds, the sign says the day the newest is dated and how far off it is, never that the record holds none.
  */
 function readRateAge(sql: Sql, nowMs: number, tz: string): SignReading {
   const at = crossing(sql);
@@ -266,7 +274,11 @@ function readRateAge(sql: Sql, nowMs: number, tz: string): SignReading {
   const facts = [`${names(at)} ${at.length === 1 ? 'matches' : 'match'} a move between two currencies.`];
   const today = dayIn(nowMs, tz);
   const newest = newestRate(sql, today);
-  if (newest === null) return reading('none', null, 'This record holds no rate yet, so a move between two currencies is not matched by itself.', facts);
+  if (newest === null) {
+    const ahead = newestRate(sql, DAY_LAST);
+    if (ahead === null) return reading('none', null, 'This record holds no rate yet, so a move between two currencies is not matched by itself.', facts);
+    return reading('none', null, `The newest rate is dated ${daySaid(ahead.as_of, today)}, in ${count(daysAhead(today, ahead.as_of), 'day')}, so none is in force yet and a move between two currencies is not matched by itself.`, facts);
+  }
   const said = `The newest rate is from ${daySaid(newest.as_of, today)}, ${newest.days === 0 ? 'today' : `${count(newest.days, 'day')} old`}.`;
   if (newest.days <= RATE_DAYS_MOST) return reading('green', newest.days, said, facts);
   facts.push('Until a newer rate arrives, both sides of such a move stay counted as money out and money in.');

@@ -50,6 +50,21 @@ export const words = {
   retry: 'Retry',
   /** A project this tab could not name is still a project, and never its id. */
   someProject: 'A project',
+  /** The verb on the bar over a selection, and the sheet's title. */
+  moveMany: 'Move to…',
+  /** Under the sheet's title: how many the press moves. */
+  picked: (n: number) => `${n} selected`,
+  movedMany: (n: number, name: string) => `Moved ${n} to ${name}.`,
+  wereThere: (n: number) => (n === 1 ? '1 was already there.' : `${n} were already there.`),
+  allThere: (n: number, name: string) => (n === 1 ? `It was already at ${name}.` : `All ${n} were already at ${name}.`),
+  notMoved: (n: number) => (n === 1 ? '1 did not move.' : `${n} did not move.`),
+  /** The verb on the bar of the list that keeps people: it asks on Decide whether the ones picked are the same one. */
+  foldMany: 'Fold into one',
+  /** The note on the way back, and the sentence once it is done. */
+  movedBack: 'Moved back',
+  backMany: (n: number) => `Moved ${n} back.`,
+  /** The question before several keys are opened to every project, as `widenKey` asks it of one. */
+  widenKeys: (n: number) => (n === 1 ? 'Any machine with a vault grant for every project can open it.' : `Any machine with a vault grant for every project can open all ${n}.`),
 } as const;
 
 /**
@@ -205,11 +220,127 @@ export async function moveScope(
     patch: { [move.field]: move.to?.id ?? null },
     note: words.movedTo(move.to?.name ?? words.everywhere),
   });
+  return movedOf(out, move.version, move.name);
+}
+
+/** What one write answered, as a move reads it: the version it made, or the sentence to say and whether to read again. */
+function movedOf(out: Awaited<ReturnType<MoveClient['update']>>, version: number, name: string): Moved {
   if (out.ok) {
-    const version = (out.value as { version?: unknown } | null)?.version;
-    return { ok: true, version: typeof version === 'number' ? version : move.version + 1 };
+    const made = (out.value as { version?: unknown } | null)?.version;
+    return { ok: true, version: typeof made === 'number' ? made : version + 1 };
   }
-  if ('conflict' in out || out.refusal.code === 'VERSION_STALE') return { ok: false, fix: copy.writeConflict(move.name), stale: true };
+  if ('conflict' in out || out.refusal.code === 'VERSION_STALE') return { ok: false, fix: copy.writeConflict(name), stale: true };
   if (out.refusal.code === 'UNREACHABLE') return { ok: false, fix: copy.writeNotReached, stale: false };
   return { ok: false, fix: out.refusal.fix, stale: false };
 }
+
+/* ── MANY AT ONCE ────────────────────────────────────────────────────────────────────────────────────────────────────
+   The bar over a list's selection moves every one picked with one press (`parts/BulkBar.svelte`). The record has no
+   write that moves several under one name, so the gesture is kept together here: each one is an ordinary edit with the
+   same note, sent one at a time so a refusal is the record's answer about that one, and what comes back is ONE answer
+   with ONE way back, which writes each that moved to where it was at the version its move answered. */
+
+/** The one write a move makes, so a test hands in a client that keeps what it was sent. */
+export type MoveClient = Pick<ReturnType<typeof createClient>, 'update'>;
+
+/** The client a screen moves with, for the record at `base`. */
+export const moverAt = (base: string, io?: Fetch): MoveClient => createClient({ base, ...(io ? { fetch: io } : {}) });
+
+/** One picked: its number, the version the list read, what it holds, and its title for the sentence a conflict says. */
+export type MoveRow = { seq: number; version: number; fields: Readonly<Record<string, unknown>>; name: string };
+
+/**
+ * What a move of many answers. `ask` is the one question, with how many keys the move would open to every project and
+ * nothing written. Otherwise: each that moved with the version it now has, how many were there already, how many the
+ * record refused with the first reason, which of those changed somewhere else first, and the one way back, `null` where
+ * nothing moved or where going back would open a key to every project (a move to be made with its question).
+ */
+export type MovedMany =
+  | { ask: true; widening: number }
+  | { ask: false; moved: { seq: number; version: number }[]; skipped: number; failed: number; fix: string | null; stale: number[]; undo: (() => Promise<MovedMany>) | null };
+
+/** What a field holds as one place, or `null` for everywhere. A ref arrives as its row's number (`remote.ts` `entryOf`). */
+const heldOf = (value: unknown): number | string | null => {
+  const first = Array.isArray(value) ? value[0] : value;
+  return (typeof first === 'number' || typeof first === 'string') && first !== '' ? first : null;
+};
+
+/** Whether what a field holds is this place already, by any of the three ways a place is named. */
+const isAt = (list: string, held: number | string | null, to: Place | null): boolean =>
+  to === null ? held === null : held !== null && (typeof held === 'number' ? `${list}#${held}` === to.ref : held === to.id || held === to.spoken || held === to.ref);
+
+/**
+ * Move every one of `rows` to a project, or to everywhere with `null`, as the person.
+ *
+ * ONE ALREADY THERE IS SKIPPED AND COUNTED, so the sentence can say so and its history gains no line that says nothing.
+ * KEYS GOING TO EVERYWHERE ARE ASKED ABOUT FIRST (`widens`): the call answers `ask` and writes nothing until it is made
+ * again with `confirmed`.
+ */
+export async function moveMany(client: MoveClient, register: string, rows: readonly MoveRow[], to: Place | null, opts: { confirmed?: boolean } = {}): Promise<MovedMany> {
+  const field = scopeFieldOf(register);
+  if (!movable(field)) return { ask: false, moved: [], skipped: 0, failed: rows.length, fix: null, stale: [], undo: null };
+  const sealed = REGISTERS[register]?.fields.some((f) => f.type === 'secret' && !f.retired) ?? false;
+  const going = rows.filter((r) => !isAt(field.to, heldOf(r.fields[field.id]), to));
+  if (sealed && to === null && going.length > 0 && !opts.confirmed) return { ask: true, widening: going.length };
+
+  const landed: { row: MoveRow; version: number; from: number | string | null }[] = [];
+  const stale: number[] = [];
+  let fix: string | null = null;
+  for (const r of going) {
+    const out = movedOf(
+      await client.update({ register, seq: r.seq, version: r.version, patch: { [field.id]: to?.id ?? null }, note: words.movedTo(to?.name ?? words.everywhere) }),
+      r.version,
+      r.name,
+    );
+    if (out.ok) landed.push({ row: r, version: out.version, from: heldOf(r.fields[field.id]) });
+    else {
+      fix ??= out.fix;
+      if (out.stale) stale.push(r.seq);
+    }
+  }
+
+  /* THE WAY BACK, offered only where it asks nothing: one that was everywhere, in a list of keys, goes back by a move
+     with its question and not by an Undo. Each goes back by its place's `<list>#<n>` form, which the kernel takes. */
+  const reopens = sealed && landed.some((l) => l.from === null);
+  const undo =
+    landed.length === 0 || reopens
+      ? null
+      : async (): Promise<MovedMany> => {
+          const back: { seq: number; version: number }[] = [];
+          const lost: number[] = [];
+          let why: string | null = null;
+          for (const l of landed) {
+            const value = l.from === null ? null : typeof l.from === 'number' ? `${field.to}#${l.from}` : l.from;
+            const out = movedOf(
+              await client.update({ register, seq: l.row.seq, version: l.version, patch: { [field.id]: value }, note: words.movedBack }),
+              l.version,
+              l.row.name,
+            );
+            if (out.ok) back.push({ seq: l.row.seq, version: out.version });
+            else {
+              why ??= out.fix;
+              if (out.stale) lost.push(l.row.seq);
+            }
+          }
+          return { ask: false, moved: back, skipped: 0, failed: landed.length - back.length, fix: why, stale: lost, undo: null };
+        };
+  return { ask: false, moved: landed.map((l) => ({ seq: l.row.seq, version: l.version })), skipped: rows.length - going.length, failed: going.length - landed.length, fix, stale, undo };
+}
+
+/**
+ * The one sentence for a move of many: how many moved and where, how many were there already, how many did not move
+ * and the first reason. A count and a name, never a number of the record's own.
+ */
+export function movedSaid(out: Extract<MovedMany, { ask: false }>, to: Place | null): string {
+  const name = to?.name ?? words.everywhere;
+  const said: string[] = [];
+  if (out.moved.length > 0) said.push(words.movedMany(out.moved.length, name));
+  if (out.skipped > 0) said.push(out.moved.length === 0 && out.failed === 0 ? words.allThere(out.skipped, name) : words.wereThere(out.skipped));
+  if (out.failed > 0) said.push(words.notMoved(out.failed));
+  if (out.fix) said.push(out.fix);
+  return said.join(' ');
+}
+
+/** The sentence once an Undo has put them back. */
+export const putBackSaid = (out: Extract<MovedMany, { ask: false }>): string =>
+  [...(out.moved.length > 0 ? [words.backMany(out.moved.length)] : []), ...(out.failed > 0 ? [words.notMoved(out.failed)] : []), ...(out.fix ? [out.fix] : [])].join(' ');

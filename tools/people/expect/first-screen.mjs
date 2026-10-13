@@ -185,3 +185,72 @@ export const firstScreen = {
 
 /** Every check, in order, on one snapshot as one person. */
 export const checkScreen = (snap, person) => Object.values(firstScreen).map((check) => check(snap, person));
+
+/* ── run as a command ─────────────────────────────────────────────────────────────────────────────────── */
+
+/** The checks that read only the words on a screen, so they can be judged with no screen drawn. */
+const WORDS_ONLY = new Set(['no-tour', 'no-count']);
+
+/** Every sentence a table of a page's words holds: its strings and its lists of strings. A sentence built from what
+ *  the person typed (a function) is not one until a screen draws it, so it is left to the rig. */
+const sentencesOf = (table) => Object.values(table).flatMap((v) => (typeof v === 'string' ? [v] : Array.isArray(v) ? v.filter((x) => typeof x === 'string') : []));
+
+/** The first run's own words, as the one screen this file can judge with no rig: what `/start` and sign-up can say. */
+export const wordsScreen = () => ({ path: '/start', text: [...sentencesOf(firstRun), ...sentencesOf(signupWords)] });
+
+/** One check as one line: its name, green, red or not seen, and what it saw. Coloured on a terminal. */
+export function lineOf(r, colour = false) {
+  const [word, code] = r.pass === true ? ['green', 32] : r.pass === false ? ['red', 31] : ['not seen', 33];
+  return `${r.id}: ${colour ? `\u001b[${code}m${word}\u001b[0m` : word}. ${r.saw}`;
+}
+
+/**
+ * Everything the command prints and the code it leaves with, from the screens it was handed (`null` for none) and the
+ * person: a heading a screen, a line a check, and a last line that counts them and says the exit code. 1 when any
+ * check is red, 0 when none is.
+ *
+ * WITH NO SCREEN, only the checks that read words are judged, on the first run's own words; the rest say "not seen",
+ * since a list nobody read and a rail nobody drew prove nothing.
+ */
+export function report(screens, person, colour = false) {
+  const out = [];
+  const all = [];
+  for (const snap of screens ?? [wordsScreen()]) {
+    const judged = checkScreen(snap, person).map((r) => (screens === null && !WORDS_ONLY.has(r.id) ? unseen(r.id, 'no screen was handed in, only the words of the first run') : r));
+    out.push(screens === null ? `The first run's own words (${snap.text.length} sentences), as ${person.name}` : `${snap.path ?? 'a screen with no path'}${snap.width ? ` at ${snap.width} wide` : ''}, as ${person.name}`);
+    for (const r of judged) out.push(`  ${lineOf(r, colour)}`);
+    all.push(...judged);
+  }
+  const n = (v) => all.filter((r) => r.pass === v).length;
+  const code = n(false) > 0 ? 1 : 0;
+  out.push(`${all.length} checks: ${n(true)} green, ${n(false)} red, ${n(null)} not seen. Exit code ${code}.`);
+  return { lines: out, code };
+}
+
+/**
+ * `node tools/people/expect/first-screen.mjs [screen.json] [person.json]`: `screen.json` is one snapshot or a list of
+ * them, as the rig writes them; with none, the first run's own words are judged. Mariam by default. Exit 0 when no
+ * check is red, 1 when one is, 2 when a file could not be read (said in a line, never in silence).
+ */
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const { readFileSync } = await import('node:fs');
+  const [screenFile, personFile = new URL('../mariam.json', import.meta.url).pathname] = process.argv.slice(2);
+  const read = (file, what) => {
+    try {
+      return JSON.parse(readFileSync(file, 'utf8'));
+    } catch (e) {
+      console.log(`first-screen: red. ${what} could not be read: ${e instanceof Error ? e.message : String(e)}. Exit code 2.`);
+      process.exit(2);
+    }
+  };
+  const person = read(personFile, 'the person');
+  const handed = screenFile === undefined ? null : read(screenFile, 'the screen');
+  const screens = handed === null ? null : Array.isArray(handed) ? handed : [handed];
+  if (screens !== null && (screens.length === 0 || screens.some((s) => s === null || typeof s !== 'object'))) {
+    console.log('first-screen: red. the screen file holds no snapshot. Exit code 2.');
+    process.exit(2);
+  }
+  const { lines, code } = report(screens, person, process.stdout.isTTY === true);
+  for (const line of lines) console.log(line);
+  process.exit(code);
+}

@@ -280,11 +280,13 @@ const WHOLE: readonly Whole[] = [
  * came from is gone with it when it is said that way: "I stopped taking orders from my old shop" (`WAS_AT`).
  *
  * A "USED TO" THAT IS TAKEN UP AGAIN CARRIES ON (`TAKEN_UP`): "I used to take orders and now track them here" keeps its
- * orders, because "them" points back at them after a word of now. "NO LONGER" CARRIES ON THE SAME WAY: "I no longer
- * take orders and now track them here" keeps them too. "I used to sell cakes and now sell bread" points back
- * at nothing and has stopped. AND WHEN IT STOPPED ENDS THE CLAUSE AS A WORD OF WHEN DOES (`SINCE_WHEN`): "I stopped
- * taking orders when I closed the shop" has no orders, where "after hours" and "when I am busy" are how it is done.
- * The thing ended there is gone with it (`ENDED`), so that sentence has no shop either.
+ * orders, because "them" points back at them after a word of now ("now", "still", "instead"). "NO LONGER" AND A WORD OF
+ * HAVING STOPPED CARRY ON THE SAME WAY: "I no longer take orders and now track them here" and "I stopped taking orders
+ * and now track them here" keep them too. "I used to sell cakes and now sell bread" points back at nothing and has
+ * stopped. AND WHEN IT STOPPED ENDS THE CLAUSE AS A WORD OF WHEN DOES (`SINCE_WHEN`): "I stopped
+ * taking orders when I closed the shop" and "as the shop closed" have no orders, where "after hours", "as a favour" and
+ * "when I am busy" are how it is done.
+ * The thing ended there is gone with it (`ENDED`, `ENDED_ITSELF`), so neither sentence has a shop either.
  */
 const REFUSES = "no|not|never|without|zero|don['’]?t|do\\s+not|doesn['’]?t|does\\s+not|haven['’]?t|hasn['’]?t|hadn['’]?t";
 /* `send` and its ending apart: the whole word is a field an add-on declares, and the core spells none (the core-names gate). */
@@ -332,19 +334,22 @@ const WHEN = [
   `(?:back\\s+)?in\\s+(?:\\d{4}|${MONTH})`,
   `(?:(?:a\\s+)?(?:few|couple\\s+of|long)\\s+|[\\p{L}\\p{N}]+\\s+)?(?:${SPAN}|while|time)\\s+ago`,
 ].join('|');
-/* What happened and ended it, said after "when", "after" or "once" by somebody and a verb of the past: "when I closed
+/* What happened and ended it, said after "when", "after", "once" or "as" by somebody and a verb of the past: "when I closed
    the shop", "after we moved", "once the stall shut". Never "after hours" or "when I am busy", which go on. */
 const DID = '[\\p{L}]+ed|shut|sold|left|went|quit|lost|had|got|gave|took|became|began|ran|fell|broke|was|were';
-const SINCE_WHEN = `(?:when|after|once)\\s+(?:${SOMEBODY}|(?:the|${OWN})\\s+[\\p{L}\\p{N}'’-]+)\\s+(?:${DID})(?![\\p{L}\\p{N}])`;
+const SINCE_WHEN = `(?:when|after|once|as)\\s+(?:${SOMEBODY}|(?:the|${OWN})\\s+[\\p{L}\\p{N}'’-]+)\\s+(?:${DID})(?![\\p{L}\\p{N}])`;
 /* And the thing that was ended there is gone too: the shop in "when I closed the shop", the stall in "after we sold our stall". */
 const ENDED = new RegExp(
   `(?:^|[^\\p{L}\\p{N}])(?:when|after|once|since)\\s+${SOMEBODY}\\s+(?:closed|shut|sold|left|lost|quit)(?:\\s+(?:down|up))?\\s+(?:(?:the|a|an|${OWN})\\s+)?(?:(?:${PAST})\\s+)*(?:(?:${[...PLAIN].join('|')})\\s+)*$`,
   'iu',
 );
+/* The same thing said as what ended, not as what somebody ended: "as the shop closed", "once my stall shut down".
+   The word of whose it is may be part of the phrase heard ("my shop"), so it is not asked for here. */
+const ENDED_ITSELF = new RegExp(`(?:^|[^\\p{L}\\p{N}])(?:when|after|once|since|as)\\s+(?:(?:the|${OWN})\\s+)?(?:(?:${PAST})\\s+)*(?:(?:${[...PLAIN].join('|')})\\s+)*$`, 'iu');
 const CLAUSE_END = `(?:\\s+(?:${WHEN}))?\\s*(?:$|[^\\p{L}\\p{N}\\s]|(?:and|or|nor|but|so|because|since)(?![\\p{L}\\p{N}])|${SINCE_WHEN})`;
-/* A thing taken up again: a word of now after the clause, then at most four words, none a join or a word of refusal or
+/* A thing taken up again: a word of now ("now", "still", "instead") after the clause, then at most four words, none a join or a word of refusal or
    of stopping, and the word that points back. "them" and "those" point at many, "it" and "that" at one. */
-const NOW = 'now|today|nowadays|these\\s+days|currently';
+const NOW = 'now|today|nowadays|these\\s+days|currently|still|instead';
 const takenUp = (back: string): RegExp =>
   new RegExp(
     `^(?:\\s+(?:${WHEN}))?(?:\\s+(?!(?:and|or|nor|but|so|because|since)(?![\\p{L}\\p{N}]))[\\p{L}\\p{N}'’-]+){0,3}\\s*[,;]?\\s*(?:(?:and|but|so)\\s+)?(?:${SOMEBODY}\\s+)?(?:${NOW})\\s+(?:(?!(?:${DENIES}|done|finished|stopped|quit|and|or|nor|but|so|because|since)(?![\\p{L}\\p{N}'’]))[\\p{L}\\p{N}'’-]+\\s+){1,4}(?:${back})(?![\\p{L}\\p{N}])`,
@@ -352,6 +357,7 @@ const takenUp = (back: string): RegExp =>
   );
 const TAKEN_UP = { many: takenUp('them|those'), one: takenUp('it|that'), done: takenUp('them|those|it') };
 const ENDS = new RegExp(`^${CLAUSE_END}`, 'iu');
+const ITSELF_ENDED = new RegExp(`^\\s+(?:(?:was|got)\\s+)?(?:closed|shut|sold)(?:\\s+(?:down|up))?${CLAUSE_END}`, 'iu');
 /* After the verb itself, what was sold or kept comes first: "done selling candles", never "selling candles on paper". */
 /* A thing joined straight on with "and", "or" or "nor": the run ends where its last thing does. */
 const RUN_ON = new RegExp(`^\\s+(?:and|or|nor)\\s+(?:(?:any|a|an|the|${OWN})\\s+)?(?:(?:${PAST})\\s+)*`, 'iu');
@@ -443,10 +449,12 @@ function refusedIn(said: string, known: readonly Said[] = []): (span: Said) => b
     if (NO_LONGER.test(before) || used) return closes(from, to) && !again(from, to) ? 'stopped' : null;
     if (NOT.test(before)) return 'refused';
     if (ENDED.test(before)) return ends(to) ? 'stopped' : null;
-    /* A word of size is said before its thing ("done selling handmade candles"), so it ends as the verb does. */
-    if (NOT_STOPPED.test(before)) return (PLAIN.has(said.slice(from, to).toLowerCase()) ? ENDS_DOING.test(said.slice(to)) : ends(to)) ? 'stopped' : null;
+    if (ENDED_ITSELF.test(before) && ITSELF_ENDED.test(said.slice(to))) return 'stopped';
+    /* A word of size is said before its thing ("done selling handmade candles"), so it ends as the verb does. And a
+       thing somebody stopped is taken up again as a "used to" is: "I stopped taking orders and now track them here". */
+    if (NOT_STOPPED.test(before)) return closes(from, to) && !again(from, to) ? 'stopped' : null;
     const doing = STOPPED_BEFORE.test(before) ? IS_DOING.exec(said.slice(from)) : null;
-    return doing && ENDS_DOING.test(said.slice(from + doing[0].length)) ? 'stopped' : null;
+    return doing && ENDS_DOING.test(said.slice(from + doing[0].length)) && !again(from, to) ? 'stopped' : null;
   };
   const refused = (from: number, to: number): Refusal => {
     const own = not(from, to);

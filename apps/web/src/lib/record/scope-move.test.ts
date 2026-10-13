@@ -1,0 +1,191 @@
+/**
+ * Moving many at once (`moveMany`): one gesture, one Undo. The client here is one that keeps what it was sent, so every
+ * test reads the writes the record would have got, in the order it would have got them.
+ */
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+import { REGISTERS } from './held.ts';
+import { moveMany, movedSaid, movable, scopeFieldOf, words, type MoveClient, type MoveRow, type Place } from './scope-move.ts';
+
+REGISTERS['projects'] = { id: 'projects', name: 'Projects', one: 'project', title: 'name', seq_prefix: 'P', fields: [{ id: 'name', type: 'text' }] } as never;
+REGISTERS['keys'] = {
+  id: 'keys',
+  name: 'Keys',
+  one: 'key',
+  title: 'label',
+  fields: [
+    { id: 'label', type: 'text' },
+    { id: 'value', type: 'secret' },
+    { id: 'project', type: 'ref', to: 'projects', scope: 'project' },
+  ],
+} as never;
+REGISTERS['skills'] = {
+  id: 'skills',
+  name: 'Skills',
+  one: 'skill',
+  title: 'label',
+  fields: [
+    { id: 'label', type: 'text' },
+    { id: 'project', type: 'ref', to: 'projects', scope: 'project' },
+  ],
+} as never;
+REGISTERS['notes'] = { id: 'notes', name: 'Notes', one: 'note', title: 'label', fields: [{ id: 'label', type: 'text' }] } as never;
+
+const kiln: Place = { id: 'e_kiln', ref: 'projects#1', spoken: 'P1', name: 'Kiln', mark: null, hue: null };
+const marsh: Place = { id: 'e_isles', ref: 'projects#2', spoken: 'P2', name: 'Marsh', mark: null, hue: null };
+
+type Sent = { register: string; seq: number; patch: Record<string, unknown>; version?: number; note?: string };
+
+/** A client that keeps every update and answers each with the next version, or with what `answer` says for that row. */
+function fake(answer: (sent: Sent) => unknown = () => undefined) {
+  const sent: Sent[] = [];
+  const client = {
+    update: async (args: Sent) => {
+      sent.push(args);
+      return answer(args) ?? { ok: true, value: { version: (args.version ?? 0) + 1 } };
+    },
+  } as unknown as MoveClient;
+  return { client, sent };
+}
+
+const row = (seq: number, project: unknown, version = 3): MoveRow => ({ seq, version, fields: { label: `Key ${seq}`, project }, name: `Key ${seq}` });
+
+test('a list is moved from the bar only where its place is one project', () => {
+  assert.equal(movable(scopeFieldOf('keys')), true);
+  assert.equal(movable(scopeFieldOf('notes')), false);
+});
+
+test('every one picked is moved in one go, each against the version read, with the note a history line reads', async () => {
+  const { client, sent } = fake();
+  const out = await moveMany(client, 'skills', [row(1, null, 3), row(2, 2, 7), row(3, '', 1)], kiln);
+  assert.equal(out.ask, false);
+  if (out.ask) return;
+  assert.deepEqual(
+    sent.map((s) => [s.seq, s.version, s.patch, s.note]),
+    [
+      [1, 3, { project: 'e_kiln' }, 'Moved to Kiln'],
+      [2, 7, { project: 'e_kiln' }, 'Moved to Kiln'],
+      [3, 1, { project: 'e_kiln' }, 'Moved to Kiln'],
+    ],
+  );
+  assert.deepEqual(out.moved, [
+    { seq: 1, version: 4 },
+    { seq: 2, version: 8 },
+    { seq: 3, version: 2 },
+  ]);
+  assert.equal(out.skipped, 0);
+  assert.equal(out.failed, 0);
+  assert.equal(movedSaid(out, kiln), 'Moved 3 to Kiln.');
+});
+
+test('one Undo puts every one of them back where it was, at the version the move answered', async () => {
+  const { client, sent } = fake();
+  const out = await moveMany(client, 'skills', [row(1, null, 3), row(2, 2, 7)], kiln);
+  assert.equal(out.ask, false);
+  if (out.ask) return;
+  assert.equal(typeof out.undo, 'function');
+  sent.length = 0;
+  const back = await out.undo?.();
+  assert.deepEqual(
+    sent.map((s) => [s.seq, s.version, s.patch, s.note]),
+    [
+      [1, 4, { project: null }, words.movedBack],
+      [2, 8, { project: 'projects#2' }, words.movedBack],
+    ],
+  );
+  assert.equal(back?.ask, false);
+  if (!back || back.ask) return;
+  assert.equal(back.moved.length, 2);
+  /* THE WAY BACK IS NOT ITSELF UNDONE: the toast that put them back offers nothing more. */
+  assert.equal(back.undo, null);
+});
+
+test('one already there is skipped and counted, and nothing is written for it', async () => {
+  const { client, sent } = fake();
+  const out = await moveMany(client, 'skills', [row(1, 1), row(2, 'e_kiln'), row(3, 'P1'), row(4, 'projects#1'), row(5, 2)], kiln);
+  assert.equal(out.ask, false);
+  if (out.ask) return;
+  assert.deepEqual(sent.map((s) => s.seq), [5]);
+  assert.equal(out.skipped, 4);
+  assert.equal(movedSaid(out, kiln), 'Moved 1 to Kiln. 4 were already there.');
+
+  const everywhere = await moveMany(client, 'skills', [row(6, null), row(7, ''), row(8, [])], null);
+  assert.equal(everywhere.ask, false);
+  if (everywhere.ask) return;
+  assert.equal(everywhere.skipped, 3);
+  assert.equal(everywhere.undo, null);
+  assert.equal(movedSaid(everywhere, null), 'All 3 were already at Everywhere.');
+});
+
+test('keys moved to Everywhere are asked about first, and nothing is written until the answer', async () => {
+  const { client, sent } = fake();
+  const rows = [row(1, 1), row(2, null), row(3, 2)];
+  const asked = await moveMany(client, 'keys', rows, null);
+  assert.deepEqual(asked, { ask: true, widening: 2 });
+  assert.equal(sent.length, 0);
+
+  const out = await moveMany(client, 'keys', rows, null, { confirmed: true });
+  assert.equal(out.ask, false);
+  if (out.ask) return;
+  assert.deepEqual(sent.map((s) => [s.seq, s.patch]), [
+    [1, { project: null }],
+    [3, { project: null }],
+  ]);
+  assert.equal(out.skipped, 1);
+  assert.equal(movedSaid(out, null), 'Moved 2 to Everywhere. 1 was already there.');
+});
+
+test('a list with no sealed value goes to Everywhere on the press', async () => {
+  const { client, sent } = fake();
+  const out = await moveMany(client, 'skills', [row(1, 1)], null);
+  assert.equal(out.ask, false);
+  assert.equal(sent.length, 1);
+});
+
+test('keys already at Everywhere ask nothing, since nothing would be opened', async () => {
+  const { client, sent } = fake();
+  const out = await moveMany(client, 'keys', [row(1, null)], null);
+  assert.equal(out.ask, false);
+  assert.equal(sent.length, 0);
+});
+
+test('an Undo that would open a key to every project is not offered', async () => {
+  const { client } = fake();
+  const out = await moveMany(client, 'keys', [row(1, null), row(2, 2)], kiln);
+  assert.equal(out.ask, false);
+  if (out.ask) return;
+  assert.equal(out.moved.length, 2);
+  assert.equal(out.undo, null);
+
+  const between = await moveMany(client, 'keys', [row(3, 2)], kiln);
+  assert.equal(between.ask, false);
+  if (between.ask) return;
+  assert.equal(typeof between.undo, 'function');
+});
+
+test('one the record refused is counted with its reason, and the Undo leaves it alone', async () => {
+  const { client, sent } = fake((s) =>
+    s.seq === 2 && s.note !== words.movedBack ? { ok: false, refusal: { code: 'VERSION_STALE', fix: 'Stale.' } } : undefined,
+  );
+  const out = await moveMany(client, 'skills', [row(1, null), row(2, null), row(3, null)], marsh);
+  assert.equal(out.ask, false);
+  if (out.ask) return;
+  assert.deepEqual(out.moved.map((m) => m.seq), [1, 3]);
+  assert.equal(out.failed, 1);
+  assert.deepEqual(out.stale, [2]);
+  assert.match(movedSaid(out, marsh), /^Moved 2 to Marsh\. 1 did not move\. Key 2 /u);
+  sent.length = 0;
+  await out.undo?.();
+  assert.deepEqual(sent.map((s) => s.seq), [1, 3]);
+});
+
+test('a list whose things name no place is moved nowhere', async () => {
+  const { client, sent } = fake();
+  const out = await moveMany(client, 'notes', [row(1, null)], kiln);
+  assert.equal(out.ask, false);
+  if (out.ask) return;
+  assert.equal(sent.length, 0);
+  assert.equal(out.failed, 1);
+});

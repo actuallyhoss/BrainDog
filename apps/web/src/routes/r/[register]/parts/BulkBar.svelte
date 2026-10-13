@@ -18,14 +18,28 @@
 
   Every verb is the page's write (`copyIds`, `setPickedState`, `archiveSelected`), and `count` is the
   selection cut to the answer on screen, so what a verb acts on is what the reader is looking at.
+
+  TWO VERBS ARE WRITTEN HERE, on `picked`, the same cut the page counts. "Move to…" is on the bar of a list whose things
+  say where they apply (a key, a tool, a skill, a learning): one sheet of places, one press, every one picked moved,
+  one sentence and one Undo (`scope-move.ts` `moveMany`). Keys going to Everywhere are asked about first, as one key is
+  on its own page. "Fold into one" is on the bar of the list that keeps people, for two to twelve picked: it asks on
+  Decide whether they are the same one and opens that question, and folds nobody itself.
 -->
 <script lang="ts">
   import { copy } from '$lib/copy.ts';
+  import { goto } from '$app/navigation';
+  import { createClient } from '@braindog/client';
+  import { apiBase, at } from '$lib/at.ts';
   import type { RegisterDecl } from '$lib/record/schema.ts';
+  import { movable, moveMany, movedSaid, moverAt, placesIn, putBackSaid, scopeFieldOf, words, type MovedMany, type MoveRow, type Place } from '$lib/record/scope-move.ts';
   import Button from '$lib/ui/Button.svelte';
   import Menu from '$lib/ui/Menu.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Kbd from '$lib/ui/Kbd.svelte';
+  import ScopeChip from '$lib/ui/ScopeChip.svelte';
+  import Sheet from '$lib/ui/Sheet.svelte';
+  import Waiting from '$lib/ui/Waiting.svelte';
+  import { toasts } from '$lib/ui/toast.svelte.ts';
 
   let {
     count,
@@ -37,6 +51,8 @@
     setPickedState,
     archiveSelected,
     onclear,
+    picked,
+    onmoved,
   }: {
     count: number;
     decl: RegisterDecl | undefined;
@@ -50,7 +66,78 @@
     /** Absent for a caller whose level cannot change the list, and Archive is then not on the bar. */
     archiveSelected?: (() => void) | undefined;
     onclear: () => void;
+    /**
+     * The ones picked, each with the version the list read and its title, for the two verbs written here. Absent for a
+     * caller whose level cannot change the list, and neither verb is then on the bar.
+     */
+    picked?: readonly MoveRow[] | undefined;
+    /** Called once a move has landed or been put back, so the page reads the list again. */
+    onmoved?: (() => void) | undefined;
   } = $props();
+
+  /* ── MOVE TO… ── */
+  const field = $derived(decl ? scopeFieldOf(decl.id) : undefined);
+  const canMove = $derived(picked !== undefined && picked.length > 0 && movable(field));
+
+  let open = $state(false);
+  /* `undefined` while the projects are being read, `null` when the record would not list them. */
+  let places = $state<Place[] | null | undefined>(undefined);
+  /* THE ONE QUESTION A MOVE ASKS: how many keys the press would open to every project, answered by the button. */
+  let asking = $state<number | null>(null);
+  /* ONE MOVE AT A TIME, so a second press on the sheet while the first is out writes nothing. */
+  let moving = $state(false);
+
+  function openMove() {
+    const to = field?.to;
+    if (!canMove || !to) return;
+    asking = null;
+    open = true;
+    places = undefined;
+    void placesIn(apiBase(), to).then((got) => (places = got));
+  }
+
+  /** What a move or its way back answered, said once: the sentence, the Undo where there is one, and the list read again. */
+  function say(out: Extract<MovedMany, { ask: false }>, line: string) {
+    const undo = out.undo;
+    toasts.push(line, {
+      ...(undo ? { undo: () => void undo().then((back) => !back.ask && say(back, putBackSaid(back))) } : {}),
+      ...(out.failed > 0 ? { intent: 'warn' as const } : {}),
+    });
+    if (out.moved.length > 0 || out.stale.length > 0) onmoved?.();
+  }
+
+  async function moveTo(to: Place | null, confirmed = false) {
+    const id = decl?.id;
+    if (moving || !id || !picked || !canMove) return;
+    moving = true;
+    const out = await moveMany(moverAt(apiBase()), id, picked, to, { confirmed });
+    moving = false;
+    if (out.ask) {
+      asking = out.widening;
+      return;
+    }
+    open = false;
+    asking = null;
+    say(out, movedSaid(out, to));
+  }
+
+  /* ── FOLD INTO ONE ── the list that keeps people (`meets:`), and as many as one question asks about. */
+  const FOLD_MOST = 12;
+  const canFold = $derived(picked !== undefined && decl?.meets !== undefined && picked.length >= 2 && picked.length <= FOLD_MOST);
+  let folding = $state(false);
+
+  async function fold() {
+    const id = decl?.id;
+    if (folding || !id || !picked || !canFold) return;
+    folding = true;
+    const out = await createClient({ base: apiBase() }).sameOne({ register: id, rows: picked.map((r) => `${id}#${r.seq}`) });
+    folding = false;
+    if (!out.ok) {
+      toasts.push('conflict' in out ? copy.writeNotReached : out.refusal.fix, { intent: 'warn' });
+      return;
+    }
+    void goto(at(`/decide/${encodeURIComponent(out.value.question)}`));
+  }
 </script>
 
 <!-- It wraps rather than scrolls, so the verbs survive a phone. `data-fixed` because it is placed on the window, which
@@ -76,6 +163,16 @@
       {/each}
     </Menu>
   {/if}
+  {#if canMove}
+    <Button weight="quiet" onclick={openMove}>
+      <Icon name="arrow" size="s" />{words.moveMany}
+    </Button>
+  {/if}
+  {#if canFold}
+    <Button weight="quiet" disabled={folding} onclick={() => void fold()}>
+      <Icon name="link" size="s" />{words.foldMany}
+    </Button>
+  {/if}
   {#if archiveSelected}
     <Button weight="quiet" onclick={() => archiveSelected?.()}>
       <Icon name="archive" size="s" />{copy.archiveSelected}
@@ -85,6 +182,38 @@
     <Icon name="close" size="s" /><span class="picked-esc" aria-hidden="true"><Kbd keys="Esc" /></span>
   </button>
 </div>
+
+{#snippet confirm()}
+  <Button weight="primary" disabled={moving} onclick={() => void moveTo(null, true)}>{words.widenGo}</Button>
+{/snippet}
+
+{#snippet place(p: Place | null)}
+  <li>
+    <button type="button" class="scope-place" disabled={moving} onclick={() => void moveTo(p)}>
+      <ScopeChip scope={p} />
+    </button>
+  </li>
+{/snippet}
+
+<!-- THE SHEET IS BESIDE THE BAR, NOT IN IT, so it is placed on the window as the row page's is (`[seq]/ScopeMove.svelte`,
+     whose list of places this is). -->
+{#if canMove}
+  <Sheet bind:open title={words.moveMany} subtitle={words.picked(count)} footer={asking !== null ? confirm : undefined} onclose={() => (asking = null)}>
+    {#if asking !== null}
+      <p class="scope-said">{words.widenKeys(asking)}</p>
+    {:else if places === undefined}
+      <Waiting rows={3} />
+    {:else if places === null}
+      <p class="scope-said" role="status">{words.noPlaces}</p>
+      <Button weight="quiet" onclick={openMove}>{words.retry}</Button>
+    {:else}
+      <ul class="scope-places" aria-label={words.moveMany}>
+        {@render place(null)}
+        {#each places as p (p.id)}{@render place(p)}{/each}
+      </ul>
+    {/if}
+  </Sheet>
+{/if}
 
 <style>
   /* THE FLOATING BAR: bottom centre, 12 above the window's edge twice over, and above the phone's tab bar there. The
@@ -140,6 +269,61 @@
     color: var(--ink);
     font-weight: 600;
     font-variant-numeric: tabular-nums;
+  }
+
+  /* THE PLACES, as the row page lists them: each the whole of its target and 48 tall, a hairline between two. */
+  .scope-places {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .scope-places > li {
+    position: relative;
+  }
+
+  .scope-places > li + li::after {
+    content: '';
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline: var(--sp-3);
+    block-size: 1px;
+    background: var(--line);
+    pointer-events: none;
+  }
+
+  .scope-place {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    inline-size: 100%;
+    min-block-size: var(--sp-7);
+    padding-block: var(--sp-1);
+    padding-inline: var(--sp-3);
+    background: none;
+    border: 0;
+    border-radius: var(--r-md);
+    color: var(--ink);
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .scope-place:hover {
+      background: var(--hover-wash);
+    }
+  }
+
+  .scope-said {
+    margin: 0;
+    max-inline-size: var(--measure);
+    color: var(--ink2);
+    font-size: var(--t-md);
+    line-height: var(--lh-body);
   }
 
   /* LET GO: a close with the Esc cap beside the glyph, the key that does the same. */

@@ -455,6 +455,12 @@ export type Meet = {
  */
 export type Met = Answer<'meet'>;
 
+/**
+ * `sameOne`: the question on Decide asking whether the people picked are one, and whether this call opened it or it was
+ * already waiting. Nothing is merged until somebody answers it. See `SameOne` in `@braindog/record`.
+ */
+export type SameOne = Answer<'sameOne'>;
+
 /** `packs`: one pack, on or off. `version` is `null` for a pack the seed owns by its bodies. See `PackState` in `@braindog/kernel`. */
 export type PackState = { id: string; version: string | null; disabled_at: string | null; registers: string[] };
 
@@ -1641,6 +1647,11 @@ export function createClient(options: ClientOptions) {
     context: () => call<Context>('context'),
     /** Someone or some organisation met in the work, a commit author, a sender or a payee, as the caller's run. */
     meet: (args: Meet) => call<Met>('meet', args as Record<string, unknown>),
+    /**
+     * Ask whether two or more people held twice are the same one: `register` is the list of people and `rows` the ones
+     * picked, two to twelve. It opens one question on Decide and merges nothing. Anybody who may write to the list.
+     */
+    sameOne: (args: { register: string; rows: readonly string[] }) => call<SameOne>('sameOne', args as Record<string, unknown>),
 
     /* THE SCHEDULED ACTIONS. `actions` is READ+; `resumeAction` is ADMIN, so a browser session, and it is the only
        thing that starts a paused action again. */

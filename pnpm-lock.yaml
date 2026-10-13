@@ -412,6 +412,8 @@ importers:
 
   packs/mercury: {}
 
+  packs/money-watch: {}
+
   packs/pad: {}
 
   packs/portfolio-bands: {}

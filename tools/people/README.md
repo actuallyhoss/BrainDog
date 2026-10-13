@@ -41,7 +41,8 @@ export PATH=~/.nvm/versions/node/v24.13.0/bin:$PATH
 node tools/people/check-files.mjs                      # every person file: "ok", or what is missing
 node tools/people/expect/first-run.mjs                 # Mariam on a fresh self-host, seven lines
 node --test tools/people/test/first-run.test.mjs       # the same walk as a test
-node tools/people/expect/keep-it.mjs                    # step 4 on the hosted service, in one process: the mailed link, her sentence kept nowhere
+node tools/people/expect/keep-it.mjs                    # step 4 on the hosted service, in one process: the mailed link, her sentence kept nowhere; it ends in 30 seconds with a red line naming the step
+node tools/people/expect/first-screen.mjs [screen.json] [person.json]   # the day-0 checks on a rig's snapshot; with no screen, the first run's own words (two checks of seven)
 node --test tools/people/test/first-screen.test.mjs
 node --test tools/people/test/read-set.test.mjs
 ```

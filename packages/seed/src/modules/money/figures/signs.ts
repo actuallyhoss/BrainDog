@@ -18,6 +18,10 @@
  * - `nights-missed-30d`, of the last 30 nights how many kept no point on the cash line (`series.cash-now` read as
  *   `{ count: 'missing' }`). It waited until `figureLists` (`money-figures.ts`) named the lists Cash now reads for its
  *   line, so a member who may not see Cash now is not shown how many nights it missed either.
+ *
+ * ONE MORE IN 3.17.0 (REC-B11 step 8):
+ * - `repeating-overdue`, how many live repeating lines have a "Next" more than three days gone. `settle` moves "Next"
+ *   when a payment is matched to the line, and until this nothing said when one was not.
  */
 
 import type { SeedMetric } from '../../base.ts';
@@ -112,6 +116,26 @@ export const SIGNS_FIGURES: Record<string, SeedMetric> = {
     value: { count: 'missing' },
     format: 'int',
     target: { lte: 2 },
+    window: '30d',
+    compare: 'none',
+  },
+  /**
+   * HOW MANY LIVE REPEATING LINES HAVE A NEXT MORE THAN THREE DAYS GONE. Money's `settle` script moves "Next" one cycle
+   * on when a payment is matched to the line, so a day left behind is a payment that did not come, came unmatched, or a
+   * line nobody ended. `next_due before -3d` leaves out the third day itself: three days is what a payment takes to land
+   * and be matched, the same three the Ledger's own age is allowed.
+   *
+   * A paused or ended line is not waiting for anything and is left out. A COUNT, NEVER A SUM, so no two currencies meet
+   * in it. None is the mark; a record with no repeating lines has none stuck.
+   */
+  'repeating-overdue': {
+    metric: 'repeating-overdue',
+    name: 'Repeating lines past their day',
+    source: 'register.recurring',
+    where: 'state is live, next_due before -3d',
+    value: { count: 'id' },
+    format: 'int',
+    target: { lte: 0 },
     window: '30d',
     compare: 'none',
   },

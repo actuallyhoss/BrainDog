@@ -219,7 +219,7 @@ test('THE LIMITS `list` AND `search` ADVERTISE ARE THE ONES THE RECORD KEEPS, ce
   /** What the tool tells an agent it may ask for, read off the argument an agent reads. */
   const advertised = (name: string) => {
     const limit = (TOOLS.find((t) => t.name === name)?.input as { properties: { limit: { description: string } } }).properties.limit;
-    const read = /^1 to ([0-9]+)\. Default ([0-9]+)\.$/.exec(limit.description);
+    const read = /^1 to ([0-9]+)\. (?:Up to [0-9]+ whole, else|Default) ([0-9]+)\.$/.exec(limit.description);
     assert.ok(read, `${name}'s limit reads ${JSON.stringify(limit.description)}, which names no range and no default`);
     return { ceiling: Number(read[1]), fallback: Number(read[2]) };
   };

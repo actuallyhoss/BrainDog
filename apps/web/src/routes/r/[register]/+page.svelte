@@ -2583,6 +2583,8 @@
           {setPickedState}
           archiveSelected={changes ? archiveSelected : undefined}
           onclear={() => (selected = new Set())}
+          picked={changes ? picked.map((e) => ({ seq: e.seq, version: e.version, fields: e.fields, name: titleSaid(e) })) : undefined}
+          onmoved={refresh}
         />
       {/if}
 

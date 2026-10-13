@@ -67,7 +67,11 @@ jobs:
     runs-on: ${{ vars.CI_RUNNER || 'self-hosted' }}
     timeout-minutes: 20
     steps:
+      # THE WHOLE HISTORY, for the two source gates below that read it: `catalogue-immutable` reads the catalogue of the
+      # released commit (SHL-B03) and `commits` counts what the tag reaches (WAY-B02). Both are red on a shallow checkout.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: ./.github/actions/setup
       - run: pnpm test
       # `typecheck` is NOT excluded here as it is in `ci.yml`: `run.mjs` runs it first, and this job

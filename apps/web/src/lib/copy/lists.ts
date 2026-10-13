@@ -119,6 +119,12 @@ export const lists = {
   noneChosen: 'None',
   yes: 'Yes',
   secretsLiveInTheVault: 'Passwords and keys go in the Vault. This records what one opens.',
+  /* The few words beside a move a row's panel offers, said before it is pressed (`ui/row-form-moves.ts`). */
+  moveNeedsReason: 'needs a reason',
+  moveNeeds: (label: string): string => `needs ${label.toLowerCase()}`,
+  moveAsksDecide: 'asks Decide',
+  /* A field the form does not draw has no label there, and an id is never the word. */
+  anotherField: 'another field',
   /* THE SAME ANSWER `/decide` GIVES TO THE SAME QUESTION. A disabled control says why it is
      disabled, and the register's own declaration is what says which fields cannot be left out — so
      the sentence names them rather than saying "some fields". */

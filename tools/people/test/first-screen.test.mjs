@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { checkScreen, firstScreen, UNITS } from '../expect/first-screen.mjs';
+import { checkScreen, firstScreen, report, UNITS } from '../expect/first-screen.mjs';
 
 const person = (file) => JSON.parse(readFileSync(new URL(`../${file}`, import.meta.url), 'utf8'));
 const LAYLA = person('layla.json');
@@ -116,4 +116,18 @@ test('what the snapshot does not hold is said, never passed', () => {
 
 test('no saw holds an em dash', () => {
   for (const { who, ok, bad } of Object.values(PLANTED)) for (const r of [...checkScreen(ok, who), ...checkScreen(bad, who)]) assert.doesNotMatch(r.saw, /\u2014/u);
+});
+
+test('with no screen only the words are judged', () => {
+  const { lines, code } = report(null, LAYLA);
+  assert.equal(code, 0);
+  assert.ok(lines.some((l) => /no-tour: green\./u.test(l)));
+  assert.ok(lines.some((l) => /rail-has-rows: not seen\./u.test(l)));
+  assert.match(lines.at(-1), /7 checks: 2 green, 0 red, 5 not seen\. Exit code 0\./u);
+});
+
+test('a tour on a screen handed in is red and the code is 1', () => {
+  const { lines, code } = report([{ ...START, text: ['Take the tour'] }], LAYLA);
+  assert.equal(code, 1);
+  assert.ok(lines.some((l) => /no-tour: red\. .*tour/u.test(l)));
 });

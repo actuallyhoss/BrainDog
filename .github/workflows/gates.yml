@@ -238,7 +238,12 @@ jobs:
       matrix:
         part: [1, 2, 3]
     steps:
+      # THE WHOLE HISTORY, as `ci.yml`'s `gates` job takes it and for its two reasons: `catalogue-immutable` reads the
+      # catalogue of the released commit (SHL-B03) and `commits` counts what HEAD reaches (WAY-B02). A shallow checkout
+      # holds neither, and both gates are red on it by design: a base that cannot be read is never a skip.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: ./.github/actions/setup
 
       # KEYED ON THE BROWSER'S VERSION, NOT THE LOCKFILE. Chromium is ~150 MB and changes when

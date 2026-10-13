@@ -4,6 +4,7 @@
  */
 
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 import { useCase } from '@braindog/seed/usecases';
@@ -14,6 +15,7 @@ import {
   casePart,
   cityOf,
   currencyChoices,
+  entryOf,
   iconOfBecame,
   joinTurns,
   marksIn,
@@ -40,7 +42,7 @@ test('A PART IS ON FOR THE PHRASE THAT ASKED FOR IT, and holds the entries the s
   assert.ok(money?.on);
   assert.equal(money?.state, 'heard');
   assert.ok(money?.why.includes('bill'), 'Money says the word that turned it on');
-  const invoice = money?.entries.find((e) => e.kind === 'owed');
+  const invoice = money?.entries.find((e) => e.kind === 'money');
   assert.equal(invoice?.title, 'Monthly invoice to Fenwick');
   assert.deepEqual(invoice?.amount, { minor: 200000, currency: 'GBP' });
   assert.match(invoice?.due ?? '', /^\d{4}-\d{2}-01$/u);
@@ -298,4 +300,16 @@ test('A PHRASE FOLDED INTO A LINE AND SAID APART LIGHTS TOO, and only where the 
     { text: 'who owes me', became: 'Money' },
     { text: ', since March', became: null },
   ]);
+});
+
+test('A BILL SAYS WHICH WAY THE MONEY GOES, in the words its own list uses, and never who owes whom', () => {
+  const bill = (direction: string) =>
+    entryOf({ register: 'obligations', fields: { what: 'Studio rent', direction, amount: { amount: 40000, currency: 'GBP' }, due: '2026-12-01', state: 'open' } } as Parameters<typeof entryOf>[0]);
+  assert.equal(bill('owed_to_me').detail, 'Money in');
+  assert.equal(bill('owed_by_me').detail, 'Money out');
+  assert.equal(bill('owed_to_me').kind, 'money');
+  assert.deepEqual(bill('owed_by_me').amount, { minor: 40000, currency: 'GBP' });
+  /* The stored value `owed_to_me` is one word to this search, so only something a person could read is caught. */
+  const source = readFileSync(new URL('./building.ts', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /\bowe[sd]?\b/iu, 'the first run frames money around who owes whom');
 });

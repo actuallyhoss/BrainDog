@@ -46,6 +46,10 @@
  * rows whose mark names no glyph, so an import that carried another system's icon names is a number a page can show and
  * a tidy can bring to nought. `marks.ts` says what names a glyph, and imports nothing, so it adds no load ring.
  *
+ * AND `held-twice`, THE PEOPLE HELD MORE THAN ONCE (AGT-D05): how many would go if every plain pair he has not answered
+ * were one person, and each one marked as the record's own person beyond the first. His own record held him twice and
+ * nothing could say so. `people.ts` counts, by the rules its nightly questions ask by, so the two never disagree.
+ *
  * `signs.ts` IS NOT IMPORTED, only its types. It reaches `flow.ts` and `digest.ts`, which import `metrics.ts`, which
  * imports this, and the loop that made broke the kernel's own load (`flow.ts` read a pattern before it was set). So the
  * signs now come in through the reader, `EvalContext.signs`, as the rates come in through `fx`; the kept readings are
@@ -65,6 +69,8 @@ import { intervalMs } from './pull.ts';
 import { KEYS_IN_TEXT } from './key-scan.ts';
 import { holdDays } from './hold.ts';
 import { isUnknownMark } from './marks.ts';
+/* `people.ts` REACHES `ingest.ts` AND THROUGH IT MUCH OF THE KERNEL. Only a function is taken, called on a read and never
+   as this file loads, so the ring it closes meets no word before it is set. */
 
 /** The source a built-in figure over the open questions reads, the same word a `queue` block's source is. */
 export const GOVERNANCE_OPEN = 'governance.open';
@@ -342,6 +348,27 @@ const MARKS_UNKNOWN: MetricDecl = {
   format: 'int',
 };
 
+/**
+ * The source of `held-twice`: the list that plays `meets:`, read by the fields it names. Said by the part and never by
+ * a list's own name, since a record may call its people anything.
+ */
+export const RECORD_PEOPLE = 'record.meets';
+
+/**
+ * People the record holds more than once, as far as the plain rules can tell. Each is a question on Decide that he
+ * answers, so the figure falls to nought by his yes (one person now) or his no (two people of one name).
+ */
+const PEOPLE_TWICE: MetricDecl = {
+  metric: 'held-twice',
+  name: 'People held more than once',
+  source: RECORD_PEOPLE,
+  value: { count: 'id' },
+  target: { lte: 0 },
+  window: '30d',
+  compare: 'none',
+  format: 'int',
+};
+
 /* ── what the night counts (REC-A17 job 3, REC-A13 job 1) ────────────── */
 
 /** The source of `lists-shrunk`: the night's counts of each list (`night-counts.ts`, `countLists`). */
@@ -402,6 +429,7 @@ export const BUILT_IN_FIGURES: Readonly<Record<string, MetricDecl>> = {
   'keys-unopenable': KEYS_UNOPENABLE,
   'keys-in-text': KEYS_IN_TEXT,
   'marks-unknown': MARKS_UNKNOWN,
+  'held-twice': PEOPLE_TWICE,
   'lists-shrunk': LISTS_SHRUNK,
   'documents-dead-paths': DOCUMENTS_DEAD_PATHS,
 };
@@ -715,6 +743,23 @@ export function readMarksUnknown(sql: Sql, _ctx: unknown, decl: MetricDecl): Res
     for (const w of words) if (isUnknownMark(w.word)) n += Number(w.n);
   }
   return judged(decl, n, 'pictures that name nothing the set draws');
+}
+
+/** The count `held-twice` reads, handed in by the module that owns it when it loads, so this file imports no list's module. */
+let heldTwice: ((sql: Sql) => number | null) | null = null;
+export function countHeldTwiceBy(count: (sql: Sql) => number | null): void {
+  heldTwice = count;
+}
+
+/**
+ * `held-twice`: the people held more than once, on the list that plays `meets:` (`peopleTwiceIn` in `people.ts`, the
+ * count the nightly questions are asked by). Never somebody another member added, never a pair he answered, and nobody
+ * counted twice. NOTHING, NEVER NOUGHT, on a record with no people list.
+ */
+export function readPeopleTwice(sql: Sql, _ctx: unknown, decl: MetricDecl): Result<Reading> {
+  const n = heldTwice ? heldTwice(sql) : null;
+  if (n === null) return judged(decl, null, 'no list on this record holds people');
+  return judged(decl, n, 'people held more than once, by name or marked as you');
 }
 
 /** `ingest.ts`'s `UNVERIFIED`, the one reason an arrival nothing vouched for carries, written once more for the import rule above. */

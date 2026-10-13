@@ -1175,7 +1175,7 @@ export function toSegments(block: BlockResult, kinds?: Readonly<Record<string, K
  * RECORD ANSWERED EVERY ONE (`values`), because half a sentence with a dash in it says less than no sentence, and a
  * path the record holds nothing for is not asked about from a tile's caption. ONLY OVER LINES: a list nothing is on
  * says its `empty:` and nothing else. ONLY A LIST'S (the `list` primitive, read from the record): a note's body is the
- * note, and a chart split by currency would say the line once a chart. AND NOT WHEN EVERY FIGURE IN IT IS NOUGHT.
+ * note, and a chart split by currency would say the line once a chart. AND ONLY WHEN A FIGURE IN IT IS ABOVE NOUGHT.
  */
 function writtenLine(block: BlockResult, kinds?: Readonly<Record<string, KindSpec>>): ReturnType<typeof parse> {
   const body = (block.body ?? '').trim();
@@ -1191,10 +1191,15 @@ function writtenLine(block: BlockResult, kinds?: Readonly<Record<string, KindSpe
   };
   const paths = [...body.matchAll(/\{\{([^{}]*)\}\}/gu)].map(([, path]) => path!.trim());
   if (!paths.every(held)) return [];
-  /* EVERY FIGURE NOUGHT IS NO LINE: over payments somebody typed by hand the Ledger read "0 filed today. 0 filed for you
+  /* NO FIGURE ABOVE NOUGHT IS NO LINE: over payments somebody typed by hand the Ledger read "0 filed today. 0 filed for you
      in 30 days.", which says nothing happened in the place a person looks for what did. One figure above nought and
-     the line is said whole, noughts and all. */
-  if (paths.length > 0 && paths.every((path) => values?.[path] === 0 || values?.[path] === '0')) return [];
+     the line is said whole, noughts and all. A FIGURE IS WHAT READS AS A NUMBER, however the record sent it ("0", "0.0"),
+     so a nought beside a name is still no line, and a line whose answers are all words is said as it was. */
+  const figures = paths.map((path) => values?.[path]).flatMap((v) => {
+    const n = typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN;
+    return Number.isFinite(n) ? [n] : [];
+  });
+  if (figures.length > 0 && !figures.some((n) => n > 0)) return [];
   return parse(body, { page: true });
 }
 

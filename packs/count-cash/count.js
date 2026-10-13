@@ -27,9 +27,17 @@
  * two currencies are never subtracted. A count dated before the day the account's own balance is from is kept and
  * changes nothing, because that balance already says more than an older count can correct. A count that agrees writes
  * no transaction and still writes the check, since the balance was checked on that day.
+ *
+ * AN ENTRY IN ANOTHER CURRENCY IS NOT LEFT OUT QUIETLY (1.3.0). This script works the roll out in its own code and
+ * cannot convert, where the record's own roll converts a cleared entry in another currency at the day's rate. Leaving
+ * such an entry out filed a difference equal to it, money the Ledger already held. So an account that holds one since
+ * its last statement is not compared: the count is kept, it says so in What happened, and no check and no
+ * difference are written. This lasts until a script can read the record's own figure for a day.
  */
 
 const WHAT = 'Cash count difference';
+/** What a count says when its account was not compared. The account's name is in the run's log beside it. */
+const NOT_COMPARED = 'This account holds an entry in another currency, so it was not compared.';
 
 /** The most rows one `ctx.record.list` answers, the record's own page. A full page may have left rows out. */
 const PAGE = 50;
@@ -75,8 +83,9 @@ async function newestIn(ctx, register, account, field, balance, from, to) {
 
 /**
  * What Cash now would say the account held on `day`: the newest statement on or before it, and every cleared movement
- * after that statement up to the day, in the statement's currency. `null` where a statement is in another currency
- * than `currency`, which the caller says and writes nothing for.
+ * after that statement up to the day, in the statement's currency. No `amount` where a statement is in another
+ * currency than `currency`, and `foreign` where a cleared movement since the statement is, which this script cannot
+ * convert: the caller says either and writes no difference.
  */
 async function rolledOn(ctx, account, day, currency) {
   const own = account.fields.balance;
@@ -93,7 +102,8 @@ async function rolledOn(ctx, account, day, currency) {
   let amount = start === null ? 0 : start.money.amount;
   for (const m of moves) {
     const money = m.fields.amount;
-    if (money === null || typeof money !== 'object' || money.currency !== currency) continue;
+    if (money === null || typeof money !== 'object') continue;
+    if (money.currency !== currency) return { currency, foreign: true };
     amount += m.fields.direction === 'out' ? -money.amount : money.amount;
   }
   return { currency, amount };
@@ -125,6 +135,11 @@ export default async function run(ctx) {
   }
 
   const rolled = await rolledOn(ctx, account, day, counted.currency);
+  if (rolled.foreign === true) {
+    ctx.log(`${name} holds an entry in another currency than ${counted.currency} since it was last stated, so this count was not compared and no difference was written.`);
+    ctx.update(`cash_counts#${count.seq}`, { said: NOT_COMPARED }, count.version);
+    return;
+  }
   if (rolled.amount === undefined) {
     ctx.log(`This count is counted in ${counted.currency} and ${name} was last said to hold ${rolled.currency}, and two currencies are not subtracted, so nothing was written.`);
     return;
