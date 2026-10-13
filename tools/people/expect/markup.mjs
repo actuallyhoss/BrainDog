@@ -47,7 +47,7 @@ function roleOf(tag, a) {
 
 /**
  * `{ text, roles }` for one piece of markup. `text` is every sentence, in the order drawn. A thing's name is its
- * `aria-label`, else the words inside it, else its `title` or `placeholder`.
+ * `aria-label`, else the words inside it, else its `title` or `placeholder`. A link also says its `href`.
  */
 export function readMarkup(html) {
   const text = [];
@@ -91,6 +91,8 @@ export function readMarkup(html) {
       if (role !== null) {
         const landmark = open.findLast((o) => o.role !== null && LANDMARKS.has(o.role))?.role ?? null;
         entry = { role, name: squash(a['aria-label'] ?? ''), landmark };
+        /* WHERE A LINK GOES, as written: the rail's rows are told apart by it (a list, a page, Settings). */
+        if (role === 'link' && typeof a.href === 'string' && a.href !== '') entry.href = a.href;
         roles.push(entry);
       }
       const node = { tag, role, entry, breaks, words: [], out: gone, fallback: squash(a.title ?? a.placeholder ?? '') };

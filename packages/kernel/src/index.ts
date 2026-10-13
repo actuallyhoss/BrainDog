@@ -2875,6 +2875,11 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * A CONDITION HOLDING `{{...}}` IS NOT READ, since the run fills it before reading it, and nor is a tree, which the run
    * evaluates without compiling. A rule whose row is on a list no lint can name (an arrival at no named door) is not
    * read either: a field of that row would be refused by a schema that is not the one the run holds.
+   *
+   * A RULE STARTED BY AN ANSWER READS THE ROW THE QUESTION WAS ABOUT, on the list of the rule that asked it
+   * (`on.decided.about`, in this batch or live). Read against its answers alone, `chase_draft is empty` was refused with
+   * "vars has no field called chase_draft" though the run holds the invoice. A decision that names no rule, or a rule
+   * this record cannot place on a list, is left to the run, as an arrival at no named door is.
    */
   function unreadIf(id: string, rule: FlowDecl, shape: (register: string) => Schema | null, batch: readonly Declaration[]): Refusal | null {
     const conditions: { cond: string; at: string }[] = [];
@@ -2901,8 +2906,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     if (conditions.length === 0) return null;
 
     const trigger = triggerOf(rule);
-    const register = rowRegisterOf(rule, doorsOf(batch));
-    if ((trigger === 'written' || trigger === 'arrival') && register === null) return null;
+    const register = trigger === 'decided' ? askedOn(rule, batch) : rowRegisterOf(rule, doorsOf(batch));
+    if ((trigger === 'written' || trigger === 'arrival' || trigger === 'decided') && register === null) return null;
     const own = register === null ? null : shape(register);
     if (register !== null && own === null) return null;
     const ctx = evalContext(batch);
@@ -2918,6 +2923,23 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       if (certain) return { ...certain, fix: `${id} cannot read its condition at ${at}: ${certain.fix}`, at: `${at}.if` };
     }
     return null;
+  }
+
+  /** The list of the rule a `decided` trigger answers, from the batch or the record, or `null` where it names none. */
+  function askedOn(rule: FlowDecl, batch: readonly Declaration[]): string | null {
+    const about = (rule.on as { decided?: { about?: unknown } } | undefined)?.decided?.about;
+    if (typeof about !== 'string' || !about.startsWith('rule.')) return null;
+    const mine = batch.find((d) => d.id === about);
+    let asker: unknown = mine?.body;
+    if (mine === undefined) {
+      const row = heldRow(about);
+      try {
+        asker = row ? JSON.parse(row.body) : undefined;
+      } catch {
+        return null;
+      }
+    }
+    return asker !== null && typeof asker === 'object' ? subjectOf(asker as FlowDecl) : null;
   }
 
   /** A `where` read against the register it filters: `null` when it can be read, the refusal when not. */

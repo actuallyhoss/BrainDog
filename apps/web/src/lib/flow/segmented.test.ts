@@ -6,9 +6,10 @@
  * and in at another. Six tracks here were written by hand: five on the step's sheet (the trigger's kind, a list's
  * changes, a figure's crossing, an answer's shape, the fields an answer is about) and one where a flow is tried.
  *
- * TWO OF THE SHEET'S TRACKS TAKE MORE THAN ONE CHOICE (a list's changes, the fields an answer is about). The part
- * draws one thumb, under the first chosen segment, and `controls.css` takes the fill from every chosen segment once
- * the thumb is placed, so the sheet gives the later ones their fill back. The last test holds that.
+ * TWO OF THE SHEET'S TRACKS TAKE MORE THAN ONE CHOICE (a list's changes, the fields an answer is about). They say so
+ * to the part with `many`, which then draws no thumb and leaves every chosen segment its own fill. The sheet used to
+ * mark them with a class of its own and give the later chosen segments their fill back; the last test holds that this
+ * is gone.
  *
  * A TEXT TEST OVER MARKUP, as `routes/settings/[area]/areas/segmented.test.ts` is: there is no component test in this
  * tree.
@@ -89,17 +90,17 @@ for (const { name, text } of PARTS) {
   });
 }
 
-test('the sheet: a track of more than one choice keeps a fill on every chosen segment', () => {
+test('the sheet: a track of more than one choice says so to the part, and fills nothing itself', () => {
   const sheet = PARTS.find((p) => p.name === 'Inspector.svelte')!;
-  const many = tracks(sheet.text).filter((t) => /\bonclick=\{\(\) => toggle[A-Z]/u.test(t));
-  assert.equal(many.length, 2, 'the tracks pressed in and out are a list\'s changes and the fields an answer is about; re-measure');
-  for (const track of many) assert.match(track, /^<Segmented\b[^>]*\bclass="[^"]*\bmany\b/u, 'a track of more than one choice is not marked');
-  /* One thumb is drawn, under the first chosen segment: each chosen one after it is filled by the sheet. A space and
-     not `>` after the track: the compiler cannot see through the part to the segment's parent, and drops a child rule
-     as one that matches nothing. */
-  assert.match(
-    styles(sheet.text).replaceAll(/\s+/gu, ' '),
-    /:global\(\.many\[data-thumb\]\) \.segment\[data-on\] ~ \.segment\[data-on\] \{ background: var\(--tile\);/u,
-    'the second chosen segment has no fill once the thumb is placed',
-  );
+  const all = tracks(sheet.text);
+  const pressed = all.filter((t) => /\bonclick=\{\(\) => toggle[A-Z]/u.test(t));
+  assert.equal(pressed.length, 2, "the tracks pressed in and out are a list's changes and the fields an answer is about; re-measure");
+  /* `many` alone, as a word on the tag: `many={…}` would be a track that is sometimes one choice. */
+  const MANY = /^<Segmented\b[^>]*\smany(?=[\s>])/u;
+  for (const track of pressed) assert.match(track, MANY, 'a track of more than one choice does not tell the part');
+  for (const track of all.filter((t) => !pressed.includes(t))) assert.doesNotMatch(track, MANY, 'a track of one choice has lost its thumb');
+  /* The fill of a chosen segment is the part's and `controls.css`'s: no class and no rule of the sheet's own. */
+  assert.doesNotMatch(markup(sheet.text), /\bclass="[^"]*\bmany\b/u, 'the sheet still marks the track with a class of its own');
+  assert.doesNotMatch(styles(sheet.text), /\.many\b/u, 'the sheet still holds a rule for .many');
+  assert.doesNotMatch(styles(sheet.text), /\[data-on\]\s*~/u, 'the sheet still fills the later chosen segments itself');
 });

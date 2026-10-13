@@ -191,6 +191,13 @@ const USE_CASE_PACKS: readonly string[] = USE_CASES.map((u) => `usecase-${u.usec
  * version the record holds.
  *
  * THEN THE AGENTS PACK AND THE USE CASES THE RECORD HOLDS, in the first pass, after the five, each on the same terms.
+ *
+ * AND A MODULE ANOTHER PACK WAS IN THE WAY OF, AGAIN THE SAME NIGHT, ONCE THAT PACK HAS GONE IN. The five are planned
+ * before the use cases, so a module that takes over something a use case holds is refused, and the use case, planned
+ * after it, then hands the thing on. Measured on what brain.dog served: money-core 3.17.0 waited a whole night for
+ * Personal 2.4.0 to let go of one count. Planned again once its holder is in, on the same terms as the first time, and
+ * its one step says what the later plan met. A module refused for any other reason, or whose holder did not go in, is
+ * planned once and waits for the next night.
  */
 export async function updateFirstParty(port: QuietPort): Promise<QuietStep[]> {
   const out: QuietStep[] = [];
@@ -221,43 +228,62 @@ export async function updateFirstParty(port: QuietPort): Promise<QuietStep[]> {
     return useCaseDocument(usecase, NO_DAY, kept.filter((list) => !lacks.has(`register.${list}`)));
   };
 
-  for (const id of [...FIRST_PARTY, AGENTS_PACK.manifest.id, ...USE_CASE_PACKS]) {
+  /**
+   * THE MODULES SOMETHING ANOTHER PACK HOLDS IS IN THE WAY OF, each with the packs that hold it (`conflicts[].pack` of
+   * its plan), and of those the ones a holder has gone in since (`freed`).
+   */
+  const waits = new Map<string, ReadonlySet<string>>();
+  const freed = new Set<string>();
+
+  /** One pack, planned against the record as it is now: what happened to it, or nothing when there is nothing newer. */
+  const attempt = async (id: string): Promise<QuietStep | null> => {
+    waits.delete(id);
     const held = await heldOf(id);
     const to = shippedVersion(id);
-    if (!held || to === undefined || compareVersions(held.version!, to) >= 0) continue;
+    if (!held || to === undefined || compareVersions(held.version!, to) >= 0) return null;
     const step = { pack: id, from: held.version!, to };
     const given = await documentOf(id);
-    if (!given) continue;
+    if (!given) return null;
     const doc = without(given);
     const planned = await port.plan(doc);
-    if (!planned.ok) {
-      out.push({ ...step, did: 'refused', why: fixOf(planned) });
-      continue;
-    }
+    if (!planned.ok) return { ...step, did: 'refused', why: fixOf(planned) };
     const diff = planned.value;
     const lose = losses(diff, nameOf, tookOff);
     /* NOTHING TO DECIDE WHILE IT CANNOT GO IN AT ALL: a yes would be refused at the accept, and the record would not file
-       the question. It is planned again next time, once what it needs is there or what was in the way is gone. */
+       the question. It is planned again once what was in the way is gone: later this night when another pack held it
+       and that pack goes in, and otherwise next time. */
     const blocked = unready(diff);
     if (blocked !== null) {
-      out.push({ ...step, did: 'refused', ...(lose.length === 0 ? {} : { lose }), why: blocked });
-      continue;
+      if (diff.conflicts.length > 0) waits.set(id, new Set(diff.conflicts.map((c) => c.pack)));
+      return { ...step, did: 'refused', ...(lose.length === 0 ? {} : { lose }), why: blocked };
     }
     if (lose.length === 0) {
       const put = await port.install(doc, diff.planHash);
-      out.push(put.ok ? { ...step, did: 'updated' } : { ...step, did: 'refused', why: fixOf(put) });
-      continue;
+      if (!put.ok) return { ...step, did: 'refused', why: fixOf(put) };
+      for (const [waiting, holders] of waits) if (holders.has(id)) freed.add(waiting);
+      return { ...step, did: 'updated' };
     }
-    if (await port.asking(id)) {
-      out.push({ ...step, did: 'waiting', lose });
-      continue;
-    }
+    if (await port.asking(id)) return { ...step, did: 'waiting', lose };
     if (!isFirstParty(id) && (await port.remembers?.(id)) !== true) {
-      out.push({ ...step, did: 'refused', lose, why: `Updating it would ${lostSaid(lose)}, so it waits for you to update it yourself.` });
-      continue;
+      return { ...step, did: 'refused', lose, why: `Updating it would ${lostSaid(lose)}, so it waits for you to update it yourself.` };
     }
     const asked = await port.propose(questionFor(id, lose));
-    out.push(asked.ok ? { ...step, did: 'asked', lose } : { ...step, did: 'refused', lose, why: fixOf(asked) });
+    return asked.ok ? { ...step, did: 'asked', lose } : { ...step, did: 'refused', lose, why: fixOf(asked) };
+  };
+
+  const order = [...FIRST_PARTY, AGENTS_PACK.manifest.id, ...USE_CASE_PACKS];
+  for (const id of order) {
+    const step = await attempt(id);
+    if (step) out.push(step);
+  }
+
+  /* AGAIN, IN THE SAME ORDER, UNTIL NONE IS FREED. It ends: a module is planned again only after a pack went in, and
+     each pack goes in once. What the later plan met takes the place of the refusal, so the night says one thing. */
+  for (let id = order.find((p) => freed.has(p)); id !== undefined; id = order.find((p) => freed.has(p))) {
+    freed.delete(id);
+    const step = await attempt(id);
+    const at = out.findIndex((s) => s.pack === id);
+    if (step && at >= 0) out[at] = step;
   }
 
   for (const id of FIRST_PARTY) {

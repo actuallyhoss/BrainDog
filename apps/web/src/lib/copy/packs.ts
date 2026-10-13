@@ -13,13 +13,15 @@ import { list } from './english.ts';
 
 export const packs = {
   /* THE HOME CURRENCY PICKER AND THE WAY INTO EXCHANGE RATES, on Money's settings (`routes/packs/[id]`). Rates are a
-     preset of the new-action sheet, so the words of the sheet itself are `actionWords` in `action-draft.ts`. */
+     preset of the new-action sheet, so the words of the sheet itself are `actionWords` in `action-draft.ts`.
+     `ratesWhy` SAYS ONE ACTION, because the preset is one poll for every currency the record holds (`ratesPreset`),
+     and opening it again replaces that poll. It said to set up one for each currency, which made two of them. */
   currencyNone: 'None chosen',
   currencyCommon: 'Common',
   currencyAll: 'All currencies',
   ratesHeading: 'Exchange rates, fetched every day',
   ratesWhy:
-    'BrainDog can fetch what a currency is worth from a public address once a day, so money in more than one currency adds up in your home currency. Set up one for each currency your money is in.',
+    'BrainDog can fetch what your currencies are worth from a public address once a day, so money in more than one currency adds up in your home currency. One action fetches every currency your money is in. Open it again when you start using a new currency.',
   ratesSetUp: 'Set up exchange rates',
   noPacksYet: 'No add-ons installed',
   /* The Vault's words are in `record/vault.ts`, which only its two routes load. */

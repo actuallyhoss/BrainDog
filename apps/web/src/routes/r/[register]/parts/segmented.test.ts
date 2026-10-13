@@ -67,11 +67,9 @@ for (const { name, text } of PARTS) {
   });
 }
 
-test('the bar: a second value that is on keeps a fill of its own', () => {
-  /* A FIELD'S VALUES ARE TOGGLES, so both of two can be on. The thumb sits under the first, and `controls.css` takes
-     the fill off every chosen segment under a thumb, which would leave the second one looking off. */
-  assert.match(
-    styles(part('ChipsBar.svelte')),
-    /:global\(\.sift-track\[data-thumb\]\)\s+\.segment\[data-on\]\s*~\s*\.segment\[data-on\]\s*\{[^}]*background:\s*var\(--tile\)/u,
-  );
+test('the bar: a field\'s values are toggles, so the track is given `many` and holds no rule for a second one', () => {
+  /* A FIELD'S VALUES ARE TOGGLES, so both of two can be on. The part draws a `many` track no thumb, and every chosen
+     segment keeps its own flat fill, so the bar needs no rule of its own for the second. */
+  assert.match(markup(part('ChipsBar.svelte')), /<Segmented\b[^>]*\smany(?=[\s>])[^>]*\bclass="sift-track"/u);
+  assert.doesNotMatch(styles(part('ChipsBar.svelte')), /\.segment\[data-on\]\s*~\s*\.segment\[data-on\]/u);
 });

@@ -25,9 +25,17 @@ and the test holds the two to be the same text.
 day of the question, which was refused once the entry had been edited; the run the answer starts marks it void. Next
 on a new Repeating line is counted from the newest payment on the day of the answer. And the line Charged twice
 writes when it switches itself off says both charges were real three times in a row, where it said "three no's".
-Since then, still 1.1.0 and not yet released: "Both real" is remembered for the payee, account and amount for about
+Also in 1.1.0: "Both real" is remembered for the payee, account and amount for about
 ninety days, where it was remembered only within two days of the pair. And three of "Both real" in a row are counted
 a payee at a time, so they switch Charged twice off for that payee alone, where three answers about three payees
 switched it off for everyone. A line written by the earlier count names no payee and still holds for the whole flag
 until it is changed to "Switched on again".
+1.2.0 reads the shop where 1.1.0 read the card. A bank line that leads with the card and the terminal, such as
+`HSBC CARD 7731 POS 55 KFC`, was read up to the card's number, so every shop paid with that card was the one payee
+"Hsbc Card": KFC and Carrefour at the same amount were asked about as one charge made twice, and the three in a row
+counted the card. Both scripts now cut the card (`HSBC CARD 7731`, `CARD XX7731`) and the terminal (`POS 55`) before
+they read the name, so each shop is its own payee. A one digit number after POS is left, since it may be the shop's
+own (7 Eleven), and a card that was bought (`GIFT CARD 1234`) is left as written. A line already in Money watch under
+a card's name stays as it is and matches no shop: "Both real" said about it quiets nothing, and a shop is asked about
+once more.
 After an edit to a script, copy its text into the matching `source` in `money-watch.pack.json`.

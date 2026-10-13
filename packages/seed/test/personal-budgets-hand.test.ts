@@ -220,23 +220,23 @@ test('BOTH IN ONE PLAN, as a use case is planned: Money first, told what Persona
   sql.close();
 });
 
-test('THE NIGHT TAKES TWO: Money waits the first night, Personal goes in, and Money follows the next, with nothing asked', async () => {
+test('THE NIGHT TAKES ONE: Money waits for Personal to hand the count on, then follows the same night, with nothing asked', async () => {
   const { k, sql } = await onReleased();
   const port = portOf(k, sql);
 
-  const first = await updateFirstParty(port);
-  const money = first.find((s) => s.pack === 'money-core');
-  assert.equal(money?.did, 'refused', JSON.stringify(first));
-  /* WHAT THE RECORD IS TOLD OF THE NIGHT IT WAITS: no question, since a yes could not install it either. */
-  assert.equal(money?.why, 'It cannot go in over what this record holds now.');
-  assert.deepEqual(money?.lose, ['take Budgets set from Personal']);
-  assert.equal(first.find((s) => s.pack === 'usecase-personal')?.did, 'updated', JSON.stringify(first));
-  assert.equal(k.packs().find((p) => p.id === 'money-core')?.version, '3.16.0');
-  assert.equal(ownerOf(k), 'money-core');
+  /* WHAT STANDS IN THE WAY WHEN THE NIGHT FIRST PLANS MONEY, before Personal: the count, which no yes could move, so it
+     is refused and never asked about (`night-one-pass.test.ts` holds what is said when Personal does not go in). */
+  const before = value<Diff>(await port.plan(documentFor(k, 'money-core')));
+  assert.deepEqual(before.conflicts.map((c) => [c.id, c.pack]), [[FIGURE, 'usecase-personal']]);
 
-  const second = await updateFirstParty(port);
-  assert.deepEqual(second.find((s) => s.pack === 'money-core'), { pack: 'money-core', from: '3.16.0', to: FIRST_PARTY_VERSIONS['money-core'], did: 'updated' }, JSON.stringify(second));
+  const night = await updateFirstParty(port);
+  assert.equal(night.find((s) => s.pack === 'usecase-personal')?.did, 'updated', JSON.stringify(night));
+  /* ONE STEP FOR MONEY, the update: the refusal it met first is not left in what the record is told of the night. */
+  assert.deepEqual(night.filter((s) => s.pack === 'money-core' && s.from === '3.16.0'), [{ pack: 'money-core', from: '3.16.0', to: FIRST_PARTY_VERSIONS['money-core'], did: 'updated' }], JSON.stringify(night));
+  assert.deepEqual(night.filter((s) => s.did === 'refused'), [], JSON.stringify(night));
   assert.deepEqual(port.asked, [], 'nothing is lost by either update, so nothing is asked');
-  settled(k, 'two nights');
+  settled(k, 'one night');
+
+  assert.deepEqual(await updateFirstParty(port), [], 'the next night found something left to do');
   sql.close();
 });

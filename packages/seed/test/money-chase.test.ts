@@ -1,16 +1,16 @@
 /**
  * What "Chase it" leaves on a late invoice (REC-B22 step 1): the day, a note, and a message ready to send.
  *
- * TODAY IT LEAVES THE DAY AND THE NOTE AND NOTHING TO SEND. `invoice-chased` in `MONEY_AUTOMATIONS` sets "Chasing
- * since" and writes one note, so a person who chose to chase still has the whole message to write. The draft is to be
- * the invoice's own amount and due day in one plain sentence, kept in `chase_draft` ("Draft to send"), written once
- * and never over words somebody changed.
+ * IT LEFT THE DAY AND THE NOTE AND NOTHING TO SEND, so a person who chose to chase still had the whole message to
+ * write. The draft is the invoice's own amount and due day in one plain sentence, kept in `chase_draft` ("Draft to
+ * send"), written once and never over words somebody changed. A template can write it since batch 74:
+ * `{{short:amount}}` is `EGP 12,000` and `{{on:due}}` is `30 Oct` (`packages/kernel/test/rules-fill-forms.test.ts`).
+ * The currency is its code, never a sign: the kernel holds no sign for a currency an add-on has not declared.
  *
- * THE FOUR TESTS OF THE DRAFT ARE `todo`, AND THE THIRD TEST HERE SAYS WHY. A rule's `set` fills a template, and a
- * template writes money as `EGP 12,000.00` (the kernel's `moneyText`: code first, every decimal) and a day as
- * `2026-10-30` or `11 days ago` (`rowValue` in `packages/kernel/src/rules.ts`). Neither is what goes in a message to a
- * client, which is `E£12,000` and `30 Oct`. So the field and the step wait on a form a template can ask for, and the
- * `todo`s turn over the day it has one. They fail now, on a list with no `chase_draft`, without turning the suite red.
+ * MONEY SHIPS BOTH SINCE 3.17.0: Bills and invoices declares `chase_draft` (`lists/obligations.ts`) and `rules.ts`
+ * adds the step only while the list holds the field, since a step that writes a field its list does not hold stops
+ * the add-on from installing. `withDraft` below would lay the two on a document without them, both as `rules.ts`
+ * exports them, and changes nothing now that Money ships them. THE LAST TEST reads the document as shipped.
  */
 
 import { test } from 'node:test';
@@ -22,7 +22,7 @@ import { sayOf } from '@braindog/ports';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 import { firstPartyDocument } from '../src/index.ts';
-import { MONEY_AUTOMATIONS } from '../src/modules/money/rules.ts';
+import { CHASE_DRAFT, CHASE_DRAFT_FIELD, CHASE_DRAFT_STEP, MONEY_AUTOMATIONS } from '../src/modules/money/rules.ts';
 
 type Fields = Record<string, unknown>;
 type Question = { id: string; opened_by?: string; body?: { about?: string; options?: { id: string; label: string }[] } };
@@ -31,8 +31,23 @@ const OWNER = { actor: 'p_1' };
 const NOW = Date.UTC(2026, 10, 10, 12);
 const DUE = '2026-10-30';
 const egp = (minor: number) => ({ amount: minor, currency: 'EGP' });
-const DRAFT = 'The invoice for E£12,000 was due on 30 Oct. Could you tell me when it will be paid?';
-const TEMPLATE_WAITS = 'a rule template writes EGP 12,000.00 and 2026-10-30, and the draft needs E£12,000 and 30 Oct';
+const DRAFT = 'The invoice for EGP 12,000 was due on 30 Oct. Could you tell me when it will be paid?';
+
+type Decl = { register?: string; rule?: string; fields?: { id: string }[]; steps?: unknown[] };
+const declared = (doc: unknown): Decl[] => (doc as { declarations: Decl[] }).declarations;
+const invoices = (doc: unknown): Decl => declared(doc).find((d) => d.register === 'obligations')!;
+const chasing = (doc: unknown): Decl => declared(doc).find((d) => d.rule === 'invoice-chased')!;
+const holdsDraft = (doc: unknown): boolean => invoices(doc).fields!.some((f) => f.id === CHASE_DRAFT_FIELD.id);
+
+/** Money's document with "Draft to send" and the step that writes it, laid on only where Money does not ship them. */
+const withDraft = (doc: unknown): unknown => {
+  if (holdsDraft(doc)) return doc;
+  const copy = structuredClone(doc);
+  const fields = invoices(copy).fields!;
+  fields.splice(fields.findIndex((f) => f.id === 'chased') + 1, 0, { ...CHASE_DRAFT_FIELD });
+  chasing(copy).steps!.push(structuredClone(CHASE_DRAFT_STEP));
+  return copy;
+};
 
 const value = <T>(r: unknown): T => {
   const x = r as { ok: boolean; value: T };
@@ -56,7 +71,7 @@ async function money() {
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));
   for (const id of ['portfolio', 'people', 'money-core']) {
-    const pack = value<Pack>(await normalise(firstPartyDocument(id, { seeds: [] }), { kind: 'local' }));
+    const pack = value<Pack>(await normalise(id === 'money-core' ? withDraft(firstPartyDocument(id, { seeds: [] })) : firstPartyDocument(id, { seeds: [] }), { kind: 'local' }));
     const state: Installed = { format: 1, primitives: 1, record_version: k.version(), packs: k.packs(), declarations: k.declarations() as Installed['declarations'], rows: k.census() };
     const diff = await plan(pack, state);
     value(await install(pack, diff, hostFor(k), diff.planHash));
@@ -101,27 +116,28 @@ test('the rule that answers "Chase it" is the one Money ships, and it names the 
   assert.deepEqual(rule.on, { decided: { about: 'rule.invoice-late', option: 'Chase it' } });
 });
 
-test('WHY THE DRAFT WAITS: a template writes the amount and the day in the record\'s forms, not a message\'s', async () => {
+test('a template writes the amount and the day in a message\'s forms, and the older forms still write the record\'s', async () => {
   const m = await money();
   const late = m.invoice();
-  /* EVERY FORM A TEMPLATE HAS FOR THESE TWO FIELDS. The day this stops holding, a template can write the draft. */
+  assert.equal(fillTemplate('{{short:amount}}', late, NOW), 'EGP 12,000');
+  assert.equal(fillTemplate('{{on:due}}', late, NOW), '30 Oct');
+  assert.equal(fillTemplate(CHASE_DRAFT, late, NOW), DRAFT);
+  /* WHAT THE DRAFT WAITED ON: every older form of these two fields, unchanged for the pages and notes that use them. */
   assert.equal(fillTemplate('{{amount}}', late, NOW), 'EGP 12,000.00');
   assert.equal(fillTemplate('{{money:amount}}', late, NOW), 'EGP 12,000.00');
   assert.equal(fillTemplate('{{due}}', late, NOW), DUE);
   assert.equal(fillTemplate('{{ago:due}}', late, NOW), '11 days ago');
-  /* AND A FORM IT DOES NOT KNOW IS THE BARE VALUE, so `{{day:due}}` is no way round it. */
-  assert.equal(fillTemplate('{{day:due}}', late, NOW), DUE);
   m.sql.close();
 });
 
-test('after "Chase it" the invoice holds a draft made from its own amount and due day', { todo: TEMPLATE_WAITS }, async () => {
+test('after "Chase it" the invoice holds a draft made from its own amount and due day', async () => {
   const m = await money();
   const chased = await m.chase(m.invoice());
   assert.equal(chased.fields.chase_draft, DRAFT);
   m.sql.close();
 });
 
-test('an invoice with nobody named on it still gets a draft that reads whole', { todo: TEMPLATE_WAITS }, async () => {
+test('an invoice with nobody named on it still gets a draft that reads whole', async () => {
   const m = await money();
   const person = m.made('people', { name: 'Layla Hassan' });
   for (const row of [m.invoice(), m.invoice({ what: 'Poster run', party: person.id })]) {
@@ -129,13 +145,13 @@ test('an invoice with nobody named on it still gets a draft that reads whole', {
     assert.equal(typeof draft, 'string', `${String(row.fields.what)} has no draft`);
     /* NO HOLE, NO BRACE LEFT AS TYPED, NO ID: the dash is what a template writes for a field that holds nothing. */
     assert.doesNotMatch(draft as string, /—|\{\{|\}\}|[0-9A-HJKMNP-TV-Z]{26}|obligations#|people#/u);
-    assert.match(draft as string, /E£12,000/u);
+    assert.match(draft as string, /EGP 12,000/u);
     assert.match(draft as string, /30 Oct/u);
   }
   m.sql.close();
 });
 
-test('the draft is never blank, whatever the invoice leaves empty', { todo: TEMPLATE_WAITS }, async () => {
+test('the draft is never blank, whatever the invoice leaves empty', async () => {
   const m = await money();
   /* The least an invoice can hold: its four required fields and its status. No note, no project, no person. */
   const draft = (await m.chase(m.invoice({ what: 'x' }))).fields.chase_draft;
@@ -144,7 +160,7 @@ test('the draft is never blank, whatever the invoice leaves empty', { todo: TEMP
   m.sql.close();
 });
 
-test('chasing again leaves a draft somebody changed as they left it', { todo: TEMPLATE_WAITS }, async () => {
+test('chasing again leaves a draft somebody changed as they left it', async () => {
   const m = await money();
   const late = m.invoice();
   await m.chase(late);
@@ -155,4 +171,21 @@ test('chasing again leaves a draft somebody changed as they left it', { todo: TE
   const again = await m.chase(late);
   assert.equal(again.fields.chase_draft, mine, 'the second chase wrote over the words somebody chose');
   m.sql.close();
+});
+
+test('a second chase with the draft cleared writes it again from the new due day', async () => {
+  const m = await money();
+  const late = m.invoice();
+  await m.chase(late);
+  value(m.k.update('obligations', late.id, { chase_draft: null, due: '2026-10-31' }, OWNER));
+  const again = await m.chase(late);
+  assert.equal(again.fields.chase_draft, DRAFT.replace('30 Oct', '31 Oct'));
+  m.sql.close();
+});
+
+test('Money as it ships declares "Draft to send" and its rule writes it', () => {
+  const doc = firstPartyDocument('money-core', { seeds: [] });
+  assert.ok(holdsDraft(doc), 'Bills and invoices has no chase_draft');
+  assert.deepEqual(chasing(doc).steps!.at(-1), CHASE_DRAFT_STEP);
+  assert.equal(withDraft(doc), doc, 'the test still lays the draft on a document that ships it');
 });

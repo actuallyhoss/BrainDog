@@ -243,7 +243,7 @@
     {/each}
   {:else}
     {#each enums as f}
-      <Segmented class="sift-track" role="group" aria-label={labelOf(f)}>
+      <Segmented many class="sift-track" role="group" aria-label={labelOf(f)}>
         {#each f.values ?? [] as value}
           {@const on = isOn(f.id, value)}
           <!-- `aria-pressed`, BECAUSE THE STATE WAS ONLY A COLOUR. A raised white segment says
@@ -384,13 +384,6 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-  }
-
-  /* A FIELD'S VALUES ARE TOGGLES, so both of two can be on. The sliding selection (`Segmented`) sits under the first,
-     and `controls.css` takes the fill off every chosen segment under it; a second one keeps the tile's colour of its
-     own, flat as the selection is, so it never reads as off. The track is the part's element, reached by this name. */
-  :global(.sift-track[data-thumb]) .segment[data-on] ~ .segment[data-on] {
-    background: var(--tile);
   }
 
   .segment-word {

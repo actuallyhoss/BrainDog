@@ -39,6 +39,7 @@
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
   import SampleText from '$lib/pattern/SampleText.svelte';
   import FieldTable from '$lib/pattern/FieldTable.svelte';
+  import Segmented from '$lib/ui/Segmented.svelte';
   import { anchorsFor, install, readSamples, suggest, tryPattern, type Anchor, type Sample, type Tried } from '$lib/pattern/api.ts';
   import {
     ASKS,
@@ -298,7 +299,7 @@
     <!-- THE FOUR STEPS AS ONE SEGMENTED CONTROL on the ground: the step in hand is the white pill, and a step not yet
          reachable is words that do not press. -->
     <nav class="steps" aria-label={words.title}>
-      <ol class="segmented steps-track">
+      <Segmented tag="ol" class="steps-track">
         {#each words.steps as name, i (name)}
           {@const n = (i + 1) as 1 | 2 | 3 | 4}
           <li>
@@ -314,7 +315,7 @@
             </button>
           </li>
         {/each}
-      </ol>
+      </Segmented>
     </nav>
 
     {#if missing > 0}<p class="note">{words.missing(missing)}</p>{/if}
@@ -521,12 +522,11 @@
     padding: var(--sp-5) var(--gutter) var(--sp-9);
   }
 
-  /* THE STEPS: the house segmented control, at its own width, its numbers in the quiet ink. */
-  .steps-track {
+  /* THE STEPS: the house segmented control, at its own width, its numbers in the quiet ink. The track is the part's
+     element, so the rule reaches it by the name this page gave it. */
+  .steps :global(.steps-track) {
     inline-size: fit-content;
     max-inline-size: 100%;
-    margin: 0;
-    list-style: none;
   }
 
   .step {

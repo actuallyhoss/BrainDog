@@ -486,7 +486,7 @@
             </div>
           {/if}
           <p class="label" id="flow-ops">When an item is</p>
-          <Segmented class="many" role="group" aria-labelledby="flow-ops">
+          <Segmented many role="group" aria-labelledby="flow-ops">
             {#each OPS as [op, label] (op)}
               {@const on = (t.written.op ?? []).includes(op)}
               <button type="button" class="segment" aria-pressed={on} data-on={on ? '' : undefined} onclick={() => toggleOp(op)}>{label}</button>
@@ -651,7 +651,7 @@
                  nobody should have to type, and each is pressed in or out as a list's changes are. -->
             <p class="label" id="{idOf(a)}-label">{a.label}</p>
             {#if aboutOptions.length > 0}
-              <Segmented class="many" id={idOf(a)} role="group" aria-labelledby="{idOf(a)}-label">
+              <Segmented many id={idOf(a)} role="group" aria-labelledby="{idOf(a)}-label">
                 {#each aboutOptions as f (f)}
                   {@const on = about.includes(f)}
                   <button type="button" class="segment" aria-pressed={on} data-on={on ? '' : undefined} onclick={() => toggleAbout(f)}>{fieldWord(f)}</button>
@@ -856,13 +856,6 @@
      The track is `Segmented`'s own element, so its rules reach it by the name this sheet gave it. */
   .inspect :global(.kinds) {
     flex-wrap: wrap;
-  }
-
-  /* PRESSED IN AND OUT, SO MORE THAN ONE CAN BE CHOSEN (a list's changes, the fields an answer is about). The part
-     draws one selection, under the first chosen segment, and `controls.css` takes the fill from every chosen segment
-     once it is placed: each chosen one after the first is the tile's colour here, as the selection is. */
-  :global(.many[data-thumb]) .segment[data-on] ~ .segment[data-on] {
-    background: var(--tile);
   }
 
   /* ONE ROW A FIELD: the name, then its value, then the way to take it out; stacked in a narrow panel, where three

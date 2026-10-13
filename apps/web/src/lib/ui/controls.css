@@ -291,6 +291,17 @@
       0 0 0 1px var(--rule);
   }
 
+  /* A TRACK OF STEPS IN ORDER is an `ol`, each segment in an `li`: the rule above reads a segment as its parent's
+     child, so it would match one in a list item of the component's track. It has no hairline either. */
+  .segmented[data-slides] > li > .segment[data-on] {
+    box-shadow: none;
+  }
+
+  ol.segmented {
+    margin: 0;
+    list-style: none;
+  }
+
   /**
    * THE SLIDING SELECTION (DIRECTION §39, `Segmented.svelte`). A track the component draws carries `data-slides`, and
    * once it has measured its chosen segment, `data-thumb` and that segment's box as `--x`, `--y`, `--w` and `--h`.
@@ -314,6 +325,10 @@
 
   /* Above the thumb, which is positioned and would otherwise paint over the words. */
   .segmented[data-slides] > .segment {
+    position: relative;
+  }
+
+  .segmented[data-slides] > li > .segment {
     position: relative;
   }
 
@@ -341,11 +356,14 @@
     box-shadow: none;
   }
 
-  /* A TRACK WHERE MORE THAN ONE IS CHOSEN has one thumb, under the first: each chosen one after it keeps the tile's
-     colour of its own, flat as the thumb is, so it never reads as off. */
-  .segmented[data-thumb] > .segment[data-on] ~ .segment[data-on] {
-    background: var(--tile);
+  .segmented[data-thumb] > li > .segment[data-on] {
+    background: none;
+    box-shadow: none;
   }
+
+  /* A TRACK WHERE MORE THAN ONE CAN BE CHOSEN is given `many` (`data-many`), and the component then draws it no
+     thumb at all: it never carries `data-thumb`, so every chosen segment keeps the flat tile fill of the plain rule
+     above, with no hairline, because the track is still the component's (`data-slides`). */
 
   /**
    * A SWITCH, FOR ONE THING THAT IS ON OR OFF.

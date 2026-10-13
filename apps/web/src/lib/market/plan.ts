@@ -82,6 +82,10 @@ export const words = {
   format: 'This file is written for a newer BrainDog than this record runs',
   orphans: (n: number) => `${n.toLocaleString('en-GB')} ${n === 1 ? 'item' : 'items'} would be left under a list it takes away`,
   conflict: (name: string, pack: string) => `${name} is already here, from ${pack}`,
+  /* A CONFLICT ANOTHER UPDATE CLEARS (`update-order.ts`): the holder's update hands the thing over, so it is a step
+     to take and not a dead end. */
+  conflictFirst: (name: string, pack: string) => `Update ${pack} first, which hands ${name} on to this`,
+  conflictAfter: (pack: string) => `goes in after ${pack}, which hands it on`,
   conflictOwn: (name: string) => `${name} is one you changed, and this version changes it too`,
   conflictReads: (name: string, reads: string) => `${name}, which you changed, reads ${reads}, which this version takes away`,
   conflictField: (name: string, field: string) => `${name} reads ${field}, which this version takes away or changes`,
@@ -198,6 +202,7 @@ function diffPart(d: Body, name: (id: string) => string, fieldOf?: FieldName): {
   const title = name(id);
 
   const stops: string[] = [];
+  const after: Row[] = [];
   const requires = isMap(d.requires) ? d.requires : {};
   if ((isMap(requires.format) && requires.format.ok === false) || (isMap(requires.primitives) && requires.primitives.ok === false)) stops.push(words.format);
   for (const p of list(requires.packs)) if (p.ok === false) stops.push(words.needs(name(text(p.id)), text(p.range), typeof p.installed === 'string' ? p.installed : null));
@@ -207,6 +212,10 @@ function diffPart(d: Body, name: (id: string) => string, fieldOf?: FieldName): {
     if (typeof c.reads === 'string') stops.push(words.conflictReads(what, name(c.reads)));
     else if (typeof c.field === 'string') stops.push(words.conflictField(what, c.field));
     else if (c.changed === true || text(c.pack) === '(this record)') stops.push(words.conflictOwn(what));
+    /* THE HOLDER'S OWN UPDATE HANDS IT OVER (`update-order.ts` `marked`). In the same run it lands before this one is
+       planned again, so it is said under Worth knowing and stops nothing; outside the run it is the step to take. */
+    else if (c.waits === 'after') after.push(row(what, words.conflictAfter(name(text(c.pack)))));
+    else if (c.waits === 'first') stops.push(words.conflictFirst(what, name(text(c.pack))));
     else stops.push(words.conflict(what, name(text(c.pack))));
   }
   if (count(d.orphans) > 0) stops.push(words.orphans(count(d.orphans)));
@@ -219,6 +228,7 @@ function diffPart(d: Body, name: (id: string) => string, fieldOf?: FieldName): {
   const seeds = isMap(d.seeds) ? d.seeds : {};
   const seedRows = list(seeds.registers).filter((r) => count(r.rows) > 0);
   const worth = [
+    ...after,
     ...list(d.retypes).map((r) => row(name(text(r.id)), words.retype(text(r.field), text(r.from), text(r.to), count(r.rows)))),
     ...list(d.newly_required).map((r) => row(name(text(r.id)), words.required(text(r.field), count(r.rows)))),
     ...list(d.renames).map((r) => row(words.renamed(name(text(r.from)), name(text(r.to))))),

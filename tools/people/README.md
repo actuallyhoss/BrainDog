@@ -25,9 +25,13 @@ here for one person, Mariam. The other seven people of USE-B01 and their nightly
   use case or none; `standing` is false for Yara and Salma; Omar and Nour carry an export in `file`.
 - `expect/first-screen.mjs`: the day-0 screen checks over a rig's snapshot { path, width, text, roles, counts }; UNITS
   names the unit that turns each one green (no-count, nothing-before-press, no-example, team-no-task: USE-B07;
-  people-only-them: USE-B06; rail-has-rows: USE-B02; no-tour: USE-B01). With no screen file it draws its own: the
-  web's rail and Today rendered for the server from a first-run walk (expect/draw.mjs, markup.mjs, screens.mjs),
-  judged by the seven and by pages-line (PGS-C30) and signs-line (PRF-A05).
+  people-only-them: USE-B06; rail-has-rows: USE-B02; no-tour: USE-B01). A snapshot may also hold `behind` (what each
+  rail row stands on, keyed by the row's href) and `signs` (how many vital signs read red, null with no page for
+  them). With no screen file it draws its own: the web's rail and Today rendered for the server from a first-run walk
+  (expect/draw.mjs, markup.mjs, screens.mjs), three screens a moment (1440 Today, 1440 list, 390 Today over the tab
+  bar), judged by the seven and by pages-line (PGS-C30), signs-line (PRF-A05) and own-lines-you (USE-B06: Today never
+  calls the owner "Someone on this record" where nobody else writes on it). A check answers green, red, not seen (it
+  applies and read nothing) or does not apply.
 - `sets/read-set.json` and `test/read-set.test.mjs`: forty sentences and the reading each must get; a sentence marked
   until may read wrong until that unit lands, and goes red if it reads right while still marked.
 - `test/first-run.test.mjs`: checks the file, then one case a step: each check goes green on what that step shows
@@ -44,9 +48,10 @@ node tools/people/check-files.mjs                      # every person file: "ok"
 node tools/people/expect/first-run.mjs                 # Mariam on a fresh self-host, seven lines
 node --test tools/people/test/first-run.test.mjs       # the same walk as a test
 node tools/people/expect/keep-it.mjs                    # step 4 on the hosted service, in one process: the mailed link, her sentence kept nowhere; it ends in 30 seconds with a red line naming the step
-node tools/people/expect/first-screen.mjs [screen.json] [person.json] [--as person.json] [--words] [--write file]   # with no screen, a fresh self-host and the rail and Today drawn at two moments; --words judges only the first run's own words
+node tools/people/expect/first-screen.mjs [screen.json] [person.json] [--as person.json] [--words] [--write file]   # with no screen, a fresh self-host and three screens drawn at each of two moments (1440 Today, 1440 list, 390 Today over the tab bar); it exits 1 when a check is red or when a check that applies read nothing; --words judges only the first run's own words
 node --test tools/people/test/first-screen.test.mjs
 node --test tools/people/expect/first-screen-drawn.test.mjs
+node --test tools/people/expect/first-screen-teeth.test.mjs
 node --test tools/people/test/read-set.test.mjs
 ```
 

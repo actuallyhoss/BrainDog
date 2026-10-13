@@ -140,3 +140,24 @@ test('a record without a shop keeps its rail and its bar exactly as they were', 
   assert.deepEqual(rail.places.map((i) => i.label), ['Today', 'Decide', 'Work', 'Projects', 'Money', 'People', 'Agents']);
   assert.deepEqual(rail.more.map((i) => i.label), ['Services', 'Activity']);
 });
+
+/* SAM'S RECORD AFTER SIGN-UP (use case 1, USE-B02): Services is a section whose list holds nothing yet. Which sections a
+   record has is the shell's to say (`layoutOf` leaves out a page over a list with nothing in it), and the rail draws
+   the sections it is handed and no others: it is told no counts, so it can neither keep an empty place nor drop one. */
+const sam = (services: boolean): [string, Entry[]][] => [
+  ['People', [page('People', '/p/people')]],
+  ['Money', [page('Money', '/p/money')]],
+  ...(services ? [['Services', [page('Renewals', '/p/estate')]] as [string, Entry[]]] : []),
+  ['Dashboard', [page('Dashboard', '/p/dashboard')]],
+];
+
+test('a section the shell left out is no place in the rail or under More, and it is a place again once it is handed in', () => {
+  const before = railOf(flatNav(sam(false), 0, WORDS), 'Decide');
+  const drawn = [...before.places, ...before.more];
+  assert.deepEqual(drawn.map((i) => i.label), ['Today', 'Decide', 'Money', 'People', 'Dashboard', 'Activity']);
+  assert.ok(!drawn.some((i) => i.href === '/p/estate'), 'the rail drew a place nobody handed it');
+  assert.deepEqual(Object.keys(before.views), []);
+  const after = railOf(flatNav(sam(true), 0, WORDS), 'Decide');
+  assert.deepEqual([...after.places, ...after.more].map((i) => i.label), ['Today', 'Decide', 'Money', 'People', 'Services', 'Dashboard', 'Activity']);
+  assert.equal(after.places.find((i) => i.label === 'Services')?.href, '/p/estate');
+});

@@ -201,6 +201,18 @@ test('AN ACCOUNT LAST STATED IN ANOTHER CURRENCY THAN THE COUNT SAYS SO ON THE C
   assert.match(a.log, /counted in EUR and Till was last said to hold GBP/);
 });
 
+test('A BANK MESSAGE THAT LAST STATED THE ACCOUNT IN ANOTHER CURRENCY SAYS SO ON THE COUNT AS WELL, and count.js holds the sentence', async () => {
+  /* The newest statement is a movement's balance after, not a balance check: the same path, reached the other way. */
+  const till = row('01K5BOX0000000000000000003', 'accounts', 6, { name: 'Till', kind: 'cash', balance: { amount: 50_000, currency: 'EUR' }, as_of: '2026-09-20', liquid: true }, 3);
+  const told = row('01K5TXN0000000000000000021', 'transactions', 21, { what: 'Paid in', on: '2026-09-23', direction: 'in', amount: { amount: 1_000, currency: 'GBP' }, balance_after: { amount: 40_000, currency: 'GBP' }, account: till.id, state: 'cleared' });
+  const count = row('01K5CNT0000000000000000010', 'cash_counts', 10, { account: till.id, counted: { amount: 41_250, currency: 'EUR' }, on: '2026-09-25' }, 4);
+  const a = await runInQuickJs(decl(), hostWith(count, till, [told]));
+  /* ONE WRITE, THE WORD ON THE COUNT: no check, no difference, and never the sentence about a foreign entry. */
+  assert.deepEqual(writesOf(a), [{ op: 'update', spoken: 'cash_counts#10', patch: { said: OTHER_CURRENCY }, version: 4 }]);
+  assert.match(a.log, /counted in EUR and Till was last said to hold GBP/);
+  assert.ok(SOURCE.includes("so it was not compared. Count in the account's currency.`;"), 'count.js says another sentence than this test holds');
+});
+
 test('THE SENTENCE NAMES THE WAY OUT, AND THE WAY OUT WORKS: the balance typed after the foreign entry, and the next count is compared', async () => {
   /* WHICH BALANCE, THEN THE WAY OUT, in that order and in one sentence a person reads under What happened. */
   assert.match(NOT_COMPARED, /type the balance its bank or statement shows, not the cash in the box, then count again\.$/);

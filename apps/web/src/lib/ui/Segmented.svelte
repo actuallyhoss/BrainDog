@@ -10,7 +10,7 @@
     </Segmented>
 
   Everything else it is given (`role`, `aria-*`, `id`, `class`) lands on the track. `tag` is for a track that is a
-  `nav` of links.
+  `nav` of links, or an `ol` where the segments are steps in order, each in an `li`.
 
   THE THUMB IS THE TRACK'S `::before` (`controls.css`), placed by `--x`, `--y`, `--w` and `--h`, which are READ FROM
   THE CHOSEN SEGMENT'S BOX and never worked out from a count: labels are different widths, and a word goes away below
@@ -19,6 +19,10 @@
 
   IT JUMPS, TOO, when the track has wrapped to two lines (a diagonal slide says nothing) and under reduced motion.
   Before the first measure, and with no script at all, the chosen segment is filled the way it always was.
+
+  `many` IS A TRACK WHERE MORE THAN ONE CAN BE CHOSEN (toggles pressed in and out). One thumb cannot sit under two
+  segments, and a thumb under the first slid across to a second that already looked chosen when the first was switched
+  off. So a `many` track draws no thumb and measures nothing: every chosen segment keeps its own flat fill.
 -->
 <script module lang="ts">
   /* thumb:start (`segmented.test.ts` reads the lines between these two marks and runs them) */
@@ -58,12 +62,16 @@
 
   let {
     tag = 'div',
+    many = false,
     class: cls = '',
     children,
     ...rest
   }: Omit<HTMLAttributes<HTMLElement>, 'class' | 'children'> & {
-    /** The track's element: a `div`, or a `nav` where the segments are links. */
-    tag?: 'div' | 'nav';
+    /** The track's element: a `div`, a `nav` where the segments are links, or an `ol` where the segments are steps
+        in order, each in an `li`. */
+    tag?: 'div' | 'nav' | 'ol';
+    /** More than one segment can be chosen at once: no thumb is drawn, and each chosen segment fills itself. */
+    many?: boolean;
     class?: string;
     children: Snippet;
   } = $props();
@@ -76,12 +84,24 @@
     const el = track;
     if (!el || typeof ResizeObserver !== 'function') return;
 
+    /* Nothing to place, so nothing to watch: a thumb left from before `many` was set is taken away. */
+    if (many) {
+      thumb = null;
+      return;
+    }
+
     /* The segment the thumb was last put under, so a resize of the same choice is told from a new one. It is kept
        here and not read back from `thumb`: reading state in this effect would run it again on every placing. */
     let under: Element | null = null;
 
+    /* A step in an ordered track is read through its list item. */
+    const segmentsOf = (of: HTMLElement) =>
+      Array.from(of.children)
+        .map((c) => (c instanceof HTMLLIElement ? c.firstElementChild : c))
+        .filter((c): c is HTMLElement => c instanceof HTMLElement);
+
     const place = () => {
-      const segments = Array.from(el.children).filter((c): c is HTMLElement => c instanceof HTMLElement);
+      const segments = segmentsOf(el);
       const chosen = segments.find((s) => s.hasAttribute('data-on')) ?? null;
       const rtl = getComputedStyle(el).direction === 'rtl';
       const next = thumbOf(
@@ -105,6 +125,7 @@
       sizes.disconnect();
       sizes.observe(el);
       for (const child of el.children) sizes.observe(child);
+      for (const segment of segmentsOf(el)) if (segment.parentElement !== el) sizes.observe(segment);
     };
 
     /* The caller moves `data-on`, or draws a segment more or fewer. */
@@ -130,6 +151,7 @@
   bind:this={track}
   class={['segmented', cls]}
   data-slides=""
+  data-many={many ? '' : undefined}
   data-thumb={thumb ? (slide ? 'slide' : 'jump') : undefined}
   style:--x={thumb ? `${thumb.x}px` : undefined}
   style:--y={thumb ? `${thumb.y}px` : undefined}

@@ -1131,7 +1131,16 @@ export function createClient(options: ClientOptions) {
   /** Past this many encoded bytes of arguments a read is sent as a POST body, well under any server's header ceiling. */
   const READ_URL_CEILING = 6000;
 
-  async function call<T>(name: string, args: Record<string, unknown> = {}): Promise<Result<T>> {
+  /** The most a browser lets every `keepalive` request of a page carry at once; one over it is refused unsent. */
+  const KEEPALIVE_CEILING = 64 * 1024;
+
+  /**
+   * `outlive` asks that the request be finished though the page that sent it has gone (`keepalive`). ONLY `markRead`
+   * ASKS, because it is the one call a screen makes as it is left: a plain fetch of a closing page is cancelled, and
+   * the reader's mark was lost with it, so what was new stayed new. It is not an option of the client, and a body
+   * at or over the ceiling goes plain, since a browser refuses that one rather than sending it late.
+   */
+  async function call<T>(name: string, args: Record<string, unknown> = {}, how: { outlive?: boolean } = {}): Promise<Result<T>> {
     if (!NAMES.has(name))
       return {
         ok: false,
@@ -1166,6 +1175,9 @@ export function createClient(options: ClientOptions) {
         url.searchParams.set(key, typeof value === 'string' ? value : JSON.stringify(value));
       }
 
+    const sent = writes ? JSON.stringify(args) : undefined;
+    const outlives = how.outlive === true && sent !== undefined && new TextEncoder().encode(sent).length < KEEPALIVE_CEILING;
+
     let res: Response;
     try {
       res = await doFetch(url.toString(), {
@@ -1174,7 +1186,8 @@ export function createClient(options: ClientOptions) {
           ...(writes ? { 'content-type': 'application/json' } : {}),
           ...(options.token ? { authorization: `Bearer ${options.token}` } : {}),
         },
-        ...(writes ? { body: JSON.stringify(args) } : {}),
+        ...(sent !== undefined ? { body: sent } : {}),
+        ...(outlives ? { keepalive: true } : {}),
       });
     } catch (e) {
       return { ok: false, refusal: unreachable(e instanceof Error ? e.message : String(e)) };
@@ -1595,9 +1608,10 @@ export function createClient(options: ClientOptions) {
     /* THE TWO DATA WRITES A SCREEN MAKES WITHOUT CHANGING A ROW. `markRead` moves the reader's own
        mark and nothing else, and with no `upTo` the record uses its own newest event, so a caller
        never has to know a number to say "I have seen this". `log` is a note against a row: it is a
-       write, and it leaves the row's version where it was. */
+       write, and it leaves the row's version where it was. `markRead` alone is sent to outlive its page (see
+       `call`), because Home stamps the mark as the reader leaves. */
     markRead: (upTo?: Cursor) =>
-      call<{ upTo: Cursor; seen_at: unknown }>('markRead', upTo === undefined ? {} : { upTo }),
+      call<{ upTo: Cursor; seen_at: unknown }>('markRead', upTo === undefined ? {} : { upTo }, { outlive: true }),
     log: (args: { register: string; seq: number; note?: string }) => call<unknown>('log', args as Record<string, unknown>),
     /**
      * One of the reader's own settings, in the shape its key takes (`Prefs`): the rail's `nav.order` and `nav.hidden`,

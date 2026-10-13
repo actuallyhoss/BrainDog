@@ -15,6 +15,7 @@ import { sayStep, sayTrigger, words } from '../../../lib/flow/flow.ts';
 import { REGISTERS } from '../../../lib/record/api.ts';
 import type { Fetch } from '../../../lib/record/page-live.ts';
 import { copy } from '../../../lib/copy.ts';
+import { forget } from '../../../lib/record/boot-live.ts';
 import { drawnOf, previewOf, proposedOf } from './proposed.ts';
 
 test('a page says where it lands in the sidebar and what it shows', () => {
@@ -338,6 +339,32 @@ test('A BLOCK THE RECORD HELD BACK IS DRAWN AS ITS REFUSAL, never filled from th
   assert.deepEqual(drawn.blocks[0]?.rows, []);
   /* THE RECORD'S SENTENCE, which is what the page's drawing reads off a refused block (`blockOf` keeps each `fix`). */
   assert.deepEqual(drawn.blocks[0]?.refusals, ['You cannot read Things.']);
+});
+
+test('A FEED ON A PROPOSED PAGE NAMES ITS READER AS You and another person by the name boot said, never as Someone', async () => {
+  const me = 'p_01M45MN5M03SECPTPXD5P98F44';
+  const ada = 'p_01M45MN5M03SECPTPXD5P98F45';
+  const at = new Date(CLOCK).toISOString();
+  const feed = {
+    kind: 'feed', source: 'activity', rows: [], matched: 2, refusals: [],
+    feed: [
+      { by: 'you', who: me, count: 1, kind: 'create', target: 'people#2', note: null, at, thing: 'Nadia' },
+      { by: 'you', who: ada, count: 1, kind: 'create', target: 'people#3', note: null, at, thing: 'Omar' },
+    ],
+  };
+  const io = (async (url: string | URL | Request) => {
+    const method = new URL(String(url)).pathname.slice('/api/'.length);
+    if (method === 'boot')
+      return reply(200, { ok: true, value: { registers: [], pages: [], record: { slug: 'the-studio', name: 'The Studio', locale: 'en', currency: 'GBP' }, me: { kind: 'person', person: me, name: 'Mariam', level: 'owner' }, names: { [me]: 'Mariam', [ada]: 'Ada Lovelace' } } });
+    if (method === 'previewPage') return reply(200, { ok: true, value: { read_at: at, blocks: [feed] } });
+    return reply(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'No such method.' } });
+  }) as Fetch;
+  forget();
+  const drawn = await drawnOf({ page: 'today', title: 'Today', blocks: [{ kind: 'feed', source: 'activity' }] }, BASE, io);
+  forget();
+  assert.equal(drawn.from, 'live');
+  if (drawn.from !== 'live') return;
+  assert.deepEqual(drawn.blocks[0]?.rows.map((r) => r.cells[1]), ['You', 'Ada Lovelace']);
 });
 
 test('A CHANGE CARRIES WHAT previewChange IS ASKED WITH, and a pattern carries none', () => {

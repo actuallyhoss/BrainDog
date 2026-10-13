@@ -19,6 +19,7 @@ import { ruleName } from '@braindog/seed/usecases/names';
 import { copy } from '../../../lib/copy.ts';
 import { pathOf, sayCondition, sayStep, sayTrigger, triggerOfBody, verbOf, words as canvas } from '../../../lib/flow/flow.ts';
 import { kindLines, kindWords } from '../../../lib/record/jobs.ts';
+import { readBoot } from '../../../lib/record/boot-live.ts';
 import { blockOf, type Fetch, type LiveBlock, type LivePageDecl, type Opened } from '../../../lib/record/page-live.ts';
 import { learn, refMapOf, targetsOf, type RecordRow, type RefMap, type SchemaCall } from '../../../lib/record/remote.ts';
 import { builderPath } from '../../../lib/pattern/draft.ts';
@@ -362,7 +363,13 @@ function declaredLists(to: unknown): Map<string, Row> {
  * held back carries its refusal and is drawn as that, never filled from the sample. Every run is read together, so a
  * list both sides of a change read is asked for once.
  */
-async function liveOf(client: Client, runs: readonly Answered[][], now: number, declared: ReadonlyMap<string, Row> = new Map()): Promise<LiveBlock[][]> {
+async function liveOf(
+  client: Client,
+  runs: readonly Answered[][],
+  now: number,
+  declared: ReadonlyMap<string, Row> = new Map(),
+  at: { base: string; io?: Fetch } | null = null,
+): Promise<LiveBlock[][]> {
   const schema: SchemaCall = (register) =>
     client.schema(register).then((out) => (out.ok || !declared.has(register) ? out : { ok: true, value: { ...declared.get(register), id: register } }));
   const lists = [...new Set(runs.flat().flatMap((b) => (!b.refusals?.length && b.source?.startsWith('register.') ? [b.source.slice('register.'.length)] : [])))];
@@ -381,7 +388,12 @@ async function liveOf(client: Client, runs: readonly Answered[][], now: number, 
     } while (cursor !== null);
     refs.set(target, refMapOf(target, rows));
   }
-  return runs.map((run) => run.map((b) => blockOf(b, refs, now)));
+  /* WHO IS READING, for a feed that names the reader as You, as a live page reads it (`pageReader`): the shell's own
+     `boot`, kept, so it costs no call. A boot that cannot be read leaves the feed with no reader, never undrawn. */
+  const booted = at !== null && runs.some((run) => run.some((b) => b.source === 'activity')) ? await readBoot(at.base, at.io).catch(() => null) : null;
+  const me = booted?.from === 'live' ? (booted.boot.me?.person ?? null) : null;
+  const names = new Map(Object.entries(booted?.from === 'live' ? (booted.boot.names ?? {}) : {}));
+  return runs.map((run) => run.map((b) => blockOf(b, refs, now, me, names)));
 }
 
 /**
@@ -404,7 +416,7 @@ export async function drawnOf(body: Row, base: string, io?: Fetch): Promise<Draw
   const blocks = (Array.isArray(out.value.blocks) ? out.value.blocks : []) as Answered[];
   const said = typeof out.value.read_at === 'string' ? Date.parse(out.value.read_at) : Number.NaN;
   const now = Number.isFinite(said) ? said : Date.now();
-  const [live = []] = await liveOf(client, [blocks], now);
+  const [live = []] = await liveOf(client, [blocks], now, new Map(), { base, ...(io ? { io } : {}) });
   return { from: 'live', now, blocks: live };
 }
 
@@ -426,7 +438,7 @@ export async function previewOf(change: Row, base: string, io?: Fetch): Promise<
   const pages = (Array.isArray(out.value.pages) ? out.value.pages : []).filter(isRow);
   const now = Date.now();
   const runs = pages.flatMap((p) => [(Array.isArray(p.blocks) ? p.blocks : []) as Answered[], (Array.isArray(p.was) ? p.was : []) as Answered[]]);
-  const live = await liveOf(client, runs, now, declaredLists(change.to));
+  const live = await liveOf(client, runs, now, declaredLists(change.to), { base, ...(io ? { io } : {}) });
   return {
     from: 'live',
     pages: pages.map((p, i) => {

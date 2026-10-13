@@ -203,7 +203,7 @@
 
   /**
    * THE RATES THE RECORD HOLDS, for the rates tile: the newest of each pair, and its last 90 days. Read off whichever of
-   * this add-on's own lists declares `rates:`, so no list is named here, and only on the page that sets the home
+   * this add-on's own lists the kernel says holds the rates (`ratesListOf`), so no list is named here, and only on the page that sets the home
    * currency, which is where the tile is. Empty until the record answers and when it holds none, and the tile is then
    * the sentence and the button alone.
    */
@@ -577,8 +577,9 @@
       {#if HOME_CURRENCY_SETTING in settings.config}
         <!-- EXCHANGE RATES ARE A PRESET OF THE NEW-ACTION SHEET, reached by its address.
              This page drew a form written for one pack, which it imported by name; now it links to the same sheet
-             every scheduled action is made on, filled in for a rate. It stays offered once one is set up, because each
-             currency is an action of its own and a second currency is the same press again. -->
+             every scheduled action is made on, filled in for the rates. It stays offered once one is set up, because the
+             one action fetches every currency the record holds, and the same press after a currency is added makes it
+             again with that currency in it (`ratesPreset`). -->
         <!-- THE TILE HOLDS WHAT THE RECORD HOLDS: the newest rate of each pair, and a line of its last 90 days once
              there are points enough to draw (`rates.ts`). Until an action has fetched one there is no rate here, and
              it is the control tile it was, which the design system allows to hold no figure. -->

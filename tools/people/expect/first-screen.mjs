@@ -8,22 +8,30 @@
  * - `width`: 390 or 1440.
  * - `text`: every sentence drawn, as one string or a list of strings.
  * - `roles`: the page's accessibility tree, flattened, as `{ role, name, landmark }`, where `landmark` is the role of
- *   the nearest landmark around it (`navigation` for the rail and the More sheet, `main`, ...) or `null`.
+ *   the nearest landmark around it (`navigation` for the rail, the tab bar and the More sheet, `main`, ...) or `null`.
+ *   A link may say where it goes (`href`), and a rail whose links do is judged row by row.
  * - `counts`: the lists as that person reads them, keyed by the list's id or by the name the screen gives it. A value
  *   is a count, or the entries themselves as `{ name, tags }` where the rig read them.
+ * - `behind`: what each row of the rail stands on, keyed by the row's `href`: the lists its page reads (or the list
+ *   itself), each under its name with how much it holds. `{}` for a page that reads no list.
+ * - `signs`: how many of the record's vital signs read red, or `null` where it holds no page they are shown on.
  * - `owner`: whether the reader owns the record, where the rig knows; left out, nothing is judged by it.
  *
  * WITH NO RIG, `screens.mjs` draws the snapshots itself: the web's own rail and Today, rendered for the server from a
  * record a walk just made (`first-run.mjs`), which is what this file's command hands in when it is given no file.
  *
- * EACH CHECK ANSWERS `{ id, pass, saw }`: `true` or `false` with what it saw, or `null` when the snapshot does not hold
- * what the check reads (the rig is told what to hand it, the product is not blamed). `saw` is read by a person in the
- * nightly report, so it is plain words and names, never an id.
+ * EACH CHECK ANSWERS `{ id, pass, saw }`: `true` or `false` with what it saw, or `null` when it judged nothing. A `null`
+ * is one of two things, told apart by `applies`. NOT SEEN (`applies` left out): the check is this screen's to judge and
+ * the snapshot does not hold what it reads, so the rig is told what to hand it, the product is not blamed, and the
+ * command leaves with 1, since a check that read nothing has proved nothing. NOT THIS SCREEN'S (`applies: false`): the
+ * check has no business here (a first-run check on Today, a team's check for one person), which is no fault of
+ * anybody's. `saw` is read by a person in the nightly report, so it is plain words and names, never an id.
  */
 
 import { firstRun } from '../../../apps/web/src/lib/first-run.ts';
 import { words as signupWords } from '../../../apps/web/src/routes/signup/words.ts';
 import { pageWords } from '../../../apps/web/src/lib/record/page-new.ts';
+import { shell as shellWords } from '../../../apps/web/src/lib/copy/shell.ts';
 
 /** Words the first screens never say: a tour, a checklist, getting started. */
 const TOUR = /\b(tour|checklist|getting started|onboarding steps?)\b/iu;
@@ -76,15 +84,18 @@ export const UNITS = {
   'team-no-task': 'USE-B07',
 };
 
-/** The same, for the two checks that read the app's shell as drawn (`drawnScreen`). */
+/** The same, for the three checks that read the app's shell as drawn (`drawnScreen`). */
 export const DRAWN_UNITS = {
   'pages-line': 'PGS-C30',
   'signs-line': 'PRF-A05',
+  'own-lines-you': 'USE-B06',
 };
 
 const pass = (id, saw) => ({ id, pass: true, saw });
 const fail = (id, saw) => ({ id, pass: false, saw });
 const unseen = (id, saw) => ({ id, pass: null, saw });
+/** Not this screen's to judge: nothing read, and nothing owed. */
+const off = (id, saw) => ({ id, pass: null, applies: false, saw });
 
 /** The snapshot's text as one string. */
 const textOf = (snap) => (Array.isArray(snap.text) ? snap.text.join('\n') : String(snap.text ?? ''));
@@ -109,6 +120,47 @@ const inRail = (snap) => (snap.roles ?? []).filter((r) => r.landmark === 'naviga
 
 /** A place's name without the count the rail draws after it: "Orders 2" is Orders. */
 const bare = (name) => String(name).replace(/\s+\d+$/u, '');
+
+/**
+ * A rail row that is a place of the record, by where its link goes: a list's own screen or a page. A name that opens
+ * with an underscore is a door of the app's own (New list goes to `_new`), and no place.
+ */
+const PLACE = /\/(?:p|r)\/[^/?#_][^/?#]*\/?(?:[?#].*)?$/u;
+
+/** Names joined as a sentence joins them: "Orders and Money", "Orders, Money and Clients". */
+const and = (names) => (names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`);
+
+/** Names as a sentence lists them: "Accounts, Ledger and 4 more". */
+const some = (names, most = 3) => (names.length > most ? `${names.slice(0, most).join(', ')} and ${names.length - most} more` : and(names));
+
+/**
+ * THE RAIL AS DRAWN, ROW BY ROW: every link in it that goes to a list or a page, held against what stands behind it
+ * (`snap.behind`, else the list of its name in `counts`). Today, Decide and People are always there. A row whose page
+ * reads lists and finds every one of them empty has nothing to show, and is red; one that reads no list has nothing to
+ * be empty. A link that is no place (New list, the account, an agent at work) is known by where it goes and is left
+ * alone, so a rail of only the three is read and green: that is what the first minute should hold.
+ */
+function drawnRows(snap, links) {
+  const rows = new Map();
+  for (const r of links) if (PLACE.test(r.href ?? '') && !ALWAYS.some((a) => same(a, bare(r.name))) && !rows.has(r.href)) rows.set(r.href, r);
+  const where = Number.isFinite(snap.width) && snap.width < RAIL_FROM ? "the phone's places" : 'the rail';
+  const empty = [];
+  const unread = [];
+  const full = [];
+  for (const [href, r] of rows) {
+    const own = [r.name, bare(r.name)].find((n) => countOf(snap.counts, n) !== undefined);
+    const reads = snap.behind?.[href] ?? (own === undefined ? undefined : { [own]: countOf(snap.counts, own) });
+    /* A LIST'S ROW SAYS ITS COUNT AFTER ITS NAME: "Orders 2" is Orders, unless a list is called just that. */
+    const name = Object.keys(reads ?? {}).some((k) => same(k, r.name)) ? r.name : bare(r.name);
+    if (reads === undefined) unread.push(name);
+    else if (Object.keys(reads).length > 0 && Object.values(reads).every((v) => size(v) === 0)) empty.push(`${name} (${some(Object.keys(reads))} ${Object.keys(reads).length === 1 ? 'holds' : 'hold'} nothing)`);
+    else if (!full.includes(name)) full.push(name);
+  }
+  if (empty.length > 0) return fail('rail-has-rows', `${and(empty)} ${empty.length === 1 ? 'is' : 'are'} in ${where} with nothing to show`);
+  if (unread.length > 0) return unseen('rail-has-rows', `the rig did not read what stands behind ${some(unread)} in ${where}`);
+  if (full.length === 0) return pass('rail-has-rows', `${where} ${where === 'the rail' ? 'holds' : 'hold'} no place besides ${and(ALWAYS)}`);
+  return pass('rail-has-rows', `${and(full)} ${full.length === 1 ? 'is' : 'are'} in ${where}, each with something in it`);
+}
 
 /** The first few words around a match, for `saw`. */
 function around(text, re) {
@@ -139,8 +191,8 @@ export const firstScreen = {
 
   /** On sign-up and the start page nothing is written before "Make it mine": every list reads empty. */
   'nothing-before-press'(snap) {
-    if (!FIRST_RUN.test(snap.path ?? '')) return unseen('nothing-before-press', `not a first-run page (${snap.path})`);
-    if (pressed(snap)) return unseen('nothing-before-press', '"Make it mine" was already pressed on this screen');
+    if (!FIRST_RUN.test(snap.path ?? '')) return off('nothing-before-press', `not a first-run page (${snap.path})`);
+    if (pressed(snap)) return off('nothing-before-press', '"Make it mine" was already pressed on this screen');
     if (snap.counts === undefined) return unseen('nothing-before-press', 'the rig read no lists');
     const full = Object.entries(snap.counts).filter(([, v]) => size(v) > 0);
     if (full.length > 0) return fail('nothing-before-press', `before the press ${full.map(([k, v]) => `${k} holds ${size(v)}`).join(', ')}`);
@@ -152,7 +204,7 @@ export const firstScreen = {
    * client in Mariam's first real thing) is hers. Before the press nothing is written, so People is not read yet.
    */
   'people-only-them'(snap, person) {
-    if (beforePress(snap)) return unseen('people-only-them', 'before "Make it mine" nothing is in People yet');
+    if (beforePress(snap)) return off('people-only-them', 'before "Make it mine" nothing is in People yet');
     const people = countOf(snap.counts, 'people');
     if (people === undefined) return unseen('people-only-them', 'the rig did not read People');
     if (Array.isArray(people)) {
@@ -178,15 +230,19 @@ export const firstScreen = {
 
   /**
    * The rail holds only places with entries, besides Today, Decide and People. On the first-run pages there is no rail
-   * at all. A place is judged by the list of its name the rig read: the rail also draws links that are no list (New
-   * list, Account, the agents at work, the pen's suggestions), and those are never blamed for being empty.
+   * at all. WHERE THE LINKS SAY WHERE THEY GO (markup that was drawn), the rail is read row by row (`drawnRows`).
+   * WHERE THEY DO NOT (a rig's flat tree), a place is judged by the list of its name the rig read: the rail also draws
+   * links that are no list (New list, Account, the agents at work, the pen's suggestions), and those are never blamed
+   * for being empty.
    */
   'rail-has-rows'(snap) {
     const rail = railOf(snap);
     if (FIRST_RUN.test(snap.path ?? '')) {
       return rail.length > 0 ? fail('rail-has-rows', `the first run draws a rail: ${rail.join(', ')}`) : pass('rail-has-rows', 'no rail on the first run');
     }
-    if (rail.length === 0) return unseen('rail-has-rows', 'no rail or More sheet on this screen');
+    if (rail.length === 0) return unseen('rail-has-rows', 'no rail, tab bar or More sheet on this screen');
+    const links = (snap.roles ?? []).filter((r) => r.landmark === 'navigation' && (r.role === 'link' || r.role === 'tab'));
+    if (links.some((r) => typeof r.href === 'string')) return drawnRows(snap, links);
     /* A LIST'S ROW SAYS ITS COUNT AFTER ITS NAME, and a screen reader hears both as the link's name. */
     const names = rail.map((name) => (countOf(snap.counts, name) === undefined ? bare(name) : name));
     const read = [...new Set(names)].filter((name) => !ALWAYS.some((a) => same(a, name)) && countOf(snap.counts, name) !== undefined);
@@ -201,7 +257,7 @@ export const firstScreen = {
    * A task named in the person's own words (her first real thing) is hers. A bare count cannot say whose, so any is red.
    */
   'team-no-task'(snap, person) {
-    if (person.expects !== 'team') return unseen('team-no-task', `${person.name} is not a team`);
+    if (person.expects !== 'team') return off('team-no-task', `${person.name} is not a team`);
     const tasks = countOf(snap.counts, 'tasks');
     if (tasks === undefined) return unseen('team-no-task', 'the rig did not read the tasks');
     const made = Array.isArray(tasks) ? tasks.filter((t) => !typed(person, t)).length : size(tasks);
@@ -214,9 +270,10 @@ export const firstScreen = {
 /* ── the checks that read the shell as drawn ──────────────────────────────────────────────────────────── */
 
 /**
- * Two checks over the app's shell once it is drawn (audit 71, finding 8): the rail's line that makes a page, and
- * Today's line on the vital signs. Kept beside the seven and not among them, since they read a rail's buttons and
- * headings and Today's links, which a snapshot of the first run's words alone never holds.
+ * Three checks over the app's shell once it is drawn (audit 71, finding 8): the rail's line that makes a page,
+ * Today's line on the vital signs, and what Today calls the reader in her own lines. Kept beside the seven and not
+ * among them, since they read a rail's buttons and headings and Today's links and feed, which a snapshot of the first
+ * run's words alone never holds.
  */
 export const drawnScreen = {
   /**
@@ -227,13 +284,13 @@ export const drawnScreen = {
    */
   'pages-line'(snap) {
     const rail = inRail(snap);
-    if (FIRST_RUN.test(snap.path ?? '')) return unseen('pages-line', 'the first run has no rail');
+    if (FIRST_RUN.test(snap.path ?? '')) return off('pages-line', 'the first run has no rail');
+    if (Number.isFinite(snap.width) && snap.width < RAIL_FROM) return off('pages-line', `at ${snap.width} wide the line is behind a press`);
     if (rail.length === 0) return unseen('pages-line', 'no rail on this screen');
-    if (Number.isFinite(snap.width) && snap.width < RAIL_FROM) return unseen('pages-line', `at ${snap.width} wide the places are behind a press`);
     const lines = rail.filter((r) => r.role !== 'heading' && [pageWords.newPage, pageWords.suggestPage].some((w) => same(w, r.name)));
     const homes = rail.filter((r) => same(pageWords.section, r.role === 'heading' ? r.name : bare(r.name)) && (r.role === 'heading' || r.role === 'link'));
     /* THE NARROW RAIL draws glyphs and no heading at all, and has no room for a name to be typed: nothing to judge. */
-    if (lines.length === 0 && !rail.some((r) => r.role === 'heading')) return unseen('pages-line', 'the narrow rail has no room for the line');
+    if (lines.length === 0 && !rail.some((r) => r.role === 'heading')) return off('pages-line', 'the narrow rail has no room for the line');
     if (lines.length === 0) return fail('pages-line', `the rail has no "${pageWords.newPage}" and no "${pageWords.suggestPage}"`);
     if (lines.length > 1) return fail('pages-line', `the rail says ${lines.map((r) => `"${r.name}"`).join(' and ')}, ${lines.length} lines where one makes a page`);
     const [line] = lines;
@@ -247,26 +304,66 @@ export const drawnScreen = {
 
   /**
    * Today says how many vital signs need a look at most once, as words that open the page they are shown on, and only
-   * to whoever owns the record (audit 71, finding 5). A Today that says nothing of them has nothing wrong to say.
+   * to whoever owns the record (audit 71, finding 5).
+   *
+   * AND IT SAYS SO WHEN ONE DOES (audit 73, finding 7): a Today with no line is held against how many read red
+   * (`snap.signs`), so taking the line out is red for whoever owns a record with a red sign. Silence is right for
+   * anybody else, on a record with no page to open, and when none is red; with the number not read, silence proves
+   * nothing and is said as not seen.
    */
   'signs-line'(snap) {
-    if (!TODAY.test(snap.path ?? '')) return unseen('signs-line', `not Today (${snap.path})`);
+    if (!TODAY.test(snap.path ?? '')) return off('signs-line', `not Today (${snap.path})`);
     const main = (snap.roles ?? []).filter((r) => r.landmark === 'main');
     if (main.length === 0) return unseen('signs-line', 'Today was not drawn on this screen');
     const said = (Array.isArray(snap.text) ? snap.text : textOf(snap).split('\n')).filter((t) => SIGNS.test(t));
-    if (said.length === 0) return pass('signs-line', 'Today says nothing about the vital signs');
+    const red = (n) => (n === 1 ? 'one vital sign reads red' : `${n} vital signs read red`);
+    if (said.length === 0) {
+      if (snap.owner === false) return pass('signs-line', 'Today says nothing about the vital signs to somebody who does not own the record');
+      if (snap.signs === null) return pass('signs-line', 'the record has no page for its vital signs, and Today says nothing about them');
+      if (!Number.isFinite(snap.signs)) return unseen('signs-line', 'Today says nothing about the vital signs, and the rig did not read how many need a look');
+      if (snap.signs === 0) return pass('signs-line', 'no vital sign needs a look, and Today says nothing about them');
+      if (snap.owner !== true) return unseen('signs-line', `${red(snap.signs)}, and the rig did not say whether the reader owns the record`);
+      return fail('signs-line', `${red(snap.signs)}, and Today does not say so`);
+    }
     const line = around(said[0], SIGNS);
     if (snap.owner === false) return fail('signs-line', `somebody who does not own the record is told "${line}"`);
     if (said.length > 1) return fail('signs-line', `Today says it ${said.length} times: "${line}"`);
     if (!main.some((r) => r.role === 'link' && SIGNS.test(r.name))) return fail('signs-line', `"${line}" opens nothing`);
+    if (snap.signs === null) return fail('signs-line', `Today says "${line}" on a record with no page for its vital signs`);
+    const told = /\b(one|\d+) vital signs?/iu.exec(said[0])?.[1];
+    const count = told === undefined ? Number.NaN : /^one$/iu.test(told) ? 1 : Number(told);
+    if (Number.isFinite(snap.signs) && count !== snap.signs) return fail('signs-line', `Today says "${line}" while ${snap.signs === 0 ? 'no vital sign reads red' : red(snap.signs)}`);
     return pass('signs-line', `Today says "${line}", and the words open the page`);
+  },
+
+  /**
+   * Today never calls the reader a stranger on her own record: where People holds her and nobody she did not type (a
+   * client named in her own words signs nothing in), whatever a person did on it she did, so a line that says somebody
+   * unnamed did it (the feed's word for a person it holds no name for, `feedSomeone`) is her own line, misnamed. Seen
+   * on the first-run walk in batch 75: "Someone on this record added Nadia just now" for the owner's own entries,
+   * with every check green. Judged for whoever owns the record; with anybody else in People the words may be true of
+   * them, and that is not this check's to tell.
+   */
+  'own-lines-you'(snap, person) {
+    if (!TODAY.test(snap.path ?? '')) return off('own-lines-you', `not Today (${snap.path})`);
+    if (!(snap.roles ?? []).some((r) => r.landmark === 'main')) return unseen('own-lines-you', 'Today was not drawn on this screen');
+    const stranger = shellWords.feedSomeone.toLocaleLowerCase();
+    const said = (Array.isArray(snap.text) ? snap.text : textOf(snap).split('\n')).filter((t) => t.toLocaleLowerCase().includes(stranger));
+    if (said.length === 0) return pass('own-lines-you', 'Today calls nobody a stranger on this record');
+    if (snap.owner === false) return off('own-lines-you', 'the reader does not own the record, and may hold no name for whoever did it');
+    const people = countOf(snap.counts, 'people');
+    if (people === undefined) return unseen('own-lines-you', `Today says "${shellWords.feedSomeone}", and the rig did not read People`);
+    const others = Array.isArray(people) ? people.filter((p) => p?.name !== person?.name && !typed(person, p)).length : size(people) - 1;
+    if (others !== 0) return off('own-lines-you', `People holds ${size(people)}, so the words may be true of somebody else`);
+    if (snap.owner !== true) return unseen('own-lines-you', `Today says "${shellWords.feedSomeone}", and the rig did not say whether the reader owns the record`);
+    return fail('own-lines-you', `nobody but ${person?.name ?? 'the reader'} writes on this record, and Today says "${said[0].replace(/\s+/gu, ' ').trim().slice(0, 80)}" ${said.length === 1 ? 'once' : `${said.length} times`}`);
   },
 };
 
 /** Every check, in order, on one snapshot as one person. */
 export const checkScreen = (snap, person) => Object.values(firstScreen).map((check) => check(snap, person));
 
-/** The seven and then the two that read the shell as drawn, on one snapshot handed in. */
+/** The seven and then the three that read the shell as drawn, on one snapshot handed in. */
 export const checkDrawn = (snap, person) => [...checkScreen(snap, person), ...Object.values(drawnScreen).map((check) => check(snap, person))];
 
 /* ── run as a command ─────────────────────────────────────────────────────────────────────────────────── */
@@ -281,27 +378,33 @@ const sentencesOf = (table) => Object.values(table).flatMap((v) => (typeof v ===
 /** The first run's own words, as the one screen this file can judge with no rig: what `/start` and sign-up can say. */
 export const wordsScreen = () => ({ path: '/start', text: [...sentencesOf(firstRun), ...sentencesOf(signupWords)] });
 
-/** One check as one line: its name, green, red or not seen, and what it saw. Coloured on a terminal. */
+/** A check that was this screen's to judge and read nothing. */
+const unread = (r) => r.pass === null && r.applies !== false;
+
+/** One check as one line: its name, green, red, not seen or does not apply, and what it saw. Coloured on a terminal. */
 export function lineOf(r, colour = false) {
-  const [word, code] = r.pass === true ? ['green', 32] : r.pass === false ? ['red', 31] : ['not seen', 33];
+  const [word, code] = r.pass === true ? ['green', 32] : r.pass === false ? ['red', 31] : unread(r) ? ['not seen', 33] : ['does not apply', 90];
   return `${r.id}: ${colour ? `\u001b[${code}m${word}\u001b[0m` : word}. ${r.saw}`;
 }
 
 /**
  * Everything the command prints and the code it leaves with, from the screens it was handed (`null` for none) and the
  * person: a heading a screen, a line a check, and a last line that counts them and says the exit code. 1 when any
- * check is red, 0 when none is. A check that read nothing leaves the code alone and is said as UNCHECKED on that line.
+ * check is red, and 1 when a check that was a screen's to judge read nothing (audit 73, finding 7: twelve unread and a
+ * code of 0 was a pass nobody had earned), said as UNCHECKED on that line. A check that does not apply to a screen is
+ * counted apart and leaves the code alone. 0 only when every check that applies read something and none is red.
  *
  * WITH NO SCREEN, only the checks that read words are judged, on the first run's own words; the rest say "not seen",
- * since a list nobody read and a rail nobody drew prove nothing. A SCREEN HANDED IN is judged by the seven and by the
- * two that read the shell as drawn (`drawnScreen`).
+ * since a list nobody read and a rail nobody drew prove nothing. Only the words were asked for, so there the code is
+ * left alone and UNCHECKED says how little was read. A SCREEN HANDED IN is judged by the seven and by the three that
+ * read the shell as drawn (`drawnScreen`).
  */
 export function report(screens, person, colour = false) {
   const out = [];
   const all = [];
   for (const snap of screens ?? [wordsScreen()]) {
     /* THE WORDS BESIDE DRAWN SCREENS (`words: true`) are judged by the two checks that read words and by nothing else:
-       the screens beside them are what the rest read. A screen handed in is judged by all nine. */
+       the screens beside them are what the rest read. A screen handed in is judged by all ten. */
     const judged =
       screens === null
         ? checkScreen(snap, person).map((r) => (WORDS_ONLY.has(r.id) ? r : unseen(r.id, 'no screen was handed in, only the words of the first run')))
@@ -318,11 +421,12 @@ export function report(screens, person, colour = false) {
     all.push(...judged);
   }
   const n = (v) => all.filter((r) => r.pass === v).length;
-  const code = n(false) > 0 ? 1 : 0;
-  /* NOT SEEN IS NOT A PASS, and the code is 0 with five of seven unread: the last line says so in a word a nightly
-     reader cannot take for green, and names how many. */
-  const unread = n(null) > 0 ? ` UNCHECKED: ${n(null)} of ${all.length} read nothing, which is not a pass.` : '';
-  out.push(`${all.length} checks: ${n(true)} green, ${n(false)} red, ${n(null)} not seen.${unread} Exit code ${code}.`);
+  const blind = all.filter(unread).length;
+  const apart = n(null) - blind;
+  const code = n(false) > 0 || (screens !== null && blind > 0) ? 1 : 0;
+  /* NOT SEEN IS NOT A PASS: the last line says so in a word a nightly reader cannot take for green, and names how many. */
+  const unchecked = blind > 0 ? ` UNCHECKED: ${blind} of ${all.length} read nothing, which is not a pass.` : '';
+  out.push(`${all.length} checks: ${n(true)} green, ${n(false)} red, ${blind} not seen${apart > 0 ? `, ${apart} that do not apply` : ''}.${unchecked} Exit code ${code}.`);
   return { lines: out, code };
 }
 
@@ -332,7 +436,7 @@ const MOMENTS = { kept: 'just kept, before anything was told', told: 'after the 
 
 /**
  * The screens of one walk as `person`, drawn (`screens.mjs`) on a fresh self-host that is closed again: the first run's
- * own words, then Today with its rail and a list's rail at each of the two moments. The walk's own steps are
+ * own words, then Today with its rail, a list's rail and Today on a phone at each of the two moments. The walk's own steps are
  * `first-run.mjs`'s to judge and are not said here; a walk that never reached the record draws nothing, and the caller
  * is told why in `why`.
  */
@@ -364,8 +468,9 @@ export async function drawnScreens(person) {
  * `screen.json` is one snapshot or a list of them, as a rig writes them. WITH NONE, the screens are drawn here: a fresh
  * self-host, the walk of `first-run.mjs`, and the web's own rail and Today rendered at its two moments (`--write` keeps
  * them as a file that can be handed back in). `--words` judges only the first run's own words, with nothing drawn and
- * no host started. Mariam by default; `--as` names somebody else with no screen file before it. Exit 0 when no check is red, 1 when one is, 2 when a file could not be read or
- * the screens could not be drawn (said in a line, never in silence).
+ * no host started. Mariam by default; `--as` names somebody else with no screen file before it. Exit 0 when every
+ * check that applies to a screen read something and none is red, 1 when one is red or one read nothing, 2 when a file
+ * could not be read or the screens could not be drawn (said in a line, never in silence).
  */
 if (import.meta.url === `file://${process.argv[1]}`) {
   const { readFileSync, writeFileSync } = await import('node:fs');

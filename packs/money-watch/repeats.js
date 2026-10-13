@@ -75,9 +75,32 @@ function moneyText(money) {
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const dayText = (day) => `${Number(day.slice(8, 10))} ${MONTHS[Number(day.slice(5, 7)) - 1]}`;
 
-/** A payee from the bank's words: `GEIDEA*CHILLOUT 0418 CAIRO` reads Chillout, and `NETFLIX.COM` reads Netflix. */
+/** Words before `CARD` that make it a thing bought, not the card that paid: a gift card is the payee's own words. */
+const BOUGHT = /^(?:gift|sim|greeting|phone|calling|scratch|top-?up|post)$/i;
+/** The card that paid, written before the shop: `HSBC CARD 7731`, `CARD XX7731`. Its number may be masked. */
+const CARD_LEAD = /^((?:[\p{L}-]+\s+){0,2})card\s+(?:no\.?\s*)?[x*#.-]*\d{3,}\s+/iu;
+/** The terminal it was paid at, written before the shop: `POS 55`. One digit is left, since it may be the shop's (7 Eleven). */
+const TERMINAL_LEAD = /^(?:[Pp][Oo][Ss]\s+\d{2,}\s+|POS\s+)/;
+
+/** The bank's words without the card and the terminal they lead with, which name neither shop nor payee. */
+function shopWords(text) {
+  let said = text.trim();
+  for (let i = 0; i < 4; i += 1) {
+    const card = CARD_LEAD.exec(said);
+    const carded = card !== null && !card[1].split(/\s+/).some((w) => BOUGHT.test(w)) ? said.slice(card[0].length) : said;
+    const led = carded.replace(TERMINAL_LEAD, '');
+    if (led === said || !/\p{L}/u.test(led)) break;
+    said = led;
+  }
+  return said;
+}
+
+/**
+ * A payee from the bank's words: `GEIDEA*CHILLOUT 0418 CAIRO` reads Chillout, `NETFLIX.COM` reads Netflix, and
+ * `HSBC CARD 7731 POS 55 KFC` reads Kfc, so two shops paid with one card are two payees.
+ */
 function fromWords(text) {
-  const said = text.trim();
+  const said = shopWords(text);
   const words = (said.includes('*') ? said.slice(said.indexOf('*') + 1) : said).split(/\s+/).filter(Boolean);
   const kept = [];
   for (const w of words) {

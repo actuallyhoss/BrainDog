@@ -2,16 +2,21 @@
  * The first screens of one walk, drawn and read into the snapshots `first-screen.mjs` judges (audit 71, finding 8).
  * `first-run.mjs` hands its `shot` the record at two moments, just kept and just told; this draws each as the app's
  * shell would at 1440: the rail (`Sidebar.svelte`, fed as `routes/+layout.svelte` feeds it) and Today inside `main`
- * (the head and the body, `PageHead.svelte` and `PageView.svelte`, fed as `Home.svelte` feeds them).
+ * (the head and the body, `PageHead.svelte` and `PageView.svelte`, fed as `Home.svelte` feeds them), and as a phone
+ * would at 390: the same Today over the tab bar (`shell/TabBar.svelte`).
  *
- * TWO SCREENS A MOMENT. Today, where the rail's lists are folded as they are at rest, so the rail is its places and the
- * Pages heading. And the first list's own screen, rail only, where the rail opens its lists, so each list in it can be
- * held against how much it holds.
+ * THREE SCREENS A MOMENT. Today, where the rail's lists are folded as they are at rest, so the rail is its places and
+ * the Pages heading. The first list's own screen, rail only, where the rail opens its lists, so each list in it can be
+ * held against how much it holds. And Today on a phone, where the first places are the tabs under it.
+ *
+ * BESIDE THE MARKUP each screen carries what the record holds behind it, read from the host and not from the screen:
+ * the lists (`counts`), what each row of the rail stands on (`behind`), and how many vital signs read red (`signs`).
  *
  * WHAT IS NOT DRAWN, and so not judged here. Today's card for one real thing and its next steps: `Home.svelte` decides
  * them in effects, and `first-run.mjs` step 6 judges them by Home's own readers. The model's line over the head. What
- * waits (`waits`), which the poll feeds. The phone: the tab bar and the More sheet are opened by a press. And nothing
- * was measured: 1440 is the shape drawn (the rail), not a width anything was laid out at.
+ * waits (`waits`), which the poll feeds. The phone's More sheet, which is opened by a press and is written inside the
+ * shell itself. And nothing was measured: 1440 and 390 are the shapes drawn (the rail, the tab bar), not widths
+ * anything was laid out at.
  */
 
 import { hooks, markupOf } from './draw.mjs';
@@ -19,8 +24,9 @@ import { readMarkup } from './markup.mjs';
 
 const web = (path) => import(new URL(`../../../apps/web/src/${path}`, import.meta.url).href);
 
-/** The width whose shape is drawn here: the rail beside the page. */
+/** The widths whose shapes are drawn here: the rail beside the page, and the phone's tab bar under it. */
 export const WIDTH = 1440;
+export const PHONE = 390;
 
 /** The rail's props, read off the shell as `routes/+layout.svelte` reads them for a reader who has arranged nothing. */
 async function railProps(shell) {
@@ -75,13 +81,72 @@ async function todayMarkup({ t, base }, shell, path) {
   const voice = voiceOf(said);
   const body = todayHome(holds, voice);
   const drawn = await drawnOf(body, base, t.io);
-  if (drawn.from !== 'live') return { markup: '', why: drawn.from === 'refused' ? `Today was refused: ${drawn.fix}` : 'the host did not draw Today' };
+  const signs = await signsOf({ t, base }, shell, body);
+  if (drawn.from !== 'live') return { markup: '', signs, why: drawn.from === 'refused' ? `Today was refused: ${drawn.fix}` : 'the host did not draw Today' };
   const shaped = homeDrawn(drawn.blocks, drawn.now, voice, holds.one, null, week);
   const at = { data: shell, path };
   const head = await markupOf('lib/ui/PageHead.svelte', { title: voiced('home', copy.today), icon: 'today', sentence: shaped.sentence?.text ?? shaped.lead ?? voiced('nothing_needs_you', words.nothingNow) }, at);
   const got = { from: 'live', page: { page: { page: body.page, title: body.title, layout: body.layout }, blocks: shaped.blocks }, now: drawn.now };
   const view = await markupOf('lib/page/PageView.svelte', { slug: 'today', got, mode: 'home', reread: async () => {} }, at);
-  return { markup: `${head}${view}`, why: null };
+  return { markup: `${head}${view}`, signs, why: null };
+}
+
+/**
+ * HOW MANY VITAL SIGNS READ RED, asked of the host by the figure Today's own line is drawn from (`SIGNS_RED`), in a
+ * body of one note that is never shown: `signs-line` holds Today's words against it. `null` where the record holds no
+ * page its vital signs are shown on, so Today has nothing to open and says nothing; `undefined` where the host did not
+ * answer, which the check says as not seen. Read for anybody, whoever owns the record: who is told is the check's.
+ */
+async function signsOf({ t, base }, shell, body) {
+  const [{ SIGNS_PAGE, SIGNS_RED }, { drawnOf }] = await Promise.all([web('lib/home/default-home.ts'), web('routes/decide/[id]/proposed.ts')]);
+  if (!(shell.pages ?? []).includes(SIGNS_PAGE)) return null;
+  const drawn = await drawnOf({ ...body, blocks: [{ kind: 'note', body: `{{${SIGNS_RED}}}` }] }, base, t.io);
+  const n = drawn.from === 'live' ? drawn.blocks[0]?.values?.[SIGNS_RED] : undefined;
+  return Number.isFinite(n) ? n : undefined;
+}
+
+/** Every list a drawn page's blocks read, by id: a block's own list, the list it adds to and each list it folds in. */
+const listsIn = (blocks) => [
+  ...new Set(
+    (blocks ?? [])
+      .flatMap((b) => [typeof b?.source === 'string' && b.source.startsWith('register.') ? b.source.slice('register.'.length) : null, b?.register, ...(Array.isArray(b?.from) ? b.from.map((f) => f?.register) : [])])
+      .filter((id) => typeof id === 'string' && id !== ''),
+  ),
+];
+
+/**
+ * WHAT STANDS BEHIND EACH ROW OF THE RAIL, keyed by where the row goes as the markup writes it: for a list, itself and
+ * how much it holds; for a page, every list its drawn blocks read and how much each holds (a page that reads no list
+ * has `{}` behind it, and nothing to be empty). `rail-has-rows` holds the drawn rows against this, so a place is judged
+ * on the first minute too, when no list of its name is in the rail. A page or a list the host would not read is left
+ * out, and the check says it was not seen.
+ */
+async function behindOf({ t, base }, shell, root) {
+  const client = t.client(base);
+  const named = new Map((shell.lists ?? []).map((l) => [l.id, l.name]));
+  const held = new Map((shell.index.registers ?? []).map((r) => [r.id, r.count]));
+  const holds = async (id) => {
+    if (!held.has(id)) {
+      const page = await client.list({ register: id, limit: 1 });
+      held.set(id, page.ok ? (page.value.rows ?? []).length : undefined);
+    }
+    return held.get(id);
+  };
+  const out = {};
+  for (const r of shell.index.registers ?? []) out[`${root}/r/${r.id}`] = { [r.name]: r.count };
+  for (const n of shell.nav ?? []) {
+    const slug = /^\/p\/([^/?#]+)$/u.exec(n.href ?? '')?.[1];
+    if (slug === undefined) continue;
+    const page = await client.page(slug);
+    if (!page.ok) continue;
+    const reads = {};
+    for (const id of listsIn(page.value.blocks)) {
+      const count = await holds(id);
+      if (count !== undefined) reads[named.get(id) ?? 'a list with no name'] = count;
+    }
+    out[`${root}${n.href}`] = reads;
+  }
+  return out;
 }
 
 /**
@@ -101,9 +166,9 @@ async function countsOf({ t, base }, boot) {
 }
 
 /**
- * The screens of one moment of the walk (`shot` as `first-run.mjs` hands it): Today with its rail, then the first
- * list's screen for its rail. Each is `{ path, width, text, roles, counts, owner, drew }`, `drew` saying in plain words
- * which parts were drawn, for the report's heading.
+ * The screens of one moment of the walk (`shot` as `first-run.mjs` hands it): Today with its rail, the first list's
+ * screen for its rail, then Today as a phone holds it, over the tab bar. Each is `{ path, width, text, roles, counts,
+ * behind, signs, owner, drew }`, `drew` saying in plain words which parts were drawn, for the report's heading.
  */
 export async function screensOf(shot) {
   await hooks();
@@ -112,18 +177,25 @@ export async function screensOf(shot) {
   const shell = layoutOf(shot.boot);
   const props = await railProps(shell);
   const counts = await countsOf(shot, shot.boot);
+  const behind = await behindOf(shot, shell, BASE);
   const owner = shell.me?.owner === true;
   const out = [];
 
   const home = `${BASE}/`;
   const rail = await markupOf('lib/ui/Sidebar.svelte', props, { data: shell, path: home });
   const today = await todayMarkup(shot, shell, home);
-  out.push({ path: home, width: WIDTH, ...readMarkup(`${rail}<main>${today.markup}</main>`), counts, owner, drew: today.why === null ? 'the rail and Today' : `the rail (${today.why})` });
+  const signs = today.signs === undefined ? {} : { signs: today.signs };
+  out.push({ path: home, width: WIDTH, ...readMarkup(`${rail}<main>${today.markup}</main>`), counts, behind, ...signs, owner, drew: today.why === null ? 'the rail and Today' : `the rail (${today.why})` });
 
   const first = (shell.index.registers ?? [])[0];
   if (first) {
     const path = `${BASE}/r/${first.id}`;
-    out.push({ path, width: WIDTH, ...readMarkup(await markupOf('lib/ui/Sidebar.svelte', props, { data: shell, path })), counts, owner, drew: `the rail on ${first.name}, its lists open` });
+    out.push({ path, width: WIDTH, ...readMarkup(await markupOf('lib/ui/Sidebar.svelte', props, { data: shell, path })), counts, behind, owner, drew: `the rail on ${first.name}, its lists open` });
   }
+
+  /* THE PHONE: Today over the tab bar, which holds the rail's first places (`tabsOf`, as the shell feeds `TabBar`). */
+  const { tabsOf } = await web('lib/nav.ts');
+  const bar = await markupOf('lib/shell/TabBar.svelte', { tabs: tabsOf(props.places), more: false }, { data: shell, path: home });
+  out.push({ path: home, width: PHONE, ...readMarkup(`<main>${today.markup}</main>${bar}`), counts, behind, ...signs, owner, drew: today.why === null ? 'Today and the tab bar' : `the tab bar (${today.why})` });
   return out;
 }

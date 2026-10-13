@@ -7,10 +7,14 @@
  * own lists what they declare and reads the one that says it. No list is named here: an add-on that keeps its rates
  * under another name draws the same tile.
  *
+ * WHICH LIST THAT IS, THE KERNEL SAYS (`ratesRole`, `roles.ts`), so the tile draws the rates the conversion reads. It
+ * was worked out here from the key alone, and a record whose rates list is older than the key converted its money and
+ * drew no rate on this page.
+ *
  * Out of the component so `node --test` can run it, since a Svelte page does not mount there (`waiting.ts`).
  */
 
-import { ratesFrom, type Rate } from '@braindog/kernel';
+import { ratesFrom, ratesRole, type Rate } from '@braindog/kernel';
 import { day as longDay, shortDay } from 'braindog-render';
 
 /** How far back the line goes. */
@@ -48,14 +52,13 @@ export type RatesDecl = { id: string; rates?: unknown };
 /**
  * The list holding the record's rates, with the field playing each part, or `null`.
  *
- * TWO DECLARING LISTS ARE NONE, which is the kernel's rule (`roles.ts` `roleOf`): choosing one would draw one list's
- * rates on a guess.
+ * THE KERNEL'S ANSWER (`ratesRole`), NOT ONE WORKED OUT HERE: the list that declares `rates:`, or, on a record older
+ * than the key, the list that played the role by its name, read with the parts under their own names. Two declaring
+ * lists are none, which is its rule too (`roles.ts` `roleOf`): choosing one would draw one list's rates on a guess.
  */
 export function ratesListOf(lists: Iterable<RatesDecl>): { register: string; fields: Record<string, string> } | null {
-  const declaring = [...lists].filter((l) => l.rates !== null && typeof l.rates === 'object' && !Array.isArray(l.rates));
-  if (declaring.length !== 1) return null;
-  const one = declaring[0]!;
-  return { register: one.id, fields: { ...(one.rates as Record<string, string>) } };
+  const role = ratesRole(lists);
+  return role ? { register: role.register, fields: { ...role.fields } } : null;
 }
 
 /** The two reads the tile makes, as the record's client answers them. */
@@ -68,8 +71,8 @@ export type RatesCalls = {
 const MOST_PAGES = 6;
 
 /**
- * Every rate the record holds, read off the one list among `registers` that declares `rates:`. Nothing when none
- * declares it or the record refuses, so the tile stays the sentence and the button it was.
+ * Every rate the record holds, read off the one list among `registers` that holds the rates (`ratesListOf`). Nothing
+ * when none does or the record refuses, so the tile stays the sentence and the button it was.
  */
 export async function readRates(calls: RatesCalls, registers: readonly string[]): Promise<Rate[]> {
   const decls = await Promise.all(

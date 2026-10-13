@@ -32,13 +32,11 @@ test('the hairline is drawn only where the part did not draw the track', () => {
   assert.equal(drawn[0]!.selector, ':not(.segmented[data-slides]) > .segment[data-on]');
 });
 
-test('the thumb is the selection, and a second chosen one keeps a flat fill', () => {
+test('the thumb is the selection, and no rule is left for a second chosen one', () => {
   const under = chosen.find((r) => r.selector === '.segmented[data-thumb] > .segment[data-on]');
   assert.ok(under, 'the rule under the thumb is gone');
   assert.match(under.body, /background:\s*none/u);
   assert.match(under.body, /box-shadow:\s*none/u);
-  const more = chosen.find((r) => r.selector === '.segmented[data-thumb] > .segment[data-on] ~ .segment[data-on]');
-  assert.ok(more, 'the rule for a second chosen segment is gone');
-  assert.match(more.body, /background:\s*var\(--tile\)/u);
-  assert.doesNotMatch(more.body, /box-shadow/u);
+  /* A track where more than one can be chosen is given `many` and draws no thumb, so nothing is chosen beside one. */
+  assert.ok(!chosen.some((r) => /~\s*\.segment\[data-on\]/u.test(r.selector)), 'a rule for a second chosen segment is back');
 });

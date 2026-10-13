@@ -1023,3 +1023,67 @@ test('ONE LINE FOR ONE THING: a second phrase that became the same is folded int
   const loose = fold([{ phrase: '900', became: 'x', at: [0, 3], loose: true }, { phrase: '400', became: 'x', at: [8, 11], loose: true }], '900 and 400');
   assert.equal(loose.length, 2);
 });
+
+test('A NEVER THAT THE CLAUSE TAKES BACK REFUSES NOTHING: "I never ran a shop before but I just opened one", "My wife never ran the shop, I do", "I never kept track of orders, I want to start"', () => {
+  const lit = (p: ReturnType<typeof propose>, word: RegExp): boolean => p.heard.some((h) => word.test(h.phrase)) || p.places.some((x) => x.phrase !== null && word.test(x.phrase));
+  const has = (p: ReturnType<typeof propose>, name: string): boolean => p.places.some((x) => x.name === name);
+  const both = (s: string): string[] => [s, `I'm a freelance designer. ${s}`];
+
+  /* THE FIVE SENTENCES OF THE AUDIT OF BATCH 71, word for word. */
+  for (const typed of both('I never ran a shop before but I just opened one')) assert.ok(lit(propose(typed, CAIRO), /shop/iu), typed);
+  for (const typed of both('My wife never ran the shop, I do')) assert.ok(lit(propose(typed, CAIRO), /shop/iu), typed);
+  for (const typed of both('I never kept track of orders, I want to start')) {
+    const p = propose(typed, CAIRO);
+    assert.ok(lit(p, /orders/iu) && has(p, 'Orders'), typed);
+  }
+  for (const typed of both('I never ran out of products')) assert.ok(!has(propose(typed, CAIRO), 'Products'), typed);
+  /* A hope of keeping a thing better is no wish to have one (`WISHED` reads verbs of having, never of keeping). */
+  for (const typed of both('I hope to track invoices better')) assert.ok(lit(propose(typed, CAIRO), /invoices/iu), typed);
+
+  /* WHAT TAKES IT BACK: a join and a word of now or of doing it, or somebody who does. */
+  for (const s of [
+    'I never ran a shop but I just opened one',
+    'I never ran a shop before, but now I have one',
+    'I never owned a shop and I finally opened one',
+    'We never ran a shop until now, but we just started one',
+    'I never ran a shop but I do now',
+    'My partner never ran the shop. I do.',
+    'I never took orders before but now I do',
+    'I never took orders and I want to start',
+    'I never kept orders, but I want to start now',
+    'I never tracked orders, I would like to start',
+    "I haven't taken orders before but I want to start",
+  ]) {
+    assert.ok(lit(propose(s, CAIRO), /shop|orders/iu), s);
+  }
+  /* AND WHAT DOES NOT: a join that says something else, a refusal after it, or a wish with nothing started. */
+  for (const s of [
+    'I never ran a shop',
+    'I never ran a shop before',
+    'I never ran a shop and I just design logos',
+    'I never ran a shop but I do design work',
+    'I never ran a shop, I do not want one',
+    "I never ran a shop and I don't now",
+    'I never took orders and never will',
+    'I never took orders, I just design',
+    'My wife never ran a shop, I do the design',
+  ]) {
+    const p = propose(s, CAIRO);
+    assert.ok(!lit(p, /shop|orders/iu) && !has(p, 'Orders') && p.usecase !== 'shop', s);
+  }
+
+  /* WANTING TO START TAKES BACK ONLY WHAT THERE IS MORE THAN ONE OF: orders are started in here, a shop is not. */
+  for (const s of ['I never ran a shop but I want to start', 'I never ran a shop, they run one', 'I never ran a shop; my brother just opened one', 'I never took orders, I want to start a blog']) {
+    const p = propose(s, CAIRO);
+    assert.ok(!lit(p, /shop|orders/iu) && p.usecase !== 'shop', s);
+  }
+  /* THE WHOLE RUN IS TAKEN BACK, and a plain refusal or a wish yields as a never does. */
+  const run = propose('I never kept orders or invoices but I want to start', CAIRO);
+  assert.ok(lit(run, /orders/iu) && lit(run, /invoices/iu), 'both of the run are heard');
+  for (const s of ['I do not take orders yet but I want to start', 'No orders but now I have them', 'I never took orders. I do now.', 'I never took orders so I want to begin tracking them', 'I always wanted a shop and I finally opened one']) {
+    assert.ok(lit(propose(s, CAIRO), /shop|orders/iu), s);
+  }
+  /* WHAT NEVER RAN OUT WAS NEVER SAID TO BE KEPT, and what is said to be kept before it still is. */
+  assert.ok(!has(propose('We never run out of products', CAIRO), 'Products'), 'We never run out of products');
+  assert.ok(has(propose('I sell products and never ran out of them', CAIRO), 'Products'), 'I sell products and never ran out of them');
+});

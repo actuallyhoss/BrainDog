@@ -30,6 +30,8 @@ test('the filters are one track, a named group, and every segment is inside it a
   const [, tag, held] = tracks[0]!;
   assert.match(tag!, /\bclass="filters"/u);
   assert.match(tag!, /\brole="group"/u);
+  /* More than one filter can be on, so the part draws no single selection to slide between them. */
+  assert.match(tag!, /\smany(?=\s)/u, 'a track where several can be on is not told so');
   assert.match(tag!, /\baria-label=\{historyWords\.filters\}/u, 'a group of filters with no name');
   const outside = markup.replace(/<Segmented\b[\s\S]*?<\/Segmented>/u, '');
   assert.doesNotMatch(outside, /\bclass="segment[\s"]/u, 'a segment outside the part has no track');

@@ -10,6 +10,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { ratesRole } from '@braindog/kernel';
+
 import { CHART_FROM, lineSaid, pairsOf, rateNote, rateSaid, ratesListOf, readRates, type RatesCalls } from './rates.ts';
 
 const TODAY = '2026-10-13';
@@ -72,7 +74,7 @@ test('A RATE QUOTED THE OTHER WAY ROUND IS THE SAME PAIR, read into the home cur
   assert.deepEqual(usd!.moved, { dir: 'down', from: 50, since: '2026-10-11' });
 });
 
-test('THE LIST IS THE ONE THAT DECLARES rates:, by its declaration and never by a name, and two declaring are none', () => {
+test('THE LIST IS THE ONE THAT DECLARES rates:, whatever it is called, and two declaring are none', () => {
   const fields = { currency: 'code', base: 'into', rate: 'worth', as_of: 'on' };
   assert.deepEqual(ratesListOf([{ id: 'wallets' }, { id: 'quotes', rates: fields }]), { register: 'quotes', fields });
   assert.equal(ratesListOf([{ id: 'wallets' }]), null);
@@ -99,6 +101,37 @@ test('THE PAGE READS THE RATES OFF THE RECORD: the add-on’s own lists are aske
   /* No list declares it, or the record refuses: nothing to draw, and the tile is the sentence and the button it was. */
   assert.deepEqual(await readRates(calls, ['wallets']), []);
   assert.deepEqual(await readRates({ ...calls, list: async () => ({ ok: false }) }, ['quotes']), []);
+});
+
+test('A RECORD OLDER THAN THE rates: KEY still draws its newest rate: the list that plays the role by name is read, as the conversion reads it', async () => {
+  /* The name is the kernel's (`roles.ts`), asked of it here so no list is spelled on the page. */
+  const old = ratesRole([{ id: 'wallets' }, { id: 'fx' }]);
+  assert.ok(old && !old.declared, 'the kernel still finds a rates list by its old name');
+  const held = ratesListOf([{ id: 'wallets' }, { id: old.register }]);
+  assert.deepEqual(held, { register: old.register, fields: { currency: 'currency', base: 'base', rate: 'rate', as_of: 'as_of' } });
+  const calls: RatesCalls = {
+    /* A declaration written before the key: fields, and no `rates:`. */
+    schema: async () => ({ ok: true, value: { fields: [] } }),
+    list: async ({ register }) => {
+      assert.equal(register, old.register);
+      return {
+        ok: true,
+        value: {
+          rows: [
+            { fields: { currency: 'USD', base: 'EGP', rate: 48, as_of: '2026-10-11' } },
+            { fields: { currency: 'USD', base: 'EGP', rate: 48.5, as_of: '2026-10-12' } },
+          ],
+          cursor: null,
+        },
+      };
+    },
+  };
+  const [usd] = pairsOf(await readRates(calls, ['wallets', old.register]), TODAY, 'EGP');
+  assert.equal(rateSaid(usd!), '1 USD is 48.5 EGP');
+  assert.equal(usd!.asOf, '2026-10-12');
+  /* A list that declares the key wins over the old name, which is the kernel's order. */
+  const fields = { currency: 'code', base: 'into', rate: 'worth', as_of: 'on' };
+  assert.deepEqual(ratesListOf([{ id: old.register }, { id: 'quotes', rates: fields }]), { register: 'quotes', fields });
 });
 
 test('WHAT IS SAID UNDER A RATE: the day it is of, then which way it went, in days and never in codes of time', () => {

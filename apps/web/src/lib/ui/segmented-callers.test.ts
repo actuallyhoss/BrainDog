@@ -67,3 +67,13 @@ test('the three sheets keep their track a named group', () => {
   assert.match(markup(read('ShareMenu.svelte')), /<Segmented\s+role="group"\s+aria-label=\{words\.shareDays\}>/u);
   assert.match(markup(read('NewAction.svelte')), /<Segmented\s+role="group"\s+aria-labelledby="new-action-channel">/u);
 });
+
+/* Each of the four is a choice of ONE, so each keeps the sliding selection: `many` takes the thumb away, and is for a
+   track whose segments are pressed in and out. */
+for (const name of CALLERS) {
+  test(`${name}: a choice of one is not given many`, () => {
+    const tracks = markup(read(name)).match(/<Segmented\b[^>]*>/gu) ?? [];
+    assert.ok(tracks.length > 0, `${name} draws no track; re-measure`);
+    for (const track of tracks) assert.doesNotMatch(track, /\smany\b/u, 'a choice of one has lost its sliding selection');
+  });
+}

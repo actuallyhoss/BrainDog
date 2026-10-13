@@ -9,6 +9,7 @@
  */
 
 import type { SeedRule } from '../base.ts';
+import { OBLIGATIONS_REGISTER } from './lists/obligations.ts';
 import { BOOK_FROM_ACCOUNT_SCRIPT } from './scripts/book-from-account.js';
 import { CLOSE_ACCOUNT_SCRIPT } from './scripts/close-account.js';
 import { LAST_DAY_SCRIPT } from './scripts/last-day.js';
@@ -179,6 +180,30 @@ export const MONEY_RULES: Record<string, SeedRule> = {
   },
 };
 
+/** What "Chase it" drafts on a late invoice. Both fields are required on an invoice, so neither form writes a dash. */
+export const CHASE_DRAFT = 'The invoice for {{short:amount}} was due on {{on:due}}. Could you tell me when it will be paid?';
+
+/** The field the draft is kept in, as Bills and invoices declares it (`lists/obligations.ts`, beside `chased`). */
+export const CHASE_DRAFT_FIELD = { id: 'chase_draft', label: 'Draft to send', type: 'text' } as const;
+
+/**
+ * The step that writes the draft, and only where there is none.
+ *
+ * THE CONDITION IS A TREE, NOT THE SENTENCE `chase_draft is empty`. A rule started by an answer names no list, so the
+ * install reads a sentence in an `if` against the run's answers alone and refuses a field of the invoice
+ * (`unreadIf` in `packages/kernel/src/index.ts`); a tree is left to the run, which holds the invoice.
+ */
+export const CHASE_DRAFT_STEP = {
+  if: { field: CHASE_DRAFT_FIELD.id, empty: true },
+  then: [{ set: { field: CHASE_DRAFT_FIELD.id, to: CHASE_DRAFT } }],
+} as const;
+
+/**
+ * WHETHER BILLS AND INVOICES DECLARES THE FIELD, which it does since money-core 3.17.0. A step that writes a field its
+ * list does not hold stops the whole add-on from installing, so the step goes only where the field does.
+ */
+const DRAFT_DECLARED = OBLIGATIONS_REGISTER.fields.some((f) => f.id === CHASE_DRAFT_FIELD.id);
+
 /**
  * WHAT HAPPENS WHEN A PERSON ANSWERS ONE OF MONEY'S QUESTIONS, SINCE money-core 3.1.0: automations started by a
  * decision in Decide (`on: decided`, `packages/kernel/src/flow.ts`'s `onDecided`), in the pack document's own form.
@@ -201,7 +226,15 @@ export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
     on: { decided: { about: 'rule.invoice-late', option: 'Chase it' } },
     /* THE DAY IT WAS DECIDED, IN THE RECORD'S OWN ZONE (`{{trigger.day}}`), so the page can say how long it has been
        chased, and a note on the row says why the day is there. */
-    steps: [{ set: { field: 'chased', to: '{{trigger.day}}' } }, { note: 'You chose to chase this in Decide.' }],
+    steps: [
+      { set: { field: 'chased', to: '{{trigger.day}}' } },
+      { note: 'You chose to chase this in Decide.' },
+      /* AND A MESSAGE READY TO SEND (REC-B22 step 1), in "Draft to send": the invoice's own amount and due day in one
+         plain sentence, in the two forms a template writes a message in (`{{short:amount}}`, `{{on:due}}`). It names
+         nobody, so it reads whole on an invoice with no person on it. WRITTEN ONLY WHERE THERE IS NONE: an invoice
+         asked about again (a new due day) keeps the words somebody changed. */
+      ...(DRAFT_DECLARED ? [CHASE_DRAFT_STEP] : []),
+    ],
   },
   {
     rule: 'recurring-stopped',

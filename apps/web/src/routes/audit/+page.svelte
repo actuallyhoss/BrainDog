@@ -576,8 +576,9 @@
 
            THE TRACK IS THE ONE PART (`Segmented.svelte`), as a list's view switch is, so it is drawn the way every
            other track is: flat, with the selection moving to the segment chosen next. More than one filter can narrow
-           at once, and then the part's one selection sits under the first and the others keep the same flat fill. -->
-      <Segmented class="filters" role="group" aria-label={historyWords.filters}>
+           at once, so the track is given `many`: the part draws it no selection that moves, and every filter that is on keeps
+           the same flat fill of its own. -->
+      <Segmented many class="filters" role="group" aria-label={historyWords.filters}>
         {#if offerAll}
           <!-- THE RECORD'S OWN BOOKKEEPING, ON OR OFF. A switch and not a filter: it is how much of the log is drawn, and
                Clear filters leaves it as it is. -->

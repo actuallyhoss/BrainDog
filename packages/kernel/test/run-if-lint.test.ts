@@ -124,3 +124,28 @@ test('A CLOCK RULE, WHICH HAS NO ROW, IS READ AGAINST ITS ANSWERS ALONE', async 
   const out = await k.install([clock('what is Rent')]);
   assert.equal(codeOf(out), 'FIELD_UNKNOWN', 'a clock rule read a field no row brings it');
 });
+
+test('A RULE STARTED BY AN ANSWER IS READ AGAINST THE LIST OF THE RULE THAT ASKED, and left to the run where none is named', async () => {
+  const { k } = await open();
+  const late: Declaration = {
+    id: 'rule.late',
+    kind: 'rule',
+    body: { rule: 'late', register: 'bills', when: 'what is Rent', once_per: ['entry'], then: [{ propose: { say: 'Late?', options: ['Chase it', 'Not yet'] } }] } as never,
+  };
+  const chased = (cond: string, about: string | undefined = 'rule.late'): Declaration => ({
+    id: 'rule.chased',
+    kind: 'rule',
+    body: { rule: 'chased', on: { decided: about === undefined ? {} : { about, option: 'Chase it' } }, steps: [{ if: cond, then: TOLD }] } as never,
+  });
+  const first = await k.install([late, chased('amount is empty')]);
+  assert.ok(first.ok, fixOf(first));
+  /* THE ASKER LIVE, NOT IN THE BATCH, and a field its list does not hold is refused as a written rule's is. */
+  assert.ok((await k.install([chased('what is Rent')])).ok);
+  const unknown = await k.install([chased('total is 5')]);
+  assert.equal(codeOf(unknown), 'FIELD_UNKNOWN', 'a decided rule read a field the asked list does not hold');
+  const verb = await k.install([chased('amount over 1000')]);
+  assert.equal(codeOf(verb), 'MATCH_OP_UNSUPPORTED');
+  /* NO RULE NAMED, OR ONE THIS RECORD DOES NOT HOLD: the row is on a list no lint can name. */
+  for (const about of [undefined, 'rule.nobody'])
+    assert.ok((await k.install([chased('amount is empty', about)])).ok, String(about));
+});

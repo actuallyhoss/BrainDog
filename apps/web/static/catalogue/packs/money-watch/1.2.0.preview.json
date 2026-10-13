@@ -1,0 +1,67 @@
+{
+  "format": 1,
+  "made_at": "2026-10-13T19:06:29.355Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "columns": [
+            {
+              "field": "found",
+              "label": "Noticed on",
+              "width": "13ch"
+            },
+            {
+              "field": "what",
+              "label": "What it noticed",
+              "width": "minmax(24ch,1fr)"
+            },
+            {
+              "field": "flag",
+              "label": "Flag",
+              "width": "22ch"
+            },
+            {
+              "field": "said",
+              "label": "What you said",
+              "width": "20ch"
+            }
+          ],
+          "empty": "Nothing noticed yet. A charge made twice or a payment that repeats shows here, with what you said about it.",
+          "heading": "Noticed",
+          "kind": "table",
+          "order": [
+            {
+              "dir": "desc",
+              "field": "found"
+            }
+          ],
+          "source": "register.money_flags",
+          "span": 12,
+          "key": "k0elko52",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        }
+      ],
+      "icon": "money",
+      "nav": {
+        "order": 45,
+        "section": "Money"
+      },
+      "page": "money-watch",
+      "requires": [
+        "register.money_flags"
+      ],
+      "title": "Money watch",
+      "read_at": "2026-10-13T19:06:29.355Z",
+      "zone": "UTC",
+      "look": {
+        "look": "money-watch",
+        "basis": "r0wh6eni",
+        "by": "rule"
+      },
+      "declared_version": 1
+    }
+  ]
+}

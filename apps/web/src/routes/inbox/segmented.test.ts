@@ -5,9 +5,9 @@
  * (`class="segmented …"` on the page's own element) has no `data-slides`, and `controls.css` leaves it the fill that
  * fades out in one place and in at another. Waiting, Filed and Archived were written by hand here.
  *
- * THE PATTERN BUILDER'S STEPS ARE NOT MEASURED (`pattern/+page.svelte`): an `ol` of four steps in order inside a `nav`,
- * some of them not yet reachable. That is a path walked, not a switch between views, and the part's track is a `div`
- * or a `nav` holding its segments directly, which a list of `li` is not.
+ * THE PATTERN BUILDER'S STEPS ARE THE PART TOO (`pattern/+page.svelte`): an `ol` of four steps in order inside a `nav`,
+ * some of them not yet reachable. The part draws the `ol` (`tag="ol"`), reads each segment through its `li`, and
+ * `controls.css` rules a segment in a list item as it rules the track's own child.
  *
  * A TEXT TEST OVER MARKUP, as `automations/segmented.test.ts` is: there is no component test in this tree.
  */
@@ -64,4 +64,46 @@ test("a rule for the track reaches the part's element", () => {
   /* The track is the part's element, not this file's, so a scoped rule for it matches nothing and is dropped. */
   assert.doesNotMatch(scoped, /\.(?:segmented|series)(?![\w-])/u, 'a scoped rule for the track is a rule for nothing');
   assert.match(styles, /:global\(\.head\[data-under\] \.series\)/u, 'the track under the compact title row lost its rule');
+});
+
+/* THE PATTERN BUILDER'S STEPS. */
+
+const steps = readFileSync(new URL('./pattern/+page.svelte', import.meta.url), 'utf8')
+  .replaceAll(/<!--[\s\S]*?-->/gu, '')
+  .replaceAll(/\/\*[\s\S]*?\*\//gu, '');
+const stepsMarkup = steps.replaceAll(/<style[\s\S]*?<\/style>/gu, '').replaceAll(/<script[\s\S]*?<\/script>/gu, '');
+/** The steps' own element, whoever draws the track: the `nav` named by the page's title, to its end. */
+const stepsNav = /<nav class="steps" aria-label=\{words\.title\}>[\s\S]*?<\/nav>/u.exec(stepsMarkup)?.[0] ?? '';
+/** The one button a step is, to its end: its `onclick` holds a `>`, so the tag is not cut at the first one. */
+const stepButton = /<button\b[^>]*\bclass="segment step"[\s\S]*?<\/button>/u.exec(stepsNav)?.[0] ?? '';
+
+test('the steps: a named nav of four steps in order, each a segment', () => {
+  assert.notEqual(stepsNav, '', 'the steps are no longer a nav named by the page; re-measure');
+  assert.match(stepsNav, /\{#each words\.steps as name, i \(name\)\}/u);
+  assert.notEqual(stepButton, '', 'a step is no longer a segment');
+  assert.match(stepsNav, /<span class="step-n num">\{n\}<\/span>\{name\}/u, 'a step lost its number, which is how its order is read');
+});
+
+test('the steps: the one in hand is said as the current step, and is the one the selection sits under', () => {
+  /* `aria-current` and not `aria-pressed`: a step is a place on a path, not a switch pressed in. */
+  assert.match(stepButton, /\baria-current=\{step === n \? 'step' : undefined\}/u);
+  assert.doesNotMatch(stepButton, /\baria-pressed\b/u);
+  assert.match(stepButton, /\bdata-on=\{step === n \? '' : undefined\}/u);
+});
+
+test('the steps: a step not yet reachable does not press', () => {
+  assert.match(stepButton, /\bdisabled=\{!reachable\(n\)\}/u);
+  assert.match(stepButton, /\bonclick=\{\(\) => \(step = n\)\}/u);
+});
+
+test('the steps: no track is written by hand', () => {
+  assert.doesNotMatch(stepsMarkup, BY_HAND, 'a track written by hand does not slide');
+});
+
+test("the steps: drawn through the part, as an ordered list", () => {
+  assert.match(steps, /import Segmented from '\$lib\/ui\/Segmented\.svelte';/u, 'the part is not imported');
+  assert.match(stepsNav, /<Segmented\b[^>]*\btag="ol"/u, 'the steps are not the part drawing an ordered list');
+  const track = /<Segmented\b[\s\S]*?<\/Segmented>/u.exec(stepsNav)?.[0] ?? '';
+  assert.match(track, /<li>\s*<button\b[^>]*\bclass="segment step"/u, 'a step is not a list item holding its segment');
+  assert.doesNotMatch(stepsNav.replace(track, ''), SEGMENT, 'a step is drawn outside the track');
 });

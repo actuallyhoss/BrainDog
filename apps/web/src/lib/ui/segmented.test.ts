@@ -75,3 +75,56 @@ test('the first placing is not a move, and neither is the same choice at a new s
   assert.equal(slides({ had: false, changed: true, wrapped: false, reduced: false }), false);
   assert.equal(slides({ had: true, changed: false, wrapped: false, reduced: false }), false);
 });
+
+/**
+ * A TRACK WHERE MORE THAN ONE CAN BE CHOSEN (`many`) HAS NO THUMB. One thumb under the first chosen segment slid
+ * across to a second that already looked chosen when the first was switched off, a move that did not happen. A `many`
+ * track draws none, and each chosen segment keeps the fill the sheet gives it.
+ *
+ * A TEXT TEST from here down, over the part and the sheet, as `segmented-callers.test.ts` is: there is no component
+ * test in this tree.
+ */
+
+const noComments = (text: string): string => text.replaceAll(/<!--[\s\S]*?-->/gu, '').replaceAll(/\/\*[\s\S]*?\*\//gu, '');
+const PART = noComments(SOURCE);
+const TRACK = /<svelte:element\b[\s\S]*?>/u.exec(PART)?.[0] ?? '';
+const SHEET = noComments(readFileSync(join(dirname(FILE), 'controls.css'), 'utf8'));
+const RULES = [...SHEET.matchAll(/([^{}]+)\{([^{}]*)\}/gu)].map((m) => ({ selector: m[1]!.trim().replaceAll(/\s+/gu, ' '), body: m[2]! }));
+
+test('many is a prop of the part, and off unless it is asked for', () => {
+  assert.match(PART, /\bmany = false,/u, 'the part takes no `many`, or it is on by default');
+  assert.match(PART, /\bmany\?: boolean;/u);
+});
+
+test('a track given many is marked, and measures and draws no thumb', () => {
+  assert.match(TRACK, /data-many=\{many \? '' : undefined\}/u, 'the track does not say it is one of many');
+  /* It leaves before it watches a size or a mark, so nothing can place a thumb later. */
+  const effect = /\$effect\(\(\) => \{([\s\S]*?)\n  \}\);/u.exec(PART)?.[1] ?? '';
+  const leaves = effect.indexOf('if (many) {');
+  assert.ok(leaves >= 0, 'the effect does not leave for a track of many');
+  assert.match(effect.slice(leaves, effect.indexOf('}', leaves)), /thumb = null;\s*return;/u);
+  assert.ok(leaves < effect.indexOf('new ResizeObserver'), 'a track of many is measured');
+  assert.ok(leaves < effect.indexOf('new MutationObserver'), 'a track of many is watched');
+});
+
+test('on a track given many, each chosen segment fills itself: the tile colour, flat, and nothing takes it off', () => {
+  /* What the part draws for it: `data-slides` and `data-many`, and never `data-thumb`. */
+  assert.match(TRACK, /data-slides=""/u, 'the track is no longer marked as the part\'s, so the hairline of a hand-written one comes back');
+  const reach = RULES.filter(
+    (r) => /\.segment\[data-on\]/u.test(r.selector) && !r.selector.includes('[data-thumb') && !r.selector.includes(':not(.segmented[data-slides])'),
+  );
+  /* The second is a step in an ordered track, read through its list item: it only keeps the hairline of a track written
+     by hand off, and leaves the fill alone. */
+  assert.deepEqual(reach.map((r) => r.selector), ['.segment[data-on]', '.segmented[data-slides] > li > .segment[data-on]']);
+  assert.match(reach[0]!.body, /background:\s*var\(--tile\)/u);
+  assert.doesNotMatch(reach[0]!.body, /box-shadow/u);
+  assert.match(reach[1]!.body, /^\s*box-shadow:\s*none;\s*$/u);
+});
+
+test('a track without many is unchanged: the thumb goes under its chosen segment and the sheet clears the fill there', () => {
+  assert.match(PART, /segments\.find\(\(s\) => s\.hasAttribute\('data-on'\)\)/u);
+  assert.match(TRACK, /data-thumb=\{thumb \? \(slide \? 'slide' : 'jump'\) : undefined\}/u);
+  const under = RULES.find((r) => r.selector === '.segmented[data-thumb] > .segment[data-on]');
+  assert.ok(under, 'the rule under the thumb is gone');
+  assert.match(under.body, /background:\s*none/u);
+});

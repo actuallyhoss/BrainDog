@@ -51,3 +51,38 @@ test('the call still carries the fields as the plan names them', () => {
   const sheet = sheetOf(diff(['invoices.amount']), named, labels);
   assert.deepEqual(sheet?.parts[0]?.calls[0]?.sends, ['invoices.amount']);
 });
+
+/* A CONFLICT ANOTHER UPDATE CLEARS (`update-order.ts` `marked`): one in the same run is no stop, one outside it says
+   which update to take first. */
+
+const pack = (id: string): string => (id === 'usecase-personal' ? 'Personal' : id === 'money-core' ? 'Money' : id === 'metric.budgets-set' ? 'Budgets set' : id);
+
+const money = (conflict: Record<string, unknown>): unknown => ({
+  pack: { id: 'money-core', version: '3.17.0', summary: '' },
+  planHash: 'h',
+  direction: 'upgrade',
+  installed_version: '3.16.0',
+  conflicts: [{ id: 'metric.budgets-set', pack: 'usecase-personal', ...conflict }],
+});
+
+test('a conflict whose holder goes in earlier in the same run is no stop, and says what it goes in after', () => {
+  const sheet = sheetOf(money({ waits: 'after' }), pack);
+  assert.ok(sheet);
+  assert.deepEqual(sheet.stops, []);
+  const worth = sheet.parts[0]?.sections.find((s) => s.key === 'worth');
+  assert.deepEqual(worth?.rows, [{ text: 'Budgets set', detail: 'goes in after Personal, which hands it on' }]);
+});
+
+test('a conflict whose holder has an update outside the run says to take that one first', () => {
+  const sheet = sheetOf(money({ waits: 'first' }), pack);
+  assert.ok(sheet);
+  assert.deepEqual(sheet.stops, ['Update Personal first, which hands Budgets set on to this']);
+});
+
+test('a conflict nobody marked stops the install as it did', () => {
+  const sheet = sheetOf(money({}), pack);
+  assert.ok(sheet);
+  assert.deepEqual(sheet.stops, ['Budgets set is already here, from Personal']);
+  /* The owner's own is never waited out, whatever a mark says. */
+  assert.deepEqual(sheetOf(money({ changed: true, waits: 'after' }), pack)?.stops, ['Budgets set is one you changed, and this version changes it too']);
+});

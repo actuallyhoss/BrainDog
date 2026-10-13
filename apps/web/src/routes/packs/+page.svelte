@@ -44,6 +44,7 @@
   import { addsOf } from '$lib/market/adds.ts';
   import type { ListingKind } from '$lib/market/listing.ts';
   import PlanSheet from '$lib/market/PlanSheet.svelte';
+  import { handsOf, holderFirst, inOrder, marked, orderWords } from '$lib/market/update-order.ts';
   import { words as market } from '$lib/market/words.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -273,8 +274,11 @@
   let updates = $state.raw<Update[] | null>(null);
   /** The Kennel's own sentence for each later version that did not verify, said quietly and never offered. */
   let unverified = $state.raw<string[]>([]);
-  /** What the last press on a row said: a refusal, or where it was filed on Decide. */
-  let said = $state<Record<string, { fix: string; code: string | null } | { filed: string }>>({});
+  /**
+   * What the last press on a row said: a refusal, or where it was filed on Decide. `first` is the update to take before
+   * this one, by its key, when this one waits on what that one hands over (`update-order.ts`).
+   */
+  let said = $state<Record<string, { fix: string; code: string | null; first?: string } | { filed: string }>>({});
 
   $effect(() => {
     const held = states;
@@ -315,7 +319,12 @@
     return planFor(client, { kind: u.kind, id: u.id, source: u.source }, u.file, installed, copy.writeRaced);
   }
 
-  /** See the plan for one update, on the sheet, with Approve installing that plan. */
+  /**
+   * See the plan for one update, on the sheet, with Approve installing that plan.
+   *
+   * AN UPDATE THAT WAITS ON ANOTHER OPENS NO SHEET IT CANNOT APPROVE. When the record would refuse it over something
+   * another waiting update hands to it, the row says so and offers that update's plan instead.
+   */
   async function showPlan(u: Update) {
     if (busy !== null) return;
     busy = u.key;
@@ -323,6 +332,8 @@
       const out = await planOf(u);
       if (!out.ok) return void (said = { ...said, [u.key]: { fix: out.fix, code: out.code } });
       const p = out.planned;
+      const holder = holderFirst(diffOf(p), (updates ?? []).filter((o) => o.key !== u.key));
+      if (holder) return void (said = { ...said, [u.key]: waitsOn(p, u, holder) });
       sheet = {
         diff: diffOf(p),
         then: async () => {
@@ -333,6 +344,18 @@
     } finally {
       busy = null;
     }
+  }
+
+  /** The row's sentence for an update that goes in after `holder`'s: what moves, by its name, and from whom. */
+  function waitsOn(p: Planned, u: Update, holder: Update): { fix: string; code: string | null; first: string } {
+    const conflicts = p.kind === 'pack' && typeof p.diff === 'object' && p.diff !== null && 'conflicts' in p.diff && Array.isArray(p.diff.conflicts) ? (p.diff.conflicts as { id?: unknown }[]) : [];
+    const handed = Object.keys(handsOf(holder.file));
+    const id = conflicts.map((c) => (typeof c?.id === 'string' ? c.id : '')).find((c) => handed.includes(c)) ?? '';
+    /* A NAME, NEVER AN ID: a figure this build holds no name for is its id read as words, as the sheet reads it. */
+    const bare = id.slice(id.indexOf('.') + 1);
+    const known = planName(id);
+    const what = known !== bare && known !== id ? known : (bare.charAt(0).toUpperCase() + bare.slice(1)).replace(/[_-]/gu, ' ');
+    return { fix: orderWords.waits(u.title, what, holder.title), code: 'PROVIDES_CONFLICT', first: holder.key };
   }
 
   /**
@@ -376,9 +399,13 @@
    * EACH IS PLANNED AGAIN JUST BEFORE IT GOES IN, because the record's version is in every plan's hash and the update
    * before it moved it. A plan that now asks to approve a calls-out line the sheet did not show stops the run there, and
    * that update opens on its own sheet to be read.
+   *
+   * A HOLDER GOES IN BEFORE THE ONE IT HANDS TO (`inOrder`), and the one that waits is drawn as going in after it
+   * rather than as a stop (`marked`): by the time it is planned again the holder has landed. One the holder's own plan
+   * already brought to its version is passed over, since there is nothing left of it to install.
    */
   async function showAll() {
-    const all = updates ?? [];
+    const all = inOrder(updates ?? []);
     if (busy !== null || all.length === 0) return;
     busy = 'all';
     try {
@@ -391,7 +418,7 @@
       if (plans.length === 0) return;
       const shown = new Set(plans.flatMap(({ p }) => (p.kind === 'pack' ? p.approve : p.plan.approve)));
       sheet = {
-        diff: plans.map(({ p }) => diffOf(p)),
+        diff: plans.map(({ p }) => marked(diffOf(p), all, plans.map((x) => x.u))),
         then: async () => {
           let done = 0;
           for (const { u, p } of plans) {
@@ -400,6 +427,7 @@
               said = { ...said, [u.key]: { fix: fresh.fix, code: fresh.code } };
               break;
             }
+            if (done > 0 && landed(fresh.planned)) continue;
             const asks = fresh.planned.kind === 'pack' ? fresh.planned.approve : fresh.planned.plan.approve;
             if (asks.some((line) => !shown.has(line))) {
               const again = fresh.planned;
@@ -416,6 +444,13 @@
     } finally {
       busy = null;
     }
+  }
+
+  /** A plan for a version the record already holds: an earlier update of the same run brought it in. */
+  function landed(p: Planned): boolean {
+    if (p.kind !== 'pack' || typeof p.diff !== 'object' || p.diff === null) return false;
+    const d = p.diff as { installed_version?: unknown; pack?: { version?: unknown } };
+    return typeof d.installed_version === 'string' && d.installed_version === d.pack?.version;
   }
 
   /* ── what they hold ────────────────────────────────────────────────────── */
@@ -676,7 +711,11 @@
               {#if s && 'filed' in s}
                 <p class="addon-said" role="status">{words.asked}{#if s.filed}{' '}<a class="tap" href={at(`/decide/${s.filed}`)}>{words.openDecide}</a>{/if}</p>
               {:else if s}
-                <p class="addon-said" role="status" title={s.code ? copy.refusalCode(s.code) : undefined}>{s.fix}</p>
+                {@const first = s.first ? updates.find((o) => o.key === s.first) : undefined}
+                <p class="addon-said" role="status" title={s.code ? copy.refusalCode(s.code) : undefined}>
+                  {s.fix}
+                  {#if first}{' '}<Button size="sm" disabled={busy !== null || !client} onclick={() => void showPlan(first)}>{orderWords.first(first.title)}</Button>{/if}
+                </p>
               {/if}
             </div>
           </li>

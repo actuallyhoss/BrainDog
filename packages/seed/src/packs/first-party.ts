@@ -585,6 +585,9 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   in, where it said Owed to you (owed-words-74); and `repeating-overdue` reads no value where it read nought, the
  *   count per the one state its lines are in, so a record whose lines were never matched is shown no mark it met
  *   (seed-money-signs-73-74).
+ *   And batch 75's, in the same unreleased step: Bills and invoices gains `chase_draft`, Draft to send, and
+ *   `invoice-chased` writes it where it is empty when Chase it is answered, the invoice's amount and due day in one
+ *   sentence, never over words somebody changed (money-chase-draft-75, REC-B22 step 1). No id added or taken away.
  * - people 3.4.0: the People page says how many people may be on the record twice (people-held-twice-69), one note under
  *   its two lead notes, from the built-in figure held-twice and drawn only above nought. 3.3.0 is released (commit
  *   63423720 holds it), so a version of its own. A note added, nothing taken away, so a minor step that reaches a record

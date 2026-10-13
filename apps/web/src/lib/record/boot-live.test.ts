@@ -168,6 +168,20 @@ test('ANOTHER PERSON IN THE FEED IS NAMED WHEN boot SAID THE NAME, and is Someon
   assert.equal(shell.whatsNew[0]?.by, 'Ada Lovelace');
 });
 
+test("THE READER'S OWN LINES ARE you, never Someone on this record and never her own name, as the first run's boot sends them", () => {
+  /* THE WALK'S OWN SHAPE (`tools/people/expect/first-run.mjs`): the owner's id is a minted one, `boot` names her among
+     `names`, and every line she wrote is signed with that id. Seen as "Someone on this record added Nadia" on Today,
+     which is the page's feed block and not this one: the shell's news already said it right, and this holds it there. */
+  const mariam = 'p_01M45MN5M03SECPTPXD5P98F44';
+  const mine = [line({ actor: mariam, kind: 'create', register: 'people', seq: 2, title: 'Nadia', target: 'entry:x', target_kind: 'entry' }), line({ actor: mariam, kind: 'decide', title: 'Renew' })];
+  const shell = layoutOf({ ...BOOT, me: { kind: 'person', person: mariam, name: 'Mariam', level: 'owner' }, names: { [mariam]: 'Mariam' }, whatsNew: { events: mine, upTo: 2, sinceCapped: false } } as never);
+  assert.equal(shell.me.person, mariam);
+  assert.deepEqual(shell.whatsNew.map((i) => i.by), ['you', 'you']);
+  /* Read with no reader, which is what a caller that forgot to hand one over does, she is her name and still no id. */
+  assert.deepEqual(newsOf(mine as never, null, new Map([[mariam, 'Mariam']])).map((i) => i.by), ['Mariam', 'Mariam']);
+  assert.deepEqual(newsOf(mine as never, null).map((i) => i.by), ['Someone on this record', 'Someone on this record']);
+});
+
 test('what was applied, kept on a decision, is not a line of its own in the feed', () => {
   const items = newsOf([line({ kind: 'note', target: 'decision:D7', target_kind: 'decision', note: 'Applied what was accepted.' }), line({ kind: 'decide', title: 'Add Personal?' })] as never, null);
   assert.deepEqual(items.map((i) => i.text), ['Decided: Add Personal?']);
@@ -346,6 +360,19 @@ test('A SAVED VIEW ON A RECORD SITS UNDER ITS LIST in the rail and at its page, 
   );
 });
 
+test('A PLACE OVER SEVERAL LISTS IS JUDGED BY THE LIST ITS SECTION IS NAMED AS: off the rail at no rows, on it at one', () => {
+  /* Sam after sign-up: Renewals reads Services, its numbers and the open questions, so boot sends it no `list`. */
+  const estate = { slug: 'estate', title: 'Renewals', nav: { section: 'Services', order: 10 }, icon: null, list: null };
+  const money = { slug: 'ledger', title: 'Ledger', nav: { section: 'Money', order: 20 }, icon: null, list: null };
+  const at = (count: number) =>
+    layoutOf({ ...BOOT, registers: [{ id: 'services', name: 'Services', count }], pages: [estate, money] } as never).nav.map((n) => n.href);
+  assert.ok(!at(0).includes('/p/estate'), 'a place with nothing in it is in the rail');
+  assert.ok(at(1).includes('/p/estate'), 'the place did not come back with its first row');
+  /* No list is named Money, so its page is never judged. */
+  assert.ok(at(0).includes('/p/ledger'));
+  assert.ok(at(1).includes('/p/ledger'));
+});
+
 test('AN IMPORT IS ONE LINE OF THE FEED with its counts and a link to that day in the log, and a few writes by hand keep their own lines', () => {
   const at = (s: number) => new Date(Date.parse('2026-09-15T09:00:00.000Z') - s * 1000).toISOString();
   /* Newest first: eight questions, then fifty-two rows, a second apart, by the reader on an open self-host. */
@@ -418,6 +445,13 @@ const AT_HIS_SCALE = [
   ...perRow('skills', 'Skills', 22),
 ];
 
+/** The same record's lists, holding the rows those pages are about: a section named as a list with no rows is no place. */
+const HIS_LISTS = [
+  { id: 'things', name: 'Projects', count: 27 },
+  { id: 'services', name: 'Services', count: 23 },
+  { id: 'skills', name: 'Skills', count: 22 },
+];
+
 test('THE RAIL A LIVE RECORD DRAWS IS CAPPED PER LIST AND HEADING, the same cap the sample applies to its own', () => {
   /**
    * THE CAP SHIPPED INTO THE SAMPLE AND THE PRODUCT'S OWN RAIL NEVER SAW IT. `api.ts`'s `boot()`
@@ -428,7 +462,7 @@ test('THE RAIL A LIVE RECORD DRAWS IS CAPPED PER LIST AND HEADING, the same cap 
    * The same three templates through a real record's `boot`, which has no written page in it, are
    * 72 against 15.
    */
-  const shell = layoutOf({ ...BOOT, pages: AT_HIS_SCALE } as never);
+  const shell = layoutOf({ ...BOOT, registers: HIS_LISTS, pages: AT_HIS_SCALE } as never);
   const under = (section: string) => shell.nav.filter((n) => n.section === section).length;
   assert.deepEqual([under('Projects'), under('Services'), under('Skills')], [5, 5, 5], `the rail drew ${shell.nav.length} entries`);
   assert.equal(shell.nav.length, 16);
@@ -453,11 +487,11 @@ test('and a host that does not say which row a page is about draws the rail it d
    * would do to every page in the record at once.
    */
   const older = AT_HIS_SCALE.map((p) => ({ ...p, about: undefined }));
-  assert.equal(layoutOf({ ...BOOT, pages: older } as never).nav.length, 73);
+  assert.equal(layoutOf({ ...BOOT, registers: HIS_LISTS, pages: older } as never).nav.length, 73);
   /* AND THE COUNT IS PER RAIL. A counter made once where the module loads would spend the budget
      on the first shell and draw no project at all in the second, which is every navigation after
      the first in a tab that reads two records. */
-  const twice = [layoutOf({ ...BOOT, pages: AT_HIS_SCALE } as never), layoutOf({ ...BOOT, pages: AT_HIS_SCALE } as never)];
+  const twice = [layoutOf({ ...BOOT, registers: HIS_LISTS, pages: AT_HIS_SCALE } as never), layoutOf({ ...BOOT, registers: HIS_LISTS, pages: AT_HIS_SCALE } as never)];
   assert.deepEqual(
     twice.map((s) => s.nav.length),
     [16, 16],

@@ -834,10 +834,18 @@ export function layoutOf(b: Boot, implied: Implied | undefined = IMPLIED.get(b))
      pages with its lists, so a record that took a few modules had a rail of pages that each said "nothing here yet".
      `list` is the one list a page draws, sent only when the caller reads it, and its count is `registers`' own. A saved
      view is somebody's own page and stays, as its list does above, and so does a colleague's own list, for the same
-     reason `registers` keeps it at zero rows below. */
+     reason `registers` keeps it at zero rows below.
+
+     A PAGE THAT READS SEVERAL LISTS ARRIVES WITH NO `list` (Services reads its numbers and the open questions too), so
+     it is judged by the list its section is named as, which is the reading the first-screen check (rail-has-rows)
+     makes. A page in a section no list is named as is never judged. */
   const rows = new Map(b.registers.map((r) => [r.id, r.count]));
-  const waiting = (p: NonNullable<Boot['pages']>[number]) =>
-    typeof p.list === 'string' && p.nav?.section !== copy.viewsSection && !theirs.has(p.list) && rows.get(p.list) === 0;
+  const named = new Map(b.registers.map((r) => [r.name.trim().toLowerCase(), r.id]));
+  const waiting = (p: NonNullable<Boot['pages']>[number]) => {
+    if (!p.nav || p.nav.section === copy.viewsSection) return false;
+    const list = typeof p.list === 'string' ? p.list : named.get(p.nav.section.trim().toLowerCase());
+    return list !== undefined && !theirs.has(list) && rows.get(list) === 0;
+  };
   /* A TABBED SECTION'S PAGES ARE NEVER CUT BY THE BUDGET. A launch desk with more parts than `RAIL_PAGES` lost the
      rest from its strip, because the cap ran before `nav` existed. They are kept apart instead: the rail still spends
      its budget, and a page past it is carried with `cut`, which the strip draws and the rail leaves out. */

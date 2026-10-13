@@ -135,6 +135,12 @@ export const OBLIGATIONS_REGISTER: MoneyRegister = {
      */
     { id: 'chased', label: 'Chasing since', type: 'day' },
     /**
+     * A MESSAGE READY TO SEND, SINCE money-core 3.17.0 (REC-B22 step 1). The record writes it when "Chase it" is the
+     * answer (`invoice-chased` in `MONEY_AUTOMATIONS`): the invoice's own amount and due day in one plain sentence.
+     * Written only where the field is empty, never over words somebody changed. Not indexed: nothing filters on it.
+     */
+    { id: 'chase_draft', label: 'Draft to send', type: 'text' },
+    /**
      * HOW OFTEN A BILL SAID IT CAME ROUND, KEPT ON ITS ROWS AND WALKED NO MORE, SINCE money-core 3.0.0.
      *
      * What repeats lives in `recurring`, and the cash walk reads it there at every cadence. A bill that also said

@@ -1315,8 +1315,39 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.1.0",
+      "latest": "1.2.0",
       "versions": [
+        {
+          "version": "1.2.0",
+          "checksum": "32d4e968b9e3a90a0ca23ffffcb4310e10c7c00ab591855964e4208adda5eb6e",
+          "bytes": 42193,
+          "published_at": "2026-10-13T19:06:29.355Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Money watch"
+            ],
+            "pages": [
+              "Money watch"
+            ],
+            "rules": [
+              "Look for a charge made twice when an entry clears",
+              "Ask about a charge made twice",
+              "Act on an answer about a charge made twice",
+              "Look for a payment that repeats when an entry clears",
+              "Ask about a payment that repeats",
+              "Act on an answer about a payment that repeats"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Charged twice and Looks like it repeats read the shop, not the card. A bank line that leads with the card and the terminal, such as HSBC CARD 7731 POS 55 KFC, named the card, so every shop paid with it was one payee, and KFC and Carrefour at the same amount were asked about as one charge made twice. Each shop is its own payee now. Both real, said before about a card by name, quiets no shop.",
+          "preview": true
+        },
         {
           "version": "1.1.0",
           "checksum": "ba5787ebcc4a3ee1430e09b2e820aa29c0456f2057a14b275393129c91fd4afe",

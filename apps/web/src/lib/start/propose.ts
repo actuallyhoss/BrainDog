@@ -300,6 +300,11 @@ const WHOLE: readonly Whole[] = [
  * invoices, and "I hope to have a shop one day" is nobody with a shop. Only a thing still to be started is wished
  * for wherever it sits (`TO_START`): "I hope to open a shop in Cairo". AND "STILL DO" POINTS BACK AT WHAT WAS DONE
  * (`STILL_DOES`): "I used to love taking orders and still do" keeps its orders.
+ *
+ * A NEVER THAT THE CLAUSE TAKES BACK REFUSES NOTHING (`TAKEN_BACK`): "I never ran a shop before but I just opened
+ * one" and "My wife never ran the shop, I do" are somebody with a shop, and "I never kept track of orders, I want to
+ * start" is somebody with orders. AND WHAT NEVER RAN OUT WAS NEVER SAID TO BE KEPT (`RAN_OUT`): "I never ran out of
+ * products" asks for no Products.
  */
 const REFUSES = "no|not|never|without|zero|don['’]?t|do\\s+not|doesn['’]?t|does\\s+not|haven['’]?t|hasn['’]?t|hadn['’]?t";
 /* `send` and its ending apart: the whole word is a field an add-on declares, and the core spells none (the core-names gate). */
@@ -320,8 +325,10 @@ const STOPPED = `${HALTED}(?=\\s+(?:${DOING})\\s)`;
 /* The same verbs said of before, so a thing never done is refused as one not done is: "I never ran a shop", "we never
    took orders". Never "sold", "closed" or "lost": whoever never sold a stall still has it. */
 const DID_IT = 'ran|took|taken|kept|owned|opened|started|tracked|chased|needed|wanted|did';
+/* "ran out of" is read through as a verb is, so a thing that never ran out is not taken for a thing somebody keeps. */
+const RAN_OUT = '(?:ran|run|running)\\s+out\\s+of';
 const NOT = new RegExp(
-  `(?:^|[^\\p{L}\\p{N}])(?:${REFUSES})\\s+(?:(?:any|more|longer|ever|had|got|${DOES}|${DID_IT}|a|an|the)\\s+){0,5}(?:(?:${[...PLAIN].join('|')})\\s+)*$`,
+  `(?:^|[^\\p{L}\\p{N}])(?:${REFUSES})\\s+(?:(?:any|more|longer|ever|had|got|${RAN_OUT}|${DOES}|${DID_IT}|a|an|the)\\s+){0,5}(?:(?:${[...PLAIN].join('|')})\\s+)*$`,
   'iu',
 );
 /* A thing of one's own, and one from before: "my products", "my old products", "the former shop". */
@@ -415,6 +422,21 @@ const STILL_DOES = new RegExp(
   `^(?:\\s+(?:${WHEN}))?\\s*[,;.]?\\s*(?:(?:and|but)\\s+)?(?:(?:i|we)\\s+)?(?:still\\s+do|do\\s+still)(?![\\p{L}\\p{N}'’])(?!\\s+not(?![\\p{L}\\p{N}]))${CLAUSE_END}`,
   'iu',
 );
+/* A REFUSAL TAKEN BACK after its clause: at most two words of before ("before", "until now"), a mark or a join, then
+   whoever speaks has one now ("but I just opened one", "and now I have one"), does it ("I do", "but now I do"), or
+   wants to start ("I want to start", "I would like to start tracking them"). Only "I" and "we" take it back, never
+   somebody else, and never a refusal ("I do not want one") or another thing ("I do the design", "I want to start a blog"). */
+const ME = "(?:i|we)(?:['’]\\p{L}+)?";
+const POINTS = 'one|it|them|those|mine|ours';
+const JUST = '(?:(?:just|now|finally|recently|today|since|have|has)\\s+){0,3}';
+const HAS_NOW = `${JUST}(?:${ME}\\s+)?${JUST}(?:have|own|run|keep|take|opened|started|got|bought|set\\s+up|took\\s+over)\\s+(?:${POINTS})(?![\\p{L}\\p{N}'’])`;
+const DOES_NOW = `(?:now\\s+)?${ME}\\s+(?:(?:now|finally|just)\\s+)?do(?![\\p{L}\\p{N}'’])(?!\\s+not(?![\\p{L}\\p{N}]))`;
+const WILL_START = `(?:${ME}\\s+)?(?:now\\s+)?(?:want|need|plan|intend|mean|(?:would\\s+)?(?:like|love)|(?:am\\s+|are\\s+)?(?:about|going|ready))\\s+to\\s+(?:start|begin)(?:\\s+(?:(?:${DOING})\\s+)?(?:${POINTS}))?`;
+const BEFORE_NOW = `(?:\\s+(?:before|yet|until\\s+now|till\\s+now|up\\s+to\\s+now|so\\s+far|myself|in\\s+my\\s+life|${WHEN})){0,2}`;
+const THEN = '(?:\\s*[,;.]\\s*(?:(?:and|but|so)\\s+)?|\\s+(?:and|but|so)\\s+)';
+const TAKEN_BACK = new RegExp(`^${BEFORE_NOW}${THEN}(?:${HAS_NOW}|${DOES_NOW}${CLAUSE_END})`, 'iu');
+/* Wanting to start takes back only what there is more than one of: orders are started in here, a shop is not. */
+const STARTED_HERE = new RegExp(`^${BEFORE_NOW}${THEN}${WILL_START}${CLAUSE_END}`, 'iu');
 /* Where one thing wished for would be, which ends the wish as a word of when does: "I wish I had a shop in Cairo",
    "by the sea". Never of many, which are had and hoped to be somewhere: "I hope to get orders in on time". */
 const SOMEWHERE = new RegExp(`^\\s+(?:in|near|by|at)(?:\\s+(?!(?:and|or|nor|but|so|because|since)(?![\\p{L}\\p{N}]))[\\p{L}\\p{N}'’-]+){1,3}${CLAUSE_END}`, 'iu');
@@ -491,29 +513,37 @@ function refusedIn(said: string, known: readonly Said[] = []): (span: Said) => b
     return PLAIN.has(word) || IS_DONE.test(word) ? ENDS_DOING.test(said.slice(to)) : ends(to);
   };
   /* Whether a thing somebody used to do is taken up again after its clause, read from where its whole run ends. */
-  const again = (from: number, to: number): boolean => {
+  const runEnd = (to: number): number => {
     let end = to;
     for (;;) {
       const next = end + (RUN_ON.exec(said.slice(end))?.[0].length ?? 0);
       const joined = next > end ? known.find((k) => k.at === next) : undefined;
-      if (!joined) break;
+      if (!joined) return end;
       end = joined.at + joined.text.length;
     }
+  };
+  const again = (from: number, to: number): boolean => {
+    const end = runEnd(to);
     const word = said.slice(from, to).toLowerCase();
     const back = PLAIN.has(word) || IS_DONE.test(word) ? TAKEN_UP.done : end > to || (MANY.test(word) && !/ss$/iu.test(word)) ? TAKEN_UP.many : TAKEN_UP.one;
     return back.test(said.slice(end)) || STILL_DOES.test(said.slice(end));
   };
   const many = (from: number, to: number): boolean => MANY.test(said.slice(from, to)) && !/ss$/iu.test(said.slice(from, to));
+  /* Whether what was refused or wished for is taken back after its whole run: "but I just opened one", "I want to start". */
+  const back = (from: number, to: number): boolean => {
+    const after = said.slice(runEnd(to));
+    return TAKEN_BACK.test(after) || (many(from, to) && STARTED_HERE.test(after));
+  };
   /* How a thing was refused: by a word of refusal, or by a word of having stopped, which holds only at a clause's end. */
   const not = (from: number, to: number): Refusal => {
     const before = said.slice(0, from);
     /* "no longer" and "used to" are read before the bare "no": they hold only at the clause's end, as stopping does. */
     const used = USED_TO.test(before);
     if (NO_LONGER.test(before) || used) return closes(from, to) && !again(from, to) ? 'stopped' : null;
-    if (NOT.test(before)) return 'refused';
+    if (NOT.test(before)) return back(from, to) ? null : 'refused';
     /* A thing only wished or hoped for is refused as one said not to be had is, where it ends the clause: "We hope to
        have invoices sorted" is somebody with invoices. One still to be started is refused wherever it sits. */
-    if (WISHED.test(before) && !HAD_ANYWAY.test(said.slice(to)) && (TO_START.test(before) || STARTS.test(said.slice(from, to)) || closes(from, to) || (!many(from, to) && SOMEWHERE.test(said.slice(to))))) return 'refused';
+    if (WISHED.test(before) && !HAD_ANYWAY.test(said.slice(to)) && !back(from, to) && (TO_START.test(before) || STARTS.test(said.slice(from, to)) || closes(from, to) || (!many(from, to) && SOMEWHERE.test(said.slice(to))))) return 'refused';
     if (ENDED.test(before)) return ends(to) ? 'stopped' : null;
     if (ENDED_ITSELF.test(before) && ITSELF_ENDED.test(said.slice(to))) return 'stopped';
     /* One thing sold, and nothing takes it up again: whoever sold a stall does not run it. */

@@ -643,6 +643,20 @@ const withoutBatch74 = (doc: Body): Body => ({
   ...doc,
   declarations: (doc.declarations as Body[]).map((d) => (d.metric === 'project-owed' ? { ...d, name: 'Owed to you' } : d)),
 });
+/**
+ * AND BATCH 75'S, folded into the same unreleased step and undone first: an invoice's Draft to send goes from Bills and
+ * invoices, and the step that writes it goes from the rule that answers Chase it (money-chase-draft-75, REC-B22 step 1).
+ */
+const withoutBatch75 = (doc: Body): Body => ({
+  ...doc,
+  declarations: (doc.declarations as Body[]).map((d) =>
+    d.register === 'obligations' && Array.isArray(d.fields)
+      ? { ...d, fields: (d.fields as Body[]).filter((f) => f.id !== 'chase_draft') }
+      : d.rule === 'invoice-chased' && Array.isArray(d.steps)
+        ? { ...d, steps: (d.steps as Body[]).filter((step) => (step.if as Body | undefined)?.field !== 'chase_draft') }
+        : d,
+  ),
+});
 /** Batch 63's four figures of this month's spending against last (spend-figures-63), new in the unreleased money-core 3.17.0. */
 const SPEND_VS_LAST: ReadonlySet<string> = new Set(['spent-last-month', 'spent-by-category-last-month', 'spent-by-category-to-date-last-month', 'spent-vs-last-month']);
 const LATEST: Record<string, { version: string; released: string; undo: (doc: Body) => Body }> = {
@@ -651,7 +665,7 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
     version: '3.13.0',
     released: '2e09983b40aba73e',
     undo: (raw) => {
-      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(withoutPlanLeads(withoutBatch73(withoutBatch74(raw))))))))))))));
+      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(withoutPlanLeads(withoutBatch73(withoutBatch74(withoutBatch75(raw)))))))))))))));
       return {
       ...doc,
       /* AND THE SCRIPT THAT MARKS A BILL PAID, WITH THE RULE THAT STARTS IT (settle-rule-60), both newer than 3.13.0. */
