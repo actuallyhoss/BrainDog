@@ -33,6 +33,7 @@
   import PageHead from '$lib/ui/PageHead.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import Segmented from '$lib/ui/Segmented.svelte';
   import ListingCard from '$lib/market/ListingCard.svelte';
   import { chipsOf, categoryName, inCategory } from '$lib/market/categories.ts';
   import { readCounts } from '$lib/market/counts.ts';
@@ -88,18 +89,18 @@
       <Icon name="search" size="m" />
       <input class="find-input" type="search" bind:value={query} aria-label={words.searchLabel} placeholder={words.searchHint} autocomplete="off" enterkeyhint="search" />
     </div>
-    <div class="segmented order" role="group" aria-label={words.orderLabel}>
+    <Segmented class="order" role="group" aria-label={words.orderLabel}>
       {#each ORDERS as o (o)}
         <button type="button" class="segment" aria-pressed={order === o} data-on={order === o ? '' : undefined} onclick={() => (order = o)}>{words.orders[o]}</button>
       {/each}
-    </div>
+    </Segmented>
   {/snippet}
 </PageHead>
 
 <div class="page">
   <!-- THE CATEGORIES, EACH WITH ITS COUNT: one glass segmented control on the ground, which wraps rather than hiding a
        chip past its edge. -->
-  <div class="segmented chips" role="group" aria-label={words.categoriesLabel}>
+  <Segmented class="chips" role="group" aria-label={words.categoriesLabel}>
     <button type="button" class="segment chip" aria-pressed={picked === null} data-on={picked === null ? '' : undefined} onclick={() => (category = null)}>
       {words.all}<span class="n">{searched.length}</span>
     </button>
@@ -108,7 +109,7 @@
         {c.name}<span class="n">{c.count}</span>
       </button>
     {/each}
-  </div>
+  </Segmented>
 
   {#if kennelRefused}<Empty kind="error" title={kennelRefused} />{/if}
 
@@ -206,7 +207,7 @@
      glass. Only where the bar is drawn, from 900px up. */
   @media (width >= 900px) {
     :global(.head[data-under]) .find,
-    :global(.head[data-under]) .order {
+    :global(.head[data-under] .segmented.order) {
       background: var(--hover-wash);
       box-shadow: none;
       backdrop-filter: none;
@@ -214,13 +215,14 @@
 
     @supports (-webkit-backdrop-filter: none) {
       :global(.head[data-under]) .find,
-      :global(.head[data-under]) .order {
+      :global(.head[data-under] .segmented.order) {
         -webkit-backdrop-filter: none;
       }
     }
   }
 
-  .chips {
+  /* The tracks are `Segmented`'s own elements, so the rules for them reach them by this page's names for them. */
+  :global(.segmented.chips) {
     align-self: start;
   }
 

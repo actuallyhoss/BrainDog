@@ -107,7 +107,11 @@ test('THE ORDERS PAGE DRAWS NOTHING ON A NEW SHOP, and each tile once an order i
   const after = value<{ blocks: Drawn[] }>(k.page('orders')).blocks;
   for (const b of after) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
   const drawn = after.filter((b) => b.drawn !== false && b.heading !== undefined);
-  assert.deepEqual(drawn.map((b) => b.heading), ['Due this week', 'Owed to you']);
+  assert.deepEqual(drawn.map((b) => b.heading), ['Due this week', 'Still to come in']);
+  /* THE TILE IS HEADED AS TODAY'S MONEY TILE OPENS IT (audit 69 finding 4): `OWED_TO_YOU` in
+     `apps/web/src/lib/home/default-home.ts` is the same words, held equal by hand since the seed cannot read the web. */
+  const orders = (SHOP.pack.declarations as readonly { page?: string; blocks?: { kind: string; heading?: string }[] }[]).find((d) => d.page === 'orders');
+  assert.ok(orders?.blocks?.some((b) => b.kind === 'table' && b.heading === 'Still to come in'), 'page.orders holds no table headed Still to come in');
   for (const b of drawn) assert.deepEqual(b.rows?.map((r) => r.fields.what), ['3 vanilla jars'], b.heading);
   sql.close();
 });
@@ -211,7 +215,7 @@ test('THE OWED CLAUSE NAMES THE OLDEST DUE, not the newest made, as the tile und
   assert.equal(line.values?.['orders-owed-named.first_who'], 'Salma');
   assert.deepEqual(line.values?.['orders-owed-named.first_total'], EGP(135_000));
   assert.equal(line.values?.['orders-owed-other'], 0);
-  assert.deepEqual(tile(k, 'Owed to you'), ['6 amber jars', '4 amber jars']);
+  assert.deepEqual(tile(k, 'Still to come in'), ['6 amber jars', '4 amber jars']);
   sql.close();
 });
 
@@ -223,7 +227,7 @@ test('A DEPOSIT DOES NOT SETTLE AN ORDER: it stays owed and is counted, and its 
   assert.deepEqual(line.refusals ?? [], []);
   assert.equal(line.values?.['orders-owed-other'], 1);
   assert.ok(!Object.hasOwn(line.values ?? {}, 'orders-owed-named.first_total'), JSON.stringify(line.values));
-  assert.deepEqual(tile(k, 'Owed to you'), ['6 amber jars']);
+  assert.deepEqual(tile(k, 'Still to come in'), ['6 amber jars']);
   sql.close();
 });
 
@@ -244,7 +248,7 @@ test('AN UNPAID ORDER WITH NOBODY ON IT, OR NO DAY, IS COUNTED and never drops t
   assert.deepEqual(both.values?.['orders-owed-named.first_total'], EGP(135_000));
   assert.equal(both.values?.['orders-owed-other'], 2);
   /* EVERY ONE OF THE THREE IS IN THE TILE, whichever clause said it. */
-  assert.equal(tile(k, 'Owed to you')?.length, 3);
+  assert.equal(tile(k, 'Still to come in')?.length, 3);
   sql.close();
 });
 
@@ -267,7 +271,7 @@ test('TWO PEOPLE OWE ON THREE ORDERS, and the line names the oldest and counts t
   assert.deepEqual(line.unnamed ?? [], []);
   assert.deepEqual(line.refusals ?? [], []);
   /* EVERY ORDER OWED IS SAID ONCE: the one named, the others not paid at all, and the one part paid. */
-  assert.equal(1 + 2 + 1, tile(k, 'Owed to you')?.length);
+  assert.equal(1 + 2 + 1, tile(k, 'Still to come in')?.length);
   sql.close();
 });
 

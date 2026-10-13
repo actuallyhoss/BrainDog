@@ -10,7 +10,7 @@ import { DatabaseSync } from 'node:sqlite';
 
 import { openRecord } from '@braindog/kernel';
 
-import { COMING_UP_LIMIT, DEFAULT_HOME, TODAY_LEAD, captureHeading, homeDrawn, railed, slashLineOf, todayHome, weekMoney, type HomeVoice, type Week } from './default-home.ts';
+import { COMING_UP_LIMIT, DEFAULT_HOME, TODAY_LEAD, captureHeading, homeDrawn, railed, slashLineOf, todayHome, weekMoney, type Holds, type HomeVoice, type Week } from './default-home.ts';
 import { homeLineOf, recordDay } from './home-line.ts';
 import type { LiveBlock } from '../record/page-live.ts';
 import type { WithRows } from './home-rows.ts';
@@ -617,4 +617,105 @@ test('A RUN QUIET FOR 20 MINUTES IS NOT WORKING NOW, though it is active and was
 
 test('THE MONEY TILE SAYS WHAT IS STILL TO COME IN, beside what was paid and what came in', () => {
   assert.deepEqual(weekMoney().cells?.map((c) => c.label), ['Paid', 'Came in', 'Still to come in']);
+});
+
+/* ── the line Today says while a vital sign reads red (PRF-A05, DIRECTION §40) ── */
+
+/** Today's two notes on `signs-red`, of which the record draws one at most. */
+const signNotes = (holds: Holds = { tasks: true, adds: true, money: true, health: true }) =>
+  todayHome(holds).blocks.filter((b) => b.when?.metric === 'signs-red');
+
+/** A record with nothing in it, on the clock the other kernel test here reads. */
+async function emptyRecord() {
+  const db = new DatabaseSync(':memory:');
+  const sql = {
+    exec: (text: string, ...params: unknown[]) => (params.length === 0 ? db.exec(text) : void db.prepare(text).run(...(params as never[]))),
+    all: (text: string, ...params: unknown[]) => db.prepare(text).all(...(params as never[])),
+    one: (text: string, ...params: unknown[]) => db.prepare(text).get(...(params as never[])),
+    transactionSync: <T>(fn: () => T): T => fn(),
+  } as unknown as Parameters<typeof openRecord>[0];
+  return { k: await openRecord(sql, { now: () => Date.parse('2026-10-02T12:00:00Z') }), db };
+}
+
+test('TODAY SAYS HOW MANY VITAL SIGNS NEED A LOOK, after what needs you and before who is working, in a person`s grammar', () => {
+  const body = todayHome({ tasks: true, adds: true, money: true, health: true });
+  const at = body.blocks.flatMap((b, n) => (b.when?.metric === 'signs-red' ? [n] : []));
+  assert.equal(at.length, 2, 'one for one sign and one for more, so the count reads as a person says it');
+  assert.ok(at[0]! > body.blocks.findIndex((b) => b.kind === 'queue'), 'after the questions');
+  assert.ok(at[1]! < body.blocks.findIndex((b) => b.heading === 'Working now'), 'before who is working');
+  const [one, many] = signNotes();
+  assert.deepEqual([one!.kind, one!.when, one!.body], ['note', { metric: 'signs-red', is: 1 }, '[One vital sign needs a look](/p/health).']);
+  assert.deepEqual([many!.kind, many!.when, many!.body], ['note', { metric: 'signs-red', gt: 1 }, '[{{signs-red}} vital signs need a look](/p/health).']);
+  /* NEVER THE PAGE'S LINE, and in the main column, never the rail. */
+  for (const b of signNotes()) {
+    assert.notEqual(b.lead, true);
+    assert.equal((b as unknown as { area?: string }).area, undefined);
+    assert.ok(!/[—]/.test(b.body ?? ''));
+  }
+  assert.equal(body.blocks.filter((b) => b.kind === 'note' && b.lead === true).length, 1);
+  assert.equal(body.blocks[0]!.body, TODAY_LEAD);
+});
+
+test('TODAY CARRIES THE LINE ONLY WHERE THE RECORD HOLDS THE PAGE IT OPENS, and is block for block as it was where it does not', () => {
+  for (const holds of [{ tasks: true, adds: true, money: true }, { tasks: false, adds: false, money: false, health: false }]) assert.deepEqual(signNotes(holds), []);
+  assert.deepEqual(todayHome({ tasks: true, adds: true, money: true, health: false }), DEFAULT_HOME);
+  /* WITH THE PAGE, the two notes are all that is added: take them out and the body is the one it was. */
+  const held = todayHome({ tasks: true, adds: true, money: true, health: true });
+  assert.deepEqual({ ...held, blocks: held.blocks.filter((b) => b.when?.metric !== 'signs-red') }, DEFAULT_HOME);
+  assert.equal(signNotes({ tasks: false, adds: false, money: false, health: true }).length, 2, 'on a record with no tasks too');
+});
+
+test('THE RECORD DRAWS THE LINE ONLY WHILE A SIGN READS RED: not on a record nobody has read, and not once every sign is green', async () => {
+  const { k, db } = await emptyRecord();
+  /* The record marks only a block it left out (`drawn: false`, `why: 'when'`). */
+  const drawn = () => signNotes().map((b) => (k.block(b as never) as { drawn?: boolean }).drawn !== false);
+  const red = (): number | null => {
+    const r = k.metric(k.metricDecl('signs-red')!);
+    assert.ok(r.ok, JSON.stringify(r));
+    return r.value.value;
+  };
+  assert.equal(red(), null);
+  assert.deepEqual(drawn(), [false, false], 'nothing read yet is not red');
+  assert.ok(k.signRead('model-answers', { state: 'green', value: 0, said: 'The model answered every time it was asked.' }).ok);
+  assert.equal(red(), 0);
+  assert.deepEqual(drawn(), [false, false], 'nought red draws no line');
+  assert.ok(k.signRead('model-answers', { state: 'red', value: 3, said: 'The model did not answer 3 times.' }).ok);
+  assert.equal(red(), 1);
+  assert.deepEqual(drawn(), [true, false]);
+  assert.ok(k.signRead('tools-listed', { state: 'red', value: 0, said: 'The tools did not list.' }).ok);
+  assert.equal(red(), 2);
+  assert.deepEqual(drawn(), [false, true]);
+  const many = k.block(signNotes()[1] as never);
+  assert.deepEqual(many.refusals, []);
+  /* AND THE RECORD TAKES BOTH AS A PAGE'S OWN: the figure, the test and the link are refused by no rule at install. */
+  const installed = (await k.install([{ id: 'page.signs', kind: 'page', body: { page: 'signs', title: 'Signs', blocks: signNotes() } }] as never)) as { ok: boolean; refusal?: { fix: string } };
+  assert.ok(installed.ok, installed.refusal?.fix);
+  db.close();
+});
+
+test('HOME DRAWS THE LINE ONCE WHILE A SIGN IS RED AND IS AS IT WAS WHILE NONE IS: never the page`s line, never counted in it', () => {
+  /* Today as the record answers it: the lead, a question, the two notes, a late task. */
+  const answered = (one: boolean, many: boolean): LiveBlock[] => [
+    block({ kind: 'note', lead: true, body: TODAY_LEAD }),
+    block({ kind: 'queue', heading: 'What needs you', source: 'governance.open', queue: [{ id: 'q1' }] as never, total: 1 }),
+    block({ kind: 'note', body: '[One vital sign needs a look](/p/health).', drawn: one, ...(one ? {} : { why: 'when' }) } as never),
+    block({ kind: 'note', body: '[{{signs-red}} vital signs need a look](/p/health).', drawn: many, ...(many ? {} : { why: 'when' }) } as never),
+    block({ kind: 'todo', heading: 'Late', source: 'register.tasks', columns: day('by') }, [{ what: 'Renew', by: '2026-09-30' }]),
+  ];
+  /* Today as it was before the line: the same answer without the two notes. */
+  const before = homeDrawn(answered(false, false).filter((b) => !(b.kind === 'note' && b.lead !== true)), NOW);
+  const calm = homeDrawn(answered(false, false), NOW);
+  assert.deepEqual(shown(calm.blocks), shown(before.blocks), 'with no sign red the body is exactly as it was');
+  assert.deepEqual(calm.sentence, before.sentence);
+  assert.equal(calm.lead, TODAY_LEAD);
+  for (const [one, many, said] of [[true, false, 'One vital sign'], [false, true, '{{signs-red}} vital signs']] as const) {
+    const red = homeDrawn(answered(one, many), NOW);
+    const notes = shown(red.blocks).filter((b) => b.kind === 'note');
+    assert.equal(notes.length, 1, 'drawn once');
+    assert.ok(notes[0]!.body?.includes(said) && notes[0]!.body.includes('](/p/health)'));
+    assert.deepEqual(shown(red.blocks).map((b) => b.kind), ['queue', 'note', 'todo'], 'after the questions, and nothing else moved');
+    assert.equal(red.blocks.length, answered(one, many).length, 'every block keeps its place in the list');
+    assert.equal(red.lead, TODAY_LEAD, 'the line is never the page’s');
+    assert.deepEqual(red.sentence, before.sentence, 'and the sentence counts what it counted');
+  }
 });

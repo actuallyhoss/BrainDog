@@ -57,8 +57,8 @@ async function on180(rows: number = HELD_AT_1_8_0.length) {
 /** money-core as a record on 1.8.0 was offered it from 2.0.0 until 2.4.0 stopped handing: today's, with the `hands` it shipped. */
 const shippedUpdate = () => handingAsShipped(firstPartyDocument('money-core'));
 
-/** What the file adds beside the list since 1.1.0: a rule and the script it starts, three figures and a page; four more figures since 1.4.0. */
-const BESIDE = ['metric.holdings-at-cost', 'metric.holdings-costed', 'metric.holdings-count', 'metric.holdings-priced-on', 'metric.holdings-stale', 'metric.holdings-unpriced', 'metric.holdings-value', 'page.holdings', 'rule.holdings_cost', 'script.holdings_cost'];
+/** What the file adds beside the list since 1.1.0: a rule and the script it starts, three figures and a page; four more figures since 1.4.0, and a second script, the one that asks about an account and a holding of one name. */
+const BESIDE = ['metric.holdings-at-cost', 'metric.holdings-costed', 'metric.holdings-count', 'metric.holdings-priced-on', 'metric.holdings-stale', 'metric.holdings-unpriced', 'metric.holdings-value', 'page.holdings', 'rule.holdings_cost', 'script.holdings_cost', 'script.holdings_twin'];
 
 /** What a row is and what happened to it, as bytes, so "untouched" is a comparison and not a reading. */
 const snapshot = (k: Kernel, ids: readonly string[]): string[] => ids.map((id) => JSON.stringify([k.get(id), k.history(id)]));

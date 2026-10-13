@@ -58,6 +58,25 @@ export const MONEY_BOOK_PAGE: SeedPage = {
       empty: 'Nothing in {{name}} is dated in the next twelve months.',
     },
     {
+      /* THIS BOOK'S MONTH IN ONE ROW (REC-A09 step 3): what came in, what went out and what is left, each read once a
+         book as `book-cash` is (`figures/books.ts`). UNDER THE CASH AND ITS WALK AND NOT BETWEEN THEM: the two are one
+         row of twelve, and a tile of twelve set between them would leave the cash alone on a line.
+
+         ONLY WHILE THE MONTH HAS MONEY IN IT. A block's `when:` reads one figure, and `book-net-month` is read over the
+         entries of both halves, so it holds an amount while either does, a net of nought in a currency among them. A
+         book with nothing earned or spent this month would say three noughts, which is no news. */
+      kind: 'stat',
+      heading: 'This month',
+      icon: 'coins',
+      span: 12,
+      cells: [
+        { metric: 'book-in-month:{{name}}', label: 'In this month' },
+        { metric: 'book-out-month:{{name}}', label: 'Out this month' },
+        { metric: 'book-net-month:{{name}}', label: 'Net' },
+      ],
+      when: { metric: 'book-net-month:{{name}}', empty: false },
+    },
+    {
       kind: 'cards',
       heading: 'Accounts',
       icon: 'landmark',

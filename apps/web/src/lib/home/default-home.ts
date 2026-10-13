@@ -104,6 +104,12 @@ export type Holds = {
    * opens on what is due this week and the money that came in. Absent where it keeps none, and Today is as it was.
    */
   week?: Week | undefined;
+  /**
+   * The record holds the page its vital signs are shown on (`SIGNS_PAGE`), so Today carries the line that says how
+   * many of them read red and opens that page (`signsLine`). Left out or `false`, Today is as it was: a line that says
+   * something needs a look and opens nothing is a dead end, and Settings says the count in plain words there.
+   */
+  health?: boolean;
 };
 
 /** The fewest days a figure's line is drawn from (DIRECTION §39: a chart has at least three points, else the tile shows the number). */
@@ -224,6 +230,29 @@ export const weekMoney = (): PageBlock => ({
   when: { metric: WEEK_IN[0], gte: ANY },
 });
 
+/** The figure that counts the vital signs reading red now, by the name the kernel answers it under (`built-in-figures.ts`). */
+export const SIGNS_RED = 'signs-red';
+/** The page the vital signs are shown on, as the health sentence in Settings links to it (`signsAt`). */
+export const SIGNS_PAGE = 'health';
+
+/**
+ * THE LINE TODAY SAYS WHILE A VITAL SIGN READS RED (PRF-A05, DIRECTION §40 "says so in the app when one fails"), in the
+ * words the health sentence in Settings says it in. TWO NOTES ON THE ONE FIGURE, so one of them draws at most and the
+ * count reads as a person says it, as the Health page's own line does. `signs-red` reads nothing while no sign has
+ * anything to judge by and nought once none is red, and neither draws a note: a Today with nothing wrong is as it was.
+ *
+ * NEVER THE PAGE'S LINE (no `lead`), so the head keeps the sentence worked out from the work, and this stands under
+ * what needs you. THE WORDS ARE THE LINK, to the page the signs are shown on, so Today carries the line only where the
+ * record holds that page (`Holds.health`).
+ */
+export function signsLine(): PageBlock[] {
+  const said = (words: string): string => `[${words}](/p/${SIGNS_PAGE}).`;
+  return [
+    { kind: 'note', when: { metric: SIGNS_RED, is: 1 }, body: said('One vital sign needs a look') },
+    { kind: 'note', when: { metric: SIGNS_RED, gt: 1 }, body: said(`{{${SIGNS_RED}}} vital signs need a look`) },
+  ];
+}
+
 /** The two blocks a record's week opens Today on: its own words, naming its list ("Orders due this week"). */
 function weekBlocks(w: Week): PageBlock[] {
   const due: PageBlock = {
@@ -242,8 +271,8 @@ function weekBlocks(w: Week): PageBlock[] {
 
 /**
  * TODAY'S BODY, in the words of the voice that speaks. In reading order: the page's line, the line a task is typed
- * into, the questions waiting on the reader as tiles, what is late (the tasks late or due today, then the money that
- * fell due), the work handed back and the urgent work; beside them, the agents at work, cash, the next few things
+ * into, the questions waiting on the reader as tiles, one line while a vital sign reads red (`signsLine`), what is late
+ * (the tasks late or due today, then the money that fell due), the work handed back and the urgent work; beside them, the agents at work, cash, the next few things
  * that fall due, and what changed since the reader last looked. The record lints it as it would any body before it
  * draws it.
  *
@@ -319,6 +348,9 @@ export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
       ...(holds.week ? weekBlocks(holds.week) : []),
       /* ANSWERED WHERE THEY ARE SHOWN: the page's writes are on, so a queue draws `QueueAnswer`. */
       { kind: 'queue', heading: voice.needsYou, icon: 'ask', source: 'governance.open', limit: NEEDS_YOU_LIMIT, empty: voice.nothingWaiting, ...TILES },
+      /* WHAT IS WRONG WITH THE RECORD ITSELF, said only while a vital sign reads red: under what needs you, since it
+         needs a look too, and over the work, which it may be the reason for. */
+      ...(holds.health ? signsLine() : []),
       ...(holds.tasks ? work : [lateMoney]),
       /* THE RUNS WORKING NOW, one line each with the agent's face; not drawn when none is. Which runs those are is the
          record's one word for it (`sessions.working`, heard from inside its own clock), so this table takes no `where:`

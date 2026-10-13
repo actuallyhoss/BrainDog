@@ -58,6 +58,7 @@
   import Tile from '$lib/ui/Tile.svelte';
   import { Sparkline, Stacked } from '$lib/viz/index.ts';
   import Menu from '$lib/ui/Menu.svelte';
+  import Segmented from '$lib/ui/Segmented.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { covered, typing } from '$lib/a11y/keys.svelte.ts';
@@ -641,14 +642,14 @@
       {/snippet}
     </PageHead>
     <div class="page">
-      <div class="segmented tabs" role="group" aria-label={title}>
+      <Segmented class="tabs" role="group" aria-label={title}>
         <button type="button" class="segment" aria-pressed={tab === 'steps'} data-on={tab === 'steps' ? '' : undefined} onclick={() => (tab = 'steps')}>{words.steps}</button>
         {#if row}
           <button type="button" class="segment" aria-pressed={tab === 'runs'} data-on={tab === 'runs' ? '' : undefined} onclick={() => (tab = 'runs')}>{words.runs}</button>
           <button type="button" class="segment" aria-pressed={tab === 'versions'} data-on={tab === 'versions' ? '' : undefined} onclick={() => ((tab = 'versions'), void loadVersions())}>{editWords.versions}</button>
         {/if}
         <button type="button" class="segment" aria-pressed={tab === 'written'} data-on={tab === 'written' ? '' : undefined} onclick={() => (tab = 'written')}>{words.written}</button>
-      </div>
+      </Segmented>
 
       {#if tab === 'steps'}
         <div class="column flow">
@@ -884,8 +885,9 @@
     padding: var(--sp-4) var(--gutter) var(--sp-9);
   }
 
-  /* FOUR TABS WRAP RATHER THAN PUSH THE PAGE SIDEWAYS on a 320px screen, where their words do not fit one row. */
-  .tabs {
+  /* FOUR TABS WRAP RATHER THAN PUSH THE PAGE SIDEWAYS on a 320px screen, where their words do not fit one row. The
+     track is `Segmented`'s own element, so the rule reaches it from this page's column. */
+  .page :global(.tabs) {
     align-self: flex-start;
     flex-wrap: wrap;
     max-inline-size: 100%;

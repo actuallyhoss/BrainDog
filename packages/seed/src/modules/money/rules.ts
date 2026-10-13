@@ -9,6 +9,7 @@
  */
 
 import type { SeedRule } from '../base.ts';
+import { BOOK_FROM_ACCOUNT_SCRIPT } from './scripts/book-from-account.js';
 import { CLOSE_ACCOUNT_SCRIPT } from './scripts/close-account.js';
 import { LAST_DAY_SCRIPT } from './scripts/last-day.js';
 import { PLANS_FROM_NAMES_SCRIPT } from './scripts/plans-from-names.js';
@@ -247,6 +248,39 @@ export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
     steps: [{ script: { id: 'settle', as: 'settling', input: { payment: '{{trigger.entry}}', item: '{{trigger.row.settles}}' } } }],
   },
   SETTLE_SCRIPT,
+  /**
+   * A THING ON AN ACCOUNT IS IN THAT ACCOUNT'S BOOK (REC-A09 job 1): a Ledger entry, a repeating line or an instalment
+   * written with an account and no book starts `script.book_from_account`, which fills the book from the account
+   * (`scripts/book-from-account.js`). Until these rules a book's page counted only what somebody filed by hand, and
+   * nothing a bank's text wrote.
+   *
+   * A RULE AND A SCRIPT, NOT A `set`, because the book is the account's and a fill reads the row that was written alone.
+   * ONE RULE FOR EACH LIST, since a trigger names one. NO RULE FOR BILLS AND INVOICES: that list holds no account, so
+   * there is nothing to take a book from, and `account is set` would be refused on it.
+   *
+   * ON A WRITE TO THE ACCOUNT ALONE. An edit to an entry's words starts nothing, and neither does the write the script
+   * makes. So a thing somebody takes out of its book stays out, and one moved to another account keeps the book it
+   * has. No `once_per`: a second run finds the book filled and writes nothing. NO `input`: a script a rule starts is
+   * handed the row's list and number.
+   *
+   * WHAT AN ACCOUNT HELD BEFORE IT WAS PUT IN A BOOK starts no rule, since that write is to the account. The script
+   * counts those once a day and asks one question that says how many.
+   */
+  ...(
+    [
+      ['entry-takes-book', 'File a Ledger entry in its account\'s book', 'transactions'],
+      ['repeat-takes-book', 'File a repeating line in its account\'s book', 'recurring'],
+      ['part-takes-book', 'File an instalment in its account\'s book', 'installments'],
+    ] as const
+  ).map(([rule, name, register]) => ({
+    rule,
+    name,
+    pack: 'money-core',
+    on: { written: { register, op: ['create', 'update'], fields: ['account'] } },
+    when: 'account is set, book is empty',
+    steps: [{ script: { id: 'book_from_account', as: 'filing', input: {} } }],
+  })),
+  BOOK_FROM_ACCOUNT_SCRIPT,
   /**
    * A PLAN IS A ROW OF ITS OWN, AND EACH PART SAYS WHAT IS LEFT AFTER IT (REC-B12 jobs 1 and 2): an instalment made, or
    * one whose plan, amount, day, status or number changed, starts `script.plans_from_names` for that part's plan

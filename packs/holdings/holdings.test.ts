@@ -50,6 +50,12 @@
  * RED AGAIN THE SAME DAY, for the upgrade: the three tests under "a record that had the list at 1.0.0" were written
  * against the rule-only file and all three failed, 11 of 14 passing: every cost undefined after the sweep's due time,
  * the tile at `rows: 3` rather than 0 with nothing costed, and 0 rows costed where fifty were expected.
+ *
+ * AND THE SAME THING TYPED TWICE, before 1.4.0 shipped. An account that counts as cash and a holding with one name may
+ * be counted twice, so `twin.js` runs once a day and asks once about each such pair: stop counting the account as cash,
+ * or keep counting it. It writes nothing itself. The question is the run's, never `system`'s, and the pair is its cause,
+ * so the record asks it once. RED FIRST: seven of the eight tests at the foot failed with no `twin.js`, and the eighth
+ * holds that a record with nothing alike is asked nothing, which no script also satisfies.
  */
 
 import { test } from 'node:test';
@@ -171,13 +177,13 @@ test('THE SCRIPT IN THE FILE IS cost.js, byte for byte, and it can reach nothing
   assert.deepEqual([script.egress, script.keys, script.reads, script.writes], [[], [], ['holdings'], ['holdings']]);
 });
 
-test('INSTALLED FROM THE FILE: one list, one rule, one script, seven figures and a page, and nothing refused', async () => {
+test('INSTALLED FROM THE FILE: one list, one rule, two scripts, seven figures and a page, and nothing refused', async () => {
   const { api, close } = await money();
   const diff = await planOf(api, file());
   assert.deepEqual(diff.conflicts, []);
   assert.deepEqual(
     diff.adds.map((a) => a.id).sort(),
-    ['metric.holdings-at-cost', 'metric.holdings-costed', 'metric.holdings-count', 'metric.holdings-priced-on', 'metric.holdings-stale', 'metric.holdings-unpriced', 'metric.holdings-value', 'page.holdings', 'register.holdings', 'rule.holdings_cost', 'script.holdings_cost'],
+    ['metric.holdings-at-cost', 'metric.holdings-costed', 'metric.holdings-count', 'metric.holdings-priced-on', 'metric.holdings-stale', 'metric.holdings-unpriced', 'metric.holdings-value', 'page.holdings', 'register.holdings', 'rule.holdings_cost', 'script.holdings_cost', 'script.holdings_twin'],
   );
   said(await put(api, file()));
   assert.equal(api.kernel.packs().find((p) => p.id === 'holdings')?.version, '1.4.0');
@@ -697,4 +703,156 @@ test('THE SCRIPT, TOLD THE PRICE MOVED, DATES IT TODAY, and told the day moved w
   assert.deepEqual(await handed('qty', { price: egp(455_000), value: egp(4_550_000) }), { priced_on: TODAY });
   /* TAKEN AWAY: the worth goes back to the cost and the day goes with the price. */
   assert.deepEqual(await handed('price', { value: egp(4_550_000), priced_on: SIXTY_AGO }), { value: egp(3_000_000), priced_on: null });
+});
+
+/* ── An account and a holding that share a name ────────────────────────────────────────────────── */
+
+/**
+ * `twin.js` by itself, with the record as two lists: what it would ask, or null. The same double `handed` uses, so the
+ * matching is held with no clock and no gate in the way.
+ */
+type TwinAsk = { cause: string; question: string; about: string; options: { id: string; label: string; because: string; patches?: Body[] }[] };
+const TWIN_FILE = new URL('./twin.js', import.meta.url);
+async function twin(accounts: readonly Body[], holdings: readonly Body[], today = TODAY): Promise<TwinAsk | null> {
+  const run = ((await import(TWIN_FILE.href)) as { default: (ctx: unknown) => Promise<{ ask: TwinAsk } | null> }).default;
+  const rows = (list: readonly Body[]) => list.map((fields, i) => ({ seq: i + 1, version: 3, fields }));
+  const out = await run({
+    input: null,
+    today: () => today,
+    log: () => undefined,
+    record: { list: async (register: string) => (register === 'accounts' ? rows(accounts) : register === 'holdings' ? rows(holdings) : []) },
+  });
+  return out === null || out === undefined ? null : out.ask;
+}
+const QUESTION = 'Silver Bar is an account and a holding. It may be counted twice. Stop counting the account as cash?';
+const ACCOUNT: Body = { name: 'Silver Bar', kind: 'cash', balance: egp(3_000_000), as_of: TODAY, liquid: true };
+const HOLDING: Body = { label: 'silver  bar', kind: 'commodity', qty: 10, unit_cost: egp(300_000) };
+
+test('AN ACCOUNT AND A HOLDING WITH ONE NAME GIVE ONE ASK, in those words, with two answers, whatever the case and the spaces', async () => {
+  const ask = await twin([ACCOUNT], [HOLDING]);
+  assert.equal(ask?.question, QUESTION);
+  assert.deepEqual(ask?.options.map((o) => o.label), ['Stop counting it', 'Keep counting it']);
+  /* THE ONE CHANGE AN ANSWER CARRIES: the account stops counting as cash, at the version this run read. */
+  assert.deepEqual(ask?.options.map((o) => o.patches ?? []), [[{ id: 'accounts#1', version: 3, fields: { liquid: false } }], []]);
+  assert.equal(ask?.about, 'Silver Bar');
+  /* THE PAIR IS THE CAUSE, by the two lines' own numbers, so the gate holds one question to a pair. */
+  assert.equal(ask?.cause, 'holdings.twin:1:1');
+  for (const [a, h] of [[' SILVER BAR ', 'Silver Bar'], ['SilverBar', 'silver bar'], ['Silver\tBar', 'S i l v e r b a r']])
+    assert.ok(await twin([{ ...ACCOUNT, name: a }], [{ ...HOLDING, label: h }]), `${JSON.stringify(a)} and ${JSON.stringify(h)} were read as two names`);
+  /* NO EM DASH AND NO NUMBER OF A LINE IN WHAT A PERSON READS. */
+  const read = [ask!.question, ...ask!.options.flatMap((o) => [o.label, o.because])].join(' ');
+  assert.doesNotMatch(read, /—|#\d|\baccounts\b|\bliquid\b/u);
+});
+
+test('DIFFERENT NAMES ASK NOTHING, and so does an account that does not count as cash, a closed one, or a name that is blank', async () => {
+  assert.equal(await twin([ACCOUNT], [{ ...HOLDING, label: 'Silver coin' }]), null);
+  assert.equal(await twin([{ ...ACCOUNT, name: 'Silver Bars' }], [HOLDING]), null, 'a name inside another name is not the same name');
+  assert.equal(await twin([{ ...ACCOUNT, liquid: false }], [HOLDING]), null, 'an account already left out of cash was asked about');
+  assert.equal(await twin([{ ...ACCOUNT, state: 'closed' }], [HOLDING]), null);
+  assert.equal(await twin([{ ...ACCOUNT, name: '  ' }], [{ ...HOLDING, label: ' ' }]), null, 'two blank names were read as one name');
+});
+
+test('A RECORD WITH NO HOLDINGS OR NO ACCOUNTS ASKS NOTHING', async () => {
+  assert.equal(await twin([], []), null);
+  assert.equal(await twin([ACCOUNT], []), null);
+  assert.equal(await twin([], [HOLDING]), null);
+});
+
+test('TWO PAIRS ARE EACH ASKED ABOUT, a night apart, since one run asks one question and an answered pair must not hide the next', async () => {
+  const accounts = [ACCOUNT, { ...ACCOUNT, name: 'Term deposit' }];
+  const holdings = [HOLDING, { ...HOLDING, label: 'TERM DEPOSIT' }];
+  const causes = new Set<string>();
+  for (const day of ['2026-09-25', '2026-09-26']) causes.add((await twin(accounts, holdings, day))!.cause);
+  assert.deepEqual([...causes].sort(), ['holdings.twin:1:1', 'holdings.twin:2:2']);
+});
+
+type Question = { id: string; status: string; by: string; cause: string | null; question: string; labels: string[] };
+
+/** A record with Money and this add-on, and every question a script of it ever asked, open or answered, oldest first. */
+async function asking(): Promise<{ api: Api; night: () => Promise<void>; asked: () => Question[]; answer: (id: string, option: string) => Promise<void>; close: () => void }> {
+  const sql = openSqlite();
+  const clock = fixedClock(NOW);
+  const api = await createRecordApi({ sql, clock });
+  for (const id of FIRST_PARTY) said(await put(api, firstPartyDocument(id)));
+  said(await put(api, file()));
+  const asked = (): Question[] =>
+    sql.all<{ id: string; status: string; opened_by: string; cause: string | null; body: string }>("SELECT id, status, opened_by, cause, body FROM suggestion WHERE opened_by LIKE 'script:holdings%' ORDER BY opened_at, id").map((s) => ({
+      id: s.id,
+      status: s.status,
+      by: s.opened_by,
+      cause: s.cause,
+      question: sql.one<{ to_v: string }>("SELECT to_v FROM event WHERE kind = 'suggest' AND target = ?", `suggestion:${s.id}`)?.to_v ?? '',
+      labels: (JSON.parse(s.body) as { options: { label: string }[] }).options.map((o) => o.label),
+    }));
+  /* A DAY AND AN HOUR, since a nightly clock is due some minutes past the day (its own spread). */
+  const night = async (): Promise<void> => {
+    clock.advance(25 * 3_600_000);
+    await settle(api, 4);
+  };
+  const answer = async (id: string, option: string): Promise<void> => {
+    said(api.kernel.decide(id, { decide: { option, reason: 'Looked at both.' } } as never, 'p_1'));
+    await settle(api);
+  };
+  return { api, night, asked, answer, close: () => sql.close() };
+}
+const bank = (api: Api, fields: Body): string => said<{ id: string }>(api.kernel.create('accounts', fields as never, { actor: 'p_1' })).id;
+
+test('ON A RECORD: the pair is asked about ONCE, on Decide, by the script and never by `system`, and "Keep counting it" is the last of it', async () => {
+  const { api, night, asked, answer, close } = await asking();
+  const account = bank(api, ACCOUNT);
+  hold(api, HOLDING);
+  bank(api, { ...ACCOUNT, name: 'Everyday' });
+  hold(api, { ...HOLDING, label: 'Life cover' });
+  await night();
+  const first = asked();
+  assert.deepEqual(first.map((q) => [q.status, q.question, q.labels]), [['open', QUESTION, ['Stop counting it', 'Keep counting it']]]);
+  assert.notEqual(first[0]!.by, 'system');
+  assert.match(first[0]!.by, /holdings_twin/);
+  /* A SECOND NIGHT WITH NOBODY ANSWERING finds the question waiting and adds none. */
+  await night();
+  assert.equal(asked().length, 1);
+  await answer(first[0]!.id, 'keep');
+  assert.equal(api.kernel.get(account)!.fields.liquid, true, 'keeping it changed the account');
+  /* ANSWERED, AND NEVER ASKED AGAIN FOR THAT PAIR, however many nights pass. */
+  for (let i = 0; i < 3; i += 1) await night();
+  assert.deepEqual(asked().map((q) => q.status === 'open'), [false]);
+  close();
+});
+
+test('ON A RECORD: "Stop counting it" takes the account out of cash, as the person, and the pair is not asked about again', async () => {
+  const { api, night, asked, answer, close } = await asking();
+  const account = bank(api, ACCOUNT);
+  hold(api, HOLDING);
+  await night();
+  const [q] = asked();
+  assert.equal(q?.question, QUESTION);
+  await answer(q!.id, 'stop');
+  const now = api.kernel.get(account)!;
+  assert.equal(now.fields.liquid, false);
+  assert.deepEqual(now.fields.balance, egp(3_000_000), 'the account lost its balance; only whether it counts as cash moves');
+  for (let i = 0; i < 2; i += 1) await night();
+  assert.equal(asked().length, 1);
+  close();
+});
+
+test('ON A RECORD: different names, no holdings, or no accounts leave Decide empty night after night', async () => {
+  const { api, night, asked, close } = await asking();
+  await night();
+  assert.deepEqual(asked(), [], 'a record with neither was asked something');
+  bank(api, ACCOUNT);
+  await night();
+  assert.deepEqual(asked(), [], 'an account with no holdings was asked about');
+  hold(api, { ...HOLDING, label: 'Silver coin' });
+  await night();
+  assert.deepEqual(asked(), []);
+  close();
+});
+
+test('THE SCRIPT IN THE FILE IS twin.js, byte for byte: it reads holdings and accounts, writes only accounts, and runs once a day', () => {
+  const script = file().declarations.find((d) => d.script === 'holdings_twin')!;
+  assert.ok(script, 'holdings.pack.json declares no holdings_twin');
+  assert.equal(script.source, readFileSync(TWIN_FILE, 'utf8'), 'holdings.pack.json and twin.js disagree; copy twin.js into the source');
+  assert.deepEqual([script.egress, script.keys, script.reads, script.writes, script.runs], [[], [], ['holdings', 'accounts'], ['accounts'], { every: '1d' }]);
+  /* NO RULE STARTS IT: a question a write opened would come the moment a name was typed, mid-edit. */
+  assert.deepEqual(file().declarations.filter((d) => d.rule !== undefined).map((d) => d.rule), ['holdings_cost']);
 });

@@ -6,8 +6,8 @@
  * accepted there. The body is built once, so a suggested page and a made one cannot differ.
  *
  * ITS SHAPE IS NOT SET HERE. A page holds 1 to 24 blocks (`packages/record/src/grammar.ts`), so an empty one cannot be
- * declared: it carries one note that says it is empty, which the Add menu's first block replaces. The side column,
- * tabs, icon and section are the page's settings, and filling it is the Add menu.
+ * declared: it carries one note that says it is empty and how to fill it, which the first thing put on the page
+ * replaces. The side column, tabs, icon and section are the page's settings.
  *
  * THE CLIENT IS HANDED IN, so the palette and the rail share one function and a test runs it over a real kernel.
  */
@@ -16,6 +16,7 @@ import { createClient } from '@braindog/client';
 
 import { copy } from '../copy.ts';
 import type { Fetch } from './row-live.ts';
+import { changeWords } from './slash.ts';
 
 /**
  * The words for making a page, kept beside the call they describe, as `retireWords` is, so this module owns them
@@ -26,8 +27,14 @@ export const pageWords = {
   section: 'Pages',
   newPage: 'New page',
   suggestPage: 'Suggest a page',
-  /** The one block a new page holds, until something is added to it. */
-  empty: 'This page is empty. Add something to it to get started.',
+  /**
+   * The one block a new page holds, until something is added to it.
+   *
+   * IT NAMES THE WAY THAT IS THERE AT EVERY WIDTH. The note is stored in the page, so it is one sentence for a phone
+   * and a wide screen alike, and arranging is drawn from 900px only: it sends the person to the page's menu and the
+   * entry there that takes a description, by the name that entry is drawn with.
+   */
+  empty: `This page is empty. To fill it, open the menu at the top of the page, choose ${changeWords.change}, and say what you want on it.`,
   blank: 'Give the page a name first.',
   long: 'That name is too long for a page. Keep it to 80 characters or fewer.',
   made: (title: string) => `${title} is ready.`,

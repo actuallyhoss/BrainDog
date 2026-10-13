@@ -820,6 +820,86 @@ test('A THING ONLY FELT ABOUT IS NOT TAKEN UP AGAIN, and a stall sold or had bef
   }
 });
 
+test('A THING NEVER DONE OR ONLY WISHED FOR IS NOT HEARD: "I never ran a shop", "I wish I had a shop", "I used to love taking orders", "now I love them"', () => {
+  const lit = (p: ReturnType<typeof propose>, word: RegExp): boolean => p.heard.some((h) => word.test(h.phrase)) || p.places.some((x) => x.phrase !== null && word.test(x.phrase));
+  const orders = (p: ReturnType<typeof propose>): boolean => p.places.some((x) => x.name === 'Orders');
+  const none = (s: string, word: RegExp): void => {
+    for (const typed of [s, `I'm a freelance designer. ${s}`]) {
+      const p = propose(typed, CAIRO);
+      assert.ok(!lit(p, word) && !orders(p) && p.usecase !== 'shop', typed);
+    }
+  };
+  const kept = (s: string, word: RegExp): void => assert.ok(lit(propose(s, CAIRO), word), s);
+
+  /* THE FOUR SENTENCES OF THE AUDIT OF BATCH 69, word for word. */
+  none('I never ran a shop', /shop/iu);
+  none('I wish I had a shop', /shop/iu);
+  none('I used to love taking orders', /orders/iu);
+  none('I stopped taking orders and now I love them', /orders/iu);
+
+  /* "NEVER" AND ITS LIKE ARE READ THROUGH A VERB OF THE PAST, as they are through one of now. */
+  for (const s of ['I never ran a small shop', "I've never owned a shop", 'I never took orders', 'We never opened a shop', 'I have not started a shop', "I haven't taken any orders", 'I never kept orders or invoices', 'I never wanted a shop']) {
+    none(s, /shop|orders|invoices/iu);
+  }
+  /* A verb that is not one of having or doing still keeps the thing, and so does a denial of having lost it. */
+  for (const s of ['I never closed my shop', 'I never sold the stall', 'I never thought I would run a shop but I do', 'No, I ran a shop for years', 'I never lost an order, I take orders daily']) {
+    kept(s, /shop|stall|orders/iu);
+  }
+
+  /* A WISH OR A HOPE BEFORE THE THING IS NOT THE THING. */
+  for (const s of [
+    'I wish I ran a shop',
+    'I wish I could run a shop',
+    'I wish that we had a small shop',
+    'If only I had a shop',
+    'I hope to open a shop one day',
+    'I am hoping to start a shop',
+    'I hope one day to have my own shop',
+    'I dream of opening a shop',
+    'I always wanted a shop',
+    'I wish I took orders',
+    'I hope to take orders someday',
+    'I wish I had a shop or orders',
+  ]) {
+    none(s, /shop|orders/iu);
+  }
+  /* What is wished ABOUT a thing somebody has is still theirs, and so is what they hope to do with it here. */
+  for (const s of [
+    'I wish my shop had more orders',
+    'I hope to grow my shop',
+    'I hope to get more orders',
+    'I wish I had sold the stall',
+    'I wish I had more time, I run a shop',
+    'I hope to keep track of my orders here',
+    'I hope to track orders and invoices',
+    'I hope to take orders here',
+    'I wish I had opened a shop sooner',
+    'I run a shop and hope it grows',
+    'I always wanted to run a shop and now I have one',
+    'I hoped to open a shop and finally did',
+    'I hope to start a small shop with this',
+  ]) {
+    kept(s, /shop|stall|orders/iu);
+  }
+
+  /* "USED TO" IS READ THROUGH A WORD OF LIKING, and what was liked then has stopped as what was done then has. */
+  for (const s of ['I used to enjoy taking orders', 'I used to hate chasing invoices', 'I used to really love running a small shop', 'We used to like taking orders but stopped']) {
+    none(s, /shop|orders|invoices/iu);
+  }
+  kept('I used to love taking orders and now track them here', /orders/iu);
+  kept('I love taking orders', /orders/iu);
+  kept('I used to like my shop', /shop/iu);
+  kept('I used to love taking orders on paper', /orders/iu);
+
+  /* A WORD OF LIKING STRAIGHT BEFORE THE WORD THAT POINTS BACK takes nothing up; one before what is done with it does. */
+  for (const s of ['I used to take orders and now I really like them', 'I no longer take orders but still love them', 'I quit taking orders and now we enjoy them']) {
+    none(s, /orders/iu);
+  }
+  for (const s of ['I stopped taking orders and now I love tracking them', 'I stopped taking orders and now I would like to track them here', 'I used to take orders and now I enjoy keeping them here']) {
+    kept(s, /orders/iu);
+  }
+});
+
 test("A SENTENCE THAT OPENS WITH A REFUSAL NAMES NOBODY: Don't need orders, I freelance as a designer", () => {
   const typed = "Don't need orders, I freelance as a designer";
   const p = propose(typed, CAIRO);

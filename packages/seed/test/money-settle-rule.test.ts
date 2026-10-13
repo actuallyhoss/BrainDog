@@ -57,7 +57,7 @@ async function money() {
   const made = (list: string, fields: Fields) => value<Entry>(k.create(list, fields, OWNER));
   const book = made('books', { name: 'Personal' }).id;
   const account = made('accounts', { name: 'Current', kind: 'bank', liquid: true, balance: gbp(1_000_000), as_of: '2026-10-01', book }).id;
-  const paid = (amount: number, on: string, more: Fields = {}) => made('transactions', { what: 'NORTHGATE ESTATES', on, direction: 'out', amount: gbp(amount), account, state: 'cleared', ...more });
+  const paid = (amount: number, on: string, more: Fields = {}) => made('transactions', { what: 'NORTHGATE ESTATES', on, direction: 'out', amount: gbp(amount), account, book, state: 'cleared', ...more });
   const bill = (more: Fields = {}) => made('obligations', { what: 'Studio rent', direction: 'owed_by_me', amount: gbp(400_000), due: '2026-10-01', state: 'open', ...more });
 
   const log: string[] = [];

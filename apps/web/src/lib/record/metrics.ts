@@ -1005,3 +1005,18 @@ export const targetLine = (decl: MetricDecl, value?: number | null): string => {
   if (under) return `Limit ${figure}`;
   return bound === 0 ? `Keep above ${figure}` : `At least ${figure}`;
 };
+
+/**
+ * How far a walk looked without going under, as the day it is said with, or `null`.
+ *
+ * NO VALUE IS TWO THINGS AND ONLY ONE OF THEM IS A FAILURE. A walk whose balance stays above zero has no day to answer
+ * with, and the record sends the last day it looked at beside the empty value (`Beyond` in the kernel's
+ * `money-figures.ts`). Only a calendar day and a whole count of days is taken for one.
+ */
+export function beyondOf(r: { beyond?: unknown }): string | null {
+  const b = r.beyond;
+  if (typeof b !== 'object' || b === null) return null;
+  const { day, days } = b as { day?: unknown; days?: unknown };
+  if (typeof day !== 'string' || !/^\d{4}-\d{2}-\d{2}$/u.test(day) || Number.isNaN(Date.parse(day))) return null;
+  return typeof days === 'number' && Number.isInteger(days) ? longDay(day) : null;
+}

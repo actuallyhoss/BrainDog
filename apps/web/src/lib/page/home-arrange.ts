@@ -62,7 +62,8 @@ export function keptAs(slug: string, pages: readonly string[]): Kept | null {
  * ones this tab heard by default.
  *
  * AND THE RECORD'S WEEK, where it keeps one (`weekOf`), which the caller reads off the lists' declarations it has learnt
- * (`weekHeld`). Home hands it in for Today's own body; the arrange mode hands it in too, or Today kept by a first Done
+ * (`weekHeld`). AND WHETHER IT HAS THE HEALTH PAGE, which Today's line on the vital signs opens (`signsLine`): the line is
+ * drawn only where that page is. Home hands the week in for Today's own body; the arrange mode hands it in too, or Today kept by a first Done
  * lost "Orders due this week" and the week's money on the day it was arranged (B46.8).
  */
 export function holdsOf(shell: Pick<Shell, 'lists' | 'pages' | 'me'>, heard: Labels = labels(), week?: Week): Holds {
@@ -70,7 +71,7 @@ export function holdsOf(shell: Pick<Shell, 'lists' | 'pages' | 'me'>, heard: Lab
   const tasks = list !== undefined;
   const bare = REGISTERS[TASKS] ?? (list ? { id: TASKS, name: list.name, one: singularOf(list.name) } : undefined);
   const one = tasks && bare ? relabel(bare, heard).one : undefined;
-  return { tasks, adds: tasks && may(shell, 'append', TASKS), money: shell.pages.includes('money'), ...(one ? { one } : {}), ...(week ? { week } : {}) };
+  return { tasks, adds: tasks && may(shell, 'append', TASKS), money: shell.pages.includes('money'), ...(shell.pages.includes('health') ? { health: true } : {}), ...(one ? { one } : {}), ...(week ? { week } : {}) };
 }
 
 /**
@@ -174,7 +175,7 @@ export function whileHeld(body: PageBody): PageBody {
 export async function previewedBody(slug: string, holds: Holds): Promise<PageBody | null> {
   if (slug === 'today') {
     const { todayHome } = await import('../home/default-home.ts');
-    return whileHeld(plainBody(todayHome({ tasks: holds.tasks, adds: holds.tasks, money: true, ...(holds.week ? { week: holds.week } : {}) }, HOUSE_VOICE)));
+    return whileHeld(plainBody(todayHome({ tasks: holds.tasks, adds: holds.tasks, money: true, ...(holds.health ? { health: true } : {}), ...(holds.week ? { week: holds.week } : {}) }, HOUSE_VOICE)));
   }
   if (slug === 'decide') return plainBody((await import('../../routes/decide/views.ts')).decideHome());
   return null;

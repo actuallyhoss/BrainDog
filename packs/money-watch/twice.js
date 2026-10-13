@@ -14,6 +14,10 @@
  * IT ASKS ONCE. A third charge of the same amount a day later belongs to the pair already asked about, so it adds no
  * second question, and a pair you answered is never asked about again.
  *
+ * "BOTH REAL" IS REMEMBERED. Once you have said both were real, a later pair of that payee, account and amount is not
+ * asked about, however long after, and no line is written for it. "One is a mistake" is remembered for its own pair
+ * only: the next pair is asked about. A different amount, or another account, is another question.
+ *
  * IT SWITCHES ITSELF OFF. After three answers of "Both real" in a row it writes one line in Money watch saying so and
  * stops looking. Change that line to "Switched on again" and it starts over.
  *
@@ -141,13 +145,16 @@ async function look(ctx, started) {
       if (run.length < 2) continue;
       const [first, newer] = run;
       const last = run[run.length - 1];
-      /* ASKED ABOUT ALREADY, when a line for this payee, account and amount sits within two days of the run. */
-      const before = await allInWindow(ctx, 'money_flags', 'on', shift(first.fields.on, -APART - 1), shift(last.fields.on, APART), [
+      /* ASKED ABOUT ALREADY, when a line for this payee, account and amount sits within two days of the run. AND
+         SAID TO BE REAL, when one of any date was answered "Both real": two coffees a morning are asked about once. */
+      const near = shift(first.fields.on, -APART - 1);
+      const lines = await allInWindow(ctx, 'money_flags', 'on', EARLIEST, shift(last.fields.on, APART), [
         { field: 'flag', is: FLAG },
         { field: 'payee', is: payee.name },
       ]);
       const amount = newer.fields.amount;
-      if (before.some((b) => b.fields.account === newer.fields.account && b.fields.amount && b.fields.amount.amount === amount.amount && b.fields.amount.currency === amount.currency)) continue;
+      const same = (b) => b.fields.account === newer.fields.account && b.fields.amount && b.fields.amount.amount === amount.amount && b.fields.amount.currency === amount.currency;
+      if (lines.some((b) => same(b) && (b.fields.said === 'real' || b.fields.on > near))) continue;
       if (written === MOST) {
         ctx.log(`More than ${MOST} pairs were found, and the rest wait for the next look.`);
         return;

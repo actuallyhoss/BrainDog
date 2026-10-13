@@ -1585,9 +1585,10 @@ const DECLARED: Record<string, Version> = {
       setting.label_people setting.label_products setting.one_orders setting.one_people setting.one_products
       setting.shared_version setting.speaks setting.voice_coming_up setting.voice_fills_with setting.voice_nothing_due
     `,
-    declares: '4b43574d8fd8259f',
+    declares: '68b91519bbf178bd',
     history: [
       'The Orders line counts every other order nothing was paid on beside the one it names (`orders-owed-named.more` in `page.orders`, shop-owed-53-54) -> 4b43574d8fd8259f',
+      "Folded into the unreleased 1.2.0 (owed-words-70-71, audit 69 finding 4; commit 63423720 holds 1.0.0): `page.orders` heads its tile of orders not paid in full Still to come in, as Today's money tile says it, with its empty line, and `setting.voice_fills_with` says the money still to come in -> 68b91519bbf178bd",
     ],
   },
 };

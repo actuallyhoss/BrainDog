@@ -598,6 +598,15 @@ const withoutPlans = (doc: Body): Body => ({
 const withoutCashStale = (doc: Body): Body => ({ ...doc, declarations: (doc.declarations as Body[]).filter((d) => d.rule !== 'cash-stale') });
 /** Work as 1.18.0 released it, the frozen document (`fixtures/released/`), which holds the follow-up script as it was. */
 const WORK_1_18 = JSON.parse(readFileSync(new URL('./fixtures/released/work-1.18.0.json', import.meta.url), 'utf8')) as Body;
+/**
+ * AND BATCH 71'S BOOKS (book-fill-71, book-figures-71, book-page-71; REC-A09 steps 1 to 3), folded into the same
+ * unreleased step: the three rules that file a thing in its account's book go with the script they start, the seven
+ * figures of a book's month and of what no book holds go, and a book's page loses This month.
+ */
+const BOOK_FIGURES_71: ReadonlySet<string> = new Set(['book-in-month', 'book-out-month', 'book-net-month', 'ledger-in-no-book', 'repeating-in-no-book', 'instalments-in-no-book', 'bills-in-no-book']);
+const BOOK_RULES_71: ReadonlySet<string> = new Set(['entry-takes-book', 'repeat-takes-book', 'part-takes-book']);
+const withoutBookFill = (doc: Body): Body =>
+  withPage(doc, 'money-book', (now) => now.filter((b) => b.heading !== 'This month'), (d) => !BOOK_FIGURES_71.has(String(d.metric)) && !BOOK_RULES_71.has(String(d.rule)) && d.script !== 'book_from_account');
 /** Batch 63's four figures of this month's spending against last (spend-figures-63), new in the unreleased money-core 3.17.0. */
 const SPEND_VS_LAST: ReadonlySet<string> = new Set(['spent-last-month', 'spent-by-category-last-month', 'spent-by-category-to-date-last-month', 'spent-vs-last-month']);
 const LATEST: Record<string, { version: string; released: string; undo: (doc: Body) => Body }> = {
@@ -606,7 +615,7 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
     version: '3.13.0',
     released: '2e09983b40aba73e',
     undo: (raw) => {
-      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(raw))))))))));
+      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(raw)))))))))));
       return {
       ...doc,
       /* AND THE SCRIPT THAT MARKS A BILL PAID, WITH THE RULE THAT STARTS IT (settle-rule-60), both newer than 3.13.0. */

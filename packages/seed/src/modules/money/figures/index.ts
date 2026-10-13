@@ -11,6 +11,7 @@ import { DIRECTION_FIGURES } from './direction.ts';
 import { DUE_FIGURES } from './due.ts';
 import { FILING_FIGURES } from './filing.ts';
 import { FLOW_FIGURES } from './flow.ts';
+import { BOOK_FIGURES } from './books.ts';
 import { BUDGET_FIGURES } from './budgets.ts';
 import { INSTALMENTS_FIGURES } from './instalments.ts';
 import { PLAN_FIGURES, PLANS_FIGURES } from './plans.ts';
@@ -62,6 +63,11 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
      reads. LAST, so every figure above keeps its place in the document. */
   ...PLAN_FIGURES,
   ...PLANS_FIGURES,
+
+  /* A BOOK'S OWN MONTH, AND WHAT IS FILED IN NO BOOK (REC-A09 step 2, book-figures-71): money in, money out and what is
+     left, read once per book, and a count a list of what no book holds. LAST, so every figure above keeps its place in
+     the document. */
+  ...BOOK_FIGURES,
 };
 
 /* EACH FIGURE WHOSE TARGET A PERSON CHANGES LATER NAMES ITS SETTING (`MONEY_TARGET_SETTINGS`), wherever Money is declared. */

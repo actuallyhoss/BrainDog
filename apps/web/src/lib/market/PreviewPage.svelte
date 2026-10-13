@@ -16,6 +16,7 @@
 <script lang="ts">
   import type { Preview } from '@braindog/declare/catalogue';
   import PageView from '$lib/page/PageView.svelte';
+  import Segmented from '$lib/ui/Segmented.svelte';
   import { openedOf } from './preview.ts';
   import { words } from './words.ts';
 
@@ -34,11 +35,11 @@
   {#if large}
     <div class="large">
       {#if pages.length > 1}
-        <div class="segmented tabs" role="tablist" aria-label={words.pages}>
+        <Segmented class="tabs" role="tablist" aria-label={words.pages}>
           {#each pages as p, i (p.page)}
             <button type="button" class="segment" role="tab" aria-selected={i === at} data-on={i === at ? '' : undefined} onclick={() => (at = i)}>{p.title}</button>
           {/each}
-        </div>
+        </Segmented>
       {/if}
       <div class="frame" role="tabpanel" aria-label={shown.title}>
         <PageView slug={shown.page} {got} mode="preview" />
@@ -62,15 +63,16 @@
     min-inline-size: 0;
   }
 
-  /* THE TABS SCROLL IN THEIR OWN ROW, never the page, when an add-on brings more pages than fit. */
-  .tabs {
+  /* THE TABS SCROLL IN THEIR OWN ROW, never the page, when an add-on brings more pages than fit. The track is
+     `Segmented`'s own element, so its rules reach it by the name this part gave it. */
+  .large :global(.tabs) {
     flex-wrap: nowrap;
     overflow-x: auto;
     align-self: flex-start;
     max-inline-size: 100%;
   }
 
-  .tabs .segment {
+  .large :global(.tabs .segment) {
     white-space: nowrap;
   }
 

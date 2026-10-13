@@ -163,7 +163,23 @@ test('WITH ALL FOUR EMPTY IT WRITES NOTHING, and a typed tier and its reason sta
   assert.equal(await tiered({ rev: null, unblock: null, clock: null, cheap: null }), null);
 });
 
-test('ONE NUMBER IS ENOUGH: the ones nobody gave count as nothing, and the line says so', async () => {
+test('WHEN ALL FOUR ARE CLEARED THE LINE LEAVES AND THE WORDS STAY, and the tier is left where it was', async () => {
+  /* RED FIRST, MEASURED: before the script read a cleared task it answered no write here, and the old sum stood as the
+     reason for a tier nobody had worked out any more. */
+  const cleared = { rev: null, unblock: null, clock: null, cheap: null, priority: 'high' };
+  assert.deepEqual(await tiered({ ...cleared, why: `${LINE} my words` }), { why: 'my words' });
+  /* A REASON THAT WAS ONLY THE LINE IS EMPTY AFTERWARDS. */
+  assert.deepEqual(await tiered({ ...cleared, why: LINE }), { why: '' });
+  assert.deepEqual(await tiered({ priority: 'high', why: `${LINE}\n\nmy words\n` }), { why: 'my words' });
+  /* A REASON SOMEBODY TYPED, WITH NO LINE AT ITS START, IS NOT TOUCHED: not when it has no sum in it, and not when a
+     sum is quoted further in. */
+  assert.equal(await tiered({ ...cleared, why: 'my words' }), null);
+  assert.equal(await tiered({ ...cleared, why: `He wrote: ${LINE}` }), null);
+  /* AND THE RUN AFTER THE LINE LEFT WRITES NOTHING, so it is taken away once. */
+  assert.equal(await tiered({ ...cleared, why: '' }), null);
+});
+
+test('ONE NUMBER IS ENOUGH:the ones nobody gave count as nothing, and the line says so', async () => {
   assert.deepEqual(await tiered({ clock: 25 }), { priority: 'low', why: 'Money 0, unblocks 0, clock 25, cheap 0: 25 of 100.' });
 });
 
@@ -251,6 +267,27 @@ test('THE WHOLE PATH ON A SELF-HOST: a task filed with four numbers has its tier
     said(await api.update({ register: 'tasks', seq: invoice.seq, patch: { rev: 25, clock: 25 } }, owner));
     await settle();
     assert.deepEqual([fieldsOf(invoice.id).priority, fieldsOf(invoice.id).why], ['high', 'Money 25, unblocks 15, clock 25, cheap 5: 70 of 100. The client asked twice.']);
+
+    /* A SECOND EDIT BEFORE THE FIRST RUN LANDS FAILS NOTHING. The second change joins the run the first one queued,
+       and that one run reads the task when it runs, not when it was queued: it reads both edits, and the version it
+       hands back is the one the task holds. */
+    /* HOW THE SCRIPT'S RUNS ENDED, read as the kernel reads them when it counts refusals in a row (`script-run.ts`). */
+    const ended = (outcome: string) =>
+      running.sql.one<{ n: number }>("SELECT count(*) AS n FROM event WHERE actor LIKE 'script:task_tier@%' AND json_valid(to_v) AND json_extract(to_v, '$.outcome') = ?", outcome)?.n;
+    const refused = () => ended('refused');
+    said(await api.update({ register: 'tasks', seq: invoice.seq, patch: { cheap: 10 } }, owner));
+    said(await api.update({ register: 'tasks', seq: invoice.seq, patch: { state: 'open', unblock: 20 } }, owner));
+    await settle();
+    assert.deepEqual([fieldsOf(invoice.id).priority, fieldsOf(invoice.id).why], ['urgent', 'Money 25, unblocks 20, clock 25, cheap 10: 80 of 100. The client asked twice.']);
+    assert.equal(refused(), 0);
+
+    /* ALL FOUR ARE CLEARED: the line leaves, the words stay, and the tier is left where it was. */
+    said(await api.update({ register: 'tasks', seq: invoice.seq, patch: { rev: null, unblock: null, clock: null, cheap: null } }, owner));
+    await settle();
+    assert.deepEqual([fieldsOf(invoice.id).priority, fieldsOf(invoice.id).why], ['urgent', 'The client asked twice.']);
+    /* EVERY RUN SO FAR ENDED WELL, so the count of refusals above is a count of something. Six changes started the
+       rule and the script ran five times, since the two edits made together were one run. */
+    assert.deepEqual([refused(), ended('ok'), runs()], [0, 5, 6]);
 
     /* A TASK WITH A TYPED TIER AND NO NUMBERS STANDS AS TYPED, and its reason is whatever its writer gave. */
     const typed = said<{ id: string }>(await api.create({ register: 'tasks', fields: { what: 'Ring the printer', priority: 'urgent', why: 'He said so.' } }, owner));

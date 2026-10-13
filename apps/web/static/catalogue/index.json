@@ -571,9 +571,9 @@
       "versions": [
         {
           "version": "1.4.0",
-          "checksum": "37c0a58b2ff473a89a0584baa6cb4b44b559bd3219cc129237ab144d5c714623",
-          "bytes": 12480,
-          "published_at": "2026-10-13T16:24:22.295Z",
+          "checksum": "e3a9c43402aecd60659a723b72d0f7b8fb83435c337a0ca283dad1e7cabdf01c",
+          "bytes": 15973,
+          "published_at": "2026-10-13T17:22:29.546Z",
           "bump": "minor",
           "reach": {
             "modules": [
@@ -592,7 +592,7 @@
             "skills": [],
             "calls_out": []
           },
-          "notes": "A holding can have a price, \"Worth each now\", and the day it was priced. Holdings value adds up what each is worth at its price, or what it cost when it has none, and says how many stand at what they cost. A price written with no day is dated the day it was written, a price taken away takes its day with it, the page says the oldest day a price was said, and warns once that day is over 30 days ago. The value reads in your home currency, or the one your holdings are in.",
+          "notes": "A holding can have a price, \"Worth each now\", and the day it was priced. Holdings value adds up what each is worth at its price, or what it cost with none, and says how many stand at what they cost. A price with no day is dated the day it was written, and the page warns once the oldest price is over 30 days old. The value reads in your home currency, or the one your holdings are in. An account that counts as cash and a holding with the same name are asked about once.",
           "preview": true
         },
         {
@@ -1267,9 +1267,9 @@
       "versions": [
         {
           "version": "1.1.0",
-          "checksum": "9ef9cf66486250f6be6c4fe397522dfaa0e2fadb3dc9abb7a4fe8642643232a8",
-          "bytes": 37501,
-          "published_at": "2026-10-13T16:40:59.475Z",
+          "checksum": "3e239c6a375f30fd2945ec7f9b490d5ad2c65740ce7dae4daaa51714af9eaf83",
+          "bytes": 38208,
+          "published_at": "2026-10-13T17:22:29.546Z",
           "bump": "patch",
           "reach": {
             "modules": [
@@ -1293,7 +1293,7 @@
             "skills": [],
             "calls_out": []
           },
-          "notes": "\"One is a mistake\" marks the newer charge void even when that entry was edited after the question was asked. A payee added to Repeating is next due a month after its newest payment on the day you answer, not on a day already paid. And the line that says Charged twice switched itself off now says why in your words: both charges were real three times in a row.",
+          "notes": "\"One is a mistake\" marks the newer charge void even when that entry was edited after the question was asked. A payee added to Repeating is next due a month after its newest payment on the day you answer, not on a day already paid. And the line that says Charged twice switched itself off now says why in your words: both charges were real three times in a row. And once you have said both charges were real, a later pair of that payee, account and amount is not asked about again.",
           "preview": true
         },
         {
@@ -2104,9 +2104,9 @@
       "versions": [
         {
           "version": "1.0.0",
-          "checksum": "349068b30592c5ea6fea089d497078cae04d316869a641d2ff6c194436c8e09a",
-          "bytes": 5096,
-          "published_at": "2026-10-13T16:24:22.295Z",
+          "checksum": "56fc5d86a75069dbc30836377d3479102f7ead32f636a6eae68428ec069a6e93",
+          "bytes": 5956,
+          "published_at": "2026-10-13T17:22:29.546Z",
           "bump": null,
           "reach": {
             "modules": [

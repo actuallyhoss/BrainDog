@@ -359,6 +359,33 @@ test('AN ANSWER THAT HOLDS EVERY KEY IS NOT BELIEVED when a day in it is too nea
   assert.deepEqual(three.said, ['2 keys: 2 kept elsewhere.'], 'nothing is said of the clock when the record answered');
 });
 
+/* Audit 70, finding 8: the smallest case of the one above, a record's only key, on the day it ends. A host that
+   answers it whatever it was asked says nothing about its day, in the line or in the document a program reads. */
+test('ONE KEY WHOSE DAY IS TODAY, ON A HOST THAT ANSWERS EVERY KEY, IS NOT CALLED EXPIRED', async (t) => {
+  const zone = process.env.TZ;
+  t.after(() => void (zone === undefined ? delete process.env.TZ : (process.env.TZ = zone)));
+  process.env.TZ = 'UTC';
+  const unsaid = 'Your record did not say which keys are past their day, so each is judged by the date on this machine.';
+  const today = [row(1, { label: 'Ends today', opens: 'A service', expires: '2026-10-13' })];
+
+  const deaf = await host(t, today, null, { today: '2026-10-14', deaf: true });
+  const one = io(deaf.base);
+  assert.equal(await keys(['list', '--json'], one), 0, one.said.join('\n'));
+  assert.deepEqual(one.lines.map((l) => l.split(' · ').at(-1)), ['expires 13 October 2026']);
+  assert.deepEqual((one.answered[0]!.value as { keys: KeyRead[] }).keys.map((k) => k.expired), [false]);
+  assert.deepEqual(one.said, [unsaid, '1 key: 1 kept elsewhere.']);
+
+  /* THE PRICE, HELD HERE SO IT IS SEEN: the same key on a record that does read the filter, in Cairo at 22:30 UTC,
+     where the day is already the 14th. Its true answer is its whole list too, and a day this near is not believed
+     from a whole list, so this machine's date judges the key, the 13th, and the sentence is said of a record that
+     did answer. */
+  const read = await host(t, today, null, { today: '2026-10-14' });
+  const two = { ...io(read.base), now: () => Date.parse('2026-10-13T22:30:00Z') };
+  assert.equal(await keys(['list'], two), 0, two.said.join('\n'));
+  assert.deepEqual(two.lines.map((l) => l.split(' · ').at(-1)), ['expires 13 October 2026']);
+  assert.equal(two.said[0], unsaid);
+});
+
 /* RED BEFORE: a value in code marks kept its mark, so the question was asked of "`sk-live-..." and a short one passed;
    and a character nobody sees inside a value hid its shape from the question, then was taken out for printing, which
    put the value on the line whole. */

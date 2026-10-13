@@ -57,6 +57,16 @@ test("Today's body is built from what the shell says the record holds", () => {
   assert.deepEqual(holdsOf({ lists: [{ id: 'notes', name: 'Notes' }], pages: [], me: owner }, {}), { tasks: false, adds: false, money: false });
 });
 
+test("Today's line on the vital signs is drawn where the record has the Health page, and a kept Today keeps it", async () => {
+  const owner = { level: 'owner', owner: true, person: 'p_1', lists: null } as never;
+  const holds = holdsOf({ lists: [{ id: 'tasks', name: 'Tasks' }], pages: ['money', 'health'], me: owner }, {});
+  assert.equal(holds.health, true);
+  assert.equal(holdsOf({ lists: [], pages: ['money'], me: owner }, {}).health, undefined, 'no Health page, no line that links to it');
+  const signs = (body: Awaited<ReturnType<typeof previewedBody>>) => (body?.blocks ?? []).filter((b) => b.kind === 'note' && String((b as { body?: unknown }).body).includes('(/p/health)'));
+  assert.equal(signs(await previewedBody('today', holds)).length, 2, 'one note for one red sign, one for several');
+  assert.equal(signs(await previewedBody('today', { tasks: true, adds: true, money: true })).length, 0);
+});
+
 test('the line a task is typed into is named by the tasks list as the record words it, and Home and the arrange mode agree', () => {
   const owner = { level: 'owner', owner: true, person: 'p_1', lists: null } as never;
   const shell = { lists: [{ id: 'tasks', name: 'Tasks' }], pages: [], me: owner };

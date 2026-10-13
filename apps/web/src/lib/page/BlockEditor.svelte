@@ -43,6 +43,7 @@
   import { seedBlock } from '$lib/record/seed.ts';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import Segmented from '$lib/ui/Segmented.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
   import { apiBase } from '../at.ts';
 
@@ -348,7 +349,7 @@
             {/each}
           </select>
           {#if draft.sortField}
-            <div class="segmented" role="group" aria-label={blockWords.sortDir}>
+            <Segmented role="group" aria-label={blockWords.sortDir}>
               {#each ways as way (way.dir)}
                 <button
                   type="button"
@@ -358,7 +359,7 @@
                   onclick={() => draft && (draft.sortDir = way.dir)}>{way.said}</button
                 >
               {/each}
-            </div>
+            </Segmented>
           {/if}
           <p class="help">{blockWords.sortHelp}</p>
         {:else}
@@ -448,7 +449,7 @@
 
     <div class="part">
       <span class="label" id="{uid}-width">{blockWords.width}</span>
-      <div class="segmented" role="group" aria-labelledby="{uid}-width">
+      <Segmented role="group" aria-labelledby="{uid}-width">
         {#each steps as step (step)}
           <button type="button" class="segment" data-on={width === step ? '' : undefined} aria-pressed={width === step ? 'true' : 'false'} onclick={() => (width = step)}>
             {spanLabel(step)}
@@ -457,20 +458,20 @@
         {#if !steps.includes(width)}
           <span class="segment" data-on aria-current="true">{spanLabel(width)}</span>
         {/if}
-      </div>
+      </Segmented>
     </div>
 
     {#if area !== null}
       <div class="part">
         <span class="label" id="{uid}-area">{blockWords.area}</span>
-        <div class="segmented" role="group" aria-labelledby="{uid}-area">
+        <Segmented role="group" aria-labelledby="{uid}-area">
           <button type="button" class="segment" data-on={column === 'main' ? '' : undefined} aria-pressed={column === 'main' ? 'true' : 'false'} onclick={() => (column = 'main')}>
             {blockWords.areaMain}
           </button>
           <button type="button" class="segment" data-on={column === 'rail' ? '' : undefined} aria-pressed={column === 'rail' ? 'true' : 'false'} onclick={() => (column = 'rail')}>
             {blockWords.areaRail}
           </button>
-        </div>
+        </Segmented>
       </div>
     {/if}
   {/if}

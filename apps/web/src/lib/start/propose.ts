@@ -291,6 +291,10 @@ const WHOLE: readonly Whole[] = [
  * A WORD OF FEELING TAKES NOTHING UP (`FEELS`): "I stopped taking orders and still miss them" and "now I hate them"
  * point back at the orders and do nothing with them, so they stay stopped. AND A THING SOLD, OR HAD BEFORE, IS GONE:
  * "I sold the stall" has no shop (`SOLD`), nor has "when I had the stall", "when we ran a small shop" (`ENDED`).
+ *
+ * A THING NEVER DONE OR ONLY WISHED FOR IS NOT HAD EITHER: "I never ran a shop" is read through the verb of before
+ * (`DID_IT`), "I wish I had a shop" and "I hope to open a shop one day" through the wish (`WISHED`), and "I used to
+ * love taking orders" through the word of liking (`LIKED`). "Now I love them" takes nothing up (`ONLY_LIKED`).
  */
 const REFUSES = "no|not|never|without|zero|don['’]?t|do\\s+not|doesn['’]?t|does\\s+not|haven['’]?t|hasn['’]?t|hadn['’]?t";
 /* `send` and its ending apart: the whole word is a field an add-on declares, and the core spells none (the core-names gate). */
@@ -308,8 +312,11 @@ const SMALL = "(?:(?:have|has|had|ever|really|actually|quite|yet|am|is|are|was|w
 const UNTHOUGHT = `(?<!(?:^|[^\\p{L}\\p{N}'’])(?:${DENIES})\\s+${SMALL}(?:${THINKS})\\s+(?:that\\s+)?${SOMEBODY}\\s+${SMALL})`;
 const HALTED = `${UNDENIED}${UNTHOUGHT}(?:done|finished|stopped|quit)(?:\\s+with)?`;
 const STOPPED = `${HALTED}(?=\\s+(?:${DOING})\\s)`;
+/* The same verbs said of before, so a thing never done is refused as one not done is: "I never ran a shop", "we never
+   took orders". Never "sold", "closed" or "lost": whoever never sold a stall still has it. */
+const DID_IT = 'ran|took|taken|kept|owned|opened|started|tracked|chased|needed|wanted|did';
 const NOT = new RegExp(
-  `(?:^|[^\\p{L}\\p{N}])(?:${REFUSES})\\s+(?:(?:any|more|longer|ever|had|got|${DOES}|a|an|the)\\s+){0,5}(?:(?:${[...PLAIN].join('|')})\\s+)*$`,
+  `(?:^|[^\\p{L}\\p{N}])(?:${REFUSES})\\s+(?:(?:any|more|longer|ever|had|got|${DOES}|${DID_IT}|a|an|the)\\s+){0,5}(?:(?:${[...PLAIN].join('|')})\\s+)*$`,
   'iu',
 );
 /* A thing of one's own, and one from before: "my products", "my old products", "the former shop". */
@@ -318,10 +325,13 @@ const PAST = 'old|former|previous|earlier|last|original|first';
 const OWNED = `(?:(?:${OWN})\\s+)?(?:(?:${PAST})\\s+)*`;
 const THING = `(?:(?:any|more|longer|ever|had|got|${DOES}|a|an|the)\\s+){0,5}${OWNED}(?:(?:${[...PLAIN].join('|')})\\s+)*$`;
 const NOT_STOPPED = new RegExp(`(?:^|[^\\p{L}\\p{N}])${STOPPED}\\s+${THING}`, 'iu');
-/* "no longer", and "used to" before a verb: never "I am used to taking orders", which is somebody who takes them. */
+/* "no longer", and "used to" before a verb: never "I am used to taking orders", which is somebody who takes them.
+   A word of liking may stand before the verb, since what was liked then was done then: "I used to love taking orders".
+   Only before a verb: "I used to like my shop" is somebody who has one. */
+const LIKED = 'love|like|enjoy|hate|dread|mind';
 const NO_LONGER = new RegExp(`(?:^|[^\\p{L}\\p{N}])no\\s+longer\\s+${THING}`, 'iu');
 const USED_TO = new RegExp(
-  `(?<!(?:am|is|are|was|were|be|been|being|get|gets|got|getting|['’]m|['’]re|['’]s)\\s+(?:(?:so|very|quite|now|well|all|really)\\s+)?)(?<![\\p{L}\\p{N}])used\\s+to\\s+(?!(?:${DOING})\\s)${THING}`,
+  `(?<!(?:am|is|are|was|were|be|been|being|get|gets|got|getting|['’]m|['’]re|['’]s)\\s+(?:(?:so|very|quite|now|well|all|really)\\s+)?)(?<![\\p{L}\\p{N}])used\\s+to\\s+(?!(?:${DOING})\\s)(?:(?:really|quite|so|just)\\s+)?(?:(?:${LIKED})\\s+(?=(?:to|${DOING}|running|owning|having)\\s)(?:(?:running|owning|having)\\s+)?)?${THING}`,
   'iu',
 );
 /* The thing heard can be the verb itself: "I am done selling" is no shop, as "no more selling" already is none. */
@@ -358,16 +368,33 @@ const SOLD = new RegExp(
   'iu',
 );
 const SOLD_TO = /^\s+(?:to|for)(?![\p{L}\p{N}])/iu;
+/* A THING ONLY WISHED FOR IS NOT HAD: "I wish I had a shop", "I hope to open a shop one day", "if only I took orders",
+   "I dream of opening a shop", "I always wanted a shop". The wish comes before the thing with only somebody and words
+   of having or starting between (`GETS`), then "a", "any", "some" or "my own". So what is wished ABOUT a thing somebody
+   has keeps it ("I wish my shop had more orders", "I hope to grow my shop", "I wish I had sold the stall"), and so does
+   what they hope to do with it in here, which is a verb of keeping and not of having ("I hope to track orders"). */
+const WISHES = 'wish(?:es|ed|ing)?|hop(?:e|es|ed|ing)|if\\s+only|dream(?:s|ed|t|ing)?\\s+(?:of|about)|always\\s+wanted';
+const GETS = 'to|have|had|having|own|owned|owning|run|ran|running|open|opened|opening|start|started|starting|get|got|getting|take|took|taking|could|would|can|will|might|someday|one\\s+day|soon|still|ever|just|be\\s+able';
+const WISHED = new RegExp(
+  `(?:^|[^\\p{L}\\p{N}'’])(?:${WISHES})\\s+(?:that\\s+)?(?:${SOMEBODY}\\s+)?(?:(?:${GETS})\\s+){0,5}(?:(?:a|an|any|some|(?:${OWN})\\s+own)\\s+)?(?:(?:${[...PLAIN].join('|')})\\s+)*$`,
+  'iu',
+);
+/* What follows says the thing is had after all: it is hoped for in here, wished to have come sooner, or had now
+   ("I always wanted a shop and now I have one"). */
+const HAD_ANYWAY = /^(?:\s+(?:here|sooner|earlier|(?:with|in|on|through|using)\s+(?:this|braindog))|\s*,?\s+(?:and|but)\s+(?:(?:i|we)\s+)?(?:now|finally|today)\s+(?:(?:i|we)\s+)?(?:have|own|run|do|did|got))(?![\p{L}\p{N}])/iu;
 const CLAUSE_END = `(?:\\s+(?:${WHEN}))?\\s*(?:$|[^\\p{L}\\p{N}\\s]|(?:and|or|nor|but|so|because|since)(?![\\p{L}\\p{N}])|${SINCE_WHEN})`;
-/* A thing taken up again: a word of now ("now", "still", "instead") after the clause, then at most four words, none a join or a word of refusal or
+/* A thing taken up again: a word of now ("now", "still", "instead") after the clause, then at most five words, none a join or a word of refusal or
    of stopping, and the word that points back. "them" and "those" point at many, "it" and "that" at one. */
 const NOW = 'now|today|nowadays|these\\s+days|currently|still|instead';
 /* A word of feeling or remembering takes nothing up: "and still miss them", "now I hate them", "still think about them".
-   The thing is pointed back at and nothing is done with it. "love" is not one: it is said of what goes on as often. */
+   The thing is pointed back at and nothing is done with it. "love" is not one of them, since it is said of what goes on
+   as often ("now I love tracking them"), but straight before the word that points back it is only a feeling too
+   (`ONLY_LIKED`): "I stopped taking orders and now I love them". */
+const ONLY_LIKED = `(?<!(?:^|[^\\p{L}\\p{N}'’])(?:lov(?:e|es|ed)|lik(?:e|es|ed)|enjoy(?:s|ed)?|ador(?:e|es|ed))\\s+)`;
 const FEELS = 'miss(?:es|ed|ing)?|hat(?:e|es|ed|ing)|regret(?:s|ted|ting)?|mourn(?:s|ed|ing)?|dread(?:s|ed|ing)?|resent(?:s|ed|ing)?|loathe[sd]?|despise[sd]?|detest(?:s|ed)?|remember(?:s|ed|ing)?|recall(?:s|ed|ing)?|forget|forgot|forgotten|think|thinking|dream(?:s|ed|ing)?|wish|grieve';
 const takenUp = (back: string): RegExp =>
   new RegExp(
-    `^(?:\\s+(?:${WHEN}))?(?:\\s+(?!(?:and|or|nor|but|so|because|since)(?![\\p{L}\\p{N}]))[\\p{L}\\p{N}'’-]+){0,3}\\s*[,;]?\\s*(?:(?:and|but|so)\\s+)?(?:${SOMEBODY}\\s+)?(?:${NOW})\\s+(?:(?!(?:${DENIES}|${FEELS}|done|finished|stopped|quit|and|or|nor|but|so|because|since)(?![\\p{L}\\p{N}'’]))[\\p{L}\\p{N}'’-]+\\s+){1,4}(?:${back})(?![\\p{L}\\p{N}])`,
+    `^(?:\\s+(?:${WHEN}))?(?:\\s+(?!(?:and|or|nor|but|so|because|since)(?![\\p{L}\\p{N}]))[\\p{L}\\p{N}'’-]+){0,3}\\s*[,;]?\\s*(?:(?:and|but|so)\\s+)?(?:${SOMEBODY}\\s+)?(?:${NOW})\\s+(?:(?!(?:${DENIES}|${FEELS}|done|finished|stopped|quit|and|or|nor|but|so|because|since)(?![\\p{L}\\p{N}'’]))[\\p{L}\\p{N}'’-]+\\s+){1,5}${ONLY_LIKED}(?:${back})(?![\\p{L}\\p{N}])`,
     'iu',
   );
 const TAKEN_UP = { many: takenUp('them|those'), one: takenUp('it|that'), done: takenUp('them|those|it') };
@@ -463,6 +490,8 @@ function refusedIn(said: string, known: readonly Said[] = []): (span: Said) => b
     const used = USED_TO.test(before);
     if (NO_LONGER.test(before) || used) return closes(from, to) && !again(from, to) ? 'stopped' : null;
     if (NOT.test(before)) return 'refused';
+    /* A thing only wished or hoped for is refused as one said not to be had is. */
+    if (WISHED.test(before) && !HAD_ANYWAY.test(said.slice(to))) return 'refused';
     if (ENDED.test(before)) return ends(to) ? 'stopped' : null;
     if (ENDED_ITSELF.test(before) && ITSELF_ENDED.test(said.slice(to))) return 'stopped';
     /* One thing sold, and nothing takes it up again: whoever sold a stall does not run it. */

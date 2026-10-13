@@ -47,6 +47,7 @@
   import { tick } from 'svelte';
   import Panel from '$lib/ui/Panel.svelte';
   import Button from '$lib/ui/Button.svelte';
+  import Segmented from '$lib/ui/Segmented.svelte';
   import { open as openRecord } from '$lib/data/record.ts';
   import type { FieldDecl } from '$lib/record/schema.ts';
   import { readNames } from '$lib/record/history-live.ts';
@@ -465,11 +466,11 @@
         </div>
 
         <p class="label" id="flow-kind">{words.trigger}</p>
-        <div class="segmented kinds" role="group" aria-labelledby="flow-kind">
+        <Segmented class="kinds" role="group" aria-labelledby="flow-kind">
           {#each TRIGGER_KINDS as k (k)}
             <button type="button" class="segment" aria-pressed={kind === k} data-on={kind === k ? '' : undefined} onclick={() => pick(k)}>{words.kinds[k]}</button>
           {/each}
-        </div>
+        </Segmented>
         <p class="help">{words.triggerHelp[kind] ?? sayTrigger(t, listSaid)}</p>
 
         {#if 'written' in t}
@@ -485,12 +486,12 @@
             </div>
           {/if}
           <p class="label" id="flow-ops">When an item is</p>
-          <div class="segmented" role="group" aria-labelledby="flow-ops">
+          <Segmented class="many" role="group" aria-labelledby="flow-ops">
             {#each OPS as [op, label] (op)}
               {@const on = (t.written.op ?? []).includes(op)}
               <button type="button" class="segment" aria-pressed={on} data-on={on ? '' : undefined} onclick={() => toggleOp(op)}>{label}</button>
             {/each}
-          </div>
+          </Segmented>
           <p class="help">{(t.written.op ?? []).length === 0 ? 'None picked is added or changed.' : ''}</p>
           <p class="label" id="flow-when-label">{words.condition}</p>
           <Condition
@@ -537,11 +538,11 @@
             </div>
           {/if}
           <p class="label" id="flow-crosses">{words.inspect.crosses}</p>
-          <div class="segmented" role="group" aria-labelledby="flow-crosses">
+          <Segmented role="group" aria-labelledby="flow-crosses">
             {#each CROSSINGS as [way, label] (way)}
               <button type="button" class="segment" aria-pressed={crossing === way} data-on={crossing === way ? '' : undefined} onclick={() => setCrossing(way, lineOf)}>{label}</button>
             {/each}
-          </div>
+          </Segmented>
           {#if crossing !== 'target'}
             <label class="label" for="flow-line">{words.inspect.line}</label>
             <div class="field">
@@ -640,22 +641,22 @@
         {#each args as a (pathKey(a))}
           {#if a.kind === 'shape'}
             <p class="label" id="{idOf(a)}-label">{a.label}</p>
-            <div class="segmented fill" id={idOf(a)} role="group" aria-labelledby="{idOf(a)}-label">
+            <Segmented class="fill" id={idOf(a)} role="group" aria-labelledby="{idOf(a)}-label">
               {#each SLASH_SHAPES as s (s)}
                 <button type="button" class="segment" aria-pressed={shape === s} data-on={shape === s ? '' : undefined} onclick={() => setShape(s)}>{SLASH_SHAPE_WORDS[s]}</button>
               {/each}
-            </div>
+            </Segmented>
           {:else if a.kind === 'fields'}
             <!-- PICKED, AS THE LIST'S FIELDS ARE PICKED EVERYWHERE ELSE ON THIS SHEET: `about:` holds field ids, which
                  nobody should have to type, and each is pressed in or out as a list's changes are. -->
             <p class="label" id="{idOf(a)}-label">{a.label}</p>
             {#if aboutOptions.length > 0}
-              <div class="segmented" id={idOf(a)} role="group" aria-labelledby="{idOf(a)}-label">
+              <Segmented class="many" id={idOf(a)} role="group" aria-labelledby="{idOf(a)}-label">
                 {#each aboutOptions as f (f)}
                   {@const on = about.includes(f)}
                   <button type="button" class="segment" aria-pressed={on} data-on={on ? '' : undefined} onclick={() => toggleAbout(f)}>{fieldWord(f)}</button>
                 {/each}
-              </div>
+              </Segmented>
               <p class="help">{words.inspect.aboutHelp}</p>
             {:else}
               <p class="help">{words.inspect.aboutNone}</p>
@@ -851,9 +852,17 @@
     }
   }
 
-  /* SIX TRIGGERS DO NOT FIT ONE ROW AT 390, so the choice wraps onto a second line rather than scrolling sideways. */
-  .kinds {
+  /* SIX TRIGGERS DO NOT FIT ONE ROW AT 390, so the choice wraps onto a second line rather than scrolling sideways.
+     The track is `Segmented`'s own element, so its rules reach it by the name this sheet gave it. */
+  .inspect :global(.kinds) {
     flex-wrap: wrap;
+  }
+
+  /* PRESSED IN AND OUT, SO MORE THAN ONE CAN BE CHOSEN (a list's changes, the fields an answer is about). The part
+     draws one selection, under the first chosen segment, and `controls.css` takes the fill from every chosen segment
+     once it is placed: each chosen one after the first is the tile's colour here, as the selection is. */
+  :global(.many[data-thumb]) .segment[data-on] ~ .segment[data-on] {
+    background: var(--tile);
   }
 
   /* ONE ROW A FIELD: the name, then its value, then the way to take it out; stacked in a narrow panel, where three
@@ -887,7 +896,7 @@
   @media (width < 640px) {
     /* EACH CONTROL THE SHEET'S WIDTH ON A PHONE: the answer's shapes share the row equally, so a thumb has an
        even part of it each rather than pills huddled at the start. */
-    .fill .segment {
+    :global(.fill) .segment {
       flex: 1 1 0;
     }
   }

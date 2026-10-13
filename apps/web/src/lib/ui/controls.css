@@ -335,6 +335,12 @@
     box-shadow: none;
   }
 
+  /* A TRACK WHERE MORE THAN ONE IS CHOSEN has one thumb, under the first: each chosen one after it keeps the tile's
+     colour of its own, flat as the thumb is, so it never reads as off. */
+  .segmented[data-thumb] > .segment[data-on] ~ .segment[data-on] {
+    background: var(--tile);
+  }
+
   /**
    * A SWITCH, FOR ONE THING THAT IS ON OR OFF.
    *

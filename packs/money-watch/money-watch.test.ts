@@ -254,6 +254,67 @@ test('CHARGED TWICE READS THE BANK\'S WORDS when an entry names no organisation,
   }
 });
 
+test('"BOTH REAL" IS REMEMBERED: the same payee, account and amount is not asked about again weeks on, and a mistake silences nobody', async () => {
+  /* RED FIRST, MEASURED on 1.1.0 before the change: an answer was remembered only within two days of its pair, so the
+     pair of 6 Oct opened "Cilantro E£150 twice on 6 Oct. Both real?" three weeks after she had said both were real. */
+  const r = await fresh();
+  try {
+    const pair = async (what: string, on: string, amount: number, more: Record<string, unknown> = {}) => {
+      await r.charge(what, on, amount, more);
+      await r.charge(what, on, amount, more);
+    };
+    /* TWO COFFEES A MORNING, and she says so once. */
+    await pair('Cilantro', '2026-09-15', 15_000);
+    assert.deepEqual(r.open().map((q) => q.question), ['Cilantro E£150 twice on 15 Sep. Both real?']);
+    await r.answer(r.open()[0]!.id, 'real');
+    /* THREE WEEKS ON, THE SAME THREE: nothing is asked and no line is written, that day or on the nightly look. */
+    await pair('Cilantro', '2026-10-06', 15_000);
+    await r.nextDay();
+    assert.deepEqual(r.open(), []);
+    assert.deepEqual(r.flags().map((f) => [f.what, f.said ?? null]), [['Cilantro E£150 twice on 15 Sep', 'real']]);
+
+    /* A DIFFERENT AMOUNT TO THE SAME PAYEE IS ASKED, and so is the same amount from another account. */
+    await pair('Cilantro', '2026-10-08', 22_500);
+    assert.deepEqual(r.open().map((q) => q.question), ['Cilantro E£225 twice on 8 Oct. Both real?']);
+    await r.answer(r.open()[0]!.id, 'mistake');
+    const debit = await r.add('accounts', { name: 'Debit Card', kind: 'card', balance: egp(900_000), as_of: '2026-08-01', liquid: true });
+    await pair('Cilantro', '2026-10-09', 15_000, { account: debit.id });
+    assert.deepEqual(r.open().map((q) => q.question), ['Cilantro E£150 twice on 9 Oct. Both real?']);
+    await r.answer(r.open()[0]!.id, 'mistake');
+
+    /* "ONE IS A MISTAKE" SILENCES NOBODY: the next pair of that payee, account and amount is asked about. */
+    await pair('Cilantro', '2026-10-12', 22_500);
+    assert.deepEqual(r.open().map((q) => q.question), ['Cilantro E£225 twice on 12 Oct. Both real?']);
+  } finally {
+    await r.close();
+  }
+});
+
+test('A PAIR PASSED OVER BECAUSE BOTH WERE REAL IS NOT AN ANSWER: the count of three in a row and its line are as they were', async () => {
+  const r = await fresh();
+  try {
+    const pair = async (what: string, on: string) => {
+      await r.charge(what, on, 15_000);
+      await r.charge(what, on, 15_000);
+    };
+    const OFF = 'Charged twice was switched off after both charges were real three times in a row. Switch it on again in Money watch.';
+    await pair('Cilantro', '2026-09-15');
+    await r.answer(r.open()[0]!.id, 'real');
+    await pair('Costa', '2026-09-18');
+    await r.answer(r.open()[0]!.id, 'real');
+    /* TWO IN A ROW, then Cilantro three times more: no question, no answer, so still two and still on. */
+    for (const on of ['2026-09-22', '2026-09-29', '2026-10-06']) await pair('Cilantro', on);
+    assert.deepEqual(r.open(), []);
+    assert.equal(r.flags().length, 2);
+    /* THE THIRD ANSWER switches it off, in the words it had. */
+    await pair('Paul', '2026-10-08');
+    await r.answer(r.open()[0]!.id, 'real');
+    assert.deepEqual(r.flags().filter((f) => f.said === 'off').map((f) => [f.what, f.flag]), [[OFF, 'twice']]);
+  } finally {
+    await r.close();
+  }
+});
+
 /* ── Looks like it repeats ─────────────────────────────────────────────────────────────────────── */
 
 test('LOOKS LIKE IT REPEATS: three payments a month apart open one offer, and yes adds a Repeating line the walk carries', async () => {

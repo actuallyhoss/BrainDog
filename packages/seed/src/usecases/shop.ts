@@ -28,18 +28,18 @@ const TO_SEND = 'state is new or ready';
 const THIS_WEEK = `${TO_SEND}, due after -1d, due before +8d`;
 const LATE = `${TO_SEND}, due before today`;
 
-/** An order not paid in full, which Owed to you reads: not marked paid, with a total to owe. A deposit does not settle it. */
+/** An order not paid in full, which Still to come in reads: not marked paid, with a total to owe. A deposit does not settle it. */
 const OWED = 'state is not paid, total is set';
 const NOT_PAID = [{ field: 'state', not: 'paid' }, { field: 'total', present: true }];
 
 /* WHO THE LINE CAN NAME: an order nothing was paid on, so its total is what is owed, with a person and a day on it. The
-   day is what orders them, oldest first, so the line names the one the Owed to you tile opens on.
+   day is what orders them, oldest first, so the line names the one the Still to come in tile opens on.
    IT NAMES ONE AND COUNTS THE REST (shop-owed-53-54): Salma owed 1,350 and 600 and Dalia 400, and the line said "Salma
    still owes EGP 1,350" with the other thousand nowhere in it. `.more` is every order here but the one named. */
 const OWED_NAMED = { all: [...NOT_PAID, { field: 'paid', empty: true }, { field: 'who', present: true }, { field: 'due', present: true }] };
 
 /* AND EVERY ORDER NOT PAID IN FULL THAT IS NOT ONE OF THOSE, counted where it cannot be named: part paid, nobody's, or
-   with no day. The two split the owed orders between them, so named, more and other add up to Owed to you. */
+   with no day. The two split the owed orders between them, so named, more and other add up to Still to come in. */
 const OWED_OTHER = { all: [...NOT_PAID, { any: [{ field: 'paid', present: true }, { field: 'who', empty: true }, { field: 'due', empty: true }] }] };
 
 export const SHOP = {
@@ -48,7 +48,10 @@ export const SHOP = {
      1.1.0: this week starts today and late is its own clause and tile; a part-paid order is owed; the line names the
      oldest order nothing was paid on, and counts the ones it cannot name.
      1.2.0: the line counts every other order nothing was paid on beside the one it names, where it said only the
-     oldest and left the rest out. */
+     oldest and left the rest out.
+     FOLDED INTO THE UNRELEASED 1.2.0 (owed-words-70-71, audit 69 finding 4): the tile of what is not paid in full is
+     headed Still to come in, the words Today's money tile opens it with, where it said Owed to you. Commit 63423720,
+     the deployed build, holds 1.0.0, so no version is cut for it. */
   version: '1.2.0',
   title: 'Shop',
   summary: 'The orders you take, who they are for and when they are due, what has been paid, and the things you sell.',
@@ -61,11 +64,12 @@ export const SHOP = {
     'online shop',
   ],
   modules: ['people'],
-  /* THE HOUSE VOICE BUT FOR THE LINES ABOUT WHAT FALLS DUE: a shop's week is orders to make and send. */
+  /* THE HOUSE VOICE BUT FOR THE LINES ABOUT WHAT FALLS DUE: a shop's week is orders to make and send.
+     MONEY STILL ON ITS WAY, never a debt held over somebody: `fills_with` says it as Today's tile does. */
   voice: {
     coming_up: 'Due soon',
     nothing_due: 'No order is due in the next two weeks.',
-    fills_with: 'The orders due this week and what you are owed show up here as you add your orders.',
+    fills_with: 'The orders due this week and the money still to come in show up here as you add your orders.',
   },
   /* THE LISTS' OWN WORDS, so a shop can call them what it does: Commissions, Stock. */
   labels: {
@@ -154,7 +158,7 @@ export const SHOP = {
                EVERY OTHER ORDER NOTHING WAS PAID ON IS COUNTED IN THE CLAUSE AFTER IT, "with 2 more orders not paid at
                all", hers or anybody's, and nought more is left out. An order that cannot be named that way (part paid,
                nobody's, no day) is counted in the clause before, which needs no name. Named, more and not paid in full
-               are every order in Owed to you, each once. The amounts are never added: two orders may be in two
+               are every order in Still to come in, each once. The amounts are never added: two orders may be in two
                currencies. */
             kind: 'note',
             lead: true,
@@ -200,9 +204,12 @@ export const SHOP = {
             empty: 'No order is due this week.',
           },
           {
-            /* WHO HAS NOT PAID IN FULL, the oldest due first, with what came in beside what it comes to. */
+            /* WHO HAS NOT PAID IN FULL, the oldest due first, with what came in beside what it comes to.
+               HEADED AS TODAY'S MONEY TILE SAYS IT (`OWED_TO_YOU` in the web's `default-home.ts`, audit 69 finding 4):
+               she taps Still to come in and lands on a tile of the same name. The two are held equal by hand, a
+               seed file cannot read the web's constant. */
             kind: 'table',
-            heading: 'Owed to you',
+            heading: 'Still to come in',
             icon: 'wallet',
             span: 12,
             source: 'register.orders',
@@ -217,7 +224,7 @@ export const SHOP = {
             ],
             order: [{ field: 'due', dir: 'asc' }],
             limit: 8,
-            empty: 'Nobody owes you for an order.',
+            empty: 'Every order is paid in full.',
           },
         ],
       },

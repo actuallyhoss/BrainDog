@@ -56,7 +56,7 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
   shop: [
     {
       version: '1.2.0',
-      notes: 'The Orders line now counts every other order nobody has paid anything on, beside the one it names. It used to name the oldest and leave the rest out.',
+      notes: 'The Orders line now counts every other order nobody has paid anything on, beside the one it names. It used to name the oldest and leave the rest out. The tile of orders not yet paid in full is called Still to come in, the same words Today uses.',
     },
     {
       version: '1.1.0',

@@ -47,7 +47,7 @@ import { linkOf, REST_MARK } from './blocks.ts';
 import { bylineOf } from './byline.ts';
 import { METRICS } from './declared.ts';
 import { readBoot } from './boot-live.ts';
-import { format, fxNote, hrefFor, leadOf, noteOf, partsShown, partsText, targetSaid, walksNote, withParam, type MetricDecl } from './metrics.ts';
+import { beyondOf, format, fxNote, hrefFor, leadOf, noteOf, partsShown, partsText, targetSaid, walksNote, withParam, type MetricDecl } from './metrics.ts';
 import { moneyInText } from './money.ts';
 import { entryOf, learn, namesOf, refMapOf, targetsOf, type RecordRow, type RefMap } from './remote.ts';
 import { REDUCES, SUMS, type Entry, type PageBlock, type PageDecl } from './schema.ts';
@@ -679,21 +679,6 @@ const isTarget = (v: unknown): v is { lte: number } | { gte: number } =>
 function backsOf(r: Reading): { backs?: string[] } {
   const held = Array.isArray(r.backs) ? r.backs.filter((h): h is string => typeof h === 'string' && h !== '') : [];
   return held.length ? { backs: held } : {};
-}
-
-/**
- * How far a walk looked without going under, as the day it is said with, or `null`.
- *
- * NO VALUE IS TWO THINGS AND ONLY ONE OF THEM IS A FAILURE. A walk whose balance stays above zero has no day to answer
- * with, and the record sends the last day it looked at beside the empty value (`Beyond` in the kernel's
- * `money-figures.ts`). Only a calendar day and a whole count of days is taken for one.
- */
-function beyondOf(r: Reading): string | null {
-  const b = r.beyond;
-  if (typeof b !== 'object' || b === null) return null;
-  const { day, days } = b as { day?: unknown; days?: unknown };
-  if (typeof day !== 'string' || !/^\d{4}-\d{2}-\d{2}$/u.test(day) || Number.isNaN(Date.parse(day))) return null;
-  return typeof days === 'number' && Number.isInteger(days) ? fmtDay(day) : null;
 }
 
 export function tileOf(cell: NonNullable<Answered['readings']>[number], values?: Record<string, unknown>, missed: 'warn' | 'bad' = 'warn'): Metric {

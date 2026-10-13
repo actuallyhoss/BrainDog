@@ -14,11 +14,18 @@
  * WORDS A PERSON WROTE ARE KEPT. Whatever Why this tier already says stays after the line. A line this script wrote
  * before is replaced by the new one, so the words are not doubled and an old sum is not left standing.
  *
- * WHAT IT LEAVES ALONE. A task with none of the four is not touched, so a tier somebody typed stands. A number
+ * WHAT IT LEAVES ALONE. A task with none of the four is not given a tier, so one somebody typed stands. A number
  * nobody gave counts as nothing. A task already at its tier with its line is not written again.
  *
- * IT WRITES TWO FIELDS, Priority and Why this tier, in one update, and the automation watches neither, so this script
- * does not start itself again.
+ * WHEN ALL FOUR ARE CLEARED THE LINE LEAVES. A sum of numbers that are gone is no reason, so the line this script
+ * wrote is taken off the start of Why this tier and the words after it stay. Priority is left where it was: it is
+ * the person's to change now. A reason with no line at its start was typed by somebody, and is not touched.
+ *
+ * IT WRITES TWO FIELDS, Priority and Why this tier, and the automation watches neither, so this script does not start
+ * itself again.
+ *
+ * IT HANDS BACK THE VERSION IT READ, so a reason somebody changed while this ran is not written over. Such a run is
+ * refused and writes nothing; the task's next change in one of the four works the tier out again.
  */
 
 const FOUR = ['rev', 'unblock', 'clock', 'cheap'];
@@ -41,7 +48,13 @@ export default async function run(ctx) {
     return;
   }
   const f = task.fields;
+  const was = typeof f.why === 'string' ? f.why : '';
   if (!FOUR.some((id) => given(f[id]))) {
+    if (WRITTEN.test(was)) {
+      ctx.log('This task has none of the four numbers any more, so the sum was taken out of its reason and its tier was left as it is.');
+      ctx.update(`tasks#${task.seq}`, { why: was.replace(WRITTEN, '').trim() }, task.version);
+      return;
+    }
     ctx.log('This task has none of the four numbers, so its tier was left as it is.');
     return;
   }
@@ -49,7 +62,7 @@ export default async function run(ctx) {
   const [rev, unblock, clock, cheap] = FOUR.map((id) => counted(f[id]));
   const sum = rev + unblock + clock + cheap;
   const line = `Money ${rev}, unblocks ${unblock}, clock ${clock}, cheap ${cheap}: ${sum} of 100.`;
-  const words = (typeof f.why === 'string' ? f.why : '').replace(WRITTEN, '').trim();
+  const words = was.replace(WRITTEN, '').trim();
   const why = words === '' ? line : `${line} ${words}`;
   const priority = tierOf(sum);
 

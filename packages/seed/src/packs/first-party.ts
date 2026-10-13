@@ -563,6 +563,10 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   History heading and Being chased leave the page (money-wire-70, REC-B19 jobs 3 and 4); a plan's page is led by
  *   one sentence (plan-lead-sentence-70); and a filing rule's Reads choice `payee` is labelled As the bank wrote it
  *   (filing-reads-words-70).
+ * - money-core 3.17.0, still unreleased (commit 63423720, the deployed build, holds 3.16.0), takes batch 71's books with
+ *   no version of its own (REC-A09 steps 1 to 3): three rules and `script.book_from_account` file a Ledger entry, a
+ *   repeating line or an instalment in its account's book (book-fill-71); seven figures say one book's month and what
+ *   is filed in no book (book-figures-71); and the book page gained This month, a row of the three (book-page-71).
  * - people 3.4.0: the People page says how many people may be on the record twice (people-held-twice-69), one note under
  *   its two lead notes, from the built-in figure held-twice and drawn only above nought. 3.3.0 is released (commit
  *   63423720 holds it), so a version of its own. A note added, nothing taken away, so a minor step that reaches a record

@@ -48,3 +48,9 @@ test('the rail keeps what it had', () => {
   assert.match(SOURCE, /data-label=\{words\.newList\}/);
   assert.match(SOURCE, /\{#each things as \[section, list\] \(section\)\}/);
 });
+
+test('the heading of its own is drawn only on a rail with no Pages place', () => {
+  assert.match(SOURCE, /\{#if !icons && !pagesPlaced\}\s*<section class="part" data-pages-heading>/);
+  assert.equal((SOURCE.match(/\{@render pageLineDrawn\(true\)\}/g) ?? []).length, 1);
+  assert.equal((SOURCE.match(/\{@render pageLineDrawn\(false\)\}/g) ?? []).length, 1);
+});

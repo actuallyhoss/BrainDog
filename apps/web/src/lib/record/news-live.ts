@@ -21,7 +21,7 @@ import { NO_ROW_SAID, unsaidFigure, type Metric } from './api.ts';
 import { actorFor, forget, type Fetch } from './boot-live.ts';
 import { METRICS } from './declared.ts';
 import { noteOf } from './history-live.ts';
-import { format, fxNote, hrefFor, offTarget, partsText, targetLine } from './metrics.ts';
+import { beyondOf, format, fxNote, hrefFor, offTarget, partsText, targetLine } from './metrics.ts';
 import { moneyInText } from './money.ts';
 import { runByIn } from './names.ts';
 import type { AuditEvent } from './schema.ts';
@@ -36,7 +36,7 @@ import type { AuditEvent } from './schema.ts';
  * absent the tile falls back to `rows`, which is the old, ambiguous reading of a zero and withholds
  * the verdict rather than inventing one.
  */
-type Reading = { value: number | null; unit: string | null; rows: number; held?: number; met: boolean | null; refusals: unknown[]; parts?: Part[]; fx?: FxRead };
+type Reading = { value: number | null; unit: string | null; rows: number; held?: number; met: boolean | null; refusals: unknown[]; parts?: Part[]; fx?: FxRead; beyond?: unknown };
 
 type Said = { code: string; fix: string };
 
@@ -85,6 +85,9 @@ export function tileOf(id: string, r: Reading | null): Metric {
   /* MONEY IN SEVERAL CURRENCIES IS EACH AMOUNT IN ITS OWN, and says why, as a page's tile does. */
   const across = r ? fxNote(r) : null;
   if (r?.parts && r.refusals.length === 0) return { id, label, value: partsText(r.parts), note: across ?? '' };
+  /* A WALK THAT NEVER WENT UNDER HAS NO VALUE AND IS NO FAILURE: the day it lasts past, as a page's tile says it. */
+  const lasts = r && r.value === null && r.refusals.length === 0 ? beyondOf(r) : null;
+  if (lasts !== null) return { id, label, value: copy.lastsPast(lasts), note: '' };
   if (!r || r.value === null || r.refusals.length) return { id, label, value: MISSING, note: copy.figureUnavailable, tone: 'warn' };
   const empty = (r.held ?? r.rows) === 0;
   const unsaid = unsaidFigure(decl, r);

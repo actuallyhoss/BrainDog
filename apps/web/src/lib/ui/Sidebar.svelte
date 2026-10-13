@@ -198,6 +198,10 @@
   let naming = $state(false);
   let pageTitle = $state('');
   let making = $state(false);
+  /* A RECORD WITH NO MADE PAGE HAS NO PAGES PLACE, and the line had nowhere to be drawn: the first page could only be
+     made from the palette. So the rail draws the heading itself, with the line under it, until a place of that name
+     is there to hold it. */
+  const pagesPlaced = $derived([...places, ...more].some((item) => holdsPages(item, pageWords.section)));
   let nameBox = $state<HTMLInputElement | null>(null);
 
   async function startPage() {
@@ -512,29 +516,35 @@
        is the box the name is typed into: Enter makes the page, Escape or leaving it empty puts the line back. Not on
        the narrow rail, which has no room for a name. -->
   {#snippet pageLineOf(item: FlatItem)}
-    {#if !icons && holdsPages(item, pageWords.section)}
-      {#if naming}
-        <form class="item view page-name" onsubmit={(e) => (e.preventDefault(), void makePage())}>
-          <input
-            bind:this={nameBox}
-            bind:value={pageTitle}
-            class="page-box"
-            type="text"
-            aria-label={pageWord}
-            placeholder={words.pageName}
-            maxlength="80"
-            autocomplete="off"
-            enterkeyhint="done"
-            readonly={making}
-            onkeydown={(e) => e.key === 'Escape' && (e.stopPropagation(), stopPage())}
-            onblur={() => pageTitle.trim() === '' && !making && stopPage()}
-          />
-        </form>
-      {:else}
-        <button type="button" class="item view tap" data-page-line onclick={() => void startPage()}>
-          <span class="item-name">{pageWord}</span>
-        </button>
-      {/if}
+    {#if !icons && holdsPages(item, pageWords.section)}{@render pageLineDrawn(false)}{/if}
+  {/snippet}
+
+  <!-- THE LINE ITSELF. Under the Pages place it is indented as a view is. `headed`, under the rail's own Pages heading
+       on a record with no made page, it is a row of its own with a plus, as "New list" is under Lists. -->
+  {#snippet pageLineDrawn(headed: boolean)}
+    {#if naming}
+      <form class={['item page-name', !headed && 'view']} onsubmit={(e) => (e.preventDefault(), void makePage())}>
+        {#if headed}<span class="rail-glyph"><Icon name="plus" size="l" /></span>{/if}
+        <input
+          bind:this={nameBox}
+          bind:value={pageTitle}
+          class="page-box"
+          type="text"
+          aria-label={pageWord}
+          placeholder={words.pageName}
+          maxlength="80"
+          autocomplete="off"
+          enterkeyhint="done"
+          readonly={making}
+          onkeydown={(e) => e.key === 'Escape' && (e.stopPropagation(), stopPage())}
+          onblur={() => pageTitle.trim() === '' && !making && stopPage()}
+        />
+      </form>
+    {:else}
+      <button type="button" class={['item tap', !headed && 'view']} data-page-line data-label={headed ? pageWord : undefined} onclick={() => void startPage()}>
+        {#if headed}<span class="rail-glyph"><Icon name="plus" size="l" /></span>{/if}
+        <span class="item-name">{pageWord}</span>
+      </button>
     {/if}
   {/snippet}
 
@@ -594,6 +604,17 @@
         </ul>
       </section>
     {/each}
+
+    <!-- PAGES, WHEN THE RECORD HAS NONE MADE: the heading and the line that makes the first one. Once a page is made
+         the Pages place holds the line and this goes. Not on the narrow rail, which has no room for a name. -->
+    {#if !icons && !pagesPlaced}
+      <section class="part" data-pages-heading>
+        <h2 class="sub"><span class="sub-words">{pageWords.section}</span></h2>
+        <ul class="group">
+          <li>{@render pageLineDrawn(true)}</li>
+        </ul>
+      </section>
+    {/if}
 
     <!-- THE LISTS, UNDER THEIR OWN WORD AND FOLDED. Native, never pack-positioned: a page can go with the add-on that
          declared it, and the rows underneath still have to be reachable. "New list" is the last row. -->

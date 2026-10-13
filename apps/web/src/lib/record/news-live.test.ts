@@ -346,3 +346,17 @@ test('TODAY READS THE RECORD`S OWN ANSWERS, leaves out what it does not hold, an
   const refused = host(() => json(403, { ok: false, refusal: { code: 'LEVEL_REQUIRED', fix: 'Ask an owner to raise your access.' } }));
   assert.deepEqual(await readToday(BASE, refused.io), { ok: false, refusal: { code: 'LEVEL_REQUIRED', fix: 'Ask an owner to raise your access.' } });
 });
+
+test('A WALK THAT NEVER WENT UNDER READS THE SAME ON TODAY AND ON A PAGE: the day the money lasts past, and no warning', () => {
+  const walked = { value: null, unit: null, rows: 3, held: 3, met: null, refusals: [], beyond: { day: '2027-10-07', days: 365 } };
+  const home = tileOf('runs-out-on', walked);
+  const page = pageTile({ metric: 'runs-out-on', reading: walked } as never);
+  assert.equal(home.value, copy.lastsPast('7 Oct 2027'));
+  assert.equal(home.value, page.value);
+  assert.equal(home.tone, page.tone);
+  assert.equal(home.note, page.note);
+  const none = tileOf('runs-out-on', { ...walked, beyond: undefined });
+  assert.equal(none.value, MISSING);
+  assert.equal(none.tone, 'warn');
+  assert.equal(tileOf('runs-out-on', { ...walked, refusals: ['x'] }).value, MISSING, 'a refused figure is not money that lasts');
+});

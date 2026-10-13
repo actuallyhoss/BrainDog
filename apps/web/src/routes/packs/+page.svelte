@@ -52,6 +52,7 @@
   import IconWell from '$lib/ui/IconWell.svelte';
   import Menu from '$lib/ui/Menu.svelte';
   import Section from '$lib/ui/Section.svelte';
+  import Segmented from '$lib/ui/Segmented.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import Stacked from '$lib/viz/Stacked.svelte';
@@ -510,7 +511,7 @@
   {#snippet actions()}
     <!-- THE TABS ARE THE TOOLBAR'S SEGMENTED CONTROL, glass on the ground, and a tab list still: the arrows
          move between them and the panel they control is the content under the title. -->
-    <div class="tabs segmented" role="tablist" aria-label={words.tabsLabel} tabindex="-1" onkeydown={tabKey}>
+    <Segmented class="tabs" role="tablist" aria-label={words.tabsLabel} tabindex={-1} onkeydown={tabKey}>
       {#each TABS as t (t)}
         <button
           type="button"
@@ -526,7 +527,7 @@
           {words.tabs[t]}{#if t === 'updates' && updates && updates.length > 0}<span class="tab-count num">{updates.length}</span>{/if}
         </button>
       {/each}
-    </div>
+    </Segmented>
     <Button weight="glass" href="/packs/browse"><Icon name="search" size="s" />{words.browse}</Button>
   {/snippet}
 </PageHead>
@@ -723,7 +724,7 @@
   /* IN THE COMPACT BAR THE TABS DROP THEIR OWN GLASS, as the bar's buttons do: the bar is glass, and glass never holds
      glass. Only where the bar is drawn, from 900px up. */
   @media (width >= 900px) {
-    :global(.head[data-under]) .tabs {
+    :global(.head[data-under] .segmented.tabs) {
       background: transparent;
       box-shadow: none;
       backdrop-filter: none;
@@ -731,7 +732,7 @@
 
     /* Safari before 18 knows the blur only by its prefixed name, and lightningcss folds a same-rule pair into one. */
     @supports (-webkit-backdrop-filter: none) {
-      :global(.head[data-under]) .tabs {
+      :global(.head[data-under] .segmented.tabs) {
         -webkit-backdrop-filter: none;
       }
     }
@@ -880,7 +881,8 @@
       padding: var(--sp-4) var(--gutter) var(--sp-8);
     }
 
-    .tabs {
+    /* The track is `Segmented`'s own element, so the rule reaches it by this page's name for it. */
+    :global(.segmented.tabs) {
       flex: 1 1 100%;
     }
 

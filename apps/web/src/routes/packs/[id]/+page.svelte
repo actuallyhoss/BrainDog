@@ -60,6 +60,7 @@
   import { methods, passkeySignIn, support } from '$lib/auth.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Section from '$lib/ui/Section.svelte';
+  import Segmented from '$lib/ui/Segmented.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import { closed, drew, opened } from '../../../lib/ui/screen.svelte.ts';
@@ -402,7 +403,7 @@
                     ><span class="switch-track"></span></button>
                   {:else if segmented}
                     {@const values = decl.values ?? []}
-                    <div class="segmented" role="radiogroup" aria-labelledby="set-{key}-label">
+                    <Segmented role="radiogroup" aria-labelledby="set-{key}-label">
                       {#each settingChoices(decl) as [v, said], i (v)}
                         <button
                           type="button"
@@ -415,7 +416,7 @@
                           onkeydown={(e) => step(e, values, i, d)}
                         >{said}</button>
                       {/each}
-                    </div>
+                    </Segmented>
                   {:else if isList(decl)}
                     <!-- A LIST IS ITS LINES, one box each, so a person reads the whole value and changes one line
                          without retyping the rest. A blank box is left out of what is saved. -->

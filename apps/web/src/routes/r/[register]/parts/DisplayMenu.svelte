@@ -13,6 +13,7 @@
   import { columnsFor, labelOf } from '$lib/record/api.ts';
   import type { FieldDecl, RegisterDecl } from '$lib/record/schema.ts';
   import Button from '$lib/ui/Button.svelte';
+  import Segmented from '$lib/ui/Segmented.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import { wayOf, type ListDefault } from './list.ts';
@@ -126,7 +127,7 @@
       </fieldset>
       {#if sort && way}
         {@const current = sort}
-        <div class="segmented sort-way" role="group" aria-label={words.direction}>
+        <Segmented class="sort-way" role="group" aria-label={words.direction}>
           <button
             type="button"
             class="segment"
@@ -145,7 +146,7 @@
               if (current.dir !== 'desc') sortBy(current.field);
             }}>{way[1]}</button
           >
-        </div>
+        </Segmented>
       {/if}
     {/if}
 
@@ -315,8 +316,9 @@
     font-size: var(--t-xs);
   }
 
-  /* The direction sits under the choice it qualifies, as its own short track. */
-  .sort-way {
+  /* The direction sits under the choice it qualifies, as its own short track. The track is `Segmented`'s own element,
+     so the rule reaches it by this part's name. */
+  :global(.sort-way) {
     align-self: start;
     margin-block-start: calc(-1 * var(--sp-3));
   }

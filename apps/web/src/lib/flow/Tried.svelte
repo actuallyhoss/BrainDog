@@ -22,6 +22,7 @@
 -->
 <script lang="ts">
   import Icon from '$lib/ui/Icon.svelte';
+  import Segmented from '$lib/ui/Segmented.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import { Stacked } from '$lib/viz/index.ts';
   import { editWords, picksFor, type Answer, type Pick, type Pickable, type Tried, type TryRun, type TryState } from './source.ts';
@@ -102,13 +103,13 @@
 
   {#if choices.length > 0}
     <div class="tried-pick">
-      <div class="segmented tried-segments" role="group" aria-label={editWords.tryFrom}>
+      <Segmented class="tried-segments" role="group" aria-label={editWords.tryFrom}>
         {#each choices as from (from)}
           <button type="button" class="segment" aria-pressed={pick.from === from} data-on={pick.from === from ? '' : undefined} onclick={() => (pick = { ...pick, from })}>
             {wordFor(from)}
           </button>
         {/each}
-      </div>
+      </Segmented>
 
       {#if pick.from === 'latest' && kind === 'written'}
         <p class="tried-note">{rows[0]?.label ?? editWords.noRows}</p>
@@ -199,8 +200,9 @@
   }
 
   /* THE THREE WAYS WRAP RATHER THAN RUN OFF A 320px SCREEN: their words are wider together than a phone's column. In a
-     tile the track is the tile's inner fill (`controls.css`). */
-  .tried-segments {
+     tile the track is the tile's inner fill (`controls.css`), and it is `Segmented`'s own element, so the rule reaches
+     it by the name this part gave it. */
+  .tried-pick :global(.tried-segments) {
     flex-wrap: wrap;
     align-self: flex-start;
     max-inline-size: 100%;
