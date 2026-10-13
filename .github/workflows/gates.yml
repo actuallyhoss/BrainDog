@@ -79,6 +79,8 @@ on:
       # the budgets `lib.mjs` reads.
       - 'tools/gates/run.mjs'
       - 'tools/gates/layout.mjs'
+      # The parts `layout` is split into by rule (PRF-B04 job 8).
+      - 'tools/gates/layout/**'
       - 'tools/gates/a11y.mjs'
       - 'tools/gates/lib.mjs'
       # What a screen may not print (`layout` reads each screen through it).
@@ -88,6 +90,8 @@ on:
       - 'tools/gates/lived.mjs'
       - 'fixtures/shapes/**'
       - 'apps/cli/**'
+      # The `cloud` variant of the gates' record is the Worker itself (`apps/worker/test/cloud-serve.ts`, PRF-B05).
+      - 'apps/worker/**'
       - 'tools/gates/record.mjs'
       - 'tools/gates/routes.mjs'
       - 'tools/gates/budgets.json'

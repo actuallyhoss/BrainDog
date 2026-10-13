@@ -138,7 +138,17 @@ export async function cloud(extra: Record<string, unknown> = {}) {
   };
   env['RECORD'] = { idFromName: (n: string) => n, get: (id: string) => objects.get(id) ?? open(id) };
 
-  const dirStorage = objectStorage();
+  /* THE DIRECTORY'S KEY-VALUE HALF, over a Map: its sign-in letter count (`letterSent`, `lettersDown`) and its night
+     read `ctx.storage.get` and `put`, which `objectStorage()` does not have, so the count was never kept. */
+  const dirKept = new Map<string, unknown>();
+  const dirStorage = Object.assign(objectStorage(), {
+    async get(key: string) {
+      return dirKept.get(key);
+    },
+    async put(key: string, value: unknown) {
+      dirKept.set(key, value);
+    },
+  });
   const blocked: Promise<unknown>[] = [];
   const dirState = { storage: dirStorage, id: { toString: () => 'directory' }, blockConcurrencyWhile: (f: () => Promise<unknown>) => (blocked.push(f()), blocked.at(-1)), waitUntil: () => {} };
   const directory = new Directory$(dirState, env) as Dir;

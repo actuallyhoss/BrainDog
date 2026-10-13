@@ -20,14 +20,27 @@ name: watch
 # `actions: read` IS FOR THE LAST GREEN DEPLOY, read with the workflow's own token, and for when
 # this workflow last ran. Nothing here writes.
 #
+# AND ONCE A MONTH, GOING BACK IS DONE ON THE CANARY (LCH-C05), in a job of its own below. The watch asks whether
+# the product answers; this asks whether a record put back to a copy comes back whole, which nothing proved until
+# somebody needed it. It is the one job here that holds secrets and signs in, so it is kept apart from the hourly
+# job: its own machine, its own environment, its own limit of minutes, and the hourly job reads none of its secrets.
+#
 # A FORCED MISS: run it by hand with `host` set to a name that answers 503, and the run is red.
 # The input reaches the script through the environment, never pasted into the command.
 
 on:
   schedule:
     - cron: '7 * * * *'
+    # THE FIRST OF THE MONTH, 04:23 UTC: going back on the canary. Off the hour for the reason above, and at an hour
+    # when the nightly copies are long done.
+    - cron: '23 4 1 * *'
   workflow_dispatch:
     inputs:
+      go_back:
+        description: 'Also put the canary back to a copy and return it, as the monthly run does.'
+        required: false
+        default: false
+        type: boolean
       host:
         description: 'A name to ask in place of production, for a forced miss. Empty asks production.'
         required: false
@@ -58,3 +71,62 @@ jobs:
           WATCH_HOST: ${{ inputs.host }}
           GITHUB_TOKEN: ${{ github.token }}
         run: node tools/watch/launch.mjs
+
+  # GOING BACK, PROVEN ON THE CANARY (`apps/worker/scripts/go-back.mjs`). Three entries, a copy, three more and an
+  # invitation; the record goes back to the copy and must answer within a minute with its log ending at the copy plus
+  # one `restore.pitr`; then it goes back to `before-restore` and the three must return. It prints PASS or the step
+  # that failed, and a red run mails him as the watch's does.
+  #
+  # ON THE CANARY AND NOTHING ELSE. The script refuses any record but the one production's `OPS_RECORD` names, so a
+  # mistyped variable cannot point it at a person's record. UNTIL THE CANARY IS NAMED (`SMOKE_SLUG`) IT IS "not run"
+  # with why, and a warning on the run. Once it is named, a missing passkey is red, not a skip.
+  #
+  # AS THE CANARY'S OWNER, SIGNED IN THE WAY THE LANE SIGNS IN (`tools/canary/lane.d/20-signin-live.mjs`, the canary's
+  # own passkey in a real browser). The session is kept in the runner's temporary folder, ended by the script, and
+  # its file removed whatever happened.
+  go-back:
+    if: github.event.schedule == '23 4 1 * *' || (github.event_name == 'workflow_dispatch' && inputs.go_back)
+    environment: production
+    runs-on: ${{ vars.CI_RUNNER || 'self-hosted' }}
+    timeout-minutes: 30
+    env:
+      SMOKE_SLUG: ${{ vars.SMOKE_SLUG }}
+      DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+      CANARY_ORIGIN: https://${{ vars.DEPLOY_HOST }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Whether there is a canary
+        id: canary
+        env:
+          CANARY_PASSKEY: ${{ secrets.CANARY_PASSKEY }}
+        run: |
+          if [ -z "$SMOKE_SLUG" ] || [ -z "$DEPLOY_HOST" ]; then
+            echo "canary=none" >> "$GITHUB_OUTPUT"
+            echo "::warning::Going back: not run: SMOKE_SLUG and DEPLOY_HOST are not both set, so there is no canary to put back yet."
+            exit 0
+          fi
+          if [ -z "$CANARY_PASSKEY" ]; then
+            echo "::error::Going back: the canary $SMOKE_SLUG is named and CANARY_PASSKEY is not set, so nobody can sign in to it. This is red and not a skip."
+            exit 1
+          fi
+          echo "canary=live" >> "$GITHUB_OUTPUT"
+          # WHERE THE SESSION IS KEPT, said here and not in the job's `env`, which cannot read the runner's folder.
+          echo "CANARY_SESSION=$RUNNER_TEMP/go-back-session.json" >> "$GITHUB_ENV"
+      - uses: ./.github/actions/setup
+        if: steps.canary.outputs.canary == 'live'
+      - name: Install the browser
+        if: steps.canary.outputs.canary == 'live'
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Sign in to the canary
+        if: steps.canary.outputs.canary == 'live'
+        env:
+          CANARY_PASSKEY: ${{ secrets.CANARY_PASSKEY }}
+        run: node tools/canary/lane.d/20-signin-live.mjs
+      - name: Go back and return
+        if: steps.canary.outputs.canary == 'live'
+        run: node apps/worker/scripts/go-back.mjs
+      - name: Forget the canary's session
+        if: always()
+        run: rm -f "$RUNNER_TEMP/go-back-session.json"

@@ -123,7 +123,7 @@ test("TODAY'S FIRST BLOCKS ON A SHOP are what is due this week and the money in;
     assert.doesNotMatch(`${b.heading} ${b.empty ?? ''}`, /\brow\b|—|#/u);
     assert.ok(b.icon);
   }
-  assert.equal(body.blocks[1]!.where, 'state is not paid, due before +8d');
+  assert.equal(body.blocks[1]!.where, 'state is not paid, due after -1d, due before +8d');
   /* THE MONEY IS MONEY'S OWN FIGURES, never a list read for it (`money-week.test.ts` holds them). */
   assert.equal(body.blocks[2]!.kind, 'stat');
   assert.equal(body.blocks[2]!.source, undefined);

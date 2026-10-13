@@ -1249,6 +1249,12 @@ export function createClient(options: ClientOptions) {
        */
       includeDeleted?: boolean;
     }) => call<Page<unknown>>('list', args as Record<string, unknown>),
+    /**
+     * How many entries of one list hold each value of one field, in one read. `counts` is the most common values; `more`
+     * says how many values and entries are in none of them. `capped` when the list was too long to count whole.
+     */
+    countBy: (args: { register: string; by: string; where?: unknown }) =>
+      call<{ register: string; by: string; counts: { value: unknown; n: number }[]; matched: number; more?: { values: number; n: number }; capped?: true }>('countBy', args as Record<string, unknown>),
     search: (q: string, limit?: number) =>
       call<{ register: string; seq: number; title: string }[]>('search', { q, ...(limit === undefined ? {} : { limit }) }),
     history: (register: string, seq: number) => call<unknown[]>('history', { register, seq }),

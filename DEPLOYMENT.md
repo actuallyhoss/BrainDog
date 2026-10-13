@@ -333,6 +333,12 @@ goes like this.
    FAIL stops the merge.
 3. Take a restore point: Settings > Backups > "Back up now" on the live record, and
    `braindog export -o <record>-<date>.brainl` on your own machine.
+   The deploy also takes its own: the "Take a restore point" step of `deploy.yml` asks the Worker to open every record
+   written in the last seven days, and to copy each when a migration changed. A missing `PROVISION_KEY` is red when a migration changed and "not run"
+   otherwise. A 404 from that door before the deploy is "not run" either way, said as a warning when a migration
+   changed, because the deploy that first ships the door has to be able to run; after the deploy the same 404 is red
+   once a migration shipped. A walk that asked nobody is red while `SMOKE_SLUG` names the canary. Going back is proven monthly on the canary by `node apps/worker/scripts/go-back.mjs`, from
+   `watch.yml`.
 4. Merge. `ci` runs on `master`, `deploy.yml` waits for the reviewer's approval, then Deploy, Parity,
    the site, Smoke (with the signed-in half when it is set up).
 5. **Red before anything irreversible** (no kernel migration, no Durable Object class migration, no

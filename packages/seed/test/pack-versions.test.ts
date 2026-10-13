@@ -1415,6 +1415,33 @@ const DECLARED: Record<string, Version> = {
       "Folded into the unreleased 3.16.0 (hop-figures-50, REC-A13 job 2): `categories-against-direction`, live categories marked one way that a Ledger entry going the other way points at (a `pointed` hop over `transactions.category`), and `page.money` gains its Heads up line; and PGS-B06 (list-order-50): the Ledger declares its order, by day, newest first -> 06d6906c4452a86e",
     ],
   },
+  'money-core@3.17.0': {
+    holds: `
+      metric.account-ages metric.arriving-30d metric.balances-stale metric.book-cash metric.book-spent-month metric.books-held metric.cash-accounts
+      metric.cash-as-of metric.cash-by-account metric.categories-against-direction metric.cash-by-book metric.cash-cross-check metric.cash-now metric.chasing metric.days-late-in metric.due-30d
+      metric.currencies-held
+      metric.due-items-30d metric.every-month-by-category metric.every-month-in metric.every-month-out metric.in-30d
+      metric.in-by-month metric.in-due-by-month metric.installments-due-30d metric.installments-left metric.late-in metric.leaving-30d
+      metric.ledger-newest-days metric.ledger-rows-7d metric.nights-missed-30d
+      metric.net-by-month metric.out-30d metric.out-by-month metric.out-due-by-month metric.overdue metric.owed-by-you
+      metric.owed-to-you metric.project-in-by-month metric.project-in-month metric.project-kept-month metric.project-out-by-month
+      metric.project-out-month metric.project-owed metric.received-30d metric.received-7d metric.runs-out-on metric.runway-days metric.settled-in-7d metric.spent-30d
+      metric.spent-by-category-month metric.statement-oldest-days metric.txn-uncategorised metric.uncategorised-share-30d
+      page.money page.money-book
+      register.accounts register.balances register.books register.categories register.fx register.installments register.obligations
+      register.recurring register.snapshots register.transactions
+      rule.installment-due-soon rule.invoice-chased rule.invoice-late rule.recurring-ended rule.recurring-missed
+      rule.recurring-stopped rule.txn-categorise
+      script.last_day
+      setting.home_currency setting.most_days_late setting.most_due_30d setting.most_leaving_30d setting.most_left_in_parts
+      setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
+      setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category setting.rest_days
+    `,
+    declares: '73738171ae2405ba',
+    history: [
+      "`cash-cross-check` is declared (cash-check-52, REC-A17): Cash now worked out a second way, each cash account walked entry by entry from its newest statement, less Cash now, a currency at a time; no value while no balance is typed -> 73738171ae2405ba",
+    ],
+  },
   'work@1.17.0': {
     holds: `
       metric.open-tasks metric.project-dated metric.project-done-7d metric.project-done-by-week metric.project-due-soon

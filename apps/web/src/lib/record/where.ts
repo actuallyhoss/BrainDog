@@ -389,18 +389,23 @@ export function registerHref(register: string, where: string | undefined): strin
   const w = compile(register, where);
   if (w.bad.length) return `/r/${register}`;
   /**
-   * AN OR-GROUP AND THE SIX COMPARE WORDS OPEN IT WIDE.
+   * AN OR-GROUP IS ITS CHIPS AND THE WORD `join=any`, which the list screen reads into the question it asks
+   * (`joinOf` in `api.ts`, then `whereFor`). It opened the whole list while the screen read the chips alone: a tile
+   * counting "late or due this week" led to every entry the list holds, under a count that was not theirs.
    *
-   * The register route builds its question from `chipsOf` alone and never reads `join`, so an or-group's address would
-   * open its chips ANDed; and `where-any.test.ts` and `chips-compare.test.ts` pin the wide address. The route passing
-   * `joinOf(page.url.searchParams)` and those pins flipping are what let these go.
+   * ONE CHIP TO A MEMBER, OR IT STAYS WIDE. Under the word every chip is one side of the "or", and a member the record
+   * spells as two clauses (a range of days is its `gte` and its `lte`) would come back as either end alone, which is
+   * every day there is.
+   *
+   * THE SIX COMPARE WORDS STILL OPEN IT WIDE, in a group or out of one, as `chips-compare.test.ts` pins.
    */
-  if (w.any) return `/r/${register}`;
-  if (w.clauses.some((c) => c.op === 'contains' || c.op === 'gt' || c.op === 'gte' || c.op === 'lt' || c.op === 'lte' || c.op === 'between'))
+  if (w.any?.some((member) => member.length !== 1)) return `/r/${register}`;
+  const clauses = w.any ? w.any.flat() : w.clauses;
+  if (clauses.some((c) => c.op === 'contains' || c.op === 'gt' || c.op === 'gte' || c.op === 'lt' || c.op === 'lte' || c.op === 'between'))
     return `/r/${register}`;
   /* AND A VALUE HOLDING A COMMA, WHICH A QUOTED SENTENCE CAN CARRY AND A CHIP CANNOT: `what is "Studio rent, June"`
      would mint two values and read back as an empty list under a tile that counted the row. */
-  if (w.clauses.some((c) => 'values' in c && c.values.some((v) => spokenValue(register, c.field, v).includes(','))))
+  if (clauses.some((c) => 'values' in c && c.values.some((v) => spokenValue(register, c.field, v).includes(','))))
     return `/r/${register}`;
 
   /**
@@ -412,7 +417,7 @@ export function registerHref(register: string, where: string | undefined): strin
    * colons, so an element holding one survives. A DAY IS THE WORD THE SENTENCE SAID IT IN, and `not on` is spelled
    * `not-on`, because a raw space in a URL is no chip anybody reads back and `whereOf` reads it as `is not`.
    */
-  const chips = w.clauses.map((c) =>
+  const chips = clauses.map((c) =>
     c.op === 'empty' || c.op === 'present'
       ? `${c.field}:is:${c.op === 'empty' ? 'empty' : 'set'}`
       : c.op === 'has' || c.op === 'lacks'
@@ -421,5 +426,6 @@ export function registerHref(register: string, where: string | undefined): strin
           ? `${c.field}:${c.op === 'is not' ? 'not-in' : 'in'}:${c.values.map((v) => encodeURIComponent(spokenValue(register, c.field, v))).join(',')}`
           : `${c.field}:${c.op === 'not on' ? 'not-on' : c.op}:${encodeURIComponent(c.day)}`,
   );
-  return chips.length ? `/r/${register}?${chips.map((f) => `f=${f}`).join('&')}` : `/r/${register}`;
+  /* THE WORD GOES LAST AND ONLY WITH A GROUP, so every address written before it is spelled as it was. */
+  return chips.length ? `/r/${register}?${chips.map((f) => `f=${f}`).join('&')}${w.any ? '&join=any' : ''}` : `/r/${register}`;
 }

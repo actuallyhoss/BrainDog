@@ -867,6 +867,9 @@ export const account = {
      never the record's: only the operator holds the key that opens the copies, so every record reads the same line. */
   drillPassed: (when: string) => `This host's last restore test: passed ${when}`,
   drillFailed: (when: string) => `This host's last restore test: failed ${when}`,
+  /* A test that opened the Directory's copy and tried no record's copy has proven no restore, so it never reads "passed". */
+  drillNoRecord: (when: string) => `This host's last restore test, ${when}: the Directory's copy opened; no record's copy was tried`,
+  drillUnproven: 'Not proven',
   drillNever: 'Never tested',
   drillNeverSaid: 'No copy on this host has been restored as a test yet',
   drillOverdue: 'Overdue',

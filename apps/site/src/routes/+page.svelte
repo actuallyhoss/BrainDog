@@ -27,7 +27,7 @@
   import InboxFlow from '$lib/InboxFlow.svelte';
   import SlashPalette from '$lib/SlashPalette.svelte';
   import Window from '$lib/app/Window.svelte';
-  import { AGENT_MARKS, type MarkedAgent } from '$lib/agent-marks.ts';
+  import { AGENT_MARKS, type MarkedAgent } from '@braindog/skin/agent-marks.ts';
   import { MCP_URL, SIGNUP, SOURCE, site } from '$lib/copy.ts';
   import { home } from '$lib/copy/home.ts';
   import type { IconName } from '$lib/icons.ts';

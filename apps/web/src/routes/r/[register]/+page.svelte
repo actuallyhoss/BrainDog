@@ -25,7 +25,7 @@
   import * as pref from '$lib/pref.ts';
   import { covered, silenced, typing as isTyping } from '$lib/a11y/keys.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { chipsOf, columnsFor, currencyFor, display, DOM_CAP, iconFor, labelOf, toRows, type Filter, whereOf } from '$lib/record/api.ts';
+  import { chipsOf, columnsFor, currencyFor, display, DOM_CAP, iconFor, joinOf, labelOf, toRows, type Filter, whereOf } from '$lib/record/api.ts';
   /* Type only, so the client's route table stays out of this chunk. */
   import { joinNames, type Names } from '$lib/record/remote.ts';
   import { open, read, type Boot, type Refusal } from '$lib/data/record.ts';
@@ -145,6 +145,12 @@
      the thing every test of a chip drove was a copy of the route rather than the route: the colon
      inside `git:jokonkwo` fell off the end of a value here and in none of them. See `chipsOf`. */
   const filters = $derived(chipsOf(page.url.searchParams));
+  /* AND THE WORD THAT JOINS THEM, `join=any`: the chips as "or" where a tile or a block said its filter with "or"
+     (`registerHref`). It was not read here, so such a link could only open the whole list. It rides in the question,
+     so the list, the next page, the recheck and the sentence above the list all ask the one set of entries. */
+  const join = $derived(joinOf(page.url.searchParams));
+  /** The chips really are an "or": the word, and more than one chip for it to join. */
+  const either = $derived(join === 'any' && filters.length > 1);
 
   /* The columns actually drawn: the register's projection minus whatever the reader has hidden. */
   let createOpen = $state(false);
@@ -441,7 +447,7 @@
   const bySeq = $derived(new Map(pages.flat().map((e) => [e.seq, e] as const)));
   const rowAt = (seq: number): Entry | undefined => bySeq.get(seq);
 
-  const question = $derived(JSON.stringify([id, filters, q, sort ?? null]));
+  const question = $derived(JSON.stringify([id, filters, q, sort ?? null, join ?? null]));
 
   $effect(() => {
     const said = question;
@@ -459,7 +465,7 @@
     }
     refusal = null;
     stale = false;
-    void ask(said, id, filters, q, sort);
+    void ask(said, id, filters, q, sort, join);
     /* AND THE RECEIPTS GO WITH THE ANSWER THEY WERE ABOUT. A chip saying `archived` beside a row
        the reader has just filtered TO is a chip about a different screen: the receipt exists to
        hold a row in place through one action, not to follow it around the product.
@@ -513,10 +519,11 @@
     const chips = filters;
     const text = q;
     const order = sort;
+    const joined = join;
     fetching = true;
     busy = true;
     await read(async () => {
-      const next = await (await open()).page(register, { filters: chips, q: text, sort: order }, from);
+      const next = await (await open()).page(register, { filters: chips, q: text, sort: order, join: joined }, from);
       if (asked !== said) return true;
       if (!next.ok) return refuse(next.refusal);
       pages = [...pages, next.value.entries];
@@ -538,14 +545,14 @@
    * screen that closed one call before it opened the next would say `ready` for a frame over a list
    * with nothing in it, which is the frame a gate measures.
    *
-   * THE PILLS ARE COUNTED ONLY WHILE THE BAR IS DRAWN, one `limit: 1` list per value of an indexed
-   * enum field, because a count nobody can see is a request nobody needed. The bar's own test is
+   * THE PILLS ARE COUNTED ONLY WHILE THE BAR IS DRAWN, one question for each indexed enum field
+   * (`countAll`), because a count nobody can see is a request nobody needed. The bar's own test is
    * repeated here from the answer, because the screen has not got the answer yet.
    *
    * AND AN ANSWER FOR A QUESTION THAT HAS MOVED ON IS DROPPED, whole, which is why the state is
    * written at the end rather than as each part arrives.
    */
-  async function ask(said: string, register: string, chips: Filter[], text: string, order: typeof sort): Promise<void> {
+  async function ask(said: string, register: string, chips: Filter[], text: string, order: typeof sort, joined: typeof join): Promise<void> {
     busy = true;
     await read(async () => {
       const src = await open();
@@ -557,8 +564,8 @@
       const size = b.value.registers.find((r) => r.id === register)?.count ?? 0;
       const bar = size >= ENOUGH_TO_SIFT || text !== '' || chips.length > 0;
       const [answer, facets] = await Promise.all([
-        src.page(register, { filters: chips, q: text, sort: order }, null),
-        bar ? countAll(register, s.value, chips, text) : Promise.resolve(new Map<string, Map<string, number>>()),
+        src.page(register, { filters: chips, q: text, sort: order, join: joined }, null),
+        bar ? countAll(register, s.value, chips, text, joined) : Promise.resolve(new Map<string, Map<string, number>>()),
       ]);
       if (asked !== said) return true;
       if (!answer.ok) return refuse(answer.refusal);
@@ -657,11 +664,12 @@
     const chips = filters;
     const text = q;
     const order = sort;
+    const joined = join;
     const decl = declared.decl;
     const src = await open();
     const [answer, facets] = await Promise.all([
-      src.page(register, { filters: chips, q: text, sort: order }, null),
-      counted.size > 0 ? countAll(register, decl, chips, text) : Promise.resolve(counted),
+      src.page(register, { filters: chips, q: text, sort: order, join: joined }, null),
+      counted.size > 0 ? countAll(register, decl, chips, text, joined) : Promise.resolve(counted),
     ]);
     if (asked !== said || !answer.ok || mine !== rechecks) return;
     /* THE READER SCROLLED WHILE THIS WAS OUT, and page 2 is now under page 1: the same seam as above. */
@@ -688,30 +696,30 @@
   /** The stale mark's control: the question asked again from the top, as a question the reader chose to ask. */
   function refresh() {
     stale = false;
-    void ask(asked, id, filters, q, sort);
+    void ask(asked, id, filters, q, sort, join);
   }
 
   /**
-   * How many rows hold each value of each pill, under every other chip and the search: the list's
-   * own question, with that one field's chip replaced by the value.
+   * How many entries hold each value of each pill, under every other chip and the search: the list's
+   * own question, without that one field's chip, counted by that field.
+   *
+   * ONE REQUEST A FIELD, WHERE IT WAS ONE A VALUE (`counts` in `data/record.ts`, the record's `countBy`).
+   *
+   * UNDER "or" THE CHIPS WIDEN THE LIST AND NARROW NOTHING, so a pill is counted under the search alone: how many
+   * entries hold its value, which is what pressing it adds to the list.
    */
-  async function countAll(register: string, d: RegisterDecl, chips: Filter[], text: string): Promise<Map<string, Map<string, number>>> {
+  async function countAll(register: string, d: RegisterDecl, chips: Filter[], text: string, joined: typeof join): Promise<Map<string, Map<string, number>>> {
     const src = await open();
     const out = new Map<string, Map<string, number>>();
     await Promise.all(
       filterableOf(d.fields)
         .filter((f) => f.type === 'enum')
-        .flatMap((f) =>
-          (f.values ?? []).map(async (value) => {
-            const n = await src.count(register, {
-              filters: [...chips.filter((x) => x.field !== f.id), { field: f.id, op: 'in', values: [value] }],
-              q: text,
-            });
-            const per = out.get(f.id) ?? new Map<string, number>();
-            per.set(value, n.ok ? n.value : 0);
-            out.set(f.id, per);
-          }),
-        ),
+        .map(async (f) => {
+          /* "or" ONLY WITH MORE THAN ONE CHIP, as `either` reads it: one chip joined by "or" still narrows the list. */
+          const others = joined === 'any' && chips.length > 1 ? [] : chips.filter((x) => x.field !== f.id);
+          const n = await src.counts(register, { filters: others, q: text }, f.id, f.values ?? []);
+          out.set(f.id, n.ok ? n.value : new Map((f.values ?? []).map((v) => [v, 0])));
+        }),
     );
     return out;
   }
@@ -1340,7 +1348,8 @@
    */
   async function createRow(said: string, onBack: (back: string) => void, mark?: string): Promise<Entry | null> {
     const was = asked;
-    const { fields, filled } = capturedFields(id, said, filters, now, result.entries);
+    /* UNDER "or" NO CHIP IS SOMETHING EVERY ENTRY HERE HOLDS, so none of them is written onto a new one. */
+    const { fields, filled } = capturedFields(id, said, either ? [] : filters, now, result.entries);
     /* THE ROW IS ON THE LIST BEFORE IT IS SENT, at the head, wearing `Saving`, and the record's row takes its place. */
     const seq = -++typedSeq;
     const line = typedRows.add({ seq, fields, version: 0, created: new Date(now).toISOString(), by: '' });
@@ -1718,7 +1727,7 @@
    *
    * A facet count: the rows holding the value under every OTHER filter and the search, so a pill
    * says what it holds whether or not its own field is filtered yet. The record counts them, one
-   * `limit: 1` list per value, while the bar is on screen (`ask`). Edits made here are added on top
+   * question a field, while the bar is on screen (`ask`, `countAll`). Edits made here are added on top
    * while they are out, because the list below draws them and the record has not answered yet.
    *
    * AN EDIT MOVES ITS ROW FROM ONE PILL TO ANOTHER, and only a row in hand can have been edited.
@@ -2225,12 +2234,13 @@
       const field = decl.fields.find((d) => d.id === f.field);
       return copy.filterClause(field ? labelOf(field) : f.field, f.values.map((v) => saidInLine(f.field, v)), f.op);
     });
-    const title = copy.viewTitle(decl.name, copy.filterReads(q ? [...clauses, `"${q}"`] : clauses));
+    /* A SEARCH IS ALWAYS "and" BESIDE THE CHIPS (`treeOf`), so the title says "or" only when the chips are all there is. */
+    const title = copy.viewTitle(decl.name, either && !q ? copy.filterReads(clauses, 'or') : copy.filterReads(q ? [...clauses, `"${q}"`] : clauses));
     const back = `${page.url.pathname}${page.url.search}`;
     const drawn = columns.map((c) => c.field).filter((f) => f !== 'select' && f !== 'act' && f !== 'seq');
     saving = true;
     try {
-      const out = await writes().saveView(id, title, { filters, q, sort }, drawn);
+      const out = await writes().saveView(id, title, { filters, q, sort, ...(either ? { join: 'any' as const } : {}) }, drawn);
       if (!out.ok) {
         toasts.push(out.fix, { intent: 'warn' });
         return;
@@ -2682,8 +2692,8 @@
   <BindBlock
     bind:open={bindOpen}
     register={id}
-    predicate={whereOf(filters) || q || copy.everything}
-    says={saidPlainly(id, whereOf(filters)) || (q ? `matching “${q}”` : copy.everything)}
+    predicate={whereOf(filters, join) || q || copy.everything}
+    says={saidPlainly(id, whereOf(filters, join)) || (q ? `matching “${q}”` : copy.everything)}
   />
 
   <!-- Display options: what YOU see, never what the record says. `v`, and Display in the bar. -->

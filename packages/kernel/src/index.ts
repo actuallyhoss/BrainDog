@@ -421,8 +421,8 @@ export { readDeclaredSigns, vitalOf } from './metrics.ts';
 export { SESSIONS_WORKING, readRunsWorking } from './built-in-figures.ts';
 export { HANDOFFS_OPEN, openSteps, readHandoffsOpen, type OpenStep } from './built-in-figures.ts';
 export { KEYS_IN_TEXT, RECORD_KEY_SCAN, keysInText, placeOf, readKeysInText, scanKeys, type KeyFinding, type KeyScan } from './key-scan.ts';
-export { ROLLED_ACCOUNTS_MOST, ROLLED_CHECKS_MOST, WALKS, WALK_SOURCE, figureLists } from './money-figures.ts';
-export type { Rolled, RolledCheck, RolledMoves, Walked } from './money-figures.ts';
+export { CROSSCHECK_ENTRIES_MOST, ROLLED_ACCOUNTS_MOST, ROLLED_CHECKS_MOST, WALKS, WALK_SOURCE, figureLists } from './money-figures.ts';
+export type { Crosscheck, Rolled, RolledCheck, RolledMoves, Walked } from './money-figures.ts';
 export { HOME_CURRENCY_SETTING, across, convertMinor, dayFieldOf, homeFrom, pairParts, partsOf, rateFor, ratesFrom, reduceOf } from './fx.ts';
 export type { Across, Amount, Part, Rate, Reduce } from './fx.ts';
 export { RAIL_PAGES, REDUCES, ROW_TEXT_MOST, SEED_ACTOR, WITHHELD_CODES, byOf, fill, pathsOf, railRoom, readBlock, readPage, resolvePages, slugify, whollyWithheld } from './pages.ts';
@@ -566,6 +566,28 @@ export { CONFIG_TYPES, configReads, configValue, fillConfig, readConfig } from '
  * `declare` line: it is setup, not a change somebody made (see `declared`).
  */
 export type DeclaredBy = { actor: string; suggestion?: string };
+
+/** One part of an add-on a plan held back, and the lists or roles it waits for the record to hold (`when: { holds }`). */
+export type PackWaiting = { at: string; holds: string[] };
+
+/** `pack.waiting` as it was written, and `[]` for anything else that got into the cell. */
+function waitingOf(cell: string): PackWaiting[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(cell);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+  const out: PackWaiting[] = [];
+  for (const w of parsed as unknown[]) {
+    if (w === null || typeof w !== 'object') continue;
+    const { at, holds } = w as { at?: unknown; holds?: unknown };
+    if (typeof at !== 'string' || !Array.isArray(holds)) continue;
+    out.push({ at, holds: holds.filter((h): h is string => typeof h === 'string') });
+  }
+  return out;
+}
 
 /**
  * One pack as `packStates()` reads it. `version` is `null` for a pack the seed owns by its body, which
@@ -9616,6 +9638,23 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       }),
 
     /**
+     * The add-ons with parts still held back, and what each part waits for (`when: { holds }`, SHL-A08).
+     *
+     * WHAT THE RECORD READS AFTER AN INSTALL OR A SWITCH-ON to know which add-ons to plan again, and what an add-on's
+     * page reads to say how many parts wait and for what. Only add-ons with something waiting, in id order, so the
+     * second plan runs in the same order every time. One that is switched off is still here: its parts wait all the
+     * same, and whether to plan a switched-off add-on again is the caller's to decide.
+     *
+     * A CELL THAT DOES NOT PARSE, OR A PART WITH NO PLACE, IS LEFT OUT rather than thrown: nothing but `rememberPack`
+     * writes the column, and a read that failed here would take the add-ons page down with it.
+     */
+    packsWaiting: (): { id: string; waiting: PackWaiting[] }[] =>
+      sql
+        .all<{ id: string; waiting: string }>('SELECT id, waiting FROM pack WHERE waiting IS NOT NULL ORDER BY id')
+        .map((p) => ({ id: p.id, waiting: waitingOf(p.waiting) }))
+        .filter((p) => p.waiting.length > 0),
+
+    /**
      * Every pack this record has, on or off, with the registers each one holds.
      *
      * BESIDE `packs()` AND NOT INSTEAD OF IT, because a plan compares `pack` rows and nothing else.
@@ -9844,13 +9883,30 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * AND THE CALLS-OUT LINES THE OWNER APPROVED WITH IT, word for word, in the `install` event's note and signed by
      * whoever approved them, so "what did I agree to send" has an answer that does not depend on the pack staying as it was.
      */
-    rememberPack: (row: { id: string; version: string; source: string; ref: string | null; manifest: string; checksum: string; approved?: readonly string[]; by?: string }) =>
+    rememberPack: (row: {
+      id: string;
+      version: string;
+      source: string;
+      ref: string | null;
+      manifest: string;
+      checksum: string;
+      approved?: readonly string[];
+      by?: string;
+      waiting?: readonly PackWaiting[];
+      /** Why an install nobody pressed was made (a part that waited arrived): the line's note, signed by `by`. */
+      because?: string;
+    }) =>
       transaction(() => {
+        /* WHAT THE PLAN HELD BACK (`when: { holds }`, migration 38), WRITTEN ON EVERY INSTALL AND NOT ONLY THE FIRST: an
+           upgrade or a reinstall whose plan held nothing back writes NULL over what the last one left, so a part that
+           has arrived stops being counted as waiting. NULL and never `[]`, which is what `packsWaiting` reads by. */
+        const waiting = row.waiting !== undefined && row.waiting.length > 0 ? jcs(row.waiting.map((w) => ({ at: w.at, holds: [...w.holds] })) as unknown as Json) : null;
         sql.exec(
-          `INSERT INTO pack (id, version, source, source_ref, manifest, installed_at, checksum)
-           VALUES (?, ?, ?, ?, ?, ?, ?)
+          `INSERT INTO pack (id, version, source, source_ref, manifest, installed_at, checksum, waiting)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT (id) DO UPDATE SET version = excluded.version, source = excluded.source,
-             source_ref = excluded.source_ref, manifest = excluded.manifest, checksum = excluded.checksum`,
+             source_ref = excluded.source_ref, manifest = excluded.manifest, checksum = excluded.checksum,
+             waiting = excluded.waiting`,
           row.id,
           row.version,
           row.source,
@@ -9858,16 +9914,17 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           row.manifest,
           instant(clock.now()),
           row.checksum,
+          waiting,
         );
         const approved = row.approved !== undefined && row.approved.length > 0;
         sql.exec(
           "INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v, note) VALUES (?, ?, ?, 'install', ?, 'pack', ?, ?)",
           mint(),
           instant(clock.now()),
-          approved && row.by ? row.by : 'system',
+          (approved || row.because !== undefined) && row.by ? row.by : 'system',
           `pack:${row.id}`,
           row.version,
-          approved ? row.approved!.join('\n') : null,
+          approved ? row.approved!.join('\n') : (row.because ?? null),
         );
         /* WHAT AN UNINSTALL TOOK, PUT BACK. The settings came in through the plan (`packSettings`); the schedules come back
            here, each as it was when the pack went, over the row the install just armed, and only for a declaration the

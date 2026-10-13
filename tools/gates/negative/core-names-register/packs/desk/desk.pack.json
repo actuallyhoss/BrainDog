@@ -1,0 +1,11 @@
+{
+  "pack": "desk",
+  "version": "1.0.0",
+  "title": "Desk",
+  "summary": "Planted: one list, one field and one figure for the core-names gate to read.",
+  "requires": { "format": 1, "primitives": 1, "packs": {} },
+  "declarations": [
+    { "register": "tasks", "name": "Tasks", "title": "what", "fields": [{ "id": "what", "type": "text" }, { "id": "state", "type": "text" }, { "id": "waiting_on", "type": "text" }] },
+    { "metric": "open-tasks", "name": "Open tasks", "source": "tasks", "where": "state is open" }
+  ]
+}

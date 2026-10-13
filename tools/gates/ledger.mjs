@@ -16,7 +16,7 @@
  *   - HELD LISTS. Each is `<gate>.<EXPORT>`, read off the gate's own module. Larger than its newest line is red; smaller
  *     is red too, until a line records the fall. A line higher than the one before is red. A gate that does not export
  *     the list yet is counted as a debt and said, never red.
- *   - NUMBERS IN A GATE FILE. A number above 1 written in `tools/gates/*.mjs`, and not read from `budgets.json`, is a
+ *   - NUMBERS IN A GATE FILE. A number above 1 written in `tools/gates/*.mjs` or a gate's parts one level down, and not read from `budgets.json`, is a
  *     finding. Today's are debts, one per file, written up front: more than the newest line is red, fewer is said.
  *   - DEVIATIONS. Each is named, with what it is, why, and the unit that ends it.
  *
@@ -28,7 +28,7 @@
  */
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { basename, join, resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import ts from 'typescript';
@@ -88,14 +88,21 @@ export function numbersOf(budgets, prefix = '') {
   });
 }
 
-/** The gate files a literal is counted in: `tools/gates/*.mjs`, not the planted trees and not the tests. */
+/**
+ * The gate files a literal is counted in: `tools/gates/*.mjs` and one level down, `tools/gates/<part>/*.mjs`, where a
+ * gate split by rule keeps its parts (`layout/`, PRF-B04 job 8). Not the planted trees and not the tests, which hold no
+ * `.mjs` at that depth or are named here.
+ */
+const NOT_GATES = new Set(['negative', 'test', 'node_modules']);
 export function gateFiles(root) {
   const dir = join(root, GATES);
   if (!existsSync(dir)) return [];
-  return readdirSync(dir)
-    .filter((f) => f.endsWith('.mjs'))
-    .sort()
-    .map((f) => `tools/gates/${f}`);
+  const mjs = (d) => readdirSync(d).filter((f) => f.endsWith('.mjs')).sort();
+  const parts = readdirSync(dir, { withFileTypes: true })
+    .filter((e) => e.isDirectory() && !NOT_GATES.has(e.name))
+    .map((e) => e.name)
+    .sort();
+  return [...mjs(dir).map((f) => `tools/gates/${f}`), ...parts.flatMap((part) => mjs(join(dir, part)).map((f) => `tools/gates/${part}/${f}`))];
 }
 
 /**
@@ -292,7 +299,7 @@ export default async function ledger(root = process.env.BRAINDOG_GATE_ROOT ?? RE
   const literals = new Map(gateFiles(ROOT).map((f) => [f, literalsIn(readFileSync(join(ROOT, f), 'utf8'))]));
   const held = await heldSizes(ROOT, isObject(book.held) ? Object.keys(book.held) : []);
   const exported = gateFiles(ROOT).flatMap((f) =>
-    heldExportsIn(readFileSync(join(ROOT, f), 'utf8')).map((n) => `${basename(f, '.mjs')}.${n}`),
+    heldExportsIn(readFileSync(join(ROOT, f), 'utf8')).map((n) => `${f.slice('tools/gates/'.length, -'.mjs'.length)}.${n}`),
   );
   const words = join(ROOT, 'loop', 'DIRECTION.md');
   const direction = existsSync(words) ? readFileSync(words, 'utf8') : '';

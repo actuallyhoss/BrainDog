@@ -627,7 +627,9 @@ export const deadKeys = (paths, sources) => {
 };
 
 function budgetsAreRead() {
-  const dirs = [here, join(here, '..', 'look')];
+  /* `layout/` TOO: a gate split by rule keeps its parts one level down (PRF-B04 job 8), and a part that reads a budget
+     reads it for the gate. */
+  const dirs = [here, join(here, 'layout'), join(here, '..', 'look')];
   const sources = dirs
     .filter((d) => existsSync(d))
     .flatMap((d) =>
@@ -697,6 +699,10 @@ function noSilentPass() {
     ...readdirSync(here)
       .filter((f) => f.endsWith('.mjs') && !RUNNERS.has(f))
       .map((f) => ({ name: f, at: join(here, f) })),
+    /* AND A GATE'S PARTS, one level down (`layout/`, PRF-B04 job 8), held to the same rule as the gate they came out of. */
+    ...readdirSync(join(here, 'layout'))
+      .filter((f) => f.endsWith('.mjs'))
+      .map((f) => ({ name: `layout/${f}`, at: join(here, 'layout', f) })),
     { name: 'packages/skin/scripts/theme.mjs', at: join(here, '..', '..', 'packages', 'skin', 'scripts', 'theme.mjs') },
   ];
 

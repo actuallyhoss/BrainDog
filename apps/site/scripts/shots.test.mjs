@@ -10,14 +10,18 @@
  * once; the next run of a capture script puts them straight back, which is why the scripts are held
  * to the page here too.
  *
- * THE SCRIPTS ARE READ AS TEXT AND NOT IMPORTED, because importing either one runs it: both open a
- * browser at the top level, and `usecases.mjs` starts a record per use case.
+ * THE CAPTURE SCRIPTS ARE READ AS TEXT AND NOT IMPORTED, because importing either one runs it: both
+ * open a browser at the top level, and `usecases.mjs` starts a record per use case. `shot.mjs` is the
+ * one that is imported: its work sits under `import.meta.main`, so what arrives here is the bounds
+ * reader the daily look at the live site fails on (LCH-B02), with no browser behind it.
  */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+
+import { hex, outOfBounds, routesOf, sheet } from './shot.mjs';
 
 const SITE = join(import.meta.dirname, '..');
 const SRC = join(SITE, 'src');
@@ -95,4 +99,97 @@ test('usecases.mjs writes nothing into static/shots', () => {
   /* It photographs for a person to look at, into the directory `--png=` names, and never ships. */
   const text = readFileSync(join(import.meta.dirname, 'usecases.mjs'), 'utf8');
   assert.doesNotMatch(text, /['"]static['"],\s*['"]shots['"]/, 'usecases.mjs builds a path into static/shots again');
+});
+
+/* THE LIVE BOUNDS (LCH-B02). The facts below are a site inside every bound; each test after the first
+   plants one fact outside and the reader has to name it, and only it. */
+const BOUNDS = JSON.parse(readFileSync(join(import.meta.dirname, 'live-bounds.json'), 'utf8'));
+
+const inBounds = () => ({
+  origin: 'https://brain.dog',
+  build: '1',
+  at: '2026-10-13T00:00:00.000Z',
+  routes: {
+    '/': { height: 5658, link: null, button: '#101318', buttonHover: '#B3322C', outside: [], cookies: [] },
+    '/pricing': { height: 9000, link: '#BB2C29', button: '#CF413A', buttonHover: '#b3322c', outside: [], cookies: [] },
+  },
+});
+
+/** The facts with one planted on a page, and what the reader says of them. */
+function planted(path, fact) {
+  const facts = inBounds();
+  Object.assign(facts.routes[path], fact);
+  return outOfBounds(facts, BOUNDS);
+}
+
+test('the bounds are the ones the site is held to', () => {
+  assert.equal(BOUNDS.heights['/'], 5658);
+  for (const red of ['#CF413A', '#B3322C']) assert.ok(BOUNDS.colours.includes(red), `${red} is not a colour in bounds`);
+  assert.equal(BOUNDS.outsideScripts, 0);
+  assert.equal(BOUNDS.cookies, 0);
+});
+
+test('a site inside every bound is green, at the bound itself and in either case of a colour', () => {
+  assert.deepEqual(outOfBounds(inBounds(), BOUNDS), []);
+});
+
+test('a home page one pixel over its height is red, and a taller page with no bound is not', () => {
+  assert.deepEqual(planted('/', { height: 5659 }), ['/ is 5,659 tall at 1440, over its bound of 5,658.']);
+  assert.deepEqual(planted('/pricing', { height: 90000 }), []);
+});
+
+test('a blue link is red, by the page and the colour', () => {
+  assert.deepEqual(planted('/pricing', { link: '#2563EB' }), [
+    "/pricing: the first link in the text is #2563EB, which is not the site's red or its ink.",
+  ]);
+});
+
+test('a blue button is red at rest and under the pointer, each said apart', () => {
+  assert.match(planted('/', { button: '#2563EB' })[0], /^\/: the main button at rest is #2563EB/);
+  assert.match(planted('/', { buttonHover: '#1D4ED8' })[0], /^\/: the main button under the pointer is #1D4ED8/);
+  // A button the pointer never reached, or a colour the browser gave in another form, is in no list.
+  assert.equal(planted('/', { buttonHover: 'not reached' }).length, 1);
+  assert.equal(planted('/', { button: 'rgba(0, 0, 0, 0)' }).length, 1);
+});
+
+test('a script from another site is red, and names where it comes from', () => {
+  assert.deepEqual(planted('/', { outside: ['cdn.example.com'] }), ['/ loads 1 script from another site: cdn.example.com.']);
+});
+
+test('a cookie is red, by its name', () => {
+  assert.deepEqual(planted('/pricing', { cookies: ['sid'] }), ['/pricing sets a cookie: sid.']);
+});
+
+test('a run that looked at no page, or missed a page with a bound, is red and not a clean site', () => {
+  assert.equal(outOfBounds({ routes: {} }, BOUNDS).length, 2);
+  const facts = inBounds();
+  delete facts.routes['/'];
+  assert.deepEqual(outOfBounds(facts, BOUNDS), ['/ has no height at 1440, and its bound is 5,658.']);
+});
+
+test('the routes are the sitemap, as paths, once each', () => {
+  const xml = '<urlset><url><loc>https://brain.dog/</loc></url><url><loc>https://brain.dog/for/teams</loc></url><url><loc> https://brain.dog/docs/ </loc></url><url><loc>https://brain.dog/docs</loc></url></urlset>';
+  assert.deepEqual(routesOf(xml), ['/', '/for/teams', '/docs']);
+});
+
+test('a computed colour is read as the palette writes it, and anything else is left in the browser words', () => {
+  assert.equal(hex('rgb(207, 65, 58)'), '#CF413A');
+  assert.equal(hex('rgba(16, 19, 24, 1)'), '#101318');
+  assert.equal(hex('rgba(0, 0, 0, 0)'), 'rgba(0, 0, 0, 0)');
+  assert.equal(hex('oklch(0.6 0.2 25)'), 'oklch(0.6 0.2 25)');
+  assert.equal(hex(null), null);
+});
+
+test('the sheet holds every capture under its page and says what is out of bounds first', () => {
+  const facts = inBounds();
+  const captures = [
+    { path: '/', width: 1440, label: 'light', file: 'home-light.png' },
+    { path: '/', width: 390, label: 'dark', file: 'home-dark-390.png' },
+    { path: '/pricing', width: 390, label: 'light', file: 'pricing-light-390.png' },
+  ];
+  const red = sheet(facts, captures, ['/ sets a cookie: sid.']);
+  for (const c of captures) assert.ok(red.includes(`src="${c.file}"`), `${c.file} is not on the sheet`);
+  assert.ok(red.indexOf('/ sets a cookie: sid.') < red.indexOf('<section>'), 'the fault is below the pictures');
+  assert.match(sheet(facts, captures, []), /In bounds\./);
+  assert.doesNotMatch(red, /\u2014/, 'an em dash on the sheet');
 });

@@ -296,7 +296,7 @@ export const SAID_MOST = 2000;
  * WITH THE ANSWER TO THE ONE QUESTION (`reply`), so an answer given before the mail is not asked again on the phone the
  * link is opened on. Left out (or `null`) when nothing was asked or nothing answered.
  */
-export type Draft = { said: string; currency: string | null; usecase: string | null; reply?: Reply | null };
+export type Draft = { said: string; currency: string | null; usecase: string | null; reply?: Reply | null; cut?: boolean };
 
 /** The one question's answer, read back off something kept, or `null` when it is not one. */
 function replyOf(v: unknown): Reply | null {
@@ -370,6 +370,13 @@ function withReply(draft: Draft, kept: unknown): Draft {
 export const SAID_LINK_MOST = 1000;
 
 /**
+ * And the most it may be as the link writes it, percent-encoded: the host's `SAID_LINK_BYTES`
+ * (`packages/record/src/identity.ts`). Arabic is nine bytes a letter there, so a sentence well inside
+ * `SAID_LINK_MOST` can still be a link too long to arrive whole.
+ */
+export const SAID_LINK_BYTES = 2000;
+
+/**
  * What a letter must not carry, so a sentence holding one stays on this device and is not sent: a web address, by its
  * scheme, `www.` or a common ending, and an email address. THE HOST'S RULES (`packages/record/src/identity.ts`,
  * `NOT_IN_LINK`), which refuse the whole start; here they only leave the sentence out of the link.
@@ -388,25 +395,34 @@ let fromLink: Draft | null = null;
  * WHAT WAS SAID, PACKED FOR THE LINK: the sentence and its one answer (the currency, or the use case picked), and nothing
  * else of the build. `null` when there is nothing to carry, or it holds an address the host would refuse.
  *
- * SHORTENED AT A WORD to fit `SAID_LINK_MOST`, so a long sentence still carries its start; the whole of it waits on
- * this device as before (`keepSaid`).
+ * SHORTENED AT A WORD to fit `SAID_LINK_MOST` and `SAID_LINK_BYTES`, so a long sentence still carries its start and
+ * the pack says `cut: true`; the whole of it waits on this device as before (`keepSaid`).
  */
 export function saidForLink(draft: Draft | null | undefined): string | null {
   if (!draft) return null;
-  const pack = (said: string): string =>
+  const pack = (said: string, cut = false): string =>
     JSON.stringify({
       said,
       ...(draft.currency ? { currency: draft.currency } : {}),
       ...(draft.usecase ? { usecase: draft.usecase } : {}),
       ...(draft.reply ? { reply: draft.reply } : {}),
+      ...(cut ? { cut: true } : {}),
     });
+  /* BOTH OF THE HOST'S MEASURES: the characters packed, and the bytes the link writes them as. Measured with `cut`
+     said, since a shortened pack says so and those words are part of what must fit. */
+  const fitsLink = (said: string): boolean => {
+    const packed = pack(said, true);
+    return packed.length <= SAID_LINK_MOST && encodeURIComponent(packed).length <= SAID_LINK_BYTES;
+  };
   let words = draft.said.trim();
-  if (pack(words).length > SAID_LINK_MOST) {
+  let shortened = false;
+  if (pack(words).length > SAID_LINK_MOST || encodeURIComponent(pack(words)).length > SAID_LINK_BYTES) {
+    shortened = true;
     /* THE LONGEST START THAT FITS PACKED, found by halves, since a quote or a line break grows when packed. */
     let fits = 0;
     for (let lo = 0, hi = words.length; lo <= hi; ) {
       const mid = (lo + hi) >> 1;
-      if (pack(words.slice(0, mid)).length <= SAID_LINK_MOST) {
+      if (fitsLink(words.slice(0, mid))) {
         fits = mid;
         lo = mid + 1;
       } else hi = mid - 1;
@@ -416,7 +432,7 @@ export function saidForLink(draft: Draft | null | undefined): string | null {
     /* NEVER HALF A CHARACTER: a lone surrogate is a character no link can carry. */
     words = (space > 0 ? cut.slice(0, space) : cut).trimEnd().replace(/[\uD800-\uDBFF]$/, '');
   }
-  const out = pack(words);
+  const out = pack(words, shortened);
   return words === '' || CARRIES_NOT.some((r) => r.test(out)) ? null : out;
 }
 
@@ -430,7 +446,8 @@ export function saidFromLink(packed: string | null): Draft | null {
     return null;
   }
   if (!isObj(v) || typeof v.said !== 'string' || v.said.trim() === '') return null;
-  return withReply({ said: v.said.slice(0, SAID_MOST), currency: str(v.currency), usecase: str(v.usecase) }, v.reply);
+  /* `cut` IS READ WHOEVER SHORTENED IT: this page before sending, or the host fitting the link (`saidFitted`). */
+  return withReply({ said: v.said.slice(0, SAID_MOST), currency: str(v.currency), usecase: str(v.usecase), ...(v.cut === true ? { cut: true } : {}) }, v.reply);
 }
 
 /**

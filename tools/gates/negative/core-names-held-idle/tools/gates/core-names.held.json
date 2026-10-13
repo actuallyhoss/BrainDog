@@ -1,0 +1,6 @@
+{
+  "//": "Planted: one entry whose file stopped spelling its name.",
+  "held": [
+    { "path": "apps/cli/src/clean.ts", "name": "tasks", "reason": "Planted. The file spelled the list once and was reworded.", "unit": "SHL-A20" }
+  ]
+}

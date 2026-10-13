@@ -73,6 +73,8 @@
     planKept,
     planOf,
     recordNames,
+    saidForLink,
+    saidFromLink,
     saidKept,
     startSignup,
     verifySignup,
@@ -230,6 +232,10 @@
 
   /* The sentence stays in memory, and in `localStorage` only once the person keeps it, never in the address. */
   let sentence = $state('');
+  /** The sentence came off a link that carried only its start (`cut`), and this device holds no copy of the whole. */
+  let linkCut = $state(false);
+  /** The link just mailed carries only the start of what was said; the whole waits here. */
+  let sentCut = $state(false);
   let field = $state<HTMLTextAreaElement | undefined>(undefined);
   /** The rules' reading of the sentence as it stands, a beat after the last key. */
   let live = $state.raw<Proposal | null>(null);
@@ -394,6 +400,8 @@
   function edit() {
     dropHuman();
     step = 'describe';
+    /* THE WORDS ARE HERS TO FINISH NOW, so the line about what the link left out has said its piece. */
+    linkCut = false;
     said = null;
     if (!nameByHand) slug = '';
     void tick().then(() => {
@@ -465,6 +473,8 @@
     const draft = saidKept(localStore());
     if (draft) {
       sentence = draft.said;
+      /* ONLY THE LINK'S COPY SAYS `cut`: this device's own is the whole of it. */
+      linkCut = arrived?.kind === 'verify' && draft.cut === true;
       chosen = draft.usecase;
       /* AND WHAT WAS CHANGED AND ANSWERED, where this device kept it; a currency answered also rides in the link. */
       const kept = amendKept(localStore(), draft.said);
@@ -554,6 +564,7 @@
     busy = false;
     if (out.ok) {
       sentTo = email.trim();
+      sentCut = saidFromLink(saidForLink(draftNow()))?.cut === true;
       /* THE CODE IS HELD BY THE PROOF JUST MAILED, so this tab has no more use for it. */
       keepCode(tabStore(), null);
       /* KEPT ONLY ONCE THE HOST SAID YES, so a refused address leaves nobody's words on this device. */
@@ -821,6 +832,7 @@
     <q class="said-text">{sentence.trim()}</q>
     <span class="said-edit">{words.edit}</span>
   </button>
+  {#if linkCut}<p class="quiet">{words.linkCut}</p>{/if}
 {/snippet}
 
 <Frame end={signedIn === null ? signInLink : undefined}>
@@ -1024,7 +1036,7 @@
       {:else if step === 'sent'}
         <h1 class="title" id="sent-h" tabindex="-1">{copy.signupCheckMail}</h1>
         <p class="lede">{copy.signupMailSent(sentTo)}</p>
-        {#if sentence.trim() !== ''}<p class="quiet">{words.sentWhy}</p>{/if}
+        {#if sentence.trim() !== ''}<p class="quiet">{sentCut ? words.sentCut : words.sentWhy}</p>{/if}
         <div class="go"><Button weight="quiet" onclick={otherAddress}>{copy.signupOtherAddress}</Button></div>
       {:else if step === 'link-failed'}
         <h1 class="title">{copy.signupLinkFailed}</h1>

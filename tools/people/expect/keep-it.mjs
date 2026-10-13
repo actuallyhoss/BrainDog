@@ -162,7 +162,17 @@ export async function keepIt(person, { title = person.expect?.heard?.title ?? pe
     seen.started = told(await startSignup({ email: person.email, slug: person.slug, name, tz: person.zone, said: draft }, t.web));
     if (seen.started.ok) {
       const letters = await lettersFor(sent, person.email, 0);
-      seen.link = letters.map((m) => /https:\/\/\S+#verify=\S+/u.exec(String(m.text ?? ''))?.[0]).find(Boolean) ?? null;
+      /* THE BUTTON'S ADDRESS, read from the HTML as a mail client reads it: the sentence rides there and the plain text
+         shows none. A letter with no such button falls back to the address its plain text says. */
+      seen.link =
+        letters
+          .map(
+            (m) =>
+              [...String(m.html ?? '').matchAll(/\shref="(https:\/\/[^"]+#verify=[^"]+)"/gu)]
+                .map((x) => x[1].replace(/&#39;/gu, "'").replace(/&amp;/gu, '&'))
+                .find((h) => h.includes('&said=')) ?? /https:\/\/\S+#verify=\S+/u.exec(String(m.text ?? ''))?.[0],
+          )
+          .find(Boolean) ?? null;
     }
     if (seen.link !== null) {
       /* THE PAGE'S OWN READING OF THE LINK: the proof and, after it, what was said, unpacked. */
@@ -196,6 +206,8 @@ export async function keepIt(person, { title = person.expect?.heard?.title ?? pe
     ...[...c.blobs.held.entries()].map(([key, o]) => ({ where: `the bucket's ${key}`, text: new TextDecoder().decode(o.bytes) })),
     ...lines.map((text, i) => ({ where: `log line ${i + 1}`, text })),
     ...c.log.map((text) => ({ where: 'the harness log', text })),
+    /* AND WHAT A PERSON READS OF THE LETTER: its plain text shows no sentence, only the button's address carries one. */
+    ...sent.map((m, i) => ({ where: `the plain text of letter ${i + 1}`, text: String(m.text ?? '') })),
   ];
   seen.kept = [...new Set(foundIn(places, person.said))];
   return { ...judge(seen, person, title), seen };

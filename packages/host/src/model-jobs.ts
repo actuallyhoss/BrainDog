@@ -19,10 +19,12 @@
  * `{ model, dims, vectors }`, one vector for each text the hourly sweep queued, which the kernel writes to `entry_vec`.
  * A doubtful pair is acked as `{ verdicts: [{ hash, same, confidence }] }`, from the cache first (`understand.ts`).
  *
- * METERED ON THE BACKGROUND ALLOWANCE, NEVER ON HIS ASKS. The daily look, an automation's question, a digest's prose and a
- * pattern's draft share `BACKGROUND_ASKS_MONTH` (60) a month, less the page headlines' own share (`HEADLINE_ASKS_MONTH`); his
- * 80 are his own (`packages/slash/src/types.ts`). Understanding who is who spends at most `UNDERSTAND_ASKS_MONTH` of that
- * rest. The pass
+ * METERED ON THE BACKGROUND ALLOWANCE, NEVER ON HIS ASKS. The daily look, a digest's prose, an embedding and a pattern
+ * drafted for the record share the background allowance (`BACKGROUND_JOBS_MONTH`), less the page headlines' own share
+ * (`HEADLINE_ASKS_MONTH`); his 80 are his own (`packages/slash/src/types.ts`), and an automation's question spends those,
+ * as his own press does. Which of the two a row spent is what the row says in `spends`, written with it, and never
+ * something read back out of its kind or its question. Understanding who is who spends at most `UNDERSTAND_ASKS_MONTH`
+ * of that rest. The pass
  * asks the meter BEFORE it leases and leases no more jobs than the month has left, so a spent month leaves the jobs
  * `pending`, where they never walk the retry ladder to dead, and the next month serves them.
  *
@@ -38,7 +40,7 @@ import type { CallContext, RecordApi } from '@braindog/record';
 import type { EngineHealthRead } from './engine-health.ts';
 import type { DraftSample, ModelJobInference } from './slash-answers.ts';
 import { slashSamplesOf } from './slash.ts';
-import { serveNotes, serveOffers, settleResolve, UNDERSTAND_ASK, UNDERSTAND_ASKS_MONTH, type OffersKernel, type UnderstandStore } from './understand.ts';
+import { serveNotes, serveOffers, settleResolve, UNDERSTAND_ASKS_MONTH, type OffersKernel, type UnderstandStore } from './understand.ts';
 
 export { UNDERSTAND_ASK, UNDERSTAND_ASKS_MONTH } from './understand.ts';
 
@@ -49,12 +51,12 @@ export const MODEL_JOBS_PER_PASS = 5;
  * The model jobs a month's background allowance holds: `@braindog/slash`'s `BACKGROUND_ASKS_MONTH`, restated because this
  * package never imports that one (the header's rule). A host that has the package's number hands it to `backgroundMeter`.
  */
-export const BACKGROUND_JOBS_MONTH = 60;
+export const BACKGROUND_JOBS_MONTH = 600;
 
 /**
  * The part of a month's background allowance kept for the daily look's page headlines, and the most they may spend: one
- * batched ask a night for thirty nights. The headline ask writes its row with `HEADLINE_ASK` as its question, which is how
- * both meters below tell it from a skill draft, a digest's prose, a pattern or an embedding.
+ * batched ask a night for thirty nights. The headline ask writes its row with purpose `headline`, which is how both
+ * meters below tell it from a skill draft, a digest's prose, a pattern or an embedding.
  *
  * TWO SHARES, SO NEITHER KIND CAN EAT THE OTHER'S MONTH. Counted as one pool, a busy inbox's patterns and a week of
  * digests spent the 60 by the twentieth and every page fell back to its rules line for the rest of the month; and a
@@ -64,8 +66,19 @@ export const BACKGROUND_JOBS_MONTH = 60;
  */
 export const HEADLINE_ASKS_MONTH = 30;
 
-/** The question a headline ask's ledger row is written with, and what the meters count it by. */
+/**
+ * The question a headline ask's ledger row is written with: the words a person reads beside the row, and nothing a
+ * meter counts by. The meters read the row's `purpose` (`backgroundSpent`).
+ */
 export const HEADLINE_ASK = "Slash's page headlines";
+
+/**
+ * What a ledger row was for, and whose allowance it spent: Slash's own two columns (`packages/slash/src/call.ts`,
+ * store version 3), restated because this package never imports that one. Every row this host writes carries both,
+ * and every count here reads them.
+ */
+export type AskPurpose = 'headline' | 'understand' | 'look' | 'ask' | 'automation' | 'plan';
+export type AskSpends = 'person' | 'background' | 'none';
 
 /** The kernel's job for a doubtful pair (`loop/contract-17.md`), migration 23's kind in `OUTBOX_KINDS`. */
 const RESOLVE: OutboxKind = 'infer.resolve';
@@ -175,11 +188,13 @@ const warn = (line: string): void => console.error(line);
 /**
  * The background allowance counted in Slash's own ledger, the `slash_call` table the engine writes each call's row to.
  *
- * A DIGEST'S PROSE AND A DRAFT FOR THE RECORD ARE THE ROWS COUNTED. `digestProse` settles a `prose` row and `draftPattern`
- * a `pattern` row with nothing in `filed`, because the kernel files it in the ack (`packages/slash/src/jobs.ts`). A press
- * that filed its pattern carries the filed id and is his ask, not this; a press the checks refused has no id either and is
- * counted here too, which errs on the side a cap should. An `embed` row is one embedding job, a hundred rows in one call.
- * `-` is a model never reached, which costs nothing and is not counted.
+ * THE ROWS COUNTED ARE THE ROWS THAT SAY `spends = 'background'`, and nothing else decides it. Whoever writes a row says
+ * whose allowance it spent: `digestProse`, `draftPattern` and an embedding (`packages/slash/src/jobs.ts`), and the look,
+ * a skill draft, the headlines and understanding (`slash-ask.ts` `background`) write `background`; his own press writes
+ * `person` whether it filed its pattern or the checks refused it, so a press that filed nothing is his ask and never
+ * this. It was counted here once, when the count was "a pattern, prose or embed row with nothing in `filed`". A model
+ * never reached and a failed attempt write `none` and cost the month nothing. An `embed` row is one embedding job, a
+ * hundred rows in one call.
  *
  * `share` SAYS WHICH OF THE TWO SHARES IS METERED (`HEADLINE_ASKS_MONTH`). `work`, the default and what the model-jobs pass
  * and a skill draft are held to, counts every background row but the headlines and holds `cap` less the headlines' share;
@@ -187,6 +202,8 @@ const warn = (line: string): void => console.error(line);
  *
  * NO LEDGER YET IS NOTHING SPENT. The engine creates the table on its first call, so a host that has not built it has
  * spent nothing this month; any other failure to count is read as spent, so a count nobody can read never lets a call through.
+ * A ledger an older build wrote, with no `spends` yet, is one of those: it reads as spent until the engine is built and
+ * steps the store (`openStore`), which the first ask of any kind does.
  */
 export function backgroundMeter(sql: Pick<Sql, 'one'>, cap = BACKGROUND_JOBS_MONTH, share: 'work' | 'headline' | 'understand' = 'work'): ModelJobMeter {
   /* IN PROPORTION, so a smaller cap keeps both shares: a flat thirty under a cap of ten would leave the work none. */
@@ -211,15 +228,16 @@ export function backgroundMeter(sql: Pick<Sql, 'one'>, cap = BACKGROUND_JOBS_MON
  * Every background ask this month, the headlines among them and the understanding asks among them, as the status door
  * shows the whole allowance spent, or `null` when the ledger could not be read. No ledger yet is nothing spent
  * (`backgroundMeter`).
+ *
+ * BY `spends` AND `purpose`, THE TWO THINGS A ROW SAYS ABOUT ITSELF. Neither its kind, nor whether it filed, nor the
+ * words of its question is read: `test/model-jobs-spends.test.ts` fails when one of them decides a count again.
  */
 export function backgroundSpent(sql: Pick<Sql, 'one'>, since: string): { all: number; headlines: number; understand: number } | null {
   try {
     const row = sql.one<{ n: number; h: number | null; u: number | null }>(
-      `SELECT COUNT(*) AS n, SUM(CASE WHEN kind = 'pattern' AND question = ? THEN 1 ELSE 0 END) AS h,
-       SUM(CASE WHEN kind = 'pattern' AND question = ? THEN 1 ELSE 0 END) AS u FROM slash_call
-       WHERE kind IN ('pattern', 'prose', 'embed') AND filed IS NULL AND model <> '-' AND ts >= ?`,
-      HEADLINE_ASK,
-      UNDERSTAND_ASK,
+      `SELECT COUNT(*) AS n, SUM(CASE WHEN purpose = 'headline' THEN 1 ELSE 0 END) AS h,
+       SUM(CASE WHEN purpose = 'understand' THEN 1 ELSE 0 END) AS u FROM slash_call
+       WHERE spends = 'background' AND ts >= ?`,
       since,
     );
     return { all: row?.n ?? 0, headlines: row?.h ?? 0, understand: row?.u ?? 0 };

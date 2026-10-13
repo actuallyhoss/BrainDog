@@ -149,8 +149,8 @@ test('SKILL DRAFTS AND THE MODEL-JOBS PASS cannot spend the headlines: with the 
   /* A month of digests and skill drafts, as the pass and the look settle them. */
   for (let i = 0; i < work.cap - 1; i++)
     sql.exec(
-      `INSERT INTO slash_call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, code, question)
-       VALUES (?, ?, 'prose', 'a', 'glm-5.3-flash', 10, 10, 0, 0, 'ok', NULL, NULL)`,
+      `INSERT INTO slash_call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, code, question, purpose, spends)
+       VALUES (?, ?, 'prose', 'a', 'glm-5.3-flash', 10, 10, 0, 0, 'ok', NULL, NULL, 'look', 'background')`,
       `prose-${i}`,
       new Date(T0 - 1000 * i).toISOString(),
     );

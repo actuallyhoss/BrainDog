@@ -178,7 +178,7 @@ export function firstAsks<F extends { id: string; required?: boolean }>(fields: 
 /** Start and end of a phrase in the sentence as typed (`who.ts` `Span`), said here so this file imports nothing. */
 type At = readonly [number, number];
 /** A line heard, as much of it as these two read (`HeardLine`, `lib/start/propose.ts`). */
-type Line = { phrase: string; became: string; at?: At; you?: true; loose?: true };
+type Line = { phrase: string; became: string; at?: At; you?: true; loose?: true; more?: readonly At[] };
 
 /** A run of the sentence as typed: plain, or words that were heard, with what they became. */
 export type Lit = { text: string; became: string | null };
@@ -187,13 +187,20 @@ export type Lit = { text: string; became: string | null };
  * THE SENTENCE CUT AT THE VERY WORDS HEARD, by where each line says it sits (`at`), never by looking for the phrase
  * again, so "orders" lights the "orders" she typed and not the first one in a word before it. Runs cover the whole
  * sentence in order; a line with no place, one past the end, one over a run already lit, or one whose words are no
- * longer there (the reading is a beat behind the typing) is left plain.
+ * longer there (the reading is a beat behind the typing) is left plain. A phrase folded into a line and said apart
+ * (`more`) lights as what the line became, while the line's own words are still where it says.
  */
 export function litIn(sentence: string, heard: readonly Line[]): Lit[] {
   const out: Lit[] = [];
   let from = 0;
-  const spans = heard.flatMap((h) => (h.at === undefined ? [] : [{ at: h.at, phrase: h.phrase, became: h.became }])).sort((a, b) => a.at[0] - b.at[0]);
   const one = (s: string): string => s.replace(/\s+/gu, ' ').toLowerCase();
+  const held = (h: Line): boolean => h.at !== undefined && h.at[1] <= sentence.length && one(sentence.slice(h.at[0], h.at[1])) === one(h.phrase);
+  const spans = heard
+    .flatMap((h) => [
+      ...(h.at === undefined ? [] : [{ at: h.at, phrase: h.phrase, became: h.became }]),
+      ...(held(h) ? (h.more ?? []).map((at) => ({ at, phrase: sentence.slice(at[0], at[1]), became: h.became })) : []),
+    ])
+    .sort((a, b) => a.at[0] - b.at[0]);
   for (const { at, phrase, became } of spans) {
     const [start, end] = at;
     if (start < from || end <= start || end > sentence.length || one(sentence.slice(start, end)) !== one(phrase)) continue;

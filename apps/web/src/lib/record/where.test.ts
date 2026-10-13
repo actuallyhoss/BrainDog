@@ -13,8 +13,12 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { DatabaseSync } from 'node:sqlite';
 
-import { chipsOf, display, labelOf, whereOf } from './api.ts';
+import { openRecord, type Kernel } from '@braindog/kernel';
+import { installSeed } from '@braindog/seed';
+
+import { chipsOf, display, joinOf, labelOf, whereOf } from './api.ts';
 import { saidPlainly } from './blocks.ts';
 import { NOW } from './fixtures/sample.ts';
 import { REGISTERS, ROWS } from './held.ts';
@@ -263,4 +267,92 @@ test('and a SHOUTED operator is the same operator in the printer as it is in the
   assert.deepEqual(compile('tools', shouted).bad, [], `the printed filter does not compile: ${shouted}`);
   assert.deepEqual(compile('tools', shouted).clauses, compile('tools', 'needs HAS BRAINDOG_TOKEN').clauses);
   assert.equal(saidPlainly('obligations', 'due BEFORE +30d'), saidPlainly('obligations', 'due before +30d'));
+});
+
+/* ── a filter said with "or" (PGS-B06 job d) ─────────────────────────────── */
+
+/** The sentence an address reads as, the way the list screen reads one: its chips, and the word that joins them. */
+const openedAs = (href: string): string => {
+  const params = new URLSearchParams(href.split('?')[1] ?? '');
+  return whereOf(chipsOf(params), joinOf(params));
+};
+
+function openSqlite(): Parameters<typeof openRecord>[0] {
+  const db = new DatabaseSync(':memory:');
+  let depth = 0;
+  const sql = {
+    exec: (text: string, ...params: unknown[]) => {
+      if (params.length === 0) db.exec(text);
+      else db.prepare(text).run(...(params as never[]));
+    },
+    all: (text: string, ...params: unknown[]) => db.prepare(text).all(...(params as never[])),
+    one: (text: string, ...params: unknown[]) => db.prepare(text).get(...(params as never[])),
+    transactionSync<T>(fn: () => T): T {
+      if (depth > 0) return fn();
+      db.exec('BEGIN');
+      depth++;
+      try {
+        const value = fn();
+        db.exec('COMMIT');
+        return value;
+      } catch (e) {
+        db.exec('ROLLBACK');
+        throw e;
+      } finally {
+        depth--;
+      }
+    },
+  };
+  return sql as unknown as Parameters<typeof openRecord>[0];
+}
+
+/** How many entries the record answers a sentence with: the number a chip prints, and the number its list heads. */
+const record = (async () => {
+  const k = await openRecord(openSqlite(), { now: () => NOW });
+  const out = await installSeed(k);
+  assert.ok(out.ok, JSON.stringify(out));
+  return k;
+})();
+const matchedBy = async (register: string, where: string | undefined): Promise<number> => {
+  const k: Kernel = await record;
+  const out = k.list({ register, limit: 1, ...(where ? { where } : {}) });
+  assert.ok(out.ok, `${register}: "${where}" was refused: ${JSON.stringify(out)}`);
+  return out.value.matched;
+};
+
+test('a filter said with "or" is its chips and join=any, and reads back as the same group', () => {
+  const sentence = 'state is open, or due before today';
+  const href = registerHref('tasks', sentence);
+  assert.equal(href, '/r/tasks?f=state:in:open&f=by:before:today&join=any');
+  const back = openedAs(href);
+  assert.equal(back, 'state is open, or by before today');
+  assert.deepEqual(compile('tasks', back).any, compile('tasks', sentence).any);
+
+  /* WITHOUT "or" THE ADDRESS IS SPELLED AS IT ALWAYS WAS, with no word on it. */
+  assert.doesNotMatch(registerHref('tasks', 'state is open, due before today'), /join/);
+  /* A SIDE THE CHIPS CANNOT SAY ALONE KEEPS THE WHOLE LIST: a range is two chips, and either end alone is every day. */
+  assert.equal(registerHref('tasks', 'state is open, or due between today and +7d'), '/r/tasks');
+  assert.equal(registerHref('obligations', 'state is open, or amount at least GBP 2400'), '/r/obligations');
+});
+
+test('a chip saying "late or due this week" opens a list whose count is the chip’s, and not the whole list', async () => {
+  let asked = 0;
+  for (const [register, sentence] of [
+    ['tasks', 'by before today, or by before +8d'],
+    ['tasks', 'state is open, or due before today'],
+    ['obligations', 'state is open, or due before today'],
+    ['obligations', 'due before today, or due on today, or direction is owed to me'],
+  ] as const) {
+    const chip = await matchedBy(register, sentence);
+    const href = registerHref(register, sentence);
+    assert.match(href, /&join=any$/, `${register}: "${sentence}" opened ${href}`);
+    const list = await matchedBy(register, openedAs(href));
+    assert.equal(list, chip, `${register}: "${sentence}" counts ${chip} and its list ${href} holds ${list}`);
+
+    /* THE TWO FAILURES THIS REPLACED, both measurable: the whole list, and the chips read as "and". */
+    const whole = await matchedBy(register, undefined);
+    const anded = await matchedBy(register, whereOf(chipsOf(new URLSearchParams(href.split('?')[1]))));
+    if (chip !== whole && chip !== anded) asked += 1;
+  }
+  assert.ok(asked >= 2, 'no group differed from the whole list and from its chips anded, so this test measured nothing');
 });

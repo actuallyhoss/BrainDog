@@ -1,0 +1,100 @@
+{
+  "id": "dina-free",
+  "name": "Dina",
+  "who": "Lives in Lisbon and keeps her own to-do list. She chose no plan and gave no card: she is the person Free is for, one person with one record.",
+  "expects": "none",
+  "standing": false,
+  "said": "I'm Dina. I want one place for my tasks.",
+  "says": {
+    "plain": "I'm Dina. I want one place for my tasks.",
+    "hard": "I'm Dina. I keep forgetting what I said I would do this week."
+  },
+  "answers": {
+    "name": "Dina",
+    "currency": "EUR",
+    "kind": "tasks",
+    "things": ["Tasks"]
+  },
+  "email": "dina@people.braindog.test",
+  "slug": "dinas-tasks",
+  "zone": "Europe/Lisbon",
+  "locale": "en-GB",
+  "languages": ["en-GB", "pt-PT"],
+  "start": "2026-10-12T08:00:00Z",
+  "first": "Renew my passport before Friday",
+  "later": [
+    { "day": 3, "said": ["Book the dentist for next week"] },
+    { "day": 7, "said": ["Pay the electricity bill", "Call the landlord about the boiler"] },
+    { "day": 30, "said": ["Renew the gym membership"] },
+    { "day": 90, "said": ["Sort the winter clothes"] }
+  ],
+  "expect": {
+    "who": {
+      "question": "Who are you?",
+      "chips": 5,
+      "promises": [
+        { "says": "free, with no card", "match": "free\\b.{0,24}\\bno card" },
+        { "says": "nothing is saved until you keep it", "match": "nothing (is )?saved until you keep" },
+        { "says": "yours to export or move", "match": "yours to (export|move|take)" }
+      ]
+    },
+    "heard": {
+      "usecase": "none",
+      "title": "Dina",
+      "lit": ["Dina", "tasks"],
+      "places": ["Today", "People", "Work"]
+    },
+    "keep": { "lists": ["tasks", "people"], "currency": "EUR" },
+    "tell": { "lists": ["tasks"] },
+    "today": { "first": "source", "lists": ["tasks"] },
+    "offer": { "id": "week:tasks", "before": 13, "after": 30 }
+  },
+  "walk": {
+    "note": "Dina taps no starting point and is asked no question, so this file holds no chip, no answer and no question.",
+    "pages": [
+      { "name": "Billing", "path": "/settings/billing" },
+      { "name": "Usage", "path": "/usage" },
+      { "name": "Slash", "path": "/slash" },
+      { "name": "Agents", "path": "/settings/agents" }
+    ],
+    "acts": [
+      { "id": "invite", "name": "People, inviting a friend", "path": "/settings/people", "field": "address field", "into": "invite-email", "type": "{address}" }
+    ],
+    "week": {
+      "lists": [
+        {
+          "list": "tasks", "count": 8, "title": "what", "day": "by", "from": -6, "to": -1, "fields": { "state": "done" },
+          "titles": ["Renew the passport", "Book the dentist", "Pay the electricity bill", "Buy a birthday present for Rita", "Return the library books", "Water the plants", "Send the rent", "Clean the bike chain"]
+        },
+        {
+          "list": "tasks", "count": 6, "title": "what", "day": "by", "from": 0, "to": 7, "fields": { "state": "open" },
+          "titles": ["Call the landlord about the boiler", "Renew the gym membership", "Book the train to Porto", "Fix the kitchen shelf", "Back up the photos", "Write to Aunt Lena"]
+        }
+      ]
+    },
+    "quarter": {
+      "lists": [
+        {
+          "list": "tasks", "count": 48, "title": "what", "day": "by", "from": -90, "to": -8, "fields": { "state": "done" },
+          "titles": ["Do the weekly shop", "Pay the phone bill", "Water the plants", "Take out the recycling", "Clean the flat", "Call home", "Go for a run", "Check the bank statement", "Wash the bedding", "Plan the week's meals", "Top up the travel card", "Tidy the desk"]
+        },
+        {
+          "list": "tasks", "count": 14, "title": "what", "day": "by", "from": -20, "to": 30, "fields": { "state": "open" },
+          "titles": ["Sort the winter clothes", "Book the eye test", "Renew the home insurance", "Find a plumber", "Frame the print", "Sell the old desk", "Learn the new bus routes", "Cancel the film subscription", "Mend the coat", "Order the tax form", "Visit the tile museum", "Repot the lemon tree", "Clear the inbox", "Buy a second set of keys"]
+        }
+      ]
+    },
+    "expect": [
+      { "id": "billing-free-first", "says": "Billing says Free first", "kind": "says", "on": "Billing", "path": "/settings/billing", "match": "\\bFree\\b", "before": ["\\bCloud\\b"] },
+      { "id": "billing-one-record", "says": "Billing says one record", "kind": "says", "on": "Billing", "path": "/settings/billing", "match": "\\b(one|1) record\\b" },
+      { "id": "billing-one-person", "says": "Billing says one person", "kind": "says", "on": "Billing", "path": "/settings/billing", "match": "\\b(one|1) person\\b" },
+      { "id": "billing-credits", "says": "Billing says 20 Slash credits", "kind": "says", "on": "Billing", "path": "/settings/billing", "match": "\\b20 Slash credits\\b" },
+      { "id": "billing-runs", "says": "Billing says 1,000 runs", "kind": "says", "on": "Billing", "path": "/settings/billing", "match": "\\b1,000 runs\\b" },
+      { "id": "slash-meter", "says": "Slash's meter says 20", "kind": "says", "on": "Slash", "path": "/slash", "match": "\\b20\\b" },
+      { "id": "invite-refused", "says": "Inviting an address is refused in one sentence that names no door", "kind": "act", "act": "invite", "match": "nobody else can join", "sentences": 1, "never": ["\\bmove it to\\b", "\\bCloud\\b", "\\bupgrade\\b"] },
+      { "id": "rail-opens", "says": "Every page of the rail opens", "kind": "opens" },
+      { "id": "usage-draws", "says": "Usage draws the month's runs", "kind": "draws", "on": "Usage", "path": "/usage", "match": "\\bruns\\b" },
+      { "id": "nothing-raw", "says": "No page prints a slot never filled, a bare id, or a business she never said", "kind": "never", "words": ["invoices?", "customers?", "clients?", "revenue"] }
+    ]
+  }
+}

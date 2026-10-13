@@ -61,8 +61,8 @@
       "before": 13,
       "after": 15,
       "lead": {
-        "says": "N orders this month, N to ship this week, and Salma still owes EGP 1,350",
-        "match": "^\\d+ orders this month, \\d+ to ship this week, and Salma still owes EGP 1,350$"
+        "says": "6 orders this month, 4 to ship this week, 2 late, and Salma still owes EGP 1,350",
+        "match": "^6 orders this month, 4 to ship this week, 2 late, and Salma still owes EGP 1,350$"
       }
     }
   }

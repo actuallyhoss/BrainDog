@@ -50,7 +50,7 @@
 -->
 <script lang="ts">
   import AgentMark from './AgentMark.svelte';
-  import { markedOf } from './agent-marks.ts';
+  import { markedOf } from '@braindog/skin/agent-marks.ts';
   /** `rule` marks a row a rule wrote, drawn with no face: faces are for agents and people. */
   type Row = { who: string; what: string; when: string; rule?: boolean };
 

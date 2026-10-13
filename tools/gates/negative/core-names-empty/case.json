@@ -1,0 +1,8 @@
+{
+  "gate": "core-names",
+  "rule": "an empty root is a skip, not a pass",
+  "expect": "no code was read",
+  "findings": 1,
+  "skip": true,
+  "why": "The tree holds nothing but its `expect.txt`, which is what a mistyped `BRAINDOG_GATE_ROOT` looks like from inside a gate. A gate that read nothing has not passed: exit 3, and the line names the root it read."
+}

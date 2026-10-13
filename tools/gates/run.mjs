@@ -152,6 +152,10 @@ const GATES = [
      and nothing held it there. Beside the kernel rule because a `'bank-hsbc-eg'` in the record is
      that rule broken without a single declaration written. */
   ['shell-words', call(join(here, 'shell-words.mjs'))],
+  /* AND THE NAMES THE ADD-ONS THEMSELVES DECLARE (SHL-A01): `shell-words` holds a list somebody wrote, and this reads every
+     pack and use case for its add-on, list, field and figure ids and fails where the core spells one as a string or
+     after `register.`. What stands today is in `core-names.held.json`, which only shrinks. */
+  ['core-names', call(join(here, 'core-names.mjs'))],
   /* AND THE SAME KIND OF RULE ABOUT THE SAMPLE. The app's test data lives in `fixtures/` and in the seed's
      root, and a shipped file that imports either draws the sample on a real record. Beside `shell-words` because both
      are a grep over what the core ships for something it must not name. */

@@ -62,8 +62,9 @@ import { panelFault, roadmapFault, shortFault } from './kinds/words.ts';
 import type { FlowDecl } from './rules.ts';
 /* THE FORMAT, THE WINDOW AND THE TWO FIGURES THAT ARE NOT A SUM, checked here by the same functions that read them. */
 import { clockOf, isMoneyFormat, windowMs, type EvalContext } from './metrics.ts';
-import { WALKS, WALK_SOURCE, isRolled, rolledFault, walksToZero, type Rolled } from './money-figures.ts';
+import { WALKS, WALK_SOURCE, crosscheckFault, isCrosscheck, isRolled, rolledFault, walksToZero, type Rolled } from './money-figures.ts';
 import { INDEX_CEILING } from './observe.ts';
+import { SOURCE_MODULES, sourceModule } from './sources/index.ts';
 
 /**
  * `34-GRAMMARS` §4. Checked before an id is inlined into an index name or a JSON path.
@@ -519,6 +520,14 @@ function metricBody(decl: Declaration, installed?: Known): Refusal | null {
       );
   }
 
+  /* A FIGURE CHECKED AGAINST ITS OWN ENTRIES names the figure and its list of accounts, and has no rows of its own to
+     filter or group. Money less the same money is money, in no one currency a format could fix. */
+  if (isCrosscheck(body.value)) {
+    const fault = crosscheckFault(body);
+    if (fault) return bad('DECLARATION_INVALID', `${id}: ${fault}.`, body.where !== undefined ? 'where' : body.group_by !== undefined ? 'group_by' : body.bucket !== undefined ? 'bucket' : 'value');
+    if (body.format !== 'money') return bad('DECLARATION_INVALID', `${id} is a difference of money in whichever currency it is out in, so its format is money.`, 'format', ['money']);
+  }
+
   /* A FIGURE OVER THE WALK AHEAD reads the legs it names, and nothing a list-reading figure writes. */
   if (!walks && (body.legs !== undefined || body.opening !== undefined))
     return bad('DECLARATION_INVALID', `${id} names ${body.legs !== undefined ? 'legs' : 'an opening'}, which only a figure over ${WALK_SOURCE} walks.`, body.legs !== undefined ? 'legs' : 'opening');
@@ -691,6 +700,16 @@ function figureListsFault(id: string, body: { source?: unknown; value?: unknown;
     const opened = installed.get(`metric.${opens}`);
     if (opened === undefined) return bad('METRIC_UNKNOWN', `${id} walks from ${opens}, and there is no metric called ${opens}.`, 'opening');
     if (opened.source === WALK_SOURCE) return bad('DECLARATION_INVALID', `${id} walks from a figure of what is held, and ${opens} is itself a walk.`, 'opening');
+  }
+  /* THE FIGURE A CROSS-CHECK CHECKS IS ASKED FOR TOO, as the reader asks: cash rolled forward, the money itself, over
+     the same list of accounts. One that checked anything else would be refused on every read. */
+  if (isCrosscheck(body.value)) {
+    const of = String((body.value as { crosscheck: { of: unknown } }).crosscheck.of);
+    const checked = installed.get(`metric.${of}`);
+    if (checked === undefined) return bad('METRIC_UNKNOWN', `${id} checks ${of}, and there is no metric called ${of}.`, 'value');
+    if (!isRolled(checked.value) || (checked.value as { rolled?: { read?: unknown } }).rolled?.read !== undefined)
+      return bad('DECLARATION_INVALID', `${id} checks cash rolled forward, and ${of} is not that money.`, 'value');
+    if (checked.source !== body.source) return bad('DECLARATION_INVALID', `${id} checks ${of}, which adds up ${String(checked.source)}, so that is its source too.`, 'source', [String(checked.source)]);
   }
   const named: { register: string; fields: unknown[]; at: string }[] = [];
   if (isRolled(body.value)) {
@@ -876,23 +895,13 @@ const TONES = ['good', 'warn', 'bad', 'info'] as const;
 /**
  * `42 §4.5`'s three source forms, plus the one the record computes.
  *
- * `forecast.runway` is not in `42 §4.5`'s table and is in `pages.ts`'s `COMPUTED` set, which is the
- * live authority — the money page ships a block sourced from it. A source list that refused the
+ * `forecast.runway` is not in `42 §4.5`'s table and is in the sources registry (`sources/index.ts`,
+ * `SOURCE_MODULES`), which is the live authority and the one place a computed source is named: the
+ * closed list below reads its keys. The money page ships a block sourced from it. A source list that refused the
  * record's own page would be a check written from the document with the product left out.
  */
 const SOURCE = /^(?:register\.[a-z][a-z0-9_-]{0,31}|metric\.[a-z][a-z0-9_-]{0,31}(?::\S.{0,199})?)$/u;
 const BLOCK_SOURCE = /^block\.\d{1,2}$/u;
-/* A SOURCE MUST BE HERE AND IN `pages.ts`'s `COMPUTED`, or a block reading it is refused at install while the reader
-   stands ready. `runs_on` is a project's keys, tools, skills and actions; `deadlines` is every row due soon and
-   `figures.home` the figures that ask a place on Home. `governance.later` is what was put off, soonest back first, and
-   `governance.decided` what was answered, latest first. `sessions.working` is the runs working now, helpers folded under
-   the run that started them, by the one clock in `presence.ts`. `signs` is every sign the record reads, red first.
-   `handoffs.open` is the next steps runs left and nobody has taken, newest first. `actions.blocking` is one project's
-   scheduled actions that are paused, failing or late (REC-C09). */
-const COMPUTED_SOURCES = [
-  'forecast.runway', 'activity', 'sessions.live', 'sessions.working', 'actions', 'governance.open', 'governance.later',
-  'governance.decided', 'runs_on', 'deadlines', 'figures.home', 'signs', 'handoffs.open', 'actions.blocking',
-] as const;
 
 /** A metric id as a page says it: `project-owed:Kiln` is one document read about one project. */
 const metricNamed = (said: string): string => said.split(':')[0] ?? '';
@@ -1680,7 +1689,7 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
       const source = block.source;
       if (
         typeof source !== 'string' ||
-        !(SOURCE.test(source) || BLOCK_SOURCE.test(source) || (COMPUTED_SOURCES as readonly string[]).includes(source))
+        !(SOURCE.test(source) || BLOCK_SOURCE.test(source) || sourceModule(source) !== undefined)
       )
         return bad(
           'DECLARATION_INVALID',
@@ -6803,7 +6812,7 @@ export function writePackConfig(
  * refused the figure.
  */
 export const GRAMMAR_VALUES: readonly string[] = [
-  ...CHANNELS, ...FORMATS, ...COMPARE, ...BUCKETS, ...CARD_ROLES, ...TONES, ...COMPUTED_SOURCES, ...LOOK_LISTS,
+  ...CHANNELS, ...FORMATS, ...COMPARE, ...BUCKETS, ...CARD_ROLES, ...TONES, ...Object.keys(SOURCE_MODULES), ...LOOK_LISTS,
   ...CHANNELS_IN, ...SIGNED_KINDS, ...ACTION_PLACEHOLDERS, ...TIME_FORMATS, ...CALL_TRIGGERS, ...ANCHORS,
   ...FETCH_FORMATS, ...REPEAT_READ, ...HAND_PARTS, ...WIDEN, ...SAME,
 ];

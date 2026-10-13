@@ -1,10 +1,11 @@
 <!--
-  An agent's mark on the site: its maker's own logo (`agent-marks.ts`), the owner's "use real ones" of 30 September 2026.
+  An agent's mark on the site: its maker's own logo, the owner's "use real ones" of 30 September 2026. The marks are
+  the app's too, one copy in `packages/skin/agent-marks.ts`, so a path changed there changes on both.
   Claude and Gemini wear their makers' colours; the marks drawn in black or white take the ink of what holds them.
   Always decoration: the agent's name is in words beside every one.
 -->
 <script lang="ts">
-  import { AGENT_MARKS, type MarkedAgent } from './agent-marks.ts';
+  import { AGENT_MARKS, type MarkedAgent } from '@braindog/skin/agent-marks.ts';
 
   let { agent }: { agent: MarkedAgent } = $props();
 

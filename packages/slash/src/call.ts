@@ -21,7 +21,7 @@ import { no, ok, type Clock, type Result, type Sql } from '@braindog/ports';
 
 import { PROMPTS, MODELS, fill, type ModelId, type PromptId } from './prompts.ts';
 import { checkSchema, isRecord, tokens } from './project.ts';
-import type { Inference, ReadTrace, Settings, Tier } from './types.ts';
+import type { Inference, Purpose, ReadTrace, Settings, Spends, Tier } from './types.ts';
 
 /** Every tier the `slash_settings` CHECK admits, and the ones a host answers unless it says fewer (`SlashOptions.tiers`). */
 export const TIERS: readonly Tier[] = ['a', 'b', 'byo'];
@@ -43,6 +43,20 @@ export type AccountRow = {
   predicate?: string | undefined;
   read?: readonly ReadTrace[] | undefined;
   filed?: string | undefined;
+  /** What the ask was for. Said by the caller, as a constant where it makes the call, and never worked out from the row. */
+  purpose: Purpose;
+  /**
+   * Whose allowance the ask is charged to WHEN IT COUNTS. The ledger writes `none` in its place for an attempt no model
+   * answered (`unspent`), so no caller decides that and no two callers can decide it differently.
+   */
+  spends: Spends;
+  /** `Ran.served`, handed on as it came: a throw the host marked as coming after its model ran, which counts once. */
+  served?: boolean | undefined;
+  /** The router's name for the path the call took and the model it tried on it (ENG-A06). Absent until a router says. */
+  route?: string | undefined;
+  candidate?: string | undefined;
+  /** The provider's own words for a failure, already cut and with nothing shaped like a key in it. Absent until a host says. */
+  raw?: string | undefined;
 };
 
 /** What a model call came back with, whichever way it went, so the caller can always account for it. */
@@ -51,6 +65,12 @@ export type Ran = {
   ms: number;
   usage: { in: number; out: number };
   out: Result<Record<string, unknown>>;
+  /**
+   * Whether a model served, or may have served, a completion: every reply, and a throw the host marked `answered` (a
+   * reply too large or unreadable, a body that broke off, a timeout: `packages/host/src/slash.ts`). A plain throw is a
+   * model that did not answer, and `account` spends nothing for it.
+   */
+  served: boolean;
 };
 
 export type RunArgs = {
@@ -78,6 +98,9 @@ export type RunArgs = {
   schema?: object | undefined;
 };
 
+/** What every hold and every settled row says about itself: what the ask was for and whose allowance it spends. */
+export type Charge = { purpose: Purpose; spends: Spends };
+
 export type Core = {
   sql: Sql;
   clock: Clock;
@@ -90,23 +113,28 @@ export type Core = {
   monthStart(): string;
   /** The first instant of the next month, which is the sentence `SLASH_BUDGET_SPENT` ends on. */
   resets(): string;
-  /** `SELECT COUNT(*)` on `slash_call_meter`: tier `a` reads and patterns this month that called a model, one row an ask. */
+  /** His asks this month on the included model: the rows that say `spends = 'person'`, one row an ask. */
   asksUsed(): number;
+  /** The background asks this month, the rows that say `spends = 'background'`: all of them, or those of one purpose. */
+  backgroundUsed(purpose?: Purpose): number;
   /**
    * Hold one ask on the meter before its model is called; see `reserve` below. Returns the row id to settle.
+   *
+   * `charge` IS WHAT THE HOLD COUNTS AS WHILE ITS MODEL IS OUT, so an ask in flight is counted on the allowance it will
+   * spend and on no other.
    *
    * `id`, WHEN GIVEN, IS THE ROW'S OWN ID IN PLACE OF A FRESH ULID: `propose.ts` passes `<ask_id>:propose` for a pass 2
    * on a stored `ask_id`, so the second such call for the same `ask_id` finds the first one's row already there and
    * refuses before it holds anything (`propose.ts`'s own check, which reads this before calling `reserve`).
    */
-  reserve(kind: 'read' | 'propose', tier: Tier, model: string, id?: string): string;
+  reserve(kind: 'read' | 'propose', tier: Tier, model: string, charge: Charge, id?: string): string;
   /** Give a held ask back when no model was called. A row already settled by `account` is left alone. */
   release(id: string): void;
   /**
    * One ask turned away because the month's asks are spent (`turnedAway`, model-sign-49): its own row, so the vital sign
    * can say the month is spent. Never counted as an ask (`asksUsed` passes over `-`).
    */
-  turnedAway(kind: 'read' | 'propose', tier: Tier): void;
+  turnedAway(kind: 'read' | 'propose', tier: Tier, purpose?: Purpose): void;
   /**
    * Write the row, or settle one this ledger minted: a hold from `reserve`, or an id from `mint` settled once already.
    * A row already held under an id this ledger did not mint is refused with a throw and never replaced.
@@ -152,8 +180,12 @@ export const ulid = (ms: number): string => {
  * Slash's own names, `slash_settings` and `slash_call`, with this row beside them: on the Worker they share the record's
  * own SQLite, where a bare `settings` and `call` read as the record's. The next change to a column raises this number and
  * adds its step to `openStore`.
+ *
+ * 3 IS THE LEDGER SAYING WHOSE ALLOWANCE A ROW SPENDS (ENG-A05): `slash_call` gains `purpose`, `spends`, `route`,
+ * `candidate` and `raw`, and `FILL_2` reads every older row once to say what it was. A build at 2 refuses a store at 3
+ * (`openStore`), so the deploy that carries this cannot be rolled back past without Slash going quiet.
  */
-export const STORE_VERSION = 2;
+export const STORE_VERSION = 3;
 
 /** The store as a new one is built: the version row's table, the settings singleton and the ledger, all `IF NOT EXISTS`. */
 export const DDL: readonly string[] = [
@@ -184,10 +216,34 @@ export const DDL: readonly string[] = [
      question   TEXT,
      predicate  TEXT,
      read       TEXT NOT NULL DEFAULT '[]',
-     filed      TEXT
+     filed      TEXT,
+     purpose    TEXT NOT NULL DEFAULT 'ask',
+     spends     TEXT NOT NULL DEFAULT 'person' CHECK (spends IN ('person','background','none')),
+     route      TEXT,
+     candidate  TEXT,
+     raw        TEXT
    )`,
   'CREATE INDEX IF NOT EXISTS slash_call_meter ON slash_call(tier, kind, ts)',
 ];
+
+/**
+ * The five columns version 3 added, each as the statement that adds it to a ledger built before them.
+ *
+ * THE DEFAULTS ARE WHAT A WRITER THAT DOES NOT KNOW THE COLUMNS GETS, and they are the old count: `ask`, spending
+ * `person`. A host a release behind writes its own rows straight into this table, and a default of `none` would let its
+ * presses through uncounted, where `person` costs at worst what the month cost before this version. `asksUsed` still
+ * passes over `-`, so a row such a writer leaves for an ask that called nothing is not counted either way.
+ */
+const COLUMNS_3: readonly (readonly [string, string])[] = [
+  ['purpose', "ALTER TABLE slash_call ADD COLUMN purpose TEXT NOT NULL DEFAULT 'ask'"],
+  ['spends', "ALTER TABLE slash_call ADD COLUMN spends TEXT NOT NULL DEFAULT 'person' CHECK (spends IN ('person','background','none'))"],
+  ['route', 'ALTER TABLE slash_call ADD COLUMN route TEXT'],
+  ['candidate', 'ALTER TABLE slash_call ADD COLUMN candidate TEXT'],
+  ['raw', 'ALTER TABLE slash_call ADD COLUMN raw TEXT'],
+];
+
+/** The index the two counts read (`asksUsed`, `backgroundUsed`), made once the column is there, so never in `DDL`. */
+const INDEX_3 = 'CREATE INDEX IF NOT EXISTS slash_call_spends ON slash_call(spends, ts)';
 
 /**
  * AN ASK TURNED AWAY BECAUSE THE MONTH'S ASKS ARE SPENT LEAVES ONE ROW (model-sign-49, audit 40-42 finding 5): model `-`,
@@ -199,10 +255,13 @@ export const DDL: readonly string[] = [
  * may not import this package (`46 §5.1`); its test holds the two to one shape.
  */
 export const TURNED_AWAY_SQL =
-  "INSERT INTO slash_call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, code) VALUES (?, ?, ?, ?, '-', 0, 0, 0, 0, 'refused', 'SLASH_BUDGET_SPENT')";
+  "INSERT INTO slash_call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, code, purpose, spends) VALUES (?, ?, ?, ?, '-', 0, 0, 0, 0, 'refused', 'SLASH_BUDGET_SPENT', 'ask', 'none')";
 
-/** The ledger's columns, named once so a carried row lands column for column. */
-const CALL_COLUMNS = 'id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, code, question, predicate, read, filed';
+/** The columns a ledger had before version 3, named once so a row carried from an older build lands column for column. */
+const CARRIED_COLUMNS = 'id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, code, question, predicate, read, filed';
+
+/** The ledger's columns as `account` writes them. */
+const CALL_COLUMNS = `${CARRIED_COLUMNS}, purpose, spends, route, candidate, raw`;
 
 /**
  * What version 1 left that version 2 does not keep: its two index names, and the two codes the ledger wrote while the
@@ -219,6 +278,87 @@ const FROM_1: readonly string[] = [
   'DROP INDEX IF EXISTS call_old_code',
   "UPDATE slash_call SET code = 'SLASH' || substr(code, 6) WHERE code IN ('SPARK_PENDING', 'SPARK_BUDGET_SPENT')",
 ];
+
+/**
+ * The questions a host wrote on the rows it made before a row could say what it was for, restated because this package
+ * may not import a host (`46 §5.1`): the page headlines, the reading of who is who, and a new record's first plan
+ * (`packages/host/src/model-jobs.ts`, `understand.ts`, `slash-ask.ts`). Read once, by `FILL_2`, and by nothing after it.
+ */
+const ASKED_2 = { headline: "Slash's page headlines", understand: "Slash's reading of who is who", plan: "Slash's first plan" } as const;
+
+/** A constant of this file as a SQL string. Never a value from outside: the store's `Sql` takes those as parameters. */
+const quoted = (text: string): string => `'${text.replaceAll("'", "''")}'`;
+
+/**
+ * What every row written before version 3 was for and whose allowance it spent, said once, from the only things such a
+ * row holds: its kind, its question, whether it filed, and `-` for a call that reached no model.
+ *
+ * A READ IS HIS: an automation's by its `rule.<id> step <n>`, the first plan by its question, and his own otherwise. A
+ * PATTERN is the headlines' or the understanding's by its question, his own press where it filed, and background work
+ * otherwise, which is the correction this version is for: on the included model those rows were counted against his 80.
+ * One of his own presses that filed nothing reads as background here, because nothing on the row tells it from a draft
+ * the record made for itself. PROSE AND AN EMBEDDING are background. A ROW UNDER `-` spends nothing.
+ *
+ * A PROPOSAL SPENDS NOTHING, where the scope's table said `person`: it is the second model call of a question whose
+ * read is already one of his asks (`asksUsed`, "one question is one ask"), and written as `person` every two-pass
+ * question of the month would have counted twice the moment the store stepped.
+ *
+ * A READ THAT FAILED KEEPS `person`, though the same row written today spends nothing (`unspent`): it was counted
+ * when it happened, and a step that took it back would move his month's count for a reason he never saw.
+ *
+ * `%SCOPE%` is nothing for the step itself, and the carried rows alone when an older build's ledger is folded in.
+ */
+const FILL_2 = `UPDATE slash_call SET
+  purpose = CASE
+    WHEN kind IN ('read', 'propose') AND question LIKE 'rule.% step %' THEN 'automation'
+    WHEN kind IN ('read', 'propose') AND question = ${quoted(ASKED_2.plan)} THEN 'plan'
+    WHEN kind IN ('read', 'propose') THEN 'ask'
+    WHEN question = ${quoted(ASKED_2.headline)} THEN 'headline'
+    WHEN question = ${quoted(ASKED_2.understand)} THEN 'understand'
+    WHEN kind = 'pattern' AND filed IS NOT NULL THEN 'ask'
+    ELSE 'look' END,
+  spends = CASE
+    WHEN model = '-' THEN 'none'
+    WHEN kind = 'read' THEN 'person'
+    WHEN kind = 'propose' THEN 'none'
+    WHEN kind = 'pattern' AND filed IS NOT NULL AND (question IS NULL OR question NOT IN (${quoted(ASKED_2.headline)}, ${quoted(ASKED_2.understand)})) THEN 'person'
+    ELSE 'background' END
+  WHERE 1 = 1 %SCOPE%`;
+
+/** His month's count as versions 1 and 2 made it, kept for the one line the step to 3 logs. */
+const COUNT_2 = "SELECT COUNT(*) AS n FROM slash_call WHERE tier = 'a' AND kind IN ('read', 'pattern') AND model <> '-' AND ts >= ?";
+
+/**
+ * His month's count: the rows on the included model that say they spend one of his asks.
+ *
+ * `tier = 'a'` STAYS, because the allowance is the included model's: an ask on his own key is listed and not capped, and
+ * a host that caps `byo` counts that tier itself. `model <> '-'` STAYS for a writer a release behind, whose row for an
+ * ask turned away takes the column's default (`COLUMNS_3`); every row this ledger writes under `-` already says `none`.
+ */
+const COUNT_3 = "SELECT COUNT(*) AS n FROM slash_call WHERE tier = 'a' AND spends = 'person' AND model <> '-' AND ts >= ?";
+
+/** The month's background asks, on whatever tier: the allowance is the record's work, wherever its model is. */
+const BACKGROUND_3 = "SELECT COUNT(*) AS n FROM slash_call WHERE spends = 'background' AND ts >= ?";
+
+/** What the step to version 3 found, said once so his count can be read on both sides of it. */
+export type StoreStep = {
+  from: number;
+  to: number;
+  /** The first instant of the month counted. */
+  month: string;
+  /** His asks this month as the older build counted them, and as this one does. */
+  before: number;
+  after: number;
+  /** The month's rows that now say they are background work. `before - after` of them were counted as his. */
+  background: number;
+};
+
+export type StoreOptions = {
+  /** The instant whose month the step counts. The wall clock unless a caller has a better one. */
+  now?: number | undefined;
+  /** Where the step's one line goes. The host's log unless a caller wants to read it. */
+  said?: ((step: StoreStep) => void) | undefined;
+};
 
 /** Every name the store's tables have had, version 1's first, as `sqlite_master` spells them. */
 const NAMES = ['settings', 'call', 'slash_meta', 'slash_settings', 'slash_call'] as const;
@@ -240,7 +380,7 @@ const NAMES = ['settings', 'call', 'slash_meta', 'slash_settings', 'slash_call']
  * build's singleton is the default it inserted on its first ask, not a choice, and copying it over would put the owner's
  * cap back at the default. A choice made on the older build during the rollback is the one thing lost.
  */
-export function openStore(sql: Sql): void {
+export function openStore(sql: Sql, options: StoreOptions = {}): void {
   const present = new Set(
     sql
       .all<{ name: string }>(`SELECT name FROM sqlite_master WHERE type = 'table' AND name IN (?, ?, ?, ?, ?)`, ...NAMES)
@@ -258,12 +398,34 @@ export function openStore(sql: Sql): void {
     if (present.has('settings')) sql.exec(present.has('slash_settings') ? 'DROP TABLE settings' : 'ALTER TABLE settings RENAME TO slash_settings');
     if (present.has('call') && !present.has('slash_call')) sql.exec('ALTER TABLE call RENAME TO slash_call');
     for (const statement of DDL) sql.exec(statement);
+    /* THE COLUMNS, WHERE THE LEDGER WAS BUILT BEFORE THEM. Read off the table's own `CREATE` text and not `PRAGMA
+       table_info`, because a Durable Object's authorizer is why this store asks no pragma (`STORE_VERSION`). */
+    const built = sql.one<{ sql: string }>("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'slash_call'")?.sql ?? '';
+    for (const [column, add] of COLUMNS_3) if (!new RegExp(`\\b${column}\\b`, 'u').test(built)) sql.exec(add);
+    sql.exec(INDEX_3);
+    const fill = (scope: string): void => sql.exec(FILL_2.replace('%SCOPE%', scope));
     if (present.has('call') && present.has('slash_call')) {
-      sql.exec(`INSERT OR IGNORE INTO slash_call (${CALL_COLUMNS}) SELECT ${CALL_COLUMNS} FROM call`);
+      sql.exec(`INSERT OR IGNORE INTO slash_call (${CARRIED_COLUMNS}) SELECT ${CARRIED_COLUMNS} FROM call`);
+      /* A CARRIED ROW IS AN OLDER BUILD'S, so it is read as one, here where the store is already at 3 and the step
+         from 2 below will not run. */
+      if (stored >= 3) fill('AND id IN (SELECT id FROM call)');
       sql.exec('DROP TABLE call');
     }
     /* AFTER THE CARRY, so a code a carried row holds under the old name is renamed with the rest. */
     for (const statement of FROM_1) sql.exec(statement);
+    /* FROM 2: EVERY ROW SAYS WHAT IT WAS, ONCE, AND HIS MONTH'S COUNT IS LOGGED ON BOTH SIDES. The risk of this step is
+       a fill that misreads old rows so that his count jumps on the deploy; the line is how that is seen, by him or by
+       whoever reads the log. A store with no ledger yet has nothing to count and says nothing. */
+    if (stored < 3) {
+      const month = monthOf(options.now ?? Date.now(), 0);
+      const count = (text: string): number => sql.one<{ n: number }>(text, month)?.n ?? 0;
+      const before = count(COUNT_2);
+      fill('');
+      if (present.has('slash_call') || present.has('call')) {
+        const step: StoreStep = { from: stored, to: STORE_VERSION, month, before, after: count(COUNT_3), background: count(BACKGROUND_3) };
+        (options.said ?? ((line) => console.log(JSON.stringify({ op: 'slash.store', ...line }))))(step);
+      }
+    }
     sql.exec(
       "INSERT INTO slash_meta (key, value) VALUES ('version', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
       String(STORE_VERSION),
@@ -285,6 +447,25 @@ const monthOf = (ms: number, add: number): string => {
  * oldest of a thousand ids is one handed out a thousand calls ago, so an id let go here belongs to a call long settled.
  */
 const MINTED_MOST = 1_000;
+
+/**
+ * Whether a settled row is an attempt no model answered, which spends nobody's allowance.
+ *
+ * HIS RULE, AND THE ONE PLACE IT IS KEPT: "a non-2xx status from the model is retried and not counted". Three rows are
+ * that attempt. One under `-`, the ledger's mark for a call that reached no model. One the provider refused with a
+ * status no retry mends (`PULL_REQUEST_REFUSED`, `answer.ts`). And an `UNREACHABLE`, whatever name it is under: a model
+ * that could not be reached, and a host's binding that threw after it was called, which was counted as an ask until
+ * this version and is the retry his rule is about.
+ *
+ * THE NEURONS ARE KEPT. `account` prices the row by its model's name as it always did, so the operator's ceiling still
+ * sees an attempt a platform may have billed; only his count and the background's pass over it.
+ *
+ * AN UNREADABLE REPLY AND A TIMEOUT COUNT ONCE AND ARE FINAL. A reply that would not parse settles as `PROPOSAL_SCHEMA`
+ * or `ANSWER_UNREADABLE`, which are not here. A throw the host marked as coming after its model ran reaches a `read` as
+ * `UNREACHABLE` all the same, so `core.run` says `served` beside it and the caller hands that on untouched.
+ */
+const unspent = (row: AccountRow): boolean =>
+  row.model === '-' || row.code === 'PULL_REQUEST_REFUSED' || (row.code === 'UNREACHABLE' && row.served !== true);
 
 /**
  * `priced` IS THE HOST'S ANSWER TO WHOSE NEURONS EACH TIER SPENDS, and `['a']` is `46 §4.1`'s. `tiers` IS ITS ANSWER TO
@@ -356,6 +537,11 @@ export const core = (sql: Sql, clock: Clock, fallback: Inference, priced: readon
       row.predicate ?? null,
       JSON.stringify(row.read ?? []),
       row.filed ?? null,
+      row.purpose,
+      unspent(row) ? 'none' : row.spends,
+      row.route ?? null,
+      row.candidate ?? null,
+      row.raw ?? null,
     ] as const;
     /* A NEW ID IS INSERTED, AND A HELD ONE IS SETTLED ONLY WHEN THIS LEDGER MINTED IT. The row
        `reserve` wrote is overwritten by the outcome, and a call settled the moment its model answered is overwritten by
@@ -372,7 +558,7 @@ export const core = (sql: Sql, clock: Clock, fallback: Inference, priced: readon
     const held = sql.one('SELECT 1 AS n FROM slash_call WHERE id = ?', row.id) !== undefined;
     if (held && !minted.has(row.id)) throw new Error("Slash's ledger already holds a call under that id, and this ask did not make it, so nothing was replaced.");
     sql.exec(
-      `${held ? 'INSERT OR REPLACE' : 'INSERT'} INTO slash_call (${CALL_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `${held ? 'INSERT OR REPLACE' : 'INSERT'} INTO slash_call (${CALL_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       row.id,
       ...values,
     );
@@ -426,6 +612,9 @@ export const core = (sql: Sql, clock: Clock, fallback: Inference, priced: readon
         model,
         ms: clock.now() - t0,
         usage: { in: estimate, out: 0 },
+        /* THE HOST'S `answered` MARK, read structurally as `answer.ts` reads it (`heardIn`): the endpoint answered and
+           the reply was too large, unreadable or cut off, or the clock ran out on a model that may have run to the end. */
+        served: typeof e === 'object' && e !== null && (e as { answered?: unknown }).answered === true,
         out: no(
           'UNREACHABLE',
           `The model did not answer${e instanceof Error && e.message !== '' ? `: ${e.message}` : ''}. Nothing was filed; ask again.`,
@@ -440,15 +629,15 @@ export const core = (sql: Sql, clock: Clock, fallback: Inference, priced: readon
     try {
       parsed = JSON.parse(reply.text);
     } catch {
-      return { model, ms, usage, out: no('PROPOSAL_SCHEMA', 'The model did not answer with JSON. Nothing was filed; ask again.') };
+      return { model, ms, usage, served: true, out: no('PROPOSAL_SCHEMA', 'The model did not answer with JSON. Nothing was filed; ask again.') };
     }
 
     const fault = checkSchema(schema, parsed);
-    if (fault) return { model, ms, usage, out: { ok: false, refusal: fault } };
+    if (fault) return { model, ms, usage, served: true, out: { ok: false, refusal: fault } };
     if (!isRecord(parsed))
-      return { model, ms, usage, out: no('PROPOSAL_SCHEMA', 'The model did not answer with an object. Nothing was filed; ask again.') };
+      return { model, ms, usage, served: true, out: no('PROPOSAL_SCHEMA', 'The model did not answer with an object. Nothing was filed; ask again.') };
 
-    return { model, ms, usage, out: ok(parsed) };
+    return { model, ms, usage, served: true, out: ok(parsed) };
   };
 
   return {
@@ -480,11 +669,18 @@ export const core = (sql: Sql, clock: Clock, fallback: Inference, priced: readon
        exactly one `read` row, pass 1 or the drafting read of a pass 2 with no stored `ask_id`, and `kind = 'propose'`
        is the second model call of the same question rather than a second one. A repeated pass 2 on one stored
        `ask_id` still cannot run free: `propose.ts` refuses it before it holds anything, off the row the first pass 2
-       left under `<ask_id>:propose` (`reserve`'s `id` parameter, just above). */
-    asksUsed: () =>
-      sql.one<{ n: number }>(
-        "SELECT COUNT(*) AS n FROM slash_call WHERE tier = 'a' AND kind IN ('read', 'pattern') AND model <> '-' AND ts >= ?",
-        monthOf(clock.now(), 0),
+       left under `<ask_id>:propose` (`reserve`'s `id` parameter, just above).
+
+       AND WHOSE ASK IT IS IS WHAT THE ROW SAYS, since version 3 (ENG-A05). The count read `kind IN ('read', 'pattern')`,
+       so a pattern the record drafted for itself, a headline and a reading of who is who each spent one of his 80 on the
+       included model (`test/spends.test.ts`). It reads `spends = 'person'` now, which the caller wrote with the row, and
+       an attempt no model answered says `none` there whatever name it is under (`unspent`). `COUNT_3` says why the tier
+       and `-` are still in it. */
+    asksUsed: () => sql.one<{ n: number }>(COUNT_3, monthOf(clock.now(), 0))?.n ?? 0,
+    backgroundUsed: (purpose) =>
+      (purpose === undefined
+        ? sql.one<{ n: number }>(BACKGROUND_3, monthOf(clock.now(), 0))
+        : sql.one<{ n: number }>(`${BACKGROUND_3} AND purpose = ?`, monthOf(clock.now(), 0), purpose)
       )?.n ?? 0,
     /* THE CHECK AND THE COUNT WERE TWO STEPS WITH A MODEL BETWEEN THEM. `spent()` read `asksUsed()`, and the row that
        count reads was written after the model answered, so every ask in flight passed the check against the same number:
@@ -495,16 +691,18 @@ export const core = (sql: Sql, clock: Clock, fallback: Inference, priced: readon
        IT IS `error · SLASH_PENDING` AND NOT A NEW STATUS because the `46 §4.1` CHECK admits four, and a new one is a
        change to a column's `CHECK`, which is a step of its own under `STORE_VERSION`. A process that dies mid-call leaves
        the hold counted, which is the side of the line a cap should err on. */
-    reserve: (kind, tier, model, id) => {
+    reserve: (kind, tier, model, charge, id) => {
       const held = id ?? ulid(clock.now());
       sql.exec(
-        `INSERT INTO slash_call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, code)
-         VALUES (?, ?, ?, ?, ?, 0, 0, 0, 0, 'error', 'SLASH_PENDING')`,
+        `INSERT INTO slash_call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, code, purpose, spends)
+         VALUES (?, ?, ?, ?, ?, 0, 0, 0, 0, 'error', 'SLASH_PENDING', ?, ?)`,
         held,
         now(),
         kind,
         tier,
         model,
+        charge.purpose,
+        charge.spends,
       );
       return remember(held);
     },
@@ -513,8 +711,13 @@ export const core = (sql: Sql, clock: Clock, fallback: Inference, priced: readon
       minted.delete(id);
       sql.exec("DELETE FROM slash_call WHERE id = ? AND code = 'SLASH_PENDING'", id);
     },
-    turnedAway: (kind, tier) => {
-      sql.exec(TURNED_AWAY_SQL, ulid(clock.now()), now(), kind, tier);
+    /* AND IT SPENDS NOTHING AND SAYS WHAT WAS TURNED AWAY, a person's ask unless the caller says otherwise.
+       `TURNED_AWAY_SQL` writes `ask` and `none` itself, as the host's restated insert does (its test holds the two to
+       one shape, `packages/host/test/slash-turned-away.test.ts`); any other purpose is said in a second statement. */
+    turnedAway: (kind, tier, purpose = 'ask') => {
+      const id = ulid(clock.now());
+      sql.exec(TURNED_AWAY_SQL, id, now(), kind, tier);
+      if (purpose !== 'ask') sql.exec('UPDATE slash_call SET purpose = ? WHERE id = ?', purpose, id);
     },
     account,
     run,

@@ -319,6 +319,8 @@ jobs:
       # AND THE PEOPLE'S WALKS (`tools/people`): each person's file is checked and walked on a fresh self-host, and
       # `tools/people` is no workspace either. After the builds, because the walk reads the start screen's own modules.
       - run: node --test tools/people/test/*.test.mjs
+      # AND THE USE-CASE WALKS' KIT (`tools/usecase-walks`), no workspace either: its walk and its doors.
+      - run: node --test tools/usecase-walks/*.test.mjs
 
   windows:
     # THE KERNEL, THE SELF-HOST AND THE CLI ON WINDOWS, which is the owner's own machine and which

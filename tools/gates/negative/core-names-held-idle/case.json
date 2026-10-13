@@ -1,0 +1,8 @@
+{
+  "gate": "core-names",
+  "rule": "a held entry whose file no longer spells its name",
+  "expect": "does not spell it",
+  "findings": 1,
+  "total": 1,
+  "why": "ONE, the tree's own held list holding `apps/cli/src/clean.ts` for `tasks`, which the file says only in a comment. An entry left standing after its name went is the hole the next `'tasks'` there walks through, so the list only shrinks."
+}

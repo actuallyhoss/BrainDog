@@ -1,0 +1,8 @@
+{
+  "gate": "core-names",
+  "rule": "a figure a use case declares in code, spelled in the web shell",
+  "expect": "spelled in the core",
+  "findings": 1,
+  "total": 1,
+  "why": "ONE, `'wicks-poured'` in `apps/web/src`, a figure only the planted use case `candle.ts` declares, and no pack file is in the tree at all: the names come off the use case's TypeScript. That file spells its own four names and the tree's held list holds each, so the case is red for the web's line alone and proves the held list is read. `wicks-poured` is one name there and not also the list `wicks`, the longest at one place."
+}

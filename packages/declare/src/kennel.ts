@@ -26,6 +26,7 @@
 import type { Result } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 
+import { addressFault, listingFault } from './address.ts';
 import {
   CATALOGUE_FORMAT,
   PACK_FILE_MOST_BYTES,
@@ -304,6 +305,12 @@ export async function acceptSubmission(state: KennelState, text: string, identit
 
   if (typeof doc.title !== 'string' || doc.title.trim() === '')
     return no('PACK_MALFORMED', 'The Kennel lists a file under its title, and this one has none. Add a title and submit it again.', { at: 'title' });
+  /* WHAT A LISTING NEVER SAYS (a price, a rating), AND AN ADDRESS WHERE NONE MAY BE, each by its own name and before
+     the closed list, which would only call `price` a key BrainDog does not read (`address.ts`). */
+  const unlistable = listingFault(doc);
+  if (unlistable) return { ok: false, refusal: unlistable };
+  const remote = addressFault(doc);
+  if (remote) return { ok: false, refusal: remote };
   /* THE MANIFEST'S CLOSED LIST IS THE KENNEL'S TO HOLD, NOT THE RECORD'S: a record reads the keys it
      knows and stays lenient, so an update it already holds never breaks, and the registry is where a key nobody reads is
      said by name. A use case keeps its own list, which its door already holds. */

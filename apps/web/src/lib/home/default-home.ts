@@ -175,8 +175,8 @@ export function weekOf(decls: readonly WeekDecl[], people: string | null): Week 
   return { due: { register: due.id, name: due.name, one: due.one, day: day.id, who: who.id, what: due.title, open, paid: paid?.id ?? null } };
 }
 
-/** What falls due this week and is not done: late ones too, since late is still due. As the shop's own figure counts it. */
-const dueWhere = (w: Week): string => `${w.due.open ? `${w.due.open}, ` : ''}${w.due.day} before +8d`;
+/** What falls due from today through the week and is not done. Not the late ones: the shop's own figure counts those apart (shop 1.1.0). */
+const dueWhere = (w: Week): string => `${w.due.open ? `${w.due.open}, ` : ''}${w.due.day} after -1d, ${w.due.day} before +8d`;
 
 /* ── the week's money ──────────────────────────────────────────────────── */
 

@@ -1,0 +1,9 @@
+{
+  "//": "Planted: the use case's own file spells its own four names, and is held for each until use cases are files.",
+  "held": [
+    { "path": "packages/seed/src/usecases/candle.ts", "name": "candle", "reason": "Planted. The use case's own id, in its own file.", "unit": "SHL-A17" },
+    { "path": "packages/seed/src/usecases/candle.ts", "name": "poured_on", "reason": "Planted. The use case's own field, in its own file.", "unit": "SHL-A17" },
+    { "path": "packages/seed/src/usecases/candle.ts", "name": "wicks", "reason": "Planted. The use case's own list, in its own file.", "unit": "SHL-A17" },
+    { "path": "packages/seed/src/usecases/candle.ts", "name": "wicks-poured", "reason": "Planted. The use case's own figure, in its own file.", "unit": "SHL-A17" }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "pack": "till",
+  "version": "1.0.0",
+  "title": "Till",
+  "summary": "Planted: a second add-on that also declares amount.",
+  "requires": { "format": 1, "primitives": 1, "packs": {} },
+  "declarations": [
+    { "register": "sales", "name": "Sales", "title": "label", "fields": [{ "id": "label", "type": "text" }, { "id": "amount", "type": "money" }] }
+  ]
+}

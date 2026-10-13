@@ -324,9 +324,20 @@ export type SignupStart = Extract<SignupCall, { flow: 'signup.start' }> & { chec
 export const SAID_IN_LINK = 1000;
 
 /**
+ * The most of it a link carries, counted as the link writes it: bytes after percent-encoding, which is what a mail
+ * client or a gateway on the way counts before it cuts an address short.
+ *
+ * NOT CHARACTERS. A Latin letter is one byte in a link and an Arabic one is six, so a thousand characters of Arabic
+ * was a link of six thousand and more. `SAID_IN_LINK` stays as the most anybody may send at all; inside it, a sentence
+ * that writes longer than this keeps its start (`saidFitted`) and is never refused for its alphabet.
+ */
+export const SAID_LINK_BYTES = 2000;
+
+/**
  * What in a sentence a letter must not carry: a web address, by its scheme, `www.` or a common ending, and an email
- * address. The link is printed in the letter as well as under its button, and a sign-up that let anybody put a link
- * into a letter to anybody else would be a way to send one.
+ * address. The link is the letter's button, and a sign-up that let anybody put a link into a letter to anybody
+ * else would be a way to send one. The letter shows the link in words only as far as its proof (`shown` in
+ * `apps/worker/src/mail.ts`), so what is said here is never printed in it.
  *
  * THE SAME RULES AS THE PAGE'S (`apps/web/src/lib/signup.ts`, `CARRIES_NOT`), which leaves such a sentence on the device
  * rather than be refused.
@@ -351,6 +362,48 @@ export function saidRefused(said: string): string | null {
     return 'What you said has a character a link cannot carry. Type it again.';
   }
   return null;
+}
+
+/** A start of `words` that ends on a whole character: half of one is a character no link can carry. */
+const startOf = (words: string, most: number): string => words.slice(0, most).replace(/[\uD800-\uDBFF]$/u, '');
+
+/**
+ * What was said, as much of it as a link carries (`SAID_LINK_BYTES`), and whether any was left out.
+ *
+ * AS THE PAGE PACKS IT (`saidForLink`: the sentence under `said`, its one answer beside it), only the sentence is
+ * shortened, at a word when one ends near, and the pack says so with `cut: true`, so the page the link opens can say the rest was left for
+ * later. The whole of it waits on the device it was typed on, as before. Anything else is words and is shortened as
+ * words. A pack that is too long with no sentence in it at all carries nothing: the link is then the proof alone.
+ *
+ * Only for what `saidRefused` let through, so nothing here meets a character a link cannot carry.
+ */
+export function saidFitted(said: string): { said: string; cut: boolean } {
+  const fits = (s: string): boolean => encodeURIComponent(s).length <= SAID_LINK_BYTES;
+  if (fits(said)) return { said, cut: false };
+  let packed: Record<string, unknown> | null = null;
+  try {
+    const v: unknown = JSON.parse(said);
+    if (typeof v === 'object' && v !== null && !Array.isArray(v) && typeof (v as { said?: unknown }).said === 'string') packed = v as Record<string, unknown>;
+  } catch {
+    /* Not a pack: plain words, shortened as they are. */
+  }
+  const whole = packed === null ? said : String(packed.said);
+  const pack = (words: string): string => (packed === null ? words : JSON.stringify({ ...packed, said: words, cut: true }));
+  /* THE LONGEST START THAT FITS, found by halves: a longer start never writes shorter. */
+  let most = 0;
+  for (let lo = 0, hi = whole.length; lo <= hi; ) {
+    const mid = (lo + hi) >> 1;
+    if (fits(pack(startOf(whole, mid)))) {
+      most = mid;
+      lo = mid + 1;
+    } else hi = mid - 1;
+  }
+  const start = startOf(whole, most);
+  /* AT A WORD, WHEN ONE ENDS NEAR: writing with few spaces or none (Chinese, Thai) keeps its start to the character,
+     and never loses most of itself to the one space it had. */
+  const space = /\s/u.test(whole[start.length] ?? '') ? -1 : start.search(/\s\S*$/u);
+  const words = (space > 0 && space >= start.length * 0.75 ? start.slice(0, space) : start).trimEnd();
+  return { said: words === '' ? '' : pack(words), cut: true };
 }
 
 /** What `signup.start` answers while sign-up is by invitation and no code could be held: the Worker turns it into a 403. */
@@ -1364,7 +1417,9 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
         /* THE SENTENCE AFTER THE PROOF, in the fragment the Worker puts the proof in (`#verify=<proof>&said=<words>`),
            so the tab the link opens, on any device, builds from it. Only the letter that makes a record carries it: a
            known address is sent a sign-in link, which builds nothing. */
-        const link = said === '' ? token : `${token}&said=${encodeURIComponent(said)}`;
+        /* AS MUCH OF IT AS A LINK CARRIES, by the bytes the link writes: a long sentence keeps its start. */
+        const carried = said === '' ? '' : saidFitted(said).said;
+        const link = carried === '' ? token : `${token}&said=${encodeURIComponent(carried)}`;
         return { status: 200, body: {}, mail: { kind: 'signup.verify', to: email, link } };
       }
 

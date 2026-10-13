@@ -4,13 +4,14 @@
   "private": true,
   "type": "module",
   "license": "Apache-2.0",
-  "description": "The token layer, element defaults and a11y layer, shared by both apps. CSS only, no JavaScript.",
+  "description": "The token layer, element defaults and a11y layer, shared by both apps. CSS, and the marks as data.",
   "exports": {
     "./tokens.css": "./tokens.css",
     "./base.css": "./base.css",
     "./a11y.css": "./a11y.css",
     "./house.css": "./house.css",
     "./mark.ts": "./mark.ts",
+    "./agent-marks.ts": "./agent-marks.ts",
     "./alpha.css": "./alpha.css",
     "./blocks.css": "./blocks.css",
     "./blocks-kinds.css": "./blocks-kinds.css",
@@ -27,7 +28,8 @@
     "blocks-kinds.css",
     "kinds",
     "blocks-charts.css",
-    "mark.ts"
+    "mark.ts",
+    "agent-marks.ts"
   ],
   "scripts": {
     "test": "node --test *.test.ts",

@@ -605,6 +605,9 @@ const FREE = PLAN_TABLE.free;
 const CLOUD = PLAN_TABLE.hosted.name;
 export const FREE_ONE_PERSON = `${FREE.name} is for ${peopleWords(FREE.people)}, so nobody else can join this record. Move it to ${CLOUD} in Settings to invite colleagues.`;
 export const FREE_JOIN_REFUSED = `This record is on ${FREE.name}, which is for ${peopleWords(FREE.people)}, so nobody else can join it. Ask its owner to move it to ${CLOUD}, then open this link again.`;
+/* THE SAME TWO ON A HOST THAT SELLS NO PLAN, where naming a plan to move to names a door that is not there. */
+export const FREE_ONE_PERSON_SHORT = `${FREE.name} is for ${peopleWords(FREE.people)}, so nobody else can join this record.`;
+export const FREE_JOIN_REFUSED_SHORT = `This record is on ${FREE.name}, which is for ${peopleWords(FREE.people)}, so nobody else can join it.`;
 
 /**
  * The Directory's own schema revision. `49 §5.1` step 4.
@@ -973,13 +976,20 @@ async function emailLinkHash(key: ReturnType<typeof crypto.subtle.importKey>, to
 }
 
 /**
+ * What the host knows that the Directory cannot. `sells` is whether this host sells a plan (the Worker's
+ * `/account/billing` answers it as `open`): `false` and a refusal on Free names no plan to move to. Absent is a host
+ * that did not say, and the sentence stays the one that names Cloud.
+ */
+export type DirectoryHost = { sells?: boolean | undefined };
+
+/**
  * The Directory over one `Sql`.
  *
  * `auth` SWITCHES SIGN-IN ON, and without it `auth()` answers `methods` with "not configured" and
  * every other flow with 404. The tenant map does not need it, and a host that has no key to take the
  * MACs under must not be able to sign anybody in by accident.
  */
-export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
+export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host: DirectoryHost = {}) {
   /* THE VERSION IS READ BEFORE THE DDL RUNS. `CREATE TABLE IF NOT EXISTS` over a newer schema is
      silent: every statement is a no-op, the object opens, and the first `resolve` answers from
      columns this build does not know the meaning of. A record refuses in that situation and the
@@ -1045,7 +1055,7 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig) {
     const row = sql.one<{ plan: string }>('SELECT plan FROM dir_record WHERE id = ?', record);
     if (row === undefined || planOf(row.plan) !== 'free') return null;
     if (sql.one('SELECT 1 AS x FROM dir_member WHERE record = ? AND person = ?', record, person)) return null;
-    return { code: 'FORBIDDEN', fix: FREE_JOIN_REFUSED, at: 'plan' };
+    return { code: 'FORBIDDEN', fix: host.sells === false ? FREE_JOIN_REFUSED_SHORT : FREE_JOIN_REFUSED, at: 'plan' };
   };
 
   const bad = badSlug;

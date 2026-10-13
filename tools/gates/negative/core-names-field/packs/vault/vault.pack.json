@@ -1,0 +1,10 @@
+{
+  "pack": "vault",
+  "version": "1.0.0",
+  "title": "Vault",
+  "summary": "Planted: three field ids, one of them only this add-on's.",
+  "requires": { "format": 1, "primitives": 1, "packs": {} },
+  "declarations": [
+    { "register": "bonds", "name": "Bonds", "title": "label", "fields": [{ "id": "label", "type": "text" }, { "id": "amount", "type": "money" }, { "id": "matures_on", "type": "day" }] }
+  ]
+}

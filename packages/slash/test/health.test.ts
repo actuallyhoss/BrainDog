@@ -146,7 +146,7 @@ test('A REAL LEDGER: three asks to a model that throws, written by the engine it
     clock.advance(60_000);
   }
   /* A hold written and not yet settled is passed over. */
-  core(sql, clock, inference).reserve('read', 'a', '@cf/model');
+  core(sql, clock, inference).reserve('read', 'a', '@cf/model', { purpose: 'ask', spends: 'person' });
   const h = engineHealth(sql, clock, MODEL);
   assert.equal(h.state, 'not_answering', JSON.stringify(sql.all('SELECT ts, kind, model, status, code FROM slash_call')));
   assert.equal(h.since, at(NOW));

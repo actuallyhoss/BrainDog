@@ -31,6 +31,29 @@ export const CASH_FIGURES: Record<string, SeedMetric> = {
   },
 
   /**
+   * CASH NOW WORKED OUT A SECOND WAY, LESS CASH NOW (REC-A17): nought, or the figure on the Money page is wrong.
+   *
+   * "Wrong money on a screen is the worst class of defect in this repo", and nothing compared a money figure with its
+   * entries on a lived record. This walks each account entry by entry from its newest statement in plain code, apart
+   * from the roll Cash now is added up by (`readCrosscheck` in `packages/kernel/src/money-figures.ts`), and takes the
+   * walk from the figure, a currency at a time and never one across them. ANYTHING BUT NOUGHT IS RED, over or under:
+   * the reader gives the verdict itself, so the target here only says which way a tile words it.
+   *
+   * WITH NO BALANCE TYPED IT HAS NO VALUE, never a nought that checked nothing, and says "No balance has been typed
+   * yet": a page draws its sentence for that on `when: { metric: cash-cross-check, empty: true }`.
+   */
+  'cash-cross-check': {
+    metric: 'cash-cross-check',
+    name: 'Cash now, checked against its entries',
+    source: 'register.accounts',
+    value: { crosscheck: { of: 'cash-now' } },
+    format: MONEY,
+    target: { lte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+
+  /**
    * CASH NOW, ONE FIGURE A BOOK, SINCE money-core 3.1.0: the same roll, grouped by the book each account is in.
    *
    * THE HEADLINE OF A RECORD THAT KEEPS TWO BOOKS. Cash now over both added a company's money to a person's own, and

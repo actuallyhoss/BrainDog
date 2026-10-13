@@ -207,6 +207,9 @@ const CORE_ROUTES: readonly Route[] = [
        The CLI's import sent that POST by hand for want of this line. Decoded, `true` is `true`; a value that is not
        true or false is the record's to refuse (`record.list`), because read as false it is the same silent answer. */
     takes: { register: 'text', where: 'json', limit: 'integer', cursor: 'text', order: 'json', includeDeleted: 'json' } },
+  /* ONE READ FOR EVERY PILL OF A FIELD: the list screen asked `list` once a value, a dozen requests before it settled. */
+  { name: 'countBy', group: 'DATA', writes: false, what: 'How many entries of one list hold each value of one field.',
+    takes: { register: 'text', by: 'text', where: 'json' } },
   { name: 'history', group: 'READ+', writes: false, what: 'The writes that made one row, in order, each with who and when.',
     takes: { register: 'text', seq: 'integer' } },
   { name: 'backlinks', group: 'READ+', writes: false, what: 'What points at one row: the rows of other lists whose reference fields name it, a page at a time.',
@@ -553,6 +556,8 @@ export type RecordSurface = {
   schema(args: never, ctx: never): Promise<Result<unknown>>;
   get(args: never, ctx: never): Promise<Result<unknown>>;
   list(args: never, ctx: never): Promise<Result<unknown>>;
+  /** OPTIONAL as `scriptTry` is: a host built over a record without the method answers `NOT_IN_THIS_BUILD`. */
+  countBy?(args: never, ctx: never): Promise<Result<unknown>>;
   history(args: never, ctx: never): Promise<Result<unknown>>;
   backlinks(args: never, ctx: never): Promise<Result<unknown>>;
   whatsNew(args: never, ctx: never): Promise<Result<unknown>>;
@@ -664,6 +669,10 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     schema: (a, ctx) => api.schema(a as never, ctx as never),
     get: (a, ctx) => api.get(a as never, ctx as never),
     list: (a, ctx) => api.list(a as never, ctx as never),
+    countBy: async (a, ctx) =>
+      api.countBy
+        ? api.countBy(a as never, ctx as never)
+        : { ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog cannot count a list by a field yet, so nothing was read.' } },
     history: (a, ctx) => api.history(a as never, ctx as never),
     backlinks: (a, ctx) => api.backlinks(a as never, ctx as never),
     whatsNew: (a, ctx) => api.whatsNew(a as never, ctx as never),

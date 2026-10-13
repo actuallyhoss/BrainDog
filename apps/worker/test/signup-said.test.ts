@@ -16,7 +16,7 @@ type Out = { ok: boolean; value?: Record<string, unknown>; refusal?: { code: str
 
 /** An open host with mail on, the letters kept, and every line the Worker logs kept too. */
 async function host() {
-  const sent: { to?: unknown; text?: unknown }[] = [];
+  const sent: { to?: unknown; text?: unknown; html?: unknown }[] = [];
   const c = await cloud({
     SIGNUP: 'open',
     AUTH_MAIL_FROM: 'hello@example.test',
@@ -50,9 +50,15 @@ test('SAID GOES THROUGH UNTOUCHED: the letter\'s link carries it after the proof
     console.error = error;
   }
   assert.equal(c.sent.length, 1);
-  const text = String(c.sent[0]?.text);
-  assert.match(text, new RegExp(`https://${HOST}/app/signup#verify=[^\\s&]+&said=`));
-  const carried = /&said=([^\s]+)/u.exec(text)?.[1] ?? '';
+  /* THE BUTTON'S ADDRESS CARRIES IT, read from the HTML as a mail client reads it, and the plain text shows no sentence. */
+  const html = String((c.sent[0] as { html?: unknown })?.html);
+  const href =
+    [...html.matchAll(/\shref="([^"]*)"/gu)]
+      .map((m) => (m[1] ?? '').replace(/&#39;/gu, "'").replace(/&amp;/gu, '&'))
+      .find((h) => h.includes('&said=')) ?? '';
+  assert.match(href, new RegExp(`^https://${HOST}/app/signup#verify=[^\\s&]+&said=`));
+  const carried = /&said=(.+)$/u.exec(href)?.[1] ?? '';
+  assert.doesNotMatch(String(c.sent[0]?.text), /said=/u);
   assert.equal(decodeURIComponent(carried).trim(), SENTENCE);
   /* AND NOWHERE ELSE: not a table of the Directory's and not a line of the Worker's. */
   assert.ok(!lines.some((l) => l.includes('pottery')), 'the sentence reached a log line');

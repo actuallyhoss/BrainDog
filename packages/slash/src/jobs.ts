@@ -6,8 +6,10 @@
  * through `record.propose`. `draftPattern` is the same draft for the record's own `infer.draft` job, and files nothing:
  * the host's model-job pass acks the job with it and the kernel files it in the ack's transaction, through the one gate
  * (`packages/kernel/src/outbox.ts`, the `infer.draft` branch), so a draft is never filed twice. `digestProse` answers an
- * `infer.prose` job. Neither job is one of the owner's asks: each writes a `pattern` or `prose` row to the ledger, which
- * `asksUsed` does not count, and the host meters them on the background allowance.
+ * `infer.prose` job. Neither job is one of the owner's asks, AND THE ROW SAYS SO: each is written `spends: 'background'`
+ * (`WORK`), which `asksUsed` passes over and the host's background meter counts. Until store version 3 a job's
+ * `pattern` row was counted with his asks by its kind, so on the included model the record's own drafts spent his 80.
+ * A press at the raw inbox is his, and `proposePattern` says that (`PRESSED`).
  *
  * WHAT A PATTERN IS FOR. Messages keep arriving that no declared pattern parses, and they are the same
  * message every time: one sender, one subject, one amount in one place. A person can write the
@@ -30,7 +32,7 @@
 
 import { no, ok, refused, type Result } from '@braindog/ports';
 
-import type { CallStatus, Core } from './call.ts';
+import type { CallStatus, Charge, Core } from './call.ts';
 import { anchorFault, checkSchema, isRecord, tokens } from './project.ts';
 import { fenced, fill, type PromptTemplate } from './prompts.ts';
 import { indexLines, nameIn, SLASH_CTX } from './propose.ts';
@@ -64,6 +66,13 @@ type Drafting = {
   account: (status: 'ok' | 'refused' | 'error', code?: string, filed?: string) => void;
 };
 
+/**
+ * What each call here is on the ledger, said once and handed to every row it settles (`call.ts`, `Charge`): the
+ * record's own work spends the background allowance, and a press at the raw inbox is one of his asks.
+ */
+const WORK = { purpose: 'look', spends: 'background' } as const;
+const PRESSED = { purpose: 'ask', spends: 'person' } as const;
+
 /** What a pattern read, for the fold and the ledger: how many messages, and never what they said. */
 const readOf = (n: number): ReadTrace[] => [{ register: 'inbox_raw', rows: n, predicate: 'shape' }];
 
@@ -81,7 +90,7 @@ export const patterns = (
    * Everything up to the filing: the model's draft, checked, overwritten where it is not the model's to say, and wrapped
    * as the declaration the accept installs. The one copy of the rules both entry points keep.
    */
-  const drafting = async (samples: readonly RawPayload[], ctx: CallContext): Promise<Result<Drafting>> => {
+  const drafting = async (samples: readonly RawPayload[], ctx: CallContext, charge: Charge): Promise<Result<Drafting>> => {
     if (samples.length === 0)
       return no('VALUE_MALFORMED', 'A pattern is proposed from the messages it has to match, and none were given.', {
         at: 'samples',
@@ -142,6 +151,8 @@ export const patterns = (
            Slash did; a sender's subject line in the audit is the payload leaking into the log. */
         read: readOf(samples.length),
         filed,
+        ...charge,
+        served: ran.served,
       });
 
     /* SETTLED THE MOMENT THE MODEL ANSWERED, as `propose.ts` settles its three sites since `538bc705`. A filing that threw
@@ -216,7 +227,7 @@ export const patterns = (
 
   return {
     async proposePattern(samples, ctx) {
-      const drafted = await drafting(samples, ctx);
+      const drafted = await drafting(samples, ctx, PRESSED);
       if (!drafted.ok) return drafted;
       const { draft, callId, used, account } = drafted.value;
       const put = await record.propose({ ...draft, op_id: callId }, SLASH_CTX);
@@ -244,7 +255,7 @@ export const patterns = (
     /* THE RECORD'S OWN JOB, SO NOBODY'S CONTEXT: the index is read as `slash`, which is how the kernel files what this
        drafts, and the row is settled `ok` with nothing in `filed`, because the filing is the ack's and happens after. */
     async draftPattern(samples) {
-      const drafted = await drafting(samples, SLASH_CTX);
+      const drafted = await drafting(samples, SLASH_CTX, WORK);
       if (!drafted.ok) return drafted;
       drafted.value.account('ok');
       return ok(drafted.value.draft);
@@ -453,7 +464,7 @@ async function prose(core: Core, fallback: Inference, digest: unknown): Promise<
   const content = proseAsked(name, id, text);
   const estimate = tokens(PROSE.system) + tokens(content);
   const account = (status: CallStatus, model: string, usage: { in: number; out: number }, code?: string): void =>
-    core.account({ id: callId, kind: 'prose', tier: s.tier, model, usage, ms: core.clock.now() - t0, status, code });
+    core.account({ id: callId, kind: 'prose', tier: s.tier, model, usage, ms: core.clock.now() - t0, status, code, ...WORK });
 
   let reply: InferenceReply;
   try {
@@ -523,7 +534,7 @@ async function embedOf(core: Core, fallback: Inference, texts: readonly string[]
   const callId = core.mint();
   const t0 = core.clock.now();
   const account = (status: CallStatus, model: string, usage: { in: number; out: number }, code?: string): void =>
-    core.account({ id: callId, kind: 'embed', tier: s.tier, model, usage, ms: core.clock.now() - t0, status, code });
+    core.account({ id: callId, kind: 'embed', tier: s.tier, model, usage, ms: core.clock.now() - t0, status, code, ...WORK });
 
   if (fallback.embed === undefined) {
     account('error', '-', { in: 0, out: 0 }, 'NOT_IN_THIS_BUILD');

@@ -1,5 +1,5 @@
 <!--
-  The mark an agent wears: its maker's own logo for a named agent (`agent-marks.ts`), and the app's glyph for a runner,
+  The mark an agent wears: its maker's own logo for a named agent (`@braindog/skin/agent-marks.ts`), and the app's glyph for a runner,
   Slash and an agent nobody names.
 
   THE OWNER ASKED FOR THE REAL ONES, so Claude is its clay starburst, Codex is OpenAI's, Cursor its cube, and so on, each at the size the glyph it replaces had.
@@ -11,7 +11,7 @@
 -->
 <script lang="ts">
   import { AGENT_GLYPHS, type AgentKind } from './face.ts';
-  import { AGENT_MARKS, isMarked } from './agent-marks.ts';
+  import { AGENT_MARKS, isMarked } from '@braindog/skin/agent-marks.ts';
   import Icon from './Icon.svelte';
 
   let { kind, size = 's' }: { kind: AgentKind; size?: 's' | 'm' | 'l' } = $props();

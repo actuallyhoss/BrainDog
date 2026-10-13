@@ -1,0 +1,8 @@
+{
+  "gate": "core-names",
+  "rule": "a list an add-on declares, spelled as a string in the kernel",
+  "expect": "spelled in the core",
+  "findings": 1,
+  "total": 1,
+  "why": "ONE, `list === 'tasks'` in `packages/kernel/src`, where the planted add-on `desk` declares the list `tasks`. `decoy.ts` beside it holds what must stay green: the name in a comment, as a variable, inside a sentence, inside `taskforce`, `multitasks`, `desktop` and `statement`, and `state`, a field id of five letters. `total` is what makes any of those a failure rather than a second line nobody counted."
+}

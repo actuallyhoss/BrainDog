@@ -14,7 +14,12 @@
  *
  * A FIELD WITH A FEW VALUES. A money or a quantity has no value worth a chip (its number differs entry to entry and two
  * currencies are not one count), nor does a list, a file or a secret, so those are refused at the door and say which
- * fields can be counted.
+ * fields can be counted. A field held unique is refused with them: every entry holds its own value, so the answer would
+ * be the list again, one count of 1 an entry.
+ *
+ * THE MOST COMMON VALUES, AND HOW MUCH IS LEFT. A title or a day can hold thousands of values, and a strip of chips or an
+ * agent reads a few dozen. `counts` holds the `SHOWN` most common, and `more` says how many values and entries are not
+ * in it, so nothing is dropped without being said. `matched` is always the list's own, also when the walk stopped early.
  */
 
 import { whereFor, type Json } from '@braindog/kernel';
@@ -29,22 +34,37 @@ const COUNTED: ReadonlySet<string> = new Set(['enum', 'ref', 'bool', 'text', 'in
 const PAGE = 500;
 /** The most the walk reads before it answers with what it has counted and says so (`capped`). */
 const WALK_MAX = 10_000;
+/** The most values one answer holds. The rest are told as `more`. */
+const SHOWN = 50;
 
 export type Counted = {
   register: string;
   by: string;
-  /** Every value the field holds with how many entries hold it, most first; `null` is the entries that leave it empty. */
+  /** The `SHOWN` most common values with how many entries hold each, most first; `null` is the entries that leave it empty. */
   counts: { value: Json; n: number }[];
-  /** The sum of `counts`: the list's own `matched` for the same `where`. */
+  /** The list's own `matched` for the same `where`: the sum of `counts` and `more.n`. */
   matched: number;
-  /** Present when the walk stopped at `WALK_MAX` before the end of the list. */
+  /**
+   * Present when `counts` is not everything: `n` entries are in none of its counts, and `values` further values were
+   * counted. When `capped` is set too, `values` is those seen before the walk stopped, so at least that many.
+   */
+  more?: { values: number; n: number };
+  /** Present when the walk stopped at `WALK_MAX` before the end of the list. `matched` is still the whole list's. */
   capped?: true;
 };
 
+/** What a read hands back: every value it counted, and the list's `matched` where the read knows it apart from them. */
+type Read = { counts: Map<string, number>; capped: boolean; matched?: number };
+/** The two limits, said by a test that cannot make ten thousand entries to reach one. */
+export type Limits = { shown?: number; walkMax?: number; page?: number };
+
 type Tally = (q: { register: string; field: string; where?: never }) => Result<{ value: Json; n: number }[]>;
 
-export function methods(deps: RecordDeps) {
+export function methods(deps: RecordDeps, limits: Limits = {}) {
   const { kernel, guard, named, no, readsEveryList } = deps;
+  const shown = limits.shown ?? SHOWN;
+  const walkMax = limits.walkMax ?? WALK_MAX;
+  const pageSize = limits.page ?? PAGE;
   /* THE KERNEL'S ONE-QUERY COUNT, READ WHERE IT IS DECLARED. `countBy` joins the kernel beside `block:` (blocked to the
      kernel's owner in batch 50); until then this reads nothing and the walk below answers. */
   const tallied = (): Tally | undefined => (kernel as unknown as { countBy?: Tally }).countBy;
@@ -52,7 +72,7 @@ export function methods(deps: RecordDeps) {
   return {
     /**
      * `{ register, by, where? }`: for each value of the field `by`, how many entries of `register` that `where` admits
-     * hold it. Answers `{ register, by, counts: [{ value, n }], matched }`, most first, then by value.
+     * hold it. Answers `{ register, by, counts: [{ value, n }], matched, more? }`, most first, then by value.
      */
     async countBy(args: { register: string; by?: unknown; where?: unknown }, ctx: CallContext): Promise<Result<Counted>> {
       const missing = named(args);
@@ -63,7 +83,7 @@ export function methods(deps: RecordDeps) {
       if (!decl) return no('REGISTER_UNKNOWN', `There is no list called ${args.register}.`, { at: 'register' });
 
       const live = decl.fields.filter((f) => f.retired !== true);
-      const countable = live.filter((f) => COUNTED.has(f.type)).map((f) => f.id);
+      const countable = live.filter((f) => COUNTED.has(f.type) && !held(f)).map((f) => f.id);
       const field = live.find((f) => f.id === args.by);
       if (field === undefined)
         return no('FIELD_UNKNOWN', `${decl.name} has no field called ${JSON.stringify(args.by ?? null)} to count by.`, { at: 'by', allowed: countable });
@@ -72,6 +92,12 @@ export function methods(deps: RecordDeps) {
           at: 'by',
           allowed: countable,
         });
+      if (held(field))
+        return no(
+          'VALUE_MALFORMED',
+          `${field.label ?? field.id} is different on every one of ${decl.name}, so there is nothing to count.${countable.length ? ` Count by one of ${countable.join(', ')}.` : ''}`,
+          { at: 'by', allowed: countable },
+        );
 
       const rule = whereFor(ctx.wheres, args.register);
       const fast = tallied();
@@ -81,17 +107,23 @@ export function methods(deps: RecordDeps) {
           : walk(args.register, field.id, decl.state === field.id, args.where, rule, ctx);
       if (!read.ok) return read;
 
-      const counts = [...read.value.counts.entries()]
+      const every = [...read.value.counts.entries()]
         .map(([key, n]) => ({ value: JSON.parse(key) as Json, n }))
         .sort((a, b) => b.n - a.n || order(a.value, b.value));
-      const matched = counts.reduce((sum, c) => sum + c.n, 0);
-      return { ok: true, value: { register: args.register, by: field.id, counts, matched, ...(read.value.capped ? { capped: true as const } : {}) } };
+      const counts = every.slice(0, shown);
+      const sum = (of: { n: number }[]) => of.reduce((total, c) => total + c.n, 0);
+      /* THE LIST'S OWN `matched`, NOT WHAT THE WALK GOT THROUGH. A walk that stopped early counted part of the list, and
+         the sum of that part was answered as the whole. The entries past the stop are in `more.n` with the rest. */
+      const matched = read.value.matched ?? sum(every);
+      const left = matched - sum(counts);
+      const more = every.length > counts.length || left > 0 ? { more: { values: every.length - counts.length, n: left } } : {};
+      return { ok: true, value: { register: args.register, by: field.id, counts, matched, ...more, ...(read.value.capped ? { capped: true as const } : {}) } };
     },
   };
 
   /* THE KERNEL'S ANSWER IN THE WALK'S SHAPE. SQLite hands a bool back as 1 or 0, which the list hands back as true or
      false, so a chip filtering on the value it was given finds the same entries either way. */
-  function fromTally(got: Result<{ value: Json; n: number }[]>, type: string): Result<{ counts: Map<string, number>; capped: boolean }> {
+  function fromTally(got: Result<{ value: Json; n: number }[]>, type: string): Result<Read> {
     if (!got.ok) return got;
     const counts = new Map<string, number>();
     for (const r of got.value) {
@@ -111,15 +143,16 @@ export function methods(deps: RecordDeps) {
     where: unknown,
     rule: Json | undefined,
     ctx: CallContext,
-  ): Result<{ counts: Map<string, number>; capped: boolean }> {
+  ): Result<Read> {
     const counts = new Map<string, number>();
     let cursor: string | null = null;
     let seen = 0;
+    let matched: number | undefined;
     do {
       const page = kernel.list(
         {
           register,
-          limit: PAGE,
+          limit: pageSize,
           ...(where === undefined ? {} : { where: where as never }),
           ...(cursor === null ? {} : { cursor }),
           reads: (r: string) => deps.readable(ctx, r) === null,
@@ -127,15 +160,22 @@ export function methods(deps: RecordDeps) {
         rule,
       );
       if (!page.ok) return page;
+      matched ??= page.value.matched;
       for (const e of page.value.rows) {
         const key = JSON.stringify((mirrored ? e.state : e.fields[by]) ?? null);
         counts.set(key, (counts.get(key) ?? 0) + 1);
       }
       seen += page.value.rows.length;
       cursor = page.value.cursor;
-    } while (cursor !== null && seen < WALK_MAX);
-    return { ok: true, value: { counts, capped: cursor !== null } };
+    } while (cursor !== null && seen < walkMax);
+    const capped = cursor !== null;
+    return { ok: true, value: { counts, capped, ...(capped && matched !== undefined ? { matched } : {}) } };
   }
+}
+
+/** A field held unique: no two entries share a value, so a count by it is the list again. */
+function held(f: { unique?: boolean }): boolean {
+  return f.unique === true;
 }
 
 /** Two values in a steady order: empty last, then numbers, then the rest by their text. */

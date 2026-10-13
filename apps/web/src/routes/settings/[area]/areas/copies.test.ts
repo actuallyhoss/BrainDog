@@ -100,6 +100,30 @@ test('a failed test is a fault, and the word failed says so beside the red', asy
   assert.deepEqual(line, { text: "This host's last restore test: failed 3 days ago", fault: true, mark: null });
 });
 
+test('a test that tried no record reads what it did, never "passed", and is a fault with its word', async () => {
+  const { io } = door(200, { ok: true, value: { at: back(12 * D), pass: true, records: 0 } });
+  const line = drillLine((await readDrill(io))!, NOW);
+  assert.deepEqual(line, {
+    text: "This host's last restore test, 12 days ago: the Directory's copy opened; no record's copy was tried",
+    fault: true,
+    mark: 'Not proven',
+  });
+  assert.doesNotMatch(line.text, /passed/);
+  // Past 35 days it is still this line: an overdue test that proved nothing is not "passed" with an Overdue mark.
+  const old = drillLine({ at: back(DRILL_DUE_MS + D), pass: true, records: 0 }, NOW);
+  assert.doesNotMatch(old.text, /passed/);
+  assert.equal(old.mark, 'Not proven');
+  // One record's copy is enough to read as a pass.
+  assert.match(drillLine({ at: back(12 * D), pass: true, records: 1 }, NOW).text, /passed 12 days ago$/);
+});
+
+test('a pass with no count draws no line, where a failure with none still reads failed', () => {
+  assert.equal(drillOf({ at: back(D), pass: true }), null);
+  assert.equal(drillOf({ at: back(D), pass: true, records: -1 }), null);
+  assert.equal(drillOf({ at: back(D), pass: true, records: '3' }), null);
+  assert.deepEqual(drillOf({ at: back(D), pass: false }), { at: back(D), pass: false, records: 0 });
+});
+
 test('a host never tested reads "Never tested" as a fault, and stays red until the first test', async () => {
   const { io } = door(200, { ok: true, value: { at: null } });
   const drill = await readDrill(io);
@@ -133,6 +157,7 @@ test('no drill line carries an em dash, an id or a path', () => {
   const lines = [
     drillLine({ at: back(12 * D), pass: true, records: 3 }, NOW),
     drillLine({ at: back(D), pass: false, records: 0 }, NOW),
+    drillLine({ at: back(D), pass: true, records: 0 }, NOW),
     drillLine({ at: null }, NOW),
   ].flatMap((l) => [l.text, l.mark ?? '']);
   for (const line of lines) assert.doesNotMatch(line, /\u2014|#\d|[0-9A-HJKMNP-TV-Z]{26}|\//, line);

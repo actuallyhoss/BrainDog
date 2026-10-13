@@ -76,6 +76,18 @@ import { fileURLToPath } from 'node:url';
 import { skipDir } from './lib.mjs';
 
 /**
+ * THE PUBLIC WORDS OF ONE COUNTRY THAT THE KERNEL HOLDS TODAY (SHL-A01): five card processors and four places.
+ * `packages/kernel/src/identity-keys.ts` strips them off a payee so two spellings of one shop are one payee, which is
+ * one country's banking written into the part every record runs. They are public names, so they are listed and
+ * printed like any tracked word; the owner's own names are the hashes below and are never printed.
+ *
+ * EACH IS HELD WHERE IT STANDS TODAY, in `HELD` under `OUT`, until SHL-A07 takes the words out of the kernel and an
+ * add-on declares them. Measured on 13 October, the day they were added: 22 places in 6 files, 9 of them in
+ * `identity-keys.ts`, and none anywhere else in the code this gate reads.
+ */
+export const PUBLIC_WORDS = ['geidea', 'paymob', 'fawry', 'kashier', 'paytabs', 'cairo', 'giza', 'maadi', 'zamalek'];
+
+/**
  * The names of use cases, banks, products and people this tree has had to keep out of the core.
  * Each is the start of a part, case-folded: see the header for why a match must begin at a part
  * boundary and why it may run on past one.
@@ -83,6 +95,7 @@ import { skipDir } from './lib.mjs';
 export const WORDS = [
   'gold', 'hsbc', 'instapay', 'egypt', 'salary', 'payroll', 'mercury', 'registrar', 'egp', 'quartz', 'payday',
   'goldapi',
+  ...PUBLIC_WORDS,
 ];
 
 /**
@@ -236,7 +249,7 @@ const READ = { packages: ['src', 'grammars', 'svelte'], apps: ['src', 'scripts']
  *
  * The hit counts are 25 September's, from this gate's own reading.
  */
-const OUT = {
+const EXEMPT = {
   /* A WORD A STRANGER TYPES, read to tell which kind of record they want, and not a use case the core
      runs: the guide hears `payday` and offers Personal. */
   'packages/seed/src/usecases/personal.ts': {
@@ -279,7 +292,79 @@ const OUT = {
 
 /* THE EXEMPT PATHS, BY THE NAME THE LEDGER READS THEM UNDER (PRF-B03 step 3): `ledger.json` holds `shell-words.EXEMPT`
    at its newest line, so this list only shrinks, and a fall is a line written there. */
-export { OUT as EXEMPT };
+export { EXEMPT };
+
+/**
+ * WHAT IS HELD UNTIL A UNIT TAKES IT OUT, AND WHICH UNIT. `EXEMPT` is what may stay: prose, a sender's name, a word a
+ * stranger types. `HELD` is what may not, and stands only because the unit that moves it has not run: the nine
+ * `PUBLIC_WORDS`, in the six files that spell one in code today. Every entry names its words, as an `EXEMPT`
+ * entry does, and `until` names the unit that ends it.
+ *
+ * ONE ENTRY SITS UNDER AN `EXEMPT` PATH, the site's changelog under `apps/site`, and a file is read against every
+ * entry that covers it. The word could not go into `apps/site`'s own words: an entry's word that exempts nothing is a
+ * finding, and `negative/shell-words` plants a site with no such word in it, so its ten findings became eleven.
+ *
+ * A LIST OF ITS OWN, AND NOT FIVE MORE PATHS IN `EXEMPT`, because the ledger holds `shell-words.EXEMPT` at 6 and a held
+ * list only shrinks: widening the gate by nine words found 22 places in six files the old list never named, and writing them into
+ * `EXEMPT` would have been a rise with no word of the owner's behind it. `ledger.json` holds `shell-words.HELD` from its
+ * first line, so this list only shrinks too. Five of its six entries go with SHL-A07.
+ *
+ * The hit counts are 13 October's, from this gate's own reading.
+ */
+export const HELD = {
+  'packages/kernel/src/identity-keys.ts': {
+    why: 'the kernel strips one country\'s card processors and places off a payee, so two spellings of one shop are one payee (9 hits).',
+    until: 'SHL-A07',
+    words: {
+      geidea: '`PROCESSORS` at line 186, the prefixes a card terminal writes before the shop\'s name.',
+      paymob: '`PROCESSORS` at line 186.',
+      fawry: '`PROCESSORS` at line 186.',
+      kashier: '`PROCESSORS` at line 186.',
+      paytabs: '`PROCESSORS` at line 186.',
+      cairo: 'the places at line 247, which a bank text writes after the merchant.',
+      giza: 'the places at line 247.',
+      maadi: 'the places at line 247.',
+      zamalek: 'the places at line 247.',
+    },
+  },
+  'packages/kernel/src/backfill.ts': {
+    why: 'the backfill tells a merchant\'s line by the same processors, in two patterns (8 hits).',
+    until: 'SHL-A07',
+    words: {
+      paymob: '`MERCHANT_SHAPE` at line 303 and `PROCESSOR_PREFIX` at line 309.',
+      fawry: '`MERCHANT_SHAPE` and `PROCESSOR_PREFIX`.',
+      kashier: '`MERCHANT_SHAPE` and `PROCESSOR_PREFIX`.',
+      paytabs: '`MERCHANT_SHAPE` and `PROCESSOR_PREFIX`.',
+    },
+  },
+  'packages/kernel/src/declare.ts': {
+    why: 'two refusals give an example in one country\'s words (2 hits).',
+    until: 'SHL-A07',
+    words: {
+      cairo: 'the refusal at line 3033 gives `Africa/Cairo` as its example of a time zone.',
+      fawry: 'the refusal at line 3256 gives `["FAWRY*"]` as its example of a prefix to strip.',
+    },
+  },
+  'packages/kernel/src/provision.ts': {
+    why: 'the refusal of a zone that is no place gives an example (1 hit).',
+    until: 'SHL-A07',
+    words: { cairo: 'the sentence at line 261 gives `Africa/Cairo` as its example of a place\'s time zone.' },
+  },
+  'apps/site/src/routes/changelog/entries.ts': {
+    why: 'a changelog entry about a fix that shipped names one city beside London (1 hit).',
+    until: 'SHL-A20',
+    words: { cairo: 'the entry at line 593 says an amount reads one way in Cairo and another in London. It is prose and may well stay; SHL-A20, where the line is held by itself, says whether it is reworded or moves to `EXEMPT`.' },
+  },
+  'packages/record/src/grammar.ts': {
+    why: 'the grammar an agent reads gives an example of a zone (1 hit).',
+    until: 'SHL-A07',
+    words: { cairo: 'the `tz` line at 379 gives `Africa/Cairo` as its example, the same one the kernel\'s refusal gives.' },
+  },
+};
+
+/** Every path that is out, for either reason. One path is in one list or the other, never both: the throw holds it. */
+const OUT = { ...EXEMPT, ...HELD };
+for (const p of Object.keys(HELD)) if (Object.hasOwn(EXEMPT, p)) throw new Error(`shell-words: ${p} is in EXEMPT and in HELD. A path is out for one reason.`);
 
 /**
  * THE FILES A CORE PACKAGE SHIPS: its `src`, without tests.
@@ -353,8 +438,13 @@ const BEFORE_REGEX = new Set(['return', 'typeof', 'instanceof', 'in', 'of', 'new
 /**
  * The source with its comments blanked and everything else untouched: code, strings, templates and
  * regular expression literals all stay, because a literal is exactly where `'bank-hsbc-eg'` lives.
+ *
+ * `literals`, WHEN A CALLER HANDS A LIST, IS FILLED WITH WHERE EACH STRING'S TEXT IS: `[from, to]` for the inside of
+ * every quoted string and every run of a template between its interpolations. `core-names` reads names only where
+ * they are spelled as a string, and this lexer is the one place that already knows a quote inside a regular
+ * expression from the start of a string.
  */
-export function uncomment(source) {
+export function uncomment(source, literals = null) {
   const out = source.split('');
   const n = source.length;
   /* A STACK OF BRACE DEPTHS, one per open `${`, so a `}` closes the interpolation it belongs to and
@@ -376,14 +466,17 @@ export function uncomment(source) {
      lost its place at the next unmatched brace, and three comments at `:3301` to `:3316` came out as
      code saying `payroll`. `negative/shell-words/.../seeded-template.ts` is that shape, as a decoy. */
   const readTemplate = () => {
+    const from = i;
     while (i < n) {
       const c = source[i];
       if (c === '\\') i += 2;
       else if (c === '`') {
+        literals?.push([from, i]);
         i++;
         last = 'literal';
         return;
       } else if (c === '$' && source[i + 1] === '{') {
+        literals?.push([from, i]);
         i += 2;
         braces.push(0);
         last = '{';
@@ -412,7 +505,9 @@ export function uncomment(source) {
     }
     if (c === "'" || c === '"') {
       i++;
+      const from = i;
       while (i < n && source[i] !== c && source[i] !== '\n') i += source[i] === '\\' ? 2 : 1;
+      literals?.push([from, Math.min(i, n)]);
       i++;
       last = 'literal';
       continue;
@@ -602,7 +697,8 @@ const privateLine = (rel, line, hash) =>
  */
 const shown = (token) => (hashedIn(token).some((h) => !KNOWN.has(h)) ? 'a name that also holds a private word' : token);
 
-const outOf = (rel) => Object.keys(OUT).find((p) => rel === p || rel.startsWith(p + '/')) ?? null;
+/** Every entry that covers one file: its own, and one for a directory above it. */
+const outsOf = (rel) => Object.keys(OUT).filter((p) => rel === p || rel.startsWith(p + '/'));
 
 /**
  * THE CHECK IS A FUNCTION, imported by `run.mjs` rather than spawned: `52 §5.1` step 3, argued in
@@ -655,11 +751,12 @@ export default function shellWords(
     const markup = file.endsWith('.svelte');
     for (const h of hitsIn(text, markup, hashedIn)) if (!KNOWN.has(h.word)) findings.push(privateLine(rel, h.line, h.word)), hidden++;
     const hits = hitsIn(text, markup);
-    const out = outOf(rel);
-    const allowed = out === null ? null : OUT[out].words ? Object.keys(OUT[out].words) : ALL;
-    if (out === null || OUT[out].words) read++;
+    const outs = outsOf(rel);
+    if (outs.every((p) => OUT[p].words)) read++;
     for (const h of hits) {
-      if (allowed !== null && allowed.includes(h.word)) {
+      /* THE ENTRY THAT NAMES THIS WORD, among those that cover the file, so each hit is counted to the reason given for it. */
+      const out = outs.find((p) => (OUT[p].words ? Object.hasOwn(OUT[p].words, h.word) : ALL.includes(h.word)));
+      if (out !== undefined) {
         exempted.set(out, exempted.get(out) + 1);
         if (OUT[out].words) byWord.set(`${out} ${h.word}`, byWord.get(`${out} ${h.word}`) + 1);
       } else findings.push(`  ${rel}:${h.line}  ${h.word}, in ${shown(h.token)}`);

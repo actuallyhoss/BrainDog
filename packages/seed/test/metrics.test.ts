@@ -268,6 +268,9 @@ test('EVERY DECLARED METRIC READS THE SAME IN SQL AND IN TYPESCRIPT', async () =
     /* NOR OF A ROLLED FIGURE THAT READS AN AGE (`rolled.read`, money-core 3.16.0's `statement-oldest-days`): it answers how
        old the balances are, not what they hold, which `kernel/test/money-figures-ages.test.ts` holds. */
     if ((decl.value as { rolled?: { read?: unknown } }).rolled?.read !== undefined) continue;
+    /* NOR OF A CROSS-CHECK (`crosscheck`, money-core 3.17.0's `cash-cross-check`): it is the difference between a figure
+       and the entries walked again, which `kernel/test/cash-cross-figure.test.ts` and `cash-cross-check.test.ts` hold. */
+    if ((decl.value as { crosscheck?: unknown }).crosscheck !== undefined) continue;
     /* A FIGURE READ ONCE PER BOOK has no book to be read about: the sample keeps none (money-core 3.1.0's `books`). */
     if (JSON.stringify(decl).includes('book is {{it}}')) continue;
     const params = JSON.stringify(decl).includes('{{it}}') ? THINGS.map((t) => String(t.name)) : [null];

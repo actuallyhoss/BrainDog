@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import type { AskSetup, SetupAsked, SetupReply } from './ask.ts';
 import { useCase } from '@braindog/seed/usecases';
 
-import { caseBecame, currencyFor, draftBrief, fromModel, heardWords, outsideCatalogue, propose, proposeFirst, setupOffer } from './propose.ts';
+import { caseBecame, currencyFor, draftBrief, fold, fromModel, heardWords, outsideCatalogue, partName, propose, proposeFirst, setupOffer } from './propose.ts';
 
 const CTX = { zone: 'Europe/London', locale: 'en-GB' };
 
@@ -328,4 +328,86 @@ test("A MODEL'S READING TAKES THE DEVICE'S CURRENCY THE SAME WAY, and the rules'
   assert.ok(!mine.heard.some((h) => h.became.endsWith(heardWords.inCurrency('EGP'))), 'a typed currency is not said again');
   const none = await proposeFirst('I keep my reading notes', CAIRO, fake(reply({ modules: ['work'] })).ask);
   assert.equal(none.currency, null, 'nothing the model kept holds money');
+});
+
+/* ── finding 3 of the audit of batches 49 and 50: what the heard lines say ── */
+
+const linesOf = (p: { heard: { phrase: string; became: string }[] }): string[] => p.heard.map((h) => `${h.phrase} > ${h.became}`);
+
+test('A LINE NEVER SAYS A PACK: a part is said by the name its place has, Projects and never Portfolio', () => {
+  assert.equal(partName('portfolio'), 'Projects');
+  assert.equal(partName('portfolio', { things: 'Shops' }), 'Shops', "in the person's word where they renamed it");
+  assert.equal(partName('people'), 'People');
+  assert.equal(partName('money-core'), 'Money', 'a part that keeps several lists keeps its own name');
+  for (const sentence of ['I track my projects and my clients', 'I run a studio and send invoices', "I'm a student and I run a small shop"]) {
+    const p = propose(sentence, CTX);
+    assert.ok(p.heard.length > 0, sentence);
+    for (const h of p.heard) assert.doesNotMatch(h.became, /Portfolio/u, `${sentence}: ${h.phrase} became ${h.became}`);
+    /* EVERY PLACE A LINE TURNED ON is found by the words the line says. */
+    for (const x of p.places.filter((y) => y.kind === 'module' && y.phrase !== null)) assert.ok(p.heard.some((h) => h.phrase === x.phrase), `${x.name} says a phrase that was heard`);
+  }
+  assert.deepEqual(linesOf(propose('I track my projects', CTX)), ['projects > Projects']);
+});
+
+test('A USE CASE TAKEN BESIDE ANOTHER CLAIMS ITS WORDS: a student with a small shop hears Orders and Products, lit', () => {
+  const p = propose("I'm a student and I run a small shop", CTX);
+  assert.equal(p.usecase, 'student');
+  assert.deepEqual(p.also, ['shop']);
+  assert.deepEqual(linesOf(p), ['student > Courses, Assignments and Study sessions', 'a small shop > Orders and Products']);
+  for (const name of ['Orders', 'Products']) assert.equal(p.places.find((x) => x.name === name)?.phrase, 'a small shop', `${name} says the words that turned it on`);
+  assert.equal(p.places.find((x) => x.id === 'portfolio'), undefined, 'the shop holds the phrase, so it asks for no Projects');
+});
+
+test('"NO ORDERS" REFUSES ORDERS: a thing said not to be had is not heard, by a use case or by a module', () => {
+  const p = propose("I'm a freelance designer, no orders", CAIRO);
+  assert.deepEqual(p.also, [], 'the shop is not taken beside');
+  assert.ok(!p.places.some((x) => x.name === 'Orders' || x.name === 'Products'), 'and its lists are not offered');
+  assert.ok(!p.heard.some((h) => /orders/iu.test(h.phrase)), 'the word is not lit');
+  assert.ok(p.heard.some((h) => h.phrase === 'freelance' && h.became.startsWith('Clients and Invoices')), 'what she does have still is');
+
+  const none = propose("I don't run a small shop, I send invoices", CTX);
+  assert.notEqual(none.usecase, 'shop');
+  assert.ok(!none.also.includes('shop') && !none.places.some((x) => x.name === 'Orders'), 'a phrase lit whole is refused from where it starts');
+  assert.ok(none.modules.includes('money-core'), 'the invoices are kept');
+
+  const bare = propose('I run a shop, no invoices', CTX);
+  assert.equal(bare.usecase, 'shop');
+  assert.ok(!bare.modules.includes('money-core'), 'a module is refused the same way');
+
+  /* A WORD BETWEEN THAT IS NOT ABOUT SIZE KEEPS THE THING: late orders are still orders. */
+  const late = propose('I sell candles, no late orders please', CTX);
+  assert.ok(late.heard.some((h) => h.phrase === 'orders' && h.became === 'Orders'));
+});
+
+test('ONE LINE FOR ONE THING: a second phrase that became the same is folded into the first', () => {
+  const p = propose("I'm Mariam. I run a small candle shop and freelance as a designer. I want to track orders, who owes me, and taxes.", CAIRO);
+  assert.deepEqual(linesOf(p), [
+    'Mariam > you',
+    'a small candle shop > Orders and Products',
+    'freelance as a designer > Clients and Invoices',
+    'orders > Orders',
+    'who owes me, and taxes > Money, in EGP',
+  ]);
+  assert.equal(p.heard.filter((h) => h.became.startsWith('Money')).length, 1, 'Money is said once');
+  const money = p.heard.at(-1);
+  assert.ok(money?.at);
+  assert.equal(p.places.find((x) => x.id === 'money-core')?.phrase, 'who owes me, and taxes');
+
+  /* SAID APART, the first line keeps its words and remembers where the other sits. */
+  const sentence = 'I pay taxes, I walk the dog, I send invoices';
+  const apart = fold(
+    [
+      { phrase: 'taxes', became: 'Money', at: [6, 11] },
+      { phrase: 'dog', became: 'Projects', at: [24, 27] },
+      { phrase: 'invoices', became: 'Money', at: [36, 44] },
+    ],
+    sentence,
+  );
+  assert.deepEqual(apart, [
+    { phrase: 'taxes', became: 'Money', at: [6, 11], more: [[36, 44]] },
+    { phrase: 'dog', became: 'Projects', at: [24, 27] },
+  ]);
+  /* THE NAME AND AN AMOUNT WITH NO CURRENCY ARE THEIR OWN LINES, however often they are said. */
+  const loose = fold([{ phrase: '900', became: 'x', at: [0, 3], loose: true }, { phrase: '400', became: 'x', at: [8, 11], loose: true }], '900 and 400');
+  assert.equal(loose.length, 2);
 });

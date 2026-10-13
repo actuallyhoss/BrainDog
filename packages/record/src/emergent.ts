@@ -29,8 +29,10 @@
  * day the record was made and never from the oldest day its entries say, so an import does not make a record old.
  *
  * ONE OFFER A LIST, IN ONE PLACE, THE BEST FEW AT ONCE (USE-B03). `penRanked` keeps one offer a list and drops a list Slash
- * already asked a page for on Decide; `penFor` shows its first `PEN_SHOWN`. An offer's id is made by `signatureOf` alone,
- * so Slash's growing list can name the same offer and ask `pageSpokenFor` before it drafts one.
+ * already asked a page for on Decide; `penFor` shows its first `PEN_SHOWN`, and beside them the offer of any list the
+ * person opened in the last day, so a list they are looking at never waits unseen behind three others. An offer's id is
+ * made by `signatureOf` alone, so Slash's growing list can name the same offer and ask `pageSpokenFor` before it
+ * drafts one.
  */
 
 import type { Declaration, Json, Kernel, RegisterDecl } from '@braindog/kernel';
@@ -292,32 +294,56 @@ export function penRanked(deps: PenDeps): PenItem[] {
   return rank(deps, one).slice(0, PEN_MOST);
 }
 
-/** The holding pen `boot` answers: the best `PEN_SHOWN` of `penRanked`, one a list. The rest wait their turn. */
+/** How far back "looking at it" reaches, in days: today and the day before, since a day here is a UTC day and a person's evening crosses it. */
+const LOOKING_DAYS = 2;
+
+/**
+ * The holding pen `boot` answers: the best `PEN_SHOWN` of `penRanked`, one a list, and after them the offer of every
+ * list the person opened in the last day, in the same rank. The rest wait their turn.
+ *
+ * WHY THE OPENED ONES ARE NOT CUT (batch 52, finding 4): Slash yields every list `penRanked` holds, shown or waiting
+ * (`pageSpokenFor`), so a list ranked fourth had its page asked for nowhere: not on Decide, and not on its own screen
+ * while the person stood on it. What Slash leaves to the pen for a list the person has open, the pen now shows. The
+ * most this adds is what `penRanked` holds, `PEN_MOST`, and with no `use` it adds nothing.
+ */
 export function penFor(deps: PenDeps): PenItem[] {
-  return penRanked(deps).slice(0, PEN_SHOWN);
+  const ranked = penRanked(deps);
+  if (!deps.use || ranked.length <= PEN_SHOWN) return ranked.slice(0, PEN_SHOWN);
+  const looking = openedSince(deps, ranked.slice(PEN_SHOWN).map((i) => i.register), LOOKING_DAYS);
+  return ranked.filter((item, at) => at < PEN_SHOWN || looking.has(item.register));
 }
 
 /** How far back "opened lately" looks, in days: a week, counted from today, so a Monday does not forget a Sunday. */
 const OPENED_DAYS = 7;
 
 /**
- * The items in the rank `penRanked` describes. A STABLE SORT, so items whose lists tie keep the order they were made in.
+ * Which of `lists` the record's people opened in the last `days` days, today among them.
  *
  * OPENED IS A READ OF THE LIST ITSELF OR A RENDER OF A PAGE THAT DRAWS IT (`observation`), the signals `weeksRead` reads.
- * THE NEWEST ENTRY is the latest `created_at` of a live entry, one grouped read for every list in the pen.
  */
-function rank(deps: PenDeps, items: readonly PenItem[]): PenItem[] {
+function openedSince(deps: PenDeps, lists: readonly string[], days: number): ReadonlySet<string> {
   const { use, pages } = deps;
-  if (!use || items.length < 2) return [...items];
-  const lists = [...new Set(items.map((i) => i.register))];
-  const since = new Date(use.nowMs - (OPENED_DAYS - 1) * DAY_MS).toISOString().slice(0, 10);
+  if (!use || lists.length === 0) return new Set();
+  const since = new Date(use.nowMs - (days - 1) * DAY_MS).toISOString().slice(0, 10);
   const seen = use.sql.all<{ kind: string; subject: string }>(
     "SELECT DISTINCT kind, subject FROM observation WHERE day >= ? AND kind IN ('register.read', 'page.render')",
     since,
   );
   const read = new Set(seen.filter((s) => s.kind === 'register.read').map((s) => s.subject));
   const rendered = new Set(seen.filter((s) => s.kind === 'page.render').map((s) => s.subject));
-  const opened = new Set(lists.filter((l) => read.has(l) || pages.some((p) => rendered.has(p.slug) && p.registers.includes(l))));
+  return new Set(lists.filter((l) => read.has(l) || pages.some((p) => rendered.has(p.slug) && p.registers.includes(l))));
+}
+
+/**
+ * The items in the rank `penRanked` describes. A STABLE SORT, so items whose lists tie keep the order they were made in.
+ *
+ * OPENED is `openedSince` over the last `OPENED_DAYS`. THE NEWEST ENTRY is the latest `created_at` of a live entry, one grouped read for every list in the pen.
+ */
+function rank(deps: PenDeps, items: readonly PenItem[]): PenItem[] {
+  const { use } = deps;
+  if (!use || items.length < 2) return [...items];
+  const lists = [...new Set(items.map((i) => i.register))];
+  const opened = openedSince(deps, lists, OPENED_DAYS);
   const newest = new Map(
     use.sql
       .all<{ register: string; at: string | null }>(

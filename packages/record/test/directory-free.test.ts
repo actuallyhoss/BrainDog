@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { ALLOWANCE, PLANS, createDirectory, type AccountUsage, type Named } from '../src/directory.ts';
+import { ALLOWANCE, FREE_JOIN_REFUSED, FREE_JOIN_REFUSED_SHORT, PLANS, createDirectory, type AccountUsage, type Named } from '../src/directory.ts';
 import { openSqlite } from '../../kernel/test/sqlite.ts';
 
 const SEPT = Date.UTC(2026, 8, 15, 12);
@@ -60,4 +60,21 @@ test('A RECORD CAN BE MADE ON FREE in the one provision', () => {
   const made = value<Named>(d.provision({ slug: 'ada', email: 'ada@example.com', plan: 'free' }));
   assert.equal(sql.one<{ plan: string }>('SELECT plan FROM dir_record WHERE id = ?', made.record)?.plan, 'free');
   sql.close();
+});
+
+test('A JOIN TO A FREE RECORD IS REFUSED IN THE SENTENCE THE HOST CAN KEEP: it names Cloud where a plan is sold, and no door where none is', () => {
+  for (const [host, fix] of [[undefined, FREE_JOIN_REFUSED], [{ sells: true }, FREE_JOIN_REFUSED], [{ sells: false }, FREE_JOIN_REFUSED_SHORT]] as const) {
+    const sql = openSqlite();
+    const d = createDirectory(sql, { now: () => SEPT }, undefined, host);
+    value(d.person$('ada@example.com', 'Ada'));
+    const made = value<Named>(d.provision({ slug: 'ada', email: 'ada@example.com', plan: 'free' }));
+    const bo = value<{ id: string }>(d.person$('bo@example.com', 'Bo'));
+    const out = d.join(made.record, bo.id) as { ok: boolean; refusal?: { code: string; fix: string; at?: string } };
+    assert.equal(out.ok, false);
+    assert.equal(out.refusal?.code, 'FORBIDDEN');
+    assert.equal(out.refusal?.fix, fix);
+    sql.close();
+  }
+  assert.equal(FREE_JOIN_REFUSED_SHORT, 'This record is on Free, which is for one person, so nobody else can join it.');
+  assert.doesNotMatch(FREE_JOIN_REFUSED_SHORT, /Cloud|Settings|link/u);
 });

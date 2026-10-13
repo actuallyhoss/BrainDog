@@ -158,6 +158,12 @@ export const priceOf = (env: BillingEnv, plan: HostedPlan): string | null => {
   return price === '' ? null : price;
 };
 
+/**
+ * Whether this host sells a plan at all: the Stripe key reads, the origin reads and Cloud has a price. What
+ * `/account/billing` answers as `open`, and what decides whether a refusal on Free may name a plan to move to.
+ */
+export const sells = (env: BillingEnv): boolean => billingKey(env).ok && originOf(env).ok && priceOf(env, 'cloud') !== null;
+
 /** Every price that is a plan on this host, so a subscription's plan item is told from any other line on it. */
 const planPrices = (env: BillingEnv): string[] => PLAN_IDS.map((p) => priceOf(env, p)).filter((p): p is string => p !== null);
 
@@ -439,7 +445,7 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
         };
       });
     const sold = PLAN_IDS.filter((p) => priceOf(env, p) !== null).map((p) => ({ id: p, name: planName(p), price: planPrice(p) }));
-    const open = key.ok && originOf(env).ok && priceOf(env, 'cloud') !== null;
+    const open = sells(env);
     const canMake = signupMode(env) !== 'closed' && !records.some((r) => r.plan === 'free');
     return ok({ records, open, plans: open ? sold : [], canMake });
   };

@@ -164,8 +164,8 @@ test('BOTH SEPARATORS IN ONE SENTENCE ARE REFUSED in both engines, in one senten
 
 /* ── the readers that must not see it, and the two that must ─────────────── */
 
-test('A LINK FROM AN OR-GROUP OPENS THE LIST WIDE, because no chip carries an or', () => {
-  assert.equal(registerHref('obligations', 'state is open, or due before today'), '/r/obligations');
+test('A LINK FROM AN OR-GROUP OPENS THE LIST ON ITS CHIPS AND join=any, the word that carries the or', () => {
+  assert.equal(registerHref('obligations', 'state is open, or due before today'), '/r/obligations?f=state:in:open&f=due:before:today&join=any');
 });
 
 test('A PARAMETER INSIDE AN OR-GROUP IS NOT THE SCOPE', () => {

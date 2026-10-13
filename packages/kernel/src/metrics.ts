@@ -58,7 +58,7 @@ import type { Leg } from './forecast.ts';
 import type { VitalSign } from './signs.ts';
 import { across, convertMinor, dayFieldOf, pairParts, rateFor, rateIsStale, type Part, type Rate, type Reduce } from './fx.ts';
 /* THE TWO FIGURES THAT ARE NOT A SUM OVER ONE LIST, read in their own file, which imports this one back (it says why that is safe). */
-import { isRolled, isWalked, readRolled, readWalk } from './money-figures.ts';
+import { isCrosscheck, isRolled, isWalked, readCrosscheck, readRolled, readWalk } from './money-figures.ts';
 
 /** The six this build reads. The other five are `08` §2.2's and are refused by name. */
 export const AGGREGATIONS = ['sum', 'count', 'avg', 'min', 'max', 'distinct', 'age', 'currencies', 'empty'] as const;
@@ -1117,6 +1117,11 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
   if (isRolled(decl.value) || isWalked(decl)) {
     if (refusals.length) return { ok: false, refusal: refusals[0]! };
     return isWalked(decl) ? readWalk(sql, decl, ctx) : readRolled(sql, decl, ctx);
+  }
+  /* AND A FIGURE CHECKED AGAINST ITS OWN ENTRIES (`readCrosscheck`), which reads the figure it checks back through here. */
+  if (isCrosscheck(decl.value)) {
+    if (refusals.length) return { ok: false, refusal: refusals[0]! };
+    return readCrosscheck(sql, decl, ctx);
   }
 
   const register = decl.source.startsWith('register.') ? decl.source.slice('register.'.length) : null;

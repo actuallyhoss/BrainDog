@@ -217,13 +217,32 @@ export const ASK_CAP_DEFAULT = 80;
 export const ASK_CAP_FREE = 20;
 
 /**
- * The asks a month Slash's background work may spend on the included model: the daily look, an automation's question,
- * digest prose and a pattern drafted for the inbox, apart from the asks a person makes.
+ * The asks a month Slash's background work may spend on the included model: the daily look, the page headlines, digest
+ * prose, a pattern drafted for the inbox and the reading of who is who, apart from the asks a person makes.
  *
- * THE NAME AND NOT YET THE COUNT. The meter that holds background work to it is the model-job meter, and the
- * ledger's count that would tell a person's ask from a background one is `call.ts`'s; this is the number both read.
+ * 600, HIS RECORD'S MONTHLY THINKING BUDGET (DIRECTION 42). It was 60 while the ledger could not tell a background ask
+ * from one of his, and a background ask on the included model spent one of his 80. The ledger says it now (`Spends`,
+ * `call.ts`'s `backgroundUsed`), so this is a count of its own and his 80 stay his. An automation's question is not in
+ * it: that spends his own allowance.
  */
-export const BACKGROUND_ASKS_MONTH = 60;
+export const BACKGROUND_ASKS_MONTH = 600;
+
+/**
+ * What an ask was for, written on its ledger row by whoever made the call and never read back out of its kind or the
+ * words of its question.
+ *
+ * `ask` is a person's own question or press. `automation` is a rule of his asking at one of its steps. `plan` is the
+ * first plan a new record is offered. `headline` is the page headlines, `understand` the reading of who is who, and
+ * `look` every other piece of background work: the daily look, a skill or pattern draft, digest prose, an embedding.
+ */
+export type Purpose = 'ask' | 'automation' | 'plan' | 'headline' | 'understand' | 'look';
+
+/**
+ * Whose monthly allowance a ledger row spends: `person` is one of his asks (`ask_cap`), `background` one of the
+ * background allowance (`BACKGROUND_ASKS_MONTH`), and `none` neither, which is every attempt no model answered and
+ * every second model call of a question already counted.
+ */
+export type Spends = 'person' | 'background' | 'none';
 
 /**
  * Where Slash's model comes from: the model this host includes, or a key of the owner's own at a provider he chose.
@@ -269,6 +288,8 @@ export type Status = {
   provider: Provider | null;
   model: string;
   asks: { used: number; cap: number; resets: string; capped: boolean };
+  /** The month's background asks and their allowance (`BACKGROUND_ASKS_MONTH`), never his. Absent from a host that does not count them. */
+  background?: { used: number; cap: number };
 };
 
 /**

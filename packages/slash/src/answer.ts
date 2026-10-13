@@ -35,6 +35,16 @@ const SHAPES: readonly string[] = ['text', 'number', 'choice'];
 /** The code a status no retry mends is answered with (`stoppedSentence`). */
 const STOPPED = 'PULL_REQUEST_REFUSED';
 
+/**
+ * What a rule's question is on the ledger: an automation's ask, and one of his own.
+ *
+ * AN AUTOMATION'S ASK SPENDS HIS ALLOWANCE, the default taken for him (DIRECTION 42): the rule is his, it asks because
+ * he wrote it to, and a rule that asked on the background's count could spend the month's headlines in an afternoon.
+ * Said once here and handed to the hold and to every settle; a rung no model answered is written `none` by the ledger
+ * (`call.ts`, `unspent`), so the ladder's retries cost his month nothing.
+ */
+const CHARGE = { purpose: 'automation', spends: 'person' } as const;
+
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 /** `2026-12-01T00:00:00.000Z` as `1 December`, the way the run's sentence says it (§4's table). */
@@ -163,7 +173,7 @@ export const answering = (core: Core, fallback: Inference): { answer(ask: Ask, i
        drift from it. The row below carries the settings' tier so the count for its tier sees it. */
     if (s.tier === 'a' && core.asksUsed() >= s.ask_cap) {
       /* THE ASK TURNED AWAY LEAVES ITS ROW (`TURNED_AWAY_SQL`, model-sign-49). */
-      core.turnedAway('read', s.tier);
+      core.turnedAway('read', s.tier, CHARGE.purpose);
       return no(
         'SLASH_BUDGET_SPENT',
         `rule.${ask.rule} asked Slash at step ${step}, and this month's asks are spent until ${firstOf(core.resets())}. Raise the monthly limit, or wait.`,
@@ -172,7 +182,7 @@ export const answering = (core: Core, fallback: Inference): { answer(ask: Ask, i
 
     /* NO `await` BETWEEN THE CHECK AND THE HOLD, for `read`'s reason: the hold is what the next ask's count includes, so
        ten answers sent together at a cap of two make two model calls (`test/answer.test.ts`, case 3). */
-    const held = core.reserve('read', s.tier, PROMPTS.answer.model);
+    const held = core.reserve('read', s.tier, PROMPTS.answer.model, CHARGE);
     try {
       /* THE MODEL THE HOST HANDS IN FOR THIS JOB, keyed in the rule's name: his own key where he chose it, and otherwise the
          host's. With none handed in, the host's model this engine was built on. */
@@ -243,7 +253,9 @@ export const answering = (core: Core, fallback: Inference): { answer(ask: Ask, i
          `glm-5.3-flash`, priced 9 neurons on the prompt estimate and counted, while this path settled the same throw
          under `-`, priced 0 and uncounted, and the host's ladder asked it again up to the eighth rung with nobody
          counting what the platform may have billed on each. A throw the host marks `reached` is now settled as `read`
-         settles it, and each rung is an ask the month's cap and the operator's ceiling both see. */
+         settles it, under the model's name, so the operator's ceiling sees each rung's neurons. HIS MONTH'S CAP DOES NOT,
+         since store version 3: the row is an `UNREACHABLE`, the ledger writes it as spending nothing, and a binding
+         that threw is a retry and not one of his asks ("a non-2xx status from the model is retried and not counted"). */
       const unreached = (code: string | undefined): boolean => (code === 'UNREACHABLE' && !(touched as boolean)) || code === STOPPED;
       const account = (status: 'ok' | 'error', code?: string): void =>
         core.account({
@@ -258,6 +270,7 @@ export const answering = (core: Core, fallback: Inference): { answer(ask: Ask, i
           status,
           code,
           question: `rule.${ask.rule} step ${step}`,
+          ...CHARGE,
         });
 
       if (!ran.out.ok) {

@@ -18,7 +18,7 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 
 import { ROOT } from './provision-check.mjs';
-import { DIRECTORY, WRANGLER, decide, directoryVersion, liveSha, migrationsBlock, readDiff, record, versionOf } from './rollback.mjs';
+import { DIRECTORY, SLASH_STORE, WRANGLER, decide, directoryVersion, liveSha, migrationsBlock, readDiff, record, storeVersion, versionOf } from './rollback.mjs';
 
 const APP_BEFORE = '6f1c2a90-3b4d-4e5f-8a7b-0c1d2e3f4a5b';
 const SITE_BEFORE = '0a9b8c7d-6e5f-4a3b-8c2d-1e0f9a8b7c6d';
@@ -82,6 +82,21 @@ test('a DIRECTORY_VERSION move holds, and an edit elsewhere in directory.ts does
   assert.match(held.hold ?? '', /DIRECTORY_VERSION moved from 4 to 5/);
 
   const rolled = decide(state('smoke'), diff([DIRECTORY], { directory: [at(4), `${at(4)}export const MORE = 2;\n`] }));
+  assert.equal(rolled.hold, null);
+  assert.equal(rolled.app, APP_BEFORE);
+});
+
+test('a Slash STORE_VERSION move holds, and an edit elsewhere in call.ts does not', () => {
+  const at = (n) => `export const OTHER = 1;\nexport const STORE_VERSION = ${n};\n`;
+  assert.equal(storeVersion(at(3)), 3);
+  assert.notEqual(storeVersion(readFileSync(join(ROOT, SLASH_STORE), 'utf8')), null, 'STORE_VERSION is no longer read from call.ts');
+
+  const held = decide(state('smoke'), diff([SLASH_STORE], { slash: [at(2), at(3)] }));
+  assert.equal(held.app, null);
+  assert.match(held.hold ?? '', /STORE_VERSION moved from 2 to 3/);
+  assert.match(decide(state('smoke'), diff([SLASH_STORE])).hold ?? '', /could not be read at both shas/);
+
+  const rolled = decide(state('smoke'), diff([SLASH_STORE], { slash: [at(3), `${at(3)}export const MORE = 2;\n`] }));
   assert.equal(rolled.hold, null);
   assert.equal(rolled.app, APP_BEFORE);
 });

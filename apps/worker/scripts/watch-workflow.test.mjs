@@ -35,9 +35,14 @@ function under(from, indent, name) {
   return body;
 }
 
+/* TWO JOBS, READ APART: the hourly watch, which stays Node only and holds no secret, and the monthly going back. */
+const jobs = under(lines, 0, 'jobs');
+const watch = under(jobs, 2, 'watch').join('\n');
+const goBack = under(jobs, 2, 'go-back').join('\n');
+
 test('HOURLY AT MINUTE 7, AND BY HAND WITH A host INPUT', () => {
   const on = under(lines, 0, 'on');
-  assert.deepEqual(under(on, 2, 'schedule'), ["    - cron: '7 * * * *'"]);
+  assert.deepEqual(under(on, 2, 'schedule'), ["    - cron: '7 * * * *'", "    - cron: '23 4 1 * *'"]);
   const inputs = under(under(on, 2, 'workflow_dispatch'), 4, 'inputs');
   assert.ok(inputs.includes('      host:'), inputs.join('\n'));
   assert.ok(under(inputs, 6, 'host').includes('        required: false'));
@@ -46,17 +51,18 @@ test('HOURLY AT MINUTE 7, AND BY HAND WITH A host INPUT', () => {
 test('IT MAY READ AND NOTHING ELSE: contents and actions, both read', () => {
   assert.deepEqual(under(lines, 0, 'permissions').map((l) => l.trim()).sort(), ['actions: read', 'contents: read']);
   assert.doesNotMatch(code, /:\s*write\b/);
-  assert.doesNotMatch(code, /secrets\./, 'the watch needs no secret beyond the workflow token');
+  assert.doesNotMatch(watch, /secrets\./, 'the watch needs no secret beyond the workflow token');
+  assert.deepEqual([...new Set([...goBack.matchAll(/secrets\.([A-Z_]+)/g)].map((m) => m[1]))], ['CANARY_PASSKEY'], 'going back holds a secret beyond the canary passkey');
 });
 
 test("NODE ONLY, ON GITHUB'S MACHINES: a checkout, Node 24.13.0, and the one command, with no install", () => {
-  assert.match(code, /^ {4}runs-on: ubuntu-latest$/m, 'a self-hosted runner is his machine, not outside');
-  const uses = [...code.matchAll(/uses: (\S+)/g)].map((m) => m[1]);
+  assert.match(watch, /^ {4}runs-on: ubuntu-latest$/m, 'a self-hosted runner is his machine, not outside');
+  const uses = [...watch.matchAll(/uses: (\S+)/g)].map((m) => m[1]);
   assert.deepEqual(uses, ['actions/checkout@v4', 'actions/setup-node@v4']);
-  assert.match(code, /node-version: 24\.13\.0/);
-  const runs = [...code.matchAll(/^\s+run: (.+)$/gm)].map((m) => m[1]);
+  assert.match(watch, /node-version: 24\.13\.0/);
+  const runs = [...watch.matchAll(/^\s+run: (.+)$/gm)].map((m) => m[1]);
   assert.deepEqual(runs, ['node tools/watch/launch.mjs']);
-  assert.doesNotMatch(code, /pnpm|npm (ci|install)|corepack/);
+  assert.doesNotMatch(watch, /pnpm|npm (ci|install)|corepack/);
   assert.ok(existsSync(join(ROOT, 'tools', 'watch', 'launch.mjs')), 'the script the workflow runs is not there');
 });
 
@@ -68,7 +74,21 @@ test('THE INPUT REACHES THE SCRIPT THROUGH THE ENVIRONMENT, never pasted into th
 });
 
 test('A RUN THAT HANGS IS STOPPED: one job with a limit of minutes, far under GitHub\'s six hours', () => {
-  const limits = [...code.matchAll(/timeout-minutes: (\d+)/g)].map((m) => Number(m[1]));
+  const limits = [...watch.matchAll(/timeout-minutes: (\d+)/g)].map((m) => Number(m[1]));
   assert.equal(limits.length, 1);
   assert.ok(limits[0] <= 10, String(limits[0]));
+  const monthly = [...goBack.matchAll(/timeout-minutes: (\d+)/g)].map((m) => Number(m[1]));
+  assert.equal(monthly.length, 1);
+  assert.ok(monthly[0] <= 45, String(monthly[0]));
+});
+
+test('ONCE A MONTH GOING BACK IS DONE ON THE CANARY, in a job of its own that the hourly watch shares nothing with', () => {
+  assert.match(goBack, /^ {4}if: github\.event\.schedule == '23 4 1 \* \*' \|\| \(github\.event_name == 'workflow_dispatch' && inputs\.go_back\)$/m);
+  assert.match(goBack, /^ {4}environment: production$/m);
+  assert.match(goBack, /^ {8}run: node tools\/canary\/lane\.d\/20-signin-live\.mjs$/m);
+  assert.match(goBack, /^ {8}run: node apps\/worker\/scripts\/go-back\.mjs$/m);
+  assert.ok(goBack.indexOf('20-signin-live.mjs') < goBack.indexOf('scripts/go-back.mjs'), 'going back runs before anybody signed in');
+  assert.match(goBack, /if: always\(\)\n {8}run: rm -f "\$RUNNER_TEMP\/go-back-session\.json"/, 'the kept session outlives the job');
+  assert.match(goBack, /not run: SMOKE_SLUG and DEPLOY_HOST are not both set/);
+  assert.ok(existsSync(join(ROOT, 'apps', 'worker', 'scripts', 'go-back.mjs')), 'the script the job runs is not there');
 });

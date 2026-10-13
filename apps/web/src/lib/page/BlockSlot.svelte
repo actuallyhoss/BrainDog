@@ -38,7 +38,7 @@
   import { fileAt, namedResolverOf, type LiveBlock, type Walked } from '$lib/record/page-live.ts';
   import { glyphSet, glyphSetNow, isGlyph, pathOf } from '$lib/ui/icons.ts';
   import { agentKindOf, liveOf } from '../ui/face.ts';
-  import { AGENT_MARKS, isMarked } from '$lib/ui/agent-marks.ts';
+  import { AGENT_MARKS, isMarked } from '@braindog/skin/agent-marks.ts';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';

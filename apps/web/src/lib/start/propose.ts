@@ -95,6 +95,8 @@ export type HeardLine = {
   you?: true;
   /** An amount typed with no currency, said back and not kept until the currency is answered. */
   loose?: true;
+  /** Where else in the sentence the same thing was said, apart from `at`: a later phrase folded into this line (`fold`). */
+  more?: Span[];
 };
 
 /**
@@ -147,7 +149,10 @@ const overlaps = (a: { at: number; text: string }, b: { at: number; text: string
  * its project) asks for no module of its own (`claimedBy`).
  */
 function modulesOf(read: ReturnType<typeof shape>, said: string, named: boolean, u: UseCase | null, beside: readonly UseCase[], offers: readonly Offer[]): PackId[] {
-  const kept = u ? heardFor(read, claimedBy(u, said)) : read;
+  /* A USE CASE TAKEN BESIDE THE ONE PROPOSED CLAIMS ITS WORDS TOO: "a small shop" said by a student is the shop's Orders
+     and Products, and asks for no Projects of its own. */
+  const claims = (u ? [u, ...beside] : []).map((c) => claimedBy(c, said));
+  const kept = u ? heardFor(read, (span) => claims.some((claimed) => claimed(span))) : read;
   const pointed = new Set(kept.packs.filter((p) => p.why.length > 0).map((p) => p.id));
   /* `toTurnOn` ADDS PEOPLE FOR A NAME, and a declined reading has no packs, so a name alone still keeps People. */
   const heard = toTurnOn(kept, named, offers).filter((id) => pointed.has(id) || (named && !kept.packs.some((p) => p.id === id)));
@@ -247,6 +252,59 @@ const WHOLE: readonly Whole[] = [
   { re: /\b(?:(?:who|what)\s+(?:still\s+)?)?owes?\s+(?:me|us)(?![\p{L}\p{N}])/diu, group: 0 },
 ];
 
+/* ── what the person said they do not have ──────────────────────────── */
+
+/*
+ * A THING SAID NOT TO BE HAD: "no orders", "not a shop", "without invoices", "I don't take orders". The word of refusal
+ * comes straight before the phrase, with at most two small words between, and then only words that say how big a place is
+ * (`PLAIN`), so "no late orders" and "I don't want to lose my orders" are still orders.
+ */
+const NOT = new RegExp(
+  `(?:^|[^\\p{L}\\p{N}])(?:no|not|never|without|zero|don['’]?t|do\\s+not|doesn['’]?t|does\\s+not)\\s+(?:(?:any|more|have|take|get|do|sell|keep|need|want|track|run|own|a|an|the)\\s+){0,2}(?:(?:${[...PLAIN].join('|')})\\s+)*$`,
+  'iu',
+);
+
+type Said = { at: number; text: string };
+
+/**
+ * WHETHER A PHRASE WAS REFUSED where it sits in what was said: "freelance designer, no orders" offered Orders and
+ * Products, because the word was heard and the "no" before it was not. A phrase lit whole (`WHOLE`) is refused from
+ * where the whole of it starts, so "I don't run a small shop" refuses the shop.
+ */
+function refusedIn(said: string): (span: Said) => boolean {
+  const wholes = WHOLE.flatMap((w) => {
+    const span = w.re.exec(said)?.indices?.[w.group];
+    return span ? [span] : [];
+  });
+  return (span) => {
+    const from = wholes.find(([a, b]) => span.at >= a && span.at + span.text.length <= b)?.[0] ?? span.at;
+    return NOT.test(said.slice(0, span.at)) || NOT.test(said.slice(0, from));
+  };
+}
+
+/** The reading with every refused phrase taken out, and each module left with no phrase behind it gone with them. */
+function unrefused(read: ReturnType<typeof shape>, no: (span: Said) => boolean): ReturnType<typeof shape> {
+  if (read.declined !== null || !read.heard.some((h) => h.loose !== true && no(h))) return read;
+  const packs = read.packs.flatMap((p) => {
+    const why = p.why.filter((w) => !no(w));
+    /* A MODULE WITH NO PHRASE OF ITS OWN was there for another to stand on, and `closeOver` brings it back if one still does. */
+    return why.length === 0 ? [] : [{ ...p, why }];
+  });
+  return { ...read, heard: read.heard.filter((h) => h.loose === true || !no(h)), packs };
+}
+
+/** The use cases ranked again without the phrases refused: one heard only in "no orders" is not proposed, nor taken beside. */
+function unrefusedCases<A extends ReturnType<typeof arrangeTurns>>(a: A, no: (span: Said) => boolean): A {
+  if (!a.ranked.some((r) => r.why.some(no))) return a;
+  const length = (why: readonly Said[]): number => why.reduce((n, w) => n + w.text.length, 0);
+  const ranked = a.ranked
+    .map((r) => ({ ...r, why: r.why.filter((w) => !no(w)) }))
+    .map((r) => ({ ...r, score: r.why.length }))
+    .sort((x, y) => y.score - x.score || length(y.why) - length(x.why));
+  const top = ranked[0];
+  return { ...a, pick: top && top.score > 0 ? top.usecase : null, ranked };
+}
+
 /**
  * EVERY WORD A LINE MAY SAY A USE CASE IN: its title, then the names of the lists it brings, in the person's word where
  * they renamed one. A line that says any of them is the use case's (`placesOf`, and `amend` in `lib/first-run.ts`).
@@ -264,6 +322,22 @@ export function caseBecame(u: UseCase, phrase: string): string {
   return lists.find((n) => [word, plural(word)].includes(n.toLocaleLowerCase())) ?? firstRun.and(lists);
 }
 
+/** The one list a part is said by: its only list (Portfolio's Projects), or its first where that has the part's name (People). */
+const leadOf = (id: string): ReturnType<typeof listsOf>[number] | undefined => {
+  const own = id === AGENTS_PACK.manifest.id ? [] : listsOf(id);
+  return own.length === 1 || own[0]?.name === moduleName(id) ? own[0] : undefined;
+};
+
+/**
+ * WHAT A PART IS CALLED TO THE PERSON: the list they will open, in their own word where they renamed it, and the part's
+ * name only where it keeps several (Money). A line read "a small shop became Portfolio", which is the name of a pack and
+ * of nothing on the rail; the place it makes is Projects, so the line says Projects.
+ */
+export const partName = (id: string, names?: Readonly<Record<string, string>>): string => {
+  const lead = leadOf(id);
+  return (lead && names?.[lead.id]) ?? lead?.name ?? moduleName(id);
+};
+
 /** A module keeps money where one of its lists holds no entry without an amount: Money's bills and its ledger. */
 const keepsMoney = (id: string): boolean => listsOf(id).some((l) => l.fields.some((f) => f.type === 'money' && f.required));
 
@@ -279,12 +353,36 @@ export function currencyFor(typed: string | null, modules: readonly string[], ct
   return !loose && device !== '' && knownCurrency(device) && modules.some(keepsMoney) ? device : null;
 }
 
+/* What may sit between two phrases said in one breath: "who owes me, and taxes", "orders and my invoices". */
+const BETWEEN = /^[\s,;]*(?:(?:and|or|plus|also)\s+)?(?:(?:my|our|the)\s+)?$/iu;
+
+/**
+ * ONE LINE FOR ONE THING: a later phrase that became exactly what an earlier one did is folded into it, so "who owes me"
+ * and "taxes" are not two lines that both say Money. Said side by side they are one phrase, lit as she typed it ("who
+ * owes me, and taxes"); said apart, the first line keeps its words and remembers where the other sits (`more`). The name
+ * and an amount with no currency are never folded: each is its own line.
+ */
+export function fold(lines: readonly HeardLine[], sentence: string): HeardLine[] {
+  const out: HeardLine[] = [];
+  for (const h of lines) {
+    const own = h.you === true || h.loose === true;
+    const i = own ? -1 : out.findIndex((o) => o.you !== true && o.loose !== true && o.became === h.became);
+    const first = out[i];
+    if (first === undefined) out.push(h);
+    else if (first.at === undefined || h.at === undefined) continue;
+    else if (i === out.length - 1 && first.more === undefined && BETWEEN.test(sentence.slice(first.at[1], h.at[0])))
+      out[i] = { ...first, phrase: sentence.slice(first.at[0], h.at[1]), at: [first.at[0], h.at[1]] };
+    else out[i] = { ...first, more: [...(first.more ?? []), h.at] };
+  }
+  return out;
+}
+
 /**
  * A CURRENCY THE WORDS DID NOT NAME IS SAID, after the first line that became a part keeping money ("Money, in EGP"),
  * else after a freelancer's Invoices, so the person sees what was taken from their device and can change it.
  */
 function sayCurrency(heard: readonly HeardLine[], modules: readonly string[], code: string | null): HeardLine[] {
-  const money = modules.filter(keepsMoney).map(moduleName);
+  const money = modules.filter(keepsMoney).flatMap((id) => [partName(id), moduleName(id)]);
   const lineOf = (says: readonly string[]): number => heard.findIndex((h) => h.loose !== true && h.you !== true && partsOfBecame(h.became).some((w) => says.includes(w)));
   const i = code === null ? -1 : lineOf(money) >= 0 ? lineOf(money) : lineOf([heardWords.invoices]);
   return heard.map((h, j) => (j === i && code !== null ? { ...h, became: `${h.became}, ${heardWords.inCurrency(code)}` } : h));
@@ -318,10 +416,9 @@ export function placesOf(p: Pick<Proposal, 'usecase' | 'also' | 'modules' | 'hea
     }),
   );
   const parts = p.modules.map((id) => {
-    const own = id === AGENTS_PACK.manifest.id ? [] : listsOf(id);
     /* A PART IS SAID BY ITS ONE LIST (Portfolio is Projects), or by its name where its first list has it (People). */
-    const lead = own.length === 1 || own[0]?.name === moduleName(id) ? own[0] : undefined;
-    const name = (lead && p.names?.[lead.id]) ?? (lead ? lead.name : moduleName(id));
+    const lead = leadOf(id);
+    const name = partName(id, p.names);
     const said = first((h) => (h.you === true && id === PEOPLE) || partsOfBecame(h.became).some((w) => w === moduleName(id) || w === name || w === lead?.name || w.startsWith(`${name} `)));
     const by = said ?? cases.filter((u) => u.modules.includes(id)).map(caseLine).find((h) => h !== null) ?? null;
     return place('module', id, name, by);
@@ -340,8 +437,10 @@ export function propose(sentence: string, ctx: ProposeContext): Proposal {
   const today = todayIn(ctx.zone);
   /* THE CATALOGUE'S SIGNALS: the bundled modules' own, and those of any other pack the caller can offer. */
   const offers = [...BUNDLED, ...(ctx.catalogue ?? []).filter((o) => !BUNDLED.some((b) => b.id === o.id))];
-  const read = shape(said, today ?? undefined, offers);
-  const arranged = arrangeTurns(null, said);
+  /* WHAT THE PERSON SAID THEY DO NOT HAVE IS NOT HEARD, by the modules or by the use cases: "no orders" is no Orders. */
+  const no = refusedIn(said);
+  const read = unrefused(shape(said, today ?? undefined, offers), no);
+  const arranged = unrefusedCases(arrangeTurns(null, said), no);
   const u = read.declined === 'language' ? null : arranged.pick;
   const beside = u ? alongside(arranged, u) : [];
   const modules = modulesOf(read, said, who.name !== null, u, beside, offers);
@@ -355,13 +454,16 @@ export function propose(sentence: string, ctx: ProposeContext): Proposal {
   const phrases = read.declined === null ? read.heard : [];
   /* A PHRASE THE USE CASE CLAIMS IS THE USE CASE'S, as it is for the modules (`modulesOf`), and it is said as the lists
      the use case brings (`caseBecame`): "a small candle shop" said to Shop is its Orders and Products, where the module
-     lexicon heard Portfolio. */
-  const claimed = u ? claimedBy(u, said) : () => false;
-  for (const h of phrases)
-    heard.push(line(h.at, h.text, h.loose ? firstRun.shapeNoCurrency : u && claimed(h) ? caseBecame(u, h.text) : firstRun.and(h.packs.map(moduleName)), h.loose));
-  /* A PHRASE THE USE CASE HEARD COUNTS AS HEARD, where no module's phrase already covers it: "orders" became Orders. */
-  const own = u ? (arranged.ranked.find((r) => r.usecase === u)?.why ?? []) : [];
-  for (const w of own) if (u && !phrases.some((h) => overlaps(h, w))) heard.push(line(w.at, w.text, caseBecame(u, w.text)));
+     lexicon heard Projects. A PART IS SAID BY THE NAME ITS PLACE HAS (`partName`), never by its pack's. */
+  /* THE USE CASES TAKEN BESIDE IT CLAIM THEIR WORDS THE SAME WAY, the one proposed first: a student who runs a small shop
+     reads "a small shop" as Orders and Products, and those two places then say the words that turned them on. */
+  const cases = (u ? [u, ...beside] : []).map((c) => ({ c, claimed: claimedBy(c, said), why: arranged.ranked.find((r) => r.usecase === c)?.why ?? [] }));
+  for (const h of phrases) {
+    const whose = h.loose ? undefined : cases.find((x) => x.claimed(h))?.c;
+    heard.push(line(h.at, h.text, h.loose ? firstRun.shapeNoCurrency : whose ? caseBecame(whose, h.text) : firstRun.and(h.packs.map((id) => partName(id))), h.loose));
+  }
+  /* A PHRASE A USE CASE HEARD COUNTS AS HEARD, where no phrase already said covers it: "orders" became Orders. */
+  for (const { c, why } of cases) for (const w of why) if (!heard.some((h) => overlaps({ at: h.at, text: h.line.phrase }, w))) heard.push(line(w.at, w.text, caseBecame(c, w.text)));
   heard.sort((a, b) => a.at - b.at);
   /* A PHRASE IS LIT WHOLE (`WHOLE`): "shop" heard inside "a small candle shop" is said as the phrase the person wrote,
      and "freelance" inside "freelance as a designer" as their Clients and Invoices, People then called Clients. */
@@ -378,7 +480,8 @@ export function propose(sentence: string, ctx: ProposeContext): Proposal {
   /* THE NAME IS THE FIRST LINE, AND IT BECOMES THEM: the first entry in People. It always comes before the rest. */
   const lines: HeardLine[] = [
     ...(who.name !== null && where.name !== null ? [{ phrase: who.name, became: YOU, at: where.name, you: true as const }] : []),
-    ...heard.filter((h) => h.line.became !== '').map((h) => h.line),
+    /* TWO PHRASES THAT BECAME THE SAME THING ARE ONE LINE (`fold`), before the currency is said on it. */
+    ...fold(heard.filter((h) => h.line.became !== '').map((h) => h.line), sentence),
   ];
 
   /* AN INVOICE KEEPS THE CLIENT IT IS TO. `shape.ts` counts `party` among every entry it read, complete or not, so it
@@ -492,7 +595,7 @@ export function fromModel(reply: SetupReply, sentence: string, ctx: ProposeConte
   const theirs = said.length > 0 ? said : rules.heard.filter((h) => h.you !== true).map((h) => (unsaid !== '' && h.became.endsWith(unsaid) ? { ...h, became: h.became.slice(0, -unsaid.length) } : h));
   /* AN AMOUNT THE RULES HEARD WITH NO CURRENCY IS STILL SAID, so the one question can ask for it (`question.ts`). */
   const loose = rules.heard.filter((h) => h.loose === true && h.at && !theirs.some((t) => t.at && h.at && t.at[0] < h.at[1] && h.at[0] < t.at[1]));
-  const lines = [...you, ...[...theirs, ...loose].sort((a, b) => (a.at?.[0] ?? 0) - (b.at?.[0] ?? 0))];
+  const lines = [...you, ...fold([...theirs, ...loose].sort((a, b) => (a.at?.[0] ?? 0) - (b.at?.[0] ?? 0)), sentence)];
   const currency = currencyFor(typed ? code : ruled, modules, ctx, lines.some((h) => h.loose === true));
   const heard = typed || ruled !== null ? lines : sayCurrency(lines, modules, currency);
 

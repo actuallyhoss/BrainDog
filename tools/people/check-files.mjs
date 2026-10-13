@@ -35,13 +35,11 @@ export const FIELDS = {
   name: [isText, 'her first name, as she types it'],
   who: [isText, 'one sentence on who she is'],
   said: [isText, 'what she types at "Who are you?"'],
-  chip: [isText, 'the starting point she would tap'],
   expects: [(v) => isText(v) && /^([a-z][a-z-]*|none)$/u.test(v), 'the use case her words should read as, or none'],
   standing: [(v) => typeof v === 'boolean', 'whether a standing record uses her every night'],
   'says.plain': [isText, 'what she types, with a keyword'],
   'says.hard': [isText, 'what she types, with no keyword'],
   answers: [(v) => v !== null && typeof v === 'object' && !Array.isArray(v), 'her answers by question kind'],
-  answer: [isText, 'her answer to the one question'],
   email: [(v) => isText(v) && /^[^@\s]+@[^@\s]+\.test$/u.test(v), 'an address at a test sink, ending .test'],
   slug: [(v) => isText(v) && /^[a-z0-9][a-z0-9-]{1,40}$/u.test(v), 'the record name she would pick'],
   zone: [(v) => isText(v) && v.includes('/'), 'a time zone such as Africa/Cairo'],
@@ -57,8 +55,6 @@ export const FIELDS = {
   'expect.heard.title': [isText, 'what the record is called from her words'],
   'expect.heard.lit': [isTexts, 'the phrases that light up'],
   'expect.heard.places': [isTexts, 'the places named, Today first'],
-  'expect.question.about': [isText, 'what the one question is about'],
-  'expect.question.choices': [isCount, 'how many answers it offers'],
   'expect.keep.lists': [isTexts, 'the lists the build makes'],
   'expect.keep.currency': [(v) => isText(v) && /^[A-Z]{3}$/u.test(v), "the record's currency"],
   'expect.tell.lists': [isTexts, 'the lists her first real thing previews into, in order'],
@@ -74,6 +70,11 @@ export const FIELDS = {
  * checked only where the file holds it, and the walk checks it only then.
  */
 export const MAYBE = {
+  /* SOMEBODY WHO TAPS NO STARTING POINT AND IS ASKED NO QUESTION holds none of these four (Dina, on Free). */
+  chip: [isText, 'the starting point she would tap'],
+  answer: [isText, 'her answer to the one question'],
+  'expect.question.about': [isText, 'what the one question is about'],
+  'expect.question.choices': [isCount, 'how many answers it offers'],
   'expect.heard.became': [(v) => v !== null && typeof v === 'object' && !Array.isArray(v) && Object.values(v).every(isTexts), 'what each phrase becomes, { phrase: [the places it names] }'],
   'expect.today.money': [isText, 'the money tile as Today draws it, such as In EGP 900'],
   'expect.offer.lead': [(v) => isText(v?.says) && isText(v?.match) && isPattern(v.match), "the Orders page's sentence on that day, as { says, match }"],
@@ -96,7 +97,7 @@ export function checkPerson(person, chips = []) {
   }
   if (out.length > 0) return out;
   if (!person.said.includes(person.name)) out.push(`said does not hold her name, ${person.name}`);
-  if (chips.length > 0 && !chips.includes(person.chip)) out.push(`chip "${person.chip}" is not one the first screen offers`);
+  if (person.chip !== undefined && chips.length > 0 && !chips.includes(person.chip)) out.push(`chip "${person.chip}" is not one the first screen offers`);
   if (person.said !== person.says.plain) out.push('said is not says.plain');
   if (person.expect.heard.places[0] !== 'Today') out.push('expect.heard.places does not start with Today');
   for (const phrase of Object.keys(person.expect.heard.became ?? {})) if (!person.expect.heard.lit.includes(phrase)) out.push(`expect.heard.became names "${phrase}", which is not lit`);

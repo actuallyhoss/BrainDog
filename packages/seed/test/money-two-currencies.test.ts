@@ -255,7 +255,9 @@ for (const stands of STANDS)
 test('EVERY MONEY FIGURE IN AN AMOUNT HAS ROWS IN BOTH CURRENCIES HERE, so none passes for holding nothing', async () => {
   const alone = await aloneReads();
   const k = await recordOf([POUNDS, DOLLARS], NO_HOME);
-  const figures = figuresOf(k).filter(isMoney);
+  /* A CROSS-CHECK READS NOUGHT BY DESIGN (money-core 3.17.0's `cash-cross-check`): nought is the figure agreeing with the
+     ledger, not a figure holding nothing. */
+  const figures = figuresOf(k).filter(isMoney).filter((f) => !/"crosscheck"/.test(JSON.stringify(f.value ?? null)));
   assert.ok(figures.length >= 30, `only ${figures.length} money figures were found, so the pack was not read`);
   const idle = figures.filter((f) => Object.values(alone).some((reads) => (reads.get(f.metric)?.value ?? 0) === 0)).map((f) => f.metric);
   assert.deepEqual(idle, [], 'these figures read nothing in one currency: give `write` a row each reads');

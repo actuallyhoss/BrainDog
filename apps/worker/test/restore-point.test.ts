@@ -11,7 +11,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { BEFORE_DEPLOY_KEPT, cloudSnapshots } from '../src/copies.ts';
-import { labelOf, readAsk, restorePoint, sayTally, type PointAnswer, type RecordPage } from '../src/restore-point.ts';
+import { labelOf, NOBODY_ASKED, readAsk, restorePoint, sayTally, type PointAnswer, type RecordPage } from '../src/restore-point.ts';
 import { prefixOf, type Dump } from '../src/snapshots.ts';
 import { bucket, cloud, recordStorage } from './cloud-harness.ts';
 
@@ -110,6 +110,29 @@ test('A CURSOR THAT DOES NOT MOVE ENDS THE WALK, so a Directory answering one pa
   );
   assert.equal(calls, 2);
   assert.equal(out.cursor, undefined);
+});
+
+test('A WHOLE WALK THAT ASKED NOBODY, ON A HOST THE CALLER SAYS HOLDS A RECORD, IS ONE FAILED and says so; a page of a longer walk is not', async () => {
+  const said: string[] = [];
+  const deps = { records: async () => ({ ids: [] }), point: async (): Promise<PointAnswer> => ({ written: false }), failed: (_r: string, why: string) => void said.push(why), now: () => NOW };
+  const out = await restorePoint(deps, { check: true, open: true });
+  assert.equal(out.failed, 1);
+  assert.equal(out.empty, true);
+  assert.equal(sayTally(out), NOBODY_ASKED);
+  assert.deepEqual(said, [NOBODY_ASKED]);
+
+  /* NOBODY SAID THE HOST HOLDS ONE, OR THIS IS ONE PAGE OF A LONGER WALK: an empty answer is only empty. */
+  for (const ask of [{ check: true }, { check: true, open: true, cursor: 'r9' }]) {
+    const quiet = await restorePoint(deps, ask);
+    assert.equal(quiet.failed, 0, JSON.stringify(ask));
+    assert.equal(quiet.empty, undefined, JSON.stringify(ask));
+  }
+  assert.equal(said.length, 1);
+
+  const refused = readAsk({ open: 'yes' });
+  assert.equal(refused.ok, false);
+  assert.equal(refused.ok ? '' : refused.at, 'open');
+  assert.deepEqual(readAsk({ check: true, open: true }), { ok: true, value: { check: true, open: true } });
 });
 
 test('COPIES: a before-deploy copy is kept seven days and is never among the thirty a hand-taken copy shares', async () => {

@@ -78,7 +78,7 @@ import type { Refusal, Result, Sql } from '@braindog/ports';
 import type { SlashBackground, SlashMeter } from '@braindog/record';
 
 import { httpStatus } from './index.ts';
-import { backgroundMeter, BACKGROUND_JOBS_MONTH, HEADLINE_ASK, UNDERSTAND_ASK } from './model-jobs.ts';
+import { backgroundMeter, BACKGROUND_JOBS_MONTH, HEADLINE_ASK, UNDERSTAND_ASK, type AskPurpose, type AskSpends } from './model-jobs.ts';
 import { slashBaseUrlOf, slashKeySave } from './slash.ts';
 import { VAULT_HEADERS } from './vault.ts';
 import { turnedAway } from './slash-turned-away.ts';
@@ -441,10 +441,12 @@ export async function serveSlash<C>(request: Request, door: SlashAskDoor<C>, ctx
  * A PRESS IS CHECKED AGAINST THE MONTH BEFORE ANY MODEL IS ASKED, on the same count `status()` shows: the package does
  * not hold a pattern to `ask_cap` itself, and a button that drafts past the month's limit is a model call nobody stopped.
  * On his own key nothing is capped, so nothing stops it here.
- * ON THE INCLUDED MODEL, CHECKED AND NOT YET COUNTED. The draft settles as a `kind = 'pattern'` row, and the included
- * count `status()` reads is `read` and `propose` rows alone (`asksUsed` in `packages/slash/src/call.ts`), so a press does
- * not yet move it. Counting it is `call.ts`'s, which this unit asked of that file's owner. On his own key the listing
- * counts the press already (`keyedAsks` in `packages/slash/src/index.ts`).
+ * ON THE INCLUDED MODEL, CHECKED AND COUNTED. The draft settles as a `kind = 'pattern'` row that says it spent his
+ * allowance (`purpose = 'ask'`, `spends = 'person'`, written by the package where it settles), and the count `status()`
+ * reads is every row that says so (`asksUsed` in `packages/slash/src/call.ts`). So a press moves his count whether its
+ * pattern was filed or the checks refused it, and it never moves the background count (`model-jobs.ts`
+ * `backgroundSpent`), which once took every press that filed nothing. On his own key the listing counts the press as it
+ * always did (`keyedAsks` in `packages/slash/src/index.ts`).
  */
 async function pattern<C>(body: Record<string, unknown>, door: SlashAskDoor<C>, ctx: C): Promise<Response> {
   const stray = Object.keys(body).find((k) => k !== 'samples');
@@ -624,8 +626,10 @@ export type SlashLedgerDeps = {
  * THE ROW IS `kind = 'read'` WITH NO PREDICATE, which is how the package already settles an ask that is not the palette's
  * (`answer.ts`, an automation's question), and the tier is the one the engine reads, as that row's is. So whichever count
  * the engine's `status()` reads, the package's own on tier `a` or the host's `drafted()` on `b` and `byo`, already sees it,
- * and `46 §4.1`'s CHECK needs no new kind. A `draft` kind of its own is the package's to add, as a step under its
- * `STORE_VERSION` (`packages/slash/src/call.ts`); until then `question` says which ask a row was.
+ * and `46 §4.1`'s CHECK needs no new kind. WHAT THE ROW WAS FOR AND WHOSE ALLOWANCE IT SPENT ARE ITS OWN TWO COLUMNS,
+ * `purpose` and `spends` (the package's store version 3, `packages/slash/src/call.ts`): his press is `ask` and the first
+ * plan is `plan`, and both spend `person`, the 80 that are his. `question` is the words shown beside the row and no
+ * count reads it.
  *
  * NO `await` BETWEEN THE CHECK AND THE HOLD, for the reason `packages/slash/src/call.ts` `reserve` gives: the hold is the
  * row the next ask's count includes, so two presses in flight cannot both pass the last ask of the month. The engine is
@@ -663,8 +667,8 @@ export type SlashRecordMeter = SlashMeter & {
 };
 
 /**
- * The question a background ask's ledger row is written with, by what it is for. `HEADLINE_ASK` and `UNDERSTAND_ASK` are
- * what the meters count.
+ * The question a background ask's ledger row is written with, by what it is for: words for a person, which no meter
+ * counts by.
  */
 const BACKGROUND_ASK: Record<SlashBackgroundAsk, string> = {
   skill: "Slash's skill draft",
@@ -672,6 +676,32 @@ const BACKGROUND_ASK: Record<SlashBackgroundAsk, string> = {
   headline: HEADLINE_ASK,
   understand: UNDERSTAND_ASK,
 };
+
+/**
+ * The purpose a background ask's row is written with, which is what the meters count by (`backgroundSpent`). A skill
+ * draft is written as `look`: the ledger names six purposes and a skill draft is the look's own work, drafted from what
+ * the look found.
+ */
+const BACKGROUND_PURPOSE: Record<SlashBackgroundAsk, AskPurpose> = {
+  skill: 'look',
+  look: 'look',
+  headline: 'headline',
+  understand: 'understand',
+};
+
+/** His own two asks through the record, by what each is for. Both spend his allowance. */
+const HELD_PURPOSE: Record<'draft' | 'form', AskPurpose> = { draft: 'ask', form: 'plan' };
+const PERSON: AskSpends = 'person';
+const BACKGROUND: AskSpends = 'background';
+
+/**
+ * What a held row spends once it settles. AN ATTEMPT NO MODEL ANSWERED SPENDS NOBODY'S MONTH AND KEEPS ITS ROW AND ITS
+ * NEURONS, the package's own rule for a row it settles (`packages/slash/src/call.ts` `unspent`), restated: the record
+ * settles a call that was sent and never answered as `UNREACHABLE`, and one the provider turned away as
+ * `PULL_REQUEST_REFUSED`. An unreadable reply was answered, so it counts, once.
+ */
+const settled = (charge: AskSpends, code: string | undefined): AskSpends =>
+  code === 'UNREACHABLE' || code === 'PULL_REQUEST_REFUSED' ? 'none' : charge;
 
 export function slashRecordMeter(deps: SlashLedgerDeps): SlashRecordMeter {
   const mint = ulids(() => deps.clock.now());
@@ -706,13 +736,15 @@ export function slashRecordMeter(deps: SlashLedgerDeps): SlashRecordMeter {
       const at = () => new Date(deps.clock.now()).toISOString();
       const t0 = deps.clock.now();
       deps.sql.exec(
-        `INSERT INTO slash_call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, code, question)
-         VALUES (?, ?, 'read', ?, ?, 0, 0, 0, 0, 'error', 'SLASH_PENDING', ?)`,
+        `INSERT INTO slash_call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, code, question, purpose, spends)
+         VALUES (?, ?, 'read', ?, ?, 0, 0, 0, 0, 'error', 'SLASH_PENDING', ?, ?, ?)`,
         id,
         at(),
         tier,
         model,
         kind === 'draft' ? "Slash's press" : "Slash's first plan",
+        HELD_PURPOSE[kind] ?? HELD_PURPOSE.draft,
+        PERSON,
       );
       let done = false;
       return {
@@ -724,7 +756,7 @@ export function slashRecordMeter(deps: SlashLedgerDeps): SlashRecordMeter {
             const rate = own ? undefined : deps.rate;
             const neurons = rate === undefined ? 0 : Math.round((usage.in * rate.in) / 1e6 + (usage.out * rate.out) / 1e6);
             deps.sql.exec(
-              'UPDATE slash_call SET ts = ?, tokens_in = ?, tokens_out = ?, neurons = ?, ms = ?, status = ?, code = ? WHERE id = ?',
+              'UPDATE slash_call SET ts = ?, tokens_in = ?, tokens_out = ?, neurons = ?, ms = ?, status = ?, code = ?, spends = ? WHERE id = ?',
               at(),
               usage.in,
               usage.out,
@@ -732,6 +764,7 @@ export function slashRecordMeter(deps: SlashLedgerDeps): SlashRecordMeter {
               deps.clock.now() - t0,
               code === undefined ? 'ok' : 'error',
               code ?? null,
+              settled(PERSON, code),
               id,
             );
           },
@@ -745,11 +778,14 @@ export function slashRecordMeter(deps: SlashLedgerDeps): SlashRecordMeter {
       };
     },
     /**
-     * ONE ASK OF THE BACKGROUND ALLOWANCE, never his: the daily look's own draft, a skill draft, or the page headlines. Counted the way
-     * `backgroundMeter` counts it, over a `pattern` row with no `filed`, which `asksUsed` (the engine's own count of kind
-     * `read`) never sees, so neither ever spends one of his asks.
+     * ONE ASK OF THE BACKGROUND ALLOWANCE, never his: the daily look's own draft, a skill draft, the page headlines, or
+     * understanding who is who. The row says so itself, `spends = 'background'`, which is the one thing `backgroundMeter`
+     * counts and the one thing the engine's `asksUsed` passes over (it counts `spends = 'person'`), so neither ever spends
+     * one of his asks. THE KIND IS STILL `pattern` AND DECIDES NOTHING: before the row said whose allowance it spent, the
+     * engine counted every `pattern` row as his, and on the included model each of these took one of his 80 while this
+     * comment said it did not.
      *
-     * EACH FROM ITS OWN SHARE (`HEADLINE_ASKS_MONTH`): a headline ask is written with `HEADLINE_ASK` as its question and
+     * EACH FROM ITS OWN SHARE (`HEADLINE_ASKS_MONTH`): a headline ask is written with purpose `headline` and
      * held to the headlines' share, and the look and a skill draft to the rest, which the model-jobs pass spends too. So a
      * month of drafts and digests cannot leave the pages without their line, nor the headlines the digests without prose.
      * `ask` is optional because a record a release behind calls `background()` for its skill drafts alone.
@@ -784,13 +820,15 @@ export function slashRecordMeter(deps: SlashLedgerDeps): SlashRecordMeter {
       const at = () => new Date(deps.clock.now()).toISOString();
       const t0 = deps.clock.now();
       deps.sql.exec(
-        `INSERT INTO slash_call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, code, question)
-         VALUES (?, ?, 'pattern', ?, ?, 0, 0, 0, 0, 'error', 'SLASH_PENDING', ?)`,
+        `INSERT INTO slash_call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, code, question, purpose, spends)
+         VALUES (?, ?, 'pattern', ?, ?, 0, 0, 0, 0, 'error', 'SLASH_PENDING', ?, ?, ?)`,
         id,
         at(),
         tier,
         model,
         BACKGROUND_ASK[ask] ?? BACKGROUND_ASK.skill,
+        BACKGROUND_PURPOSE[ask] ?? BACKGROUND_PURPOSE.skill,
+        BACKGROUND,
       );
       let done = false;
       return {
@@ -802,7 +840,7 @@ export function slashRecordMeter(deps: SlashLedgerDeps): SlashRecordMeter {
             const rate = deps.rate;
             const neurons = rate === undefined ? 0 : Math.round((usage.in * rate.in) / 1e6 + (usage.out * rate.out) / 1e6);
             deps.sql.exec(
-              'UPDATE slash_call SET ts = ?, tokens_in = ?, tokens_out = ?, neurons = ?, ms = ?, status = ?, code = ? WHERE id = ?',
+              'UPDATE slash_call SET ts = ?, tokens_in = ?, tokens_out = ?, neurons = ?, ms = ?, status = ?, code = ?, spends = ? WHERE id = ?',
               at(),
               usage.in,
               usage.out,
@@ -810,6 +848,7 @@ export function slashRecordMeter(deps: SlashLedgerDeps): SlashRecordMeter {
               deps.clock.now() - t0,
               code === undefined ? 'ok' : 'error',
               code ?? null,
+              settled(BACKGROUND, code),
               id,
             );
           },

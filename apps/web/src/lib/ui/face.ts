@@ -91,7 +91,7 @@ export const hueFor = (key: string): number => {
 
 /* ── an agent's run ─────────────────────────────────────────────────────────── */
 
-/** The kinds of agent a run face tells apart: each named one by its maker's mark (`agent-marks.ts`), the rest by a glyph. */
+/** The kinds of agent a run face tells apart: each named one by its maker's mark (`@braindog/skin/agent-marks.ts`), the rest by a glyph. */
 export type AgentKind = 'claude' | 'codex' | 'cursor' | 'gemini' | 'copilot' | 'windsurf' | 'slash' | 'runner' | 'other';
 
 /** Where a run is: working, gone quiet while still open, or stopped. The ring says which. */

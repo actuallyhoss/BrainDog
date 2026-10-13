@@ -331,7 +331,7 @@ test('THE ROUTE STILL SPELLS A SEARCH THE WAY THE SHEET READS IT', () => {
   const route = readFileSync(new URL('../../routes/r/[register]/+page.svelte', import.meta.url), 'utf8');
   /* IF THIS GOES RED THE ROUTE CHANGED HOW IT HANDS A SEARCH OVER, and `unkept` no longer recognises one: the sheet would
      offer the press again and the record's refusal, translated, would be all that is left. Change both together. */
-  assert.match(route, /predicate=\{whereOf\(filters\) \|\| q \|\| copy\.everything\}/);
+  assert.match(route, /predicate=\{whereOf\(filters, join\) \|\| q \|\| copy\.everything\}/);
   assert.ok(route.includes('(q ? `matching “${q}”` : copy.everything)'), 'the route no longer says a search as matching “…”');
 });
 

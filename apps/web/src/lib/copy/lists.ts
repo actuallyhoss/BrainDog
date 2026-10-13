@@ -217,9 +217,9 @@ export const lists = {
         : `${label} is ${op === 'not-in' ? 'not ' : ''}${values.join(' or ')}`,
   /* Every clause after the first starts lower-case when it starts with an ordinary word, so "Due"
      joins the sentence and "VAT number" keeps its capitals. */
-  filterReads: (clauses: readonly string[]): string => {
+  filterReads: (clauses: readonly string[], join: 'and' | 'or' = 'and'): string => {
     const said = clauses.map((c, i) => (i > 0 && /^[A-Z][a-z]/.test(c) ? c.charAt(0).toLowerCase() + c.slice(1) : c));
-    return said.length < 2 ? (said[0] ?? '') : `${said.slice(0, -1).join(', ')}, and ${said.at(-1) ?? ''}`;
+    return said.length < 2 ? (said[0] ?? '') : `${said.slice(0, -1).join(', ')}, ${join} ${said.at(-1) ?? ''}`;
   },
   backToView: 'Back to the saved view',
   rowsWord: (n: number) => (n === 1 ? 'item' : 'items'),

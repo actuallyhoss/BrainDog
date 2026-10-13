@@ -167,3 +167,14 @@ test('WHAT WAS CHANGED AND ANSWERED WAITS FOR THE SAME SENTENCE ONLY, and storag
   keepAmend(broken, { said: MARIAM, amend: NO_AMEND, reply: null });
   assert.deepEqual(amendKept(broken, MARIAM), { amend: NO_AMEND, reply: null });
 });
+
+test('A PHRASE FOLDED INTO A LINE AND SAID APART LIGHTS AS WHAT THE LINE BECAME, while the line still sits where it says', () => {
+  const said = 'who owes me, a studio, and taxes';
+  const line = { phrase: 'who owes me', became: 'Money', at: [0, 11] as const, more: [[27, 32] as const] };
+  assert.deepEqual(litIn(said, [line]), [
+    { text: 'who owes me', became: 'Money' },
+    { text: ', a studio, and ', became: null },
+    { text: 'taxes', became: 'Money' },
+  ]);
+  assert.ok(litIn(`So, ${said}`, [line]).every((r) => r.became === null), 'a stale line lit its other span');
+});

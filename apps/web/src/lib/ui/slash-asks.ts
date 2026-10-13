@@ -75,7 +75,7 @@ export const LEDGER_FETCHED = 100;
  * because the web never imports the engine, as `BACKGROUND_JOBS_MONTH` in `packages/host/src/model-jobs.ts` restates it
  * for the same reason. The status door says his cap and not this one, so this is the figure the section is measured to.
  */
-export const BACKGROUND_ASKS_MONTH = 60;
+export const BACKGROUND_ASKS_MONTH = 600;
 
 /* WORK NOBODY ASKED FOR. The host's background meter (`backgroundMeter` in `packages/host/src/model-jobs.ts`) counts a
    digest's prose and a pattern drafted for the record, which files nothing itself; a pattern that filed a proposal was a

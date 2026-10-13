@@ -36,6 +36,7 @@ import { createRecordApi, type CallContext } from '@braindog/record';
 
 import { handlersFor, serveApi, serveSlash, servesSlash, slashAskDoor, type SlashAskDoor, type SlashAskEngine } from '../src/index.ts';
 import { endpointInference, slashRecord } from '../src/slash.ts';
+import { slashRecordMeter } from '../src/slash-ask.ts';
 import { createSlash } from '../../slash/src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
@@ -660,4 +661,43 @@ test("A HOST THAT CAN OPEN A KEY GETS TIER b THROUGH, and propose is handed what
   assert.equal(refused.status, 500);
   assert.match(((await refused.json()) as { refusal: { fix: string } }).refusal.fix, /the grant is revoked/);
   assert.equal(seen.length, 2);
+});
+
+test("A BACKGROUND ASK LEAVES HIS COUNT WHERE IT WAS, and his own press moves it by one, on the real engine's own count", async () => {
+  /* THE COMMENT SAID SO AND THE COUNT DID NOT (ENG-A05). On the included model the engine counted every `pattern` row as
+     one of his asks, and the record's headlines, its look and its reading of who is who are all written as `pattern`. So
+     each took one of his 80. The row now says whose month it spent, and the engine's `status()` is the judge here, not a
+     count this file makes for itself. */
+  const sql = openSqlite();
+  const clock = fixedClock(Date.UTC(2026, 9, 2, 3, 17));
+  const engine = createSlash({
+    sql,
+    clock,
+    inference: { complete: async () => ({ text: '{}', usage: { in: 1, out: 1 } }) },
+    record: new Proxy({}, { get: () => { throw new Error('the record was read by the package'); } }) as never,
+  });
+  const meter = slashRecordMeter({ sql, clock, engine: async () => engine, model: 'glm-5.3-flash' });
+  const used = () => (engine.status() as { asks: { used: number } }).asks.used;
+  assert.equal(used(), 0);
+
+  for (const ask of ['headline', 'look', 'skill', 'understand'] as const) {
+    const held = await meter.background(ask);
+    assert.ok(held.ok, `${ask} was refused`);
+    held.value.settle({ usage: { in: 300, out: 40 } });
+    assert.equal(used(), 0, `${ask} spent one of his asks`);
+  }
+
+  const press = await meter.hold('draft');
+  assert.ok(press.ok);
+  assert.equal(used(), 1, 'a press in flight is not counted yet');
+  press.value.settle({ usage: { in: 120, out: 30 } });
+  const plan = await meter.hold('form');
+  assert.ok(plan.ok);
+  plan.value.settle({ usage: { in: 120, out: 30 } });
+  assert.equal(used(), 2);
+  assert.deepEqual(
+    sql.all<{ purpose: string; spends: string }>('SELECT purpose, spends FROM slash_call ORDER BY rowid').map((r) => `${r.purpose} ${r.spends}`),
+    ['headline background', 'look background', 'look background', 'understand background', 'ask person', 'plan person'],
+  );
+  sql.close();
 });

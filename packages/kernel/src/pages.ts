@@ -20,7 +20,7 @@
 import type { Refusal, Result } from '@braindog/ports';
 import { no, ok, refused } from '@braindog/ports';
 import type { Leaf, Predicate, Schema } from '@braindog/where';
-import { clausesOf, evaluate, quoteValue } from '@braindog/where';
+import { clausesOf, quoteValue } from '@braindog/where';
 import { unquoted } from '@braindog/where';
 
 import type { ActionRow } from './actions.ts';
@@ -30,6 +30,10 @@ import { HANDOFFS_OPEN, builtInFigure, type OpenStep } from './built-in-figures.
 import type { ActionBlocking } from './signs-actions.ts';
 import { KEEP, markDrawn, type Why } from './drawn.ts';
 import { kindModule } from './kinds/index.ts';
+import { sourceModule } from './sources/index.ts';
+import { ACTIONS_BLOCKING } from './sources/actions-blocking.ts';
+import { FEED_BY } from './sources/activity.ts';
+import { RUNS_ON_LISTS } from './sources/runs-on.ts';
 import { fileLists } from './kinds/gallery.ts';
 import { panelFault, roadmapFault, shortFault } from './kinds/words.ts';
 import { BODY_KINDS, type Shows } from './govern.ts';
@@ -45,7 +49,7 @@ import { barsOf, type Bars, type SeriesLine } from './series.ts';
 import { isBucket } from './buckets.ts';
 import { isQuiet, presenceOf, WORKING_MS } from './presence.ts';
 import { SESSION_PREFIX, agentOf } from './session.ts';
-import { quietSign, type SignState, type VitalSign } from './signs.ts';
+import { quietSign, type VitalSign } from './signs.ts';
 import { nextSteps, stepsPercent, tallySteps, type StepsDecl } from './steps.ts';
 import { COSTS, type Cost, type Wait } from './weigh.ts';
 import { MEASURES_MOST, MEASURE_BUCKETS, measureBucket, measureLines, measureSeries, measureWindow, readableZone, type MeasureLatest, type MeasureSeries, type RawReading } from './measures.ts';
@@ -435,8 +439,8 @@ export type BlockResult = PageBlock & {
   refusals: Refusal[];
 };
 
-/** The kinds of actor a feed groups by, `packages/render/src/feed.ts`'s `FEED_BY`, copied as `BLOCK_KINDS` is in `declare.ts`. */
-export const FEED_BY = ['agent', 'rule', 'you'] as const;
+/** The kinds of actor a feed groups by, which the feed's own source holds (`sources/activity.ts`). */
+export { FEED_BY };
 export type FeedBy = (typeof FEED_BY)[number];
 
 /** One row of a feed. `who`, `kind` and `target` are `null` on the row that folds a group's rows past `first:`. */
@@ -866,28 +870,11 @@ export type ListsBeside = {
   metrics?: () => readonly MetricDecl[];
 };
 
-/** The source a block names for one project's actions in its way (REC-C09). */
-export const ACTIONS_BLOCKING = 'actions.blocking';
-
-/** The sources a block may name that are not a register. Named, so a new one is a refusal. */
-const COMPUTED = new Set([
-  'forecast.runway', 'activity', 'sessions.live', 'sessions.working', 'actions', 'governance.open', 'governance.later', 'governance.decided', 'runs_on',
-  'deadlines', 'figures.home', 'signs', HANDOFFS_OPEN, ACTIONS_BLOCKING,
-]);
+/** The source a block names for one project's actions in its way (REC-C09), which that source holds. */
+export { ACTIONS_BLOCKING };
 
 /** The name `registersOf` gives a read across the whole record, which no register id can be. */
 export const WHOLE_RECORD = '*';
-
-/**
- * The computed sources that belong to no list. The others are each named by what they read (`registersOf`): a walk by
- * its legs' lists, the live runs by `session`, `deadlines` by every list that holds a deadline and `figures.home` by
- * the list behind each pinned figure.
- *
- * `deadlines` IS NOT ONE OF THESE, though it reads across the record. Its rows are rows of named lists, so a reader who
- * may open every list that holds a deadline may be shown them all, and naming `*` would hold them back from anybody
- * whose access is the lists themselves rather than the whole record.
- */
-const WHOLE: ReadonlySet<string> = new Set(['activity', 'actions', ACTIONS_BLOCKING, 'governance.open', 'governance.later', 'governance.decided', 'signs']);
 
 /**
  * The kinds that ADD THEIR ROWS UP, whose `limit:` cuts the GROUPS they draw and never the rows they read.
@@ -947,9 +934,6 @@ const READ_WHOLE = 200;
 
 /** The register `sessions.live` and `sessions.working` read, whose fields their columns name. */
 const SESSION = 'session';
-
-/** How many events a feed reads. Bursts are counted from events, so a feed of 20 rows reads more than 20. */
-const FEED_EVENTS = 500;
 
 /** How many versions a `diff` shows: `42 §4.5` bounds `versions` at 2 to 10. */
 const VERSIONS = { least: 2, most: 10 } as const;
@@ -1944,13 +1928,11 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
       refusals: also({ code: 'DECLARATION_INVALID', fix: `group: draws cards in groups by a link field of their list, and these cards are over no list. Give them source: register.<id>, or take group: off.`, at: 'group' }),
     };
 
-  /* THE FIGURES PINNED TO HOME ARE CHOSEN BY THE RECORD, AND ANSWERED BEFORE ANY KIND READS THE BLOCK: a `stat` over
-     `figures.home` names no cells, so the stat arm below would draw it empty, and a kind module registered for `stat`
-     later would have to know this source to draw it at all. `homeFigures` reads the chosen figures as that arm does. */
-  if (block.source === 'figures.home') return homeFigures(deps, block, base, also);
-  /* AND WHAT FALLS DUE IS ONE ANSWER WHATEVER DRAWS IT: a `table`, a `timeline` and a `todo` over `deadlines` are handed
-     the same rows, built by the source, so no kind module has to learn to read across the lists. */
-  if (block.source === 'deadlines') return deadlinesBlock(deps, block, base, also);
+  /* A SOURCE THAT SAYS `first` IS ANSWERED BEFORE ANY KIND READS THE BLOCK (`sources/index.ts` `Source.first`): the figures
+     pinned to Home, which a `stat` names no cells for, and what falls due, which is one answer whatever draws it. Each
+     says why in its own file. */
+  const early = sourceModule(block.source);
+  if (early?.first) return early.read(deps, block, base, also, SOURCE_KIT);
 
   /* A REGISTERED KIND READS ITSELF, AND IT IS ASKED BEFORE ANY ARM BELOW (`kinds/index.ts`). What every block shares is
      already done by here: the keys nobody reads, `when:` and the page's `{{path}}` values. So a kind module is only the
@@ -2022,159 +2004,14 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
      other declaration and is simply handed back. Refusing it would be the record insisting that a
      paragraph is a query. */
   if (!block.source) return base;
-  /* A COMPUTED SOURCE IS A READING OVER SEVERAL REGISTERS rather than a query against one, and what
-     it reads is DECLARED on the block: a forecast that knew the word "obligations" would be a
-     forecast that works for one record. */
-  if (block.source === 'forecast.runway') {
-    const opened = openingOf(deps, block.opening);
-    if (opened.refusal) return { ...base, refusals: also(opened.refusal) };
-    /* THE WALK GOES PAST `horizon:` TO THE LENGTHS THE KNOB OFFERS, within two years and a day unless a reader asked
-       for a longer one (`walkReach`), and opens on `horizon:`. A walk of `horizon:` days and no further let the renderer
-       offer no length past it, so Money's Cash ahead opened on a whole year to keep the year in reach (visual review 4).
-       Each walk says both (`opensOn`), and every reading of it below is over the whole walk. */
-    const reach = walkReach(block, deps.walk);
-    const opensOn = (w: Runway): Runway =>
-      typeof block.horizon === 'number' && w.horizon > block.horizon ? { ...w, horizon: block.horizon, reach: w.horizon } : w;
-    /* AN OPENING IN ONE CURRENCY THAT IS NOT THE HOME ONE IS A BOOK'S OWN: Quartz says USD, so its cash is read in dollars
-       (`scopeCurrency` in `metrics.ts`), and its walk is asked for in dollars too, a bill in pounds converted into them.
-       Walked in the home currency, a book's dollars were refused as "movements in EGP", or drawn beside an empty walk. */
-    const home = deps.ctx.fx?.().home ?? null;
-    const into = home !== null && !opened.parts && opened.unit !== null && opened.unit !== home ? opened.unit : undefined;
-    /* MONEY IN SEVERAL CURRENCIES WITH NO RATE BETWEEN THEM IS ONE WALK A CURRENCY, never a sentence instead of a walk:
-       each walks that currency's part of the opening through that currency's movements, and a crossing day is a day in
-       one currency. A converted opening is walked as one, and a movement it cannot convert still says which rate. */
-    if (Array.isArray(block.from) && (opened.parts || opened.value !== null)) {
-      const whole = opened.parts ? null : deps.runway(opened.value!, block.from, reach, undefined, into);
-      /* AN OPENING IN THE HOME CURRENCY AND A MOVEMENT WITH NO RATE INTO IT: the home walk draws everything it can convert,
-         and each currency with no rate walks on its own beside it, from nothing, so no movement is left out. */
-      const lacking =
-        whole && home !== null && !opened.parts && (opened.unit === null || opened.unit === home) && whole.missing?.length
-          ? [...new Set(whole.missing.map((pair) => pair.split(' to ')[0]!))].sort()
-          : [];
-      const apart =
-        opened.parts !== undefined ||
-        lacking.length > 0 ||
-        /* A WALK ASKED FOR IN A BOOK'S CURRENCY THAT CAME BACK IN ANOTHER, from a host that walks in the home one only or
-           for want of a rate, is one walk a currency, each as it is, and never a walk converted out of the book's. */
-        (into !== undefined && whole !== null && whole.currency !== into) ||
-        (whole !== null && !opened.converted && ((whole.mixed.length > 0 && whole.steps.length === 0) || (opened.unit !== null && whole.currency !== null && opened.unit !== whole.currency)));
-      if (apart) {
-        const moving = whole ?? deps.runway(0, block.from, reach);
-        const currencies = [...new Set([...(opened.parts?.map((p) => p.currency) ?? (opened.unit ? [opened.unit] : [])), ...(moving?.mixed ?? []), ...(moving?.currency ? [moving.currency] : [])])]
-          .filter((c) => /^[A-Z]{3}$/u.test(c))
-          .sort();
-        const homeWalk = lacking.length ? deps.runway(opened.value!, block.from, reach, { except: lacking }) : null;
-        const walks = lacking.length
-          ? [
-              ...(homeWalk ? [{ ...homeWalk, currency: homeWalk.currency ?? home }] : []),
-              ...lacking.flatMap((c) => {
-                const one = deps.runway(0, block.from!, reach, c);
-                return one ? [one] : [];
-              }),
-            ]
-          : (() => {
-              const each = currencies.flatMap((c) => {
-                const from = opened.parts ? (opened.parts.find((p) => p.currency === c)?.amount ?? 0) : opened.unit === c ? opened.value! : 0;
-                const one = deps.runway(from, block.from!, reach, c);
-                return one ? [one] : [];
-              });
-              /* A CURRENCY NOTHING IS HELD IN AND NOTHING MOVES IN IS NO WALK: the home one a book's walk was converted
-                 into, beside the dollars the book keeps. Every walk is kept when every one is empty, as it was. */
-              const held = each.filter((w) => w.from !== 0 || w.steps.length > 0);
-              return held.length > 0 ? held : each;
-            })();
-        if (walks.length > 0) {
-          const recorded = recordedOf(deps, block);
-          if ('refusal' in recorded) return { ...base, refusals: also(recorded.refusal) };
-          const late = latenessOf(deps, block);
-          if ('refusal' in late) return { ...base, refusals: also(late.refusal) };
-          /* A SELL FIGURE IS CHECKED HERE AND NOT OFFERED. The host draws each walk with the block's own keys spread over
-             it (`charted` in `apps/web/src/lib/record/blocks.ts`), so one `sells` on this block would be written under
-             the dollar walk and the pound walk alike, each time as that walk's money. */
-          const sold = sellsOf(deps, block, null);
-          if ('refusal' in sold) return { ...base, refusals: also(sold.refusal) };
-          const missing = [...new Set([...(opened.missing ?? []), ...(moving?.missing ?? [])])].sort();
-          return {
-            ...base,
-            /* EACH WALK'S REMEMBERED CASH IS THE FIGURE AS IT WAS WRITTEN DOWN IN THAT WALK'S CURRENCY, so a walk in pounds
-               draws the days its opening figure was pounds, and no walk joins a line in another currency at today. */
-            walks: walks.map(opensOn).map((w) => (recorded.past ? { ...w, past: pastIn(recorded.past, w.currency) } : w)),
-            walkFx: { home, missing },
-            ...fxOf(deps),
-            ...late,
-            matched: walks.reduce((n, w) => n + w.steps.length, 0),
-            refusals: also(...walks.flatMap((w) => w.refusals)),
-          };
-        }
-      }
-    }
-    if (opened.value === null || !Array.isArray(block.from))
-      return {
-        ...base,
-        refusals: also({
-          code: 'REQUIRED_MISSING',
-          fix: 'A cash walk names what is liquid today (`opening:`) and the legs it reads (`from:`). A runway seeded from a balance nobody declared is a forecast that looks like a fact.',
-          at: 'opening',
-        }),
-      };
-    /* `NOT_IN_THIS_BUILD` RATHER THAN `UNIMPLEMENTED`, and the distinction below it is the one that
-       matters to whoever wrote the block: `08 §2.6` and `06 §3` PUBLISH these computed sources, so a
-       block naming one is a correct declaration against a build that has not caught up — a deploy
-       away, not an edit away. `SOURCE_UNKNOWN` at the bottom of this function is the other answer,
-       for a word no document publishes at all. Both said `UNIMPLEMENTED` once and a person could not
-       tell "wait" from "you made this up". */
-    const walk = deps.runway(opened.value, block.from, reach, undefined, into);
-    if (!walk)
-      return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not compute a cash walk.', at: 'source' }) };
-    /* A BALANCE IN ONE CURRENCY AND MOVEMENTS IN ANOTHER ARE NOT ONE WALK. */
-    if (opened.unit !== null && walk.currency !== null && opened.unit !== walk.currency)
-      return {
-        ...base,
-        refusals: also({
-          code: 'MIXED_CURRENCY',
-          fix: `The opening balance is in ${opened.unit} and the movements are in ${walk.currency}. A cash walk adds them, so they need one currency.`,
-          at: 'opening',
-        }),
-      };
-    const recorded = recordedOf(deps, block);
-    if ('refusal' in recorded) return { ...base, refusals: also(recorded.refusal) };
-    const late = latenessOf(deps, block);
-    if ('refusal' in late) return { ...base, refusals: also(late.refusal) };
-    /* A WALK WITH NO MOVEMENT HAS NO CURRENCY OF ITS OWN, and is then in the money its opening figure is. */
-    const sold = sellsOf(deps, block, walk.currency ?? opened.unit);
-    if ('refusal' in sold) return { ...base, refusals: also(sold.refusal) };
-    return {
-      ...base,
-      walk: opensOn(walk),
-      ...(recorded.past ? { past: pastIn(recorded.past, walk.currency) } : {}),
-      ...fxOf(deps),
-      ...late,
-      ...sold,
-      matched: walk.steps.length,
-      refusals: also(...walk.refusals),
-    };
-  }
-  /* A FEED READS THE RECORD'S EVENTS, not a register's rows. */
-  if (block.source === 'activity') return activityBlock(deps, block, base, also);
-  if (block.source === 'sessions.live') return liveBlock(deps, block, base, also);
-  if (block.source === 'sessions.working') return workingBlock(deps, block, base, also);
-  if (block.source === 'actions') return actionsBlock(deps, block, base, also);
-  if (block.source === 'signs') return signsBlock(deps, block, base, also);
-  if (block.source === HANDOFFS_OPEN) return handoffsBlock(deps, block, base, also);
-  if (block.source === ACTIONS_BLOCKING) return blockingBlock(deps, block, base, also);
-  if (block.source === 'governance.open') return openBlock(deps, block, base, also);
-  if (block.source === 'governance.later') return laterBlock(deps, block, base, also);
-  if (block.source === 'governance.decided') return decidedBlock(deps, block, base, also);
-  if (block.source === 'runs_on') return runsOnBlock(deps, block, base, also);
+  /* A SOURCE THAT IS NOT A LIST ANSWERS ITSELF, by the module registered under its name (`sources/index.ts`): a reading
+     over several lists, the record's events, its runs or its questions, rather than a query against one list. What every
+     block shares is already done by here, and a registered kind was asked first, above. */
+  const computed = sourceModule(block.source);
+  if (computed) return computed.read(deps, block, base, also, SOURCE_KIT);
   /* A BAR OR A SPLIT OVER A GROUPED FIGURE draws the figure's parts, so a part may be a monthly share of a yearly
      cost, which a sum over the rows cannot be. The host adds what no part holds as its `unset:` row. */
   if (block.source.startsWith('metric.')) return metricBlock(deps, block, block.source.slice('metric.'.length), base, also);
-  if (COMPUTED.has(block.source))
-    return {
-      ...base,
-      refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: `${block.source} is computed, and this record does not compute it yet.`, at: 'source' }),
-    };
-
   const register = block.source.startsWith('register.') ? block.source.slice('register.'.length) : null;
   const schema = register ? deps.schemaOf(register) : null;
   if (!register || !schema)
@@ -3303,19 +3140,6 @@ function markOf(row: Entry | undefined, identity: { mark?: string; accent?: stri
 
 /* ── activity ────────────────────────────────────────────────────────────── */
 
-/**
- * What a feed's `where:` may ask about an event. `actor` is the kind of actor, which is what the groups are.
- *
- * `list` IS THE LIST THE TARGET IS A ROW OF (`listOf`), so a page about one area draws that area's work with
- * `list is transactions` rather than a pattern over `target`, which a row's spoken id would make a guess. It is `list`
- * and not `register` because this schema already calls itself `activity`, and `governance.open` and `deadlines` say
- * the same word for the same thing.
- */
-const ACTIVITY: Schema = {
-  register: 'activity',
-  fields: { actor: { type: 'enum', values: FEED_BY }, kind: { type: 'text' }, target: { type: 'text' }, list: { type: 'text' } },
-};
-
 /** Who `@braindog/seed` writes a sample as, which the app names BrainDog (`names.ts`). */
 export const SEED_ACTOR = 'p_seed';
 
@@ -3433,28 +3257,6 @@ export function agentRows(events: readonly ActivityEvent[], first?: number): Fee
     }
   }
   return [...kept, ...rest.values()];
-}
-
-function activityBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: (...more: readonly Refusal[]) => Refusal[]): BlockResult {
-  if (!deps.activity)
-    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read its activity onto a page yet.', at: 'source' }) };
-  const said = predicateOf(block.where, ACTIVITY, deps.ctx);
-  if (said.bad.length) return { ...base, refusals: also(...said.bad) };
-  const read = deps.activity(FEED_EVENTS);
-  const kept = read.events.filter((e) => evaluate(said.predicate, { actor: byOf(e.actor), kind: e.kind, target: e.target, list: listOf(e.target) }, ACTIVITY));
-  /* EVERY ROW SAYS ITS LIST, as the filter read it, so a host groups or links by the list without parsing `target`. */
-  const listed = (rows: FeedRow[]): FeedRow[] => rows.map((r) => ({ ...r, list: listOf(r.target) }));
-  /* AN `agents` BLOCK IS THE AGENTS' WORK ONLY, one group per agent, so its `first:` counts each agent's rows. */
-  if (block.kind === 'agents') {
-    const theirs = kept.filter((e) => byOf(e.actor) === 'agent');
-    return { ...base, feed: listed(agentRows(theirs, block.first)), matched: theirs.length };
-  }
-  return {
-    ...base,
-    feed: listed(feedRows(kept, block.first)),
-    matched: kept.length,
-    ...(block.since === 'seen' ? { seen: read.seen } : {}),
-  };
 }
 
 /* ── the one-line add ────────────────────────────────────────────────────── */
@@ -3602,519 +3404,13 @@ function captureFills(predicate: Predicate | undefined, schema: Schema, title: s
 
 /* ── the open questions ──────────────────────────────────────────────────── */
 
-/**
- * What a queue's `where:` may ask about a question: who opened it, and what kind of thing it proposes.
- *
- * NOT THE BODY ITSELF. A proposal's body is a different shape per kind, and a predicate over it would be
- * a query language over something the record does not promise to keep stable. Who asked and what they are
- * asking for is what a page filters on.
- *
- * AND WHAT IT WOULD COST TO GET WRONG, which is a fact about the body that the record computes rather
- * than reads (`weigh.ts`). It is here because a page that wants only the expensive half — a Home that
- * draws what must be thought about, with the rest behind a count — can then say so, and because
- * without it the only way to filter to the same set is to name the body kinds one by one and keep
- * that list in step with `weigh.ts` by hand.
- */
-/* AND WHAT IT IS ABOUT, when whoever opened it said (`body.about`), so a page per area draws that area's calls with
-   `about is {{name}}`. It is the one word of a body read here, and it is a word the proposer chose to be filtered by. */
-/* AND THE LIST THAT ROW IS ON, when `about` names a row (`obligations#4`, as a rule's question does), so a module's page
-   draws its own calls with `list is obligations or transactions` and never a pattern over `about` (`listOf`). */
-const OPEN: Schema = {
-  register: 'governance',
-  fields: { who: { type: 'text' }, kind: { type: 'enum', values: BODY_KINDS }, cost: { type: 'enum', values: COSTS }, about: { type: 'text' }, list: { type: 'text' } },
-};
-
-/** How many questions a queue draws when a page names no `limit:`. Past this, the rest is the count. */
-const QUEUE_LIMIT = 3;
-/** The most it will draw, however large a `limit:` a page asks for: a queue is not a list of everything. */
-const QUEUE_CEILING = 20;
-
-/**
- * A `queue` over `governance.open`: the questions waiting on a person, and how many there are.
- *
- * THE COUNT IS OF WHAT MATCHED, NOT OF WHAT IS DRAWN, so "3 more" is three more and not the remainder of a
- * page the reader cannot see. A predicate narrows both, which is why the filter runs before the cut.
- */
-function openBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: (...more: readonly Refusal[]) => Refusal[]): BlockResult {
-  if (!deps.openQuestions)
-    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read its open questions onto a page yet.', at: 'source' }) };
-  if (block.order?.length)
-    return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: 'governance.open comes ranked by what each question would cost to get wrong, so it takes no order:.', at: 'order' }) };
-  const said = predicateOf(block.where, OPEN, deps.ctx);
-  if (said.bad.length) return { ...base, refusals: also(...said.bad) };
-  const limit = Math.min(QUEUE_CEILING, Math.max(1, Math.floor(block.limit ?? QUEUE_LIMIT)));
-  const admits = (q: OpenFacts): boolean => evaluate(said.predicate, { ...q, list: listOf(q.about) }, OPEN);
-  /* THE FILTER GOES TO THE RECORD, which ranks every open question it admits and cuts after. Filtered here over the
-     newest twenty, an expensive question asked a month ago never reached a page with a `where:`, nor its count. */
-  const read = deps.openQuestions(Math.max(limit, QUEUE_CEILING), said.predicate === undefined ? undefined : admits);
-  /* AND AGAIN HERE, for a host that takes no filter: what it was handed is filtered as it always was. */
-  const kept = read.questions
-    .map((q) => familyOf({ ...q, list: listOf(q.about) }))
-    .filter((q) => admits({ who: q.who, kind: q.kind, cost: q.cost, about: q.about ?? null }));
-  /* THE RECORD'S OWN COUNT when it answered one, over everything the filter admitted. A host that answers none: with no
-     predicate, every open question; with one, what this page could see, and it says so by being smaller. */
-  const matched = read.matched ?? (said.predicate === undefined && read.questions.length < read.open ? read.open : kept.length);
-  const stale = read.stale ?? kept.filter((q) => staleAt(q.at, deps.ctx.nowMs)).length;
-  const hardToUndo = read.hardToUndo ?? kept.filter((q) => q.cost === 'undo').length;
-  return { ...base, queue: ledBy(block, kept.slice(0, limit)), matched, waiting: { stale, hardToUndo } };
-}
-
 /** Whether a question opened at `at` has waited past `STALE_DAYS` by `nowMs`. An instant that cannot be read has not. */
 export function staleAt(at: string, nowMs: number): boolean {
   const ms = Date.parse(at);
   return Number.isFinite(ms) && nowMs - ms > STALE_DAYS * 86_400_000;
 }
 
-/**
- * A question with its family as the record said it (`cause`, `alike`), or neither.
- *
- * A COUNT OF A FAMILY THAT HAS NO NAME SAYS NOTHING, so `alike` without a `cause` is left off, and so is one that is not
- * a whole number of at least one: the question itself is always one of its own family. A blank cause is no cause.
- */
-function familyOf<Q extends QueueQuestion>(q: Q): Q {
-  const { cause, alike, ...rest } = q;
-  if (typeof cause !== 'string' || cause.trim() === '') return rest as Q;
-  return { ...rest, cause, ...(typeof alike === 'number' && Number.isInteger(alike) && alike >= 1 ? { alike } : {}) } as Q;
-}
-
-/**
- * A queue's questions with only the lead's carrying what was proposed and what accepting does.
- *
- * THE LEAD IS DRAWN WHOLE AND THE REST ARE ONE LINE EACH, so the line saying what a yes changes travels on the first
- * question alone: a queue of twenty is not twenty paragraphs nobody reads. Without `lead: true` none carries it.
- */
-function ledBy(block: PageBlock, questions: readonly QueueQuestion[]): QueueQuestion[] {
-  return questions.map((q, at) => {
-    const { body_kind, does, ...rest } = q;
-    if (block.lead !== true || at > 0) return rest;
-    return { ...rest, body_kind: body_kind ?? q.kind, ...(does ? { does } : {}) };
-  });
-}
-
-/**
- * A `queue` over `governance.later`: the questions put off whose day has not come, soonest back first, each with the
- * day it comes back and why it was put off. The same shape and the same `where` an open question has, so a page draws
- * them with the queue it draws the open ones with.
- */
-function laterBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: (...more: readonly Refusal[]) => Refusal[]): BlockResult {
-  if (!deps.laterQuestions)
-    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read what was put off onto a page yet.', at: 'source' }) };
-  if (block.order?.length)
-    return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: 'governance.later comes soonest back first, so it takes no order:.', at: 'order' }) };
-  const said = predicateOf(block.where, OPEN, deps.ctx);
-  if (said.bad.length) return { ...base, refusals: also(...said.bad) };
-  const limit = Math.min(QUEUE_CEILING, Math.max(1, Math.floor(block.limit ?? QUEUE_LIMIT)));
-  const read = deps.laterQuestions(Math.max(limit, QUEUE_CEILING));
-  const kept = read.questions
-    .map((q) => familyOf({ ...q, list: listOf(q.about) }))
-    .filter((q) => evaluate(said.predicate, { who: q.who, kind: q.kind, cost: q.cost, about: q.about ?? null, list: q.list }, OPEN));
-  const matched = said.predicate === undefined && read.questions.length < read.later ? read.later : kept.length;
-  return { ...base, queue: ledBy(block, kept.slice(0, limit)), matched };
-}
-
-/**
- * What a `governance.decided` block's `where` and columns may name: one row an answered question. `answer` is the
- * option chosen and `answer_label` its own words; `kind` and `about` are the question's.
- */
-const DECIDED: Schema = {
-  register: 'governance',
-  fields: {
-    question: { type: 'text' },
-    answer: { type: 'text' },
-    answer_label: { type: 'text' },
-    reason: { type: 'text' },
-    who: { type: 'text' },
-    at: { type: 'instant' },
-    kind: { type: 'enum', values: BODY_KINDS },
-    about: { type: 'text' },
-    list: { type: 'text' },
-  },
-};
-
-/** How many answered questions a block draws unasked, and the most it reads to find them. */
-const DECIDED_LIMIT = 10;
-const DECIDED_READ = 200;
-
-/**
- * A block over `governance.decided`: what was answered, latest first, one row a decision. Rows rather than a queue,
- * because nothing waits on them: a table, a timeline or a feed draws them as it draws any list's.
- */
-function decidedBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: (...more: readonly Refusal[]) => Refusal[]): BlockResult {
-  if (!deps.decisions)
-    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read what was decided onto a page yet.', at: 'source' }) };
-  if (block.order?.length)
-    return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: 'governance.decided comes latest first, so it takes no order:.', at: 'order' }) };
-  const unknown = (block.columns ?? []).map((c) => c.field).filter((f) => !Object.hasOwn(DECIDED.fields, f));
-  if (unknown.length)
-    return {
-      ...base,
-      refusals: also({ code: 'FIELD_UNKNOWN', fix: `A decision has no field called ${unknown.join(', ')}.`, at: 'columns', allowed: Object.keys(DECIDED.fields) }),
-    };
-  const said = predicateOf(block.where, DECIDED, deps.ctx);
-  if (said.bad.length) return { ...base, refusals: also(...said.bad) };
-  const limit = block.limit === undefined ? DECIDED_LIMIT : Math.min(DECIDED_READ, Math.max(0, Math.floor(block.limit)));
-  const read = deps.decisions(DECIDED_READ);
-  const rows = read.decisions
-    .map((d): Entry => ({
-      id: d.id,
-      register: DECIDED.register,
-      seq: null,
-      fields: {
-        question: d.question,
-        answer: d.answer,
-        answer_label: d.answer_label ?? null,
-        reason: d.reason,
-        who: d.who,
-        at: d.at,
-        kind: d.kind,
-        about: d.about ?? null,
-        list: listOf(d.about),
-      },
-      state: null,
-      version: 1,
-      created_at: d.at,
-      updated_at: d.at,
-      deleted_at: null,
-    }))
-    .filter((e) => evaluate(said.predicate, e.fields, DECIDED));
-  const matched = said.predicate === undefined && read.decisions.length < read.total ? read.total : rows.length;
-  return { ...base, rows: rows.slice(0, limit), matched };
-}
-
-/* ── the record's scheduled actions ──────────────────────────────────────── */
-
-/** What an `actions` block's `where`, `order` and columns may name: one row per action, as `listActions` reads it. */
-const ACTIONS: Schema = {
-  register: 'actions',
-  fields: {
-    ingest: { type: 'text' },
-    channel: { type: 'enum', values: ['pull', 'call', 'poll'] },
-    project: { type: 'text' },
-    host: { type: 'text' },
-    every: { type: 'text' },
-    key: { type: 'text' },
-    state: { type: 'enum', values: ['pending', 'firing', 'paused', 'done'] },
-    next: { type: 'text' },
-    last_at: { type: 'text' },
-    last_outcome: { type: 'text' },
-    /* The last run's HTTP status and note, so a host can say why an action paused or waits. */
-    last_status: { type: 'int' },
-    last_note: { type: 'text' },
-    runs: { type: 'int' },
-    failures: { type: 'int' },
-  },
-};
-
-/** One action as a row a table or cards block draws. The key is its label, and `seq` is `null` because it is no register's row. */
-const actionEntry = (a: ActionRow): Entry => ({
-  id: `action:${a.ingest}`,
-  register: ACTIONS.register,
-  seq: null,
-  fields: {
-    ingest: a.ingest,
-    channel: a.channel,
-    project: a.project,
-    host: a.host,
-    every: a.every,
-    key: a.key,
-    state: a.state,
-    next: a.next,
-    last_at: a.last?.at ?? null,
-    last_outcome: a.last?.outcome ?? null,
-    last_status: a.last?.status ?? null,
-    last_note: a.last?.note ?? null,
-    runs: a.month.runs,
-    failures: a.month.failures,
-  },
-  state: a.state,
-  version: 1,
-  created_at: a.last?.at ?? '',
-  updated_at: a.last?.at ?? '',
-  deleted_at: null,
-});
-
-/**
- * The record's scheduled actions, one row each, in the order the record lists them (by ingest id).
- *
- * THE SAME LIST AS THE `actions` READ, so a page and the "Runs on" screen cannot disagree about what runs. A key is
- * its label and nothing sealed is read. The order is the record's: `order:` is refused rather than ignored.
- */
-function actionsBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: (...more: readonly Refusal[]) => Refusal[]): BlockResult {
-  if (!deps.actions)
-    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read its scheduled actions onto a page yet.', at: 'source' }) };
-  if (block.order?.length)
-    return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: 'actions come in the order the record lists them, so it takes no order:.', at: 'order' }) };
-  const unknown = (block.columns ?? []).map((c) => c.field).filter((f) => !Object.hasOwn(ACTIONS.fields, f));
-  if (unknown.length)
-    return {
-      ...base,
-      refusals: also({ code: 'FIELD_UNKNOWN', fix: `An action has no field called ${unknown.join(', ')}.`, at: 'columns', allowed: Object.keys(ACTIONS.fields) }),
-    };
-  const said = predicateOf(block.where, ACTIONS, deps.ctx);
-  if (said.bad.length) return { ...base, refusals: also(...said.bad) };
-  const kept = deps.actions().map(actionEntry).filter((r) => evaluate(said.predicate, r.fields, ACTIONS));
-  const limit = block.limit === undefined ? 50 : Math.max(0, Math.floor(block.limit));
-  return { ...base, rows: kept.slice(0, limit), matched: kept.length };
-}
-
-/* ── the record's vital signs ────────────────────────────────────────────── */
-
-/** The states a sign can be in. Anything else a host hands is read as `none`: nothing to read is never green. */
-const SIGN_STATES: readonly SignState[] = ['green', 'red', 'none'];
-
-/**
- * What a `signs` block's `where` and columns may name: one row a sign. `sign` is its id, a handle and never what a
- * person reads; `name` is what they read, `value` its number (`null` where it counts nothing) and `said` its own
- * sentence, never one made here.
- */
-const SIGNS: Schema = {
-  register: 'signs',
-  fields: {
-    sign: { type: 'text' },
-    name: { type: 'text' },
-    state: { type: 'enum', values: SIGN_STATES },
-    value: { type: 'decimal' },
-    said: { type: 'text' },
-  },
-};
-
-/**
- * One sign as a row a table or cards block draws, keyed by its id, `seq` `null` because it is no list's row. Read now,
- * so the row was last changed when the page was read.
- *
- * A SIGN WITH NOTHING TO READ IS `none`, NEVER GREEN: a state outside the three, from a host or a reading out of shape,
- * is `none`, and so is its number, so a page never draws a sign as well that nobody has read.
- */
-function signEntry(s: VitalSign, at: string): Entry {
-  const state: SignState = SIGN_STATES.includes(s.state) ? s.state : 'none';
-  const value = state !== 'none' && typeof s.value === 'number' && Number.isFinite(s.value) ? s.value : null;
-  return {
-    id: `sign:${s.sign}`,
-    register: SIGNS.register,
-    seq: null,
-    fields: { sign: s.sign, name: s.name, state, value, said: typeof s.said === 'string' ? s.said : '' },
-    state,
-    version: 1,
-    created_at: at,
-    updated_at: at,
-    deleted_at: null,
-  };
-}
-
-/**
- * The record's vital signs, one row each, in the order of the closed list (`signs.ts` `VITAL_SIGNS`).
- *
- * THE SAME READ AS `braindog signs` AND THE RECORD'S `signs`, so Health, the command line and an agent cannot disagree
- * about what is red. The order is the list's: `order:` is refused rather than ignored, and a page that wants the red
- * ones first asks for them with `where: state is red`.
- */
-function signsBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: (...more: readonly Refusal[]) => Refusal[]): BlockResult {
-  if (!deps.signs) return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read its vital signs onto a page yet.', at: 'source' }) };
-  if (block.order?.length)
-    return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: 'signs come in the order the record lists them, so it takes no order:. Use where: state is red for the red ones.', at: 'order' }) };
-  const unknown = (block.columns ?? []).map((c) => c.field).filter((f) => !Object.hasOwn(SIGNS.fields, f));
-  if (unknown.length)
-    return { ...base, refusals: also({ code: 'FIELD_UNKNOWN', fix: `A sign has no field called ${unknown.join(', ')}.`, at: 'columns', allowed: Object.keys(SIGNS.fields) }) };
-  const said = predicateOf(block.where, SIGNS, deps.ctx);
-  if (said.bad.length) return { ...base, refusals: also(...said.bad) };
-  const at = new Date(deps.ctx.nowMs).toISOString();
-  /* QUIETED BEFORE IT IS A ROW, so neither a column nor a `where:` reads the inbox's words for a reader held from it. */
-  const quiet = deps.reader?.inbox === false;
-  const kept = deps
-    .signs()
-    .map((s) => signEntry(quiet ? quietSign(s) : s, at))
-    .filter((r) => evaluate(said.predicate, r.fields, SIGNS));
-  const limit = block.limit === undefined ? 50 : Math.max(0, Math.floor(block.limit));
-  return { ...base, rows: kept.slice(0, limit), matched: kept.length };
-}
-
-/* ── the next steps left to take ─────────────────────────────────────────── */
-
-/**
- * What a `handoffs.open` block's `where` and columns may name: one row a step left. `run` is the run that left it, a
- * handle a host draws as `agent` and links by, never alone; `next` is the step in the run's words; `left_at` when.
- * `mark` is `next` for the one a new session is handed and `earlier` for the rest, older than a week or passed over.
- */
-const HANDOFFS: Schema = {
-  register: HANDOFFS_OPEN,
-  fields: {
-    run: { type: 'text' },
-    agent: { type: 'text' },
-    next: { type: 'text' },
-    left_at: { type: 'instant' },
-    mark: { type: 'enum', values: ['next', 'earlier'] },
-  },
-};
-
-/**
- * One step as a row, keyed by the run that left it. `project` rides on the row for `projectsOf`, which says the
- * project's name, and is no field a column may name: it is a spoken id, and a person reads the name.
- */
-function stepEntry(h: OpenStep): Entry {
-  return {
-    id: h.id,
-    register: SESSION,
-    seq: null,
-    fields: { run: h.spoken, agent: agentOf({ agent: h.agent ?? undefined, client: h.client ?? undefined }).name, next: h.next, left_at: h.left_at, mark: h.mark, project: h.project },
-    state: 'handoff',
-    version: 1,
-    created_at: h.left_at,
-    updated_at: h.left_at,
-    deleted_at: null,
-  };
-}
-
-/**
- * The next steps runs left and nobody has taken, newest first: one project's, when `about:` names its row, else the
- * whole record's, each with the project it was left in.
- *
- * THE SAME READ AS THE BRIEFING'S (`openHandoffs`), so the Agents page never lists a step the card would not offer, nor
- * leaves out one it would. Newest first is the read's order, so `order:` is refused; `where: mark is next` keeps the
- * steps a new session would be handed.
- */
-function handoffsBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: (...more: readonly Refusal[]) => Refusal[]): BlockResult {
-  if (!deps.handoffs) return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read the steps runs left onto a page yet.', at: 'source' }) };
-  if (block.order?.length)
-    return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: 'handoffs.open comes the newest step first, so it takes no order:. Use where: mark is next for the ones to take now.', at: 'order' }) };
-  const unknown = (block.columns ?? []).map((c) => c.field).filter((f) => !Object.hasOwn(HANDOFFS.fields, f));
-  if (unknown.length)
-    return { ...base, refusals: also({ code: 'FIELD_UNKNOWN', fix: `A step left has no field called ${unknown.join(', ')}.`, at: 'columns', allowed: Object.keys(HANDOFFS.fields) }) };
-  const about = block.about === undefined ? null : typeof block.about === 'string' ? SPOKEN.exec(block.about) : null;
-  if (block.about !== undefined && !about)
-    return { ...base, refusals: also({ code: 'VALUE_MALFORMED', fix: 'about: names the project by its row, such as things#1, or is left off for every project.', at: 'about' }) };
-  const said = predicateOf(block.where, HANDOFFS, deps.ctx);
-  if (said.bad.length) return { ...base, refusals: also(...said.bad) };
-  const kept = deps
-    .handoffs(about ? String(block.about) : null)
-    .map(stepEntry)
-    .filter((r) => evaluate(said.predicate, r.fields, HANDOFFS, r));
-  const limit = block.limit === undefined ? 50 : Math.max(0, Math.floor(block.limit));
-  const rows = kept.slice(0, limit);
-  return { ...base, rows, matched: kept.length, types: typesOf(HANDOFFS), ...projectsOf(deps, rows) };
-}
-
-/* ── what is in a project's way ───────────────────────────────────────────── */
-
-/**
- * What an `actions.blocking` block's `where` and columns may name: one action in a project's way. `name` is the action
- * as a person reads it, `why` paused, failed or late, `since` when it last ran well, `status` the provider's last answer
- * and `said` its one sentence.
- */
-const BLOCKING: Schema = {
-  register: ACTIONS_BLOCKING,
-  fields: {
-    name: { type: 'text' },
-    why: { type: 'enum', values: ['paused', 'failed', 'late'] },
-    since: { type: 'instant' },
-    status: { type: 'int' },
-    said: { type: 'text' },
-  },
-};
-
-/**
- * One project's scheduled actions that are paused, failing or late, in the order the record lists its actions: the
- * project `about:` names by its row. THE SAME READ AS THE SIGN'S (`actionsBlocking`), so a project page never says an
- * action is in its way that Health does not, nor leaves out one it does. `order:` is refused, as for the steps left.
- */
-function blockingBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: (...more: readonly Refusal[]) => Refusal[]): BlockResult {
-  if (!deps.blocking) return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read what is in a project\'s way onto a page yet.', at: 'source' }) };
-  if (block.order?.length)
-    return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: 'actions.blocking comes in the order the record lists its actions, so it takes no order:.', at: 'order' }) };
-  const unknown = (block.columns ?? []).map((c) => c.field).filter((f) => !Object.hasOwn(BLOCKING.fields, f));
-  if (unknown.length)
-    return { ...base, refusals: also({ code: 'FIELD_UNKNOWN', fix: `An action in the way has no field called ${unknown.join(', ')}.`, at: 'columns', allowed: Object.keys(BLOCKING.fields) }) };
-  /* THE PROJECT AS AN ACTION NAMES IT: its row (things#1), its row id, or the words its declaration holds. */
-  const about = typeof block.about === 'string' ? block.about.trim() : '';
-  if (about === '')
-    return { ...base, refusals: also({ code: 'VALUE_MALFORMED', fix: 'about: names the project, such as things#1: an action in the way is one project\'s.', at: 'about' }) };
-  const said = predicateOf(block.where, BLOCKING, deps.ctx);
-  if (said.bad.length) return { ...base, refusals: also(...said.bad) };
-  const kept = deps
-    .blocking(about)
-    .map(
-      (a): Entry => ({
-        id: a.action,
-        register: ACTIONS_BLOCKING,
-        seq: null,
-        fields: { name: a.name, why: a.why, since: a.since, status: a.status, said: a.said },
-        state: a.why,
-        version: 1,
-        created_at: a.since ?? '',
-        updated_at: a.since ?? '',
-        deleted_at: null,
-      }),
-    )
-    .filter((r) => evaluate(said.predicate, r.fields, BLOCKING, r));
-  const limit = block.limit === undefined ? 50 : Math.max(0, Math.floor(block.limit));
-  return { ...base, rows: kept.slice(0, limit), matched: kept.length, types: typesOf(BLOCKING) };
-}
-
 /* ── the runs working now ────────────────────────────────────────────────── */
-
-/**
- * The runs that are not finished, as rows of `session`, the most recently seen first.
- *
- * WHICH RUNS ARE LIVE IS THE HOST'S TO SAY, from the register's own `done` list, so a page and a
- * briefing agree. The order is the host's too: `order:` is refused rather than ignored.
- */
-function liveBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: (...more: readonly Refusal[]) => Refusal[]): BlockResult {
-  if (!deps.sessionsLive)
-    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read its live runs onto a page yet.', at: 'source' }) };
-  const schema = deps.schemaOf(SESSION);
-  if (!schema) return { ...base, refusals: also({ code: 'SOURCE_UNKNOWN', fix: 'This record keeps no runs.', at: 'source' }) };
-  if (block.order?.length)
-    return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: 'sessions.live comes the most recently seen first, so it takes no order:.', at: 'order' }) };
-  const unknown = (block.columns ?? []).map((c) => c.field).filter((f) => f !== 'seq' && !Object.hasOwn(schema.fields, f));
-  if (unknown.length)
-    return {
-      ...base,
-      refusals: also({ code: 'FIELD_UNKNOWN', fix: `${SESSION} has no field called ${unknown.join(', ')}.`, at: 'columns', allowed: Object.keys(schema.fields) }),
-    };
-  const said = predicateOf(block.where, schema, deps.ctx);
-  if (said.bad.length) return { ...base, refusals: also(...said.bad) };
-  const kept = deps.sessionsLive().filter((r) => evaluate(said.predicate, r.fields, schema));
-  const limit = block.limit === undefined ? 50 : Math.max(0, Math.floor(block.limit));
-  const rows = kept.slice(0, limit);
-  /* AND WHICH OF THEM HAVE GONE QUIET, read here so a page and the rail agree on the one clock: open is not working, and
-     four runs reading "Working now" that nobody had heard from in hours was the board the owner saw. Open and not working
-     (`isQuiet` over `presenceOf`): a run that left a step is never quiet, even one carried in with no `last_seen`. */
-  return { ...base, rows, matched: kept.length, ...projectsOf(deps, rows), quiet: rows.map((r) => isQuiet(r, deps.ctx.nowMs)) };
-}
-
-/**
- * The runs working now, as rows of `session`, each with its helpers folded under it, the most recently heard from first.
- *
- * ONE NUMBER FOR EVERY READER. The rail's foot, Today's headline and tile and the Agents headline each counted runs
- * their own way, and on the owner's record they said four while two of the four were last heard from hours before.
- * They all read this now, and this reads `workingRuns` in `presence.ts`, so the count is the clock's and nobody's own.
- *
- * NO `where` AND NO `order`. Which runs are working is the clock's to say and the order is the clock's too; a `where`
- * would let a page count a different "working" under the same name, which is the fault this source closes.
- */
-function workingBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: (...more: readonly Refusal[]) => Refusal[]): BlockResult {
-  if (!deps.sessionsWorking)
-    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read its working runs onto a page yet.', at: 'source' }) };
-  const schema = deps.schemaOf(SESSION);
-  if (!schema) return { ...base, refusals: also({ code: 'SOURCE_UNKNOWN', fix: 'This record keeps no runs.', at: 'source' }) };
-  if (block.where !== undefined)
-    return {
-      ...base,
-      refusals: also({ code: 'DECLARATION_INVALID', fix: 'sessions.working is every run working now, so it takes no where:. Use sessions.live to choose among runs.', at: 'where' }),
-    };
-  if (block.order?.length)
-    return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: 'sessions.working comes the most recently heard from first, so it takes no order:.', at: 'order' }) };
-  const unknown = (block.columns ?? []).map((c) => c.field).filter((f) => f !== 'seq' && !Object.hasOwn(schema.fields, f));
-  if (unknown.length)
-    return {
-      ...base,
-      refusals: also({ code: 'FIELD_UNKNOWN', fix: `${SESSION} has no field called ${unknown.join(', ')}.`, at: 'columns', allowed: Object.keys(schema.fields) }),
-    };
-  const working = deps.sessionsWorking();
-  const limit = block.limit === undefined ? 50 : Math.max(0, Math.floor(block.limit));
-  const kept = working.slice(0, limit);
-  const rows = kept.map((w) => w.run);
-  return { ...base, rows, matched: working.length, ...projectsOf(deps, rows), helpers: kept.map((w) => w.helpers) };
-}
 
 /** A spoken id as the ladder writes a run's project: `things#1`. */
 const SPOKEN = /^([a-z][a-z0-9_]*)#([1-9][0-9]*)$/;
@@ -4163,29 +3459,6 @@ function projectsOf(deps: PageDeps, rows: readonly Entry[]): { scopes: (string |
 /* ── what a project runs on ──────────────────────────────────────────────── */
 
 /**
- * What a `runs_on` block's `where` and columns may name about one thing a project runs on.
- *
- * `quiet` IS THE EVALUATOR'S AND NOT AN AUTHOR'S: it holds a word on every row that applies everywhere and nothing on
- * the project's own, so a host fills the card's `quiet` role from it and draws the global rows faint, as it draws a run
- * gone quiet on `sessions.live`. A declaration does not name that role (`declare.ts` `CARD_ROLES`).
- */
-const RUNS_ON: Schema = {
-  register: 'runs_on',
-  fields: {
-    kind: { type: 'enum', values: ['key', 'tool', 'skill', 'action'] },
-    name: { type: 'text' },
-    scope: { type: 'enum', values: ['project', 'global'] },
-    state: { type: 'text' },
-    detail: { type: 'text' },
-    used_by: { type: 'text' },
-    used_agent: { type: 'text' },
-    used_at: { type: 'instant' },
-    spoken: { type: 'text' },
-    quiet: { type: 'text' },
-  },
-};
-
-/**
  * The type a host reads a computed source's field as, by field, where it is not the type the source's `where` reads.
  *
  * A RUN IS A HANDLE, `S731`, which `where: used_by is S731` compares as words, and which a person is never shown alone: a
@@ -4203,183 +3476,6 @@ function typesOf(schema: Schema): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [field, spec] of Object.entries(schema.fields)) out[field] = HOST_TYPES[schema.register]?.[field] ?? spec.type;
   return out;
-}
-
-/**
- * The lists `runs_on` reads, in the order it draws them, each with what one of its rows is called there and the field
- * said beside its name: what a key opens, how a tool is reached, which version a skill is at.
- *
- * NAMED BY THE AGENTS PACK'S LIST IDS, and each is read only where the record holds it and places its rows in projects
- * of the kind `about:` names: a record without the pack has none of them, and the block draws its `empty:` rather than
- * refusing for a list somebody chose not to install.
- */
-const RUNS_ON_LISTS = [
-  { register: 'credentials', kind: 'key', detail: 'opens' },
-  { register: 'tools', kind: 'tool', detail: 'transport' },
-  { register: 'skills', kind: 'skill', detail: 'rev' },
-] as const;
-
-/**
- * How many rows `runs_on` reads from each list for the project, and as many again for everywhere (`inScope` reads at
- * most 200). A tool's last use is one history read per tool row, so one block reads at most twice this many histories.
- * The scheduled actions are the record's whole schedule, which its declarations bound.
- */
-const RUNS_ON_EACH = 50;
-
-/**
- * Whether an actor is a run's name as an event is signed with it, `S47`: the only actor `used_by` answers, because a
- * person is not a run. THE PREFIX IS THE `session` LIST'S OWN (`SESSION_PREFIX`), so this and the runs it names cannot
- * spell a run two ways.
- */
-const isRun = (actor: string): boolean => actor.startsWith(SESSION_PREFIX) && /^[1-9][0-9]*$/u.test(actor.slice(SESSION_PREFIX.length));
-
-/**
- * What one project runs on: its keys, tools, skills and scheduled actions, then the ones that apply everywhere, each
- * group by name.
- *
- * NEARER WINS AS `inScope` DECIDES IT, the one read `context` and `inherit:` are built on, so a project's own skill hides
- * the global one of the same name here exactly as it does for an agent working in that project, and a retired row is
- * left out as a finished one is there.
- *
- * NO ROW OF A LIST IS HANDED BACK AS IT IS: each answer row is built from the fields `RUNS_ON` names, so the grant a
- * key's row points at is used to ask who opened it and goes no further, and nothing else of the key's row travels.
- */
-function runsOnBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: (...more: readonly Refusal[]) => Refusal[]): BlockResult {
-  if (!deps.inScope || !deps.scopeOf)
-    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read what a project runs on onto a page yet.', at: 'source' }) };
-  const about = typeof block.about === 'string' ? SPOKEN.exec(block.about) : null;
-  if (!about)
-    return {
-      ...base,
-      refusals: also({ code: 'REQUIRED_MISSING', fix: 'runs_on reads what one project runs on, and about: names that project by its row, such as things#1.', at: 'about' }),
-    };
-  const projects = about[1]!;
-  const spoken = String(block.about);
-  if (block.order?.length)
-    return {
-      ...base,
-      refusals: also({ code: 'DECLARATION_INVALID', fix: "runs_on comes the project's own first, then what applies everywhere, each by name, so it takes no order:.", at: 'order' }),
-    };
-  const unknown = (block.columns ?? []).map((c) => c.field).filter((f) => !Object.hasOwn(RUNS_ON.fields, f));
-  if (unknown.length)
-    return {
-      ...base,
-      refusals: also({ code: 'FIELD_UNKNOWN', fix: `What a project runs on has no field called ${unknown.join(', ')}.`, at: 'columns', allowed: Object.keys(RUNS_ON.fields) }),
-    };
-  const said = predicateOf(block.where, RUNS_ON, deps.ctx);
-  if (said.bad.length) return { ...base, refusals: also(...said.bad) };
-
-  const found = deps.list({ register: projects, where: { field: 'seq', is: Number(about[2]) }, limit: 1 });
-  if (!found.ok) return { ...base, refusals: refused(found) ? also(found.refusal) : also() };
-  const home = found.value.rows[0];
-  if (!home) return { ...base, refusals: also({ code: 'VALUE_MALFORMED', fix: `${spoken} is not a row of ${projects}, so there is no project to read.`, at: 'about' }) };
-
-  const scalar = (v: Json | undefined): string | null => (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' ? String(v) : null);
-  const byName = (a: Entry, b: Entry): number => {
-    const x = String(a.fields.name ?? '');
-    const y = String(b.fields.name ?? '');
-    return x < y ? -1 : x > y ? 1 : 0;
-  };
-  /* THE AGENT A RUN IS, read once a run and called as the run's own name calls it (`agentOf` in `session.ts`), so a cell
-     says "Claude Code" beside the run's handle and never the handle alone. A run the caller may not read, or one gone,
-     names no agent, and the host draws the day by itself. */
-  const agents = new Map<string, string | null>();
-  const agentNamed = (run: string | null): string | null => {
-    if (run === null) return null;
-    if (!agents.has(run)) {
-      const found = deps.list({ register: SESSION, where: { field: 'seq', is: Number(run.slice(SESSION_PREFIX.length)) }, limit: 1 });
-      const fields = found.ok ? found.value.rows[0]?.fields : undefined;
-      agents.set(run, fields ? agentOf({ agent: scalar(fields.agent) ?? undefined, client: scalar(fields.client) ?? undefined }).name : null);
-    }
-    return agents.get(run)!;
-  };
-  const own: Entry[] = [];
-  const everywhere: Entry[] = [];
-  for (const list of RUNS_ON_LISTS) {
-    const schema = deps.schemaOf(list.register);
-    if (!schema || deps.scopeOf(list.register)?.to !== projects) continue;
-    const read = deps.inScope(list.register, home.id, { open: true, limit: RUNS_ON_EACH });
-    if (!read.ok) return { ...base, refusals: refused(read) ? also(read.refusal) : also() };
-    const title = deps.titleOf(list.register) ?? '';
-    const secret = Object.keys(schema.fields).find((f) => schema.fields[f]?.type === 'secret');
-    const shaped = (r: Entry, scope: 'project' | 'global'): Entry => {
-      const used = list.kind === 'key' ? keyUse(deps, r, secret) : list.kind === 'tool' ? toolUse(deps, list.register, r) : { by: null, at: null };
-      return {
-        ...r,
-        fields: {
-          kind: list.kind,
-          name: scalar(r.fields[title]) ?? '',
-          scope,
-          state: r.state,
-          detail: scalar(r.fields[list.detail]),
-          used_by: used.by,
-          used_agent: agentNamed(used.by),
-          used_at: used.at,
-          spoken: r.seq === null ? r.id : `${list.register}#${r.seq}`,
-          quiet: scope === 'global' ? 'global' : null,
-        },
-      };
-    };
-    own.push(...read.value.rows.map((r) => shaped(r, 'project')).sort(byName));
-    everywhere.push(...read.value.inherited.map((r) => shaped(r, 'global')).sort(byName));
-  }
-  /* A SCHEDULED ACTION RUNS FOR ONE PROJECT OR FOR ALL OF THEM, and one that has finished runs on nothing. Its
-     declaration holds the project as the row's id; the spoken id is taken too, as the way a person would write it. */
-  const acts = { project: [] as Entry[], global: [] as Entry[] };
-  for (const a of deps.actions?.() ?? []) {
-    if (a.state === 'done') continue;
-    const scope = a.project === null ? 'global' : a.project === home.id || a.project === spoken ? 'project' : null;
-    if (scope === null) continue;
-    acts[scope].push({
-      ...actionEntry(a),
-      fields: { kind: 'action', name: a.ingest, scope, state: a.state, detail: a.next, used_by: null, used_agent: null, used_at: null, spoken: a.ingest, quiet: scope === 'global' ? 'global' : null },
-    });
-  }
-  const all = [...own, ...acts.project.sort(byName), ...everywhere, ...acts.global.sort(byName)];
-  /* WITH THE ROW, because `seq is 3` is a sentence the grammar reads over any schema and answers from the row's column,
-     and `evaluate` throws rather than guess when it is handed only the fields. */
-  const kept = all.filter((r) => evaluate(said.predicate, r.fields, RUNS_ON, r));
-  const limit = block.limit === undefined ? 50 : Math.max(0, Math.floor(block.limit));
-  const rows = kept.slice(0, limit);
-  /* EACH ROW'S CHIP IS THE PROJECT'S OR NONE, as `scopesOf` answers a block over one of these lists. */
-  const name = scalar(home.fields[deps.titleOf(projects) ?? '']) ?? spoken;
-  const mark = markOf(home, deps.identityOf?.(projects) ?? null);
-  return {
-    ...base,
-    rows,
-    matched: kept.length,
-    types: typesOf(RUNS_ON),
-    scopes: rows.map((r) => (r.fields.scope === 'project' ? name : null)),
-    scope_marks: rows.map((r) => (r.fields.scope === 'project' ? mark : null)),
-  };
-}
-
-/**
- * Who opened a key last, when that was a run, and when it was last opened by anybody; `null` in both when nobody has.
- * The grant's id is the value of the key row's secret field, and it is asked about and never answered.
- */
-function keyUse(deps: PageDeps, row: Entry, secret: string | undefined): { by: string | null; at: string | null } {
-  const grant = secret === undefined ? undefined : row.fields[secret];
-  const last = typeof grant === 'string' && grant !== '' ? (deps.keyOpened?.(grant) ?? null) : null;
-  return last ? { by: isRun(last.actor) ? last.actor : null, at: last.ts } : { by: null, at: null };
-}
-
-/**
- * When a tool was last seen, as its own `seen` says, and the run that wrote that, from the row's history.
- *
- * THE HISTORY IS READ ONLY FOR A TOOL SEEN AT ALL, so a tool nobody has used costs no read.
- */
-function toolUse(deps: PageDeps, register: string, row: Entry): { by: string | null; at: string | null } {
-  const seen = row.fields.seen;
-  const at = typeof seen === 'string' && seen !== '' ? seen : null;
-  if (at === null || row.seq === null || !deps.history) return { by: null, at };
-  const events = deps.history(register, `${register}#${row.seq}`);
-  const wrote = events.ok
-    ? events.value
-        .filter((e) => e.field === 'seen' || (e.field === null && e.to !== null && typeof e.to === 'object' && !Array.isArray(e.to) && Object.hasOwn(e.to, 'seen')))
-        .at(-1)
-    : undefined;
-  return { by: wrote && isRun(wrote.actor) ? wrote.actor : null, at };
 }
 
 /* ── one row's history ───────────────────────────────────────────────────── */
@@ -4677,7 +3773,7 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
        name the record's `reaches` already answers only for a ceiling of the whole record, so asking whether a
        caller may read it is asking whether they read all of it. It is never a list's id: `declare.ts` refuses
        a register id that is not lower-case letters, digits and underscores. */
-    if (typeof block.source === 'string' && WHOLE.has(block.source)) named.add(WHOLE_RECORD);
+    if (sourceModule(block.source)?.whole) named.add(WHOLE_RECORD);
     /* WHAT A PROJECT RUNS ON READS THE KEYS, TOOLS AND SKILLS LISTS AND THE PROJECT `about:` NAMES, each whether or not
        this record holds it, and the scheduled actions beside them, which belong to no list and so are `*`: a key's
        label and an action's host are held back from a member who may not read all of them, as `actions` holds them. */
@@ -5309,224 +4405,6 @@ function pinnedOf(metrics: readonly MetricDecl[], reads?: (decl: MetricDecl) => 
 }
 
 /**
- * A `stat` over `figures.home`: the figures the record pins to Home, each read as a `stat` reads a figure its `cells`
- * name, and labelled by the name it is declared with.
- *
- * THE RECORD CHOOSES THEM AND NOT THE PAGE, so one Home written over computed sources draws the figures each use case
- * pins (`home:` on a metric). `cells:` beside the source would be two answers to one question, so it is refused.
- */
-function homeFigures(deps: PageDeps, block: PageBlock, base: BlockResult, also: (...more: readonly Refusal[]) => Refusal[]): BlockResult {
-  if (block.kind !== 'stat')
-    return {
-      ...base,
-      refusals: also({ code: 'DECLARATION_INVALID', fix: `figures.home is drawn by a stat block, and a ${block.kind} block has no figures to draw it with.`, at: 'source' }),
-    };
-  if (block.cells !== undefined)
-    return {
-      ...base,
-      refusals: also({
-        code: 'DECLARATION_INVALID',
-        fix: 'figures.home draws the figures this record pins to Home, so it takes no cells:. Take the cells off, or take the source off to draw the cells.',
-        at: 'cells',
-      }),
-    };
-  if (!deps.metrics)
-    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read the figures pinned to Home onto a page yet.', at: 'source' }) };
-  const pinned = pinnedOf(deps.metrics(), (d) => mayRead(deps, d));
-  /* READ BY THE STAT ARM ITSELF, handed a block of those cells and nothing else, so a pinned figure's reading, target
-     and refusal are exactly what the same figure named in `cells:` answers, and there is one reading of a cell. */
-  const cells = pinned.map((d) => ({ metric: d.metric, ...(typeof d.name === 'string' && d.name.trim() !== '' ? { label: d.name } : {}) }));
-  const read = readBlock(deps, { kind: 'stat', cells });
-  return { ...base, readings: read.readings ?? [], matched: pinned.length, refusals: also(...read.refusals) };
-}
-
-/** The days ahead a `deadlines` block reads when it names no `horizon:`. */
-const DEADLINES_HORIZON = 14;
-/** The furthest ahead it reads: a year and a day, so a yearly renewal is in reach of a page that asks for it. */
-const DEADLINES_HORIZON_MOST = 366;
-/**
- * The rows read for each deadline field of each list, soonest first, and the most a block draws. Each list's soonest
- * rows are read, so the soonest across all of them are exact up to this many; the lists are the record's declarations.
- */
-const DEADLINES_READ = 200;
-
-/**
- * What a `deadlines` block's `where` and columns may name about one thing falling due.
- *
- * `row` IS THE ROW'S SPOKEN ID AND `list` ITS LIST, so a page narrows with `list is tasks or services` and a host opens
- * each row where it lives. `amount` and `direction` are empty on a list that holds no money.
- */
-const DEADLINES: Schema = {
-  register: 'deadlines',
-  fields: {
-    list: { type: 'text' },
-    row: { type: 'text' },
-    title: { type: 'text' },
-    day: { type: 'day' },
-    amount: { type: 'money' },
-    direction: { type: 'enum', values: ['in', 'out'] },
-  },
-};
-
-/** Which field of a list is what falls due in money, and which way a row of it moves. */
-type MoneyWay = { amount: string | null; way: (fields: Record<string, Json>) => 'in' | 'out' | null };
-
-/**
- * Every leg a cash walk on this record reads, as it was written: the walks on its pages, and the figures that read a
- * walk (`source: forecast.runway` with `legs:`). What `moneyWayOf` learns a list's money from.
- */
-function legsOf(deps: PageDeps): unknown[] {
-  const onPages = deps.pages().flatMap((p) =>
-    (Array.isArray(p.blocks) ? p.blocks : []).flatMap((b) => (b !== null && typeof b === 'object' && b.source === 'forecast.runway' && Array.isArray(b.from) ? (b.from as unknown[]) : [])),
-  );
-  const inFigures = (deps.metrics?.() ?? []).flatMap((m) => (m.source === 'forecast.runway' && Array.isArray(m.legs) ? [...m.legs] : []));
-  return [...onPages, ...inFigures];
-}
-
-/**
- * Which field of a list holds what falls due and which way it moves, from what the record already declares.
- *
- * A CASH WALK'S LEG OVER THE LIST SAYS BOTH (`forecast.ts` `Leg`): its `amount`, and in `incoming` the field and value
- * that mean money arriving, every other row of the leg going out. So a list the record walks is read here as the walk
- * reads it, and no module's own word for money in is written into the kernel. A list no walk reads has its one money
- * field as its amount, and says which way only by an enum of exactly `in` and `out`; any other way is `null`, never a
- * guess. A list with no money field, or several and no leg to choose, has neither.
- */
-function moneyWayOf(schema: Schema, legs: readonly unknown[]): MoneyWay {
-  const money = Object.keys(schema.fields).filter((f) => schema.fields[f]!.type === 'money');
-  const leg = legs.find(
-    (l): l is Leg =>
-      l !== null &&
-      typeof l === 'object' &&
-      (l as { register?: unknown }).register === schema.register &&
-      typeof (l as { amount?: unknown }).amount === 'string' &&
-      money.includes((l as { amount: string }).amount),
-  );
-  if (leg) {
-    const said = leg.incoming as unknown;
-    const incoming =
-      said !== null && typeof said === 'object' && typeof (said as { field?: unknown }).field === 'string' && typeof (said as { is?: unknown }).is === 'string'
-        ? (said as { field: string; is: string })
-        : null;
-    return { amount: leg.amount, way: (fields) => (incoming === null ? 'out' : fields[incoming.field] === incoming.is ? 'in' : 'out') };
-  }
-  const amount = money.length === 1 ? money[0]! : null;
-  if (amount === null) return { amount: null, way: () => null };
-  const sign = Object.keys(schema.fields).find((f) => {
-    const values = schema.fields[f]!.type === 'enum' ? (schema.fields[f]!.values ?? []) : [];
-    return values.length === 2 && values.includes('in') && values.includes('out');
-  });
-  return {
-    amount,
-    way: (fields) => {
-      const v = sign === undefined ? undefined : fields[sign];
-      return v === 'in' || v === 'out' ? v : null;
-    },
-  };
-}
-
-/** A stored money value as a reader is shown it, its amount and currency and nothing else, or `null`. */
-function moneyValue(v: Json | undefined): { amount: number; currency: string } | null {
-  return v !== null && typeof v === 'object' && !Array.isArray(v) && typeof v.amount === 'number' && typeof v.currency === 'string'
-    ? { amount: v.amount, currency: v.currency }
-    : null;
-}
-
-/**
- * A block over `deadlines`: every row of every list the reader may read that falls due on a field the list declares
- * `deadline: true`, is not in one of the list's `done` states, and falls due by `horizon:` days from today, overdue
- * first and then by day.
- *
- * ONE ANSWER ACROSS THE LISTS, so Home says what is coming without naming a list: a task's `by`, a service's `renews`,
- * a bill's `due`. Each row is `{ list, row, title, day, amount, direction }`, and `state` is the row's own, so a host
- * tones it as the list's own grid does. The order is the record's, so `order:` is refused rather than ignored.
- *
- * A LIST THE READER MAY NOT READ IS LEFT OUT, when the host says who is reading (`EvalContext.reads`). When it does not,
- * every list is read and `registersOf` names each, so the record holds the block from anybody who may not read them all.
- */
-function deadlinesBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: (...more: readonly Refusal[]) => Refusal[]): BlockResult {
-  if (!deps.lists)
-    return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read what falls due across its lists onto a page yet.', at: 'source' }) };
-  const horizon = block.horizon ?? DEADLINES_HORIZON;
-  if (typeof horizon !== 'number' || !Number.isInteger(horizon) || horizon < 0 || horizon > DEADLINES_HORIZON_MOST)
-    return {
-      ...base,
-      refusals: also({ code: 'OUT_OF_BOUNDS', fix: `horizon: on deadlines is a whole number of days ahead, from 0 to ${DEADLINES_HORIZON_MOST}.`, at: 'horizon' }),
-    };
-  if (block.order?.length)
-    return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: 'deadlines come overdue first and then by day, so it takes no order:.', at: 'order' }) };
-  const unknown = (block.columns ?? []).map((c) => c.field).filter((f) => !Object.hasOwn(DEADLINES.fields, f));
-  if (unknown.length)
-    return {
-      ...base,
-      refusals: also({ code: 'FIELD_UNKNOWN', fix: `A deadline has no field called ${unknown.join(', ')}.`, at: 'columns', allowed: Object.keys(DEADLINES.fields) }),
-    };
-  const said = predicateOf(block.where, DEADLINES, deps.ctx);
-  if (said.bad.length) return { ...base, refusals: also(...said.bad) };
-  const limit = block.limit === undefined ? 50 : Math.min(DEADLINES_READ, Math.max(0, Math.floor(block.limit)));
-
-  /* TODAY IS THE RECORD'S LOCAL DAY, as every `today` a predicate names is (`metrics.ts` `clockOf`). */
-  const today = localDays(readableZone(deps.ctx.tz ?? deps.tz))(deps.ctx.asOfMs ?? deps.ctx.nowMs);
-  const last = new Date(Date.parse(`${today}T00:00:00Z`) + horizon * 86_400_000).toISOString().slice(0, 10);
-  const legs = legsOf(deps);
-  const found: { day: string; list: string; seq: number; entry: Entry }[] = [];
-  let counted = 0;
-  for (const list of deps.lists()) {
-    if (deps.ctx.reads !== undefined && !deps.ctx.reads(list.id)) continue;
-    const schema = deps.schemaOf(list.id);
-    if (!schema) continue;
-    const dated = Object.keys(schema.fields).filter((f) => schema.fields[f]!.deadline === true && schema.fields[f]!.type === 'day');
-    if (dated.length === 0) continue;
-    const money = moneyWayOf(schema, legs);
-    const title = deps.titleOf(list.id);
-    const done = list.done ?? [];
-    /* NOT FINISHED IS THE LIST'S OWN `done` STATES, read off the field it mirrors onto the state column. A row with no
-       state yet is open. */
-    const open: Predicate[] = schema.state !== undefined && done.length > 0 ? [{ field: schema.state, not_in: [...done] }] : [];
-    for (const field of dated) {
-      const got = deps.list({ register: list.id, where: { all: [{ field, lte: last }, ...open] }, limit: DEADLINES_READ, order: [{ field, dir: 'asc' }] });
-      if (!got.ok) return { ...base, refusals: refused(got) ? also(got.refusal) : also() };
-      counted += got.value.matched;
-      for (const r of got.value.rows) {
-        const day = r.fields[field];
-        if (typeof day !== 'string' || r.seq === null) continue;
-        const named = title !== null && Object.hasOwn(r.fields, title) ? r.fields[title] : undefined;
-        const amount = money.amount !== null && Object.hasOwn(r.fields, money.amount) ? moneyValue(r.fields[money.amount]) : null;
-        found.push({
-          day: day.slice(0, 10),
-          list: list.id,
-          seq: r.seq,
-          entry: {
-            id: `${r.id}:${field}`,
-            register: DEADLINES.register,
-            seq: null,
-            fields: {
-              list: list.id,
-              row: `${list.id}#${r.seq}`,
-              title: typeof named === 'string' ? named : typeof named === 'number' || typeof named === 'boolean' ? String(named) : '',
-              day: day.slice(0, 10),
-              amount,
-              direction: amount === null ? null : money.way(r.fields),
-            },
-            state: r.state,
-            version: r.version,
-            created_at: r.created_at,
-            updated_at: r.updated_at,
-            deleted_at: null,
-          },
-        });
-      }
-    }
-  }
-  /* OVERDUE FIRST AND THEN BY DAY is one order, the day's: every overdue day is before today. The list and the row's
-     number settle a tie, so two reads of one record answer the same order. */
-  found.sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : a.list < b.list ? -1 : a.list > b.list ? 1 : a.seq - b.seq));
-  const kept = found.map((f) => f.entry).filter((e) => evaluate(said.predicate, e.fields, DEADLINES));
-  /* WITH NO `where` THE COUNT IS EVERY ROW DUE, as each list counted them; with one it is the rows read that it kept. */
-  return { ...base, rows: kept.slice(0, limit), matched: said.predicate === undefined ? counted : kept.length };
-}
-
-/**
  * The lists a block that reads across them may read, for `registersOf`: every list holding a deadline, the lists behind
  * each figure pinned to Home, and behind each figure a sell knob with no `sell:` may offer (`listsRead`). `*` for any
  * of them whose declarations the caller did not hand over (`beside`), so an unknown is never a licence.
@@ -5550,3 +4428,50 @@ function acrossLists(block: PageBlock, beside: ListsBeside | undefined): string[
   const figure = (id: string): MetricDecl | null => metrics.find((m) => m.metric === id) ?? null;
   return chosen.flatMap((d) => listsRead(d, figure, pointsBeside(beside)));
 }
+
+/**
+ * What a source module is handed beside the record's reads: the helpers and the words of this file and of the kernel
+ * that its read needs, which it cannot import (`sources/index.ts` says why a module is a leaf at run time).
+ *
+ * ONE OBJECT FOR EVERY SOURCE, made once, since nothing in it is about one block: each module takes the names it uses.
+ * AT THE FOOT OF THE FILE, so every word in it is made by the time it is; it is read only when a block is.
+ */
+const SOURCE_KIT = {
+  predicateOf,
+  /* the feed */
+  byOf,
+  listOf,
+  agentRows,
+  feedRows,
+  /* the questions */
+  staleAt,
+  BODY_KINDS,
+  COSTS,
+  /* the runs, and what is called by a run */
+  SESSION,
+  SESSION_PREFIX,
+  SPOKEN,
+  HANDOFFS_OPEN,
+  agentOf,
+  isQuiet,
+  projectsOf,
+  markOf,
+  typesOf,
+  quietSign,
+  /* what falls due */
+  localDays,
+  readableZone,
+  /* the figures pinned to Home */
+  pinnedOf,
+  mayRead,
+  readBlock,
+  /* the cash walk */
+  openingOf,
+  walkReach,
+  recordedOf,
+  latenessOf,
+  sellsOf,
+  pastIn,
+  fxOf,
+};
+export type SourceKit = typeof SOURCE_KIT;

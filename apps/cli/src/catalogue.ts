@@ -51,7 +51,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
-import { exportUseCase, sharedFileName } from '@braindog/declare';
+import { addressFaults, exportUseCase, listingFault, sharedFileName } from '@braindog/declare';
 import {
   addKeyStatement,
   CATALOGUE_INDEX,
@@ -349,10 +349,22 @@ async function checkPack(args: string[], io: AgentIo): Promise<number> {
   io.out(`${title} ${pack.manifest.version} reads as an add-on: ${count('register')} lists, ${count('page')} pages and ${pack.seeds.length} example rows. Nothing was sent.`);
   io.out(`  By ${pack.manifest.author}, ${pack.manifest.license}.`);
   for (const line of reachLines(reachOf(read.file))) io.out(line);
+  /* THE FILE AS WRITTEN, read for what the Kennel and an install both refuse by name (`address.ts`): every address
+     where none may be, and a key a listing never says. Said here in the sentence those two say, and every one of them,
+     where a record stops at the first. */
+  const written: unknown = JSON.parse(read.text);
+  const remote = addressFaults(written);
+  const unlistable = listingFault(written);
+  for (const r of [...remote, ...(unlistable ? [unlistable] : [])]) io.out(`  ${oneLine(`${r.fix} (${r.code})`)}`);
+  if (remote.length > 0) {
+    io.say(`${title} ${pack.manifest.version} would be refused by a record, as said above.`);
+    return 1;
+  }
   const checked = await checkInScratch(read.file);
   for (const line of checked.lines) io.out(line);
   if (!checked.ok) io.say(`${title} ${pack.manifest.version} would be refused by a record, as said above.`);
-  return checked.ok ? 0 : 1;
+  else if (unlistable) io.say(`${title} ${pack.manifest.version} would be refused by the Kennel, as said above.`);
+  return checked.ok && !unlistable ? 0 : 1;
 }
 
 /**

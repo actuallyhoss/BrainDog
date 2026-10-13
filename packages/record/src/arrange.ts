@@ -19,7 +19,7 @@
 
 import type { Refusal, Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
-import { conflictFault, installFault, installOrder, labelsOf, laterVersion, packIdOf, plan, plannedState, readShared, install, stagedBatch, uninstall, unresolvedFault, SPEAKS, VOICE_KEYS, speakingPack, voiceOf as voiceIn, voiceSetting, voiceWrites, type Host, type Installed, type Pack, type VoiceKey } from '@braindog/declare';
+import { conflictFault, installFault, installOrder, labelsOf, laterVersion, packIdOf, plan, plannedState, readShared, install, stagedBatch, uninstall, unresolvedFault, SPEAKS, VOICE_KEYS, speakingPack, voiceOf as voiceIn, voiceSetting, voiceWrites, type Diff, type Host, type Installed, type Pack, type VoiceKey } from '@braindog/declare';
 import { KEYS_REACH_ALL, approvalLines, configReads, configValue, egressChanged, egressOf, ulids, type ConfigDecl, type Declaration, type Json, type Kernel, type PlannedRecord } from '@braindog/kernel';
 import type { FormSpec, NextSpec } from './slash.ts';
 import { normaliseChecked } from './theme-check.ts';
@@ -142,6 +142,130 @@ export async function carryUpdate(catalogue: readonly CatalogueEntry[], kernel: 
 }
 
 type Body = Record<string, unknown>;
+
+/** Who holds each add-on's file while a part of it waits (`installHeld`), in the record's own settings. */
+const WAITING_HOLDER = 'braindog:waiting';
+
+/**
+ * `install`, with what the plan held back written on the add-on (migration 38) and the add-on's file kept beside it for as
+ * long as a part waits (SHL-A08 job 4).
+ *
+ * WHY THE FILE IS KEPT. A part that says `when: { holds: [people] }` is cut out of what the install stages, and the record
+ * stores declarations and a manifest, never the file. So the day People arrives nothing the record held could say what
+ * the part was. The file as it was read is kept until nothing of it waits, and the first install that leaves nothing
+ * waiting takes it away again. Without its example entries: a part that lands by itself writes nothing nobody typed.
+ */
+export async function installHeld(kernel: Kernel, pack: Pack, diff: Diff, host: Host, planHash: string, approve: readonly string[] = [], because?: string): ReturnType<typeof install> {
+  const waiting = diff.waiting ?? [];
+  /* `because` IS WHY AN INSTALL NOBODY PRESSED HAPPENED, for the line history keeps of it (`planAgain`). */
+  const more = { waiting, ...(because === undefined ? {} : { because }) };
+  const put = await install(pack, diff, { ...host, remember: (row) => host.remember({ ...row, ...more } as Parameters<Host['remember']>[0]) }, planHash, approve);
+  if (put.ok) kernel.setPref(WAITING_HOLDER, pack.manifest.pack, waiting.length > 0 ? { ...pack, seeds: [] } : null);
+  return put;
+}
+
+/** The file of an add-on that is gone is let go with it. */
+export const forgetHeld = (kernel: Kernel, id: string): void => kernel.setPref(WAITING_HOLDER, id, null);
+
+/**
+ * Whether a plan made again only brings parts that waited, and brings nothing a person has to be asked about.
+ *
+ * ADDITIVE: the same version over itself, with fewer parts waiting than before and none waiting that did not, so a part
+ * that landed is never taken back out (RQ-SHL-454: the add-on that made it true may be off, and the part stays).
+ * Nothing retired, renamed, retyped or taken over, and no other add-on left broken.
+ * AND ONLY WHAT WAITED: every list, page or rule the plan would add or change holds a part that arrives. A setting somebody
+ * changed and has not installed yet would otherwise ride in with it and rename a list nothing waited on, with no press.
+ * OPTIONAL: no field made required. The grammar refuses `when` on a required field, and this is asked all the same.
+ * AND NOTHING THAT REACHES OUTSIDE, which no plan is ever let do unasked (`@braindog/seed` `losses`).
+ */
+function arrivesAlone(pack: Pack, diff: Diff, before: readonly { at: string }[]): boolean {
+  const was = new Set(before.map((w) => w.at));
+  const still = diff.waiting ?? [];
+  if (diff.direction !== 'reinstall' || still.length >= was.size || still.some((w) => !was.has(w.at))) return false;
+  if (diff.retires.length + diff.conflicts.length + diff.renames.length + diff.retypes.length + diff.newly_required.length + diff.misreads.length > 0) return false;
+  const left = new Set(still.map((w) => w.at));
+  const came = [...was].filter((at) => !left.has(at));
+  const brought = (id: string): boolean => came.some((at) => at === id || at.startsWith(`${id}.`) || at.startsWith(`${id}[`));
+  if (![...diff.adds, ...diff.changes].every((c) => brought(c.id))) return false;
+  if (diff.orphans > 0 || diff.unresolved.length > 0 || diff.dependents.some((p) => p.was && !p.ok)) return false;
+  if (diff.approve.length > 0 || diff.calls_out.some((c) => c.change !== 'same')) return false;
+  return installFault(pack, diff) === null;
+}
+
+/**
+ * THE RULE AN ADD-ON'S PUBLISHER EARNS for a part that arrives: whether it lands with no press. Every publisher earns the
+ * same today, since the file is the one the owner already installed at this version and `arrivesAlone` has passed it.
+ * The one place a rule by publisher goes when the catalogue says who signed what (SHL-A10).
+ */
+const earnsAlone = (_pack: Pack): boolean => true;
+
+/** What a person calls a role a part can wait for, where no list of that name says it. */
+const ROLE_WORDS: Readonly<Record<string, string>> = { rates: 'Exchange rates', meets: 'People', org: 'Organisations' };
+
+/** Why a plan made again landed, as history says it: "1 part that waited for People arrived." */
+function arrivedSaid(kernel: Kernel, before: readonly { at: string; holds: readonly string[] }[], still: readonly { at: string }[]): string {
+  const left = new Set(still.map((w) => w.at));
+  const came = before.filter((w) => !left.has(w.at));
+  const names = [...new Set(came.flatMap((w) => w.holds))].map((hold) => {
+    const words = hold.replace(/_/gu, ' ');
+    return kernel.register(hold)?.name ?? ROLE_WORDS[hold] ?? words.charAt(0).toUpperCase() + words.slice(1);
+  });
+  const said = names.length <= 1 ? (names[0] ?? 'the record') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)!}`;
+  return `${came.length === 1 ? '1 part' : `${came.length} parts`} that waited for ${said} arrived.`;
+}
+
+/**
+ * AFTER AN INSTALL, AN UPDATE OR A SWITCH-ON: every add-on with a part waiting is planned again over what the record holds
+ * now, and a part whose wait is over lands (SHL-A08 job 4). Answers the add-ons something landed for.
+ *
+ * BEFORE: a field that waited for People stayed out for good once People was installed, until somebody installed the
+ * add-on a second time by hand. Now it is there within the next plan, with no press.
+ *
+ * ONE PASS, EACH ADD-ON PLANNED ONCE, in the order they would install (`installOrder`). What waits is read once, before
+ * anything is planned, and an install made here does not start another pass: two add-ons that wait on each other each
+ * get one plan a pass, and a part the pass itself made true lands after the next install or switch-on, never in a loop.
+ *
+ * AN ADD-ON THAT IS OFF IS LEFT, since a plan installed would turn it on, and turning it on is what runs this again.
+ * One whose file was not kept, or was kept at another version, is left too. Anything but parts arriving is left
+ * (`arrivesAlone`), and so is a plan the install refuses.
+ *
+ * THE HOST SIGNS WHAT LANDS, as whoever's install or switch-on brought the part, and the install carries why
+ * (`arrivedSaid`), so history says who and what for. Any throw is swallowed: the install that ran this is in, and a
+ * part that could not land goes on waiting.
+ */
+export async function planAgain(d: { kernel: Kernel; installed: () => Installed; host: Host }): Promise<string[]> {
+  const landed: string[] = [];
+  try {
+    const { kernel } = d;
+    const waits = new Map(kernel.packsWaiting().map((p) => [p.id, p.waiting]));
+    if (waits.size === 0) return landed;
+    const kept = kernel.prefsOf(WAITING_HOLDER) as Record<string, Pack | undefined>;
+    const states = new Map(kernel.packStates().map((p) => [p.id, p]));
+    const files = new Map<string, Pack>();
+    for (const id of waits.keys()) {
+      const file = kept[id];
+      const state = states.get(id);
+      if (file !== undefined && state !== undefined && state.disabled_at === null && state.version === file.manifest.version) files.set(id, file);
+    }
+    const order = installOrder([...files.values()].map((f) => ({ id: f.manifest.pack, version: f.manifest.version, requires: f.manifest.requires.packs })), d.installed());
+    for (const id of order) {
+      /* ONE ADD-ON AT A TIME: a throw from one plan or install leaves that one waiting, and the ones after it are
+         still tried (audit of batch 51, finding 7). */
+      try {
+        const file = files.get(id)!;
+        const diff = await plan(file, d.installed());
+        const before = waits.get(id) ?? [];
+        if (!arrivesAlone(file, diff, before) || !earnsAlone(file)) continue;
+        if ((await installHeld(kernel, file, diff, d.host, diff.planHash, [], arrivedSaid(kernel, before, diff.waiting ?? []))).ok) landed.push(id);
+      } catch {
+        /* This one goes on waiting. */
+      }
+    }
+  } catch {
+    /* Said above: what could not land goes on waiting. */
+  }
+  return landed;
+}
 
 /** One current entry of the host's whole catalogue: `id` is the pack id a record holds it under, `modules` what goes in first. */
 export type ShelfEntry = { id: string; kind: 'pack' | 'usecase'; title: string; summary: string; version: string; modules: readonly string[] };
@@ -1573,7 +1697,7 @@ export function arranger(d: ArrangeDeps) {
       const pack = await packOf(id, docs, heldBy(state), useCaseFor(packs.install ?? [], id));
       if (!pack.ok) return false;
       const diff = await plan(pack.value, state, { settings: values });
-      return (await install(pack.value, diff, d.host(actor), diff.planHash, diff.approve)).ok;
+      return (await installHeld(kernel, pack.value, diff, d.host(actor), diff.planHash, diff.approve)).ok;
     };
     const filled = new Set<string>();
     const spokeBefore = speakerNow();
@@ -1609,7 +1733,7 @@ export function arranger(d: ArrangeDeps) {
          settings it held. One that had declarations live under it before (a handover), or an update, cannot be. */
       const before = replanning ? heldValues(id, Object.keys(given.get(id) ?? {})) : null;
       const fresh = from === null && running(id) === undefined;
-      const put = await install(pack.value, diff, d.host(actor), diff.planHash, diff.approve);
+      const put = await installHeld(kernel, pack.value, diff, d.host(actor), diff.planHash, diff.approve);
       if (!put.ok) return stopped(put);
       if (given.has(id)) filled.add(id);
       if (replanning) {
@@ -1694,6 +1818,8 @@ export function arranger(d: ArrangeDeps) {
       if (!wrote.ok) return stopped(wrote);
       done.rows.push(...wrote.value);
     }
+    /* AND WHAT WAITED FOR ANY OF IT LANDS (`planAgain`). Last, so nothing after it can stop and take the press back. */
+    if (done.installed.length + done.enabled.length + done.declarations.length > 0) await planAgain({ kernel, installed: d.installed, host: d.host(actor) });
     return ok(Object.fromEntries(Object.entries(done).filter(([, v]) => v.length > 0)));
   }
 

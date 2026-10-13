@@ -21,7 +21,6 @@ import { lintRound, pagesCleanReading } from './page-lint.ts';
 import { fileRecordSigns } from './signs.ts';
 import {
   handedOf,
-  install,
   plan,
   uninstall,
   type Host,
@@ -140,7 +139,7 @@ import {
 import { parseWhere, type Predicate } from '@braindog/where';
 import type { Json as JsonValue } from '@braindog/kernel';
 
-import { arranger, carryUpdate, speakingNow, writeVoice, type CatalogueEntry, type CatalogueShelf } from './arrange.ts';
+import { arranger, carryUpdate, forgetHeld, installHeld, planAgain, speakingNow, writeVoice, type CatalogueEntry, type CatalogueShelf } from './arrange.ts';
 import { LATE_DAYS, isWorking, presenceOf, waiting as waitingOf, type Presence, type WaitingNow } from './waiting.ts';
 import { useCases, type ExportArgs } from './usecase.ts';
 import { catalogueDrafts, describedPresses, drawnVersions, FORM_SAID_MOST, formedRows, fromModel, growsDrafts, noticeUsage, pageShowsAgents, readUsage, SLASH_ASKED_MOST, SLASH_OPEN_CAP, stableKey, type CatalogueOffer, type Offered, type SlashDraft, type SlashModel } from './slash.ts';
@@ -305,7 +304,7 @@ const ingestTokenKey = (ingest: string): string => `ingest_token.${ingest}`;
  *
  * THE FORWARDING ADDRESS'S OWN SHAPE (`secret` in `apps/worker/src/inbound.ts`, and `randomBytes(32)`
  * on the self-host), so a person carries one kind of token between hosts, and it needs no percent
- * escape in the URL his Shortcut posts to. A fifth copy of four lines, for the reason that file gives
+ * escape in the URL a phone's automation posts to. A fifth copy of four lines, for the reason that file gives
  * for its fourth: the exported ones are named for invitations.
  */
 const webhookSecret = (): string => {
@@ -1043,8 +1042,8 @@ export type Boot = {
    */
   counts: { decide: number; inbox: number | null; decided: number; arrived: number | null };
   /**
-   * The holding pen: what this record would add if somebody asked, ranked, one offer a list, at most `PEN_SHOWN` (`penRanked` holds the rest)
-   * (`emergent.ts`). Placed by nobody: each item carries the whole declaration accepting it would write.
+   * The holding pen: what this record would add if somebody asked, ranked, one offer a list, the best `PEN_SHOWN` and any
+   * list opened in the last day (`penRanked` holds the rest) (`emergent.ts`). Placed by nobody: each item carries the whole declaration accepting it would write.
    *
    * THE OWNER'S AND A WHOLE-RECORD READER'S, and empty for anybody else, because an item is a page over a list and a
    * reader held to some lists is not offered the rest. Empty too when the person turned `pen.suggest` off, and an item
@@ -1512,7 +1511,7 @@ export type SlashMeter = {
   /** `draft` for a press or a description, `form` for a first plan. A refusal's `fix` is the sentence the owner is shown. */
   hold(kind: 'draft' | 'form'): Promise<{ ok: true; value: SlashHeld } | { ok: false; refusal: Refusal }>;
   /**
-   * One ask of the background allowance (`BACKGROUND_ASKS_MONTH`, 60 a month), never one of his: everything the daily
+   * One ask of the background allowance (`BACKGROUND_ASKS_MONTH`, 600 a month), never one of his: everything the daily
    * look asks on its own, its draft, a skill's next version and the pages' headlines, each named by `kind`. OPTIONAL, AND
    * A METER WITHOUT IT LETS THE LOOK ASK NOTHING, because `hold` counts against his asks and Free's `ASK_CAP_FREE` are his
    * alone: the look falls to the rules, and no skill or headline is drafted.
@@ -2245,7 +2244,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * The kernel never deletes a declaration row (`0001_kernel.ts`): a change is a new version, a retire sets
    * `retired` on the row that was live, and a reinstall after one is a new version too. So the mint keeps the
    * version it was shown against, and the digest is good exactly while every version from that one on is
-   * unretired, a webhook, and `verify: { kind: path }`. A pack update that keeps `verify:` keeps his Shortcut working; turning money-core off
+   * unretired, a webhook, and `verify: { kind: path }`. A pack update that keeps `verify:` keeps the address a phone posts to working; turning the pack off
    * and on again does not, because a disable retires the twin like any other retire.
    */
   const heldDigest = (ingest: string): string | undefined => {
@@ -2483,10 +2482,17 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         ...(note === undefined ? {} : { note }),
       } as never),
     remember: (row) => kernel.rememberPack({ ...row, by: actorOf(ctx) }),
-    forget: (id) => kernel.forgetPack(id),
+    /* AND ITS FILE, kept while a part of it waited (`installHeld`), goes with it. */
+    forget: (id) => {
+      kernel.forgetPack(id);
+      forgetHeld(kernel, id);
+    },
     claimed: (pack) => kernel.packClaims(pack),
     keyReady: (name, paged) => kernel.keyReady(name, paged),
   });
+
+  /** After an install or a switch-on by `ctx`: each add-on with a part waiting, planned again once (`arrange.ts` `planAgain`). */
+  const waitedFor = (ctx: CallContext): Promise<string[]> => planAgain({ kernel, installed: () => installedState(), host: packHost(ctx) });
 
   /* WHAT AN AGENT OR SLASH MAY ASK TO CHANGE ABOUT THIS RECORD, and how the owner's press applies it (`arrange.ts`). */
   const arrangement = arranger({
@@ -3293,7 +3299,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           if (!got.ok) return got;
           const id = got.value.pack.manifest.pack;
           const from = kernel.packStates().find((p) => p.id === id)?.version ?? null;
-          const put = await install(got.value.pack, got.value.diff, host, planHash, []);
+          const put = await installHeld(kernel, got.value.pack, got.value.diff, host, planHash, []);
           /* EACH MODULE'S CARRY IN ITS OWN TRY (research-audit-21 item 7): the install is in, so a carry that throws is
              said and the night goes on to the next module, keeping every step said so far. */
           if (put.ok)
@@ -3350,6 +3356,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     } catch {
       said.push('Finding which person is you stopped partway, and runs again tomorrow.');
     }
+    /* AND WHAT WAITED FOR AN UPDATE LANDS (`planAgain`), after the pass's end is read, so a part that arrives is its own
+       line in the log and never a step of the night's updates. */
+    if (steps.some((st) => st.did === 'updated')) await planAgain({ kernel, installed: () => installedState(), host });
     const pass: UpdatePass = {
       from,
       to,
@@ -10041,11 +10050,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          caller that updates a use case does it (`arrange.ts` `carryUpdate`). */
       const from = state.packs.find((p) => p.id === pack.value.manifest.pack)?.version ?? null;
       const spoke = speakingNow(kernel);
-      const put = await install(pack.value, diff, packHost(ctx), args.planHash, (approve ?? []) as string[]);
+      const put = await installHeld(kernel, pack.value, diff, packHost(ctx), args.planHash, (approve ?? []) as string[]);
       if (put.ok) await carryUpdate(deps.catalogue ?? [], kernel, pack.value.manifest.pack, from, actorOf(ctx));
       /* A USE CASE INSTALLED BESIDE THE ONE SPEAKING NEVER TAKES ITS VOICE (`declare` `voiceWhenAdding`), whichever way the ids
          sort: the answer is written down. A person who chose the new one to speak says so with its setting after. */
       if (put.ok && from === null && spoke !== null && pack.value.manifest.pack.startsWith('usecase-')) writeVoice(kernel, spoke, actorOf(ctx));
+      /* AND EVERY ADD-ON WITH A PART THAT WAITED IS PLANNED AGAIN, once (`arrange.ts` `planAgain`): a field that waited for
+         what this install brought is there with no press, signed by whoever installed it. */
+      if (put.ok) await waitedFor(ctx);
       return tail(put);
     },
 
@@ -10085,6 +10097,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (extra) return { ok: false as const, refusal: extra };
       if (typeof args?.id !== 'string' || !args.id) return no('REQUIRED_MISSING', 'Which pack?', { at: 'id' });
       const out = await kernel.enablePack(args.id, { actor: actorOf(ctx) });
+      /* A SWITCH-ON BRINGS WHAT WAITED FOR IT, as an install does, and is what plans an add-on that was off again. */
+      if (out.ok) await waitedFor(ctx);
       /* A REGISTER ID IS `[a-z][a-z0-9_]*`, so it goes into the pattern as it is. */
       const fix = !out.ok && 'refusal' in out ? out.refusal.fix : '';
       return tail(offPack(out, (r) => new RegExp(`\\b${r}\\b`).test(fix), args.id));
@@ -11289,7 +11303,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     /**
      * Every live webhook door this record declares, for the screen that mints their tokens. ADMIN, routed as `/api/doors`.
      *
-     * THE APP NAMED THE ONE DOOR IT COULD SHOW. `shortcut-door.ts` held `bank-from-out-sms` as a constant, so a door a
+     * THE APP NAMED THE ONE DOOR IT COULD SHOW. Its door screen held one bank door's id as a constant, so a door a
      * person or an agent declared at run time had no screen at all. The record lists them instead.
      *
      * `held` SAYS WHETHER A TOKEN IS GOOD FOR IT, AND NEVER WHAT THE TOKEN'S DIGEST IS. The digest is what the `/in/*`

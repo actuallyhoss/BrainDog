@@ -1,0 +1,8 @@
+{
+  "gate": "core-names",
+  "rule": "a field only one add-on declares, spelled in camel case",
+  "expect": "spelled in the core",
+  "findings": 1,
+  "total": 1,
+  "why": "ONE, `'maturesOn'` in `packages/host/src`, where `vault` alone declares the field `matures_on`: a name's own separators do not count. `decoy.ts` spells `label`, a field id of five letters, and `amount`, which both planted add-ons declare, and neither is a finding: those two rules are all that holds the field pass back from every common word."
+}

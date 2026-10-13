@@ -11,8 +11,9 @@
  * counted), a transfer between two of the owner's accounts (out of one, into the other), an account that is not cash,
  * and two currencies, which are never added: each currency's walk is checked against the figure's part in it.
  *
- * THE NIGHTLY FIGURE, `cash-cross-check` reading the difference on a lived record, needs a value kind in the kernel's
- * `money-figures.ts`, which another unit owns. Until then this is the check, on a record made here.
+ * THE NIGHTLY FIGURE, `cash-cross-check`, reads the same difference on a lived record (`readCrosscheck` in the kernel's
+ * `money-figures.ts`, its own tests in `packages/kernel/test/cash-cross-figure.test.ts`). Here it is held to the walk
+ * this file does: nought where the two ways agree, on the record made here and on Money's own example entries.
  */
 
 import { test } from 'node:test';
@@ -47,10 +48,10 @@ const hostFor = (k: Kernel): Host => ({
 });
 
 /** A record holding money-core as the pack document says it, and what it points at, with no example rows. */
-async function moneyCore(): Promise<Kernel> {
+async function moneyCore(examples = false): Promise<Kernel> {
   const k = await openRecord(openSqlite(), fixedClock(NOW));
   for (const id of ['portfolio', 'people', 'money-core']) {
-    const pack = value<Pack>(await normalise(firstPartyDocument(id, { seeds: [] }), { kind: 'local' }));
+    const pack = value<Pack>(await normalise(examples ? firstPartyDocument(id) : firstPartyDocument(id, { seeds: [] }), { kind: 'local' }));
     const state: Installed = { format: 1, primitives: 1, record_version: k.version(), packs: k.packs(), declarations: k.declarations() as Installed['declarations'], rows: k.census() };
     const diff = await plan(pack, state);
     value(await install(pack, diff, hostFor(k), diff.planHash));
@@ -133,6 +134,10 @@ function figure(k: Kernel): { read: Reading; totals: Map<string, number> } {
   return { read, totals };
 }
 
+/** What the record's own check of Cash now reads: nought and met, or how far out it is. */
+type Checked = Reading & { met: boolean | null };
+const checked = (k: Kernel): Checked => value<Checked>(k.metric(CASH_FIGURES['cash-cross-check'] as never));
+
 test('in pounds alone, Cash now walked entry by entry from each newest statement is the figure, a transfer moving nothing', async () => {
   const k = await moneyCore();
   write(k, false);
@@ -141,6 +146,8 @@ test('in pounds alone, Cash now walked entry by entry from each newest statement
   assert.deepEqual([...walked(k)], [['GBP', 310_000]], 'the second way is not the arithmetic of the rows');
   assert.deepEqual([read.value, read.unit], [310_000, 'GBP']);
   assert.deepEqual([...totals], [...walked(k)]);
+  const check = checked(k);
+  assert.deepEqual([check.value, check.unit, check.met], [0, 'GBP', true], 'the nightly figure is out where this walk is not');
 });
 
 test('in pounds and dollars, each currency walked entry by entry is the figure\'s part in it, and the two are never added', async () => {
@@ -153,4 +160,15 @@ test('in pounds and dollars, each currency walked entry by entry is the figure\'
   assert.deepEqual(Object.fromEntries(second), { GBP: 310_000, USD: 116_000 }, 'the second way is not the arithmetic of the rows');
   assert.equal(read.value, null, 'Cash now added pounds and dollars with no rate between them');
   assert.deepEqual(Object.fromEntries(totals), Object.fromEntries(second));
+  const check = checked(k);
+  assert.deepEqual([check.value, check.unit, check.met, check.parts], [0, null, true, undefined], 'the nightly figure is out, or added two currencies');
+});
+
+test('on Money\'s own example entries the nightly figure reads nought, and this walk agrees with Cash now', async () => {
+  const k = await moneyCore(true);
+  const { totals } = figure(k);
+  assert.ok(totals.size > 0, 'the example record holds no cash, so nothing was checked');
+  assert.deepEqual(Object.fromEntries(totals), Object.fromEntries(walked(k)));
+  const check = checked(k);
+  assert.deepEqual([check.value, check.met, check.parts], [0, true, undefined]);
 });

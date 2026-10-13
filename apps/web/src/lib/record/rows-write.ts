@@ -137,8 +137,8 @@ function misTyped(register: string, fields: Fields): string | null {
   return null;
 }
 
-/** What the list's address says about the rows on screen: the chips, the search box and the order. */
-export type Address = { filters: readonly Filter[]; q: string; sort: { field: string; dir: 'asc' | 'desc' } | undefined };
+/** What the list's address says about the rows on screen: the chips, the word that joins them (`join=any` is "or"), the search box and the order. */
+export type Address = { filters: readonly Filter[]; q: string; sort: { field: string; dir: 'asc' | 'desc' } | undefined; join?: 'any' };
 
 export type Saved = { ok: true; slug: string; id: string } | { ok: false; why: 'refused' | 'unreachable'; fix: string };
 
@@ -150,7 +150,7 @@ export type Saved = { ok: true; slug: string; id: string } | { ok: false; why: '
  * live at `/p/<slug>`, which `retireDeclaration` takes back out. The columns are the ones the list was drawing.
  */
 export function viewPage(register: string, slug: string, title: string, address: Address, columns: readonly string[], refs: Refs): Record<string, unknown> {
-  const where = treeOf(register, address.filters, address.q, refs);
+  const where = treeOf(register, address.filters, address.q, refs, address.join);
   const order = orderOf(address.sort);
   return {
     page: slug,

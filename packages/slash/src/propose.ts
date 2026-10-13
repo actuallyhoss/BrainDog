@@ -32,7 +32,7 @@
 import { no, ok, refused, type Refusal, type Result } from '@braindog/ports';
 import { compile, type Schema } from '@braindog/where';
 
-import type { Core } from './call.ts';
+import type { Charge, Core } from './call.ts';
 import { BODIES, fenced, PROMPTS, type AnsweredKind } from './prompts.ts';
 import {
   checkSchema,
@@ -291,6 +291,8 @@ type Drew = Drafted & {
   ms: number;
   status: 'ok' | 'nothing';
   code?: string | undefined;
+  /** `Ran.served` of the drafting call, kept beside its code so the ledger can tell a timeout from a model not reached. */
+  served?: boolean | undefined;
 };
 
 type Read = Drew & {
@@ -311,6 +313,17 @@ type Read = Drew & {
  * A code the ports already list, and not one of Slash's own, because a new one is an amendment to `30 §6`.
  */
 const UNSETTLED = 'RECORD_UNAVAILABLE';
+
+/**
+ * What each model call here is on the ledger, said once and handed to its hold and its settle (`call.ts`, `Charge`).
+ *
+ * A QUESTION IS ONE OF HIS ASKS, ON ITS DRAFTING READ. The proposal is the second model call of that same question and
+ * spends nothing, which is "one question is one ask" (`asksUsed`) written on the row where it used to be a kind the
+ * count left out. The first plan and a file he asked to have read are his asks too, and say which they were.
+ */
+const ASKED = { purpose: 'ask', spends: 'person' } as const;
+const PROPOSED = { purpose: 'ask', spends: 'none' } as const;
+const PLANNED = { purpose: 'plan', spends: 'person' } as const;
 
 export type Palette = {
   read(question: string, ctx: CallContext, inference?: Inference): Promise<Result<Reading>>;
@@ -363,6 +376,7 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
     let usage = { in: 0, out: 0 };
     let ms = 0;
     let code: string | undefined;
+    let served: boolean | undefined;
 
     if (stored) {
       registers = stored.registers.filter((id) => !FORBIDDEN_REGISTERS.has(id));
@@ -404,6 +418,7 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
       model = drafter.sent() ?? ran.model;
       usage = ran.usage;
       ms = ran.ms;
+      served = ran.served;
       /* NO RETRY, AND A FALLBACK RATHER THAN A REFUSAL (`46 §10`). A predicate that did not come back,
          or came back ungrammatical, costs the ask its filter and not its answer: the keywords still
          search, and a second model call to fix the first one doubles the bill for one question. */
@@ -446,6 +461,7 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
       ms,
       status: 'nothing',
       code: code ?? ended,
+      served,
     });
     const drafting = stored === undefined ? hold : undefined;
     if (drafting !== undefined) accountRead(drew([GRANT], UNSETTLED), question, drafting);
@@ -498,6 +514,7 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
       ms,
       status: rows.value.rows.length === 0 && readings.length === 0 ? 'nothing' : 'ok',
       ...(code === undefined ? {} : { code }),
+      served,
     });
   };
 
@@ -525,6 +542,8 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
          well, and re-drafting them is the second model call this shape exists to avoid. */
       predicate: draftText(it),
       read: it.read,
+      ...ASKED,
+      served: it.served,
     });
     return askId;
   };
@@ -543,7 +562,7 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
     /* NO `await` BETWEEN `spent()` AND HERE. The hold is what the next ask's check counts, so it has to exist before
        this function first yields; `core.reserve` says why it is a row. The hold becomes the ask's own row, and its id
        the `ask_id`, on every path that called a model, and is given back on the ones that did not. */
-    const held = core.reserve('read', core.settings().tier, PROMPTS.predicate.model);
+    const held = core.reserve('read', core.settings().tier, PROMPTS.predicate.model, ASKED);
     try {
       const looked = await look(asked, ctx, inference ?? fallback, undefined, held);
       if (!looked.ok) return looked;
@@ -599,9 +618,10 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
       'propose',
       s0.tier,
       s0.tier === 'a' ? PROMPTS.propose.model : (s0.model ?? PROMPTS.propose.model),
+      PROPOSED,
       askId === undefined ? undefined : `${askId}:propose`,
     );
-    const drafting = stored === undefined ? core.reserve('read', s0.tier, PROMPTS.predicate.model) : undefined;
+    const drafting = stored === undefined ? core.reserve('read', s0.tier, PROMPTS.predicate.model, ASKED) : undefined;
     try {
       return await pass2(asked, ctx, byok, inference ?? fallback, stored, drafting, proposing);
     } finally {
@@ -691,6 +711,7 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
         predicate: draftText(it),
         read: trimmedRead(it.read, kept.rows),
         filed,
+        ...PROPOSED,
       });
 
     /* SETTLED THE MOMENT THE MODEL ANSWERED, for the drafting call's reason in `look`: a filing that threw after the
@@ -1203,11 +1224,11 @@ const listLines = (lists: readonly MappingList[]): string =>
  * the answer is a proposal the first run draws, and the person's one press is what writes it.
  */
 export const setups = (core: Core, fallback: Inference): Setups => {
-  const spent = (): Refusal | null => {
+  const spent = (charge: Charge): Refusal | null => {
     const s = core.settings();
     if (s.tier !== 'a' || core.asksUsed() < s.ask_cap) return null;
-    /* THE ASK TURNED AWAY LEAVES ITS ROW (`TURNED_AWAY_SQL`, model-sign-49). */
-    core.turnedAway('read', s.tier);
+    /* THE ASK TURNED AWAY LEAVES ITS ROW (`TURNED_AWAY_SQL`, model-sign-49), saying which ask it was. */
+    core.turnedAway('read', s.tier, charge.purpose);
     return { code: 'SLASH_BUDGET_SPENT', fix: `Slash is out of asks until ${core.resets().slice(0, 10)}. Add your own key, or wait.` };
   };
   const owner = (ctx: CallContext): Refusal | null =>
@@ -1219,12 +1240,13 @@ export const setups = (core: Core, fallback: Inference): Setups => {
     question: string,
     slots: Record<string, string>,
     inference: Inference | undefined,
+    charge: Charge,
     trim?: { slot: string; lines: readonly string[] },
   ): Promise<Result<{ value: Record<string, unknown>; by: string }>> => {
     const s = core.settings();
     const template = PROMPTS[id];
     const model = s.tier === 'a' ? template.model : (s.model ?? template.model);
-    const held = core.reserve('read', s.tier, model);
+    const held = core.reserve('read', s.tier, model, charge);
     try {
       const named = naming(inference ?? fallback);
       const ran = await core.run({ id, slots, inference: named.inference, model, ...(trim ? { trim } : {}) });
@@ -1239,6 +1261,8 @@ export const setups = (core: Core, fallback: Inference): Setups => {
         status: ran.out.ok ? 'ok' : 'error',
         code: refused(ran.out) ? ran.out.refusal.code : undefined,
         question,
+        ...charge,
+        served: ran.served,
       });
       return ran.out.ok ? ok({ value: ran.out.value, by }) : ran.out;
     } finally {
@@ -1247,7 +1271,7 @@ export const setups = (core: Core, fallback: Inference): Setups => {
   };
 
   const proposeSetup = async (raw: SetupAsk, ctx: CallContext, inference?: Inference): Promise<Result<SetupAnswer>> => {
-    const stop = owner(ctx) ?? spent();
+    const stop = owner(ctx) ?? spent(PLANNED);
     if (stop) return { ok: false, refusal: stop };
     const ask = setupAskOf(raw);
     const said = firstBytes(ask.said.trim(), SAID_BYTES);
@@ -1259,12 +1283,13 @@ export const setups = (core: Core, fallback: Inference): Setups => {
       firstBytes(said, ASK_BYTES),
       { '%USECASES%': caseLines(ask.offer), '%MODULES%': moduleLines(ask.offer), '%TODAY%': ask.today === '' ? 'not said' : ask.today, '%SAID%': fenced('said', said) },
       inference,
+      PLANNED,
     );
     return out.ok ? ok(setupOf(out.value.value, { ...ask, said }, out.value.by)) : out;
   };
 
   const proposeMapping = async (raw: MappingAsk, ctx: CallContext, inference?: Inference): Promise<Result<MappingAnswer>> => {
-    const stop = owner(ctx) ?? spent();
+    const stop = owner(ctx) ?? spent(ASKED);
     if (stop) return { ok: false, refusal: stop };
     const ask = mappingAskOf(raw);
     const columns = ask.columns;
@@ -1282,6 +1307,7 @@ export const setups = (core: Core, fallback: Inference): Setups => {
       /* THE FILE'S NAME AND HEADINGS ARE ITS OWN TEXT TOO: one line each, and no `<` to close a fence with. */
       { '%FILE%': quoted(file), '%COLUMNS%': columns.map(quoted).join(', '), '%LISTS%': listLines(ask.lists) },
       inference,
+      ASKED,
       { slot: '%SAMPLE%', lines },
     );
     return out.ok ? ok(mappingOf(out.value.value, { ...ask, columns }, out.value.by)) : out;

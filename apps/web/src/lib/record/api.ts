@@ -866,8 +866,8 @@ export const joinOf = (params: URLSearchParams): 'any' | undefined => (params.ge
  * sample, and on a record the register list sends this very sentence (`whereFor` in `remote.ts`),
  * which the record parses; `treeOf` reads the same word into an `any` group only when the search box
  * holds words. `remote-compare.test.ts` holds the two to
- * the same rows. The address is read by `joinOf` above, and the register route does not read it
- * yet, which is why `registerHref` still mints no such address.
+ * the same rows. The address is read by `joinOf` above, the register route reads it into the question
+ * it asks, and `registerHref` mints it for a tile or a block whose filter says "or".
  */
 export const whereOf = (filters: Filter[], join?: 'any'): string =>
   filters

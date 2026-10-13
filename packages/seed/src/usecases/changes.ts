@@ -45,7 +45,13 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
     },
   ],
   guide: [{ version: '1.6.1', notes: NAMED('Steps') }],
-  shop: [{ version: '1.0.0', notes: 'The first version: Orders and Products, and an Orders page that says the month\'s orders, what ships this week and who still owes you.' }],
+  shop: [
+    {
+      version: '1.1.0',
+      notes: 'This week now starts today, and an order past its day is counted as late on its own. An order with a deposit stays in Owed to you, and the Orders line names whoever has owed longest.',
+    },
+    { version: '1.0.0', notes: 'The first version: Orders and Products, and an Orders page that says the month\'s orders, what ships this week and who still owes you.' },
+  ],
   business: [
     {
       version: '1.7.0',

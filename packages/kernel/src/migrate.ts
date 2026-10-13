@@ -57,6 +57,7 @@ import ruleStat0034 from './migrations/0034_rule_stat.ts';
 import repeatMarks0035, { repeatMarks } from './migrations/0035_repeat_marks.ts';
 import runsBefore0036 from './migrations/0036_runs_before.ts';
 import causeAnswered0037 from './migrations/0037_cause_answered.ts';
+import packWaiting0038 from './migrations/0038_pack_waiting.ts';
 
 export type Migration = { version: number; slug: string; sql: string };
 
@@ -99,6 +100,7 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 35, slug: 'repeat_marks', sql: repeatMarks0035 },
   { version: 36, slug: 'runs_before', sql: runsBefore0036 },
   { version: 37, slug: 'cause_answered', sql: causeAnswered0037 },
+  { version: 38, slug: 'pack_waiting', sql: packWaiting0038 },
 ];
 
 /**
@@ -151,6 +153,8 @@ export const MIGRATIONS: readonly Migration[] = [
  * Migration 36 adds no table and no column: it takes `next` off the runs never heard from here and not in `handoff`,
  * in their fields, which an older file's runs import with and a newer reader reads without, so the format is still 1.
  * Migration 37 adds `suggestion_cause_closed`, an index no file carries, so the format is still 1.
+ * Migration 38 rebuilds `pack` with one more nullable column, which an older file imports without and reads as NULL,
+ * an add-on with nothing waiting, which is what every add-on was before `when`, so the format is still 1.
  */
 export const FORMAT_VERSION = 1 as const;
 

@@ -64,6 +64,10 @@ export const words = {
   openHereWide: 'Open it on this device. After that, this device signs you in with its own lock, with no password to remember.',
   /** While the mail travels, beside the build that waits for it. What was said rides in the link. */
   sentWhy: 'The link builds what you see here, on this device or another.',
+  /** And when what was said was too long for a link to carry whole: said on the device that sent it. */
+  sentCut: 'The link in the letter carries the start of what you said. All of it waits on this device.',
+  /** Under the sentence, on a device that opened such a link and has no copy of its own. */
+  linkCut: 'The link carried the start of what you said. The rest was left for later: add it here, or once your record is made.',
 
   /** Straight after the link, over the passkey (`PasskeyFirst`), before the build is made. */
   lockTitle: 'Your email is confirmed',

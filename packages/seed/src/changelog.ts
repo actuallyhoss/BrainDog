@@ -107,6 +107,10 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   ],
   'money-core': [
     {
+      version: '3.17.0',
+      notes: 'Money works out your cash a second way, entry by entry from the last statement, so a cash figure that is wrong can be caught.',
+    },
+    {
       version: '3.16.0',
       notes:
         "Money says how old the newest Ledger money and oldest balance are, the currencies held, money out with no category, and nights the cash line missed. A balance is as old as the bank's last word, and Heads up shows each account's last confirmed day once one is a week old, in place of the weekly note. A repeating payment can land on set days of the month and move off rest days, and Decide asks about one on a month's last day. An amount keeps its account's currency. It says what came in this week. Heads up names any category marked one way that holds money going the other. The Ledger opens on its newest day.",

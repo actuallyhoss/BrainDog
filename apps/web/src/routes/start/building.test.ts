@@ -111,7 +111,7 @@ test('WHAT WAS SAID IS MARKED PHRASE BY PHRASE, in order, and a phrase not found
   const p = propose(said, ctx);
   const runs = marksIn(said, p.heard, p.name);
   assert.equal(runs.map((r) => r.text).join(''), said, 'the runs put the sentence back together exactly');
-  assert.ok(runs.some((r) => r.text === 'Kiln' && r.became === 'Portfolio'));
+  assert.ok(runs.some((r) => r.text === 'Kiln' && r.became === 'Projects'));
   assert.ok(runs.some((r) => r.text === 'Sam' && r.became !== null), 'the name is marked too');
   const lost = marksIn('abc', [{ phrase: 'zzz', became: 'Money' }], null);
   assert.deepEqual(lost, [{ text: 'abc', became: null }]);
@@ -274,4 +274,20 @@ test('HER WORDS AS THE BUILD SAYS THEM: the shop by its lists, Clients for Peopl
   assert.equal(iconOfBecame('Clients and Invoices', p.names), partIcon('people'));
   assert.equal(iconOfBecame('Money, in EGP'), partIcon('money-core'));
   assert.equal(iconOfBecame('Orders and Products'), placeIcon({ kind: 'list', id: 'orders' }));
+});
+
+test('A PHRASE FOLDED INTO A LINE AND SAID APART LIGHTS TOO, and only where the line itself sits in this sentence', () => {
+  const said = 'who owes me, a studio, and taxes';
+  const line = { phrase: 'who owes me', became: 'Money', at: [0, 11] as [number, number], more: [[27, 32] as [number, number]] };
+  assert.deepEqual(marksIn(said, [line], null), [
+    { text: 'who owes me', became: 'Money' },
+    { text: ', a studio, and ', became: null },
+    { text: 'taxes', became: 'Money' },
+  ]);
+  /* A later turn drawn on its own: the line's place is in another sentence, so its other span is not trusted. */
+  assert.deepEqual(marksIn('and who owes me, since March', [line], null), [
+    { text: 'and ', became: null },
+    { text: 'who owes me', became: 'Money' },
+    { text: ', since March', became: null },
+  ]);
 });

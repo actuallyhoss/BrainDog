@@ -17,7 +17,7 @@ import { moduleName } from '@braindog/seed/usecases/names';
 
 import { firstRun } from '../../lib/first-run.ts';
 import { shape } from '../../lib/shape.ts';
-import type { Place, Proposal } from '../../lib/start/propose.ts';
+import { partName, type Place, type Proposal } from '../../lib/start/propose.ts';
 import { isGlyph, type IconName } from '../../lib/ui/icons.ts';
 import { hear, PEOPLE } from '../../lib/who.ts';
 
@@ -227,7 +227,8 @@ export function iconOfBecame(became: string, names: Readonly<Record<string, stri
   if (became === firstRun.shapeNoCurrency) return 'money';
   const first = became.split(/,\s*|\s+and\s+/u)[0] ?? '';
   const renamed = Object.entries(names).find(([, word]) => word === first)?.[0];
-  const id = MODULE_ORDER.find((m) => moduleName(m) === first) ?? (renamed === undefined ? undefined : moduleOfList(renamed)?.id);
+  /* BY THE NAME ITS PLACE HAS TOO (`partName`): a line says Projects, never the pack's Portfolio. */
+  const id = MODULE_ORDER.find((m) => moduleName(m) === first || partName(m) === first) ?? (renamed === undefined ? undefined : moduleOfList(renamed)?.id);
   if (id !== undefined) return partIcon(id);
   const list = USE_CASES.flatMap((u) => caseLists(u).map((l) => [l.id, u.labels[l.id] ?? l.name] as const)).find(([, word]) => word === first)?.[0];
   return list === undefined ? 'home' : placeIcon({ kind: 'list', id: list });
@@ -268,7 +269,8 @@ export function partsOf(p: PartsIn): Part[] {
     const info = firstPartyModule(id);
     const on = p.modules.includes(id);
     const renamed = Object.entries(p.names ?? {}).flatMap(([list, word]) => (moduleOfList(list)?.id === id ? [word] : []));
-    const why = phrasesFor([name, ...renamed], p.heard);
+    /* A LINE SAYS THE PART BY THE NAME ITS PLACE HAS (`partName`, Projects for Portfolio), so its why is found by that too. */
+    const why = phrasesFor([...new Set([name, partName(id, p.names), ...renamed])], p.heard);
     const held = p.heldBy(id);
     /* A PART THAT CANNOT BE TURNED OFF SAYS WHO NEEDS IT before why it was heard, so a still switch has its reason. */
     const state: PartState = !on ? 'off' : id === p.waiting ? 'waiting' : held !== null ? 'held' : why.length > 0 ? 'heard' : p.byHand.has(id) ? 'hand' : 'heard';
@@ -339,23 +341,38 @@ export type Run = { text: string; became: string | null };
  * What was said, cut into runs, with each phrase heard marked by what it became. The phrases come in sentence order, so
  * each is looked for after the last one found; one that is not there (the reader trims a name's full stop) is skipped
  * rather than guessed at.
+ *
+ * A PHRASE FOLDED INTO A LINE AND SAID APART (`more`) LIGHTS TOO, as what the line became. Its place is trusted only when
+ * the line's own place holds its phrase in this very sentence: a later turn is drawn on its own, and a span measured in
+ * another sentence would light the wrong words.
  */
 export function marksIn(sentence: string, heard: readonly Said[], name: string | null): Run[] {
-  const out: Run[] = [];
+  const found: { at: number; end: number; became: string }[] = [];
   let from = 0;
   const mark = (phrase: string, became: string) => {
     if (phrase === '') return;
     const at = sentence.indexOf(phrase, from);
     if (at < 0) return;
-    if (at > from) out.push({ text: sentence.slice(from, at), became: null });
-    out.push({ text: phrase, became });
+    found.push({ at, end: at + phrase.length, became });
     from = at + phrase.length;
   };
   if (name) mark(name, firstRun.heardName(name));
   /* THE NAME IS ALSO A HEARD LINE (`you`), marked once above: marking it again would light a second saying of the name
      as `you`, or mark the same words twice. */
   for (const h of heard) if (h.you !== true) mark(h.phrase, h.became);
-  if (from < sentence.length) out.push({ text: sentence.slice(from), became: null });
+  for (const h of heard) {
+    if (h.you === true || h.at === undefined || h.more === undefined || sentence.slice(h.at[0], h.at[1]) !== h.phrase) continue;
+    for (const [at, end] of h.more) if (at >= 0 && end > at && end <= sentence.length) found.push({ at, end, became: h.became });
+  }
+  const out: Run[] = [];
+  let done = 0;
+  for (const m of found.sort((a, b) => a.at - b.at)) {
+    if (m.at < done) continue;
+    if (m.at > done) out.push({ text: sentence.slice(done, m.at), became: null });
+    out.push({ text: sentence.slice(m.at, m.end), became: m.became });
+    done = m.end;
+  }
+  if (done < sentence.length) out.push({ text: sentence.slice(done), became: null });
   return out;
 }
 

@@ -163,7 +163,7 @@ test('6. HER FIRST TODAY: green on the card gone and In EGP 900; red on the tile
 
 test('7. A PAGE FOR HER PATTERN: green on day 15 with Orders saying who still owes; red on an early offer, none, or a sentence with no owed clause', () => {
   const offer = { id: 'week:orders', title: 'Orders this week', why: 'Orders has 4 due this week. Give them a page of their own?' };
-  const lead = '6 orders this month, 6 to ship this week, and Salma still owes EGP 1,350';
+  const lead = '6 orders this month, 4 to ship this week, 2 late, and Salma still owes EGP 1,350';
   const seen = { early: [], earlyDay: 13, late: [offer], lateDay: 15, weeks: 3, thisWeek: 4, lead };
   const green = expect.offer(seen, MARIAM);
   assert.equal(green.pass, true, green.saw);
@@ -176,8 +176,8 @@ test('7. A PAGE FOR HER PATTERN: green on day 15 with Orders saying who still ow
   for (const said of [/before day 14/u, /read on 2 weeks/u]) assert.match(red.saw, said);
   assert.match(expect.offer({ ...seen, late: [{ ...offer, why: 'You have 4 rows' }] }, MARIAM).saw, /its why says/u);
   /* THE OWED CLAUSE IS WHAT THE MOCKUP SAYS, and a ref drawn as its id, or a total never kept, leaves it out or wrong. */
-  assert.match(expect.offer({ ...seen, lead: '6 orders this month, 6 to ship this week' }, MARIAM).saw, /Orders says "6 orders this month, 6 to ship this week", not/u);
-  assert.match(expect.offer({ ...seen, lead: '6 orders this month, 6 to ship this week, and 01JZ8QK3F7R2M9V4XN6TCB5HAD still owes EGP 1,350' }, MARIAM).saw, /not "N orders this month/u);
+  assert.match(expect.offer({ ...seen, lead: '6 orders this month, 4 to ship this week, 2 late' }, MARIAM).saw, /Orders says "6 orders this month, 4 to ship this week, 2 late", not/u);
+  assert.match(expect.offer({ ...seen, lead: '6 orders this month, 4 to ship this week, 2 late, and 01JZ8QK3F7R2M9V4XN6TCB5HAD still owes EGP 1,350' }, MARIAM).saw, /not "6 orders this month/u);
   assert.match(expect.offer({ ...seen, lead: null }, MARIAM).saw, /Orders says no sentence/u);
 });
 

@@ -259,7 +259,8 @@
       "file": "tools/gates/layout.mjs",
       "lines": [
         { "at": 30, "on": "2026-10-09", "why": "Numbers above 1 written in the gate before the ledger began. Each one moves to budgets.json, and this line falls with it." },
-        { "at": 29, "on": "2026-10-09", "why": "The page-open move (gates-lib-46 #8) took the gate's own viewport and context numbers into openPage." }
+        { "at": 29, "on": "2026-10-09", "why": "The page-open move (gates-lib-46 #8) took the gate's own viewport and context numbers into openPage." },
+        { "at": 8, "on": "2026-10-13", "why": "The split by rule (PRF-B04 job 8) took 21 of the gate's numbers into tools/gates/layout/." }
       ]
     },
     "tools/gates/lived.mjs": {
@@ -450,7 +451,16 @@
     "tools/gates/commits.mjs": { "owes": "proof", "file": "tools/gates/commits.mjs", "lines": [ { "at": 4, "on": "2026-10-09", "why": "COULD_NOT_RUN = 3, the exit of a gate that could not run, as no-transcript.mjs writes it; and the five fields of one commit as git log prints them, said three times." } ] },
     "tools/gates/hygiene.mjs": { "owes": "proof", "file": "tools/gates/hygiene.mjs", "lines": [ { "at": 1, "on": "2026-10-09", "why": "COULD_NOT_RUN = 3, the exit of a gate that could not run, as no-transcript.mjs writes it." } ] },
     "tools/gates/no-shape-files.mjs": { "owes": "proof", "file": "tools/gates/no-shape-files.mjs", "lines": [ { "at": 7, "on": "2026-10-09", "why": "The 4096 bytes of a file's head the mark is looked for in, the 8000 bytes read to tell a binary file, the four lines the mark may sit on, git's 64 MiB listing buffer, and exit 3 for a gate that read nothing." } ] },
-    "tools/gates/rulings.mjs": { "owes": "proof", "file": "tools/gates/rulings.mjs", "lines": [ { "at": 1, "on": "2026-10-09", "why": "The two characters of the section heading's line break the page is sliced past." } ] }
+    "tools/gates/rulings.mjs": { "owes": "proof", "file": "tools/gates/rulings.mjs", "lines": [ { "at": 1, "on": "2026-10-09", "why": "The two characters of the section heading's line break the page is sliced past." } ] },
+    "tools/gates/layout/acts.mjs": { "owes": "proof", "file": "tools/gates/layout/acts.mjs", "lines": [ { "at": 4, "on": "2026-10-13", "why": "Numbers above 1 that came out of tools/gates/layout.mjs with the split by rule (PRF-B04 job 8): the acts a screen is put through. Each one moves to budgets.json, and this line falls with it." } ] },
+    "tools/gates/layout/dock.mjs": { "owes": "proof", "file": "tools/gates/layout/dock.mjs", "lines": [ { "at": 2, "on": "2026-10-13", "why": "Numbers above 1 that came out of tools/gates/layout.mjs with the split by rule (PRF-B04 job 8): the dock's measure. Each one moves to budgets.json, and this line falls with it." } ] },
+    "tools/gates/layout/full.mjs": { "owes": "proof", "file": "tools/gates/layout/full.mjs", "lines": [ { "at": 2, "on": "2026-10-13", "why": "Numbers above 1 that came out of tools/gates/layout.mjs with the split by rule (PRF-B04 job 8): the full-width measure. Each one moves to budgets.json, and this line falls with it." } ] },
+    "tools/gates/layout/measure.mjs": { "owes": "proof", "file": "tools/gates/layout/measure.mjs", "lines": [ { "at": 1, "on": "2026-10-13", "why": "Numbers above 1 that came out of tools/gates/layout.mjs with the split by rule (PRF-B04 job 8): the shared measure, where slice(0, 4) is written a second time. Each one moves to budgets.json, and this line falls with it." } ] },
+    "tools/gates/layout/overflow.mjs": { "owes": "proof", "file": "tools/gates/layout/overflow.mjs", "lines": [ { "at": 1, "on": "2026-10-13", "why": "Numbers above 1 that came out of tools/gates/layout.mjs with the split by rule (PRF-B04 job 8): the overflow measure. Each one moves to budgets.json, and this line falls with it." } ] },
+    "tools/gates/layout/site.mjs": { "owes": "proof", "file": "tools/gates/layout/site.mjs", "lines": [ { "at": 3, "on": "2026-10-13", "why": "Numbers above 1 that came out of tools/gates/layout.mjs with the split by rule (PRF-B04 job 8): the site and the record variants. Each one moves to budgets.json, and this line falls with it." } ] },
+    "tools/gates/layout/sweep.mjs": { "owes": "proof", "file": "tools/gates/layout/sweep.mjs", "lines": [ { "at": 4, "on": "2026-10-13", "why": "Numbers above 1 that came out of tools/gates/layout.mjs with the split by rule (PRF-B04 job 8): the sweep of every address. Each one moves to budgets.json, and this line falls with it." } ] },
+    "tools/gates/layout/target.mjs": { "owes": "proof", "file": "tools/gates/layout/target.mjs", "lines": [ { "at": 5, "on": "2026-10-13", "why": "Numbers above 1 that came out of tools/gates/layout.mjs with the split by rule (PRF-B04 job 8): the touch-target measure. Each one moves to budgets.json, and this line falls with it." } ] },
+    "tools/gates/core-names.mjs": { "owes": "shell", "file": "tools/gates/core-names.mjs", "lines": [ { "at": 2, "on": "2026-10-13", "why": "The five letters a field id must be longer than, which the unit SHL-A01 gives, and exit 3 for a gate that read nothing." } ] }
   },
   "held": {
     "commits.EXEMPT": { "lines": [ { "count": 7, "on": "2026-10-09", "why": "Local commits made before the first push the commits gate guards, each subject past 72 characters; exempt by sha until his word to reword them." } ] },
@@ -469,6 +479,8 @@
         { "count": 6, "on": "2026-10-09", "why": "Paths the core may still name a pack word in, each for a stated reason." }
       ]
     },
+    "shell-words.HELD": { "lines": [ { "count": 6, "on": "2026-10-13", "why": "Files that spell one of the nine public words of one country the gate took on with SHL-A01, each held until a unit takes the word out: five until SHL-A07, the site's changelog until SHL-A20. A list of its own from its first line, so EXEMPT did not rise." } ] },
+    "core-names.HELD": { "lines": [ { "count": 1277, "on": "2026-10-13", "why": "Names an add-on or a use case declares that a core file still spells, one entry for each file and name, generated once from the gate's own reading the day SHL-A01 landed: 1274 in 519 files. Three more the same day, before the list was first committed, for two files written beside it: orders-late in the shop use case (shop 1.1.0), and work and people in the site's icons script, where they are the app's names for two glyphs. 1277 is the first number held; each entry names the unit that takes it out." } ] },
     "dead-copy.ALLOWED": {
       "lines": [
         { "count": 8, "on": "2026-10-09", "why": "Sentences in the copy file that nothing renders yet, each correct or unbuilt by its own reason." }

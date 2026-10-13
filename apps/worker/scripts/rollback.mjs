@@ -42,6 +42,9 @@ export const WRANGLER = 'apps/worker/wrangler.jsonc';
 /** The Directory, whose `DIRECTORY_VERSION` an older Worker refuses to read past. */
 export const DIRECTORY = 'packages/record/src/directory.ts';
 
+/** Slash's ledger, whose `STORE_VERSION` an older build refuses to read past (`openStore`). */
+export const SLASH_STORE = 'packages/slash/src/call.ts';
+
 /** How long `record` waits for the live build id before calling it unknown. */
 const ASK_MS = 20_000;
 
@@ -116,15 +119,22 @@ export function directoryVersion(text) {
   return found ? Number(found[1]) : null;
 }
 
+/** `STORE_VERSION` as Slash's `call.ts` exports it, or `null` when the file does not say. */
+export function storeVersion(text) {
+  if (typeof text !== 'string') return null;
+  const found = /export\s+const\s+STORE_VERSION\s*=\s*(\d+)/.exec(text);
+  return found ? Number(found[1]) : null;
+}
+
 /**
  * What changed between the live build and this one, read from this clone, or `changed: null` when it cannot be.
  *
- * `changed` is `git diff --name-only`; `wrangler` and `directory` are each file's text at the two shas, `null` where the
+ * `changed` is `git diff --name-only`; `wrangler`, `directory` and `slash` are each file's text at the two shas, `null` where the
  * file is absent at one. The checkout has to hold both commits, which is why `deploy.yml` checks out with the whole
  * history. A sha that is not a sha is refused before `git` sees it.
  */
 export function readDiff(from, to, repo = ROOT) {
-  const none = { changed: null, wrangler: [null, null], directory: [null, null] };
+  const none = { changed: null, wrangler: [null, null], directory: [null, null], slash: [null, null] };
   if (!known(from, SHA) || !known(to, SHA)) return none;
   const say = (args) => {
     try {
@@ -140,6 +150,7 @@ export function readDiff(from, to, repo = ROOT) {
     changed: names.split('\n').map((line) => line.trim()).filter((line) => line.length > 0),
     wrangler: [at(from, WRANGLER), at(to, WRANGLER)],
     directory: [at(from, DIRECTORY), at(to, DIRECTORY)],
+    slash: [at(from, SLASH_STORE), at(to, SLASH_STORE)],
   };
 }
 
@@ -178,6 +189,11 @@ export function decide(state, diff) {
     const [before, after] = (diff.directory ?? [null, null]).map(directoryVersion);
     if (before === null || after === null) return held(`${DIRECTORY} changed and its DIRECTORY_VERSION could not be read at both shas`);
     if (before !== after) return held(`DIRECTORY_VERSION moved from ${before} to ${after}: an older Worker refuses the newer Directory, and the Directory serves every record, so a rollback would sign nobody in`);
+  }
+  if (changed.includes(SLASH_STORE)) {
+    const [before, after] = (diff.slash ?? [null, null]).map(storeVersion);
+    if (before === null || after === null) return held(`${SLASH_STORE} changed and its STORE_VERSION could not be read at both shas`);
+    if (before !== after) return held(`STORE_VERSION moved from ${before} to ${after}: an older build refuses a Slash ledger newer than it reads, so a rollback would leave Slash answering nobody on every record that asked since`);
   }
 
   const app = known(appPrevious, VERSION_ID);

@@ -8,6 +8,7 @@
  *
  * THE HOST KEEPS THE LAST DRILL, not one per record (the scope's critic): only the operator holds the key that opens a
  * copy, so the Directory keeps it (`drill` in `@braindog/record/directory`) and every signed-in person reads the same one.
+ * The last is the newest by when it ran: a post older than the kept drill is ignored (`olderDrill`).
  */
 
 import type { HostDrill } from '@braindog/record/directory';
@@ -63,7 +64,34 @@ export function drillNote(d: HostDrill): string {
   return `drill ${d.at.slice(0, 10)} · ${d.pass ? 'pass' : 'fail'} · ${String(d.copies)} records`;
 }
 
-/** What `GET /account/drill` answers a signed-in person: when, whether it passed, and how many records it opened, or `{ at: null }`. */
-export function drillAnswer(d: HostDrill | null): { at: string; pass: boolean; records: number } | { at: null } {
-  return d === null ? { at: null } : { at: d.at, pass: d.pass, records: d.copies };
+/**
+ * A DRILL OF THE DIRECTORY ALONE: it opened the Directory's copy (`records` is its count) and no record's (`copies` 0).
+ * Such a drill may pass, yet no record's copy was tried, so the answer says so in a field of its own and the Backups
+ * area never has to read it out of a zero.
+ */
+export function directoryOnly(d: HostDrill): boolean {
+  return d.copies === 0 && d.records !== null;
+}
+
+/**
+ * Whether a drill just told is OLDER than the one the host keeps, so the door ignores it: the host keeps the NEWEST
+ * drill by when it ran, not whichever post lands last (a report sent again, or two Macs out of order). The same
+ * instant is not older, so a drill run again in the same minute replaces the one before it. Nothing kept, or a kept
+ * `at` this build cannot read, is older than nothing.
+ */
+export function olderDrill(told: HostDrill, kept: HostDrill | null): boolean {
+  if (kept === null) return false;
+  const was = Date.parse(kept.at);
+  return Number.isFinite(was) && Date.parse(told.at) < was;
+}
+
+/** What the door answers: when, whether it passed, how many records it opened, and whether it opened the Directory alone. */
+export type DrillAnswer = { at: string; pass: boolean; records: number; directory_only: boolean } | { at: null };
+
+/**
+ * What `GET /account/drill` answers a signed-in person, or `{ at: null }`. `records` is the count of records whose copy
+ * was opened; `directory_only` is true when that is none because the drill opened the Directory's copy and no other.
+ */
+export function drillAnswer(d: HostDrill | null): DrillAnswer {
+  return d === null ? { at: null } : { at: d.at, pass: d.pass, records: d.copies, directory_only: directoryOnly(d) };
 }

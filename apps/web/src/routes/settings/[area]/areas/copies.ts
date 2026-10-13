@@ -89,8 +89,10 @@ export function drillOf(value: unknown): DrillFacts | null {
   if (v.at === null) return { at: null };
   const at = instant(v.at);
   if (at === null || typeof v.pass !== 'boolean') return null;
-  const records = typeof v.records === 'number' && Number.isInteger(v.records) && v.records >= 0 ? v.records : 0;
-  return { at, pass: v.pass, records };
+  const counted = typeof v.records === 'number' && Number.isInteger(v.records) && v.records >= 0;
+  // A pass with no count is not the door's shape: zero now reads "no record's copy was tried", which nobody said.
+  if (v.pass && !counted) return null;
+  return { at, pass: v.pass, records: counted ? (v.records as number) : 0 };
 }
 
 /**
@@ -114,14 +116,17 @@ export async function readDrill(io: typeof fetch, base = ''): Promise<DrillFacts
 /**
  * The drill line: the sentence, whether it is a fault, and the word that marks it beside the deeper red. A test never
  * run is a fault, and stays one until the operator runs the first; so is a failed test, and a pass past 35 days.
+ * A PASS THAT TRIED NO RECORD'S COPY IS NOT "PASSED" (finding 8): the Directory's copy opened and nothing else was
+ * restored, so the line says exactly that, as a fault, until a test restores at least one record's copy.
  */
 export type DrillLine = { text: string; fault: boolean; mark: string | null };
 
-/** "This host's last restore test: passed 12 days ago", "...: failed 3 days ago", or "Never tested". */
+/** "This host's last restore test: passed 12 days ago", "...: failed 3 days ago", "..., 12 days ago: the Directory's copy opened; no record's copy was tried", or "Never tested". */
 export function drillLine(drill: DrillFacts, now: number): DrillLine {
   if (drill.at === null) return { text: copy.drillNeverSaid, fault: true, mark: copy.drillNever };
   const when = ago(drill.at, now);
   if (!drill.pass) return { text: copy.drillFailed(when), fault: true, mark: null };
+  if (drill.records === 0) return { text: copy.drillNoRecord(when), fault: true, mark: copy.drillUnproven };
   const overdue = now - Date.parse(drill.at) > DRILL_DUE_MS;
   return { text: copy.drillPassed(when), fault: overdue, mark: overdue ? copy.drillOverdue : null };
 }

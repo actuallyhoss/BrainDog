@@ -44,11 +44,12 @@ async function render(props: unknown): Promise<string> {
   const dir = mkdtempSync(join(tmpdir(), 'decide-'));
 
   /* EACH COMPONENT IT DRAWS IS COMPILED BESIDE IT, and each plain module it imports is read from its source: `Decide`
-     draws an agent's mark with `AgentMark`, which reads `agent-marks.ts`. */
+     draws an agent's mark with `AgentMark`, which reads the marks both apps share, `@braindog/skin/agent-marks.ts`.
+     That name is resolved here as `svelte` is, because the temp directory has no `node_modules` above it. */
   const build = (name: string) => {
     const { js } = compile(readFileSync(new URL(`${name}.svelte`, HERE), 'utf8'), { generate: 'server', filename: `${name}.svelte` });
     const code = (js.code as string)
-      .replace(/from ['"](svelte[^'"]*)['"]/g, (_: string, spec: string) => `from '${import.meta.resolve(spec, HERE.href)}'`)
+      .replace(/from ['"]((?:svelte|@braindog\/skin\/)[^'"]*)['"]/g, (_: string, spec: string) => `from '${import.meta.resolve(spec, HERE.href)}'`)
       .replace(/from ['"]\.\/([A-Za-z]+)\.svelte['"]/g, (_: string, dep: string) => `from './${dep}.js'`)
       .replace(/from ['"]\.\/([A-Za-z-]+\.ts)['"]/g, (_: string, mod: string) => `from '${new URL(mod, HERE).href}'`);
     writeFileSync(join(dir, `${name}.js`), code);

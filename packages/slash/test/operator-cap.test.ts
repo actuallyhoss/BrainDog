@@ -105,18 +105,19 @@ test('(3) ONE REACHED THROW, ONE SETTLEMENT: a read and an answer both keep the 
     assert.equal(row.tokens_out, 0);
     assert.equal(row.neurons, priced(row), `the ${path} row was priced ${row.neurons} where the rule gives ${priced(row)}`);
   }
-  /* BOTH ARE ASKS. RED: 1, the read alone. */
-  assert.equal((slash.status() as { asks: { used: number } }).asks.used, 2);
+  /* NEITHER IS ONE OF HIS ASKS: a binding that threw keeps its neurons on the row and spends nothing of his month. */
+  assert.equal((slash.status() as { asks: { used: number } }).asks.used, 0);
   sql.close();
 });
 
-test("(4) THE LADDER'S RUNGS ARE SPENT FROM ask_cap: at a cap of two, the third reached throw is refused before the model", async () => {
+test("(4) THE LADDER'S RUNGS KEEP THEIR NEURONS AND SPEND NONE OF ask_cap: at a cap of two, a third reached throw still reaches the model", async () => {
   const model = throwing(reachedError);
   const { sql, slash } = build(model);
   assert.ok(slash.configure({ ask_cap: 2 }, OWNER).ok);
   const codes = [];
   for (let i = 0; i < 3; i++) codes.push(codeOf(await slash.answer(RATE)));
-  assert.deepEqual(codes, ['UNREACHABLE', 'UNREACHABLE', 'SLASH_BUDGET_SPENT']);
-  assert.equal(model.calls(), 2, 'a rung past the cap reached the model');
+  assert.deepEqual(codes, ['UNREACHABLE', 'UNREACHABLE', 'UNREACHABLE']);
+  assert.equal(model.calls(), 3, 'a rung was turned away at a cap no rung had spent');
+  assert.equal((slash.status() as { asks: { used: number } }).asks.used, 0);
   sql.close();
 });

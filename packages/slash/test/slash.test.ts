@@ -32,7 +32,7 @@ test('createSlash makes the store under Slash\'s own names, one settings row and
     ['slash_call', 'slash_meta', 'slash_settings'],
   );
   assert.equal(sql.one<{ n: number }>('SELECT COUNT(*) AS n FROM slash_settings')?.n, 1);
-  assert.equal(sql.one<{ value: string }>("SELECT value FROM slash_meta WHERE key = 'version'")?.value, '2');
+  assert.equal(sql.one<{ value: string }>("SELECT value FROM slash_meta WHERE key = 'version'")?.value, '3');
 
   createSlash({ sql, clock, inference, record });
   assert.equal(sql.one<{ n: number }>('SELECT COUNT(*) AS n FROM slash_settings')?.n, 1);
@@ -51,6 +51,7 @@ test('status is the included source on tier a, the routing table model, and a ca
     provider: null,
     model: 'glm-5.3-flash',
     asks: { used: 0, cap: 80, resets: '2026-12-01T00:00:00.000Z', capped: true },
+    background: { used: 0, cap: 600 },
   });
 });
 
@@ -70,27 +71,30 @@ test('on his own key status says so, lists his asks uncapped, and a save of noth
     provider: 'anthropic',
     model: 'claude-x',
     asks: { used: 1, cap: 80, resets: '2026-12-01T00:00:00.000Z', capped: false },
+    background: { used: 0, cap: 600 },
   });
   const read = slash.configure({}, OWNER);
   assert.ok(read.ok);
   assert.deepEqual(read.value, saved.value);
 });
 
-test('ASK_CAP_DEFAULT AND BACKGROUND_ASKS_MONTH ARE THE NAMES THE CONTRACT GIVES, at 80 and 60', () => {
+test('ASK_CAP_DEFAULT AND BACKGROUND_ASKS_MONTH ARE THE NAMES THE CONTRACT GIVES, at 80 and 600', () => {
   assert.equal(ASK_CAP_DEFAULT, 80);
-  assert.equal(BACKGROUND_ASKS_MONTH, 60);
+  assert.equal(BACKGROUND_ASKS_MONTH, 600);
 });
 
 test('the meter counts tier a asks in this month, reads and patterns alike, and never a propose', () => {
   const { sql, slash } = build();
   const put = (kind: string, tier: string, ts: string): void =>
     sql.exec(
-      `INSERT INTO slash_call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status)
-       VALUES (?, ?, ?, ?, 'glm-5.3-flash', 1, 1, 1, 1, 'ok')`,
+      `INSERT INTO slash_call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, purpose, spends)
+       VALUES (?, ?, ?, ?, 'glm-5.3-flash', 1, 1, 1, 1, 'ok', 'ask', ?)`,
       `${kind}${tier}${ts}`,
       ts,
       kind,
       tier,
+      /* WHAT A ROW SPENDS IS WRITTEN ON IT (store version 3): a propose's row spends none, its read spent the ask. */
+      kind === 'propose' ? 'none' : 'person',
     );
   /* A READ IS AN ASK since the read door was metered: before, `ask_cap` could never be reached through the only door. */
   put('read', 'a', '2026-11-02T00:00:00.000Z');

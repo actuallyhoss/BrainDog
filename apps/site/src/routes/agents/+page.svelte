@@ -20,7 +20,7 @@
 -->
 <script lang="ts">
   import AgentMark from '$lib/AgentMark.svelte';
-  import { markedOf } from '$lib/agent-marks.ts';
+  import { markedOf } from '@braindog/skin/agent-marks.ts';
   import Icon from '$lib/Icon.svelte';
   import Mark from '$lib/Mark.svelte';
   import type { IconName } from '$lib/icons.ts';

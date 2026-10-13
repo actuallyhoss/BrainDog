@@ -57,9 +57,82 @@ export type Source = {
   boot(): Promise<Said<Boot>>;
   schema(register: string): Promise<Said<RegisterDecl>>;
   page(register: string, ask: Ask, cursor: string | null): Promise<Said<Answer>>;
-  /** How many rows answer, and nothing else: the pills' counts. */
+  /** How many rows answer, and nothing else. */
   count(register: string, ask: Ask): Promise<Said<number>>;
+  /**
+   * How many of the answer's entries hold each of `values` in the field `by`: one pill strip's counts, in one request.
+   * `ask` is the list's question without that field's own chip, which is what a pill's count is counted under. ITS
+   * CHIPS ARE READ AS "and" WHATEVER `join` SAYS: a count by value is a count inside one set of entries, and a screen
+   * whose chips are joined by "or" hands over the search alone (`countAll` on the list screen).
+   */
+  counts(register: string, ask: Ask, by: string, values: readonly string[]): Promise<Said<Map<string, number>>>;
 };
+
+/** The record's `countBy`, as much of its answer as a pill reads. */
+export type Counter = (args: { register: string; by: string; where?: unknown }) => Promise<
+  { ok: true; value: unknown } | { ok: false; refusal: Refusal } | { ok: false; conflict: unknown }
+>;
+
+/**
+ * One field's counts for a strip of pills, from ONE question where the record answers it.
+ *
+ * A STRIP OF PILLS ASKED ONCE A PILL. Each count was its own `list` with `limit: 1`, read for its `matched`, so a list
+ * with a dozen values sent a dozen requests before the screen settled. The record's `countBy` answers every value of a
+ * field under one `where`, and the answer is the list's own count, so a pill that says 12 opens a list that says 12.
+ *
+ * A HOST THAT HAS NO SUCH METHOD IS COUNTED THE OLD WAY, a pill at a time through `one`: `counter` is absent when the
+ * client this build carries does not name it, a host a version behind refuses it `ROUTE_UNKNOWN`, and a host built
+ * over a record without the method refuses it `NOT_IN_THIS_BUILD`. Any other refusal is the record's answer about this
+ * question and is handed back as it came.
+ *
+ * EVERY VALUE ASKED FOR IS ANSWERED, WITH 0 ONLY WHERE NOTHING HOLDS IT. The record lists the values it found, and a
+ * pill with no entries still prints its number; but it lists only its fifty most common and says the rest as `more`,
+ * and a walk that stopped early says `capped`, with counts that are then only what it reached. So a 0 is written only
+ * when the answer was whole. With `more`, a value asked for and not listed is asked on its own through `one`, the
+ * list's own count; with `capped`, every value is, since none of the counts can be trusted to open a list that size.
+ * A value that is not text (an empty field's `null`) has no pill.
+ */
+export async function countsOf(
+  counter: Counter | undefined,
+  one: (value: string) => Promise<Said<number>>,
+  register: string,
+  where: unknown,
+  by: string,
+  values: readonly string[],
+): Promise<Said<Map<string, number>> & { absent?: true }> {
+  const out = new Map<string, number>(values.map((v) => [v, 0]));
+  /** Each of `asked` counted on its own, into `out`; the first refusal, or nothing. */
+  const singly = async (asked: readonly string[]): Promise<Exclude<Said<number>, { ok: true }> | undefined> => {
+    const each = await Promise.all(asked.map(async (v) => [v, await one(v)] as const));
+    for (const [v, n] of each) {
+      if (!n.ok) return n;
+      out.set(v, n.value);
+    }
+    return undefined;
+  };
+  if (counter) {
+    const got = said(await counter({ register, by, ...(where === undefined ? {} : { where }) }));
+    if (got.ok) {
+      const answer = got.value as { counts?: { value: unknown; n: number }[]; more?: unknown; capped?: unknown } | null;
+      const listed = new Set<string>();
+      if (answer?.capped !== true)
+        for (const c of answer?.counts ?? [])
+          if (typeof c.value === 'string' && out.has(c.value)) {
+            out.set(c.value, c.n);
+            listed.add(c.value);
+          }
+      /* WHOLE: every value not listed is held by nothing. Otherwise the ones not listed are asked one at a time. */
+      const unsaid = answer?.capped === true || answer?.more !== undefined ? values.filter((v) => !listed.has(v)) : [];
+      const refused = await singly(unsaid);
+      return refused ?? { ok: true, value: out };
+    }
+    if (got.refusal.code !== 'ROUTE_UNKNOWN' && got.refusal.code !== 'NOT_IN_THIS_BUILD') return got;
+  }
+  const refused = await singly(values);
+  if (refused) return refused;
+  /* `absent` SAYS THE HOST REFUSED THE METHOD, so its caller stops asking it for the life of the tab's source. */
+  return { ok: true, value: out, ...(counter ? { absent: true as const } : {}) };
+}
 
 /**
  * A call the screen is waiting on, bracketed by its readiness counters.
@@ -193,6 +266,17 @@ function remote(client: ReturnType<typeof createClient>, booted: Boot): Source {
     return { ok: true, value: { entries, matched: out.value.matched, cursor: out.value.cursor, names } };
   }
 
+  /* ONE ROW, BECAUSE ONLY THE COUNT IS READ. `matched` is the whole answer's size whatever the
+     page holds, and a page of one is the smallest the record will send. */
+  async function count(register: string, a: Ask): Promise<Said<number>> {
+    const out = await ask(register, { filters: a.filters, q: a.q, join: a.join }, null, 1);
+    return out.ok ? { ok: true, value: out.value.matched } : out;
+  }
+
+  /* `countBy` WHERE THIS BUILD'S CLIENT NAMES IT, read off the client and not assumed: the route and the client's
+     method are the host's and the client's to add, and until both are in, the pills are counted one at a time. */
+  let counter = (client as unknown as { countBy?: Counter }).countBy;
+
   return {
     boot: async () => ({ ok: true, value: booted }),
     /* THE RECORD'S OWN WORDS OVER THE DECLARATION'S: a use case's labels for this list,
@@ -219,11 +303,16 @@ function remote(client: ReturnType<typeof createClient>, booted: Boot): Source {
       return { ok: true, value: relabel(decl, labels()) };
     },
     page: (register, a, cursor) => ask(register, a, cursor, PAGE),
-    async count(register, a) {
-      /* ONE ROW, BECAUSE ONLY THE COUNT IS READ. `matched` is the whole answer's size whatever the
-         page holds, and a page of one is the smallest the record will send. */
-      const out = await ask(register, { filters: a.filters, q: a.q, join: a.join }, null, 1);
-      return out.ok ? { ok: true, value: out.value.matched } : out;
+    count,
+    async counts(register, a, by, values) {
+      const refs = await refsFor(register);
+      if (!refs.ok) return refs;
+      /* THE LIST'S OWN `where`, built by the one function the list is asked through, so the two cannot disagree. */
+      const where = whereFor(register, a.filters, a.q, refs.value);
+      const one = (value: string) => count(register, { filters: [...a.filters, { field: by, op: 'in', values: [value] }], q: a.q });
+      const out = await countsOf(counter, one, register, where === undefined ? undefined : carried(where), by, values);
+      if (out.ok && out.absent) counter = undefined;
+      return out.ok ? { ok: true, value: out.value } : out;
     },
   };
 }
@@ -231,7 +320,7 @@ function remote(client: ReturnType<typeof createClient>, booted: Boot): Source {
 /** Every call answering the one refusal `boot` gave, so the screen draws it rather than guessing. */
 const refusing = (refusal: Refusal): Source => {
   const no = async <T>(): Promise<Said<T>> => ({ ok: false, refusal });
-  return { boot: no, schema: no, page: no, count: no };
+  return { boot: no, schema: no, page: no, count: no, counts: no };
 };
 
 /** The source this tab reads, beside the answer it was built from. See `open`. */

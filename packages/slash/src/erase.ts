@@ -33,7 +33,7 @@ const ERASED = '--erased--';
  */
 const ERASE_PAGE = 500;
 
-type Row = { id: string; rowid: number; question: string | null; predicate: string | null; read: string };
+type Row = { id: string; rowid: number; question: string | null; predicate: string | null; read: string; raw: string | null };
 
 /**
  * Tombstone every value in Slash's ledger that names one of `subjects`, in one transaction, and answer how many rows it
@@ -52,7 +52,7 @@ export function eraseSlash(sql: Sql, subjects: readonly string[]): number {
     let after = 0;
     for (;;) {
       const page = sql.all<Row>(
-        'SELECT id, rowid, question, predicate, read FROM slash_call WHERE rowid > ? ORDER BY rowid LIMIT ?',
+        'SELECT id, rowid, question, predicate, read, raw FROM slash_call WHERE rowid > ? ORDER BY rowid LIMIT ?',
         after,
         ERASE_PAGE,
       );
@@ -60,8 +60,10 @@ export function eraseSlash(sql: Sql, subjects: readonly string[]): number {
         const read = names(row.read) ? tracesErased(row.read, names) : row.read;
         const question = names(row.question) ? ERASED : row.question;
         const predicate = names(row.predicate) ? ERASED : row.predicate;
-        if (question === row.question && predicate === row.predicate && read === row.read) continue;
-        sql.exec('UPDATE slash_call SET question = ?, predicate = ?, read = ? WHERE id = ?', question, predicate, read, row.id);
+        /* A PROVIDER'S OWN MESSAGE CAN ECHO WHAT A PERSON TYPED, so `raw` goes with the question: NULL, since nothing reads it back. */
+        const raw = names(row.raw) ? null : row.raw;
+        if (question === row.question && predicate === row.predicate && read === row.read && raw === row.raw) continue;
+        sql.exec('UPDATE slash_call SET question = ?, predicate = ?, read = ?, raw = ? WHERE id = ?', question, predicate, read, raw, row.id);
         touched++;
       }
       const last = page[page.length - 1];

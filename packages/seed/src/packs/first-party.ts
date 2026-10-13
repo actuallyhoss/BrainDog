@@ -458,6 +458,11 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   a script, fields and a setting added and a rule taken away, nothing another pack reads,
  *   so a minor step. NOT A QUIET ONE: a rule taken away is a loss (`packs/quiet.ts`), so a record on 3.15.0 or before is
  *   asked once in Decide ("take away Cash stale") and gets none of this until it says yes.
+ * - money-core 3.17.0 (cash-check-52, REC-A17): `cash-cross-check`, Cash now worked out a second way, less Cash now. The
+ *   kernel walks each cash account entry by entry from its newest statement, apart from the roll, and the figure is the
+ *   difference a currency at a time: nought, or the figure on Money is wrong. With no balance typed it has no value.
+ *   MONEY-CORE 3.16.0 IS RELEASED (`test/fixtures/released/money-core-3.16.0.json`), so this is a version of its own. One
+ *   figure added, nothing taken away or retyped, so a minor step that reaches a record on its own. No page draws it yet.
  * - portfolio 1.16.0 and work 1.18.0 (batch 46, REC-C08's remainder and REC-C16): a project others point at stays. Projects
  *   declares `delete: refuse_while_referenced`, as Accounts does, so a project a task, a bill, a service or a person names
  *   is not deleted out from under them, and the refusal names the lists and how many. Under What each one earns, one
@@ -474,7 +479,7 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.16.0',
   people: '3.3.0',
-  'money-core': '3.16.0',
+  'money-core': '3.17.0',
   estate: '2.1.0',
   work: '1.18.0',
 };

@@ -11,7 +11,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { FREE_JOIN_REFUSED, FREE_ONE_PERSON } from '@braindog/record/directory';
+import { FREE_JOIN_REFUSED, FREE_JOIN_REFUSED_SHORT, FREE_ONE_PERSON, FREE_ONE_PERSON_SHORT } from '@braindog/record/directory';
 
 import { cloud } from './cloud-harness.ts';
 
@@ -20,9 +20,12 @@ const OWNER = 'ada@example.test';
 
 type Out = { ok: boolean; value?: Record<string, unknown>; refusal?: { code: string; fix: string; at?: string } };
 
+/** A host that sells Cloud, as `/account/billing` reads it: a key that matches its mode, an address, and Cloud's price. */
+const SELLS = { BILLING: 'test', STRIPE_SECRET_KEY: 'sk_test_abc', STRIPE_PRICE_HOSTED: 'price_cloud' };
+
 /** A record, its owner signed in, and a way to put it on a plan as billing does: the Directory first, then the record. */
-async function studio() {
-  const c = await cloud();
+async function studio(extra: Record<string, unknown> = SELLS) {
+  const c = await cloud(extra);
   await c.provision(REC, 'studio', OWNER);
   const cookie = await c.signIn(OWNER);
   const plan = async (to: string) => {
@@ -78,6 +81,29 @@ test('A LINK TO A RECORD NOW ON FREE IS REFUSED WHEN IT IS OPENED, before a proo
   const bo = dir.invitee('bo@example.test');
   assert.ok(bo.ok);
   assert.equal(dir.joinRecord(REC, bo.value.id).refusal?.fix, FREE_JOIN_REFUSED);
+});
+
+test('ON A HOST THAT SELLS NO PLAN THE SAME THREE REFUSALS NAME NO DOOR: no Cloud, no Settings, no link to open again', async () => {
+  const c = await studio({});
+  const minted = await c.invite('bo@example.test');
+  const token = minted.body.value?.['token'] as string;
+  assert.equal(typeof token, 'string', JSON.stringify(minted.body));
+  await c.plan('free');
+
+  const out = await c.invite('cy@example.test');
+  assert.equal(out.status, 403, JSON.stringify(out.body));
+  assert.equal(out.body.refusal?.fix, FREE_ONE_PERSON_SHORT);
+  assert.equal(FREE_ONE_PERSON_SHORT, 'Free is for one person, so nobody else can join this record.');
+
+  const res = await c.ask('/auth/invite', { method: 'POST', body: JSON.stringify({ inviteToken: token, accept: true }) });
+  const opened = (await res.json()) as Out;
+  assert.equal(res.status, 403, JSON.stringify(opened));
+  assert.equal(opened.refusal?.fix, FREE_JOIN_REFUSED_SHORT);
+
+  const dir = c.directory as unknown as { invitee(e: string): { ok: boolean; value: { id: string } }; joinRecord(r: string, p: string): Out };
+  const bo = dir.invitee('bo@example.test');
+  assert.ok(bo.ok);
+  assert.equal(dir.joinRecord(REC, bo.value.id).refusal?.fix, FREE_JOIN_REFUSED_SHORT);
 });
 
 test('SIGN-UP IS OPEN WHERE SIGNUP SAYS open, with billing off', async () => {

@@ -105,6 +105,20 @@ export const ROLLED_READS = ['as_of', 'age', 'stale'] as const;
  */
 export type Rolled = { balance: string; as_of: string; checks?: RolledCheck[]; moves: RolledMoves; read?: (typeof ROLLED_READS)[number]; after?: string };
 
+/**
+ * `value: { crosscheck: { of } }` (REC-A17): the rolled figure `of` names, less the same money worked out a second way.
+ *
+ * IT NAMES THE FIGURE AND NOTHING ELSE, so the two cannot be declared apart: the accounts, the lists that restart one
+ * and the moves are the checked figure's own, read off its body each time (`readCrosscheck`).
+ */
+export type Crosscheck = { of: string };
+
+/**
+ * The most entries one cross-check reads, statements and moves together. Past it the figure refuses rather than walk a
+ * part: a check over some of the money is a nought nobody can trust.
+ */
+export const CROSSCHECK_ENTRIES_MOST = 50_000;
+
 /** `value: { walk, within }` over `source: forecast.runway` (`modules.md` C4). */
 export type Walked = { walk: (typeof WALKS)[number]; within?: string };
 
@@ -133,6 +147,23 @@ export function rolledFault(rolled: unknown): string | null {
   if (r.after !== undefined && (typeof r.after !== 'string' || windowMs(r.after) === null)) return 'rolled.after is a span of days, such as 7d';
   if (r.read === 'stale' && r.after === undefined) return 'a stale count says how old a balance may be before it counts: after: 7d';
   if (r.after !== undefined && r.read !== 'stale') return 'rolled.after is the window a stale count reads, so it goes with read: stale';
+  return null;
+}
+
+/** Whether a figure's value is a cross-check of another figure. The shape inside is checked where it is read. */
+export const isCrosscheck = (value: unknown): boolean => value !== null && typeof value === 'object' && !Array.isArray(value) && Object.hasOwn(value, 'crosscheck');
+
+/**
+ * A cross-check's figure as it must be, or the sentence saying what is wrong with it. `declare.ts` asks the same at
+ * install. It takes the whole body, since a cross-check has no rows of its own to filter, group or cut into days.
+ */
+export function crosscheckFault(body: { source?: unknown; value?: unknown; where?: unknown; group_by?: unknown; bucket?: unknown }): string | null {
+  const said = (body.value as { crosscheck?: unknown } | null | undefined)?.crosscheck;
+  if (said === null || typeof said !== 'object' || Array.isArray(said) || !named((said as Record<string, unknown>).of))
+    return 'crosscheck names the figure it checks: { of: cash-now }';
+  if (typeof body.source !== 'string' || !body.source.startsWith('register.')) return 'a cross-check is over the list of accounts the figure it checks adds up, so its source is register.<id>';
+  for (const key of ['where', 'group_by', 'bucket'] as const)
+    if (body[key] !== undefined) return `a cross-check reads the accounts of the figure it checks, all of them and as one, so it has no ${key}`;
   return null;
 }
 
@@ -430,6 +461,160 @@ export function readRolled(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result
   });
 }
 
+/** A day as SQLite compares one in `readRolled`: the first ten characters of a stored text, or `null` for none. */
+const dayText = (v: unknown): string | null => (typeof v === 'string' ? v.slice(0, 10) : null);
+
+/**
+ * A rolled figure, less the same money walked entry by entry (REC-A17 job 4): nought, or the figure is wrong.
+ *
+ * "WRONG MONEY ON A SCREEN IS THE WORST CLASS OF DEFECT IN THIS REPO" (W.512), and nothing compared a money figure
+ * with its rows on a lived record. `readRolled` picks each account's statement and adds its moves inside SQLite, one
+ * `ORDER BY ... LIMIT 1` and one `sum(CASE ...)` an account. This reads the same entries out one at a time and does
+ * every comparison of days, every choice of statement, every sign and every addition here, in plain code, so a change
+ * to either that moves one minor unit leaves a difference. It never calls `readRolled`: the figure it checks is read
+ * through `evaluateMetric`, the door every screen reads it through, and the walk shares none of its arithmetic.
+ *
+ * WHICH ENTRIES COUNT IS ASKED ONCE, of the checked figure's own `where` and `moves.where`, through the one reader of a
+ * sentence (`predicateOf`, `compile`). What a sentence means is one rule for the whole record; what the entries it
+ * admits add up to is the thing checked twice.
+ *
+ * ONE DIFFERENCE A CURRENCY, NEVER ONE ACROSS THEM. The checked figure is read with no home currency, so it comes back
+ * as an amount a currency, and each is compared with the walk's amount in that currency as whole minor units with no
+ * rate between them. The value is the difference where one currency is out, nought where none is, and nothing with a
+ * part a currency where several are. The verdict is this reader's own and not the target's: any difference, over or
+ * under, in any currency, is a miss.
+ *
+ * NO BALANCE IS NO VALUE, and `why` says so in the words a page says it with (`when: { metric, empty: true }`,
+ * PGS-C06). Nought over no accounts would be a check that checked nothing reading as a pass.
+ */
+export function readCrosscheck(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result<Reading> {
+  const fault = crosscheckFault(decl as unknown as Parameters<typeof crosscheckFault>[0]);
+  if (fault) return no<Reading>('VALUE_MALFORMED', `${decl.metric}: ${fault}.`, { at: 'value' });
+  const of = (decl.value as unknown as { crosscheck: Crosscheck }).crosscheck.of;
+  const stored = sql.one<{ body: string }>("SELECT body FROM declaration WHERE id = ? AND kind = 'metric' AND superseded_at IS NULL AND retired = 0", `metric.${of}`);
+  if (!stored) return no<Reading>('METRIC_UNKNOWN', `${decl.metric}: there is no metric called ${of} to check.`, { at: 'value' });
+  const checked = JSON.parse(stored.body) as MetricDecl;
+  const body = isRolled(checked.value) ? (checked.value as unknown as { rolled: unknown }).rolled : null;
+  if (body === null || rolledFault(body) !== null || (body as Rolled).read !== undefined)
+    return no<Reading>('DECLARATION_INVALID', `${decl.metric}: a cross-check is of cash rolled forward, and ${of} is not that money.`, { at: 'value' });
+  if (checked.source !== decl.source)
+    return no<Reading>('DECLARATION_INVALID', `${decl.metric}: ${of} adds up ${checked.source}, so that is the source of its cross-check too.`, { at: 'source' });
+  const rolled = body as Rolled;
+
+  /* THE FIGURE, AN AMOUNT A CURRENCY: as one whole, with no home currency to convert into and no parts by group. */
+  const { group_by: _parts, ...whole } = checked;
+  const shown = evaluateMetric(sql, { ...whole, compare: 'none' }, { ...ctx, fx: undefined });
+  if (!shown.ok) return shown;
+  const figure = new Map<string, number>();
+  for (const p of shown.value.parts ?? []) figure.set(p.currency, p.amount);
+  if (!shown.value.parts && shown.value.value !== null && shown.value.unit !== null) figure.set(shown.value.unit, shown.value.value);
+
+  /* EVERY LIST AND FIELD IS DECLARED, or `evaluateMetric` refused above: `readRolled` asks for each before it reads. */
+  const register = checked.source.slice('register.'.length);
+  const accounts = ctx.schemaOf(register)!;
+  const moves = ctx.schemaOf(rolled.moves.register)!;
+  const w = compile(predicateOf(checked.where, accounts, ctx).predicate, accounts);
+  const m = compile(predicateOf(rolled.moves.where, moves, ctx).predicate, moves);
+  if (w.bad.length || m.bad.length) return { ok: false, refusal: (w.bad[0] ?? m.bad[0])! };
+
+  let left = CROSSCHECK_ENTRIES_MOST;
+  const tooMany = (): Result<Reading> =>
+    no<Reading>('OUT_OF_BOUNDS', `${decl.metric}: ${of} is over more than ${CROSSCHECK_ENTRIES_MOST} statements and moves, which is more than one check walks.`, { at: 'value' });
+  /* ONE ACCOUNT'S ENTRIES IN A LIST, oldest written first, each read out whole. `null` past the bound. */
+  const entriesOf = (list: string, by: string, account: string, admits: { sql: string; params: readonly unknown[] } | null): Record<string, unknown>[] | null => {
+    const rows = sql.all<{ id: string; fields: string }>(
+      `SELECT id, fields FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, '${jsonPath(by)}') = ?${admits ? ` AND (${admits.sql})` : ''} ORDER BY rowid LIMIT ${left + 1}`,
+      list,
+      account,
+      ...((admits?.params ?? []) as never[]),
+    );
+    if (rows.length > left) return null;
+    left -= rows.length;
+    return rows.map((r) => JSON.parse(r.fields) as Record<string, unknown>);
+  };
+  const held = sql.all<{ id: string; fields: string }>(
+    `SELECT id, fields FROM entry WHERE register = ? AND deleted_at IS NULL AND (${w.sql}) ORDER BY rowid LIMIT ${ROLLED_ACCOUNTS_MOST + 1}`,
+    register,
+    ...w.params,
+  );
+  if (held.length > ROLLED_ACCOUNTS_MOST) return tooMany();
+
+  const anchor = clockOf(ctx);
+  const on = new Date(anchor).toISOString().slice(0, 10);
+  const walk = new Map<string, number>();
+  const add = (currency: string, amount: number): void => void walk.set(currency, (walk.get(currency) ?? 0) + amount);
+  type Stated = { day: string; money: { amount: number; currency: string } | null };
+  for (const row of held) {
+    const fields = JSON.parse(row.fields) as Record<string, unknown>;
+    const own: Stated = { day: dayIn(fields[rolled.as_of]), money: moneyOf(fields[rolled.balance]) };
+    /* EACH LIST THAT RESTARTS AN ACCOUNT SAYS TWO THINGS ABOUT IT: the newest statement on or before today, the last
+       written of a day's, and the earliest after today, the first written. One with no amount or no day says nothing. */
+    const newest: Stated[] = [];
+    const ahead: Stated[] = [];
+    for (const check of rolled.checks ?? []) {
+      const entries = entriesOf(check.register, check.by, row.id, null);
+      if (entries === null) return tooMany();
+      let before: Record<string, unknown> | null = null;
+      let after: Record<string, unknown> | null = null;
+      for (const e of entries) {
+        const d = dayText(e[check.on]);
+        const stated = e[check.balance] as { amount?: unknown } | null | undefined;
+        if (d === null || stated === null || typeof stated !== 'object' || stated.amount === null || stated.amount === undefined) continue;
+        if (d <= on && (before === null || d >= dayText(before[check.on])!)) before = e;
+        if (d > on && (after === null || d < dayText(after[check.on])!)) after = e;
+      }
+      for (const [e, into] of [[before, newest], [after, ahead]] as const) {
+        const money = e === null ? null : moneyOf(e[check.balance]);
+        const day = e === null ? '' : dayIn(e[check.on]);
+        if (money && day) into.push({ day, money });
+      }
+    }
+    /* THE ACCOUNT'S OWN BALANCE STANDS UNLESS A CHECK IS NEWER, and one with no day stands before every move. An account
+       whose every statement is dated after today is the earliest of them, less what moves between today and it. */
+    let start: Stated | null = own.day === '' || own.day <= on ? own : null;
+    for (const s of newest) if (start === null || s.day > start.day) start = s;
+    let from = on;
+    let sign = -1;
+    if (start !== null) {
+      from = start.day;
+      sign = 1;
+    } else {
+      start = own;
+      for (const s of ahead) if (s.day < start.day) start = s;
+    }
+    const to = sign === 1 ? on : start.day;
+    if (start.money) add(start.money.currency, start.money.amount);
+    const moved = entriesOf(rolled.moves.register, rolled.moves.by, row.id, m);
+    if (moved === null) return tooMany();
+    for (const e of moved) {
+      const d = dayText(e[rolled.moves.on]);
+      const amount = moneyOf(e[rolled.moves.amount]);
+      if (d === null || amount === null || d <= from || d > to) continue;
+      add(amount.currency, sign * (e[rolled.moves.direction] === rolled.moves.out ? -amount.amount : amount.amount));
+    }
+  }
+
+  /* THE FIGURE LESS THE WALK, A CURRENCY AT A TIME, over every currency either of them holds. */
+  const apart: Part[] = [...new Set([...figure.keys(), ...walk.keys()])].sort().map((currency) => ({ currency, amount: (figure.get(currency) ?? 0) - (walk.get(currency) ?? 0) }));
+  const home = ctx.fx?.() ?? { home: null, rates: [] };
+  if (apart.length === 0) return ok(empty(decl, 'No balance has been typed yet', home.rates, on));
+  const out = apart.filter((p) => p.amount !== 0);
+  /* SEVERAL CURRENCIES OUT IS NO ONE NUMBER: each is said as its own part, and nothing is added. */
+  const one = apart.length === 1 ? apart[0]! : out.length === 1 ? out[0]! : null;
+  const several = out.length > 1 && one === null;
+  return ok({
+    value: several ? null : (one?.amount ?? 0),
+    unit: several ? null : (one?.currency ?? null),
+    rows: held.length,
+    held: held.length,
+    delta: null,
+    why: 'no comparison asked for',
+    met: out.length === 0,
+    refusals: [],
+    ...(several ? { parts: out } : {}),
+  });
+}
+
 /** Whether a figure reads the walk ahead rather than a list. */
 export const isWalked = (decl: Pick<MetricDecl, 'source'>): boolean => decl.source === WALK_SOURCE;
 
@@ -667,6 +852,10 @@ export function figureLists(
   const opened = decl.source === WALK_SOURCE && typeof decl.opening?.metric === 'string' ? figure?.(decl.opening.metric) : null;
   /* ONE STEP DEEP, as the walk itself reads it: a walk never opens from a walk. */
   if (opened && opened.source !== WALK_SOURCE) add(opened);
+  /* A CROSS-CHECK READS EVERY LIST THE FIGURE IT CHECKS READS, its statements and its moves, one step deep as well. */
+  const of = isCrosscheck(decl.value) ? (decl.value as unknown as { crosscheck?: { of?: unknown } }).crosscheck?.of : null;
+  const checked = typeof of === 'string' ? figure?.(of) : null;
+  if (checked && !isCrosscheck(checked.value)) add(checked);
   const named = pointsAt && typeof decl.group_by === 'string' && decl.source.startsWith('register.') ? pointsAt(decl.source.slice('register.'.length), decl.group_by) : null;
   if (named) out.add(named);
   return [...out];

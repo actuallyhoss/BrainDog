@@ -1,0 +1,8 @@
+{
+  "gate": "core-names",
+  "rule": "a list addressed after `register.` outside any string",
+  "expect": "spelled in the core",
+  "findings": 1,
+  "total": 1,
+  "why": "ONE, `db.register.tasks.count()` in `packages/record/src`: no quote anywhere on the line, so a gate that read strings alone would pass it. `decoy.ts` addresses `register.session`, which no add-on declares, and `register.taskforce`, which only starts with the name."
+}

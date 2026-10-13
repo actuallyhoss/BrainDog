@@ -104,7 +104,7 @@ test('UNDER join=any THE CHIPS ARE JOINED WITH ", or", and read back as the or-g
   assert.equal(compile('tasks', opened(query).said).any, undefined);
 });
 
-test('THE RECORD’S READER HOLDS BOTH NOW, and registerHref stays wide until the route reads the join', () => {
+test('THE RECORD’S READER HOLDS BOTH NOW, and registerHref mints the or-group as its chips and join=any, which the route reads', () => {
   /* THE TRIPWIRE, FLIPPED. These two held the old answers, `{ field: 'amount', is: 'GBP 2400' }` and
      an `all` group, and failed the day `treeOf` learnt the words, as they were written to. What they
      hold now is the record's own literal, the money in minor units with its currency, and an `any`. */
@@ -123,5 +123,5 @@ test('THE RECORD’S READER HOLDS BOTH NOW, and registerHref stays wide until th
 
   assert.equal(registerHref('obligations', 'amount at least GBP 2400'), '/r/obligations');
   assert.equal(registerHref('obligations', 'what contains rent'), '/r/obligations');
-  assert.equal(registerHref('tasks', 'state is open, or due before today'), '/r/tasks');
+  assert.equal(registerHref('tasks', 'state is open, or due before today'), '/r/tasks?f=state:in:open&f=by:before:today&join=any');
 });

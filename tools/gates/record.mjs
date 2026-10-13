@@ -30,6 +30,10 @@
  * anything is measured and throws unless the record answered it.
  *
  * AND THE VARIANTS ARE RECORDS NOW, NOT BUILDS. See `VARIANTS`.
+ *
+ * AND ONE OF THEM IS THE CLOUD ITSELF (PRF-B05). `cloud` is the Worker's own `fetch` over a real Directory and a real
+ * record (`apps/worker/test/cloud-serve.ts`), reached with a signed-in person's cookie where the others are reached
+ * with a server key. See `startCloudRecord`.
  */
 
 import { randomBytes } from 'node:crypto';
@@ -37,6 +41,7 @@ import { argv } from 'node:process';
 import { pathToFileURL } from 'node:url';
 
 import { start } from '../../apps/selfhost/src/server.ts';
+import { startCloud } from '../../apps/worker/test/cloud-serve.ts';
 import { httpStatus } from '../../packages/host/src/index.ts';
 import { NOW, ORDER, ROWS, declarations, forWrite, ingestDeclarations, installSeed, metricDeclarations, pageDeclarations } from '../../packages/seed/src/index.ts';
 
@@ -49,8 +54,14 @@ export { buildLived, openLived } from './lived.mjs';
 /** Each running record's server key, by its base. Here and nowhere else. */
 const KEYS = new Map();
 
-/** Which variant each running record is, by its base, for the one variant `forward` has to answer for. */
-const VARIANT_OF = new Map();
+/**
+ * Each running Cloud's signed-in person, by its base: the session cookie their browser would hold. Here and nowhere else.
+ *
+ * A BASE IN THIS MAP IS THE CLOUD, and that is the one thing `forward`, `ask` and `setPref` ask of it: the Worker reads
+ * who is asking from a cookie it set itself, `__Host-` and `Secure`, which a browser on `http://127.0.0.1` would never
+ * send back. So the gate carries it, as it carries the self-host's key.
+ */
+const COOKIES = new Map();
 
 /** Each running record's clock, by its base, as epoch milliseconds (`clockOf`). */
 const CLOCKS = new Map();
@@ -65,9 +76,11 @@ const CLOCKS = new Map();
  * it existed for went unmeasured, at three Vite builds a CI run. A variant is a record that holds something different,
  * which is what the build flag's own comment said it should be.
  *
- * `cloud` IS THIS RECORD SAYING IT IS ON THE CLOUD. `boot` carries the host's word (`host`, `apps/worker/src/index.ts`),
- * and the self-host cannot be asked to say `cloud`, so `forward` puts it in the answer. Backups and Billing are the two
- * areas whose sentences turn on it.
+ * `cloud` IS THE CLOUD, AND WAS THE SELF-HOST SAYING IT WAS. Until PRF-B05 `forward` wrote `host: 'cloud'` into this
+ * record's `boot` and answered Billing with one fixed line, and no account door was handed on, so `/usage` was never
+ * drawn from an answer the Worker gave while Usage was broken on a real record. Now the Worker answers all of it
+ * (`startCloudRecord`): `boot` says `cloud` because the Worker says so, and Billing and Usage are its own doors. It
+ * holds what a person a day into the Cloud holds, one use case and no entries, and not the seed.
  *
  * `connected` REPLACES `quiet`, BECAUSE THE GATES' RECORD IS THE QUIET ONE NOW. `quiet` was the sample with no machines,
  * no keys and no vault grants, so `/settings/agents` could draw its two designed empty states; the seeded record has none
@@ -162,6 +175,75 @@ async function connect(port, key) {
   await send('/api/createToken', { scope: 'read', label: 'Nightly export' }, true);
 }
 
+/** The person `cloud` is provisioned for, invented, and the key and the runs their first day left behind. */
+const CLOUD_PERSON = 'mina@the-studio.example';
+const CLOUD_USE_CASE = 'usecase-founder';
+const CLOUD_KEY = 'Studio laptop agent';
+const CLOUD_AGENT_RUNS = ['Send the September invoices', 'Check the licence renewal dates'];
+/** The script whose runs the ledger holds: Solo founder's daily one, so Usage says a name the record itself holds. */
+const CLOUD_SCRIPT = 'last_day';
+
+/**
+ * `cloud`: the Worker itself, with one person a day into it (PRF-B05).
+ *
+ * EVERYTHING HERE GOES IN THROUGH THE WORKER'S OWN DOORS, in the order a person meets them. An operator provisions the
+ * record and the claim link is spent (`startCloud`'s `provision`), which signs them in. Solo founder is put on Decide
+ * and accepted, which is what the first run's "Make it mine" comes to once its plan is drawn. A key is minted for an
+ * agent, and with that key two agent runs are opened and ended, each by `handoff`. The saved view every gate record
+ * holds is saved here too.
+ *
+ * AND THIS MONTH HAS RUNS IN IT, THREE DAYS OF THEM, so `/usage` draws a month with something to say and a chart with
+ * three points. THE COUNT IS HANDED TO THE LEDGER AS A RECORD'S ALARM HANDS IT (`startCloud`'s `meter`), and the alarm
+ * itself is not fired: that is the one step here that is not a door a person or an agent opens. What Usage reads after
+ * it is the Worker's own `/account/usage` (both in `startCloud`'s `lived`), and a month that came back short throws,
+ * because a gate that measured an
+ * empty Usage would be measuring the page this variant exists to stop being the only one drawn.
+ *
+ * NOT THE SEED. The seed goes in through the kernel, which a Durable Object does not hand out, and a record a day old
+ * with one use case is the Cloud most people are on.
+ */
+async function startCloudRecord() {
+  const running = await startCloud({ now: NOW });
+  try {
+    const person = await running.provision(CLOUD_PERSON, { slug: IDENTITY.slug, name: IDENTITY.name, tz: IDENTITY.tz });
+    const send = async (name, body, headers = { cookie: person.cookie }) => {
+      const said = await fetch(`${running.base}/api/${name}`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) })
+        .then((r) => r.json())
+        .catch(() => null);
+      if (said?.ok !== true) throw new Error(`the Cloud refused ${name}: ${said?.refusal?.fix ?? 'it did not answer'}`);
+      return said.value;
+    };
+    const offered = await send('propose', { question: 'Set this record up for a solo founder?', body_kind: 'pack', body: { install: CLOUD_USE_CASE } });
+    await send('decide', { id: offered.id, decide: { option: 'accept', reason: 'This is what the record is for.' } });
+    const saved = await send('saveView', VIEW);
+    if (saved === undefined) throw new Error("the Cloud did not save the gates' view");
+    const key = await send('createToken', { scope: 'write', label: CLOUD_KEY });
+    const agent = { authorization: `Bearer ${key.bearer}` };
+    for (const next of CLOUD_AGENT_RUNS) {
+      await send('handoff', { next, note: 'Read the open bills first.' }, agent);
+      await send('handoff', { next, state: 'done' }, agent);
+    }
+    const month = await running.lived(person, CLOUD_SCRIPT);
+    if (month.runs === null || month.runs < month.counted)
+      throw new Error(`the Cloud's usage for this month does not hold the ${month.counted} runs counted: ${month.fix ?? `it holds ${month.runs}`}`);
+    COOKIES.set(running.base, person.cookie);
+    CLOCKS.set(running.base, NOW);
+  } catch (e) {
+    await running.close().catch(() => {});
+    throw e;
+  }
+  return {
+    ...recordAt(running.base),
+    variants: {},
+    close: async () => {
+      COOKIES.delete(running.base);
+      CLOCKS.delete(running.base);
+      await running.close();
+    },
+    server: running.server,
+  };
+}
+
 /**
  * Start one. `{ base, now, ask, setPref, close, server, variants }`, where `base` is `http://127.0.0.1:<port>`, `now` its
  * clock and `ask` and `setPref` its own doors with the gate's key (`recordAt`).
@@ -180,6 +262,8 @@ async function connect(port, key) {
  */
 export async function startRecord(port = 0, { open = false, origin, variant, variants = false, queuePage = false, fresh = false } = {}) {
   if (variant !== undefined && !VARIANTS.some((v) => v.name === variant)) throw new Error(`there is no record variant called ${variant}`);
+  /* THE CLOUD IS ANOTHER HOST, NOT THIS ONE WITH SOMETHING ADDED, so none of what follows is asked of it. */
+  if (variant === 'cloud') return startCloudRecord();
   const key = open ? undefined : randomBytes(32).toString('base64url');
   const running = await start({
     file: ':memory:',
@@ -248,11 +332,9 @@ export async function startRecord(port = 0, { open = false, origin, variant, var
   const { port: at } = running.server.address();
   const base = `http://127.0.0.1:${at}`;
   if (key !== undefined) KEYS.set(base, key);
-  if (variant !== undefined) VARIANT_OF.set(base, variant);
   CLOCKS.set(base, NOW);
   const stop = () => {
     KEYS.delete(base);
-    VARIANT_OF.delete(base);
     CLOCKS.delete(base);
     return running.close();
   };
@@ -280,19 +362,27 @@ export async function startRecord(port = 0, { open = false, origin, variant, var
   };
 }
 
-/** The paths a gate's server hands to the record: the record's, sign-in's, and the Cloud's billing door, which `forward`
-    answers itself for the cloud variant. Everything else is the build's. */
-export const forwards = (pathname) => /^\/+(?:api|auth|account\/billing)(?:\/|$)/.test(pathname);
+/**
+ * The paths a gate's server hands to the record: the record's own (`api`), sign-in's (`auth`), the person's account
+ * doors (`account`), OAuth's (`oauth`), an agent's (`mcp`) and what arrives from outside (`in`). Everything else is the
+ * build's.
+ *
+ * EVERY DOOR A HOST ANSWERS AND THE BUILD DOES NOT (PRF-B05). It was `api`, `auth` and `account/billing`, so the build's
+ * own fallback answered `/account/usage` and no gate had drawn Usage from a host's answer. The same six names are the
+ * Worker's root doors (`apps/worker/src/route.ts`) and the self-host's.
+ */
+export const forwards = (pathname) => /^\/+(?:api|auth|account|oauth|mcp|in)(?:\/|$)/.test(pathname);
 
 /**
  * `GET /account/records` as the host's envelope (`readRecordsForSwitcher` in `apps/web/src/lib/record/switcher.ts`):
  * the one record a gate's server holds, its owner's.
  *
- * NOT FORWARDED, BECAUSE THE SELF-HOST WOULD SAY NO. The route reads a session cookie and nothing else, and a gate's
- * record is reached with its server key, so the record behind it answers 401 and the switcher would draw "Sign in
- * again" over a record the screen is plainly open on. The shell asks this on every screen, so a source that left it to
- * a 404 put one failed request and two console errors in every picture. A variant is the same record under another
- * port, so every one answers the same row.
+ * NOT FORWARDED TO A SELF-HOST, BECAUSE THE SELF-HOST WOULD SAY NO. The route reads a session cookie and nothing else,
+ * and a gate's self-host is reached with its server key, so the record behind it answers 401 and the switcher would
+ * draw "Sign in again" over a record the screen is plainly open on. The shell asks this on every screen, so a source
+ * that left it to a 404 put one failed request and two console errors in every picture. `forward` answers with this
+ * for a self-host now that `forwards` hands the whole of `account` on, so a gate whose server does not answer it
+ * first draws the same row. THE CLOUD ANSWERS FOR ITSELF: its person is signed in, and the row is the Worker's.
  */
 export const recordsAnswer = () => ({ ok: true, value: [{ slug: IDENTITY.slug, name: IDENTITY.name, level: 'owner' }] });
 
@@ -313,6 +403,17 @@ export const serverKeyFor = (base) => KEYS.get(base);
  */
 export const clockOf = (base) => CLOCKS.get(base) ?? null;
 
+/**
+ * What a gate presents to one running record as its owner: a self-host's server key, or the Cloud person's cookie.
+ * Nothing for an open record.
+ */
+function credentialOf(base) {
+  const cookie = COOKIES.get(base);
+  if (cookie !== undefined) return { cookie };
+  const key = KEYS.get(base);
+  return key === undefined ? {} : { authorization: `Bearer ${key}` };
+}
+
 /** The query string the client writes: a string as itself, anything else as JSON, an absent value left out. */
 const queryOf = (args) =>
   new URLSearchParams(
@@ -328,8 +429,7 @@ const queryOf = (args) =>
  * is one the record holds, and a record that does not answer is the envelope `forward` gives, not a throw.
  */
 export async function ask(base, name, args = {}) {
-  const key = KEYS.get(base);
-  return fetch(new URL(`/api/${name}?${queryOf(args)}`, base), { headers: key === undefined ? {} : { authorization: `Bearer ${key}` } })
+  return fetch(new URL(`/api/${name}?${queryOf(args)}`, base), { headers: credentialOf(base) })
     .then((r) => r.json())
     .catch((e) => ({ ok: false, refusal: { code: 'RECORD_UNAVAILABLE', fix: `The gate's record did not answer ${name}: ${e instanceof Error ? e.message : String(e)}.` } }));
 }
@@ -341,16 +441,16 @@ export async function ask(base, name, args = {}) {
  * that writer is gone (PRF-B04). The record refuses a token (`packages/record/src/index.ts` `setPref`), and
  * the gate's key is the self-host's server key, which speaks as the owner, a person (`apps/selfhost/src/server.ts`
  * `owner`): asked on 9 October, `setPref nav.shape bar` with this key answered `ok: true`. So a page reads what the
- * record keeps, through the door a person's own Settings writes through, and no answer is written by a gate.
+ * record keeps, through the door a person's own Settings writes through, and no answer is written by a gate. On the
+ * Cloud it is the signed-in person's cookie, and the Worker answered the same on 13 October.
  *
  * A REFUSAL THROWS, in the record's own words, because a gate that measured a screen without the setting it asked for
  * would measure the wrong screen and say nothing.
  */
 export async function setPref(base, key, value) {
-  const bearer = KEYS.get(base);
   const said = await fetch(new URL('/api/setPref', base), {
     method: 'POST',
-    headers: { 'content-type': 'application/json', ...(bearer === undefined ? {} : { authorization: `Bearer ${bearer}` }) },
+    headers: { 'content-type': 'application/json', ...credentialOf(base) },
     body: JSON.stringify({ key, value }),
   })
     .then((r) => r.json())
@@ -383,22 +483,27 @@ const HOP = new Set(['connection', 'keep-alive', 'transfer-encoding', 'upgrade',
  * route outside `MAY_REFUSE`, and never `UNREACHABLE`, which is the one answer that means the gate's port
  * reached nothing at all.
  *
- * AND ONE ANSWER IS REWRITTEN, FOR ONE RECORD: `boot` from the `cloud` variant says `host: 'cloud'`, which is the
- * one fact the self-host cannot be started to say. See `VARIANTS`.
+ * NO ANSWER IS WRITTEN OR REWRITTEN FOR THE CLOUD (PRF-B05). `boot` from the `cloud` variant had `host: 'cloud'` put
+ * into it here and Billing was one fixed line, `{ records: [], open: false }`; both are the Worker's own answers now.
+ * THE ONE ANSWER MADE HERE is a self-host's `GET /account/records`, for the reason `recordsAnswer` gives, and only
+ * while the gate is speaking as the owner: with `bearer: false` the self-host answers for itself, 401 to nobody and
+ * the person's own records once they have signed in.
+ *
+ * THE CLOUD'S PERSON IS SIGNED IN ON EVERY PATH, as their browser is: the cookie goes with whatever is handed on, where
+ * a self-host's key goes on `/api/*` alone. The Worker asks `/auth/methods` who is here before Usage asks the ledger.
  *
  * EVERY `Set-Cookie` COMES BACK AS ITS OWN HEADER. `forEach` joins them into one value no browser can split.
  *
- * `bearer: false` KEEPS THE KEY OFF THE WIRE, which is what a gate about signing in needs: with the key on
- * every request, each screen reads the record as its owner and there is no signed-out state left to drive.
+ * `bearer: false` KEEPS THE KEY OFF THE WIRE, and the Cloud's cookie with it, which is what a gate about signing in
+ * needs: with the key on every request, each screen reads the record as its owner and there is no signed-out state
+ * left to drive.
  * It is on by default because every other browser gate measures a screen rather than a door.
  */
 export async function forward(req, res, base, { bearer = true } = {}) {
-  /* THE CLOUD'S OWN BILLING DOOR, which the self-host behind the `cloud` variant has none of: the Cloud answers
-     `GET /account/billing` for every signed-in person, so the variant answers it too, with nothing owed and no
-     checkout open, and Billing draws the screen it draws for a record paid up. */
-  if (VARIANT_OF.get(base) === 'cloud' && req.method === 'GET' && /^\/+account\/billing\/?$/u.test(new URL(req.url ?? '/', base).pathname)) {
+  const cookie = COOKIES.get(base);
+  if (bearer && cookie === undefined && req.method === 'GET' && /^\/+account\/records\/?$/u.test(new URL(req.url ?? '/', base).pathname)) {
     res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
-    res.end(JSON.stringify({ ok: true, value: { records: [], open: false } }));
+    res.end(JSON.stringify(recordsAnswer()));
     return;
   }
   const chunks = [];
@@ -408,6 +513,7 @@ export async function forward(req, res, base, { bearer = true } = {}) {
   const url = new URL(req.url ?? '/', base);
   const key = KEYS.get(base);
   if (bearer && key !== undefined && /^\/+api(?:\/|$)/.test(url.pathname) && headers.authorization === undefined) headers.authorization = `Bearer ${key}`;
+  if (bearer && cookie !== undefined) headers.cookie = headers.cookie === undefined ? cookie : `${headers.cookie}; ${cookie}`;
   try {
     const out = await fetch(url, {
       method: req.method ?? 'GET',
@@ -420,14 +526,8 @@ export async function forward(req, res, base, { bearer = true } = {}) {
     });
     const cookies = out.headers.getSetCookie();
     if (cookies.length > 0) back['set-cookie'] = cookies;
-    let body = Buffer.from(await out.arrayBuffer());
-    if (VARIANT_OF.get(base) === 'cloud' && /^\/+api\/boot$/u.test(url.pathname)) {
-      const said = JSON.parse(body.toString('utf8'));
-      if (said?.ok === true) said.value.host = 'cloud';
-      body = Buffer.from(JSON.stringify(said));
-    }
     res.writeHead(out.status, back);
-    res.end(body);
+    res.end(Buffer.from(await out.arrayBuffer()));
   } catch (e) {
     const answer = { ok: false, refusal: { code: 'RECORD_UNAVAILABLE', fix: `The gate's record did not answer: ${e instanceof Error ? e.message : String(e)}.` } };
     res.writeHead(httpStatus(answer), { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });

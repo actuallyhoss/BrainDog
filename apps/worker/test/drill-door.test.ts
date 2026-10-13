@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { drillNote, readDrill } from '../src/drill-door.ts';
+import { directoryOnly, drillAnswer, drillNote, olderDrill, readDrill } from '../src/drill-door.ts';
 import { cloud } from './cloud-harness.ts';
 
 const OPERATOR = 'an-operator-key-for-these-tests-only-0123456789';
@@ -68,7 +68,7 @@ test('READ AFTER WRITE: the host keeps the last drill, the ops record takes its 
 
   const res = await post(c, { ...BODY, records: null });
   assert.equal(res.status, 200, await res.clone().text());
-  const said = { at: AT, pass: true, records: 2 };
+  const said = { at: AT, pass: true, records: 2, directory_only: false };
   assert.deepEqual(await res.json(), { ok: true, value: said });
   assert.deepEqual(await (await c.ask('/account/drill', { cookie })).json(), { ok: true, value: said });
 
@@ -78,7 +78,7 @@ test('READ AFTER WRITE: the host keeps the last drill, the ops record takes its 
   /* A LATER, FAILED DRILL REPLACES IT: the host keeps the last, not a history. */
   const failed = await post(c, { ...BODY, pass: false });
   assert.equal(failed.status, 200);
-  assert.deepEqual(await (await c.ask('/account/drill', { cookie })).json(), { ok: true, value: { at: AT, pass: false, records: 2 } });
+  assert.deepEqual(await (await c.ask('/account/drill', { cookie })).json(), { ok: true, value: { at: AT, pass: false, records: 2, directory_only: false } });
 });
 
 test('readDrill: counts only, records null when the Directory was not opened, and the note in the walk\'s form', () => {
@@ -91,4 +91,55 @@ test('readDrill: counts only, records null when the Directory was not opened, an
   const directoryOnly = readDrill({ at: AT, pass: true, copies: 0, rows: 0, lists: 0, people: 0, records: 7 });
   assert.ok(directoryOnly.ok, directoryOnly.ok ? '' : directoryOnly.fix);
   assert.equal(drillNote(directoryOnly.value), `drill ${AT.slice(0, 10)} · pass · 0 records`);
+});
+
+test('THE DIRECTORY ALONE is said in a field of its own, never left to a zero', async () => {
+  const read = readDrill({ at: AT, pass: true, copies: 0, rows: 0, lists: 0, people: 0, records: 7 });
+  assert.ok(read.ok);
+  assert.equal(directoryOnly(read.value), true);
+  assert.deepEqual(drillAnswer(read.value), { at: AT, pass: true, records: 0, directory_only: true });
+  /* A record's copy opened beside the Directory's is not the Directory alone, and neither is a failed drill that opened nothing. */
+  assert.deepEqual(drillAnswer({ ...read.value, copies: 2 }), { at: AT, pass: true, records: 2, directory_only: false });
+  assert.deepEqual(drillAnswer({ ...read.value, pass: false, records: null }), { at: AT, pass: false, records: 0, directory_only: false });
+  assert.deepEqual(drillAnswer(null), { at: null });
+
+  /* THROUGH THE DOOR: the post's answer and the signed-in read both carry it. */
+  const c = await cloud({ PROVISION_KEY: OPERATOR });
+  await c.provision(OPS, 'ops', 'ada@example.test');
+  const cookie = await c.signIn('ada@example.test');
+  const want = { ok: true, value: { at: AT, pass: true, records: 0, directory_only: true } };
+  assert.deepEqual(await (await post(c, { ...BODY, copies: 0 })).json(), want);
+  assert.deepEqual(await (await c.ask('/account/drill', { cookie })).json(), want);
+});
+
+test('olderDrill: a post older than the kept drill is ignored, and the same instant or a newer one is kept', () => {
+  const kept = readDrill(BODY);
+  assert.ok(kept.ok);
+  const at = (ms: number) => ({ ...kept.value, at: new Date(Date.parse(AT) + ms).toISOString() });
+  assert.equal(olderDrill(at(-86_400_000), kept.value), true, 'a drill from the day before replaced the kept one');
+  assert.equal(olderDrill(at(-1), kept.value), true);
+  assert.equal(olderDrill(at(0), kept.value), false, 'a drill run again at the same instant was ignored');
+  assert.equal(olderDrill(at(1), kept.value), false, 'a newer drill was ignored');
+  assert.equal(olderDrill(kept.value, null), false, 'the first drill was ignored');
+  /* A kept drill whose date this build cannot read holds nothing back. */
+  assert.equal(olderDrill(kept.value, { ...kept.value, at: 'yesterday' }), false);
+  /* THE ZONE IS READ, NOT THE LETTERS: 09:00+02:00 is 07:00Z, older than 08:00Z though it sorts after it as text. */
+  assert.equal(olderDrill({ ...kept.value, at: '2026-10-09T09:00:00+02:00' }, { ...kept.value, at: '2026-10-09T08:00:00Z' }), true);
+});
+
+test('THROUGH THE DOOR, AN OLDER DRILL IS IGNORED: the newest stays, the answer is the one kept, and no second note is written', async () => {
+  const c = await cloud({ PROVISION_KEY: OPERATOR, OPS_RECORD: OPS });
+  await c.provision(OPS, 'ops', 'ada@example.test');
+  const cookie = await c.signIn('ada@example.test');
+  const kept = { at: AT, pass: true, records: 2, directory_only: false };
+  assert.equal((await post(c, { ...BODY, records: null })).status, 200);
+
+  const older = new Date(Date.parse(AT) - 24 * 3_600_000).toISOString();
+  const late = await post(c, { ...BODY, at: older, pass: false, records: null });
+  assert.equal(late.status, 200, await late.clone().text());
+  assert.deepEqual(await late.json(), { ok: true, value: kept }, 'the door answered the older drill it was told, not the one it keeps');
+  assert.deepEqual(await (await c.ask('/account/drill', { cookie })).json(), { ok: true, value: kept });
+
+  const notes = c.storages.get(OPS)?.sql.exec("SELECT note FROM event WHERE kind = 'note'").toArray() as { note: string }[];
+  assert.deepEqual(notes.map((n) => n.note), [`drill ${AT.slice(0, 10)} · pass · 2 records`], 'an ignored drill wrote a note');
 });

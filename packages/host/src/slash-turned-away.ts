@@ -10,7 +10,7 @@
 import type { Sql } from '@braindog/ports';
 
 export const TURNED_AWAY_SQL =
-  "INSERT INTO slash_call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, code) VALUES (?, ?, ?, ?, '-', 0, 0, 0, 0, 'refused', 'SLASH_BUDGET_SPENT')";
+  "INSERT INTO slash_call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, code, purpose, spends) VALUES (?, ?, ?, ?, '-', 0, 0, 0, 0, 'refused', 'SLASH_BUDGET_SPENT', 'ask', 'none')";
 
 /** Write the row. A ledger that will not take it (no table yet, a tier its `CHECK` does not hold) costs the ask nothing. */
 export function turnedAway(sql: Pick<Sql, 'exec'>, at: string, kind: 'read' | 'propose' | 'pattern', tier: string, id: string = crypto.randomUUID()): void {

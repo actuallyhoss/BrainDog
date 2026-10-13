@@ -23,7 +23,7 @@
 <script lang="ts">
   import { at } from '../at.ts';
   import { agentKindOf, faceWords, runHue, runSeq, type RunLive } from './face.ts';
-  import { isMarked } from './agent-marks.ts';
+  import { isMarked } from '@braindog/skin/agent-marks.ts';
   import AgentMark from './AgentMark.svelte';
 
   let {

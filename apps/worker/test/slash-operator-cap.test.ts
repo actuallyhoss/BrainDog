@@ -245,14 +245,14 @@ test('(9) WHERE THE CEILING IS THE CAP STATUS NAMES, THE COUNT IS THE CEILING\'S
   done();
 });
 
-test('(8) ONE BINDING THROW, ONE SETTLEMENT: the read and the answer both keep the model, are priced by one rule and are counted', async () => {
+test('(8) ONE BINDING THROW, ONE SETTLEMENT: the read and the answer both keep the model, are priced by one rule and are counted by the operator, never as his asks', async () => {
   const ai = fakeAi('', true);
   const { clock, api, own, engine, done } = await withEngine(ai);
   await engine.read('open tasks', OWNER);
   const own2 = openSqlite();
   const answer = workerSlashAnswers(prod(ai), () => api, { sql: own2, clock })!;
   const out = (await answer(ASK)) as Refused;
-  /* STILL `UNREACHABLE`, SO THE LADDER MAY ASK AGAIN, and each rung is now an ask the caps see. */
+  /* STILL `UNREACHABLE`, SO THE LADDER MAY ASK AGAIN, and each rung is a call the operator's count sees. */
   assert.equal(out.refusal?.code, 'UNREACHABLE');
   type Row = { model: string; tokens_in: number; tokens_out: number; neurons: number; code: string | null };
   const sel = 'SELECT model, tokens_in, tokens_out, neurons, code FROM slash_call';
@@ -268,9 +268,10 @@ test('(8) ONE BINDING THROW, ONE SETTLEMENT: the read and the answer both keep t
     assert.equal(row.tokens_out, 0);
     assert.equal(row.neurons, Math.round((row.tokens_in * 13_636) / 1e6), `the ${path} row was priced off the rule`);
     const counted = sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM slash_call WHERE tier = 'a' AND model <> '-'")!.n;
-    assert.equal(counted, 1, `the ${path} row is not an ask any count reads`);
+    assert.equal(counted, 1, `the ${path} row is not a call the operator's count reads`);
   }
-  assert.equal((engine.status() as Status).asks.used, 1);
+  /* AND NOT ONE OF HIS: a binding that threw keeps its neurons on the row and spends none of his month (`spends = 'none'`). */
+  assert.equal((engine.status() as Status).asks.used, 0);
   own2.close();
   done();
 });

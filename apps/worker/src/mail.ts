@@ -389,6 +389,13 @@ const button = (label: string, href: string): string => {
   );
 };
 
+/**
+ * A link as a letter shows it in words: as far as its proof. What a person said follows the proof of a sign-up link
+ * (`#verify=<proof>&said=<words>`, `packages/record/src/identity.ts`) and rides in the button's address only, so no
+ * letter prints a sentence, hers or one somebody else typed for her address.
+ */
+const shown = (href: string): string => href.replace(/(#verify=[^&#\s]*)&said=.*$/su, '$1');
+
 /** For a link that works once: the address itself under the button, for the client that will not follow a button. */
 const fallback = (href: string): string =>
   `<p class="bd-dim" style="margin:0 0 20px;font-family:${FONT};font-size:13px;line-height:20px;color:${L.dim}">` +
@@ -480,6 +487,9 @@ const textFooter = (why: string, support: string): string =>
  * THE LINK IS THE BUTTON. What comes before it is the letter's body; what comes after it is quieter, under a hairline,
  * because it is the sentence for the person who did not ask. A link that works once also shows itself as text under
  * the button, for the client that will not follow one.
+ *
+ * ONLY THE BUTTON CARRIES WHAT WAS SAID. The line under it and the plain text show the link as far as its proof
+ * (`shown`), which still makes the record: a client that reads only the plain text opens it without the sentence.
  */
 export function letterOf(kind: MailKind, vars: MailVars = {}): Letter {
   const v = {
@@ -492,14 +502,14 @@ export function letterOf(kind: MailKind, vars: MailVars = {}): Letter {
     say: flat(vars.say),
   };
   const { subject, parts } = partsOf(kind, v);
-  const line = (p: Part): string => ('say' in p ? p.say : p.link);
+  const line = (p: Part): string => ('say' in p ? p.say : shown(p.link));
   /* A BLANK LINE BETWEEN PARAGRAPHS, AS THE SIGN-IN LETTER HAS ALWAYS HAD, and the footer's lines together under them. */
   const text = [parts.map(line).join('\n\n'), textFooter(WHY[kind], v.support)].join('\n\n');
 
   const at = parts.findIndex((p) => 'link' in p);
   const body = parts
     .map((p, i) => {
-      if ('link' in p) return button(actionOf(kind, v.record), p.link) + (NEEDS_LINK.has(kind) ? fallback(p.link) : '');
+      if ('link' in p) return button(actionOf(kind, v.record), p.link) + (NEEDS_LINK.has(kind) ? fallback(shown(p.link)) : '');
       if (at === -1 || i < at) return para(p.say);
       return (i === at + 1 ? rule : '') + aside(p.say);
     })

@@ -38,7 +38,7 @@ import { createRecordApi, type CallContext, type Deposited, type IngestVerificat
 import { fixOf, ok, refused } from '@braindog/ports';
 import type { Auth, AuthCall, AuthResult, Param, Refusal, Result, Row, Scheduler, Snapshots, Sql, Who } from '@braindog/ports';
 
-import { FREE_JOIN_REFUSED, FREE_ONE_PERSON, createDirectory, switcherAsk, type AccountUsage, type Directory as Dir, type RunUsage, type SessionAsk, type SwitcherAsk, type SwitcherRow } from '@braindog/record/directory';
+import { FREE_JOIN_REFUSED, FREE_JOIN_REFUSED_SHORT, FREE_ONE_PERSON, FREE_ONE_PERSON_SHORT, createDirectory, switcherAsk, type AccountUsage, type Directory as Dir, type RunUsage, type SessionAsk, type SwitcherAsk, type SwitcherRow } from '@braindog/record/directory';
 import type { InviteAnswers, InviteCall, SignupNeeds, SignupStart } from '@braindog/record/directory';
 import type { BillingAnswers, BillingCall } from '@braindog/record/directory';
 import type { MeterTally, Person, SlashDay, SlashTally, UsageNotice } from '@braindog/record/directory';
@@ -70,7 +70,7 @@ import { fileKeeper, takeMail } from './email.ts';
 import { fileKey, serveFiles, servesFiles } from './files.ts';
 import { cloudSnapshots, type Pitr } from './copies.ts';
 import { readAsk as readRestorePoint, restorePoint, sayTally, type PointAnswer } from './restore-point.ts';
-import { drillAnswer, drillNote, readDrill } from './drill-door.ts';
+import { drillAnswer, drillNote, olderDrill, readDrill } from './drill-door.ts';
 import { DELETED, destroyRecord, expireFinal } from './destroy.ts';
 import { directoryCopies } from './directory-copy.ts';
 import { isMailKind, isWaitedOn, mailOutcome, opsAlert, sendMail, type MailKind, type MailVars, type OpsKind } from './mail.ts';
@@ -116,7 +116,7 @@ import { codeOf, guarded } from '@braindog/ports';
 import { KERNEL_MIGRATION, type Ack } from '@braindog/kernel';
 import { doorPath, op, outboxFields, type AckedRow } from './oplog.ts';
 /* BILLING: the account's four billing doors, and the Stripe client they call through. */
-import { billingDoors, type BillingDeps } from './billing.ts';
+import { billingDoors, sells, type BillingDeps } from './billing.ts';
 import { stripeOf } from './stripe.ts';
 /* TELEMETRY: one Analytics Engine point per request, when `TELEMETRY` is bound. */
 import { telemetry } from './telemetry.ts';
@@ -688,7 +688,7 @@ export class Record$ extends DurableObject<Env> {
     const invite = api.invite.bind(api);
     api.invite = async (args, ctx) => {
       const member = typeof args?.person === 'string' && api.kernel.members().some((m) => m.person_id === args.person);
-      if (!member && (await this.#planOf(api)) === 'free') return { ok: false as const, refusal: { code: 'FORBIDDEN', fix: FREE_ONE_PERSON, at: 'plan' } };
+      if (!member && (await this.#planOf(api)) === 'free') return { ok: false as const, refusal: { code: 'FORBIDDEN', fix: sells(this.env) ? FREE_ONE_PERSON : FREE_ONE_PERSON_SHORT, at: 'plan' } };
       return invite(args, ctx);
     };
   }
@@ -2016,6 +2016,8 @@ export class Directory$ extends DurableObject<Env> {
             admits: async (record, person) => (await this.env.RECORD.get(this.env.RECORD.idFromName(record)).access(person)) !== null,
           }
         : undefined,
+      /* WHETHER A REFUSAL ON FREE MAY NAME A PLAN TO MOVE TO, the answer `/account/billing` gives as `open`. */
+      { sells: sells(this.env) },
     );
     /* `createDirectory` imported its own copy, so this was the last one held as bytes. */
     mac?.fill(0);
@@ -2040,7 +2042,9 @@ export class Directory$ extends DurableObject<Env> {
   drill(call: DrillCall): HostDrill | null {
     const drill = this.#directory().drill;
     if (call.op === 'read') return drill.read();
-    drill.put(call.drill);
+    /* THE NEWEST BY WHEN IT RAN IS KEPT, and the check and the write are one step in here, so two posts out of order
+       cannot both find nothing newer (`olderDrill`). */
+    if (!olderDrill(call.drill, drill.read())) drill.put(call.drill);
     return drill.read();
   }
 
@@ -3844,10 +3848,11 @@ const OPS_RESTORE_POINT = /^\/+account\/+ops\/+restore-point\/*$/;
 
 /**
  * `/account/ops/restore-point`: the deploy workflow's restore point (LCH-C06, `restore-point.ts`). `POST { commit?,
- * check?, cursor? }`. With `check: true` it opens every record written in the last seven days once and copies nothing,
+ * check?, cursor?, open? }`. With `check: true` it opens every record written in the last seven days once and copies nothing,
  * which is what the workflow asks on every deploy; without it each of those records takes a `before-deploy-<commit>`
  * copy, which the workflow asks only when a migration changed. It answers counts, never a record's name, and `cursor`
- * while there is more to walk. ANY `failed` IS A 500, so the step that asked turns red.
+ * while there is more to walk. ANY `failed` IS A 500, so the step that asked turns red. `open: true` is the caller
+ * saying this host holds a record: a whole walk that then asked nobody is counted in `failed`, and so is a 500 too.
  *
  * Guarded as `/account/ops/invite` is: 404 with no `PROVISION_KEY`, 401 on a wrong key or none, a session cookie
  * included, because the operator key is the one thing it reads. A copy needs `BLOBS`; check mode does not.
@@ -3914,7 +3919,12 @@ async function opsDrill(request: Request, env: Env): Promise<Response> {
   const told = readDrill(body);
   if (!told.ok) return json({ ok: false, refusal: { code: 'BODY_MALFORMED', fix: told.fix, at: told.at } }, 400);
   const drill = told.value;
-  await env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')).drill({ op: 'put', drill });
+  const kept = await env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')).drill({ op: 'put', drill });
+  /* AN OLDER DRILL THAN THE ONE KEPT IS IGNORED: no note is written, and the answer is the drill the host keeps. */
+  if (olderDrill(drill, kept)) {
+    op({ op: 'drill', ignored: 'older', at: drill.at });
+    return json({ ok: true, value: drillAnswer(kept) }, 200);
+  }
   op({ op: 'drill', pass: drill.pass, copies: drill.copies, rows: drill.rows, lists: drill.lists, people: drill.people, records: drill.records });
   const opsRecord = (env.OPS_RECORD ?? '').trim();
   if (opsRecord !== '') {
@@ -4044,7 +4054,8 @@ const SIGNUP_BODY_MAX = 8_192;
  * The most of what a person said that a sign-up carries (`said`), in characters: the sentence and its one answer, as the
  * page packs them, so a link opened on another device keeps it. The Directory's own rule (`SAID_IN_LINK` in
  * `packages/record/src/identity.ts`) says the same number and is the one that also refuses an address in it; this is the
- * door's, so a longer one is refused before the Directory is asked or anything is mailed.
+ * door's, so a longer one is refused before the Directory is asked or anything is mailed. Inside that number the
+ * Directory also fits it to `SAID_LINK_BYTES` (2,000 bytes as the link writes it), and there it cuts, never refuses.
  */
 const SIGNUP_SAID_MOST = 1_000;
 
@@ -4240,7 +4251,7 @@ function invites(env: Env): InviteDoor {
       const found = await recordOf(inviteToken);
       if (!found) return gone;
       /* A FREE RECORD IS ONE PERSON, SAID WHEN THE LINK IS OPENED, before a new address is sent a proof it cannot use. */
-      if ((await directory.planFor(found.id)) === 'free') return { ok: false, refusal: { code: 'FORBIDDEN', fix: FREE_JOIN_REFUSED, at: 'plan' } };
+      if ((await directory.planFor(found.id)) === 'free') return { ok: false, refusal: { code: 'FORBIDDEN', fix: sells(env) ? FREE_JOIN_REFUSED : FREE_JOIN_REFUSED_SHORT, at: 'plan' } };
       return (await found.stub.acceptInvite({ token: inviteToken })) as unknown as Awaited<ReturnType<InviteDoor['look']>>;
     },
     accept: async (inviteToken, person) => {

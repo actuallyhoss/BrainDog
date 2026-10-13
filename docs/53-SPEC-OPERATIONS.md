@@ -234,7 +234,9 @@ re-wraps at start (§5.6) and has no billing.
    - Open each saved query of `DEPLOYMENT.md` "Alerts". Each red row opens its runbook.
    - Read the host's last restore test, which the Directory keeps (§5.4 step 3): Settings > Backups on any record says
      `This host's last restore test: passed 12 days ago` (`GET /account/drill`, `{ at, pass, records }`), and with
-     `OPS_RECORD` set the ops record holds the same as a `drill <date> · pass · <n> records` note. The drill is monthly:
+     `OPS_RECORD` set the ops record holds the same as a `drill <date> · pass · <n> records` note. A test that opened no
+     record's copy (`records` 0) reads `This host's last restore test, 12 days ago: the Directory's copy opened; no
+     record's copy was tried`, marked `Not proven`, and is a fault. The drill is monthly:
      a pass more than 35 days old reads Overdue, a failed one reads failed, and "Never tested" means no drill has ever
      reported; each is in the fault tone, a red row, and the day's work is §5.4. The walk cannot write this fact for
      you: the Worker holds no age identity and never opens a copy, so the drill is the only thing that does, and its
@@ -265,6 +267,12 @@ applies too; any of the three makes the deploy one that cannot be rolled back.
 1. **A restore point** on the live record: Settings > Backups > "Back up now", and
    `braindog export -o <slug>-<date>.brainl --host https://brain.dog/app/<slug>` on your own machine. `log` in the ops
    record: `deploy <sha> · replaces <live sha>`.
+   The deploy also takes its own: the "Take a restore point" step of `deploy.yml` asks the Worker to open every record
+   written in the last seven days, and to copy each when a migration changed. A missing `PROVISION_KEY` is red when a migration changed and "not run"
+   otherwise. A 404 from that door before the deploy is "not run" either way, said as a warning when a migration
+   changed, because the deploy that first ships the door has to be able to run; after the deploy the same 404 is red
+   once a migration shipped. A walk that asked nobody is red while `SMOKE_SLUG` names the canary. Going back is proven monthly on the canary by `node apps/worker/scripts/go-back.mjs`, from
+   `watch.yml`.
 2. **Merge.** `ci` runs on `master`; `deploy.yml` starts on its success and waits for the reviewer.
 3. **Approve** in the run's page. The job records the live app and site versions and the live sha, deploys the app
    with `BRAINDOG_BUILD` set, then runs Parity: `/app/` and `/app/_app/version.json` from the live host must hash to the
@@ -383,7 +391,9 @@ result, `PROVISION_KEY` in the environment of that one command.
    last drill; with `OPS_RECORD` set the door also writes the note `drill <date> · pass · <n> records` in the ops
    record. The line it prints says what became of it: `not sent: no key`, `not sent: no door`, `not sent: the host
    refused the key`, or `sent to <host>`. Every record's Settings > Backups then reads `This host's last restore test: passed
-   just now` from `GET /account/drill`, the same line for every person, because the fact is the host's.
+   just now` from `GET /account/drill`, the same line for every person, because the fact is the host's. A drill that
+   opened no record's copy (`records` 0) reads `This host's last restore test, just now: the Directory's copy opened;
+   no record's copy was tried`, marked `Not proven`, and is a fault: run it again with a record's copy.
 4. Monthly, by itself: `node apps/cli/scripts/restore-drill.mjs --print-timer` with the same arguments prints a launchd
    file (`dog.brain.restore-drill`, the first of the month at 09:17, its log in
    `~/Library/Logs/braindog-restore-drill.log`). Save it in `~/Library/LaunchAgents/` and `launchctl load` it. It holds

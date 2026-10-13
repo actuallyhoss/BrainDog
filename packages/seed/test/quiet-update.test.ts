@@ -443,6 +443,8 @@ const withoutDirection = (doc: Body): Body => ({
       return d;
     }),
 });
+/** AND 3.17.0'S CROSS-CHECK (cash-check-52): `cash-cross-check`, the one figure it adds, goes. */
+const withoutCrossCheck = (doc: Body): Body => ({ ...doc, declarations: (doc.declarations as Body[]).filter((d) => d.metric !== 'cash-cross-check') });
 const withoutCashStale = (doc: Body): Body => ({ ...doc, declarations: (doc.declarations as Body[]).filter((d) => d.rule !== 'cash-stale') });
 const LATEST: Record<string, { version: string; released: string; undo: (doc: Body) => Body }> = {
   /* AN ACCOUNT'S DIGITS SAID THE LAST FOUR. */
@@ -450,7 +452,7 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
     version: '3.13.0',
     released: '2e09983b40aba73e',
     undo: (raw) => {
-      const doc = withoutPaydays(withoutAges(withoutDirection(raw)));
+      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(raw))));
       return {
       ...doc,
       declarations: (doc.declarations as Body[]).filter((d) => !SIGNS_ADDED.has(String(d.metric)) && !WEEK_IN.has(String(d.metric)) && d.script !== 'last_day').map((d) =>

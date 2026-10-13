@@ -15,16 +15,31 @@
 
 import { counted } from './counted.ts';
 
-/** An order not yet made or sent, which Due this week reads. */
+/** An order not yet made or sent, which Due this week and Late read. */
 const TO_SEND = 'state is new or ready';
 
-/** An order nobody has paid for yet, which Owed to you reads: not marked paid, no amount written as paid, and a total to owe. */
-const OWED = 'state is not paid, paid is empty, total is set';
+/* THIS WEEK IS TODAY AND THE SEVEN DAYS AFTER, AND LATE IS ITS OWN COUNT (shop-sentence-52): "6 to ship this week" counted
+   the two already past their day, beside a page offer that said four. An order past its day is late, never this week's. */
+const THIS_WEEK = `${TO_SEND}, due after -1d, due before +8d`;
+const LATE = `${TO_SEND}, due before today`;
+
+/** An order not paid in full, which Owed to you reads: not marked paid, with a total to owe. A deposit does not settle it. */
+const OWED = 'state is not paid, total is set';
+const NOT_PAID = [{ field: 'state', not: 'paid' }, { field: 'total', present: true }];
+
+/* WHO THE LINE CAN NAME: an order nothing was paid on, so its total is what is owed, with a person and a day on it. The
+   day is what orders them, oldest first, so the line names the one the Owed to you tile opens on. */
+const OWED_NAMED = { all: [...NOT_PAID, { field: 'paid', empty: true }, { field: 'who', present: true }, { field: 'due', present: true }] };
+
+/* AND EVERY OTHER ORDER NOT PAID IN FULL, counted where it cannot be named: part paid, nobody's, or with no day. */
+const OWED_OTHER = { all: [...NOT_PAID, { any: [{ field: 'paid', present: true }, { field: 'who', empty: true }, { field: 'due', empty: true }] }] };
 
 export const SHOP = {
   usecase: 'shop',
-  /* 1.0.0: the first version, with Orders and Products and the Orders page. */
-  version: '1.0.0',
+  /* 1.0.0: the first version, with Orders and Products and the Orders page.
+     1.1.0: this week starts today and late is its own clause and tile; a part-paid order is owed; the line names the
+     oldest order nothing was paid on, and counts the ones it cannot name. */
+  version: '1.1.0',
   title: 'Shop',
   summary: 'The orders you take, who they are for and when they are due, what has been paid, and the things you sell.',
   author: 'BrainDog',
@@ -108,8 +123,12 @@ export const SHOP = {
          month's orders are the ones written in the last 30 days, by the day the record wrote them: an order has no day
          of its own but the one it is due. */
       counted('orders-30d', 'Orders in the last 30 days', 'register.orders', 'created_at after -30d'),
-      counted('orders-due-7d', 'Orders due this week', 'register.orders', `${TO_SEND}, due before +8d`),
-      counted('orders-owed', 'Orders not paid yet', 'register.orders', OWED),
+      counted('orders-due-7d', 'Orders due this week', 'register.orders', THIS_WEEK),
+      counted('orders-late', 'Orders late', 'register.orders', LATE),
+      counted('orders-owed', 'Orders not paid in full', 'register.orders', OWED),
+      /* TREES, because the second ORs three fields and the two must split the owed orders between them. */
+      { ...counted('orders-owed-named', 'Orders nothing was paid on, with a name and a day', 'register.orders'), where: OWED_NAMED },
+      { ...counted('orders-owed-other', 'Other orders not paid in full', 'register.orders'), where: OWED_OTHER },
       {
         page: 'orders',
         title: 'Orders',
@@ -119,22 +138,43 @@ export const SHOP = {
         blocks: [
           {
             /* THE PAGE'S ONE LINE, as the vision says it: "3 orders this month, 2 to ship this week, and Salma still owes
-               EGP 1,350". A clause whose figure is nought is left out, so a new shop reads no line, and the owed clause
-               names the first order nobody has paid and its total, one order's both. The clauses are cut at commas
-               (`leadOf`), so each goes on its own when it has nothing to say. */
+               EGP 1,350". A clause whose figure is nought is left out, so a new shop reads no line. The clauses are cut
+               at commas (`leadOf`), so each goes on its own when it has nothing to say.
+               THE OWED CLAUSE NAMES THE OLDEST ORDER NOTHING WAS PAID ON, its person and its total, one order's both.
+               An order it cannot name that way (part paid, nobody's, no day) is counted in the clause before it, which
+               needs no name, so an unpaid order is never left out of the line. */
             kind: 'note',
             lead: true,
             span: 12,
-            body: '{{orders-30d}} order(s) this month, {{orders-due-7d}} to ship this week, and {{orders-owed.first_who}} still owes {{orders-owed.first_total}}',
+            body: '{{orders-30d}} order(s) this month, {{orders-due-7d}} to ship this week, {{orders-late}} late, {{orders-owed-other}} not paid in full, and {{orders-owed-named.first_who}} still owes {{orders-owed-named.first_total}}',
           },
           {
-            /* WHAT TO MAKE OR SEND IN SEVEN DAYS, the late ones first. */
+            /* WHAT IS PAST ITS DAY AND NOT SENT, the longest late first, drawn only while something is. */
+            kind: 'table',
+            heading: 'Late',
+            icon: 'calendar-clock',
+            span: 12,
+            source: 'register.orders',
+            where: LATE,
+            when: { metric: 'orders-late', gt: 0 },
+            columns: [
+              { field: 'what', label: 'Order', width: 'minmax(18ch,1fr)' },
+              { field: 'who', label: 'Who', width: 'minmax(10ch,18ch)' },
+              { field: 'how_many', label: 'How many', width: '10ch', align: 'end' },
+              { field: 'due', label: 'Due', width: '14ch', align: 'end' },
+            ],
+            order: [{ field: 'due', dir: 'asc' }],
+            limit: 8,
+            empty: 'No order is late.',
+          },
+          {
+            /* WHAT TO MAKE OR SEND TODAY AND IN THE SEVEN DAYS AFTER, the soonest first. */
             kind: 'table',
             heading: 'Due this week',
             icon: 'calendar-clock',
             span: 12,
             source: 'register.orders',
-            where: `${TO_SEND}, due before +8d`,
+            where: THIS_WEEK,
             when: { metric: 'orders-due-7d', gt: 0 },
             columns: [
               { field: 'what', label: 'Order', width: 'minmax(18ch,1fr)' },
@@ -147,7 +187,7 @@ export const SHOP = {
             empty: 'No order is due this week.',
           },
           {
-            /* WHO HAS NOT PAID YET, the oldest due first. */
+            /* WHO HAS NOT PAID IN FULL, the oldest due first, with what came in beside what it comes to. */
             kind: 'table',
             heading: 'Owed to you',
             icon: 'wallet',
@@ -159,6 +199,7 @@ export const SHOP = {
               { field: 'who', label: 'Who', width: 'minmax(10ch,18ch)' },
               { field: 'what', label: 'Order', width: 'minmax(18ch,1fr)' },
               { field: 'total', label: 'Total', width: '14ch', align: 'end' },
+              { field: 'paid', label: 'Paid', width: '14ch', align: 'end' },
               { field: 'due', label: 'Due', width: '14ch', align: 'end' },
             ],
             order: [{ field: 'due', dir: 'asc' }],

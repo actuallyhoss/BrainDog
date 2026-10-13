@@ -179,13 +179,14 @@ test('an ask that called no model gives its place back: the record refused the r
   }
 });
 
-test('a provider that did not answer is still billed, as 46 §4.1 says, and leaves no held row behind', async () => {
+test('a provider that did not answer keeps its row and is not counted as one of his asks, and leaves no held row behind', async () => {
   const { sql, inference, slash, rows } = build();
   try {
     inference.say(new Error('502 from the gateway'));
     const out = await slash.read('what is open', OWNER);
     assert.equal(out.ok, true);
-    assert.equal(slash.status().asks.used, 1);
+    /* HIS RULE: an ask the model never answered is not one of his. The row is kept, with what it cost, and spends none. */
+    assert.equal(slash.status().asks.used, 0);
     assert.deepEqual(rows(), [{ kind: 'read', status: 'error', code: 'UNREACHABLE' }]);
   } finally {
     sql.close();

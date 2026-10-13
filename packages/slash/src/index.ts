@@ -50,6 +50,7 @@ import { patterns } from './jobs.ts';
 import { palette, setups } from './propose.ts';
 import {
   ASK_CAP_DEFAULT,
+  BACKGROUND_ASKS_MONTH,
   PROVIDERS,
   type Asked,
   type CallContext,
@@ -67,6 +68,7 @@ export { eraseSlash } from './erase.ts';
 export { health as engineHealth, said as engineSaid, ANSWER_STALE_DAYS, FAILS_DOWN, HEALTH_DAYS, LEDGER_ANSWERED, LEDGER_FAILED } from './health.ts';
 export type { EngineFacts, EngineHealth, EngineSaid } from './health.ts';
 export { STORE_VERSION } from './call.ts';
+export type { Charge, StoreStep } from './call.ts';
 export { cite, citable, shapeOf, tokens } from './project.ts';
 export { answerSchema } from './answer.ts';
 export { ANSWER_SYSTEM, MODELS, PROMPTS, SYSTEM } from './prompts.ts';
@@ -86,6 +88,7 @@ export type {
   ProjectQuery,
   Proposal,
   Provider,
+  Purpose,
   RawPayload,
   ReadTrace,
   Reading,
@@ -96,6 +99,7 @@ export type {
   Slash,
   SlashDeps,
   Source,
+  Spends,
   Status,
   Tier,
   Verb,
@@ -193,7 +197,7 @@ export function createSlash(deps: SlashDeps, options: SlashOptions = {}): Slash 
      `not authorized: SQLITE_AUTH` out of the object's authorizer, so on the Worker every ask answered 500 before a model
      was called (`apps/worker/test/slash-in-do.test.ts`), until the statement was wrapped. The store's version is a row
      now (`STORE_VERSION`, `slash_meta`), so nothing here asks the pragma at all. */
-  openStore(deps.sql);
+  openStore(deps.sql, { now: deps.clock.now() });
   deps.sql.exec(
     'INSERT OR IGNORE INTO slash_settings (singleton, tier, model, grant_id, ask_cap, updated_at) VALUES (1, ?, NULL, NULL, ?, ?)',
     'a',
@@ -246,6 +250,8 @@ export function createSlash(deps: SlashDeps, options: SlashOptions = {}): Slash 
       /* ONE COUNT FOR WHAT IS SHOWN AND WHAT STOPS AN ASK. On the included model it is the count `spent()` refuses on
          (`propose.ts`); on his own key it is the same kinds of row on his tier, listed and never a limit. */
       asks: { used: key ? keyedAsks() : core.asksUsed(), cap: s.ask_cap, resets: core.resets(), capped: !key },
+      /* AND THE RECORD'S OWN WORK BESIDE HIS, a count of its own (`spends = 'background'`), so Settings shows the two apart. */
+      background: { used: core.backgroundUsed(), cap: BACKGROUND_ASKS_MONTH },
     };
   };
 

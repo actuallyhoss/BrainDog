@@ -1,6 +1,9 @@
 /**
- * THE SAME MARKS AS THE APP'S (`apps/web/src/lib/ui/agent-marks.ts`), copied because the site ships none of the app's code.
- * Change one, change both.
+ * THE AGENTS' MARKS, as data, in the one place both apps read them from.
+ *
+ * Two copies of this existed, the app's and the site's, under a line that said "change one, change both". The site
+ * ships none of the app's code, but both ship the skin, so the marks live here beside `mark.ts` and neither is typed
+ * by hand again.
  *
  * The marks of the agents a record works with, drawn as their makers draw them (the owner, 30 September 2026: "for stuff
  * like claude codex logos etc please use real ones").
@@ -69,5 +72,7 @@ const ALIASES: Readonly<Record<string, MarkedAgent>> = {
 /** The agent a name says, or null for anybody else. */
 export const markedOf = (name: string): MarkedAgent | null => {
   const said = name.trim().toLowerCase().replace(/^agent:/u, '');
-  return isMarked(said) ? said : (ALIASES[said] ?? null);
+  if (isMarked(said)) return said;
+  /* Its own words only: `constructor` is on every object, and is nobody's name. */
+  return Object.hasOwn(ALIASES, said) ? (ALIASES[said] ?? null) : null;
 };

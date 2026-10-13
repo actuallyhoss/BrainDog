@@ -16,6 +16,12 @@
  *
  * PAGED, AS THE NIGHT'S WALK IS. A larger fleet runs one request out of time, so the walk stops after `budgetMs` at a
  * page's end and answers `cursor`; the caller asks again with it until there is none.
+ *
+ * NO RECORD ASKED IS NOT A PASS (audit 45-46, finding 1). A walk that asked nobody opened nothing, and "0 failed" of
+ * nobody read as green in the deploy log. The Directory is the walk's only list, so the door cannot tell an empty host
+ * from a list that came back empty; the caller can, and says so with `open: true` ("this host holds at least one open
+ * record", which the workflow knows from its canary). Then a whole walk that asked nobody is `empty` and one `failed`,
+ * and the door's own rule turns that into a 500.
  */
 
 /** How far back a record counts as in use: seven days, the window a `before-deploy` copy is kept for. */
@@ -33,8 +39,11 @@ export type RecordPage = { ids: readonly string[]; cursor?: string | undefined }
 /** What one record answers: not written in the window, or written, with the copy's name when one was taken. */
 export type PointAnswer = { written: false } | { written: true; copied?: string | undefined };
 
-/** What the caller asks for: the commit the copies are labelled with, `check` or not, and where a paged walk left off. */
-export type RestorePointAsk = { commit?: string | undefined; check: boolean; cursor?: string | undefined };
+/**
+ * What the caller asks for: the commit the copies are labelled with, `check` or not, where a paged walk left off, and
+ * `open` when the caller knows the host holds at least one open record.
+ */
+export type RestorePointAsk = { commit?: string | undefined; check: boolean; cursor?: string | undefined; open?: boolean | undefined };
 
 /** The answer: counts only. `records` is how many were written in the window, which is how many a real run copies. */
 export type RestorePointTally = {
@@ -45,6 +54,8 @@ export type RestorePointTally = {
   opened: number;
   copied: number;
   failed: number;
+  /** A whole walk that asked nobody on a host the caller said holds a record. Counted in `failed` too. */
+  empty?: true;
   cursor?: string;
 };
 
@@ -64,10 +75,10 @@ export function labelOf(commit: string | undefined): string {
   return commit === undefined || commit === '' ? 'before-deploy' : `before-deploy-${commit.slice(0, 7)}`;
 }
 
-/** The body a caller sent, read: `{ commit?, check?, cursor? }`, or the sentence that says what is wrong with it. */
+/** The body a caller sent, read: `{ commit?, check?, cursor?, open? }`, or the sentence that says what is wrong with it. */
 export function readAsk(body: unknown): { ok: true; value: RestorePointAsk } | { ok: false; fix: string; at: string } {
   if (typeof body !== 'object' || body === null || Array.isArray(body))
-    return { ok: false, fix: '/account/ops/restore-point takes { commit?, check?, cursor? } as JSON.', at: 'body' };
+    return { ok: false, fix: '/account/ops/restore-point takes { commit?, check?, cursor?, open? } as JSON.', at: 'body' };
   const b = body as Record<string, unknown>;
   const commit = b['commit'];
   if (commit !== undefined && (typeof commit !== 'string' || !/^[0-9a-f]{7,40}$/u.test(commit.toLowerCase())))
@@ -77,10 +88,13 @@ export function readAsk(body: unknown): { ok: true; value: RestorePointAsk } | {
   const cursor = b['cursor'];
   if (cursor !== undefined && (typeof cursor !== 'string' || cursor === '' || cursor.length > 128))
     return { ok: false, fix: 'The cursor is the one the last answer gave, as it was given.', at: 'cursor' };
+  const open = b['open'];
+  if (open !== undefined && typeof open !== 'boolean') return { ok: false, fix: 'Open is true or false.', at: 'open' };
   return {
     ok: true,
     value: {
       check: check === true,
+      ...(open === true ? { open: true } : {}),
       ...(typeof commit === 'string' ? { commit: commit.toLowerCase() } : {}),
       ...(typeof cursor === 'string' ? { cursor } : {}),
     },
@@ -122,15 +136,32 @@ export async function restorePoint(deps: RestorePointDeps, ask: RestorePointAsk)
       });
     }
     const next = page.cursor !== undefined && page.cursor !== '' && !seen.has(page.cursor) ? page.cursor : undefined;
-    if (next === undefined) return tally;
+    if (next === undefined) return wholeOf(deps, ask, tally);
     seen.add(next);
     cursor = next;
     if (deps.now() - began >= budget) return { ...tally, cursor: next };
   }
 }
 
+/** Why a walk that asked nobody is not a pass, as the Worker's log and the deploy log say it. */
+export const NOBODY_ASKED = 'No open record was listed, so nothing was opened. This host holds at least one, so the list of records is wrong.';
+
+/**
+ * The end of a whole walk: `empty` and one `failed` when it began at the start, asked nobody, and the caller said the
+ * host holds a record. A walk picked up from a cursor is one page of a longer one, and its caller adds the pages up.
+ */
+function wholeOf(deps: RestorePointDeps, ask: RestorePointAsk, tally: RestorePointTally): RestorePointTally {
+  if (ask.open !== true || ask.cursor !== undefined || tally.asked > 0) return tally;
+  deps.failed?.('', NOBODY_ASKED);
+  return { ...tally, failed: tally.failed + 1, empty: true };
+}
+
+/** Whether a tally is a pass: nothing failed, and somebody was asked or the walk goes on. The door answers 200 on `failed` alone. */
+export const passed = (t: RestorePointTally): boolean => t.failed === 0 && t.empty !== true;
+
 /** One line for the deploy log: the counts, said plainly. */
 export function sayTally(t: RestorePointTally): string {
+  if (t.empty === true) return NOBODY_ASKED;
   const more = t.cursor === undefined ? '' : ' More to walk.';
   const records = `${String(t.records)} ${t.records === 1 ? 'record' : 'records'} written in the last ${String(RESTORE_POINT_DAYS)} days`;
   if (t.mode === 'check') return `Checked: ${records}, ${String(t.opened)} opened, ${String(t.failed)} failed, nothing copied.${more}`;

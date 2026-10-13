@@ -28,6 +28,8 @@ import { no, ok, refused } from '@braindog/ports';
 import { credentialKey as credential, credentialValue, NESTED_MOST, nestedPast } from './credentials.ts';
 import { FIRST_PARTY_LISTS } from './usecase.ts';
 import { cardsFault } from './cards.ts';
+import { addressFault } from './address.ts';
+export { addressFault, addressFaults, listingFault } from './address.ts';
 import { holdsOf, resolveWhen, settleWhen } from './when.ts';
 export { holdsIn, holdsOf, resolveWhen, settleWhen, type Waiting } from './when.ts';
 import { KINDS, approvalLines, configReads, configValue, digest, egressChanged, egressOf as egressOfBody, fillConfig, jcs, misread, readConfig, rowRegisterOf, sentencesOver, validateDeclaration, widens, type ConfigDecl, type DeclKind, type Egress, type Json } from '@braindog/kernel';
@@ -553,6 +555,11 @@ export type Diff = {
    */
   unresolved: { register: string; at: string; provider: string | null }[];
   base: { format: number; primitives: number; packs: [string, string][]; declarations: [string, number, string][] };
+  /**
+   * An address the add-on holds where none may be, with every setting filled in, as `install` will refuse it
+   * (`address.ts`). Absent when it holds none, which is every plan made before the check and every add-on that passes.
+   */
+  remote?: Refusal;
   planHash: string;
 };
 
@@ -592,7 +599,7 @@ export type Host = {
    * The `pack` row, and the ids it claims — read on uninstall. `approved` is the calls-out lines the owner approved
    * with this install, word for word, when it asked for any.
    */
-  remember: (row: { id: string; version: string; source: string; ref: string | null; manifest: string; checksum: string; approved?: readonly string[] }) => void;
+  remember: (row: { id: string; version: string; source: string; ref: string | null; manifest: string; checksum: string; approved?: readonly string[]; waiting?: readonly { at: string; holds: string[] }[]; because?: string }) => void;
   forget: (id: string) => void;
   claimed: (pack: string) => string[];
   /**
@@ -1464,7 +1471,13 @@ export async function plan(given: Pack, installed: Installed, options: PlanOptio
   const sent = settingsSent(given, options.settings);
   const config = settingsFor(given, installed, sent.values);
   /* A PART THAT WAITS FOR A LIST THE RECORD DOES NOT HOLD IS TAKEN OUT (when-49), and the plan says what waits. */
-  const held = resolveWhen(filledWith(given, config), holdsOf(installed, given));
+  const whole = filledWith(given, config);
+  /* AN ADDRESS WHERE NONE MAY BE IS FOUND BEFORE ANYTHING ELSE IS READ, in the add-on as it would be stored: a setting
+     sent with the install is filled in first, so a value cannot carry in what the file could not, and a part that waits
+     is read too, since it is installed the day the record holds what it waits for. Said on the plan, refused by
+     `install` (`faultOf`). */
+  const remote = addressFault(whole);
+  const held = resolveWhen(whole, holdsOf(installed, given));
   const pack = held.pack;
   const live = new Map(installed.declarations.map((d) => [d.id, d]));
   const mine = pack.manifest.pack;
@@ -1844,6 +1857,7 @@ export async function plan(given: Pack, installed: Installed, options: PlanOptio
     config,
     unresolved,
     base,
+    ...(remote === null ? {} : { remote }),
     /* THE INTEGER HALF CATCHES A RECORD THAT MOVED and the hash half catches a PACK that was edited
        between the plan and the install — which no version number can see, and which is exactly what
        happens when the thing being approved is a file in somebody's editor. */
@@ -2919,6 +2933,11 @@ function faultOf(pack: Pack, diff: Diff): Result<never> | null {
      handed to the constructor. In a tuple it is a string in an array and the gate that counts what
      the product emits sees nothing, which is how both of these came to be published in `30 §6` and
      emitted by nothing. Two calls, four lines, and the sentences can differ. */
+  /* FIRST, AND READ FROM THE ADD-ON RATHER THAN FROM `diff.remote`, so a plan that did not say it is refused all the
+     same. Nothing an update fixes makes an address in a note safe, so no other repair is worth naming before it. */
+  const remote = addressFault(filledWith(pack, diff.config));
+  if (remote) return { ok: false, refusal: remote };
+
   if (!diff.requires.format.ok)
     return no<never>(
       'FORMAT_OUT_OF_RANGE',
@@ -3392,6 +3411,7 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
         manifest: jcs({ ...manifest, ...(kept.length > 0 ? { config_values: Object.fromEntries(kept) } : {}) } as unknown as Json),
         checksum: pack.checksum,
         ...(diff.approve.length > 0 ? { approved: diff.approve } : {}),
+        ...(diff.waiting !== undefined && diff.waiting.length > 0 ? { waiting: diff.waiting } : {}),
       });
 
       return ok({

@@ -31,7 +31,9 @@ import { compileModule } from 'svelte/compiler';
 import '../record/fixtures/fill.ts';
 import { REGISTERS } from '../record/api.ts';
 import { forget } from '../record/boot-live.ts';
-import type { Ask, Refusal, Said } from './record.ts';
+import { createClient } from '@braindog/client';
+
+import type { Ask, Counter, Refusal, Said } from './record.ts';
 
 registerHooks({
   load(url, context, next) {
@@ -46,7 +48,7 @@ registerHooks({
 
 /* AFTER THE HOOK, AND THAT IS WHY IT IS DYNAMIC. A static import is evaluated before this file's body
    runs, so the module would load before the hook that makes it loadable was registered. */
-const { open, read } = await import('./record.ts');
+const { countsOf, open, read } = await import('./record.ts');
 const screen = await import('../ui/screen.svelte.ts');
 
 const BASE = 'http://record.test';
@@ -414,6 +416,124 @@ test("a list this build does not ship draws a link by the linked row's name, and
   const answer = value(await source.page('rs_meetings', EMPTY, null), 'the page');
   assert.equal(answer.entries[0]?.fields.book, 2);
   assert.equal(answer.names?.get('rs_books#2'), 'The Remains of the Day');
+});
+
+/* ── the pills' counts (PGS-B06 job d) ───────────────────────────────────── */
+
+const STATES = ['open', 'paid', 'disputed', 'void'];
+
+/** A record's `countBy` answer: the values it found, most first, and never one nothing holds. */
+const counted = (counts: { value: unknown; n: number }[]) => ({ ok: true as const, value: { register: 'obligations', by: 'state', counts, matched: counts.reduce((n, c) => n + c.n, 0) } });
+
+test('ONE QUESTION ANSWERS EVERY PILL OF A FIELD, and a value nothing holds says 0', async () => {
+  const calls: Parameters<Counter>[0][] = [];
+  let singly = 0;
+  const counter: Counter = async (args) => {
+    calls.push(args);
+    return counted([{ value: 'open', n: 24 }, { value: 'paid', n: 9 }, { value: null, n: 2 }, { value: 'a value retired since', n: 1 }]);
+  };
+  const one = async (): Promise<Said<number>> => ((singly += 1), { ok: true, value: 99 });
+
+  const out = value(await countsOf(counter, one, 'obligations', 'direction is owed_to_me', 'state', STATES), 'the counts');
+  assert.deepEqual(calls, [{ register: 'obligations', by: 'state', where: 'direction is owed_to_me' }], 'the record was not asked once, with the list’s own where');
+  assert.equal(singly, 0, 'a pill was counted by itself beside the one question');
+  assert.deepEqual([...out], [['open', 24], ['paid', 9], ['disputed', 0], ['void', 0]]);
+
+  /* NO `where` IS NO KEY, since the client writes every key it is handed into the address. */
+  await countsOf(counter, one, 'obligations', undefined, 'state', STATES);
+  assert.deepEqual(calls[1], { register: 'obligations', by: 'state' });
+});
+
+test('a host with no countBy is counted a pill at a time, and says so once', async () => {
+  let refusals = 0;
+  const behind: Counter = async () => ((refusals += 1), { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'Nothing here answers countBy.' } });
+  const one = async (v: string): Promise<Said<number>> => ({ ok: true, value: v.length });
+
+  const out = await countsOf(behind, one, 'obligations', undefined, 'state', STATES);
+  assert.ok(out.ok);
+  assert.equal(out.absent, true, 'the caller is not told to stop asking a host that has no such method');
+  assert.deepEqual([...out.value], STATES.map((v) => [v, v.length]));
+  assert.equal(refusals, 1);
+
+  /* AND A BUILD WHOSE CLIENT DOES NOT NAME IT ASKS NOTHING IT CANNOT ASK. */
+  const without = await countsOf(undefined, one, 'obligations', undefined, 'state', STATES);
+  assert.ok(without.ok);
+  assert.equal(without.absent, undefined);
+  assert.deepEqual([...without.value], STATES.map((v) => [v, v.length]));
+});
+
+test('A VALUE PAST THE RECORD’S MOST COMMON IS ASKED ON ITS OWN, never shown as 0, and a walk cut short counts every pill singly', async () => {
+  const asked: string[] = [];
+  const one = async (v: string): Promise<Said<number>> => (asked.push(v), { ok: true, value: 7 });
+  /* `more`: the listed values are exact, and the ones not listed are held by some entries the answer did not name. */
+  const more: Counter = async () => ({ ok: true, value: { counts: [{ value: 'open', n: 24 }, { value: 'paid', n: 9 }], matched: 40, more: { values: 3, n: 7 } } });
+  const out = value(await countsOf(more, one, 'obligations', undefined, 'state', STATES), 'the counts');
+  assert.deepEqual([...out], [['open', 24], ['paid', 9], ['disputed', 7], ['void', 7]]);
+  assert.deepEqual(asked, ['disputed', 'void']);
+
+  /* `capped`: the walk stopped early, so even a listed count is only what it reached. */
+  asked.length = 0;
+  const capped: Counter = async () => ({ ok: true, value: { counts: [{ value: 'open', n: 24 }], matched: 90_000, capped: true } });
+  const all = value(await countsOf(capped, one, 'obligations', undefined, 'state', STATES), 'the counts');
+  assert.deepEqual([...all], STATES.map((v) => [v, 7]));
+  assert.deepEqual(asked, [...STATES]);
+
+  /* A REFUSAL OF ONE OF THOSE IS THE ANSWER, not a 0. */
+  const no = await countsOf(more, async () => ({ ok: false, refusal: { code: 'FORBIDDEN', fix: 'You cannot read this list.' } }), 'obligations', undefined, 'state', STATES);
+  assert.equal(refused(no, 'the counts').code, 'FORBIDDEN');
+});
+
+test('a host built over a record that cannot count by a field is counted a pill at a time too', async () => {
+  const cannot: Counter = async () => ({ ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog cannot count a list by a field yet, so nothing was read.' } });
+  const out = await countsOf(cannot, async (v) => ({ ok: true, value: v.length }), 'obligations', undefined, 'state', STATES);
+  assert.ok(out.ok);
+  assert.equal(out.absent, true);
+  assert.deepEqual([...out.value], STATES.map((v) => [v, v.length]));
+});
+
+test('any other refusal is the record’s answer about the question, and is not counted round', async () => {
+  let singly = 0;
+  const no: Counter = async () => ({ ok: false, refusal: { code: 'FORBIDDEN', fix: 'You cannot read this list.' } });
+  const out = await countsOf(no, async () => ((singly += 1), { ok: true, value: 1 }), 'obligations', undefined, 'state', STATES);
+  assert.equal(refused(out, 'the counts').code, 'FORBIDDEN');
+  assert.equal(singly, 0);
+});
+
+/** The host of this file, with `countBy` beside it. */
+const counting = (name: string, params: URLSearchParams): Response =>
+  name === 'countBy' ? json(200, counted([{ value: 'open', n: 24 }, { value: 'paid', n: 9 }])) : record(name, params);
+
+test('THROUGH THE SOURCE: a host behind this build is still counted, each pill under the list’s other chips', async () => {
+  tab(record);
+  const source = await open();
+  const ask: Ask = { filters: [{ field: 'direction', op: 'in', values: ['owed_to_me'] }], q: '' };
+  const out = value(await source.counts('obligations', ask, 'state', STATES), 'the counts');
+  assert.deepEqual([...out], STATES.map((v) => [v, 38]));
+  const lists = sent.filter((r) => r.name === 'list' && r.params.get('register') === 'obligations');
+  assert.equal(lists.length, STATES.length);
+  assert.deepEqual(
+    lists.map((r) => JSON.parse(r.params.get('where') ?? 'null')).sort(),
+    STATES.map((v) => `direction is owed_to_me, state is ${v}`).sort(),
+  );
+
+  /* THE HOST SAID ONCE THAT IT HAS NO SUCH METHOD, and is not asked again by this source. */
+  await source.counts('obligations', ask, 'state', STATES);
+  assert.ok(asked('countBy') <= 1, `countBy was asked ${asked('countBy')} times of a host that refused it`);
+});
+
+test('THROUGH THE SOURCE: the pills of a field arrive in ONE request, once the client names countBy', async (t) => {
+  if (typeof (createClient({ base: BASE }) as unknown as { countBy?: unknown }).countBy !== 'function')
+    return t.skip('the client has no countBy yet (the route and the method are blocked to the host and the client)');
+  tab(counting);
+  const source = await open();
+  const ask: Ask = { filters: [{ field: 'direction', op: 'in', values: ['owed_to_me'] }], q: '' };
+  const out = value(await source.counts('obligations', ask, 'state', STATES), 'the counts');
+  assert.deepEqual([...out], [['open', 24], ['paid', 9], ['disputed', 0], ['void', 0]]);
+  assert.equal(asked('countBy'), 1, 'the pills of one field took more than one request');
+  assert.equal(asked('list', 'obligations'), 0, 'a pill was also counted by a list of its own');
+  const one = sent.find((r) => r.name === 'countBy');
+  assert.equal(one?.params.get('by'), 'state');
+  assert.equal(JSON.parse(one?.params.get('where') ?? 'null'), 'direction is owed_to_me');
 });
 
 /* ── 4. what the sample left behind on the screens that read this ────────── */
