@@ -54,6 +54,18 @@
  * and `href="/r/tasks"` are how a page would name a list. AN IMPORT IS STILL READ, because `from '../work/list.ts'` is
  * exactly how the core wires in one add-on by name.
  *
+ * A DECLARATION IS NOT THE CORE (`declarationsOf`). Until SHL-A15 and SHL-A17 an add-on and a use case are TypeScript
+ * in the seed, under `packages/`, and that text is the same thing a `packs/<id>/<id>.pack.json` is: the place a name
+ * is made. `pack: 'money-core'` there, a list's own id and `to: 'accounts'` on its field name nothing of anybody
+ * else's, so a file that says whose it is (`pack: '<id>'`, `usecase: '<id>'`) is not read for names, and neither is the
+ * rest of its folder. ANOTHER ADD-ON'S LIST SPELLED THERE IS LEFT TOO, and that was weighed: on 13 October the seed's
+ * 61 declaration files held 1,280 places, 1,076 of them their own names, and the other 204 were a link to a
+ * neighbour's list (`to: 'things'`, `source: 'register.tasks'`, `requires:`, `modules:`), a label (`'Status'`) or
+ * a longer word (`'due-items-30d'`). One add-on leaning on another is a thing a declaration says, under `requires`, and whether
+ * it may is the declaration checker's to judge; what this unit guards is that the code that RUNS declarations knows
+ * none of them, and no pack file under `packs/` was ever read for it either. A file beside the declarations that says
+ * neither key, the installer or the table of names, is that code and is read like the kernel.
+ *
  * THE HELD LIST IS A FILE, `core-names.held.json`, one entry a line: the path, the name, why, and the unit that takes
  * it out. It was generated once, from this gate's own reading on 13 October, and this gate cannot write it. An entry
  * whose path no longer spells its name is a finding, so the list only shrinks. That it never grows is the ledger's
@@ -251,6 +263,34 @@ export function sourcesOf(root) {
   return files.map((f) => relative(root, f).replace(/\\/g, '/'));
 }
 
+/** Where the seed writes an add-on or a use case in TypeScript, until each is a file under `packs/` or `usecases/`. */
+const DECLARED_IN = ['packages/seed/src/modules', 'packages/seed/src/packs', USE_CASE_SOURCE];
+
+/** What a declaration says of itself: whose it is, as a key with an id for its value. `pack: {` and `pack: string` are neither. */
+const DECLARES = /\b(?:pack|usecase):\s*'[a-z][a-z0-9-]*'/;
+
+/**
+ * THE SHIPPED FILES THAT ARE AN ADD-ON'S OR A USE CASE'S OWN DECLARATION, out of `sources`. One thing directly under a
+ * directory of `DECLARED_IN` is one add-on's writing, a file (`work.ts`, `founder.ts`) or a folder (`money/`, with its
+ * lists, figures and pages), and it is a declaration when a file of it says whose it is, outside a comment. A folder
+ * is taken whole, because the file that holds a figure's arithmetic says `pack:` nowhere and is the add-on's all the
+ * same. A file that says neither (`install.ts`, `names.ts`, `first-party.ts`) is code that runs the declarations, and
+ * is the core.
+ */
+export function declarationsOf(root, sources) {
+  const units = new Map();
+  for (const path of sources) {
+    const dir = DECLARED_IN.find((d) => path.startsWith(`${d}/`));
+    if (dir === undefined) continue;
+    const unit = `${dir}/${path.slice(dir.length + 1).split('/')[0]}`;
+    if (!units.has(unit)) units.set(unit, { files: [], declares: false });
+    const u = units.get(unit);
+    u.files.push(path);
+    u.declares ||= DECLARES.test(uncomment(readFileSync(join(root, path), 'utf8')));
+  }
+  return new Set([...units.values()].filter((u) => u.declares).flatMap((u) => u.files));
+}
+
 /** A token is a run of the characters an identifier or a slug is written in, separators included. */
 const TOKEN = /[A-Za-z0-9_$][A-Za-z0-9_$.-]*/g;
 
@@ -326,18 +366,21 @@ export function hitsIn(source, names, markup = false, own = new Set()) {
 
 /**
  * THE WHOLE READING OF ONE ROOT, with no held list in it: the names, how many files declared them, how many files were
- * read, and every hit. `test/core-names.test.mjs` and the gate both stand on this one function.
+ * read, and every hit. `test/core-names.test.mjs` and the gate both stand on this one function. `sources` is the core
+ * alone: a declaration (`declarationsOf`) is counted beside it as `declarations` and no place in it is a hit.
  */
 export function read(root) {
   const { names, files: declared } = collect(root);
-  const sources = sourcesOf(root);
+  const shipped = sourcesOf(root);
+  const declarations = declarationsOf(root, shipped);
+  const sources = shipped.filter((path) => !declarations.has(path));
   const own = kernelWords(root);
   const hits = [];
   for (const path of sources) {
     const text = readFileSync(join(root, path), 'utf8');
     for (const h of hitsIn(text, names, path.endsWith('.svelte'), own)) hits.push({ path, line: h.line, key: h.key, token: h.token });
   }
-  return { names, declared, sources, hits, own };
+  return { names, declared, sources, declarations, hits, own };
 }
 
 /** Where a root keeps its held list. A planted tree has its own or none, so the tree's own list never excuses it. */
@@ -442,7 +485,8 @@ export default function coreNames(
   if (findings.length === 0) {
     console.log(
       `  core-names: 0 names of an add-on or a use case spelled in ${reading.sources.length} core files, outside the held list; ` +
-        `${reading.names.size} names read from ${reading.declared} files; ${heldHits} places held by ${held.length} entries`,
+        `${reading.names.size} names read from ${reading.declared} files; ${reading.declarations.size} files left as an add-on's or a use case's ` +
+        `own declaration; ${heldHits} places held by ${held.length} entries`,
     );
     return;
   }

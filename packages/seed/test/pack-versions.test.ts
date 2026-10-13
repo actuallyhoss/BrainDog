@@ -1452,11 +1452,12 @@ const DECLARED: Record<string, Version> = {
       setting.most_on_one_category setting.most_out_30d setting.most_out_every_month setting.most_owed_by_you setting.most_owed_to_you
       setting.most_parts_due_30d setting.most_spent_30d setting.most_spent_on_one_category setting.rest_days
     `,
-    declares: 'f3d700ae322b0ea0',
+    declares: 'c238f926c22cb938',
     history: [
       "`cash-cross-check` is declared (cash-check-52, REC-A17): Cash now worked out a second way, each cash account walked entry by entry from its newest statement, less Cash now, a currency at a time; no value while no balance is typed -> 73738171ae2405ba",
       'The Money page draws the check (cash-page-54, REC-A17): one tile, Cash now does not add up, while `cash-cross-check` is not nought, and one line while no balance is typed -> e4a453d69795fe22',
       "Folded into the unreleased 3.17.0 (filing-list-56, REC-B10 job 3; account-state-56; integrate 56): the list Filing rules (`filing_rules`), the Ledger's `filed_by`, `pattern` on a category's How it matches, and `txn-categorise` links through the list by which way, account and on or off; an account's Status, open or closed, with closed its finished state, and the cash figures, `statement-oldest-days`, the Last confirmed cards and a book's Accounts cards leave a closed account out (`liquid is true, state is not closed`) -> f3d700ae322b0ea0",
+      "Folded into the unreleased 3.17.0 (pay-links-57, REC-B11; integrate 57): a payment marks what it paid. `obligations` gains `paid_so_far`, `installments` gains `paid_by` (a link to the Ledger), `recurring` gains `last_paid` and `last_amount`, none indexed, and `transactions` declares `delete: refuse_while_referenced` so a payment an instalment names is not deleted from under it; no id added or taken away -> c238f926c22cb938",
     ],
   },
   'work@1.17.0': {

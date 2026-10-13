@@ -582,7 +582,8 @@ export type Diff = {
 };
 
 /** `handed` is how many declarations this install gave to another pack, and is absent when it gave none. */
-export type Applied = { pack: string; version: string; declarations: number; seeds: number; retired: number; handed?: number };
+/** `refreshed` is how many rows it planted before this update went over, when it went over any. */
+export type Applied = { pack: string; version: string; declarations: number; seeds: number; retired: number; handed?: number; refreshed?: number };
 export type Retired = { pack: string; declarations: number; rows_kept: Record<string, number> };
 
 /**
@@ -613,6 +614,21 @@ export type Host = {
    */
   retire: (ids: readonly string[], by?: { actor: string; suggestion?: string }) => Result<unknown>;
   seed: (register: string, fields: Record<string, Json>, note: string | undefined) => Result<unknown>;
+  /**
+   * What this add-on remembers planting: `planted` of its stored manifest, as it was written (`plantedOf` reads it).
+   *
+   * OPTIONAL, as `today` is. A host without it remembers nothing across an update, so no row is gone over, and the
+   * update writes the manifest without what the last one remembered.
+   */
+  planted?: (pack: string) => unknown;
+  /**
+   * The add-on's update going over a row it planted before: the kernel's update of `row` in `register` with these
+   * fields, and with `pack: true` in the write, so a field the list says is written `once` stays as the row holds it
+   * (SHL-A09). It answers `ok(null)` for a row that is no longer live: somebody removed it, and it stays removed.
+   *
+   * OPTIONAL, and an install with a host that leaves it out writes over no row at all, as every install did before.
+   */
+  reseed?: (register: string, row: string, fields: Record<string, Json>) => Result<unknown>;
   /**
    * Install day as the record's own clock reads it, YYYY-MM-DD: what a seed's `{ day: '+3' }` counts from. OPTIONAL, so
    * every host written before a seed could say a day keeps compiling; without it the day is today in UTC.
@@ -2058,6 +2074,38 @@ function seedFields(seed: Seed, today: string, made: ReadonlyMap<string, string>
     if (filled !== undefined) out[field] = filled;
   }
   return out;
+}
+
+/**
+ * One example row an add-on remembers planting: its list, the row, and its fields as the file said them that day.
+ *
+ * KEPT IN THE ADD-ON'S STORED MANIFEST UNDER `planted`, BY THE SEED'S `key`, because nothing on a row says which seed
+ * made it, and a row a person has renamed cannot be found again by its name. The fields are the file's words and not
+ * the row's: `{ day: '+3' }` and `{ ref: 'yard' }` as written, so the next update can tell what the FILE changed from
+ * what a person changed, and writes only the first.
+ */
+export type Planted = { list: string; row: string; fields: Record<string, Json> };
+
+/** `planted` as a stored manifest holds it, by seed key. Anything that is not the shape is left out, never thrown. */
+export function plantedOf(raw: unknown): Map<string, Planted> {
+  const out = new Map<string, Planted>();
+  if (!isObject(raw)) return out;
+  for (const [key, held] of Object.entries(raw)) {
+    if (!isObject(held) || typeof held.list !== 'string' || typeof held.row !== 'string' || !isObject(held.fields)) continue;
+    out.set(key, { list: held.list, row: held.row, fields: held.fields as Record<string, Json> });
+  }
+  return out;
+}
+
+/**
+ * The fields of a seed the file has changed since the row was planted, as the file says them now.
+ *
+ * ONLY WHAT THE FILE CHANGED IS WRITTEN. A field the file says as it did is left to the row, which may hold a person's
+ * correction, and so is a field the file no longer says. `tags` is never in it: the host tags an example row when it
+ * plants one, and taking the tag off is how a person makes the row their own.
+ */
+function seedChanges(seed: Seed, was: Planted): Record<string, Json> {
+  return Object.fromEntries(Object.entries(seed.fields).filter(([field, value]) => field !== 'tags' && (!Object.hasOwn(was.fields, field) || jcs(value) !== jcs(was.fields[field]!))));
 }
 
 /* ── settings, and the lists a pack points at ────────────────────────────── */
@@ -3584,11 +3632,38 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
       /* AND EACH IS WRITTEN ONCE, IN ITS FINAL STATE: its days counted from install day and its links already the ids
          of the rows written before it (`seedFields`), so nothing has to move a row after. */
       const made = new Map<string, string>();
+      /* AND EACH ROW WITH A KEY IS REMEMBERED (`Planted`), so a later update can find it whatever it is called by then. */
+      const remembered = new Map<string, Planted>();
       for (const seed of planted) {
         const row = host.seed(seed.register, seedFields(seed, today, made), seed.note);
         if (!row.ok) throw new Rolled(row);
         const id = isObject(row.value) ? row.value.id : undefined;
-        if (seed.key !== undefined && typeof id === 'string') made.set(seed.key, id);
+        if (seed.key === undefined || typeof id !== 'string') continue;
+        made.set(seed.key, id);
+        remembered.set(seed.key, { list: seed.register, row: id, fields: seed.fields });
+      }
+
+      /* AN UPDATE GOES OVER THE ROWS IT PLANTED BEFORE, AND WRITES ONLY WHAT THE FILE CHANGED (`seedChanges`). The write
+         is the add-on's own (`Host.reseed`, the kernel's update with `pack: true`), so a field the list says is written
+         `once` stays as the row holds it: a category a person renamed keeps their name through every update (SHL-A09).
+         Until this, no update touched a planted row at all, and `once` had nothing to be obeyed by.
+         A ROW THE RECORD WILL NOT TAKE THE CHANGE ON DOES NOT STOP THE UPDATE. What refuses it is the record's own
+         state, a name somebody has since given another row for one, and an example is not worth an add-on left on its
+         old version. The row stays as it is and is remembered as it was, so the next update tries again. */
+      const before = plantedOf(host.planted?.(pack.manifest.pack));
+      const linked = new Map<string, string>([...[...before].map(([key, was]) => [key, was.row] as const), ...made]);
+      let refreshed = 0;
+      for (const seed of filled.seeds) {
+        if (seed.key === undefined || remembered.has(seed.key)) continue;
+        const was = before.get(seed.key);
+        if (was === undefined || was.list !== seed.register) continue;
+        const changes = seedChanges(seed, was);
+        const patch = seedFields({ ...seed, fields: changes }, today, linked);
+        const row = host.reseed === undefined || Object.keys(patch).length === 0 ? undefined : host.reseed(seed.register, was.row, patch);
+        /* GONE: somebody removed the row, so it is not written and not remembered. */
+        if (row?.ok === true && row.value === null) continue;
+        if (row?.ok === true) refreshed += 1;
+        remembered.set(seed.key, row?.ok === true ? { ...was, fields: { ...was.fields, ...changes } } : was);
       }
 
       host.remember({
@@ -3597,7 +3672,11 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
         source: pack.source.kind,
         ref: pack.source.ref ?? null,
         /* THE CHOSEN SETTINGS TRAVEL WITH THE PACK ROW, and only the ones this version still accepts. */
-        manifest: jcs({ ...manifest, ...(kept.length > 0 ? { config_values: Object.fromEntries(kept) } : {}) } as unknown as Json),
+        manifest: jcs({
+          ...manifest,
+          ...(kept.length > 0 ? { config_values: Object.fromEntries(kept) } : {}),
+          ...(remembered.size > 0 ? { planted: Object.fromEntries(remembered) } : {}),
+        } as unknown as Json),
         checksum: pack.checksum,
         ...(diff.approve.length > 0 ? { approved: diff.approve } : {}),
         ...(diff.waiting !== undefined && diff.waiting.length > 0 ? { waiting: diff.waiting } : {}),
@@ -3610,6 +3689,7 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
         seeds: planted.length,
         retired: retiring.length,
         ...(handing > 0 ? { handed: handing } : {}),
+        ...(refreshed > 0 ? { refreshed } : {}),
       });
     });
   } catch (e) {

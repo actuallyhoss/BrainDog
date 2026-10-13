@@ -44,8 +44,8 @@ import { BRIDGE_AMOUNT, BRIDGE_STEP, bridgePlan, bridgeSentence, signedOf } from
 import { SERIES_NET, SERIES_NONE, seriesPlan, type SeriesPlan } from './series.ts';
 import { LINES_AGAINST, LINES_NONE, LINES_NUMBERS, linesOnly, linesPlan } from './lines.ts';
 import { PROGRESS_NONE, PROGRESS_OF, PROGRESS_TOTAL, progressPlan, progressRangeSaid, progressSentence, progressSpentSaid, rangePlan, rangeSentence } from './progress.ts';
-import { figureLike } from './figure.ts';
-import { FORECAST_BALANCE, FORECAST_MOVE, FORECAST_NONE, FORECAST_NUMBERS, FORECAST_PAINT, FORECAST_WHAT, FORECAST_WHEN, baseKnobs, forecastModel, forecastPlan, scenario, underNote } from './forecast.ts';
+import { AMOUNT_SPACE } from './money.ts';
+import { FORECAST_BALANCE, FORECAST_MOVE, FORECAST_NONE, FORECAST_NUMBERS, FORECAST_PAINT, FORECAST_WHAT, FORECAST_WHEN, baseKnobs, forecastFigure, forecastModel, forecastPlan, scenario, underNote } from './forecast.ts';
 import { DIFF_GLYPHS, DIFF_WORDS, diffFolded, diffPlan, type DiffLine } from './diff.ts';
 import { ROADMAP_LEGEND, ROADMAP_NONE, ROADMAP_TODAY, roadmapAxis, roadmapFlip, roadmapLegend, roadmapLines, roadmapPlan, roadmapRow, roadmapSentence, roadmapShare, roadmapSkipped, roadmapToday } from './roadmap.ts';
 import { RING_NONE, RING_OF, RING_PAINT, RING_STEP_OPACITY, ringPlan } from './ring.ts';
@@ -60,6 +60,11 @@ import { pathRest, pathShort } from './path.ts';
 import type { Block, Degraded, Markdown, Row, Segment } from './parse.ts';
 
 export type RenderOptions = InlineOptions & {
+  /**
+   * The record's home currency, which the one writer of an amount spells every figure against (`money.ts`): `null` for
+   * a record that has none, and left out by a host that does not say, which keeps each figure as its cell wrote it.
+   */
+  home?: string | null;
   /** Turn a spoken id into an address. A link the host cannot resolve renders as plain text. */
   link?: (spoken: string) => string | null;
   /**
@@ -755,12 +760,12 @@ function table(b: Block, o: RenderOptions): string {
           const index = g * grouped.step + i;
           const tds = columns
             .map((column, c) => {
-              const drawn = tableCellBody(row.cells[c] ?? null);
+              const drawn = tableCellBody(row.cells[c] ?? null, o.home);
               const inner =
                 drawn.body.kind === 'missing'
                   ? `<span class="missing">${MISSING}</span>`
                   : drawn.body.kind === 'coded'
-                    ? `<span class="amount">${escape(drawn.body.sign)}<span class="amount-code">${escape(drawn.body.currency)}</span> ${escape(drawn.body.rest.slice(0, figureEnd(drawn.body.rest)))}</span>${escape(drawn.body.rest.slice(figureEnd(drawn.body.rest)))}`
+                    ? `<span class="amount">${escape(drawn.body.sign)}<span class="amount-code">${escape(drawn.body.currency)}</span>${AMOUNT_SPACE}${escape(drawn.body.rest.slice(0, figureEnd(drawn.body.rest)))}</span>${escape(drawn.body.rest.slice(figureEnd(drawn.body.rest)))}`
                     : escape(drawn.body.text);
               /* NO TONE GLYPH AND NO `data-tone` HERE, because a dialect table cannot carry either:
                  `comparisonPlan` builds its rows from cells and a block's tone belongs to the whole
@@ -1312,7 +1317,7 @@ function progress(b: Block, o: RenderOptions): string {
   if (b.form === 'range') return range(b, o);
   const form = b.form === 'budget' ? 'budget' : 'goal';
   const said = (r: Row, i: number) => plain(inline(r.cells[i] ?? '', o));
-  const plan = progressPlan(b.rows.map((r) => ({ value: said(r, 1), target: said(r, 2), ...(r.tone ? { tone: r.tone } : {}) })), form);
+  const plan = progressPlan(b.rows.map((r) => ({ value: said(r, 1), target: said(r, 2), ...(r.tone ? { tone: r.tone } : {}) })), form, o.home);
   const drawn = (v: string | undefined): string => renderInline(inline(v || MISSING, o), o);
   const body = b.rows.length
     ? b.rows
@@ -1345,7 +1350,7 @@ function progress(b: Block, o: RenderOptions): string {
  */
 function range(b: Block, o: RenderOptions): string {
   const said = (r: Row, i: number) => plain(inline(r.cells[i] ?? '', o));
-  const plan = rangePlan(b.rows.map((r) => ({ spent: said(r, 1), low: said(r, 2), high: said(r, 3), ...(r.tone ? { tone: r.tone } : {}) })));
+  const plan = rangePlan(b.rows.map((r) => ({ spent: said(r, 1), low: said(r, 2), high: said(r, 3), ...(r.tone ? { tone: r.tone } : {}) })), o.home);
   if (b.rows.length === 0) return `<div class="prop progress" data-form="range"><p class="progress-empty">${escape(PROGRESS_NONE)}</p></div>`;
   const body = b.rows
     .map((r, i) => {
@@ -1374,7 +1379,7 @@ function range(b: Block, o: RenderOptions): string {
  * is this function's twin; the pointer's readout is the component's alone, because nothing here moves.
  */
 function lines(b: Block, o: RenderOptions): string {
-  const plan = linesPlan(b.rows.map((r) => r.cells.map((c) => plain(inline(c, o)))));
+  const plan = linesPlan(b.rows.map((r) => r.cells.map((c) => plain(inline(c, o)))), o.home);
   /* ONE READING IS A FIGURE, its value and when it was read, with no chart of one dot and no fold of one point. */
   if (plan.single)
     return `<div class="prop lines" data-single=""><p class="lines-lead"><span class="lines-now num">${escape(plan.single.value)}</span><span class="lines-against">${escape(
@@ -1434,6 +1439,7 @@ function series(b: Block, o: RenderOptions): string {
   const plan = seriesPlan(
     b.rows.map((r) => r.cells.map((c) => plain(inline(c, o)))),
     b.form === 'net',
+    o.home,
   );
   const net = b.form === 'net';
   const keyed = plan.drawn && (plan.series.length > 1 || net);
@@ -1523,7 +1529,7 @@ function forecast(b: Block, o: RenderOptions): string {
   const numbers = `<details class="forecast-numbers"><summary class="forecast-toggle">${escape(FORECAST_NUMBERS)}</summary><table class="forecast-table"><thead><tr>${[FORECAST_WHEN, FORECAST_WHAT, FORECAST_MOVE, FORECAST_BALANCE]
     .map((h) => `<th scope="col">${escape(h)}</th>`)
     .join('')}</tr></thead><tbody>${row(day(model.today), model.label, '', model.template)}${shown.steps
-    .map((s) => row(day(s.day), s.label, figureLike(model.template, s.delta), figureLike(model.template, s.balance)))
+    .map((s) => row(day(s.day), s.label, forecastFigure(model, s.delta), forecastFigure(model, s.balance)))
     .join('')}</tbody></table></details>`;
   const note = underNote(model, shown);
   const soon = note ? `<p class="forecast-soon">${escape(note)}</p>` : '';
@@ -1585,7 +1591,7 @@ function roadmap(b: Block, o: RenderOptions): string {
 function ring(b: Block, o: RenderOptions): string {
   const said = (r: Row, i: number): string => plain(inline(r.cells[i] ?? '', o));
   const drawn = (v: string | undefined): string => renderInline(inline(v ?? '', o), o);
-  const plan = ringPlan(b.rows.map((r) => ({ label: said(r, 0), value: said(r, 1), third: said(r, 2), ...(r.tone ? { tone: r.tone } : {}) })));
+  const plan = ringPlan(b.rows.map((r) => ({ label: said(r, 0), value: said(r, 1), third: said(r, 2), ...(r.tone ? { tone: r.tone } : {}) })), o.home);
   if (plan.empty) return `<div class="prop ring"><p class="ring-empty">${escape(RING_NONE)}</p></div>`;
 
   const paint = (p: Readonly<Record<string, string>>): string =>

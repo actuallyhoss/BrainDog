@@ -51,6 +51,13 @@ export const RECURRING_REGISTER: MoneyRegister = {
       required: true,
     },
     { id: 'next_due', label: 'Next', type: 'day', index: true, deadline: true, required: true, remind: ['-3d', '0d'] },
+    /* THE LAST PAYMENT, ITS DAY AND WHAT IT CAME TO (REC-B11), and no link: a line is a pattern and is paid every cycle,
+       so it names no one Ledger entry. Money's `settle` script writes both when a payment is matched to the line and
+       moves "Next" one cycle on in the same change, by the walk's own steps (`cycleAfter`). The amount is the payment's,
+       which is not always the line's: a line keeps its own amount until a person says to change it. Neither is indexed,
+       for the reason `book` is not. */
+    { id: 'last_paid', label: 'Last paid', type: 'day' },
+    { id: 'last_amount', label: 'Last amount', type: 'money' },
     /* THE DAYS OF THE MONTH IT LANDS ON, SINCE money-core 3.16.0 (REC-B13): a day from 1 to 31, `last`, or two of them,
        `15, last`. A salary paid twice a month has days, and they were one table for every line of every record, the 1st
        and the 15th; and a line on the 30th typed in September walked to 31 October, read as "the end of the month".

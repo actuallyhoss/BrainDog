@@ -1,0 +1,6 @@
+{
+  "//": "Planted: the table of names beside the use cases is the core, and is held for the one id it spells.",
+  "held": [
+    { "path": "packages/seed/src/usecases/names.ts", "name": "kiosk", "reason": "Planted. The table of names spells the use case's id until names are read off the declaration.", "unit": "SHL-A17" }
+  ]
+}

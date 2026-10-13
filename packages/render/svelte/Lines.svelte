@@ -15,7 +15,7 @@
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
 
-  const plan = $derived(linesPlan(block.rows.map((r) => r.cells.map((c) => text(inline(c, opts))))));
+  const plan = $derived(linesPlan(block.rows.map((r) => r.cells.map((c) => text(inline(c, opts)))), opts.home));
   const name = $derived(`${plan.axis ? `${plan.axis}: ` : ''}${plan.sentence}`);
   const was = $derived(plan.lines.filter((l) => l.was));
   const current = $derived(plan.lines.filter((l) => !l.was));

@@ -146,6 +146,8 @@ export type Reading = {
   href?: string;
   /** A grouped figure's parts, as the record's `groupsOf` returns them. */
   groups?: Group[];
+  /** On a kept series with gaps: the days that have no point for want of a rate (the kernel's `Reading.noRateDays`). */
+  noRateDays?: string[];
   /** The bucket the clock is in, on a figure bucketed by date. */
   current?: string;
   /** Groups past the cap of fifty, left out. */

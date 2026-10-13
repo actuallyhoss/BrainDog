@@ -42,6 +42,10 @@
  * cannot declare either, since it does not know another list's field names. AND `record.door`, the reader the add-on's
  * figures over the agent door's signs read (AGT-B01).
  *
+ * AND `marks-unknown`, THE ROWS WEARING A WORD THAT DRAWS NOTHING (REC-C17): on every list that declares an identity, the
+ * rows whose mark names no glyph, so an import that carried another system's icon names is a number a page can show and
+ * a tidy can bring to nought. `marks.ts` says what names a glyph, and imports nothing, so it adds no load ring.
+ *
  * `signs.ts` IS NOT IMPORTED, only its types. It reaches `flow.ts` and `digest.ts`, which import `metrics.ts`, which
  * imports this, and the loop that made broke the kernel's own load (`flow.ts` read a pattern before it was set). So the
  * signs now come in through the reader, `EvalContext.signs`, as the rates come in through `fx`; the kept readings are
@@ -60,6 +64,7 @@ import { intervalMs } from './pull.ts';
 /* `key-scan.ts` IMPORTS ONLY `coerce.ts` AT RUN TIME, and `coerce.ts` only types, so this adds no load ring. */
 import { KEYS_IN_TEXT } from './key-scan.ts';
 import { holdDays } from './hold.ts';
+import { isUnknownMark } from './marks.ts';
 
 /** The source a built-in figure over the open questions reads, the same word a `queue` block's source is. */
 export const GOVERNANCE_OPEN = 'governance.open';
@@ -319,6 +324,24 @@ const KEYS_UNOPENABLE: MetricDecl = {
   format: 'int',
 };
 
+/** The source of `marks-unknown`: every list that declares `identity.mark`, read by the field it names. */
+export const RECORD_MARKS = 'record.marks';
+
+/**
+ * Rows whose mark names no picture. A page draws the row's own first letter for these, so nothing is broken to look at,
+ * but the picture somebody chose in another system is gone, and the count is how a person learns there are any to pick.
+ */
+const MARKS_UNKNOWN: MetricDecl = {
+  metric: 'marks-unknown',
+  name: 'Pictures that name nothing we draw',
+  source: RECORD_MARKS,
+  value: { count: 'id' },
+  target: { lte: 0 },
+  window: '30d',
+  compare: 'none',
+  format: 'int',
+};
+
 /* ── what the night counts (REC-A17 job 3, REC-A13 job 1) ────────────── */
 
 /** The source of `lists-shrunk`: the night's counts of each list (`night-counts.ts`, `countLists`). */
@@ -378,6 +401,7 @@ export const BUILT_IN_FIGURES: Readonly<Record<string, MetricDecl>> = {
   'projects-unplaced': PROJECTS_UNPLACED,
   'keys-unopenable': KEYS_UNOPENABLE,
   'keys-in-text': KEYS_IN_TEXT,
+  'marks-unknown': MARKS_UNKNOWN,
   'lists-shrunk': LISTS_SHRUNK,
   'documents-dead-paths': DOCUMENTS_DEAD_PATHS,
 };
@@ -662,6 +686,35 @@ export function readKeysUnopenable(sql: Sql, _ctx: unknown, decl: MetricDecl): R
     );
   }
   return judged(decl, n, 'keys whose sealed value names a grant revoked or gone');
+}
+
+/**
+ * `marks-unknown`: rows not deleted, on every list that declares `identity.mark`, whose mark is a word the set does not
+ * draw. An empty mark is not counted: nothing was chosen. A FINISHED ROW IS COUNTED, unlike the two above, because a
+ * project that shipped is still drawn on Projects with its mark. NOTHING, NEVER NOUGHT, where no list marks its rows.
+ *
+ * READ BY THE DISTINCT WORDS, never row by row: a record holds a few dozen marks over any number of rows, and what
+ * names a glyph is `marks.ts`'s to say, which SQL cannot ask.
+ */
+export function readMarksUnknown(sql: Sql, _ctx: unknown, decl: MetricDecl): Result<Reading> {
+  const lists = sql
+    .all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'register' AND superseded_at IS NULL AND retired = 0 AND json_valid(body)")
+    .flatMap((r) => {
+      const body = JSON.parse(r.body) as { id?: unknown; identity?: { mark?: unknown } | null };
+      const mark = body.identity?.mark;
+      return typeof body.id === 'string' && typeof mark === 'string' && mark !== '' ? [{ list: body.id, mark }] : [];
+    });
+  if (lists.length === 0) return judged(decl, null, 'no list on this record gives its things a picture');
+  let n = 0;
+  for (const { list, mark } of lists) {
+    const words = sql.all<{ word: unknown; n: number }>(
+      `SELECT json_extract(fields, '$."${mark.replaceAll('"', '""').replaceAll("'", "''")}"') AS word, COUNT(*) AS n
+         FROM entry WHERE register = ? AND deleted_at IS NULL GROUP BY 1`,
+      list,
+    );
+    for (const w of words) if (isUnknownMark(w.word)) n += Number(w.n);
+  }
+  return judged(decl, n, 'pictures that name nothing the set draws');
 }
 
 /** `ingest.ts`'s `UNVERIFIED`, the one reason an arrival nothing vouched for carries, written once more for the import rule above. */

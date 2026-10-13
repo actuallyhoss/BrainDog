@@ -7,6 +7,10 @@
  * figure has no value, the night writes nothing, and the day is counted in `noRate`. The backfill writes every day
  * that holds no point, so the night after a rate arrives fills the gap in.
  *
+ * A RATES ADDRESS PUBLISHES ON WORKING DAYS, so the rate may reach back over `RATE_QUIET_DAYS` more days this record
+ * holds no rate of: Friday's prices the Sunday and the Monday. A day that still has no rate is kept under the line, and
+ * the figure over the line (`series.<figure>`, `count: missing`) says how many of its missing days are a rate's.
+ *
  *     dollars of the 14th, one rate of the 1st     live: 6000, as of the 1st | the 14th, 15th and 16th: no point
  *     and a rate of the 13th, the night after      the 14th, 15th and 16th: 6000 each
  */
@@ -17,7 +21,7 @@ import assert from 'node:assert/strict';
 import type { Schema } from '@braindog/where';
 
 import { evaluateMetric, openRecord, snapshot, type Declaration, type EvalContext, type MetricDecl, type Rate, type Reading } from '../src/index.ts';
-import { farRates, pointSaid } from '../src/metrics.ts';
+import { farRates, pointSaid, RATE_QUIET_DAYS } from '../src/metrics.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
 /* Noon UTC on 17 September, so the last day a night writes is the 16th. */
@@ -85,11 +89,13 @@ const live = (sql: NodeSql, rates: readonly Rate[]): Reading => {
   return out.value;
 };
 
-test('A RATE IS NEAR ENOUGH FOR A POINT when it is of the amount’s own day or the day before, and never a later one', () => {
+test('A RATE IS NEAR ENOUGH FOR A POINT when it is of the amount’s own day, the day before or the quiet days before that, and never a later one', () => {
+  assert.equal(RATE_QUIET_DAYS, 3, 'a weekend and a bank holiday beside it');
   const dollar = [{ currency: 'USD', amount: 100, day: '2026-09-14' }];
   assert.deepEqual(farRates(dollar, 'EGP', [usd('2026-09-14')], '2026-09-16'), []);
   assert.deepEqual(farRates(dollar, 'EGP', [usd('2026-09-13')], '2026-09-16'), []);
-  assert.deepEqual(farRates(dollar, 'EGP', [usd('2026-09-12')], '2026-09-16'), ['USD to EGP'], 'two days old is not that day’s rate');
+  assert.deepEqual(farRates(dollar, 'EGP', [usd('2026-09-10')], '2026-09-16'), [], 'the day before and three quiet days is the reach');
+  assert.deepEqual(farRates(dollar, 'EGP', [usd('2026-09-09')], '2026-09-16'), ['USD to EGP'], 'five days old is not that day’s rate');
   assert.deepEqual(farRates(dollar, 'EGP', [usd('2026-09-15')], '2026-09-16'), ['USD to EGP'], 'a later rate stood in');
   assert.deepEqual(farRates(dollar, 'EGP', [], '2026-09-16'), ['USD to EGP']);
   /* AN AMOUNT WITH NO DAY IS DATED THE DAY ASKED ABOUT, and one already in the currency needs no rate at all. */
@@ -100,7 +106,8 @@ test('A RATE IS NEAR ENOUGH FOR A POINT when it is of the amount’s own day or 
   const due = [{ currency: 'USD', amount: 100, day: '2026-09-30' }];
   assert.deepEqual(farRates(due, 'EGP', [usd('2026-09-16')], '2026-09-16'), [], 'a bill not yet due could never be a point');
   assert.deepEqual(farRates(due, 'EGP', [usd('2026-09-15')], '2026-09-16'), []);
-  assert.deepEqual(farRates(due, 'EGP', [usd('2026-09-14')], '2026-09-16'), ['USD to EGP']);
+  assert.deepEqual(farRates(due, 'EGP', [usd('2026-09-12')], '2026-09-16'), []);
+  assert.deepEqual(farRates(due, 'EGP', [usd('2026-09-11')], '2026-09-16'), ['USD to EGP']);
 
   assert.equal(pointSaid(dollar, 'EGP', 'EGP', [usd('2026-09-14')], '2026-09-16'), null);
   assert.equal(pointSaid(dollar, null, null, [], '2026-09-16'), null, 'with no currency to add up in there is no rate to lack');
@@ -174,5 +181,95 @@ test('A FIGURE IN ONE CURRENCY, AND ONE WITH NO HOME CURRENCY, are kept as befor
   const out = snapshot(sql, SPENT, ctx, { nowAt: new Date(NOW).toISOString(), tz: 'UTC' }, 3);
   assert.ok(out.ok, JSON.stringify(out));
   assert.deepEqual({ missing: out.value.missing, noRate: out.value.noRate }, { missing: 3, noRate: 0 });
+  sql.close();
+});
+
+/* 11 September 2026 is a Friday: the 13th is the Sunday, the 14th the Monday, the 16th the Wednesday. */
+const FRIDAY = '2026-09-11';
+
+test('AN AMOUNT OF A SUNDAY AND ONE OF A MONDAY ARE PRICED AT FRIDAY’S RATE, the last one published, and each day is a point', async () => {
+  const sunday = [{ currency: 'USD', amount: 100, day: '2026-09-13' }];
+  const monday = [{ currency: 'USD', amount: 100, day: '2026-09-14' }];
+  assert.deepEqual(farRates(sunday, 'EGP', [usd(FRIDAY)], '2026-09-16'), []);
+  assert.deepEqual(farRates(monday, 'EGP', [usd(FRIDAY)], '2026-09-16'), []);
+  /* AND NOT A WEEK OF THEM: Wednesday's amount is five days from Friday's rate, and a rate of its own week is owed. */
+  assert.deepEqual(farRates([{ currency: 'USD', amount: 100, day: '2026-09-16' }], 'EGP', [usd(FRIDAY)], '2026-09-16'), ['USD to EGP']);
+
+  const sql = await spending([
+    ['2026-09-10', 1_000, 'EGP'],
+    ['2026-09-13', 100, 'USD'],
+    ['2026-09-14', 100, 'USD'],
+  ]);
+  const out = night(sql, [usd(FRIDAY)]);
+  assert.deepEqual({ wrote: out.wrote, backfilled: out.backfilled, missing: out.missing, noRate: out.noRate }, { wrote: 1, backfilled: 3, missing: 0, noRate: 0 });
+  assert.deepEqual(points(sql), { '2026-09-13': 6_000, '2026-09-14': 11_000, '2026-09-15': 11_000, '2026-09-16': 11_000 });
+  assert.deepEqual(kept(sql), [], 'a day priced at Friday’s rate was kept as one with no rate');
+  sql.close();
+});
+
+/** How many nights the line missed, the figure over it (REC-B01). */
+const MISSED: MetricDecl = {
+  metric: 'spent-nights-missed',
+  name: 'Nights the spending line missed',
+  source: 'series.spent-30d',
+  value: { count: 'missing' } as never,
+  target: { lte: 0 },
+  window: '30d',
+  compare: 'none',
+  format: 'int',
+};
+
+/** The days kept as having no rate, oldest first. */
+const kept = (sql: NodeSql): string[] =>
+  sql.all<{ at: string }>("SELECT at FROM metric_point WHERE series = 'no-rate:spent-30d' AND grain = 'day' ORDER BY at").map((p) => p.at);
+
+const missed = (sql: NodeSql): Reading => {
+  const out = evaluateMetric(sql, MISSED, ctxWith([]));
+  assert.ok(out.ok, JSON.stringify(out));
+  return out.value;
+};
+
+test('THE DAYS THAT LACKED A RATE ARE KEPT, and the figure over the line says how many of its missing days are a rate’s', async () => {
+  const sql = await spending();
+  const old = [usd('2026-09-01')];
+  night(sql, old);
+  assert.deepEqual(kept(sql), ['2026-09-14', '2026-09-15', '2026-09-16']);
+  /* THE LINE'S OWN POINTS ARE UNTOUCHED: a kept day is not a point, and no reader of the line's days meets it. */
+  assert.deepEqual(points(sql), { '2026-09-13': 1_000 });
+
+  /* THE LINE BEGAN ON THE 13TH, so four days are asked about and three hold no point, each for want of a rate. */
+  const all = missed(sql);
+  assert.equal(all.value, 3);
+  assert.deepEqual(all.noRateDays, ['2026-09-14', '2026-09-15', '2026-09-16']);
+  assert.match(all.why ?? '', /^days of the last 4 with no point in .+, each for want of a rate$/);
+
+  /* A NIGHT THAT NEVER RAN IS NOT A RATE'S. With a point on the 11th the 12th is missing too, and nothing was kept of it. */
+  sql.exec("INSERT INTO metric_point (series, grain, at, value, unit, n, source, wrote_at) VALUES ('spent-30d', 'day', '2026-09-11', 1000, 'EGP', 1, 'register.spending', ?)", new Date(NOW).toISOString());
+  const some = missed(sql);
+  assert.equal(some.value, 4);
+  assert.deepEqual(some.noRateDays, ['2026-09-14', '2026-09-15', '2026-09-16']);
+  assert.match(some.why ?? '', /^days of the last 6 with no point in .+, 3 of them for want of a rate$/);
+
+  /* THE NIGHT AFTER A RATE ARRIVES the days get their points, and what was kept of them goes with the gap. */
+  night(sql, [...old, usd('2026-09-13')]);
+  assert.deepEqual(kept(sql), []);
+  const after = missed(sql);
+  assert.equal(after.value, 1, 'the 12th, which no rate would mend');
+  assert.equal(after.noRateDays, undefined);
+  assert.match(after.why ?? '', /^days of the last 6 with no point in [^,]+$/);
+  sql.close();
+});
+
+test('A DAY MISSING FOR ANOTHER REASON IS NOT KEPT AS A RATE’S, and one kept stops being one when the reason changes', async () => {
+  const sql = await spending();
+  night(sql, [usd('2026-09-01')]);
+  assert.equal(kept(sql).length, 3);
+  /* NO HOME CURRENCY NOW: the same days are in parts, and no rate would add them up. */
+  const ctx: EvalContext = { nowMs: NOW, schemaOf: (register) => (register === 'spending' ? SCHEMA : null) };
+  const out = snapshot(sql, SPENT, ctx, { nowAt: new Date(NOW).toISOString(), tz: 'UTC' }, 3);
+  assert.ok(out.ok, JSON.stringify(out));
+  assert.deepEqual({ missing: out.value.missing, noRate: out.value.noRate }, { missing: 3, noRate: 0 });
+  assert.deepEqual(kept(sql), []);
+  assert.equal(missed(sql).noRateDays, undefined);
   sql.close();
 });

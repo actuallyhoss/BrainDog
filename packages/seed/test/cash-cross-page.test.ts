@@ -192,10 +192,18 @@ test('WITH NO BALANCE TYPED the page says the sentence the reading gives, as a l
   assert.equal(drawn[0]!.body, `${read.why}.`, 'the line on the page is not the sentence the check gives for no value');
 });
 
-test('an account that is not cash is still no balance to check, and the line stands', async () => {
+/**
+ * AN ACCOUNT THAT IS NOT CASH HAS A BALANCE, AND THE CHECK SAID NONE HAD BEEN TYPED (audit 54, item 7). The reading
+ * tells the two days apart: with no account at all nothing has been typed, and with one that does not count as cash a
+ * balance has been and there is still nothing to check.
+ */
+test('an account that is not cash is still nothing to check, and the reading says no account counts as cash', async () => {
   const k = await moneyCore();
+  assert.equal(checked(k).why, 'No balance has been typed yet', 'with no account at all the check stopped saying no balance was typed');
   make(k, 'accounts', { name: 'Deposit', kind: 'bank', liquid: false, balance: money(900_000, 'GBP'), as_of: day(-30) });
-  assert.equal(checked(k).why, 'No balance has been typed yet');
+  const read = checked(k);
+  assert.deepEqual([read.value, read.unit, read.met], [null, null, null]);
+  assert.equal(read.why, 'No account counts as cash yet', 'the check said no balance was typed of an account that has one');
   assert.deepEqual(about(k).drawn.map((b) => b.kind), ['note']);
 });
 

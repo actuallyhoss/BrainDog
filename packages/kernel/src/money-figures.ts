@@ -25,7 +25,7 @@ import { no, ok } from '@braindog/ports';
 import { compile, jsonPath, type Schema } from '@braindog/where';
 
 import { GROUP_CAP } from './buckets.ts';
-import { GOVERNANCE_OPEN, HANDOFFS_OPEN, RECORD_DOOR, RECORD_KEYS, RECORD_LISTS, RECORD_PATHS, RECORD_PLACES, RECORD_SIGNS, RECORD_VITALS, SESSIONS_WORKING } from './built-in-figures.ts';
+import { GOVERNANCE_OPEN, HANDOFFS_OPEN, RECORD_DOOR, RECORD_KEYS, RECORD_LISTS, RECORD_MARKS, RECORD_PATHS, RECORD_PLACES, RECORD_SIGNS, RECORD_VITALS, SESSIONS_WORKING } from './built-in-figures.ts';
 import { runway, type Leg, type Runway } from './forecast.ts';
 import { RECORD_KEY_SCAN } from './key-scan.ts';
 import { across, type Amount, type Part } from './fx.ts';
@@ -606,7 +606,12 @@ export function readCrosscheck(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
   /* THE FIGURE LESS THE WALK, A CURRENCY AT A TIME, over every currency either of them holds. */
   const apart: Part[] = [...new Set([...figure.keys(), ...walk.keys()])].sort().map((currency) => ({ currency, amount: (figure.get(currency) ?? 0) - (walk.get(currency) ?? 0) }));
   const home = ctx.fx?.() ?? { home: null, rates: [] };
-  if (apart.length === 0) return ok(empty(decl, 'No balance has been typed yet', home.rates, on));
+  if (apart.length === 0) {
+    /* NOTHING TO CHECK IS ONE OF TWO DAYS, AND EACH IS SAID AS ITSELF: with accounts and none of them counted, a balance
+       has been typed and "No balance has been typed yet" was untrue of it. With no account at all it is still the truth. */
+    const uncounted = held.length === 0 && sql.one<{ n: number }>('SELECT 1 AS n FROM entry WHERE register = ? AND deleted_at IS NULL LIMIT 1', register) !== undefined;
+    return ok(empty(decl, uncounted ? 'No account counts as cash yet' : 'No balance has been typed yet', home.rates, on));
+  }
   const out = apart.filter((p) => p.amount !== 0);
   /* SEVERAL CURRENCIES OUT IS NO ONE NUMBER: each is said as its own part, and nothing is added. */
   const one = apart.length === 1 ? apart[0]! : out.length === 1 ? out[0]! : null;
@@ -838,6 +843,7 @@ export function figureLists(
     decl.source === RECORD_KEYS ||
     decl.source === RECORD_KEY_SCAN ||
     decl.source === RECORD_LISTS ||
+    decl.source === RECORD_MARKS ||
     decl.source === RECORD_PATHS ||
     decl.source === RECORD_PLACES ||
     decl.source === RECORD_VITALS

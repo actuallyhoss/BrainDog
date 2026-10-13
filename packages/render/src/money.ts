@@ -11,13 +11,17 @@
  * THE RULE IS ONE TABLE, the two `const`s under "The rule". They are calls made on the person's behalf and theirs
  * to reverse: another answer changes that table and nothing else in this file.
  *
- *   the home currency, with a sign      sign, amount                 E£1,086,213.41
+ *   the home currency, with a sign      sign, amount                 £1,086,213.41
  *   any other currency with a sign      sign, amount, code after     $2,947.95 USD
- *   a currency with no sign             code, amount                 CHF 1,200.00
- *   a negative amount                   a true minus in front        −E£497.26
- *   `exact` (tables, ledgers, forms)    every minor unit             E£58,185.00
- *   `read` (tiles, sentences, bars)     a fraction of zeros dropped  E£58,185
- *   `axis` (a chart's axis only)        compact                      E£31k
+ *   a currency with no sign             code, amount                 EGP 1,200.00
+ *   a negative amount                   a true minus in front        −EGP 497.26
+ *   `exact` (tables, ledgers, forms)    every minor unit             EGP 58,185.00
+ *   `read` (tiles, sentences, bars)     a fraction of zeros dropped  EGP 58,185
+ *   `axis` (a chart's axis only)        compact                      EGP 31k
+ *
+ * A CURRENCY ENGLISH WRITES BY ITS CODE HAS NO SIGN, even where the runtime knows a narrow one: the Egyptian pound
+ * is `EGP`, as the franc is `CHF`, never `E£` (his word, 9 October). So no figure reads `E£1,299.00 EGP`, with or
+ * without a home currency.
  *
  * NEVER CUT, NEVER ROUNDED off an axis. The amount is a run of digits from the moment it is read to the moment it
  * is written, so every digit stored is a digit drawn, and the code is joined to its figure by a space that does
@@ -52,7 +56,7 @@ export type WrittenAmount = {
 /** Whether the home currency drops its code when it has a sign. `false` writes the code first everywhere. */
 const HOME_BY_SIGN = true;
 
-/** A sign is the runtime's narrow form when it is a currency sign with at most two capitals before it: `$`, `E£`, `R$`. Not `kr`, not `CHF`. */
+/** A sign is the runtime's narrow form when it is a currency sign with at most two capitals before it: `$`, `£`, `R$`. Not `kr`, not `CHF`. */
 const A_SIGN = /^[A-Z]{0,2}\p{Sc}$/u;
 
 /* ---- The glyphs ---------------------------------------------------------------------------------------------- */
@@ -64,16 +68,21 @@ const STEPS = ['', 'k', 'm', 'bn', 'tn'] as const;
 
 const signs = new Map<string, string>();
 
+/** How English writes a currency in one of its two displays; it throws on a code the runtime refuses. */
+const written = (currency: string, currencyDisplay: 'symbol' | 'narrowSymbol'): string | undefined =>
+  new Intl.NumberFormat('en', { style: 'currency', currency, currencyDisplay }).formatToParts(0).find((p) => p.type === 'currency')?.value;
+
 /** The sign a currency is written with, or `''` when it has none of its own and is written by its code. */
 function signOf(currency: string): string {
   const known = signs.get(currency);
   if (known !== undefined) return known;
   let sign = '';
   try {
-    const narrow = new Intl.NumberFormat('en', { style: 'currency', currency, currencyDisplay: 'narrowSymbol' })
-      .formatToParts(0)
-      .find((p) => p.type === 'currency')?.value;
-    if (narrow && A_SIGN.test(narrow)) sign = narrow;
+    /* Where English's own symbol for it is the code (`EGP`, `SGD`, `CHF`), the code is how it is written: the
+       narrow form alone gave `E£`, which English does not write. */
+    const narrow = written(currency, 'symbol') === currency ? undefined : written(currency, 'narrowSymbol');
+    /* `¤` is the runtime's mark for no currency at all (`XXX`), not a sign anyone writes. */
+    if (narrow && narrow !== '¤' && A_SIGN.test(narrow)) sign = narrow;
   } catch {
     /* Not a code the runtime will format: it is written by its code. */
   }
@@ -137,7 +146,7 @@ function compact(units: number): string {
  * `minor` may be a whole number as well as a `bigint`, since most callers hold one. A number that is not whole is
  * not money, and comes back `null` rather than rounded to a penny nobody has.
  *
- * THE MINUS IS IN FRONT OF EVERYTHING, a code too: `−E£497.26`, `−$12.00 USD`, `−CHF 1,200.00`. One place for the
+ * THE MINUS IS IN FRONT OF EVERYTHING, a code too: `−£497.26`, `−$12.00 USD`, `−EGP 1,200.00`. One place for the
  * sign down a column of mixed currencies. Nought has none.
  */
 export function writeAmount(
@@ -180,17 +189,22 @@ export function writeAmount(
 
 /* A stored amount inside other words: the same shape as `STORED`, not glued to a letter or a digit in front, and
    not the head of a longer number behind. */
-const IN_WORDS = /(?<![A-Za-z0-9])[A-Z]{3} −?\d{1,3}(?:,\d{3})*(?:\.\d+)?(?![\d,]*\d)/gu;
+const IN_WORDS = /(?<![A-Za-z0-9])([A-Z]{3}) −?\d{1,3}(?:,\d{3})*(?:\.\d+)?(?![\d,]*\d)/gu;
+
+/* The currencies the runtime has a name for. Three capitals it has none for are a word, whatever follows them. */
+let names: Intl.DisplayNames | undefined;
+const isCurrency = (code: string): boolean =>
+  (names ??= new Intl.DisplayNames('en', { type: 'currency', fallback: 'none' })).of(code) !== undefined;
 
 /**
- * A sentence with every stored amount in it written for a screen: "Rent of EGP 12,000.00 is due" is
- * "Rent of E£12,000 is due" on a record whose home is the pound. Stored text shown on a screen, a question's
- * button or a note, goes through here. What is not a stored amount is left exactly as it was, so three capitals
- * and a number ("THE 100") stay words.
+ * A sentence with every stored amount in it written for a screen: "Rent of GBP 12,000.00 is due" is
+ * "Rent of £12,000 is due" where the stored code and the home are GBP. Stored text shown on a screen, a question's
+ * button or a note, goes through here. What is not a stored amount is left exactly as it was, and only a real
+ * currency code starts one, so three capitals and a number ("THE 100.00", "USB 3.00") stay words.
  */
 export function amountsIn(text: string, home: string | null, setting: AmountSetting): string {
-  return text.replace(IN_WORDS, (found) => {
-    const amount = readAmount(found);
+  return text.replace(IN_WORDS, (found: string, code: string) => {
+    const amount = isCurrency(code) ? readAmount(found) : null;
     return (amount && writeAmount(amount, home, setting)?.text) ?? found;
   });
 }

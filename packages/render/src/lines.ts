@@ -16,9 +16,9 @@
  * everything they print comes back from here. No import from the app: this package is MIT and embeddable.
  */
 
-import { MISSING, axisFigure } from './format.ts';
+import { MISSING } from './format.ts';
 import { signedOf } from './bridge.ts';
-import { figureLike } from './figure.ts';
+import { amountLike } from './series.ts';
 
 /** At most this many lines draw; a fifth column is left out of the drawing and the numbers alike. */
 export const LINES_MOST = 4;
@@ -100,7 +100,7 @@ const lastOf = (values: (number | null)[]): number => {
 /**
  * The lines, the lead and every printed figure, from the header row and the body rows as text.
  */
-export function linesPlan(rows: readonly (readonly string[])[]): LinesPlan {
+export function linesPlan(rows: readonly (readonly string[])[], home?: string | null): LinesPlan {
   const [head = [], ...body] = rows;
   const steps = { now: 0, was: 0 };
   const named = head.slice(1, LINES_MOST + 1).map((cell) => {
@@ -211,8 +211,8 @@ export function linesPlan(rows: readonly (readonly string[])[]): LinesPlan {
     lines,
     points,
     ticks,
-    top: every.length ? axisFigure(figureLike(template, hi)) : '',
-    bottom: every.length && span > 0 ? axisFigure(figureLike(template, lo)) : '',
+    top: every.length ? amountLike(template, hi, home, 'axis') : '',
+    bottom: every.length && span > 0 ? amountLike(template, lo, home, 'axis') : '',
     now,
     then,
     change,

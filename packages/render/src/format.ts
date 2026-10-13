@@ -8,8 +8,29 @@
  * Eastern Arabic digits break tabular alignment: prose may use the locale's digits, a ledger may not.
  */
 
+import { amountsIn, readAmount, writeAmount, type AmountSetting, type WrittenAmount } from './money.ts';
+
 const MINUS = '−';
 const NUM = 'en-u-nu-latn';
+
+/**
+ * THE HOME CURRENCY, AS THE OLD NAMES BELOW ARE TOLD IT (REC-C05). `symbolFigure`, `headlineFigure`, `barFigure`,
+ * `axisFigure` and `leadingCode` each wrote an amount their own way, from text, with a sign table of their own. Told
+ * the record's home currency (a code, or `null` for a record that has none) each is one call of the one writer in
+ * `money.ts`: the stored figure is read once (`readAmount`) and written once (`writeAmount`).
+ *
+ * NOT TOLD (`undefined`), each keeps the path it had, because a caller that does not know the home currency cannot
+ * be given the rule, and every drawer still calls these without it. That path goes when the last of them passes
+ * `home`. Text that is not a stored figure, a drawing or a bare number, keeps that path too: it is never read as one.
+ */
+export type Home = string | null | undefined;
+
+/** A stored figure as the one writer writes it, or `null` when the home is not told or the text is not a stored figure. */
+function writtenOnce(text: string, home: Home, setting: AmountSetting): WrittenAmount | null {
+  if (home === undefined) return null;
+  const amount = readAmount(text.trim());
+  return amount && writeAmount(amount, home, setting);
+}
 
 /**
  * Currencies whose minor unit is not two decimal places. Money is ALWAYS an integer in minor units.
@@ -90,7 +111,19 @@ export function money(minor: number | bigint | string, currency: string): string
  * starts with a code" rather than a regex in every component. Three capitals, one space, then a
  * digit or a minus: anything else is not a figure this module wrote, and comes back `null`.
  */
-export function leadingCode(text: string): { currency: string; rest: string; sign: string } | null {
+export function leadingCode(
+  text: string,
+  home?: Home,
+  setting: AmountSetting = 'exact',
+): { currency: string; rest: string; sign: string; place?: WrittenAmount['codePlace']; text?: string } | null {
+  /* TOLD THE HOME CURRENCY, THE PARTS ARE THE WRITER'S. `place` says where the code stands, and it is `null` with an
+     empty `currency` when the figure's sign says the currency. `sign` is the minus in front of everything, and
+     `rest` is the figure with its currency sign: the three, set in their place, are `text` and nothing more. */
+  const w = writtenOnce(text, home, setting);
+  if (w) {
+    const figure = `${w.whole}${w.fraction}`;
+    return { currency: w.code, rest: w.codePlace === 'before' ? figure : `${w.sign}${figure}`, sign: w.minus, place: w.codePlace, text: w.text };
+  }
   /* A SIGN WRITTEN IN FRONT OF THE CODE IS PART OF THE FIGURE. A page may mark an amount as money in or money out
      ("+GBP 850.00"), and read as not a figure at all the whole cell stayed in the code’s spelling, in a column of symbols. */
   const m = /^([+\u2212-]?)([A-Z]{3}) (?=[\u2212\-\d])/u.exec(text);
@@ -106,7 +139,9 @@ export function leadingCode(text: string): { currency: string; rest: string; sig
  * two currencies in one column never look alike. A currency with no symbol of its own (`EGP`, `CHF`)
  * comes back `null`, and the caller keeps drawing its code.
  */
-export function symbolFigure(text: string): string | null {
+export function symbolFigure(text: string, home?: Home): string | null {
+  const w = writtenOnce(text, home, 'exact');
+  if (w) return w.text;
   const coded = leadingCode(text);
   if (!coded) return null;
   const symbol = symbolOf(coded.currency);
@@ -132,9 +167,9 @@ function symbolOf(currency: string): string | null {
  * into the next one (the host's stylesheet reads `--chars`). An amount never breaks inside itself and several amounts break
  * between their ` · ` (a no-break space before the dot, so a line never starts with it), so the longest amount, as drawn, is what has to fit. `null` for a figure any tile holds.
  */
-export function figureChars(text: string): number | null {
+export function figureChars(text: string, home?: Home): number | null {
   if (!text) return null;
-  const longest = Math.max(...text.split(/\s·\s/u).map((part) => (symbolFigure(part.trim()) ?? part.trim()).length));
+  const longest = Math.max(...text.split(/\s·\s/u).map((part) => (symbolFigure(part.trim(), home) ?? part.trim()).length));
   return longest > 10 ? longest : null;
 }
 
@@ -145,7 +180,9 @@ const SYMBOL_CODED = /(?<![\p{L}\p{N}])[+\u2212-]?[A-Z]{0,2}\p{Sc}[\u2212-]?[\d,
  * A sentence with every figure `money` wrote in it drawn the way `symbolFigure` draws one, or, for a `headline` (the
  * page's one line, a tile's note), the way `headlineFigure` does.
  */
-export const symbolText = (text: string, headline = false): string => {
+export const symbolText = (text: string, headline = false, home?: Home): string => {
+  /* Told the home currency, a sentence is the writer's too: every stored amount in it, written once. */
+  if (home !== undefined) return amountsIn(text, home, headline ? 'read' : 'exact');
   const coded = text.replace(/\b[A-Z]{3} [\u2212-]?[\d,]+(?:\.\d+)?/gu, (hit) => (headline ? headlineFigure(hit) : (symbolFigure(hit) ?? hit)));
   /* A HEADLINE ALSO SAYS SHORT WHAT A HOST ALREADY DREW, `£24,000.00 GBP` with its code after: `£24,000`. */
   return headline ? coded.replace(SYMBOL_CODED, (hit) => headlineFigure(hit)) : coded;
@@ -254,7 +291,9 @@ function oneMark(p: FigureParts): { unit: string; code: string } {
  * bar's value cell is the author's, and a sentence in it is not this function's to rewrite. A symbol with its code
  * after it is said once (`oneMark`): `$4,800.00 USD` is `US$4,800`.
  */
-export function barFigure(text: string): string {
+export function barFigure(text: string, home?: Home): string {
+  const w = writtenOnce(text, home, 'read');
+  if (w) return w.text;
   const p = figureParts(text);
   if (!p) return text;
   const minor = /^0*$/u.test(p.minor) ? '' : `.${p.minor}`;
@@ -274,10 +313,10 @@ export function barFigure(text: string): string {
  * its digits line up and none is rounded away. Several amounts joined by ` · ` are each said this way. A figure that
  * names no currency is not money and comes back as written: a bare `2026` may be a year, and grouping it would lie.
  */
-export function headlineFigure(text: string): string {
+export function headlineFigure(text: string, home?: Home): string {
   return text
     .split(/(\s·\s)/u)
-    .map((part, i) => (i % 2 === 1 ? part : headlineOne(part)))
+    .map((part, i) => (i % 2 === 1 ? part : (writtenOnce(part, home, 'read')?.text ?? headlineOne(part))))
     .join('');
 }
 
@@ -297,7 +336,7 @@ function headlineOne(text: string): string {
 }
 
 /** An amount in minor units as a headline says it: `headlineMoney(3_385_000, 'GBP')` is `£33,850`. */
-export const headlineMoney = (minor: number, currency: string): string => headlineFigure(money(minor, currency));
+export const headlineMoney = (minor: number, currency: string, home?: Home): string => headlineFigure(money(minor, currency), home);
 
 /** The steps a chart's axis counts in. British usage: a thousand is `k`, a million `m`, a billion `bn`. */
 const COMPACT = ['', 'k', 'm', 'bn', 'tn'] as const;
@@ -314,7 +353,9 @@ const COMPACT = ['', 'k', 'm', 'bn', 'tn'] as const;
  * `999,700` as `1,000k`. Rounded to nothing, the sign goes too, because `−£0` is not a reading anybody
  * wants. Text that is not one figure comes back unchanged.
  */
-export function axisFigure(text: string): string {
+export function axisFigure(text: string, home?: Home): string {
+  const w = writtenOnce(text, home, 'axis');
+  if (w) return w.text;
   const p = figureParts(text);
   if (!p) return text;
   let n = Number(`${p.whole}.${p.minor || '0'}`);

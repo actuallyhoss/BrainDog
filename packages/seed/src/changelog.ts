@@ -108,7 +108,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   'money-core': [
     {
       version: '3.17.0',
-      notes: 'Money works out your cash a second way, entry by entry from the last statement, so a cash figure that is wrong can be caught. If the two ever disagree, Money says so in one red tile under Cash ahead. Filing rules are a list of their own: a text, how it matches, which way the money goes and the category it files under, and the Ledger says which rule filed an entry. An account can be closed, and a closed account is left out of today\'s cash.',
+      notes: 'Money works out your cash a second way, entry by entry from the last statement, so a cash figure that is wrong can be caught. If the two ever disagree, Money says so in one red tile under Cash ahead. Filing rules are a list of their own: a text, how it matches, which way the money goes and the category it files under, and the Ledger says which rule filed an entry. An account can be closed, and a closed account is left out of today\'s cash. A payment can mark what it paid: a bill says how much is paid so far, an instalment names the payment that paid it, and a repeating line keeps the day and amount it was last paid. A payment an instalment names cannot be deleted.',
     },
     {
       version: '3.16.0',

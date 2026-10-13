@@ -1,0 +1,8 @@
+{
+  "gate": "core-names",
+  "rule": "an add-on's own declaration in the seed is not the core, and the web shell spelling its list still is",
+  "expect": "spelled in the core",
+  "findings": 1,
+  "total": 1,
+  "why": "ONE, `list === 'drawers'` in `apps/web/src`, a list the planted add-on `till` declares in the seed and the use case `kiosk` names. `total` is what proves the rest: four files under `packages/seed/src` spell `drawers`, `till`, `kiosk` and the neighbour's list `tasks` thirteen times between them and none is a line, because each says whose it is (`pack: 'till'`, `pack: 'ledger'`, `usecase: 'kiosk'`) or, like `legs.ts`, sits in the folder of one that does. No held list is in the tree, so nothing but the rule excuses them."
+}

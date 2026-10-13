@@ -29,9 +29,10 @@
  * know about a step beyond its day and amount comes on an `of` row under it, written only when the host knows it.
  */
 
-import { MISSING, axisFigure, exponentOf, headlineFigure, money } from './format.ts';
+import { MISSING, axisFigure, exponentOf, headlineFigure } from './format.ts';
 import { signedOf } from './bridge.ts';
 import { figureLike } from './figure.ts';
+import { readAmount, writeAmount, type AmountSetting } from './money.ts';
 
 const at = (n: number): string => String(Math.round(n * 100) / 100);
 const DAY_MS = 86_400_000;
@@ -70,7 +71,16 @@ export type ForecastModel = {
   /** What the opening figure is called: `Cash now`. */
   label: string;
   opening: number;
-  /** The opening cell as drawn, which every computed figure is written like. */
+  /**
+   * The currency every amount of the walk is in, read from the opening cell (`currencyOf`), or `null` when that cell
+   * names none this file can be sure of. Every figure is then written from a number and this, by `forecastFigure`.
+   */
+  currency: string | null;
+  /**
+   * The opening figure as the table's first line reads it: what `forecastFigure` writes for it where the currency is
+   * known, and the host's own cell where it is not, which is then the shape a figure is copied from. Any other figure
+   * is `forecastFigure`'s to write, never a copy of this.
+   */
   template: string;
   past: { day: string; value: number }[];
   steps: ForecastStep[];
@@ -202,12 +212,15 @@ export function forecastModel(rows: readonly (readonly string[])[]): ForecastMod
   if (!opening || !ISO.test(today) || !Number.isFinite(value)) return null;
   const horizonCell = Number(rows.find((r) => r[0]?.trim() === 'horizon')?.[1]);
   const horizon = Number.isInteger(horizonCell) && horizonCell > 0 ? horizonCell : 180;
+  const home = homeOf(rows.find((r) => r[0]?.trim() === 'home'));
+  const currency = currencyOf(opening[3]!.trim(), home);
   const knobWords = (rows.find((r) => r[0]?.trim() === 'knobs')?.[1] ?? '').split(/\s+/u);
   return {
     today,
     label: opening[2]?.trim() ?? '',
     opening: value,
-    template: opening[3]!.trim(),
+    currency,
+    template: currency === null ? opening[3]!.trim() : forecastFigure({ currency, home, template: '' }, value),
     past: rows.flatMap((r) => {
       const v = signedOf(r[3] ?? '');
       const d = r[1]?.trim() ?? '';
@@ -224,7 +237,7 @@ export function forecastModel(rows: readonly (readonly string[])[]): ForecastMod
     group: groupOf(rows.find((r) => r[0]?.trim() === 'group')),
     sells: sellsOf(rows, opening[3]!),
     shows: showsOf(rows),
-    home: homeOf(rows.find((r) => r[0]?.trim() === 'home')),
+    home,
     spent: spentOf(rows.find((r) => r[0]?.trim() === 'spent'), opening[3]!),
     known: knownOf(rows.find((r) => r[0]?.trim() === 'known'), today),
     headline: rows.some((r) => r[0]?.trim() === 'headline' && r[1]?.trim() === 'under'),
@@ -249,10 +262,10 @@ function homeOf(row: readonly string[] | undefined): string | null {
  * ONLY IN THE WALK'S OWN MONEY, as a `sell` figure is (`sellsOf`): the number is read without the unit it is written in,
  * so an average in dollars beside a walk in pounds would set the slider's reach by the wrong amount.
  */
-function spentOf(row: readonly string[] | undefined, template: string): number | null {
+function spentOf(row: readonly string[] | undefined, opening: string): number | null {
   const cell = row?.[3]?.trim() ?? '';
   const v = Math.abs(signedOf(cell));
-  return cell && Number.isFinite(v) && v > 0 && unitOf(cell) === unitOf(template) ? v : null;
+  return cell && Number.isFinite(v) && v > 0 && unitOf(cell) === unitOf(opening) ? v : null;
 }
 
 /**
@@ -294,7 +307,7 @@ function showsOf(rows: readonly (readonly string[])[]): ForecastShow[] {
 
 /**
  * The walk in another currency: every amount multiplied by the rate and rounded to that currency's own decimals, and
- * written as a screen writes that currency (`writtenIn`), so the chart, the table and every knob's figure read in it.
+ * written as a screen writes that currency (`forecastFigure`), so the chart, the table and every knob's figure read in it.
  *
  * ONE RATE FOR EVERY DAY OF THE WALK, the newest the record holds, because no rate is known for a day ahead of today
  * and a walk is days ahead of today. The remembered balance before today is shown at the same rate, which the note
@@ -308,7 +321,8 @@ export function inCurrency(model: ForecastModel, show: ForecastShow): ForecastMo
   return {
     ...model,
     opening,
-    template: writtenIn(Math.round(opening * unit), show.to, model.home),
+    currency: show.to,
+    template: forecastFigure({ currency: show.to, home: model.home, template: '' }, opening),
     past: model.past.map((p) => ({ ...p, value: by(p.value) })),
     steps: model.steps.map((s) => ({ ...s, delta: by(s.delta) })),
     sells: model.sells.map((s) => ({ ...s, value: by(s.value) })),
@@ -317,40 +331,55 @@ export function inCurrency(model: ForecastModel, show: ForecastShow): ForecastMo
   };
 }
 
-/** How English writes a currency in one of its two displays, or `undefined`; it throws on a code the runtime refuses. */
-const display = (currency: string, currencyDisplay: 'symbol' | 'narrowSymbol'): string | undefined =>
-  new Intl.NumberFormat('en', { style: 'currency', currency, currencyDisplay }).formatToParts(0).find((p) => p.type === 'currency')?.value;
+/** Text with every run of space as one plain space, so a figure joined by a space that does not break reads the same. */
+const spaced = (text: string): string => text.replace(/\s+/gu, ' ').trim();
 
 /**
- * The symbol a currency is written with, `$` for USD, or `null` for one English writes by its code (`EGP`, `CHF`).
+ * The currency an opening cell is in, or `null` when the cell does not say.
  *
- * THE APP'S OWN RULE (`symbolOf` in `apps/web/src/lib/record/money.ts`), SAID AGAIN because this package imports nothing
- * from the app: the walk's own figures reach this file already drawn by it, and a converted figure beside them has to
- * be drawn the same way or the two amounts in one table read as two kinds of money.
+ * A HOST WRITES THE STORED FORM, `EGP 34,850.00`, and `readAmount` reads that and nothing else. A host that has already
+ * written the cell for a screen sends `£34,850.00` or `$4,800.00 USD`, and this file holds no table of signs to read
+ * one back with. So the writer is asked instead: the cell is in a currency when writing the cell's own number in that
+ * currency gives the cell back. The currencies tried are a code the cell holds and the record's own, and nothing else,
+ * so a bare `£` on a record that named no currency stays a figure whose currency is not known.
  */
-function symbolOf(currency: string): string | null {
-  try {
-    if (display(currency, 'symbol')?.toUpperCase() === currency) return null;
-    const narrow = display(currency, 'narrowSymbol');
-    return narrow && narrow.toUpperCase() !== currency ? narrow : null;
-  } catch {
-    return null;
+function currencyOf(cell: string, home: string | null): string | null {
+  const stored = readAmount(cell)?.currency;
+  if (stored) return stored;
+  const value = signedOf(cell);
+  if (!Number.isFinite(value)) return null;
+  for (const currency of new Set([...(cell.match(/[A-Z]{3}/gu) ?? []), ...(home ? [home] : [])])) {
+    for (const as of [home, null]) {
+      for (const setting of ['exact', 'read'] as const) {
+        if (spaced(forecastFigure({ currency, home: as, template: '' }, value, setting)) === spaced(cell)) return currency;
+      }
+    }
   }
+  return null;
 }
 
 /**
- * An amount in minor units as a screen writes money (contracts §8.3): `£2,400.00` in the record's own currency,
- * `$4,800.00 USD` in any other, and `EGP 58,185.54`, code first, for a currency with no symbol of its own.
+ * An amount of the walk as a screen writes it, by the one writer (`writeAmount`): every penny in a table (`exact`), a
+ * fraction of noughts dropped beside the chart (`read`), compact on the value axis (`axis`). Both drawers call this
+ * for every figure a forecast shows, so a walk reads one way whichever drew it.
  *
- * A CURRENCY NOT KNOWN TO BE THE RECORD'S KEEPS ITS CODE AFTER THE AMOUNT, so a bare `$` never stands for a dollar nobody
- * named: when the host sends no `home` row, every converted figure says which currency it is in.
+ * THE AXIS IS IN ONE CURRENCY AND NAMES IT ONCE. Every level of it is the walk's own money, which the balance beside
+ * today's dot and the table under the chart both write in full, so a level is written as that currency writes itself,
+ * `$1.5k`, and not `$1.5k USD` six times down the side.
+ *
+ * A WALK WHOSE CURRENCY IS NOT KNOWN COPIES ITS OPENING CELL, as every figure once did: the number in the shape of the
+ * cell the host drew. It is the one case left, a cell drawn in a sign the record never named.
  */
-function writtenIn(minor: number, currency: string, home: string | null): string {
-  const coded = money(minor, currency);
-  const symbol = symbolOf(currency);
-  const m = /^[A-Z]{3} (−?)(.+)$/u.exec(coded);
-  if (!symbol || !m) return coded;
-  return `${m[1]}${symbol}${m[2]}${currency === home ? '' : ` ${currency}`}`;
+export function forecastFigure(model: Pick<ForecastModel, 'currency' | 'home' | 'template'>, value: number, setting: AmountSetting = 'exact'): string {
+  if (!Number.isFinite(value)) return MISSING;
+  if (model.currency !== null) {
+    /* THE SIGN IS PUT BACK AFTER ROUNDING, as `scaled` below does it, so a cost and a refund of one size agree. */
+    const minor = Math.sign(value) * Math.round(Math.abs(value) * 10 ** exponentOf(model.currency));
+    const said = writeAmount({ minor, currency: model.currency }, setting === 'axis' ? model.currency : model.home, setting);
+    if (said) return said.text;
+  }
+  const copied = figureLike(model.template, value);
+  return setting === 'axis' ? axisFigure(copied) : setting === 'read' ? headlineFigure(copied) : copied;
 }
 
 /**
@@ -414,8 +443,8 @@ const unitOf = (figure: string): string => figure.replace(/[\d.,\s−+-]/gu, '')
  * holdings of $900.00 beside a walk in pounds read as 900 and would have walked as £900.00. The host converts what it
  * can before it writes the row; what reaches here in another unit is a figure this walk cannot add.
  */
-function sellsOf(rows: readonly (readonly string[])[], template: string): ForecastSell[] {
-  const unit = unitOf(template);
+function sellsOf(rows: readonly (readonly string[])[], opening: string): ForecastSell[] {
+  const unit = unitOf(opening);
   return rows.flatMap((r) => {
     const cell = r[3]?.trim() ?? '';
     const v = signedOf(cell);
@@ -649,7 +678,7 @@ export function largest(model: ForecastModel, most = 5): { label: string; amount
     .filter(([label]) => label !== '')
     .sort((a, b) => b[1].weight - a[1].weight)
     .slice(0, most)
-    .map(([label, g]) => ({ label, amount: figureLike(model.template, g.sum) }));
+    .map(([label, g]) => ({ label, amount: forecastFigure(model, g.sum) }));
 }
 
 /**
@@ -687,7 +716,7 @@ export function streamsOf(model: ForecastModel, horizon: number = model.horizon)
     by.set(key, g);
   }
   const all = [...by.entries()].filter(([, g]) => g.n > 1).sort((a, b) => b[1].weight - a[1].weight);
-  const said = ([label, g]: [string, { sum: number }]) => ({ label, amount: figureLike(model.template, g.sum) });
+  const said = ([label, g]: [string, { sum: number }]) => ({ label, amount: forecastFigure(model, g.sum) });
   return { in: all.filter(([, g]) => g.sum > 0).map(said), out: all.filter(([, g]) => g.sum <= 0).map(said) };
 }
 
@@ -719,7 +748,7 @@ export function countsOf(model: ForecastModel, horizon: number = model.horizon, 
   const once = all.filter(([, g]) => g.n === 1).sort(heaviest).slice(0, most);
   const offered = [...all.filter(([, g]) => g.n > 1), ...once].sort(heaviest);
   /* A SWITCH'S AMOUNT IS SAID SHORT, `−£54,560`, since it says how much a stream weighs and the table says it exactly. */
-  const said = ([label, g]: [string, { sum: number }]): Counted => ({ label, amount: headlineFigure(figureLike(model.template, g.sum)) });
+  const said = ([label, g]: [string, { sum: number }]): Counted => ({ label, amount: forecastFigure(model, g.sum, 'read') });
   return { in: offered.filter(([, g]) => g.sum > 0).map(said), out: offered.filter(([, g]) => g.sum <= 0).map(said) };
 }
 
@@ -989,9 +1018,9 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
   const c = shown.crossed;
   const said = c ? forecastUnder(shortDay(c.day)) : forecastAbove(shortDay(end));
   const nowAt = daysBetween(start, model.today) / span;
-  const figure = (v: number) => figureLike(model.template, v);
+  const figure = (v: number) => forecastFigure(model, v);
   /* `--at` IS A SHARE, as every chart's ticks read it, and `y` answers in the box's hundred units. */
-  const axis = levels.map((v) => ({ at: String(Math.round(Number(y(v)) * 100) / 10_000), label: axisFigure(figure(v)), zero: v === 0 }));
+  const axis = levels.map((v) => ({ at: String(Math.round(Number(y(v)) * 100) / 10_000), label: forecastFigure(model, v, 'axis'), zero: v === 0 }));
   const sentence = [
     `${model.label || FORECAST_BALANCE} ${figure(model.opening)} ${FORECAST_TODAY}`,
     model.past.length ? forecastRecorded(shortDay(model.past[0]!.day), figure(model.past[0]!.value)) : '',
@@ -1014,7 +1043,7 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
       d: `M${x(model.today)} ${y(model.opening)}h0`,
       at: at(nowAt),
       y: String(Math.round(Number(y(model.opening)) * 100) / 10_000),
-      label: headlineFigure(figure(model.opening)),
+      label: forecastFigure(model, model.opening, 'read'),
     },
     base: base ? line(base.days) : '',
     zero: y(floor),
@@ -1058,8 +1087,8 @@ export function readoutAt(model: ForecastModel, shown: Scenario, plan: ForecastP
     at: at(daysBetween(plan.start, day) / plan.span),
     flip: f > 0.5,
     day: shortDay(day),
-    balance: balance === null ? MISSING : headlineFigure(figureLike(model.template, balance)),
-    moves: shown.steps.filter((s) => s.day === day).slice(0, 3).map((s) => ({ label: s.label, amount: headlineFigure(figureLike(model.template, s.delta)) })),
+    balance: balance === null ? MISSING : forecastFigure(model, balance, 'read'),
+    moves: shown.steps.filter((s) => s.day === day).slice(0, 3).map((s) => ({ label: s.label, amount: forecastFigure(model, s.delta, 'read') })),
   };
 }
 

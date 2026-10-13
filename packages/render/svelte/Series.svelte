@@ -12,7 +12,7 @@
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
 
   const net = $derived(block.form === 'net');
-  const plan = $derived(seriesPlan(block.rows.map((r) => r.cells.map((c) => text(inline(c, opts)))), net));
+  const plan = $derived(seriesPlan(block.rows.map((r) => r.cells.map((c) => text(inline(c, opts)))), net, opts.home));
   const name = $derived(`${plan.axis ? `${plan.axis}: ` : ''}${plan.sentence}`);
   const keyed = $derived(plan.drawn && (plan.series.length > 1 || net));
 </script>

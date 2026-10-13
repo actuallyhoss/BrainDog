@@ -402,7 +402,7 @@ export type { CreateRecordArgs, Provisioned, Purged, WrappedKey } from './provis
 export { GRANT_KINDS, spanMs } from './vault.ts';
 import { GROUP_CAP } from './buckets.ts';
 import { ratesFrom } from './fx.ts';
-import { MARK_IS_CONTROL, MARK_IS_CONTROL_SAYS, isControlMark } from './marks.ts';
+import { MARK_IS_CONTROL, MARK_IS_CONTROL_SAYS, isControlMark, markFrozen } from './marks.ts';
 import { laidOf } from './pack-laid.ts';
 export { BUCKETS, GROUP_CAP, bucketOf, bucketRun, bucketStart, isBucket, nextBucket, shiftBucket } from './buckets.ts';
 export { MEASURES_MOST, MEASURE_BACK, MEASURE_BUCKETS, localDays, measureBucket, measureLines, measurePeriod, measureSeries, measureWindow, readableZone } from './measures.ts';
@@ -418,7 +418,7 @@ export { COSTS, MANY_ROWS, WAITS, WAIT_RANK_SQL, WAIT_SQL, costOf, costRank, wai
 export { AGGREGATIONS, bucketState, deltaFrom, evaluateMetric, fxOfPair, largestFirst, meets, rateUnit, scorePrediction, snapshot, targetCurrency, targetFor, targetInto, targetOf, windowMs } from './metrics.ts';
 export { clockOf, isMoneyFormat, verdictOf } from './metrics.ts';
 export { readDeclaredSigns, vitalOf } from './metrics.ts';
-export { farRates, pointSaid } from './metrics.ts';
+export { farRates, pointSaid, RATE_QUIET_DAYS } from './metrics.ts';
 export { SESSIONS_WORKING, readRunsWorking } from './built-in-figures.ts';
 export { HANDOFFS_OPEN, openSteps, readHandoffsOpen, type OpenStep } from './built-in-figures.ts';
 export { KEYS_IN_TEXT, RECORD_KEY_SCAN, keysInText, placeOf, readKeysInText, scanKeys, type KeyFinding, type KeyScan } from './key-scan.ts';
@@ -453,7 +453,7 @@ export {
 } from './digest.ts';
 export { CREATE_CEILING, applyRule, dryRun, fill as fillTemplate, linkFault, linkPatternFault, marker, order as orderRules, runRules } from './rules.ts';
 export { runway } from './forecast.ts';
-export { cycleAfter, restDaysOf } from './forecast.ts';
+export { anchorDayOf, cycleAfter, restDaysOf } from './forecast.ts';
 export { SERIES_AHEAD, SERIES_BACK, SERIES_LINES, barsOf } from './series.ts';
 export { SETUP_KIND, setupCollapser, type FeedLine } from './feed.ts';
 export type { Bars, SeriesLine } from './series.ts';
@@ -3768,6 +3768,12 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         /* A MARK IS A PICTURE, NEVER A CONTROL (PGS-A06): a project drawn as the close cross reads as a button. */
         if ((decl as { identity?: { mark?: unknown } }).identity?.mark === key && isControlMark(value))
           return no<Entry>(MARK_IS_CONTROL, MARK_IS_CONTROL_SAYS, { at: key });
+        /* AND A PICTURE STAYS ONCE IT IS CHOSEN (REC-C17, `markFrozen`): a mark that names a glyph takes no change, and
+           before the `null` branch on purpose, so it is not cleared either. One that names no glyph takes the write. */
+        if (current && (decl as { identity?: { mark?: unknown } }).identity?.mark === key) {
+          const frozen = markFrozen(current.fields[key], value);
+          if (frozen) return no<Entry>(frozen.code, frozen.fix, { at: key });
+        }
         touched.push(key);
         if (value === null) {
           if (field.immutable && current && current.fields[key] !== undefined)
@@ -9683,6 +9689,20 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
             AND NOT EXISTS (SELECT 1 FROM declaration r WHERE r.id = d.id AND r.retired = 1 AND r.version >= p.version AND r.version < d.version)
           ORDER BY d.id`,
       ),
+
+    /**
+     * WHAT AN ADD-ON REMEMBERS PLANTING (`planted` in its stored manifest, written by `declare` at install): the example
+     * rows it made, by seed key, which is how an update finds a row a person has since renamed. `undefined` for an
+     * add-on not installed, one that planted nothing, or a manifest that does not read.
+     */
+    packPlanted: (id: string): unknown => {
+      const m = sql.one<{ manifest: string }>('SELECT manifest FROM pack WHERE id = ?', id)?.manifest;
+      try {
+        return m === undefined ? undefined : (JSON.parse(m) as { planted?: unknown }).planted;
+      } catch {
+        return undefined;
+      }
+    },
 
     /**
      * The `pack` rows: what is installed, at which version, and what each asks of the others (`requires.packs`).

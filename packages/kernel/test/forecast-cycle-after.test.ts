@@ -13,7 +13,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { openRecord, type Declaration, type Leg } from '../src/index.ts';
-import { cycleAfter, type CycleLine } from '../src/forecast.ts';
+import { anchorDayOf, cycleAfter, type CycleLine } from '../src/forecast.ts';
 import { fixedClock, openSqlite } from './sqlite.ts';
 
 const LEG: Leg = {
@@ -201,4 +201,99 @@ test('and with a weekend rule, each day answered is the day the walk moves', asy
   /* 31 October and 31 January fall on a Saturday and a Sunday. */
   assert.deepEqual(named, ['2026-08-31', '2026-09-30', '2026-10-31', '2026-11-30', '2026-12-31', '2027-01-31'].slice(0, days.length));
   assert.deepEqual(days, ['2026-08-31', '2026-09-30', '2026-10-30', '2026-11-30', '2026-12-31', '2027-01-29'].slice(0, days.length));
+});
+
+/**
+ * The days a line steps to when each answer is WRITTEN BACK to its "Next", which is what paying a line does: the next
+ * question is asked of a row whose first day is the day last answered, and the day it began on is gone from it.
+ */
+function written(fields: Record<string, unknown>, count: number, anchorDay?: number | null): (string | null)[] {
+  const out: (string | null)[] = [];
+  let now = { ...fields };
+  while (out.length < count) {
+    const day = cycleAfter(String(now.next), { ...line(now), ...(anchorDay != null ? { anchorDay } : {}) });
+    out.push(day);
+    if (day === null) break;
+    now = { ...now, next: day };
+  }
+  return out;
+}
+
+/* 2027 IS A COMMON YEAR, so 28 February is its month's last day and all three lines below are written back to it. */
+const CLAMPED: [number, string[]][] = [
+  [28, ['2027-02-28', '2027-03-28', '2027-04-28', '2027-05-28', '2027-06-28']],
+  [29, ['2027-02-28', '2027-03-29', '2027-04-29', '2027-05-29', '2027-06-29']],
+  [30, ['2027-02-28', '2027-03-30', '2027-04-30', '2027-05-30', '2027-06-30']],
+];
+
+for (const [anchorDay, days] of CLAMPED)
+  test(`A LINE FIRST DUE ON ${anchorDay} JANUARY, WRITTEN BACK EACH STEP, IS NOT A MONTH END AFTER FEBRUARY`, async () => {
+    const fields = { next: `2027-01-${anchorDay}`, repeats: 'monthly' };
+    assert.equal(anchorDayOf(line(fields)), anchorDay);
+    assert.deepEqual(written(fields, 5, anchorDay), days);
+    /* And they are the days the walk shows for the row as it stood before anybody stepped it. */
+    assert.deepEqual((await walked(fields, 340)).slice(0, 6), [fields.next, ...days]);
+  });
+
+test('and in a leap year the 30th clamps to the 29th and comes back, and the 29th is simply the 29th', () => {
+  assert.deepEqual(written({ next: '2028-01-30', repeats: 'monthly' }, 3, 30), ['2028-02-29', '2028-03-30', '2028-04-30']);
+  assert.deepEqual(written({ next: '2028-01-29', repeats: 'monthly' }, 3, 29), ['2028-02-29', '2028-03-29', '2028-04-29']);
+  assert.deepEqual(written({ next: '2028-01-28', repeats: 'monthly' }, 3, 28), ['2028-02-28', '2028-03-28', '2028-04-28']);
+});
+
+test('WITHOUT AN ANCHOR THE CLAMPED DAY IS ALL THE ROW HAS, and it is read as the month end the walk reads', () => {
+  /* What the anchor is for: the three January lines cannot be told apart once they are written back. */
+  for (const day of [28, 29, 30])
+    assert.deepEqual(written({ next: `2027-01-${day}`, repeats: 'monthly' }, 3), ['2027-02-28', '2027-03-31', '2027-04-30']);
+});
+
+test('THE SAME DAY KEPT IN THE LINE\'S OWN DAYS NEEDS NO ANCHOR, and the days win over one', () => {
+  const fields = { next: '2027-01-30', repeats: 'monthly', days: '30' };
+  assert.equal(anchorDayOf(line(fields)), null);
+  assert.deepEqual(written(fields, 3), ['2027-02-28', '2027-03-30', '2027-04-30']);
+  assert.deepEqual(written(fields, 3, 31), ['2027-02-28', '2027-03-30', '2027-04-30']);
+});
+
+test('A MONTH END IS ANCHORED ON THE 31ST, so it stays one through February whatever day it began on', () => {
+  for (const next of ['2026-08-31', '2026-09-30', '2027-02-28']) assert.equal(anchorDayOf(line({ next, repeats: 'monthly' })), 31);
+  assert.deepEqual(written({ next: '2026-11-30', repeats: 'monthly' }, 5, 31), ['2026-12-31', '2027-01-31', '2027-02-28', '2027-03-31', '2027-04-30']);
+});
+
+test('A QUARTERLY LINE ON THE 30TH CLAMPS IN FEBRUARY AND COMES BACK IN MAY', () => {
+  const fields = { next: '2026-11-30', repeats: 'quarterly' };
+  /* 30 November is a month end, so the walk's own reading is the 31st: say the 30th to have the 30th. */
+  assert.equal(anchorDayOf(line(fields)), 31);
+  assert.deepEqual(written(fields, 3, 30), ['2027-02-28', '2027-05-30', '2027-08-30']);
+  assert.deepEqual(written(fields, 3, 31), ['2027-02-28', '2027-05-31', '2027-08-31']);
+});
+
+test('A LEAP DAY PAID YEARLY COMES BACK TO THE 29TH, and a yearly 28 February never leaves the 28th', () => {
+  const leap = { next: '2028-02-29', repeats: 'yearly' };
+  assert.equal(anchorDayOf(line(leap)), 29);
+  assert.deepEqual(written(leap, 4, 29), ['2029-02-28', '2030-02-28', '2031-02-28', '2032-02-29']);
+  const plain = { next: '2027-02-28', repeats: 'yearly' };
+  assert.equal(anchorDayOf(line(plain)), 28);
+  assert.deepEqual(written(plain, 2, 28), ['2028-02-28', '2029-02-28']);
+});
+
+test('AN ANCHOR IS READ ONLY ON A CYCLE OF MONTHS, and one that is no day of the month is left', () => {
+  assert.equal(anchorDayOf(line({ next: '2028-02-22', repeats: 'weekly' })), null);
+  assert.equal(anchorDayOf(line({ next: '2026-10-03', repeats: 'twice_monthly' })), null);
+  assert.equal(anchorDayOf(line({ next: '2026-10-15', repeats: 'none' })), null);
+  assert.equal(anchorDayOf(line({ next: 'soon', repeats: 'monthly' })), null);
+  assert.deepEqual(written({ next: '2028-02-22', repeats: 'weekly' }, 2, 30), ['2028-02-29', '2028-03-07']);
+  assert.deepEqual(written({ next: '2026-10-03', repeats: 'twice_monthly' }, 2, 30), ['2026-10-15', '2026-11-01']);
+  for (const bad of [0, 32, 29.5, Number.NaN]) assert.deepEqual(written({ next: '2027-01-30', repeats: 'monthly' }, 2, bad), ['2027-02-28', '2027-03-31']);
+});
+
+test('and a rest day still answers the day the line names, anchored', () => {
+  /* 30 October 2027 is a Saturday: answered as the 30th, and the walk moves it to the 29th. */
+  const fields = { next: '2027-09-30', repeats: 'monthly', weekend: 'before' };
+  const days: (string | null)[] = [];
+  let now: Record<string, unknown> = fields;
+  for (let n = 0; n < 2; n++) {
+    days.push(cycleAfter(String(now.next), { ...line(now, SAT_SUN), anchorDay: 30 }));
+    now = { ...now, next: days[n] };
+  }
+  assert.deepEqual(days, ['2027-10-30', '2027-11-30']);
 });

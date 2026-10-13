@@ -2485,6 +2485,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         pack: true,
         ...(note === undefined ? {} : { note }),
       } as never),
+    /* WHAT THE LAST INSTALL REMEMBERED PLANTING, AND AN UPDATE GOING OVER ONE OF THOSE ROWS (SHL-A09): the add-on's own
+       write again, so a field its list says is written once stays as the row holds it. A row a person deleted is left. */
+    planted: (pack) => kernel.packPlanted(pack),
+    reseed: (register, row, fields) => {
+      const held = kernel.get(row);
+      if (!held || held.deleted_at) return ok(null);
+      return kernel.update(register, row, fields, { actor: actorOf(ctx), cascade: false, pack: true } as never);
+    },
     /* THE RECORD'S OWN CLOCK, so a seed's `{ day }` counts from the day this record reads and not the machine's. */
     today: () => new Date(clock.now()).toISOString().slice(0, 10),
     remember: (row) => kernel.rememberPack({ ...row, by: actorOf(ctx) }),

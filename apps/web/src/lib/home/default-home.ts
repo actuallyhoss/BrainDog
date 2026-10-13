@@ -697,17 +697,33 @@ function weekMoneyDrawn(b: LiveBlock): LiveBlock {
 }
 
 /**
+ * The entries behind a figure, by handle, where the record sent them with it (`backs`), else none. Unchecked, so it is
+ * narrowed here; a figure that names none is backed by nothing Home can see.
+ */
+const backsOf = (m: object): string[] => {
+  const held = (m as { backs?: unknown }).backs;
+  return Array.isArray(held) ? held.filter((h): h is string => typeof h === 'string' && h !== '') : [];
+};
+
+/** Whether two figures are one entry's: each names what backs it, and both name the same single entry. */
+const oneBacks = (a: object, b: object): boolean => {
+  const [x, y] = [backsOf(a), backsOf(b)];
+  return x.length === 1 && y.length === 1 && x[0] === y[0];
+};
+
+/**
  * WHAT CAME IN, AS THE LINE SAYS IT, read off the tile so the two cannot disagree. One figure is said by who paid
  * where exactly one entry due this week was paid that very amount ("Nadia paid EGP 900."), else as the amount
  * ("EGP 900 came in this week."). Both are said side by side, each by the tile's own name for it and never added
  * ("EGP 900 was paid, and EGP 150 came in this week."): they are two figures, and two amounts under one verb read
- * as the same money twice. TWO FIGURES OF ONE AMOUNT ARE SAID ONCE, as one figure is: "EGP 900 was paid, and EGP 900
- * came in this week." reads as 1,800 to anyone who was paid 900, and the tile beside it still names both.
+ * as the same money twice. TWO FIGURES OF ONE AMOUNT ARE TWO MONEYS, and both are said: an order marked paid and an
+ * unrelated EGP 900 in the bank's text are 1,800, and one sentence of 900 would lose half of it. THEY ARE SAID ONCE ONLY
+ * WHERE ONE ENTRY BACKS BOTH (`oneBacks`), which the figures themselves must say; the amounts being equal never does.
  */
 function weekInSaid(blocks: readonly LiveBlock[], due: LiveBlock | undefined, w: Week): string | null {
   const tile = blocks.find((b) => b.drawn && !says(b) && isWeekMoney(b));
   const each = (tile?.metrics ?? []).filter((m) => (WEEK_IN as readonly string[]).includes(m.id) && !nought(m.value) && m.value !== MISSING);
-  const came = each.length === 2 && each[0]!.value.trim() === each[1]!.value.trim() ? each.slice(0, 1) : each;
+  const came = each.length === 2 && each[0]!.value.trim() === each[1]!.value.trim() && oneBacks(each[0]!, each[1]!) ? each.slice(0, 1) : each;
   if (came.length === 0) return null;
   if (came.length === 2) {
     const [settled, received] = WEEK_IN.map((id) => came.find((m) => m.id === id)!.value);
@@ -737,15 +753,23 @@ function weekLate(b: LiveBlock, w: Week, today: string): number[] {
   return where(b, (f) => typeof f.row === 'string' && f.row.startsWith(`${w.due.register}#`) && (dueDay(f) ?? today) < today);
 }
 
+/** A clause that keeps one list and no other: `list is orders`, never `list is orders or obligations`. */
+const ONE_LIST = /^\s*list\s+is\s+(\S+)\s*$/u;
+
+/** Whether a block's own `where:` keeps it to the week's list, so every entry it holds, drawn or not, is one of the week's. */
+const onWeekList = (b: LiveBlock, w: Week): boolean =>
+  typeof b.where === 'string' && clausesOf(b.where).some((clause) => ONE_LIST.exec(clause)?.[1] === w.due.register);
+
 /**
  * THE WEEK'S LIST'S LATE ONES LATE HOLDS PAST ITS LIMIT. Twelve late orders drawn eight at a time are twelve late, as
- * the house line counts them (`lateBeyond`): the block's own total says how many it holds. ONLY WHERE EVERY ONE DRAWN IS
- * THE WEEK'S LIST'S. Late is every list's, so with a bill among the eight what stands past them may be bills, and it
- * stays the house line's to count as things.
+ * the house line counts them (`lateBeyond`): the block's own total says how many it holds. ONLY WHERE THE BLOCK'S OWN
+ * `where:` KEEPS IT TO THE WEEK'S LIST (`list is orders`). Late is every list's, and its oldest eight being orders says
+ * nothing of the four behind them: eight old orders and four newer bills read "12 orders are late". Where the block
+ * does not say so itself, what stands past its limit is the house line's to count as things.
  */
 function weekLatePast(b: LiveBlock, w: Week, today: string): number {
   const mine = weekLate(b, w, today);
-  return mine.length > 0 && mine.length === b.entries.length ? lateBeyond(b, today) : 0;
+  return mine.length > 0 && mine.length === b.entries.length && onWeekList(b, w) ? lateBeyond(b, today) : 0;
 }
 
 /** A block over what fell due without the week's late ones, for the house line to count: the week's line says those. */
@@ -753,7 +777,10 @@ function lessWeekLate(b: LiveBlock, w: Week, today: string): LiveBlock {
   const mine = weekLate(b, w, today);
   if (mine.length === 0) return b;
   const past = weekLatePast(b, w, today);
-  return pick(b, b.entries.flatMap((_, n) => (mine.includes(n) ? [] : [n])), undefined, b.total - mine.length - past);
+  const rest = pick(b, b.entries.flatMap((_, n) => (mine.includes(n) ? [] : [n])), undefined, b.total - mine.length - past);
+  /* WHAT THE BLOCK HOLDS LATE PAST ITS LIMIT, READ BEFORE THE WEEK'S WERE TAKEN OUT: with every drawn one an order and
+     Late over every list, none is left drawn to say the four behind them are late, and they are still the house's. */
+  return { ...rest, lateHeld: lateBeyond(b, today) - past } as LiveBlock;
 }
 
 /**
@@ -974,6 +1001,9 @@ const dueDay = (fields: Record<string, unknown>): string | null => (typeof field
  * and what falls due in the next fortnight (a `deadlines` block reads 14 days ahead when it names no bound) as neither.
  */
 function lateBeyond(b: LiveBlock, today: string): number {
+  /* A block the week's late ones were taken out of says its own count, read while they were still in it (`lessWeekLate`). */
+  const held = (b as { lateHeld?: unknown }).lateHeld;
+  if (typeof held === 'number') return Math.max(0, held);
   const beyond = Math.max(0, b.total - b.entries.length);
   if (beyond === 0 || b.entries.length === 0) return 0;
   const due = isDue(b);

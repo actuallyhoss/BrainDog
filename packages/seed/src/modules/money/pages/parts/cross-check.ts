@@ -35,9 +35,13 @@ export const CROSS_CHECK: Record<string, unknown>[] = [
     /* NOTHING TO CHECK YET IS SAID, NEVER READ AS A PASS: with no balance typed the check has no value, and its
        reading says why in these words (`readCrosscheck` in `packages/kernel/src/money-figures.ts`). A LINE AND NOT A
        FIGURE, as a figure with no value is never drawn (`packages/kernel/src/drawn.ts`), so the sentence is written
-       here and `packages/seed/test/cash-cross-page.test.ts` holds it to the reading's: the two cannot drift. An
-       account is not saved without a balance, so this is the day no account counts as cash, and the line stands
-       under the box that adds one.
+       here and `packages/seed/test/cash-cross-page.test.ts` holds it to the reading's for a record with no account:
+       the two cannot drift. The line stands under the box that adds one.
+
+       THE READING HAS A SECOND SENTENCE THIS LINE DOES NOT SAY (audit 54, item 7): with accounts and none of them
+       counted as cash it reads "No account counts as cash yet", since an account is not saved without a balance and
+       one has been typed. A line's words are written and not read off a figure, and Money stands at the most blocks
+       a page declares, so on that day the page still says these words. It wants a line that reads its figure's own.
 
        ON CASH NOW HOLDING NOTHING, which is the same day: a check that agrees in two currencies reads nought with no
        currency, and `empty:` takes that for no amount at all, so a condition on the check itself would say no balance

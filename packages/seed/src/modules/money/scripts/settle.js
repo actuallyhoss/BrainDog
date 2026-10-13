@@ -1,0 +1,212 @@
+/**
+ * What a payment does to the thing it pays (REC-B11 step 4), as the decision, the script a host runs round it, and the
+ * declaration a pack document carries.
+ *
+ * PAID IS WHAT A PAYMENT DID, NOT A STATUS SOMEBODY REMEMBERED TO SET. Handed a Ledger entry and the bill, instalment
+ * or repeating line it pays, `settle` answers with the changes that follow:
+ *   - a bill is paid, with the day the money moved, or part paid; either way "Paid so far" holds the sum, and the
+ *     payment keeps the link in "Settles", since one bill can take several payments;
+ *   - an instalment is paid, with the day, and names the one payment in "Paid by";
+ *   - a repeating line moves "Next" one cycle on and keeps the last day and the last amount.
+ *
+ * IT NEVER CHANGES AN AMOUNT. A payment more than 2% off what was expected is a question, "Rent was GBP 4,200 this
+ * time, not GBP 4,000. Change the line?", and the answer is the change: each option carries its own patches at the
+ * version the script read, so the gate refuses a pick whose line was edited since. Within 2% it is the same payment,
+ * and what was expected stays as written.
+ *
+ * TWO CURRENCIES ARE NEVER ADDED OR COMPARED. A payment in another currency than the thing it pays changes nothing and
+ * says so, as does money going the other way, and a thing already paid, cancelled or ended.
+ *
+ * THE DAY "NEXT" MOVES TO IS HANDED IN, as `next`, because it is the walk's own arithmetic (`cycleAfter` in the kernel's
+ * forecast) and a sandbox runs this file's text alone: a second copy of the cycle tables here would be a second walk.
+ * `cycleOn` below is that call for a caller outside the sandbox, and a rule that starts the script hands the day as
+ * `input.next`. A line handed no day is not moved.
+ *
+ * NOTHING OUTSIDE ITSELF IS READ BY `settle`, AND NOTHING BUT `settle` BY `run`: the two texts together are the script
+ * (`SETTLE_SCRIPT.source`).
+ */
+
+import { cycleAfter } from '@braindog/kernel';
+
+import { CASH_LEGS } from '../legs.ts';
+
+export function settle(item, payment, opts) {
+  const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  /* THE CURRENCIES WHOSE MINOR UNIT IS NOT A HUNDREDTH, for the words of a question only: no figure is computed from
+     this table, and a code it does not hold reads to two places, as most do. */
+  const PLACES = { JPY: 0, KRW: 0, VND: 0, CLP: 0, ISK: 0, PYG: 0, UGX: 0, RWF: 0, XAF: 0, XOF: 0, BHD: 3, KWD: 3, OMR: 3, JOD: 3, TND: 3, IQD: 3, LYD: 3 };
+  const moneyOf = (v) => (v && typeof v === 'object' && Number.isSafeInteger(v.amount) && typeof v.currency === 'string' ? v : null);
+  const words = (m) => {
+    const places = PLACES[m.currency] ?? 2;
+    const digits = String(Math.abs(m.amount)).padStart(places + 1, '0');
+    const whole = digits.slice(0, digits.length - places).replace(/\B(?=(\d{3})+$)/g, ',');
+    const rest = places === 0 ? '' : digits.slice(-places);
+    return `${m.currency} ${m.amount < 0 ? '-' : ''}${whole}${/^0*$/.test(rest) ? '' : `.${rest}`}`;
+  };
+  const dayWords = (d) => {
+    const m = typeof d === 'string' ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(d) : null;
+    return m ? `${Number(m[3])} ${MONTHS[Number(m[2]) - 1]}` : String(d);
+  };
+  /* MORE THAN 2% OFF, in whole minor units: no division, so no rounding decides whether a person is asked. */
+  const off = (paid, expected) => Math.abs(paid - expected) * 100 > Math.abs(expected) * 2;
+
+  const f = item.fields;
+  const p = payment.fields;
+  const name = String(f.what ?? '').trim() || 'This';
+  const due = moneyOf(f.amount);
+  const paid = moneyOf(p.amount);
+  const on = typeof p.on === 'string' ? p.on : '';
+  if (!due || !paid || !on) return { nothing: `${name} or its payment has no amount or no day, so nothing was marked paid.` };
+  if (due.currency !== paid.currency) return { nothing: `${name} is in ${due.currency} and the payment is in ${paid.currency}, so nothing was marked paid.` };
+  const way = item.list === 'obligations' ? { owed_by_me: 'out', owed_to_me: 'in' }[f.direction] : f.direction;
+  if (way && p.direction && way !== p.direction) return { nothing: `${name} is money ${way} and the payment is money ${p.direction}, so nothing was marked paid.` };
+
+  /* A PAYMENT PAYS ONE THING. One that already names a bill in "Settles" is that bill's, and marking a second thing paid
+     with it would count the same money twice and leave the first bill paid by nothing. */
+  const taken = typeof p.settles === 'string' && p.settles !== '';
+  if (taken && (item.list !== 'obligations' || p.settles !== item.id)) return { nothing: `The payment already settles something else, so ${name} was not marked paid.` };
+
+  const change = (fields) => ({ id: item.spoken, version: item.version, fields });
+  const ask = (question, options) => ({ ask: { cause: `money.settle.${item.spoken}`, question, about: name, options } });
+
+  if (item.list === 'obligations') {
+    if (f.state !== 'open' && f.state !== 'part') return { nothing: `${name} is not open, so the payment changed nothing.` };
+    /* WHAT WAS PAID BEFORE THIS PAYMENT: the sum the caller counted from the payments that name the bill, and failing
+       that the bill's own "Paid so far", when it is in the bill's currency. */
+    const held = moneyOf(f.paid_so_far);
+    const before = opts && Number.isSafeInteger(opts.before) ? opts.before : held && held.currency === due.currency ? held.amount : 0;
+    const total = { amount: before + paid.amount, currency: due.currency };
+    /* THE LINK STAYS ON THE PAYMENT, and is written only where it is not there yet. */
+    const link = p.settles === item.id ? [] : [{ id: payment.spoken, version: payment.version, fields: { settles: item.id } }];
+    const closed = [change({ state: 'paid', settled: on, paid_so_far: total }), ...link];
+    /* RUN AGAIN FOR A PAYMENT ALREADY COUNTED, the bill holds this sum and the link: nothing is written a second time. */
+    if (total.amount < due.amount && f.state === 'part' && link.length === 0 && held && held.currency === due.currency && held.amount === total.amount)
+      return { nothing: `${name} already counts this payment, so nothing changed.` };
+    if (total.amount < due.amount)
+      return { writes: [change({ state: 'part', paid_so_far: total }), ...link], said: `${name} is part paid: ${words(total)} of ${words(due)}.` };
+    if (off(total.amount, due.amount))
+      /* SEVERAL PAYMENTS ARE NOT "THIS TIME": the sum is said as a sum once an earlier payment is in it. */
+      return ask(before === 0 ? `${name} was ${words(total)} this time, not ${words(due)}. Mark it paid?` : `The payments for ${name} come to ${words(total)}, not ${words(due)}. Mark it paid?`, [
+        { label: 'Mark it paid', because: `It is paid on ${dayWords(on)}, and keeps ${words(due)} as its amount.`, patches: closed },
+        { label: 'Leave it open', because: 'Nothing changes, and it stays in what is still to pay.' },
+      ]);
+    return { writes: closed, said: `${name} is paid, on ${dayWords(on)}.` };
+  }
+
+  if (item.list === 'installments') {
+    if (f.state !== 'open') return { nothing: `${name} is not open, so the payment changed nothing.` };
+    const closed = [change({ state: 'paid', settled: on, paid_by: payment.id })];
+    if (off(paid.amount, due.amount))
+      return ask(`${name} was ${words(paid)} this time, not ${words(due)}. Mark it paid?`, [
+        { label: 'Mark it paid', because: `It is paid on ${dayWords(on)}, and keeps ${words(due)} as its amount.`, patches: closed },
+        { label: 'Leave it open', because: 'Nothing changes, and it stays in what is still to pay.' },
+      ]);
+    return { writes: closed, said: `${name} is paid, on ${dayWords(on)}.` };
+  }
+
+  if (item.list === 'recurring') {
+    if (f.state !== 'live') return { nothing: `${name} is not live, so the payment changed nothing.` };
+    /* THE SAME PAYMENT HANDED TWICE MOVES THE LINE ONCE: a payment on or before the last one counted is that one or an
+       older one, and "Next" has already moved past it. */
+    if (typeof f.last_paid === 'string' && on <= f.last_paid) return { nothing: `${name} already counts a payment on ${dayWords(f.last_paid)}, so nothing moved.` };
+    const next = opts ? opts.next : undefined;
+    /* A DAY, AND A LATER ONE THAN THE LINE NAMES, or no day at all (`null`, below). Anything else was worked out from a
+       line that has moved since, and writing it would walk "Next" backwards. */
+    const later = typeof next === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(next) && typeof f.next_due === 'string' && next > f.next_due;
+    if (next === undefined || (next !== null && !later)) return { nothing: `${name} was handed no later day to move to, so its Next stayed where it was.` };
+    const last = { last_paid: on, last_amount: paid };
+    /* NO LATER DAY, past the line's end or on a cycle nobody can read: the payment is kept and "Next" stays. */
+    const moved = later ? { next_due: next, ...last } : last;
+    const said = moved.next_due ? `${name} is paid for ${dayWords(f.next_due)}, and Next is ${dayWords(next)}.` : `${name} is paid for ${dayWords(f.next_due)}, and has no later day.`;
+    if (off(paid.amount, due.amount))
+      return ask(`${name} was ${words(paid)} this time, not ${words(due)}. Change the line?`, [
+        { label: 'Change the line', because: `Every payment ahead is counted at ${words(paid)}.`, patches: [change({ ...moved, amount: paid })] },
+        { label: `Keep ${words(due)}`, because: `This payment was a one-off, and the ones ahead stay at ${words(due)}.`, patches: [change(moved)] },
+      ]);
+    return { writes: [change(moved)], said };
+  }
+
+  return { nothing: `${name} is in a list a payment does not settle, so nothing changed.` };
+}
+
+/**
+ * The script: `input.payment` and `input.item` are the two things as a rule names them ("transactions#12",
+ * "recurring#7"), and `input.next` the day a repeating line moves to. It reads both, asks `settle`, and either makes the
+ * changes at the versions it read or ends its run with the one question.
+ *
+ * A BILL'S "PAID SO FAR" IS COUNTED, NOT ADDED TO. Every payment that names the bill in "Settles" is read and summed,
+ * this one left out and then put in, so a run started twice for one payment, or for a payment a person linked by hand
+ * before the rule fired, writes the same sum and never the sum plus one more.
+ */
+export default async function run(ctx) {
+  const input = ctx.input && typeof ctx.input === 'object' ? ctx.input : {};
+  const named = (spoken) => (typeof spoken === 'string' && /^[a-z_]+#\d+$/.test(spoken) ? spoken : null);
+  const [paymentAt, itemAt] = [named(input.payment), named(input.item)];
+  if (!paymentAt || !itemAt || !paymentAt.startsWith('transactions#')) {
+    ctx.log('The script was handed no payment or nothing for it to pay, so nothing was marked paid.');
+    return null;
+  }
+  const [paymentRow, itemRow] = [await ctx.record.get(paymentAt), await ctx.record.get(itemAt)];
+  if (!paymentRow) {
+    ctx.log('The payment is no longer in the record, so nothing was marked paid.');
+    return null;
+  }
+  if (!itemRow) {
+    ctx.log('The thing this payment was to pay is no longer in the record, so nothing was marked paid.');
+    return null;
+  }
+  const item = { list: itemAt.split('#')[0], id: itemRow.id, spoken: itemAt, version: itemRow.version, fields: itemRow.fields };
+  const payment = { id: paymentRow.id, spoken: paymentAt, version: paymentRow.version, fields: paymentRow.fields };
+
+  const opts = {};
+  if ('next' in input) opts.next = input.next;
+  if (item.list === 'obligations') {
+    const currency = item.fields.amount && item.fields.amount.currency;
+    const others = await ctx.record.list('transactions', { field: 'settles', is: item.id });
+    opts.before = 0;
+    for (const other of others) {
+      const m = other.fields.amount;
+      /* ONE CURRENCY ONLY: a payment in another is left out of the sum rather than added to it. */
+      if (other.id === payment.id || !m || m.currency !== currency || !Number.isSafeInteger(m.amount)) continue;
+      opts.before += m.amount;
+    }
+  }
+
+  const out = settle(item, payment, opts);
+  if (out.nothing) {
+    ctx.log(out.nothing);
+    return null;
+  }
+  if (out.ask) return { ask: out.ask };
+  for (const w of out.writes) ctx.update(w.id, w.fields, w.version);
+  ctx.log(out.said);
+  return { settled: item.spoken };
+}
+
+/**
+ * The day a repeating line's "Next" moves to once the cycle it names is paid, or `null` when it has none: the kernel's
+ * `cycleAfter` on Cash ahead's own leg for Repeating (`CASH_LEGS`), so the day written is the day the forecast walks
+ * next. FROM THE DAY THE LINE NAMES, NOT THE DAY THE MONEY MOVED: rent due on the 1st and paid on 29 September still
+ * moves to 1 November. `rest` is the record's rest days (`restDaysOf`), and none moves nothing.
+ */
+export function cycleOn(fields, rest) {
+  const leg = CASH_LEGS.find((l) => l.register === 'recurring');
+  if (!leg || typeof fields.next_due !== 'string') return null;
+  return cycleAfter(fields.next_due, { leg, fields, ...(rest ? { rest } : {}) });
+}
+
+/**
+ * The script as Money's pack document writes it, as `LAST_DAY_SCRIPT` is: no egress, no keys, started by a rule and
+ * never by the clock, reading and writing the three lists a payment settles and the Ledger, where a bill's link lives.
+ */
+export const SETTLE_SCRIPT = {
+  script: 'settle',
+  title: 'Mark what a payment paid',
+  pack: 'money-core',
+  runs: { rule: true },
+  egress: [],
+  keys: [],
+  reads: ['obligations', 'installments', 'recurring', 'transactions'],
+  writes: ['obligations', 'installments', 'recurring', 'transactions'],
+  source: `${settle.toString()}\nexport default ${run.toString()}`,
+};

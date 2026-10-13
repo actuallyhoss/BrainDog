@@ -9,8 +9,8 @@
  */
 import type { GroupKnobs } from '../src/forecast.ts';
 
-/** What one walk of a group tells the controls: how its amounts are written, and its movements worth leaving out. */
-export type GroupMember = { template: string; heavy: { label: string; amount: string }[] };
+/** What one walk of a group tells the controls: its movements worth leaving out. */
+export type GroupMember = { heavy: { label: string; amount: string }[] };
 
 export type Group = { knobs: GroupKnobs; members: Record<string, GroupMember> };
 

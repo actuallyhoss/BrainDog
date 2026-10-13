@@ -13,13 +13,13 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { HELD, collect, fold, heldIn, hitsIn, judge, kernelWords, namesIn, namesOfDocument, namesOfSource, read, unnamed } from '../core-names.mjs';
+import { HELD, collect, declarationsOf, fold, heldIn, hitsIn, judge, kernelWords, namesIn, namesOfDocument, namesOfSource, read, unnamed } from '../core-names.mjs';
 import { EXEMPT, HELD as WORDS_HELD, PUBLIC_WORDS, WORDS, uncomment, wordsWith } from '../shell-words.mjs';
 
 const gates = join(import.meta.dirname, '..');
@@ -169,6 +169,8 @@ for (const [tree, place] of [
   ['core-names-register', 'packages/record/src/seeded-address.ts:3'],
   ['core-names-usecase', 'apps/web/src/lib/seeded-figure.ts:2'],
   ['core-names-field', 'packages/host/src/seeded-field.ts:2'],
+  ['core-names-declaration', 'apps/web/src/lib/seeded-drawer.ts:2'],
+  ['core-names-declaration-beside', 'packages/seed/src/usecases/seeded-install.ts:3'],
 ])
   test(`the planted tree ${tree} is red, once, at its seeded line`, () => {
     const { status, said } = run(join(gates, 'negative', tree));
@@ -176,6 +178,67 @@ for (const [tree, place] of [
     assert.deepEqual(places(said), [place], said);
     assert.match(said, /1 finding\(s\)/u);
   });
+
+/* THE DECLARATIONS, which are not the core. The two planted trees above are the gate's own answer; these are the rule. */
+test("an add-on's or a use case's own declaration is not read, and its folder goes with it", () => {
+  const root = join(gates, 'negative', 'core-names-declaration');
+  const planted = read(root);
+  assert.deepEqual(
+    [...planted.declarations].sort(),
+    [
+      'packages/seed/src/modules/till/legs.ts',
+      'packages/seed/src/modules/till/lists/drawers.ts',
+      'packages/seed/src/packs/ledger.ts',
+      'packages/seed/src/usecases/kiosk.ts',
+    ],
+  );
+  assert.deepEqual(planted.sources, ['apps/web/src/lib/seeded-drawer.ts']);
+  assert.deepEqual(planted.hits.map((h) => `${h.path}:${h.line} ${h.key}`), ['apps/web/src/lib/seeded-drawer.ts:2 drawers']);
+  /* What the rule left out is there to be found: read as the core, the four files spell a name thirteen times. */
+  const asCore = [...planted.declarations].flatMap((path) => hitsIn(readFileSync(join(root, path), 'utf8'), planted.names));
+  assert.equal(asCore.length, 13);
+  assert.ok(asCore.some((h) => h.key === 'tasks'), "a neighbour's list is spelled there, and left");
+});
+
+test('a file is a declaration by what it says and where it stands, and a comment or a type says nothing', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'core-names-declares-'));
+  const files = {
+    'packages/seed/src/modules/work.ts': "export const WORK = [{ id: 'tasks', pack: 'work' }];\n",
+    'packages/seed/src/modules/base.ts': "export type Module = { pack: string };\nexport const A = 'tasks';\n",
+    'packages/seed/src/modules/money/lists/accounts.ts': "export const ACCOUNTS = { id: 'accounts', pack: 'money-core' };\n",
+    'packages/seed/src/modules/money/figures/cash.ts': "export const CASH = 'register.accounts';\n",
+    'packages/seed/src/usecases/shop.ts': "export const SHOP = { usecase: 'shop', pack: { declarations: [] } };\n",
+    'packages/seed/src/usecases/install.ts': "/* usecase: 'shop' */\nexport const FIRST = 'shop';\n",
+    'packages/seed/src/index.ts': "export const SEED = { pack: 'work' };\n",
+    'packages/kernel/src/modules/work.ts': "export const WORK = { pack: 'work' };\n",
+  };
+  try {
+    for (const [path, text] of Object.entries(files)) {
+      mkdirSync(join(dir, path, '..'), { recursive: true });
+      writeFileSync(join(dir, path), text);
+    }
+    assert.deepEqual(
+      [...declarationsOf(dir, Object.keys(files))].sort(),
+      [
+        'packages/seed/src/modules/money/figures/cash.ts',
+        'packages/seed/src/modules/money/lists/accounts.ts',
+        'packages/seed/src/modules/work.ts',
+        'packages/seed/src/usecases/shop.ts',
+      ],
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('this tree: the money add-on lists are declarations, the code beside the use cases is not, and no entry holds a declaration', () => {
+  for (const path of ['packages/seed/src/modules/money/lists/filing-rules.ts', 'packages/seed/src/modules/money/lists/accounts.ts', 'packages/seed/src/usecases/founder.ts'])
+    assert.ok(reading.declarations.has(path), path);
+  for (const path of ['packages/seed/src/usecases/install.ts', 'packages/seed/src/usecases/names.ts', 'packages/seed/src/packs/first-party.ts', 'packages/seed/src/index.ts'])
+    assert.ok(reading.sources.includes(path) && !reading.declarations.has(path), path);
+  assert.deepEqual(reading.hits.filter((h) => reading.declarations.has(h.path)), []);
+  assert.deepEqual(HELD.filter((e) => reading.declarations.has(e.path)), []);
+});
 
 test('a word the kernel declares is not a place, and after register. it still is', () => {
   const own = kernelWords(repo);

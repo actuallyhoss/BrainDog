@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { arrivalOf, keepSaid, SAID_KEY, SAID_LINK_BYTES, SAID_LINK_MOST, saidForLink, saidFromLink, saidKept, startSignup, type Draft, type Io } from './signup.ts';
+import { arrivalOf, keepKey, keepSaid, SAID_KEY, SAID_LINK_BYTES, SAID_LINK_MOST, saidForLink, saidFromLink, saidKept, startSignup, type Draft, type Io } from './signup.ts';
 
 const MARIAM = "I'm Mariam. I run a small candle shop in Alexandria and freelance as a designer.";
 const TOKEN = 'v'.repeat(20) + '_-' + 'K'.repeat(21);
@@ -124,4 +124,54 @@ test('A LINK WITH NO SENTENCE, OR A BROKEN ONE, IS A PROOF AS BEFORE and builds 
   assert.equal(arrivalOf(`#verify=short&said=${encodeURIComponent(JSON.stringify({ said: MARIAM }))}`, () => (wiped += 1)), null);
   assert.equal(wiped, 2);
   assert.equal(saidKept(phone), null);
+});
+
+test('THE BUILD\'S KEY IS KEPT WITH THE SENTENCE, so a reload between the call and its answer presses under the same one', () => {
+  const desk = storage();
+  const KEY = 'first-run-3f2b8c1e-0d4a-4a6f-9b57-1c2d3e4f5a6b';
+  keepSaid(desk, { said: MARIAM, currency: 'EGP', usecase: null, key: KEY }, 1);
+  assert.deepEqual(saidKept(desk, 2, null), { said: MARIAM, currency: 'EGP', usecase: null, key: KEY });
+  /* ONE KEPT BEFORE THERE WAS A KEY reads back without one, as it always did. */
+  const before = storage();
+  before.map.set(SAID_KEY, JSON.stringify({ said: MARIAM, currency: 'EGP', usecase: null, at: 1 }));
+  const old = saidKept(before, 2, null);
+  assert.deepEqual(old, { said: MARIAM, currency: 'EGP', usecase: null });
+  assert.equal(old !== null && 'key' in old, false);
+  /* A KEY THAT IS NOT ONE IS LEFT OUT, and the sentence is still built. */
+  for (const bad of [7, '', 'has space', 'k'.repeat(101), null]) {
+    before.map.set(SAID_KEY, JSON.stringify({ said: MARIAM, currency: null, usecase: null, key: bad, at: 1 }));
+    assert.deepEqual(saidKept(before, 2, null), { said: MARIAM, currency: null, usecase: null }, String(bad));
+  }
+  /* DROPPED WITH THE DRAFT once all of it is in the record. */
+  keepSaid(desk, null);
+  assert.equal(desk.map.has(SAID_KEY), false);
+  assert.equal(saidKept(desk, 2, null), null);
+});
+
+test('A KEY IS PUT BESIDE A SENTENCE ALREADY KEPT, without making the sentence any younger', () => {
+  const desk = storage();
+  keepSaid(desk, { said: MARIAM, currency: 'EGP', usecase: 'shop', reply: { about: 'currency', value: 'EGP' } }, 1000);
+  keepKey(desk, 'first-run-one', 5000);
+  assert.deepEqual(saidKept(desk, 5000, null), { said: MARIAM, currency: 'EGP', usecase: 'shop', reply: { about: 'currency', value: 'EGP' }, key: 'first-run-one' });
+  assert.equal((JSON.parse(desk.map.get(SAID_KEY) ?? '{}') as { at?: number }).at, 1000, 'its day still runs from when it was said');
+  /* A NEW KEY TAKES THE OLD ONE'S PLACE, as a Try again of an answered press takes a new one. */
+  keepKey(desk, 'first-run-two', 6000);
+  assert.equal(saidKept(desk, 6000, null)?.key, 'first-run-two');
+  /* NOTHING KEPT, NOTHING WRITTEN: a key alone builds nothing, and a key that is not one changes nothing. */
+  const phone = storage();
+  keepKey(phone, 'first-run-one', 1);
+  assert.equal(phone.map.has(SAID_KEY), false);
+  keepKey(desk, 'not a key', 7000);
+  assert.equal(saidKept(desk, 7000, null)?.key, 'first-run-two');
+  /* STORAGE OFF: no throw, and the page presses under the key it holds in memory. */
+  const blocked = { getItem: () => { throw new Error('off'); }, setItem: () => { throw new Error('off'); }, removeItem: () => { throw new Error('off'); } };
+  assert.doesNotThrow(() => keepKey(blocked, 'first-run-one'));
+  assert.doesNotThrow(() => keepSaid(blocked, { said: MARIAM, currency: null, usecase: null, key: 'first-run-one' }));
+});
+
+test('THE KEY NEVER RIDES IN THE LINK: it is this device\'s handle on its own press', () => {
+  const packed = saidForLink({ said: MARIAM, currency: 'EGP', usecase: null, key: 'first-run-one' });
+  assert.deepEqual(JSON.parse(packed ?? '{}'), { said: MARIAM, currency: 'EGP' });
+  const back = saidFromLink(JSON.stringify({ said: MARIAM, key: 'first-run-other' }));
+  assert.equal(back !== null && 'key' in back, false, 'and one a link carries is not taken');
 });

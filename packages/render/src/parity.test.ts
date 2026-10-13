@@ -23,6 +23,8 @@ import type { Component } from 'svelte';
 import { parse, type Block as BlockSegment } from './parse.ts';
 import { toHTML } from './html.ts';
 import { UNNAMED } from './inline.ts';
+import { forecastFigure, forecastModel, forecastPerMonth, inCurrency, largest } from './forecast.ts';
+import { writeAmount } from './money.ts';
 
 registerHooks({
   load(url, context, next) {
@@ -343,6 +345,57 @@ test('WHAT COUNTS OFFERS WHAT THE CHART SHOWS: every switch is a movement both r
     assert.ok(!table(html).includes(past), `${past} moves past the three months on screen`);
     assert.ok(!chips.some(([label]) => label === past), `${past} is offered over a chart that does not reach it`);
   }
+});
+
+/** The cells of a forecast's table, in order: what moved and the balance after it. */
+const tableFigures = (t: string): string[] =>
+  [...(/<table class="forecast-table">[\s\S]*?<\/table>/u.exec(t)?.[0] ?? '').matchAll(/<td class="num">([^<]*)<\/td>/gu)].map((m) => decode(m[1]!)).filter(Boolean);
+
+/** A walk as a host writes it, every amount in the stored form, on a record whose own currency is `home`. */
+const walkIn = (currency: string, home: string): string =>
+  `\`\`\`forecast\nopening | 2026-09-17 | Cash now | ${currency} 34,850.00\nstep | 2026-09-20 | Invoice | ${currency} 960.00\nstep | 2026-10-01 | Tax | ${currency} −40,100.00\nhorizon | 90 |  | \nhome | ${home} |  | \nknobs | spend count |  | \n\`\`\``;
+
+test('A FORECAST WRITES EVERY AMOUNT WITH THE ONE WRITER: the table reads the same in both renderers, in the home currency and in another', () => {
+  const Knobbed = Block as unknown as Component<{ block: BlockSegment; opts: { scenario: boolean } }>;
+  for (const currency of ['EGP', 'USD']) {
+    const block = page(walkIn(currency, 'EGP'));
+    /* `tree` makes every run of space one plain space, the space that joins a code to its figure among them. */
+    const said = (minor: number): string => writeAmount({ minor, currency }, 'EGP', 'exact')!.text.replaceAll('\u00a0', ' ');
+    const html = tree(toHTML([block]));
+    const svelte = tree(render(Block, { props: { block } }).body);
+    const wanted = [said(3_485_000), said(96_000), said(3_581_000), said(-4_010_000), said(-429_000)];
+    assert.deepEqual(tableFigures(html), wanted, `${currency}: toHTML writes what the writer writes`);
+    assert.deepEqual(tableFigures(svelte), wanted, `${currency}: the Svelte drawer writes what the writer writes`);
+    assert.equal(svelte, html, `${currency}: and the two are one tree`);
+    /* THE CHIPS AND THE SLIDER ARE THE SVELTE DRAWER'S ALONE, and are the same writer's, a fraction of noughts dropped. */
+    const knobs = tree(render(Knobbed, { props: { block, opts: { scenario: true } } }).body);
+    const read = (minor: number): string => writeAmount({ minor, currency }, 'EGP', 'read')!.text.replaceAll('\u00a0', ' ');
+    const chips = [...knobs.matchAll(/<span class="forecast-chip-amount num">([^<]*)<\/span>/gu)].map((m) => decode(m[1]!));
+    assert.deepEqual(chips, [read(96_000), read(-4_010_000)], `${currency}: what counts`);
+    assert.ok(knobs.includes(`>${forecastPerMonth(read(0))}<`), `${currency}: the spend slider at rest`);
+  }
+  /* AND ANOTHER CURRENCY KEEPS ITS CODE while the home currency's is the record's to drop, whatever the rule's table says. */
+  const usd = tableFigures(tree(toHTML([page(walkIn('USD', 'EGP'))])));
+  assert.ok(usd.every((f) => f.includes('USD')), 'a dollar on a pound record says it is a dollar');
+  assert.ok(usd[3]!.startsWith('−'), 'and what goes out has a true minus in front');
+});
+
+test('a walk shown in another currency is written by the same writer, and the model holds a currency and numbers', () => {
+  const rows = [
+    ['opening', '2026-09-17', 'Cash now', 'EGP 48,500.00'],
+    ['step', '2026-10-01', 'Rent', 'EGP −12,125.00'],
+    ['home', 'EGP', '', ''],
+    ['show', 'EGP to USD', '2026-09-16', '0.02'],
+  ];
+  const own = forecastModel(rows)!;
+  assert.equal(own.currency, 'EGP');
+  assert.equal(forecastFigure(own, own.opening), writeAmount({ minor: 4_850_000, currency: 'EGP' }, 'EGP', 'exact')!.text);
+  const shown = inCurrency(own, own.shows[0]!);
+  assert.equal(shown.currency, 'USD');
+  assert.equal(shown.opening, 970);
+  assert.equal(forecastFigure(shown, shown.opening), writeAmount({ minor: 97_000, currency: 'USD' }, 'EGP', 'exact')!.text);
+  assert.equal(forecastFigure(shown, shown.steps[0]!.delta, 'read'), writeAmount({ minor: -24_250, currency: 'USD' }, 'EGP', 'read')!.text);
+  assert.equal(largest(shown)[0]!.amount, writeAmount({ minor: -24_250, currency: 'USD' }, 'EGP', 'exact')!.text);
 });
 
 test('a capture draws its field only where the host can write, prompted by its heading, and no Add until there is text', () => {

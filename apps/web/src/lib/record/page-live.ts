@@ -43,7 +43,7 @@ import {
   type WalkStep,
 } from './api.ts';
 import { REGISTERS } from './held.ts';
-import { linkOf } from './blocks.ts';
+import { linkOf, REST_MARK } from './blocks.ts';
 import { bylineOf } from './byline.ts';
 import { METRICS } from './declared.ts';
 import { readBoot } from './boot-live.ts';
@@ -226,6 +226,8 @@ export type LiveBlock = BlockResult & {
   actions?: ActionRow[];
   /** Set when this build cannot draw the block from a live answer: the one line drawn instead. */
   cannot?: string;
+  /** A heat's: how many of its list's days fall outside its twelve weeks, which no cell draws and the block says under them. */
+  outside?: number;
   /**
    * An `inputs` block's: the record's home currency as the kernel answers it beside `types`, or `null` where none is set,
    * which a bare figure typed into an empty money box is written in (`inputs-write.ts` `home`).
@@ -387,7 +389,69 @@ const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : und
  * ONE LINE OF A WHOLE: a label as the list stores it, what every row under it adds to, the currency when that is
  * money, and for a heat set against another whole (`of:`) that day's whole.
  */
-type WholeLine = { label: string | number | boolean | null; value: number; currency?: string; of?: number };
+type WholeLine = { label: string | number | boolean | null; value: number; currency?: string; of?: number; rest?: true };
+
+/** A whole number that counts something, nought or more. */
+const counted = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0;
+
+/**
+ * THE LABELS PAST THE KERNEL'S CAP AS LINES OF THE WHOLE (`rest`, `WHOLE_PARTS` in `kernel/src/pages.ts`), or `null`
+ * where the rest does not read: none where there is no rest, one where it added up, and one a currency where it did not.
+ *
+ * A REST LINE HOLDS NO LABEL, because it is no value of the field: a date column would write it as a day and a chip
+ * would filter by it. It is marked instead, and the drawer says it in its own words, last (`blocks.ts` `REST_MARK`).
+ */
+function restOf(past: unknown): WholeLine[] | null {
+  if (past === undefined || past === null) return [];
+  if (typeof past !== 'object') return null;
+  const { labels, rows, value, unit, parts } = past as Record<string, unknown>;
+  if (!counted(labels) || labels === 0 || !counted(rows)) return null;
+  if (unit !== undefined && unit !== null && typeof unit !== 'string') return null;
+  if (typeof value === 'number' && Number.isFinite(value))
+    return [{ label: null, value, ...(typeof unit === 'string' && /^[A-Z]{3}$/.test(unit) ? { currency: unit } : {}), rest: true }];
+  if (value !== null || !Array.isArray(parts) || parts.length === 0) return null;
+  const lines: WholeLine[] = [];
+  for (const p of parts) {
+    const { amount, currency } = (p ?? {}) as Record<string, unknown>;
+    if (typeof amount !== 'number' || !Number.isFinite(amount) || typeof currency !== 'string') return null;
+    lines.push({ label: null, value: amount, currency, rest: true });
+  }
+  return lines;
+}
+
+/**
+ * HOW MANY OF A HEAT'S ROWS NO CELL DRAWS (`outside` on the kernel's `WholeRead`: dated outside its twelve weeks, or
+ * holding no day): the count, nought where the record said none, and `null` where what it said is no count.
+ */
+function outsideOf(v: unknown): number | null {
+  const outside = v !== null && typeof v === 'object' ? (v as { outside?: unknown }).outside : undefined;
+  if (outside === undefined || outside === null) return 0;
+  return counted(outside) ? outside : null;
+}
+
+/**
+ * WHETHER THE LINES ADD TO THE WHOLE'S OWN TOTAL, the rest among them. Bars that add to something else than the figure
+ * the record read over the same rows are a chart about a different list, and nothing on screen would say which is right.
+ *
+ * A TOTAL THAT IS NO NUMBER HOLDS THE LINES TO NOTHING: money the record could not add into one currency is `null`,
+ * and a record that sent none has none. A GAUGE AND A TRACK A ROW HAVE NO LINES, their whole being the one sum.
+ * A HEAT'S TOTAL COUNTS THE ROWS NO CELL DRAWS, so a heat that counts is held to its cells and those together, and one
+ * that adds a field up with rows outside is not held: what those rows hold is in the total and in no line.
+ * MONEY CONVERTED A LINE AT A TIME ROUNDS A LINE AT A TIME, so it is held to within one minor unit a line.
+ */
+function addsUp(v: unknown, kind: string, sums: boolean, lines: readonly WholeLine[]): boolean {
+  const { total, unit, currency, converted } = v as Record<string, unknown>;
+  if (typeof total !== 'number' || !Number.isFinite(total)) return true;
+  if (kind === 'gauge' || (kind === 'progress' && lines.length === 0)) return true;
+  const outside = kind === 'heat' ? (outsideOf(v) ?? 0) : 0;
+  if (outside > 0 && sums) return true;
+  const named = typeof unit === 'string' ? unit : typeof currency === 'string' ? currency : null;
+  if (named !== null && lines.some((l) => l.currency !== undefined && l.currency !== named)) return false;
+  if (new Set(lines.map((l) => l.currency ?? '')).size > 1) return false;
+  const sum = lines.reduce((n, l) => n + l.value, outside);
+  const slack = converted !== undefined && converted !== null ? lines.length : 1e-9 * Math.max(1, Math.abs(total));
+  return Math.abs(sum - total) <= slack;
+}
 
 /**
  * A SUM KIND'S WHOLE AS THE RECORD ANSWERS IT (`wholeRead`: `{ rows, total, of? }`), narrowed, or `null`.
@@ -395,14 +459,16 @@ type WholeLine = { label: string | number | boolean | null; value: number; curre
  * ALL OF IT READS OR NONE OF IT DOES. A line whose sum is not a number, or whose currency is not a word, is not left
  * out and the rest drawn: the bars would add to less than the list and nothing on screen would say so.
  */
-function wholeOf(v: unknown): WholeLine[] | null {
+function wholeOf(v: unknown, kind: string, sums: boolean): WholeLine[] | null {
   const rows = v !== null && typeof v === 'object' ? (v as { rows?: unknown }).rows : undefined;
   if (!Array.isArray(rows)) return null;
-  /* AND THE LABELS PAST THE KERNEL'S CAP ARE PART OF THE WHOLE (`rest`, `WHOLE_PARTS` in `kernel/src/pages.ts`): two
-     hundred labels drawn and the smallest hundred left out add to less than the list with nothing saying so, so a
-     whole that holds a `rest` is not drawn from its lines at all (audit 53, finding 4). */
-  const past = (v as { rest?: unknown }).rest;
-  if (past !== undefined && past !== null) return null;
+  /* AND THE LABELS PAST THE KERNEL'S CAP ARE PART OF THE WHOLE: two hundred labels drawn and the smallest hundred left
+     out add to less than the list with nothing saying so (audit 53, finding 4), so they are one line more, last. A HEAT
+     HAS NO REST, every day of its twelve weeks being a line, and a rest has no day to be drawn on; nor has a count of
+     what is done, whose rest says how many are done and not out of how many. */
+  const past = restOf((v as { rest?: unknown }).rest);
+  if (past === null || (past.length > 0 && (kind === 'heat' || kind === 'progress'))) return null;
+  if (outsideOf(v) === null) return null;
   const lines: WholeLine[] = [];
   for (const r of rows) {
     if (r === null || typeof r !== 'object') return null;
@@ -424,7 +490,8 @@ function wholeOf(v: unknown): WholeLine[] | null {
     if (typeof value !== 'number' || !Number.isFinite(value)) return null;
     lines.push({ label, value, ...(typeof currency === 'string' ? { currency } : {}), ...at });
   }
-  return lines;
+  lines.push(...past);
+  return addsUp(v, kind, sums, lines) ? lines : null;
 }
 
 /** The column a heat's share is written in when the block declares only its day: no list's field, so it is said as written. */
@@ -450,6 +517,8 @@ const WHOLE_COUNTED_MOST = 50_000;
  * A HEAT'S SHARE IS WRITTEN IN ITS VALUE, `3 of 12`, which is how the renderer reads a day set against its whole
  * (`render/src/heat.ts`), in the block's second column or, where it declares only its day, in `WHOLE_SHARE`.
  * A LINE IS NO ROW OF THE LIST, so it carries no number: nothing drawn from it opens a row (`withRefs`).
+ * THE REST'S LINE HOLDS NO LABEL AND THE DRAWER'S MARK (`REST_MARK`), a column no list has, so it is said as the drawer
+ * says it and never as a value of the field.
  * A THIRD COLUMN IS NOT IN THE LINES: a progress drawn against each row's target has no target to read here.
  */
 function wholeRows(kind: string, columns: readonly { field?: unknown }[], lines: readonly WholeLine[]): Row[] | null {
@@ -471,10 +540,10 @@ function wholeRows(kind: string, columns: readonly { field?: unknown }[], lines:
     const row = (fields: Record<string, unknown>): Row => ({ id: '', seq: null, fields, version: 0, created_at: '' });
     if (!counts) {
       const sum = shares ? `${l.value} of ${l.of}` : l.currency ? { amount: l.value, currency: l.currency } : l.value;
-      rows.push(row({ [by]: l.label, [of || WHOLE_SHARE]: sum }));
+      rows.push(row({ [by]: l.label, [of || WHOLE_SHARE]: sum, ...(l.rest ? { [REST_MARK]: true } : {}) }));
       continue;
     }
-    const one = row({ [by]: l.label });
+    const one = row({ [by]: l.label, ...(l.rest ? { [REST_MARK]: true } : {}) });
     for (let i = 0; i < l.value; i++) rows.push(one);
   }
   return rows;
@@ -1487,8 +1556,13 @@ export function blockOf(
      A RECORD THAT SENDS NO WHOLE STILL IS NOT ADDED UP FROM A SLICE. The record is a different deployment from this
      app, and one on an older kernel answers 200 rows of 301 with nothing beside them: that says it cannot be drawn. */
   let columns = shell.columns;
+  /* AND A HEAT SAYS HOW MANY OF ITS ROWS NO CELL DRAWS (`outside`), whichever it was drawn from: its cells add to less
+     than the list by that many, and the drawer says so under them (`blocks.ts` `outsideSaid`). */
+  let outside = 0;
   if (SUMS.has(kind)) {
-    const lines = wholeOf(summed);
+    const adds = kind === 'heat' && (b.columns ?? []).length > 1 && (b as { who?: unknown }).who !== true;
+    const lines = wholeOf(summed, kind, adds);
+    if (kind === 'heat' && lines !== null) outside = outsideOf(summed) ?? 0;
     const shares = kind === 'heat' && lines !== null && lines.some((l) => l.of !== undefined);
     if (sent.length < matched || shares) {
       const whole = lines === null ? null : wholeRows(kind, b.columns ?? [], lines);
@@ -1598,6 +1672,7 @@ export function blockOf(
     ...path,
     ...open,
     ...(spentBy === undefined ? {} : { spentBy }),
+    ...(outside > 0 ? { outside } : {}),
     names: namesOf(refs),
     ...(cardGroups ? { groups: cardGroups } : {}),
     ...(bylines ? { bylines } : {}),

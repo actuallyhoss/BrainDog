@@ -12,9 +12,10 @@
  * everything they print comes back from here.
  */
 
-import { MISSING, axisFigure } from './format.ts';
+import { MISSING, axisFigure, exponentOf } from './format.ts';
 import { signedOf } from './bridge.ts';
 import { figureLike } from './figure.ts';
+import { type AmountSetting, readAmount, writeAmount } from './money.ts';
 
 /** Two decimals at most, and no trailing zeros, so an attribute stays short and exact. */
 const at = (n: number): string => String(Math.round(n * 100) / 100);
@@ -99,7 +100,7 @@ const stateOf = (cell: string | undefined): SeriesState => {
  *
  * `net` is the fence's `net` form.
  */
-export function seriesPlan(rows: readonly (readonly string[])[], net = false): SeriesPlan {
+export function seriesPlan(rows: readonly (readonly string[])[], net = false, home?: string | null): SeriesPlan {
   const [head = [], ...body] = rows;
   const stated = head.length > 1 && head[head.length - 1]!.trim().toLowerCase() === 'state';
   const named = head.slice(1, stated ? -1 : undefined).slice(0, SERIES_MOST);
@@ -203,7 +204,7 @@ export function seriesPlan(rows: readonly (readonly string[])[], net = false): S
       state,
       said: state === 'partial' ? SERIES_PARTIAL : state === 'due' ? SERIES_DUE : state === 'ahead' ? SERIES_AHEAD : '',
       values: series.map((_, k) => (values[i]![k] === null ? MISSING : (r[k + 1] ?? '').trim())),
-      net: v === null ? MISSING : figureLike(template, v),
+      net: v === null ? MISSING : amountLike(template, v, home, 'exact'),
     };
   });
 
@@ -221,7 +222,7 @@ export function seriesPlan(rows: readonly (readonly string[])[], net = false): S
     }
     const places = Math.max(0, ...cells.map((c) => /\.(\d+)/u.exec(c.replace(/,/gu, ''))?.[1]?.length ?? 0));
     const minor = cells.reduce((t, c) => t + Math.round(seriesValue(c)! * 10 ** places), 0);
-    return [{ label: sr.label, value: figureLike(cells[0]!, minor / 10 ** places) }];
+    return [{ label: sr.label, value: amountLike(cells[0]!, minor / 10 ** places, home, 'read') }];
   });
 
   const sentence = buckets
@@ -240,14 +241,31 @@ export function seriesPlan(rows: readonly (readonly string[])[], net = false): S
     zero: at(y(0)),
     netLine,
     netDots,
-    top: hi > 0 ? axisFigure(figureLike(template, hi)) : '',
-    bottom: lo > 0 ? axisFigure(figureLike(template, -lo)) : '',
-    ticks: span > 0 ? seriesScale(hi, lo, y, template) : [],
+    top: hi > 0 ? amountLike(template, hi, home, 'axis') : '',
+    bottom: lo > 0 ? amountLike(template, -lo, home, 'axis') : '',
+    ticks: span > 0 ? seriesScale(hi, lo, y, template, home) : [],
     empty: span <= 0,
     drawn: span > 0 && (sums.filter((x) => !x.gap).length >= SERIES_POINTS || mixed),
     totals,
     sentence,
   };
+}
+
+/**
+ * A figure a chart worked out, written by the one writer (`money.ts`) once the host has said the record's home.
+ *
+ * `home` is the record's home currency, `null` when it has none, and `undefined` when the caller was never told:
+ * then, and for a cell that is not stored money (hours, a count, a figure a page drew itself), the figure copies
+ * the cell's own shape as it always has. The amount is rounded once, to the currency's own minor unit, and only
+ * `axis` is compact.
+ */
+export function amountLike(template: string, value: number, home: string | null | undefined, setting: AmountSetting): string {
+  const copied = (): string => (setting === 'axis' ? axisFigure(figureLike(template, value)) : figureLike(template, value));
+  const like = home === undefined || !Number.isFinite(value) ? null : readAmount(template.trim());
+  if (!like) return copied();
+  const minor = Math.sign(value) * Math.round(Math.abs(value) * 10 ** exponentOf(like.currency));
+  if (!Number.isSafeInteger(minor)) return copied();
+  return writeAmount({ minor, currency: like.currency }, home ?? null, setting)?.text ?? copied();
 }
 
 /** What a cell says around its figure, its sign aside: `£#` of `−£1,200.00`, `GBP #`, `#h`. */
@@ -282,9 +300,9 @@ export function seriesNice(v: number, whole = false): number {
  * The scale's three lines, top first: the top, its middle and zero where nothing goes out; the top, zero and the foot
  * where something does; zero, the middle and the foot where nothing comes in.
  */
-function seriesScale(hi: number, lo: number, y: (v: number) => number, template: string): SeriesTick[] {
+function seriesScale(hi: number, lo: number, y: (v: number) => number, template: string, home: string | null | undefined): SeriesTick[] {
   const marks = hi > 0 && lo > 0 ? [hi, 0, -lo] : hi > 0 ? [hi, hi / 2, 0] : [0, -lo / 2, -lo];
-  return marks.map((v) => ({ y: at(y(v)), label: axisFigure(figureLike(template, v)), zero: v === 0 }));
+  return marks.map((v) => ({ y: at(y(v)), label: amountLike(template, v, home, 'axis'), zero: v === 0 }));
 }
 
 /** The renderer's own words, as `split.ts` keeps `SPLIT_ZERO`: it imports nothing from the app. */

@@ -820,6 +820,11 @@ export type CycleLine = {
   leg: Pick<Leg, 'on' | 'every' | 'ends' | 'days' | 'weekend'>;
   fields: Readonly<Record<string, unknown>>;
   rest?: readonly number[];
+  /**
+   * The day of the month the line is paid on, 1 to 31, kept by whoever writes the answer back to the row's first day.
+   * See `cycleAfter` and `anchorDayOf`. Only a cycle of months reads it, and the row's own days win when they fit.
+   */
+  anchorDay?: number;
 };
 
 /**
@@ -838,6 +843,18 @@ export type CycleLine = {
  * paid on Friday the 30th, "the working day before", the 30th is that same pay and the answer is 30 November. So is a
  * step moved onto or behind the one before it, as in `occurrences`.
  *
+ * A DAY WRITTEN BACK HAS LOST THE DAY IT WAS CLAMPED FROM, AND `anchorDay` KEEPS IT. The walk steps every cycle from
+ * one first day, so 30 January clamps to 28 February and is the 30th again in March. A line whose "Next" is moved on
+ * each time it is paid steps from the day last written, and 28 February read alone is a month end: measured, lines
+ * first due on 28, 29 and 30 January were all answered 31 March, and the 31st of every long month after. Nothing on
+ * the row says which it was, so the caller says it: with `anchorDay` a cycle of months steps as a row naming that one
+ * day steps (`namedSteps`), the day itself or the last day of a month too short for it, and a leap day paid yearly
+ * comes back to the 29th. Read it once with `anchorDayOf` before the first write, and keep it.
+ *
+ * WITHOUT ONE, AND WITHOUT DAYS OF ITS OWN, THE ROW IS READ AS THE WALK READS IT, month end and all, so the two still
+ * agree on a row nobody has written back. A leg with a `days` field can keep the anchor there instead, and then the
+ * walk reads it too.
+ *
  * `null` PAST THE ROW'S LAST DAY, which bounds the day the row names, and when `SKIP_CAP` steps do not reach `day`.
  */
 export function cycleAfter(day: string, line: CycleLine): string | null {
@@ -853,7 +870,8 @@ export function cycleAfter(day: string, line: CycleLine): string | null {
   const { cadence } = cadenceOf(leg.every, leg.every ? String(fields[leg.every.field] ?? '') : '');
   if (cadence === null) return null;
   const given = leg.days ? daysOf(fields[leg.days]) : null;
-  const named = misfit(given, cadence) ? null : (given ?? null);
+  const fits = given && !misfit(given, cadence) ? given : null;
+  const named = fits ?? anchored(line.anchorDay, cadence);
   const shift = leg.weekend ? shiftOf(fields[leg.weekend]) : 'leave';
   const rest = new Set(line.rest ?? []);
   let prev = '';
@@ -866,6 +884,34 @@ export function cycleAfter(day: string, line: CycleLine): string | null {
     if (step > after && to > after && !repeat) return step;
   }
   return null;
+}
+
+/** An anchor as the one day a cycle of months names, or nothing: no anchor, not a day of the month, or another cycle. */
+const anchored = (anchorDay: number | undefined, cadence: NonNullable<Cadence>): readonly Named[] | null =>
+  cadence.kind === 'months' && Number.isInteger(anchorDay) && anchorDay! >= 1 && anchorDay! <= 31 ? [anchorDay!] : null;
+
+/**
+ * The `anchorDay` to keep for a line before its first day is written back for the first time, or `null` when it needs
+ * none: a week or twice a month names its days without the first day, a row's own days that fit already say it, and a
+ * row the walk reads once has no next day.
+ *
+ * THE DAY THE WALK WOULD HAVE STEPPED BY, so the days answered with it are the days the forecast showed while the row
+ * stood still: the day of the month of the first day, and 31, every month's last day, for a first day that is a month
+ * end on a cycle that is not whole years (`stepsOf`). On whole years 29 February stays the 29th.
+ *
+ * READ IT FROM A ROW NOBODY HAS STEPPED YET. A row already written back to 28 February answers 31 here, as the walk
+ * reads it, and only whoever knows the line can say it was the 28th, 29th or 30th.
+ */
+export function anchorDayOf(line: Pick<CycleLine, 'leg' | 'fields'>): number | null {
+  const { leg, fields } = line;
+  const on = String(fields[leg.on] ?? '');
+  if (!on || !Number.isFinite(noon(on))) return null;
+  const { cadence } = cadenceOf(leg.every, leg.every ? String(fields[leg.every.field] ?? '') : '');
+  if (cadence === null || cadence.kind !== 'months') return null;
+  const given = leg.days ? daysOf(fields[leg.days]) : null;
+  if (given && !misfit(given, cadence)) return null;
+  const first = dayOf(on);
+  return cadence.months % 12 !== 0 && endOfMonth(first) === first ? 31 : Number(first.slice(8, 10));
 }
 
 /** How a row repeats, once its cycle value has been looked up in the leg's tables. `null` walks once. */

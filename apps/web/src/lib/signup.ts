@@ -295,8 +295,16 @@ export const SAID_MOST = 2000;
  *
  * WITH THE ANSWER TO THE ONE QUESTION (`reply`), so an answer given before the mail is not asked again on the phone the
  * link is opened on. Left out (or `null`) when nothing was asked or nothing answered.
+ *
+ * AND WITH THE BUILD'S OWN KEY (`key`), once a press has gone out: a reload between the call and its answer finds the
+ * key here and presses under it again, so the record writes its entries once (audit 53, finding 2). This device's
+ * only: it is never packed for the link, and one kept before there were keys reads back without it.
  */
-export type Draft = { said: string; currency: string | null; usecase: string | null; reply?: Reply | null; cut?: boolean };
+export type Draft = { said: string; currency: string | null; usecase: string | null; reply?: Reply | null; cut?: boolean; key?: string };
+
+/** What a build's key looks like, as the page makes it (`first-run-` and a UUID): short, and nothing a link could misread. */
+const KEY = /^[A-Za-z0-9_-]{1,100}$/;
+const keyOf = (v: unknown): string | null => (typeof v === 'string' && KEY.test(v) ? v : null);
 
 /** The one question's answer, read back off something kept, or `null` when it is not one. */
 function replyOf(v: unknown): Reply | null {
@@ -316,7 +324,7 @@ export function keepSaid(storage: Pick<Storage, 'setItem' | 'removeItem'> | null
   if (draft === null) fromLink = null;
   try {
     if (draft === null || draft.said.trim() === '') storage?.removeItem(SAID_KEY);
-    else storage?.setItem(SAID_KEY, JSON.stringify({ said: draft.said.slice(0, SAID_MOST), currency: draft.currency, usecase: draft.usecase, ...(draft.reply ? { reply: draft.reply } : {}), at: now }));
+    else storage?.setItem(SAID_KEY, JSON.stringify({ said: draft.said.slice(0, SAID_MOST), currency: draft.currency, usecase: draft.usecase, ...(draft.reply ? { reply: draft.reply } : {}), ...(keyOf(draft.key) ? { key: draft.key } : {}), at: now }));
   } catch {
     /* Storage off: the new record's /start asks "Who are you?" again, which is the whole of the cost. */
   }
@@ -357,7 +365,25 @@ function keptHere(storage: Pick<Storage, 'getItem' | 'removeItem'> | null | unde
     }
     return null;
   }
-  return withReply({ said: v.said.slice(0, SAID_MOST), currency: str(v.currency), usecase: str(v.usecase) }, v.reply);
+  const key = keyOf(v.key);
+  return withReply({ said: v.said.slice(0, SAID_MOST), currency: str(v.currency), usecase: str(v.usecase), ...(key ? { key } : {}) }, v.reply);
+}
+
+/**
+ * Put a build's key beside the sentence kept on this device, before its press goes out. Storage may be off, and then
+ * the key lives in the page alone, as it did.
+ *
+ * THE SENTENCE IS NO YOUNGER FOR IT: its day still runs from when it was said. NOTHING KEPT, NOTHING WRITTEN: a key
+ * with no sentence builds nothing, so a link opened on a phone (which keeps none) is as it was.
+ */
+export function keepKey(storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null | undefined, key: string, now: number = Date.now()): void {
+  if (keyOf(key) === null || keptHere(storage, now) === null) return;
+  try {
+    const kept: unknown = JSON.parse(storage?.getItem(SAID_KEY) ?? 'null');
+    if (isObj(kept)) storage?.setItem(SAID_KEY, JSON.stringify({ ...kept, key }));
+  } catch {
+    /* Storage off or full: a reload presses under a new key, which is what happened before there was this. */
+  }
 }
 
 /** A draft with its answer when one was kept, and without the key at all when none was. */

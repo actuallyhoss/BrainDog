@@ -95,6 +95,13 @@ export async function openScratch(now: number = Date.now()): Promise<Scratch> {
     reload: () => kernel.reload(),
     retire: (ids, by) => kernel.retire(ids, by ?? { actor: ACTOR }),
     seed: (register, fields, note) => kernel.create(register, { ...fields, tags: ['example'] }, { actor: ACTOR, cascade: false, pack: true, ...(note === undefined ? {} : { note }) } as never) as never,
+    /* AND AN UPDATE GOES OVER THE ROWS THE LAST INSTALL REMEMBERED PLANTING, as `packHost` does (SHL-A09). */
+    planted: (pack) => kernel.packPlanted(pack),
+    reseed: (register, row, fields) => {
+      const held = kernel.get(row);
+      if (!held || held.deleted_at) return { ok: true, value: null };
+      return kernel.update(register, row, fields, { actor: ACTOR, cascade: false, pack: true } as never) as never;
+    },
     today: () => new Date(now).toISOString().slice(0, 10),
     remember: (row) => kernel.rememberPack({ ...row, by: ACTOR } as never),
     forget: (id) => kernel.forgetPack(id),

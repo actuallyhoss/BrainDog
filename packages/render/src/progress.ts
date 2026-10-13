@@ -14,7 +14,7 @@
 
 import type { Tone } from './kinds.ts';
 import { signedOf } from './bridge.ts';
-import { figureLike } from './figure.ts';
+import { amountLike } from './series.ts';
 import { MISSING } from './format.ts';
 
 export type ProgressForm = 'goal' | 'budget' | 'range';
@@ -42,7 +42,7 @@ const fixed = (v: number): string => Math.max(0, Math.min(1, v)).toFixed(2);
 export const PROGRESS_NEAR = 0.9;
 
 /** Each row's fill, share, intent and what is left, for the form the fence names. */
-export function progressPlan(rows: readonly ProgressInput[], form: ProgressForm = 'goal'): ProgressBar[] {
+export function progressPlan(rows: readonly ProgressInput[], form: ProgressForm = 'goal', home?: string | null): ProgressBar[] {
   return rows.map(({ value, target, tone }) => {
     const t = signedOf(target);
     const read = signedOf(value);
@@ -52,11 +52,11 @@ export function progressPlan(rows: readonly ProgressInput[], form: ProgressForm 
     const ratio = v / t;
     const share = `${Math.round(ratio * 100)}%`;
     if (form === 'budget') {
-      if (v > t) return { drawable: true, fill: '1.00', limit: fixed(t / v), share, intent: tone ?? 'bad', left: progressOver(figureLike(target, v - t)) };
-      return { drawable: true, fill: fixed(ratio), limit: null, share, intent: tone ?? (ratio >= PROGRESS_NEAR ? 'warn' : undefined), left: progressLeft(figureLike(target, t - v)) };
+      if (v > t) return { drawable: true, fill: '1.00', limit: fixed(t / v), share, intent: tone ?? 'bad', left: progressOver(amountLike(target, v - t, home, 'read')) };
+      return { drawable: true, fill: fixed(ratio), limit: null, share, intent: tone ?? (ratio >= PROGRESS_NEAR ? 'warn' : undefined), left: progressLeft(amountLike(target, t - v, home, 'read')) };
     }
     if (v >= t) return { drawable: true, fill: '1.00', limit: null, share, intent: tone ?? 'good', left: PROGRESS_REACHED };
-    return { drawable: true, fill: fixed(ratio), limit: null, share, intent: tone, left: progressToGo(figureLike(target, t - v)) };
+    return { drawable: true, fill: fixed(ratio), limit: null, share, intent: tone, left: progressToGo(amountLike(target, t - v, home, 'read')) };
   });
 }
 
@@ -145,7 +145,7 @@ export const RANGE_MIXED = 'These figures are not all in one unit, money beside 
  * figure is still said as written, because each cell is right on its own and only the arithmetic across them is not.
  * A cell that does not read as a number (blank, or the dash) is no unit at all, so a gap does not refuse the block.
  */
-export function rangePlan(rows: readonly RangeInput[]): { bars: RangeBar[]; total: { spent: string; low: string; high: string }; refused: string | null } {
+export function rangePlan(rows: readonly RangeInput[], home?: string | null): { bars: RangeBar[]; total: { spent: string; low: string; high: string }; refused: string | null } {
   const read = rows.map((r) => ({ spent: signedOf(r.spent), low: signedOf(r.low), high: signedOf(r.high) }));
   const figures = rows.flatMap((r) => [r.spent, r.low, r.high]).filter((c) => Number.isFinite(signedOf(c)));
   const refused = new Set(figures.map(unitOf)).size > 1 ? RANGE_MIXED : null;
@@ -180,7 +180,7 @@ export function rangePlan(rows: readonly RangeInput[]): { bars: RangeBar[]; tota
     /* WHOLE UNITS OF THE FINEST PLACE, each rounded once from the figure as written, so 0.333 three times is 999
        thousandths and not 0.9990000000000001. */
     const units = values.reduce((a, v) => a + Math.sign(v) * Math.round(Math.abs(v) * 10 ** places), 0);
-    return figureLike(shape, units / 10 ** places);
+    return amountLike(shape, units / 10 ** places, home, 'read');
   };
   return { bars, total: { spent: sum('spent'), low: sum('low'), high: sum('high') }, refused };
 }

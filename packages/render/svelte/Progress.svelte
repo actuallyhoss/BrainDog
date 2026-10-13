@@ -28,9 +28,10 @@
     progressPlan(
       block.rows.map((r) => ({ value: said(r, 1), target: said(r, 2), ...(r.tone ? { tone: r.tone } : {}) })),
       form === 'budget' ? 'budget' : 'goal',
+      opts.home,
     ),
   );
-  const ranges = $derived(rangePlan(block.rows.map((r) => ({ spent: said(r, 1), low: said(r, 2), high: said(r, 3), ...(r.tone ? { tone: r.tone } : {}) }))));
+  const ranges = $derived(rangePlan(block.rows.map((r) => ({ spent: said(r, 1), low: said(r, 2), high: said(r, 3), ...(r.tone ? { tone: r.tone } : {}) })), opts.home));
 </script>
 
 {#if form === 'range'}

@@ -23,8 +23,7 @@
 -->
 <script lang="ts">
   import { inline, text, TONES, type Block, type RenderOptions } from '../src/index.ts';
-  import { figureLike } from '../src/figure.ts';
-  import { day, headlineFigure } from '../src/format.ts';
+  import { day } from '../src/format.ts';
   import {
     FORECAST_ADJUST,
     FORECAST_BALANCE,
@@ -67,6 +66,7 @@
     forecastSold,
     forecastSpendIn,
     horizonChoices,
+    forecastFigure,
     inCurrency,
     knobsIn,
     knobsMoved,
@@ -94,7 +94,9 @@
    * What a walk tells its group beyond `GroupMember`: what it may count in or out, by side, and its spend slider's reach
    * in its own money. Every member is written by this component, so every member carries both.
    */
-  type Member = GroupMember & { counts: { in: Counted[]; out: Counted[] }; range: SpendRange };
+  type Member = GroupMember & { counts: { in: Counted[]; out: Counted[] }; range: SpendRange; money: Money };
+  /** What `forecastFigure` writes an amount of a walk from: its currency and the record's own. */
+  type Money = Pick<ForecastModel, 'currency' | 'home' | 'template'>;
 
   /* A WALK ON ITS OWN HOLDS ITS KNOBS HERE; A WALK OF A GROUP (one a currency) READS THE GROUP'S, so one set of controls,
      under the walk that names `knobs`, moves every walk of the declaration at once. Spending is held by currency. */
@@ -165,8 +167,8 @@
   const countable = $derived(
     Boolean(model && (model.knobs.includes('count') || model.knobs.includes('leave'))) && counts.in.length + counts.out.length > 0,
   );
-  const spends = $derived<[string, string, SpendRange][]>(
-    group ? members.map(([k, m]) => [k, m.template, m.range]) : drawn ? [['', drawn.template, spendRange(drawn)]] : [],
+  const spends = $derived<[string, Money, SpendRange][]>(
+    group ? members.map(([k, m]) => [k, m.money, m.range]) : drawn ? [['', drawn, spendRange(drawn)]] : [],
   );
   const pairs = $derived(drawn ? pairsOf(drawn) : []);
   const sellEnd = $derived(drawn && shown ? addDays(drawn.today, shown.horizon) : '');
@@ -188,7 +190,7 @@
   $effect(() => {
     if (!group || !model) return;
     const mine = countsOf(model, held.horizon ?? model.horizon);
-    const member: Member = { template: model.template, heavy: [...mine.in, ...mine.out], counts: mine, range: spendRange(model) };
+    const member: Member = { money: { currency: model.currency, home: model.home, template: model.template }, heavy: [...mine.in, ...mine.out], counts: mine, range: spendRange(model) };
     group.members[key] = member;
   });
 
@@ -376,8 +378,8 @@
           <tr>
             <th scope="row">{day(step.day)}</th>
             <td>{step.label}</td>
-            <td class="num">{figureLike(m.template, step.delta)}</td>
-            <td class="num">{figureLike(m.template, step.balance)}</td>
+            <td class="num">{forecastFigure(m, step.delta)}</td>
+            <td class="num">{forecastFigure(m, step.balance)}</td>
           </tr>
         {/each}
       </tbody>
@@ -427,11 +429,11 @@
       </label>
     {/if}
     {#if m.knobs.includes('spend')}
-      {#each spends as [k, template, range] (k)}
+      {#each spends as [k, money, range] (k)}
         <label class="forecast-knob">
           <span class="forecast-knob-name">{k ? forecastSpendIn(k) : FORECAST_SPEND}</span>
           <input class="forecast-range" type="range" min="0" max={range.max} step={range.step} value={spendOf(k) * rate} oninput={(e) => setSpend(k, e)} />
-          <span class="forecast-knob-value num">{forecastPerMonth(headlineFigure(figureLike(template, spendOf(k) * rate)))}</span>
+          <span class="forecast-knob-value num">{forecastPerMonth(forecastFigure(money, spendOf(k) * rate, 'read'))}</span>
           <span class="forecast-knob-note">{FORECAST_SPEND_NOTE}</span>
         </label>
       {/each}

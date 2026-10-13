@@ -30,6 +30,7 @@
 import type { CardRole } from './cards.ts';
 import type { Tone } from './kinds.ts';
 import { leadingCode, symbolFigure } from './format.ts';
+import { type WrittenAmount, readAmount, writeAmount } from './money.ts';
 import { takeWorking } from './working.ts';
 
 export type Column = {
@@ -217,8 +218,8 @@ export function comparisonPlan(rows: readonly { cells: readonly (string | null)[
  */
 export type TableCellBody =
   | { kind: 'missing' }
-  | { kind: 'symbol'; text: string }
-  | { kind: 'coded'; sign: string; currency: string; rest: string }
+  | { kind: 'symbol'; text: string; amount?: WrittenAmount }
+  | { kind: 'coded'; sign: string; currency: string; rest: string; amount?: WrittenAmount }
   | { kind: 'text'; text: string };
 
 /**
@@ -227,10 +228,26 @@ export type TableCellBody =
  * A MISSING CELL CARRIES NO DOT, which is not an oversight. `working: true` says an agent is on
  * this ROW, and the mark is put at the head of the row's title by the evaluator; a title that is
  * missing has nothing for the mark to qualify, so the mark would be a glyph floating beside a dash.
+ *
+ * MONEY IS READ ONCE AND WRITTEN ONCE, by the one writer (`money.ts`), when the host says the record's home: `home`
+ * is its currency, `null` when the record has none, and `undefined` when the caller was never told, which keeps the
+ * older spelling. A table is `exact`, every minor unit. The amount comes back as one of the shapes a drawer already
+ * knows, a currency with a sign as `symbol` and one written by its code as `coded`, with its parts in `amount` for
+ * a drawer that sets the fraction or the code quieter. Only a cell that is the stored form and nothing else is
+ * money: `E£1,299`, `EGP 1,299` and a sentence with an amount in it are left exactly as they were.
  */
-export function tableCellBody(value: string | null | undefined): { working: boolean; body: TableCellBody } {
+export function tableCellBody(value: string | null | undefined, home?: string | null): { working: boolean; body: TableCellBody } {
   const taken = takeWorking(value ?? null);
   if (taken.text === null) return { working: false, body: { kind: 'missing' } };
+  const stored = home === undefined ? null : readAmount(taken.text);
+  const amount = stored && writeAmount(stored, home ?? null, 'exact');
+  if (amount) {
+    const body: TableCellBody =
+      amount.codePlace === 'before'
+        ? { kind: 'coded', sign: amount.minus, currency: amount.code, rest: `${amount.whole}${amount.fraction}`, amount }
+        : { kind: 'symbol', text: amount.text, amount };
+    return { working: taken.working, body };
+  }
   const symbol = symbolFigure(taken.text);
   if (symbol) return { working: taken.working, body: { kind: 'symbol', text: symbol } };
   const coded = leadingCode(taken.text);

@@ -37,6 +37,10 @@ export const INSTALLMENTS_REGISTER: MoneyRegister = {
     { id: 'due', type: 'day', index: true, deadline: true, required: true, remind: ['-7d', '0d'] },
     { id: 'state', label: 'Status', type: 'enum', values: ['open', 'paid', 'cancelled'], default: 'open', index: true, required: true },
     { id: 'settled', label: 'Paid on', type: 'day' },
+    /* THE ONE LEDGER ENTRY THAT PAID IT (REC-B11). A part is paid once, so the link lives here and names one payment,
+       where a bill keeps "Settles" on each of its several. Written by Money's `settle` script with the state and the
+       day, so paid is what a payment did and not a status somebody remembered to set. Not indexed, as `book` is not. */
+    { id: 'paid_by', label: 'Paid by', type: 'ref', to: 'transactions' },
     { id: 'party', label: 'Who', type: 'ref', to: 'people' },
     { id: 'account', type: 'ref', to: 'accounts', index: true },
     { id: 'category', type: 'ref', to: 'categories', index: true },

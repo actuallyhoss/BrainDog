@@ -480,6 +480,24 @@ const withoutFiling = (doc: Body): Body => ({
       return open(d);
     }),
 });
+/**
+ * AND 3.17.0'S PAYMENT LINKS (pay-links-57, REC-B11), folded into the same unreleased step: a bill loses Paid so far,
+ * an instalment Paid by, a repeating line Last paid and Last amount, and the Ledger its delete rule, which is there
+ * for Paid by alone.
+ */
+const PAID_FIELDS: Record<string, ReadonlySet<string>> = {
+  obligations: new Set(['paid_so_far']),
+  installments: new Set(['paid_by']),
+  recurring: new Set(['last_paid', 'last_amount']),
+};
+const withoutPaid = (doc: Body): Body => ({
+  ...doc,
+  declarations: (doc.declarations as Body[]).map((d) => {
+    if (d.register === 'transactions' && d.delete !== undefined) return (({ delete: _delete, ...rest }) => rest)(d);
+    const gone = typeof d.register === 'string' ? PAID_FIELDS[d.register] : undefined;
+    return gone && Array.isArray(d.fields) ? { ...d, fields: (d.fields as Body[]).filter((f) => !gone.has(String(f.id))) } : d;
+  }),
+});
 const withoutCashStale = (doc: Body): Body => ({ ...doc, declarations: (doc.declarations as Body[]).filter((d) => d.rule !== 'cash-stale') });
 const LATEST: Record<string, { version: string; released: string; undo: (doc: Body) => Body }> = {
   /* AN ACCOUNT'S DIGITS SAID THE LAST FOUR. */
@@ -487,7 +505,7 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
     version: '3.13.0',
     released: '2e09983b40aba73e',
     undo: (raw) => {
-      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(raw)))));
+      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(raw))))));
       return {
       ...doc,
       declarations: (doc.declarations as Body[]).filter((d) => !SIGNS_ADDED.has(String(d.metric)) && !WEEK_IN.has(String(d.metric)) && d.script !== 'last_day').map((d) =>

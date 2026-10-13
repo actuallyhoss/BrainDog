@@ -325,7 +325,7 @@ const schemaOf = (decl: Declaration): Schema => {
 };
 const SCHEMAS = new Map([ACCOUNTS, BALANCES, TRANSACTIONS].map((d) => [schemaOf(d).register, schemaOf(d)]));
 
-test('A KEPT POINT OF CASH NEEDS A RATE OF ITS OWN DAY OR THE DAY BEFORE: a night without one is a gap, filled the night after', async () => {
+test('A KEPT POINT OF CASH NEEDS A RATE OF ITS OWN DAY OR THE DAY BEFORE, or the quiet days before that: a night without one is a gap, filled the night after', async () => {
   const { sql } = await abroad();
   const dollar = (as_of: string): Rate => ({ currency: 'USD', base: 'EGP', rate: 50, as_of });
   const night = (rates: readonly Rate[]) => {

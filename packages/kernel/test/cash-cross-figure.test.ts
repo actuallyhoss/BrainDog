@@ -200,6 +200,13 @@ test('with no balance typed it has no value, and says so', async () => {
   assert.deepEqual([check.value, check.unit, check.met, check.why], [null, null, null, 'No balance has been typed yet']);
 });
 
+test('with an account and none of them cash it has no value, and says that and not that no balance was typed', async () => {
+  const k = await record();
+  make(k, 'accounts', { name: 'Deposit', liquid: false, balance: money(900_000, 'GBP'), as_of: day(-30) });
+  const check = read(k, CHECK);
+  assert.deepEqual([check.value, check.unit, check.met, check.why], [null, null, null, 'No account counts as cash yet']);
+});
+
 test('an account whose every statement is dated ahead is walked back from it, as the roll does', async () => {
   const k = await record();
   const ahead = make(k, 'accounts', { name: 'Opens next week', liquid: true, balance: money(70_000, 'GBP'), as_of: day(5) });

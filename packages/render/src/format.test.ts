@@ -5,7 +5,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { axisFigure, barFigure, headlineFigure, headlineMoney, money, symbolFigure, symbolText } from './format.ts';
+import { axisFigure, barFigure, figureChars, headlineFigure, headlineMoney, leadingCode, money, symbolFigure, symbolText } from './format.ts';
+import { figureLike } from './figure.ts';
+import { AMOUNT_SPACE, amountsIn, readAmount, writeAmount, type AmountSetting } from './money.ts';
 
 test('A HEADLINE SAYS A WHOLE AMOUNT WITHOUT ITS ZEROS, and keeps a fraction that is part of the amount', () => {
   assert.equal(headlineFigure(money(3_385_000, 'GBP')), '£33,850');
@@ -70,4 +72,97 @@ test('three capitals after a figure are a code only when they are a currency: an
   assert.equal(barFigure('£2,000 ISA'), '£2,000 ISA');
   assert.equal(axisFigure('£2,000 ISA'), '£2,000 ISA');
   assert.equal(headlineFigure('£24,000.00 GBP'), '£24,000', 'a real code is still read');
+});
+
+/* ---- One writer (REC-C05): told the home currency, each old function says what `writeAmount` says ---------------- */
+
+const AMOUNTS: [number, string][] = [
+  [108_621_341, 'EGP'], [5_818_500, 'EGP'], [-49_726, 'EGP'], [294_795, 'USD'], [-1_200, 'USD'], [480_000, 'USD'],
+  [3_124_055, 'GBP'], [120_000, 'CHF'], [-120_050, 'CHF'], [1_299, 'JPY'], [1_500, 'KWD'], [0, 'USD'], [0, 'EGP'],
+];
+const HOMES = ['EGP', 'USD', null] as const;
+const written = (minor: number, currency: string, home: string | null, setting: AmountSetting): string => writeAmount({ minor, currency }, home, setting)!.text;
+
+test('TOLD THE HOME CURRENCY, EACH OLD FUNCTION WRITES WHAT THE ONE WRITER WRITES: exact, read and axis, at home in pounds and in dollars', () => {
+  for (const home of HOMES) {
+    for (const [minor, currency] of AMOUNTS) {
+      const stored = money(minor, currency);
+      const said = `${stored} at home in ${home}`;
+      assert.equal(symbolFigure(stored, home), written(minor, currency, home, 'exact'), said);
+      assert.equal(headlineFigure(stored, home), written(minor, currency, home, 'read'), said);
+      assert.equal(barFigure(stored, home), written(minor, currency, home, 'read'), said);
+      assert.equal(axisFigure(stored, home), written(minor, currency, home, 'axis'), said);
+      assert.equal(headlineMoney(minor, currency, home), written(minor, currency, home, 'read'), said);
+      for (const setting of ['exact', 'read', 'axis'] as const) {
+        const w = writeAmount({ minor, currency }, home, setting)!;
+        const coded = leadingCode(stored, home, setting)!;
+        assert.equal(coded.text, w.text, `${said}, ${setting}`);
+        assert.equal(coded.place, w.codePlace, `${said}, ${setting}`);
+        assert.equal(coded.currency, w.code, `${said}, ${setting}`);
+        /* The parts a screen sets apart are the whole of the text: nothing is drawn that the writer did not write. */
+        const joined = coded.place === 'before' ? `${coded.sign}${coded.currency}${AMOUNT_SPACE}${coded.rest}` : coded.place === 'after' ? `${coded.sign}${coded.rest}${AMOUNT_SPACE}${coded.currency}` : `${coded.sign}${coded.rest}`;
+        assert.equal(joined, w.text, `${said}, ${setting}`);
+      }
+    }
+  }
+});
+
+test('THE RULE AS A PERSON READS IT, through the old names: at home by its sign, another currency with its code after, a true minus in front', () => {
+  /* The dollar and sterling, whose signs nobody disputes. How the Egyptian pound is written is the writer's one
+     table and the person's to rule, so it is held above only to what the writer says, never to a spelling here. */
+  assert.equal(symbolFigure(money(108_621_341, 'GBP'), 'GBP'), '£1,086,213.41');
+  assert.equal(symbolFigure(money(294_795, 'USD'), 'EGP'), `$2,947.95${AMOUNT_SPACE}USD`);
+  assert.equal(symbolFigure(money(294_795, 'USD'), 'USD'), '$2,947.95');
+  assert.equal(symbolFigure(money(-7_361_527, 'USD'), 'USD'), '−$73,615.27');
+  assert.equal(symbolFigure(money(-120_000, 'CHF'), 'EGP'), `−CHF${AMOUNT_SPACE}1,200.00`, 'a currency with no sign keeps its code, and the minus stands in front of it');
+  assert.equal(headlineFigure(money(5_818_500, 'USD'), 'USD'), '$58,185');
+  assert.equal(headlineFigure(money(5_818_550, 'USD'), 'USD'), '$58,185.50', 'a fraction that is part of the amount stays');
+  assert.equal(barFigure(money(480_000, 'USD'), 'EGP'), `$4,800${AMOUNT_SPACE}USD`);
+  assert.equal(axisFigure(money(3_124_055, 'GBP'), 'GBP'), '£31k');
+  assert.equal(axisFigure(money(800_000_000, 'USD'), 'USD'), '$8m');
+  assert.equal(headlineFigure('GBP 43,700.00 · USD 24,800.50', 'GBP'), `£43,700 · $24,800.50${AMOUNT_SPACE}USD`, 'several amounts are each written once');
+  for (const home of HOMES) {
+    assert.equal(figureChars(money(108_621_341, 'EGP'), home), written(108_621_341, 'EGP', home, 'exact').length, 'a tile measures the figure as it is drawn');
+  }
+});
+
+test('A SENTENCE TOLD THE HOME CURRENCY has every stored amount in it written by the one writer', () => {
+  const said = 'Rent of EGP 12,000.00 is due, and USD 39.50 to the host';
+  for (const home of HOMES) {
+    assert.equal(symbolText(said, false, home), amountsIn(said, home, 'exact'));
+    assert.equal(symbolText(said, true, home), amountsIn(said, home, 'read'));
+  }
+  assert.equal(symbolText('Rent of USD 12,000.00 is due, and GBP 39.50 to the host', true, 'USD'), `Rent of $12,000 is due, and £39.50${AMOUNT_SPACE}GBP to the host`);
+});
+
+test('WHAT IS NOT A STORED AMOUNT IS NOT READ AS ONE: told the home currency, a drawing and a bare number keep the path they had', () => {
+  for (const home of ['EGP', 'USD']) {
+    for (const text of ['2026', '1,200', '41 days', '—', '12%', 'Q3 −1,299.00', '', 'EGP 1,299']) {
+      assert.equal(headlineFigure(text, home), headlineFigure(text), text);
+      assert.equal(barFigure(text, home), barFigure(text), text);
+      assert.equal(axisFigure(text, home), axisFigure(text), text);
+      assert.equal(symbolFigure(text, home), symbolFigure(text), text);
+    }
+    assert.equal(leadingCode('no figure', home), null);
+  }
+  assert.equal(headlineMoney(0.5, 'GBP', 'EGP'), '—', 'a fractional minor unit is still no figure');
+});
+
+test('A COMPUTED FIGURE IN THE SHAPE OF A STORED ONE is read once and written once, and a plain number keeps its path', () => {
+  /* Not told the home currency, it answers the stored form, so whoever draws it next reads an amount and not a drawing. */
+  assert.equal(figureLike('USD 12.00', -1234.567), 'USD −1,234.57');
+  assert.equal(figureLike('GBP 4,800.00', 0), 'GBP 0.00');
+  assert.equal(figureLike('JPY 1,299', 31_240.4), 'JPY 31,240');
+  assert.deepEqual(readAmount(figureLike('EGP 12.00', 31_240.55)), { minor: 3_124_055n, currency: 'EGP' });
+  for (const home of HOMES) {
+    for (const setting of ['exact', 'read', 'axis'] as const) {
+      assert.equal(figureLike('EGP 12.00', -73_615.27, home, setting), written(-7_361_527, 'EGP', home, setting));
+      assert.equal(figureLike('USD 12.00', 2_947.95, home, setting), written(294_795, 'USD', home, setting));
+    }
+    assert.equal(axisFigure(figureLike('EGP 12.00', 31_240.55), home), written(3_124_055, 'EGP', home, 'axis'), 'the chain a chart draws its axis with');
+    assert.equal(figureLike('1,200', 3400.4, home), '3,400');
+    assert.equal(figureLike('no number', 12.5, home), '12.5');
+    assert.equal(figureLike('£34,850.00', -2000, home), '−£2,000.00', 'a drawing is not read as an amount');
+  }
+  assert.equal(figureLike('EGP 12.00', Number.NaN, 'EGP'), '—');
 });

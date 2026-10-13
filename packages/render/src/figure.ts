@@ -7,15 +7,31 @@
  * beside a host's `−£1,600.00` rather than as a bare `-2000`.
  */
 
-import { MISSING, quantity } from './format.ts';
+import { MISSING, exponentOf, money, quantity, type Home } from './format.ts';
+import { readAmount, writeAmount, type AmountSetting } from './money.ts';
 
 const MINUS = '−';
 const NUM = 'en-u-nu-latn';
 const NUMBER = /(?<![\p{L}\p{N}.,])[−-]?\d[\d,]*(?:\.(\d+))?/u;
 
-/** `value` in the shape of `template`: `£34,850.00`, `USD 12.00`, `−£1,600.00`, or a plain number. */
-export function figureLike(template: string, value: number): string {
+/**
+ * `value` in the shape of `template`: `£34,850.00`, `USD 12.00`, `−£1,600.00`, or a plain number.
+ *
+ * A STORED FIGURE IS NOT COPIED, IT IS READ (REC-C05). When the template is one `money()` wrote, `EGP 1,299.00`,
+ * only its currency is taken (`readAmount`) and the value is written as an amount in it. Told the home currency
+ * (a code, or `null` for a record with none), by the one writer, in the setting asked for. Not told, in the stored
+ * form again, so whoever draws it next (`axisFigure`, `headlineFigure`) reads an amount and never a drawing.
+ * A template that is a drawing or a plain number keeps the path below.
+ */
+export function figureLike(template: string, value: number, home?: Home, setting: AmountSetting = 'exact'): string {
   if (!Number.isFinite(value)) return MISSING;
+  const stored = readAmount(template.trim());
+  if (stored) {
+    /* Half a minor unit rounds away from nought, on either side of it, as the path below always did. */
+    const minor = Math.sign(value) * Math.round(Math.abs(value) * 10 ** exponentOf(stored.currency));
+    if (home === undefined) return money(minor, stored.currency);
+    return writeAmount({ minor, currency: stored.currency }, home, setting)?.text ?? MISSING;
+  }
   const m = NUMBER.exec(template);
   if (!m) return quantity(Math.round(value * 100) / 100, '');
   const decimals = m[1]?.length ?? 0;

@@ -20,8 +20,8 @@
 import type { Tone } from './kinds.ts';
 import { signedOf } from './bridge.ts';
 import { ringOf } from './cards.ts';
-import { figureLike } from './figure.ts';
 import { progressPlan, progressSentence } from './progress.ts';
+import { amountLike } from './series.ts';
 import { SPLIT_PART, splitPlan, splitSentence } from './split.ts';
 
 /** The most rows a ring takes. `kinds.ts` caps the fence at it, so a sixth row degrades rather than drawing. */
@@ -67,9 +67,9 @@ const unitOf = (text: string): string => text.replace(/[\d.,\s−-]/gu, '');
 const NO_RING = { ring: false, arcs: [], centre: '', left: '' } as const;
 
 /** The dial for a block's rows: progress for one, parts for two to five. */
-export function ringPlan(rows: readonly RingInput[]): RingPlan {
+export function ringPlan(rows: readonly RingInput[], home?: string | null): RingPlan {
   if (rows.length === 0) return { form: 'progress', ...NO_RING, arcs: [], name: '', shares: [], empty: true };
-  if (rows.length === 1) return progressRing(rows[0]!);
+  if (rows.length === 1) return progressRing(rows[0]!, home);
 
   const values = rows.map((r) => signedOf(r.value));
   const plan = splitPlan(values);
@@ -91,7 +91,7 @@ export function ringPlan(rows: readonly RingInput[]): RingPlan {
     form: 'parts',
     ring: true,
     arcs,
-    centre: one ? figureLike(drawn[0]!.value, total) : '',
+    centre: one ? amountLike(drawn[0]!.value, total, home, 'read') : '',
     name: splitSentence(plan.parts.map((p) => ({ label: rows[p.at]!.label, share: p.share }))),
     left: '',
     shares,
@@ -103,10 +103,10 @@ export function ringPlan(rows: readonly RingInput[]): RingPlan {
  * One row toward its target, through `progressPlan` so the share, the reading and what is left are the ones a
  * `progress` track says. A value written as a proportion, `3/5` or `60%`, needs no target, as a card's ring reads it.
  */
-function progressRing(r: RingInput): RingPlan {
+function progressRing(r: RingInput, home: string | null | undefined): RingPlan {
   const base = { form: 'progress' as const, shares: [], empty: false };
   if (!Number.isFinite(signedOf(r.value))) return { ...base, ...NO_RING, arcs: [], name: '' };
-  const [p] = progressPlan([{ value: r.value, target: r.third, ...(r.tone ? { tone: r.tone } : {}) }]);
+  const [p] = progressPlan([{ value: r.value, target: r.third, ...(r.tone ? { tone: r.tone } : {}) }], 'goal', home);
   if (p?.drawable) {
     return {
       ...base,

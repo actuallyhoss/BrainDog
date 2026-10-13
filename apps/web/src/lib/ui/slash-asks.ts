@@ -12,7 +12,7 @@
  * capped: the host says so with `asks.capped: false`.
  *
  * WHAT SLASH SPENT IS HERE TOO, for the Slash section of `/usage`: the month's asks and the
- * background work's own allowance, apart, then the asks by day with what each cost and what it filed, and when the month
+ * background work's own allowance, apart, each with a line for every purpose it was spent on, then the asks by day with what each cost and what it filed, and when the month
  * is spent, the two ways on. `SlashUsage.svelte` draws it and `SlashOut.svelte` draws the two buttons.
  */
 
@@ -70,30 +70,59 @@ export const capSaid = (cap: number): string =>
  */
 export const LEDGER_FETCHED = 100;
 
-/**
- * The asks a month Slash's background work may spend: `BACKGROUND_ASKS_MONTH` in `packages/slash/src/types.ts`, restated
- * because the web never imports the engine, as `BACKGROUND_JOBS_MONTH` in `packages/host/src/model-jobs.ts` restates it
- * for the same reason. The status door says his cap and not this one, so this is the figure the section is measured to.
- */
-export const BACKGROUND_ASKS_MONTH = 600;
+/* WHOSE AN ASK WAS IS WHAT THE LEDGER SAYS IT WAS FOR (ENG-A05), and no longer read out of its kind. `Purpose` in
+   `packages/slash/src/types.ts` names them: his own question, a rule of his asking at a step and a new record's first
+   plan spend his allowance, and everything else the record did for itself. The background allowance's size is the
+   host's to say (`status.background.cap`); the copy of it that stood here is gone, so a host that does not say it gets a
+   count and no figure to measure it to. */
+const HIS: ReadonlySet<string> = new Set(['ask', 'automation', 'plan']);
 
-/* WORK NOBODY ASKED FOR. The host's background meter (`backgroundMeter` in `packages/host/src/model-jobs.ts`) counts a
-   digest's prose and a pattern drafted for the record, which files nothing itself; a pattern that filed a proposal was a
-   press of his, so it is his. Sorting the inbox and indexing for search are the record's own work as well. */
-const BACKGROUND: ReadonlySet<string> = new Set(['prose', 'triage', 'embed']);
+/** The engine's own words on a call nobody typed, each the purpose it was made for (`ASKED_2` in `call.ts` and the host's). */
+const ASKED_FOR = new Map<string, string>([
+  ["Slash's page headlines", 'headline'],
+  ["Slash's reading of who is who", 'understand'],
+  ["Slash's first plan", 'plan'],
+  ["Slash's skill draft", 'skill'],
+  ["Slash's daily look", 'look'],
+]);
+
+const AUTOMATION = /^rule\..+ step \d+$/u;
+
+/** What of a ledger row says what it was for: its kind, its purpose, the engine's own words and what it filed. */
+export type Purposed = Pick<SlashAsked, 'kind' | 'filed' | 'purpose'> & { question: string | null };
+
+/**
+ * What an ask was for. The row says it; a host built before it did says only the kind, so there it is worked out as the
+ * store's own step to version 3 fills it (`FILL_2` in `packages/slash/src/call.ts`): by the kind, the engine's own
+ * question, and whether a pattern filed.
+ */
+export const purposeOf = (a: Purposed): string => {
+  if (a.purpose !== undefined && a.purpose !== '') return a.purpose;
+  const q = a.question?.trim() ?? '';
+  const named = ASKED_FOR.get(q);
+  if (a.kind === 'read' || a.kind === 'propose') return AUTOMATION.test(q) ? 'automation' : named === 'plan' ? 'plan' : 'ask';
+  if (named !== undefined) return named;
+  if (a.kind === 'pattern') return a.filed === null ? 'pattern' : 'ask';
+  return a.kind;
+};
 
 /** Whether a call on the ledger was background work rather than a question of his. */
-export const isBackground = (a: Pick<SlashAsked, 'kind' | 'filed'>): boolean =>
-  BACKGROUND.has(a.kind) || (a.kind === 'pattern' && a.filed === null);
+export const isBackground = (a: Purposed): boolean => !HIS.has(purposeOf(a));
 
-/* WHAT A CALL COST IS WHAT A METER COUNTED FOR IT, and no second rule. `asksUsed` in `packages/slash/src/call.ts` counts
-   `read`, `propose` and `pattern` against his cap, and the background meter counts `prose` and an unfiled `pattern`
-   against its own; both pass over `-`, a model never reached. Every other kind is counted by neither, so it cost nothing.
-   The door says no cost of its own, so this is the meters' rule read back, and it moves when theirs does. */
-const METERED: ReadonlySet<string> = new Set(['read', 'propose', 'pattern', 'prose']);
+/* WHAT A CALL COST IS WHAT A METER COUNTED FOR IT, and no second rule. The ledger's `spends` column is the meters' word
+   and the door does not hand it on, so this is their rule read back (`PURPOSES` in `packages/host/src/infer.ts`): a call
+   no model answered (`-`) spends nothing, a proposal is the second model call of a question whose read is already one
+   ask (`PROPOSED` in `packages/slash/src/propose.ts`), the operator's test of a model spends nobody's, and every other
+   call spends one of the allowance its purpose names. */
+/** The kinds a meter counted on a host built before purposes: his cap's `read` and `pattern`, the background's `prose`. */
+const COUNTED_BEFORE: ReadonlySet<string> = new Set(['read', 'pattern', 'prose']);
 
 /** The asks one call cost: 1 when a meter counted it, 0 when none did. */
-export const costOf = (a: Pick<SlashAsked, 'kind' | 'model'>): number => (a.model !== '-' && METERED.has(a.kind) ? 1 : 0);
+export const costOf = (a: Pick<SlashAsked, 'kind' | 'model' | 'purpose'>): number => {
+  if (a.model === '-' || a.kind === 'propose') return 0;
+  if (a.purpose === undefined || a.purpose === '') return COUNTED_BEFORE.has(a.kind) ? 1 : 0;
+  return a.purpose === 'probe' ? 0 : 1;
+};
 
 /** One line of the day: a question of his, or a piece of background work, and what it cost. */
 export type SpentLine = {
@@ -113,9 +142,12 @@ export type SpentDay = { day: string; label: string; asks: number; background: n
 
 /**
  * The month as the ledger lists it. `whole` is `false` when the door's list ended inside the month, so the counts below
- * are the newest calls' and not the month's.
+ * are the newest calls' and not the month's. `by` is the same asks by what they were for, the most spent first.
  */
-export type SpentMonth = { days: SpentDay[]; asks: number; background: number; whole: boolean };
+export type SpentMonth = { days: SpentDay[]; asks: number; background: number; whole: boolean; by: SpentFor[] };
+
+/** What one purpose spent in the month: its words, the asks a meter counted for it, and whose allowance they were. */
+export type SpentFor = { label: string; n: number; background: boolean };
 
 const SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -150,9 +182,37 @@ const ASKED_AS = new Map<string, string>([
   ["Slash's daily look", 'Daily look written'],
 ]);
 
-/** What a piece of background work was, by its question first and then by the ledger's kind. */
-const workOf = (a: SlashAsked): string =>
-  (a.kind === 'pattern' && a.question !== null ? ASKED_AS.get(a.question.trim()) : undefined) ?? WORK.get(a.kind) ?? words.workOther;
+/**
+ * A PURPOSE IN A PERSON'S WORDS: `line` heads its count for the month, and `what` is one call of it on a day's list where
+ * the purpose alone says what the work was. `look` has no `what`, because it is several kinds of work and the call's own
+ * kind and question say which (`WORK`, `ASKED_AS`). A purpose with no entry is a newer host's, and is counted as other
+ * work rather than shown under the host's own name for it.
+ */
+const PURPOSES = new Map<string, { line: string; what?: string }>([
+  ['ask', { line: 'Your questions' }],
+  ['automation', { line: 'Automations', what: 'An automation asked' }],
+  ['plan', { line: 'First plan', what: 'First plan drafted' }],
+  ['headline', { line: 'Page headlines', what: 'Page headlines written' }],
+  ['understand', { line: 'Read what arrived', what: 'Read what arrived' }],
+  ['look', { line: 'Daily look and drafts' }],
+  ['compose', { line: 'Drafts written', what: 'Draft written' }],
+  ['skill', { line: 'Skills revised', what: 'Skill revised' }],
+  ['pattern', { line: 'Patterns drafted', what: 'Pattern drafted for the inbox' }],
+  ['prose', { line: 'Digest summaries', what: 'Summary for a digest' }],
+  ['embed', { line: 'Search kept up to date', what: 'Search kept up to date' }],
+  ['probe', { line: 'Model tests', what: 'Model tested' }],
+]);
+
+/** What a piece of background work was: by its purpose, then by its question, then by the ledger's kind. */
+const workOf = (a: SlashAsked, purpose: string): string =>
+  PURPOSES.get(purpose)?.what ??
+  (a.kind === 'pattern' && a.question !== null ? ASKED_AS.get(a.question.trim()) : undefined) ??
+  WORK.get(a.kind) ??
+  words.workOther;
+
+/* A QUESTION OF HIS IS SHOWN AS HE TYPED IT. An automation's is `rule.<id> step <n>` on the ledger and a first plan's is
+   the engine's own phrase, neither of which he typed, so those two are named by what they were. */
+const askedOf = (a: SlashAsked, purpose: string): string => (purpose === 'ask' ? undefined : PURPOSES.get(purpose)?.what) ?? (a.question?.trim() || words.erased);
 
 /**
  * The ledger's calls in `month` (`YYYY-MM`), by day, newest first.
@@ -166,8 +226,10 @@ export function spentIn(rows: readonly SlashAsked[], month: string, now: number 
   const days: SpentDay[] = [];
   let asks = 0;
   let background = 0;
-  /* The line a proposal opened, waiting for the read that drafted it. */
+  const by: SpentFor[] = [];
+  /* The line a proposal opened, waiting for the read that drafted it, and the question both were. */
   let waiting: SpentLine | null = null;
+  let waitingFor: string | null = null;
   for (const a of rows) {
     if (a.ts.slice(0, 7) !== month) continue;
     const day = a.ts.slice(0, 10);
@@ -176,11 +238,19 @@ export function spentIn(rows: readonly SlashAsked[], month: string, now: number 
       d = { day, label: dayWords(day, now), asks: 0, background: 0, lines: [] };
       days.push(d);
     }
-    const bg = isBackground(a);
+    const purpose = purposeOf(a);
+    const bg = !HIS.has(purpose);
     const cost = costOf(a);
     const href = a.filed === null ? null : `/decide/${encodeURIComponent(a.filed)}`;
     const refused = a.status === 'refused' || a.status === 'error';
-    const what = bg ? workOf(a) : a.question?.trim() || words.erased;
+    const what = bg ? workOf(a, purpose) : askedOf(a, purpose);
+    const label = PURPOSES.get(purpose)?.line ?? words.workElse;
+    let f = by.find((x) => x.label === label);
+    if (!f) {
+      f = { label, n: 0, background: bg };
+      by.push(f);
+    }
+    f.n += cost;
     if (bg) {
       d.background += cost;
       background += cost;
@@ -188,7 +258,7 @@ export function spentIn(rows: readonly SlashAsked[], month: string, now: number 
       d.asks += cost;
       asks += cost;
     }
-    if (!bg && a.kind === 'read' && waiting !== null && waiting.what === what && d.lines.includes(waiting)) {
+    if (!bg && a.kind === 'read' && waiting !== null && waitingFor === a.question && d.lines.includes(waiting)) {
       waiting.cost += cost;
       waiting.refused = waiting.refused && refused;
       waiting = null;
@@ -197,11 +267,20 @@ export function spentIn(rows: readonly SlashAsked[], month: string, now: number 
     const line: SpentLine = { id: a.id, what, when: since(a.ts, now), cost, href, refused, background: bg };
     d.lines.push(line);
     waiting = !bg && a.kind === 'propose' && a.question !== null ? line : null;
+    waitingFor = waiting === null ? null : a.question;
   }
   const oldest = rows[rows.length - 1];
   const whole = rows.length < LEDGER_FETCHED || (oldest !== undefined && oldest.ts.slice(0, 7) < month);
-  return { days, asks, background, whole };
+  by.sort((x, y) => y.n - x.n || x.label.localeCompare(y.label));
+  return { days, asks, background, whole, by: by.filter((x) => x.n > 0) };
 }
+
+/**
+ * One line a purpose under a count: `Read what arrived: 4`, the most spent first. `background` picks the allowance.
+ * Counted from a list that ended inside the month, each is a floor, and says so.
+ */
+export const purposeLines = (m: SpentMonth, background: boolean): string[] =>
+  m.by.filter((f) => f.background === background).map((f) => `${f.label}: ${m.whole ? '' : 'at least '}${f.n.toLocaleString('en-GB')}`);
 
 /** A call's cost as the line says it. */
 export const costSaid = (cost: number, background: boolean): string =>
@@ -214,9 +293,15 @@ export const asksLine = (s: SlashStatus): string | null => {
   return metered(s) ? `${shown} asks this month` : `${shown} ${s.asks.used === 1 ? 'ask' : 'asks'} on your key this month`;
 };
 
-/** The background allowance's line. Counted from a list that ended inside the month, it is a floor, and says so. */
-export const backgroundLine = (m: SpentMonth): string =>
-  `${m.whole ? '' : 'At least '}${m.background} of ${BACKGROUND_ASKS_MONTH} background asks this month`;
+/**
+ * The background allowance's line. `exact` is the host's own count and its allowance (`status.background`), said as it
+ * came. A host that says neither gets the ledger's count with no allowance beside it, since the figure is the host's and
+ * is copied nowhere here; counted from a list that ended inside the month, that count is a floor, and says so.
+ */
+export const backgroundLine = (m: SpentMonth, exact?: { used: number; cap: number }): string =>
+  exact
+    ? `${exact.used.toLocaleString('en-GB')} of ${exact.cap.toLocaleString('en-GB')} background asks this month`
+    : `${m.whole ? '' : 'At least '}${m.background.toLocaleString('en-GB')} background ${m.background === 1 && m.whole ? 'ask' : 'asks'} this month`;
 
 /**
  * Where the two buttons go when the month's asks are spent. Both are the Agents area of
@@ -242,6 +327,8 @@ export const words = {
   partial: 'The newest asks are listed here; the earlier ones this month are in the count above.',
   erased: 'A question since erased',
   workOther: 'Background work',
+  workElse: 'Other background work',
+  forWhat: 'What they were for',
   free: 'Cost nothing',
   filed: 'Open on Decide',
   refused: 'not answered',

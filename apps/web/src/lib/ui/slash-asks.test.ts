@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import type { SlashAsked, SlashStatus } from '@braindog/client';
-import { asksShown, atCap, capOf, capSaid, nearCap, resetsWords, spentIn } from './slash-asks.ts';
+import { asksShown, atCap, backgroundLine, capOf, capSaid, LEDGER_FETCHED, nearCap, purposeLines, resetsWords, spentIn } from './slash-asks.ts';
 
 const RESETS = '2026-10-01T00:00:00.000Z';
 const on = (used: number, cap = 80, tier: SlashStatus['tier'] = 'a'): SlashStatus => ({ tier, model: 'glm-5.3-flash', asks: { used, cap, resets: RESETS } });
@@ -86,4 +86,97 @@ test('a background pattern call is named by its question, and any other unfiled 
       ['e', 'Pattern drafted for the inbox', true],
     ],
   );
+});
+
+/* THE MONTH BY PURPOSE (ENG-A05 job 5). The ledger says what each ask was for, so the section counts by that and no
+   longer by the call's kind, and a host built before the column falls back to the kind. */
+const NOON = Date.parse('2026-10-02T12:00:00.000Z');
+const asked = (id: string, over: Partial<SlashAsked>): SlashAsked => ({
+  id,
+  ts: '2026-10-02T09:00:00.000Z',
+  kind: 'pattern',
+  status: 'ok',
+  code: null,
+  question: null,
+  model: 'glm-5.3-flash',
+  filed: null,
+  ...over,
+});
+const many = (n: number, prefix: string, over: Partial<SlashAsked>): SlashAsked[] => Array.from({ length: n }, (_, i) => asked(`${prefix}${i}`, over));
+
+test('the month is counted by what each ask was for, one line a purpose, and the lines add up to the two counts', () => {
+  const month = spentIn(
+    [
+      ...many(4, 'u', { purpose: 'understand', question: "Slash's reading of who is who" }),
+      ...many(9, 'h', { purpose: 'headline', question: "Slash's page headlines" }),
+      ...many(2, 'q', { kind: 'read', purpose: 'ask', question: 'What is late' }),
+      asked('r', { kind: 'read', purpose: 'automation', question: 'rule.01JABCDEFGHJKMNPQRSTVWXYZ0 step 2' }),
+    ],
+    '2026-10',
+    NOON,
+  );
+  assert.deepEqual(purposeLines(month, true), ['Page headlines: 9', 'Read what arrived: 4']);
+  assert.deepEqual(purposeLines(month, false), ['Your questions: 2', 'Automations: 1']);
+  assert.equal(month.background, 13);
+  assert.equal(month.asks, 3);
+});
+
+test('a purpose is read off the row and never off its kind: a headline that filed is still background work', () => {
+  const month = spentIn([asked('h', { purpose: 'headline', filed: 'SG4', question: "Slash's page headlines" })], '2026-10', NOON);
+  assert.equal(month.background, 1);
+  assert.equal(month.asks, 0);
+  assert.equal(month.days[0]?.lines[0]?.background, true);
+});
+
+test('a row with no purpose falls back to its kind', () => {
+  const month = spentIn(
+    [
+      asked('a', { kind: 'read', question: 'What is late' }),
+      asked('b', { question: "Slash's page headlines" }),
+      asked('c', { kind: 'prose' }),
+      asked('d', { question: "Slash's reading of who is who" }),
+    ],
+    '2026-10',
+    NOON,
+  );
+  assert.deepEqual(purposeLines(month, false), ['Your questions: 1']);
+  assert.deepEqual(purposeLines(month, true), ['Digest summaries: 1', 'Page headlines: 1', 'Read what arrived: 1']);
+});
+
+test('a purpose this screen has no word for is counted as other work, never under the host\'s own name', () => {
+  const month = spentIn(many(3, 'x', { purpose: 'tidy_v2' }), '2026-10', NOON);
+  assert.deepEqual(purposeLines(month, true), ['Other background work: 3']);
+});
+
+test('a call no model answered and an operator\'s test of a model are in no count', () => {
+  const month = spentIn([asked('a', { purpose: 'headline', model: '-' }), asked('b', { purpose: 'probe' })], '2026-10', NOON);
+  assert.equal(month.background, 0);
+  assert.deepEqual(purposeLines(month, true), []);
+});
+
+test('the second model call of a question spends nothing, so one question is one ask', () => {
+  const month = spentIn(
+    [asked('p', { kind: 'propose', purpose: 'ask', question: 'Close the invoice', filed: 'SG7' }), asked('r', { kind: 'read', purpose: 'ask', question: 'Close the invoice' })],
+    '2026-10',
+    NOON,
+  );
+  assert.equal(month.asks, 1);
+  assert.deepEqual(month.days[0]?.lines.map((l) => l.cost), [1]);
+});
+
+test('a list that came back full is a floor, and every line counted from it says at least', () => {
+  const full = spentIn(many(LEDGER_FETCHED, 'u', { purpose: 'understand' }), '2026-10', NOON);
+  assert.equal(full.whole, false);
+  assert.deepEqual(purposeLines(full, true), ['Read what arrived: at least 100']);
+  assert.equal(backgroundLine(full), 'At least 100 background asks this month');
+  const short = spentIn(many(4, 'u', { purpose: 'understand' }), '2026-10', NOON);
+  assert.equal(backgroundLine(short), '4 background asks this month');
+  assert.equal(backgroundLine(short, { used: 41, cap: 600 }), '41 of 600 background asks this month');
+});
+
+test('an automation\'s ask is named as one, never by the rule\'s id', () => {
+  const month = spentIn([asked('r', { kind: 'read', purpose: 'automation', question: 'rule.01JABCDEFGHJKMNPQRSTVWXYZ0 step 2' })], '2026-10', NOON);
+  assert.equal(month.days[0]?.lines[0]?.what, 'An automation asked');
+  const old = spentIn([asked('r', { kind: 'read', question: 'rule.01JABCDEFGHJKMNPQRSTVWXYZ0 step 2' })], '2026-10', NOON);
+  assert.equal(old.days[0]?.lines[0]?.what, 'An automation asked');
 });

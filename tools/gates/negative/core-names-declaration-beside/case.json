@@ -1,0 +1,8 @@
+{
+  "gate": "core-names",
+  "rule": "a file beside the declarations that says neither pack nor usecase is the core",
+  "expect": "spelled in the core",
+  "findings": 1,
+  "total": 1,
+  "why": "ONE, `list === 'drawers'` in `packages/seed/src/usecases/seeded-install.ts`, which stands in the directory the use cases are written in and says whose it is only in a comment. `kiosk.ts` beside it is the use case and is not read. `names.ts` is the same kind of file as the seeded one, spells the use case's id and has a type with a key called `usecase`: it is a line too unless the tree's held list is read, so the case proves the held list excuses a place and a declaration needs no entry."
+}

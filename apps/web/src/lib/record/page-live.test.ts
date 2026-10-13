@@ -1422,10 +1422,11 @@ test('A BAR OVER MORE THAN THE RECORD HANDS BACK IS DRAWN FROM THE WHOLE, and it
   /* AND A RECORD THAT SENDS NO WHOLE, OR ONE THAT DOES NOT READ, IS STILL NOT ADDED UP FROM A SLICE. */
   const { wholeRead: _none, ...short } = bar;
   assert.equal(blockOf(short as never, new Map(), AT).cannot, liveWords.cannot);
-  /* AND ONE THAT LEFT LABELS OUT PAST THE CAP (`rest`) IS NOT DRAWN AS IF ITS LINES WERE THE WHOLE LIST. */
-  const capped = { rows: [{ label: 'tax', value: 12 }], total: 40, rest: { labels: 101, rows: 140, value: 28 } };
-  for (const bad of ['all', { rows: 'many' }, { rows: [{ label: 'tax', value: '12' }] }, { rows: [{ label: 'tax', value: 1, currency: 7 }] }, capped])
+  for (const bad of ['all', { rows: 'many' }, { rows: [{ label: 'tax', value: '12' }] }, { rows: [{ label: 'tax', value: 1, currency: 7 }] }])
     assert.equal(blockOf({ ...bar, wholeRead: bad } as never, new Map(), AT).cannot, liveWords.cannot, JSON.stringify(bad));
+  /* AND ONE THAT LEFT LABELS OUT PAST THE CAP (`rest`) DRAWS THEM AS ONE BAR MORE, so its bars are still the whole list. */
+  const capped = { rows: [{ label: 'tax', value: 12 }], total: 40, rest: { labels: 101, rows: 140, value: 28 } };
+  assert.equal(drawnCells(blockOf({ ...bar, wholeRead: capped } as never, new Map(), AT)).length, 2);
 });
 
 test("THE KERNEL'S OWN WHOLE (`unit`, `rows`, and `parts` for money it could not add) IS READ AS IT IS SENT", () => {
@@ -1472,8 +1473,8 @@ test("A HEAT SET AGAINST ANOTHER WHOLE WRITES EACH DAY AS ITS SHARE, and a block
   assert.equal(counted(30_000, 20_001).cannot, liveWords.cannot);
   assert.equal(counted(3, -1).cannot, liveWords.cannot);
 
-  /* AND LABELS LEFT OUT PAST THE CAP (`rest`) REFUSE A COUNT AND A HEAT AS THEY DO A BAR, whatever the rest holds:
-     the chips drawn would count fewer than the list. */
+  /* AND A REST THE LINES DO NOT ADD UP WITH REFUSES A COUNT (these chips already count all 300), as does one that
+     does not read; A HEAT HAS NO REST, a rest having no day to be drawn on, so one that holds any is refused. */
   for (const rest of [{ labels: 3, rows: 9, value: 9 }, { labels: 1, rows: 1, value: null, parts: [{ currency: 'GBP', amount: 1 }] }, {}, 0]) {
     assert.equal(blockOf({ ...chips, wholeRead: { ...chips.wholeRead, rest } } as never, new Map(), AT).cannot, liveWords.cannot, JSON.stringify(rest));
     assert.equal(blockOf({ ...heat, wholeRead: { ...days, rest } } as never, new Map(), AT).cannot, liveWords.cannot, JSON.stringify(rest));
@@ -1484,4 +1485,77 @@ test("A HEAT SET AGAINST ANOTHER WHOLE WRITES EACH DAY AS ITS SHARE, and a block
   /* AND A THIRD COLUMN IS NOT IN THE LINES: a progress against each row's target is not drawn from two of its three. */
   const tracks = { kind: 'progress', source: 'register.tasks', columns: [{ field: 'what' }, { field: 'effort' }, { field: 'effort' }], rows: [], matched: 300, refusals: [], wholeRead: { rows: [{ label: 'a', value: 1 }] } };
   assert.equal(blockOf(tracks as never, new Map(), AT).cannot, liveWords.cannot);
+});
+
+test('LABELS PAST THE CAP ARE ONE LAST BAR, Everything else, and the bars add to the whole', () => {
+  /* THE RECORD HANDS BACK 200 LABELS AND ADDS THE SMALLEST PAST THEM INTO `rest`. A list of 237 payees said it could
+     not be drawn; it draws its 200 and one bar more for the 37, last however much it holds, so nothing is left out. */
+  const lines = Array.from({ length: 200 }, (_, n) => ({ label: `payee ${String(n).padStart(3, '0')}`, rows: 1, value: 100_000 - n, unit: 'GBP' }));
+  const kept = lines.reduce((n, l) => n + l.value, 0);
+  const whole = { rows: lines, total: kept + 1250, unit: 'GBP', rest: { labels: 37, rows: 41, value: 1250, unit: 'GBP' } };
+  const sent = Array.from({ length: 200 }, (_, n) => row(n + 1, { ...obligation, [column]: 'payee 000', amount: { amount: 100, currency: 'GBP' } }));
+  const bar = { kind: 'bar', source: 'register.obligations', columns: [{ field: column }, { field: 'amount' }], rows: sent, matched: 241, refusals: [], wholeRead: whole };
+  const drawn = blockOf(bar as never, new Map(), AT);
+  assert.equal(drawn.cannot, undefined, 'a whole with labels past the cap was refused');
+  const cells = drawnCells(drawn);
+  assert.equal(cells.length, 201);
+  assert.equal(cells.at(-1)![0], 'Everything else');
+  assert.equal(pence(cells.at(-1)![1]!), 1250);
+  assert.equal(cells.reduce((n, c) => n + pence(c[1]!), 0), whole.total, 'the bars do not add to the whole');
+  assert.equal(cells.filter((c) => c[0] === 'Everything else').length, 1);
+
+  /* IT IS LAST EVEN WHEN IT HOLDS THE MOST, and `limit:` folds what it cuts into the same bar and never draws two. */
+  const heavy = { ...whole, total: kept + 900_000_000, rest: { ...whole.rest, value: 900_000_000 } };
+  assert.equal(drawnCells(blockOf({ ...bar, wholeRead: heavy } as never, new Map(), AT)).at(-1)![0], 'Everything else');
+  const cut = drawnCells(blockOf({ ...bar, limit: 8 } as never, new Map(), AT));
+  assert.equal(cut.length, 8);
+  assert.equal(cut.at(-1)![0], 'Everything else');
+  assert.equal(cut.reduce((n, c) => n + pence(c[1]!), 0), whole.total);
+
+  /* A REST IN TWO CURRENCIES IS A LINE A CURRENCY, never one sum. */
+  const mixed = { rows: lines, total: null, rest: { labels: 2, rows: 2, value: null, parts: [{ currency: 'GBP', amount: 500 }, { currency: 'USD', amount: 700 }] } };
+  assert.equal(blockOf({ ...bar, wholeRead: mixed } as never, new Map(), AT).cannot, undefined);
+
+  /* CHIPS COUNT IT TOO: the labels past the cap are one chip, last. */
+  const chips = { kind: 'chips', source: 'register.obligations', columns: [{ field: column }], rows: [], matched: 12, refusals: [], wholeRead: { rows: [{ label: 'a', value: 7 }, { label: 'b', value: 2 }], total: 12, rest: { labels: 3, rows: 3, value: 3 } } };
+  assert.deepEqual(drawnCells(blockOf(chips as never, new Map(), AT)).map((c) => [c[1], c[2]]).at(-1), ['3', 'Everything else']);
+
+  /* A REST THAT DOES NOT READ REFUSES THE WHOLE, as a line that does not read does. */
+  for (const rest of [{}, 0, 'more', { labels: 0, rows: 0, value: 0 }, { labels: 2.5, rows: 3, value: 1 }, { labels: 2, rows: 3, value: '1' }, { labels: 2, rows: 3, value: null }, { labels: 2, rows: -1, value: 1 }])
+    assert.equal(blockOf({ ...bar, wholeRead: { ...whole, rest } } as never, new Map(), AT).cannot, liveWords.cannot, JSON.stringify(rest));
+});
+
+test("THE LINES ARE HELD TO THE WHOLE'S OWN TOTAL, and a whole whose bars would add to something else is not drawn", () => {
+  const sent = Array.from({ length: 200 }, (_, n) => row(n + 1, { ...obligation, amount: { amount: 100, currency: 'GBP' } }));
+  const bar = (wholeRead: unknown) => blockOf({ kind: 'bar', source: 'register.obligations', columns: [{ field: column }, { field: 'amount' }], rows: sent, matched: 300, refusals: [], wholeRead } as never, new Map(), AT);
+  const rows = [{ label: 'a', value: 700, unit: 'GBP' }, { label: 'b', value: 300, unit: 'GBP' }];
+  assert.equal(bar({ rows, total: 1000, unit: 'GBP' }).cannot, undefined);
+  assert.equal(bar({ rows, total: 1001, unit: 'GBP' }).cannot, liveWords.cannot, 'bars adding to less than the total were drawn');
+  assert.equal(bar({ rows, total: 1000, unit: 'USD' }).cannot, liveWords.cannot, 'bars in another currency than the total were drawn');
+  assert.equal(bar({ rows: [], total: 1000, unit: 'GBP' }).cannot, liveWords.cannot, 'a total with no line under it was drawn as nothing');
+  /* THE REST IS PART OF WHAT IS ADDED, so a rest that does not make up the difference refuses too. */
+  assert.equal(bar({ rows, total: 1250, unit: 'GBP', rest: { labels: 4, rows: 4, value: 250, unit: 'GBP' } }).cannot, undefined);
+  assert.equal(bar({ rows, total: 1250, unit: 'GBP', rest: { labels: 4, rows: 4, value: 249, unit: 'GBP' } }).cannot, liveWords.cannot);
+  /* MONEY CONVERTED A LINE AT A TIME ROUNDS A LINE AT A TIME, so it is held to within a minor unit a line. */
+  const converted = { asOf: '2026-09-14', stale: false };
+  assert.equal(bar({ rows, total: 1001, unit: 'GBP', converted }).cannot, undefined);
+  assert.equal(bar({ rows, total: 1003, unit: 'GBP', converted }).cannot, liveWords.cannot);
+  /* A TOTAL THE RECORD COULD NOT ADD INTO ONE CURRENCY (`null`) IS NOTHING TO HOLD THE LINES TO. */
+  assert.equal(bar({ rows, total: null }).cannot, undefined);
+});
+
+test('A HEAT SAYS HOW MANY DAYS FALL OUTSIDE ITS TWELVE WEEKS, since no cell draws them', () => {
+  const days = { rows: [{ label: '2026-09-14', value: 2 }, { label: '2026-09-10', value: 1 }], total: 6, outside: 3 };
+  const heat = { kind: 'heat', source: 'register.tasks', columns: [{ field: 'by' }], rows: [], matched: 6, refusals: [], wholeRead: days };
+  const said = (b: unknown): string => JSON.stringify(toSegments(blockOf(b as never, new Map(), AT)));
+  assert.equal(blockOf(heat as never, new Map(), AT).cannot, undefined);
+  assert.match(said(heat), /3 days fall outside the twelve weeks/u);
+  assert.match(said({ ...heat, wholeRead: { ...days, total: 4, outside: 1 } }), /1 day falls outside the twelve weeks/u);
+  /* NONE OUTSIDE SAYS NOTHING, and a count that is no count says nothing rather than a wrong number. */
+  assert.doesNotMatch(said({ ...heat, matched: 3, wholeRead: { ...days, total: 3, outside: 0 } }), /outside the twelve weeks/u);
+  assert.doesNotMatch(said({ ...heat, matched: 3, wholeRead: { rows: days.rows, total: 3 } }), /outside the twelve weeks/u);
+  for (const outside of [-1, 2.5, 'three'])
+    assert.equal(blockOf({ ...heat, wholeRead: { ...days, outside } } as never, new Map(), AT).cannot, liveWords.cannot, String(outside));
+  /* AND A HEAT WHOSE CELLS WITH WHAT FELL OUTSIDE DO NOT MAKE ITS COUNT IS NOT DRAWN. */
+  assert.equal(blockOf({ ...heat, wholeRead: { ...days, total: 7 } } as never, new Map(), AT).cannot, liveWords.cannot);
 });

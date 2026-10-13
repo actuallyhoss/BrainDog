@@ -104,6 +104,20 @@ export function linkOf(register: string | null, field: string | undefined): { to
  */
 const REST = 'Everything else';
 
+/**
+ * THE COLUMN THAT MARKS A LINE AS EVERYTHING PAST THE LABELS THE RECORD HANDED BACK (`page-live.ts` `restOf`).
+ *
+ * The record adds up a list by label, hands back the two hundred largest and adds the others into one figure. That
+ * figure has no label: it is no value of the field, so a day column must not write it as a day and nothing may filter
+ * by it. Its line holds this column, which holds a space and so is no list's field, and is said as `REST`, last.
+ */
+export const REST_MARK = 'everything else';
+const isRest = (e: { fields: Record<string, unknown> }): boolean => e.fields[REST_MARK] === true;
+
+/** What a heat says under its cells when some of its list falls outside them, or nothing when none does. */
+export const outsideSaid = (n: unknown): string | null =>
+  typeof n !== 'number' || !Number.isInteger(n) || n < 1 ? null : n === 1 ? '1 day falls outside the twelve weeks.' : `${n} days fall outside the twelve weeks.`;
+
 function cut(groups: [string, number][], limit: number | undefined): [string, number][] {
   if (limit === undefined || groups.length <= limit) return groups;
   const kept = groups.slice(0, Math.max(1, limit - 1));
@@ -134,7 +148,13 @@ function barRows(block: BlockResult): string[] {
      summing the page instead of the answer is a figure that is wrong by however many rows did not
      fit, silently, and it is the same number of pixels either way. */
   const unset: unknown[] = [];
+  /* WHAT THE RECORD ADDED UP PAST THE LABELS IT HANDED BACK, kept apart so it is no value of the field and is drawn last. */
+  const past: unknown[] = [];
   for (const e of block.matched) {
+    if (isRest(e)) {
+      past.push(...valuesOf(e.fields[of]));
+      continue;
+    }
     /* A ROW THAT LINKS TO NOTHING WITH MONEY IN IT HAS NO BAR, because a zero would say it holds none. */
     if (link && valuesOf(e.fields[of]).length === 0) continue;
     /* NOR DOES A ROW WITH NOTHING TO ADD: open work with no size is not "No project 0 d", and a group or the rest that only
@@ -157,10 +177,15 @@ function barRows(block: BlockResult): string[] {
      bar whose length is a number about nothing — and it sits in a chart beside bars that are real,
      which is the version of this nobody catches. */
   const totals = [...grouped].map(([key, values]) => [key, total(values)] as const);
-  const drawn = cutTotals(
+  const cutTo = cutTotals(
     totals.sort((a, b) => b[1].amount - a[1].amount),
     block.limit,
-  ).map(([key, sum]) => {
+  );
+  /* THE REST IS LAST HOWEVER MUCH IT HOLDS, and where `limit:` cut bars too it is the same bar and never a second. */
+  const wasCut = block.limit !== undefined && totals.length > block.limit;
+  const bars =
+    past.length === 0 ? cutTo : wasCut ? [...cutTo.slice(0, -1), [REST, merge([cutTo.at(-1)![1], total(past)])] as const] : [...cutTo, [REST, total(past)] as const];
+  const drawn = bars.map(([key, sum]) => {
     /* The SUM is formatted through the summed field's own type, not always as money. A bar over
        `effort` in days printed `GBP 0.02` — the total was 2.4 days, run through a money formatter
        that reads its input as minor units. A block that can be bound to any register cannot assume
@@ -510,13 +535,20 @@ const escapeCell = (c: string): string =>
 function chipsRows(block: BlockResult): string[] {
   const by = block.columns[0]?.field ?? '';
   const counts = new Map<string, number>();
+  /* THE LABELS THE RECORD COUNTED PAST THE ONES IT HANDED BACK are one chip, last, and the same chip as what `limit:` cut. */
+  let past = 0;
   for (const e of block.matched) {
+    if (isRest(e)) {
+      past += 1;
+      continue;
+    }
     const key = display(block.register ?? '', by, e.fields[by]) ?? 'Unset';
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
-  return cut([...counts].sort((a, b) => b[1] - a[1]), block.limit).map(
-    ([key, n]) => ` | ${n} | ${escapeCell(key)}`,
-  );
+  const chips = cut([...counts].sort((a, b) => b[1] - a[1]), block.limit);
+  const wasCut = block.limit !== undefined && counts.size > block.limit;
+  const all: [string, number][] = past === 0 ? chips : wasCut ? [...chips.slice(0, -1), [REST, chips.at(-1)![1] + past]] : [...chips, [REST, past]];
+  return all.map(([key, n]) => ` | ${n} | ${escapeCell(key)}`);
 }
 
 /**
@@ -1093,7 +1125,10 @@ export function toSegments(block: BlockResult, kinds?: Readonly<Record<string, K
       ...(split.note ? parse(split.note, { page: true }) : []),
     ];
   }
-  return groupedSegments(block, kinds) ?? drawSegments(block, kinds);
+  const drawn = groupedSegments(block, kinds) ?? drawSegments(block, kinds);
+  /* A HEAT SAYS WHAT ITS CELLS LEAVE OUT, under them: twelve weeks of days add to less than a list that reaches further back. */
+  const outside = block.kind === 'heat' ? outsideSaid(keyOf(block, 'outside')) : null;
+  return outside === null ? drawn : [...drawn, ...parse(outside, { page: true })];
 }
 
 /**

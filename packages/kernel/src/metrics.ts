@@ -34,6 +34,7 @@ import {
   RECORD_DOOR,
   RECORD_KEYS,
   RECORD_LISTS,
+  RECORD_MARKS,
   RECORD_PATHS,
   RECORD_PLACES,
   RECORD_RATES,
@@ -45,6 +46,7 @@ import {
   readHandoffsOpen,
   readKeysUnopenable,
   readListsShrunk,
+  readMarksUnknown,
   readOpenQuestions,
   readProjectsUnplaced,
   readRatesAge,
@@ -346,6 +348,11 @@ export type Reading = {
    */
   atLeast?: true;
   noRate?: Part[];
+  /**
+   * ON A FIGURE OVER A KEPT LINE (`readSeriesGaps`): the days counted in `value` that hold no point for want of a rate,
+   * oldest first, as `snapshot` kept them. Absent when none of the missing days is one.
+   */
+  noRateDays?: string[];
   /**
    * A MONEY FIGURE CONVERTED OUT OF THE CURRENCY IT DECLARES HAS ITS TARGET CONVERTED TOO, at the latest rate from that
    * currency into this one, and `met` is read against it. Absent when there is no such rate, and then `met` is `null`.
@@ -756,8 +763,8 @@ export type EvalContext = {
   tz?: string | undefined;
   /**
    * THIS READ IS A KEPT POINT'S (`snapshot`, REC-B05). A row in a sum takes the nearest rate there is and says how old
-   * it is; a point in a line is drawn as that day's, so each amount needs a rate of its own day or the day before, and
-   * never a later one standing in. Without one the figure has no `value` and names the pair (`pointSaid`), so the night
+   * it is; a point in a line is drawn as that day's, so each amount needs a rate of its own day or the day before (or of
+   * the last day one was published, `RATE_QUIET_DAYS`), and never a later one standing in. Without one the figure has no `value` and names the pair (`pointSaid`), so the night
    * writes no point: a gap in the line is honest, and a point that is quietly wrong is not. Absent on every other read.
    */
   point?: true | undefined;
@@ -828,12 +835,25 @@ export function acrossSaid(said: Added, amounts: readonly Amount[], into: string
   return { value: null, unit: null, parts: said.parts, fx: { into, home, asOf: null, forward: false, stale: false, missing: said.missing } };
 }
 
-/** The day before a day, as text. Noon UTC is only a place to do the subtraction. */
-const dayBefore = (day: string): string => new Date(Date.parse(`${day}T12:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+/** The day `n` days before a day, as text. Noon UTC is only a place to do the subtraction. */
+const daysBefore = (day: string, n: number): string => new Date(Date.parse(`${day}T12:00:00Z`) - n * 86_400_000).toISOString().slice(0, 10);
+
+/**
+ * HOW MANY DAYS WITH NO RATE PUBLISHED A POINT'S RATE MAY REACH BACK OVER, past the day before the amount's own day.
+ *
+ * A RATES ADDRESS PUBLISHES ON WORKING DAYS. Held to the day before and no further, an amount of a Sunday or a Monday
+ * had only Friday's rate to be priced at and was never a point: no rate of the Saturday or the Sunday ever arrives, so
+ * the night after did not fill the day in either, and every line over two currencies had a hole each weekend. Three
+ * is a weekend and a bank holiday beside it, and the four days markets close over Easter: Thursday's rate prices the
+ * Monday. `rateFor` hands back the newest rate on or before the day, so the days reached over are days this record
+ * holds no rate of, which is all "not published" can mean here.
+ */
+export const RATE_QUIET_DAYS = 3;
 
 /**
  * Each pair a kept point has no rate for, as `USD to EGP`, in code order: none at all, only a later one standing in, or
- * one older than the day before the amount's own day (`today` for an amount whose row has no day).
+ * one older than the day before the amount's own day and `RATE_QUIET_DAYS` more (`today` for an amount whose row has
+ * no day).
  *
  * THE DAY IS THE AMOUNT'S, as `across` converts each amount at its own day's rate: a bill of the 3rd read in a point of
  * the 30th was priced on the 3rd, and it is the 3rd's rate that has to be there.
@@ -854,7 +874,7 @@ export function farRates(amounts: readonly Amount[], into: string, rates: readon
     if (isFar === undefined) {
       /* The rate `across` converts this amount with, so what is judged is what was used. */
       const r = rateFor(rates, a.currency, into, day);
-      isFar = !r || r.forward || r.as_of < dayBefore(day > point ? point : day);
+      isFar = !r || r.forward || r.as_of < daysBefore(day > point ? point : day, 1 + RATE_QUIET_DAYS);
       seen.set(key, isFar);
     }
     if (isFar) far.add(`${a.currency} to ${into}`);
@@ -1150,6 +1170,7 @@ export const sourceReaders = (): Readonly<Record<string, SourceReader>> => (read
   [RECORD_DOOR]: readDoor,
   [RECORD_PLACES]: readProjectsUnplaced,
   [RECORD_KEYS]: readKeysUnopenable,
+  [RECORD_MARKS]: readMarksUnknown,
   [RECORD_KEY_SCAN]: readKeysInText,
   [RECORD_LISTS]: readListsShrunk,
   [RECORD_PATHS]: readDeadPaths,
@@ -2564,6 +2585,18 @@ export function targetOf(text: string): { lte: number } | { gte: number } | null
 /* ── a figure, kept ────────────────────────────────────────────────── */
 
 /**
+ * The line a figure's days with no rate are kept in: one `metric_point` a day under `no-rate:<figure>`, holding how
+ * many pairs had no rate (`value`), gone the night the day gets its point.
+ *
+ * A LINE OF ITS OWN AND NOT A TABLE, so it travels, is erased and is exported as every kept line is. NOT IN THE
+ * FIGURE'S OWN LINE under another grain, because a reader of a line by its name alone would take the day for a point.
+ * ITS SOURCE IS THE NIGHT'S (`night.`), which Health's late-numbers sign leaves out: it is written by the record
+ * about itself, and a line that stops when rates arrive is not a number gone quiet.
+ */
+const noRateLine = (figure: string): string => `no-rate:${figure}`;
+const NO_RATE_SOURCE = 'night.no-rate';
+
+/**
  * `missing` is every day asked for that got no point, and `noRate` is how many of those are missing for want of a rate
  * of that day (REC-B05): the figure had its rows and no way to price them as that day's.
  */
@@ -2648,7 +2681,9 @@ export const point = (value: number, unit: string | null | undefined): { value: 
  * three days ago is not thirty nights behind. NOTHING, NEVER NOUGHT, for a line with no point at all, or one that began
  * after the window: there is nothing to have missed yet, and nought would say every night was kept.
  *
- * ONE QUERY, however long the window: the line's first day and the days of the window holding a point, together.
+ * ONE QUERY, however long the window: the line's first day, the days of the window holding a point, and which of the
+ * others lacked a rate (`noRateLine`), together. "3 nights missed" over a line that had its rows and no rate to price
+ * them at is a different thing to mend than a night that never ran, and the sentence says how many are which.
  */
 function readSeriesGaps(sql: Sql, decl: MetricDecl, ctx: EvalContext, shift: number): Result<Reading> {
   const series = decl.source.slice('series.'.length);
@@ -2656,9 +2691,16 @@ function readSeriesGaps(sql: Sql, decl: MetricDecl, ctx: EvalContext, shift: num
   const today = new Date(clockOf(ctx)).toISOString().slice(0, 10);
   const last = back(today, 1);
   const first = back(today, Math.max(1, Math.round(shift / DAY)));
-  const row = sql.one<{ began: string | null; held: number }>(
-    `SELECT (SELECT min(at) FROM metric_point WHERE series = ? AND grain = 'day') AS began, COUNT(DISTINCT at) AS held
+  /* A day that has since got its point is not one, whatever was kept of it. */
+  const row = sql.one<{ began: string | null; held: number; no_rate: string | null }>(
+    `SELECT (SELECT min(at) FROM metric_point WHERE series = ? AND grain = 'day') AS began, COUNT(DISTINCT at) AS held,
+            (SELECT group_concat(at) FROM (SELECT n.at FROM metric_point n WHERE n.series = ? AND n.grain = 'day' AND n.at >= ? AND n.at <= ?
+               AND NOT EXISTS (SELECT 1 FROM metric_point p WHERE p.series = ? AND p.grain = 'day' AND p.at = n.at) ORDER BY n.at)) AS no_rate
        FROM metric_point WHERE series = ? AND grain = 'day' AND at >= ? AND at <= ?`,
+    series,
+    noRateLine(series),
+    first,
+    last,
     series,
     series,
     first,
@@ -2674,7 +2716,13 @@ function readSeriesGaps(sql: Sql, decl: MetricDecl, ctx: EvalContext, shift: num
   if (began > last) return said(null, 0, `${wordsOf(series)} began after the window`);
   const from = began > first ? began : first;
   const days = Math.round((Date.parse(`${last}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / DAY) + 1;
-  return said(days - Number(row?.held ?? 0), days, `days of the last ${days} with no point in ${wordsOf(series)}`);
+  const gaps = days - Number(row?.held ?? 0);
+  const why = `days of the last ${days} with no point in ${wordsOf(series)}`;
+  /* The window asked about starts where the line did, so a day kept before that is not one of these. */
+  const noRate = (row?.no_rate ?? '').split(',').filter((at) => at >= from).sort();
+  if (gaps <= 0 || noRate.length === 0) return said(gaps, days, why);
+  const out = said(gaps, days, `${why}, ${noRate.length === gaps ? (gaps === 1 ? 'for' : 'each for') : `${noRate.length} of them for`} want of a rate`);
+  return out.ok ? ok({ ...out.value, noRateDays: noRate }) : out;
 }
 
 export function snapshot(
@@ -2735,7 +2783,8 @@ export function snapshot(
      */
     /* AND THE ZONE GOES WITH IT, because noon UTC makes every bare day in the predicate a local day
        and an `instant` is only compared with one in a zone (`localInstants`). */
-    /* AND AS A POINT (`EvalContext.point`): a rate of the amount's own day or the day before, else no number. */
+    /* AND AS A POINT (`EvalContext.point`): a rate of the amount's own day, the day before or the quiet days before
+       that (`RATE_QUIET_DAYS`), else no number. */
     const read = evaluateMetric(sql, decl, { ...ctx, asOfMs: Date.parse(`${day}T12:00:00Z`), tz: deps.tz, point: true });
     /* A NULL VALUE IS NO ROW. A series with a zero on every day nothing happened is a series that
        cannot tell "nothing" from "no answer", and the difference is the whole of a trend. */
@@ -2743,9 +2792,23 @@ export function snapshot(
       /* THE REASON IS "NO RATE" when the figure named a pair it could not price, or left amounts out and is at least:
          a lower bound is not that day's number either. A night with no rate is counted, and a later night with one
          fills the day in, since the backfill writes every day that holds no point. */
-      if (read.ok && (read.value.atLeast === true || (read.value.fx?.missing.length ?? 0) > 0)) noRate++;
+      const pairs = read.ok ? (read.value.fx?.missing.length ?? 0) : 0;
+      if (read.ok && (read.value.atLeast === true || pairs > 0)) {
+        noRate++;
+        /* AND THE DAY IS KEPT, so the figure over this line can say which nights were a rate's (`readSeriesGaps`). */
+        sql.exec(
+          `INSERT INTO metric_point (series, grain, at, value, unit, n, source, wrote_at) VALUES (?, 'day', ?, ?, '', NULL, ?, ?)
+           ON CONFLICT (series, grain, at) DO UPDATE SET value = excluded.value, source = excluded.source, wrote_at = excluded.wrote_at`,
+          noRateLine(decl.metric),
+          day,
+          Math.max(1, pairs),
+          NO_RATE_SOURCE,
+          deps.nowAt,
+        );
+      } else sql.exec("DELETE FROM metric_point WHERE series = ? AND grain = 'day' AND at = ?", noRateLine(decl.metric), day);
       return 'missing';
     }
+    sql.exec("DELETE FROM metric_point WHERE series = ? AND grain = 'day' AND at = ?", noRateLine(decl.metric), day);
 
     const wrote = point(read.value.value, read.value.unit);
 

@@ -205,6 +205,7 @@ export {
   type Knobs,
   type Scenario,
 } from './forecast.ts';
+export { forecastFigure } from './forecast.ts';
 export { UNNAMED, cellNamesNothing, inline, magnitudeOfCell, namesNothing, safeHref, text, type Inline, type InlineOptions, type Resolve } from './inline.ts';
 export {
   KINDS,
@@ -255,6 +256,7 @@ export {
   axisFigure,
   barFigure,
   zeroFigure,
+  type Home,
 } from './format.ts';
 /* The one writer of an amount for a screen (REC-C05): the stored form read, and written for exact, read and axis. */
 export { AMOUNT_SPACE, amountsIn, readAmount, writeAmount, type Amount, type AmountSetting, type WrittenAmount } from './money.ts';

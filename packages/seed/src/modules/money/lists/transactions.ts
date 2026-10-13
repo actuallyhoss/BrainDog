@@ -30,6 +30,9 @@ export const TRANSACTIONS_REGISTER: MoneyRegister = {
      import that touched July's rows last opened the Ledger on 13 July with December under it. `on` is the day the money
      moved, the field a person reads the Ledger by; the kernel breaks a tie by the row's id. */
   order: { field: 'on', dir: 'desc' },
+  /* A PAYMENT AN INSTALMENT NAMES IN "Paid by" IS NOT DELETED OUT FROM UNDER IT (REC-B11), as an account is not from
+     under its movements (`accounts.ts`): the record says which list still points at it, and the person clears that first. */
+  delete: 'refuse_while_referenced',
   /**
    * THE TWO LEGS OF A TRANSFER ARE FOUND BY THE RECORD (`packages/kernel/src/pairs.ts`, `02 §5`): the same amount in the
    * same currency, one leg out and one in, two different accounts, within four days. Both are marked `transfer` and

@@ -470,6 +470,11 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   A closed account (account-state-56): Accounts gains Status, open or closed, with closed its finished state, and
  *   today's cash, the oldest balance, the Last confirmed cards and a book's Accounts cards leave a closed one out. An
  *   account typed before the field counts as open. A list, fields and a state added, nothing taken away, still minor.
+ *   A payment marks what it paid (pay-links-57, REC-B11): a bill gains Paid so far, an instalment Paid by, a link to
+ *   the Ledger entry that paid it, and a repeating line Last paid and Last amount. The Ledger declares
+ *   `delete: refuse_while_referenced`, so a payment an instalment names is not deleted out from under it. Fields and a
+ *   delete rule added, nothing taken away, still minor. The script that writes them (`scripts/settle.js`) is not
+ *   registered yet, so a person fills them until it is.
  * - portfolio 1.16.0 and work 1.18.0 (batch 46, REC-C08's remainder and REC-C16): a project others point at stays. Projects
  *   declares `delete: refuse_while_referenced`, as Accounts does, so a project a task, a bill, a service or a person names
  *   is not deleted out from under them, and the refusal names the lists and how many. Under What each one earns, one

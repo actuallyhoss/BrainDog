@@ -65,6 +65,7 @@
     heldOf,
     hold,
     keepCode,
+    keepKey,
     keepPlan,
     keepSaid,
     madeFor,
@@ -757,7 +758,9 @@
     }
     const one = caseOf(asked.usecase);
     stage = words.makingParts([...(one ? [one.title] : []), ...asked.modules.map(moduleName)].slice(0, 4));
-    await write(name, asked);
+    /* A BUILD THIS DEVICE ALREADY PRESSED FOR (a reload mid-press): the same key, sent with `again`, so the record
+       writes only what it does not hold yet and nothing a second time. */
+    await write(name, draft?.key ? { ...asked, key: draft.key, again: true } : asked);
   }
 
   /**
@@ -779,6 +782,8 @@
     /* ONE HANDLE FOR THE BUILD, set here once and kept through every Try again of a press nobody answered: a call that
        went in and never answered is told from a new press by it, so its entries are not written a second time. */
     const asked: Accepting = given.key === undefined ? { ...given, key: pressKey() } : given;
+    /* KEPT BESIDE THE SENTENCE, so a reload presses under this key and not a new one (`keepKey`). */
+    keepKey(localStore(), asked.key!);
     /* THE NEW RECORD BY ITS NAME: this page is under no slug, so its own base is the host's, and the record's is under it. */
     const client = createClient({ base: apiBase({ origin: apiBase(), pathname: `${BASE}/${name}/` }) });
     /* NOTHING TO DRAW, NOTHING READ: a build with no part on is the title and its one line, and the record is left alone. */
@@ -814,6 +819,8 @@
        back the entries it did not write, which go under a new key, over the rail order this press already wrote
        (`pressAgain`). */
     again = { name, asked: pressAgain(asked, out) };
+    /* AN ANSWERED PRESS HANDS BACK A NEW KEY, and it replaces the old one. */
+    if (again.asked.key) keepKey(localStore(), again.asked.key);
     /* THE PART-MADE STATE IS THE CALL'S OWN ANSWER: what it said it could not make, and why, and nothing guessed. */
     missed = out === null ? [] : out.failed;
     watched = null;

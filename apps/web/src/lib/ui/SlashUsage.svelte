@@ -3,8 +3,8 @@
 
   TWO ALLOWANCES, APART. His asks against his cap, then the background work's own month (the daily look, an
   automation's question, a digest's prose, a pattern drafted for the inbox), because one never spends the other.
-  Each is a tile with its ring and the line that reads it, and the asks by
-  day are a third, as bars. Under the tiles, on the ground, each day's lines: what was asked, when, what it cost and a
+  Each is a tile with its ring and the line that reads it, then one line for each thing the asks were for ("Read what
+  arrived: 4", "Page headlines: 9"), the most spent first, and the asks by day are a third, as bars. Under the tiles, on the ground, each day's lines: what was asked, when, what it cost and a
   link to what it filed. The rules are `slash-asks.ts`, which the tests hold; this draws what they answer.
 
   RUNNING OUT SAYS SO, and `SlashOut` offers the two ways on beside the sentence.
@@ -24,10 +24,10 @@
     asksLine,
     atCap,
     backgroundLine,
-    BACKGROUND_ASKS_MONTH,
     costSaid,
     LEDGER_FETCHED,
     metered,
+    purposeLines,
     resetsWords,
     spentIn,
     words,
@@ -47,7 +47,6 @@
     asks: 'Your asks',
     background: 'Background work',
     of: (cap: number) => `of ${cap.toLocaleString('en-GB')}`,
-    backgroundExact: (used: number, cap: number) => `${used.toLocaleString('en-GB')} of ${cap.toLocaleString('en-GB')} background asks this month`,
     busiest: (label: string, n: number) => `Busiest ${label === 'Today' || label === 'Yesterday' ? label.toLowerCase() : `on ${label}`}, with ${n === 1 ? '1 ask' : `${n.toLocaleString('en-GB')} asks`}.`,
     asksSubject: 'Asks by day',
   } as const;
@@ -75,15 +74,23 @@
   /** A ring's tone: ink with room, amber from 80%, red once it is spent. */
   const toneOf = (used: number, cap: number): 'ink' | 'warn' | 'danger' => (cap <= 0 || used >= cap ? 'danger' : used >= cap * 0.8 ? 'warn' : 'ink');
 
-  /* THE BACKGROUND ALLOWANCE, EXACT WHERE THE HOST SAYS IT (`status.background`), and counted from the ledger's list
-     against the engine's figure where it does not, which is what this section always drew. */
+  /* THE BACKGROUND ALLOWANCE IS THE HOST'S TO SAY (`status.background`): its count and its size, drawn as a ring. A host
+     that says neither gets the ledger's own count as a figure, with no allowance copied here to measure it to. */
   const background = $derived(
-    status?.background
-      ? { used: status.background.used, cap: status.background.cap, line: said.backgroundExact(status.background.used, status.background.cap) }
-      : spent
-        ? { used: spent.background, cap: BACKGROUND_ASKS_MONTH, line: backgroundLine(spent) }
-        : null,
+    !spent
+      ? null
+      : status?.background
+        ? { used: status.background.used, cap: status.background.cap as number | null, line: backgroundLine(spent, status.background) }
+        : { used: spent.background, cap: null, line: backgroundLine(spent) },
   );
+
+  /* WHAT THE ASKS WERE FOR, a line a purpose. His own are listed only when they were for more than one thing, since
+     one line would say the count above it again. */
+  const mineFor = $derived.by(() => {
+    const lines = spent ? purposeLines(spent, false) : [];
+    return lines.length > 1 ? lines : [];
+  });
+  const backgroundFor = $derived(spent ? purposeLines(spent, true) : []);
 
   /* THE ASKS BY DAY, newest first as the lines below are, the busiest day in ink and the rest greys. */
   const busiest = $derived(spent && spent.days.length > 0 ? spent.days.reduce((a, b) => (b.asks > a.asks ? b : a)) : null);
@@ -103,15 +110,29 @@
             <p class="spent-figure num">{status.asks.used.toLocaleString('en-GB')}</p>
           {/if}
           <p class="spent-reading">{mine}</p>
+          {#if mineFor.length > 0}
+            <ul class="spent-for" aria-label={words.forWhat}>
+              {#each mineFor as line (line)}<li>{line}</li>{/each}
+            </ul>
+          {/if}
         </Tile>
       {/if}
 
       {#if background}
         <Tile icon="observe" title={said.background}>
-          <div class="spent-ring">
-            <Ring value={background.used} max={background.cap} tone={toneOf(background.used, background.cap)} size={112} label={said.of(background.cap)} summary={background.line} />
-          </div>
+          {#if background.cap !== null}
+            <div class="spent-ring">
+              <Ring value={background.used} max={background.cap} tone={toneOf(background.used, background.cap)} size={112} label={said.of(background.cap)} summary={background.line} />
+            </div>
+          {:else}
+            <p class="spent-figure num">{background.used.toLocaleString('en-GB')}</p>
+          {/if}
           <p class="spent-reading">{background.line}</p>
+          {#if backgroundFor.length > 0}
+            <ul class="spent-for" aria-label={words.forWhat}>
+              {#each backgroundFor as line (line)}<li>{line}</li>{/each}
+            </ul>
+          {/if}
         </Tile>
       {/if}
 
@@ -190,6 +211,20 @@
     color: var(--ink2);
     font-size: var(--t-base);
     line-height: 20px;
+  }
+
+  /* WHAT THE ASKS WERE FOR, a line a purpose under the reading, in the same size. */
+  .spent-for {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    color: var(--ink2);
+    font-size: var(--t-base);
+    line-height: 20px;
+    font-variant-numeric: tabular-nums;
   }
 
   .spent-out {

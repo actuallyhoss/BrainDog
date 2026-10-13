@@ -49,6 +49,7 @@
   import SlashModel from '$lib/ui/SlashModel.svelte';
   import SlashDaily from '$lib/ui/SlashDaily.svelte';
   import SlashReads from '$lib/ui/SlashReads.svelte';
+  import TrustRows from '$lib/ui/TrustRows.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
@@ -487,6 +488,7 @@
       {#if reading}<p class="reading">{reading}</p>{/if}
     {/if}
   </Tile>
+  <TrustRows />
 
   <!-- THE AGENTS ADD-ON, OFFERED ONCE SOMETHING IS CONNECTED, on the ground under the list it follows from. -->
   {#if offer}

@@ -118,6 +118,12 @@ export const OBLIGATIONS_REGISTER: MoneyRegister = {
        it when the row is marked paid (`finished:` above). */
     { id: 'settled', label: 'Paid on', type: 'day' },
     /**
+     * HOW MUCH OF IT IS PAID (REC-B11). "Part paid" was a status with no amount behind it. Money's `settle` script
+     * writes the sum of the payments that name this bill in "Settles", in the bill's own currency, and marks it paid
+     * when the sum reaches the amount. Empty on a bill no payment has been matched to. Not indexed: nothing filters on it.
+     */
+    { id: 'paid_so_far', label: 'Paid so far', type: 'money' },
+    /**
      * THE DAY SOMEBODY DECIDED TO CHASE IT, SINCE money-core 3.1.0. Written by the record when "Chase it" is the
      * answer to `invoice-late` in Decide (`invoice-chased` in `MONEY_AUTOMATIONS`), so Money can say how long an
      * invoice has been chased rather than only that it is late. Empty on every row nobody chose to chase.
