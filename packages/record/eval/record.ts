@@ -1,5 +1,6 @@
 /**
- * The record the evaluation drafts over and writes headlines for: one person's money at HSBC, a small baking trade and an
+ * The record the evaluation drafts over and writes headlines for, and the fresh record `tools/model-checks/describe-live.mjs`
+ * asks a host's door over: one person's money at HSBC, a small baking trade and an
  * allotment, each with a page in the rail that opens on a lead note with real figures.
  *
  * THE SAME SEED FOR EVERY CASE, A FRESH COPY EACH TIME. `slashDraft` files nothing, but it writes a ledger row per ask and
@@ -108,6 +109,10 @@ const ROWS: { register: string; fields: Record<string, unknown> }[] = [
   { register: 'orders', fields: { what: 'Sourdough for the Lees', price: gbp(1_200), due: '2026-10-03', state: 'open' } },
   { register: 'orders', fields: { what: 'Birthday cake, Ama', price: gbp(4_500), due: '2026-10-04', state: 'open' } },
   { register: 'orders', fields: { what: 'Cinnamon buns, café', price: gbp(3_600), due: '2026-10-01', state: 'done' } },
+  /* THREE BAKES DONE ON THREE DAYS, and not one: a description that puts what was taken beside what was spent (`cases.ts`,
+     the baking costs) reads takings worth a sentence, and a chart over the orders has the three points it needs to be drawn. */
+  { register: 'orders', fields: { what: 'Focaccia, market café', price: gbp(2_800), due: '2026-09-24', state: 'done' } },
+  { register: 'orders', fields: { what: 'Lemon drizzle, the Okafors', price: gbp(2_200), due: '2026-09-29', state: 'done' } },
   { register: 'jobs', fields: { what: 'Lift the last potatoes', state: 'open' } },
   { register: 'jobs', fields: { what: 'Mend the shed door', state: 'open' } },
   { register: 'jobs', fields: { what: 'Sow the broad beans', state: 'done' } },

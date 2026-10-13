@@ -142,7 +142,7 @@ test("A HOME LINE WITH A NUMBER IT WAS NOT HANDED IS REFUSED, and Today's read c
   const { api, sql } = await record(model);
   const out = await api.slashTick();
   assert.ok(out.ran);
-  assert.ok(out.dropped.some((d) => /said 2, which none of its figures holds/u.test(d)), JSON.stringify(out.dropped));
+  assert.ok(out.dropped.some((d) => /typed 2, where a number is written as the hole of its figure/u.test(d)), JSON.stringify(out.dropped));
   assert.equal(api.kernel.prefsOf('slash')['headline.home'], undefined);
   assert.equal(await homeSaid(api), undefined);
   sql.close();
@@ -162,32 +162,49 @@ test(`A FIGURE THAT MOVES THE SAME DAY IS ASKED ABOUT EXACTLY ONCE MORE, and hea
   assert.deepEqual(await api.slashTick(), { ran: false, why: 'today' });
   assert.equal(heard.length, 1, 'a page whose figures did not move was asked about again');
 
-  /* A FIGURE MOVES: the next tick asks once more, for what moved. */
+  /* A FIGURE MOVES: the tick that sees it notes when and asks nothing, so the writes of one sitting are one ask. */
   value(await api.create({ register: 'tasks', fields: { what: 'Box quote', by: '2026-11-01', state: 'open' } }, OWNER));
   clock.set(night + 2 * HOUR);
   await api.slashTick();
+  assert.equal(heard.length, 1, 'a moved figure was asked about before its sitting had ended');
+  /* AND THE FIRST TICK A QUARTER OF AN HOUR ON ASKS ONCE MORE, for what moved. */
+  clock.set(night + 3 * HOUR);
+  await api.slashTick();
   assert.equal(heard.length, 2, 'a moved figure was not asked about again that day');
   assert.equal(heard[1]!.pages.find((p) => p.page === 'desk')?.figures[0]?.value, '4');
-  /* AND A TICK SOON AFTER, with nothing new, asks nothing. */
-  clock.set(night + 3 * HOUR);
+  /* A TICK AFTER, with nothing new, asks nothing. */
+  clock.set(night + 3.5 * HOUR);
   await api.slashTick();
   assert.equal(heard.length, 2);
 
-  /* IT MOVES AGAIN: the day's asks are spent, so the rules speak until the next night. */
+  /* IT MOVES AGAIN: with a day's cap of several the second move is asked about too, once, however many ticks follow. */
   value(await api.create({ register: 'tasks', fields: { what: 'Glaze order', by: '2026-11-02', state: 'open' } }, OWNER));
   for (const h of [4, 6, 9]) {
     clock.set(night + h * HOUR);
     await api.slashTick();
   }
-  assert.equal(heard.length, 2);
-  assert.equal(headlineAsks(), HEADLINE_ASKS_DAY);
+  assert.equal(heard.length, 3);
+  assert.ok(headlineAsks() <= HEADLINE_ASKS_DAY);
   assert.ok(rows.every((r) => r.kind.startsWith('background:')), 'a headline spent one of the person’s asks');
 
   /* THE NEXT NIGHT ASKS AGAIN, from a fresh day's count. */
+  const before = headlineAsks();
   clock.set(night + DAY);
   assert.ok((await api.slashTick()).ran);
-  assert.equal(heard.length, 3);
-  assert.equal(heard[2]!.pages.find((p) => p.page === 'desk')?.figures[0]?.value, '5');
+  assert.equal(heard.length, 4);
+  assert.equal(heard[3]!.pages.find((p) => p.page === 'desk')?.figures[0]?.value, '5');
+
+  /* AND THE CAP ITSELF HOLDS: a figure moved until the day's asks are spent is asked about no more that day. */
+  let at = night + DAY;
+  for (let move = 0; move < HEADLINE_ASKS_DAY + 2; move++) {
+    value(await api.create({ register: 'tasks', fields: { what: `Order ${String(move)}`, by: '2026-11-03', state: 'open' } }, OWNER));
+    for (let tick = 0; tick < 2; tick++) {
+      at += HOUR / 3;
+      clock.set(at);
+      await api.slashTick();
+    }
+  }
+  assert.equal(headlineAsks() - before, HEADLINE_ASKS_DAY);
   sql.close();
 });
 

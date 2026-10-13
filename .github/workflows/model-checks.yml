@@ -62,7 +62,7 @@ jobs:
       # THE INSTALL IS FOR THE HARNESSES: they run the shipped engine, which imports the workspace.
       - uses: ./.github/actions/setup
       - name: The runner's own tests
-        run: node --test tools/model-checks/test/outcomes.test.mjs
+        run: node --test tools/model-checks/test/outcomes.test.mjs tools/model-checks/test/describe-live.test.mjs
       - name: The nights before
         env:
           GH_TOKEN: ${{ github.token }}
@@ -90,9 +90,17 @@ jobs:
           if [ "$SET_BASELINE" = true ]; then args+=(--set-baseline); fi
           node tools/model-checks/run.mjs "${args[@]}" --history previous/model-checks.json --out model-checks.json
           code=$?
+          # THE SIXTEEN DESCRIPTIONS THROUGH THE HOST'S OWN DOOR, ON A NIGHT (ENG-B11): red under 13 clean on the first
+          # ask. It reads the same two names, and with neither it says not measured and exits 0. Its asks are its own,
+          # about 12,400 neurons at the very worst (14 cents), and are not counted against --max-neurons.
+          live=0
+          if [ "$EVENT" = schedule ]; then
+            node tools/model-checks/describe-live.mjs --bar 13 --out describe-live.json
+            live=$?
+          fi
           alarm=$(node -e "const r=JSON.parse(require('fs').readFileSync('model-checks.json','utf8'));process.stdout.write(r.alarm?(r.alarm.why==='below'?r.alarm.nights+' nights below the bar':r.alarm.nights+' nights not measured'):'')" 2>/dev/null)
           echo "alarm=$alarm" >> "$GITHUB_OUTPUT"
-          exit $code
+          exit $(( code > live ? code : live ))
       - name: Keep the report
         if: always()
         uses: actions/upload-artifact@v4
@@ -100,6 +108,7 @@ jobs:
           name: model-checks
           path: |
             model-checks.json
+            describe-live.json
             tools/model-checks/baseline.json
           if-no-files-found: warn
           retention-days: 90

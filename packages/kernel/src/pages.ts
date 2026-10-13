@@ -22,6 +22,7 @@ import { no, ok, refused } from '@braindog/ports';
 import type { Leaf, Predicate, Schema } from '@braindog/where';
 
 import type { ActionRow } from './actions.ts';
+import type { Exception } from './exceptions.ts';
 import { ANSWER_KEYS, BLOCK_READS, FILTER_TYPES, blockKeyOf, keyedBlocks, kindsReading, wrongKindKey } from './block-keys.ts';
 import { applyLook, composeLook, lookOf, mergeLook, type LookBody } from './compose.ts';
 import { HANDOFFS_OPEN, builtInFigure, type OpenStep } from './built-in-figures.ts';
@@ -774,6 +775,11 @@ export type PageDeps = {
    * `handoff.ts`'s `openHandoffs`). A `handoffs.open` block reads them.
    */
   handoffs?: (project: string | null) => readonly OpenStep[];
+  /**
+   * What went quiet on this record, the longest quiet first (`openExceptions` in `exceptions.ts`, ENG-B13): a list or a
+   * door that stopped, a feed that missed its time, a row older than its page allows. An `exceptions` block reads them.
+   */
+  exceptions?: () => readonly Exception[];
   /**
    * One project's scheduled actions that are paused, stopped as failed, or late, each in one sentence (`signs-actions.ts`
    * `actionsBlocking`, REC-C09): what is in the project's way besides its blockers. An `actions.blocking` block reads them.

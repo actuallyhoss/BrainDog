@@ -8,7 +8,7 @@
  *   --routes            one ask a routed name (`ROUTED` in `apps/worker/src/inference.ts`): served, schema taken, time,
  *                       tokens, and the provider's own words on a failure; and one ask through the production gateway
  *   --suite slash       Slash's thirty questions (`packages/slash/eval/run.ts --json`), scored against the bar
- *   --suite record      the twelve descriptions and the night's headlines (`packages/record/eval/run.ts --json`)
+ *   --suite record      the sixteen descriptions and the night's headlines (`packages/record/eval/run.ts --json`)
  *   --small             the routes and eight chosen cases (`SMALL` in `lib.mjs`); nothing named is the routes and both suites
  *   --changed <base>    run only when the diff from <base> touches a file in `watched.json`
  *   --max-neurons <n>   the most the run may spend; 20,000 for --small and 100,000 otherwise (22 cents and $1.10)

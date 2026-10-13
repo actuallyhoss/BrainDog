@@ -27,6 +27,8 @@
  */
 
 import { BLOCK_KEY, blockKeyOf, shortHash } from './block-keys.ts';
+import type { Json } from './coerce.ts';
+import { exponentOf } from './ingest.ts';
 import type { BlockResult, ListShape, PageRow } from './pages.ts';
 
 /** Who arranged a look. */
@@ -188,6 +190,80 @@ export function lookOf(raw: unknown): LookBody | null {
       : {}),
     ...(pinned ? { pinned } : {}),
   };
+}
+
+/* ── a headline's holes ──────────────────────────────────────────────────── */
+
+/**
+ * A HEADLINE SAYS A NUMBER AS A HOLE, `{{figure id}}`, AND THE READ FILLS IT (decision 3 of the engine's part B).
+ *
+ * A number a model typed was checked against the figures it was handed, which let a right number sit in a wrong
+ * sentence, and it was right only for the night it was written. A hole is filled each time the page is read, from the
+ * figures the page shows then and in the form it prints them, so the line can never say a count the page does not.
+ */
+const HOLE = /\{\{\s*([^{}\s]+)\s*\}\}/gu;
+
+/** Every figure a headline names in a hole, in order and once each. */
+export const holesIn = (headline: string): string[] => [...new Set([...headline.matchAll(HOLE)].map((m) => m[1]!))];
+
+/** A headline with its holes taken out: what is left is the words, and a brace left in them is no hole. */
+export const withoutHoles = (headline: string): string => headline.replace(HOLE, '');
+
+/** A money in minor units as a person reads it, in the currency's own decimals: `GBP 33,850.00`, `JPY 129,900`. */
+const moneySaid = (amount: number, currency: string): string => {
+  const exp = exponentOf(currency);
+  const body = (Math.abs(amount) / 10 ** exp).toLocaleString('en-u-nu-latn', { minimumFractionDigits: exp, maximumFractionDigits: exp });
+  return `${currency.toUpperCase()} ${amount < 0 ? '−' : ''}${body}`;
+};
+
+/**
+ * A figure as the page prints it, or `null` for one with nothing to say. A figure in several currencies is each of its
+ * amounts, never their sum: two currencies are not added. The same writing the rules' line is filled with.
+ */
+export function figureSaid(v: Json | undefined): string | null {
+  if (typeof v === 'string') return v.trim() === '' ? null : v;
+  /* `v || 0`: a nought that came out of a subtraction as -0 is said as 0, never "-0". */
+  if (typeof v === 'number') return Number.isFinite(v) ? (v || 0).toLocaleString('en-u-nu-latn', { maximumFractionDigits: 2 }) : null;
+  if (typeof v === 'boolean') return v ? 'yes' : 'no';
+  const isMoney = (p: unknown): p is { amount: number; currency: string } =>
+    p !== null && typeof p === 'object' && Number.isFinite((p as { amount?: unknown }).amount) && typeof (p as { currency?: unknown }).currency === 'string' && (p as { currency: string }).currency.trim() !== '';
+  if (Array.isArray(v)) return v.length > 0 && v.every(isMoney) ? v.map((p) => moneySaid(p.amount, p.currency)).join(' · ') : null;
+  return isMoney(v) ? moneySaid(v.amount, v.currency) : null;
+}
+
+/**
+ * The page's own figures as it reads now: every `{{path}}` its blocks hold a value for, by the path as written. Only a
+ * block that is drawn and refused nothing says one, and the first block to say a figure is the one that is heard, so
+ * the lead note's reading stands over a later block's.
+ */
+export function figuresOf(blocks: readonly BlockResult[]): Record<string, Json> {
+  const out: Record<string, Json> = {};
+  for (const b of blocks) {
+    if (b.drawn === false || b.refusals.length > 0) continue;
+    const values = (b as { values?: unknown }).values;
+    if (values === null || typeof values !== 'object' || Array.isArray(values)) continue;
+    /* `__proto__` written as a key would set what `out` inherits from, and be no figure of its own. */
+    for (const [path, value] of Object.entries(values as Record<string, Json>)) if (path !== '__proto__' && !Object.hasOwn(out, path)) out[path] = value;
+  }
+  return out;
+}
+
+/**
+ * A headline with every hole filled from `figures`, or `null` when it cannot be said: a hole names no figure handed,
+ * or one with no value; a brace is left that is no hole; or the line as filled is not one plain line within the
+ * headline's ceiling. One without a hole comes back as it was written.
+ */
+export function fillHoles(headline: string, figures: Readonly<Record<string, Json>>): string | null {
+  if (/[{}]/u.test(withoutHoles(headline))) return null;
+  let whole = true;
+  const filled = headline.replace(HOLE, (_, id: string) => {
+    const said = Object.hasOwn(figures, id) ? figureSaid(figures[id]) : null;
+    /* A FIGURE'S OWN TEXT IS WORDS, NEVER A HOLE OR A BREAK: a value holding either would be drawn as written. */
+    if (said === null || /[\n\r{}]/u.test(said)) whole = false;
+    return said ?? '';
+  });
+  if (!whole) return null;
+  return new TextEncoder().encode(filled).length > LOOK_HEADLINE_BYTES ? null : filled;
 }
 
 /* ── the rules ───────────────────────────────────────────────────────────── */
@@ -442,6 +518,8 @@ function handlesOf(blocks: readonly BlockResult[]): Set<string> {
  *   a look that is not the person's own, the questions while any are waiting. A heading that is hidden hides the blocks
  *   under it, and is not hidden while one of them may not be.
  * - NEXT is kept only when a block still drawn after the hide holds the row it names.
+ * - HEADLINE has its holes filled from the page's own figures as they read now (`fillHoles`). One that cannot be
+ *   filled is left out, so the rules' line stands.
  *
  * Nothing is added and nothing is taken out of the list, so a host keyed by `key` sees the same blocks, moved.
  */
@@ -538,6 +616,10 @@ export function applyLook(blocks: readonly BlockResult[], look: LookBody): { blo
   /* NEXT IS A ROW THE READER IS SHOWN: one in a block the look just hid, or one refused, is no step anybody can take. */
   const next = look.next !== undefined && handlesOf(out.filter((b) => b.drawn !== false && b.refusals.length === 0)).has(look.next.row) ? look.next : undefined;
   const hidden = keys.filter((k) => hide.has(k));
+  /* THE HEADLINE'S HOLES ARE FILLED FROM THE PAGE AS IT READS NOW, before the look hid anything: a figure of a block the
+     look hides is still the page's. A hole that cannot be filled drops the line, so the rules' line stands, and the
+     rest of the look is kept. */
+  const headline = look.headline === undefined ? null : fillHoles(look.headline, figuresOf(blocks));
   return {
     blocks: out,
     look: {
@@ -547,7 +629,7 @@ export function applyLook(blocks: readonly BlockResult[], look: LookBody): { blo
       ...(lead !== undefined ? { lead } : {}),
       ...(order.length ? { order } : {}),
       ...(hidden.length ? { hide: hidden } : {}),
-      ...(look.headline !== undefined ? { headline: look.headline } : {}),
+      ...(headline !== null ? { headline } : {}),
       ...(next !== undefined ? { next } : {}),
       ...(pinned.length ? { pinned } : {}),
     },

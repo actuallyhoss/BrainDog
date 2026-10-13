@@ -27,6 +27,7 @@ import { actions } from './actions.ts';
 import { ACTIONS_BLOCKING, actionsBlocking } from './actions-blocking.ts';
 import { activity } from './activity.ts';
 import { deadlines } from './deadlines.ts';
+import { exceptions } from './exceptions.ts';
 import { figuresHome } from './figures-home.ts';
 import { forecastRunway } from './forecast-runway.ts';
 import { governanceDecided, governanceLater, governanceOpen } from './governance.ts';
@@ -46,6 +47,13 @@ export type Source = {
    * A source whose rows are rows of named lists leaves it off, and `registersOf` names those lists.
    */
   whole?: true;
+  /**
+   * Set when the source's rows say something of every list the record declares, by name: a block over it is then
+   * named as a read of each of them as well (`index.ts` `blockRegisters`), so a reader held from any one list, or
+   * narrowed to some of one's rows, is not shown it. `whole` alone names `*`, which a reader with no ceiling passes
+   * while one of her lists is held to `append`.
+   */
+  everyList?: true;
   /**
    * Set when the source is answered before any kind reads the block. A registered kind is asked before the sources
    * are (`kinds/index.ts`), so a source whose answer is the same whatever draws it, or which the kind's own arm would
@@ -81,6 +89,7 @@ export const SOURCE_MODULES: Record<string, Source> = {
   signs,
   'handoffs.open': handoffsOpen,
   [ACTIONS_BLOCKING]: actionsBlocking,
+  exceptions,
 };
 
 /** The module that answers `name`, or `undefined` for a word that is no registered source: a list, a figure or nothing. */

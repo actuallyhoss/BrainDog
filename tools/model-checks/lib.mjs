@@ -28,7 +28,7 @@ export const MAX_NEURONS = { small: 20_000, full: 100_000 };
 export const SMALL = { slash: [1, 9, 16, 21, 28, 29], record: [1, 7] };
 
 /** How many cases each harness holds (`questions.ts`, `cases.ts`), used only to reckon a full run's worst spend. */
-export const CASES = { slash: 30, record: 12 };
+export const CASES = { slash: 30, record: 16 };
 
 /** The worst a harness case can spend, in neurons: two asks at the package's worst call (232, `worstAsk`) on Slash, three on a draft with its repairs. */
 export const WORST_CASE = { slash: 2 * 257, record: 3 * 257 };

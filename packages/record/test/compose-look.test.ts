@@ -155,14 +155,14 @@ test('a next names a row the page was handed, in one plain phrase with no number
 });
 
 test('an answer is kept part by part: a bad order costs the order, not the line or the next', () => {
-  const got = lookAnswerOf({ headline: 'One task waits on you, and the Kiln quote is the one to send.', order: ['late', 'ghost'], next: { row: 'tasks#4', text: 'Send the Kiln quote' } }, PAGE);
-  assert.equal(got.headline, 'One task waits on you, and the Kiln quote is the one to send.');
+  const got = lookAnswerOf({ headline: '{{tasks-waiting}} task waits on you, and the Kiln quote is the one to send.', order: ['late', 'ghost'], next: { row: 'tasks#4', text: 'Send the Kiln quote' } }, PAGE);
+  assert.equal(got.headline, '{{tasks-waiting}} task waits on you, and the Kiln quote is the one to send.');
   assert.equal(got.order, undefined);
   assert.deepEqual(got.next, { row: 'tasks#4', text: 'Send the Kiln quote' });
   assert.equal(got.faults.length, 1);
   assert.match(got.faults[0]!, /keeps its order/u);
   /* A BARE LINE IS A HEADLINE AND NOTHING ELSE, as it always was. */
-  assert.deepEqual(lookAnswerOf('4 open, and 1 waits on you.', PAGE), { faults: [], headline: '4 open, and 1 waits on you.' });
+  assert.deepEqual(lookAnswerOf('{{open-tasks}} open, and {{tasks-waiting}} waits on you.', PAGE), { faults: [], headline: '{{open-tasks}} open, and {{tasks-waiting}} waits on you.' });
   /* A LINE SAYING A NUMBER IT WAS NOT HANDED IS NOT KEPT, AND THE ORDER STILL IS. */
   const made = lookAnswerOf({ headline: '9 tasks are late.', order: ['board', 'late'] }, PAGE);
   assert.equal(made.headline, undefined);

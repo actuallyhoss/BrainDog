@@ -259,6 +259,12 @@ export type McpSurface<C> = {
    */
   understandPlan?(args: Record<string, never>, ctx: C): Answer;
   /**
+   * What one thing on the record is, asked by its name: its kind, what else it goes by and where it was seen, or the
+   * things the name may mean (the record's `about`, READ+, ENG-B02). It backs `braindog:about/<name>`. Optional as the
+   * read above is: a surface without it answers `NOT_IN_THIS_BUILD`.
+   */
+  about?(args: { name: string }, ctx: C): Answer;
+  /**
    * Take back a question this run asked, while it is still open (the record's `withdraw`, DATA, AGT-C07). It backs
    * `propose`'s `withdraw`. Optional for the command line's reason above, and a surface without it answers that
    * `NOT_IN_THIS_BUILD`. Who may is the record's to say, and its refusal is said as it came.
@@ -3043,6 +3049,18 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     if (head === 'whoami' && !rest) return surface.whoami(ctx);
     if (head === 'boot' && !rest) return surface.boot(ctx);
     if (head === 'understand' && !rest) return understood(ctx, lean);
+    /* WHAT ONE THING IS, BY ITS NAME (`braindog:about/<name>`): the name is a person's words, so it is decoded and handed
+       to the record as text, which holds it to a name's length and to what this caller may read. */
+    if (head === 'about' && rest) {
+      if (!surface.about) return unbuilt('about', 'Search the record for the name instead.');
+      let name: string;
+      try {
+        name = decodeURIComponent(rest);
+      } catch {
+        return { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: 'Write the name after braindog:about/ as plain text, with a space as %20.', at: 'uri' } };
+      }
+      return surface.about({ name }, ctx);
+    }
     if (head === 'handoffs' && !rest) return handoffsRead(ctx);
     if (head === 'context' && !rest) {
       if (!surface.context) return unbuilt('context', 'Read braindog:boot instead.');

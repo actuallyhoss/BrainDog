@@ -6,16 +6,27 @@
  * a list that says nothing when it is empty, which the record refuses and hands back, and the stub mends it on the repair,
  * so the repair path and the first-try score are both walked. A description about a page changes that page and keeps its id.
  *
- * ITS HEADLINES ARE THE RULES' OWN LINES, which `headlineFault` always keeps, so a dry run that drops one has found a fault
- * in the scorer and not in a model.
+ * ITS HEADLINES ARE THE RULES' OWN LINES WITH EACH NUMBER AS ITS FIGURE'S HOLE (`holedRules`), which `headlineFault`
+ * keeps, so a dry run that drops one has found a fault in the scorer and not in a model.
  */
 
 import type { HeadlineInput, SlashModel, SlashModelInput } from '../src/index.ts';
+import { holedRules } from '../src/headlines.ts';
 import { CASES } from './cases.ts';
 
 const changeOf = (input: SlashModelInput): unknown => {
   const c = CASES.find((x) => x.asked === input.asked);
   if (c === undefined) return { drafts: [] };
+  /* A DESCRIPTION THAT NEEDS THE FULL LEVEL IS ANSWERED WITH ALL OF IT (`stub.built` in `cases.ts`), so a dry run draws
+     the page a good answer declares. One marked `mends` leaves out what its table says when empty on the first ask. */
+  if (c.stub.built !== undefined && input.page === undefined) {
+    const { declarations, rows } = structuredClone(c.stub.built);
+    if (c.stub.mends === true && input.repair === undefined)
+      for (const d of declarations)
+        if (d.kind === 'page')
+          for (const b of (d.body as { blocks: Record<string, unknown>[] }).blocks) if (b['kind'] === 'table') delete b['empty'];
+    return { drafts: [{ question: `Build ${c.stub.title} for you, as you described it?`, body_kind: 'change', body: { to: { declarations } }, rows }] };
+  }
   const { list, title, one, icon } = c.stub;
   if (input.page !== undefined) {
     const body = structuredClone(input.page.body) as { blocks?: Record<string, unknown>[] };
@@ -78,5 +89,5 @@ const changeOf = (input: SlashModelInput): unknown => {
 export const STUB: SlashModel = {
   name: 'dry stub',
   draft: async (input) => changeOf(input),
-  headline: async (input: HeadlineInput) => ({ lines: Object.fromEntries(input.pages.map((p) => [p.page, p.rules])) }),
+  headline: async (input: HeadlineInput) => ({ lines: Object.fromEntries(input.pages.map((p) => [p.page, holedRules(p)])) }),
 };

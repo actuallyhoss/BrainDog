@@ -36,6 +36,10 @@ import { ROUTES as capture } from './capture.ts';
 import { ROUTES as trust } from './trust.ts';
 import { ROUTES as sameOne } from './same-one.ts';
 import { ROUTES as heldTwice } from './held-twice.ts';
+import { ROUTES as about } from './about.ts';
+import { ROUTES as briefing } from './briefing.ts';
+import { ROUTES as exceptions } from './exceptions.ts';
+import { ROUTES as matched } from './matched.ts';
 /* END ROUTES */
 
 export const EXTRA_ROUTES: readonly Route[] = [
@@ -63,5 +67,9 @@ export const EXTRA_ROUTES: readonly Route[] = [
   ...trust,
   ...sameOne,
   ...heldTwice,
+  ...about,
+  ...briefing,
+  ...exceptions,
+  ...matched,
   /* END ROUTES */
 ];

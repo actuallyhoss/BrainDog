@@ -1,0 +1,191 @@
+/**
+ * Who the record matched on its own: `matched` (READ+), the folds its strong rules made, each with its evidence and the
+ * batch its Undo takes.
+ *
+ * BEFORE THIS A CONFIDENT MATCH WAS ONE COUNT ON ONE PAGE. The rules fold two of somebody into one as a single batch the
+ * record can undo, and the only place that batch was ever said was the answer to the meeting that made it. Nothing
+ * listed what was matched, so a wrong fold could not be found, read or taken back.
+ *
+ * READ FROM WHAT STANDS, THEN FROM THE LOG. A fold is somebody taken out of the list and pointed at who they were
+ * folded into, so the ones still pointed are the folds that stand. Each one's batch is the last line in the log that
+ * pointed it, read as the kernel's own undo of a merge reads it. A fold put back is no longer pointed, and is not listed.
+ *
+ * ONLY WHAT THE RECORD MADE. A merge the owner answered a question with carries its decision in the same batch, and is
+ * theirs, not a match made for them: it is left out.
+ *
+ * ONE ANSWER A BATCH, NEWEST FIRST, FIFTY AT MOST. One meeting may fold a few in a row, all under one batch, so one
+ * Undo takes them all back and they are said together: everybody folded, and the one they are now.
+ *
+ * NAMES, AND ONE SENTENCE. Who was folded and into whom by what each is called, the number of the one kept so a list
+ * can open them, and the evidence in plain words: the handle the two share, read without its dots and the number on
+ * its end as the rules read it, and never an address. Where no shared handle can be read from what the two hold now,
+ * the sentence is the reason the batch itself wrote down.
+ *
+ * IT WRITES NOTHING AND FOLDS NOTHING. Which list holds the people is the kernel's to say (`meetsList`), so no list is
+ * named here. A caller whose grant is narrowed to some of them is answered only the folds into somebody it admits.
+ */
+
+import type { Result } from '@braindog/ports';
+import { whereFor } from '@braindog/kernel';
+
+import type { CallContext } from '../index.ts';
+import type { RecordDeps } from './index.ts';
+
+/** How many folds one answer holds at most, and what `limit` may ask for. */
+export const MATCHED_MOST = 50;
+
+/** How many of the most recently folded are read to find them: a fold answered by a question is read and left out. */
+const SCANNED = 500;
+
+/** How many steps of a fold's chain are followed, as the kernel follows them (`FOLD_HOPS`). */
+const HOPS = 16;
+
+/** One batch of folds: who was folded, who they are now, why in one sentence, when, and the batch its Undo takes. */
+export type Match = { from: string[]; into: { name: string; seq: number | null }; evidence: string; at: string; batch: string };
+
+/** What `matched` answers, or `null` on a record that keeps no people. */
+export type Matched = { matches: Match[] } | null;
+
+/**
+ * A handle as the strong rules compare two (`stem` in the kernel's people file): lower case, without what follows a
+ * plus, its dots, dashes and underscores, or the number on its end. Five characters at least, as there.
+ */
+const stemOf = (handle: string): string => handle.toLowerCase().replace(/\+.*$/, '').replace(/[._-]/g, '').replace(/\d+$/, '');
+const STEM_LEAST = 5;
+
+/** The handle of one stored key: `email:ada@one.example`, `github:ada` and a bare address alike. Never the domain. */
+const handleOf = (key: string): string => {
+  const said = /^[a-z]+:/u.test(key) ? key.slice(key.indexOf(':') + 1) : key;
+  return said.split('@')[0] ?? '';
+};
+
+const fieldsOf = (text: string): Record<string, unknown> => {
+  try {
+    const v = JSON.parse(text) as unknown;
+    return v !== null && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+};
+
+/** Every key one of them holds, from the fields that carry keys: text, or a list of text. */
+const keysIn = (fields: Record<string, unknown>, at: readonly (string | undefined)[]): string[] =>
+  at.flatMap((f) => {
+    const v = f === undefined ? undefined : fields[f];
+    return typeof v === 'string' ? [v] : Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+  });
+
+export function methods(deps: RecordDeps) {
+  const { kernel, sql, guard, no } = deps;
+
+  type Folded = { n: number; event: string; batch: string | null; ts: string; note: string | null; to_v: string; row: string; fields: string };
+
+  return {
+    /**
+     * `{ limit? }`: the folds the record made on its own that still stand, newest first, `MATCHED_MOST` at most. `null`
+     * on a record that keeps no people. READ+ on the list that holds them, and it changes nothing.
+     */
+    async matched(args: { limit?: unknown } | undefined, ctx: CallContext): Promise<Result<Matched>> {
+      const stop = guard(ctx, 'read', kernel.meetsList()?.register);
+      if (stop) return { ok: false, refusal: stop };
+      const limit = args?.limit ?? MATCHED_MOST;
+      if (typeof limit !== 'number' || !Number.isSafeInteger(limit) || limit < 1 || limit > MATCHED_MOST)
+        return no('VALUE_MALFORMED', `limit is a whole number from 1 to ${MATCHED_MOST}.`, { at: 'limit' });
+      const held = kernel.meetsList();
+      if (held === null) return { ok: true, value: null };
+      const { register, fields: at } = held;
+      const merge = at.merged_into;
+      if (merge === undefined) return { ok: true, value: { matches: [] } };
+
+      /* EVERYBODY STILL FOLDED, WITH EVERY LINE THAT POINTED THEM, newest line first: the first line met for each is the
+         fold that stands, as `undoMerge` finds a merge's batch from the one folded. */
+      const lines = sql.all<Folded>(
+        `SELECT e.rowid AS n, e.id AS event, e.batch AS batch, e.ts AS ts, e.note AS note, e.to_v AS to_v, r.id AS row, r.fields AS fields
+           FROM entry r JOIN event e ON e.target = 'entry:' || r.id AND e.field = ? AND e.to_v IS NOT NULL
+          WHERE r.register = ? AND r.deleted_at IS NOT NULL AND json_extract(r.fields, ?) IS NOT NULL
+          ORDER BY e.rowid DESC LIMIT ?`,
+        merge,
+        register,
+        `$.${merge}`,
+        SCANNED,
+      );
+      const seen = new Set<string>();
+      const stands = lines.filter((l) => {
+        if (seen.has(l.row)) return false;
+        seen.add(l.row);
+        /* POINTED SOMEWHERE ELSE SINCE, by a write the log does not hold: not this line's fold. */
+        return JSON.stringify(fieldsOf(l.fields)[merge]) === l.to_v;
+      });
+
+      const person = (id: string) => sql.one<{ seq: number | null; fields: string }>('SELECT seq, fields FROM entry WHERE id = ?', id);
+      /** Who somebody folded is now: the end of their chain, since the one they were folded into may have been folded since. */
+      const endOf = (from: string): string => {
+        const walked = new Set([from]);
+        let here = from;
+        for (let hop = 0; hop < HOPS; hop++) {
+          const next = fieldsOf(person(here)?.fields ?? '')[merge];
+          if (typeof next !== 'string' || walked.has(next)) break;
+          walked.add(next);
+          here = next;
+        }
+        return here;
+      };
+      /* SOMEBODY A NARROWED GRANT LEAVES OUT IS NOT THERE FOR THIS CALLER, read as `heldTwice` reads it: the one kept,
+         again by their own number under the grant's rule. A grant that is whole admits everybody. */
+      const rule = whereFor(ctx.wheres, register);
+      const admitted = (seq: number | null): boolean => {
+        if (rule === undefined) return true;
+        if (seq === null) return false;
+        const found = kernel.list({ register, where: { field: 'seq', is: seq }, limit: 1 }, rule);
+        return found.ok && found.value.rows.length > 0;
+      };
+      const named = (id: string): string => {
+        const title = (kernel.titleOfRow(id) ?? '').trim();
+        return title === '' ? 'Somebody with no name' : title.length > 80 ? `${title.slice(0, 79)}…` : title;
+      };
+      /**
+       * The one sentence. The handle is one the kept one holds apart from the keys carried over from the folded, and
+       * that a folded one holds too. With none to read, the reason the batch wrote down, which is the rule's own.
+       */
+      const evidenceOf = (folded: readonly Folded[], end: string): string => {
+        const carry = [at.email, at.handles, at.keys];
+        const theirs = folded.flatMap((f) => keysIn(fieldsOf(f.fields), carry));
+        const bare = (key: string): string => key.replace(/^[a-z]+:/u, '').toLowerCase();
+        const carried = new Set(theirs.map(bare));
+        const own = keysIn(fieldsOf(person(end)?.fields ?? ''), carry).filter((k) => !carried.has(bare(k)));
+        const stems = new Set(theirs.map((k) => stemOf(handleOf(k))).filter((s) => s.length >= STEM_LEAST));
+        const shared = own.map((k) => stemOf(handleOf(k))).find((s) => stems.has(s));
+        if (shared !== undefined) return `The same name and the same handle, ${shared}.`;
+        const note = folded.map((f) => f.note ?? '').find((n) => n.includes(': ')) ?? '';
+        const why = note.slice(note.lastIndexOf(': ') + 2).trim();
+        return why === '' ? 'The rules for a certain match held for the two.' : `${why.charAt(0).toUpperCase()}${why.slice(1)}`;
+      };
+
+      /* ONE ANSWER A BATCH AND THE ONE ITS FOLDS ENDED AT, in the order the log met them: newest first. */
+      const groups = new Map<string, { batch: string; end: string; folded: Folded[] }>();
+      const decided = new Map<string, boolean>();
+      for (const l of stands) {
+        const batch = l.batch ?? l.event;
+        /* THE OWNER'S OWN ANSWER, NOT A MATCH MADE FOR THEM: the decision is a line of the same batch. */
+        if (!decided.has(batch)) decided.set(batch, sql.one("SELECT 1 AS y FROM event WHERE batch = ? AND kind = 'decide' LIMIT 1", batch) !== undefined);
+        if (decided.get(batch)) continue;
+        const end = endOf(l.row);
+        const key = `${batch} ${end}`;
+        const group = groups.get(key) ?? { batch, end, folded: [] };
+        groups.set(key, group);
+        group.folded.push(l);
+      }
+
+      const matches: Match[] = [];
+      for (const g of groups.values()) {
+        if (matches.length >= limit) break;
+        const seq = person(g.end)?.seq ?? null;
+        if (!admitted(seq)) continue;
+        /* Said in the order they were folded, and when the last of them was. */
+        const folded = [...g.folded].sort((a, b) => a.n - b.n);
+        matches.push({ from: folded.map((f) => named(f.row)), into: { name: named(g.end), seq }, evidence: evidenceOf(folded, g.end), at: g.folded[0]!.ts, batch: g.batch });
+      }
+      return { ok: true, value: { matches } };
+    },
+  };
+}

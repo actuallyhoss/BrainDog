@@ -54,7 +54,7 @@ import { DELETE_RULES } from './referenced.ts';
 import { spanMs } from './vault.ts';
 import { actionsOf, callFault, flowFault, sealedAs, subjectOf } from './flow-lint.ts';
 import { BLOCK_INSTALLS, BLOCK_KEY, FILTER_CONTROLS, FILTER_TYPES, FILTERS_MOST, NAV_KEYS, PAGE_KEYS, PAGE_UNBUILT, keyedBlocks, keysFor, kindsReading, unreadBlockKey, unreadPageKey, wrongKindKey } from './block-keys.ts';
-import { LOOK_BASIS_BYTES, LOOK_BY, LOOK_HEADLINE_BYTES, LOOK_KEYS, LOOK_KEYS_MOST, LOOK_NEXT_BYTES } from './compose.ts';
+import { LOOK_BASIS_BYTES, LOOK_BY, LOOK_HEADLINE_BYTES, LOOK_KEYS, LOOK_KEYS_MOST, LOOK_NEXT_BYTES, withoutHoles } from './compose.ts';
 /* THE KINDS THAT READ THEMSELVES, admitted into `BLOCK_KINDS` and asked to check their own blocks at install. */
 import { BLOCK_KIND_MODULES, kindModule } from './kinds/index.ts';
 /* THE PAGE WORDS THE INSTALL AND THE READ REFUSE IN ONE SENTENCE: a section's host panel, a path's short view and a roadmap's columns. */
@@ -1273,6 +1273,10 @@ function lookBody(decl: Declaration, installed?: Known): Refusal | null {
   if (body.headline !== undefined) {
     const said = textFault(body.headline, LOOK_HEADLINE_BYTES, 'headline', `${id}'s headline`, 'It is the page\'s one line, in words.');
     if (said) return said;
+    /* A NUMBER IS A HOLE, `{{figure id}}`, which the read fills from the page's own figures (`fillHoles`). Any other brace
+       is a hole nobody fills, and a break or markup would be drawn as written, since the line is drawn as it is said. */
+    if (/[\n\r{}[\]*`<>]/u.test(withoutHoles(body.headline as string)))
+      return bad('DECLARATION_INVALID', `${id}'s headline is one plain line. A figure is written as a hole, {{its id}}, and the page fills it; take out any other brace, break or markup.`, 'headline');
   }
   if (body.next !== undefined) {
     const next = body.next as { row?: unknown; text?: unknown } | null;

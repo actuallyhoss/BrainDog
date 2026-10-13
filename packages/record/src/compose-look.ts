@@ -5,16 +5,21 @@
  * page at read time (`loop/contract-17.md`, "Look overlay"), and its rules answer one when none is stored. This file is
  * what the model adds to that, and it rides inside the night's headline ask (`headlines.ts`), so it costs Free no ask
  * beyond the line it already had: each page is handed its blocks by `key` and a few of the rows it draws by handle and
- * title, and may answer `{ headline, order, next }` in place of the bare line.
+ * title, and may answer `{ headline, lead, order, hide, next }` in place of the bare line.
  *
  * NOTHING THE MODEL SAYS IS TRUSTED AS IT CAME. The headline passes `headlineFault` or the rules' line stands. An order
  * names only keys the page was handed, each once, and never moves anything ahead of the lead note. A next names a row the
  * page was handed and says it in one short plain phrase, with no number it was not handed and none of the system's
- * words. A part that fails is dropped on its own, with the record's sentence for why, and the rest is kept.
+ * words. A lead names one part it was handed, of the main column, that is not a heading or a line that keeps its place.
+ * What it leaves out is never pinned, never a part that could not be drawn, never what leads, never the questions, and
+ * never the last thing the main column shows. A part that fails is dropped on its own, with the record's sentence for
+ * why, and the rest is kept.
  *
  * VERSIONED, SO UNDO PUTS BACK THE ONE BEFORE. Every look Slash writes is a declaration (`by: 'slash'`) installed over
  * the live version it read, and Slash's pref `look.undo.<page>` keeps that version and the body it replaced. `undoLook`
  * reinstalls the body (or retires the look when there was none) only while the live look is still the one Slash wrote.
+ * A look put back is a no: `look.undone.<page>` keeps what it was written from, and Slash writes none over that page
+ * until that moves (`undoneFor`).
  *
  * AN OWNER'S LOOK IS NEVER TOUCHED. A look the person set ("Change this…", Pin) or a pack shipped is not Slash's to write
  * over, whatever the model answered, and while one fixes the headline, Slash's line is not sent on that page.
@@ -56,6 +61,9 @@ export const lookId = (page: string): string => `look.${page}`;
 
 /** Slash's pref keeping what Undo restores: the version Slash wrote and the body it replaced. Not `headline.`, so no page's line is it. */
 export const lookUndoKey = (page: string): string => `look.undo.${page}`;
+
+/** Slash's pref keeping what the look the person put back was written from, so the same one is not written again (`undoneFor`). */
+export const lookUndoneKey = (page: string): string => `look.undone.${page}`;
 
 /** Slash's pref keeping who kept its look over a page and which version they kept, for the history line "Slash arranged · Mara kept". */
 export const lookKeptKey = (page: string): string => `look.kept.${page}`;
@@ -101,6 +109,7 @@ type ReadBlock = {
   source?: unknown;
   heading?: unknown;
   lead?: unknown;
+  area?: unknown;
   drawn?: unknown;
   refusals?: unknown;
   rows?: unknown;
@@ -186,7 +195,46 @@ export function lookInputOf(blocks: readonly unknown[], titleOf: (list: string) 
 }
 
 /** What a page's answer arranged, each part only when it passed, and why each part that did not was dropped. */
-export type LookAnswer = { headline?: string; order?: string[]; next?: LookNext; faults: string[] };
+export type LookAnswer = { headline?: string; lead?: string; order?: string[]; hide?: string[]; next?: LookNext; faults: string[] };
+
+/** The kinds a look neither leads with nor leaves out: the page's own words, the line a thing is typed into, its forms and its headings (the kernel's `STAYS`). */
+const STAYS: ReadonlySet<string> = new Set(['note', 'capture', 'inputs', 'section']);
+
+/** One part of a page as the checks on a lead and a hide read it. */
+type Part = { key: string; kind: string; main: boolean; drawn: boolean; refused: boolean; leadNote: boolean; queue: boolean };
+
+/**
+ * The page's parts in the order it draws them: from `read`, its blocks as its read answered them, which say what could
+ * not be drawn and what stands beside the main column; without it, from the blocks the ask was handed, every one of
+ * which was drawn, refused nothing, and is taken to be in the main column. Two blocks of one key are the first of them.
+ */
+function partsOf(page: HeadlinePage, read?: readonly unknown[]): Part[] {
+  if (read === undefined)
+    return (page.blocks ?? []).map((b) => ({ key: b.key, kind: b.kind, main: true, drawn: true, refused: false, leadNote: b.lead === true, queue: b.kind === 'queue' }));
+  const out: Part[] = [];
+  const met = new Set<string>();
+  let lead = false;
+  for (const raw of read) {
+    if (raw === null || typeof raw !== 'object') continue;
+    const b = raw as ReadBlock;
+    const key = blockKeyOf(b);
+    if (met.has(key)) continue;
+    met.add(key);
+    const refused = Array.isArray(b.refusals) && b.refusals.length > 0;
+    const leadNote = !lead && b.drawn !== false && !refused && b.kind === 'note' && b.lead === true;
+    if (leadNote) lead = true;
+    out.push({
+      key,
+      kind: typeof b.kind === 'string' ? b.kind : 'block',
+      main: b.area !== 'rail',
+      drawn: b.drawn !== false,
+      refused,
+      leadNote,
+      queue: b.kind === 'queue' || b.source === 'governance.open',
+    });
+  }
+  return out;
+}
 
 /**
  * Why an order the model answered is not kept, or `null` with the order to keep. Only keys the page was handed, each
@@ -231,21 +279,96 @@ export function nextFault(raw: unknown, page: HeadlinePage): string | null {
 }
 
 /**
- * One page's answer read as a look: the headline when `headlineFault` passes it, the order when `orderFault` does, and the
- * next when `nextFault` does. A bare line is a headline and nothing else, as it always was. The headline's own fault is
- * not among `faults`, since the headline step says it already.
+ * Why a lead the model answered is not kept, or the lead to keep. It names one part the page was handed: not a heading
+ * or a line that keeps its place, and, where `read` says which column a part is in, not one beside the main column.
+ * The lead line itself, and the part already first under the page's opening, lead as it stands, so naming either
+ * chooses nothing and is not written.
  */
-export function lookAnswerOf(answer: unknown, page: HeadlinePage): LookAnswer {
+export function leadFault(raw: unknown, page: HeadlinePage, read?: readonly unknown[]): { fault: string } | { lead: string | null } {
+  if (typeof raw !== 'string') return { fault: `The lead for ${page.title} did not name a part of the page.` };
+  const handed = (page.blocks ?? []).find((b) => b.key === raw);
+  if (handed === undefined) return { fault: `The lead for ${page.title} named a part the page does not have.` };
+  if (handed.lead === true) return { lead: null };
+  if (STAYS.has(handed.kind)) return { fault: `The lead for ${page.title} named a heading or a line that keeps its place.` };
+  const parts = partsOf(page, read);
+  if (parts.find((p) => p.key === raw)?.main === false) return { fault: `The lead for ${page.title} named a part beside the main column, which cannot lead.` };
+  const first = parts.find((p) => p.main && p.drawn && !STAYS.has(p.kind));
+  return { lead: first?.key === raw ? null : raw };
+}
+
+/**
+ * Why what the model left out is not kept, or the keys to hide. Only parts the page was handed, each once, and never
+ * one the person pinned, one that could not be drawn (he needs to see what broke), what leads (the lead line, or `lead`,
+ * the part this answer leads with), the questions waiting on him, a heading or a line that keeps its place, nor so many
+ * that the main column is left showing nothing. ONE BAD NAME AND NOTHING IS HIDDEN: a page half emptied is worse than
+ * one left whole.
+ *
+ * `read` is the page's blocks as its read answered them, which say what was refused and what stands beside the main
+ * column. Without it the blocks handed stand in, and a refused part reads as one the page lacks, since it was never handed.
+ */
+export function hideFault(
+  raw: unknown,
+  page: HeadlinePage,
+  pinned: readonly string[],
+  at: { lead?: string; read?: readonly unknown[] } = {},
+): { fault: string } | { hide: string[] | null } {
+  const said = (why: string): { fault: string } => ({ fault: `What to leave out of ${page.title} ${why}` });
+  if (!Array.isArray(raw) || raw.some((k) => typeof k !== 'string')) return said('did not name the parts of the page.');
+  const keys = raw as string[];
+  if (new Set(keys).size !== keys.length) return said('named one part twice.');
+  const handed = new Map((page.blocks ?? []).map((b) => [b.key, b]));
+  const parts = partsOf(page, at.read);
+  const pins = new Set(pinned);
+  for (const key of keys) {
+    const part = parts.find((p) => p.key === key);
+    if (part?.refused) return said('named a part that could not be drawn, which stays where you can see what broke.');
+    const block = handed.get(key);
+    if (block === undefined) return said('named a part the page does not have.');
+    if (block.lead === true || key === at.lead) return said('named what leads the page.');
+    if (pins.has(key)) return said('named a part you pinned.');
+    if (block.kind === 'queue' || part?.queue) return said('named the questions waiting on you.');
+    if (block.kind === 'section') return said('named a heading, which goes only when everything under it does.');
+    if (STAYS.has(block.kind)) return said('named a line that keeps its place.');
+  }
+  if (keys.length === 0) return { hide: null };
+  /* A PAGE WITH NOTHING IN IT SAYS NOTHING: something the main column draws, other than its lead line and its headings,
+     is left standing (the kernel's own rule for what its rules hide, `composeLook`). A part that could not be drawn does
+     not count: a page showing only what broke shows nothing of his. */
+  const left = parts.some((p) => p.main && p.drawn && !p.refused && p.kind !== 'section' && !p.leadNote && !keys.includes(p.key));
+  if (!left) return said('left nothing on the page.');
+  return { hide: keys };
+}
+
+/**
+ * One page's answer read as a look: the headline when `headlineFault` passes it, the order when `orderFault` does, and the
+ * next when `nextFault` does, the lead when `leadFault` does and what is left out when `hideFault` does. A bare line is a
+ * headline and nothing else, as it always was. The headline's own fault is not among `faults`, since the headline step
+ * says it already.
+ *
+ * `at` IS WHAT THE CHECKS ON A HIDE ARE READ AGAINST: the keys the person pinned, and the page's blocks as its read
+ * answered them. Whoever writes the answer as a look asks `undoneFor` first: a look he put back is not written again.
+ */
+export function lookAnswerOf(answer: unknown, page: HeadlinePage, at: { pinned?: readonly string[]; read?: readonly unknown[] } = {}): LookAnswer {
   const faults: string[] = [];
   const line = typeof answer === 'string' ? answer : answer !== null && typeof answer === 'object' && !Array.isArray(answer) ? (answer as { headline?: unknown }).headline : undefined;
   const out: LookAnswer = { faults };
   if (headlineFault(line, page) === null) out.headline = (line as string).trim();
   if (answer === null || typeof answer !== 'object' || Array.isArray(answer)) return out;
-  const { order, next } = answer as { order?: unknown; next?: unknown };
+  const { lead, order, hide, next } = answer as { lead?: unknown; order?: unknown; hide?: unknown; next?: unknown };
+  if (lead !== undefined && lead !== null) {
+    const got = leadFault(lead, page, at.read);
+    if ('fault' in got) faults.push(`${got.fault} The page keeps its lead.`);
+    else if (got.lead !== null) out.lead = got.lead;
+  }
   if (order !== undefined) {
     const got = orderFault(order, page);
     if ('fault' in got) faults.push(`${got.fault} The page keeps its order.`);
     else if (got.order !== null) out.order = got.order;
+  }
+  if (hide !== undefined && hide !== null) {
+    const got = hideFault(hide, page, at.pinned ?? [], { ...(out.lead === undefined ? {} : { lead: out.lead }), ...(at.read === undefined ? {} : { read: at.read }) });
+    if ('fault' in got) faults.push(`${got.fault} Nothing is left out.`);
+    else if (got.hide !== null) out.hide = got.hide;
   }
   if (next !== undefined && next !== null) {
     const fault = nextFault(next, page);
@@ -343,6 +466,17 @@ const undoOf = (raw: unknown, page: string): Undo | null => {
   return { version, was: was === null || was === undefined ? null : lookBodyOf(was, page) };
 };
 
+/**
+ * Whether the look written from `basis` over this page is one the person put back: Undo said no to it, so whoever reads
+ * an answer for the page (`lookAnswerOf`) writes no look from that basis again. Once the basis moves the page is
+ * Slash's to arrange again, and the next look written forgets the no (`writeLook`).
+ */
+export function undoneFor(kernel: Pick<Kernel, 'prefsOf'>, page: string, basis: string): boolean {
+  const raw = kernel.prefsOf(SLASH)[lookUndoneKey(page)];
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return false;
+  return (raw as { basis?: unknown }).basis === basis;
+}
+
 /** Two looks that say the same, whatever order their keys came in, so writing the second would be a version that changes nothing. */
 const sameLook = (a: LookBody, b: LookBody): boolean => JSON.stringify(lookBodyOf(a, a.look)) === JSON.stringify(lookBodyOf(b, b.look));
 
@@ -366,13 +500,16 @@ export async function writeLook(kernel: Kept, page: string, title: string, given
   if (!put.ok) return put as Result<never>;
   const version = put.value.find((d) => d.id === id)?.version;
   if (version !== undefined) kernel.setPref(SLASH, lookUndoKey(page), { version, was: (live?.body ?? null) as unknown as Json });
+  /* A NEW LOOK IS A NEW OFFER, so the one he put back before it is no longer what stands between Slash and the page. */
+  if (kernel.prefsOf(SLASH)[lookUndoneKey(page)] !== undefined) kernel.setPref(SLASH, lookUndoneKey(page), null);
   return ok({ written: true });
 }
 
 /**
  * Undo Slash's look over a page: the look it replaced installed again, or the page given back to the kernel's rules when
  * there was none. Only while the live look is still the version Slash wrote: a look the person or Slash changed since
- * is not put back over, and says so. `actor` is who pressed Undo, for the history.
+ * is not put back over, and says so. `actor` is who pressed Undo, for the history. What the look put back was written
+ * from is kept (`lookUndoneKey`), so the same look is not written again the next time the page is asked about.
  */
 export async function undoLook(kernel: Kept, page: string, title: string, actor: string): Promise<Result<{ restored: 'previous' | 'rules' }>> {
   const key = lookUndoKey(page);
@@ -387,6 +524,7 @@ export async function undoLook(kernel: Kept, page: string, title: string, actor:
   const done = kept.was === null ? kernel.retire([id], { actor }) : await kernel.install([{ id, kind: LOOK_KIND as never, body: kept.was as never }], { id, version: live.version }, { actor });
   if (!done.ok) return done as Result<never>;
   kernel.setPref(SLASH, key, null);
+  if (live.body.basis !== '') kernel.setPref(SLASH, lookUndoneKey(page), { basis: live.body.basis });
   return ok({ restored: kept.was === null ? 'rules' : 'previous' });
 }
 
@@ -418,18 +556,25 @@ export function keptBy(kernel: Pick<Kernel, 'declarations' | 'prefsOf'>, page: s
 
 /**
  * THE LOOK STEP, after the headline step has read the model's answer: each page that was handed its blocks and answered
- * more than a line gets Slash's look, with the order and next that passed, written from the basis it was asked at. A
- * page whose answer was a bare line arranges nothing, and a page set by its owner is left alone with a line in the log.
+ * more than a line gets Slash's look, with the lead, the order, what is left out and the next that passed, written from
+ * the basis it was asked at. A page whose answer was a bare line arranges nothing, a page set by its owner is left alone
+ * with a line in the log, and so is a page whose look from this same basis the person put back (`undoneFor`).
+ *
+ * WHAT THE PERSON PINNED IS READ FROM THE LIVE LOOK, never left out by the answer, and carried into the look written.
  *
  * `read` IS THE PAGE'S BLOCKS AS ITS READ ANSWERED THEM, which say where the questions are and whether the page is
  * anything else (`questionsKept`).
  *
  * `next` NAMES ONE OF THE PERSON'S THINGS, so it goes out only through `lookHeld`, for the reader the row is drawn for.
+ *
+ * `rehearsed` IS ASKED OF EACH LOOK ABOUT TO BE WRITTEN and answers a sentence when it may not be: the record hands the
+ * rehearsal (`compose-rehearse.ts`), which reads the page, and this file reads none.
  */
 export async function composeLooks(
   kernel: Kept,
   due: readonly { page: HeadlinePage; basis: string; facts?: string; read?: readonly unknown[] }[],
   lines: Readonly<Record<string, unknown>>,
+  rehearsed?: (page: string, title: string, body: LookBody) => string | null,
 ): Promise<{ said: string[]; dropped: string[] }> {
   const said: string[] = [];
   const dropped: string[] = [];
@@ -437,25 +582,51 @@ export async function composeLooks(
     if (d.page.page === HOME_PAGE || d.page.blocks === undefined) continue;
     const answer = Object.hasOwn(lines, d.page.page) ? lines[d.page.page] : undefined;
     if (answer === null || typeof answer !== 'object' || Array.isArray(answer)) continue;
-    const got = lookAnswerOf(answer, d.page);
+    const pinned = liveLook(kernel, d.page.page)?.body.pinned ?? [];
+    const got = lookAnswerOf(answer, d.page, { pinned, ...(d.read === undefined ? {} : { read: d.read }) });
     dropped.push(...got.faults);
     /* THE QUESTIONS KEEP THEIR PLACE on a page that is about something else, as the kernel lays any look of Slash's. */
-    const held = lookKept({ look: d.page.page, basis: '', by: 'slash', ...(got.order === undefined ? {} : { order: got.order }) }, questionsKept(d.page, d.read), d.page.blocks.map((b) => b.key));
+    const held = lookKept(
+      { look: d.page.page, basis: '', by: 'slash', ...(got.lead === undefined ? {} : { lead: got.lead }), ...(got.order === undefined ? {} : { order: got.order }) },
+      questionsKept(d.page, d.read),
+      d.page.blocks.map((b) => b.key),
+    );
+    if (got.lead !== undefined && held.lead === undefined) {
+      dropped.push(`The lead for ${d.page.title} was the questions waiting on you, which keep their place on that page. The page keeps its lead.`);
+      delete got.lead;
+    }
     if (got.order !== undefined && held.order !== got.order) {
       dropped.push(`The order for ${d.page.title} moved the questions waiting on you, which keep their place on that page. ${held.order === undefined ? 'The page keeps its order.' : 'The rest of the order is kept.'}`);
       if (held.order === undefined) delete got.order;
       else got.order = held.order;
     }
-    if (got.order === undefined && got.next === undefined) continue;
+    if (got.lead === undefined && got.order === undefined && got.hide === undefined && got.next === undefined) continue;
+    const basis = lookBasis(d.basis, d.facts);
+    /* HE PUT THIS ONE BACK. The same page read from the same figures and the same named things is answered much the same,
+       and a look he undid that came back the next night would be Slash not listening. */
+    if (undoneFor(kernel, d.page.page, basis)) {
+      dropped.push(`You put ${d.page.title} back the way it was, so Slash leaves it as it is until something on it changes.`);
+      continue;
+    }
     /* NO `headline` IN SLASH'S LOOK: its line goes out through `headline.<page>` and `headlineFor`, which sends one naming
        things only to somebody who reads all of every list the page does. A declaration is laid over every reader's page. */
     const body: LookBody = {
       look: d.page.page,
-      basis: lookBasis(d.basis, d.facts),
+      basis,
       by: 'slash',
+      ...(got.lead === undefined ? {} : { lead: got.lead }),
       ...(got.order === undefined ? {} : { order: got.order }),
+      ...(got.hide === undefined ? {} : { hide: got.hide }),
       ...(got.next === undefined ? {} : { next: got.next }),
+      ...(pinned.length === 0 ? {} : { pinned: [...pinned] }),
     };
+    /* REHEARSED FIRST, when the caller can (`compose-rehearse.ts`): a look that would print a fault is not written, and
+       the caller's sentence says why in the log. */
+    const refused = rehearsed?.(d.page.page, d.page.title, body) ?? null;
+    if (refused !== null) {
+      dropped.push(refused);
+      continue;
+    }
     let put: Result<{ written: boolean }>;
     try {
       put = await writeLook(kernel, d.page.page, d.page.title, body);

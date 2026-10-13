@@ -254,6 +254,8 @@ import { answeredOnly, askOwnRows, askSame, fileVerdicts, joinOrganisation, meet
 import { meetsRole, orgRole, ratesRole, type MeetsFields, type OrgFields } from './roles.ts';
 import { entityLists, foldChain, foldEnd, foldedCarry, holderOf, keyedLists, mergeFieldOf, rebuildKeys, rekey, rowKeys, type KeyedList } from './entities.ts';
 import { builtInFigure, openSteps } from './built-in-figures.ts';
+import { openExceptions } from './exceptions.ts';
+import { sourceModule } from './sources/index.ts';
 import { beatRun, workingRuns } from './presence.ts';
 import { agentOf as ladderAgentOf, keysOfStamp, kindOfEvent, kindsOfProposal, madeByIn, personOf, recordReader, shapeIn, tokenOfRun } from './change-kind.ts';
 import { undoApply as applyUndo, undoPlan as planUndo, undoStaged as stageUndo, type UndoApplied, type UndoDeclared, type UndoOptions, type UndoPlan, type UndoScope } from './undo.ts';
@@ -441,6 +443,13 @@ export { KEEP, WHY, arranged, bare, emptyHidden, gone, holdsNothing, keeps, lead
 export { ANSWER_KEYS, BLOCK_KEY, blockKeyOf, defaultBlockKey, keyedBlocks } from './block-keys.ts';
 /* THE LOOK OVERLAY (DIRECTION §38, `compose.ts`): what Slash and the owner write over a page, and the rules' own look. */
 export { applyLook, composeLook, drewNothing, lookOf, mergeLook, questionsLead, queuesKept, LOOK_BY, RANK, type ComposeInput, type LookBody, type LookBy, type LookNext } from './compose.ts';
+/* THE HOLES IN A LOOK'S HEADLINE (ENG-B09, `compose.ts`): a number a line says is a hole the record fills from the page's own figures. */
+export { figureSaid, figuresOf, fillHoles, holesIn, withoutHoles } from './compose.ts';
+/* WHAT WENT QUIET (ENG-B13, `exceptions.ts`): the read, what it answers and the lists a caller hands it to watch. */
+export { LISTS_A_READ, openExceptions, type Exception, type Was, type Watched } from './exceptions.ts';
+/* WHAT A ROW IS AND WHERE IT WAS SEEN (ENG-B02, `about.ts`): the one read of a person, an organisation or a project, and the candidates a text may be about. */
+export { CANDIDATES, SEEN_KEPT, SEEN_SHOWN, aboutOf, aboutOfRow, candidatesFor, keysIn } from './about.ts';
+export type { About, AboutDeps, AboutKind, AboutLink, AboutSeen, Candidate as AboutCandidate, FoundBy, Handed, HandleRow } from './about.ts';
 export { lookFault } from './declare.ts';
 export {
   CHANNELS,
@@ -526,6 +535,9 @@ export type { ArrangePart, Arranging, Decision, Decided, Filed, Proposal, Rememb
    `Intl`, cached per code; a table built from a copy of it could disagree with the reading. */
 export { CHANNELS as INGEST_CHANNELS, CONFIDENCES, PROPOSE_AT, arrive, day as ingestDay, exponentOf, extract as extractField, fileAsSecond, patternReport, resolve as extractOutcome, senderOf, shapeOf, tailCause } from './ingest.ts';
 export { SIGNALS, WINDOWS, analyse, findingsFrom, observe } from './observe.ts';
+/* WHAT A CARD SAYS OF AN AMOUNT AND OF WHERE A RUN STANDS (ENG-B12): the kernel's own two readings, so the briefing writes neither again. */
+export { moneyText } from './ingest.ts';
+export { runPlace } from './handoff.ts';
 export { FLOOR_MS, applyPull, checkInterval, firePull, intervalMs, jitterMs } from './pull.ts';
 export { applyPage, writePoints } from './fetched.ts';
 export { extractPull } from './extract.ts';
@@ -6142,6 +6154,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     return out;
   };
 
+  /** The lists a read of what went quiet watches: every one this record declares but the kernel's own list of runs. */
+  const watchedLists = (): { id: string; name: string }[] => [...registers.values()].filter((r) => r.id !== SESSION).map((r) => ({ id: r.id, name: r.name }));
+
   const pageDeps = (): PageDeps => ({
     pages: () =>
       sql
@@ -6188,6 +6203,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     /* THE STEPS RUNS LEFT AND NOBODY TOOK, in one project or on the whole record (`openSteps`, AGT-C05), so a
        `handoffs.open` block draws them on Agents. Without this line the block refuses as not in this build. */
     handoffs: (project) => openSteps(sql, clock.now(), project),
+    /* WHAT WENT QUIET (`openExceptions`, ENG-B13), over every list this record declares but the kernel's own list of
+       runs, so an `exceptions` block draws them. Without this line the block refuses as not in this build. */
+    exceptions: () => openExceptions(sql, clock.now(), watchedLists()),
     blocking: (project) => actionsBlocking(sql, clock.now(), project, recordTz()),
     /* `into` GOES THROUGH, so a walk opened from one book walks in the book's own currency. Dropped here, the page asked
        for the book's currency and this host walked the home one, drawn once per currency instead. */
@@ -8028,7 +8046,12 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * caller has no way to resolve, so the check simply did not apply to a page made of figures and
      * its readings were handed to anybody who could open the page.
      */
-    blockRegisters: (block: PageBlock): string[] => registersOfBlock(block, pageDeps().metric, beside()),
+    /* AND A SOURCE THAT SAYS SOMETHING OF EVERY LIST (`sources/index.ts` `everyList`) NAMES EACH LIST IT WATCHES, so a
+       reader held from one of them is held from the block. `*` alone let her through when she had no ceiling. */
+    blockRegisters: (block: PageBlock): string[] => [
+      ...registersOfBlock(block, pageDeps().metric, beside()),
+      ...(sourceModule(block.source)?.everyList ? watchedLists().map((l) => l.id) : []),
+    ],
 
     /**
      * Whether a block's `source` is one this build can read: `register.x`, `metric.x`, `block.n`, or a part of the code

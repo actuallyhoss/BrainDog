@@ -11,15 +11,19 @@
  * late one" rather than restate a count. Home is one more page in the same ask (`HOME_PAGE`), read from Today inside the
  * record: how many things need the person, the titles of what is late, and how many runs are working.
  *
- * NOTHING THE MODEL SAYS IS TRUSTED AS IT CAME. `headlineFault` keeps a line only when it is one short sentence, every
- * number in it is a number the model was handed, and it names none of the system's words, so the line on the page can
- * never say a figure the tiles beside it do not. A line is kept with the `basis` it was written from, a hash of the lead
+ * NOTHING THE MODEL SAYS IS TRUSTED AS IT CAME, AND IT TYPES NO NUMBER (ENG-B09, decision 3). Each figure is handed with
+ * its id and the model writes `{{id}}` where the number goes; the record fills the hole from what it handed
+ * (`filledHeadline`). `headlineFault` keeps a line only when it is one short sentence, every hole in it names a figure
+ * the page was handed, it holds no digit and no number in words, and it names none of the system's words, so the line on
+ * the page can never say a figure the tiles beside it do not, nor a right number in a sentence of the model's own
+ * arithmetic. A line is kept with the `basis` it was written from, a hash of the lead
  * note's figures (and `facts`, a hash of the titles it was handed), and the page read sends it only while both still hash
  * the same: once a figure moves, the rules speak again until a new line is written.
  *
- * AND A NEW LINE IS WRITTEN THE SAME DAY, ONCE. A page whose basis moves after the night's ask is asked about again on a
- * later tick, on the background allowance, and never more than `HEADLINE_ASKS_DAY` headline asks are made in one day
- * (`HEADLINES_ASKED`), so a busy day costs one extra ask and not one a write.
+ * AND A NEW LINE IS WRITTEN MINUTES AFTER THE BASIS MOVES. A page whose basis moves is owed a look from that moment
+ * (`owedSince`), and the ask goes `HEADLINE_OWED_MS` after the first page was owed with every owed page in it
+ * (`owedPages`), so a burst of writes is one ask and not one a write. On the background allowance, and never more than
+ * `HEADLINE_ASKS_DAY` headline asks in one day (`HEADLINES_ASKED`).
  *
  * AND THE SAME ASK ARRANGES THE PAGE (DIRECTION §38, `compose-look.ts`). Each page is handed its blocks by `key` and a
  * few of the rows it draws by their handle and title, and the model may answer `{ headline, order, next }` in place of
@@ -35,6 +39,9 @@ import { nothingWaits, type WaitingNow } from './waiting.ts';
 /** A headline is a line, not a paragraph: what fits beside a page's title on a phone. */
 export const HEADLINE_MOST = 140;
 
+/** A line as the model wrote it, holes unfilled, is at most this long: what a look's headline may hold. */
+export const HEADLINE_RAW_MOST = 200;
+
 /** At most this many pages go into the one nightly ask, so its input stays the size of one ask. */
 export const HEADLINE_PAGES_MOST = 24;
 
@@ -47,8 +54,14 @@ export const HOME_PAGE = 'home';
 /** How many late or due things a page's ask names, most pressing first. */
 export const HEADLINE_ITEMS_MOST = 3;
 
-/** At most this many headline asks in one day: the night's, and one more when a page's figures move after it. */
-export const HEADLINE_ASKS_DAY = 2;
+/** At most this many headline asks in one day: the night's, and one each time pages are owed a look after it. */
+export const HEADLINE_ASKS_DAY = 8;
+
+/** How long after the first page is owed a look the ask goes, so the writes of one sitting are one ask. */
+export const HEADLINE_OWED_MS = 15 * 60_000;
+
+/** Slash's pref keeping when each owed page was first owed, by page, in milliseconds. Not `headline.`, so no page's slug can be it. */
+export const HEADLINES_OWED = 'headlines.owed';
 
 /** How often a tick after the day's look reads the pages again for a basis that moved: a read, never an ask. */
 export const HEADLINE_LOOK_MS = 15 * 60_000;
@@ -59,7 +72,10 @@ export const HEADLINES_ASKED = 'headlines.asked';
 /** The words a person never reads about their own things (DIRECTION §35): the system's, not theirs. */
 export const SYSTEM_WORDS = /\b(?:rows?|lists?|registers?|blocks?)\b/iu;
 
-/** One figure the model is handed: its path as the note writes it, its value as a person reads it, and how far it moved. */
+/**
+ * One figure the model is handed: its `id`, the path the note writes it by, its value as a person reads it, and how far
+ * it moved. THE ID IS THE HOLE: a line says the value as `{{id}}` and the change as `{{id.change}}`, and types neither.
+ */
 export type HeadlineFigure = { id: string; value: string; change?: string };
 
 /** One thing late or due on a page's lists, by its own title: late, due today, or due tomorrow. No day, so no number. */
@@ -104,8 +120,8 @@ export type HeadlinePage = {
 
 /**
  * What `SlashModel.headline` is handed. The host answers `{"lines":{"<page>":"..."}}`, or for a page handed blocks,
- * `{"lines":{"<page>":{"headline":"...","order":["<key>",...],"next":{"row":"<handle>","text":"..."}}}}`. Either is read
- * (`lineOf` for the line, `lookAnswerOf` in `compose-look.ts` for the rest).
+ * `{"lines":{"<page>":{"headline":"...","lead":"<key>","order":["<key>",...],"hide":["<key>",...],"next":{"row":"<handle>","text":"..."}}}}`.
+ * Either is read (`lineOf` for the line, `lookAnswerOf` in `compose-look.ts` for the rest).
  */
 export type HeadlineInput = { today: string; pages: HeadlinePage[] };
 
@@ -243,46 +259,137 @@ export const numbersIn = (text: string): number[] => [
   ...[...text.toLowerCase().matchAll(/\b[a-z]+\b/gu)].flatMap((m) => (Object.hasOwn(WORD_NUMBERS, m[0]) ? [WORD_NUMBERS[m[0]]!] : [])),
 ];
 
-/** Every number the model was handed for one page, which are the only numbers its line may say. */
+/** Every number the model was handed for one page, which are the only numbers a next step's phrase may say (`nextFault`). */
 export const numbersOf = (page: HeadlinePage): Set<number> =>
   new Set([page.title, page.rules, ...page.figures.flatMap((f) => [f.value, f.change ?? '']), ...namesOf(page)].flatMap(numbersIn));
 
 /** The person's own names a page was handed: the titles of what is late or due, and the open question. */
 const namesOf = (page: HeadlinePage): string[] => [...(page.items ?? []).map((i) => i.title), ...(page.question === undefined ? [] : [page.question])];
 
+/** A hole as a line writes it: `{{id}}`, the id a figure was handed by. The same form a lead note's template has. */
+const HOLE = /\{\{\s*([^{}\s]+)\s*\}\}/gu;
+
 /**
- * Why a line the model wrote is not kept, or `null` for one that is. One line of at most `HEADLINE_MOST`, no hole
- * left in it and no markup, no number it was not handed, in digits or in words, and none of the system's words.
+ * Every hole a page's line may hold, with what fills it: each figure's id for its value, and `<id>.change` for how far
+ * it moved, when the page was handed that. Nothing else is a hole of this page.
+ */
+export function handedHoles(page: HeadlinePage): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const f of page.figures) {
+    out.set(f.id, f.value);
+    if (f.change !== undefined && !out.has(`${f.id}.change`)) out.set(`${f.id}.change`, f.change);
+  }
+  return out;
+}
+
+/**
+ * A line with each of its holes filled from the figures its page was handed, as a person reads it, or `null` when a
+ * hole names a figure the page was not handed. A line with no hole is itself.
+ */
+export function filledHeadline(line: string, page: HeadlinePage): string | null {
+  const handed = handedHoles(page);
+  let missing = false;
+  const filled = line.replace(HOLE, (_, id: string) => {
+    const value = handed.get(id);
+    if (value === undefined) missing = true;
+    return value ?? '';
+  });
+  return missing ? null : filled.trim();
+}
+
+/**
+ * A page's rules line with each figure it says written as that figure's hole: what "give back the rules line" means now
+ * that no number is typed. Each value is found whole, never inside a longer number, and the longest first, so `2` is
+ * not taken out of `GBP 2,400.00`. A number the rules worked out and no figure holds is left as it is, and
+ * `headlineFault` refuses the line for it.
+ */
+export function holedRules(page: HeadlinePage): string {
+  const by = new Map<string, string>();
+  for (const [id, value] of handedHoles(page)) if (/\d/u.test(value) && !by.has(value)) by.set(value, id);
+  if (by.size === 0) return page.rules;
+  const said = [...by.keys()].sort((a, b) => b.length - a.length).map((v) => v.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'));
+  /* NOR OUT OF A WORD: the `2` of `v2` or `2nd` is part of a name, and a hole never touches a letter (`headlineFault`). */
+  return page.rules.replace(new RegExp(`(?<![\\p{L}\\p{N}.,])(?:${said.join('|')})(?![\\p{L}\\p{N}]|[.,]\\p{N})`, 'gu'), (v) => `{{${by.get(v)!}}}`);
+}
+
+/**
+ * A number as a model types one: `3`, `33,850.00`, `8` in `+8%`. A hole is never one, since it is taken out first. ANY
+ * SCRIPT'S DIGIT IS ONE, a full-width `２` or a `²` as much as a `2`: a person reads them all as a number.
+ */
+const TYPED = /\p{N}+(?:,\p{N}+)*(?:\.\p{N}+)?/u;
+
+/** Numbers said in words that are not counted as numbers elsewhere, but are a count the model worked out all the same. */
+const WORKED_OUT: ReadonlySet<string> = new Set(['zero', 'half', 'both', 'twice', 'couple']);
+
+/**
+ * A HOLE STANDS AS A WORD OF ITS OWN. Two holes with no space between them, or a hole touching a letter or a digit,
+ * make a number or a unit no figure holds: `{{a}}{{b}}` reads 22, `{{a}}.{{b}}` reads 2.2, `{{a}}k` reads 2k.
+ */
+const JOINED = /\}\}[^\s{}]*\{\{|[\p{L}\p{N}]\{\{|\}\}[\p{L}\p{N}]/u;
+
+/**
+ * The first number a text types, as it typed it: a run of digits, or failing that a number in words. "ONE" AFTER "THE",
+ * "THIS" OR "THAT" IS A THING AND NOT A COUNT, "the late one", "the one to send", and is let by; "One task waits" is a
+ * count and is not, and "no one" is nobody. ONLY INSIDE ONE CLAUSE, with at most one word between that is not itself a number: "Pay the bill,
+ * one is late" counts, and so does "the two one".
+ */
+const typedIn = (text: string): string | undefined => {
+  const digit = TYPED.exec(text)?.[0];
+  if (digit !== undefined) return digit;
+  const things = text.toLowerCase().replace(/\b(the|this|that|no)( +[a-z'’-]+)? +one\b/gu, (all: string, point: string, between: string | undefined) =>
+    between !== undefined && Object.hasOwn(WORD_NUMBERS, between.trim()) ? all : `${point}${between ?? ''}`,
+  );
+  return [...things.matchAll(/\b[a-z]+\b/gu)].map((m) => m[0]).find((w) => Object.hasOwn(WORD_NUMBERS, w) || WORKED_OUT.has(w));
+};
+
+/**
+ * Why a line the model wrote is not kept, or `null` for one that is. One line of at most `HEADLINE_MOST` once its holes
+ * are filled, every hole the id of a figure the page was handed, no markup, NO NUMBER TYPED, in digits or in words, and
+ * none of the system's words.
+ *
+ * A NUMBER IS A HOLE OR IT IS A FAULT. Before, a typed number was kept when the page had been handed it, which let a
+ * right number sit in a wrong sentence ("3 of 2 steps" beside figures of 3 and 2). Now the record writes every number
+ * itself, from the figure the hole names.
  */
 export function headlineFault(text: unknown, page: HeadlinePage): string | null {
   if (typeof text !== 'string' || text.trim() === '') return `The model wrote no line for ${page.title}.`;
   const line = text.trim();
-  if (line.length > HEADLINE_MOST) return `The line for ${page.title} was longer than ${HEADLINE_MOST} characters.`;
-  /* A HOLE, A BREAK OR MARKUP: the lead note's body is drawn as written, so a `**` or a `[link](…)` would be drawn too. */
-  if (/[\n\r{}[\]*`<>]/u.test(line)) return `The line for ${page.title} was not one plain sentence.`;
-  /* A NAME OF THEIR OWN MAY HOLD ONE OF THOSE WORDS, "Reading list" or "Fix the rows", and saying it is naming their
-     thing: what is checked is the line with the names it was handed taken out. */
-  const own = namesOf(page)
+  const handed = handedHoles(page);
+  const stray = [...line.matchAll(HOLE)].map((m) => m[1]!).find((id) => !handed.has(id));
+  if (stray !== undefined) return `The line for ${page.title} left a hole for ${stray}, which is not one of its figures.`;
+  if (JOINED.test(line)) return `The line for ${page.title} joined a figure to what is beside it, where each stands as a word of its own.`;
+  const filled = filledHeadline(line, page) ?? line;
+  if (filled.length > HEADLINE_MOST || line.length > HEADLINE_RAW_MOST) return `The line for ${page.title} was longer than ${HEADLINE_MOST} characters.`;
+  /* WHAT THE MODEL TYPED ITSELF: the line with its holes taken out. */
+  const typed = line.replace(HOLE, ' ');
+  /* A BRACE LEFT OVER, A BREAK OR MARKUP: the lead note's body is drawn as written, so a `**` or a `[link](…)` would be drawn too. */
+  if (/[\n\r{}[\]*`<>]/u.test(typed)) return `The line for ${page.title} was not one plain sentence.`;
+  /* A NAME OF THEIR OWN MAY HOLD ONE OF THOSE WORDS OR A NUMBER, "Reading list", "Fix the rows", "Renew the 2027
+     domains", and saying it is naming their thing: what is checked is the line with the names it was handed taken out. */
+  const own = [page.title, ...namesOf(page)]
     .filter((n) => n.trim() !== '')
     .sort((a, b) => b.length - a.length)
-    .reduce((rest, n) => rest.split(n).join(' '), line);
+    .reduce((rest, n) => rest.split(n).join(' '), typed);
   if (SYSTEM_WORDS.test(own)) return `The line for ${page.title} used the system's words rather than the person's.`;
-  const handed = numbersOf(page);
-  const made = numbersIn(line).find((n) => !handed.has(n));
-  if (made !== undefined) return `The line for ${page.title} said ${made}, which none of its figures holds.`;
-  /* AND HOME'S LINE AGREES WITH WHAT WAITS (`headlineAgrees`): a number it was handed for one count is never said of
-     another, and "nothing needs you" is never said beside a question or an arrival. */
+  const digit = typedIn(own);
+  if (digit !== undefined) return `The line for ${page.title} typed ${digit}, where a number is written as the hole of its figure.`;
+  /* AND HOME'S LINE AGREES WITH WHAT WAITS (`headlineAgrees`), read as it will be drawn, holes filled: the figure for
+     one count is never said of another, and "nothing needs you" is never said beside a question or an arrival. */
   const waits = page.page === HOME_PAGE ? waitsHanded(page) : null;
-  const off = waits === null ? [] : headlineAgrees(line, waits);
+  const off = waits === null ? [] : headlineAgrees(filled, waits);
   if (off.length > 0) return `The line for ${page.title} said "${off[0]!.said}", which is not what waits.`;
   return null;
 }
 
-/** A kept line as Slash's pref holds it, or `null` for a pref that is not one. */
+/**
+ * A kept line as Slash's pref holds it, or `null` for a pref that is not one. A LINE IS KEPT FILLED (`filledHeadline`),
+ * so one with a hole still in it is not a line a page may draw, and it is no line at all: the rules' line stands.
+ */
 export function storedHeadline(raw: unknown): SlashHeadline | null {
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const { text, day, basis, facts } = raw as { text?: unknown; day?: unknown; basis?: unknown; facts?: unknown };
   if (typeof text !== 'string' || typeof day !== 'string' || typeof basis !== 'string') return null;
+  if (/\{\{|\}\}/u.test(text)) return null;
   return typeof facts === 'string' ? { text, day, basis, facts } : { text, day, basis };
 }
 
@@ -296,6 +403,47 @@ export function askedOn(raw: unknown, today: string): HeadlinesAsked {
   if (bases !== null && typeof bases === 'object' && !Array.isArray(bases))
     for (const [page, b] of Object.entries(bases)) if (typeof b === 'string') kept[page] = b;
   return { day: today, asks, bases: kept };
+}
+
+/** One page as a tick reads it: the basis it has now, and `at`, the basis its line was last written or asked at, if any. */
+export type PageBasis = { page: string; basis: string; at?: string };
+
+/** A page that is owed a look, and `since` when: the first moment its basis was seen to have moved, in milliseconds. */
+export type OwedBasis = PageBasis & { since: number };
+
+/** When each owed page was first owed, as `HEADLINES_OWED` keeps it; a pref that is not one is no waits at all. */
+export function owedOn(raw: unknown): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return out;
+  for (const [page, since] of Object.entries(raw)) if (typeof since === 'number' && Number.isFinite(since)) out[page] = since;
+  return out;
+}
+
+/**
+ * The pages owed a look now, each with when it was first owed. A PAGE IS OWED WHEN ITS BASIS MOVED: the basis it has is
+ * not the one its line was written or asked at, or it has no line yet. `since` is what was kept for it (`owedOn`) or
+ * `now` for one owed from this moment, so a second write does not start its wait again; a page no longer owed is left
+ * out, and its wait with it. What comes back, by page, is what `HEADLINES_OWED` keeps next.
+ */
+export function owedSince(since: Readonly<Record<string, number>>, pages: readonly PageBasis[], now: number): OwedBasis[] {
+  return pages.filter((p) => p.basis !== p.at).map((p) => ({ ...p, since: Object.hasOwn(since, p.page) ? Math.min(since[p.page]!, now) : now }));
+}
+
+/**
+ * THE PAGES THAT GO IN THE ASK NOW: every page whose basis moved, the longest owed first, `HEADLINE_PAGES_MOST` at
+ * most, and none until `HEADLINE_OWED_MS` after the first of them was owed. So a page is composed again minutes after
+ * its basis moves, and the writes of one sitting are answered in one ask. The day's cap (`HEADLINE_ASKS_DAY`) and the
+ * allowance are the caller's to hold; this says only who is owed and whether it is time.
+ */
+export function owedPages(bases: readonly OwedBasis[], now: number): string[] {
+  const owed = bases.filter((b) => b.basis !== b.at);
+  if (owed.length === 0) return [];
+  const first = Math.min(...owed.map((b) => b.since));
+  if (now - first < HEADLINE_OWED_MS) return [];
+  return [...owed]
+    .sort((a, b) => a.since - b.since)
+    .slice(0, HEADLINE_PAGES_MOST)
+    .map((b) => b.page);
 }
 
 /**

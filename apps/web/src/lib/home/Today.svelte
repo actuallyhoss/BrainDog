@@ -54,6 +54,8 @@
   import { Sparkline, Stacked, Swimlanes, WeekStrip } from '$lib/viz/index.ts';
   import { rampAt } from '$lib/viz/shared.ts';
   import Question from './Question.svelte';
+  import Briefing from './Briefing.svelte';
+  import type { BriefingRow } from './briefing.ts';
   import { waitsNow } from './waits.svelte.ts';
   import type { DayRow, DueRow, TaskRow, TodayRead } from '$lib/record/today-live.ts';
   import { markAll } from '$lib/record/news-live.ts';
@@ -133,6 +135,18 @@
   );
   const t = $derived(today.value);
   const day = $derived(t ? dayOf(t.now) : dayOf(data.now));
+
+  /* THE BRIEFING, a read of its own beside the screen's: what matters today, as the record wrote it (`briefing.ts`).
+     It never holds the screen back and never fails it, because it answers no cards for a record with no briefing, and
+     no cards draws nothing. */
+  const briefing = read<BriefingRow[]>(
+    () => (data.refused ? null : apiBase()),
+    () =>
+      import('./briefing.ts')
+        .then((m) => m.readBriefing(apiBase()))
+        .catch(() => ({ ok: true as const, value: [] })),
+  );
+  const brief = $derived(briefing.value ?? []);
 
   const takesTasks = $derived(data.lists.some((l) => l.id === TASKS) && may(data, 'append', TASKS));
   const mayWrite = $derived(data.lists.some((l) => l.id === TASKS) && may(data, 'write', TASKS));
@@ -552,7 +566,7 @@
     <div class="today" data-alone={sideShown ? undefined : ''}>
       <div class="t-main">
         <!-- ══ THE LEAD TILE: the day, the sentence, and what needs you ══ -->
-        <div class="t-needs tile" data-quiet={needing === 0 && !capturing ? '' : undefined}>
+        <div class="t-needs tile" data-quiet={needing === 0 && !capturing && brief.length === 0 ? '' : undefined}>
           {#if capturing}
             <form class="capture" id="today-capture" onsubmit={ask}>
               <label class="sr-only" for="today-ask">{words.addTask}</label>
@@ -576,6 +590,9 @@
               {/if}
             </form>
           {/if}
+
+          <!-- WHAT MATTERS TODAY, first, and nothing where the record wrote no briefing. -->
+          <Briefing cards={brief} />
 
           <!-- WHAT NEEDS YOU, and nothing when nothing does: the sentence above has already said so. -->
           {#if needing > 0}

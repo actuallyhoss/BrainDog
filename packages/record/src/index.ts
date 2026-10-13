@@ -155,12 +155,14 @@ import {
   askedOn,
   factsBasis,
   figureText,
+  filledHeadline,
   hashOf,
   HEADLINE_ASKS_DAY,
   HEADLINE_ITEMS_MOST,
   HEADLINE_LOOK_MS,
   HEADLINE_PAGES_MOST,
   HEADLINES_ASKED,
+  HEADLINES_OWED,
   headlineBasis,
   headlineFault,
   headlineKey,
@@ -171,6 +173,9 @@ import {
   leadBlockOf,
   lineOf as answeredLine,
   linesIn,
+  owedOn,
+  owedPages,
+  owedSince,
   rulesLine,
   storedHeadline,
   type HeadlineFigure,
@@ -181,7 +186,8 @@ import {
   type SlashHeadline,
 } from './headlines.ts';
 import { nameOnly, scrubbed, spokenName } from './scrub.ts';
-import { composeLooks, keepLook as keepLookOf, keptBy, lookHeld, lookInputOf, undoLook as undoLookOf, type LookNext } from './compose-look.ts';
+import { lookRefusedKey, noteRefusal, refusedFor, rehearse } from './compose-rehearse.ts';
+import { composeLooks, keepLook as keepLookOf, keptBy, lookHeld, lookInputOf, undoLook as undoLookOf, type LookBody, type LookNext } from './compose-look.ts';
 import {
   BODY_DEPTH,
   SAID_DEPTH,
@@ -245,15 +251,34 @@ export { lintAnswer, lintRound, pagesCleanReading, pagesToLint, ROUND_MS, TEMPLA
 export {
   HEADLINE_ASKS_DAY,
   HEADLINE_MOST,
+  HEADLINE_OWED_MS,
   HEADLINE_PAGES_MOST,
+  HEADLINE_RAW_MOST,
+  HEADLINES_OWED,
+  filledHeadline,
+  handedHoles,
   headlineFault,
+  holedRules,
   HOME_PAGE,
+  owedOn,
+  owedPages,
+  owedSince,
   type HeadlineFigure,
   type HeadlineInput,
   type HeadlineItem,
   type HeadlinePage,
+  type OwedBasis,
+  type PageBasis,
   type SlashHeadline,
 } from './headlines.ts';
+/* THE BRIEFING'S CARDS (ENG-B12, `briefing.ts`): the facts a briefing is written from, the check a model's cards pass,
+   and the rules' own cards. The read is `briefing` in `methods/briefing.ts`. */
+export { BRIEF_CARDS_MOST, BRIEF_FACTS_MOST, BRIEF_KINDS, BRIEF_LINE_MOST, BRIEF_RANK, BRIEF_RULES_MOST, briefBasis, briefCandidates, briefFault, briefFrom, briefOf, rulesBrief, type Brief as Briefing, type BriefAnswer, type BriefCard, type BriefFact, type BriefKind } from './briefing.ts';
+/* THE ONE RECOMMENDER AND THE ONE QUEUE OF WHAT THE RECORD OFFERS TO ARRANGE (ENG-B14, `design-agent.ts`), under one name
+   because its own are short words (`Offer`, `Queue`, `recommend`). Nothing in the record calls it yet. */
+export * as designAgent from './design-agent.ts';
+/* THE REHEARSAL OF A LOOK BEFORE IT IS WRITTEN (ENG-B09, `compose-rehearse.ts`), and the two refusals a basis is given. */
+export { REFUSALS_MOST, lookRefusedKey, noteRefusal, refusedFor, rehearse, type Refused, type RehearseDeps, type RehearseFinding, type RehearseRule, type Rehearsal } from './compose-rehearse.ts';
 
 /** A payee the nightly walk would not give a held organisation's key on its own (`HeldAsk` in `kernel/src/backfill.ts`). */
 type HeldAsk = Backfilled['held'][number];
@@ -4085,7 +4110,48 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * A LINE IS KEPT ONLY WHEN IT PASSES `headlineFault`: one line of at most 140 characters, no number the model was not
    * handed, and none of the system's words. A line that fails is said in the look's log and the rules' line stands.
    */
-  const slashHeadlines = async (today: string): Promise<{ said: string[]; dropped: string[] }> => {
+  /* WHAT THE PAGE LINT READS A CELL BY, for its round (`lintTick`) and for a look's rehearsal: each list's field types,
+     and each closed field's values that have no name. */
+  const lintTypesOf = (register: string): Record<string, string> | null => {
+    const s = kernel.schemaOf(register);
+    return s ? Object.fromEntries(Object.entries(s.fields).map(([k, f]) => [k, f.type])) : null;
+  };
+  const lintKeysOf = (register: string): Record<string, string[]> | null => {
+    const s = kernel.schemaOf(register);
+    return s
+      ? Object.fromEntries(
+          Object.entries(s.fields)
+            .filter(([, f]) => f.type === 'enum')
+            .map(([k, f]) => [k, (f.values ?? []).filter((v) => !f.labels?.[v])]),
+        )
+      : null;
+  };
+
+  /**
+   * A LOOK IS REHEARSED BEFORE IT IS WRITTEN (`compose-rehearse.ts`, ENG-B09): laid over the page as it reads now and
+   * read as the page lint reads a page. One that would print a fault is not written and is counted against the basis it
+   * was composed from (`look.refused.<page>`); after two for one basis the page is left to its rules until it moves.
+   * Answers the sentence for the log, or `null` for a look that may be written.
+   */
+  const lookRehearsed = (page: string, title: string, body: LookBody): string | null => {
+    const key = lookRefusedKey(page);
+    const kept = kernel.prefsOf(SLASH)[key];
+    if (refusedFor(body.basis, kept) === 'leave') return `Slash's arrangement of ${title} was refused twice, so the page is left as it is until something on it changes.`;
+    const read = kernel.page(page);
+    if (!read.ok) return `${title} could not be read, so it was left as it is.`;
+    const decl = kernel.metricDecl('questions-open');
+    const open = decl ? kernel.metric(decl) : null;
+    const tried = rehearse(read.value, body, { waiting: open?.ok ? open.value.value : null, typesOf: lintTypesOf, keysOf: lintKeysOf });
+    if (!tried.ok) {
+      kernel.setPref(SLASH, key, noteRefusal(body.basis, kept));
+      const first = tried.findings[0]!;
+      return `Slash's arrangement of ${title} was not kept: ${first.part === title ? 'the page' : first.part} ${first.said.charAt(0).toLowerCase()}${first.said.slice(1)} The page stays as it is.`;
+    }
+    if (kept !== undefined && kept !== null) kernel.setPref(SLASH, key, null);
+    return null;
+  };
+
+  const slashHeadlines = async (today: string, again = false): Promise<{ said: string[]; dropped: string[] }> => {
     const model = deps.slashModel;
     if (!model?.headline) return { said: [], dropped: [] };
     const headline = model.headline.bind(model);
@@ -4093,7 +4159,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const asked = askedOn(prefs[HEADLINES_ASKED], today);
     if (asked.asks >= HEADLINE_ASKS_DAY) return { said: [], dropped: [] };
     const pressing = pressingRead(today);
-    const due: { page: HeadlinePage; basis: string; facts?: string; read?: readonly unknown[] }[] = [];
+    let due: { page: HeadlinePage; basis: string; facts?: string; read?: readonly unknown[] }[] = [];
     /* A PAGE IS DUE when what it would be written from is not what its line was, and it was not asked at that today. */
     const owed = (slug: string, basis: string, facts: string | undefined): boolean => {
       const stored = storedHeadline(prefs[headlineKey(slug)]);
@@ -4158,6 +4224,16 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         read: read.value.blocks,
       });
     }
+    /* A LATER TICK OF THE SAME DAY WAITS FOR THE SITTING TO END (`owedPages`, ENG-B09 job 5): each page whose basis moved
+       is kept with when it was first seen owed (`HEADLINES_OWED`), and none is asked about until `HEADLINE_OWED_MS` after
+       the first, so the writes of one sitting are answered in one ask. The night asks every page it owes at once. */
+    const waits = again ? owedSince(owedOn(prefs[HEADLINES_OWED]), due.map((d) => ({ page: d.page.page, basis: askedAt(d.basis, d.facts) })), clock.now()) : [];
+    const waiting = Object.fromEntries(waits.map((w) => [w.page, w.since]));
+    if (JSON.stringify(waiting) !== JSON.stringify(owedOn(prefs[HEADLINES_OWED]))) kernel.setPref(SLASH, HEADLINES_OWED, waiting);
+    if (again) {
+      const now = new Set(owedPages(waits, clock.now()));
+      due = due.filter((d) => now.has(d.page.page));
+    }
     if (due.length === 0) return { said: [], dropped: [] };
     const input: HeadlineInput = { today, pages: due.map((d) => d.page) };
     /* COUNTED BEFORE THE MODEL IS ASKED, answered or not: the ask awaits the meter and the model, and a tick that comes in
@@ -4186,29 +4262,32 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         dropped.push(`${fault} Its own line stands.`);
         continue;
       }
-      const kept: SlashHeadline = { text: (text as string).trim(), day: today, basis: d.basis, ...(d.facts === undefined ? {} : { facts: d.facts }) };
+      /* KEPT FILLED (`filledHeadline`): each hole the model left is the figure the page was handed, so what is stored is the
+         sentence a person reads and `storedHeadline` answers it. */
+      const kept: SlashHeadline = { text: filledHeadline((text as string).trim(), d.page) ?? (text as string).trim(), day: today, basis: d.basis, ...(d.facts === undefined ? {} : { facts: d.facts }) };
       kernel.setPref(SLASH, headlineKey(d.page.page), kept);
       said.push(d.page.page);
     }
     /* THEN THE LOOK STEP, from the same answer: Slash's order and next step over each page that answered more than a line,
        written as a versioned look so Undo restores the one before, and never over a look the person set. */
-    const looked = await composeLooks(kernel, due, lines);
+    const looked = await composeLooks(kernel, due, lines, lookRehearsed);
     for (const page of looked.said) if (!said.includes(page)) said.push(page);
     dropped.push(...looked.dropped);
     return { said, dropped };
   };
 
   /**
-   * THE SAME DAY'S SECOND LOOK at the headlines, on a tick after the daily look: only the headline step, and at most once
+   * THE SAME DAY'S LATER LOOKS at the headlines, on a tick after the daily look: only the headline step, and at most once
    * every `HEADLINE_LOOK_MS`, since the Worker asks after every request. Kept in memory, so a restart looks once more,
-   * which costs a read and never an ask: the ask is bounded by `HEADLINES_ASKED`.
+   * which costs a read and never an ask: the ask is bounded by `HEADLINES_ASKED`. A look that finds a page's basis moved
+   * notes when (`HEADLINES_OWED`) and asks nothing; the ask goes on the first look `HEADLINE_OWED_MS` after that.
    */
   let headlinesLooked = Number.NEGATIVE_INFINITY;
   const slashHeadlinesAgain = async (today: string): Promise<void> => {
     if (clock.now() - headlinesLooked < HEADLINE_LOOK_MS) return;
     headlinesLooked = clock.now();
     if (askedOn(kernel.prefsOf(SLASH)[HEADLINES_ASKED], today).asks >= HEADLINE_ASKS_DAY) return;
-    await slashHeadlines(today);
+    await slashHeadlines(today, true);
   };
 
   /**
@@ -4459,7 +4538,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * `actions` both held those back from her. The record asks the source itself rather than waiting for `kernel.blockRegisters` to name something for it, so the
    * block is held whether or not the kernel's answer carries a name for the whole record.
    */
-  const ACROSS = new Set(['activity', 'actions', 'governance.open', 'governance.later', 'governance.decided', 'signs']);
+  const ACROSS = new Set(['activity', 'actions', 'governance.open', 'governance.later', 'governance.decided', 'signs', 'exceptions']);
 
   /**
    * The lists one block reads that `kernel.blockRegisters` may not name: each leg of a cash walk, and `session` for a
@@ -4769,7 +4848,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        who may not read that list, and a member at `read` with Diary held to `append` has no ceiling: `wholeRecord` called
        her whole, and the queue drew her the Diary rowset's question that `governance` held back. So a queue is for
        whoever reads every list, and so are the questions put off and the ones answered, which name the same rowsets. */
-    const whole = typeof b.source === 'string' && b.source.startsWith('governance.') ? readsEveryList(ctx) : wholeRecord(ctx);
+    /* AND WHAT WENT QUIET NAMES EVERY LIST, so it too is for whoever reads every one of them. */
+    const whole = typeof b.source === 'string' && (b.source.startsWith('governance.') || b.source === 'exceptions') ? readsEveryList(ctx) : wholeRecord(ctx);
     /* NOR DOES A GRANT NARROWED TO SOME OF A LIST'S ROWS (`wheres`) READ ALL OF IT: the kernel's feed names every row
        written, and a token held to the paper jobs was drawn "File at court" off a feed block (measured). */
     const narrow = Object.keys(ctx.wheres ?? {}).length > 0;
@@ -4782,7 +4862,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
                 ? 'What happened across this BrainDog is shown to people who can read all of it.'
                 : b.source === 'actions'
                   ? 'What this BrainDog does on a schedule is shown to people who can read all of it.'
-                  : 'The questions asked across this BrainDog are shown to people who can read all of it.',
+                  : b.source === 'exceptions'
+                    ? 'What went quiet across this BrainDog is shown to people who can read all of it.'
+                    : 'The questions asked across this BrainDog are shown to people who can read all of it.',
             at: 'source',
           }
         : null;
@@ -8597,22 +8679,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         },
         /* EACH DECLARED LIST'S FIELD TYPES, so the lint reads the cells of every table and card over one, and not only
            the blocks whose answer carries `types` (the computed sources). */
-        typesOf: (register) => {
-          const s = kernel.schemaOf(register);
-          return s ? Object.fromEntries(Object.entries(s.fields).map(([k, f]) => [k, f.type])) : null;
-        },
+        typesOf: lintTypesOf,
         /* EACH CLOSED FIELD'S VALUES THAT HAVE NO NAME: the web draws a named value by its name, and only an unnamed one
            (`vm`) prints as its key, so only those are a key where a name goes. */
-        keysOf: (register) => {
-          const s = kernel.schemaOf(register);
-          return s
-            ? Object.fromEntries(
-                Object.entries(s.fields)
-                  .filter(([, f]) => f.type === 'enum')
-                  .map(([k, f]) => [k, (f.values ?? []).filter((v) => !f.labels?.[v])]),
-              )
-            : null;
-        },
+        keysOf: lintKeysOf,
         now: () => Date.now(),
       });
       const reading = pagesCleanReading(round);

@@ -68,6 +68,6 @@ test('HOME’S RULES LINE ALWAYS AGREES, and a model’s line that says "Nothing
       { id: 'inbox', value: '32' },
     ],
   };
-  assert.match(headlineFault('Nothing needs you, and 1 agent is working.', page) ?? '', /not what waits/u);
-  assert.equal(headlineFault('25 questions wait on you, and 1 agent is working.', page), null);
+  assert.match(headlineFault('Nothing needs you, and {{working}} agent is working.', page) ?? '', /not what waits/u);
+  assert.equal(headlineFault('{{needs-you}} questions wait on you, and {{working}} agent is working.', page), null);
 });

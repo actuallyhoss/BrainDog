@@ -474,6 +474,34 @@ export type SameOne = Answer<'sameOne'>;
  */
 export type HeldTwice = Answer<'heldTwice'>;
 
+/**
+ * `about`: what one thing on the record is, asked by its name. `is` is the one thing the name answers to (its kind,
+ * name, what else it goes by, where it was seen, and its list and number), or `null`; `candidates` are the things that
+ * answer to the name when more than one does, and none is picked. See `AboutAnswer` in `@braindog/record`.
+ */
+export type About = Answer<'about'>;
+
+/**
+ * `matched`: who the record matched on its own and still holds as one, newest first, 50 at most: who was folded into
+ * whom by name, one sentence of evidence, when, and the batch an Undo takes. `null` on a record that keeps no people.
+ */
+export type Matched = Answer<'matched'>;
+
+/**
+ * `exceptions`: what stopped on the record, each as `{ kind, subject, said, since, row }`: what it is called, one
+ * sentence about it, the day it stopped, and what to open (`null` where there is nothing to open).
+ */
+export type Exceptions = Answer<'exceptions'>;
+
+/**
+ * `briefing`: what matters today as cards, in the record's order, seven at most. `h` is the card's handle, `line` its
+ * one sentence, `row` the thing it opens as a record says one (`tasks#12`) or `null`, `cause` what several questions
+ * share, and `by` whether the model wrote the line or the rules did. `at` is when it was written and `basis` what it
+ * was written from. Written out here because the record's own type is not yet named from `@braindog/host/types`.
+ */
+export type BriefingCard = { h: string; line: string; row: string | null; cause: string | null; by: 'slash' | 'rule' };
+export type Briefing = { cards: BriefingCard[]; at: string; basis: string };
+
 /** `packs`: one pack, on or off. `version` is `null` for a pack the seed owns by its bodies. See `PackState` in `@braindog/kernel`. */
 export type PackState = { id: string; version: string | null; disabled_at: string | null; registers: string[] };
 
@@ -1686,6 +1714,26 @@ export function createClient(options: ClientOptions) {
      * when that list is not where the record keeps people. It reads and changes nothing. READ+.
      */
     heldTwice: (args: { register: string }) => call<HeldTwice>('heldTwice', args as Record<string, unknown>),
+    /**
+     * What matters today, as cards a screen draws above everything else: `{ cards, at, basis }`. It reads and changes
+     * nothing, and a caller is handed no card from a list they may not read. READ+.
+     */
+    briefing: () => call<Briefing>('briefing', {}),
+    /**
+     * What one thing is, asked by its name: `{ is, candidates }`. Two things of one name are both offered and neither
+     * is picked. Held to the lists the caller may read, and it changes nothing. READ+.
+     */
+    about: (args: { name: string }) => call<About>('about', args as Record<string, unknown>),
+    /**
+     * Who the record matched on its own and still holds as one: `{ matches }`, newest first, or `null` on a record
+     * that keeps no people. Each carries the `batch` an Undo takes. It reads and changes nothing. READ+.
+     */
+    matched: (args?: { limit?: number }) => call<Matched>('matched', (args ?? {}) as Record<string, unknown>),
+    /**
+     * What stopped on the record: a list or a way in that went quiet, a feed that missed its time, and anything older
+     * than its page allows, each in one sentence. Held to what the caller may read, and it changes nothing. READ+.
+     */
+    exceptions: () => call<Exceptions>('exceptions', {}),
 
     /* THE SCHEDULED ACTIONS. `actions` is READ+; `resumeAction` is ADMIN, so a browser session, and it is the only
        thing that starts a paused action again. */

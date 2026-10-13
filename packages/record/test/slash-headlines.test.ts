@@ -113,7 +113,7 @@ const lead = async (api: Awaited<ReturnType<typeof record>>['api']): Promise<Blo
 
 test('THE NIGHT WRITES ONE LINE A PAGE IN ONE BACKGROUND ASK, the page read carries it while its figures hold, and a still page is not asked again', async () => {
   /* THE LINE IS WRITTEN FROM WHAT THE MODEL IS HANDED, so the night after a figure moves it says the new one. */
-  const { heard, model } = writing((p) => `${p.figures[0]!.value} of ${p.figures[1]!.value} steps done; the fit is next.`);
+  const { heard, model } = writing((p) => `{{${p.figures[0]!.id}}} of {{${p.figures[1]!.id}}} steps done; the fit is next.`);
   const { rows, meter } = meterOf();
   const { api, clock, sql } = await record(model, meter);
 
@@ -167,12 +167,12 @@ test('THE NIGHT WRITES ONE LINE A PAGE IN ONE BACKGROUND ASK, the page read carr
 
 test('A LINE IS KEPT ONLY WHEN IT IS SHORT, SAYS NO NUMBER IT WAS NOT HANDED, AND NAMES NONE OF THE SYSTEM’S WORDS', async () => {
   for (const [line, why] of [
-    ['3 of 2 steps are done.', /said 3, which none of its figures holds/u],
+    ['3 of 2 steps are done.', /typed 3, where a number is written as the hole/u],
     ['1 row of your list is done.', /system's words/u],
     ['x'.repeat(HEADLINE_MOST + 1), /longer than 140/u],
-    ['Done: {{done-steps}}.', /not one plain sentence/u],
+    ['Done: {{ghost}}.', /left a hole for ghost, which is not one of its figures/u],
     ['**1** of 2 steps are done.', /not one plain sentence/u],
-    ['One of three steps is done.', /said 3, which none of its figures holds/u],
+    ['One of three steps is done.', /typed one/u],
   ] as const) {
     const { model } = writing(() => line);
     const { api, sql } = await record(model, meterOf().meter);
@@ -185,11 +185,11 @@ test('A LINE IS KEPT ONLY WHEN IT IS SHORT, SAYS NO NUMBER IT WAS NOT HANDED, AN
   }
   /* AND THE NUMBERS ARE READ AS NUMBERS: a figure written with its grouping or its currency is the figure. */
   const page = { page: 'money', title: 'Money', rules: 'Cash is GBP 33,850.00.', figures: [{ id: 'cash-now', value: 'GBP 33,850.00', change: '+8%' }] };
-  assert.equal(headlineFault('£33,850 in hand, up 8% on a month ago.', page), null);
-  assert.match(headlineFault('£33,851 in hand.', page) ?? '', /said 33851/u);
+  assert.equal(headlineFault('{{cash-now}} in hand, up {{cash-now.change}} on a month ago.', page), null);
+  assert.match(headlineFault('£33,851 in hand.', page) ?? '', /typed 33,851/u);
   /* AND IN WORDS: a count written out is the count, and one the figures do not hold is refused as a digit is. */
-  assert.equal(headlineFault('Eight percent up on a month ago.', page), null);
-  assert.match(headlineFault('Up eight percent, two months running.', page) ?? '', /said 2/u);
+  assert.match(headlineFault('Eight percent up on a month ago.', page) ?? '', /typed eight/u);
+  assert.match(headlineFault('Up eight percent, two months running.', page) ?? '', /typed eight/u);
 });
 
 test('A METER THAT CANNOT COUNT A BACKGROUND ASK SPENDS NONE OF HIS: the look falls to the rules and no headline is written', async () => {

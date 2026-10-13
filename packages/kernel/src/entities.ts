@@ -397,7 +397,7 @@ export const nameKey = (name: string): string => nameWords(name);
  */
 export function noteMention(
   sql: Pick<Sql, 'exec'>,
-  m: { name: string; kind: 'person' | 'organisation'; project: string | null; source: string; at: string },
+  m: { name: string; kind: 'person' | 'organisation' | 'project' | 'thing'; project: string | null; source: string; at: string },
 ): void {
   sql.exec(
     `INSERT INTO entity_mention (name_key, name, kind, project, source, at) VALUES (?, ?, ?, ?, ?, ?)
@@ -410,6 +410,10 @@ export function noteMention(
     m.at,
   );
 }
+
+/** The kind a mention of a row of this role was kept under: what `noteMention` wrote, and so what a read of it asks for. */
+export const mentionKindOf = (role: EntityList['role']): 'person' | 'organisation' | 'project' =>
+  role === 'meets' ? 'person' : role === 'org' ? 'organisation' : 'project';
 
 /** How many sources a name has been mentioned in, of one kind. */
 export const mentionSources = (sql: Pick<Sql, 'one'>, name: string, kind: 'person' | 'organisation'): number =>

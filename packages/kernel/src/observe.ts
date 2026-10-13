@@ -138,6 +138,51 @@ export type Analysis = {
 
 const DAY_MS = 86_400_000;
 
+/* ── presence, read one way (ENG-B13 job 3) ──────────────────────────── */
+
+/**
+ * The three places this record writes down that something happened, each with the column that says which thing, the
+ * one that says when, and the one that tells two marks apart. The text is fixed here and never built from a caller's
+ * words: a caller picks a name, and the name picks the SQL.
+ */
+const PRESENCE = {
+  /** What was observed: a signal's subjects by day. */
+  signals: { from: 'observation', key: 'kind = ?', at: 'day', mark: 'subject' },
+  /** The rows a list took, by the instant each was made. */
+  rows: { from: 'entry', key: 'register = ?', at: 'created_at', mark: 'id' },
+  /** The messages a door's pattern took, by the instant each was filed. */
+  arrivals: { from: 'ingest_receipt', key: "replace(ingest_id, 'ingest.', '') = ?", at: 'ts', mark: 'raw_id' },
+} as const;
+
+export type PresenceSource = keyof typeof PRESENCE;
+/** How many separate days carry a mark, and how many separate marks there are. */
+export type Presence = { days: number; marks: number };
+
+/**
+ * How present `key` was from the day `from` up to, and not including, the day `before`.
+ *
+ * THIS IS THE ONE READING BEHIND "AN ABSENCE IS ONLY EVIDENCE WHERE PRESENCE IS BEING RECORDED". Whoever calls a silence
+ * a fact asks here first whether anybody was listening, and says how much listening is enough: the weekly analysis
+ * asks it of a signal, and `exceptions.ts` of a list and a door. Days are counted and not marks alone, because a burst
+ * on one day is not presence.
+ */
+export function presenceOf(sql: Sql, source: PresenceSource, key: string, from: string, before = '9999'): Presence {
+  const p = PRESENCE[source];
+  const r = sql.one<{ days: number; marks: number }>(
+    `SELECT count(DISTINCT substr(${p.at}, 1, 10)) AS days, count(DISTINCT ${p.mark}) AS marks FROM ${p.from} WHERE ${p.key} AND ${p.at} >= ? AND ${p.at} < ?`,
+    key,
+    from,
+    before,
+  );
+  return { days: Number(r?.days ?? 0), marks: Number(r?.marks ?? 0) };
+}
+
+/** When `key` was last present, as the record wrote it (a day for a signal, an instant for a row or an arrival), or `null`. */
+export function lastPresence(sql: Sql, source: PresenceSource, key: string): string | null {
+  const p = PRESENCE[source];
+  return sql.one<{ at: string | null }>(`SELECT max(${p.at}) AS at FROM ${p.from} WHERE ${p.key}`, key)?.at ?? null;
+}
+
 type Detector = { signal: Signal; windowDays: number; n: number; days: number; why: (subject: string, n: number) => string };
 
 /**
@@ -252,12 +297,8 @@ function dormant(deps: AnalyseDeps): Finding[] {
        TWO OTHER SUBJECTS ON THREE SEPARATE DAYS. One subject read once is somebody trying the
        product; the question "which of these does nobody open" only means anything on a record where
        the others are being opened. */
-    const alive = deps.sql.one<{ subjects: number; days: number }>(
-      'SELECT count(DISTINCT subject) AS subjects, count(DISTINCT day) AS days FROM observation WHERE kind = ? AND day >= ?',
-      d.signal,
-      since,
-    );
-    if (Number(alive?.subjects ?? 0) < 2 || Number(alive?.days ?? 0) < 3) continue;
+    const alive = presenceOf(deps.sql, 'signals', d.signal, since);
+    if (alive.marks < 2 || alive.days < 3) continue;
 
     for (const row of deps.sql.all<{ id: string }>(
       `SELECT id FROM declaration

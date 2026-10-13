@@ -52,6 +52,10 @@ import { methods as trust } from './trust.ts';
 import { methods as sameOne } from './same-one.ts';
 import { methods as offered } from './offered.ts';
 import { methods as heldTwice } from './held-twice.ts';
+import { methods as about } from './about.ts';
+import { methods as briefing } from './briefing.ts';
+import { methods as exceptions } from './exceptions.ts';
+import { methods as matched } from './matched.ts';
 /* END METHODS */
 
 /**
@@ -163,6 +167,10 @@ export function methods(deps: RecordDeps) {
     ...sameOne(deps),
     ...offered(deps),
     ...heldTwice(deps),
+    ...about(deps),
+    ...briefing(deps),
+    ...exceptions(deps),
+    ...matched(deps),
     /* END METHODS */
   };
 }
