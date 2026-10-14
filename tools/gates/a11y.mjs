@@ -236,6 +236,8 @@ export async function surfaces(root = join(import.meta.dirname, '..', '..'), rec
        not seen with data, never dropped. */
     unseen: Object.entries(derived).flatMap(([tree, d]) => (d.unseen ?? []).map((u) => `${tree}: ${u}`)),
     strays: stray(APPS, derived),
+    /* A SITE ADDRESS THE SITE HOLDS FROM VISITORS (`routes.mjs`'s `held`), left out as the site leaves it out and said. */
+    held: derived.site.held.map((h) => `site: ${h}`),
   };
 }
 
@@ -271,7 +273,7 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
     console.error(`  ${e.message}`);
     return 1;
   }
-  let { apps: APPS, unsampled, strays } = await surfaces(root);
+  let { apps: APPS, unsampled, strays, held } = await surfaces(root);
   /** The web's addresses the record had nothing for, filled once the record is asked (`routesFor`). */
   let unseen = [];
   const AXE = join(root, 'node_modules', 'axe-core', 'axe.min.js');
@@ -901,6 +903,8 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
     /* NOT SEEN WITH DATA (`routesFor`'s `unseen`): an address the record held nothing for, audited as not found. Said,
        never dropped, so a sweep that quietly stopped reaching a screen with the record on it reads as one. */
     if (unseen.length) console.log(`      not seen with data: ${unseen.length} address(es), ${unseen.join(', ')}`);
+    /* HELD FROM VISITORS (`routesFor`'s `held`): a site address the site answers not found until it is public. */
+    if (held.length) console.log(`      held by the site, not opened: ${held.join(', ')}`);
 
     if (mute.size) {
       /* ONE LINE, AND IT USED TO BE TWO. Three sentences in this file opened with a bare newline inside a

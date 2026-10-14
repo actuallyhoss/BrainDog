@@ -31,7 +31,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { stray, surfaces } from '../a11y.mjs';
-import { routesOf } from '../routes.mjs';
+import { routesFor, routesOf } from '../routes.mjs';
+import { HELD, held } from '../../../apps/site/src/lib/launch.ts';
 
 const root = join(import.meta.dirname, '..', '..', '..');
 
@@ -45,6 +46,19 @@ test('every route the marketing site has is a route the gate audits', async () =
      above and audit nothing. Five is what `apps/site/src/routes` holds and what `shot.mjs`
      photographs; a sixth route passes this and a route file deleted by accident does not. */
   assert.ok(site.routes.length >= 5, `the site has ${site.routes.length} audited route(s), and it has five pages`);
+});
+
+/* A HELD ADDRESS IS LEFT OUT AS THE SITE LEAVES IT OUT (`apps/site/src/lib/launch.ts`): while the site is not public the
+   changelog answers not found and writes no file, so a pass over it waited ten seconds on nothing. Said, not dropped;
+   and the day the flag flips it is audited again, which the second half holds. */
+test('a site address the site holds from visitors is not audited, and is named as held', async () => {
+  const { apps, held: said } = await surfaces(root);
+  const site = apps.find((a) => a.name === 'site');
+  const shut = held() ? [...HELD].filter((h) => !h.endsWith('.xml')) : [];
+  for (const h of shut) assert.ok(!site.routes.includes(h), `${h} is held by the site and still audited`);
+  assert.deepEqual(said, shut.map((h) => `site: ${h}`));
+  const open = await routesFor(join(root, 'apps', 'site'));
+  assert.deepEqual(open.held, shut);
 });
 
 test('every route the record app has is a route the gate audits', async () => {

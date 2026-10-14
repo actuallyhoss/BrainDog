@@ -20,6 +20,7 @@ import { basename, join, relative } from 'node:path';
 
 import { skipDir } from './lib.mjs';
 import { AREAS } from '../../apps/web/src/routes/settings/[area]/place.ts';
+import { HELD, held } from '../../apps/site/src/lib/launch.ts';
 
 /** One dynamic segment filled: `{ '[register]': 'obligations', '[seq]': '1' }`. */
 const fill = (seg, value) => ({ [seg]: String(value) });
@@ -118,12 +119,18 @@ async function walk(dir, out = []) {
 /**
  * The routes of one SvelteKit app, as addresses, at the record's own ids.
  *
- * Returns `{ routes, unsampled, unseen, missing }`. `unsampled` is a route the table has no sample for, a FAILURE at every
+ * Returns `{ routes, unsampled, unseen, missing, held }`. `unsampled` is a route the table has no sample for, a FAILURE at every
  * call site, since it is the only way "we forgot to sample this" differs from "there is nothing here". `unseen` is an
  * address the record had nothing for, opened at the sample it had before and drawn as not found, which the gate's
  * summary counts as "not seen with data". A caller that ignores either has quietly stopped checking part of the app.
  * `missing` is every address drawn as not found ON PURPOSE, `unseen` and the samples marked `missing`: there the host's
  * not found is the answer asked for (`printed.mjs` `checkScreen`'s `missing`).
+ *
+ * A SITE ADDRESS THE SITE HOLDS IS NOT A ROUTE A VISITOR HAS (`held` in `apps/site/src/lib/launch.ts`): while the site is
+ * not public the changelog answers not found and its build writes no file, and `nav.ts` drops it from every list, so a
+ * browser gate that opened it measured the site's 404 or nothing and waited ten seconds for a page that is not there.
+ * It is left out as the site leaves it out, and named in `held`, so a caller can say what it did not open. The day
+ * `LAUNCH.public` is flipped it is swept again with nothing to change here.
  *
  * `record` is `startRecord`'s handle or `recordAt(base)` (`record.mjs`); `null` reads no record and opens every route
  * at its `was`, which is `routesOf` for the gates whose lines have not moved yet. `extra` is added as it is.
@@ -135,6 +142,8 @@ export async function routesFor(appRoot, record = null, { every = false, extra =
   const unsampled = [];
   const unseen = [];
   const notFound = [];
+  const holding = app === 'site' && held() ? new Set(HELD) : new Set();
+  const kept = [];
 
   for (const dir of await walk(join(appRoot, 'src', 'routes'))) {
     const rel = relative(join(appRoot, 'src', 'routes'), dir).replace(/[\\/]+/g, '/');
@@ -142,7 +151,8 @@ export async function routesFor(appRoot, record = null, { every = false, extra =
     const segments = pattern === '/' ? [] : pattern.slice(1).split('/');
     const dynamic = segments.filter((s) => s.startsWith('['));
     if (dynamic.length === 0) {
-      routes.add(pattern);
+      if (holding.has(pattern)) kept.push(pattern);
+      else routes.add(pattern);
       continue;
     }
     const entry = SAMPLE_OF[`${app}:${pattern}`];
@@ -166,7 +176,7 @@ export async function routesFor(appRoot, record = null, { every = false, extra =
     }
   }
 
-  return { routes: [...routes].sort(), unsampled, unseen, missing: notFound };
+  return { routes: [...routes].sort(), unsampled, unseen, missing: notFound, held: kept };
 }
 
 /** Every route at the samples it had before the record was asked, for `a11y` and `layout` until their lines move. */

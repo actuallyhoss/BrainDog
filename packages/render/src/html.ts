@@ -237,7 +237,7 @@ function renderInline(nodes: Inline[], opts: RenderOptions): string {
             : `<span class="hole" data-path="${escape(n.path)}">${escape(holeLabel(n.path))} ${MISSING}</span>`;
         case 'typed': {
           const href = n.link === 'row' ? opts.link?.(n.arg) : n.link === 'day' ? opts.dayHref?.(n.arg) : null;
-          const body = `<span class="typed num" data-form="${n.form}">${escape(n.text)}</span>`;
+          const body = `<span class="typed num" data-form="${n.form}">${escape(typedText(n, opts))}</span>`;
           return href ? `<a href="${escape(hrefFor(opts, href))}">${body}</a>` : body;
         }
         case 'evidence':
@@ -1024,6 +1024,15 @@ export function written(value: string, o: Pick<RenderOptions, 'home'>, setting: 
   if (o.home === undefined) return null;
   return writeFigure(value, o.home, setting);
 }
+
+/**
+ * A typed figure's words as they are drawn. `{{money:1840000 GBP}}` stands among words, so where the page says its home it
+ * is the one writer's amount said short (`£18,400`), as the figures round it are; `formatTyped` wrote the stored form
+ * (`GBP 18,400.00`), and drawn as it was one page spelled the pound two ways. Where the host does not say, and for every
+ * other form, it is the text as written. The node keeps the stored form, which `text` hands the drawers that parse it.
+ */
+export const typedText = (n: Extract<Inline, { type: 'typed' }>, o: Pick<RenderOptions, 'home'>): string =>
+  n.form === 'money' ? (written(n.text, o, 'read')?.text ?? n.text) : n.text;
 
 /** A gauge's value or target: a stored amount as the writer says it short, and anything else as its cell wrote it. */
 export const gaugeFigure = (cell: string | undefined, o: Pick<RenderOptions, 'home'>): string | undefined =>

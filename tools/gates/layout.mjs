@@ -183,6 +183,8 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
    * be missing, and the run says so rather than quietly covering less: "we did not check this" must not look like
    * "there was nothing here".
    */
+  /* The site's routes, and the addresses it holds from visitors (`routesFor`'s `held`), said in the summary. */
+  const SITE = await routesOf(join(root, 'apps', 'site'));
   const VARIANTS = [
     /**
      * THE MARKETING SITE, which no layout gate has ever measured.
@@ -202,7 +204,7 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
 
        ITS ROUTES COME FROM ITS TREE, as `a11y` reads them, because the three typed here left every page
        added since unswept: a new page is measured the day its folder lands. */
-    { name: 'site', root: join(root, 'apps', 'site', 'build'), routes: (await routesOf(join(root, 'apps', 'site'))).routes, prerendered: true },
+    { name: 'site', root: join(root, 'apps', 'site', 'build'), routes: SITE.routes, prerendered: true },
     /* `record` NAMES WHICH OF `record.mjs`'s VARIANTS THE PORT FORWARDS TO for the length of the pass, over the one
        build. Why each exists, and why `connected` took `quiet`'s place, is written beside `VARIANTS` there. */
     ...RECORDS.map((v) => ({ name: v.name, root: ROOT, routes: v.routes, record: v.name })),
@@ -551,6 +553,7 @@ export default async function layout(root = join(import.meta.dirname, '..', '..'
     if (ready.retried()) console.log(`  ${ready.retried()} screen(s) settled only after one reload`);
     /* NOT SEEN WITH DATA (`routesFor`'s `unseen`): an address the record held nothing for, measured as not found. */
     if (unseen.length) console.log(`  not seen with data: ${unseen.length} address(es), ${unseen.join(', ')}`);
+    if (SITE.held.length) console.log(`  held by the site, not opened: ${SITE.held.join(', ')}`);
     const blind = ready.nothingDrawn();
     if (blind) console.error(`  ${blind}`);
 

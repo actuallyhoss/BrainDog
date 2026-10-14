@@ -67,3 +67,12 @@ test('each part is read on its own, and a note of his own only in its figures', 
   const figures = '<p><span class="num">£12</span> and <span class="num">GBP 4</span></p>';
   assert.ok(found(lintHtml(figures, { name: 'A note', theirs: true })));
 });
+
+test('a whole screen is read for one currency two ways, not for the writer\'s two settings', () => {
+  /* A note says the amount short and the progress row beside it keeps its cents: two parts, each the writer's way. */
+  const screen = 'Eating out is $16 over its budget.\nEating out\n$96.00\n$80.00\n$16.00 over';
+  assert.ok(found(lintText(screen)), 'one part: found');
+  assert.equal(found(lintText(screen, { name: 'Budgets', screen: true })), false);
+  /* One currency by its sign and by its code is still a finding anywhere on a screen. */
+  assert.ok(found(lintText('Kiln\nEarning GBP 18,400.00 in the last twelve months.\n£4,050', { name: 'Kiln', screen: true })));
+});

@@ -121,8 +121,10 @@ export function checkScreen({ where, text = '', code = [], errors = [], failed =
   for (const c of code) if (c) prose = prose.replace(c, '\n');
   for (const own of OWN) if (own.find.test(prose)) out.push(`${where}  ${own.said}`);
   /* THE LINT'S SENTENCE WITHOUT WHAT IT NAMED. It quotes a key spoken (`next due at`), and a key-shaped secret drawn on a
-     screen is a key too: spoken, it is still the secret, in a log anybody with the run can read. */
-  for (const f of lintText(prose, { name: where, ids: true })) if (LINT_HELD.has(f.rule)) out.push(`${where}  ${f.said.replace(/:.*$/su, '.')} (${f.rule})`);
+     screen is a key too: spoken, it is still the secret, in a log anybody with the run can read.
+     `screen`: the words are a whole screen of parts, so `two-spellings` reads one currency spelled two ways and not an
+     amount said short in a sentence beside the same amount exact on a ledger's row, which is the one writer's rule. */
+  for (const f of lintText(prose, { name: where, ids: true, screen: true })) if (LINT_HELD.has(f.rule)) out.push(`${where}  ${f.said.replace(/:.*$/su, '.')} (${f.rule})`);
   return out;
 }
 

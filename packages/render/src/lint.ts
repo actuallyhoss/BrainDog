@@ -80,6 +80,13 @@ export type LintPart = {
   buttons?: readonly string[];
   /** The keys of the closed lists the part draws: one printed as itself is a key where its name goes. */
   keys?: readonly string[];
+  /**
+   * The part is a whole screen read as one (a gate's `#main`), so it holds many parts. The one writer says an amount
+   * short among words and exact in a ledger or a progress row (`money.ts`, `read` and `exact`), so "£16 over its
+   * budget" in a note above "£16.00 over" on the row is each part written its own way, and `two-spellings` reads only
+   * its currency half here: one currency by its sign and by its code is still a finding anywhere on a screen.
+   */
+  screen?: boolean;
 };
 
 /** A page: its own drawn HTML (linted as one part under the page's name), its parts, or both. */
@@ -279,7 +286,7 @@ const signFor = (sign: string, code: string): boolean => {
  * sign alone ("£12"). One part holding two of them for one currency is a hit, and so is "£12" beside "£12.00". A rounded
  * headline beside the exact figure ("£1,086,213" and "£1,086,213.41") is two amounts, each written its own way, and is not.
  */
-function twoSpellings(lines: readonly string[]): Hit[] {
+function twoSpellings(lines: readonly string[], minorToo = true): Hit[] {
   const ways = new Map<string, Set<string>>();
   const bare = new Set<string>();
   const minor = new Map<string, Set<boolean>>();
@@ -304,7 +311,7 @@ function twoSpellings(lines: readonly string[]): Hit[] {
   for (const sign of bare) for (const code of ways.keys()) if (signFor(sign, code)) way(code, 'sign');
   return [
     ...[...ways].filter(([, how]) => how.size > 1).map(([code]) => ({ raw: code, label: '' })),
-    ...[...minor].filter(([, both]) => both.size > 1).map(([at]) => ({ raw: at, label: '' })),
+    ...(minorToo ? [...minor].filter(([, both]) => both.size > 1).map(([at]) => ({ raw: at, label: '' })) : []),
   ];
 }
 /**
@@ -491,8 +498,9 @@ const RULES: readonly RuleSpec[] = [
     rule: 'two-spellings',
     copy: false,
     says: 'One currency written two ways in one place, by its sign and by its code, or one amount with and without the digits after its point.',
-    /* In his own words, only a figure slot: how he writes money in a note is his. */
-    find: (v) => twoSpellings(v.part.theirs ? v.figures : v.lines),
+    /* In his own words, only a figure slot: how he writes money in a note is his. On a whole screen, the currency half
+       only: an amount with and without its minor digits there is two parts, each in the writer's own setting. */
+    find: (v) => twoSpellings(v.part.theirs ? v.figures : v.lines, v.part.screen !== true),
     said: () => 'Money is written two ways here. Write every amount the same way.',
   },
   {

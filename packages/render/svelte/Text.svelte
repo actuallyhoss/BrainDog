@@ -10,6 +10,8 @@
   /* From the module and not the root, because it is the drawers' shared question and not something a
      host asks: the host answers `opts.icon` and never calls this. */
   import { glyphPath } from '../src/inline.ts';
+  /* A typed amount is the one writer's where the host says the record's home, as `renderInline` draws it. */
+  import { typedText } from '../src/html.ts';
   import Self from './Text.svelte';
 
   let { nodes, opts = {} }: { nodes: Inline[]; opts?: RenderOptions } = $props();
@@ -54,8 +56,8 @@
     {:else}<span class="figure num">{node.resolved}</span>{/if}
   {:else if node.type === 'typed'}
     {#if href(node)}
-      <a href={href(node)}><span class="typed num" data-form={node.form}>{node.text}</span></a>
-    {:else}<span class="typed num" data-form={node.form}>{node.text}</span>{/if}
+      <a href={href(node)}><span class="typed num" data-form={node.form}>{typedText(node, opts)}</span></a>
+    {:else}<span class="typed num" data-form={node.form}>{typedText(node, opts)}</span>{/if}
   {:else if node.type === 'evidence'}
     {#if node.kind === 'unknown'}
       {#if opts.hole}<button type="button" class="hole" onclick={() => onHole(null)}>unknown</button>
