@@ -53,7 +53,8 @@
    * then each list by its own name. `null` when a host older than these fields said nothing about either, and the
    * page then says only the address, as it did.
    */
-  const does = (level: InviteLevel): string => (Object.hasOwn(copy.inviteDoes, level) ? copy.inviteDoes[level] : level);
+  /* A LEVEL THIS BUILD HAS NO WORDS FOR IS SAID AS "access", never printed as the host's own word for it. */
+  const does = (level: InviteLevel): string => (Object.hasOwn(copy.inviteDoes, level) ? copy.inviteDoes[level] : 'access');
   const opens = (v: InviteSeen): string | null => {
     const what = [
       ...(v.level !== null ? [copy.inviteEverything(does(v.level))] : []),
@@ -61,6 +62,30 @@
     ];
     return what.length > 0 ? copy.inviteOpens(v.record ?? copy.inviteThisRecord, what.join(', ')) : null;
   };
+
+  /**
+   * AN INVITATION THAT GIVES "ADDS ONLY" AND NOTHING TO READ (USE-A11). Every screen of the app reads first, so the
+   * one door that is hers is her agent's key, and Accept leads there instead of to a Home that can only refuse her.
+   * Adds only on the whole record, or no whole record and every list at adds only; a host older than these fields,
+   * which names neither, keeps the usual way on.
+   */
+  const addsOnly = $derived.by((): boolean => {
+    if (!seen?.ok) return false;
+    const v = seen.value;
+    if (v.level !== null && v.level !== 'append') return false;
+    if (v.level === null && v.lists.length === 0) return false;
+    return v.lists.every((l) => l.level === 'append');
+  });
+
+  /** Whether the host was not reached at all, which is not the link being refused and is said apart from it. */
+  const unreached = (out: Said<unknown> | null): boolean => out !== null && !out.ok && out.kind === 'unreachable';
+
+  /** Ask the host about the link again, after it was not reached. "Checking the link" shows while it asks. */
+  async function lookAgain() {
+    if (!token) return;
+    seen = null;
+    await look(token);
+  }
 
   /** The host's own sentence where it gave one, and a calm general one where it did not. */
   const sentence = (out: Said<unknown>): string => (!out.ok && 'fix' in out && typeof out.fix === 'string' && out.fix ? out.fix : copy.inviteFailed);
@@ -98,7 +123,8 @@
     closed(true, at);
     busy = null;
     if (!out.ok) {
-      failed = sentence(out);
+      /* NOT REACHED IS NOT REFUSED: the link is still good, so the sentence says to press Accept again. */
+      failed = unreached(out) ? copy.unreachableWhy : sentence(out);
       /* A PROOF THE HOST REFUSED IS DROPPED, because it was spent, ran out, or belongs to another invitation, and the
          host's sentence says to accept again for a new one. Kept, every later press would send the same dead proof
          and be refused the same way; dropped, the next press asks for a fresh mail and the name box comes back. */
@@ -143,6 +169,12 @@
              new one, so the one thing left to press is the way into whatever they already hold. -->
         <Empty heading kind="no-results" glyph="link" title={copy.inviteNoLink} body={copy.inviteAskNew}>
           {#snippet actions()}<Button href="/signin">{copy.signIn}</Button>{/snippet}
+        </Empty>
+      {:else if unreached(seen)}
+        <!-- THE HOST WAS NOT REACHED, WHICH SAYS NOTHING ABOUT THE LINK. Drawn as the refusal below, it told somebody
+             whose wifi dropped to ask for a new link; the link is still good, and asking again is the whole answer. -->
+        <Empty heading kind="error" glyph="link" title={copy.unreachableTitle} body={copy.unreachableWhy}>
+          {#snippet actions()}<Button weight="primary" onclick={lookAgain}>{copy.askAgain}</Button>{/snippet}
         </Empty>
       {:else if seen && !seen.ok}
         <Empty heading kind="error" glyph="link" title={sentence(seen)} body={copy.inviteAskNew}>
@@ -194,6 +226,7 @@
         <div class="calm">
           <IconWell name="check" size="l" tone="earn" />
           <h1 class="calm-title">{copy.inviteJoined}</h1>
+          {#if addsOnly}<p class="calm-body">{copy.inviteAddsOnlyNext}</p>{/if}
           {#if !keyAdded && here.webauthn && here.secure}<p class="calm-body">{copy.inviteKeepWay}</p>{/if}
         </div>
         <div class="doors">
@@ -209,7 +242,12 @@
                this tab decided before Accept: the sample boot, the switcher's list, the voice. `/signin` walked it
                twice and drew The Studio with no request made; a reload draws the colleague's record, because the
                Worker answers `/app/` with a 302 to `/app/<slug>/` once there is a session. -->
-          <Button weight={keyAdded || !(here.webauthn && here.secure) ? 'primary' : 'quiet'} href="/" data-sveltekit-reload>{copy.openBrainDog}</Button>
+          {#if addsOnly}
+            <!-- HER KEY SCREEN, BY THE SAME FULL LOAD, so the session Accept just set is the one it reads. -->
+            <Button weight={keyAdded || !(here.webauthn && here.secure) ? 'primary' : 'quiet'} href="/settings/agents" data-sveltekit-reload>{copy.inviteMakeAgentKey}</Button>
+          {:else}
+            <Button weight={keyAdded || !(here.webauthn && here.secure) ? 'primary' : 'quiet'} href="/" data-sveltekit-reload>{copy.openBrainDog}</Button>
+          {/if}
         </div>
       {/if}
     </div>

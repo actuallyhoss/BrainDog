@@ -423,6 +423,8 @@
            three an hour from one address until the secret half, `TURNSTILE_SECRET` (named at the end of this file),
            is set; `/healthz` says so in its `launch` sentence. */
         "TURNSTILE_SITE_KEY": "",
+        /* FIRST_READ_DAILY: the day's ceiling of sign-up readings by the included model for all strangers, and his yes to them. Unset is off, and the page reads by rules. His to set. */
+        /* SHARE_LINKS: `on` makes read-only links to a page (`sharesOf` in `src/share.ts`), with `KEK` bound. Unset, and none are made. Unset in production until the owner says yes. */
         /* THE OPERATOR'S CANARY RECORD, a `rec_...` id. Empty, and the nightly walk writes its summary nowhere and
            `deploy.yml`'s sandbox smoke says it was skipped. EMPTY ON PURPOSE UNTIL HIS CANARY SITTING (PRF-A09, the
            ten minutes in `loop/scope/area-proof-a.md` section 5, item 1): `tools/canary/enrol.mjs`, run by him, makes
@@ -647,6 +649,8 @@
         "SIGNUP": "open",
         /* THE SIGN-UP PAGE'S TURNSTILE WIDGET, as alpha's comment says. */
         "TURNSTILE_SITE_KEY": "",
+        /* FIRST_READ_DAILY: the day's ceiling of sign-up readings by the included model for all strangers, and his yes to them. Unset is off, and the page reads by rules. His to set. */
+        /* SHARE_LINKS: `on` makes read-only links to a page (`sharesOf` in `src/share.ts`), with `KEK` bound. Unset, and none are made. Unset in production until the owner says yes. */
         /* THE OPERATOR'S CANARY RECORD, as alpha's comment says, and empty until the same sitting: the line
            `tools/canary/enrol.mjs` prints goes here, in the commit after his sitting, and from then the sandbox smoke
            and `after-deploy.yml` both run on it. */

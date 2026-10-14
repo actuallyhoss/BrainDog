@@ -216,7 +216,7 @@ test('ONE ID FOR A TRIAL: the job its fetches are sent for is the event the ledg
   };
   const trial = scriptTrial({ sandbox, ledger: books, now: () => NOW, mint: () => 'try_fixed' });
   await trial({ record: { id: REC, tz: 'UTC' }, body: body(), grantOf: null });
-  assert.deepEqual(seen, [{ job: 'try_fixed', trial: ['grantOf', 'reads'] }]);
+  assert.deepEqual(seen, [{ job: 'try_fixed', trial: ['grantOf', 'readOnly', 'reads'] }]);
   assert.equal(books.counted[0]!.event, 'try_fixed');
 });
 

@@ -40,7 +40,18 @@ export const agents = {
   agentOn: (agent: string, machine: string) => `${agent} on ${machine}`,
   canAndInbox: (can: string) => `${can}, and may read the inbox`,
   unnamedKey: 'A key with no name',
+  unnamedApp: 'An app with no name',
+  /* A MACHINE SIGNED IN BY THE COMMAND, before any agent there has opened a run to say which it is. */
+  theCommand: 'The BrainDog command',
   lastRun: 'last run',
+  /* WHERE IT RUNS AND HOW IT CAME IN, the quieter line under a connection's name (`record/apps.ts` `lineOf`). */
+  connectedOn: (machine: string) => `On ${machine}, signed in`,
+  connectedFrom: (site: string) => `From ${site}, signed in`,
+  connectedSignedIn: 'Signed in',
+  connectedHere: 'Signed in on this computer',
+  connectedKeyYours: 'A key you made',
+  connectedKey: 'A key',
+  notUsedFor: (days: number) => `Not used for ${days} days`,
 
   /* THE CONSENT SCREEN (`routes/connect`). What it may do is always a sentence and never the bare word. */
   consentTitle: 'Connect an app',

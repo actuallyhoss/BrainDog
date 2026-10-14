@@ -58,6 +58,7 @@ import { EMBED_NONE, embedOpen, embedPlan } from './embed.ts';
 import { hueOf } from './cards.ts';
 import { pathRest, pathShort } from './path.ts';
 import type { Block, Degraded, Markdown, Row, Segment } from './parse.ts';
+import { actionLabels } from './actions.ts';
 
 export type RenderOptions = InlineOptions & {
   /**
@@ -2001,9 +2002,13 @@ function block(b: Block, o: RenderOptions): string {
      is not drawn at all, frame and caption with it (`emptied`). */
   const left = emptied(b, o);
   if (left === null) return '';
+  /* A BLOCK'S ACTIONS WITH NO HOST TO PRESS THEM are one quiet line of their labels, the line Block.svelte draws when no
+     `act` is handed, so the two renderers stay one tree. */
+  const acts = actionLabels(b.actions);
+  const actsLine = acts.length ? `<p class="block-actions">${escape(acts.join(' · '))}</p>` : '';
   return `<figure class="block block-${spec.primitive}" data-kind="${b.kind}"${form} data-primitive="${spec.primitive}"${toneAttrs(b.tone)}>${cap}${
     left === undefined ? draw(b as never, o) : emptyLine(left)
-  }</figure>`;
+  }${actsLine}</figure>`;
 }
 
 /**

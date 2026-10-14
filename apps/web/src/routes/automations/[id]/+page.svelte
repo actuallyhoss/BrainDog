@@ -91,6 +91,7 @@
     type Version,
   } from '$lib/flow/source.ts';
   import { canvasWords, lastRunReading, pageSentence, runDurations, runMark, runParts, triggerIcon } from '../hub.ts';
+  import { contestLines, contestOf, fieldOf, nameFor } from './run-again.ts';
 
   const flow = new FlowDraft({ slash: () => page.data.slash === true });
 
@@ -108,6 +109,8 @@
   let source = $state<Source | null>(null);
   let row = $state<AutomationRow | null>(null);
   let taken = $state<string[]>([]);
+  /** Every rule's name by its handle, from the list read, so a dry run's "taken by" says names and never handles. */
+  let ruleNames = $state<ReadonlyMap<string, string>>(new Map());
   let fix = $state('');
   let tab = $state<'steps' | 'runs' | 'versions' | 'written'>('steps');
   let busy = $state(false);
@@ -172,6 +175,7 @@
     source = out.source;
     const rows = out.first.ok ? out.first.value : [];
     taken = rows.map((r) => r.id);
+    ruleNames = new Map(rows.map((r) => [r.id, r.name]));
     closed(out.first.ok || out.absent, at);
     if (!out.first.ok && !out.absent) {
       fix = out.first.refusal.fix;
@@ -273,6 +277,15 @@
   const manual = $derived('manual' in flow.draft.trigger);
   const kind = $derived(triggerKind(flow.draft.trigger));
   const register = $derived('written' in flow.draft.trigger ? flow.draft.trigger.written.register : null);
+  const ruleNameOf = $derived(nameFor(ruleNames));
+  /* WHICH RULE GETS THERE FIRST on the dry run drawn now, by name (SHL-D07 job 6). The rule being drawn is never its own rival. */
+  const contestNow = $derived.by(() => {
+    const c = triedNow?.ok ? contestOf(triedNow.value) : null;
+    return c ? contestLines(c, ruleNameOf) : [];
+  });
+  /* THE FIELD THE INSTALLED RULE SETS, so Run again is offered only where there is a gap to fill. The saved body and not
+     the drawing: a run again runs what is live. */
+  const againField = $derived(row && row.path === 'inline' && row.enabled ? fieldOf(row.body) : null);
   const saveWord = $derived(busy ? words.saving : !owner ? words.save : row ? editWords.saveChanges : editWords.saveOn);
   /* THE SENTENCE UNDER THE TITLE: the last run and the next, the failed clause red. None for a draft never saved. */
   const said = $derived(pageSentence(row, now));
@@ -676,7 +689,15 @@
           </div>
 
           {#if flow.draft.steps.length > 0}
-            <Tried {kind} path={flow.path} {owner} rows={pickRows} {arrivals} bind:pick inline={triedNow} run={ranNow} />
+            <Tried {kind} path={flow.path} {owner} rows={pickRows} {arrivals} bind:pick inline={triedNow} run={ranNow} contest={contestNow} />
+          {/if}
+
+          <!-- RUN AGAIN OVER WHAT IS ALREADY THERE (SHL-D07): the owner's, for a saved inline rule that sets a field, and
+               loaded only here, by `import()`, so no other screen carries it. -->
+          {#if owner && row && againField !== null}
+            {#await import('./RunAgain.svelte') then part}
+              <part.default id={row.id} body={row.body} field={againField} register={row.register} nameOf={ruleNameOf} />
+            {/await}
           {/if}
 
           {#if calls.length > 0}

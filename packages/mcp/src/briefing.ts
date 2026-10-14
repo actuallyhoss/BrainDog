@@ -1,32 +1,21 @@
 /**
- * `context`, as an agent reads it first: a card of five slots, and beside it the briefing cut to what a session acts on.
+ * `context`, as an agent reads it first: the record's card, and beside it the briefing cut to what a session acts on.
  *
- *     BrainDog · run S731 · project BrainDog · Claude Code on MacBook
- *     Next     Cut page answers to block summaries. (S729, Claude Code, 5h ago, check before acting)
- *     Waiting  2 on Mara: Change how copperleaf starts? · 3 bank texts the pattern couldn't read
- *     Who      Priya Raman (client), Teodor Vance (Copperleaf), Wren, +4 · for Brightwell
- *     Learned  Money is minor units plus currency. Never add two currencies.
- *     More     3 dead ends, 5 learnings and 41 keys by name · call context {"format":"full"}
- *
- * WHAT IT REPLACED, MEASURED ON THE OWNER'S RECORD: `context` answered 16.6 KB, most of it the forty-one keys and the
- * skills that apply everywhere, each key with an object saying whether its value was sealed; the tools a session can use
- * listed as if they were open work; and a warning that two sessions shared one working tree, where the second was the
- * caller itself. The card is the part every session needs, at most 1,500 characters, three things a slot, each slot left
- * out when it has nothing to say. It is the agent research's fixed-slot card (`loop/reports/BrainDog agent and MCP
- * experience.md`, "Brief in five lines"), in the order it gives: who and where, next, waiting, learned, on demand.
+ * ONE CARD, THE RECORD'S (`packages/record/src/card.ts`, AGT-B07; "the same card from context", D37.81 to D37.89, and
+ * "keep MCP/HTTP/CLI one core", HD.316). `context` sends `card`, and this door prints it as it came, then the open work,
+ * the Home page and the habits, none of which is a card. The door composes no card of its own: a second composer here
+ * was a second set of rules, and the card a session read was whatever this package was built with. A host too old to
+ * send one gets one line, `Connected to <record>. Call context.`, and nothing drawn in its place.
  *
  * THE REST OF THE BRIEFING STAYS, LEANER. Work (a list that declares who holds a row or when it is finished) and
  * learnings are listed; every other list that says where its rows apply, keys and skills and tools among them, is a
  * count and the rows of this project only, because "what applies everywhere" is the same forty rows every session.
  *
- * THE CARD IS THE RECORD'S NOW (`packages/record/src/card.ts`, AGT-B07): `context` sends `card`, and this prints it, then
- * the open work and the habits. The card composed here is only for a context that carries none, a test's or an old host's.
- *
  * PURE, as `brief.ts` is: the tools in `index.ts` read the record, and this decides what is said.
  */
 
-import { alikeKey, handlesIn, nameOnly, namedIn, plainOf, rowLine, titleOf, unaddressed, type Decl, type Look, type Shaped } from './brief.ts';
-import { agentOf, ago, callOf, clip, counted, grouped, runnerOf, ULID } from './words.ts';
+import { alikeKey, handlesIn, namedIn, plainOf, rowLine, unaddressed, type Decl, type Look, type Shaped } from './brief.ts';
+import { agentOf, ago, callOf, clip, grouped, runnerOf, ULID } from './words.ts';
 
 const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
 const text = (x: unknown): string | null => (typeof x === 'string' && x.trim() !== '' ? x : null);
@@ -44,20 +33,12 @@ export type Briefing = {
   waiting?: number | undefined;
   /** The page Home draws, by slug and title, or `null` where the record declares none. */
   home: { slug: string; title: string } | null;
+  /** The record as `boot` names it (`{ name, slug }`, or its name), for the one line a host with no card is told. */
+  record?: unknown;
 };
 
-/** The width of a slot's label, so the four read as a column: `Waiting  ` and `Next     `. */
-const LABEL = 9;
-/** The most one line of the card says, so five of them and their breaks stay inside `CARD_MOST`. */
-const LINE_MOST = 290;
-/** The most the card says. Measured, the owner's queue and handoff alone ran past it before every slot was cut. */
-export const CARD_MOST = 1_500;
-/** The most a slot names. */
-const SLOT_MOST = 3;
 /** A day, in seconds: a step older than this is checked before it is acted on. */
 const DAY_S = 86_400;
-/** The learnings the card names: the two newest that apply here. */
-const LEARNED_SHOWN = 2;
 
 /** The most rows of one list the lean briefing carries, by kind. */
 const WORK_MOST = 10;
@@ -69,11 +50,15 @@ const KEPT_TEXT = 160;
 /** The work rows said after the card, of each list. */
 const WORK_SHOWN = 5;
 
-/** Things said as a person lists them: `a`, `a and b`, `a, b and c`. */
-const spokenList = (items: readonly string[]): string => (items.length <= 1 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${items.at(-1)!}`);
-
-/** A slot: its label padded to the column, and its line cut at a word. The padding is added after the cut, which closes up spaces. */
-const slot = (label: string, body: string): string => `${label.padEnd(LABEL)}${clip(body, LINE_MOST - LABEL)}`;
+/**
+ * The one line a host with no card is told: which record answered, and the call that has the rest.
+ *
+ * THE RECORD'S NAME, NEVER AN ID: its name, else its slug as its address says it, else BrainDog. A ULID names nobody.
+ */
+export function connectedLine(record: unknown, c: Record<string, unknown> = {}): string {
+  const named = [record, c.record].flatMap((r) => (isObject(r) ? [r.name, r.title, r.slug] : [r])).map((r) => (typeof r === 'string' ? r.trim() : '')).find((r) => r !== '' && !ULID.test(r));
+  return `Connected to ${named === undefined ? 'BrainDog' : clip(unaddressed(named), 60)}. Call context.`;
+}
 
 /* `plainOf` AND `handlesIn` ARE `brief.ts`'s, where every other answer says a question too, and named here for the callers that read them here. */
 export { handlesIn, plainOf };
@@ -162,89 +147,8 @@ export function teach(c: { session: string | null; project: string | null; tasks
   ];
 }
 
-/** The people the Who slot names, and how many more. */
-const WHO_SHOWN = 3;
-
 /**
- * A person's or an organisation's words as `context` sends them: a name, or a handle whose words this answer read.
- *
- * NEVER AN ADDRESS (audit 19, M11). The record keeps a person met by mail under their address until somebody says their
- * name, so `jo@kiln.example` came to the Who slot as a name. One beside a name goes and the name stays; an address alone
- * names nobody, and the slot says the people it can name.
- */
-function wordsOf(value: unknown, look: Look): string | null {
-  if (typeof value === 'string') {
-    const said = value.trim();
-    if (said === '' || ULID.test(said)) return null;
-    /* A HANDLE IS SAID BY ITS WORDS OR NOT AT ALL: the slot names people, and `O3` names nobody. */
-    if (/^(?:[A-Z]{1,4}[1-9][0-9]*|[a-z][a-z0-9_]*#[1-9][0-9]*)$/u.test(said)) {
-      const title = look.title(said);
-      return title === undefined ? null : nameOnly(title);
-    }
-    return nameOnly(said);
-  }
-  if (isObject(value)) return wordsOf(value.name ?? value.title, look);
-  return null;
-}
-
-/** When somebody was last in touch, as a number to sort by, or `null` where `context` did not say. */
-const touched = (p: Record<string, unknown>): number | null => {
-  for (const k of ['in_touch', 'last_in_touch', 'touched_at']) {
-    const at = typeof p[k] === 'string' ? Date.parse(p[k]) : NaN;
-    if (Number.isFinite(at)) return at;
-  }
-  return null;
-};
-
-/**
- * The Who slot: the three people most recently in touch on this project, each with their role or organisation, how many
- * more, and the organisation the project is for.
- *
- *     Who      Priya Raman (client), Teodor Vance (Copperleaf), Wren, +4 · for Brightwell
- *
- * IT REPLACED "6 people met here" UNDER MORE. An agent about to write to somebody, or told "ask Priya", read a count and
- * had to list People to learn who that was. The record sends up to ten people linked to the project, the most recently
- * touched first (`context`'s `people`), with a name and, where the list says them, a role, an organisation and when they
- * were last in touch; the person whose record it is (`self`) is not somebody met. Nothing is said where nothing is
- * known, and no handle is said for a person, because the slot is read by a person through the agent.
- */
-export function whoSaid(c: Record<string, unknown>, project: Record<string, unknown> | null, look: Look): string | null {
-  /* THE ORGANISATIONS `context` SENDS (`organisations`, each `{ spoken, name, kind }`, the project's own first), read
-     for two things: a person's organisation sent as a handle is said by its name from here when this answer read no
-     words for it, and the project's own is what it is for. */
-  const organisations = (Array.isArray(c.organisations) ? c.organisations : []).filter(isObject);
-  const orgNames = new Map(organisations.flatMap((o) => (typeof o.spoken === 'string' && typeof o.name === 'string' && o.name.trim() !== '' ? [[o.spoken, o.name.trim()] as const] : [])));
-  const said: Look = { ...look, title: (spoken) => look.title(spoken) ?? orgNames.get(spoken) };
-  const people = (Array.isArray(c.people) ? c.people : []).filter(isObject).filter((p) => p.self !== true);
-  const order = people.map((p, i) => ({ p, i, at: touched(p) }));
-  /* THE DATED FIRST, NEWEST AT THE TOP, and anybody `context` sent no date for after them in the order it sent: a
-     comparison that fell back to the order only between two undated people could put one above somebody in touch today. */
-  order.sort((a, z) => (a.at === z.at ? a.i - z.i : a.at === null ? 1 : z.at === null ? -1 : z.at - a.at));
-  const named = order
-    .map(({ p }) => {
-      const name = wordsOf(p.name, said) ?? wordsOf(titleOf(shapedOf(p).fields, undefined), said);
-      if (name === null) return null;
-      const about = wordsOf(p.role, said) ?? wordsOf(p.org, said) ?? wordsOf(p.organisation, said);
-      return about && about.toLowerCase() !== name.toLowerCase() ? `${clip(name, 40)} (${clip(about, 30)})` : clip(name, 40);
-    })
-    .filter((n): n is string => n !== null);
-  const total = typeof c.people_total === 'number' && c.people_total >= named.length ? c.people_total : named.length;
-  const rest = total - Math.min(named.length, WHO_SHOWN);
-  /* WHAT THE PROJECT IS FOR IS ITS OWN ORGANISATION: one the project names, else one `context` marks `linked`, else, from
-     a record that marks none, the first it sent, which is the linked one when there is one. One marked not linked is
-     only who its people are with, and they already say so beside their names. */
-  const marked = organisations.some((o) => typeof o.linked === 'boolean');
-  const own = marked ? organisations.filter((o) => o.linked === true) : organisations;
-  const orgs = [project?.org, project?.organisation, ...own];
-  const org = orgs.map((o) => wordsOf(o, said)).find((o): o is string => o !== null) ?? null;
-  /* ONE THING FOR THE PEOPLE AND ONE FOR THE ORGANISATION, as every slot names at most three. */
-  const who = [...named.slice(0, WHO_SHOWN), ...(rest > 0 ? [`+${grouped(rest)}`] : [])].join(', ');
-  const parts = [...(who ? [who] : []), ...(org ? [`for ${clip(org, 40)}`] : [])];
-  return parts.length === 0 ? null : parts.join(' · ');
-}
-
-/**
- * The briefing, lean, with its card, and the text an agent reads: the card, then what else applies here.
+ * The briefing, lean, with the record's card, and the text an agent reads: that card as it came, then what else applies here.
  */
 export function briefed(b: Briefing): { value: Record<string, unknown>; text: string; card: string } {
   const c = b.context;
@@ -346,97 +250,20 @@ export function briefed(b: Briefing): { value: Record<string, unknown>; text: st
   }
   const questions = [...merged.values()];
   const total = Math.max(b.waiting ?? 0, asked.length);
-  /* HOW MANY THINGS WAIT, as far as this answer can tell them apart: the distinct questions among the ones it read, and
-     every question past them, which it could not compare. */
-  const distinct = questions.length + (total - asked.length);
-
-  /* ── the learnings, in the order `braindog:learnings` reads them (AGT-C14): the kind the list declares first before the
-     next (a method before a fact), this project's before everywhere's, then the newest. The kinds are the list's own,
-     so no kind is named here, and a list that declares none is newest first as it was. The sort is stable. ──── */
-
-  const learned = groups.filter((g) => g.kind === 'learned');
-  const lessons = learned.flatMap((g) => {
-    const kinds = g.decl?.fields.find((f) => f.id === 'kind' && f.type === 'enum' && f.retired !== true)?.values ?? [];
-    const rank = (r: Record<string, unknown>): number => {
-      const at = typeof r.kind === 'string' ? kinds.indexOf(r.kind) : -1;
-      return at === -1 ? kinds.length : at;
-    };
-    return [...newest(g.rows), ...newest(g.inherited)].sort((a, z) => rank(a) - rank(z)).map((r) => ({ spoken: String(r.spoken), words: titleOf(shapedOf(r).fields, g.decl) }));
-  });
-  const shownLessons = lessons.filter((l) => l.words !== '').slice(0, LEARNED_SHOWN);
 
   /* ── the card ──────────────────────────────────────────────────────────── */
 
   const runner = Object.keys(mine).length > 0 ? runnerOf(mine) : null;
-  /* THE PROJECT'S NAME IS A ROW'S WORDS, and one named for its folder or its owner's address was said as it was
-     (audit 21, item 15): said as every other row's words are, and a project with none by its list's word and handle. */
-  const projectWords = project && text(project.name) ? nameOnly(String(project.name)) : null;
-  const projectName = project ? (projectWords ? plainOf(projectWords, look, false) : namedIn('', String(project.spoken), look)) : null;
-  const head = [
-    'BrainDog',
-    mineSpoken ? `run ${mineSpoken}` : 'no run yet',
-    projectName ? `project ${clip(projectName, 40)}` : 'no project',
-    runner,
-  ]
-    .filter(Boolean)
-    .join(' · ');
-  const card: string[] = [clip(head, LINE_MOST)];
-
-  if (handoff) {
-    const about = [from, by, age === null ? null : ago(age), check ? 'check before acting' : null].filter(Boolean).join(', ');
-    card.push(slot('Next', `${clip(plainOf(String(handoff.next), look), 180)} (${about})`));
-  } else if (text(c.next)) card.push(slot('Next', clip(plainOf(String(c.next), look), 200)));
-
-  if (questions.length > 0) {
-    const shown = questions.slice(0, SLOT_MOST).map((q) => {
-      /* THE WHOLE QUESTION, CUT AT A WORD: the record's own questions say the fact first and ask second ("Ledger Post,
-         sending plan was due 4 days ago, GBP 39.00. Did it go through?"), so a first sentence was often no question. */
-      const words = clip(plainOf(q.question, look), 90);
-      return q.alike.length === 0 ? words : `${words} (${grouped(1 + q.alike.length)} alike)`;
-    });
-    const rest = distinct - shown.length;
-    card.push(slot('Waiting', `${grouped(distinct)} on ${look.decider}: ${shown.join(' · ')}${rest > 0 ? ` · ${grouped(rest)} more` : ''}`));
-  }
-
-  const who = whoSaid(c, project, look);
-  if (who) card.push(slot('Who', who));
-
-  if (shownLessons.length > 0) card.push(slot('Learned', shownLessons.map((l) => clip(plainOf(l.words, look), 130)).join(' · ')));
-
-  const more: string[] = [];
-  if (tried.length > 0) more.push(counted(tried.length, 'dead end'));
-  /* A FLOOR WHERE THE RECORD STOPPED, as a kept list's count is: `22+ learnings` where it sent twenty of this project's. */
-  if (lessons.length > 0) more.push(`${grouped(lessons.length)}${learned.some((g) => g.truncated) ? '+' : ''} ${lessons.length === 1 ? 'learning' : 'learnings'}`);
-  for (const g of groups) {
-    if (g.kind !== 'kept') continue;
-    const n = g.rows.length + g.inherited.length;
-    if (n === 0) continue;
-    const keys = g.decl?.fields.some((f) => f.type === 'secret') === true;
-    more.push(`${grouped(n)}${g.truncated ? '+' : ''} ${g.name.toLowerCase()}${keys ? ' by name' : ''}`);
-  }
-  /* THE PEOPLE ARE THE WHO SLOT NOW, by name, and not a count under More. */
   const people = (Array.isArray(c.people) ? c.people : []).filter(isObject);
-  /* ONE PHRASE OF COUNTS AND THE CALL THAT OPENS THEM, so this slot holds two things and not six. */
-  if (more.length > 0) card.push(slot('More', `${spokenList(more.slice(0, 5))} · call ${callOf('context', { format: 'full' })}`));
-
-  let said = card.join('\n');
-  if (said.length > CARD_MOST) said = said.slice(0, CARD_MOST).replace(/\n[^\n]*$/u, '');
-  /* THE RECORD'S OWN CARD WHEN IT SENT ONE (`card.ts`, AGT-B07), printed as it came, so the start hook, `context` and
-     `braindog context` say one text made by one set of rules. It already says the runs in this tree and the red signs,
-     so the lines below leave those out. The card composed above is for a record that sends none. */
+  /* THE RECORD'S CARD, PRINTED AS IT CAME (`card.ts`, AGT-B07), so the start hook, `context` and `braindog context` say
+     one text made by one set of rules. It already says the runs in this tree, the red signs and the Home page. A host
+     that sends none is told the one line, and nothing is drawn in the card's place. */
   const told = text(c.card);
-  if (told !== null) said = told;
+  const said = told ?? connectedLine(b.record, c);
 
   /* ── what follows the card ─────────────────────────────────────────────── */
 
   const lines: string[] = [];
-  for (const r of told === null ? here : []) {
-    const as = agentOf(r.agent, true);
-    const same = text(mine.agent) === null || r.agent === mine.agent;
-    lines.push(
-      `Two sessions: ${as} (${String(r.spoken)}) is live in this folder too${typeof r.age_s === 'number' ? `, seen ${ago(r.age_s)}` : ''}${text(r.doing) ? `, ${clip(plainOf(String(r.doing), look), 60)}` : ''}. Two sessions in one working tree overwrite each other${same ? '; if that is not you, coordinate or stop' : '. Coordinate or stop'}.`,
-    );
-  }
   const ambiguous = Array.isArray(c.ambiguous) ? c.ambiguous.filter((a): a is string => typeof a === 'string') : [];
   /* ONE QUESTION, which the agent can put to the person as it stands: which of these this folder is. It was a statement
      of what the record could not tell, with the consequence after it, and nothing for anybody to answer. */
@@ -446,10 +273,8 @@ export function briefed(b: Briefing): { value: Record<string, unknown>; text: st
     const choices = rest > 0 ? `${named.join(', ')} or one of ${grouped(rest)} more` : named.length === 1 ? named[0]! : `${named.slice(0, -1).join(', ')} or ${named.at(-1)!}`;
     lines.push(`Which project is this folder, ${choices}? Until one is set you work in no project.`);
   }
-  /* THE RED SIGNS, each by name with its own sentence, so an agent starting work sees what the record says is wrong with
-     itself (C07-f). The record has already held back what this key may not read (`quietSign`). */
+  /* THE RED SIGNS ARE THE CARD'S (its `Signs` slot), so they are kept here for the agent that acts on one, never said again. */
   const signs = (Array.isArray(c.signs) ? c.signs : []).filter(isObject).filter((s) => typeof s.name === 'string' && typeof s.said === 'string');
-  for (const s of told === null ? signs.slice(0, 3) : []) lines.push(`Red on this record: ${String(s.name)}. ${String(s.said)}`);
   for (const g of groups) {
     if (g.kind !== 'work') continue;
     const rows = [...g.rows, ...g.inherited];

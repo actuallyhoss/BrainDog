@@ -19,7 +19,7 @@ import { fileURLToPath } from 'node:url';
 
 import { CLAIMS } from './claims.ts';
 import { site } from './copy.ts';
-import { LAUNCH } from './launch.ts';
+import { HELD, LAUNCH, held } from './launch.ts';
 import { SUPPORT_EMAIL } from './links.ts';
 import { PAGES, PLACES } from './nav.ts';
 
@@ -58,7 +58,7 @@ test('nav.ts names every page the site prerenders, so the header, the 404 and th
   const pages = [
     '/',
     ...readdirSync(routes, { withFileTypes: true })
-      .filter((d) => d.isDirectory() && d.name !== '404' && existsSync(new URL(`${d.name}/+page.svelte`, routes)))
+      .filter((d) => d.isDirectory() && d.name !== '404' && existsSync(new URL(`${d.name}/+page.svelte`, routes)) && !(held() && (HELD as readonly string[]).includes(`/${d.name}`)))
       .map((d) => `/${d.name}`),
   ];
 

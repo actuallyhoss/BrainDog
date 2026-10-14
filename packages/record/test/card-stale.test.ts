@@ -61,7 +61,7 @@ test('THE NUMBER LEADS THE OTHER COUNTS, and More still names three things at mo
   const skills = reg('skills', [row('skills#1', { name: 'glaze' })]);
   const handoff = { from: 'S6', next: 'Fire the test tiles.', age_s: 600, tried: ['a cooler kiln', 'a longer soak'], head: null };
   const more = slot(draw(ctx({ stale: 4, handoff, registers: [keys, skills] })), 'More');
-  assert.equal(more, `${STALE} · 2 dead ends · 2 keys by name · call context`);
+  assert.equal(more, `${STALE} · 2 keys by name · 1 skill · call context`);
 });
 
 test('NOTHING IS SAID OF IT at zero, with no count, or with a count that is not a whole number above zero', () => {

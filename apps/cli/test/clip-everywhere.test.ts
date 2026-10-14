@@ -110,7 +110,9 @@ function clean(lines: string[], expected: number): void {
 }
 
 test('the start hook briefing: a DEL and a C1 CSI in the handoff, a live run, a question and the next step never reach the model', () => {
-  clean(briefingOf('BrainDog: S7 resumed.', hostile(), undefined).split('\n'), 3);
+  /* The record draws the card now and this command only cleans it, so the context carries a card holding the hostile words. */
+  const h = hostile();
+  clean(briefingOf('', { ...h, card: [`Next     ${h.handoff!.next}`, `Also     ${h.live.same_repo[0]!.doing}`, `Waiting  ${h.waiting[0]!.question}`].join('\n') } as Context, undefined).split('\n'), 3);
 });
 
 test('braindog context: the headline scrubs a state the record sent, through the same clip as every other line', () => {

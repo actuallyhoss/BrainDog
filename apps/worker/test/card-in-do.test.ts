@@ -308,7 +308,7 @@ test('THE START HOOK AND context PRINT ONE CARD: line one names the run, the app
   assert.equal(lines[0], `BrainDog · run ${told.attached.spoken} · Claude Code on MacBook · project Kiln · branch main`);
   /* NEXT STEP FIRST: the first slot after line one is the step the last run left, said as another run's. */
   assert.match(lines[1]!, /^Next\s/u, told.hook);
-  assert.ok(lines[1]!.includes(STEP) && lines[1]!.includes(`(${before}, Claude Code, `) && lines[1]!.endsWith('check before acting)'), lines[1]);
+  assert.ok(lines[1]!.includes(STEP) && lines[1]!.includes(`Left by Claude (${before}) `) && lines[1]!.endsWith('Check before acting.'), lines[1]);
   /* AND A COMPACTION PRINTS THAT LINE ALONE, from the record's `card_next`. */
   assert.equal(told.mcp.card_next, lines[1]);
   assert.equal(nextLine(told.attached, undefined), lines[1]);
@@ -338,7 +338,7 @@ test('A STEP MORE THAN SEVEN DAYS OLD IS NO NEXT LINE, and one six days old stil
   const told = await starts(run(h, 'run-d'), 'run-d');
   assert.equal(told.mcp.card, told.hook);
   const next = told.hook.split('\n').find((line) => /^Next\s/u.test(line));
-  assert.ok(next?.includes(fresher) && next.includes(`(${by}, Claude Code, 6d ago, check before acting)`), told.hook);
+  assert.ok(next?.includes(fresher) && next.includes(`Left by Claude (${by}) 6 days ago. Check before acting.`), told.hook);
   assert.ok(!told.hook.includes(STEP), `the eight-day step came back beside the six-day one:\n${told.hook}`);
 });
 
@@ -373,7 +373,7 @@ test('A CARD THAT WOULD RUN PAST 150 WORDS IS CUT TO 150, and line one and the s
   const lines = told.hook.split('\n');
   assert.equal(lines[0], `BrainDog · run ${told.attached.spoken} · Claude Code on MacBook · project Kiln · branch main`);
   const next = lines.find((line) => /^Next\s/u.test(line));
-  assert.ok(next?.includes(long) && next.endsWith('check before acting)'), told.hook);
+  assert.ok(next?.includes(long) && next.endsWith('Check before acting.'), told.hook);
 });
 
 /*

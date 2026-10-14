@@ -44,8 +44,9 @@ import { budgetOf, hostsPath, target, type Target } from './http.ts';
 import { fillFeed } from '@braindog/pack-live-feed/fill.ts';
 import FEED from '@braindog/pack-live-feed/live-feed.pack.json' with { type: 'json' };
 
-import { TOOLS, folderCatalogue, gatherAsks, holdsKey, isRef, loadAdapter, loadMap, packFrom, type CatalogueRead, type ImportMap, type Offer, type Plan, type PlannedRow, type Settled, type Skipped } from './adapter.ts';
-import { knownKeys } from './catalogue.ts';
+import { TOOLS, type AdapterFetch, folderCatalogue, gatherAsks, holdsKey, isRef, loadAdapter, loadMap, packFrom, type CatalogueRead, type ImportMap, type Offer, type Plan, type PlannedRow, type Settled, type Skipped } from './adapter.ts';
+import { askToRun, fetchAdapter, type Asker } from './adapter-fetch.ts';
+import { hostCatalogueFor, knownKeys } from './catalogue.ts';
 import { keysOfRow, meeter, metOf, sameName, type Meeting } from './people.ts';
 import type { AgentIo } from './skills.ts';
 import { readSource } from './usecase.ts';
@@ -54,7 +55,7 @@ import { cliBuild } from './position.ts';
 import { createClient } from '@braindog/client';
 
 const USAGE =
-  'braindog import takes <adapter> <export.json> [--setup <setup.json>] [--map <map.json>] [--catalogue <folder or address>] [--host <host>] [--dry-run] [--strict], or --map <map.json> <export.json> when the map has sections, or <adapter> <export.json> --draft-setup, or <adapter> --since <day or last>. The adapter is a pack in packs/ by its id, or the path of an adapter module.';
+  'braindog import takes <adapter> <export.json> [--setup <setup.json>] [--map <map.json>] [--catalogue <folder or address>] [--host <host>] [--dry-run] [--strict] [--yes], or --map <map.json> <export.json> when the map has sections, or <adapter> <export.json> --draft-setup, or <adapter> --since <day or last>. The adapter is the path of an adapter module, or an add-on by its id: from packs/ here, or else from the catalogue, asked about once. --yes is for a script: it says yes to running an add-on\'s adapter without asking.';
 
 /** The options only an adapter import takes, which is how `main.ts` tells one from putting a .brainl file back. */
 export const ADAPTER_OPTIONS = ['setup', 'map', 'catalogue', 'dry-run', 'draft-setup', 'since', 'bin-emptied', 'strict'] as const;
@@ -2328,8 +2329,33 @@ const addressCatalogue = (base: string, io: AgentIo, ms: number): CatalogueRead 
   },
 });
 
+/**
+ * AN ADD-ON'S ADAPTER BY ITS ID, FOR A LINE TYPED ANYWHERE: an id no `packs/` folder holds is fetched from the
+ * catalogue `--catalogue` names, else the host's (`hostCatalogueFor`, the one `pack install` reads), held and kept by
+ * `fetchAdapter`, and run only once `askToRun` has its yes. `io.ask` is the terminal a test stands in for.
+ */
+const fromCatalogue =
+  (io: ImportIo, values: { host?: string | undefined; catalogue?: string | undefined; yes?: boolean | undefined }): AdapterFetch =>
+  async (id) => {
+    const ms = budgetOf(io.env);
+    const named = values.catalogue;
+    const catalogue: CatalogueRead =
+      named === undefined
+        ? addressCatalogue(await hostCatalogueFor(id, 'pack', values.host, io), io, ms)
+        : /^[a-z][a-z0-9+.-]*:\/\//iu.test(named)
+          ? addressCatalogue(named, io, ms)
+          : folderCatalogue(resolve(io.cwd, named));
+    const got = await fetchAdapter(id, { home: io.home, catalogue, known: knownKeys(io) });
+    if (!got.ok) return got;
+    const may = await askToRun(got.value, got.value.hash, { home: io.home, ask: io.ask, yes: values.yes });
+    return may.ok ? { ok: true, file: got.value.file } : may;
+  };
+
+/** What the import is handed: an agent's io, and who answers at the terminal when a test stands in for it. */
+export type ImportIo = AgentIo & { ask?: Asker | undefined };
+
 /** `braindog import <adapter> <file>`, and the exit code: 0 done, 1 refused or partly refused, 3 the host did not answer. */
-export async function importCommand(args: string[], io: AgentIo, given?: string, now: () => Date = () => new Date(), offsetOf: (at: Date) => number = localOffset): Promise<number> {
+export async function importCommand(args: string[], io: ImportIo, given?: string, now: () => Date = () => new Date(), offsetOf: (at: Date) => number = localOffset): Promise<number> {
   /* THE PLAN'S DAY IS THE OWNER'S LOCAL DAY, NOT THE UTC DATE. It was `toISOString().slice(0, 10)`, so a nightly run at
      22:30 at -03:00 planned on tomorrow's UTC date: a date due today was filed as already done, and a run at 01:30 at
      +03:00 planned on yesterday's. Taken from `now` and `offsetOf`, the same clock `--since` reads a run by. */
@@ -2344,6 +2370,7 @@ export async function importCommand(args: string[], io: AgentIo, given?: string,
     since?: string | undefined;
     'bin-emptied'?: boolean | undefined;
     strict?: boolean | undefined;
+    yes?: boolean | undefined;
   };
   let positionals: string[];
   try {
@@ -2361,6 +2388,7 @@ export async function importCommand(args: string[], io: AgentIo, given?: string,
         since: { type: 'string' },
         'bin-emptied': { type: 'boolean' },
         strict: { type: 'boolean' },
+        yes: { type: 'boolean' },
       },
     }));
   } catch {
@@ -2377,7 +2405,7 @@ export async function importCommand(args: string[], io: AgentIo, given?: string,
   }
   /** How the line named what reads the export, for a sentence that tells him what to type next. */
   const line = mapOnly ? `--map ${String(values.map)}` : String(spec);
-  const loaded = mapOnly ? loadMap(String(values.map), io.cwd) : await loadAdapter(String(spec), { cwd: io.cwd, map: values.map });
+  const loaded = mapOnly ? loadMap(String(values.map), io.cwd) : await loadAdapter(String(spec), { cwd: io.cwd, map: values.map, fetch: fromCatalogue(io, values) });
   if (!loaded.ok) {
     io.say(loaded.fix);
     return 1;

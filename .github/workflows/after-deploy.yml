@@ -202,6 +202,12 @@ jobs:
           # THE CANARY'S SESSION, which `signin-live` keeps and the look reads. Outside `LANE_OUT`, so the sheet's
           # artefact never carries it, and removed the moment the lane is done.
           CANARY_SESSION: ${{ runner.temp }}/canary-session.json
+          # THE STRANGER'S DRILL (`60-stranger.mjs`): the mail door and the invite it signs up with, the inbox it reads
+          # the link from, and the operator's key that takes the record away after. Without them it says skipped.
+          CANARY_MAIL_DOOR: ${{ secrets.CANARY_MAIL_DOOR }}
+          CANARY_INVITE_CODE: ${{ secrets.CANARY_INVITE_CODE }}
+          CANARY_INBOX_KEY: ${{ secrets.CANARY_INBOX_KEY }}
+          DRILL_OPERATOR_KEY: ${{ secrets.DRILL_OPERATOR_KEY }}
 
       - name: Forget the canary's session
         if: always()

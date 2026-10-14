@@ -93,7 +93,7 @@ export const SCRIPT_GRAMMAR = {
   to_propose:
     'propose body_kind change with {"declaration_id":"script.<name>","to":<the declaration>}. The owner approves each origin and key in Decide, and a key must be in the vault before they can accept.',
   to_try:
-    'the same change with "try":true beside "to", or "try":{"input":...} to hand it what a door would. It runs now and answers script_try: the writes it would make, its log and any refusal. Nothing is written and nothing is proposed, so send it again without try when it works. It fetches for real and counts as a run of the plan, and it opens a key only for the owner.',
+    'the same change with "try":true beside "to", or "try":{"input":...} to hand it what a door would. It runs now and answers script_try: the writes it would make, its log and any refusal. Nothing is written and nothing is proposed, so send it again without try when it works. It fetches for real and counts as a run of the plan. For an agent it opens no key and only reads, a GET or a HEAD without a body, twenty trials a record a day; the owner\'s trial sends what the draft asks.',
   in_this_build:
     "an accepted script runs on the self-host and on the Cloud: on its clock, from a rule's script step when it says rule:true, and from every verified arrival at its door, within a daily cap, and the script's history says when arrivals went past it. An arrival nothing verified starts nothing. A trial runs on a self-host whose actions are on, and on the Cloud.",
 };

@@ -10,6 +10,7 @@ import { shell } from './copy/shell.ts';
 import { cases } from './copy/cases.ts';
 import { forPages } from './copy/for.ts';
 import { DOCS, PACKS, SECURITY, SUPPORT } from './links.ts';
+import { HELD, LAUNCH, held } from './launch.ts';
 
 export type Group = 'product' | 'build' | 'trust';
 
@@ -42,7 +43,8 @@ const person = (id: keyof typeof forPages.person.who): Place => ({
  *
  * THE HEADER'S ROW IS FINAL: Slash, For agents, Packs, Pricing, Docs, Changelog, and then GitHub, which
  * `+layout.svelte` adds from `SOURCE` in `links.ts` because it is not a page of this site. Slash leads
- * because it has a page of its own since the redesign of 26 September.
+ * because it has a page of its own since the redesign of 26 September. Changelog is drawn only once
+ * `LAUNCH.public` is on (`reachable` below): until then the row ends at Docs.
  */
 export const PLACES: readonly Place[] = [
   place('/slash', 'slash', 'product', true),
@@ -82,8 +84,16 @@ const found: ReadonlySet<string> | null =
 /** Whether the site has a page at this path. */
 export const exists = (path: string): boolean => found === null || found.has(path);
 
+/**
+ * The places a visitor may reach under these flags, in order: each that exists, less the ones `launch.ts` holds
+ * until the site is public. The changelog is one of `PLACES` on every day, so flipping `LAUNCH.public` draws it in
+ * the header again and edits nothing here. Takes the flags so a test can pass a copy with one turned on.
+ */
+export const reachable = (launch: { public: boolean } = LAUNCH): readonly Place[] =>
+  PLACES.filter((p) => exists(p.path) && !(held(launch) && (HELD as readonly string[]).includes(p.path)));
+
 /** The places that exist today, in order. */
-export const LIVE: readonly Place[] = PLACES.filter((p) => exists(p.path));
+export const LIVE: readonly Place[] = reachable();
 
 /** Home and every live place: what the 404 lists and the sitemap names. */
 export const PAGES: readonly Place[] = [{ path: '/', label: shell.nav.home, header: false, group: 'product' }, ...LIVE];

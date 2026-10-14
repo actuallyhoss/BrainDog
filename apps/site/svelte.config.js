@@ -1,4 +1,5 @@
 import adapter from '@sveltejs/adapter-static';
+import { HELD } from './src/lib/launch.ts';
 
 const OUT = process.env.BRAINDOG_ENV ? `build-${process.env.BRAINDOG_ENV}` : 'build';
 
@@ -25,7 +26,15 @@ export default {
     files: { assets: 'static' },
     /* `*` is every route without a parameter. `/legal` is named as well, so the page a licence
        points at is prerendered even on a day nothing on the site links to it. */
-    prerender: { entries: ['*', '/legal'] },
+    prerender: {
+      entries: ['*', '/legal'],
+      /* A HELD ADDRESS ANSWERS 404 ON PURPOSE (`HELD` in `src/lib/launch.ts`): it writes no file, so the site's 404 page
+         answers it. Any other failure still stops the build. */
+      handleHttpError: ({ status, path, message }) => {
+        if (status === 404 && HELD.includes(path)) return;
+        throw new Error(message);
+      },
+    },
     /* EVERY ASSET IS NAMED FROM THE ROOT, because `not_found_handling: "404-page"` in
        `wrangler.jsonc` serves one `404.html` at whatever address was asked, at any depth. With
        SvelteKit's default of relative paths that page, prerendered for `/404`, asked for

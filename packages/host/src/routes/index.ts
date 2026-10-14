@@ -50,6 +50,8 @@ import { ROUTES as SKILLS_BEHIND } from './skills-behind.ts';
 import { ROUTES as TOOLS_SEEN } from './tools-seen.ts';
 import { ROUTES as NAMED_TWICE } from './named-twice.ts';
 import { ROUTES as exportPack } from './export-pack.ts';
+import { ROUTES as SHARES } from './shares.ts';
+import { ROUTES as deviceRename } from './device-rename.ts';
 /* END ROUTES */
 
 export const EXTRA_ROUTES: readonly Route[] = [
@@ -91,5 +93,7 @@ export const EXTRA_ROUTES: readonly Route[] = [
   ...TOOLS_SEEN,
   ...NAMED_TWICE,
   ...exportPack,
+  ...SHARES,
+  ...deviceRename,
   /* END ROUTES */
 ];

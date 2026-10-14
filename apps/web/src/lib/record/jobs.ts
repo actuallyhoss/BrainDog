@@ -19,6 +19,7 @@
  * draws a kind's card from here. The clock is an argument.
  */
 
+import { since } from 'braindog-render';
 import { createClient, type ClientOptions } from '@braindog/client';
 import { commandOf, JOB_MCP_PREFIX, type Cancelled, type JobEvent, type JobEvents, type JobRow, type JobsPage } from '@braindog/kernel';
 
@@ -378,6 +379,36 @@ export function kindLines(body: Record<string, unknown>): { label: string; value
   return lines;
 }
 
+/* ── whether a machine is listening ─────────────────────────────────────── */
+
+/** How often the Jobs screen asks again which machines are listening, while it is open and in view. */
+export const HEARD_POLL_MS = 20_000;
+/**
+ * HOW RECENTLY A MACHINE MUST HAVE BEEN HEARD TO BE LISTENING. A runner asks for work while it holds its claim, which is
+ * held 20 seconds (`apps/cli/src/runner.ts`), and every call it makes stamps its grant's `last_used`; twice that leaves
+ * room for one late ask without saying a waiting machine has gone.
+ */
+export const LISTEN_MS = 40_000;
+
+/**
+ * Whether a machine will take a job now, from when its grant was last used (`seen`), read against `now`.
+ *
+ * LISTENING SAYS NOTHING MORE, and a machine heard longer ago says when ("Last heard 3 days ago"). A machine never heard
+ * at all answers `heard: null`, so the screen says how it was enrolled instead. A stamp a little ahead of this browser's
+ * clock is a machine heard just now, not one heard in the future.
+ */
+export function listeningOf(machine: { seen: string | null }, now: number): { listening: boolean; heard: string | null } {
+  const { seen } = machine;
+  const t = seen === null ? Number.NaN : Date.parse(seen);
+  if (seen === null || !Number.isFinite(t)) return { listening: false, heard: null };
+  if (now - t <= LISTEN_MS) return { listening: true, heard: null };
+  return { listening: false, heard: words.lastHeard(since(seen, now)) };
+}
+
+/** Whether any of these machines will take a job now. */
+export const anyListening = (machines: readonly { seen: string | null }[], now: number): boolean =>
+  machines.some((m) => listeningOf(m, now).listening);
+
 /* ── words ──────────────────────────────────────────────────────────────── */
 
 export const words = {
@@ -417,6 +448,10 @@ export const words = {
   inNoRepo: 'Runs in an empty folder',
   writesShort: 'Changes files',
   startedToast: (title: string) => `${title} is waiting for a machine.`,
+  nobodyListening: 'No machine is listening. The job waits up to a day.',
+  /* Whether a machine is listening. */
+  listening: 'Listening',
+  lastHeard: (ago: string) => `Last heard ${ago}`,
   /* One run. */
   run1: 'Run',
   noSuchWhy: 'It may have been from another record, or the link may be wrong.',

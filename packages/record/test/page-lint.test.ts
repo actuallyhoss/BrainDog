@@ -72,16 +72,20 @@ test('A NOTE THAT PRINTS THREE RAW THINGS IS THREE FINDINGS, named by page and p
   assert.deepEqual(ran, { ran: true, state: 'red', findings: 3, pages: 1 });
   const s = sign(api);
   assert.equal(s.state, 'red');
-  assert.equal(s.value, 3);
-  assert.equal(s.said, '1 page prints something raw: Kiln.');
+  /* AND THE PAGES CENSUS BESIDE THE LINT (PGS-A01 step 5): the note's `{{revenue.monthly}}` names nothing on this
+     record, so the census counts the page once more and its fact names the path, ahead of the lint's three. */
+  assert.equal(s.value, 4);
+  assert.equal(s.said, '1 page prints a path that names nothing: Kiln. 1 page prints something raw: Kiln.');
+  assert.equal(s.facts[0], 'Kiln prints {{revenue.monthly}}, naming nothing.');
+  const lint = s.facts.slice(1);
   assert.deepEqual(
-    s.facts.map((f) => f.split(':')[0]),
+    lint.map((f) => f.split(':')[0]),
     ['Kiln, Notes', 'Kiln, Notes', 'Kiln, Notes'],
     'each finding names the page and the part',
   );
-  const facts = s.facts.join('\n');
+  const facts = lint.join('\n');
   for (const said of ['placeholder', 'an id where a name goes', 'a raw time']) assert.match(facts, new RegExp(said));
-  /* NOTHING RAW IN THE FINDINGS THEMSELVES: no handle, no instant, no braces, no slug. */
+  /* NOTHING RAW IN THE LINT'S FINDINGS THEMSELVES: no handle, no instant, no braces, no slug. */
   assert.doesNotMatch(`${s.said}\n${facts}`, /S731|2026-10-07T|\{\{|kiln\b|—/);
   /* ONCE A DAY: the same day's tick does not read again. */
   assert.deepEqual(await api.lintTick(), { ran: false, why: 'today' });

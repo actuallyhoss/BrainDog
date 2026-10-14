@@ -24,6 +24,7 @@
   import { inline } from 'braindog-render';
   import { Text } from 'braindog-render/svelte';
   import { drew, undrew } from './screen.svelte.ts';
+  import { screenSays } from './empty-part.ts';
   import type { IconName } from './icons.ts';
 
   export type EmptyKind = 'no-data-yet' | 'no-results' | 'cleared' | 'no-permission' | 'error';
@@ -136,7 +137,10 @@
    * state normally and must not measure a refusal, which is the whole reason they are told apart.
    */
   $effect(() => {
-    const said = kind === 'error' ? 'refused' : 'empty';
+    /* A COMPACT ONE IS A PART INSIDE A SECTION and says nothing unless it is a refusal (`empty-part.ts`): one
+       "Nothing matched." under a project's money section settled the whole page `empty`. */
+    const said = screenSays(kind, compact);
+    if (said === null) return;
     /**
      * `untrack`, AND WITHOUT IT EVERY DESIGNED EMPTY STATE IN THE PRODUCT THREW.
      *

@@ -26,3 +26,21 @@ export async function shareKeyOf(bound: KekBinding | undefined): Promise<Uint8Ar
   if (current === '') return null;
   return deriveShareKey(new TextEncoder().encode(current));
 }
+
+/** What `sharesOf` answers: whether this Worker makes read-only links, and the owner's sentence when it does not. */
+export type Shareable = { can: boolean; why?: string };
+
+/** The one sentence an owner reads on a Worker that makes no links, whichever of the two reasons it is. */
+export const SHARES_OFF = 'Read-only links are switched off on this BrainDog.';
+
+/**
+ * Whether this Worker makes read-only links: yes only when `KEK` is bound, which the share key is derived from, and the
+ * variable `SHARE_LINKS` is exactly `on`.
+ *
+ * OFF UNLESS SAID, AND OFF IN PRODUCTION UNTIL THE OWNER SAYS YES. An unset, empty or misspelt `SHARE_LINKS` is no, so a
+ * deploy that forgets the variable makes no link, and the app offers no button that would fail. The answer says
+ * whether the key is bound and never reads it, so nothing here touches the secret's value.
+ */
+export function sharesOf(env: { KEK?: KekBinding | undefined; SHARE_LINKS?: string | undefined }): Shareable {
+  return isBound(env.KEK) && env.SHARE_LINKS === 'on' ? { can: true } : { can: false, why: SHARES_OFF };
+}

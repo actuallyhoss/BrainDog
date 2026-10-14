@@ -36,6 +36,7 @@
     pick = $bindable(),
     inline,
     run,
+    contest = [],
   }: {
     /** What starts it: written, arrival, every, metric, decided or manual. */
     kind: string;
@@ -48,6 +49,11 @@
     inline: Answer<Tried> | null;
     /** The last try of a run body, or `null`. */
     run: Answer<TryRun> | null;
+    /**
+     * Which rule gets there first, one line each by rule name, from the dry run's `won`, `lost` and `takenBy`: the
+     * page says them (`run-again.ts` `contestLines`), since only it knows every rule's name.
+     */
+    contest?: readonly string[];
   } = $props();
 
   /** How many walked rows are listed. The record hands back twenty, and a column of twenty under a column of cards buries it. */
@@ -166,6 +172,8 @@
       />
     {/if}
     <p class="tried-count num">{said.matches(t.matches ?? 0, t.rows)}</p>
+    <!-- WHICH RULE GETS THERE FIRST (SHL-D07 job 6): the dry run's `won`, `lost` and `takenBy`, one line each by name. -->
+    {#each contest as line (line)}<p class="tried-note num">{line}</p>{/each}
     {#if t.sample.length > 0}
       <ul class="tried-rows">
         {#each t.sample.slice(0, SHOWN) as r (r.spoken)}

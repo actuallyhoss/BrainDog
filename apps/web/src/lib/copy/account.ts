@@ -696,6 +696,8 @@ export const account = {
   inviteNoMail: 'No email is sent. Copy the link and send it to them yourself.',
   inviteLinkReady: (email: string) => `This link is for ${email}. It is shown once, so copy it now.`,
   inviteCopyLink: 'Copy link',
+  inviteAddsOnlyNext: 'You add to this record through an agent of your own. Make its key next, then give it to your agent.',
+  inviteMakeAgentKey: "Make your agent's key",
   inviteLinkLabel: 'the invitation link',
   inviteDone: 'Done',
   invitesWaiting: 'Waiting to be used',

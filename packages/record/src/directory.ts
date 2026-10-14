@@ -2323,6 +2323,34 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
       }),
 
     /**
+     * One more sign-up reading by the included model today, and whether it is within the day's `most`, for every
+     * stranger at once (`first-read`, USE-B05). Kept in `dir_fail` under `read.<day>.<key>`, a prefix no lockout uses,
+     * with `until` at the day's end so the sign-in prune keeps the row all day. Capped one past `most`, so the count
+     * stops growing once the day is spent.
+     */
+    firstReadHit: (key: string, day: string, most: number): boolean => {
+      const end = Date.parse(`${day}T00:00:00Z`) + 86_400_000;
+      const row = sql.one(
+        'INSERT INTO dir_fail (key, n, first, until) VALUES (?1, 1, ?2, ?3) ON CONFLICT (key) DO UPDATE SET n = MIN(n + 1, ?4 + 1) RETURNING n',
+        `read.${day}.${key}`,
+        clock.now(),
+        end,
+        most,
+      ) as { n: number } | undefined;
+      return row !== undefined && row.n <= most;
+    },
+
+    /**
+     * How many trials agents have run on this record since midnight UTC of `at` (`script-try-cap.ts`): every metered
+     * trial writes its `try_agent_` event to `dir_usage_run`, so the ledger already holds the count.
+     */
+    trialsToday: (record: string, at: number): number => {
+      const midnight = Date.parse(`${new Date(at).toISOString().slice(0, 10)}T00:00:00Z`);
+      const row = sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM dir_usage_run WHERE record = ? AND event LIKE 'try\\_agent\\_%' ESCAPE '\\' AND at >= ?", record, midnight);
+      return row?.n ?? 0;
+    },
+
+    /**
      * A record's Slash asks, a UTC day at a time, as its own ledger totals them (`slash_call`, in the record): the
      * host's nightly call, one per record, and nothing a person can reach.
      *

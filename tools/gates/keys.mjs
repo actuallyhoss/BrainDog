@@ -161,8 +161,10 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
   let server = null;
   let browser = null;
   try {
-    /* THE RECORD THE REGISTER LIST READS, forwarded to from this gate's own port. See `record.mjs`. */
-    record = await startRecord();
+    /* THE RECORD THE REGISTER LIST READS, forwarded to from this gate's own port. See `record.mjs`. WITH THE QUEUE PAGE
+       (`/p/questions`), as `queue.mjs` takes it: since money-core 3.17.0 no seeded page draws the open questions as
+       rows, and `page-answer` needs a page that does. */
+    record = await startRecord(0, { queuePage: true });
 
     /* Read as text, not imported: the registry uses runes, so anything reaching it cannot load outside
        a Svelte build. That is the same reason `silenced` lives next door in a plain `.ts`. */
@@ -451,13 +453,15 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
 
       /* THE ROW KEYS OF A PAGE AT ITS OWN ADDRESS (`/p/<slug>`, PageBody in mode=page with a host), pressed with the
          row cursor on a row each can act on, as Today's are. `/p/work` and not `/?work`, which the work-* recipes
-         already press, so the page's own address is the one proved here. `/p/money` draws the record's open questions
-         as rows, which is where a number has an option to choose; the tick and the answer are held, as Today's are. */
+         already press, so the page's own address is the one proved here. `/p/questions`, the gate record's queue page,
+         draws the record's open questions as rows, which is where a number has an option to choose; the tick and the
+         answer are held, as Today's are. NOT `/p/money` SINCE money-core 3.17.0: its questions went to Decide, and
+         every other seeded queue is filtered to rows the seed's questions are not about. */
       'page-tick': { route: '/p/work', setup: held(onTask), press: ['x'] },
       'page-edit': { route: '/p/work', setup: onTask, press: ['e'] },
       'page-menu': { route: '/p/work', setup: onTask, press: ['m'] },
       'page-new': { route: '/p/work', press: ['n'] },
-      'page-answer': { route: '/p/money', setup: held(onQuestion), press: ['1'] },
+      'page-answer': { route: '/p/questions', setup: held(onQuestion), press: ['1'] },
 
       /* The gate is a question, and a question has an address. There is no `/gate` route. SG5 is the
          seeded record's Kiln licensing question (the sample's SG31): open, with three options. */

@@ -66,6 +66,7 @@ import { methods as skillsBehindMethods } from './skills-behind.ts';
 import { methods as toolsSeenMethods } from './tools-seen.ts';
 import { methods as namedTwiceMethods } from './named-twice.ts';
 import { methods as exportPack } from './export-pack.ts';
+import { methods as deviceRenameMethods } from './device-rename.ts';
 /* END METHODS */
 
 /**
@@ -147,6 +148,8 @@ export type RecordDeps = {
    * because a page nobody checked may open onto nothing.
    */
   withheld?: ((ctx: CallContext, slug: string) => boolean) | undefined;
+  /** The host's answer to whether it can make a read-only link (`shareable`). Absent is no. */
+  shares?: (() => import('./shares.ts').SharesAnswer) | undefined;
 };
 
 export function methods(deps: RecordDeps) {
@@ -196,6 +199,7 @@ export function methods(deps: RecordDeps) {
     ...toolsSeenMethods(deps),
     ...namedTwiceMethods(deps),
     ...exportPack(deps),
+    ...deviceRenameMethods(deps),
     /* END METHODS */
   };
 }

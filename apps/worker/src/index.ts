@@ -51,8 +51,9 @@ import { ALARM_RUNS, IN_FLIGHT, actionExecutor, holding, holdingPaged, invocatio
 import { deliveryRun, holdAutomations, noticePass, replayUsage, runsHold, type Replayed } from '@braindog/host/actions';
 import { arrivalRun } from '@braindog/host/actions';
 import { runScript, ScriptRuns, type ScriptCall, type ScriptExports, type ScriptReply } from './script.ts';
-import { grantNamed, holdingScript, scriptReads } from '@braindog/host/script';
+import { grantNamed, holdingScript, readOnlyExecute, scriptReads } from '@braindog/host/script';
 import { askerOf, scriptTrial } from '@braindog/host/script-try';
+import { serveFirstRead } from '@braindog/host/first-read';
 import { pagedRunner } from '@braindog/host/connector';
 import { serveAsks, type ModelJobInference, type SlashAnswer } from '@braindog/host/slash-answers';
 import { backgroundMeter, serveModelJobs, type ModelJobMeter } from '@braindog/host/model-jobs';
@@ -80,7 +81,8 @@ import { NO_SHARE_KEY, linkOpened, opensShare, serveShared, sharedNone, type Sha
 /* NAMED APART FOR THE LINK'S DOOR, so the front doors' own limiter can import the same two functions under their own
    names without this file binding one name twice. */
 import { bindingLimiter as linkLimiter, refusedFor as linkRefused } from '@braindog/host/limits';
-import { shareKeyOf } from './share.ts';
+import { shareKeyOf, sharesOf } from './share.ts';
+import { firstReadDoorOf } from './first-read.ts';
 import { consume, pump } from './pump.ts';
 import { afterRestore, appPath, pollAsked, recoverRestore, restoredOf, asPage, atRoot, cloudIngest, copyAsked, copyRefusal, drained, ingestBudget, inward, isRecordId, legacyRedirect, restoreAsked, servesAccount, servesApi, servesAuth, servesBuild, servesIn, servesKey, servesMcp, type AppPath, type CloudIngestDeps, type Restored, type Stranded } from './route.ts';
 import { HEALTHZ, healthz, type Night } from './health.ts';
@@ -237,6 +239,8 @@ type Env = {
    * reader.
    */
   KEK?: KekBinding;
+  /** `on` makes read-only links to a page (`sharesOf` in `share.ts`); unset, or anything else, makes none. Unset in production until the owner says yes. */
+  SHARE_LINKS?: string;
   /** The operator's own record id, where the nightly walk writes its summary as one note (`53 §5.1`). Unset or empty, no note. */
   OPS_RECORD?: string;
   /** The sender for sign-in links, on a domain Email Service sends for. Empty, or no `EMAIL`, and there are no links. */
@@ -323,6 +327,8 @@ type Env = {
    */
   TURNSTILE_SITE_KEY?: string;
   TURNSTILE_SECRET?: string;
+  /** The day's ceiling of sign-up readings by the included model for all strangers (`first-read.ts`), and his yes to them. Unset is off. */
+  FIRST_READ_DAILY?: string;
   /**
    * The Google OAuth client sign-in with Google runs as (`google.ts`), both put with `wrangler secret put`. The id is
    * not a secret, and is one here so that it is set beside the half that is. Either unset, and both routes are 404
@@ -874,7 +880,8 @@ export class Record$ extends DurableObject<Env> {
                   exports: this.ctx.exports as unknown as ScriptExports,
                   object: this.ctx.id.toString(),
                   runs: this.#scripts,
-                  send: (egress) => actionExecutor(() => egress, { openKey }),
+                  /* AN AGENT'S TRIAL ONLY READS (`readOnlyExecute`): a GET or a HEAD without a body, as on a self-host. */
+                  send: (egress) => (t.readOnly ? readOnlyExecute(actionExecutor(() => egress, { openKey })) : actionExecutor(() => egress, { openKey })),
                   grant: t.grantOf,
                   read: t.reads,
                   now: () => Date.now(),
@@ -893,6 +900,10 @@ export class Record$ extends DurableObject<Env> {
         catalogueShelf: workerCatalogueShelf(this.env.ASSETS, this.env.BLOBS),
         /* AN INVITATION IS SPENT BY SIGNING IN, and nobody signs in here without the Directory's key. */
         invitations: () => ((this.env.SESSION_SECRET ?? '').length >= 32 ? null : INVITES_OFF),
+        /* WHETHER THIS WORKER MAKES READ-ONLY LINKS (`sharesOf`): `KEK` bound and `SHARE_LINKS` on, and the owner's sentence when not. */
+        shares: () => sharesOf(this.env),
+        /* AN AGENT'S TRIALS TODAY, from the Directory's ledger, which every metered trial already writes to (`script-try-cap.ts`). */
+        trialsToday: (r) => this.env.DIRECTORY.get(this.env.DIRECTORY.idFromName('directory')).trialsToday(r, Date.now()) as unknown as Promise<number>,
         ...(copies === undefined ? {} : { snapshots: copies }),
         /* DELETION, `51 §5.13`, in this order: a final copy, every other object under the
            record's prefix, the alarm, the bytes, the names. The record has checked the owner, the sign-in and the typed
@@ -2137,6 +2148,16 @@ export class Directory$ extends DurableObject<Env> {
     return this.#directory().meterSlash(record, days);
   }
 
+  /** One more sign-up reading today under `key`, and whether it is within `most` (`first-read.ts`'s `MeterStore`). */
+  firstReadHit(key: string, day: string, most: number): boolean {
+    return this.#directory().firstReadHit(key, day, most);
+  }
+
+  /** How many trials agents ran on `record` since midnight UTC of `at`: the record's daily cap of twenty (`script-try-cap.ts`). */
+  trialsToday(record: string, at: number): number {
+    return this.#directory().trialsToday(record, at);
+  }
+
   /** `GET /account/usage`: what the records this person owns used between two days. */
   usage(person: string, range: { from: string; to: string }): Result<AccountUsage> {
     return this.#directory().usage(person, range);
@@ -3309,7 +3330,8 @@ function sharedDoor(env: Env): SharedDoor {
   const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
   const limits = linkLimiter({ read: env.RL_READ });
   return {
-    key: () => shareKey(env),
+    /* SWITCHING `SHARE_LINKS` OFF CLOSES EVERY OPEN LINK: with no key, no link checks. */
+    key: async () => (sharesOf(env).can ? shareKey(env) : null),
     knows: (record) => directory.knows(record),
     spend: async (key) => {
       try {
@@ -3331,11 +3353,15 @@ function sharedDoor(env: Env): SharedDoor {
 /**
  * `POST /api/openShare` from the owner's session: the record opens the link and this Worker signs it.
  *
- * REFUSED BEFORE THE RECORD WRITES WHEN THERE IS NO KEY, so no `share.open` is written for a link nobody could be handed.
+ * REFUSED BEFORE THE RECORD WRITES WHEN LINKS ARE OFF OR THERE IS NO KEY (`sharesOf`), so no `share.open` is written for
+ * a link nobody could be handed: off, the record itself refuses in the host's sentence once it knows who asked.
  * A refusal from the record passes through as the record sent it, and a link it opened comes back with `token` and
  * `url` (`linkOpened`), whose address is this deployment's own public host.
  */
 async function openShare(inner: Request, env: Env, record: string, ctx: CallContext): Promise<Response> {
+  /* LINKS SWITCHED OFF ARE THE RECORD'S TO SAY, after it has asked who is asking: it reads the same `sharesOf` (its
+     `shares` dependency) and refuses NOT_IN_THIS_BUILD at `host` before it writes anything. */
+  if (!sharesOf(env).can) return forward(inner, env, record, ctx);
   const key = await shareKey(env);
   if (key === null) return json({ ok: false, refusal: NO_SHARE_KEY }, 501);
   const out = await forward(inner, env, record, ctx);
@@ -4021,6 +4047,17 @@ async function signIn(request: Request, env: Env, ctx: ExecutionContext): Promis
      host does not offer until a host serves them (`packages/host/src/auth.ts`). Only the Worker ever will: a self-host
      is made by its operator. */
   const signupPath = url.pathname.replace(/\/+$/, '');
+  /* A STRANGER'S FIRST SENTENCE READ BY THE INCLUDED MODEL (`first-read.ts`), off until `FIRST_READ_DAILY` is set. No
+     reader is built yet (`readSetup`), so the door answers that it is not in this build. */
+  if (signupPath === '/auth/signup/read')
+    return serveFirstRead(
+      request,
+      firstReadDoorOf(env, {
+        origin: `https://${env.PUBLIC_HOST ?? ''}`,
+        readSetup: null,
+        store: { hit: (key, day, most) => directory.firstReadHit(key, day, most) as unknown as Promise<boolean> },
+      }),
+    );
   if (Object.hasOwn(SIGNUP_ROUTES, signupPath)) return signUp(request, env, ctx, signupPath as keyof typeof SIGNUP_ROUTES);
   /* GOOGLE IS ANSWERED HERE FOR THE SAME REASON, and only where sign-in is on and a client is set. Without one the
      rows fall through to `serveAuth`, which answers each as a way in this host does not offer. */

@@ -8,10 +8,12 @@
   promise what installing does not do.
 
   A KENNEL VERSION IS VERIFIED WHEN THE PAGE OPENS: its checksum, and its author's signature when it has one. One that
-  does not verify is refused with its sentence and code and nothing can be pressed. A signed one says whether this
-  browser has seen that key for its author before, loudly when it is a different key; a key its author revoked, or a
-  version that lost the signature earlier ones had, is never offered. The key is kept on first use when the install goes
-  through (`catalogue.ts` `keepFirstKey`), and never written over.
+  does not verify is refused with its sentence and code and nothing can be pressed. A signed one says, in one line under
+  the summary and by the publisher's name (`catalogue.ts` `trustLine`), whether this person has seen that key before:
+  the keys seen are kept on their record (`../known-keys.ts`), so a new phone and the command line read the same trust.
+  A key its author revoked, or a version that lost the signature earlier ones had, is never offered; a different key is
+  not offered until the person presses Trust this key (`trustThisKey`), which keeps it and reads again. The key is kept
+  on first use when the install goes through (`keepFirstKey`), and never written over.
 
   ONE PRIMARY BUTTON: Install, Update, Turn on, or Installed. Install and Update read the record's plan and open the plan
   sheet (`$lib/market/PlanSheet.svelte`); what installs is what the sheet showed (`./offer.ts`). Somebody the
@@ -57,7 +59,8 @@
   import { hostedHere } from '../../../settings/billing.ts';
   import { listWords, moduleTitle, oneOf } from '../../sharing.ts';
   import Preview from '../Preview.svelte';
-  import { browserStore, catalogueText, keepFirstKey, readHostCatalogue, signedWords, trustForEntry, trustWords } from '../catalogue.ts';
+  import { catalogueText, keepFirstKey, readHostCatalogue, signedWords, trustForEntry, trustLine, trustThisKey } from '../catalogue.ts';
+  import { recordKeys } from '../known-keys.ts';
   import { FIXABLE, hasTheme, stageFix } from '$lib/theme/staged.ts';
   import { askOnDecide, diffOf, install, notOwner, planFor, sheetWords, turnOn, turnWords, waitingOf, waitsOf, type OfferClient, type Planned } from './offer.ts';
 
@@ -96,11 +99,15 @@
   /** A Kennel version that did not verify, or a plan or install the record refused. */
   let refused = $state<{ fix: string; code: string | null } | null>(null);
   let trust = $state.raw<Trust | null>(null);
-  const said = $derived(trust && listing ? trustWords(trust, listing.author) : null);
-  const untrusted = $derived(trust?.kind === 'revoked' || trust?.kind === 'stripped');
+  /* THE KEYS SEEN ARE THE RECORD'S, read through the client the page already makes, with this browser behind it on an
+     older record. The client may not be made yet when the file is verified, so one is made for the read. */
+  const keys = recordKeys((name, args) => (client ?? createClient({ base: apiBase() })).call(name, args));
+  const said = $derived(trust && listing ? trustLine(trust, listing.publisher?.name ?? listing.author) : null);
+  /* WITHHELD, as `catalogue.ts` `withheld` says: a revoked key, a lost signature, or a different key until pressed. */
+  const untrusted = $derived(trust?.kind === 'revoked' || trust?.kind === 'stripped' || trust?.kind === 'changed');
   /**
    * The intent a trust state is drawn in. A key its author revoked, or a version that lost the signature earlier ones
-   * had, is never offered, so it is `bad`, the one that needs him; a key that changed is `warn`; a key this browser
+   * had, is never offered, so it is `bad`, the one that needs him; a key that changed is `warn`; a key this person
    * knows is `good`; a first sight, a rotation and an unsigned version are `info`.
    */
   const trustTone = $derived.by((): Tone | null => {
@@ -209,7 +216,7 @@
         const parsed = safeParse(got.text);
         file = { doc: l.kind === 'pack' && parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null, text: got.text };
         reach = v.reach;
-        const t = await trustForEntry(browserStore(), e, v.version, got.signature, kennel?.keys);
+        const t = await trustForEntry(keys, e, v.version, got.signature, kennel?.keys);
         if (!still()) return;
         trust = t;
         if (!v.preview) return;
@@ -305,6 +312,22 @@
     }
   }
 
+  /**
+   * THE OWNER'S PRESS ON A KEY THAT CHANGED: the new key is kept beside the ones seen before, on the record, and the
+   * version is read again, so the line says "as before" and the button is offered. Nothing is kept by itself.
+   */
+  let trusting = $state(false);
+  async function trustKey() {
+    if (!entry || trust?.kind !== 'changed' || trusting) return;
+    trusting = true;
+    try {
+      if (await trustThisKey(keys, `${entry.kind}:${entry.id}`, trust)) load(fileKey);
+      else toasts.push('This key could not be kept, so nothing it signed is offered yet.', { intent: 'warn' });
+    } finally {
+      trusting = false;
+    }
+  }
+
   /** A run refused part way still put updates in: they are named beside the refusal, so nobody finds one moved unsaid. */
   function wentIn(out: { fix: string; first?: readonly string[]; stopped?: string }) {
     if (out.first && out.first.length > 0) toasts.push(turnWords.stoppedAfter(out.first, out.fix, out.stopped), { intent: 'warn' });
@@ -318,7 +341,7 @@
       const out = await install(client, p, states, pref.read().nav ?? [], copy.writeRaced);
       if (out.ok) {
         if (out.nav) pref.write({ nav: out.nav });
-        if (entry && trust) await keepFirstKey(browserStore(), `${entry.kind}:${entry.id}`, trust);
+        if (entry && trust) await keepFirstKey(keys, `${entry.kind}:${entry.id}`, trust);
         /* A run that took other updates in first names them (`offer.ts` `installInTurn`), so nobody finds one moved unsaid. */
         toasts.push(out.first ? turnWords.installedAfter(listing.title, out.first) : copy.shareInstalled(listing.title), { intent: 'good' });
         planned = null;
@@ -372,6 +395,8 @@
     <p class="said" role="status">{words.asked}{#if filed}{' '}<a class="tap" href={at(`/decide/${filed}`)}>{words.openDecide}</a>{/if}</p>
   {:else if action?.kind === 'installed'}
     <Button weight="primary" disabled>{label}</Button>
+  {:else if trust?.kind === 'changed'}
+    <Button disabled={trusting} onclick={() => void trustKey()}>Trust this key</Button>
   {:else if !untrusted}
     <Button weight="primary" disabled={!pressable || planned !== null} onclick={() => void press()}>{label}</Button>
   {/if}

@@ -26,6 +26,8 @@
     onkeydown,
     onfocusout,
     onclick,
+    describedby,
+    invalid = false,
   }: {
     /* WITH NO FALLBACK, because Svelte refuses `bind:value={undefined}` on a prop that has one, and the new-row sheet
        binds a day nobody has typed yet, which is an absent key in its `typed` and not an empty string. */
@@ -42,6 +44,10 @@
     onkeydown?: ((e: KeyboardEvent) => void) | undefined;
     onfocusout?: ((e: FocusEvent) => void) | undefined;
     onclick?: ((e: MouseEvent) => void) | undefined;
+    /** The id of the line under the field that says what is wrong with it, or what it takes. */
+    describedby?: string | undefined;
+    /** The record or the form refused what the box holds. */
+    invalid?: boolean | undefined;
   } = $props();
 
   /* A DAY THE BOX SHOWS WHILE IT IS EMPTY, as an example of the form it reads and not as its label. */
@@ -63,6 +69,8 @@
   type="text"
   autocomplete="off"
   aria-label={label}
+  aria-describedby={describedby}
+  aria-invalid={invalid ? 'true' : undefined}
   placeholder={words.example}
   {autofocus}
   value={text}

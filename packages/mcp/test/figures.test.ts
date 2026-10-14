@@ -153,7 +153,8 @@ test('record_index ASKS THREE METHODS, and reads no page and no figure to name t
   });
   const index = await tools(counted as never).call('record_index', {}, owner);
   assert.ok(index.ok, JSON.stringify(index));
-  assert.deepEqual(asked.sort(), ['boot', 'figures', 'version']);
+  /* THE DOOR'S `beat` IS THE RUN'S HEARTBEAT (`beatOn`), sent and never waited on, and reads nothing to name a figure. */
+  assert.deepEqual(asked.filter((m) => m !== 'beat').sort(), ['boot', 'figures', 'version']);
   sql.close();
 });
 

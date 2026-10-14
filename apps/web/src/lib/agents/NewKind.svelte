@@ -53,7 +53,9 @@
       return;
     }
     sending = true;
-    const out = await fileKind(apiBase(page.url), $state.snapshot(draft) as KindDraft);
+    /* A PLAIN COPY BY HAND, NOT `$state.snapshot`: this form was its only caller, and the clone it brings sits in the
+       Svelte chunk every screen loads, which put the entry script over its debt. */
+    const out = await fileKind(apiBase(page.url), { ...draft, args: draft.args.map((a) => ({ ...a })), tools: [...draft.tools] });
     sending = false;
     if (out.kind === 'refused') refusal = out.fix;
     else filed = out.question ?? '';

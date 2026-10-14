@@ -403,13 +403,33 @@ export function adapterFile(spec: string, cwd: string): string | null {
 const isAdapter = (v: unknown): v is Adapter =>
   isObj(v) && typeof v.source === 'string' && v.source !== '' && typeof v.key === 'string' && v.key !== '' && typeof v.read === 'function' && typeof v.plan === 'function';
 
+/** An add-on's adapter from the catalogue, by its id: the file this machine keeps it in, once it may run. */
+export type AdapterFetch = (id: string) => Promise<{ ok: true; file: string } | { ok: false; fix: string }>;
+
+/**
+ * The file an adapter named on the line is, as `adapterFile` finds it, and then, for an id no `packs/` folder holds,
+ * the copy `fetch` keeps of the add-on's adapter from the catalogue (`adapter-fetch.ts`). `fetched` says which.
+ */
+export async function adapterFileOr(spec: string, cwd: string, fetch?: AdapterFetch): Promise<{ ok: true; file: string; fetched: boolean } | { ok: false; fix: string }> {
+  const file = adapterFile(spec, cwd);
+  if (file !== null) return { ok: true, file, fetched: false };
+  if (fetch === undefined || !PACK_ID.test(spec)) return { ok: false, fix: `${spec} is neither a file nor a pack in packs/ with an adapter.ts in it.` };
+  const got = await fetch(spec);
+  return got.ok ? { ok: true, file: got.file, fetched: true } : got;
+}
+
 /**
  * The adapter and its mapping, loaded, or the sentence saying why not. `map` is `--map`'s file; without it the
- * `map.json` beside the adapter is read, which is where a pack keeps it.
+ * `map.json` beside the adapter is read, which is where a pack keeps it. An adapter from the catalogue is one file, so
+ * its mapping travels inside it as its `map` export, and the folder it is kept in is never read for one.
  */
-export async function loadAdapter(spec: string, o: { cwd: string; map?: string | undefined }): Promise<{ ok: true; adapter: Adapter; map: ImportMap; file: string } | { ok: false; fix: string }> {
-  const file = adapterFile(spec, o.cwd);
-  if (file === null) return { ok: false, fix: `${spec} is neither a file nor a pack in packs/ with an adapter.ts in it.` };
+export async function loadAdapter(
+  spec: string,
+  o: { cwd: string; map?: string | undefined; fetch?: AdapterFetch | undefined },
+): Promise<{ ok: true; adapter: Adapter; map: ImportMap; file: string } | { ok: false; fix: string }> {
+  const found = await adapterFileOr(spec, o.cwd, o.fetch);
+  if (!found.ok) return found;
+  const { file } = found;
   let mod: unknown;
   try {
     mod = await import(pathToFileURL(file).href);
@@ -418,6 +438,12 @@ export async function loadAdapter(spec: string, o: { cwd: string; map?: string |
   }
   const adapter = isObj(mod) ? (mod.default ?? mod.adapter) : undefined;
   if (!isAdapter(adapter)) return { ok: false, fix: `${spec} is not an import adapter: its default export names no source, key, read and plan.` };
+  if (found.fetched && o.map === undefined) {
+    const inside = isObj(mod) ? (isObj(mod.map) ? mod.map : (adapter as unknown as Obj).map) : undefined;
+    if (!isObj(inside)) return { ok: false, fix: `The import adapter of ${spec} carries no mapping. Name one with --map <file>.` };
+    const map = readMap(JSON.stringify(inside), `the adapter of ${spec}`);
+    return map.ok ? { ok: true, adapter, map: map.value, file } : map;
+  }
   const mapFile = o.map !== undefined ? resolve(o.cwd, o.map) : join(dirname(file), 'map.json');
   let text: string;
   try {

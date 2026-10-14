@@ -31,7 +31,6 @@
 
 # ── The things that decide whether a green run means anything ─────────────────────────────────────
 /tools/gates/                       @actuallyhoss
-/tools/gates/clean-room.txt         @actuallyhoss   # maintained by the maintainer alone; never edited in a PR
 /tools/gates/negative/              @actuallyhoss
 /tools/gates/budgets.json           @actuallyhoss
 /.github/workflows/                 @actuallyhoss

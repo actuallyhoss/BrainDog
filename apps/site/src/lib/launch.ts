@@ -16,6 +16,20 @@ export const LAUNCH = {
   cli: false, // the CLI is on npm under the name the docs print
   render: false, // braindog-render is on npm
   legal: false, // the owner's Terms, Privacy and processing texts are in apps/site/legal/
+  public: false, // the site is public: the changelog and its feed are shown
 } as const;
 
 export type LaunchFlag = keyof typeof LAUNCH;
+
+/**
+ * The addresses held until the site is public, his word on W.170: "we didnt even deploy publically yet. remove
+ * those changelog". The source stays (`routes/changelog/entries.ts`); only what a visitor can reach is held.
+ *
+ * A HELD ADDRESS ANSWERS 404 AND WRITES NO FILE, so the site's own 404 page answers it the way it answers any miss
+ * (`not_found_handling` in `wrangler.jsonc`). `nav.ts` drops it from the header, the footer, the 404's list and the
+ * sitemap, and `svelte.config.js` lets the prerender pass over a 404 here and nowhere else.
+ */
+export const HELD = ['/changelog', '/changelog.xml'] as const;
+
+/** Whether the changelog and its feed are held from visitors, for this set of flags. */
+export const held = (launch: { public: boolean } = LAUNCH): boolean => !launch.public;

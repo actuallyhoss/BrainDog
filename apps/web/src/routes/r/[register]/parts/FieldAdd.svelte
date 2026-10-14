@@ -24,6 +24,7 @@
     problems = $bindable([]),
     taken = $bindable({}),
     writing,
+    refused = null,
     addTypedRow,
     closeCreate,
   }: {
@@ -35,9 +36,13 @@
     taken?: Fields;
     /** The add is out, so the button stays down until the record answers. */
     writing: boolean;
+    /** The record's refusal of the last add, drawn under the field it names (`RowForm`), or above the button when it names none. */
+    refused?: { fix: string; at?: string | undefined } | null;
     addTypedRow: () => void;
     closeCreate: () => void;
   } = $props();
+
+  let unnamed = $state<string | null>(null);
 </script>
 
 <Sheet bind:open onclose={closeCreate} title="{said('new_row')} {one}">
@@ -57,7 +62,7 @@
       addTypedRow();
     }}
   >
-    <RowForm {register} bind:problems bind:taken />
+    <RowForm {register} {refused} bind:unnamed bind:problems bind:taken />
   </form>
   {#snippet footer()}
     <!-- A DISABLED CONTROL SAYS WHY IT IS DISABLED, which is `/decide`'s answer to the same
@@ -65,7 +70,7 @@
          answered the press with "nothing was written", true of every submit here, and silent
          about the actual reason. `aria-describedby` points at the sentence so the greying is not
          the only cue. -->
-    {#if problems.length > 0}<p class="drawer-why" id="new-row-why">{problems[0]}</p>{/if}
+    {#if problems.length > 0}<p class="drawer-why" id="new-row-why">{problems[0]}</p>{:else if unnamed}<p class="drawer-why" id="new-row-why" role="alert">{unnamed}</p>{/if}
     <!-- `type="submit"` AND `form`, WHICH IS WHAT MAKES ENTER WORK. `Button` defaults to
          `type="button"`, and this control lives in the Sheet's footer snippet, outside the form
          it submits: a form whose only submit control is elsewhere and unassociated has no submit

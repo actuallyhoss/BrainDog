@@ -630,8 +630,9 @@ test('THE START HOOK SYNCS SKILLS on startup, says so as one count on the card, 
 
   await hook('startup');
   const lines = (written[0] ?? '').split('\n');
-  /* A count, not the sync's lines: they carry file paths, and are not what an agent starts from. */
-  assert.deepEqual(lines, ['BrainDog · run S7 · no project · Claude Code on MacBook', 'More     1 skill · skills sync: 1 change · call context']);
+  /* Never the sync's lines: they carry file paths, and are not what an agent starts from. The stub sends no card (the
+     record draws it, AGT-B07, and counts the skills itself), so the start prints the one line. */
+  assert.deepEqual(lines, ['Connected to BrainDog. Call context.']);
   assert.ok(existsSync(h.global('kiln-release')));
   assert.deepEqual(h.seen.map((s) => s.method), ['attach', 'get']);
   assert.equal(h.seen[1]?.authorization, `Bearer ${TOKEN}`);

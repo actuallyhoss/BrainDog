@@ -18,6 +18,8 @@
 import { integer, lintPart, money, parse, toHTML, type LintFinding, type LintPart, type LintRule } from 'braindog-render';
 import type { BlockResult, PageResult } from '@braindog/kernel';
 
+import type { PagesCensus } from './methods/pages-census.ts';
+
 /** What an answer can say is wrong with itself, beside what render's rules find in what was drawn. A closed list. */
 export type AnswerRule = 'no-reading' | 'refused' | 'none-matched' | 'questions-hidden' | 'no-draw';
 
@@ -318,8 +320,15 @@ export function lintRound(deps: PageLintDeps): PageLintRound {
 
 /* ── the sign ───────────────────────────────────────────────────────────── */
 
+/**
+ * The four counts the pages census adds to the sign (PGS-A01 step 5), as the kernel files them beside its value
+ * (`SIGN_COUNTS` in `kernel/src/signs.ts`): pages with a refused block, pages that print a path that named nothing, pages
+ * the record does not hold, and suggested pages waiting. `suggested_waiting` is left out when nobody counted it.
+ */
+export type PagesCleanCounts = { refused_pages: number; unnamed_pages: number; missing_pages: number; suggested_waiting?: number };
+
 /** A reading of `pages-clean` as the kernel files it (`SignReading`): its six facts are the first findings, then any cut. */
-export type PagesCleanReading = { state: 'green' | 'red' | 'none'; value: number | null; said: string; facts: string[] };
+export type PagesCleanReading = { state: 'green' | 'red' | 'none'; value: number | null; said: string; facts: string[]; counts?: PagesCleanCounts };
 
 const FACTS_MOST = 6;
 const FACT_MOST = 200;
@@ -335,8 +344,18 @@ const fit = (s: string, most: number): string => (s.length <= most ? s : `${s.sl
  * THE GREEN SENTENCE SAYS WHAT WAS READ, never more: "print clean" over cells nobody read was the sign going green on a
  * page that printed a raw time in a table. Cells are named only when a round read some, and a block whose rows were
  * more than `CELLS_ROWS` says so in the facts, after the findings and never in place of all of them.
+ *
+ * WITH THE PAGES CENSUS (`pagesCensus`, read as the system) and the count of suggested pages waiting, the reading also
+ * carries the census's four counts and goes red on a refused block or a path that named nothing (`withCensus`). Without
+ * one, it is the lint's reading exactly as it was.
  */
-export function pagesCleanReading(round: PageLintRound): PagesCleanReading {
+export function pagesCleanReading(round: PageLintRound, census?: PagesCensus, suggested?: number | null): PagesCleanReading {
+  if (census !== undefined) return withCensus(lintReading(round), census, suggested ?? null);
+  return lintReading(round);
+}
+
+/** The round alone, as the sign read before the census: the page lint's findings and nothing else. */
+function lintReading(round: PageLintRound): PagesCleanReading {
   const unread = round.unread > 0 ? ` ${integer(round.unread)} more ${round.unread === 1 ? 'was' : 'were'} not reached in this round.` : '';
   if (round.pages === 0) return { state: 'none', value: null, said: 'There is no page to read yet.', facts: [] };
   const cut = round.cut.map((c) => fit(`${c.part === c.page ? c.page : `${c.page}, ${c.part}`}: only the first ${integer(c.read)} of ${integer(c.held)} were read.`, FACT_MOST));
@@ -351,4 +370,47 @@ export function pagesCleanReading(round: PageLintRound): PagesCleanReading {
     .slice(0, FACTS_MOST - Math.min(cut.length, 1))
     .map((f) => fit(f.part === f.page ? `${f.page}: ${f.said}` : `${f.page}, ${f.part}: ${f.said}`, FACT_MOST));
   return { state: 'red', value: round.findings.length, said: fit(`${head}${unread}`, SAID_MOST), facts: [...found, ...cut].slice(0, FACTS_MOST) };
+}
+
+/* ── the census on the sign ─────────────────────────────────────────────── */
+
+/** How many sentences of facts the census may take when the lint has facts of its own, so neither crowds the other out. */
+const CENSUS_FACTS_SHARED = 3;
+
+const says = (n: number, one: string, many: string, names: readonly string[] = []): string =>
+  n <= 0 ? '' : `${n === 1 ? `1 ${one}` : `${integer(n)} ${many}`}${listed(names)}.`;
+
+/**
+ * The round's reading with the pages census beside it (PGS-A01 step 5): the four counts ride on the reading, and the
+ * sentence names the worst first. A REFUSED BLOCK AND A PATH THAT NAMED NOTHING TURN THE SIGN RED, whatever the lint
+ * found: either is a page that shows its reader less than the record holds. Pages the record does not hold and
+ * suggested pages waiting are said, never judged. The census is the record's own (`pagesCensus`), never a second scan.
+ */
+function withCensus(base: PagesCleanReading, census: PagesCensus, suggested: number | null): PagesCleanReading {
+  const refused = census.pages.filter((p) => p.refused.length > 0);
+  const unnamed = census.pages.filter((p) => p.unresolved.length > 0);
+  const counts: PagesCleanCounts = {
+    refused_pages: Math.max(census.totals.refused, refused.length),
+    unnamed_pages: Math.max(census.totals.unresolved, unnamed.length),
+    missing_pages: census.pages.filter((p) => p.held === 'web').length,
+  };
+  if (suggested !== null && Number.isSafeInteger(suggested) && suggested >= 0) counts.suggested_waiting = suggested;
+  const worst = [
+    says(counts.refused_pages, 'page shows a block that could not be read', 'pages show a block that could not be read', refused.map((p) => p.title)),
+    says(counts.unnamed_pages, 'page prints a path that names nothing', 'pages print a path that names nothing', unnamed.map((p) => p.title)),
+  ].filter((s) => s !== '');
+  const told = [
+    counts.missing_pages > 0 ? `The record does not hold ${counts.missing_pages === 1 ? '1 page' : `${integer(counts.missing_pages)} pages`}.` : '',
+    says(counts.suggested_waiting ?? 0, 'suggested page waits', 'suggested pages wait'),
+  ].filter((s) => s !== '');
+  const red = worst.length > 0 || base.state === 'red';
+  const own = [
+    ...refused.map((p) => fit(`${p.title}: ${p.refused.length === 1 ? 'a block' : `${integer(p.refused.length)} blocks`} could not be read.`, FACT_MOST)),
+    ...unnamed.map((p) => fit(`${p.title} prints ${p.unresolved.slice(0, 3).map((x) => `{{${x}}}`).join(', ')}, naming nothing.`, FACT_MOST)),
+  ];
+  const facts = [...own.slice(0, base.facts.length > 0 ? CENSUS_FACTS_SHARED : FACTS_MOST), ...base.facts].slice(0, FACTS_MOST);
+  if (!red) return { ...base, said: fit([base.said, ...told].join(' '), SAID_MOST), facts, counts };
+  const value = (base.state === 'red' ? (base.value ?? 0) : 0) + counts.refused_pages + counts.unnamed_pages;
+  const said = [...worst, base.state === 'red' ? base.said : '', ...told].filter((s) => s !== '').join(' ');
+  return { state: 'red', value, said: fit(said, SAID_MOST), facts, counts };
 }

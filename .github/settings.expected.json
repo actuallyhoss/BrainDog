@@ -1,0 +1,16 @@
+{
+  "$comment": "What was decided for the repository on GitHub (LCH-C12), read daily by tools/watch/settings.mjs from watch.yml. A setting that drifts from this is a red line. When his click and this file disagree three days running, this file is what changes, with his word. `at: public` is a setting free only once the repository is public (LCH-C16): until then it reads 'waits on going public', not red.",
+  "branch": "master",
+  "rules": ["deletion", "non_fast_forward"],
+  "secret_scanning": { "want": "enabled", "at": "public" },
+  "push_protection": { "want": "enabled", "at": "public" },
+  "validity_checks": { "want": "enabled", "at": "public" },
+  "private_reporting": { "want": true, "at": "public" },
+  "ci_runner": "ubuntu-latest",
+  "runners": 0,
+  "wiki": false,
+  "discussions": false,
+  "description": { "from": "README.md" },
+  "reviewers": { "production": 0 },
+  "open_alerts": { "severity": ["high", "critical"], "most": 0 }
+}

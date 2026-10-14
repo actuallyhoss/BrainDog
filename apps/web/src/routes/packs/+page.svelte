@@ -60,7 +60,8 @@
   import { drew } from '../../lib/ui/screen.svelte.ts';
   import { hostedHere } from '../settings/billing.ts';
   import InstallShared from './InstallShared.svelte';
-  import { browserStore, catalogueTitles, fileProposal, keepFirstKey, readHostCatalogue, trustForEntry, updatesFor } from './browse/catalogue.ts';
+  import { catalogueTitles, fileProposal, keepFirstKey, readHostCatalogue, trustForEntry, updatesFor, withheld } from './browse/catalogue.ts';
+  import { recordKeys } from './browse/known-keys.ts';
   import { askOnDecide, diffOf, install, installInTurn, notOwner, planFor, turnWords, type Offered, type OfferClient, type Planned } from './browse/[id]/offer.ts';
   import { words } from './words.ts';
   import { glyphOf } from './glyph.ts';
@@ -99,6 +100,9 @@
   let busy = $state<string | null>(null);
   let source: Source | null = null;
   let client = $state.raw<OfferClient | null>(null);
+  /* THE PUBLISHER KEYS THIS RECORD HAS SEEN are the record's (`packs.known_keys`), so a key trusted on one device is
+     known on every other, and a changed key is held back here as on the add-on's own page. */
+  const keys = recordKeys((name, args) => (client ?? createClient({ base: apiBase() })).call(name, args));
   /** True once the record answered. Until then, and after a refusal, nothing below the refusal is drawn. */
   const live = $derived(states !== null);
   const installed = $derived(states ?? []);
@@ -295,7 +299,6 @@
     if (!index) return bundled;
     const out = await updatesFor(fetch, index, held);
     unverified = out.refused;
-    const store = browserStore();
     const fromKennel = await Promise.all(
       out.updates.map(async (u: CatalogueUpdate): Promise<Update> => ({
         key: `${u.entry.kind}:${u.entry.id}`,
@@ -307,11 +310,12 @@
         source: 'kennel',
         file: { doc: u.file.kind === 'pack' ? u.file.file.doc : null, text: u.text },
         entry: u.entry,
-        trust: await trustForEntry(store, u.entry, u.to.version, u.signature, index.keys),
+        trust: await trustForEntry(keys, u.entry, u.to.version, u.signature, index.keys),
       })),
     );
     const taken = new Set(fromKennel.map((u) => u.key));
-    return [...bundled.filter((u) => !taken.has(u.key)), ...fromKennel];
+    /* AN UPDATE SIGNED BY A CHANGED, TAKEN BACK OR STRIPPED KEY is not offered (`withheld`). */
+    return [...bundled.filter((u) => !taken.has(u.key)), ...fromKennel.filter((u) => !withheld(u.trust))];
   }
 
   /**
@@ -378,7 +382,7 @@
     sheet = null;
     if (out.ok) {
       if (out.nav) pref.write({ nav: out.nav });
-      if (u?.entry && u.trust) await keepFirstKey(browserStore(), u.key, u.trust);
+      if (u?.entry && u.trust) await keepFirstKey(keys, u.key, u.trust);
       toasts.push(words.installed(title), { intent: 'good' });
       return true;
     }
@@ -424,7 +428,7 @@
     sheet = null;
     if (out.ok) {
       if (out.nav) pref.write({ nav: out.nav });
-      if (u.entry && u.trust) await keepFirstKey(browserStore(), u.key, u.trust);
+      if (u.entry && u.trust) await keepFirstKey(keys, u.key, u.trust);
       toasts.push(out.first ? turnWords.installedAfter(u.title, out.first) : words.installed(u.title), { intent: 'good' });
       return true;
     }

@@ -8,9 +8,14 @@
  * AN ENTRY'S ID IS ITS PERMALINK, the address `log.ts` gives the page's own anchor, so a reader who
  * follows an item lands on that entry and a feed reader never sees one entry under two ids. The
  * entries carry a date and no time, so each is stamped at midnight UTC on its day.
+ *
+ * HELD WITH THE PAGE until the site is public (`HELD` in `launch.ts`): while held it answers 404, so no
+ * `changelog.xml` is written and the site's 404 page answers the address. Imported by path and not through
+ * `$lib`, so a test can call `_feed` under plain Node with a copy of the flags.
  */
-import { site } from '$lib/copy.ts';
-import { FEED } from '$lib/links.ts';
+import { site } from '../../lib/copy.ts';
+import { LAUNCH, held } from '../../lib/launch.ts';
+import { FEED } from '../../lib/links.ts';
 import { ITEMS } from '../changelog/log.ts';
 
 export const prerender = true;
@@ -25,7 +30,9 @@ const esc = (s: string): string =>
 
 const stamp = (date: string): string => `${date}T00:00:00Z`;
 
-export const GET = (): Response => {
+/** The feed's answer under these flags: the Atom document while it is shown, and not found while it is held. */
+export const _feed = (launch: { public: boolean }): Response => {
+  if (held(launch)) return new Response('Not found', { status: 404, headers: { 'content-type': 'text/plain; charset=utf-8' } });
   const copy = site.changelog;
   const newest = ITEMS[0]?.date ?? '1970-01-01';
 
@@ -61,3 +68,5 @@ export const GET = (): Response => {
 
   return new Response(body, { headers: { 'content-type': 'application/atom+xml; charset=utf-8' } });
 };
+
+export const GET = (): Response => _feed(LAUNCH);

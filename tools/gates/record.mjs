@@ -307,9 +307,10 @@ export async function startRecord(port = 0, { open = false, origin, variant, var
        not reached", which is a finding on any route outside `MAY_REFUSE` (`lib.mjs`). `routes.mjs` samples this key. */
     const saved = running.api.kernel.saveView(VIEW, { actor: 'p_seed' });
     if (!saved.ok) throw new Error(`the gate's record could not save its view: ${saved.refusal?.fix ?? 'no reason given'}`);
-    /* A QUEUE OF ITS OWN, ASKED FOR BY `queue.mjs` ALONE, SO IT HAS ONE TO PRESS. The seeded Agents page stopped drawing
-       one at agents 1.5.0, since it repeated Decide, and every other seeded queue is filtered to a list the seed's
-       questions are not about. No other gate's record holds it, so their sweeps measure the seed as it ships. */
+    /* A QUEUE OF ITS OWN, ASKED FOR BY `queue.mjs` AND `keys.mjs` ALONE, SO EACH HAS ONE TO PRESS. The seeded Agents page
+       stopped drawing one at agents 1.5.0, since it repeated Decide, Money's went to Decide at money-core 3.17.0, and
+       every other seeded queue is filtered to a list the seed's questions are not about. No sweeping gate's record holds
+       it, so their sweeps measure the seed as it ships. */
     const queued = !queuePage ? { ok: true } : await running.api.kernel.install([
       {
         id: 'page.questions',

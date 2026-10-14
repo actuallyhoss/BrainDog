@@ -313,6 +313,8 @@ jobs:
       - run: node --test tools/look/test/*.test.mjs tools/look/*.test.mjs
       # AND THE CANARY'S (PRF-A09): `tools/canary` is no workspace either.
       - run: node --test tools/canary/test/*.test.mjs
+      # AND THE STRANGER'S DRILL (LCH-A03), whose lane step is the canary's: `tools/drill` is no workspace either.
+      - run: node --test tools/drill/*.test.mjs
       # AND THE WATCH'S (LCH-C01): `tools/watch` is no workspace either, and its test is run by nothing else.
       - run: node --test tools/watch/*.test.mjs
       # AND THE DOOR CHECK'S RUNNER (`tools/door-check`), on every push and not only the nightly.

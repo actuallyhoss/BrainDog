@@ -28,6 +28,7 @@
     RUNS_READ, connectLines, connected, nameOf, reachKey, reachOf, reportKeyOf,
     runName, runsOf, standing, waiting, type Connection, type DeviceRow, type Run, type TokenRow,
   } from '$lib/record/device.ts';
+  import { lineOf, partsOf } from '$lib/record/apps.ts';
   import { planOf, revoke, words as vaultWords, type Plan } from '$lib/record/vault.ts';
   /* THE SIX-DIGIT FIELD, ONE COMPONENT that Home's connect sheet draws too; it approves through `vault.ts` `approve`,
      the approval `/vault` sends, so the screens cannot drift apart. */
@@ -214,7 +215,7 @@
    * separator leading the next line. A grant that is waiting or finished says only that: "never used"
    * beside "turned away" says nothing more.
    */
-  function factsOf(c: Connection, nowMs: number): string[] {
+  function factsOf(c: Connection, nowMs: number, idle: number | null): string[] {
     if (c.machine?.ended_by === 'operator' || c.token?.ended_by === 'operator') return [copy.endedByOperator];
     const status = c.machine?.status;
     if (status === 'pending' || status === 'expired' || status === 'denied' || status === 'revoked') return [copy.deviceState[status] ?? status];
@@ -224,7 +225,8 @@
        `device.ts` declares, so it is read here as the optional it is. */
     const whose = (c.token as { person_name?: string | null } | null | undefined)?.person_name;
     if (whose) facts.push(ownWords.madeBy(whose));
-    facts.push(c.used ? copy.usedWhen(since(c.used, nowMs)) : copy.neverUsed);
+    /* A CONNECTION GONE QUIET FOR OVER A WEEK SAYS SO IN ITS OWN MARKED WORDS on the row, so not twice here. */
+    if (idle === null) facts.push(c.used ? copy.usedWhen(since(c.used, nowMs)) : copy.neverUsed);
     if (c.token?.expires_at) facts.push(copy.endsWhen(relative(c.token.expires_at.slice(0, 10), nowMs)));
     return facts;
   }
@@ -386,6 +388,7 @@
       <ul class="whos">
         {#each rows as c (c.key)}
           {@const scope = scopeOf(c)}
+          {@const parts = partsOf(c, nowMs)}
           <li class="who" data-done={c.live ? undefined : ''}>
             <!-- A RUN'S FACE WHERE A RUN USED IT, its ring the run's state (at work, quiet, stopped); a well otherwise,
                  amber only on the machine waiting for the reader's six digits. -->
@@ -396,10 +399,14 @@
             {/if}
             <span class="who-words">
               <!-- `dir="auto"`: an app names itself, in whatever script it chose. -->
-              <span class="who-name" dir="auto">{nameOf(c)}</span>
+              <span class="who-name" dir="auto">{parts.app}</span>
+              <!-- WHERE IT RUNS AND HOW IT CAME IN, one quieter line: "On Studio, signed in", "A key you made". -->
+              <span class="who-detail" dir="auto">{lineOf(c, parts)}</span>
               {#if !scope.whole}<span class="who-detail who-reach">{reachOf(c)}</span>{/if}
               <span class="who-detail who-facts">
-                {#each factsOf(c, nowMs) as fact}<span>{fact}</span>{/each}
+                <!-- UNUSED FOR OVER A WEEK: the warn tone, and its mark beside the words, never the colour alone. -->
+                {#if parts.idle !== null}<span class="who-idle"><span role="img" aria-label={TONES.warn.label}>{TONES.warn.glyph}</span> {copy.notUsedFor(parts.idle)}</span>{/if}
+                {#each factsOf(c, nowMs, parts.idle) as fact}<span>{fact}</span>{/each}
                 <!-- THE RUN THAT LAST USED IT, BY THE NAME ITS WRITES ARE SIGNED WITH, and a link to what it did. `.tap`
                      because `S47` in small text is a target far under a thumb's 44px. -->
                 {#if c.run}<span>{copy.lastRun} <a class="run tap" href={at(`/r/session/${c.run.seq}`)}>{runName(c.run)}</a></span>{/if}
@@ -544,6 +551,11 @@
      the second ink rather than the quiet one. */
   .who-reach {
     color: var(--ink2);
+  }
+
+  /* A CONNECTION NOBODY HAS USED FOR OVER A WEEK: worth a look, so the warn tone, with its mark. */
+  .who-idle {
+    color: var(--warn);
   }
 
   /* WHAT IT CAN DO, IN TWO WORDS, at the end of the row where the eye runs down the list. */

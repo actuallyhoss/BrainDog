@@ -24,6 +24,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 
+import { held } from '../src/lib/launch.ts';
 import { BUILD, missing, when } from './built.ts';
 
 /**
@@ -36,19 +37,20 @@ import { BUILD, missing, when } from './built.ts';
  * backtick, a dead href or a missing picture. It is prerendered from `src/routes/404` through the
  * same layout as the rest, so it carries the same nav, the same footer and the same risks.
  */
-const REQUIRED = [
+const REQUIRED: readonly string[] = [
   'index.html',
   'slash.html',
   'agents.html',
   'packs.html',
   'pricing.html',
   'docs.html',
-  'changelog.html',
+  /* Only once the site is public: until `LAUNCH.public` the changelog is held and the build writes none. */
+  ...(held() ? [] : ['changelog.html']),
   'support.html',
   'security.html',
   'legal.html',
   '404.html',
-] as const;
+];
 
 const NO_BUILD = missing(REQUIRED);
 

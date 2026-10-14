@@ -570,6 +570,12 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
    * that is not a fault. THE DAY `pref.ts` KEEPS ITS COPY, TAKE IT OUT OF HERE and give it a case with `record: true`
    * beside `look.contrast`'s, measuring the plate on a row's own words.
    *
+   * `packs.known_keys` IS EXCUSED BECAUSE IT IS A MEMORY, NOT A LOOK (batch 97, publisher-trust-97). It maps each add-on
+   * to the publisher keys the person has already trusted for it, so Browse can say when a key changed; two loads that
+   * differ only in it draw the same page until a key changes, which no fixture loading a URL can stage. What it does is
+   * tested where it is read: `apps/web/src/routes/packs/browse/known-keys.test.ts`, and its value check in the record's
+   * `setPref`.
+   *
    * `notify.muted` IS EXCUSED BECAUSE THE RECORD APPLIES IT, NOT THE PAGE. The record drops a muted rule's notes from what
    * it answers (`mutedFor`), reading the mutes it keeps, so what it changes is the record's answer and not a page load;
    * a case here would be asking the record's question of a screen. The test
@@ -581,7 +587,7 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
    * anybody from looking (`loop/research-audit-11-13.md`). Whether a muted note leaves Today is the record's to test, where
    * the activity block is built: `packages/record/test/activity-muted.test.ts`.
    */
-  const RECORD_EXCUSED = new Set(['nav.order', 'nav.hidden', 'notify.muted', 'look.shot']);
+  const RECORD_EXCUSED = new Set(['nav.order', 'nav.hidden', 'notify.muted', 'look.shot', 'packs.known_keys']);
   const recordSrc = await readFile(join(root, 'packages', 'record', 'src', 'index.ts'), 'utf8').catch(() => '');
   const keysSaid = /export const PREF_KEYS = \[([^\]]*)\]/u.exec(recordSrc)?.[1];
   const RECORD_KEYS = keysSaid === undefined ? [] : [...keysSaid.matchAll(/'([^']+)'/gu)].map((m) => m[1]);

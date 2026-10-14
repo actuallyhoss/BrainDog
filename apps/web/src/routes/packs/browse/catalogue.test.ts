@@ -26,7 +26,9 @@ import {
   signedWords,
   standingOf,
   trustFor,
+  trustLine,
   trustWords,
+  withheld,
   updateProposal,
   updatesFor,
   type KeyStore,
@@ -525,4 +527,37 @@ test('from-packs --check writes nothing, exits 1 naming an unpublished change, a
   const emptied = run(packs, to, '--check');
   assert.equal(emptied.code, 1);
   assert.match(emptied.said, /packs\/shelf has no test/u);
+});
+
+test('the line under an add-on\'s name names its publisher, never a key, in one of three sentences, and a changed key is withheld until pressed', async () => {
+  const key = await newAuthorKey('Halden');
+  const { entry } = await servedAddon(key);
+  const signature = entry.versions[0]!.signature!;
+  const store = memoryStore();
+
+  const first = await trustFor(store, 'Halden', signature);
+  assert.deepEqual(trustLine(first, 'Halden Press'), { text: 'First add-on you have seen from Halden Press', loud: false });
+  assert.equal(withheld(first), false);
+  await keepFirstKey(store, 'Halden', first);
+  const known = await trustFor(store, 'Halden', signature);
+  assert.deepEqual(trustLine(known, 'Halden Press'), { text: 'Signed by Halden Press, as before', loud: false });
+
+  const other = await newAuthorKey('Mallory');
+  const changed = await trustFor(store, 'Halden', { ...signature, key_id: other.key_id });
+  const said = trustLine(changed, 'Halden Press');
+  assert.deepEqual(said, { text: 'Signed by a different key than before', loud: true });
+  assert.equal(withheld(changed), true);
+  for (const t of [first, known, changed]) assert.doesNotMatch(trustLine(t, 'Halden Press').text, /[0-9a-f]{16}|—/u);
+  assert.equal(withheld({ kind: 'revoked', key_id: key.key_id, reason: 'Lost.' }), true);
+  assert.equal(withheld({ kind: 'stripped', before: [key.key_id] }), true);
+  assert.equal(withheld({ kind: 'rotated', key_id: key.key_id, from: other.key_id }), false);
+  assert.equal(withheld(null), false);
+
+  const { readFileSync } = await import('node:fs');
+  const detail = readFileSync(new URL('./[id]/+page.svelte', import.meta.url), 'utf8');
+  assert.match(detail, /recordKeys\(/u);
+  assert.match(detail, /trustLine\(/u);
+  assert.match(detail, /trustThisKey\(/u);
+  assert.match(detail, /Trust this key/u);
+  assert.doesNotMatch(detail, /trustForEntry\(browserStore\(\)/u);
 });

@@ -28,6 +28,7 @@ import { inputsFault } from './inputs.ts';
 import { linkFault } from './links.ts';
 import { embedFault } from './embed.ts';
 import { lanesFault } from './lanes.ts';
+import type { Action } from './actions.ts';
 
 /**
  * `page` is set by a page's own evaluator and never by a write-up. It admits the page-only kinds
@@ -64,6 +65,8 @@ export type Block = {
   heading?: string;
   tone?: Tone;
   rows: Row[];
+  /** A declared block's actions, cut by the page read to what this reader may press (PGS-A12). Never parsed: a fence an author typed has none. */
+  actions?: readonly Action[];
   /** The raw fence, kept so a degraded sibling can show exactly what the author typed. */
   raw: string;
   start: number;

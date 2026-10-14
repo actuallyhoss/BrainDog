@@ -18,10 +18,19 @@
  * kind added last month. A list of keys to take off leaks the first key nobody thought of, so `shownBlock` builds each
  * block from nothing: how it is drawn (`LOOKS`), what the record computed that names no row (`FIGURES`), and each row's
  * own values of the fields the block draws, by field type (`SHOWN_TYPES`). A kind that writes, links, or reads across
- * the record is drawn as its heading and nothing else (`HEADING_ONLY`, `ACROSS`).
+ * the record is not sent at all (`HEADING_ONLY`, `ACROSS`): its heading alone would say "Nothing is waiting on you"
+ * about a record where things are.
+ *
+ * AND IT TELLS THE TRUTH (USE-A07). Every cell carries its type and its value, money whole as minor units and its own
+ * currency; every column and figure carries the label the owner reads; a `{{path}}` in the owner's words is filled here
+ * in the record's language, and one with nothing to fill prints nothing; and the answer says the record's language and
+ * zone, so a stranger's device does not decide how a number or a day reads.
+ *
+ * ONLY WHERE THE HOST SAYS IT CAN. `shareable` asks the host (`shares` in the record's dependencies), and a host that
+ * never said is a host that cannot, so links ship switched off until somebody switches them on.
  */
 
-import { instant, ulids, type BlockResult, type Entry, type FieldType, type Json, type PageResult, type RegisterDecl } from '@braindog/kernel';
+import { exponentOf, instant, ulids, type BlockResult, type Entry, type FieldType, type Json, type PageResult, type RegisterDecl } from '@braindog/kernel';
 import type { Refusal, Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
 
@@ -63,8 +72,32 @@ export type SharedPage = {
   layout: { rail?: number; sticky?: boolean } | null;
   /** When the link stops opening, so the reader can say so. */
   expires_at: string;
+  /** The record's language (a BCP 47 tag) and its zone (an IANA name), which a number, an amount and a day are read in. */
+  language: string;
+  zone: string;
+  /** One calm line when no block of the page can be shown through a link, and `null` while one can. */
+  empty: string | null;
   blocks: Record<string, unknown>[];
 };
+
+/**
+ * One cell of a shared row: the field's type and its value, as the owner's own table reads it. Money is
+ * `{ amount, currency }` in minor units, never added to another; a choice carries the word the owner reads for it; a
+ * list says the type of what it holds.
+ */
+export type SharedCell = { type: FieldType; of?: FieldType; value: Json; label?: string };
+
+/** The host's answer to whether it can make a read-only link, and why not (`sharesOf` at the Worker's door). */
+export type SharesAnswer = { can: boolean; why?: string };
+
+/** What `shareable` says on a host that never answered, or said no without a sentence. */
+export const SHARES_OFF = 'Read-only links are switched off on this BrainDog.';
+
+/** What `shareable` says to an owner who is not signed in, as `openShare` refuses her. */
+const SHARES_SIGNED_IN = 'A link can be read from anywhere, so opening one needs the owner signed in. Open this from the app.';
+
+/** The one line a shared page says when none of its blocks can be shown. */
+export const NOTHING_SHOWN = 'This page has nothing a link can show.';
 
 /** How a block is drawn: the owner's words on the page and where they sit. None names a list, a field, a row or a page. */
 const LOOKS = ['kind', 'heading', 'span', 'area', 'tone', 'lead', 'range', 'tiles', 'who', 'box', 'fold', 'icon', 'empty', 'body'] as const;
@@ -80,7 +113,7 @@ const FIGURES = [
 ] as const;
 
 /**
- * The kinds drawn as their heading and nothing else. `capture` and `inputs` write; a `link` block is links; `feed`,
+ * The kinds a link never sends, not even their heading. `capture` and `inputs` write; a `link` block is links; `feed`,
  * `queue` and `agents` read the whole record's log and questions and name rows of every list; a `diff` names who
  * changed a row and when.
  */
@@ -98,16 +131,19 @@ const SHOWN_TYPES: ReadonlySet<FieldType> = new Set<FieldType>([
   'text', 'int', 'duration', 'decimal', 'money', 'quantity', 'day', 'instant', 'bool', 'enum', 'email',
 ]);
 
-/** What a block the record could not draw for the owner says on a shared page: the owner's sentence could name a list. */
-const NOT_SHOWN: Refusal = { code: 'FORBIDDEN', fix: 'This part of the page cannot be shown through a link.' };
-
 const isRecord = (x: unknown): x is Record<string, unknown> => x !== null && typeof x === 'object' && !Array.isArray(x);
 
 /** A plain value: a string, a number, a boolean or null. Anything with keys is a level this page does not go down. */
 const isScalar = (x: unknown): x is string | number | boolean | null => x === null || ['string', 'number', 'boolean'].includes(typeof x);
 
-/** An address into this BrainDog, a path or a fragment, which is a link to another page or row and never shown. */
-const inside = (x: unknown): boolean => typeof x === 'string' && /^\s*[/#]/u.test(x);
+/** A ULID, the shape of every id the record mints: a row's, a link's, an event's. */
+const ULID = /^[0-9A-HJKMNP-TV-Z]{26}$/u;
+
+/**
+ * An address into this BrainDog, a path or a fragment, which is a link to another page or row, or an id the record
+ * minted, which names one. Neither is ever shown.
+ */
+const inside = (x: unknown): boolean => typeof x === 'string' && (/^\s*[/#]/u.test(x) || ULID.test(x.trim()));
 
 /**
  * The owner's words with every link into this BrainDog left as its words: `[the handbook](/p/handbook)` is shown as
@@ -118,36 +154,160 @@ const wordsShown = (text: string): string => text.replace(/\[([^\]]*)\]\(\s*[/#]
 /** An address that leaves this BrainDog: the only kind of `url` value a shared row keeps. */
 const outward = (x: unknown): boolean => typeof x === 'string' && /^(?:https:\/\/|mailto:)/iu.test(x.trim());
 
+/** Money rebuilt from nothing: a whole number of minor units and its own three-letter currency, and no other key. */
+const moneyShown = (x: unknown): { amount: number; currency: string } | undefined =>
+  isRecord(x) && Number.isSafeInteger(x.amount) && typeof x.currency === 'string' && /^[A-Z]{3}$/u.test(x.currency)
+    ? { amount: x.amount as number, currency: x.currency }
+    : undefined;
+
+/** A quantity rebuilt from nothing: its number and its unit. */
+const quantityShown = (x: unknown): { value: number; unit: string } | undefined =>
+  isRecord(x) && typeof x.value === 'number' && Number.isFinite(x.value) && typeof x.unit === 'string' && !inside(x.unit)
+    ? { value: x.value, unit: x.unit }
+    : undefined;
+
+/** One value of a type a link shows, or `undefined`. Money and a quantity are the two kept whole, each rebuilt. */
+const oneShown = (type: FieldType, value: unknown): Json | undefined => {
+  if (!SHOWN_TYPES.has(type)) return undefined;
+  if (type === 'money') return moneyShown(value);
+  if (type === 'quantity') return quantityShown(value);
+  return isScalar(value) && !inside(value) ? value : undefined;
+};
+
 /** One field's value as a shared row shows it, or `undefined` for a value it does not. */
 const valueShown = (field: RegisterDecl['fields'][number], value: Json | undefined): Json | undefined => {
   if (value === undefined) return undefined;
   if (field.type === 'url') return outward(value) ? value : undefined;
   if (field.type === 'list') {
-    if (field.of === undefined || !SHOWN_TYPES.has(field.of) || !Array.isArray(value)) return undefined;
-    return value.filter((v) => isScalar(v) && !inside(v));
+    const of = field.of;
+    if (of === undefined || !SHOWN_TYPES.has(of) || !Array.isArray(value)) return undefined;
+    return value.map((v) => oneShown(of, v)).filter((v) => v !== undefined);
   }
-  if (!SHOWN_TYPES.has(field.type) || !isScalar(value)) return undefined;
-  return inside(value) ? undefined : value;
+  return oneShown(field.type, value);
 };
 
+/** A plain value, or a list of them: what the older reader of `fields` draws, which never held an amount. */
+const plain = (v: Json): boolean => isScalar(v) || (Array.isArray(v) && v.every(isScalar));
+
 /**
- * One row as a shared page shows it: the values of the fields the block draws, and its state. No id, no list, no number,
- * no version and no instants, so nothing on it names the row or leads to it.
+ * One row as a shared page shows it: each cell of the fields the block draws with its type (`cells`), and its state. No
+ * id, no list, no number, no version and no instants, so nothing on it names the row or leads to it.
+ *
+ * `fields` IS THE SAME ROW AS PLAIN VALUES, for the reader that predates `cells` (`share-write.ts`), so money is in
+ * `cells` alone: that reader drew an amount blank, and would draw an object as its braces.
  */
 const rowShown = (row: Entry, drawn: readonly string[], lists: ReadonlyMap<string, RegisterDecl>) => {
   const decl = lists.get(row.register);
   const fields: Record<string, Json> = {};
+  const cells: Record<string, SharedCell> = {};
   for (const id of drawn) {
     const field = decl?.fields.find((f) => f.id === id);
     if (field === undefined || !Object.hasOwn(row.fields, id)) continue;
     const shown = valueShown(field, row.fields[id]);
-    if (shown !== undefined) fields[id] = shown;
+    if (shown === undefined) continue;
+    if (plain(shown)) fields[id] = shown;
+    const word = field.type === 'enum' && typeof shown === 'string' ? field.labels?.[shown] : undefined;
+    cells[id] = { type: field.type, ...(field.type === 'list' && field.of !== undefined ? { of: field.of } : {}), value: shown, ...(word === undefined ? {} : { label: word }) };
   }
-  return { fields, state: row.state };
+  return { fields, cells, state: row.state };
 };
 
-/** A column as a shared block keeps it: the field it draws, its label, its role and its money sign. */
-type ColumnShown = { field: string; label?: string; as?: string; sign?: { field: string; minus: string } };
+/** A field or figure id said as words, for one the owner gave no label: `due_on` is "Due on", as the app says it. */
+const idSaid = (id: string): string => {
+  const spaced = id.replace(/[_-]+/gu, ' ').trim();
+  return spaced === '' ? '' : spaced[0]!.toUpperCase() + spaced.slice(1);
+};
+
+/** The keys of a figure's reading that name no row: its number, its counts, its verdict and how its money was read. */
+const READING_KEPT = ['value', 'unit', 'rows', 'held', 'delta', 'met', 'unsaid', 'atLeast', 'fx', 'targetIn', 'as_of', 'current', 'more', 'halves', 'trend', 'beyond'] as const;
+
+/** Each amount of a figure in parts, rebuilt as money is. */
+const partsShown = (x: unknown) => (Array.isArray(x) ? x.map(moneyShown).filter((m) => m !== undefined) : undefined);
+
+/**
+ * A figure's reading built from nothing. Left off: `backs`, the handles of the rows a sum added (`invoices#2`), and
+ * `crossed`, the id of the row a running total reached its line at, which each name a row and its list; `refusals` and
+ * `why`, which can name a list or a field. A part keyed by a row's id (a grouping by a `ref`) is keyed by its words.
+ */
+const readingShown = (reading: unknown): Record<string, unknown> | null => {
+  if (!isRecord(reading)) return null;
+  const kept: Record<string, unknown> = {};
+  for (const key of READING_KEPT) if (reading[key] !== undefined) kept[key] = reading[key];
+  const parts = partsShown(reading.parts);
+  if (parts !== undefined) kept.parts = parts;
+  const noRate = partsShown(reading.noRate);
+  if (noRate !== undefined) kept.noRate = noRate;
+  if (Array.isArray(reading.groups))
+    kept.groups = reading.groups.filter(isRecord).map((g) => {
+      const label = typeof g.label === 'string' && !inside(g.label) ? g.label : undefined;
+      const key = typeof g.key === 'string' && !inside(g.key) ? g.key : (label ?? '');
+      const gParts = partsShown(g.parts);
+      return { key, ...(label === undefined ? {} : { label }), value: g.value, rows: g.rows, state: g.state, ...(gParts === undefined ? {} : { parts: gParts }) };
+    });
+  kept.refusals = [];
+  return kept;
+};
+
+/** A tag the runtime's `Intl` takes, or `en` for one it does not, so a record's odd tag never throws on a read. */
+const languageOf = (tag: unknown): string => {
+  try {
+    return typeof tag === 'string' && tag !== '' ? (Intl.getCanonicalLocales(tag)[0] ?? 'en') : 'en';
+  } catch {
+    return 'en';
+  }
+};
+
+/** Minor units as a decimal string, `-123456` at exponent 2 is `-1234.56`, so no amount passes through a float. */
+const decimalOf = (amount: number, exponent: number): string => {
+  const digits = Math.abs(amount).toString().padStart(exponent + 1, '0');
+  const whole = exponent === 0 ? digits : `${digits.slice(0, -exponent)}.${digits.slice(-exponent)}`;
+  return amount < 0 ? `-${whole}` : whole;
+};
+
+/**
+ * One `{{path}}` value as the owner's words print it in the record's language, or `undefined` for one they do not:
+ * an amount with its currency, a figure in several currencies as each amount in turn and never their sum, a number,
+ * and words. An address or an id is no value here.
+ */
+const saidIn = (language: string) => {
+  const amount = (m: { amount: number; currency: string }): string => {
+    const exponent = exponentOf(m.currency);
+    const format = new Intl.NumberFormat(language, { style: 'currency', currency: m.currency, minimumFractionDigits: exponent, maximumFractionDigits: exponent });
+    return format.format(decimalOf(m.amount, exponent) as `${number}`);
+  };
+  return (v: Json | undefined): string | undefined => {
+    if (typeof v === 'string') return inside(v) ? undefined : wordsShown(v);
+    if (typeof v === 'number') return Number.isFinite(v) ? new Intl.NumberFormat(language).format(v) : undefined;
+    const one = moneyShown(v);
+    if (one !== undefined) return amount(one);
+    if (Array.isArray(v) && v.length > 0) {
+      const each = v.map(moneyShown);
+      return each.every((m) => m !== undefined) ? each.map((m) => amount(m!)).join(', ') : undefined;
+    }
+    return undefined;
+  };
+};
+
+/**
+ * The owner's words with every `{{path}}` filled, and one the record holds nothing for printing nothing at all. ONLY THE
+ * SPACE AROUND AN EMPTIED PATH CLOSES UP: the rest of her words keep their spacing, which in a note's body is a nested
+ * list's indent and a line's break.
+ */
+const filledIn = (text: string, values: Record<string, Json>, said: (v: Json | undefined) => string | undefined): string => {
+  if (!text.includes('{{')) return text;
+  const out = text.replace(/([ \t]*)\{\{\s*([^}]*?)\s*\}\}([ \t]*)/gu, (_whole, before: string, key: string, after: string) => {
+    const v = said(Object.hasOwn(values, key) ? values[key] : undefined);
+    if (v !== undefined && v !== '') return `${before}${v}${after}`;
+    return before !== '' && after !== '' ? before : `${before}${after}`;
+  });
+  return text.trim() === text ? out.trim() : out;
+};
+
+/** What one block is shown with: the lists' declarations, a figure's name, and how a value is said in the record's language. */
+type Showing = { lists: ReadonlyMap<string, RegisterDecl>; figure: (metric: string) => string | undefined; said: (v: Json | undefined) => string | undefined };
+
+/** A column as a shared block keeps it: the field it draws, the label the owner reads, its role and its money sign. */
+type ColumnShown = { field: string; label: string; as?: string; sign?: { field: string; minus: string } };
 
 /** A walk's step without the list and the row it came from (`source`, `spoken`). */
 const stepShown = (step: unknown) => {
@@ -166,27 +326,36 @@ const walkShown = (walk: unknown) => {
   return kept;
 };
 
+/** The keys of `LOOKS` that hold the owner's words, which a `{{path}}` is filled in. */
+const WORDS = ['heading', 'lead', 'empty', 'body'] as const;
+
 /**
- * One block as a shared page shows it, built from nothing (this file's header says why).
+ * One block as a shared page shows it, built from nothing (this file's header says why), or `null` for a block the link
+ * hides, which is not sent at all: a kind that writes, links or reads across the record, and a block the record could
+ * not draw for the owner, whose sentence could name a list.
  *
  * THE FIELDS A ROW KEEPS ARE THE ONES THE BLOCK'S COLUMNS DRAW, and the list's title field for a block that names no
  * columns, which is what a card or a list without columns draws. A `sign` names a second field a money column reads.
+ * Every column says the label the owner reads over it: hers, else the field's, else the field's id as words.
  */
-const shownBlock = (b: BlockResult, lists: ReadonlyMap<string, RegisterDecl>): Record<string, unknown> => {
+const shownBlock = (b: BlockResult, showing: Showing): Record<string, unknown> | null => {
+  const { lists, figure, said } = showing;
+  if (typeof b.kind !== 'string' || HEADING_ONLY.has(b.kind) || (typeof b.source === 'string' && ACROSS.has(b.source))) return null;
+  if (b.refusals.length > 0) return null;
   const block = b as unknown as Record<string, unknown>;
   const kept: Record<string, unknown> = {};
   for (const key of LOOKS) if (block[key] !== undefined) kept[key] = block[key];
-  if (typeof kept.body === 'string') kept.body = wordsShown(kept.body);
-  const bare = { ...kept, rows: [], matched: 0, refusals: [] };
-  if (typeof b.kind !== 'string' || HEADING_ONLY.has(b.kind) || (typeof b.source === 'string' && ACROSS.has(b.source))) return bare;
-  if (b.refusals.length > 0) return { ...bare, refusals: [NOT_SHOWN] };
+  const values: Record<string, Json> = isRecord(block.values) ? (block.values as Record<string, Json>) : {};
+  for (const key of WORDS) if (typeof kept[key] === 'string') kept[key] = filledIn(wordsShown(kept[key]), values, said);
 
   for (const key of FIGURES) if (block[key] !== undefined) kept[key] = block[key];
   if (typeof block.target === 'number') kept.target = block.target;
 
+  const list = typeof b.source === 'string' && b.source.startsWith('register.') ? b.source.slice('register.'.length) : (b.register ?? b.rows[0]?.register);
+  const declared = list === undefined ? undefined : lists.get(list);
   const columns = (b.columns ?? []).map((c) => {
-    const shown: ColumnShown = { field: c.field };
-    if (c.label !== undefined) shown.label = c.label;
+    const owned = typeof c.label === 'string' && c.label.trim() !== '' ? c.label : undefined;
+    const shown: ColumnShown = { field: c.field, label: owned ?? declared?.fields.find((f) => f.id === c.field)?.label ?? idSaid(c.field) };
     if (c.as !== undefined) shown.as = c.as;
     if (c.sign !== undefined) shown.sign = { field: c.sign.field, minus: c.sign.minus };
     return shown;
@@ -196,37 +365,46 @@ const shownBlock = (b: BlockResult, lists: ReadonlyMap<string, RegisterDecl>): R
     columns.length > 0 ? columns.flatMap((c) => (c.sign === undefined ? [c.field] : [c.field, c.sign.field])) : [lists.get(register)?.title ?? ''];
   kept.rows = b.rows.map((row) => rowShown(row, drawn(row.register), lists));
 
+  /* EVERY FIGURE SAYS ITS NAME: the cell's label, else the figure's own, so a stranger never reads a metric's id. */
   if (b.readings !== undefined)
     kept.readings = b.readings.map((r) => ({
       metric: r.metric,
-      ...(r.label === undefined ? {} : { label: r.label }),
-      reading: r.reading,
+      label: r.label ?? figure(r.metric) ?? idSaid(r.metric),
+      reading: readingShown(r.reading),
       ...(r.trend === undefined ? {} : { trend: r.trend }),
       ...(r.target === undefined ? {} : { target: r.target }),
     }));
   if (b.walk !== undefined) kept.walk = walkShown(b.walk);
   if (b.walks !== undefined) kept.walks = b.walks.map(walkShown);
 
-  /* WHAT A BLOCK WRITES OUT ITSELF, cell by cell, keeps its plain values, with an address into this BrainDog blanked. */
+  /* WHAT A BLOCK WRITES OUT ITSELF, cell by cell, keeps its plain values, with an address into this BrainDog blanked and
+     its words filled. `values` itself is not sent: every `{{path}}` it fills is filled here. */
   const authored = block.authored;
   if (Array.isArray(authored))
     kept.authored = authored.map((row) => ({
       cells:
         isRecord(row) && Array.isArray(row.cells)
-          ? row.cells.map((c) => (!isScalar(c) || inside(c) ? '' : typeof c === 'string' ? wordsShown(c) : c))
+          ? row.cells.map((c) => (!isScalar(c) || inside(c) ? '' : typeof c === 'string' ? filledIn(wordsShown(c), values, said) : c))
           : [],
     }));
-  /* AND THE `{{path}}` VALUES ITS WORDS ARE FILLED WITH, when each is a plain value. */
-  if (isRecord(block.values))
-    kept.values = Object.fromEntries(Object.entries(block.values).filter(([, v]) => isScalar(v) && !inside(v)));
 
   kept.refusals = [];
   return kept;
 };
 
-/** The page as a link shows it: its title, when it was read, its layout, when the link closes and each block. */
-const shownPage = (page: PageResult, expires_at: string, lists: ReadonlyMap<string, RegisterDecl>): SharedPage => {
+/** Where a page is read: the record's language and zone, and the figures' names, which `shownPage` is handed. */
+type ReadIn = { language: unknown; zone: unknown; figure: Showing['figure'] };
+
+/**
+ * The page as a link shows it: its title, when it was read, its layout, when the link closes, the language and zone it
+ * is read in, and each block a link may show. A page left with none says `NOTHING_SHOWN`, once, and draws no block.
+ */
+const shownPage = (page: PageResult, expires_at: string, lists: ReadonlyMap<string, RegisterDecl>, where: ReadIn): SharedPage => {
   const layout = isRecord(page.layout) ? page.layout : null;
+  const language = languageOf(where.language);
+  const zone = typeof where.zone === 'string' && where.zone !== '' ? where.zone : typeof page.zone === 'string' && page.zone !== '' ? page.zone : 'UTC';
+  const showing: Showing = { lists, figure: where.figure, said: saidIn(language) };
+  const blocks = page.blocks.map((b) => shownBlock(b, showing)).filter((b) => b !== null);
   return {
     title: page.title,
     read_at: typeof page.read_at === 'string' ? page.read_at : null,
@@ -238,13 +416,33 @@ const shownPage = (page: PageResult, expires_at: string, lists: ReadonlyMap<stri
             ...(typeof layout.sticky === 'boolean' ? { sticky: layout.sticky } : {}),
           },
     expires_at,
-    blocks: page.blocks.map((b) => shownBlock(b, lists)),
+    language,
+    zone,
+    empty: blocks.length === 0 ? NOTHING_SHOWN : null,
+    blocks,
   };
 };
 
 export function methods(deps: RecordDeps) {
   const { kernel, sql, scoped, admin, no, tail, clock } = deps;
   const mint = ulids(() => clock.now());
+
+  /**
+   * Whether this host can make a read-only link now, asked of the host on every call because its switch can change.
+   * ABSENT IS NO, and so is an answer that throws or is not one: a link the host cannot sign is a button that fails.
+   */
+  const host = deps.shares;
+  const hostSays = (): SharesAnswer => {
+    let said: unknown;
+    try {
+      said = host?.();
+    } catch {
+      said = undefined;
+    }
+    if (isRecord(said) && said.can === true) return { can: true };
+    const why = isRecord(said) && typeof said.why === 'string' && said.why.trim() !== '' ? said.why.trim() : SHARES_OFF;
+    return { can: false, why };
+  };
 
   /** The `share.open` of one link, or `undefined` for an id this record never opened. */
   const openedOf = (id: string) =>
@@ -269,6 +467,18 @@ export function methods(deps: RecordDeps) {
 
   return {
     /**
+     * Whether a read-only link can be made here, and why not, so the Share sheet draws the press only when it would
+     * work. ADMIN, A READ: the owner in a browser asks; a token or a member is refused as every ADMIN method refuses them.
+     * An owner who is not signed in is told she must be, as `openShare` would tell her.
+     */
+    async shareable(_args: unknown, ctx: CallContext): Promise<Result<SharesAnswer>> {
+      const stop = admin(ctx, 'ask whether a link can be made');
+      if (stop) return { ok: false, refusal: stop };
+      if (ctx.principal.kind !== 'person' || ctx.credentialed === false) return ok({ can: false, why: SHARES_SIGNED_IN });
+      return ok(hostSays());
+    },
+
+    /**
      * Open a link to one page for `days`, 1 to 90 and 30 unless said. ADMIN.
      *
      * A PERSON, SIGNED IN, AND NOT A SELF-HOST'S OPEN MODE. A link is read from anywhere for up to ninety days, which is
@@ -283,7 +493,11 @@ export function methods(deps: RecordDeps) {
       const stop = admin(ctx);
       if (stop) return { ok: false, refusal: stop };
       if (ctx.principal.kind !== 'person' || ctx.credentialed === false)
-        return no('NEEDS_BROWSER_SESSION', 'A link can be read from anywhere, so opening one needs the owner signed in. Open this from the app.', { at: 'principal' });
+        return no('NEEDS_BROWSER_SESSION', SHARES_SIGNED_IN, { at: 'principal' });
+      /* AND ONLY WHERE THE HOST SAYS IT CAN, in the host's own sentence, so no `share.open` is written for a link it
+         would not sign. */
+      const can = hostSays();
+      if (!can.can) return no('NOT_IN_THIS_BUILD', can.why ?? SHARES_OFF, { at: 'host' });
       const broken = kernel.refused();
       if (broken) return { ok: false, refusal: broken };
       const said: Record<string, unknown> = isRecord(args) ? args : {};
@@ -350,9 +564,12 @@ export function methods(deps: RecordDeps) {
         `SELECT o.target AS target, o.field AS slug, o.ts AS opened_at, o.to_v AS expires_at,
                 (SELECT MIN(c.ts) FROM event c WHERE c.target = o.target AND c.kind = 'share.close') AS closed_at
            FROM event o
-          WHERE o.target >= 'share:' AND o.target < 'share;' AND o.kind = 'share.open'
+          WHERE o.target >= ? AND o.target < ? AND o.kind = 'share.open'
           ORDER BY o.ts DESC, o.id DESC
           LIMIT ?`,
+        /* THE BOUNDS ARE BOUND, never written in: ';' (the next character after ':') inside the text reads as a second statement to the self-host's guard. */
+        'share:',
+        'share;',
         SHARES_LISTED_MOST,
       );
       return ok(
@@ -392,7 +609,9 @@ export function methods(deps: RecordDeps) {
       if (!kernel.pages().some((p) => p.slug === link.slug)) return { ok: false, refusal: SHUT };
       const out = kernel.page(link.slug);
       if (!out.ok) return { ok: false, refusal: SHUT };
-      return ok(shownPage(out.value, opened.expires_at, kernel.registers()));
+      const identity = kernel.identity();
+      const figure = (metric: string): string | undefined => kernel.metricDecl(metric)?.name || undefined;
+      return ok(shownPage(out.value, opened.expires_at, kernel.registers(), { language: identity?.locale, zone: identity?.tz, figure }));
     },
   };
 }

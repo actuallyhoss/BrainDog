@@ -42,7 +42,8 @@ const goBack = under(jobs, 2, 'go-back').join('\n');
 
 test('HOURLY AT MINUTE 7, AND BY HAND WITH A host INPUT', () => {
   const on = under(lines, 0, 'on');
-  assert.deepEqual(under(on, 2, 'schedule'), ["    - cron: '7 * * * *'", "    - cron: '23 4 1 * *'"]);
+  /* AND ONCE A DAY AT 05:41 THE REPOSITORY'S SETTINGS ARE HELD TO WHAT WAS DECIDED (`tools/watch/settings.mjs`, LCH-C12). */
+  assert.deepEqual(under(on, 2, 'schedule'), ["    - cron: '7 * * * *'", "    - cron: '23 4 1 * *'", "    - cron: '41 5 * * *'"]);
   const inputs = under(under(on, 2, 'workflow_dispatch'), 4, 'inputs');
   assert.ok(inputs.includes('      host:'), inputs.join('\n'));
   assert.ok(under(inputs, 6, 'host').includes('        required: false'));
@@ -51,7 +52,11 @@ test('HOURLY AT MINUTE 7, AND BY HAND WITH A host INPUT', () => {
 test('IT MAY READ AND NOTHING ELSE: contents and actions, both read', () => {
   assert.deepEqual(under(lines, 0, 'permissions').map((l) => l.trim()).sort(), ['actions: read', 'contents: read']);
   assert.doesNotMatch(code, /:\s*write\b/);
-  assert.doesNotMatch(watch, /secrets\./, 'the watch needs no secret beyond the workflow token');
+  /* ONE SECRET, AND ONLY FOR THE DAILY SETTINGS STEP: `WATCH_TOKEN`, the owner's read-only token for this one repository,
+     since the workflow token cannot read its settings. The hourly ask from outside still holds none. */
+  assert.deepEqual([...new Set([...watch.matchAll(/secrets\.([A-Z_]+)/g)].map((m) => m[1]))], ['WATCH_TOKEN'], 'the watch holds a secret beyond the settings token');
+  const launch = watch.slice(0, watch.indexOf('node tools/watch/launch.mjs'));
+  assert.doesNotMatch(launch, /secrets\./, 'the hourly ask needs no secret beyond the workflow token');
   assert.deepEqual([...new Set([...goBack.matchAll(/secrets\.([A-Z_]+)/g)].map((m) => m[1]))], ['CANARY_PASSKEY'], 'going back holds a secret beyond the canary passkey');
 });
 
@@ -61,9 +66,9 @@ test("NODE ONLY, ON GITHUB'S MACHINES: a checkout, Node 24.13.0, and the one com
   assert.deepEqual(uses, ['actions/checkout@v4', 'actions/setup-node@v4']);
   assert.match(watch, /node-version: 24\.13\.0/);
   const runs = [...watch.matchAll(/^\s+run: (.+)$/gm)].map((m) => m[1]);
-  assert.deepEqual(runs, ['node tools/watch/launch.mjs']);
+  assert.deepEqual(runs, ['node tools/watch/launch.mjs', 'node tools/watch/settings.mjs']);
   assert.doesNotMatch(watch, /pnpm|npm (ci|install)|corepack/);
-  assert.ok(existsSync(join(ROOT, 'tools', 'watch', 'launch.mjs')), 'the script the workflow runs is not there');
+  for (const script of ['launch.mjs', 'settings.mjs']) assert.ok(existsSync(join(ROOT, 'tools', 'watch', script)), `${script}, which the workflow runs, is not there`);
 });
 
 test('THE INPUT REACHES THE SCRIPT THROUGH THE ENVIRONMENT, never pasted into the command', () => {

@@ -6,8 +6,9 @@
  * gives, says whether this record holds that entry at that version, and what changed from the version installed. The
  * detail page hands what it verified to the record's plan, and the plan sheet installs it.
  *
- * TRUST ON FIRST USE IS KEPT PER BROWSER: the key ids seen for each author, in `localStorage` under `KNOWN_KEYS`. A page
- * that cannot reach storage still draws; it only cannot say a key was seen before. The catalogue's own rotation and
+ * TRUST ON FIRST USE IS KEPT IN THE RECORD: the key ids seen for each entry, on the person's pref `packs.known_keys`
+ * (`known-keys.ts`), so every device reads the same trust; an older record falls back to `localStorage` under
+ * `KNOWN_KEYS` as before. A page that reaches neither still draws; it only cannot say a key was seen before. The catalogue's own rotation and
  * revocation statements are verified here too: a new key named by a key already seen is trusted and kept, and a revoked
  * key is said as untrusted and nothing it signed is asked for.
  *
@@ -21,6 +22,7 @@ import type { CatalogueEntry, CatalogueFile, CatalogueIndex, CatalogueUpdate, Ca
 import { copy } from '../../../lib/copy.ts';
 import { KENNEL_AT } from '../../../lib/market/counts.ts';
 import type { PackState } from '../../../lib/record/packs.ts';
+import { localKeys, readLocal, type KeySource, type KeyStore } from './known-keys.ts';
 
 type Fetcher = (input: string, init?: RequestInit) => Promise<Response>;
 
@@ -111,49 +113,38 @@ export async function catalogueTitles(index: CatalogueIndex | null): Promise<Map
 
 /* ── signatures and trust on first use ──────────────────────────────────── */
 
-/** Where this browser keeps the key ids it has seen for each entry, by `trustSubject` (kind and id, never the author name). */
-export const KNOWN_KEYS = 'braindog.catalogue.keys';
-
-/** The part of `Storage` read here, so a test hands in a map and a page hands in `localStorage`. */
-export type KeyStore = { getItem(key: string): string | null; setItem(key: string, value: string): void };
-
-/** This browser's storage, or `null` when it cannot be reached (a private window, blocked site data, the server). */
-export function browserStore(): KeyStore | null {
-  try {
-    return typeof localStorage === 'undefined' ? null : localStorage;
-  } catch {
-    return null;
-  }
-}
+/* Where the keys are kept moved to `known-keys.ts`; these stay importable from here for the screens that read them. */
+export { browserStore, KNOWN_KEYS, type KeySource, type KeyStore } from './known-keys.ts';
 
 /** A version's signature said plainly: the key that signed it, or that nothing did. */
 export const signedWords = (signature: Signature | null | undefined): string => (signature ? copy.catalogueSigned(signature.key_id) : copy.catalogueUnsigned);
 
 /** The keys this browser has seen, or none when storage is out of reach or holds something else. */
-export async function loadKnownKeys(store: KeyStore | null): Promise<KnownKeys> {
-  const { readKnownKeys } = await import('@braindog/declare/catalogue');
-  try {
-    const raw = store?.getItem(KNOWN_KEYS) ?? null;
-    return raw === null ? {} : readKnownKeys(JSON.parse(raw));
-  } catch {
-    return {};
-  }
-}
+export const loadKnownKeys = (store: KeyStore | null): Promise<KnownKeys> => readLocal(store);
 
 /**
- * Whether this browser has seen the key that signed a version for its entry before (`subject`, from `trustSubject`), read
- * with the catalogue's key statements (`index.keys`), each verified here before it counts, and the keys that signed the
- * entry's earlier versions (`keysSignedBefore`), so a version that lost its signature is said loudly.
+ * Where trust is read: a key source handed in (the record, `recordKeys`), or a browser's storage alone (`localKeys`), as
+ * `/packs` still hands in, or nothing.
  */
-export async function trustFor(store: KeyStore | null, subject: string, signature: Signature | null | undefined, keys?: KeyStatements, signedBefore: readonly string[] = []): Promise<Trust> {
+export type Keys = KeyStore | KeySource | null;
+const sourceOf = (keys: Keys): KeySource | null => (keys === null ? null : 'read' in keys && 'keep' in keys ? keys : localKeys(keys));
+
+/**
+ * Whether this person has seen the key that signed a version for its entry before (`subject`, from `trustSubject`), read
+ * from `keys` (the record's, or a browser's alone) with the catalogue's key statements (`index.keys`), each verified here
+ * before it counts, and the keys that signed the entry's earlier versions (`keysSignedBefore`), so a version that lost its
+ * signature is said loudly.
+ */
+export async function trustFor(keys: Keys, subject: string, signature: Signature | null | undefined, statements?: KeyStatements, signedBefore: readonly string[] = []): Promise<Trust> {
   const { trustOf, verifiedStatements } = await import('@braindog/declare/catalogue');
-  return trustOf(await loadKnownKeys(store), subject, signature, await verifiedStatements(keys), signedBefore);
+  const known = (await sourceOf(keys)?.read().catch(() => ({}))) ?? {};
+  return trustOf(known, subject, signature, await verifiedStatements(statements), signedBefore);
 }
 
 /** Trust for an entry's version, with its subject and earlier signatures read from the entry itself. */
-export async function trustForEntry(store: KeyStore | null, entry: CatalogueEntry, version: string, signature: Signature | null | undefined, keys?: KeyStatements): Promise<Trust> {
+export async function trustForEntry(keys: Keys, entry: CatalogueEntry, version: string, signature: Signature | null | undefined, statements?: KeyStatements): Promise<Trust> {
   const { keysSignedBefore, trustSubject } = await import('@braindog/declare/catalogue');
-  return trustFor(store, trustSubject(entry), signature, keys, await keysSignedBefore(entry, version));
+  return trustFor(keys, trustSubject(entry), signature, statements, await keysSignedBefore(entry, version));
 }
 
 /** Trust said as a sentence, loud when the key is not the one seen before. */
@@ -177,17 +168,59 @@ export function trustWords(trust: Trust, author: string): { text: string; loud: 
 }
 
 /**
+ * The one line under an add-on's name, by its publisher's name and never a key id: signed by the key seen before, the
+ * first add-on seen from them, or a different key. A rotation their own key signed is the key seen before. The rest
+ * say why nothing is offered, or that nobody signed.
+ */
+export function trustLine(trust: Trust, publisher: string): { text: string; loud: boolean } {
+  switch (trust.kind) {
+    case 'known':
+    case 'rotated':
+      return { text: `Signed by ${publisher}, as before`, loud: false };
+    case 'first':
+      return { text: `First add-on you have seen from ${publisher}`, loud: false };
+    case 'changed':
+      return { text: 'Signed by a different key than before', loud: true };
+    case 'revoked':
+      return { text: `${publisher} withdrew the key that signed this version, so it is not offered`, loud: true };
+    case 'stripped':
+      return { text: `This version is not signed, and earlier ones from ${publisher} were, so it is not offered`, loud: true };
+    case 'unsigned':
+      return { text: 'Nobody signed this version', loud: false };
+  }
+}
+
+/**
+ * Whether nothing a version's key signed is offered to install: a revoked key, a signature lost, or a key other than the
+ * one seen before until the person presses Trust this key (`trustThisKey`).
+ */
+export const withheld = (trust: Trust | null): boolean => trust !== null && (trust.kind === 'revoked' || trust.kind === 'stripped' || trust.kind === 'changed');
+
+/**
  * The key kept once a person asks for a version: on first use, or a key one already seen named as its successor. A known
  * key needs nothing, and a changed or revoked key is never written over the one seen before, so it is said loudly again
  * next time. Answers whether anything was kept.
  */
-export async function keepFirstKey(store: KeyStore | null, subject: string, trust: Trust): Promise<boolean> {
-  const { keyToKeep, rememberKey } = await import('@braindog/declare/catalogue');
+export async function keepFirstKey(keys: Keys, subject: string, trust: Trust): Promise<boolean> {
+  const { keyToKeep } = await import('@braindog/declare/catalogue');
   const keep = keyToKeep(trust);
-  if (keep === null || !store) return false;
+  return keep === null ? false : keepKey(keys, subject, keep);
+}
+
+/**
+ * The person's own press on a key that changed: the new key is kept beside the ones seen before, so what it signs is
+ * offered from then on. Only a changed key is taken this way; a revoked one never is.
+ */
+export async function trustThisKey(keys: Keys, subject: string, trust: Trust): Promise<boolean> {
+  return trust.kind === 'changed' ? keepKey(keys, subject, trust.key_id) : false;
+}
+
+async function keepKey(keys: Keys, subject: string, keyId: string): Promise<boolean> {
+  const source = sourceOf(keys);
+  if (!source) return false;
+  const { rememberKey } = await import('@braindog/declare/catalogue');
   try {
-    store.setItem(KNOWN_KEYS, JSON.stringify(rememberKey(await loadKnownKeys(store), subject, keep)));
-    return true;
+    return await source.keep(rememberKey(await source.read(), subject, keyId));
   } catch {
     return false;
   }

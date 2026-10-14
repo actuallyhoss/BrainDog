@@ -59,7 +59,7 @@ for (const name of CALLERS) {
 }
 
 test('the form keeps its track a radiogroup named by the field label', () => {
-  assert.match(markup(read('RowForm.svelte')), /<Segmented\s+role="radiogroup"\s+aria-labelledby=\{labelId\(f\)\}>/u);
+  assert.match(markup(read('RowForm.svelte')), /<Segmented\s+role="radiogroup"\s+aria-labelledby=\{labelId\(f\)\}[^>]*>/u);
 });
 
 test('the three sheets keep their track a named group', () => {

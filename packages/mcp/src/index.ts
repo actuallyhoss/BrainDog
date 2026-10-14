@@ -309,6 +309,13 @@ export type McpSurface<C> = {
   heard?(args: { kind: 'hello' | 'listed' | 'called' | 'internal'; n?: number; build?: string; client?: string }, ctx: C): Answer;
   /** The door's own mark (the record's `doorHeard`, unrouted, audit 38-39): hello, listed, called, internal; a key's called also moves its last tool call. `rpc.ts` prefers it to `heard`. */
   doorHeard?(args: { kind: 'hello' | 'listed' | 'called' | 'internal'; n?: number; build?: string; client?: string }, ctx: C): Answer;
+  /**
+   * The caller's run is still working (the record's `beat`, DATA, AGT-C03): last seen moved in place, at most once a
+   * minute, no version and no event. The door beats once for every tool call it admits (`beatOn`), so any client on it
+   * reads Working while it calls tools, hook or none. Optional: both HTTP hosts hand `serveMcp` the whole record, so it
+   * arrives with them; the command line routes a fixed list, and a surface without it answers every call as before.
+   */
+  beat?(args: Record<string, never>, ctx: C): Answer;
 };
 
 /**
@@ -1273,6 +1280,25 @@ type Done = {
 };
 
 /**
+ * One beat for one tool call the door admitted (AGT-C03 step 4, "a real heartbeat"): the caller's run is heard from
+ * now, so a client with no hook of its own reads Working through a long stretch of reads, not Quiet.
+ *
+ * NEVER WAITED ON, AND EVERY WAY IT CAN GO WRONG IS SWALLOWED, as `rpc.ts`'s marks are: a beat that throws, refuses,
+ * rejects or never settles costs the tool's answer nothing. It sends nothing the call did not carry, only the caller's
+ * own context, and the record finds the run from that or finds none. A surface without `beat` is not asked.
+ */
+function beatOn<C>(surface: McpSurface<C>, ctx: C): void {
+  if (typeof surface.beat !== 'function') return;
+  try {
+    const p: unknown = surface.beat({}, ctx);
+    /* ANY THENABLE, so a rejection from a surface built in another realm is caught too. */
+    if (p !== null && typeof p === 'object' && typeof (p as { then?: unknown }).then === 'function') Promise.resolve(p).catch(() => undefined);
+  } catch {
+    /* A beat that throws is a beat not heard, and nothing more. */
+  }
+}
+
+/**
  * Run one tool, list the resources, read one.
  *
  * The tool layer holds NO logic of its own beyond addressing and wording: every refusal a caller sees comes from
@@ -2101,6 +2127,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       mine: session === null ? undefined : runs.get(session),
       left: from === null ? undefined : runs.get(from),
       waiting: typeof counts.decide === 'number' ? counts.decide : undefined,
+      record: shell.record,
       home: await homeIn(pagesIn(shell), ctx, isObject(c.project) && typeof c.project.spoken === 'string' ? c.project.spoken : null),
     });
   };
@@ -3021,6 +3048,9 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     /* EXCEPT THAT A FULL context ASKS THE RECORD FOR THE FULL ANSWER TOO, twenty rows of each list where the brief one
        sends five (AGT-B09): as a hint on the session, which is where the record reads it, never as an argument. */
     const asked = name === 'context' && full ? ({ ...ctx, session: { ...((ctx as { session?: object }).session ?? {}), format: 'full' } } as typeof ctx) : ctx;
+    /* ADMITTED, SO IT BEATS: a name and keys this door took go on to the record, and a call refused above never got
+       there. With the caller's own context, never `asked`'s hint, and never waited on. */
+    beatOn(surface, ctx);
     const done = await tool(sent, asked, turn);
     let result = done.result;
     if (refused(result)) {

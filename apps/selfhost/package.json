@@ -19,7 +19,7 @@
   "scripts": {
     "start": "node src/main.ts",
     "init": "node src/main.ts init",
-    "test": "node --test test/*.test.ts",
+    "test": "node --test test/*.test.ts && node --test test/*.test.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {

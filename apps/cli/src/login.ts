@@ -8,12 +8,51 @@
  * shown: six digits typed into a page somebody else controls are an approval they can spend.
  */
 
+import { execFile } from 'node:child_process';
 import { hostname } from 'node:os';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 
 import { hostKey, inTheClear, isLoopback, readHosts, sameHost, saveHosts } from './http.ts';
 import type { Answering } from './json.ts';
+
+/* ── the machine's own name ───────────────────────────────────────────── */
+
+/** What `machineName` reads, injectable so a test needs no Mac. */
+export type MachineIo = {
+  platform?: NodeJS.Platform | undefined;
+  hostname?: (() => string) | undefined;
+  /** Runs a program with no shell and answers its stdout, as `execFile` does. */
+  run?: ((file: string, args: string[]) => Promise<string>) | undefined;
+};
+
+const runFile = (file: string, args: string[]): Promise<string> =>
+  new Promise((resolve, reject) => {
+    execFile(file, args, { timeout: 2_000, encoding: 'utf8' }, (err, stdout) => (err ? reject(err) : resolve(stdout)));
+  });
+
+/** One line of at most sixty characters, with no control character and no ` · `, which the label spends as its seam. */
+const tidy = (raw: string): string =>
+  raw.replace(/\p{Cc}+/gu, ' ').replaceAll(' · ', ' ').replace(/\s+/g, ' ').trim().slice(0, 60).trim();
+
+/**
+ * The name this machine goes by to its owner: on a Mac the one set in the system ("Studio"), read with `scutil` and no
+ * shell, and elsewhere the host name with a trailing `.local` cut.
+ *
+ * THE HOST NAME ALONE READ "STUDIO-PC.local · braindog-cli", which is the network's spelling and not a name anybody
+ * gave the machine. The record stamps what comes before the label's first ` · ` as the device's host, so this is the
+ * name Settings shows beside the app. Never empty: a failing `scutil`, or a blank answer, falls back to the host name.
+ */
+export async function machineName(io: MachineIo = {}): Promise<string> {
+  const host = (io.hostname ?? hostname)();
+  const plain = tidy(host.replace(/\.local\.?$/i, '')) || tidy(host) || 'this machine';
+  if ((io.platform ?? process.platform) !== 'darwin') return plain;
+  try {
+    return tidy(await (io.run ?? runFile)('scutil', ['--get', 'ComputerName'])) || plain;
+  } catch {
+    return plain;
+  }
+}
 
 /* ── the login this machine keeps, and when it lapses ──────────────────── */
 
@@ -182,7 +221,7 @@ export async function login(raw: string, io: LoginIo): Promise<number> {
     return REFUSED;
   }
 
-  const label = (io.label ?? `${hostname()} · braindog-cli`).slice(0, 120);
+  const label = (io.label ?? `${await machineName()} · braindog-cli`).slice(0, 120);
   const again = `Run braindog login ${key}${vault === undefined ? '' : ` --vault ${vault}`} to start again.`;
   const got = await approve(host, vault === undefined ? { reach: 'login' } : { reach: 'vault', scope: vault }, label, {
     again,
@@ -358,7 +397,7 @@ export async function approveOperation(raw: string, reach: OperationReach, io: F
   const host = hostOf(raw, io.say);
   if (typeof host === 'number') return host;
   /* THE REACH IS APPENDED EVEN TO A LABEL THE CALLER CHOSE, and the machine's name is cut rather than the reach. */
-  const label = `${(io.label ?? `${hostname()} · braindog-cli`).slice(0, 110)} · ${reach}`;
+  const label = `${(io.label ?? `${await machineName()} · braindog-cli`).slice(0, 110)} · ${reach}`;
   const got = await approve(host, { reach }, label, {
     again: `Run braindog ${reach} again to ask for a new code.`,
     nothing: 'nothing was approved',
@@ -379,7 +418,7 @@ export async function approveOperation(raw: string, reach: OperationReach, io: F
 export async function approveRunner(raw: string, io: FlowIo & { label?: string | undefined }): Promise<{ key: string; bearer: string; expires: string; label: string } | number> {
   const host = hostOf(raw, io.say);
   if (typeof host === 'number') return host;
-  const label = `${(io.label ?? `${hostname()} · braindog-cli`).slice(0, 110)} · runner`;
+  const label = `${(io.label ?? `${await machineName()} · braindog-cli`).slice(0, 110)} · runner`;
   const got = await approve(host, { reach: 'runner' }, label, {
     again: `Run braindog runner enrol ${host.key} to start again.`,
     nothing: 'this machine was not enrolled',
@@ -397,7 +436,7 @@ export async function approveRunner(raw: string, io: FlowIo & { label?: string |
 export async function approveShape(raw: string, io: FlowIo & { label?: string | undefined }): Promise<{ key: string; bearer: string; expires: string; label: string } | number> {
   const host = hostOf(raw, io.say);
   if (typeof host === 'number') return host;
-  const label = `${(io.label ?? `${hostname()} · braindog-cli`).slice(0, 110)} · shape`;
+  const label = `${(io.label ?? `${await machineName()} · braindog-cli`).slice(0, 110)} · shape`;
   const got = await approve(host, { reach: 'shape' }, label, {
     again: `Run braindog export --shape --host ${host.key} to ask for a new code.`,
     nothing: 'no shape grant was approved',

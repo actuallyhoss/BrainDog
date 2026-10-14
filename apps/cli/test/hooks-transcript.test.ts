@@ -96,7 +96,8 @@ test('a transcript_path that is a folder is never opened: start prints its card,
   const io = (name: string) => ({ env, stdin: event(name), cwd, home, device: 'the test machine', write: (text: string) => printed.push(text) });
 
   await hookStart(io('SessionStart'));
-  assert.ok(printed.join('\n').includes('S7'), `no card:\n${printed.join('\n')}`);
+  /* The stub sends no card (the record draws it), so the start says it is connected and to call context. */
+  assert.ok(printed.join('\n').startsWith('Connected to BrainDog. Call context.'), `no card:\n${printed.join('\n')}`);
   assert.equal(await hookBeat(io('PostToolUse')), 'sent');
   await hookEnd(io('SessionEnd'));
   assert.ok(seen.includes('attach') && seen.includes('beat') && seen.includes('end'), seen.join(', '));

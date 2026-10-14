@@ -142,6 +142,7 @@ Roughly from the simplest to the most involved, each with what it shows you how 
 | `launch-desk` | A desk for launching a thing in parts, with each part's next step, a calendar and a price check. | A whole set of pages and example rows for one use case, built on other add-ons. |
 | `task-tiers` | Four numbers on a task, and its priority worked out with the sum as the reason. | Optional fields laid on another add-on's list by `extends`, and a script that writes two fields its own automation does not watch. |
 | `landlord` | The flats you rent out, each tenancy's rent, deposit and end day, the rent that came in and the repairs. | A use case nobody here runs, as a file only, with figures that hop back through a link (`pointed`) and a page per row in a rail section of its own. |
+| `job-starter` | Three kinds of job to run on your own machine: a review of the week, a sort of what arrived, and where a repository stands. | Job kinds as declarations, installed through Decide, each reading and proposing and never skipping its permissions. |
 
 ## How the packs here reach a record
 

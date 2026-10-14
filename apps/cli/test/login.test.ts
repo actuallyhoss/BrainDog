@@ -16,7 +16,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { readHosts } from '../src/http.ts';
-import { ANY_HOST, login, sameMachine } from '../src/login.ts';
+import { ANY_HOST, login, machineName, sameMachine } from '../src/login.ts';
 
 /**
  * Production's `PUBLIC_HOST`, read off `apps/worker/wrangler.jsonc` with the deploy check script's own parser.
@@ -237,4 +237,32 @@ test('CTRL+C WHILE WAITING ENDS WITH ONE SENTENCE, A NON-ZERO EXIT, AND NOTHING 
   assert.equal(code, 1);
   assert.equal(lines.at(-1), 'Sign-in was stopped before it finished, and nothing was saved.');
   assert.equal(existsSync(file), false);
+});
+
+/* ── the machine's own name ──────────────────────────────────────────────── */
+
+test('ON A MAC THE NAME SET IN THE SYSTEM, read with scutil and no shell', async () => {
+  const asked: string[][] = [];
+  const name = await machineName({
+    platform: 'darwin',
+    hostname: () => 'STUDIO-PC.local',
+    run: async (file, args) => {
+      asked.push([file, ...args]);
+      return 'Studio\n';
+    },
+  });
+  assert.equal(name, 'Studio');
+  assert.deepEqual(asked, [['scutil', '--get', 'ComputerName']]);
+});
+
+test('ELSEWHERE THE HOST NAME, its trailing .local cut, and scutil never asked', async () => {
+  const name = await machineName({ platform: 'linux', hostname: () => 'box.local', run: async () => assert.fail('scutil was run off a Mac') });
+  assert.equal(name, 'box');
+});
+
+test('A FAILING OR BLANK scutil FALLS BACK TO THE HOST NAME, and a long name is cut to sixty characters', async () => {
+  const failing = await machineName({ platform: 'darwin', hostname: () => 'box.local', run: async () => Promise.reject(new Error('no such program')) });
+  assert.equal(failing, 'box');
+  assert.equal(await machineName({ platform: 'darwin', hostname: () => 'box', run: async () => '  \n' }), 'box');
+  assert.equal((await machineName({ platform: 'linux', hostname: () => 'b'.repeat(80) })).length, 60);
 });

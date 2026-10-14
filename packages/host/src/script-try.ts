@@ -27,6 +27,10 @@
  * not what is wrong. The Worker's `Record$` does not pass `stale` yet, so its owner is refused the key all the same and
  * is told the `NO_KEYS` sentence instead.
  *
+ * AND A TRIAL BY ANYBODY BUT THE OWNER ONLY READS (`readsOnly`). No key is not enough: a POST needs none to reach a
+ * public form, so a propose token's draft made the host write to whatever outside service it named, unapproved. Every
+ * fetch but a GET or a HEAD without a body is a rejected promise in the run, and the run goes on as a refused key's does.
+ *
  * THE READS ARE THE CALLER'S OWN. `scriptReads` reads as `system`, held to the script's `reads:`, because a scheduled run
  * has no person behind it and its reads were approved at accept. A trial's `reads:` were approved by nobody either, and
  * a trial answers its writes and its log to the caller, so reading as `system` would hand a member restricted to two
@@ -75,7 +79,28 @@ export type ScriptDraft = {
    * changes what a fetch naming a key is told, never whether a key opens, which `grantOf` alone decides.
    */
   stale?: boolean | undefined;
+  /**
+   * The record's `owner` word for the caller. Absent, as both hosts hand a draft today, it is read from `grantOf`, which
+   * each builds from that word and nothing else (`grantOf: d.owner ? ... : null`).
+   */
+  owner?: boolean | undefined;
 };
+
+/**
+ * Whether a trial only reads (`readOnlyRefused` in `script.ts`): for every caller the record does not call `owner`.
+ *
+ * THE OWNER WHOSE PROOF IS STALE KEEPS ANY METHOD AND NO KEY. Her draft is hers to send, and the proof's age is a
+ * reason to keep the vault shut, which `grantOf` already does, not a reason to treat her as an agent.
+ */
+export const readsOnly = (draft: Pick<ScriptDraft, 'grantOf' | 'stale' | 'owner'>): boolean =>
+  !(draft.owner ?? draft.grantOf !== null) && draft.stale !== true;
+
+/**
+ * How a trial by an agent's event id begins on the ledger. The Directory keeps every metered run's event by record and
+ * time (`dir_usage_run`), so the trials by agents a record ran today are the ones there with this prefix since midnight
+ * UTC, which is what `trialsLeft` in `packages/record` is read against.
+ */
+export const AGENT_TRIAL = 'try_agent_';
 
 /** What a trial answers: the kernel's `ScriptAnswer`, which is the sandbox's, or `held`. */
 export type TriedScript = ScriptAnswer;
@@ -87,7 +112,7 @@ export type TriedScript = ScriptAnswer;
  * `env.LOADER.load` (`apps/worker/src/script.ts`), a trial's included, so no draft can be handed another's module or
  * `globalThis`, and the self-host starts a fresh QuickJS instance per run as it always has.
  */
-export type TrialSandbox = (s: Scripted, trial: { grantOf: GrantOf; reads: ScriptReads | undefined }) => Promise<ScriptAnswer>;
+export type TrialSandbox = (s: Scripted, trial: { grantOf: GrantOf; reads: ScriptReads | undefined; readOnly: boolean }) => Promise<ScriptAnswer>;
 
 /**
  * The id a trial's key is opened in the name of: the `asker` the record hands `tryScript`, or `undefined`, which each
@@ -126,10 +151,10 @@ const STALE = (label: string): string =>
  * ONE `scriptRunner` PER TRIAL, because `grantOf` and `reads` belong to whoever asked and `scriptRunner` fixes both when
  * it is built. It is a handful of closures; the sandbox itself is started per run either way.
  */
-export function trialSandbox<P extends object | undefined = undefined>(options: Omit<ScriptRunnerOptions<P>, 'grantOf' | 'reads'>): TrialSandbox {
+export function trialSandbox<P extends object | undefined = undefined>(options: Omit<ScriptRunnerOptions<P>, 'grantOf' | 'reads' | 'readOnly'>): TrialSandbox {
   return (s, trial) => {
     const reads = trial.reads;
-    return scriptRunner<P>({ ...options, grantOf: trial.grantOf, ...(reads === undefined ? {} : { reads: () => reads }) })(s);
+    return scriptRunner<P>({ ...options, grantOf: trial.grantOf, readOnly: trial.readOnly, ...(reads === undefined ? {} : { reads: () => reads }) })(s);
   };
 }
 
@@ -140,9 +165,10 @@ export type ScriptTrialOptions = {
   now?: (() => number) | undefined;
   /**
    * The id a trial is sent and counted under: the job its fetches are sent for, and its event on the ledger. Absent is
-   * a random one, which is all the Directory's dedupe needs.
+   * a random one, which is all the Directory's dedupe needs, begun `try_agent_` for a trial that only reads
+   * (`AGENT_TRIAL`), so the day's trials by agents can be counted off the ledger's runs without a table of their own.
    */
-  mint?: (() => string) | undefined;
+  mint?: ((agent: boolean) => string) | undefined;
   /**
    * The runs let through and not yet metered, shared with the host's scheduled pass when it hands the same one to
    * `pass(flight)`. Absent is `IN_FLIGHT`, the runtime's own, so a host that builds a trial per request still shares one.
@@ -159,7 +185,7 @@ export type ScriptTrialOptions = {
  */
 export function scriptTrial(options: ScriptTrialOptions): (draft: ScriptDraft) => Promise<TriedScript> {
   const now = options.now ?? (() => Date.now());
-  const mint = options.mint ?? (() => `try_${crypto.randomUUID()}`);
+  const mint = options.mint ?? ((agent: boolean) => `${agent ? AGENT_TRIAL : 'try_'}${crypto.randomUUID()}`);
 
   const count = async (event: string, record: string, script: string, outcome: Metered['outcome'], usage: Metered['usage']): Promise<void> => {
     if (options.ledger === null) return;
@@ -182,7 +208,8 @@ export function scriptTrial(options: ScriptTrialOptions): (draft: ScriptDraft) =
   async function attempt(draft: ScriptDraft, pending: number): Promise<TriedScript> {
     const { record, body } = draft;
     /* ONE ID FOR THE TRIAL: the job its fetches are sent for, and the event the ledger counts it under. */
-    const id = mint();
+    const readOnly = readsOnly(draft);
+    const id = mint(readOnly);
     const hold = options.ledger === null ? null : await options.ledger.mayRun(record.id, body.script, pending);
     if (hold) {
       await count(id, record.id, body.script, 'held', { runs: 0, requests: 0, bytes: 0, ms: 0, failures: 0, held: 1, cpu_ms: 0 });
@@ -220,7 +247,7 @@ export function scriptTrial(options: ScriptTrialOptions): (draft: ScriptDraft) =
 
     let answer: ScriptAnswer;
     try {
-      answer = await options.sandbox(scripted, { grantOf, reads: draft.reads });
+      answer = await options.sandbox(scripted, { grantOf, reads: draft.reads, readOnly });
     } catch (e) {
       await count(id, record.id, body.script, 'failed', { runs: 0, requests: 0, bytes: 0, ms: 0, failures: 1, held: 0, cpu_ms: 0 });
       throw e;

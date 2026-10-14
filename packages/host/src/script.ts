@@ -31,7 +31,7 @@ import { fixOf } from '@braindog/ports';
 import type { CallContext, RecordApi } from '@braindog/record';
 import type { CtxHost, HostRequest, HostResponse, Json, ScriptAnswer, ScriptDecl, ScriptRefusal } from '@braindog/script';
 
-import { pass, sendAction, type Admissions, type Ledger, type OpenKey, type Pin, type Send } from './actions.ts';
+import { pass, sendAction, type Admissions, type Execute, type Ledger, type OpenKey, type Pin, type Send } from './actions.ts';
 import { SLASH_KEY_LABEL } from './slash.ts';
 
 /** One run of one script in a sandbox: `runInQuickJs` on the self-host, a Dynamic Worker on Cloud. */
@@ -68,7 +68,43 @@ export type ScriptRunnerOptions<P> = {
   reads?: ((s: Scripted) => ScriptReads) | undefined;
   /** The host clock, which `ctx.now()` reads. Absent is `Date.now`. */
   now?: (() => number) | undefined;
+  /**
+   * `true` for a trial by an agent (`script-try.ts`): a fetch that is not a GET or a HEAD, or that carries a body, is
+   * refused unsent with `readOnlyRefused`'s sentence, as a rejected promise the run goes on from. Absent is `false`, a scheduled run's, whose sends the owner approved in Decide.
+   */
+  readOnly?: boolean | undefined;
 };
+
+/**
+ * The sentence a trial by an agent answers a fetch that would write, or `null` for a read it may send.
+ *
+ * A DRAFT HAS BEEN APPROVED BY NOBODY, AND A TOKEN'S TRIAL OF ONE SENT WHATEVER IT ASKED. It opened no key, but a POST
+ * needs none to reach a public form or webhook, so any propose token could make the host write to an outside service
+ * the draft named, on the owner's plan. A read is what a trial is for; a send waits for the owner's accept. A body on a
+ * GET is refused too, because a server may act on one. The host's name only: the path and the body can hold values.
+ */
+export function readOnlyRefused(method: string, url: string, body: string | null): string | null {
+  const asked = method.toUpperCase();
+  if ((asked === 'GET' || asked === 'HEAD') && (body === null || body === '')) return null;
+  let host = 'its server';
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    /* NOT A URL IS NOT THIS CHECK'S QUESTION; it is refused unsent either way, and the sentence names no part of it. */
+  }
+  return `A trial by an agent only reads, so the ${asked} to ${host} was not sent. Propose the script, and its runs send it once the owner accepts.`;
+}
+
+/**
+ * An executor that refuses every write a trial by an agent asks, before `execute` is reached, for a host whose sandbox
+ * sends through an `Execute` of its own rather than `scriptRunner`'s fetch: the Worker's `runScript`.
+ */
+export function readOnlyExecute(execute: Execute): Execute {
+  return async (request) => {
+    const why = readOnlyRefused(request.method, request.url, request.body ?? null);
+    return why === null ? execute(request) : { refused: { code: 'PULL_REQUEST_REFUSED', fix: why }, bytes: 0, ms: 0, requests: 0 };
+  };
+}
 
 /** The fields of `register` a script is never told about: `secret`, and `list<secret>`. */
 function sealedOf(api: Pick<RecordApi, 'kernel'>, register: string): Set<string> {
@@ -289,6 +325,10 @@ export function scriptRunner<P extends object | undefined = undefined>(options: 
 
     const fetch = async (asked: HostRequest): Promise<HostResponse> => {
       if (kept.stop !== null) throw new Error(kept.stop.why);
+      /* BEFORE THE KEY IS LOOKED UP, so a write by an agent's trial reaches neither the vault nor the socket. A rejected
+         promise like a refused key's: the script may catch it and go on reading. */
+      const unread = options.readOnly === true ? readOnlyRefused(asked.method, asked.url, asked.body) : null;
+      if (unread !== null) throw new Error(unread);
       const grant = asked.key === null ? null : options.grantOf(asked.key);
       if (asked.key !== null && grant === null) throw new Error(`The key "${asked.key}" is not in the vault, so nothing was sent.`);
       const broken = grant === null ? null : keyRefused(scripted.script, grant, new URL(asked.url));

@@ -51,7 +51,7 @@
 
 <script lang="ts">
   import { apiBase } from '$lib/at.ts';
-  import type { Shell } from '$lib/record/boot-live.ts';
+  import { onAppendOnly, type Shell } from '$lib/record/boot-live.ts';
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import { heard, homePage, said } from '$lib/voice.svelte.ts';
@@ -592,13 +592,17 @@
   {#if data.refused}
     <!--
       THE RECORD WOULD NOT ANSWER THIS READER, WHICH IS NOT THE SAME THING AS AN EMPTY RECORD. A colleague invited with
-      `Adds only` is refused `boot` with the record's own sentence, which names the person who can help, so it stands
-      here alone with no action. And a record that could not be reached is not a refusal: the one
-      offline sentence with Retry, and the client's own reason under Details.
+      `Adds only` is refused `boot` with the record's own sentence, which names the person who can help, and under it the
+      one thing that is hers to do: make her agent's key (`onAppendOnly`). And a record that could not be reached is not
+      a refusal: the one offline sentence with Retry, and the client's own reason under Details.
     -->
     {#if data.refused.code === 'UNREACHABLE'}
       <Empty kind="error" title={copy.readOffline} detail={data.refused.fix}>
         {#snippet actions()}<Button weight="primary" onclick={() => location.reload()}>{copy.readRetry}</Button>{/snippet}
+      </Empty>
+    {:else if onAppendOnly(data.refused)}
+      <Empty kind="no-permission" title={data.refused.fix}>
+        {#snippet actions()}<Button weight="primary" href="/settings/agents">{copy.inviteMakeAgentKey}</Button>{/snippet}
       </Empty>
     {:else}
       <Empty kind="no-permission" title={data.refused.fix} />

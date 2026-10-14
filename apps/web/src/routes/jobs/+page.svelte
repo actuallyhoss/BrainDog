@@ -21,9 +21,9 @@
   record with no runs yet still shows what it can do and what it is waiting on. The machines stay listed under the
   tiles once there are runs. Only an owner reads them (`listDevices` is the owner's); anybody else is shown no tile.
 
-  "RUN A JOB" OPENS A SHEET that reads the approved kinds only when opened (`readKinds` in `lib/record/jobs.ts`), since
-  the kinds come from the decided proposals and nobody reading the list needs them. It picks a kind, takes its
-  arguments, starts it and opens the run, where the transcript fills in as the machine works.
+  "RUN A JOB" OPENS A SHEET that reads the approved kinds only when opened (`readHeldKinds` in `lib/record/page-jobs.ts`:
+  those accepted in Decide and those an add-on this record holds carries), since nobody reading the list needs them.
+  It picks a kind, takes its arguments, starts it and opens the run, where the transcript fills in as the machine works.
 -->
 <script lang="ts">
   import { goto } from '$app/navigation';
@@ -34,13 +34,15 @@
   import { titleOf } from '$lib/title.ts';
   import { read } from '$lib/data/read.svelte.ts';
   import {
+    HEARD_POLL_MS,
     LIST_POLL_MS,
+    anyListening,
     argsFor,
     isLive,
     joined,
+    listeningOf,
     ordered,
     readJobs,
-    readKinds,
     runName,
     startJob,
     statusOf,
@@ -68,6 +70,7 @@
   import { since } from 'braindog-render';
   import { createClient } from '@braindog/client';
   import { words as kindWords } from '$lib/agents/new-kind.ts';
+  import { readHeldKinds } from '$lib/record/page-jobs.ts';
   import {
     detailOf,
     enrolAddress,
@@ -169,15 +172,46 @@
       slugOf(page.url.pathname) ?? ((page.data.index as { slug?: string } | undefined)?.slug || null),
     ),
   );
+  /* WHEN THE MACHINES WERE LAST ASKED, the clock "Listening" is read against, apart from `now` so the runs' days and
+     lanes do not move every time the machines are asked again. */
+  let heardAt = $state(Date.now());
+  /* ASKED AGAIN EVERY 20 SECONDS WHILE THE SCREEN IS IN VIEW, so a machine that starts or stops listening is seen to;
+     a hidden screen asks nothing, and asks at once when it is shown again. An answer for a record left since is dropped. */
   $effect(() => {
     const base = recordBase;
-    void createClient({ base })
-      .listDevices()
-      .then(
-        (out) => (devices = out.ok ? enrolledOf(out.value) : null),
-        () => (devices = null),
-      );
+    let gone = false;
+    const ask = () => {
+      void createClient({ base })
+        .listDevices()
+        .then(
+          (out) => {
+            if (gone) return;
+            heardAt = Date.now();
+            devices = out.ok ? enrolledOf(out.value) : null;
+          },
+          () => {
+            if (!gone) devices = null;
+          },
+        );
+    };
+    let timer: ReturnType<typeof setInterval> | undefined;
+    const watch = () => {
+      clearInterval(timer);
+      timer = undefined;
+      if (document.visibilityState === 'hidden') return;
+      ask();
+      timer = setInterval(ask, HEARD_POLL_MS);
+    };
+    watch();
+    document.addEventListener('visibilitychange', watch);
+    return () => {
+      gone = true;
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', watch);
+    };
   });
+  /* WHETHER ANY MACHINE WILL TAKE A JOB NOW. Unknown (no answer, or not an owner's to read) says nothing in the sheet. */
+  const nobodyListening = $derived(devices !== null && !anyListening(devices, heardAt));
 
   /* ── Run a job ── */
 
@@ -196,7 +230,7 @@
     fix = null;
     if (kinds?.ok) return;
     kinds = null;
-    const got = await readKinds(apiBase(page.url), rows);
+    const got = await readHeldKinds(apiBase(page.url), rows);
     kinds = got;
     if (got.ok && chosen === null && got.value.length === 1) chosen = got.value[0]?.id ?? null;
   }
@@ -329,11 +363,17 @@
     {:else}
       <ul class="machines">
         {#each list as m (m.key)}
+          {@const heard = listeningOf(m, heardAt)}
           <li class="machine">
-            <IconWell name="monitor" size="l" tone={m.seen ? 'action' : undefined} />
+            <IconWell name="monitor" size="l" tone={heard.listening ? 'action' : undefined} />
             <span class="machine-main">
               <span class="machine-name">{m.name}</span>
-              <span class="machine-seen">{enrolledSaid(m, (iso) => since(iso, now))}</span>
+              <!-- LISTENING WEARS THE LIVE DOT AND SAYS SO, never the dot alone; a machine never heard says how it was enrolled. -->
+              {#if heard.listening}
+                <span class="machine-seen machine-listening"><span class="live-dot" aria-hidden="true"></span>{words.listening}</span>
+              {:else}
+                <span class="machine-seen">{heard.heard ?? enrolledSaid(m, (iso) => since(iso, heardAt))}</span>
+              {/if}
             </span>
           </li>
         {/each}
@@ -386,6 +426,8 @@
       {/each}
     {/if}
     {#if fix}<p class="sheet-fix" role="status">{fix}</p>{/if}
+    <!-- NO MACHINE LISTENING IS SAID BEFORE START, which still starts it: the job waits for a machine. -->
+    {#if nobodyListening}<p class="sheet-note" role="status">{words.nobodyListening}</p>{/if}
   {/if}
   <a class="link" href={at('/agents/new-kind')}>{kindWords.open}</a>
   {#snippet footer()}
@@ -526,6 +568,10 @@
   .machine-seen {
     color: var(--dim);
     font-size: var(--fs-meta);
+  }
+
+  .machine-listening {
+    color: var(--ink2);
   }
 
   /* THE LIVE DOT IN THE SENTENCE: 6px of the one hue that means alive, still, before the clause it belongs to. */

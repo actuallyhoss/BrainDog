@@ -105,7 +105,7 @@ export async function surfaceOver(clientFor: (ctx: Ctx) => Client): Promise<McpS
   const allowed = refused(probe) ? (probe.refusal as { allowed?: unknown }).allowed : undefined;
   const routed = new Set(Array.isArray(allowed) ? allowed : []);
 
-  const later: Pick<McpSurface<Ctx>, (typeof LATER)[number] | 'actions' | 'figures' | 'offered'> = {};
+  const later: Pick<McpSurface<Ctx>, (typeof LATER)[number] | 'actions' | 'figures' | 'offered' | 'beat'> = {};
   for (const name of LATER) if (routed.has(name)) later[name] = (args: object, ctx: Ctx) => ask<unknown>(ctx, name, args);
   /* `actions` TAKES NO ARGUMENTS, so it is written out rather than folded into the loop above: the surface declares it
      as `(ctx)` alone, and giving it the loop's `(args, ctx)` shape is a compile error, not a harmless widening. */
@@ -118,6 +118,17 @@ export async function surfaceOver(clientFor: (ctx: Ctx) => Client): Promise<McpS
      reads every fixed address and draws every page to learn what to list, a round trip each over this transport. A host
      that answers it with a refusal is listed the old way, so a host older than the route costs nothing but the time. */
   if (routed.has('offered')) later.offered = (ctx: Ctx) => ask<unknown>(ctx, 'offered');
+  /* `beat` AT MOST ONCE A MINUTE FROM HERE (AGT-C03 step 4): the door beats on every tool call it admits and the record
+     keeps one a minute, so the rest would be a round trip each for nothing. Its own two-second deadline, so it outlives
+     the call it rode on. So Codex and any stdio client without the PostToolUse hook reads Working too. */
+  let beatAt = 0;
+  if (routed.has('beat'))
+    later.beat = () => {
+      const now = Date.now();
+      if (now - beatAt < 60_000) return Promise.resolve({ ok: true, value: { run: null } });
+      beatAt = now;
+      return ask<unknown>({ signal: AbortSignal.timeout(2_000) }, 'beat');
+    };
 
   return {
     boot: (ctx) => ask(ctx, 'boot'),

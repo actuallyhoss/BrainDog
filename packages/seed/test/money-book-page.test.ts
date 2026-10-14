@@ -203,17 +203,17 @@ test('THE PAGE DECLARES ONE ROW OF THREE, under what the book has and its walk, 
   /* THE WHOLE WIDTH, so the three stand in one row and the tile of cash keeps its walk beside it. */
   assert.equal(row.span, 12);
   assert.deepEqual(
-    blocks.slice(0, 3).map((b) => b.heading),
+    blocks.filter((b) => !(b.kind === 'note' && b.lead === true)).slice(0, 3).map((b) => b.heading),
     ['What you have', 'Cash ahead', ROW],
   );
   /* AND WITH NO OTHER FIGURE OF A BOOK DECLARED THE ACCOUNTS COME NEXT, as they did. */
   const bare = bookPage((id) => CELLS.some(([had]) => had === id)).blocks as Declared[];
   assert.deepEqual(
-    bare.slice(0, 4).map((b) => b.heading),
+    bare.filter((b) => !(b.kind === 'note' && b.lead === true)).slice(0, 4).map((b) => b.heading),
     ['What you have', 'Cash ahead', ROW, 'Accounts'],
   );
   /* CASH STILL LEADS, and nothing else does. */
-  assert.deepEqual(blocks.filter((b) => b.lead === true).map((b) => b.heading), ['What you have']);
+  assert.deepEqual(blocks.filter((b) => b.lead === true && b.kind !== 'note').map((b) => b.heading), ['What you have']);
   /* DRAWN ON A FIGURE OF THIS BOOK: the page fills the name in, as every cell does. */
   assert.match(String(row.when?.metric), /^book-(in|out|net)-month:\{\{name\}\}$/);
 });
@@ -221,12 +221,12 @@ test('THE PAGE DECLARES ONE ROW OF THREE, under what the book has and its walk, 
 test('THE PAGE STAYS WITHIN THE CEILING OF 24 BLOCKS, with nothing folded away to make room', () => {
   const blocks = MONEY_BOOK_PAGE.blocks as unknown as Declared[];
   assert.ok(blocks.length <= 24, `${blocks.length} blocks`);
-  /* TEN AS IT WAS, AND THIRTEEN WITH ITS OWED ROW, THE LINE THAT ITS MONEY LASTS AND ITS MONTHS, whatever the tree
-     declares: a block over half the ceiling. */
+  /* TWELVE BARE, WITH THE TWO LINES ON CATEGORIES MARKED AGAINST THE LEDGER, AND FIFTEEN WITH ITS OWED ROW, THE LINE
+     THAT ITS MONEY LASTS AND ITS MONTHS, whatever the tree declares: well under the ceiling. */
   const full = bookPage(() => true).blocks as Declared[];
-  assert.equal((bookPage(() => false).blocks as Declared[]).length, 10);
-  assert.equal(full.length, 13);
-  assert.ok(blocks.length >= 10 && blocks.length <= full.length, `${blocks.length} blocks`);
+  assert.equal((bookPage(() => false).blocks as Declared[]).length, 12);
+  assert.equal(full.length, 15);
+  assert.ok(blocks.length >= 12 && blocks.length <= full.length, `${blocks.length} blocks`);
   for (const heading of ['Accounts', 'Add an account', 'Coming and going', 'Due in the next 30 days', 'The next 30 days', "Where this month's money went", 'What moved'])
     for (const page of [blocks, full]) assert.ok(page.some((b) => b.heading === heading), `${heading} was taken off the page to make room`);
 });
@@ -234,7 +234,7 @@ test('THE PAGE STAYS WITHIN THE CEILING OF 24 BLOCKS, with nothing folded away t
 test('WITH ITS FIGURES DECLARED THE PAGE HOLDS WHAT IS OWED AND ITS MONTHS, under This month and above the accounts', () => {
   const blocks = bookPage(() => true).blocks as Declared[];
   assert.deepEqual(
-    blocks.slice(0, 7).map((b) => b.heading ?? b.body),
+    blocks.filter((b) => !(b.kind === 'note' && b.lead === true)).slice(0, 7).map((b) => b.heading ?? b.body),
     ['What you have', 'Cash ahead', ROW, OWED, LASTS, CHART, 'Accounts'],
   );
   const owed = blocks.find((b) => b.heading === OWED)!;
@@ -449,7 +449,7 @@ test('WHAT IS DUE IS READ ABOUT THIS BOOK, each cell by its own words and none r
    reached its last day above zero, and never on the figure being empty, which a book nobody put money in is too. */
 test('THE PAGE DECLARES ONE LINE THAT THE MONEY LASTS, under What is due, drawn on the walk never going under', () => {
   const blocks = bookPage(() => true).blocks as Declared[];
-  const notes = blocks.filter((b) => b.kind === 'note');
+  const notes = blocks.filter((b) => b.kind === 'note' && b.lead !== true);
   assert.equal(notes.length, 1, 'one line, and no second');
   const note = notes[0]!;
   assert.equal(note.body, LASTS);
@@ -460,8 +460,8 @@ test('THE PAGE DECLARES ONE LINE THAT THE MONEY LASTS, under What is due, drawn 
   assert.equal(blocks[blocks.indexOf(note) - 1]?.heading, OWED, 'the line is not under What is due');
   /* IT WAITS FOR ITS FIGURE, as the cell does: a `when:` naming a figure nobody declared draws nothing for ever. */
   const without = bookPage((id) => id !== 'book-lasts-until').blocks as Declared[];
-  assert.equal(without.some((b) => b.kind === 'note'), false);
-  assert.equal((bookPage((id) => id === 'book-lasts-until').blocks as Declared[]).filter((b) => b.kind === 'note').length, 1);
+  assert.equal(without.some((b) => b.kind === 'note' && b.lead !== true), false);
+  assert.equal((bookPage((id) => id === 'book-lasts-until').blocks as Declared[]).filter((b) => b.kind === 'note' && b.lead !== true).length, 1);
   /* NO DASH, NO ADDRESS AND NO NAME OF A FIGURE IN WHAT A PERSON READS. */
   assert.doesNotMatch(LASTS, /—|register\.|book-|\{\{/u);
 });

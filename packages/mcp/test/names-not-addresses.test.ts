@@ -82,7 +82,7 @@ test('A FILED OR LANDED ANSWER IS IN NAMES TOO', () => {
 });
 
 test('THE BRIEFING SAYS PEOPLE BY NAME, and a step, a question or a learning never carries an address or an id', () => {
-  const { card, text, value } = briefed({
+  const { text, value } = briefed({
     look,
     home: null,
     context: {
@@ -98,11 +98,6 @@ test('THE BRIEFING SAYS PEOPLE BY NAME, and a step, a question or a learning nev
       live: { same_repo: [{ spoken: 'S4', agent: 'claude', doing: 'Mailing jo@kiln.example from /Users/mara/Developer', age_s: 60 }] },
     },
   });
-  const who = card.split('\n').find((l) => l.startsWith('Who')) ?? '';
-  assert.match(who, /Teodor Vance \(client\), Wren \(Teodor Vance\)/u);
-  assert.doesNotMatch(who, /someone|kiln/iu, 'a person known only by an address was named');
-  assert.match(card, /^Next {5}Write to someone about Joaquin Herrera \(people#3\) \(S5, /mu);
-  assert.match(card, /^Waiting {2}1 on Mara: Is Joaquin Herrera the same person as Joaquin Herrera \(people#3\)\?/mu);
   clean(text, 'the briefing');
   const kept = value as { handoff: { next: string; tried: string[] }; waiting: { shown: { question: string }[] } };
   for (const s of [kept.handoff.next, ...kept.handoff.tried, ...kept.waiting.shown.map((q) => q.question)]) assert.doesNotMatch(s, NEVER[0]![0], `the briefing's value carried an address: ${s}`);

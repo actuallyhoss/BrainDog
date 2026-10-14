@@ -86,6 +86,7 @@
     type Held,
     type Plan,
   } from '$lib/signup.ts';
+  import { heardOf, offerOf, readCatalogueOffer, type CatalogueOffer } from '$lib/start/offer.ts';
   import { placesOf, proposeFirst, type HeardLine, type Proposal } from '$lib/start/propose.ts';
   import { answer, oneQuestion } from '$lib/start/question.ts';
   import { titleOf } from '$lib/title.ts';
@@ -270,7 +271,11 @@
   let pick = $state<string | null>(null);
 
   /* THE DEVICE'S CURRENCY GOES IN WITH THE WORDS, so a shop in Cairo keeps EGP without being asked (`zoneCurrency`). */
-  const reading = (s: string): Promise<Proposal> => proposeFirst(s, { zone: here, locale, currency: zoneCurrency(here) }, null);
+  /* THE CATALOGUE'S USE CASES ARE LISTENED FOR TOO (`heardOf`), once the host's catalogue answers; the model's offer
+     (`offerOf`) goes with them for the day a model reads here. */
+  let cat = $state.raw<CatalogueOffer | null>(null);
+  const reading = (s: string): Promise<Proposal> =>
+    proposeFirst(s, { zone: here, locale, currency: zoneCurrency(here), catalogue: heardOf(cat), offer: offerOf(cat) }, null);
 
   $effect(() => {
     const s = sentence;
@@ -486,6 +491,7 @@
   });
 
   onMount(() => {
+    void readCatalogueOffer().then((c) => (cat = c));
     /* THE FRAGMENT IS WIPED AS IT IS READ, so the proof never sits in the tab's history or a copied address. */
     const arrived = arrivalOf(location.hash, () => history.replaceState(history.state, '', location.pathname + location.search));
     const kept = heldOf(globalThis.sessionStorage);

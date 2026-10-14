@@ -51,6 +51,7 @@
     monthBars,
     monthReading,
     nextOf,
+    ruleSaid,
     triggerIcon,
     type HubRow,
     type Sentence,
@@ -124,6 +125,7 @@
     icon: triggerIcon(r.trigger, listIcon(r.register)),
     aside: nextOf(r, now),
     toggle: owner ? { on: r.enabled, label: w.switchOf(r.name) } : undefined,
+    ...ruleSaid(r, listSaid),
   });
 
   const on = $derived(rows.filter((r) => placed.get(r.id) ?? r.enabled).map(rowOf));

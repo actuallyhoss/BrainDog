@@ -93,7 +93,7 @@ export async function readLinks(base: string, io?: Fetch): Promise<Wrote<ShareRo
 /**
  * The link as the owner copies it: whole, with this origin in front of it.
  *
- * A HOST WITH NO PUBLIC ORIGIN WRITES THE ADDRESS FROM THE ROOT (`linkOpened` in `@braindog/host`), `/app/s/<token>`,
+ * A HOST WITH NO PUBLIC ORIGIN WRITES THE ADDRESS FROM THE ROOT (`linkOpened` in `@braindog/host`), `/app/s#<token>`,
  * and a link pasted into a message without its origin opens nothing. So a root-relative address is read against the
  * page it was made on, and a whole one is handed back as it came.
  */

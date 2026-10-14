@@ -23,12 +23,15 @@
     value = $bindable(''),
     label,
     id,
+    describedby,
   }: {
     value?: string | undefined;
     /** The field's name, which the button and the preview are announced by. */
     label: string;
     /** The id a `<label for>` points at, given to the button. */
     id?: string | undefined;
+    /** The id of the line under the field that says what is wrong with it, beside this field's own why. */
+    describedby?: string | undefined;
   } = $props();
 
   /* THIS FIELD'S WORDS, said only by it. */
@@ -117,7 +120,7 @@
         class="file-button"
         {id}
         disabled={sending}
-        aria-describedby={why ? `${id ?? 'file'}-why` : undefined}
+        aria-describedby={[why ? `${id ?? 'file'}-why` : '', describedby ?? ''].filter(Boolean).join(' ') || undefined}
         onclick={() => picker?.click()}
       >
         <Icon name="plus" size="s" />

@@ -3,8 +3,12 @@
   tier 0).
 
   WHY THIS IS HERE. An "Adds only" colleague cannot open the rest of the app, since every screen reads first, and an
-  agent adding rows through MCP is the one way in their level was made for. So their sign-in lands here, and this is
-  where they mint the key. The owner sees every key, theirs included, in the Connected list above this one instead.
+  agent adding through MCP is the one way in their level was made for. Accepting an invitation that gives only that
+  opens this screen (`invite/+page.svelte`), and the refusal every other screen gives her names it, so this is where
+  she makes the key. The owner sees every key, hers included, in his own Connected list.
+
+  UNDER A NEW KEY, THE LINE TO PASTE INTO AN AGENT, beside the key and its header as the owner's connect sheet prints
+  them, so whoever made it can say in one line what to do with it.
 
   THE RECORD CAPS EACH KEY BY ITS PERSON'S LEVELS AT EVERY CALL, so the scope chosen here is a ceiling and never a
   grant, and the screen does not repeat the ladder: it prints what the record answers.
@@ -16,10 +20,11 @@
   import { copy } from '$lib/copy.ts';
   import * as clipboard from '$lib/clipboard.ts';
   import { read, type Result } from '$lib/data/read.svelte.ts';
-  import { LABEL_MAX, TOKEN_DAYS, headerLine } from '$lib/record/device.ts';
+  import { LABEL_MAX, TOKEN_DAYS, connectLines, headerLine } from '$lib/record/device.ts';
   import { wrote } from '$lib/record/settings-write.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
+  import { bareOrigin } from '../settings-state.svelte.ts';
   import { createClient, type TokenRow } from '@braindog/client';
   import { TONES, relative, since } from 'braindog-render';
   import Section from '$lib/ui/Section.svelte';
@@ -90,6 +95,13 @@
     return facts;
   }
 
+  /**
+   * The line that connects an agent with this key: Claude Code's own command for the record's MCP address, as the
+   * owner's sheet prints it, with the key's header beside it. Built only inside the one reveal, so the key is never
+   * written anywhere else, and gone with it on Done.
+   */
+  const agentLine = (bearer: string): string => `${connectLines(bareOrigin()).claude} --header "${headerLine(bearer)}"`;
+
   /* A LINE IS COPIED WITH ITS OWN SENTENCE, and the line is never quoted in the toast: the key is one of them. */
   const put = (line: string, said: string): void => void clipboard.put(line, line, said);
 </script>
@@ -100,6 +112,11 @@
     {@const bearer = minted.bearer}
     <div class="mine-minted" role="status">
       <p class="mine-step">{copy.tokenOnce}</p>
+      <p class="mine-step">{words.agentStep}</p>
+      <div class="mine-line">
+        <code class="mine-code">{agentLine(bearer)}</code>
+        <Button weight="primary" onclick={() => put(agentLine(bearer), copy.lineCopied)}>{words.copyAgentLine}</Button>
+      </div>
       <div class="mine-line">
         <code class="mine-code">{bearer}</code>
         <Button weight="quiet" onclick={() => put(bearer, copy.keyCopied)}>{copy.copyKey}</Button>

@@ -56,7 +56,28 @@ export type Implied = { setting: string | null; held: string[] };
  */
 const IMPLIED = new WeakMap<Boot, Implied>();
 
-export type Booted = { from: 'live'; boot: Boot } | { from: 'refused'; code: string; fix: string };
+export type Booted = { from: 'live'; boot: Boot } | ({ from: 'refused' } & Said);
+
+/**
+ * What the record said instead of its `boot`: its code, its sentence, and where the refusal is about when it said.
+ *
+ * `at` IS KEPT because a screen branches on it and never on the sentence: `level.append` is a person at "Adds only",
+ * and Home draws the one button that is hers under her sentence (USE-A11). Left off when the record sent none, so every
+ * refusal that never carried one reads exactly as it did.
+ */
+export type Said = { code: string; fix: string; at?: string };
+
+/** Where an "Adds only" person's refusal is about, as the record's `appendReadRefusal` sends it. */
+export const APPEND_AT = 'level.append';
+
+/** Whether a refused `boot` is the one a person at "Adds only" gets: the screen offers her agent's key. */
+export const onAppendOnly = (said: Said | null | undefined): boolean => said?.at === APPEND_AT;
+
+const saidOf = (r: { code: string; fix: string; at?: string | undefined }): Said => ({
+  code: r.code,
+  fix: r.fix,
+  ...(typeof r.at === 'string' && r.at !== '' ? { at: r.at } : {}),
+});
 
 /**
  * What every shell carries, whoever answered.
@@ -163,7 +184,7 @@ export type Shell = ShellBase & {
    *
    * Absent on every shell drawn over a record that answered.
    */
-  refused?: { code: string; fix: string } | undefined;
+  refused?: Said | undefined;
   /**
    * EVERY LIST THE RECORD HOLDS, the empty ones too, for the places that put something INTO a list.
    *
@@ -219,7 +240,7 @@ let keptFor = '';
  * away there, and this is the file that had it. Cleared the moment the record answers, so a shell
  * over a record that came back never carries a sentence about a read that is over.
  */
-let refusal: { code: string; fix: string } | null = null;
+let refusal: Said | null = null;
 
 /**
  * THE `boot` THE PAGE ASKED FOR BEFORE THE APP ARRIVED (`app.html`), taken once and only for the address it was asked
@@ -264,8 +285,8 @@ export function readBoot(base: string, io?: Fetch): Promise<Booted> {
        sample, for the tab, and so the first load after signing in was handed The Studio with no request made.
        A refusal kept nothing then either; now it is every such answer. */
     kept = null;
-    refusal = { code: said.code, fix: said.fix };
-    return { from: 'refused', code: said.code, fix: said.fix };
+    refusal = saidOf(said);
+    return { from: 'refused', ...refusal };
   })();
   return kept;
 }
@@ -977,7 +998,7 @@ export const NO_RECORD_FIX = 'You are signed in and on no record yet.';
 export const onNoRecord = (said: { code: string; fix: string } | null | undefined): boolean =>
   said !== null && said !== undefined && said.code === 'FORBIDDEN' && said.fix === NO_RECORD_FIX;
 
-export const refusedShell = (said: { code: string; fix: string } | null = refusal): Shell => ({
+export const refusedShell = (said: Said | null = refusal): Shell => ({
   ...layoutOf({ registers: [], now: new Date().toISOString(), home: null }),
   ...(said ? { refused: said } : {}),
 });

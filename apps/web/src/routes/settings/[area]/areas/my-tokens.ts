@@ -32,6 +32,8 @@ export const words = {
   noneWhy: 'Make one above and give it to your agent. It works until it ends or you revoke it.',
   unnamed: 'A key with no name',
   madeBy: (who: string) => `made by ${who}`,
+  agentStep: 'Paste this into Claude Code, or give your agent the key and the header below it.',
+  copyAgentLine: 'Copy the line',
 } as const;
 
 /** Only the keys still standing are listed: a revoked one can do nothing, and the owner's history keeps it. */

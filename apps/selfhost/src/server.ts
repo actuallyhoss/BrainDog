@@ -90,6 +90,8 @@ import { shellOf } from './shell.ts';
 import { signerFor } from './sign.ts';
 import { keysDoor, vaultDoor } from './vault.ts';
 import { serveShape, servesShape, type ShapeDoor } from '@braindog/host/shape';
+import { serveFirstRead, type FirstReadDoor } from '@braindog/host/first-read';
+import { selfhostFirstReadDoor } from './first-read.ts';
 /* THE SHAPE COPY'S RECORD HALF, BUILT HERE OVER THE RECORD'S KERNEL so the door answers whether or not `methods/index.ts`
    has spread it into the API yet; the same deps the record hands it, so the two cannot answer differently. */
 import { methods as shapeMethods } from '@braindog/record/shape';
@@ -337,6 +339,8 @@ type Site = {
   limits: Limiter | null;
   /** `/oauth/*` and the OAuth metadata (`./oauth.ts`): on where somebody signs in from a browser, and off with its sentence. */
   oauth: OAuthHere;
+  /** `POST /auth/signup/read` (`./first-read.ts`), built once so its in-memory count lasts the whole process. */
+  firstRead: FirstReadDoor;
 };
 
 /** Who is asking, a refusal, or a bare status; and the cookie the answer carries, when it carries one. */
@@ -1654,6 +1658,10 @@ export async function start(options: {
        the owner's two listings, which mark what it ended. */
     validFrom,
     invitations: () => invitesOff,
+    /* WHETHER THIS PROCESS MAKES READ-ONLY LINKS: only with a share key (below), and the owner's sentence without one. */
+    /* AN AGENT'S TRIALS TODAY, from the Directory's ledger opened below (`script-try-cap.ts`); none counted before it is. */
+    trialsToday: (r) => ledger?.trialsToday(r, clock.now()) ?? 0,
+    shares: () => (shareKey !== null ? { can: true } : { can: false, why: 'Read-only links are switched off on this BrainDog.' }),
     /* WHAT AN AGENT MAY PROPOSE INSTALLING: the first-party packs and the starter use cases (`catalogue.ts`). */
     catalogue: seedCatalogue(),
     /* A SHARED FILE AT AN ADDRESS IS READ HERE, not in the tab, so a site with no CORS header still installs. */
@@ -2033,6 +2041,8 @@ export async function start(options: {
       send: options.shared?.send,
       resolve: options.shared?.resolve,
     }),
+    /* THE FIRST READ OF A STRANGER'S SENTENCE, built once here where the origin is known, so its count lasts the process. */
+    firstRead: selfhostFirstReadDoor(env, { origin, slash: slashConfig, readSetup: null }),
     snapshots: kept,
     blobs: blobsFolder(options.file),
     /* THE TWO EMAIL ROUTES, GIVEN ONLY WHERE THIS HOST CAN MAIL THE LETTERS, as the magic-link door beside it is
@@ -2366,6 +2376,9 @@ async function answer(
        are yet, and the address the lockouts count is the one thing here a caller cannot choose (`ipOf`). */
     const ip = ipOf(req, trustProxy);
     const over = await overLimit(site, null, ip, SAFE_METHODS.has(method) ? 'read' : 'write');
+    /* A STRANGER'S FIRST SENTENCE, READ BY THIS HOST'S MODEL (`./first-read.ts`): off until `FIRST_READ_DAILY` is set,
+       and no reader is built yet (`readSetup`), so it answers that it is not in this build. */
+    if (over === null && /^\/+auth\/signup\/read\/*$/.test(path)) return write(res, await serveFirstRead(request, site.firstRead));
     return write(res, over ?? (await serveAuth(request, { ...site.door, ip, reached: req.headers.host ?? '' })));
   }
   /* `/account/*` IS THE DIRECTORY'S TOO, and reads only the session cookie. */

@@ -19,7 +19,7 @@
   import { apiBase } from '$lib/at.ts';
   import { readSeen, seenLines, type Seen } from './seen.ts';
 
-  let { register, seq, now }: { register: string; seq: number; now: number } = $props();
+  let { register, seq, now, ondrew }: { register: string; seq: number; now: number; ondrew?: (drew: boolean) => void } = $props();
 
   let found = $state<Seen | null>(null);
   const shown = $derived(seenLines(found, now));
@@ -28,7 +28,7 @@
     const client = createClient({ base: apiBase() });
     const out = await readSeen((name, args) => client.call(name, args), row);
     /* AN ANSWER FOR A ROW THE PAGE HAS LEFT is dropped, so one page never lists another's places. */
-    if (row.register === register && row.seq === seq) found = out;
+    if (row.register === register && row.seq === seq) { found = out; ondrew?.(out !== null); }
   }
 
   $effect(() => {

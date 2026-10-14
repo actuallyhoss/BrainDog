@@ -125,6 +125,9 @@ export const hubWords = {
   switchOf: (name: string) => `Run ${name}`,
   /* THE RIGHT-HAND COLUMN OF AN AUTOMATION'S ROW, when it has a next turn. */
   nextAt: (when: string) => `Next ${when}`,
+  /* WHAT A RULE HAS DONE, from the record's whole count: how often and the day it last did, or never. */
+  ranCount: (n: number, when: string) => `Ran ${times(n)}${when ? `${n === 1 ? ', ' : ', last '}${when}` : ''}.`,
+  neverRan: 'Never ran.',
 
   /* ── the tiles above the lists, each a chart and the one line saying what it means ────────────── */
   runsMonth: 'Runs this month',
@@ -234,11 +237,91 @@ export function hubSentence(rows: readonly AutomationRow[]): Sentence | null {
 /* ── an automation's row ────────────────────────────────────────────────── */
 
 /**
- * An automation's second line: off, or how its last run went. Its next turn is the row's right-hand column
- * (`nextOf`), so it is not said twice the way `rowLine` says it for a list that has no column to put it in.
+ * A row as the record's `automations` answers it with its whole count (`packages/record/src/automations.ts`): how many
+ * times its work has landed ever (`fired`), when it last did (`last_at`), one sentence on why one that never has not
+ * (`why_idle`), and the key it shares with rules that do the same thing to the same list (`family`). All four are
+ * absent from a host that sends no count, and the row is then said from its last run and one page of the log, as before.
  */
-export function lastLine(row: AutomationRow, now: number): string {
-  return row.enabled ? lastSaid(row, now) : flowWords.off;
+export type Counted = AutomationRow & {
+  fired?: number | undefined;
+  last_at?: string | null | undefined;
+  why_idle?: string | null | undefined;
+  family?: string | null | undefined;
+};
+
+/** When a count's last firing was, as a person says a day: today, yesterday, "on 3 Oct", and the year when not this one. */
+export function onDay(iso: string, now: number): string {
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return '';
+  const key = dayKey(t);
+  if (key === dayKey(now)) return 'today';
+  if (key === dayKey(now - DAY_MS)) return 'yesterday';
+  const d = new Date(t);
+  const year = d.getFullYear() === new Date(now).getFullYear() ? '' : ` ${d.getFullYear()}`;
+  return `on ${d.getDate()} ${MONTH[d.getMonth()]}${year}`;
+}
+
+/**
+ * What a rule has done, from the whole count: "Ran 12 times, last on 3 Oct." or "Never ran." and the record's one
+ * sentence on why. `''` for a host that sent no count.
+ *
+ * THE COUNT IS THE WHOLE OF IT, NOT A PAGE OF HISTORY. "Has done nothing lately" was read off the newest 200 lines of
+ * the log, and on a lived record sixty rules said it in a column; the record keeps the count, so a rule that has worked
+ * says how often and one that never has says "never", and why.
+ */
+export function countSaid(row: Counted, now: number): string {
+  if (typeof row.fired !== 'number') return '';
+  if (row.fired <= 0) return [hubWords.neverRan, row.why_idle?.trim() ?? ''].filter(Boolean).join(' ');
+  const when = row.last_at ? onDay(row.last_at, now) : '';
+  return hubWords.ranCount(row.fired, when);
+}
+
+/**
+ * An automation's second line: off, or what it has done. Its next turn is the row's right-hand column
+ * (`nextOf`), so it is not said twice the way `rowLine` says it for a list that has no column to put it in.
+ *
+ * THE COUNT LEADS WHERE THE RECORD SENT ONE, and a last run that did not finish well follows it, since a failure is the
+ * part that needs him. A host that sends no count is said from its last run and the log, as before.
+ */
+export function lastLine(row: Counted, now: number): string {
+  if (!row.enabled) return flowWords.off;
+  const count = countSaid(row, now);
+  if (count === '') return lastSaid(row, now);
+  const tail = row.last && row.last.state !== 'done' ? lastSaid(row, now) : '';
+  return [count, tail].filter(Boolean).join(' ');
+}
+
+/**
+ * What a rule's hub row carries so its family can be folded (`hub-family.ts`): the key, the list's name, and what its
+ * actions act on, in words; and its count. `listSaid` is the caller's, the list's name as the rail says it.
+ *
+ * THE KEY IS A HANDLE AND NEVER WORDS. It is the record's (`familyOf`), and the family's name is made from the list's
+ * name and the fields its actions set, read off the body the row already has, so nothing a person reads spells the key.
+ */
+export function ruleSaid(row: Counted, listSaid: (id: string) => string): Pick<HubRow, 'family' | 'fired' | 'lastAt'> {
+  const fired = typeof row.fired === 'number' ? row.fired : undefined;
+  const lastAt = fired === undefined ? undefined : (row.last_at ?? null);
+  if (!row.family || row.register === null) return { fired, lastAt };
+  return { family: { key: row.family, list: listSaid(row.register), did: didOf(row.body) }, fired, lastAt };
+}
+
+/* WHAT AN ACTION WITH NO FIELD ACTS ON, as a family names it. */
+const DID_WORDS: Record<string, string> = { tag: 'Tags', untag: 'Tags', note: 'Note', notify: 'Notice', move: 'State', create: 'New items' };
+
+/** What a body's actions act on, in words and in order, each once: the field a step sets, else what the verb touches. */
+function didOf(body: AutomationRow['body']): string[] {
+  const steps = Array.isArray(body?.then) ? body.then : Array.isArray(body?.steps) ? body.steps : [];
+  const out: string[] = [];
+  for (const step of steps as unknown[]) {
+    if (step === null || typeof step !== 'object') continue;
+    const verb = 'if' in step ? 'if' : Object.keys(step)[0];
+    if (verb === undefined || verb === 'if') continue;
+    const arg = (step as Record<string, unknown>)[verb];
+    const field = arg !== null && typeof arg === 'object' && typeof (arg as { field?: unknown }).field === 'string' ? (arg as { field: string }).field : null;
+    const said = field !== null ? humanize(field) : (DID_WORDS[verb] ?? humanize(verb));
+    if (said !== '' && !out.includes(said)) out.push(said);
+  }
+  return out;
 }
 
 /** "Next in 2h", for a turned-on automation that has one. */
@@ -482,6 +565,12 @@ export type HubRow = {
   clock?: boolean | undefined;
   /** A switch at the row's end, for a thing the reader may turn on and off: how it stands, and what the switch is called. */
   toggle?: { on: boolean; label: string } | undefined;
+  /** The family a rule shares with others that do the same thing to the same list (`ruleSaid`), which folds it. */
+  family?: { key: string; list: string; did: string[] } | undefined;
+  /** How many times a rule's work has landed, from the record's whole count, when the host sent one. */
+  fired?: number | undefined;
+  /** When it last did, beside `fired`. */
+  lastAt?: string | null | undefined;
 };
 
 export type RunKind = 'automation' | 'scheduled' | 'script';
@@ -664,12 +753,13 @@ export function lastRunReading(runs: readonly RunRow[], places: readonly string[
  * The page's sentence under its title: its last run and its next, and the failed clause as the phrase that needs him.
  * `null` for a draft that was never saved, which has nothing to report.
  */
-export function pageSentence(row: AutomationRow | null, now: number): Sentence | null {
+export function pageSentence(row: Counted | null, now: number): Sentence | null {
   if (!row) return null;
   if (!row.enabled) return { text: flowWords.off, needs: '' };
   const next = row.next ? flowWords.nextRun(since(row.next, now)) : '';
   if (!row.last) {
-    const text = [lastSaid(row, now), next].filter(Boolean).join(' ');
+    /* THE WHOLE COUNT WHERE THE RECORD SENT ONE, as the hub's row says it, and the log's page only where it did not. */
+    const text = [countSaid(row, now) || lastSaid(row, now), next].filter(Boolean).join(' ');
     return text === '' ? null : { text, needs: '' };
   }
   const state = flowWords.runState[row.last.state] ?? row.last.state;

@@ -19,6 +19,8 @@ import type { Clock, Refusal, Result, Scheduler, Snapshot, Snapshots, Sql } from
 import { PRIMITIVES_VERSION, type KindSpec } from 'braindog-render';
 import { lintRound, pagesCleanReading } from './page-lint.ts';
 import { fileRecordSigns } from './signs.ts';
+import { appendReadRefusal } from './append-refusal.ts';
+import { trialsLeft } from './script-try-cap.ts';
 import {
   handedOf,
   keptQuestion,
@@ -217,6 +219,7 @@ import type { EngineHealthRead } from './methods/engine.ts';
 import { quietSign } from './methods/signs.ts';
 import { methods as jobMethods } from './jobs.ts';
 import { PEN_DISMISSED_MOST, penFor, penRanked, signatureOf, type PenItem } from './emergent.ts';
+import { methods as censusMethods } from './methods/pages-census.ts';
 import { methods as previewChangeMethods } from './methods/preview-change.ts';
 import { landRetype } from './methods/retype.ts';
 import { byMeaning } from './near.ts';
@@ -903,6 +906,7 @@ export function allows(ctx: CallContext, need: Need, nameOf: (list: string) => s
      `code: short ? 'SCOPE_INSUFFICIENT' : 'LEVEL_REQUIRED'`, and the first arm was a code in no
      registry, counted by that gate as one of the five outside it. */
   if (short) return { code: 'FORBIDDEN', fix: `This needs ${need}, and you have ${has}.${next}`, allowed: reach };
+  if (p.kind === 'person' && level === 'append' && need === 'read') return { ...appendReadRefusal(), allowed: reach };
   return { code: 'LEVEL_REQUIRED', fix: `This needs ${need}, and you have ${has}.${next}`, allowed: reach };
 }
 
@@ -946,6 +950,7 @@ export const PREF_KEYS = [
   'look.contrast',
   'look.accent',
   'look.shot',
+  'packs.known_keys',
 ] as const;
 export type PrefKey = (typeof PREF_KEYS)[number];
 /**
@@ -963,6 +968,9 @@ export type PrefKey = (typeof PREF_KEYS)[number];
  *
  * `look.shot` IS SCREENSHOT MODE, ON OR OFF (batch 62): the person's own words are plated while the screen is shown to
  * someone else. Kept and sent with boot like the five; no screen reads it yet, and the browser keeps no copy of it.
+ *
+ * `packs.known_keys` IS THE PUBLISHER KEYS THIS PERSON HAS SEEN SIGN EACH ADD-ON (batch 97), add-on by add-on, at most
+ * eight ids each: Browse reads it to say when an add-on's key changed, on every device rather than in one browser.
  */
 export type Prefs = {
   'nav.order'?: string[];
@@ -979,6 +987,7 @@ export type Prefs = {
   'look.contrast'?: boolean;
   'look.accent'?: string;
   'look.shot'?: boolean;
+  'packs.known_keys'?: Record<string, string[]>;
 };
 
 /** The words each `look.*` key takes. `look.accent` takes `LOOK_ACCENTS`, which follows the suggested accents. */
@@ -1729,6 +1738,8 @@ export type RecordDeps = {
    * Absent is the same as a host that cannot, so a link is never minted for a door that is not there.
    */
   invitations?: (() => string | null) | undefined;
+  /** Whether this host can make a read-only link to a page, and why not (`sharesOf` at the Worker's door). Absent is no. */
+  shares?: (() => { can: boolean; why?: string }) | undefined;
   /**
    * The operator's cut-off, `TOKENS_VALID_FROM` on the Worker and `BRAINDOG_TOKENS_VALID_FROM` on the self-host: an ISO
    * instant before which every token and device grant this record issued is refused (`TokenDeps.validFrom`, `53 §5.11`).
@@ -1790,6 +1801,8 @@ export type RecordDeps = {
    * host passes the run through as `ctx.config`.
    */
   tryScript?: ((draft: { record: { id: string; tz: string }; body: Record<string, unknown>; config: Record<string, JsonValue>; input: unknown; reads: { list(register: string, where: unknown, options?: unknown): Promise<unknown[]>; get(spoken: string): Promise<unknown> }; owner: boolean; stale: boolean; asker: string }) => Promise<unknown>) | undefined;
+  /** How many trials agents have run on this record today, from the host's ledger (`trialsToday` in the Directory). Absent, no cap is kept. */
+  trialsToday?: ((record: string) => Promise<number> | number) | undefined;
   /**
    * The Directory, where this host keeps it in the same process as the record, for the methods under `methods/`.
    *
@@ -1992,7 +2005,7 @@ export async function createRecordApi(deps: RecordDeps) {
   return { ...api(kernel, deps, cursors), kernel };
 }
 
-function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress' | 'slashModel' | 'slashMeter' | 'engineHealth' | 'engineLedger' | 'catalogueOffers' | 'catalogueShelf' | 'tryScript' | 'answersSlash' | 'directory' | 'validFrom' | 'meaning'>, cursors: HistoryCursors) {
+function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress' | 'slashModel' | 'slashMeter' | 'engineHealth' | 'engineLedger' | 'catalogueOffers' | 'catalogueShelf' | 'tryScript' | 'trialsToday' | 'shares' | 'answersSlash' | 'directory' | 'validFrom' | 'meaning'>, cursors: HistoryCursors) {
   const { sql, clock, scheduler, build, snapshots, destroy, invitations } = deps;
   /* THE LADDER OF TRUST, the record's half (`ladder.ts`): what an agent's write does at the rung it stands on. */
   const trust = ladder({ sql, kernel, now: () => clock.now() });
@@ -7865,7 +7878,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * the first call, so `context` counts what went stale through the same guards the read `stale` answers through.
    */
   let methodsHanded: MethodDeps | null = null;
-  const methodDeps = (): MethodDeps => (methodsHanded ??= { kernel, sql, guard, scoped, readable, sightOf, admin, vault, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), ...(deps.engineLedger === undefined ? {} : { engineLedger: deps.engineLedger }), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom, untrusted: (ctx, where) => { const reader = callerOf(ctx); if (reader !== null) trust.markUntrusted(reader, where); }, createDoor: (ctx, register, fields) => { const stop = mergeShaped(ctx, register, fields, null) ?? keyHeld(ctx, register, fields, null); return stop ? { refusal: stop } : { fields: huedOf(register, fields) }; }, withheld: drawnWithheld });
+  const methodDeps = (): MethodDeps => (methodsHanded ??= { kernel, sql, guard, scoped, readable, sightOf, admin, vault, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), ...(deps.engineLedger === undefined ? {} : { engineLedger: deps.engineLedger }), ...(deps.shares === undefined ? {} : { shares: deps.shares }), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom, untrusted: (ctx, where) => { const reader = callerOf(ctx); if (reader !== null) trust.markUntrusted(reader, where); }, createDoor: (ctx, register, fields) => { const stop = mergeShaped(ctx, register, fields, null) ?? keyHeld(ctx, register, fields, null); return stop ? { refusal: stop } : { fields: huedOf(register, fields) }; }, withheld: drawnWithheld });
 
   /**
    * The stale count `context` carries: the lines the read `stale` would answer this caller at this moment, added up
@@ -9018,7 +9031,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         keysOf: lintKeysOf,
         now: () => Date.now(),
       });
-      const reading = pagesCleanReading(round);
+      /* THE PAGES CENSUS BESIDE THE LINT (PGS-A01 step 5): every page, read as the system, and the suggested pages waiting
+         in the holding pen, so the sign also says which pages show a refused block or print a path that named nothing. */
+      const census = await censusMethods(methodDeps()).pagesCensus(undefined, { principal: { kind: 'system', id: 'signs' } });
+      const suggested = penFor({ kernel, reads: () => true, pages: kernel.pages(), dismissed: new Set(), use: { sql, nowMs: clock.now() } }).filter((i) => i.kind === 'page').length;
+      const reading = pagesCleanReading(round, census.ok ? census.value : undefined, suggested);
       /* A READING THE KERNEL REFUSES IS SAID, never dropped: the host logs the throw, and the sign keeps yesterday's. */
       const filed = kernel.signRead('pages-clean', reading);
       if (!filed.ok) throw new Error(`pages-clean was not filed: ${'refusal' in filed ? filed.refusal.fix : 'the record changed under it'}`);
@@ -9704,6 +9721,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const shut = vault(ctx);
       const p = ctx.principal;
       const who = kernel.identity();
+      /* TWENTY TRIALS AN AGENT A RECORD A DAY (`script-try-cap.ts`): a token's trial is counted by the host's ledger,
+         and a refused body returned above, so it never counts. */
+      if (p.kind === 'token' && deps.trialsToday) {
+        const left = trialsLeft(await deps.trialsToday(who?.id ?? 'self'));
+        if (!left.ok) return left;
+      }
       /* THE DRAFT'S OWN PACK'S SETTINGS, since the record is the only side that can read them; a
          script that names no pack, or one this record does not hold, tries with none. */
       const config: Record<string, JsonValue> = typeof b.pack === 'string' ? ((r) => (r.ok ? r.value.values : {}))(kernel.packConfig(b.pack)) : {};
@@ -9906,6 +9929,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         if (typeof value !== 'string' || !allowed.includes(value))
           return no('VALUE_MALFORMED', `${key} is ${allowed.join(', ')}, or null to take it away.`, { at: 'value', allowed: [...allowed] });
         kept = value;
+      } else if (value !== null && key === 'packs.known_keys') {
+        const entries = typeof value === 'object' && !Array.isArray(value) ? Object.entries(value as Record<string, unknown>) : null;
+        if (!entries || entries.length > 200 || !entries.every(([k, v]) => k.length > 0 && k.length <= 300 && texts(v, 8, (s) => /^[0-9a-f]{16}$/u.test(s))))
+          return no('VALUE_MALFORMED', 'packs.known_keys maps each add-on to the ids of at most 8 publisher keys seen for it, at most 200 add-ons, or null to take it away.', { at: 'value' });
+        kept = Object.fromEntries(entries.map(([k, v]) => [k, [...new Set(v as string[])]]));
       }
       kernel.setPref(ctx.principal.id, key, kept);
       return ok({ key, value: kept });
@@ -11194,7 +11222,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          undo puts the whole press back, where the kernel's default gave each row a batch of its own. */
       const batch = ctx.batch ?? mintBatch();
       const out = kernel.applyRule(args.id, { ...(args.dry === undefined ? {} : { dry: args.dry }), ...(args.limit === undefined ? {} : { limit: args.limit }), batch });
-      return args.dry ? out : tail(out);
+      return args.dry ? out : tail(out.ok ? { ...out, value: { ...out.value, batch } } : out);
     },
 
     /* ── ADMIN: WHO IS ON THE RECORD ───────────────────── */

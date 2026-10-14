@@ -22,7 +22,8 @@ import { BOOK_LEGS, DUE_30D, MOVED_COLUMNS } from './shared.ts';
  * true, because a book's few accounts are the page's subject and Cash now by account is a figure of the whole record.
  * SINCE money-core 3.4.0 the month ahead and what moved are folded under the accounts, as Money's are.
  *
- * SINCE money-core 3.17.0 a book whose money never goes under in the year reads one line that it lasts (`lastsNote`).
+ * SINCE money-core 3.17.0 a book whose money never goes under in the year reads one line that it lasts (`lastsNote`),
+ * and a record holding categories marked against how the Ledger books them says how many (`againstNotes`).
  *
  * A BLOCK IS ON THE PAGE ONCE EVERY FIGURE IT READS IS DECLARED (REC-A09 step 3, second half). What a book is owed and
  * its months are read from figures of one book (`figures/books.ts`), and those are declared by their own jobs: a cell
@@ -38,6 +39,7 @@ export const bookPage = (declared: (figure: string) => boolean): SeedPage => ({
   requires: ['register.books', 'register.accounts', 'register.obligations', 'register.transactions', 'register.recurring', 'register.installments'],
   pack: 'money-core',
   blocks: [
+    ...againstNotes(),
     {
       kind: 'stat',
       lead: true,
@@ -220,6 +222,31 @@ function owedRow(declared: (figure: string) => boolean): Record<string, unknown>
 function lastsNote(declared: (figure: string) => boolean): Record<string, unknown>[] {
   if (!declared('book-lasts-until')) return [];
   return [{ kind: 'note', span: 12, when: { metric: 'book-lasts-until:{{name}}', beyond: true }, body: 'Its money lasts the year on what is due.' }];
+}
+
+/** The figure the two lines below are drawn on, and the list they send a person to. */
+const AGAINST = 'categories-against-direction';
+const SEE_CATEGORIES = '[See Categories](/r/categories).';
+
+/**
+ * WHAT AN IMPORT LEFT, SAID WHERE A BOOK IS READ, SINCE THE UNRELEASED money-core 3.17.0 (REC-A13's visible half). A
+ * category marked one way that the Ledger books money going the other way under leaves every figure by category wrong in
+ * silence. Money's Heads up held the line, and it was taken off that page to keep it at twenty-four blocks
+ * (`money.ts`), so no screen said the figure at all.
+ *
+ * TWO LINES, ONE A COUNT AND ONE "1 category", because only one of a pair on `is: 1` and `gt: 1` draws, as Health says
+ * how many signs are red (`health.ts`). LEADS, the sentence under the book's name and over its cash: a line about the
+ * record the book is kept in, said only while the figure is above nought, and never a tile, since the page is already
+ * one tile over its fold (`calm-pages.test.ts`). FIRST AND NOT BETWEEN THE CASH AND ITS WALK, which stand as one row of
+ * four twelfths and eight (`money.test.ts`), and a line of the whole width set between them would break the row. The count is of categories and never a sum of what is in them, so no two
+ * currencies meet in it (`figures/direction.ts`).
+ */
+function againstNotes(): Record<string, unknown>[] {
+  const note = (when: Record<string, unknown>, body: string) => ({ kind: 'note', lead: true, tone: 'warn', span: 12, when: { metric: AGAINST, ...when }, body });
+  return [
+    note({ is: 1 }, `1 category is marked the other way from how the Ledger books it. ${SEE_CATEGORIES}`),
+    note({ gt: 1 }, `{{${AGAINST}}} categories are marked the other way from how the Ledger books them. ${SEE_CATEGORIES}`),
+  ];
 }
 
 /** The figures the chart reads: its two lines, and what was left each month, which it is drawn on. */

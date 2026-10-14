@@ -110,7 +110,7 @@ const wordsOf = (said: unknown, at: string, what: string): Result<string> => {
   /* CHARACTERS AND NOT UTF-16 UNITS, so an emoji counts once, as a person counting would count it. */
   const length = [...text].length;
   if (length > COMMENT_MOST)
-    return no('VALUE_MALFORMED', `${what} is ${COMMENT_MOST} characters or fewer, and this one is ${length}. Say it shorter, or split it into a reply.`, { at });
+    return no('VALUE_MALFORMED', `${what} is ${COMMENT_MOST} characters or fewer, and this one is ${length}, ${length - COMMENT_MOST} over. Say it shorter, or split it into a reply.`, { at });
   return ok(text);
 };
 

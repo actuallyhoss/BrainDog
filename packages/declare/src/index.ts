@@ -48,6 +48,7 @@ export type { Egress };
 /* A use case: a pack with a front, its modules, signals and voice. */
 export { SHARED_MOST_BYTES, SHARED_SUFFIX, exampleFields, exportUseCase, kindUnknownSentence, laterVersion, nextVersion, readShared, sharedFileName, unfilled, type ExportParts, type Shared, type VersionStep } from './shared.ts';
 export { looksLikeCredential } from './credentials.ts';
+export { takesHold, takesHoldAll, type TakesHold } from './takes-hold.ts';
 export { CARDS_FOLD, CARDS_FOLD_MOST, cardsFault } from './cards.ts';
 export { AUDIENCES, FIRST_PARTY_LISTS, LABEL_KEY, MODULES, MODULE_LISTS, MODULE_WORDS, SHARED_VERSION, SPEAKS, VOICE_KEYS, VOICE_TAB_CHARS, VOICE_TAB_KEYS, labelKeyOf, labelSetting, labelsOf, overHidden, overSettings, speakingPack, voiceWhenAdding, voiceWrites, normaliseUseCase, packIdOf, useCasePack, voiceOf, voiceSetting, wordsOf, type AddonWords, type Audience, type ExampleLink, type ListWords, type ModuleId, type Over, type SpeakingState, type UseCase, type VoiceKey } from './usecase.ts';
 

@@ -272,18 +272,22 @@ const isOpened = (x: unknown): x is ShareOpened => {
 };
 
 /**
- * The record's `openShare` answer with the link signed into it: `token`, and `url`, which is `<origin>/app/s/<token>`.
+ * The record's `openShare` answer with the link signed into it: `token`, and `url`, which is `<origin>/app/s#<token>`.
+ *
+ * THE TOKEN RIDES IN THE FRAGMENT, NEVER THE PATH. A browser sends no fragment to any server, so the secret is in no
+ * access log, no proxy's and no Worker's, and the page reads it and wipes it from the address bar, as an invite does;
+ * it reaches a host only as `Authorization: Share <token>` on `/api/sharedPage`.
  *
  * A REFUSAL PASSES THROUGH UNCHANGED, and the link expires when the record's `share.open` says it does, to the second
  * below it, so the host and the record never disagree about the day a link stops. An empty origin writes the address
- * from the root, `/app/s/<token>`, which the app reads against its own.
+ * from the root, `/app/s#<token>`, which the app reads against its own.
  */
 export async function linkOpened(out: Result<unknown>, by: ShareSigner): Promise<Result<ShareLink>> {
   if (!out.ok) return out;
   if (!isOpened(out.value)) return { ok: false, refusal: UNSIGNED };
   const { id, slug, expires_at } = out.value;
   const token = await shareToken(by.key, by.record, { id, slug, exp: Math.floor(Date.parse(expires_at) / 1000) });
-  return { ok: true, value: { id, slug, expires_at, token, url: `${by.origin}/app/s/${token}` } };
+  return { ok: true, value: { id, slug, expires_at, token, url: `${by.origin}/app/s#${token}` } };
 }
 
 /**
@@ -293,6 +297,10 @@ export async function linkOpened(out: Result<unknown>, by: ShareSigner): Promise
  * FOR A HOST THAT CALLS THE RECORD IN ITS OWN PROCESS, the self-host. The Worker answers `openShare` inside the record's
  * Durable Object, where the key is not, so it signs the object's answer at its door with `linkOpened` instead, and both
  * make the same link. A table with no `openShare` row is handed back as it came.
+ *
+ * WHO IS ASKING IS SAID BEFORE WHAT THIS HOST LACKS. With no key, the record's `shareable` (a read, the same ADMIN guard)
+ * is asked first, so a token or a member is refused as every ADMIN method refuses them, and only the owner learns that
+ * this host makes no links.
  */
 export function withShareLinks(handlers: Record<string, Handler>, signer: () => Promise<ShareSigner | null>): Record<string, Handler> {
   const open = handlers.openShare;
@@ -301,7 +309,11 @@ export function withShareLinks(handlers: Record<string, Handler>, signer: () => 
     ...handlers,
     openShare: async (args, ctx) => {
       const by = await signer();
-      if (by === null) return { ok: false, refusal: NO_SHARE_KEY };
+      if (by === null) {
+        const asked = handlers.shareable === undefined ? null : await handlers.shareable({}, ctx);
+        if (asked !== null && !asked.ok) return asked;
+        return { ok: false, refusal: NO_SHARE_KEY };
+      }
       return linkOpened(await open(args, ctx), by);
     },
   };

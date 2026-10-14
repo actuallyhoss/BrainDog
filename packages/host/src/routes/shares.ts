@@ -9,7 +9,8 @@
  * are ADMIN, a browser session at owner. `sharedPage` is reached only through `Authorization: Share <token>`, which each host
  * checks at its own door (`packages/host/src/share.ts`) and turns into the share principal; any other caller asking it
  * is refused by the record's ladder. `openShare`'s answer carries the link, which the host signs, because the record
- * never holds the key.
+ * never holds the key. `shareable` is the owner's too: it says whether this BrainDog makes links at all, and the host's
+ * sentence when it does not, so the app draws "Share a read-only link" only where pressing it can work.
  */
 
 import type { Route } from '../index.ts';
@@ -19,4 +20,5 @@ export const ROUTES: readonly Route[] = [
   { name: 'closeShare', group: 'ADMIN', writes: true, what: 'Close one shared link for good. Sharing the page again makes a new link.' },
   { name: 'shares', group: 'ADMIN', writes: false, what: 'The links this record opened to its pages, newest first, open and closed, and never a link itself.' },
   { name: 'sharedPage', group: 'READ+', writes: false, what: 'The one page a shared link opens, read-only and one level deep. Only a shared link asks it.' },
+  { name: 'shareable', group: 'ADMIN', writes: false, what: 'Whether this BrainDog can make a read-only link to a page, and why not.' },
 ];

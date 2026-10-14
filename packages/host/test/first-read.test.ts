@@ -1,0 +1,166 @@
+/**
+ * `/auth/signup/read`: every way the reading door says no, and the one way it reads.
+ *
+ * THE READER IS A FAKE THAT COUNTS, and so are the bot check and the meter, so each refusal can be shown to have
+ * stopped before the thing after it was asked. No model is called and no network is touched.
+ */
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+import { PEOPLE, PROJECTS } from '../../../fixtures/names.ts';
+import {
+  FIRST_READ_ADDRESS_SPENT, FIRST_READ_DAY_SPENT, FIRST_READ_NOT_PERSON, FIRST_READ_OFF, serveFirstRead, type FirstReadDoor,
+} from '../src/first-read.ts';
+
+const ORIGIN = 'https://braindog.example';
+const SAID = `I'm ${PEOPLE[3]!.name} and I run ${PROJECTS[0]}, a small shop, with two people.`;
+/* 2026-10-14 at 21:00 UTC, so the day the meter is handed is the UTC one even where it is already tomorrow. */
+const NOW = Date.parse('2026-10-14T21:00:00Z');
+
+type Answer = { ok: boolean; value?: unknown; refusal?: { code: string; fix: string; at?: string } };
+
+function fakeDoor(over: Partial<FirstReadDoor> = {}, verdict: 'ok' | 'address' | 'day' = 'ok') {
+  const seen = { checks: [] as [string, string][], takes: [] as [string, string][], reads: [] as { said: string; offer: unknown; today: string }[] };
+  const door: FirstReadDoor = {
+    origin: ORIGIN,
+    on: true,
+    botCheck: async (token, ip) => (seen.checks.push([token, ip]), token === 'good'),
+    meter: { take: async (ip, day) => (seen.takes.push([ip, day]), verdict) },
+    offer: async () => ({ usecases: [{ id: 'shop', title: 'A shop', summary: 'Orders and stock.' }] }),
+    read: async (ask) => (seen.reads.push(ask), { ok: true, value: { usecase: 'shop', heard: ['a small shop'] } }),
+    ...over,
+  };
+  return { door, seen };
+}
+
+function ask(body: unknown, init: { method?: string; origin?: string | null; type?: string; ip?: Record<string, string> } = {}): Request {
+  const headers: Record<string, string> = { 'content-type': init.type ?? 'application/json', ...(init.ip ?? { 'cf-connecting-ip': '203.0.113.7' }) };
+  if (init.origin !== null) headers['origin'] = init.origin ?? ORIGIN;
+  const method = init.method ?? 'POST';
+  return new Request(`${ORIGIN}/auth/signup/read`, { method, headers, ...(method === 'GET' ? {} : { body: typeof body === 'string' ? body : JSON.stringify(body) }) });
+}
+
+const good = { said: SAID, today: '2026-10-14', zone: 'Africa/Cairo', locale: 'en-GB', turnstile: 'good' };
+
+async function answer(res: Response): Promise<{ status: number; out: Answer }> {
+  return { status: res.status, out: (await res.json()) as Answer };
+}
+
+test('a good reading: the reader is handed what she said, the offer and her day, and its value comes back', async () => {
+  const { door, seen } = fakeDoor();
+  const { status, out } = await answer(await serveFirstRead(ask(good), door, NOW));
+  assert.equal(status, 200);
+  assert.deepEqual(out, { ok: true, value: { usecase: 'shop', heard: ['a small shop'] } });
+  assert.deepEqual(seen.reads, [{ said: SAID, offer: { usecases: [{ id: 'shop', title: 'A shop', summary: 'Orders and stock.' }] }, today: '2026-10-14' }]);
+  assert.deepEqual(seen.checks, [['good', '203.0.113.7']]);
+});
+
+test('the meter is handed the address and the UTC day, from cf-connecting-ip or else the first forwarded hop', async () => {
+  const { door, seen } = fakeDoor();
+  await serveFirstRead(ask(good), door, Date.parse('2026-10-14T23:30:00Z'));
+  await serveFirstRead(ask(good, { ip: { 'x-forwarded-for': '198.51.100.4, 10.0.0.1' } }), door, Date.parse('2026-10-15T00:10:00Z'));
+  assert.deepEqual(seen.takes, [['203.0.113.7', '2026-10-14'], ['198.51.100.4', '2026-10-15']]);
+});
+
+test('the checks the sign-up doors make: POST, this origin, JSON, 8 KB', async () => {
+  const { door, seen } = fakeDoor();
+  const get = await serveFirstRead(ask(good, { method: 'GET' }), door, NOW);
+  assert.equal(get.status, 405);
+  assert.equal(get.headers.get('allow'), 'POST');
+  assert.equal((await answer(await serveFirstRead(ask(good, { origin: 'https://elsewhere.example' }), door, NOW))).status, 403);
+  assert.equal((await answer(await serveFirstRead(ask(good, { origin: null }), door, NOW))).status, 403);
+  const typed = await answer(await serveFirstRead(ask(good, { type: 'text/plain' }), door, NOW));
+  assert.equal(typed.status, 415);
+  assert.equal(typed.out.refusal?.code, 'BODY_MALFORMED');
+  const big = await answer(await serveFirstRead(ask({ ...good, zone: 'x'.repeat(9 * 1024) }), door, NOW));
+  assert.equal(big.status, 413);
+  assert.equal((await answer(await serveFirstRead(ask('{not json'), door, NOW))).status, 400);
+  assert.equal(seen.reads.length + seen.checks.length + seen.takes.length, 0);
+});
+
+test('a key the door does not take is refused by its name', async () => {
+  const { door, seen } = fakeDoor();
+  const { status, out } = await answer(await serveFirstRead(ask({ ...good, email: 'a@b.example' }), door, NOW));
+  assert.equal(status, 400);
+  assert.equal(out.refusal?.code, 'FIELD_UNKNOWN');
+  assert.equal(out.refusal?.at, 'email');
+  assert.match(out.refusal!.fix, /not email/);
+  assert.equal(seen.reads.length, 0);
+});
+
+test('an empty sentence, a sentence too long and a day that is not a date are refused at their field', async () => {
+  const { door } = fakeDoor();
+  for (const [body, at] of [[{ ...good, said: '  ' }, 'said'], [{ ...good, said: 'a'.repeat(1001) }, 'said'], [{ ...good, today: 'Tuesday' }, 'today'], [{ ...good, zone: 3 }, 'zone']] as const) {
+    const { status, out } = await answer(await serveFirstRead(ask(body), door, NOW));
+    assert.equal(status, 400);
+    assert.equal(out.refusal?.at, at);
+  }
+});
+
+test('off, without a reader or without a bot check, the door answers 501 and simple rules read it', async () => {
+  for (const over of [{ on: false }, { read: null }, { botCheck: null }] as Partial<FirstReadDoor>[]) {
+    const { door, seen } = fakeDoor(over);
+    const { status, out } = await answer(await serveFirstRead(ask(good), door, NOW));
+    assert.equal(status, 501);
+    assert.deepEqual(out.refusal, { code: 'NOT_IN_THIS_BUILD', fix: FIRST_READ_OFF });
+    assert.equal(seen.reads.length + seen.takes.length, 0);
+  }
+});
+
+test('a failed or missing bot check is a 403 before the meter is spent', async () => {
+  for (const turnstile of ['bad', undefined]) {
+    const { door, seen } = fakeDoor();
+    const { status, out } = await answer(await serveFirstRead(ask({ ...good, turnstile }), door, NOW));
+    assert.equal(status, 403);
+    assert.equal(out.refusal?.fix, FIRST_READ_NOT_PERSON);
+    assert.equal(out.refusal?.at, 'turnstile');
+    assert.equal(seen.takes.length, 0);
+  }
+});
+
+test('the meter says no for one address and for the whole day, with a wait until UTC midnight', async () => {
+  for (const [verdict, fix] of [['address', FIRST_READ_ADDRESS_SPENT], ['day', FIRST_READ_DAY_SPENT]] as const) {
+    const { door, seen } = fakeDoor({}, verdict);
+    const res = await serveFirstRead(ask(good), door, NOW);
+    assert.equal(res.headers.get('retry-after'), String(3 * 3600));
+    const { status, out } = await answer(res);
+    assert.equal(status, 429);
+    assert.deepEqual(out.refusal, { code: 'RATE_LIMITED', fix });
+    assert.equal(seen.reads.length, 0);
+  }
+});
+
+test('a meter that cannot answer keeps the reader from being asked', async () => {
+  const { door, seen } = fakeDoor({ meter: { take: async () => { throw new Error('down'); } } });
+  const { status, out } = await answer(await serveFirstRead(ask(good), door, NOW));
+  assert.equal(status, 503);
+  assert.equal(out.refusal?.code, 'UNREACHABLE');
+  assert.equal(seen.reads.length, 0);
+});
+
+test("the reader's own refusal comes back with its code kept, and a reader that throws is UNREACHABLE", async () => {
+  for (const code of ['UNREACHABLE', 'PROPOSAL_SCHEMA', 'SLASH_BUDGET_SPENT']) {
+    const { door } = fakeDoor({ read: async () => ({ ok: false, refusal: { code, fix: 'The model could not read it.' } }) });
+    const { out } = await answer(await serveFirstRead(ask(good), door, NOW));
+    assert.deepEqual(out, { ok: false, refusal: { code, fix: 'The model could not read it.' } });
+  }
+  const { door } = fakeDoor({ read: async (a) => { throw new Error(`could not read ${a.said}`); } });
+  const { status, out } = await answer(await serveFirstRead(ask(good), door, NOW));
+  assert.equal(status, 503);
+  assert.equal(out.refusal?.code, 'UNREACHABLE');
+  assert.doesNotMatch(JSON.stringify(out), new RegExp(PROJECTS[0]));
+});
+
+test('what she said is never printed and never put in a header', async (t) => {
+  const printed: string[] = [];
+  for (const name of ['log', 'info', 'warn', 'error', 'debug'] as const)
+    t.mock.method(console, name, (...a: unknown[]) => void printed.push(a.map(String).join(' ')));
+  const runs: Partial<FirstReadDoor>[] = [{}, { on: false }, { read: async (a) => { throw new Error(a.said); } }, { read: async () => ({ ok: false, refusal: { code: 'UNREACHABLE', fix: 'Down.' } }) }];
+  for (const over of runs) {
+    const { door } = fakeDoor(over);
+    const res = await serveFirstRead(ask(good), door, NOW);
+    for (const [, v] of res.headers) assert.doesNotMatch(v, new RegExp(PROJECTS[0]));
+  }
+  assert.ok(printed.every((line) => !line.includes(SAID) && !line.includes(PROJECTS[0])), 'nothing printed carries the sentence');
+});

@@ -1143,7 +1143,8 @@ const dropAmount = (v: unknown): unknown =>
  * block or a table over them. Undone with the two changes before it, so the version before is still the one released.
  * AND THE UNRELEASED 2.6.0'S SERVICE NUMBERS (estate-numbers-61) come off with them: the field `about_service`, the figure
  * `service-numbers`, and the block laid on Renewals. The unreleased 2.6.0's end of day comes off the counts of numbers
- * too (founder-bound-66): `, at before tomorrow` on each `datapoints-` figure.
+ * too (founder-bound-66): `, at before tomorrow` on each `datapoints-` figure. And the order Numbers declares, newest
+ * first by `at` (numbers-order-categories-97), comes off the list.
  */
 const numbersBefore = (doc: Body, id: string): Body =>
   id !== 'founder'
@@ -1159,7 +1160,7 @@ const numbersBefore = (doc: Body, id: string): Body =>
             : d.page === 'dashboard'
             ? (dropAmount({ ...d, blocks: (d.blocks as Body[]).map((b) => (b.heading === 'Latest numbers' ? (({ where: _where, ...table }) => table)(b) : b)) }) as Body)
             : d.register === 'datapoints'
-            ? { ...d, fields: (d.fields as Body[]).flatMap((f) => (f.id === 'amount' || f.id === 'about_service' ? [] : f.id === 'value' ? [{ ...f, required: true }] : [f])) }
+            ? (({ order: _order, ...held }) => ({ ...held, fields: (d.fields as Body[]).flatMap((f) => (f.id === 'amount' || f.id === 'about_service' ? [] : f.id === 'value' ? [{ ...f, required: true }] : [f])) }))(d)
             : (dropAmount(d) as Body),
         ),
       };

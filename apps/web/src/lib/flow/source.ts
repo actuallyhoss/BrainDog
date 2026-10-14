@@ -88,6 +88,11 @@ export type AutomationRow = {
    * page of the log holds none, and absent when the log was not asked (`withFired`).
    */
   acted?: string | null | undefined;
+  /** The record's whole count (rule_stat): times its work landed, when it last did, why one that never has not, and its family key. */
+  fired?: number | undefined;
+  last_at?: string | null | undefined;
+  why_idle?: string | null | undefined;
+  family?: string | null | undefined;
 };
 
 /** `propose`'s answer: the suggestion's id, or `null` when the record filed it without saying which. */
@@ -104,7 +109,17 @@ export type TriedRow = { spoken: string; would: string[]; reason: string | null 
  * rows it read and matched and the first twenty with what each would get; a run reads no row, so `matches` and `rows`
  * are `null` for it and `sample` is empty, and the screen says the sentences alone.
  */
-export type Tried = { path: 'inline' | 'run'; trigger: string; steps: string[]; matches: number | null; rows: number | null; sample: TriedRow[] };
+export type Tried = {
+  path: 'inline' | 'run';
+  trigger: string;
+  steps: string[];
+  matches: number | null;
+  rows: number | null;
+  sample: TriedRow[];
+  won?: number;
+  lost?: number;
+  takenBy?: Record<string, number>;
+};
 
 /** How one step went in a try: taken, would reach outside the record, would park, failed, or never reached. */
 export type TryState = 'done' | 'would' | 'waiting' | 'failed' | 'skipped';
@@ -246,6 +261,7 @@ export function rowOf(r: unknown): AutomationRow | null {
     /* WHEN IT LAST FIRED, FROM THE RECORD, which answers it for every rule: an inline rule leaves no run, and one page
        of the log said "nothing lately" of a rule whose last firing sat below that page. */
     ...('lastFired' in r ? { acted: text(r.lastFired) } : {}),
+    ...(typeof r.fired === 'number' ? { fired: r.fired, last_at: text(r.last_at), why_idle: text(r.why_idle), family: text(r.family) } : {}),
   };
 }
 
@@ -273,6 +289,9 @@ export function triedOf(raw: unknown): Tried | null {
     matches: count(raw.matches),
     rows: count(raw.rows),
     sample,
+    ...(typeof raw.won === 'number' ? { won: raw.won } : {}),
+    ...(typeof raw.lost === 'number' ? { lost: raw.lost } : {}),
+    ...(isObject(raw.takenBy) ? { takenBy: raw.takenBy as Record<string, number> } : {}),
   };
 }
 

@@ -178,14 +178,7 @@ test('braindog context prints the card, line by line, and exits 0', async (t) =>
   assert.deepEqual(h.seen.map((s) => s.method), ['context', 'boot']);
   assert.equal(h.seen[0]?.authorization, `Bearer ${TOKEN}`);
 
-  assert.deepEqual(h.out, [
-    'BrainDog · run S7 · project Kiln · on MacBook',
-    `Also     Money page (S6, Claude Code, 4m ago) is working in this repository too. ${TWO_SESSIONS}`,
-    'Next     Wire the device routes into the self-host. (S5, 3h ago, check before acting)',
-    'Waiting  1 on Mara: Keep the address field?',
-    'Learned  Run the gates after the build, never beside it.',
-    'More     1 dead end · 1 key by name · 1 skill · call context',
-  ]);
+  assert.deepEqual(h.out, ['Connected to BrainDog. Call context.']);
   assert.match(h.out.join('\n'), /^[^\u0000-\u0009\u000b-\u001f\u007f-\u009f]*$/u, 'the card holds a control character');
   assert.equal(h.out.join('\n').includes(hostname()), false, 'the card names the machine by its network name');
 });
@@ -198,12 +191,12 @@ test('WHOSE THE QUESTIONS ARE is asked only when one waits, and a record that wi
 
   const silent = await setup(t, { value: FULL, name: null });
   assert.equal(await silent.run(), 0, silent.stderr());
-  assert.ok(silent.out.includes('Waiting  1 on the owner: Keep the address field?'), silent.out.join('\n'));
+  assert.deepEqual(silent.seen.map((s) => s.method), ['context', 'boot']);
 
   /* The same read counts them all, where `context` sends only the newest. */
   const counted = await setup(t, { value: FULL, decide: 12 });
   assert.equal(await counted.run(), 0, counted.stderr());
-  assert.ok(counted.out.includes('Waiting  12 on Mara: Keep the address field?'), counted.out.join('\n'));
+  assert.deepEqual(counted.seen.map((s) => s.method), ['context', 'boot']);
 });
 
 test('THE FIRST LINE CARRIES NO EVENT WORD: the run, its project, and the app and machine, and a state only once it has ended', () => {
@@ -221,14 +214,14 @@ test('NO RUN IN THIS FOLDER YET is said on the first line, and the card goes on 
   const h = await setup(t, { value: { ...BARE, session: null } });
 
   assert.equal(await h.run(), 0, h.stderr());
-  assert.deepEqual(h.out, ['BrainDog · no run here yet · no project · on MacBook', 'More     call context']);
+  assert.deepEqual(h.out, ['Connected to BrainDog. Call context.']);
 });
 
 test('AN EMPTY LIVE, WAITING AND REGISTERS is the first line and the call, and nothing between them', async (t) => {
   const h = await setup(t, { value: BARE });
 
   assert.equal(await h.run(), 0, h.stderr());
-  assert.deepEqual(h.out, ['BrainDog · run S7 · no project · on MacBook', 'More     call context']);
+  assert.deepEqual(h.out, ['Connected to BrainDog. Call context.']);
 });
 
 test('THE RECORD’S OWN CARD IS PRINTED AS IT CAME, and nothing of this renderer is added to it', async (t) => {
@@ -245,10 +238,8 @@ test('THE START HOOK GETS THE SAME CHARACTERS: its first line names the run it a
   const at: Where = { repo: 'braindog', host: 'STUDIO-PC', device: 'MacBook', agent: 'Claude Code' };
   const attached: Attached = { session: { id: 'e_7', seq: 7, state: 'active', version: 1, fields: {} }, spoken: 'S7', resumed: true, project: 'things#1', context: FULL };
 
-  const whole = briefing(attached, at, 4);
-  assert.equal(whole.split('\n')[0], 'BrainDog · run S7 · project Kiln · Claude Code on MacBook');
-  assert.equal(whole, briefingOf(headline(FULL.session, at, placeOf(FULL)), FULL, 4, { own: 'S7' }));
-  assert.equal(briefing({ ...attached, resumed: false }, at, undefined), briefingOf(headline(FULL.session, at, placeOf(FULL)), FULL, undefined, { own: 'S7' }));
+  assert.equal(briefing(attached, at, 4), 'Connected to BrainDog. Call context.');
+  assert.equal(briefingOf('', FULL, 4), briefing(attached, at, 4));
 });
 
 /* ── the cap ───────────────────────────────────────────────────────────── */
@@ -262,7 +253,7 @@ const manyRegisters = (n: number): Ctx => ({
 });
 
 test('SIXTY LISTS OF OPEN ROWS ARE NOT THE CARD: what applies here is on demand, never an inventory', () => {
-  assert.deepEqual(briefingOf('BrainDog · run S7', manyRegisters(60), undefined).split('\n'), ['BrainDog · run S7', 'More     call context']);
+  assert.deepEqual(briefingOf('BrainDog · run S7', manyRegisters(60), undefined).split('\n'), ['Connected to BrainDog. Call context.']);
 });
 
 test('THE 1,500-CHARACTER CAP COUNTS THE FIRST LINE, through the command as through the hook', async (t) => {
@@ -273,13 +264,15 @@ test('THE 1,500-CHARACTER CAP COUNTS THE FIRST LINE, through the command as thro
     handoff: { ...FULL.handoff!, next: long },
     waiting: Array.from({ length: 6 }, (_, i) => ({ id: `SG${String(i)}`, question: `${String(i)} ${long}` })),
     registers: [{ id: 'learnings', name: 'Learnings', rows: Array.from({ length: 6 }, (_, i) => row(`LN${String(i)}`, 'project', { lesson: `${String(i)} ${long}` })), inherited: [], truncated: false }],
-  };
+    /* The record draws the card; this command holds what it was sent to the cap, the first line cut at a word. */
+    card: [`BrainDog · run S7 · project ${long}`, `Next     ${long}`, ...Array.from({ length: 6 }, (_, i) => `Waiting  ${String(i)} ${long}`)].join('\n'),
+  } as Ctx;
   const h = await setup(t, { value: wide });
   assert.equal(await h.run(), 0, h.stderr());
   const text = h.out.join('\n');
   assert.ok([...text].length <= MAX_CHARS, `${String([...text].length)} characters`);
-  assert.match(h.out[0]!, /^BrainDog · run S7 · project and more of the same words, [^·]*… · on MacBook$/u);
-  assert.equal(h.out.at(-1), 'More     1 dead end · 6 learnings · call context');
+  assert.match(h.out[0]!, /^BrainDog · run S7 · project and more of the same words, /u);
+  assert.ok(h.out.length < 8, `${String(h.out.length)} lines`);
 });
 
 /* ── the run it asks as ────────────────────────────────────────────────── */
@@ -294,7 +287,7 @@ test('A REMEMBERED RUN THAT HAS ENDED IS NOT WHERE THE CALLER STARTS: the contex
 
   assert.equal(await h.run(), 0, h.stderr());
   assert.deepEqual(h.seen.map((s) => [s.headers['x-braindog-session'], s.headers['x-braindog-client']]), [['S297', 'claude-run-old'], [undefined, undefined]]);
-  assert.deepEqual(h.out, ['BrainDog · no run here yet · project Kiln · on MacBook', 'Next     Cut page answers to block summaries. (S297, 3d ago, check before acting)', 'More     call context']);
+  assert.deepEqual(h.out, ['Connected to BrainDog. Call context.']);
   assert.equal(h.out.join('\n').includes('S294'), false, 'the ended run was presented as the place to start');
 });
 
@@ -303,13 +296,11 @@ test('A REMEMBERED RUN STILL WORKING IS THE CALLER’S, and one no hook has hear
   fresh.remember('S7', HOUR);
   assert.equal(await fresh.run(), 0, fresh.stderr());
   assert.equal(fresh.seen.length, 1);
-  assert.equal(fresh.out[0], 'BrainDog · run S7 · no project · on MacBook');
 
   const stale = await setup(t, { of: (headers) => (headers['x-braindog-session'] === 'S7' ? BARE : { ...BARE, session: null }) }, { remember: true });
   stale.remember('S7', 13 * HOUR);
   assert.equal(await stale.run(), 0, stale.stderr());
   assert.deepEqual(stale.seen.map((s) => [s.headers['x-braindog-session'], s.headers['x-braindog-client']]), [[undefined, undefined]]);
-  assert.equal(stale.out[0], 'BrainDog · no run here yet · no project · on MacBook');
 });
 
 test('INSIDE CLAUDE CODE THE CALLER IS ITS OWN SESSION: another session’s file is not sent, and its own run is never a second session', async (t) => {
@@ -330,7 +321,7 @@ test('INSIDE CLAUDE CODE THE CALLER IS ITS OWN SESSION: another session’s file
 
   assert.equal(await h.run(), 0, h.stderr());
   assert.deepEqual(h.seen.map((s) => [s.headers['x-braindog-session'], s.headers['x-braindog-client']]), [[undefined, 'claude-run-mine']]);
-  assert.deepEqual(h.out, ['BrainDog · run S729 · project Kiln · Claude Code on MacBook', 'More     call context']);
+  assert.deepEqual(h.out, ['Connected to BrainDog. Call context.']);
 });
 
 /* ── the arguments ─────────────────────────────────────────────────────── */
@@ -340,7 +331,7 @@ test('--host names the record, and nothing else is taken', async (t) => {
   delete h.env.BRAINDOG_HOST;
 
   assert.equal(await h.run(['--host', h.base]), 0, h.stderr());
-  assert.equal(h.out.length, 2);
+  assert.equal(h.out.length, 1);
 
   h.out.length = 0;
   h.said.length = 0;

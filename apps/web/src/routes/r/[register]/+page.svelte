@@ -228,6 +228,7 @@
 
   const closeCreate = () => {
     createOpen = false;
+    addRefused = null;
     if (page.url.searchParams.has('new')) setParam((p) => p.delete('new'));
   };
 
@@ -1292,6 +1293,7 @@
   const writes = (): RowWriter => (writer ??= rowWriter(apiBase()));
   /** The sheet's add is out, so a second press does not send a second row. */
   let writing = $state(false);
+  let addRefused = $state<{ fix: string; at?: string | undefined } | null>(null);
 
   /* A ROW WRITE'S ANSWER AS THE OPTIMISTIC LAYER READS IT. A conflict draws the row as it now stands first, so the
      retry is against the latest version, as `missed` does; the layer says the sentence. */
@@ -1397,10 +1399,15 @@
     if (writing) return;
     writing = true;
     const was = asked;
+    addRefused = null;
     void writes()
       .create(id, taken)
       .then((out) => {
         writing = false;
+        if (!out.ok && out.why === 'refused') {
+          addRefused = out;
+          return;
+        }
         if (!out.ok) return missed(was, out);
         if (asked === was) addLanded(out.entry);
         closeCreate();
@@ -2950,6 +2957,7 @@
       bind:problems
       bind:taken
       {writing}
+      refused={addRefused}
       {addTypedRow}
       {closeCreate}
     />

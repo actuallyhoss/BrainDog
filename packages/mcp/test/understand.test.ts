@@ -205,24 +205,6 @@ test('GET OF A MERGED ROW ANSWERS THE ROW KEPT, saying which it was asked for', 
 
 const card = (context: Record<string, unknown>) => briefed({ context, look, home: null });
 
-test('THE CARD SAYS WHO IS IN TOUCH HERE, most recent first, with role or organisation, then how many more and the project\'s organisation', () => {
-  const people = [
-    { spoken: 'P1', name: 'Wren', in_touch: '2026-10-01T09:00:00Z' },
-    { spoken: 'P2', name: 'Teodor Vance', role: 'client', in_touch: '2026-10-05T09:00:00Z' },
-    { spoken: 'P3', name: 'Mara', self: true, in_touch: '2026-10-06T09:00:00Z' },
-    { spoken: 'P4', name: 'Joaquin Herrera', org: 'O1', in_touch: '2026-10-04T09:00:00Z' },
-    { spoken: 'P5', name: 'Ann', in_touch: '2026-09-01T09:00:00Z' },
-    { spoken: 'P6', name: 'Bo', in_touch: '2026-09-02T09:00:00Z' },
-  ];
-  /* SOMEBODY WITH NO DATE IS NEVER PUT ABOVE SOMEBODY IN TOUCH, wherever the record sent them. */
-  people.unshift({ spoken: 'P7', name: 'Undated' } as (typeof people)[number]);
-  const { card: said, value } = card({ project: { spoken: 'things#2', name: 'Copperleaf', org: 'O1' }, people });
-  const who = said.split('\n').find((l) => l.startsWith('Who'));
-  assert.equal(who, 'Who      Teodor Vance (client), Joaquin Herrera (Lanternfish), Wren, +3 · for Lanternfish');
-  assert.doesNotMatch(said, /people met here/u, 'the people were still a count under More');
-  assert.ok(Array.isArray(value.people));
-});
-
 test('A FOLDER THAT MATCHES SEVERAL PROJECTS IS ONE QUESTION', () => {
   const { text } = card({ ambiguous: ['things#2', 'O1'] });
   assert.match(text, /^Which project is this folder, Copperleaf \(things#2\) or Lanternfish \(O1\)\? Until one is set you work in no project\.$/mu);

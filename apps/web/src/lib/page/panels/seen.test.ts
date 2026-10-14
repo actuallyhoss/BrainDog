@@ -141,3 +141,19 @@ test('NO ID, NO ADDRESS, NO EM DASH in a line a person reads', () => {
   assert.deepEqual(out.lines, ['3 Oct · Notes, Kickoff']);
   for (const line of out.lines) assert.doesNotMatch(line, /—/u);
 });
+
+test('THE CALL IS EXACTLY THE SHAPE THE ROUTE TAKES: `about`, one `row` of a list and a number, and nothing else', async () => {
+  const { call, calls } = asked(answer([]));
+  /* A row handed with more than it needs still asks by its list and its number alone. */
+  await readSeen(call, { register: 'projects', seq: 7, name: 'Larkspur' } as { register: string; seq: number });
+  assert.deepEqual(calls, [{ name: 'about', args: { row: { register: 'projects', seq: 7 } } }]);
+  /* Sent as a GET, the row is one JSON query value (`row: 'json'` on the route), and it reads back the same. */
+  assert.deepEqual(Object.keys(calls[0]!.args), ['row']);
+  assert.deepEqual(JSON.parse(JSON.stringify(calls[0]!.args.row)), { register: 'projects', seq: 7 });
+});
+
+test('THE ROUTE\'S REFUSAL AT `row` READS NULL, so the panel draws nothing rather than a wrong body', async () => {
+  const at = { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: 'row names a list by its id and one of its rows by its number.', at: 'row' } };
+  assert.equal(await readSeen(asked(at).call, { register: 'projects', seq: 7 }), null);
+  assert.deepEqual(seenLines(null, NOW), { lines: [], also: null, more: null, none: null });
+});

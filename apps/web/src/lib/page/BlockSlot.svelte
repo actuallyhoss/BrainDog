@@ -369,6 +369,8 @@
 
   /* The panel the host draws under this block, by the name the section gives it (`panel-of.ts`). */
   const panel = $derived(panelOf(block));
+  /* WHERE IT WAS SEEN SAYS WHETHER IT DREW (`Seen.svelte` `ondrew`): false on a refusal or an answer that is not one thing. Its section is a heading over the panel, so it is then left out rather than a heading over nothing. */
+  let seenDrew = $state<boolean | null>(null);
 
   /* WHAT THE BLOCK'S LIST HOLDS, when it holds nothing yet. 19 §6 names five empty states and says collapsing them into
      one is the failure; a filter that matched nothing and a list with nothing in it are different facts, and the
@@ -612,7 +614,7 @@
 <!-- WHERE IT WAS SEEN (`panel: seen`) ONLY READS, so it is drawn for any page drawn for a row, one that does not write
      as well, and never while arranging. IT IS LOADED BY `import()`, so neither it nor its styles reach the entry chunk. -->
 {#if panel === 'seen' && param && !arranging}
-  {#await import('./panels/Seen.svelte') then { default: Seen }}<Seen register={param.register} seq={param.seq} {now} />{/await}
+  {#await import('./panels/Seen.svelte') then { default: Seen }}<Seen register={param.register} seq={param.seq} {now} ondrew={(d) => (seenDrew = d)} />{/await}{#if seenDrew === false}<span data-seen-none hidden></span>{/if}
 {:else if panel && panel !== 'seen' && param && writes && !arranging}
   <!-- BY THE ROW, `things#1`, and not by its title: the record resolves each action's project to its row. -->
   {#if panel === 'actions'}<Actions project={{ spoken: `${param.register}#${param.seq}`, title: param.title }} />
@@ -666,6 +668,10 @@
 {/if}
 
 <style>
+  /* A `panel: seen` SECTION WHOSE PANEL DREW NOTHING is left out whole, tile and heading. */
+  :global(.block-slot:has(> [data-seen-none])) {
+    display: none;
+  }
   /* THE TILE'S HEADING ROW (`ui/Tile.svelte`'s): the well, the name at `--t-row` 600, and the source as the
      meta at the right, one well high, with the tile's 16 under it. No rule under it: the name is what says a block
      starts here. */

@@ -36,7 +36,7 @@
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
-  import { onMount } from 'svelte';
+  import { onMount, type Component } from 'svelte';
   import { page } from '$app/state';
   import { createClient, type EngineHealth } from '@braindog/client';
   import { copy } from '$lib/copy.ts';
@@ -312,12 +312,26 @@
     return false;
   }
 
+  /**
+   * A PAGE COMPOSED ON THE OWNER'S OWN MACHINE (`PageJobs.svelte`, `page-jobs.ts`): fetched by `import()` for the owner only,
+   * so a member and every other screen load none of it. It asks the record itself, as this screen does, and draws
+   * nothing at all where the record does not answer or no add-on ships a kind that takes a page.
+   */
+  let PageJobs = $state<Component | null>(null);
+
   onMount(() => {
     door = createClient({ base: apiBase() });
     client = door as unknown as SlashClient;
     void read(load);
     void loadAsks();
     void loadEngine();
+    if (page.data.me?.owner === true)
+      void import('./PageJobs.svelte').then(
+        (m) => (PageJobs = m.default),
+        () => {
+          /* A CHUNK THAT DID NOT ARRIVE leaves Slash as it is, without the press. */
+        },
+      );
   });
 
   $effect(() => {
@@ -646,6 +660,8 @@
         </div>
       </details>
     {/if}
+
+    {#if PageJobs}<PageJobs />{/if}
 
     {#if drafts}
       <!-- WHO DRAFTS, ONCE, AT THE FOOT: a fact about the host, linked to where a model is set up or changed. -->

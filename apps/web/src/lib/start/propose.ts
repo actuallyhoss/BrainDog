@@ -29,11 +29,12 @@ import { moduleName } from '@braindog/seed/usecases/names';
 
 import { arrangeTurns } from '../arrange.ts';
 import { firstRun } from '../first-run.ts';
-import { BUNDLED, closeOver, heardFor, INSTALL_ORDER, PROJECTS, shape, toTurnOn, writable, type Offer, type PackId } from '../shape.ts';
+import { BUNDLED, closeOver, heardFor, PROJECTS, shape, toTurnOn, writable, type Offer, type PackId } from '../shape.ts';
 import { hear, heardAt, PEOPLE, type Span } from '../who.ts';
 import type { AskSetup, SetupOffer, SetupReply } from './ask.ts';
+import { offerOf } from './offer.ts';
 import type { ArrivesBy } from './made.ts';
-import { entryOf, FILLABLE, knownCurrency, listById, listsOf } from './lists.ts';
+import { entryOf, knownCurrency, listById, listsOf } from './lists.ts';
 
 export type Proposal = {
   /** The person's name, where the sentence puts one unmistakably. */
@@ -121,7 +122,14 @@ export type { ArrivesBy };
  * Kennel listing's manifest); absent, only the modules this build ships are listened for. `currency` is the device's,
  * the one currency of the region whose time it keeps (`zoneCurrency`, `routes/start/building.ts`), or `null`.
  */
-export type ProposeContext = { zone: string | null; locale: string; catalogue?: readonly Offer[]; currency?: string | null };
+export type ProposeContext = {
+  zone: string | null;
+  locale: string;
+  catalogue?: readonly Offer[];
+  currency?: string | null;
+  /** What the model may choose from (`offerOf` in `./offer.ts`, with the catalogue's use cases); absent, this build's own. */
+  offer?: SetupOffer;
+};
 
 /**
  * TODAY WHERE THE PERSON IS, for a date the sentence gives as a day of the month. `null` when the zone is not one the
@@ -905,20 +913,11 @@ export function propose(sentence: string, ctx: ProposeContext): Proposal {
 /* ── the model, first ──────────────────────────────────────────────────── */
 
 /**
- * WHAT THE MODEL MAY CHOOSE FROM: every use case and every module this build ships, each module with its lists and the
- * fields an entry from typed words can fill. The agents' lists are offered by name only, since an agent writes what goes
- * in them and nothing a person types about themselves does.
+ * WHAT THE MODEL MAY CHOOSE FROM when the caller hands no catalogue: every use case and every module this build ships
+ * (`offerOf` with none).
  */
 export function setupOffer(): SetupOffer {
-  return {
-    usecases: USE_CASES.map((u) => ({ id: u.usecase, title: u.title, summary: u.summary })),
-    modules: INSTALL_ORDER.map((id) => ({
-      id,
-      name: moduleName(id),
-      lists:
-        id === AGENTS_PACK.manifest.id ? [] : listsOf(id).map((l) => ({ id: l.id, name: l.name, fields: l.fields.filter((f) => FILLABLE.has(f.type)).map((f) => f.id) })),
-    })),
-  };
+  return offerOf();
 }
 
 /** Where `needle` sits in what was typed, read without case, or -1. */
@@ -1023,7 +1022,7 @@ export async function proposeFirst(sentence: string, ctx: ProposeContext, ask: A
   if (ask === null || sentence.trim() === '') return rules;
   let out: Awaited<ReturnType<AskSetup>>;
   try {
-    out = await ask({ said: sentence, offer: setupOffer(), today: todayIn(ctx.zone) ?? new Date().toISOString().slice(0, 10) });
+    out = await ask({ said: sentence, offer: ctx.offer ?? setupOffer(), today: todayIn(ctx.zone) ?? new Date().toISOString().slice(0, 10) });
   } catch (e) {
     out = { ok: false, refusal: { code: 'UNREACHABLE', fix: e instanceof Error ? e.message : String(e) } };
   }

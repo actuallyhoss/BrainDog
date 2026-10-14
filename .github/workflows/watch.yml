@@ -34,6 +34,8 @@ on:
     # THE FIRST OF THE MONTH, 04:23 UTC: going back on the canary. Off the hour for the reason above, and at an hour
     # when the nightly copies are long done.
     - cron: '23 4 1 * *'
+    # EVERY DAY, 05:41 UTC: the repository's settings held to `.github/settings.expected.json` (LCH-C12).
+    - cron: '41 5 * * *'
   workflow_dispatch:
     inputs:
       go_back:
@@ -71,6 +73,16 @@ jobs:
           WATCH_HOST: ${{ inputs.host }}
           GITHUB_TOKEN: ${{ github.token }}
         run: node tools/watch/launch.mjs
+      # THE REPOSITORY'S SETTINGS, ONCE A DAY AND BY HAND (`tools/watch/settings.mjs`, LCH-C12): the rules on master,
+      # secret scanning, private reporting, `CI_RUNNER`, runners, wiki, Discussions, the description, the production
+      # reviewers and open high alerts, each against `.github/settings.expected.json`. A READ-ONLY FINE-GRAINED TOKEN,
+      # because the workflow's own token cannot read alerts: `WATCH_TOKEN`, a repository secret he makes. Without it the
+      # step says skipped and is green. Asked even when the step above missed, so one red does not hide the other.
+      - name: Hold the repository's settings to what was decided
+        if: ${{ !cancelled() && (github.event.schedule == '41 5 * * *' || github.event_name == 'workflow_dispatch') }}
+        env:
+          WATCH_TOKEN: ${{ secrets.WATCH_TOKEN }}
+        run: node tools/watch/settings.mjs
 
   # GOING BACK, PROVEN ON THE CANARY (`apps/worker/scripts/go-back.mjs`). Three entries, a copy, three more and an
   # invitation; the record goes back to the copy and must answer within a minute with its log ending at the copy plus

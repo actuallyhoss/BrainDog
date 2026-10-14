@@ -12,11 +12,17 @@
  * READ+ TO READ A THREAD AND DATA TO WRITE ONE. Anybody who reads a thing may say something about it, a colleague
  * invited at Reads included, because a comment changes no field (`docs/20` §5). A token is held to `propose`, the rung
  * an agent's other words on the record need, so a read-only token reads a thread and writes nothing to it.
+ *
+ * ONE THREAD FOR A QUESTION AND THE DECISION THAT SETTLED IT. A decision named by its number reads, takes and resolves
+ * the words of its question's thread (`targetOf`), the one the app mounts under a question open or settled.
+ *
+ * NOTHING IS SENT TO ANYBODY (HD.383, "no mentions or notifications yet"). A body holding `@ada` is kept as the text
+ * it is; no name in it is looked up and nothing is queued, so a comment is read by whoever opens the thing.
  */
 
 import type { Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
-import type { Kernel } from '@braindog/kernel';
+import { COMMENT_MOST, type Kernel } from '@braindog/kernel';
 
 import type { CallContext } from '../index.ts';
 import { isHandle, spokenOf } from '../question-handles.ts';
@@ -55,8 +61,37 @@ export function methods(deps: RecordDeps) {
     ctx.principal.kind === 'token' ? `agent:${ctx.session?.agent ?? 'other'}` : ctx.principal.id;
 
   /**
-   * What `on` names, as the log keys it (`entry:<id>`, `suggestion:SG5`, `decision:D4`), with the list a row is on, or
-   * `null` for anything the caller may not see or that is not there.
+   * The question a decision settled, by its number, or `null` for a decision the log pairs with none.
+   *
+   * THE PAIR `govern.ts` READS (`SETTLED`: the `decide` line and the question's `resolve` line beside it), and, for a
+   * question accepted in part, which stays open and has no `resolve`, the question its `decide` line names. A decision
+   * with neither, an imported one whose two lines are not adjacent, is a decision with no question to share a thread.
+   */
+  const questionOf = (decision: string): string | null => {
+    const row = kernel.governanceRow('decision', decision);
+    if (row === null) return null;
+    if (typeof row.suggestion === 'string' && row.suggestion !== '') return row.suggestion;
+    const part = sql.one<{ q: unknown }>(
+      "SELECT json_extract(to_v, '$.suggestion') AS q FROM event WHERE kind = 'decide' AND target = ? AND json_valid(to_v) ORDER BY rowid DESC LIMIT 1",
+      `decision:${decision}`,
+    );
+    return typeof part?.q === 'string' && part.q !== '' ? part.q : null;
+  };
+
+  /**
+   * Where words said on a decision before it shared its question's thread are kept: `decision:<number>` of the decision
+   * that settled the question, or `null`. Read into the question's thread, so nothing said on a decision is left where
+   * no screen looks, and a reply under one is written beside it.
+   */
+  const olderOf = (target: string): string | null => {
+    if (!target.startsWith('suggestion:')) return null;
+    const settled = kernel.governanceRow('suggestion', target.slice('suggestion:'.length))?.decision;
+    return typeof settled === 'string' && settled !== '' ? `decision:${settled}` : null;
+  };
+
+  /**
+   * What `on` names, as the log keys it (`entry:<id>`, `suggestion:SG5`), with the list a row is on, or `null` for
+   * anything the caller may not see or that is not there. `decision:D4` answers `suggestion:SG5` when D4 settled SG5.
    *
    * A HANDLE IS TURNED BACK INTO ITS NUMBER FIRST, as `governance` turns one, so a hidden question named by handle meets
    * the same `sightOf` as one named by its number. A handle of the other kind (`decision:q.<id>`) names nothing.
@@ -70,7 +105,14 @@ export function methods(deps: RecordDeps) {
       const number = isHandle(given) ? (given.startsWith(GOVERNED[kind]) ? spokenOf(sql, given) : null) : given;
       if (number === null || number === '') return null;
       const target = `${kind}:${number}`;
-      return sightOf(ctx, target) === null ? null : { target, list: null };
+      if (sightOf(ctx, target) === null) return null;
+      /* ONE THREAD FOR A QUESTION AND ITS DECISION. The decision is named on to the question it settled, which is the
+         thread the app mounts under a settled question, so a word sent to `decision:D4` is read where people look. A
+         decision the log pairs with no question keeps its own thread, and the question must be seen as well. */
+      const question = kind === 'decision' ? questionOf(number) : null;
+      if (question === null) return { target, list: null };
+      const asked = `suggestion:${question}`;
+      return sightOf(ctx, asked) === null ? null : { target: asked, list: null };
     }
     /* A ROW BY ITS SPOKEN ID, ITS PREFIX (`T3`) OR ITS ID, as `get` takes one. A deleted row has no thread to add to. */
     const row = said === '' ? null : kernel.get(said);
@@ -89,7 +131,10 @@ export function methods(deps: RecordDeps) {
       if (stop) return { ok: false, refusal: stop };
       const at = targetOf(ctx, args?.on);
       if (at === null) return no('REF_UNKNOWN', NOTHING, { at: 'on' });
-      return ok(kernel.commentsOn(at.target));
+      const older = olderOf(at.target);
+      if (older === null) return ok(kernel.commentsOn(at.target));
+      /* OLDEST FIRST ACROSS BOTH, as one thread reads; the sort is stable, so a reply in the same instant stays after. */
+      return ok([...kernel.commentsOn(older), ...kernel.commentsOn(at.target)].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0)));
     },
 
     /**
@@ -101,15 +146,25 @@ export function methods(deps: RecordDeps) {
       if (stop) return { ok: false, refusal: stop };
       const at = targetOf(ctx, args?.on);
       if (at === null) return no('REF_UNKNOWN', NOTHING, { at: 'on' });
+      /* THE KERNEL'S OWN MOST (`COMMENT_MOST`), asked here first so the refusal says how many over (HD.381), counted by
+         character as the kernel counts; the kernel still asks it again, so the two cannot let a long one through. */
+      const over = typeof args?.body === 'string' ? [...args.body.trim()].length - COMMENT_MOST : 0;
+      if (over > 0)
+        return no('VALUE_MALFORMED', `A comment holds ${COMMENT_MOST} characters, and this one is ${over} over. Say it shorter, or split it into a reply.`, {
+          at: 'body',
+        });
       /* AND THE ROW'S OWN LIST, for a token: `scoped` asked whether any grant reaches `propose`, and this asks the one
          the row is on, as `propose` and `log` are held to the list they are about. */
       if (at.list !== null && ctx.principal.kind === 'token') {
         const held = guard(ctx, 'propose', at.list);
         if (held) return { ok: false, refusal: held };
       }
+      /* A REPLY UNDER A WORD KEPT ON THE DECISION goes beside it, so the reply reads under it in the one thread. */
+      const older = args?.reply_to === undefined ? null : olderOf(at.target);
+      const parent = older !== null && typeof args.reply_to === 'string' ? kernel.commentOf(args.reply_to.trim()) : null;
       return tail(
         kernel.writeComment({
-          target: at.target,
+          target: parent !== null && parent.target === older ? older : at.target,
           body: args?.body,
           ...(args?.reply_to === undefined ? {} : { reply_to: args.reply_to }),
           actor: actorOf(ctx),

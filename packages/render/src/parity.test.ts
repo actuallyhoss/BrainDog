@@ -1102,3 +1102,20 @@ for (const [name, { src, has, not, todo }] of Object.entries(PRINTS)) {
     for (const n of not) assert.ok(!html.includes(n), `${n} was drawn: ${html}`);
   });
 }
+
+/* ── a declared block's actions ────────────────────────────────────────────── */
+
+test('A BLOCK WITH ACTIONS AND NO HOST TO PRESS THEM draws one line of labels in both renderers, and no button', () => {
+  const block: BlockSegment = {
+    ...page('```stat\nCups today | 4\n```'),
+    actions: [
+      { verb: 'row.update', label: 'Brew' },
+      { verb: 'row.delete', label: 'Toss', hard: true },
+    ],
+  };
+  const svelte = tree(render(Block, { props: { block } }).body);
+  const html = tree(toHTML([block]));
+  assert.equal(svelte, html);
+  assert.ok(html.includes('<p class="block-actions">Brew · Toss (hard to undo)</p>'), html);
+  assert.doesNotMatch(html, /<button/u);
+});

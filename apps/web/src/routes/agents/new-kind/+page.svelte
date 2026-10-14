@@ -10,6 +10,11 @@
   import { words } from '$lib/agents/new-kind.ts';
   import NewKind from '$lib/agents/NewKind.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
+  import { drew } from '$lib/ui/screen.svelte.ts';
+
+  /* IT CALLS NOTHING, SO IT SAYS IT DREW: with no call out and no claim, `data-screen` never appears and the screen
+     reads as one that never settled. */
+  $effect(() => drew('ready'));
 </script>
 
 <svelte:head><title>{titleOf(words.heading)}</title></svelte:head>

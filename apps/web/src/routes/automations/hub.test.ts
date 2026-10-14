@@ -15,6 +15,7 @@ import type { AutomationRow, RunRow } from '../../lib/flow/source.ts';
 import type { ActionRow } from '../../lib/record/actions.ts';
 import {
   canvasWords,
+  countSaid,
   dayKey,
   dayTitle,
   endedReading,
@@ -37,6 +38,7 @@ import {
   nextWeek,
   runDays,
   runHeat,
+  ruleSaid,
   spell,
   triggerIcon,
   type RunLine,
@@ -146,6 +148,44 @@ test('ONE THE RECORD KEEPS NO RUNS OF SAYS WHEN THE LOG LAST HAS IT, never "Not 
   /* THE PAGE'S SENTENCE SAYS THE SAME, and a draft with nothing true to say has none. */
   assert.deepEqual(pageSentence({ ...inline, acted: iso(NOW - 2 * 3_600_000) }, NOW), { text: 'Last ran 2h ago.', needs: '' });
   assert.equal(pageSentence(inline, NOW), null);
+});
+
+test('A RULE THE RECORD COUNTED SAYS HOW OFTEN IT RAN AND THE DAY IT LAST DID, never "nothing lately"', () => {
+  const inline = auto('File parcels by courier', { trigger: 'written', path: 'inline', register: 'parcels' });
+  const counted = { ...inline, acted: null, fired: 12, last_at: new Date(2026, 9, 3, 9).toISOString() };
+  assert.equal(lastLine(counted, NOW), 'Ran 12 times, last on 3 Oct.');
+  assert.equal(lastLine({ ...counted, fired: 1 }, NOW), 'Ran once, on 3 Oct.');
+  assert.equal(lastLine({ ...counted, last_at: iso(NOW - 3_600_000) }, NOW), 'Ran 12 times, last today.');
+  assert.equal(lastLine({ ...counted, last_at: new Date(2025, 11, 30, 9).toISOString() }, NOW), 'Ran 12 times, last on 30 Dec 2025.');
+  assert.doesNotMatch(lastLine(counted, NOW), /lately/u, 'the count is the whole of it, not a page of the log');
+  assert.deepEqual(pageSentence(counted, NOW), { text: 'Ran 12 times, last on 3 Oct.', needs: '' });
+  assert.equal(countSaid(inline, NOW), '', 'a host that sends no count says nothing from one');
+});
+
+test('A RULE THAT NEVER RAN SAYS "NEVER" AND THE RECORD\'S ONE SENTENCE ON WHY', () => {
+  const idle = auto('Shelve big parcels', { trigger: 'written', path: 'inline', register: 'parcels', acted: null });
+  const why = 'No entry has been added to Parcels since it was turned on.';
+  assert.equal(lastLine({ ...idle, fired: 0, last_at: null, why_idle: why }, NOW), `Never ran. ${why}`);
+  assert.equal(lastLine({ ...idle, fired: 0, why_idle: '34 were added to Parcels and none matched.' }, NOW), 'Never ran. 34 were added to Parcels and none matched.');
+  assert.equal(lastLine({ ...idle, fired: 0, why_idle: null }, NOW), 'Never ran.', 'with no sentence it still says never');
+  assert.equal(lastLine({ ...idle, fired: 0, why_idle: why, enabled: false }, NOW), 'Turned off.');
+});
+
+test('A COUNTED RULE WHOSE LAST RUN FAILED SAYS THE COUNT, THEN THE FAILURE', () => {
+  const row = { ...auto('Weekly digest', { last: { at: iso(NOW - 3_600_000), state: 'failed' as const, say: 'The key is missing.' } }), fired: 8, last_at: iso(NOW - 3_600_000) };
+  assert.match(lastLine(row, NOW), /^Ran 8 times, last today\. Last run .*failed\. The key is missing\.$/u);
+  assert.equal(lastLine({ ...row, last: { ...row.last!, state: 'done' } }, NOW), 'Ran 8 times, last today.');
+});
+
+test('A RULE IN A FAMILY CARRIES THE LIST AND WHAT IT SETS, IN WORDS, beside the key', () => {
+  const body = { on: { written: { register: 'parcels' } }, then: [{ set: { field: 'shelf_code', to: 'B2' } }, { tag: 'big' }] };
+  const row = { ...auto('Shelve by courier', { register: 'parcels', body }), fired: 4, last_at: iso(NOW), family: 'parcels/inline/set:shelf_code+tag' };
+  assert.deepEqual(ruleSaid(row, (id) => (id === 'parcels' ? 'Parcels' : id)), {
+    family: { key: 'parcels/inline/set:shelf_code+tag', list: 'Parcels', did: ['Shelf code', 'Tags'] },
+    fired: 4,
+    lastAt: iso(NOW),
+  });
+  assert.deepEqual(ruleSaid(auto('Loose'), String), { fired: undefined, lastAt: undefined });
 });
 
 test('AN OWNER\'S ROW ENDS IN A SWITCH, a row is a link only without one, and the switch is never inside a link', () => {

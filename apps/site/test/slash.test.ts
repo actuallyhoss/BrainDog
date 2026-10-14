@@ -24,9 +24,14 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 
 import { ENTRIES } from '../src/routes/changelog/entries.ts';
+import { held } from '../src/lib/launch.ts';
 import { BUILD, missing, when } from './built.ts';
 
-const REQUIRED = ['index.html', 'slash.html', 'pricing.html', 'agents.html', 'changelog.html', '404.html'] as const;
+/* `changelog.html` ONLY ONCE THE SITE IS PUBLIC: until `LAUNCH.public` the page is held and the build writes none
+   (`launch.ts`). The entries are its source and are read on every day, in the first test below. */
+const SHOWN = !held();
+
+const REQUIRED: readonly string[] = ['index.html', 'slash.html', 'pricing.html', 'agents.html', ...(SHOWN ? ['changelog.html'] : []), '404.html'];
 
 const NO_BUILD = missing(REQUIRED);
 
@@ -77,7 +82,10 @@ test('no page this site serves names Spark outside the entry announcing the rena
   }
 });
 
-test('the changelog calls the assistant Slash', when(NO_BUILD), () => {
+/* A HELD PAGE IS A SKIP AND NOT A FAULT, even under `SITE_BUILT=1`: the build wrote no `changelog.html` on purpose. */
+const HELD_PAGE = { skip: 'the changelog is held until LAUNCH.public in src/lib/launch.ts, so the build writes no changelog.html' };
+
+test('the changelog calls the assistant Slash', SHOWN ? when(NO_BUILD) : HELD_PAGE, () => {
   const text = words(readFileSync(new URL('changelog.html', BUILD), 'utf8'));
   /* `ok` AND NOT `match`, because a failed `match` prints the whole page as its `actual`. */
   assert.ok(/\bSlash\b/.test(text), 'changelog.html never says Slash');

@@ -471,6 +471,11 @@ export const FOUNDER = {
         holds: 'one number from one project at one moment, reported by the project or polled by the record',
         title: 'name',
         mobile: ['name', 'value', 'at'],
+        /* NEWEST FIRST BY THE MOMENT A NUMBER IS FOR, IN THE SAME UNRELEASED 2.6.0 (PGS-B06), as the Ledger opens on its
+           newest day (`modules/money/lists/transactions.ts`). A list that names no order came back newest written first,
+           so a feed polled late, or a week of numbers typed in one sitting, opened Numbers on whatever was written last.
+           `at` is the moment the number is for; the kernel breaks a tie by the row's id. */
+        order: { field: 'at', dir: 'desc' },
         fields: [
           { id: 'name', label: 'Measure', type: 'text', required: true, index: true, search: true },
           /* A NUMBER OR AN AMOUNT, SINCE 2.5.0: money is written as `amount`, integer minor units and its currency,

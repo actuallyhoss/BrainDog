@@ -3,10 +3,16 @@
  * print one text made by one set of rules, whatever build of the command sits on the machine.
  *
  *   BrainDog · run S731 · Claude Code on MacBook · project BrainDog · branch main
- *   Next     Cut page answers to block summaries. (S729, Claude Code, 5h ago, check before acting)
+ *   Next     Cut page answers to block summaries. Left by Claude (S729) 5h ago. Check before acting. · Tried: ...
  *   Waiting  2 on Mara: Change how copperleaf starts? · ...
  *   Learned  Money is minor units plus currency. Never add two currencies.
- *   More     4 stale, read braindog:stale · 3 dead ends · 5 learnings · call context
+ *   More     4 stale, read braindog:stale · 5 learnings · call context
+ *
+ * NEXT SAYS WHAT IS TRUE ABOUT THE STEP (AGT-B08 job 4, AGT-C05): the record's own lines (`next_lines`, `nextLines` in
+ * `same-tree.ts`) when the context carries them, so a session is told "Nothing was handed over. Last here: ...", or
+ * who took the step and when, never a step that was taken; what its writer tried; and how many older steps wait. A
+ * context drawn by hand with only a `handoff` still reads, through the card's own wording of it. Likewise the
+ * same-tree line reads the record's `also_here` when it is sent, the warning and then "Also here:" by name.
  *
  * LINE ONE SAYS WHO AND WHERE: the run, the app on the machine as a person names it, the project, the branch. Then the
  * line about another run working in the same tree, only when it is true. Then the slots in this order, each left out
@@ -16,9 +22,9 @@
  *
  * ABOUT 120 WORDS, NEVER MORE THAN 150. Past 120 it cuts what `More` names, then the second learning, then the third
  * question, then the runs named after the first on the same-tree line. Past 150 it keeps cutting, in the order of what
- * matters least, and never cuts line one, the same-tree warning, the handoff in `Next` or the line saying the command is
- * older than the record. A word count, not characters, because the card is read and a name in Arabic letters is no
- * longer to read than one in Latin ones.
+ * matters least, and never cuts line one, the same-tree warning, the step's lines in `Next` or the line saying the
+ * command is older than the record. A word count, not characters, because the card is read and a name in Arabic letters
+ * is no longer to read than one in Latin ones.
  *
  * NAMES PRINT AS WRITTEN, accents and other scripts kept. Every control and format character is removed (`oneLine`, the
  * command's own scrub copied here), since a terminal obeys what it is handed. A machine's network name, a path and a
@@ -29,6 +35,7 @@
 
 import { RULE, rulesOf, type Rules } from './context-caps.ts';
 import type { Brief, Context } from './index.ts';
+import { ALSO_HERE_MOST, TRIED_MOST } from './same-tree.ts';
 
 /** About this many words. Past it, the first cuts are made. */
 export const CARD_AIM = 120;
@@ -44,6 +51,9 @@ const LEARNED = 2;
 
 /** The read that says, one by one, what the card's stale count added up, with the call that clears each. */
 const STALE_READ = 'braindog:stale';
+
+/** The read that lists every step left here and not taken, newest first, which Next names when older ones wait. */
+const HANDOFFS_READ = 'braindog:handoffs';
 
 /** Said word for word whenever another run is working in the same repository (`docs/32-PARITY.md:142`). */
 export const TWO_SESSIONS = 'Two sessions in one working tree overwrite each other. Coordinate or stop.';
@@ -255,20 +265,45 @@ function firstLine(c: Context, at: CardAt, own: string | null): string {
 
 /**
  * One line under the first: its label, the words before its things, the things, and what follows them, worked out from
- * how many are still shown. `least` is how many things it keeps when the card runs long, `lastStays` says its last
- * thing matters most, as the handoff does in Next, and `kept` that the line itself is never taken off.
+ * how many are still shown. `least` is how many things it keeps when the card runs long, `stays` how many of its last
+ * things are never cut, as the record's own Next lines are, `kept` that the line itself is never taken off, and `sep`
+ * what stands between its things when it is not ` · `.
  */
-type Slot = { label: string; lead: string; items: string[]; tail: (shown: number) => string; least: number; lastStays?: boolean; kept?: boolean };
+type Slot = { label: string; lead: string; items: string[]; tail: (shown: number) => string; least: number; stays?: number; kept?: boolean; sep?: string };
 
 const LABEL = 9;
 const none = (): string => '';
-const lineOfSlot = (s: Slot): string => `${s.label.padEnd(LABEL - 1)} ${s.lead}${s.items.join(' · ')}${s.tail(s.items.length)}`;
+const lineOfSlot = (s: Slot): string => `${s.label.padEnd(LABEL - 1)} ${s.lead}${s.items.join(s.sep ?? ' · ')}${s.tail(s.items.length)}`;
 
 /** A run's state that is working: active, and not gone quiet nor stale. */
 const working = (r: Context['live']['same_repo'][number]): boolean => r.state === 'active' && r.quiet !== true && !r.stale;
 
-/** The line about other runs working in the same tree, said only when it is true. The caller's own run is never one. */
-function alsoSlot(c: Context, own: string | null): Slot | null {
+/**
+ * The line about other runs working in the same tree, said only when it is true. The caller's own run is never one.
+ *
+ * THE RECORD'S `also_here` WHEN IT SENT ONE: it knows the machine and the helpers, which a run's brief does not, so a
+ * `null` there means nobody shares this tree, whatever `same_repo` holds. The warning, word for word, then "Also here:"
+ * and the runs by name, each with what it says it is doing, and "and 2 more" counted from what the cut left.
+ */
+function alsoSlot(c: Context, own: string | null, at: CardAt): Slot | null {
+  if (c.also_here !== undefined) {
+    const here = c.also_here;
+    if (here === null) return null;
+    const runs = here.runs.slice(0, ALSO_HERE_MOST).map((r) => {
+      const name = words(plainly(r.name, c, true, at), 40);
+      return r.doing ? `${name}, ${words(plainly(r.doing, c, true, at), 60)}` : name;
+    });
+    const all = here.runs.length + (Number.isInteger(here.more) && here.more > 0 ? here.more : 0);
+    return {
+      label: 'Also',
+      lead: `${oneLine(here.warning) || TWO_SESSIONS} Also here: `,
+      items: runs,
+      sep: '; ',
+      tail: (shown) => `${all > shown ? `, and ${String(all - shown)} more` : ''}.`,
+      least: 1,
+      kept: true,
+    };
+  }
   const others = c.live.same_repo.filter((r) => working(r) && r.spoken !== own);
   if (others.length === 0) return null;
   const runs = others.slice(0, PER_SLOT).map((r) => {
@@ -317,14 +352,40 @@ function handoffItem(c: Context, at: CardAt, own: string | null): string | null 
   return `${stopped(words(plainly(h.next, c, false), 160))} (${notes.join(', ')})`;
 }
 
-/** Next: what a person handed to this agent, then the step the last run left, which is the one thing never cut. */
+/** What the step's writer tried, as one "Tried:" line of at most `TRIED_MOST` characters, or `null` when nothing was. */
+function triedItem(c: Context): string | null {
+  const tried = (c.handoff?.tried ?? []).map((t) => oneLine(plainly(String(t), c, false)).replace(/[.;]+$/u, '')).filter((t) => t !== '');
+  return tried.length === 0 ? null : words(`Tried: ${tried.join('; ')}`, TRIED_MOST);
+}
+
+/** "2 older steps were left here", with the read that lists them, when the record counted any past the one handed over. */
+function earlierItem(c: Context): string | null {
+  const n = c.handoff?.earlier;
+  if (typeof n !== 'number' || !Number.isInteger(n) || n <= 0) return null;
+  return `${count(n, 'older step')} ${n === 1 ? 'was' : 'were'} left here: read ${HANDOFFS_READ}`;
+}
+
+/**
+ * The step as the record says it: its own Next lines (`next_lines`), each whole and on one line, else the card's
+ * wording of a `handoff` with what was tried; then how many older steps wait. Empty when there is nothing true to say.
+ */
+function stepItems(c: Context, at: CardAt, own: string | null): string[] {
+  const told = (Array.isArray(c.next_lines) ? c.next_lines : [])
+    .map((line) => (typeof line === 'string' ? words(plainly(line, c, false), Number.POSITIVE_INFINITY) : ''))
+    .filter((line) => line !== '');
+  const worded = handoffItem(c, at, own);
+  const step = told.length > 0 ? told : worded === null ? [] : [worded, triedItem(c)];
+  return [...step, earlierItem(c)].filter((s): s is string => s !== null);
+}
+
+/** Next: what a person handed to this agent, then the record's lines about the step, which are never cut. */
 function nextSlot(c: Context, at: CardAt, own: string | null): { slot: Slot | null; handedLeft: number } {
   const handed = handedTo(c, at.agent ?? null);
-  const step = handoffItem(c, at, own);
-  const shown = handed.slice(0, step === null ? PER_SLOT : PER_SLOT - 1);
-  const items = [...shown.map((row) => `${words(plainly(wordsOf(row), c, true, at), 60)} (${clip(row.spoken, 24)}, handed to you)`), ...(step === null ? [] : [step])];
+  const step = stepItems(c, at, own);
+  const shown = handed.slice(0, step.length === 0 ? PER_SLOT : PER_SLOT - 1);
+  const items = [...shown.map((row) => `${words(plainly(wordsOf(row), c, true, at), 60)} (${clip(row.spoken, 24)}, handed to you)`), ...step];
   if (items.length === 0) return { slot: null, handedLeft: 0 };
-  return { slot: { label: 'Next', lead: '', items, tail: none, least: 1, lastStays: step !== null, kept: true }, handedLeft: handed.length - shown.length };
+  return { slot: { label: 'Next', lead: '', items, tail: none, least: 1, stays: step.length, kept: true }, handedLeft: handed.length - shown.length };
 }
 
 /** The red signs, by name, and the one sentence when only one is red. Said only to a caller the record sent them to. */
@@ -488,8 +549,7 @@ function learnedAndMore(c: Context, at: CardAt, handedLeft: number): Slot[] {
     .slice(0, Math.max(0, Math.min(LEARNED, PER_SLOT - ruled.length)));
   const more: string[] = [];
   if (typeof c.stale === 'number' && Number.isInteger(c.stale) && c.stale > 0) more.push(`${String(c.stale)} stale, read ${STALE_READ}`);
-  const tried = c.handoff?.tried.length ?? 0;
-  if (tried > 0) more.push(count(tried, 'dead end'));
+  /* WHAT WAS TRIED IS SAID IN NEXT, in its writer's words, so More no longer counts it as dead ends. */
   if (handedLeft > 0) more.push(`${String(handedLeft)} more handed to you`);
   const grow = bearing(c);
   if (grow) more.push(`${count(grow.learnings, 'learning')} for a skill`);
@@ -558,9 +618,10 @@ function cutOnce(slots: Slot[], rules: [string, number][]): boolean {
       slot.least = -1;
       return true;
     }
-    if (slot.items.length <= floor) continue;
-    /* The handoff is Next's last thing and its reason for being, so a row handed over goes before it does. */
-    slot.items.splice(slot.lastStays === true ? slot.items.length - 2 : slot.items.length - 1, 1);
+    const stays = slot.stays ?? 0;
+    if (slot.items.length <= floor || slot.items.length <= stays) continue;
+    /* The step is Next's last things and its reason for being, so a row handed over goes before any of them does. */
+    slot.items.splice(slot.items.length - stays - 1, 1);
     return true;
   }
   return false;
@@ -605,7 +666,7 @@ export function card(c: Context, at: CardAt, now: number): Card {
   const head = firstLine(c, at, own);
   const next = nextSlot(c, at, own);
   const nextLine = next.slot === null ? null : lineOfSlot(next.slot);
-  const slots = [alsoSlot(c, own), next.slot, signsSlot(c), waitingSlot(c, at), decidedSlot(c), ...learnedAndMore(c, at, next.handedLeft), olderSlot(at, now)].filter((s): s is Slot => s !== null);
+  const slots = [alsoSlot(c, own, at), next.slot, signsSlot(c), waitingSlot(c, at), decidedSlot(c), ...learnedAndMore(c, at, next.handedLeft), olderSlot(at, now)].filter((s): s is Slot => s !== null);
   const size = () => wordCount(render(head, slots).join('\n'));
   while (size() > CARD_AIM && cutOnce(slots, AIM_CUTS));
   while (size() > CARD_MOST && cutOnce(slots, [...AIM_CUTS, ...MOST_CUTS]));

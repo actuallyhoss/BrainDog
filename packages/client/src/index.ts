@@ -815,6 +815,8 @@ export type TokenRow = {
   ended_by?: 'operator';
   /** Whose it is, by name or address, on `listTokens`'s rows only: a colleague may hold keys of their own. */
   person_name?: string | null;
+  /** The app and machine that signed in for it (the sign-in stamp); absent on a host older than the stamp. */
+  client?: { id: string; kind: 'cimd' | 'dcr' | 'device' | 'key'; host: string | null } | null;
   /** The build of the command behind the key, as its last call said it (`x-braindog-cli`, AGT-A02). Absent on an older host. */
   last_build?: string | null;
   /** When the key last made a tool call through the door (`noteTool`). Absent on an older host. */
@@ -1576,6 +1578,8 @@ export function createClient(options: ClientOptions) {
     listDevices: () => call<DeviceRow[]>('listDevices'),
     deviceApprove: (args: { user_code: string }) => call<DeviceApproved>('deviceApprove', args as Record<string, unknown>),
     revokeDevice: (args: { handle: string }) => call<DeviceRow>('revokeDevice', args as Record<string, unknown>),
+    /** Rename one machine by its handle (`id`): its sign-in and its key read the new name. */
+    renameDevice: (args: { id: string; label: string }) => call<DeviceRow>('renameDevice', args as Record<string, unknown>),
     listGrants: () => call<unknown[]>('listGrants'),
     /* VAULT, SO A BROWSER SESSION AND A SIGN-IN IN THE LAST FIFTEEN MINUTES. The bytes go and the row stays. */
     revokeGrant: (args: { id: string }) => call<null>('revokeGrant', args as Record<string, unknown>),

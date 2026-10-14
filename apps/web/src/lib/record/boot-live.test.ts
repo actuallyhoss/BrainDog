@@ -7,7 +7,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import './fixtures/fill.ts';
-import { forget, layoutOf, newsOf, readBoot, refusedShell, rereadBoot, signsIn, waitsOf, workingOf, type Fetch } from './boot-live.ts';
+import { readFileSync } from 'node:fs';
+import { APPEND_AT, forget, layoutOf, newsOf, onAppendOnly, readBoot, refusedShell, rereadBoot, signsIn, waitsOf, workingOf, type Fetch } from './boot-live.ts';
 import { hueFor } from '../ui/face.ts';
 import { tabsOf } from '../page/tabs.ts';
 
@@ -820,3 +821,11 @@ test("a page about a row carries the hue boot sends, else its name's", () => {
   assert.equal(hues.odd, hueFor('Odd'), 'a hue that is not a turn was drawn');
 });
 
+
+test("HOME KNOWS AN ADDS-ONLY REFUSAL BY THE RECORD'S OWN `at`: the two spellings of level.append are one", () => {
+  const record = readFileSync(new URL('../../../../../packages/record/src/append-refusal.ts', import.meta.url), 'utf8');
+  const sent = /export const APPEND_READ_AT = '([^']+)';/u.exec(record)?.[1];
+  assert.equal(sent, APPEND_AT, "the record's appendReadRefusal sends another at than the one Home branches on");
+  assert.equal(onAppendOnly({ code: 'LEVEL_REQUIRED', fix: 'x', at: sent ?? '' }), true);
+  assert.equal(onAppendOnly({ code: 'LEVEL_REQUIRED', fix: 'x' }), false, 'a refusal with no at is not the adds-only one');
+});

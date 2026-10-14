@@ -27,7 +27,10 @@
   import { copy } from '../copy.ts';
   import { valueSaid } from '../voice.ts';
   import { firstAsks } from '../first-run.ts';
+  import { untrack } from 'svelte';
   import DayBox from './DayBox.svelte';
+  import Field from './Field.svelte';
+  import { errorFor, loose, type Refused } from './field.ts';
   import FileField from './FileField.svelte';
   import Icon from './Icon.svelte';
   import Segmented from './Segmented.svelte';
@@ -50,6 +53,8 @@
     taken = $bindable<Fields>({}),
     given = {},
     values = {},
+    refused = null,
+    unnamed = $bindable<string | null>(null),
   }: {
     register: string;
     first?: boolean;
@@ -80,6 +85,14 @@
      * there is no row yet, only what the choice answered (`given`).
      */
     values?: Readonly<Record<string, string>> | undefined;
+    /**
+     * WHAT THE RECORD SAID WHEN IT REFUSED THIS ROW, from the screen that owns the submit. A refusal that names a field
+     * (`at`) is said under that field, in the record's own words, and nowhere else; the typed values stay where they
+     * were, because nothing here clears them.
+     */
+    refused?: Refused | null | undefined;
+    /** The refusal's sentence when it names no field this form draws, for the one line at the form's foot. */
+    unnamed?: string | null;
   } = $props();
 
   /**
@@ -299,6 +312,26 @@
   const wrong = (f: FieldDecl): string | null => amountWrong(f, typed[f.id] ?? '', listed(f));
 
   /**
+   * WHAT WAS IN EACH FIELD WHEN THE RECORD REFUSED IT, so the record's sentence goes the moment that field is changed:
+   * the refusal was about the value it saw, and a corrected value is not still wrong until the next save says so.
+   */
+  const now = (f: FieldDecl): string => (f.type === 'bool' ? String(ticked[f.id] ?? '') : (typed[f.id] ?? ''));
+  let seen = $state<Record<string, string>>({});
+  $effect(() => {
+    if (!refused) return;
+    seen = untrack(() => Object.fromEntries(fields.map((f) => [f.id, now(f)])));
+  });
+
+  /** The line under a field: the record's refusal while the value it refused is still there, else what this form sees. */
+  const errorOf = (f: FieldDecl): string | null =>
+    (seen[f.id] !== undefined && seen[f.id] === now(f) ? errorFor(refused, f.id) : undefined) ?? (f.type === 'money' ? wrong(f) : null);
+
+  /* WHAT NAMES NO FIELD ON THIS FORM, a hidden one among them, goes out for the foot; what names one is said only there. */
+  $effect(() => {
+    unnamed = loose(refused, fields.map((f) => f.id));
+  });
+
+  /**
    * WHAT THE REGISTER ITSELF SAYS CANNOT BE LEFT OUT, and is.
    *
    * `f.required` was already rendered beside the label and enforced nowhere — a form that marks a
@@ -355,29 +388,20 @@
 <div class="row-form" bind:this={form}>
   {#each fields as f, i}
     <div class="row-field" data-type={f.type}>
-      <!-- `for` ONLY WHERE THERE IS SOMETHING TO POINT AT. The segmented branch renders no element
-           carrying `id(f)`, so both the label's `for` and the group's `aria-labelledby` pointed at
-           an id that does not exist — which is a label announced as attached to nothing. -->
-      <label class="row-label" id={labelId(f)} for={f.type === 'enum' && (f.values?.length ?? 0) <= 4 ? undefined : id(f)}>
-        <!-- ON THE FIRST RUN THE TITLE FIELD IS ASKED FOR AS A FACT. `firstRun.firstField` had a
-             sentence per register — "Your first invoice", "The first person" — and was referenced
-             nowhere, so the one screen `19 §6` writes a budget for asked for `Description`. -->
-        {label && f.id === decl?.title ? label : labelOf(f)}
-        <!-- Required is marked on the LABEL and spelled out, never as a bare asterisk: an asterisk
-             is a convention you have to already know, and it is announced as "star". -->
-        <!-- AND THE ATTRIBUTE, NOT ONLY THE WORD. The first-run form said the word `required` five
-             times over zero fields carrying it: the form said the rule and
-             the browser did not know it, so a screen reader announced nothing, autofill treated
-             every field alike, and the only thing enforcing it was this component's own count. The
-             submit is still what refuses, with a sentence naming the fields; this is the browser
-             being told the same fact. -->
-        <!-- AND ON THE FIRST RUN THE WORD GOES AND THE ATTRIBUTE STAYS. Everything that form draws
-             is a field the register requires (`firstAsks` is the title and the required fields the
-             choice has not answered), so the word marked every field and told a reader nothing
-             about any one of them: five on five fields when it was measured. The attribute still
-             tells the browser, and the sentence beside the dead button still names what is empty. -->
-        {#if f.required && !first}<span class="row-required">{copy.required}</span>{/if}
-      </label>
+      <!-- ONE FIELD (`Field.svelte`): the label, the control, and one line under it that is the record's refusal for
+           this field when it refused one. `for` only where there is something to point at: the segmented branch
+           renders no element carrying `id(f)`, so it is a `group` and names itself by the label's id.
+           ON THE FIRST RUN THE TITLE FIELD IS ASKED FOR AS A FACT ("Your first invoice", never `Description`).
+           Required is marked on the label and spelled out, never as a bare asterisk, and the attribute goes on the
+           control too; on the first run the word goes (every field it draws is required) and the attribute stays. -->
+      <Field
+        id={id(f)}
+        label={label && f.id === decl?.title ? label : labelOf(f)}
+        marked={f.required && !first ? copy.required : undefined}
+        group={f.type === 'enum' && (f.values?.length ?? 0) <= 4}
+        error={errorOf(f)}
+      >
+        {#snippet children({ describedBy, invalid })}
 
       {#if f.type === 'enum' && (f.values?.length ?? 0) <= 4}
         <!--
@@ -427,14 +451,14 @@
           {/each}
         </Segmented>
       {:else if f.type === 'enum'}
-        <select class="row-input" id={id(f)} required={f.required} bind:value={typed[f.id]}>
+        <select class="row-input" id={id(f)} required={f.required} bind:value={typed[f.id]} aria-describedby={describedBy} aria-invalid={invalid ? 'true' : undefined}>
           {#each offered(f) as move}
             <!-- An option cannot hold muted text, so the word follows the value after a comma. -->
             <option value={move.value}>{valueSaid(f, move.value)}{word(move) ? `, ${word(move)}` : ''}</option>
           {/each}
         </select>
       {:else if f.type === 'ref'}
-        <select class="row-input" id={id(f)} required={f.required} bind:value={typed[f.id]}>
+        <select class="row-input" id={id(f)} required={f.required} bind:value={typed[f.id]} aria-describedby={describedBy} aria-invalid={invalid ? 'true' : undefined}>
           <option value="">{copy.noneChosen}</option>
           {#each options(f) as o}<option value={String(o.value)}>{o.label}</option>{/each}
         </select>
@@ -456,13 +480,12 @@
             placeholder={unit ? (0).toFixed(exponentOf(unit)) : '0'}
             required={f.required}
             bind:value={typed[f.id]}
-            aria-invalid={wrong(f) ? 'true' : undefined}
-            aria-describedby={wrong(f) ? `${id(f)}-why` : undefined}
+            aria-invalid={invalid ? 'true' : undefined}
+            aria-describedby={describedBy}
           />
         </div>
-        <!-- SAID WHERE IT WAS TYPED, not at submit. A value the record will refuse is worth knowing
-             about while the caret is still in the field. -->
-        {#if wrong(f)}<p class="row-why" id="{id(f)}-why">{wrong(f)}</p>{/if}
+        <!-- SAID WHERE IT WAS TYPED, not at submit: a value the record will refuse is the field's line (`errorOf`)
+             while the caret is still in it. -->
       {:else if f.type === 'day'}
         <!-- PRE-FILLED FROM THE RECORD'S OWN CLOCK ON THE FIRST RUN, and not from a literal: a
              hardcoded date is a past date within weeks, on the one screen where a wrong default is
@@ -471,19 +494,21 @@
         <DayBox id={id(f)} label={labelOf(f)} bind:value={typed[f.id]} />
       {:else if f.type === 'int' || f.type === 'decimal' || f.type === 'duration'}
         <div class="field">
-          <input class="field-input num" id={id(f)} type="text" inputmode="decimal" required={f.required} bind:value={typed[f.id]} />
+          <input class="field-input num" id={id(f)} type="text" inputmode="decimal" required={f.required} bind:value={typed[f.id]} aria-describedby={describedBy} aria-invalid={invalid ? 'true' : undefined} />
           {#if f.unit}<span class="money-unit">{f.unit}</span>{/if}
         </div>
       {:else if f.type === 'bool'}
-        <label class="row-check"><input id={id(f)} type="checkbox" bind:checked={ticked[f.id]} /> {copy.yes}</label>
+        <label class="row-check"><input id={id(f)} type="checkbox" bind:checked={ticked[f.id]} aria-describedby={describedBy} aria-invalid={invalid ? 'true' : undefined} /> {copy.yes}</label>
       {:else if f.type === 'document'}
-        <textarea class="row-input row-area" id={id(f)} rows="4" required={f.required} bind:value={typed[f.id]}></textarea>
+        <textarea class="row-input row-area" id={id(f)} rows="4" required={f.required} bind:value={typed[f.id]} aria-describedby={describedBy} aria-invalid={invalid ? 'true' : undefined}></textarea>
       {:else if isFile(f)}
         <!-- A FILE IS CHOSEN, NEVER TYPED: the picker sends the bytes and the draft holds what came back. -->
         <FileField id={id(f)} label={labelOf(f)} bind:value={typed[f.id]} />
       {:else}
-        <div class="field"><input class="field-input" id={id(f)} type="text" required={f.required} bind:value={typed[f.id]} /></div>
+        <div class="field"><input class="field-input" id={id(f)} type="text" required={f.required} bind:value={typed[f.id]} aria-describedby={describedBy} aria-invalid={invalid ? 'true' : undefined} /></div>
       {/if}
+        {/snippet}
+      </Field>
     </div>
   {/each}
 
@@ -502,40 +527,11 @@
     gap: var(--sp-4);
   }
 
-  .row-field {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-2);
-  }
-
-  .row-label {
-    display: flex;
-    align-items: baseline;
-    gap: var(--sp-2);
-    color: var(--ink2);
-    font-size: var(--t-sm);
-    font-weight: 500;
-  }
-
-  /* THE COLOUR IS NOT THE MESSAGE. Somebody who cannot tell the two reds apart still reads the
-     sentence, which is why there is one. */
-  .row-why {
-    margin-block: var(--sp-1) 0;
-    color: var(--danger-text);
-    font-size: var(--t-sm);
-  }
-
   /* WHAT A MOVE ASKS FOR, muted beside its value: said in words, so it reads the same on the chosen segment. */
   .move-word {
     margin-inline-start: var(--sp-2);
     color: var(--dim);
     font-size: var(--t-sm);
-    font-weight: 400;
-  }
-
-  .row-required {
-    color: var(--dim);
-    font-size: var(--t-xs);
     font-weight: 400;
   }
 

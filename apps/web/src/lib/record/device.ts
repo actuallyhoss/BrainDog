@@ -23,7 +23,9 @@ import type { DeviceApproved, DeviceRow } from '@braindog/client';
 import { BASE } from '../at.ts';
 import { copy } from '../copy.ts';
 import { REGISTERS } from './held.ts';
-import { AGENT_NAMES } from './names.ts';
+/* A CYCLE, ON PURPOSE AND SAFE: `apps.ts` reads `reportKeyOf` from here and this reads `partsOf` from there, both
+   function declarations called only after both modules have loaded. */
+import { partsOf } from './apps.ts';
 
 export type { DeviceRow };
 
@@ -52,6 +54,9 @@ export type TokenRow = {
   last_build?: string | null;
   /** When the key last made a tool call through the door. Absent on an older host. */
   last_tool_at?: string | null;
+  /** Which app the token was minted for, as the door stamped it (`TokenClient` in `@braindog/kernel`). Read by
+      `clientOf` in `apps.ts`, never trusted as typed: absent on a host older than the stamp. */
+  client?: unknown;
 };
 
 /**
@@ -196,8 +201,11 @@ export const headerLine = (bearer: string): string => `Authorization: Bearer ${b
 /** The most runs read to find each connection's last one: the newest first, so a connection used this month is found. */
 export const RUNS_READ = 200;
 
-/** A run as the connected list reads it: its number, the key that opened it, and the agent and machine it said it was. */
-export type Run = { seq: number; token: string; agent: string | null; host: string | null };
+/**
+ * A run as the connected list reads it: its number, the key that opened it, the agent and machine it said it was, and
+ * the app it said it ran in (`claude-code`), which a run made before the app said so has none of.
+ */
+export type Run = { seq: number; token: string; agent: string | null; host: string | null; client?: string | null };
 
 const text = (x: unknown): string | null => (typeof x === 'string' && x.trim() !== '' ? x : null);
 
@@ -215,7 +223,7 @@ export function runsOf(rows: readonly unknown[]): Run[] {
     if (typeof seq !== 'number' || typeof fields !== 'object' || fields === null) continue;
     const f = fields as Record<string, unknown>;
     const token = text(f.token_id);
-    if (token !== null) runs.push({ seq, token, agent: text(f.agent), host: text(f.host) });
+    if (token !== null) runs.push({ seq, token, agent: text(f.agent), host: text(f.host), client: text(f.client) });
   }
   return runs;
 }
@@ -291,26 +299,16 @@ export function connected(machines: readonly DeviceRow[], tokens: readonly Token
   return rows.sort((a, b) => Number(b.live) - Number(a.live) || newer(a, b));
 }
 
-/** A key read in an author's map only when the map holds it, so a name like `constructor` finds nothing. */
-const own = (map: Readonly<Record<string, string>>, key: string | null): string | undefined =>
-  key !== null && Object.hasOwn(map, key) ? map[key] : undefined;
-
 /**
- * What a connection is called.
+ * What a connection is called, in one string, for the screens that name it in a sentence: the app and where it runs,
+ * "Claude on STUDIO-PC", from `partsOf` in `apps.ts`, which the Connected list draws as its three parts.
  *
- * A MACHINE IS WHAT RUNS ON IT, "Claude on STUDIO-PC", from the newest run its key opened, because the label a machine
- * signs in with is the command's own (`STUDIO-PC · braindog-cli`) and says nothing about the agent. A key and an app keep
- * the name they were given, which the owner typed or the app registered ("claude.ai"): that name was chosen.
+ * A MACHINE IS WHAT RUNS ON IT, because the label a machine signs in with is the command's own
+ * (`STUDIO-PC · braindog-cli`) and says nothing about the agent. A key keeps the name the owner typed.
  */
 export function nameOf(c: Connection): string {
-  const report = reportKeyOf(c.token?.label ?? null);
-  if (report) return copy.reportKeyNamed(report.name);
-  if (c.machine) {
-    const agent = own(AGENT_NAMES, c.run?.agent ?? null);
-    if (agent && c.run?.host) return copy.agentOn(agent, c.run.host);
-    return c.machine.label ?? copy.unnamedMachine;
-  }
-  return c.token?.label ?? copy.unnamedKey;
+  const { app, where } = partsOf(c);
+  return where !== null && where !== app ? copy.agentOn(app, where) : app;
 }
 
 /** What a connection may do, in words: a key's scope and its inbox, or a grant's reach and how long it lasts. */

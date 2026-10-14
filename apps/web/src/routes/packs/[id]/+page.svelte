@@ -6,9 +6,10 @@
   beside its field, and Ctrl or Cmd with Enter saves from anywhere in the form.
 
   SAVE SENDS ONLY WHAT MOVED, and Reset sends `null` for one setting, which the record reads as its
-  default. Nothing installed changes: the record fills `{{config:}}` when the add-on is next installed
-  or updated, and that is the one sentence this screen says. An add-on that declares no settings
-  draws no settings section.
+  default. Each setting says when a change takes hold, worked out from the add-on's file (`takes-hold.ts`): at
+  once for what reads it when drawn, or when the add-on next updates for a `{{config:}}` the record fills at
+  install. Only when the file cannot be read does the form say the general rule once. An add-on that declares
+  no settings draws no settings section.
 
   THE LOOK: what the add-on does is the title row's sentence and its switch is in the toolbar. The form
   is a group on the ground, each setting's label above its 40px field (a switch sits beside its label, as a switch
@@ -36,6 +37,7 @@
   import { currencyChoices } from '$lib/record/currencies.ts';
   import { settingChoices } from './said.ts';
   import { heldNames, holdName, waitingIn, waitingLine } from './waiting.ts';
+  import { answersIn, declarationsOf, savedSaid, takesHoldSaid, type TakesHold } from './takes-hold.ts';
   import { lineSaid, pairsOf, rateNote, rateSaid, readRates, type PairRead } from './rates.ts';
   import { Sparkline } from '$lib/viz/index.ts';
   import { kennelFetch, publishedText } from '$lib/market/publish.ts';
@@ -163,10 +165,12 @@
     alone = chosen.alone;
     installed = null;
     turnSaid = '';
+    holds = undefined;
     if (chosen.first.ok) {
       show(chosen.first.value);
       from = 'ready';
       void readHeld(chosen.source, want);
+      void readHolds(chosen.first.value, want);
     } else {
       refusal = chosen.first.refusal.fix;
       unknown = chosen.first.refusal.code === 'DECLARATION_UNKNOWN';
@@ -179,6 +183,19 @@
     const want = id;
     untrack(() => void load(want));
   });
+
+  /**
+   * WHEN EACH SETTING TAKES HOLD (SHL-A09): at once, or when this add-on next updates, worked out from its own file
+   * (`takes-hold.ts`). `undefined` while the file is read, and no line is drawn then; `null` when it cannot be read,
+   * and the form says the general rule once instead of guessing per setting.
+   */
+  let holds = $state<Record<string, TakesHold> | null | undefined>(undefined);
+  async function readHolds(s: PackConfig, want: string) {
+    const firstParty = firstPartyModules().some((m) => m.id === want);
+    const declarations = await declarationsOf(want, s.version, firstParty).catch(() => null);
+    if (String(page.params.id) !== want) return;
+    holds = declarations === null ? null : answersIn(declarations, Object.keys(s.config));
+  }
 
   /* ── on or off ─────────────────────────────────────────────────────────── */
 
@@ -303,7 +320,9 @@
     show(out.value, Object.keys(values));
     const names = out.value.changed.map((k) => labelOf(k, out.value.config[k] as ConfigDecl));
     if (names.length === 0) return;
-    toasts.push(words.saved(names), { intent: 'good' });
+    /* A SAVED SETTING THAT WAITS FOR THE UPDATE SAYS SO, so a target changed with nothing moving is never unexplained. */
+    const said = out.value.changed.map((k, i) => ({ name: names[i] ?? k, answer: holds?.[k] }));
+    toasts.push(savedSaid(words.saved(names), said, name), { intent: 'good' });
   }
 
   function submit(e?: Event) {
@@ -392,7 +411,7 @@
     {#if entries.length}
       <Section title={words.settings}>
         <form class="settings" bind:this={form} onsubmit={submit} novalidate>
-          <p class="when">{words.when}</p>
+          {#if holds === null}<p class="when">{words.when}</p>{/if}
 
           {#each entries as [key, decl] (key)}
             {@const d = drafts[key]}
@@ -559,6 +578,7 @@
 
                 {#if only}<p class="setting-note">{words.speaksAlone}</p>{/if}
                 {#if decl.note}<p class="setting-note">{decl.note}</p>{/if}
+                {#if holds?.[key]}<p class="setting-note">{takesHoldSaid(holds[key], name)}</p>{/if}
                 {#if why}<p class="setting-why" id="set-{key}-why" data-intent="bad"><span class="glyph" role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span>{why}</p>{/if}
               </div>
             {/if}

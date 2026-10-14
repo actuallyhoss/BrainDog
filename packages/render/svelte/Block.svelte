@@ -29,6 +29,8 @@
   import Gallery from './Gallery.svelte';
   import Embed from './Embed.svelte';
   import Path from './Path.svelte';
+  import Actions from './Actions.svelte';
+  import { actionLabels, type OnAct } from '../src/actions.ts';
   import type { OnCapture } from './types.ts';
   import type { OnInput } from '../src/inputs.ts';
 
@@ -48,6 +50,7 @@
     onmenu,
     onselect,
     selected,
+    act,
   }: {
     block: Block;
     opts?: RenderOptions;
@@ -112,7 +115,17 @@
      */
     onselect?: ((row: Row, on: boolean) => void) | undefined;
     selected?: readonly string[] | undefined;
+    /**
+     * A DECLARED ACTION PRESSED (PGS-A12): the action, and a switch's or a choice's new value. Handed to `Actions` alone,
+     * which draws the block's `actions` under it only when this is passed; a preview or the mirror passes nothing and
+     * gets the block as it always was. Row actions inside the row drawers are a later job.
+     */
+    act?: OnAct | undefined;
   } = $props();
+
+  /* THE BLOCK'S DECLARED ACTIONS, as the page read handed them, cut to what this reader may press. Read loosely until
+     the parsed `Block` type carries the key: a fence an author typed never has one. */
+  const actions = $derived(block.actions);
 
   /** The list this block draws through, so `choose` can reach its queue. */
   let list = $state<{ choose(i: number, key?: string | null): boolean } | undefined>(undefined);
@@ -206,6 +219,14 @@
     <!-- An unknown primitive degrades to one line: a label and what to do. Not an explanation, not
          a metric — the reader cannot act on either (22 §3). -->
     <p class="needs-client">Block “{block.kind}” needs a newer client.</p>
+  {/if}
+  <!-- UNDER THE BLOCK AND INSIDE ITS FIGURE, the controls only when the host can press them. With no `act` (a preview,
+       the mirror) the labels are one quiet line and nothing pressable, the line `toHTML` prints, so the two trees stay
+       equal; a block with no actions draws neither. -->
+  {#if act && actions?.length}
+    <Actions {actions} onact={act} />
+  {:else if actionLabels(actions).length > 0}
+    <p class="block-actions">{actionLabels(actions).join(' · ')}</p>
   {/if}
 </figure>
 {/if}

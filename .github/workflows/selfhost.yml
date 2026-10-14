@@ -1,0 +1,104 @@
+name: selfhost
+
+# THE SELF-HOST FROM A CLEAN CLONE, EVERY WEEK AND ON A CHANGE TO IT (LCH-C13 jobs 1 and 2, "The software stays
+# self-hostable", D33.45).
+#
+# `apps/selfhost/test/from-clean.mjs` reads README.md's own self-host lines and runs them in a copy of this commit made
+# with `git archive`: install, build, `init` with an invented record and owner, start. Then the real `braindog` command,
+# built from the same commit, signs in with a token, boots, writes a row, reads it, exports, verifies, restores into a
+# second folder with `init --from`, and reads the row there. The container job does the same through `docker build` and
+# `docker run`, with the image's health check healthy.
+#
+# OUTBOUND CALLS ARE BLOCKED ONCE WHAT NEEDS THE NETWORK IS IN (the scope's risk): the install for the plain run, and the
+# image build too for the container. A run that fails after that line needed the Cloud by accident, a font or a
+# catalogue fetch, and the step it failed at says which. Loopback and the runner's own Docker bridge stay open; the
+# runner's resolver is on loopback, and what it would ask upstream is blocked with everything else.
+#
+# NOTHING IS PUSHED, DEPLOYED OR SIGNED IN AS ANYBODY. The image is built and thrown away; no secret is read.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Mondays, 05:17 UTC: off the hour, as the scheduler asks.
+    - cron: '17 5 * * 1'
+  push:
+    paths:
+      - 'apps/selfhost/**'
+      - 'packages/host/**'
+      - 'README.md'
+      - '.github/workflows/selfhost.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: selfhost-${{ github.ref_name }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  plain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.13.0
+
+      # THE PARSER AND THE STEP LIST FIRST, which install nothing: a README the check cannot place fails here in seconds.
+      - name: The README lines and the steps
+        run: |
+          node --test apps/selfhost/test/from-clean.test.mjs
+          node apps/selfhost/test/from-clean.mjs --dry
+
+      - name: Write the outbound block
+        run: |
+          cat > "$RUNNER_TEMP/offline.sh" <<'EOF'
+          set -eu
+          for t in iptables ip6tables; do
+            sudo "$t" -A OUTPUT -o lo -j ACCEPT
+            sudo "$t" -A OUTPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+            sudo "$t" -A OUTPUT -j REJECT
+          done
+          EOF
+
+      - name: From a clean clone, outbound blocked after the install
+        run: node apps/selfhost/test/from-clean.mjs --after-install "$RUNNER_TEMP/offline.sh"
+
+  container:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.13.0
+
+      # THE CONTAINERS' OWN CALLS GO THROUGH FORWARD, NOT OUTPUT, so Docker's DOCKER-USER chain blocks them, and the
+      # runner's calls into a container over its bridge stay open.
+      - name: Write the outbound block
+        run: |
+          cat > "$RUNNER_TEMP/offline.sh" <<'EOF'
+          set -eu
+          for t in iptables ip6tables; do
+            sudo "$t" -A OUTPUT -o lo -j ACCEPT
+            sudo "$t" -A OUTPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+            sudo "$t" -A OUTPUT -o docker0 -j ACCEPT
+            sudo "$t" -A OUTPUT -j REJECT
+          done
+          sudo iptables -I DOCKER-USER 1 -i docker0 ! -o docker0 -j REJECT
+          sudo iptables -I DOCKER-USER 1 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+          EOF
+
+      - name: The container from a clean clone, outbound blocked after the image is built
+        run: node apps/selfhost/test/from-clean.mjs --container --after-install "$RUNNER_TEMP/offline.sh"

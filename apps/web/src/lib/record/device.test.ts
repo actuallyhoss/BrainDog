@@ -11,9 +11,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  reportKeyOf, CODE_DIGITS, LABEL_MAX, TOKEN_DAYS, answerOf, codeOf, connectLines, normalise, reachKey, revocable,
-  standing, type DeviceRow, type TokenRow,
+  reportKeyOf, CODE_DIGITS, LABEL_MAX, TOKEN_DAYS, answerOf, codeOf, connectLines, connected, nameOf, normalise, reachKey,
+  revocable, standing, type Connection, type DeviceRow, type TokenRow,
 } from './device.ts';
+import { APP_NAMES, clientOf, lineOf, partsOf } from './apps.ts';
 import * as device from './device.ts';
 import { REACHES, SCOPES } from '@braindog/kernel';
 import { copy } from '../copy.ts';
@@ -201,4 +202,91 @@ test('a report key reads as its name and the list it sends to, never as its labe
   assert.deepEqual(reportKeyOf('report:not json'), { name: null, register: '' });
   assert.equal(reportKeyOf('Claude on the laptop'), null);
   assert.equal(reportKeyOf(null), null);
+});
+
+/* ── who is connected, in three parts (AGT-A06) ── */
+
+const NOW = Date.parse('2026-10-14T12:00:00Z');
+const daysAgo = (n: number): string => new Date(NOW - n * 86_400_000).toISOString();
+
+const key = (over: Partial<TokenRow> = {}): TokenRow => ({
+  id: 'tk_a', person_id: 'p_1', scope: 'write', label: 'nightly-report', created_at: daysAgo(30),
+  last_used_at: daysAgo(1), last_surface: null, expires_at: null, revoked_at: null, ...over,
+});
+
+const only = (token: TokenRow, run: Connection['run'] = null): Connection => connected([], [token], run ? [run] : [])[0]!;
+
+const studio: DeviceRow = {
+  handle: 'dv_1', status: 'active', reach: 'login', scope: null, label: 'STUDIO-PC · braindog-cli', ua: null, tries: 0,
+  expires: '2026-12-01T00:00:00Z', approved_by: 'p_1', approved_at: daysAgo(20), last_used: daysAgo(1),
+};
+
+test('an app that signed in from claude.ai with a metadata document reads Claude, signed in', () => {
+  const c = only(key({ label: 'Claude', client: { id: 'https://claude.ai/oauth/mcp-client', kind: 'cimd', host: 'claude.ai' } }));
+  const parts = partsOf(c, NOW);
+  assert.deepEqual(parts, { app: 'Claude', where: 'claude.ai', how: 'signed in', idle: null });
+  assert.equal(lineOf(c, parts), 'From claude.ai, signed in');
+  assert.equal(nameOf(c), 'Claude on claude.ai');
+});
+
+test('a key with no client reads its label and is a key you made', () => {
+  const c = only(key());
+  assert.deepEqual(partsOf(c, NOW), { app: 'nightly-report', where: null, how: 'a key you made', idle: null });
+  assert.equal(lineOf(c), 'A key you made');
+  assert.equal(nameOf(c), 'nightly-report');
+});
+
+test('a machine reads its agent on its machine, as it did before the stamp', () => {
+  const token = key({ id: 'tk_m', label: studio.label, expires_at: studio.expires });
+  const c = connected([studio], [token], [{ seq: 4, token: 'tk_m', agent: 'claude', host: 'STUDIO-PC' }])[0]!;
+  assert.deepEqual(partsOf(c, NOW), { app: 'Claude', where: 'STUDIO-PC', how: 'signed in', idle: null });
+  assert.equal(nameOf(c), 'Claude on STUDIO-PC');
+  assert.equal(lineOf(c), 'On STUDIO-PC, signed in');
+  /* THE APP THE RUN SAID IT RAN IN IS READ BEFORE THE KIND OF AGENT. */
+  const coded = connected([studio], [token], [{ seq: 5, token: 'tk_m', agent: 'claude', host: 'STUDIO-PC', client: 'claude-code 2.1.4' }])[0]!;
+  assert.equal(nameOf(coded), 'Claude Code on STUDIO-PC');
+  /* NO RUN, NO MACHINE NAME: the label it signed in with stands. */
+  assert.equal(nameOf(connected([studio], [token], [])[0]!), 'STUDIO-PC · braindog-cli');
+});
+
+test('a machine whose sign-in was stamped reads on the name it gave', () => {
+  const token = key({ id: 'tk_d', label: studio.label, expires_at: studio.expires, client: { id: 'braindog', kind: 'device', host: 'Studio' } });
+  const c = connected([studio], [token], [{ seq: 6, token: 'tk_d', agent: 'claude', host: 'STUDIO-PC', client: 'claude-code' }])[0]!;
+  assert.equal(partsOf(c, NOW).where, 'Studio');
+  assert.equal(lineOf(c), 'On Studio, signed in');
+  assert.equal(nameOf(c), 'Claude Code on Studio');
+  /* BEFORE ANY RUN, THE MACHINE IS STILL ON ITS NAME: the command signed it in. */
+  const fresh = connected([studio], [token], [])[0]!;
+  assert.equal(nameOf(fresh), 'The BrainDog command on Studio');
+  assert.equal(lineOf(fresh), 'On Studio, signed in');
+});
+
+test('a connection unused for twelve days says so, and one used yesterday says nothing', () => {
+  assert.equal(partsOf(only(key({ last_used_at: daysAgo(12) })), NOW).idle, 12);
+  assert.equal(partsOf(only(key({ last_used_at: daysAgo(1) })), NOW).idle, null);
+  assert.equal(partsOf(only(key({ last_used_at: null })), NOW).idle, null);
+  assert.equal(copy.notUsedFor(12), 'Not used for 12 days');
+});
+
+test('an unknown host reads as its host name, never its id', () => {
+  const c = only(key({ label: null, client: { id: '01JABCDEFGHJKMNPQRSTVWXYZ0', kind: 'dcr', host: 'notes.example:8443' } }));
+  const parts = partsOf(c, NOW);
+  assert.equal(parts.app, 'notes.example');
+  assert.equal(nameOf(c), 'notes.example');
+  assert.doesNotMatch(`${nameOf(c)} ${lineOf(c, parts)}`, /01JABC/u);
+  /* KNOWN SITES BY THEIR APP, a subdomain included, and a loopback sign-in is this computer. */
+  assert.equal(partsOf(only(key({ client: { id: 'x1', kind: 'dcr', host: 'www.chatgpt.com' } })), NOW).app, 'ChatGPT');
+  assert.equal(partsOf(only(key({ client: { id: 'x2', kind: 'dcr', host: 'app.cursor.com' } })), NOW).app, 'Cursor');
+  const here = only(key({ label: 'Codex', client: { id: 'x3', kind: 'dcr', host: null } }));
+  assert.equal(partsOf(here, NOW).how, 'this machine');
+  assert.equal(lineOf(here), 'Signed in on this computer');
+});
+
+test('a client that is not one reads as no client, and the words carry no em dash', () => {
+  for (const raw of [null, undefined, 'claude.ai', { id: 7, kind: 'cimd' }, { id: 'a', kind: 'oauth' }]) assert.equal(clientOf(raw), null);
+  assert.deepEqual(clientOf({ id: 'a', kind: 'cimd', host: ' ' }), { id: 'a', kind: 'cimd', host: null });
+  for (const s of [copy.connectedOn('Studio'), copy.connectedFrom('claude.ai'), copy.connectedHere, copy.connectedKey, copy.connectedKeyYours, copy.notUsedFor(9)]) {
+    assert.doesNotMatch(s, /—/u);
+  }
+  assert.equal(APP_NAMES['claude-code'], 'Claude Code');
 });

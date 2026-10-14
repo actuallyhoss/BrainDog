@@ -3,7 +3,6 @@
   "held": [
     { "path": "apps/cli/src/adapter.ts", "name": "options", "reason": "Spells options, a field of guide, in 2 places on 13 October. No earlier unit owns this file, and the line is not held while this entry stands.", "unit": "SHL-A20" },
     { "path": "apps/cli/src/bridge.ts", "name": "resources", "reason": "Spells resources, a list of guide, in 1 place on 13 October. No earlier unit owns this file, and the line is not held while this entry stands.", "unit": "SHL-A20" },
-    { "path": "apps/cli/src/brief.ts", "name": "lesson", "reason": "Spells lesson, a field of launch-desk, in 1 place on 13 October. No earlier unit owns this file, and the line is not held while this entry stands.", "unit": "SHL-A20" },
     { "path": "apps/cli/src/catalogue.ts", "name": "items", "reason": "Spells items, a list of hello, in 8 places on 13 October. No earlier unit owns this file, and the line is not held while this entry stands.", "unit": "SHL-A20" },
     { "path": "apps/cli/src/feed.ts", "name": "live-feed", "reason": "Spells the id of the add-on live-feed, in 3 places on 13 October. No earlier unit owns this file, and the line is not held while this entry stands.", "unit": "SHL-A20" },
     { "path": "apps/cli/src/feed.ts", "name": "organisation", "reason": "Spells organisation, a field of founder, in 2 places on 13 October. No earlier unit owns this file, and the line is not held while this entry stands.", "unit": "SHL-A20" },

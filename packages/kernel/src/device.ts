@@ -242,6 +242,28 @@ export async function deviceApprove(deps: TokenDeps, person: string, args: { use
   return no('FORBIDDEN', 'No device is waiting with that code.', { at: 'user_code' });
 }
 
+/**
+ * The app a login exchange is: BrainDog's own command, on the machine its label names.
+ *
+ * THE STAMP IS THE KERNEL'S. `createToken` takes a client only from a host's door, and this is that door for a device:
+ * the label was typed into nothing the grant's approver could not read, and the id and kind are fixed here, so a
+ * caller cannot sign a token in as some other app.
+ */
+export const DEVICE_CLIENT = 'braindog';
+
+/** At most this many characters in a machine's name, as the CLI's `machineName` cuts it. */
+export const MACHINE_NAME_MAX = 60;
+
+/** A label's seam: the machine's name comes before the first one ("Studio · braindog-cli"). */
+const SEAM = ' · ';
+
+/** The machine a label names, the part before its first ` · `, or `null` for a grant with no label. */
+export function machineOf(label: string | null): string | null {
+  if (label === null) return null;
+  const name = (label.includes(SEAM) ? label.slice(0, label.indexOf(SEAM)) : label).trim();
+  return name === '' ? null : name;
+}
+
 /** How long an exchanged grant lasts, by what it reaches. */
 function lifeMs(row: Stored): number {
   if (row.reach === 'vault') return (row.scope === '*' ? VAULT_ALL_DAYS : VAULT_DAYS) * 86_400_000;
@@ -294,6 +316,7 @@ export async function devicePoll(deps: TokenDeps, args: { device_code: string })
       scope: 'write',
       days: DEFAULT_DAYS,
       ...(row.label === null ? {} : { label: row.label }),
+      client: { id: DEVICE_CLIENT, kind: 'device', host: machineOf(row.label) },
     });
     if (!minted.ok) {
       deps.sql.exec("UPDATE device_grant SET status = 'approved' WHERE id = ?", id);
@@ -346,6 +369,53 @@ export async function deviceRevoke(deps: TokenDeps, person: string, handle: stri
     found.reach,
   );
   return ok(await shown(deps, { ...visible, status: 'revoked' }));
+}
+
+/**
+ * Rename a machine: its owner calls "STUDIO-PC" what they call it, "Studio".
+ *
+ * THE NAME REPLACES WHAT COMES BEFORE THE LABEL'S FIRST ` · `, and what follows is kept, so a runner still reads as a
+ * runner and a login as the command's. The grant's label, and the label and stamped host of every live token its login
+ * minted, change in one transaction, so the device list and Settings never disagree about what the machine is called.
+ *
+ * A REVOKED, EXPIRED OR DENIED GRANT IS REFUSED. It is finished, and its name is part of what it said; a machine signed
+ * in again is a new grant with its own. Who may call this is the record's (an owner-only method), not the kernel's.
+ */
+export async function renameDevice(deps: TokenDeps, handle: string, label: string): Promise<Result<DeviceRow>> {
+  const name = typeof label === 'string' ? label.trim() : '';
+  if (name === '') return no('REQUIRED_MISSING', 'Name the machine, such as Studio or MacBook.', { at: 'label' });
+  if (name.length > MACHINE_NAME_MAX)
+    return no('OUT_OF_BOUNDS', `A machine's name is at most ${String(MACHINE_NAME_MAX)} characters, and this is ${String(name.length)}. Choose a shorter one.`, { at: 'label' });
+  if (/\p{Cc}/u.test(name)) return no('VALUE_MALFORMED', "A machine's name is one line, with no tab or line break. Type it on one line.", { at: 'label' });
+  if (name.includes(SEAM.trim()))
+    return no('VALUE_MALFORMED', "A machine's name cannot hold a middle dot, which the record uses to say what the machine does. Leave it out.", { at: 'label' });
+  if (name.startsWith('report:') || name.startsWith('job:'))
+    return no('VALUE_MALFORMED', 'A machine cannot be called report: or job:, which name keys the record makes itself. Choose another name.', { at: 'label' });
+
+  let found: Stored | undefined;
+  for (const row of deps.sql.all<Stored>(`SELECT ${VISIBLE}, code_hash, token_hash FROM device_grant`))
+    if ((await handleOf(deps, row.id)) === handle) found = row;
+  if (!found) return no('OUT_OF_BOUNDS', `There is no device called ${String(handle)}.`, { at: 'handle' });
+  if (!['pending', 'approved', 'active'].includes(found.status))
+    return no('FORBIDDEN', `That machine's sign-in is ${found.status}, so it keeps the name it had. Sign the machine in again to name it.`, { at: 'handle' });
+
+  const old = found.label ?? '';
+  const renamed = old.includes(SEAM) ? `${name}${old.slice(old.indexOf(SEAM))}`.slice(0, 120) : name;
+  const now = instant(deps.nowMs);
+  const { id, code_hash: _code, token_hash: tokenHash, ...visible } = found;
+  deps.sql.transactionSync(() => {
+    deps.sql.exec('UPDATE device_grant SET label = ? WHERE id = ?', renamed, id);
+    if (tokenHash)
+      deps.sql.exec(
+        /* A token minted before the stamp has no app to name a host for, and still takes the new label. */
+        "UPDATE token SET label = ?, host = CASE WHEN client_kind = 'device' THEN ? ELSE host END WHERE hash = ? AND revoked_at IS NULL AND expires_at > ?",
+        renamed,
+        name,
+        tokenHash,
+        now,
+      );
+  });
+  return ok(await shown(deps, { ...visible, id, label: renamed }));
 }
 
 /**

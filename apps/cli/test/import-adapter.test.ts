@@ -317,3 +317,164 @@ test('A NIGHT WITH NO SOURCE IS READ ONLY BY THE ADAPTER THAT SAYS IT WROTE THOS
   assert.equal(await importCommand([join(io.cwd, 'older.ts'), '--since', 'last'], io, undefined, () => new Date(NOW), () => 0), 0, said.join(' | '));
   assert.ok(out.includes('- Created in Tasks: A night before sources.'), out.join(' | '));
 });
+
+/*
+ * AN ADD-ON'S ADAPTER BY ITS ID, FROM THE CATALOGUE, ASKED ABOUT ONCE.
+ *
+ * Before `adapter-fetch.ts`, an id was looked for only in a `packs/` folder of the working folder or the checkout, so
+ * `braindog import ledgerline export.json` typed anywhere else said "neither a file nor a pack" and stopped. The
+ * catalogue below is a folder `pack publish` filled, with the adapter beside the add-on and its checksum in the index.
+ */
+
+/** The fixture adapter as one plain module, its mapping inside it, as the catalogue carries one. */
+const ADAPTER_MJS = (source = 'Tallybook'): string =>
+  `const read = (text) => { const value = JSON.parse(text); return Array.isArray(value.items) ? { ok: true, value } : { ok: false, fix: 'A Tallybook export holds a list called items.' }; };\n` +
+  `const plan = (exp, o) => ({ key: 'tallybook:', taken: typeof exp.saved === 'string' ? exp.saved : null, rev: null, rows: exp.items.map((item) => ({ register: 'tasks', key: 'tallybook:item:' + String(item.id), label: String(item.what), fields: { what: item.what, by: item.due ?? o.today } })), asks: [], polls: [], skipped: [], changed: [] });\n` +
+  `export const map = { targets: { order: ['tasks'], names: { tasks: 'Tasks' }, providedBy: { tasks: 'Tasks' } } };\n` +
+  `export default { source: ${JSON.stringify(source)}, key: 'tallybook:', read, plan };\n`;
+
+const sha = async (text: string): Promise<string> => (await import('node:crypto')).createHash('sha256').update(text, 'utf8').digest('hex');
+
+/** `ledgerline` published to `catalogue/`, signed when `key` is given, with `body` as its adapter. */
+async function published(io: AgentIo, said: string[], body: string, key?: string): Promise<{ catalogue: string; index: string }> {
+  const { pack } = await import('../src/catalogue.ts');
+  if (!readFileSafe(join(io.cwd, 'ledgerline', 'ledgerline.pack.json'))) assert.equal(await pack(['new', 'ledgerline', '--author', 'Halden'], io), 0, said.join(' '));
+  assert.equal(await pack(['publish', 'ledgerline', '--to', 'catalogue', ...(key ? ['--sign', key] : [])], io), 0, said.join(' '));
+  return withAdapter(io, body, key);
+}
+
+const readFileSafe = (path: string): string | null => {
+  try {
+    return readFileSync(path, 'utf8');
+  } catch {
+    return null;
+  }
+};
+
+/** The adapter put beside the add-on in the catalogue, and its checksum (and signature, by `key`) written into the index. */
+async function withAdapter(io: AgentIo, body: string, key?: string): Promise<{ catalogue: string; index: string }> {
+  const catalogue = join(io.cwd, 'catalogue');
+  const index = join(catalogue, 'index.json');
+  const doc = JSON.parse(readFileSync(index, 'utf8')) as { entries: { id: string; versions: Record<string, unknown>[] }[] };
+  const version = doc.entries.find((e) => e.id === 'ledgerline')!.versions[0]!;
+  const checksum = await sha(body);
+  let signature: unknown;
+  if (key) {
+    const { readAuthorKey, signVersion } = await import('@braindog/declare/catalogue');
+    const k = await readAuthorKey(JSON.parse(readFileSync(key, 'utf8')));
+    assert.ok(k.ok);
+    const s = await signVersion(k.value, 'adapter', 'ledgerline', String(version.version), checksum);
+    assert.ok(s.ok);
+    signature = s.value;
+  }
+  version.adapter = { checksum, ...(signature ? { signature } : {}) };
+  writeFileSync(index, JSON.stringify(doc));
+  mkdirSync(join(catalogue, 'packs', 'ledgerline'), { recursive: true });
+  writeFileSync(join(catalogue, 'packs', 'ledgerline', `${String(version.version)}.adapter.mjs`), body);
+  return { catalogue, index };
+}
+
+/** A folder catalogue that counts what is read from it. */
+const counted = async (dir: string): Promise<{ read: Map<string, number>; catalogue: import('../src/adapter.ts').CatalogueRead }> => {
+  const { folderCatalogue } = await import('../src/adapter.ts');
+  const inner = folderCatalogue(dir);
+  const read = new Map<string, number>();
+  return { read, catalogue: { where: inner.where, read: async (p) => (read.set(p, (read.get(p) ?? 0) + 1), inner.read(p)) } };
+};
+
+test('AN ADAPTER FETCHED FROM THE CATALOGUE IS KEPT, and the next run uses the kept copy without fetching it again', async (t) => {
+  const { fetchAdapter, keptAdapter } = await import('../src/adapter-fetch.ts');
+  const { io, said } = await setUp(t);
+  const { catalogue: dir } = await published(io, said, ADAPTER_MJS());
+  const { read, catalogue } = await counted(dir);
+  const first = await fetchAdapter('ledgerline', { home: io.home, catalogue });
+  assert.ok(first.ok, first.ok ? '' : first.fix);
+  assert.equal(first.value.file, keptAdapter(io.home, 'ledgerline', '1.0.0'));
+  assert.equal(readFileSync(first.value.file, 'utf8'), ADAPTER_MJS());
+  assert.equal(read.get('packs/ledgerline/1.0.0.adapter.mjs'), 1);
+  const second = await fetchAdapter('ledgerline', { home: io.home, catalogue });
+  assert.ok(second.ok);
+  assert.equal(read.get('packs/ledgerline/1.0.0.adapter.mjs'), 1, 'the kept copy was fetched again');
+});
+
+test('AN ADAPTER WHOSE CHECKSUM DIFFERS IS REFUSED, and nothing is kept', async (t) => {
+  const { fetchAdapter, keptAdapter } = await import('../src/adapter-fetch.ts');
+  const { io, said } = await setUp(t);
+  const { catalogue: dir } = await published(io, said, ADAPTER_MJS());
+  writeFileSync(join(dir, 'packs', 'ledgerline', '1.0.0.adapter.mjs'), ADAPTER_MJS('Swapped'));
+  const got = await fetchAdapter('ledgerline', { home: io.home, catalogue: (await counted(dir)).catalogue });
+  assert.ok(!got.ok);
+  assert.match(got.fix, /^The import adapter of Ledgerline 1\.0\.0 is not the one the catalogue published: its checksum differs\./u);
+  assert.equal(readFileSafe(keptAdapter(io.home, 'ledgerline', '1.0.0')), null);
+});
+
+test('AN ADD-ON WITH NO ADAPTER, OR A SIGNED ONE WHOSE ADAPTER IS NOT SIGNED, IS REFUSED IN WORDS', async (t) => {
+  const { fetchAdapter } = await import('../src/adapter-fetch.ts');
+  const { pack } = await import('../src/catalogue.ts');
+  const { io, said } = await setUp(t);
+  const key = join(io.cwd, 'keys', 'k.json');
+  assert.equal(await pack(['key', key, '--author', 'Halden'], io), 0, said.join(' '));
+  const { catalogue: dir, index } = await published(io, said, ADAPTER_MJS(), key);
+  const { catalogue } = await counted(dir);
+  assert.ok((await fetchAdapter('ledgerline', { home: io.home, catalogue })).ok, 'a signed adapter by the same key is taken');
+  const doc = JSON.parse(readFileSync(index, 'utf8')) as { entries: { versions: { adapter?: { signature?: unknown } }[] }[] };
+  delete doc.entries[0]!.versions[0]!.adapter!.signature;
+  writeFileSync(index, JSON.stringify(doc));
+  const unsigned = await fetchAdapter('ledgerline', { home: io.home, catalogue });
+  assert.ok(!unsigned.ok && /is signed and its import adapter is not/u.test(unsigned.fix));
+  delete doc.entries[0]!.versions[0]!.adapter;
+  writeFileSync(index, JSON.stringify(doc));
+  const none = await fetchAdapter('ledgerline', { home: io.home, catalogue });
+  assert.ok(!none.ok && none.fix === 'Ledgerline 1.0.0 has no import adapter in the catalogue, so it cannot read a file for the import.');
+});
+
+const QUESTION = 'Run the import adapter of Ledgerline 1.0.0? It is a program and runs on this machine.';
+
+test('AN ID THE CHECKOUT DOES NOT HOLD IS FETCHED AND ASKED ABOUT: a no runs nothing, a yes runs it and is kept', async (t) => {
+  const { io, out, said } = await setUp(t);
+  await published(io, said, ADAPTER_MJS());
+  const asked: string[] = [];
+  const run = (answer: boolean) => importCommand(['ledgerline', 'export.json', '--catalogue', 'catalogue'], { ...io, ask: async (q) => (asked.push(q), answer) }, undefined, () => new Date(NOW), () => 0);
+
+  said.length = 0;
+  assert.equal(await run(false), 1, [...said, ...out].join(' | '));
+  assert.deepEqual(asked, [QUESTION]);
+  assert.ok(said.includes('The import adapter of Ledgerline 1.0.0 was not run, and nothing was read or sent.'), said.join(' | '));
+  assert.equal(readFileSafe(join(io.home, '.braindog', 'adapters.json')), null, 'a no was kept');
+
+  asked.length = 0;
+  assert.equal(await run(true), 0, [...said, ...out].join(' | '));
+  assert.deepEqual(asked, [QUESTION]);
+  assert.ok(out.includes('Tasks: 2 added, 0 updated, 0 unchanged.'), out.join(' | '));
+
+  /* THE SECOND RUN DOES NOT ASK: the yes is kept by the file's hash. */
+  asked.length = 0;
+  out.length = 0;
+  assert.equal(await run(false), 0, [...said, ...out].join(' | '));
+  assert.deepEqual(asked, []);
+  assert.ok(out.includes('Tasks: 0 added, 0 updated, 2 unchanged.'), out.join(' | '));
+});
+
+test('A CHANGED ADAPTER ASKS AGAIN, because the yes was for the file it was', async (t) => {
+  const { io, out, said } = await setUp(t);
+  await published(io, said, ADAPTER_MJS());
+  const asked: string[] = [];
+  const run = () => importCommand(['ledgerline', 'export.json', '--catalogue', 'catalogue', '--dry-run'], { ...io, ask: async (q) => (asked.push(q), true) }, undefined, () => new Date(NOW), () => 0);
+  assert.equal(await run(), 0, [...said, ...out].join(' | '));
+  assert.equal(asked.length, 1);
+  await withAdapter(io, ADAPTER_MJS('Tallybook, kept tidier'));
+  assert.equal(await run(), 0, [...said, ...out].join(' | '));
+  assert.equal(asked.length, 2, 'a changed adapter ran on the yes given to the one before');
+});
+
+test('WITH NO TERMINAL AND NO --yes NOTHING RUNS, and --yes is the yes a script gives', async (t) => {
+  const { kernel, io, out, said } = await setUp(t);
+  await published(io, said, ADAPTER_MJS());
+  const line = ['ledgerline', 'export.json', '--catalogue', 'catalogue'];
+  said.length = 0;
+  assert.equal(await importCommand(line, { ...io, ask: null }, undefined, () => new Date(NOW), () => 0), 1);
+  assert.ok(said.some((l) => l.startsWith('The import adapter of Ledgerline 1.0.0 is a program and nobody has said yes to running it here.') && l.includes('--yes')), said.join(' | '));
+  assert.deepEqual(await whats(kernel), []);
+  assert.equal(await importCommand([...line, '--yes'], { ...io, ask: null }, undefined, () => new Date(NOW), () => 0), 0, [...said, ...out].join(' | '));
+  assert.deepEqual(await whats(kernel), ['Renew the workshop lease', 'Send the October invoices']);
+});

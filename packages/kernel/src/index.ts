@@ -293,6 +293,7 @@ import {
   deviceStart,
   deviceSweep,
   operationGrant,
+  renameDevice,
   shapeGrant,
   vaultGrant,
   type Approved,
@@ -357,6 +358,8 @@ export { NIGHT_FAULT, NIGHT_KIND, copyFacts, copyFailed, copyKept, failedNote, k
 export { CAUSE, MOOT_GONE, MOOT_HELD, canon as canonValue, causeFault, causeOf, moot, mootWhy, noop, recheck, sha256 } from './cause.ts';
 /* THE RECORD'S OWN NAME RULE (`api/person-name.ts`), so the Worker refuses at provision what a rename would refuse. */
 export { PERSON_NAME_SUPPORT, personNameOf, placeholderName } from './api/person-name.ts';
+export { COMMENT_MOST } from './api/comments.ts';
+export { ACTION_VERBS, ACTION_LEVELS, ACTION_AS, ACTION_KEYS, ACTIONS_MOST, BLOCK_VERBS, actionsBody, cutActions, type ActionVerb, type ActionLevel, type DeclaredAction, type OfferedAction, type VerbName } from './row-actions.ts';
 /* THE ONE CLOCK (`presence.ts`): every reader that asks whether a run is working, quiet or gone asks here. */
 export {
   ABANDON_MS,
@@ -9200,6 +9203,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
     /** Revoke one; a login grant takes its token with it. */
     deviceRevoke: (person: string, handle: string): Promise<Result<DeviceRow>> => deviceRevoke(tokenDeps(), person, handle),
+
+    /** Rename one machine by its handle: its sign-in and its key read the new name. */
+    renameDevice: (handle: string, label: string): Promise<Result<DeviceRow>> => renameDevice(tokenDeps(), handle, label),
 
     /** A vault bearer, checked. INTERNAL. */
     vaultGrant: (bearer: string, validFrom?: string): Promise<Result<VaultGrant>> => vaultGrant({ ...tokenDeps(), validFrom }, bearer),

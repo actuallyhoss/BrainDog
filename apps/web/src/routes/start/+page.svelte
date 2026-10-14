@@ -60,6 +60,7 @@
   import { byRules, draftChange, type Drafted, type SlashClient } from '$lib/record/slash.ts';
   import { draftBrief, outsideCatalogue, propose, proposeFirst, type Proposal } from '$lib/start/propose.ts';
   import { slashAsks } from '$lib/start/ask.ts';
+  import { heardOf, offerOf, readCatalogueOffer, type CatalogueOffer } from '$lib/start/offer.ts';
   import { BYTES_MOST, drawnWith, entriesOf, mapExport, newListDeclarations, ownList, readExport, type Export, type Mapping } from '$lib/start/export.ts';
   import { listById } from '$lib/start/lists.ts';
   import { titleOf } from '$lib/title.ts';
@@ -155,6 +156,13 @@
   /* THE CURRENCY THIS DEVICE'S ZONE KEEPS, read in with the words, so a shop in Cairo keeps EGP without being asked. */
   const deviceCurrency = zoneCurrency(zone);
 
+  /* THE CATALOGUE'S USE CASES, read once as the page opens: the rules listen for their words (`heardOf`) and the model may
+     choose them (`offerOf`). Until it answers, or when there is none, only what this build ships is offered. */
+  let cat = $state.raw<CatalogueOffer | null>(null);
+  onMount(() => {
+    void readCatalogueOffer().then((c) => (cat = c));
+  });
+
   /* "09:38", in the person's own clock, beside each turn of the conversation. */
   const clock = (() => {
     try {
@@ -201,7 +209,7 @@
       return;
     }
     const wait = setTimeout(() => {
-      live = propose(said, { zone, locale, currency: deviceCurrency });
+      live = propose(said, { zone, locale, currency: deviceCurrency, catalogue: heardOf(cat), offer: offerOf(cat) });
     }, 140);
     return () => clearTimeout(wait);
   });
@@ -253,7 +261,7 @@
   let readings = 0;
 
   /** The model's reading, or the rules' where there is no model, for the words as they stand. */
-  const readingOf = (said: string): Promise<Proposal> => proposeFirst(said, { zone, locale, currency: deviceCurrency }, door?.setup ?? null);
+  const readingOf = (said: string): Promise<Proposal> => proposeFirst(said, { zone, locale, currency: deviceCurrency, catalogue: heardOf(cat), offer: offerOf(cat) }, door?.setup ?? null);
 
   async function read() {
     if (thinking) return;

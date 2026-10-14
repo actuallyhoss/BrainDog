@@ -122,7 +122,8 @@ test('a list of 127 learnings, each superseding the last, reads each register it
     asked.splice(0);
     const page = await call(surface, owner, 'list', { register: 'learnings', limit: 500, ...(cursor === undefined ? {} : { cursor }) });
     rows.push(...rowsOf(page));
-    costs.push([...asked]);
+    /* THE DOOR'S `beat` (`beatOn`) is the run's heartbeat, not a read the list made. */
+    costs.push(asked.filter((m) => m !== 'beat'));
     cursor = typeof page.value.cursor === 'string' ? page.value.cursor : undefined;
   } while (cursor !== undefined && costs.length < 5);
   assert.equal(rows.length, 127);

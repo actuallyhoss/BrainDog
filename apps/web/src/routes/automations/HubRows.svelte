@@ -25,7 +25,9 @@
   import { goto } from '$app/navigation';
   import { at } from '$lib/at.ts';
   import { ownPress } from '$lib/record/actions.ts';
+  import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
+  import { families, familySaid, familyWords } from './hub-family.ts';
   import type { HubRow } from './hub.ts';
 
   let {
@@ -42,6 +44,18 @@
     /** The key of the row whose switch is out to the record now; every switch waits while one is. */
     busy?: string | null;
   } = $props();
+
+  /* RULES OF ONE FAMILY ARE ONE ROW (`hub-family.ts`); every other row, and a family of one, is itself. */
+  const folds = $derived(families(rows));
+  /* THE FAMILIES OPENED, by key. Closed when drawn, so a long family never pushes the rest of the page down. */
+  let opened = $state.raw<ReadonlySet<string>>(new Set());
+  const flip = (key: string): void => {
+    const next = new Set(opened);
+    if (!next.delete(key)) next.add(key);
+    opened = next;
+  };
+  /* THIS BROWSER'S CLOCK, read once when the list is drawn, as the rows' own sentences were. */
+  const now = Date.now();
 </script>
 
 {#snippet body(r: HubRow, linked: boolean)}
@@ -60,40 +74,72 @@
   {#if r.aside}<span class="line-when aside" data-clock={r.clock ? '' : undefined}>{r.aside}</span>{/if}
 {/snippet}
 
+{#snippet item(r: HubRow)}
+  {@const t = r.toggle}
+  {#if t && ontoggle}
+    <div class="row line line-tall switched" data-off={t.on ? undefined : ''}>
+      {@render body(r, true)}
+      <button
+        type="button"
+        class="switch"
+        role="switch"
+        aria-checked={t.on}
+        aria-label={t.label}
+        disabled={busy !== null}
+        onclick={() => ontoggle(r.key, !t.on)}><span class="switch-track"></span></button
+      >
+    </div>
+  {:else if r.path}
+    <a class="row tap line line-tall" href={at(r.path)}>{@render body(r, false)}</a>
+  {:else}
+    <div class="row line line-tall">{@render body(r, false)}</div>
+  {/if}
+  {#if r.fix}
+    <a
+      class="fix tap"
+      href={at(r.fix.path)}
+      onclick={(e) => {
+        const f = r.fix;
+        if (!f?.state || !ownPress(e)) return;
+        e.preventDefault();
+        void goto(at(f.path), { state: f.state });
+      }}>{r.fix.label}</a>
+  {/if}
+{/snippet}
+
+<!--
+  A FAMILY IS A DISCLOSURE: one button as tall as any row, its name, how many rules and what they have done together,
+  and a chevron that turns; pressed, its members open under it in the order they came, each with its own count and
+  idle sentence, indented to the family's words. No tile of its own: it is a row of the same list.
+-->
 <ul class="ledger ledger-lead hub-rows" data-dim={dim ? '' : undefined}>
-  {#each rows as r (r.key)}
-    {@const t = r.toggle}
-    <li>
-      {#if t && ontoggle}
-        <div class="row line line-tall switched" data-off={t.on ? undefined : ''}>
-          {@render body(r, true)}
-          <button
-            type="button"
-            class="switch"
-            role="switch"
-            aria-checked={t.on}
-            aria-label={t.label}
-            disabled={busy !== null}
-            onclick={() => ontoggle(r.key, !t.on)}><span class="switch-track"></span></button
-          >
-        </div>
-      {:else if r.path}
-        <a class="row tap line line-tall" href={at(r.path)}>{@render body(r, false)}</a>
-      {:else}
-        <div class="row line line-tall">{@render body(r, false)}</div>
-      {/if}
-      {#if r.fix}
-        <a
-          class="fix tap"
-          href={at(r.fix.path)}
-          onclick={(e) => {
-            const f = r.fix;
-            if (!f?.state || !ownPress(e)) return;
-            e.preventDefault();
-            void goto(at(f.path), { state: f.state });
-          }}>{r.fix.label}</a>
-      {/if}
-    </li>
+  {#each folds as f (f.kind === 'one' ? f.row.key : `family:${f.family.key}`)}
+    {#if f.kind === 'one'}
+      <li>{@render item(f.row)}</li>
+    {:else}
+      {@const fam = f.family}
+      {@const shown = opened.has(fam.key)}
+      {@const said = familySaid(fam, now)}
+      <li class="family">
+        <button type="button" class="row line line-tall kin" aria-expanded={shown} onclick={() => flip(fam.key)}>
+          <IconWell name={fam.members[0]?.icon ?? 'refresh'} size="l" />
+          <span class="line-main">
+            <span class="line-title name">{fam.name}</span>
+            <span class="line-detail meta"
+              ><span class="what">{familyWords.count(fam.count)}</span>{#if said}<span class="sep"> · </span><span class="said">{said}</span>{/if}</span
+            >
+          </span>
+          <span class="aside turn" data-open={shown ? '' : undefined}><Icon name="chevronDown" size="s" /></span>
+        </button>
+        {#if shown}
+          <ul class="ledger ledger-lead members">
+            {#each fam.members as m (m.key)}
+              <li>{@render item(m)}</li>
+            {/each}
+          </ul>
+        {/if}
+      </li>
+    {/if}
   {/each}
 </ul>
 
@@ -184,6 +230,44 @@
   /* OFF IS NOT A STATE THAT NEEDS ANYTHING, so it is a ring and not a fill, in the quiet ink. */
   .said[data-dot='off']::before {
     border: 1.5px solid var(--dim);
+  }
+
+  /* A FAMILY'S ROW IS A BUTTON THAT LOOKS LIKE EVERY OTHER ROW: no face of a button's own, the whole width, and at
+     least 56 tall, past the 44 a thumb needs. */
+  .kin {
+    inline-size: 100%;
+    border: 0;
+    background: none;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .kin:focus-visible .name {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  /* THE CHEVRON TURNS WHEN THE FAMILY IS OPEN, in the quiet ink: the row's words say what it is. */
+  .turn {
+    display: grid;
+    place-items: center;
+    color: var(--ink2);
+    transition: transform var(--d-state) var(--ease-out);
+  }
+
+  .turn[data-open] {
+    transform: rotate(180deg);
+  }
+
+  /* THE MEMBERS SIT UNDER THE FAMILY, their wells lined up with its words, so the fold reads as one thing opened. */
+  .members {
+    margin: 0 0 var(--sp-2) calc(var(--well-l) + var(--sp-3));
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .turn {
+      transition: none;
+    }
   }
 
   /* A TIME IN A FEED IS SET IN GEIST MONO; a next turn is words and keeps the UI face. */

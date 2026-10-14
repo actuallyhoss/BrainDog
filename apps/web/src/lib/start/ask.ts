@@ -1,14 +1,15 @@
 /**
  * The first run's two asks of Slash, through the host's own Slash doors: `POST /api/slash/setup` for what the person said
- * and `POST /api/slash/mapping` for the first entries of a file they exported elsewhere.
+ * and `POST /api/slash/mapping` for the first entries of a file they exported elsewhere. Before there is a record,
+ * sign-up asks the host's `POST /auth/signup/read` instead (`readAsks`).
  *
  * DOORS, NOT RECORD METHODS, as `/api/slash/pattern` is: the engine is built by the host, holds the month's asks and
  * opens the owner's own key where they chose one, and the record never sees a model (`packages/host/src/slash-ask.ts`).
  * A browser session and this origin; the cookie and the `Origin` are the browser's own and it sends both itself.
  *
- * NEVER A THROW. A host with no model answers 501 `NOT_IN_THIS_BUILD`, a month spent answers `SLASH_BUDGET_SPENT`, and a
- * network that did not answer is `UNREACHABLE` here; every one of them is the first run reading by its own rules
- * instead, so the caller only ever reads a result.
+ * NEVER A THROW. A host with no model answers 501 `NOT_IN_THIS_BUILD` (a bare 404 or 501 reads the same), a month
+ * spent answers `SLASH_BUDGET_SPENT`, and a network that did not answer is `UNREACHABLE` here; every one of them is the
+ * first run reading by its own rules instead, so the caller only ever reads a result.
  */
 
 export type Refused = { ok: false; refusal: { code: string; fix: string } };
@@ -67,7 +68,7 @@ async function door<T>(send: typeof fetch, url: string, body: unknown, wait: num
     const res = await send(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal: stop.signal });
     const out = (await res.json().catch(() => null)) as { ok?: unknown; value?: unknown; refusal?: { code?: unknown; fix?: unknown } } | null;
     if (out?.ok === true) return { ok: true, value: out.value as T };
-    const code = typeof out?.refusal?.code === 'string' ? out.refusal.code : res.status === 404 ? 'NOT_IN_THIS_BUILD' : 'UNREACHABLE';
+    const code = typeof out?.refusal?.code === 'string' ? out.refusal.code : res.status === 404 || res.status === 501 ? 'NOT_IN_THIS_BUILD' : 'UNREACHABLE';
     return refusedBy(code, typeof out?.refusal?.fix === 'string' ? out.refusal.fix : `Slash answered ${res.status}.`);
   } catch (e) {
     return refusedBy('UNREACHABLE', e instanceof Error ? e.message : String(e));
@@ -81,5 +82,23 @@ export function slashAsks(base: string, send: typeof fetch = (...a) => globalThi
   return {
     setup: (ask) => door<SetupReply>(send, `${base}/api/slash/setup`, ask, wait),
     mapping: (ask) => door<MappingReply>(send, `${base}/api/slash/mapping`, ask, wait),
+  };
+}
+
+/** What the sign-up page hands the reading door: what it hands the record's, and where and who is typing. */
+export type FirstAsked = SetupAsked & { zone: string; locale: string; turnstile: string };
+
+/**
+ * THE READING BEFORE THERE IS AN ACCOUNT, at the host's `POST /auth/signup/read` (`packages/host/src/first-read.ts`).
+ * The same reply and the same twenty seconds as the record's door, over the page's own origin and no session.
+ *
+ * THE HOST BUILDS ITS OWN OFFER from its catalogue, and the door takes exactly `said`, `today`, `zone`, `locale` and
+ * `turnstile`, refusing any other key by name, so the offer the page holds is never sent. A host with the door switched
+ * off, no model or no bot check answers 501 `NOT_IN_THIS_BUILD`, a silence is `UNREACHABLE`, and each is the page's
+ * own rules reading instead.
+ */
+export function readAsks(origin: string, send: typeof fetch = (...a) => globalThis.fetch(...a), wait = WAIT_MS): { setup: (ask: FirstAsked) => Promise<Asked<SetupReply>> } {
+  return {
+    setup: ({ said, today, zone, locale, turnstile }) => door<SetupReply>(send, `${origin}/auth/signup/read`, { said, today, zone, locale, turnstile }, wait),
   };
 }

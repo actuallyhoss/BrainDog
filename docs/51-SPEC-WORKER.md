@@ -375,11 +375,14 @@ Erasure and deletion: an `erase.r2` job's `key` is a file's hash, and the pump d
 expires a closed record's final copy sweeps it again. The self-host keeps the same files at `<data>/<slug>/blobs/`
 (`apps/selfhost/src/files.ts`), under the same rules.
 
-### 5.6 · A shared link: `/app/s/<token>` and `Authorization: Share <token>`
+### 5.6 · A shared link: `/app/s#<token>` and `Authorization: Share <token>`
 
-The page a person opens is `/app/s/<token>`, which is the app's shell like any
-page under `/app`; the shell reads the page with `GET /api/sharedPage` and `Authorization: Share <token>`. Nothing is
-served at a bare `/s/*`, which the site does not forward.
+The page a person opens is `/app/s#<token>`, which is the app's shell like any
+page under `/app`. The token rides in the fragment, which no browser sends, so it never reaches a server's log; the
+app reads it and wipes it from the address as it opens.
+*(Amended October 14th 2026 (USE-A07): the link was `/app/s/<token>`. The app's page still reads the path form, and
+reading the fragment is the next job.)* The shell reads the page with `GET /api/sharedPage` and
+`Authorization: Share <token>`. Nothing is served at a bare `/s/*`, which the site does not forward.
 
 **What is built and what is not.** The hosts' half is built: the token, both hosts' door and the signing of a new link
 (steps 1 and 3, and the hosts' lines of steps 2 and 4). The record's half is specified here and is not in the tree yet:
@@ -397,7 +400,7 @@ lands, no link is made and every link answers the 404.
    A host with no key makes no link and opens none.
 2. **Opening one.** `POST /api/openShare` `{ slug, days? }` from the owner's session reaches the record, which writes
    `share.open` (`target: 'share:<id>'`, `field: <slug>`, `to_v` the instant it stops opening) and answers
-   `{ id, slug, expires_at }`; the Worker's `recordApi` signs that into `token` and `url` (`https://<PUBLIC_HOST>/app/s/<token>`)
+   `{ id, slug, expires_at }`; the Worker's `recordApi` signs that into `token` and `url` (`https://<PUBLIC_HOST>/app/s#<token>`)
    on its way out, and the self-host's `withShareLinks` does the same for the origin it serves. With no key it refuses
    `NOT_IN_THIS_BUILD` before the record writes anything. `closeShare { id }` writes `share.close`, which is for good,
    and `shares` lists them, never a token. All three are ADMIN.

@@ -1,6 +1,5 @@
 /**
- * What an agent is told its rung did with a write (DIRECTION §37's ladder), and the card's Who slot reading the
- * organisations `context` sends.
+ * What an agent is told its rung did with a write (DIRECTION §37's ladder).
  *
  * OVER THE STUB SURFACE, because the ladder is the record's: what is tested is that the tool layer says what the record
  * answered, in names, and decides nothing itself. `rung` beside a write means it went through on the agent's rung;
@@ -12,7 +11,6 @@ import assert from 'node:assert/strict';
 
 import type { Look } from '../src/brief.ts';
 import { ruledBrief, ruledOf } from '../src/brief.ts';
-import { briefed } from '../src/briefing.ts';
 import { tools } from '../src/index.ts';
 import { stub } from './stub.ts';
 
@@ -90,30 +88,4 @@ test('THE LINE NAMES EVERY LIST ONCE, and the owner in plain words where the rec
   const look: Look = { now: 0, decl: (r) => (r === 'tasks' ? ({ id: 'tasks', name: 'Tasks', fields: [] } as never) : undefined), title: () => undefined, actor: (b) => b, decider: 'the owner' };
   assert.equal(ruledBrief({ rung: 'tell' }, ['tasks', 'tasks', 'notes'], look), 'Done, as you may on Tasks and notes · the owner can undo it');
   assert.equal(ruledBrief({ filed: { id: 'Q1', question: '' } }, [], look), 'Filed for the owner to decide (Q1)\nNothing is written until the owner accepts it in BrainDog.');
-});
-
-/* ── the card's Who slot ─────────────────────────────────────────────────── */
-
-const look: Look = { now: Date.UTC(2026, 9, 6), decl: () => undefined, title: () => undefined, actor: (b) => b, decider: 'Mara' };
-const whoOf = (context: Record<string, unknown>) =>
-  briefed({ context, look, home: null })
-    .card.split('\n')
-    .find((l) => l.startsWith('Who')) ?? null;
-
-test('THE WHO SLOT SAYS AN ORGANISATION BY THE NAME CONTEXT SENT, never its handle', () => {
-  const who = whoOf({
-    project: { spoken: 'things#2', name: 'Copperleaf' },
-    people: [{ spoken: 'P4', name: 'Joaquin Herrera', org: 'O1', in_touch: '2026-10-04' }],
-    organisations: [{ spoken: 'O1', name: 'Lanternfish', kind: 'client' }],
-  });
-  assert.equal(who, 'Who      Joaquin Herrera (Lanternfish) · for Lanternfish');
-});
-
-test('THE PROJECT IS FOR ITS OWN ORGANISATION, and not one its people are only with', () => {
-  const people = [{ spoken: 'P4', name: 'Joaquin Herrera', org: 'Acme', in_touch: '2026-10-04' }];
-  assert.equal(
-    whoOf({ people, organisations: [{ spoken: 'O2', name: 'Acme', kind: null, linked: false }, { spoken: 'O1', name: 'Lanternfish', kind: 'client', linked: true }] }),
-    'Who      Joaquin Herrera (Acme) · for Lanternfish',
-  );
-  assert.equal(whoOf({ people, organisations: [{ spoken: 'O2', name: 'Acme', kind: null, linked: false }] }), 'Who      Joaquin Herrera (Acme)');
 });

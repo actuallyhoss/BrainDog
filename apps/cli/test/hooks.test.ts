@@ -211,10 +211,9 @@ test('THE START HOOK ATTACHES, KEEPS THE SESSION FILE, AND PRINTS THE CARD, then
   assert.equal(out.code, 0, out.stderr);
   assert.equal(out.stderr, '');
   const lines = out.stdout.trimEnd().split('\n');
-  assert.match(lines[0]!, /^BrainDog · run S7 · project Kiln · Claude Code on \S/u);
+  assert.deepEqual(lines, ['Connected to BrainDog. Call context.']);
   /* The machine as a person names it, never its network name. */
   assert.equal(lines[0]!.includes(hostname()), false, lines[0]);
-  assert.deepEqual(lines.slice(1), ['Next     Kern the lowercase pairs. (S6, 10m ago, check before acting)', `Waiting  1 on ${FIRST}: Let kilnfonts.example lapse?`, 'More     call context']);
 
   /* A question waits, so whose it is was read beside the attach. */
   assert.deepEqual(host.seen.map((s) => s.method), ['attach', 'boot']);
@@ -251,7 +250,7 @@ test('COMPACT RE-ATTACHES to the same run by its client id, prints only the Next
   const out = await run(['hook', 'start'], env, event(cwd, { session_id: 'claude-run-1', source: 'compact' }));
   assert.equal(out.code, 0);
   assert.deepEqual(host.seen[0]?.body, { source: 'compact', client_id: 'claude-run-1' });
-  assert.equal(out.stdout, 'Next     Kern the lowercase pairs. (S6, 10m ago, check before acting)\n', 'a compaction is told only the step it is on');
+  assert.equal(out.stdout, '', 'a host with no card has no Next line to give');
   assert.equal(readSession(sessionPath(env, cwd))?.head_at_start, 'abc1234');
 });
 
@@ -271,12 +270,12 @@ test('A RESUME WITHIN THE HOUR OF THE SAME SESSION PRINTS NOTHING and still re-a
 
   /* Two hours away: the whole card. */
   writeSession(file, { host: host.base, spoken: 'S7', client_id: 'claude-run-1', head_at_start: null, at: minutes(300), seen: minutes(120) });
-  assert.match((await run(['hook', 'start'], env, resume)).stdout, /^BrainDog · run S7 · project Kiln · Claude Code on [^\n]+\nNext {5}Kern/u);
+  assert.match((await run(['hook', 'start'], env, resume)).stdout, /^Connected to BrainDog\. Call context\.\n/u);
 
   /* With no file of its own, the folder's, which another session wrote a minute ago, is not this session's card. */
   rmSync(file);
   writeSession(sessionPath(env, cwd), { host: host.base, spoken: 'S7', client_id: 'claude-run-2', head_at_start: null, at: minutes(1) });
-  assert.match((await run(['hook', 'start'], env, resume)).stdout, /^BrainDog · run S7 /u);
+  assert.match((await run(['hook', 'start'], env, resume)).stdout, /^Connected to BrainDog\. /u);
 
   /* Not signed in, within the hour: still nothing, because the session already said so when it started. */
   const signedOut = envFor(folder('config'), {});
@@ -284,7 +283,7 @@ test('A RESUME WITHIN THE HOUR OF THE SAME SESSION PRINTS NOTHING and still re-a
   assert.equal((await run(['hook', 'start'], signedOut, resume)).stdout, '');
 
   /* A clear empties the conversation, so it is the whole card however recent. */
-  assert.match((await run(['hook', 'start'], env, event(cwd, { session_id: 'claude-run-1', source: 'clear' }))).stdout, /^BrainDog · run S7 [^\n]*\nNext {5}Kern/u);
+  assert.match((await run(['hook', 'start'], env, event(cwd, { session_id: 'claude-run-1', source: 'clear' }))).stdout, /^Connected to BrainDog\. Call context\.\n/u);
 });
 
 test('THE RECORD’S OWN CARD IS PRINTED AS IT CAME, and a compaction prints only its Next line', async (t) => {

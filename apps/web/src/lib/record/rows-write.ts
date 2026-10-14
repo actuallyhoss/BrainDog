@@ -32,13 +32,13 @@ import { singularOf } from '../voice.ts';
 
 export type Wrote =
   | { ok: true; entry: Entry }
-  | { ok: false; why: 'refused'; fix: string }
+  | { ok: false; why: 'refused'; fix: string; at?: string | undefined }
   | { ok: false; why: 'conflict'; fix: string; entry: Entry | null }
   | { ok: false; why: 'unreachable'; fix: string };
 
 export type Noted = { ok: true } | { ok: false; why: 'refused' | 'unreachable'; fix: string };
 
-type Failed = { ok: false; refusal: { code: string; fix: string } } | { ok: false; conflict: { current: unknown } };
+type Failed = { ok: false; refusal: { code: string; fix: string; at?: string | undefined } } | { ok: false; conflict: { current: unknown } };
 
 const isRow = (v: unknown): v is RecordRow => v !== null && typeof v === 'object' && 'fields' in v && 'seq' in v;
 
@@ -447,7 +447,7 @@ export function rowWriter(base: string, io?: Fetch): RowWriter {
     }
     if ('conflict' in out) return { ok: false, why: 'refused', fix: copy.writeConflict(rowSaid(register, seq, out.conflict.current)) };
     if (out.refusal.code === 'UNREACHABLE') return { ok: false, why: 'unreachable', fix: copy.writeNotReached };
-    return { ok: false, why: 'refused', fix: out.refusal.fix };
+    return { ok: false, why: 'refused', fix: out.refusal.fix, ...(out.refusal.at ? { at: out.refusal.at } : {}) };
   }
 
   /**

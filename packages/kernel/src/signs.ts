@@ -46,10 +46,27 @@ export type VitalSign = {
   said: string;
   facts: string[];
   days: { day: string; state: SignState }[];
+  /** The counts a filed sign carries beside its value (`SIGN_COUNTS`), when its filing held any. */
+  counts?: Record<string, number>;
 };
 
 /** What a reader answers, and what the record or host files through `fileSignReading`. */
-export type SignReading = { state: SignState; value: number | null; said: string; facts?: string[] };
+export type SignReading = { state: SignState; value: number | null; said: string; facts?: string[]; counts?: Readonly<Record<string, number>> };
+
+/**
+ * THE COUNTS A FILED SIGN MAY CARRY BESIDE ITS ONE VALUE, a closed list a sign, each with the words a person reads it
+ * by. `pages-clean` carries the pages census's four (PGS-A01 step 5): its value stays the number of faults, and these
+ * say which kind. Each is a whole number of nought or more, and a filing may leave one out when nobody counted it.
+ * Kept in the row's `facts`, as its last entry and the one that is not a line (`{ counts }`), so no column is added.
+ */
+export const SIGN_COUNTS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  'pages-clean': {
+    refused_pages: 'pages show a block that could not be read',
+    unnamed_pages: 'pages print a path that names nothing',
+    missing_pages: 'pages the record does not hold',
+    suggested_waiting: 'suggested pages wait',
+  },
+};
 
 /** The key the nightly `snapshot` row is armed under, payload `{ signs: true }`. */
 export const SIGNS_KEY = 'signs';
@@ -114,7 +131,19 @@ export const FILED_STANDS_MS = DAY;
 
 /* ── helpers ───────────────────────────────────────────────────────────── */
 
-const reading = (state: SignState, value: number | null, said: string, facts: string[] = []): SignReading => ({ state, value, said, facts: facts.slice(0, 6) });
+const reading = (state: SignState, value: number | null, said: string, facts: string[] = [], counts?: Record<string, number>): SignReading =>
+  counts === undefined ? { state, value, said, facts: facts.slice(0, 6) } : { state, value, said, facts: facts.slice(0, 6), counts };
+
+/** A row's `facts` as kept: its lines, and the counts a filed sign carried as the one entry that is not a line. */
+function factsOf(text: string): { facts: string[]; counts?: Record<string, number> } {
+  const kept = JSON.parse(text) as unknown;
+  if (!Array.isArray(kept)) return { facts: [] };
+  const facts = kept.filter((f) => typeof f !== 'object' || f === null).map(String);
+  const box = kept.find((f): f is { counts: unknown } => typeof f === 'object' && f !== null && 'counts' in f);
+  if (box === undefined || typeof box.counts !== 'object' || box.counts === null) return { facts };
+  const counts = Object.fromEntries(Object.entries(box.counts as Record<string, unknown>).filter(([, n]) => Number.isSafeInteger(n) && (n as number) >= 0)) as Record<string, number>;
+  return { facts, counts };
+}
 
 /** `n thing` or `n things`. */
 const count = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`;
@@ -508,7 +537,7 @@ function readRuns(sql: Sql, nowMs: number): SignReading {
 /* A READER WHOSE RULE CHANGED WITHOUT A THRESHOLD MOVING TAKES THE NEXT VERSION, so its days read under the old rule keep
    the old `rule`. Version 2 (audit 35): arrivals all set aside, a young series read by its feed, a run the sweep handed off. */
 const kernel = (sign: string, name: string, thresholds: Record<string, number>, read: NonNullable<SignReader['read']>, version = 1): SignReader => ({ sign, name, hand: 'kernel', version, thresholds, read });
-const filed = (sign: string, name: string, hand: 'record' | 'host'): SignReader => ({ sign, name, hand, version: 1, thresholds: {}, read: null });
+const filed = (sign: string, name: string, hand: 'record' | 'host', version = 1): SignReader => ({ sign, name, hand, version, thresholds: {}, read: null });
 
 /**
  * THE KERNEL'S FIVE AND THE FOUR FILED, in the order 2.2 sets them, then `arrived` (PRF-A20, filed by the record), the
@@ -524,7 +553,8 @@ export const VITAL_SIGNS: readonly SignReader[] = [
   kernel('questions-by-cause', 'One question per cause', { CAUSE_QUESTIONS_MOST, UNCAUSED_MOST }, (sql, nowMs) => readCauses(sql, nowMs)),
   kernel('oldest-question', 'No question waits too long', { QUESTION_DAYS_MOST }, readOldest),
   kernel('runs-true', 'Runs end as they ended', { RUNS_WINDOW_DAYS, RUN_SILENT_MS, RUNS_ENDED_LEAST, RUNS_ABANDONED_ONE_IN }, (sql, nowMs) => readRuns(sql, nowMs), 2),
-  filed('pages-clean', 'Pages print clean', 'host'),
+  /* Version 2 (PGS-A01 step 5): a refused block or a path that named nothing, counted by the pages census, is red too. */
+  filed('pages-clean', 'Pages print clean', 'host', 2),
   filed('arrived', 'What shipped has arrived', 'record'),
   ...SIGNS_FLOW,
   ...SIGNS_ACTIONS,
@@ -559,8 +589,8 @@ function readNow(sql: Sql, s: SignReader, nowMs: number, tz: string): SignReadin
   const t = Date.parse(row.read_at);
   if (!(nowMs - t <= FILED_STANDS_MS))
     return reading('none', null, Number.isNaN(t) ? 'Not read on any day this record can tell.' : `Not read since ${dateSaid(t, tz, nowMs)}.`, [`It last read ${row.state === 'none' ? 'nothing to judge by' : row.state}: ${row.said}`.slice(0, 200)]);
-  const facts = JSON.parse(row.facts) as unknown;
-  return reading(row.state, row.value === null ? null : Number(row.value), row.said, Array.isArray(facts) ? facts.map(String) : []);
+  const kept = factsOf(row.facts);
+  return reading(row.state, row.value === null ? null : Number(row.value), row.said, kept.facts, kept.counts);
 }
 
 /** Every sign now, with its last fourteen days, oldest first; a day with no reading is `none`. */
@@ -573,7 +603,9 @@ export function readSigns(sql: Sql, nowMs: number, tz: string): VitalSign[] {
   return VITAL_SIGNS.map((s) => {
     const now = readNow(sql, s, nowMs, safeZone(tz));
     const days = Array.from({ length: 14 }, (_, i) => dayBefore(today, 14 - i)).map((day) => ({ day, state: kept.get(`${s.sign} ${day}`) ?? ('none' as const) }));
-    return { sign: s.sign, name: s.name, state: now.state, value: now.value, said: now.said, facts: now.facts ?? [], days };
+    const sign: VitalSign = { sign: s.sign, name: s.name, state: now.state, value: now.value, said: now.said, facts: now.facts ?? [], days };
+    if (now.counts !== undefined) sign.counts = { ...now.counts };
+    return sign;
   });
 }
 
@@ -581,6 +613,27 @@ export function readSigns(sql: Sql, nowMs: number, tz: string): VitalSign[] {
 const SAID_MOST = 280;
 const FACTS_MOST = 6;
 const FACT_MOST = 200;
+
+/**
+ * A filing's counts, checked against the sign's own list (`SIGN_COUNTS`): `null` when it carries none, and a refusal
+ * that names what the sign counts when one is not on its list, or is not a whole number of nought or more.
+ */
+function countsOf(s: SignReader, counts: unknown): Result<Record<string, number> | null> {
+  if (counts === undefined) return ok(null);
+  const words = SIGN_COUNTS[s.sign];
+  if (words === undefined) return no('VALUE_MALFORMED', `${s.name} carries no counts beside its value. File it with state, value, said and facts.`);
+  const named = Object.entries(words).map(([k, w]) => `${k} (${w})`).join(', ');
+  if (counts === null || typeof counts !== 'object' || Array.isArray(counts))
+    return no('VALUE_MALFORMED', `${s.name} counts are whole numbers by name: ${named}.`);
+  const out: Record<string, number> = {};
+  for (const [k, n] of Object.entries(counts as Record<string, unknown>)) {
+    if (!Object.hasOwn(words, k)) return no('VALUE_MALFORMED', `${JSON.stringify(k).slice(0, 40)} is not something ${s.name} counts. It counts ${named}.`);
+    if (typeof n !== 'number' || !Number.isSafeInteger(n) || n < 0)
+      return no('VALUE_MALFORMED', `How many ${words[k]} is a whole number of nought or more.`);
+    out[k] = n;
+  }
+  return ok(out);
+}
 
 /**
  * The record layer or the host files today's reading of one of the signs it owns. A later filing the same day
@@ -598,8 +651,10 @@ export function fileSignReading(sql: Sql, id: string, r: SignReading, nowMs: num
   const facts = r.facts ?? [];
   if (!Array.isArray(facts) || facts.length > FACTS_MOST || facts.some((f) => typeof f !== 'string' || f.length > FACT_MOST))
     return no('VALUE_MALFORMED', `A reading's facts are at most ${FACTS_MOST} lines of at most ${FACT_MOST} characters.`);
+  const counted = countsOf(s, r.counts);
+  if (!counted.ok) return counted;
   const day = dayIn(nowMs, safeZone(tz));
-  write(sql, s, day, { state: r.state, value: r.value, said: r.said.trim(), facts }, nowMs, true);
+  write(sql, s, day, { state: r.state, value: r.value, said: r.said.trim(), facts, ...(counted.value === null ? {} : { counts: counted.value }) }, nowMs, true);
   return ok({ sign: s.sign, day });
 }
 
@@ -614,7 +669,7 @@ function write(sql: Sql, s: SignReader, day: string, r: SignReading, nowMs: numb
     r.state,
     r.value,
     r.said,
-    JSON.stringify(r.facts ?? []),
+    JSON.stringify(r.counts === undefined ? (r.facts ?? []) : [...(r.facts ?? []), { counts: r.counts }]),
     ruleOf(s),
     s.hand,
     new Date(nowMs).toISOString(),

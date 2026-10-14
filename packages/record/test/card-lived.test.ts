@@ -58,7 +58,8 @@ function holds(c: Context, where: string): string {
   for (const line of card.split('\n'))
     for (const m of line.matchAll(/\bS\d+\b/gu)) {
       const before = line.slice(0, m.index);
-      const ok = before.endsWith('run ') || (before.endsWith('(') && line.slice(m.index + m[0].length).startsWith(', Claude Code'));
+      const after = line.slice(m.index + m[0].length);
+      const ok = before.endsWith('run ') || (before.endsWith('(') && after.startsWith(', Claude Code')) || (/\bClaude(?: Code)? \($/u.test(before) && after.startsWith(')'));
       assert.ok(ok, `${where}: a run's handle is printed without its name: ${line}`);
     }
   /* THE RED SIGNS IT COUNTS ARE THE RECORD'S. */
@@ -110,9 +111,9 @@ test('AFTER A RUN HANDS OFF: the fresh session\'s Next line is the step that run
   assert.equal(c.handoff?.from, left);
   assert.equal(c.handoff?.next, 'Match the card ending 4817 to its account');
   assert.ok(line.includes('Match the card ending 4817 to its account'), line);
-  assert.ok(line.includes(`(${left}, Claude Code`), line);
+  assert.ok(line.includes(`Left by Claude (${left})`), line);
   /* ANOTHER RUN LEFT IT, so the line says to check it before acting on it. */
-  assert.match(line, /check before acting/u);
+  assert.match(line, /Check before acting\./u);
   /* A COMPACTION PRINTS THIS LINE ALONE, so it is the same line. */
   assert.equal(c.card_next, line);
 });

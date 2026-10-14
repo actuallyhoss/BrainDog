@@ -184,3 +184,28 @@ test('HOW THE APP LOOKS FOLLOWS THE PERSON: scheme, size, density, contrast and 
   assert.deepEqual(await prefsOf(api, ada), {});
   sql.close();
 });
+
+test("THE PUBLISHER KEYS A PERSON HAS SEEN FOLLOW THEM: packs.known_keys is kept per add-on, and a wrong shape is refused", async () => {
+  const { api, sql } = await record();
+  const code = (r: { ok: boolean }) => (r.ok ? 'ok' : (r as unknown as { refusal: { code: string; at?: string } }).refusal.code);
+  const one = '0123456789abcdef';
+  const two = 'fedcba9876543210';
+  const kept = await api.setPref({ key: 'packs.known_keys', value: { 'kiln-log': [one, one, two] } }, ada);
+  assert.ok(kept.ok, JSON.stringify(kept));
+  assert.deepEqual(kept.value, { key: 'packs.known_keys', value: { 'kiln-log': [one, two] } }, 'a key seen twice was kept twice');
+  assert.deepEqual(await prefsOf(api, ada), { 'packs.known_keys': { 'kiln-log': [one, two] } });
+  assert.deepEqual(await prefsOf(api, bo), {}, "somebody else's trust followed Ada's");
+
+  assert.equal(code(await api.setPref({ key: 'packs.known_keys', value: [one] }, ada)), 'VALUE_MALFORMED');
+  assert.equal(code(await api.setPref({ key: 'packs.known_keys', value: { 'kiln-log': ['not-a-key-id'] } }, ada)), 'VALUE_MALFORMED');
+  assert.equal(code(await api.setPref({ key: 'packs.known_keys', value: { '': [one] } }, ada)), 'VALUE_MALFORMED');
+  assert.equal(code(await api.setPref({ key: 'packs.known_keys', value: { ['x'.repeat(301)]: [one] } }, ada)), 'VALUE_MALFORMED');
+  assert.equal(code(await api.setPref({ key: 'packs.known_keys', value: { 'kiln-log': Array.from({ length: 9 }, (_, i) => i.toString(16).padStart(16, '0')) } }, ada)), 'VALUE_MALFORMED');
+  assert.equal(code(await api.setPref({ key: 'packs.known_keys', value: Object.fromEntries(Array.from({ length: 201 }, (_, i) => [`pack-${i}`, [one]])) }, ada)), 'VALUE_MALFORMED');
+  assert.equal(code(await api.setPref({ key: 'packs.known_keys', value: { 'kiln-log': [one] } }, agent)), 'FORBIDDEN');
+  assert.deepEqual(await prefsOf(api, ada), { 'packs.known_keys': { 'kiln-log': [one, two] } }, 'a refused value was kept');
+
+  await api.setPref({ key: 'packs.known_keys', value: null }, ada);
+  assert.deepEqual(await prefsOf(api, ada), {});
+  sql.close();
+});

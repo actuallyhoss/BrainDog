@@ -19,10 +19,10 @@
  */
 
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { createInterface } from 'node:readline/promises';
-import { homedir } from 'node:os';
+import { homedir, userInfo } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
@@ -35,7 +35,7 @@ import { serveBridge } from './bridge.ts';
 import { exportFile, importFile } from './brainfile.ts';
 import { HOOK_MS, heldHere, hookBudget, hookEnd, hookStart, parentOf, unreachable } from './hooks.ts';
 import { hookBeat } from './beat.ts';
-import { budgetOf, clientFor, hostsPath, target, type Target } from './http.ts';
+import { budgetOf, clientFor, hostsPath, runnerTarget, target, type Target } from './http.ts';
 import { byHand, handRun, installProfiles, profilesOf, readReplace, replaceByHand, shellOf, type Replace } from './install.ts';
 import { machine, takeJson, type Machine } from './json.ts';
 import { keys, spawnInherit } from './keys.ts';
@@ -57,6 +57,7 @@ import { signedOutFix, signedOutSurface } from './signed-out.ts';
 import { serveStdio } from './stdio.ts';
 import { surfaceOver } from './surface.ts';
 import { runner } from './runner.ts';
+import { service } from './runner-service.ts';
 import { setup } from './setup.ts';
 import { tools } from './tools.ts';
 import { tokenCommand } from './token.ts';
@@ -263,7 +264,7 @@ const usage = () =>
     'braindog import <file.brainl> [--key <pubkey|url>] [--host <host>]',
     "  Check the file here, then put the record back from it, in place of everything it holds now. The record takes only its own copy.",
     '  Both ask the owner to approve the one operation in the app, with six digits, unless BRAINDOG_TOKEN is the self-host\'s server key.',
-    'braindog import <adapter> <export.json> [--setup <setup.json>] [--map <map.json>] [--catalogue <folder|address>] [--host <host>] [--dry-run] [--strict] | --draft-setup | --since <day|last>',
+    'braindog import <adapter> <export.json> [--setup <setup.json>] [--map <map.json>] [--catalogue <folder|address>] [--host <host>] [--dry-run] [--strict] [--yes] | --draft-setup | --since <day|last>',
     "  Move another tool's export into this BrainDog through its adapter: a pack id such as one in packs/, or the path of a module. Running it again updates what it added, and no key value is ever read.",
     'braindog import --map <map.json> <export.json> [--host <host>] [--dry-run] [--strict]',
     "  The same with no adapter: the map file says which list each part of the export goes to. --strict refuses the whole file when any part of it would not be read.",
@@ -300,6 +301,8 @@ const usage = () =>
     '  Allow a job kind on this machine, as runner run asks the first time it sees one, for a runner with no terminal.',
     'braindog runner run [--once] [--host <host>]',
     "  Claim the jobs approved for this machine and run each in Claude Code with only its kind's tools, sending back what it does. With --once, one job.",
+    'braindog runner service on [--host <host>] | off | status',
+    '  Start this machine\'s runner at log-on and keep it up, with no terminal open, writing to runner.log in your .braindog folder; off stops it and takes it out.',
     'braindog init <slug> --owner <email>',
     'braindog serve [<record file>]',
     '  Create or serve a record on this machine, through the self-host.',
@@ -565,15 +568,28 @@ async function setupCommand(args: string[]): Promise<void> {
  * stdout for its answer, so the envelope is the one document there once the verb returns.
  */
 async function runnerCommand(args: string[]): Promise<void> {
+  /* `service` NEVER REACHES `runner.ts`: it writes and loads this machine's unit (`runner-service.ts`), and the unit
+     runs `runner run` with nothing in it but this Node, this file and the host it was named. It is taken before the
+     stop signals are, so a `service on` is still ended by SIGTERM as any short command is. */
+  if (args[0] === 'service') return runnerServiceCommand(args.slice(1));
   const stopping = new AbortController();
   process.on('SIGINT', () => stopping.abort());
-  const code = await runner(args, {
+  /* A SERVICE IS STOPPED WITH SIGTERM (`launchctl bootout`, `systemctl stop`), and a job running then is ended
+     `interrupted` exactly as Ctrl+C ends it, rather than left claimed until its lease runs out. */
+  process.on('SIGTERM', () => stopping.abort());
+  /* `run --log <file>` IS WHAT THE WINDOWS TASK RUNS, because Task Scheduler hands a task no streams to send to a log:
+     every line goes to the file instead, and nothing else changes. Taken here, so `runner.ts` never sees it. */
+  const at = args[0] === 'run' ? args.indexOf('--log') : -1;
+  const log = at > 0 ? args[at + 1] : undefined;
+  if (at > 0 && !log) return stop('braindog runner run --log takes the file to write to.');
+  const into = log ? (line: string) => appendFileSync(log, `${new Date().toISOString()} ${line}\n`) : null;
+  const code = await runner(at > 0 ? [...args.slice(0, at), ...args.slice(at + 2)] : args, {
     env: process.env,
     cwd: process.cwd(),
     home: homedir(),
     file: hostsPath(process.env),
-    out: json ? json.out : (line: string) => writeFileSync(1, `${line}\n`),
-    say: json ? json.say : say,
+    out: into ?? (json ? json.out : (line: string) => writeFileSync(1, `${line}\n`)),
+    say: into ?? (json ? json.say : say),
     answer: json?.answer,
     signal: stopping.signal,
   });
@@ -581,6 +597,32 @@ async function runnerCommand(args: string[]): Promise<void> {
   /* LEFT TO END ON ITS OWN, for the reason `hook` gives. */
   process.exitCode = code;
   setTimeout(() => process.exit(code), 1_000).unref();
+}
+
+/**
+ * `braindog runner service on|off|status` (`runner-service.ts`): this Node, this file, the log in `~/.braindog`, and
+ * whether `runner run` would start, read the way `runner run` reads it, so `on` never installs a runner that cannot run.
+ */
+async function runnerServiceCommand(args: string[]): Promise<void> {
+  const home = homedir();
+  const code = await service(args, {
+    platform: process.platform,
+    paths: { node: process.execPath, cli: fileURLToPath(import.meta.url), log: join(home, '.braindog', 'runner.log'), home, path: process.env.PATH, user: process.platform === 'win32' ? userInfo().username : undefined },
+    say: json ? json.say : say,
+    answer: json?.answer,
+    /* READ WITHOUT `BRAINDOG_HOST`, because the unit does not carry this shell's environment: a host named only there
+       would pass here and leave the service runner on another BrainDog, or on none. `--host` is what the unit keeps. */
+    ready: (host) => {
+      try {
+        runnerTarget(host, { ...process.env, BRAINDOG_HOST: undefined }, hostsPath(process.env));
+        return null;
+      } catch (e) {
+        return e instanceof Error ? e.message : 'This machine is not enrolled as a runner.';
+      }
+    },
+  });
+  if (json) emit(json.envelope(code));
+  process.exitCode = code;
 }
 
 function selfhost(command: 'init' | 'serve', args: string[]): void {

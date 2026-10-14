@@ -3,10 +3,9 @@
  *
  * THE SLOTS IN ONE ORDER, EACH LEFT OUT WHEN IT HAS NOTHING: who and where, then `Also`, `Next`, `Signs`, `Waiting`,
  * `Learned`, `More` and `Update`, the record's order (`packages/record/src/card.ts`). No Who slot: the critic cut it, and
- * `context` prints the record's card, which has none. The cases over a context built here hold the card this package
- * still composes for a context that carries none. At most three things a slot and 1,500 characters in all, every line cut at a word. A step is checked before
- * it is acted on when it is a day old or another run left it; questions that read the same once their ids are set
- * aside are one; the two newest learnings are the ones said; the machine is said as a person names it.
+ * `context` prints the record's card, which has none. At most three things a slot and 1,500 characters in all, every
+ * line cut at a word. This package composes no card (AGT-B07): the rules for each slot are the record's, held in
+ * `packages/record/test/card.test.ts`, and a context with no card is one line, held in `briefing-relay.test.ts`.
  *
  * AND ON A RECORD LIKE THE OWNER'S, THE WHOLE ANSWER IS UNDER 1,500 TOKENS. Measured there before the card, `context`
  * alone was 16.6 KB: forty-one keys and the skills that apply everywhere, each listed whole. So the seed is grown here
@@ -19,7 +18,7 @@ import assert from 'node:assert/strict';
 
 import { createRecordApi, type CallContext } from '@braindog/record';
 
-import { briefed, CARD_MOST } from '../src/briefing.ts';
+import { briefed } from '../src/briefing.ts';
 import type { Decl, Look } from '../src/brief.ts';
 import { tools } from '../src/index.ts';
 import { handle, type Reply } from '../src/rpc.ts';
@@ -30,6 +29,8 @@ import { tokenBudget } from './tokens.ts';
 const NOW = Date.UTC(2026, 8, 22, 9);
 const LABELS = ['Also', 'Next', 'Signs', 'Waiting', 'Decided', 'Learned', 'More', 'Update'] as const;
 const HOUR = 3_600;
+/** The most characters the card says, the cap the record's card holds as well as its 150 words. */
+const CARD_MOST = 1_500;
 
 /** The card's lines after the header, as `[label, body]`, each held to the column the labels make. */
 function slotsOf(card: string): [string, string][] {
@@ -84,62 +85,15 @@ const look: Look = {
   decider: 'Ada',
 };
 
-const card = (context: Record<string, unknown>, mine: Record<string, unknown> = {}) => briefed({ context, look, mine, home: null }).card;
 const run = { spoken: 'S6' };
 const step = (from: string, age_s: number) => ({ from, next: 'Sign off instances 4 to 6 once the mastering pass lands.', age_s });
 
-test('AN EMPTY SLOT IS LEFT OUT: a record with nothing to say is the header alone', () => {
-  assert.equal(card({}), 'BrainDog · no run yet · no project');
-  assert.equal(card({ session: run, project: { spoken: 'things#1', name: 'Kiln' } }), 'BrainDog · run S6 · project Kiln');
-});
-
-test("THE HEAD SAYS THE PROJECT'S NAME AS A PERSON READS IT, never its folder, an address or a machine (audit 21, item 15)", () => {
-  assert.equal(card({ session: run, project: { spoken: 'things#1', name: '/Users/ada/Code/kiln' } }), 'BrainDog · run S6 · project kiln');
-  assert.equal(card({ session: run, project: { spoken: 'things#1', name: 'Kiln <ada@kiln.example>' } }), 'BrainDog · run S6 · project Kiln');
-  assert.equal(card({ session: run, project: { spoken: 'things#1', name: 'Kiln on Adas-MacBook-Pro.local' } }), 'BrainDog · run S6 · project Kiln on MacBook');
-  assert.equal(card({ session: run, project: { spoken: 'things#1', name: 'ada@kiln.example' } }), 'BrainDog · run S6 · project things#1');
-});
-
-test('THE MACHINE IS SAID AS A PERSON NAMES IT, never by the name it gives itself', () => {
-  const said = card({ session: run }, { agent: 'claude', cwd: '/Users/ada/Code/kiln', host: 'Adas-MacBook-Pro.local' });
-  assert.equal(said, 'BrainDog · run S6 · no project · Claude Code on MacBook');
-});
-
-test('A STEP IS CHECKED BEFORE IT IS ACTED ON when it is a day old or another run left it, and taken as it stands when it is the caller\'s own and fresh', () => {
-  const next = (handoff: Record<string, unknown>) => shaped(card({ session: run, handoff })).get('Next') ?? '';
-  assert.doesNotMatch(next(step('S6', 2 * HOUR)), /check before acting/u);
-  assert.match(next(step('S6', 2 * HOUR)), /^Sign off instances 4 to 6 once the mastering pass lands\. \(S6, 2h ago\)$/u);
-  assert.match(next(step('S6', 26 * HOUR)), /\(S6, 1d ago, check before acting\)$/u);
-  assert.match(next(step('S5', HOUR)), /\(S5, 1h ago, check before acting\)$/u);
-});
-
-test('QUESTIONS THAT READ THE SAME ARE ONE, three a slot, and the count is of the things that differ', () => {
-  const waiting = [
-    { id: 'SG73', question: 'bank-ipn-out-sms could not read account out of this one. Accept it into transactions, or fix the pattern?' },
-    { id: 'SG72', question: 'bank-card-used-sms could not read account out of this one. Accept it into transactions, or fix the pattern?' },
-    { id: 'SG71', question: 'Bank-card-used-sms could not read account out of this one. Accept it into transactions, or fix the pattern?' },
-    { id: 'SG70', question: 'Change tools#8 to how fly is set up on this Mac?' },
-    { id: 'SG69', question: 'Does Kiln licence per seat, per product, or one flat studio price?' },
-    { id: 'SG68', question: 'Does Tallow get retired, or parked for another year?' },
-  ];
-  const body = shaped(card({ session: run, waiting }, {})).get('Waiting') ?? '';
-  assert.match(body, /^4 on Ada: bank-ipn-out-sms could not read account out of this one\. [^·]*\.\.\. \(3 alike\) · Change/u);
-  assert.equal(thingsIn(body).length, 3);
-  assert.match(body, / · 1 more$/u);
-});
-
-test('THE TWO NEWEST LEARNINGS ARE SAID, this project\'s before those that apply everywhere', () => {
-  const lesson = (n: number) => ({ spoken: `LN${String(n)}`, lesson: `Lesson ${String(n)} is what a session would otherwise get wrong.` });
-  const registers = [{ id: 'learnings', rows: [lesson(2), lesson(9), lesson(4)], inherited: [lesson(12), lesson(11)] }];
-  const body = shaped(card({ session: run, registers })).get('Learned') ?? '';
-  assert.equal(body, 'Lesson 9 is what a session would otherwise get wrong. · Lesson 4 is what a session would otherwise get wrong.');
-});
-
-test('A LONG SLOT IS CUT AT A WORD, and the card never passes its size', () => {
-  const long = 'Rebuild the specimen page from the new outline, then run every proof again and send the ones that pass to the foundry. '.repeat(6);
-  const waiting = Array.from({ length: 30 }, (_, i) => ({ id: `SG${String(i + 1)}`, question: `${String(i)} ${long}` }));
-  const registers = [{ id: 'learnings', rows: Array.from({ length: 8 }, (_, i) => ({ spoken: `LN${String(i + 1)}`, lesson: long })), inherited: [] }];
-  shaped(card({ session: run, handoff: { from: 'S5', next: long, age_s: 3 * 86_400, tried: ['one', 'two'] }, waiting, registers }));
+/* THE CASES THAT HELD THE CARD THIS PACKAGE COMPOSED (an empty slot left out, the head's project and machine, a step
+   checked before acting, questions alike counted once, the two newest learnings, a long slot cut at a word) moved with
+   the composer to the record (AGT-B07). What holds here is that a context with none composes none. */
+test('A CONTEXT WITH NO CARD COMPOSES NONE: one line, whatever else it sends', () => {
+  const said = briefed({ context: { session: run, project: { spoken: 'things#1', name: 'Kiln' }, handoff: step('S5', HOUR), waiting: [{ id: 'SG69', question: 'Does Kiln licence per seat?' }] }, look, home: null }).card;
+  assert.equal(said, 'Connected to BrainDog. Call context.');
 });
 
 /* ── on a record the size of the owner's ──────────────────────────────────── */

@@ -577,6 +577,7 @@ The column "Meets" marks the six rulings that change what a person sees or is as
 | 439 | May a member read people's names through any list that meets people? | Yes: a member who may read a list whose role says it meets people reads the names of who is on the record. | The rule knew one list by name; once a list says its role, the role is what counts. | 9 October 2026 | the loop's call | yes | `packages/record/test/rulings.test.ts`, waits on SHL-A05 |
 | 440 | Is the eighth `via` of the refusal fixtures kept? | Kept, and named: `pull`, for the seven refusals of a scheduled connector run. | Without it seven fixtures said `rpc`, which is not how they are reached. | 9 October 2026 | the loop's call | no | `packages/record/test/rulings.test.ts` |
 | 441 | What goes into the search index? | Each list's searchable fields and its title, except a title made only of money or a date, which is left out. | An amount is stored as a number with a currency and a date as digits; neither is the words a person searches by. | 9 October 2026 | the loop's call | no | `packages/kernel/test/rulings.test.ts` |
+| 442 | When does a changed setting take hold? | A changed setting takes hold at once for what reads it when read, and at the next install or update for what it fills into a declaration; the settings screen says which. | A person changed a figure's target and nothing moved, and nothing said why. | 14 October 2026 | the loop's call | yes | `packages/declare/test/takes-hold.test.ts` |
 
 ### 9.1 · The eight overbuilt things (ruling 285)
 
