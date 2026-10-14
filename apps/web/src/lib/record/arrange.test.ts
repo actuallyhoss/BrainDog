@@ -134,20 +134,20 @@ test('A BLOCK DROPPED ON A BLOCK IN THE OTHER AREA JOINS THAT AREA, where it was
 test('a kind with internal columns is never offered a third', () => {
   // A `table` at span 4 is eight columns in a third of a page: not a narrow table, an unreadable
   // one. The control REFUSES rather than clamping, so the button is absent.
-  assert.deepEqual(stepsFor('table'), [12, 6]);
-  assert.deepEqual(stepsFor('board'), [12, 6]);
-  assert.deepEqual(stepsFor('comparison'), [12, 6]);
+  assert.deepEqual(stepsFor('table'), [12, 8, 6]);
+  assert.deepEqual(stepsFor('board'), [12, 8, 6]);
+  assert.deepEqual(stepsFor('comparison'), [12, 8, 6]);
 });
 
 test('a short drawn kind is offered every step', () => {
-  assert.deepEqual(stepsFor('chips'), [12, 6, 4]);
-  assert.deepEqual(stepsFor('todo'), [12, 6, 4]);
+  assert.deepEqual(stepsFor('chips'), [12, 8, 6, 4, 3]);
+  assert.deepEqual(stepsFor('todo'), [12, 8, 6, 4, 3]);
 });
 
 test('an unknown kind gets the conservative floor rather than throwing', () => {
   // A pack a stranger wrote may name a kind this build has never heard of. The rail is not allowed
   // to fail to render because of it.
-  assert.deepEqual(stepsFor('some-pack-kind'), [12, 6, 4]);
+  assert.deepEqual(stepsFor('some-pack-kind'), [12, 8, 6, 4]);
 });
 
 test("a table's floor grows with its own column count", () => {
@@ -168,7 +168,8 @@ test("a table's floor grows with its own column count", () => {
 
 test("the width control offers nothing below a table's own floor", () => {
   assert.deepEqual(stepsFor('table', 5), [12]);
-  assert.deepEqual(stepsFor('table', 3), [12, 6]);
+  assert.deepEqual(stepsFor('table', 3), [12, 8, 6]);
+  assert.deepEqual(stepsFor('table', 4), [12, 8]);
 });
 
 test('a declared span is clamped up to the kind floor, never down past 12', () => {
@@ -179,9 +180,11 @@ test('a declared span is clamped up to the kind floor, never down past 12', () =
 });
 
 test('precise widths keep their own number instead of rounding to a button', () => {
-  assert.equal(spanLabel(12), 'Full');
+  assert.equal(spanLabel(12), 'Whole');
+  assert.equal(spanLabel(8), 'Two thirds');
   assert.equal(spanLabel(6), 'Half');
   assert.equal(spanLabel(4), 'Third');
+  assert.equal(spanLabel(3), 'Quarter');
   assert.equal(spanLabel(5), '5/12');
 });
 

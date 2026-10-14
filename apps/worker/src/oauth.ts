@@ -30,7 +30,6 @@ import {
   type Consent,
   type Minted,
   type OAuthDeps,
-  type OAuthScope,
   type OAuthStore,
 } from '@braindog/host/oauth';
 import type { AuthResult, Who } from '@braindog/ports';
@@ -118,11 +117,14 @@ const REFUSED: Record<401 | 403 | 429 | 503, string> = {
   503: 'BrainDog could not reach this record. Try again in a minute.',
 };
 
+/** What the door mints with: the reach, the app's name, the days, and the app the door proved, forwarded as is. */
+type MintArgs = Parameters<Extract<Approver, { ok: true }>['mint']>[0];
+
 /**
  * `POST /api/createToken` on one record, as the person the session named, with the host's arguments: the record's own
  * answer, read for the bearer or for its sentence.
  */
-async function mintOn(record: RecordCalls, origin: string, ctx: CallContext, args: { scope: OAuthScope; label: string; days: number }): Promise<Minted> {
+async function mintOn(record: RecordCalls, origin: string, ctx: CallContext, args: MintArgs): Promise<Minted> {
   const asked = new Request(`${origin}/api/createToken`, { method: 'POST', headers: [['content-type', 'application/json']], body: JSON.stringify(args) });
   const out = await record.fetch(inward(asked, ctx));
   type Said = { ok?: unknown; value?: { bearer?: unknown }; refusal?: { fix?: unknown } };

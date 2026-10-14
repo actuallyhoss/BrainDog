@@ -86,6 +86,19 @@ export const KERNEL_WRITTEN: readonly string[] = [
 ];
 
 /**
+ * What a run says about itself: the app it is and that app's version and session id, and where it ran, the repository
+ * and its remote, the folder, the machine, the branch and the commit (`SessionHints`).
+ *
+ * THE RUN'S OWN, SET BY ITS AGENT'S TOKEN AND NEVER BY A PERSON. The ladder writes them as the agent says them when it
+ * opens or re-attaches a run, and they are how the next write finds it (`findSession`), so a person who rewrote the
+ * folder would move a run out of the place its agent works in. Unlike `KERNEL_WRITTEN`, a caller does write them: the
+ * agent, through its token. A screen draws them as facts with no box (`field-draft.ts` holds the same list, which
+ * `field-draft.test.ts` keeps equal to this one). `agent` is not among them: a person who makes a run by hand for an
+ * agent to take up says which kind it is for, and `doing` and `next` stay a person's.
+ */
+export const RUN_FACTS: readonly string[] = ['client_id', 'client', 'client_version', 'repo', 'remote', 'cwd', 'host', 'branch', 'head'];
+
+/**
  * The clock lives in `presence.ts`: working, stale and quiet, and the reads that compare `last_seen` with it. Exported
  * again from here so a reader that imported them from the ladder keeps working.
  */

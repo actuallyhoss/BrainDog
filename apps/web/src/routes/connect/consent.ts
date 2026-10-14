@@ -15,6 +15,7 @@
 
 import { copy } from '../../lib/copy.ts';
 import type { Result } from '../../lib/data/read.ts';
+import { sourceFrom, type AppSource } from './proven.ts';
 
 /** A key's scope, in the ladder's order: each opens what the one before it does. */
 export type Scope = 'read' | 'propose' | 'write';
@@ -32,6 +33,8 @@ export type Consent = {
   offers: Scope[];
   /** The one chosen before the person chooses: `propose` or less, because an agent proposes and a person decides. */
   suggested: Scope;
+  /** How the app came to the door, as the host says it (`source` on `Consent`), or `null` where it said nothing. */
+  source: AppSource | null;
 };
 
 /** What the screen draws: the request to answer, or the host's sentence for why there is none to answer any more. */
@@ -53,7 +56,7 @@ function consentOf(body: unknown): Consent | null {
   const offers = Array.isArray(b.offers) ? b.offers.filter(isScope) : [];
   if (typeof b.request !== 'string' || typeof b.client_name !== 'string' || typeof b.redirect_host !== 'string') return null;
   if (!isScope(b.suggested) || offers.length === 0) return null;
-  return { request: b.request, client_name: b.client_name, redirect_host: b.redirect_host, scope: isScope(b.scope) ? b.scope : null, offers, suggested: b.suggested };
+  return { request: b.request, client_name: b.client_name, redirect_host: b.redirect_host, scope: isScope(b.scope) ? b.scope : null, offers, suggested: b.suggested, source: sourceFrom(b.source) };
 }
 
 /**

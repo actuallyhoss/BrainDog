@@ -16,6 +16,11 @@
  * NO MODEL ID, JOB NAME OR CODE IN WHAT A PERSON READS. `said` names the model as "Slash's model" and the key as "your own
  * key", because a person cannot act on `@cf/...` or `UNREACHABLE`; the operator reads those in the Worker's log
  * (ENG-A01), which is where the provider's own words are kept.
+ *
+ * BESIDE THE SENTENCE, WHAT SETTINGS SAYS UNDER IT (ENG-A05, ENG-A06, "health shown", DIRECTION 40): which model answered
+ * last and when, the provider's own words for the newest failure (scrubbed again, never a key), how many asks needed a
+ * second model, and this month's asks by whose allowance they spent. "Rules are the fallback, not the engine." (D35.43):
+ * a fallback that doubles the bill unseen is the risk the scope names, so the share is read here and not guessed.
  */
 
 import type { Clock, Sql } from '@braindog/ports';
@@ -27,6 +32,21 @@ export type EngineHealth = {
   last_ok: string | null;
   /** The first failure after `last_ok`, where the state is a failure, and `null` otherwise. */
   since: string | null;
+  /*
+   * WHAT THE LEDGER SAYS BESIDE THE STATE (ENG-A05, ENG-A06), each ABSENT AND NEVER ZERO OR NULL where the ledger has
+   * nothing to say: a host restates the three fields above (`packages/host/src/engine-health.ts`) and its tests hold a
+   * failing ledger to exactly them, and an older host hands none of these, so a reader treats absent as "not said".
+   */
+  /** The newest answer in the window: the model that gave it, by the name on its row, and when. */
+  answeredBy?: { model: string; at: string } | undefined;
+  /** The provider's own words on the newest failure in the window, scrubbed again here (`scrubWords`) and cut at 200. */
+  lastWords?: string | undefined;
+  /** The asks answered in the window that needed a second model, over the asks answered; present once one was. */
+  doubleShare?: number | undefined;
+  /** The two counts `doubleShare` is made of, so a person reads "2 of 40" and never a ratio. */
+  doubleOf?: { twice: number; asks: number } | undefined;
+  /** This month's asks by whose allowance they spent, as the meter counts them; present once one was spent. */
+  spent?: { person: number; background: number } | undefined;
 };
 
 /** The one sentence a person reads, and whose it is to fix: ours (the operator's), yours (the owner's), or nobody's. */
@@ -80,6 +100,106 @@ export const LEDGER_ANSWERED =
  */
 export const LEDGER_BUDGET = "model = '-' AND code IN ('SLASH_BUDGET_SPENT', 'SPARK_BUDGET_SPENT')";
 
+/** The most of a provider's own words a person is shown. */
+export const WORDS_MOST = 200;
+
+/**
+ * A provider's own words, fit for a person to read: anything shaped like a key cut out, then cut at `WORDS_MOST`.
+ *
+ * THE WORKER'S `scrubRaw` (`apps/worker/src/inference.ts`), RESTATED, because this package may not import an app and a
+ * `raw` reaches the ledger by more than one road: the Worker scrubs the platform's sentence before it is written, but the
+ * host's router writes a throw's message as it came (`packages/host/src/infer.ts`, `said`), and a provider quotes back
+ * what it was sent. So it is scrubbed again on the way out, whoever wrote it. The patterns are the Worker's, line for
+ * line; a change to one is a change to both.
+ */
+export const scrubWords = (said: string): string =>
+  said
+    .replace(/\b(bearer|basic)\s+\S+/giu, '$1 [cut]')
+    .replace(/\b(?:sk|pk|rk)[-_][\w-]{6,}|\b(?:ghp|gho|ghu|ghs|ghr|github_pat|glpat|xox[abprse]|cfut|cfat|AIza)[\w-]{6,}|\b(?:AKIA|ASIA)[A-Z0-9]{12,}/gu, '[cut]')
+    .replace(/\b((?:api|access|secret|auth)[ _-]?(?:key|token)s?)((?:\s+provided)?\s*:?\s+)(?=\S*\d)\S{6,}/giu, '$1$2[cut]')
+    .replace(/(["']?)\b([\w-]*(?:key|token|secret|password|authorization)[\w-]*)\1(\s*[:=]\s*)("(?:[^"\\]|\\.)*"|'[^']*'|[^\s,;}&]+)/giu, '$1$2$1$3[cut]')
+    .replace(/(["']?)\b(content|prompt|text|input)\1(\s*:\s*)(?:"(?:[^"\\]|\\.)*"?|\[(?:[^\]"]|"(?:[^"\\]|\\.)*"?)*\]?)/giu, '$1$2$1$3"[cut]"')
+    .replace(/[A-Za-z0-9_\-+/=]{32,}/gu, '[cut]')
+    .replace(/\s+/gu, ' ')
+    .trim()
+    .slice(0, WORDS_MOST);
+
+/** A `WHERE` clause as a 0 or 1 a `SELECT` can sum: a clause that reads NULL (a failure's `code IN` on no code) is 0. */
+const flag = (clause: string): string => `CASE WHEN ${clause} THEN 1 ELSE 0 END`;
+
+/** The holds in flight, which are no attempt yet and sit between the rows of an ask in `rowid` order. */
+const NOT_HELD = "(code IS NULL OR code NOT IN ('SLASH_PENDING', 'SPARK_PENDING'))";
+
+/**
+ * ASKS THAT NEEDED A SECOND MODEL, read from the order the rows were settled in, because no column ties two attempts to
+ * one ask. A router writes one row an attempt and settles each as it ends (`account` replaces a hold, so `rowid` is the
+ * order of settling), so an ask that fell through reads as a failure on one candidate and, next, an answer on another
+ * on the same route. An answer counts as a second model's when the row settled just before it is such a failure: on a
+ * candidate, on the same route (both may be NULL, as `core`'s own walk writes), and on a candidate that is not this
+ * answer's. A schema retry on the same candidate is not counted; it is one model asked twice, and it spends once.
+ */
+const DOUBLED = `
+  WITH seq AS (
+    SELECT rowid AS r, route, candidate, ${flag(LEDGER_ANSWERED)} AS answered, ${flag(LEDGER_FAILED)} AS failed
+    FROM slash_call WHERE ts >= ? AND ${NOT_HELD}
+  ),
+  lagged AS (
+    SELECT answered, route, candidate,
+           LAG(failed) OVER w AS p_failed, LAG(candidate) OVER w AS p_candidate, LAG(route) OVER w AS p_route
+    FROM seq WINDOW w AS (ORDER BY r)
+  )
+  SELECT COALESCE(SUM(answered), 0) AS asks,
+         COALESCE(SUM(CASE WHEN answered = 1 AND p_failed = 1 AND p_candidate IS NOT NULL AND p_route IS route AND p_candidate IS NOT candidate THEN 1 ELSE 0 END), 0) AS twice
+  FROM lagged`;
+
+/**
+ * This month's asks by whose allowance they spent: `call.ts`'s `COUNT_3` and `BACKGROUND_3`, restated because neither is
+ * exported, and held equal to `asksUsed` and `backgroundUsed` by `test/health.test.ts`.
+ */
+const SPENT =
+  "SELECT COALESCE(SUM(CASE WHEN tier = 'a' AND spends = 'person' AND model <> '-' THEN 1 ELSE 0 END), 0) AS person, " +
+  "COALESCE(SUM(CASE WHEN spends = 'background' THEN 1 ELSE 0 END), 0) AS background FROM slash_call WHERE ts >= ?";
+
+/** The first instant of the UTC month `ms` falls in, as the meter's month starts (`monthOf` in `call.ts`). */
+const monthStart = (ms: number): string => {
+  const at = new Date(ms);
+  return new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), 1)).toISOString();
+};
+
+type Beside = Pick<EngineHealth, 'answeredBy' | 'lastWords' | 'doubleShare' | 'doubleOf' | 'spent'>;
+
+/**
+ * What the ledger says beside the state, each field only where it says something.
+ *
+ * THE COLUMNS VERSION 3 ADDED ARE READ ONLY WHERE THEY ARE. A store at 2 not yet opened by a build at 3 has no `raw`,
+ * `candidate` or `spends`, and this read must not migrate it (`health` below), so its table's own `CREATE` text says
+ * which it has: `sqlite_master` is read where `PRAGMA table_info` is refused (a Durable Object's authorizer). Such a store
+ * still says who answered last, which needs none of them. Old rows in a store at 3 hold NULL there and read as nothing.
+ */
+const beside = (sql: Sql, from: string, nowMs: number): Beside => {
+  const out: Beside = {};
+  const made = sql.one<{ sql: string | null }>("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'slash_call'")?.sql ?? '';
+  const v3 = /\braw\b/.test(made) && /\bcandidate\b/.test(made) && /\bspends\b/.test(made);
+
+  const last = sql.one<{ model: string; ts: string }>(`SELECT model, ts FROM slash_call WHERE ts >= ? AND ${LEDGER_ANSWERED} ORDER BY ts DESC, rowid DESC LIMIT 1`, from);
+  if (last !== undefined) out.answeredBy = { model: last.model, at: last.ts };
+  if (!v3) return out;
+
+  const failed = sql.one<{ raw: string | null }>(`SELECT raw FROM slash_call WHERE ts >= ? AND ${LEDGER_FAILED} ORDER BY ts DESC, rowid DESC LIMIT 1`, from);
+  const words = failed?.raw ? scrubWords(failed.raw) : '';
+  if (words !== '') out.lastWords = words;
+
+  const doubled = sql.one<{ asks: number; twice: number }>(DOUBLED, from);
+  if (doubled !== undefined && doubled.asks > 0) {
+    out.doubleShare = doubled.twice / doubled.asks;
+    out.doubleOf = { twice: doubled.twice, asks: doubled.asks };
+  }
+
+  const spent = sql.one<{ person: number; background: number }>(SPENT, monthStart(nowMs));
+  if (spent !== undefined && spent.person + spent.background > 0) out.spent = { person: spent.person, background: spent.background };
+  return out;
+};
+
 /**
  * Read the last `HEALTH_DAYS` of Slash's ledger and say how the engine stands.
  *
@@ -107,6 +227,7 @@ export function health(sql: Sql, clock: Clock, facts: EngineFacts): EngineHealth
           from,
           lastOk ?? '',
         ) ?? { n: 0, first: null, newest: null });
+  const more: Beside = ledger === 0 ? {} : beside(sql, from, now);
 
   if (facts.own_key === true) {
     const keyRefused =
@@ -115,18 +236,18 @@ export function health(sql: Sql, clock: Clock, facts: EngineFacts): EngineHealth
         `SELECT COUNT(*) AS n FROM slash_call WHERE ts = ? AND tier <> 'a' AND code = 'PULL_REQUEST_REFUSED' AND ${LEDGER_FAILED}`,
         fails.newest,
       )?.n !== 0;
-    if (facts.key_open === false || keyRefused) return { state: 'key_closed', last_ok: lastOk, since: fails.first };
+    if (facts.key_open === false || keyRefused) return { state: 'key_closed', last_ok: lastOk, since: fails.first, ...more };
   }
 
-  if (lastOk === null && fails.n === 0) return { state: 'never_asked', last_ok: null, since: null };
-  if (lastOk === null) return { state: 'not_answering', last_ok: null, since: fails.first };
+  if (lastOk === null && fails.n === 0) return { state: 'never_asked', last_ok: null, since: null, ...more };
+  if (lastOk === null) return { state: 'not_answering', last_ok: null, since: fails.first, ...more };
   const fresh = fails.newest !== null && now - Date.parse(fails.newest) < DAY;
   /* A RECENT ANSWER EARNS THE BLIP ITS TWO FREE FAILURES; AN OLD ONE DOES NOT. Two fresh failures after an answer twenty
      days old read "answered 20 days ago" while the model was failing, so past `ANSWER_STALE_DAYS` one fresh failure is
      enough. */
   const stale = now - Date.parse(lastOk) > ANSWER_STALE_DAYS * DAY;
-  if (fresh && (fails.n >= FAILS_DOWN || stale)) return { state: 'not_answering', last_ok: lastOk, since: fails.first };
-  return { state: 'answering', last_ok: lastOk, since: null };
+  if (fresh && (fails.n >= FAILS_DOWN || stale)) return { state: 'not_answering', last_ok: lastOk, since: fails.first, ...more };
+  return { state: 'answering', last_ok: lastOk, since: null, ...more };
 }
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];

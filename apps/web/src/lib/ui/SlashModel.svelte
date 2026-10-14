@@ -1,7 +1,7 @@
 <!--
-  How Slash is run, the owner's choice in Settings: "Included" or "Your own key", and on a
-  self-host also `byo`, the host's own endpoint with a model the owner names. The rules and the words are `slash-model.ts`,
-  which the tests hold; this file only draws what they answer and sends what `patchOf` says to send.
+  How Slash is run, the owner's choice in Settings: "Included" or "Your own key", the same two on every host. On a
+  self-host "Included" is the host's own endpoint, so it names that endpoint and takes the model it serves. The rules and
+  the words are `slash-model.ts`, which the tests hold; this file only draws what they answer and sends what `patchOf` says.
 
   THE OWNER'S AND NOBODY ELSE'S. `configure` answers anyone else 403 `FORBIDDEN`, so for a member this row would be
   controls that always fail; it is not drawn for them. `SlashAsks` beside it already shows everyone the model in use.
@@ -26,9 +26,12 @@
   import { createClient } from '@braindog/client';
   import {
     PROVIDERS,
+    chosen,
+    endpointSaid,
     keyNamed,
     keysOf,
     kindsOn,
+    modelOn,
     modelSaid,
     nowSaid,
     patchOf,
@@ -56,8 +59,11 @@
   let keysRefused = $state('');
   let picking = $state(false);
 
-  const patch = $derived(start ? patchOf(start, draft) : null);
+  const named = $derived(modelOn(page.data.host));
+  const patch = $derived(start ? patchOf(start, draft, named) : null);
   const kinds = $derived(kindsOn(page.data.host));
+  /* THE ENDPOINT BY THE NAME `boot` GIVES IT, where a host sends one; none sends it yet, so the plain words stand. */
+  const endpoint = $derived(endpointSaid((page.data as { slash_endpoint?: unknown }).slash_endpoint));
   const picked = $derived(keys === null ? null : keyNamed(keys, draft.grant_id));
 
   /* Neither door reads or writes a record row, so no conflict comes back; the sentence is here so the type is whole. */
@@ -88,7 +94,7 @@
   });
 
   function choose(kind: Draft['kind']) {
-    draft.kind = kind;
+    if (start) draft = chosen(start, draft, kind);
     if (kind === 'key') loadKeys();
   }
 
@@ -171,9 +177,12 @@
         </div>
       {/if}
 
-      <!-- THE NAME ONLY WHERE IT IS READ. On the included model the engine clears it on save, so a field there would take
-           a name that is thrown away the moment it is saved. -->
-      {#if draft.kind !== 'included'}
+      <!-- THE NAME ONLY WHERE IT IS READ. On the Cloud's included model the engine clears it on save, so a field there would
+           take a name thrown away the moment it is saved; on a self-host the included model is its own endpoint's. -->
+      {#if draft.kind === 'included' && named}
+        <p class="hint">{endpoint}</p>
+      {/if}
+      {#if draft.kind === 'key' || named}
         <label class="model-label" for="slash-model">{words.modelLabel}</label>
         <p class="hint" id="slash-model-hint">{draft.kind === 'key' ? words.keyModelHint : words.modelHint}</p>
         <div class="field">

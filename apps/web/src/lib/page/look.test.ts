@@ -18,6 +18,7 @@ import { lookOf } from '../record/page-live.ts';
 import {
   arrivedNow,
   bodyOf,
+  hiddenOf,
   historyOf,
   isPinned,
   keepLook,
@@ -27,8 +28,12 @@ import {
   offerKey,
   offerUndo,
   pinBody,
+  putBack,
+  putBackSaid,
+  putBackWords,
   repeatsFirst,
   retireLook,
+  showBody,
   slashOpen,
   undoLook,
   writeLook,
@@ -298,4 +303,46 @@ test('THE NEXT STEP IS NOT SAID OVER THE FIRST TILE WHEN THAT TILE OPENS ON IT, 
   assert.equal(repeatsFirst(doing, { register: 'invoices', entries: [{ seq: 12 }] }), false, 'the same number in another list is another row');
   assert.equal(repeatsFirst(doing, null), false);
   assert.equal(repeatsFirst(look({}), { queue: [{ id: 'q_7' }] }), false, 'no next step repeats nothing');
+});
+
+test('PUT BACK IS NAMED BY WHOSE LOOK IT TAKES OFF AND ITS DAY, and the rules have nothing to put back', () => {
+  assert.equal(putBackWords(look({ by: 'slash' }), '2026-10-07T12:00:00.000Z'), "Put back: Slash's arrangement of 7 October");
+  assert.equal(putBackWords(look({ by: 'owner', pinned: ['cash'] }), '2026-10-07T12:00:00.000Z'), 'Put back: your arrangement of 7 October');
+  assert.equal(putBackWords(look({ by: 'owner' }), null), 'Put back: your arrangement', 'no day the record did not send');
+  assert.equal(putBackWords(look({ by: 'slash' }), 'not a day'), "Put back: Slash's arrangement");
+  assert.equal(putBackWords(look({ by: 'rule' }), '2026-10-07T12:00:00.000Z'), null);
+  assert.equal(putBackWords(null, null), null);
+  assert.equal(putBackSaid('Money', 'rules'), 'Money is back as BrainDog arranges it.');
+  assert.equal(putBackSaid('Money', 'previous'), 'Money is back as it was before.');
+});
+
+test('Hidden lists what the look hides by heading, his apart from the engine\'s, and never a pinned block', () => {
+  const blocks = [{ key: 'late', heading: 'Late bills' }, { key: 'cash', heading: '  ' }, { key: 'open-jobs' }];
+  assert.deepEqual(hiddenOf(look({ by: 'owner', hide: ['late', 'open-jobs'] }), blocks), [
+    { key: 'late', heading: 'Late bills', by: 'you' },
+    { key: 'open-jobs', heading: 'Open jobs', by: 'you' },
+  ]);
+  assert.deepEqual(hiddenOf(look({ by: 'slash', hide: ['cash', 'late'], pinned: ['late'] }), blocks), [{ key: 'cash', heading: 'Cash', by: 'engine' }]);
+  assert.deepEqual(hiddenOf(look({ by: 'rule' }), blocks), []);
+  assert.deepEqual(hiddenOf(null, blocks), []);
+});
+
+test('Show takes the block out of his hide and pins it, so it outranks the engine\'s hide too', () => {
+  const his = look({ by: 'owner', basis: 'pinned', hide: ['late', 'feed'], pinned: ['cash'], order: ['cash'], headline: 'Cash is fine', next: { row: 'tasks#1', text: 'Pay' } });
+  assert.deepEqual(showBody('money', his, 'late'), { look: 'money', basis: 'pinned', by: 'owner', order: ['cash'], hide: ['feed'], pinned: ['cash', 'late'] });
+  assert.deepEqual(
+    showBody('money', look({ by: 'slash', hide: ['late'], order: ['feed', 'cash'], lead: 'cash' }), 'late'),
+    { look: 'money', basis: 'b1', by: 'owner', pinned: ['late'] },
+    "over the engine's look, his own with that one pin and nothing else of the engine's",
+  );
+});
+
+test('Put back asks the record for one step back and says what came back, or why not', async () => {
+  const r = record();
+  const answered = (value: unknown) => (async () => new Response(JSON.stringify({ ok: true, value }), { status: 200, headers: { 'content-type': 'application/json' } })) as never;
+  assert.deepEqual(await putBack(BASE, 'money', answered({ restored: 'rules', was: { by: 'owner', at: '2026-10-07' } })), { ok: true, restored: 'rules' });
+  assert.deepEqual(await putBack(BASE, 'money', answered({ restored: 'previous' })), { ok: true, restored: 'previous' });
+  await putBack(BASE, 'money', r.io);
+  assert.deepEqual(r.sent, [{ method: 'undoLook', body: { page: 'money' } }]);
+  assert.deepEqual(await putBack(BASE, 'money', record(true).io), { ok: false, fix: 'Only the owner arranges a page.', code: 'FORBIDDEN' });
 });

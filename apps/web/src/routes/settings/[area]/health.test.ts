@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { daysLeft, healthSaid, lastCopy, leadFault, nearest, redSigns, unreadSigns, type Engine, type Fault, type Part, type Sign } from './health.ts';
+import { dayAgo, daysLeft, engineLines, healthSaid, lastCopy, leadFault, modelName, nearest, redSigns, unreadSigns, type Engine, type Fault, type Part, type Sign } from './health.ts';
 
 const text = (parts: Part[] | null): string => (parts ?? []).map((p) => p.text).join('');
 const needs = (parts: Part[] | null): string[] => (parts ?? []).filter((p) => p.needs).map((p) => p.text);
@@ -163,4 +163,50 @@ test('one red with the rest unread: red leads and is marked, and the unread are 
   assert.deepEqual(needs(said), ['One vital sign needs a look']);
   assert.deepEqual(links(said), ['/p/health', '/p/health']);
   assert.doesNotMatch(text(said), /healthy/u);
+});
+
+/* ── The lines under Slash's sentence (ENG-A05, ENG-A06): who answered, the provider's words, a second model ───────── */
+
+/** Noon on 14 October in the reader's own zone, so "today" and "yesterday" are the reader's days wherever this runs. */
+const NOON = new Date(2026, 9, 14, 12).getTime();
+const local = (month: number, day: number, hour = 9): string => new Date(2026, month, day, hour).toISOString();
+const withHealth = (state: Engine['health']['state'], more: Partial<Engine['health']>): Engine => ({ health: { state, ...more }, said: { text: '', whose: null } });
+
+test('the model that answered last is named, by its own name and the reader’s day, never a timestamp or a path', () => {
+  const e = withHealth('answering', { answeredBy: { model: '@cf/acme-labs/quill-2-fast', at: local(9, 14) } });
+  assert.deepEqual(engineLines(e, NOON), ['Answered by quill-2-fast today.']);
+  assert.deepEqual(engineLines(withHealth('answering', { answeredBy: { model: 'quill-2', at: local(9, 13, 23) } }), NOON), ['Answered by quill-2 yesterday.']);
+  assert.equal(dayAgo(local(9, 9), NOON), '5 days ago');
+  assert.equal(dayAgo(local(7, 2), NOON), 'on 2 Aug');
+  assert.equal(modelName('@cf/acme-labs/quill-2-fast'), 'quill-2-fast');
+  assert.ok(!engineLines(e, NOON).join(' ').match(/\d{4}-\d{2}-\d{2}|T\d{2}:|\//), 'no timestamp and no path');
+});
+
+test('under a failure the provider’s own words are said as the provider’s, and only under a failure', () => {
+  const words = 'Daily request limit reached for this account.';
+  assert.deepEqual(engineLines(withHealth('not_answering', { lastWords: words }), NOON), [`The provider said: ${words}`]);
+  assert.deepEqual(engineLines(withHealth('key_closed', { lastWords: 'Invalid credentials.' }), NOON), ['Your key’s provider said: Invalid credentials.']);
+  /* A failure the engine has recovered from is not one going on. */
+  assert.deepEqual(engineLines(withHealth('answering', { lastWords: words }), NOON), []);
+});
+
+test('a second model is said with its counts once one was needed, and never at none', () => {
+  const twice = withHealth('answering', { doubleShare: 0.05, doubleOf: { twice: 2, asks: 40 } });
+  assert.deepEqual(engineLines(twice, NOON), ['Needed a second model for 2 of 40 asks.']);
+  assert.deepEqual(engineLines(withHealth('answering', { doubleShare: 0, doubleOf: { twice: 0, asks: 40 } }), NOON), []);
+  assert.deepEqual(engineLines(withHealth('answering', { doubleShare: 1, doubleOf: { twice: 1, asks: 1 } }), NOON), ['Needed a second model for 1 of 1 ask.']);
+});
+
+test('all three lines together, in order, and nothing at all from an older host or with no model', () => {
+  const all = withHealth('not_answering', {
+    answeredBy: { model: 'quill-2', at: local(9, 12) },
+    lastWords: 'Upstream timed out.',
+    doubleShare: 0.25,
+    doubleOf: { twice: 1, asks: 4 },
+  });
+  assert.deepEqual(engineLines(all, NOON), ['Answered by quill-2 2 days ago.', 'The provider said: Upstream timed out.', 'Needed a second model for 1 of 4 asks.']);
+  assert.deepEqual(engineLines(engine('not_answering', 'Slash’s model is not answering.'), NOON), [], 'an older host hands none of the fields');
+  assert.deepEqual(engineLines(withHealth('off', { answeredBy: { model: 'quill-2', at: local(9, 14) } }), NOON), []);
+  assert.deepEqual(engineLines(null, NOON), []);
+  for (const line of engineLines(all, NOON)) assert.ok(!line.includes('—'), 'no em dash');
 });

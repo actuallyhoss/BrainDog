@@ -205,10 +205,19 @@ export const answering = (core: Core, fallback: Inference): { answer(ask: Ask, i
       let touched = false;
       /* AND THE NAME THE HOST SENT, off a reply that came back. `core.run` keeps the template's (`nameIn`). */
       let sent: string | undefined;
-      const watched: Inference = {
+      /* EACH CALL STARTS WITH NO MARKS, so a route's walk (ENG-A06) leaves the last attempt's: a provider candidate's 401
+         after the included model threw is read as that 401, and under the provider's own name. `core.run` hands each
+         candidate's own wire through `watch`. */
+      const watch = (wire: Inference): Inference => ({
         complete: async (call) => {
+          lost = '';
+          heard = null;
+          stopped = null;
+          unsent = false;
+          touched = false;
+          sent = undefined;
           try {
-            const reply = await engine.complete(call);
+            const reply = await wire.complete(call);
             sent = nameIn(reply);
             return reply;
           } catch (e) {
@@ -220,12 +229,14 @@ export const answering = (core: Core, fallback: Inference): { answer(ask: Ask, i
             throw e;
           }
         },
-      };
+      });
+      const watched = watch(engine);
 
       const ran = await core.run({
         id: 'answer',
         slots: { '%QUESTION%': encoded(ask.question.trim()), '%SHAPE%': shapeLine(ask) },
         inference: watched,
+        watch,
         schema: answerSchema(ask),
         /* THE FIELDS COME OFF THE END WHEN THE PROMPT IS OVER ITS CAP, and the question never does. */
         trim: { slot: '%ABOUT%', lines: Object.entries(ask.about ?? {}).map(([field, value]) => fenced(field, printValue(value))) },
@@ -247,7 +258,7 @@ export const answering = (core: Core, fallback: Inference): { answer(ask: Ask, i
          assign them. */
       const reached = heard as Heard | null;
       const refusedBy = stopped as Stopped | null;
-      /* A CANDIDATE ON ITS OWN WIRE (ENG-A06) BYPASSES `watched`, whose `sent` would still hold an earlier attempt's name. */
+      /* A CANDIDATE ON ITS OWN WIRE (ENG-A06) IS NAMED AS THE WALK RAN IT, `ran.model`. */
       const used = ran.candidate !== undefined ? ran.model : ((sent as string | undefined) ?? reached?.model ?? ran.model);
       /* ONE BINDING THROW HAD TWO PRICES UNTIL THIS LINE. Measured:
          the Worker's included model threw after `AI.run` was called, and a person's read settled it under

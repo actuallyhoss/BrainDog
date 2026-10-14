@@ -371,6 +371,7 @@ export const LOOK_KEYS = {
   density: 'look.density',
   contrast: 'look.contrast',
   theme: 'look.accent',
+  shot: 'look.shot',
 } as const;
 export type LookKey = (typeof LOOK_KEYS)[keyof typeof LOOK_KEYS];
 

@@ -276,6 +276,12 @@ export type LiveLook = {
   pinned: readonly string[];
   by: 'rule' | 'slash' | 'owner';
   kept: string | null;
+  /** The owner's widths, columns and grouping, where the look says them, so Undo puts an earlier look back whole. */
+  span?: Record<string, number>;
+  area?: Record<string, 'main' | 'rail'>;
+  group?: Record<string, string>;
+  /** When the live look was written, when the record says. */
+  at?: string | null;
 };
 
 type AnsweredPage = LivePageDecl & { blocks?: Answered[]; [key: string]: unknown };
@@ -319,6 +325,8 @@ export type LiveBlock = BlockResult & {
    * where the row names no run the page could read. Handed to the renderer as its `runs`, as a block of runs is.
    */
   runFaces?: (RunCell | null)[];
+  /** HOW MANY HELPERS EACH RUN HAS WORKING WITH IT, on a block of runs at work (`sessions.working`), aligned with the rows. */
+  helpers?: number[];
   /**
    * SET ON A BLOCK THE READER ADDED AND THE PAGE NEVER DECLARED (the foot, `footed`). Arrange and Change this page save
    * against the count of declared blocks, and the record refuses a save whose count is off; whoever hands blocks to
@@ -987,6 +995,10 @@ export function lookOf(v: unknown): LiveLook | null {
     pinned: keysOf(v.pinned),
     by,
     kept: said(v.kept),
+    ...(isObject(v.span) ? { span: v.span as Record<string, number> } : {}),
+    ...(isObject(v.area) ? { area: v.area as Record<string, 'main' | 'rail'> } : {}),
+    ...(isObject(v.group) ? { group: v.group as Record<string, string> } : {}),
+    ...(typeof v.at === 'string' ? { at: v.at } : {}),
   };
 }
 
@@ -1311,6 +1323,8 @@ export function blockOf(
     nexts: nexted,
     /* EACH CARD'S TREND, a run of numbers a card, taken by name and narrowed into its cell below. */
     trends: trended,
+    /* EACH CARD'S WHEN OVER A FIGURE, a number a card, taken by name and narrowed into its cell below. */
+    whens: whened,
     types: typed,
     home: homeSaid,
     done_now: doneNow,
@@ -1809,6 +1823,17 @@ export function blockOf(
       const run = trends?.[n];
       row.cells[trendAt] = Array.isArray(run) ? run.map((v) => (typeof v === 'number' && Number.isFinite(v) ? String(v) : '-')).join(' ') : null;
     });
+  /* AND EACH CARD'S WHEN OVER A FIGURE, `whens` (W096, REC-C16): the days the record read for the card, said in words in
+     its head, the column's label leading ("Worked on 2 days ago"). A figure past its target says the days as quiet
+     ("Quiet for 40 days") and tones the card late, the word beside the colour. A card the record read nothing for draws
+     no line. */
+  const whens = kind === 'cards' && Array.isArray(whened) && whened.length === got.length ? whened : null;
+  const whenAt = (b.columns ?? []).findIndex((c) => c.as === 'when' && typeof c.metric === 'string');
+  if (whenAt >= 0)
+    rows.forEach((row, n) => {
+      row.cells[whenAt] = whenSaid(whens?.[n], typeof b.columns?.[whenAt]?.label === 'string' ? (b.columns[whenAt]!.label as string) : undefined);
+      if ((whens?.[n] as { met?: unknown } | null | undefined)?.met === false && !row.tone) Object.assign(row, { tone: 'bad' });
+    });
   /* EACH CARD'S GROUP BY NAME, READ OFF ITS OWN ROW (`PageRow.group` in the kernel's `pages.ts`): the record puts it on
      the row and not beside the rows, so a block held from a reader keeps no name of a list she may not read. A card the
      record says points at nothing (`value: ''`, "No project") and a group that is not text are drawn among the
@@ -2244,4 +2269,15 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
       };
     },
   };
+}
+
+/** A card's when over a figure of days, in words: "Worked on 2 days ago", "Quiet for 40 days" past its target, or nothing. */
+export function whenSaid(when: unknown, label?: string): string | null {
+  if (!when || typeof when !== 'object') return null;
+  const { value, met } = when as { value?: unknown; met?: unknown };
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) return null;
+  const days = `${value} ${value === 1 ? 'day' : 'days'}`;
+  if (met === false) return `Quiet for ${days}`;
+  const ago = value === 0 ? 'today' : value === 1 ? 'yesterday' : `${days} ago`;
+  return label ? `${label} ${ago}` : ago;
 }

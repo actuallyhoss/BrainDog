@@ -282,6 +282,10 @@ export type Spends = 'person' | 'background' | 'none';
  * `included` is stored as `a` and `key` as `b`, and a record a self-host keeps on `byo` reads as `included`: that is the
  * host's own endpoint with a model name typed for it, and nothing of the owner's is sent. `tier` stays readable beside it
  * for one release.
+ *
+ * A SAVE OF `included` NEVER WRITES `byo` (ENG-A07), whatever `tier` it carries. On a self-host it keeps the model name
+ * typed for the host's own endpoint on tier `a`, so the two forms are the same two on every host; a row stored on `byo`
+ * before is read, never rewritten, and keeps the count its host gives that tier.
  */
 export type Source = 'included' | 'key';
 
@@ -403,8 +407,8 @@ export interface Slash {
   read(question: string, ctx: CallContext, inference?: Inference): Promise<Result<Reading>>;
   propose(question: string, ctx: CallContext, byok?: Inference, askId?: string, inference?: Inference): Promise<Result<Proposal>>;
   proposePattern(samples: readonly RawPayload[], ctx: CallContext, inference?: Inference): Promise<Result<Proposal>>;
-  /** A pattern for the samples, drafted and not filed: the record's `infer.draft` job, which the host's pass acks with it (`jobs.ts`). */
-  draftPattern(samples: readonly RawPayload[]): Promise<Result<PatternDraft>>;
+  /** A pattern for the samples, drafted and not filed: the record's `infer.draft` job, which the host's pass acks with it (`jobs.ts`). The three oldest are sent, and `waiting` is how many of the shape wait (ENG-B07). */
+  draftPattern(samples: readonly RawPayload[], waiting?: number): Promise<Result<PatternDraft>>;
   /** Two sentences above a digest about to be sent, or `{ text: '' }` for none: the record's `infer.prose` job (`jobs.ts`). */
   digestProse(digest: unknown): Promise<Result<{ text: string }>>;
   /** The record's `infer.embed` job: one embedding call over `texts`, on the engine's own `Inference.embed` (`jobs.ts`). */

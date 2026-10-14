@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 
 import { ulids } from '../src/ids.ts';
 import { openRecord } from '../src/index.ts';
-import { BUILT_IN_FIGURES, RECORD_TIDY, builtInFigure, readTidy, staleFigureOf } from '../src/built-in-figures.ts';
+import { BUILT_IN_FIGURES, RECORD_TIDY, builtInFigure, readTidy, staleFigureOf, tidiedFigureOf, type TidyReading } from '../src/built-in-figures.ts';
 import { TIDY_LINE_DDL, finders, registerFinder, staleNow, tidied, tidyHour, type TidyDeps } from '../src/tidy.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
@@ -65,6 +65,13 @@ const value = (sql: NodeSql, id: string): number | null => {
   const read = readTidy(sql, { nowMs: NOW }, decl);
   assert.ok(read.ok, id);
   return read.value.value;
+};
+
+/** What a figure says finder by finder, or `undefined` when it names nothing. */
+const named = (sql: NodeSql, id: string): string | undefined => {
+  const read = readTidy(sql, { nowMs: NOW }, builtInFigure(id)!);
+  assert.ok(read.ok, id);
+  return (read.value as TidyReading).names;
 };
 
 /** Two steps left over thirty days ago, one question open fifteen days, and things that are not stale beside them. */
@@ -166,6 +173,45 @@ test('a target of none stale: met at 0, missed above it, and the week\'s count i
   assert.equal(week.value.met, null);
 });
 
+/* WHAT WAS CLEARED AND WHAT WAITS, IN WORDS (AGT-C18 item 5): the Agents page said two bare counts, and now it says
+   what each was. */
+test('WHAT WAS TIDIED THIS WEEK IS SAID FINDER BY FINDER, the largest first, and a finder at nought is left out', async () => {
+  const { sql } = await record();
+  kept(sql, 'steps-old', 1, 2);
+  kept(sql, 'steps-old', 4, 1);
+  kept(sql, 'runs-empty', 2, 41);
+  kept(sql, 'runs-stopped', 3, 0);
+  kept(sql, 'runs-stopped', 9, 6); // before the week
+  assert.equal(value(sql, 'tidied-week'), 44);
+  assert.equal(named(sql, 'tidied-week'), '41 empty runs hidden and 3 steps nobody took closed');
+  /* ONE FINDER'S WEEK, built when asked for as the stale ones are, says its number and no names. */
+  assert.equal(value(sql, tidiedFigureOf('runs-empty')), 41);
+  assert.equal(value(sql, 'tidied-steps-old'), 3);
+  assert.equal(value(sql, 'tidied-runs-stopped'), 0);
+  assert.equal(named(sql, 'tidied-runs-empty'), undefined);
+  assert.equal(builtInFigure('tidied-runs-empty')?.name, 'Tidied this week: ended runs that wrote nothing');
+  for (const f of finders()) {
+    const decl = builtInFigure(tidiedFigureOf(f.id));
+    assert.ok(decl, f.id);
+    assert.doesNotMatch(decl.name, /-|#|\bfinder\b/, `${f.id} is named in plain words`);
+  }
+  assert.equal(builtInFigure('tidied-nothing-here'), null);
+  assert.equal(builtInFigure('tidied-week'), BUILT_IN_FIGURES['tidied-week']);
+});
+
+test('WHAT IS STILL STALE IS SAID THE SAME WAY, right for one, and past four finders it says and more', async () => {
+  const { sql } = await record();
+  assert.equal(named(sql, 'gone-stale'), undefined, 'a fresh record names something stale');
+  assert.equal(named(sql, 'tidied-week'), undefined, 'a fresh record names something tidied');
+  stale(sql);
+  assert.equal(value(sql, 'gone-stale'), 3);
+  assert.equal(named(sql, 'gone-stale'), '2 steps nobody took and 1 question left open');
+  /* A TIE KEEPS THE ORDER THE FINDERS WERE REGISTERED IN, and the fifth is "and more". */
+  for (const [finder, did] of [['rows-same', 1], ['faults-open', 2], ['steps-old', 3], ['runs-empty', 3], ['runs-stopped', 5]] as const) kept(sql, finder, 0, did);
+  assert.equal(named(sql, 'tidied-week'), '5 silent runs written off, 3 empty runs hidden, 3 steps nobody took closed, 2 faults cleared and more');
+  for (const said of [named(sql, 'gone-stale')!, named(sql, 'tidied-week')!]) assert.doesNotMatch(said, /—|-[a-z]|\b1 \w+s\b/u, said);
+});
+
 test('a finder registered later has its figure too, named by its own words', async () => {
   const { sql } = await record();
   registerFinder({ id: 'figures-test-extra', name: 'Things only this test counts', find: () => ({ stale: 5, did: 0, ask: null }) });
@@ -173,6 +219,8 @@ test('a finder registered later has its figure too, named by its own words', asy
   assert.equal(decl?.name, 'Things only this test counts');
   assert.equal(value(sql, 'stale-figures-test-extra'), 5);
   assert.equal(value(sql, 'gone-stale'), 5);
+  /* AND SAID BY ITS OWN NAME, with no words of its own beside it. */
+  assert.equal(named(sql, 'gone-stale'), '5 things only this test counts');
 });
 
 test('a finder that cannot count reads nothing in its own figure, never a nought, and the total still adds the others', async () => {

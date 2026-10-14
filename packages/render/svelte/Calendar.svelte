@@ -10,18 +10,40 @@
 
   The markup has no whitespace between tags that sit on one line, on purpose: a line break there is a space the other
   renderer does not draw.
+
+  A DAY A LINK OPENED THE CALENDAR ON (`?day=`, which a date anywhere on the record writes) is marked: `aria-current`
+  says it, a ring in the working accent shows it, and it is scrolled into view once for each day asked, at once under
+  reduced motion. The day comes from `opts.day`, or from the host's context (`CALENDAR_DAY`) where the host cannot
+  reach a block's options; with neither, nothing is marked and the tree is the twin's.
 -->
 <script lang="ts">
   import { MISSING, TONES, WORKING_GLYPH, WORKING_LABEL, inline, takeWorking, text, type Block, type RenderOptions, type Row } from '../src/index.ts';
-  import { CALENDAR_NONE, WEEKDAYS, calendarMore, calendarPlan, calendarSkipped } from '../src/calendar.ts';
+  import { getContext } from 'svelte';
+  import { CALENDAR_DAY, CALENDAR_NONE, WEEKDAYS, calendarMore, calendarPlan, calendarSkipped } from '../src/calendar.ts';
   import { roadmapToday } from '../src/roadmap.ts';
   import Text from './Text.svelte';
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
 
   const said = (r: Row, i: number): string => text(inline(r.cells[i] ?? '', opts));
-  const plan = $derived(calendarPlan(block.rows, roadmapToday(opts.now)));
+  /* `day` is not yet a key of RenderOptions (`src/html.ts`), so it is read as one more the host may give. */
+  const asked = getContext<(() => string | null) | undefined>(CALENDAR_DAY);
+  const mark = $derived((opts as RenderOptions & { day?: string | null }).day ?? asked?.() ?? null);
+  const plan = $derived(calendarPlan(block.rows, roadmapToday(opts.now), mark));
   const skipped = $derived(plan.skipped.length ? calendarSkipped(plan.skipped.map((i) => said(block.rows[i]!, 0) || MISSING)) : '');
+
+  /* THE MARKED DAY IN VIEW, once for each day asked: a re-read of the page draws the same day again and does not move
+     the reader, and a second link on the same page moves them to its day. */
+  let root = $state<HTMLElement | undefined>();
+  let shown: string | null = null;
+  $effect(() => {
+    const day = mark;
+    const cell = root?.querySelector('.calendar-cell[aria-current="date"]');
+    if (!day || !cell || shown === day) return;
+    shown = day;
+    const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    cell.scrollIntoView({ block: 'center', behavior: still ? 'auto' : 'smooth' });
+  });
 </script>
 
 {#snippet item(r: Row)}
@@ -44,7 +66,7 @@
     {#if skipped}<p class="calendar-skipped">{skipped}</p>{/if}
   </div>
 {:else}
-  <div class="calendar">
+  <div class="calendar" bind:this={root}>
     {#each plan.months as m}
       <table class="calendar-month">
         <caption class="calendar-caption">{m.label}</caption>
@@ -58,7 +80,7 @@
             <tr>
               {#each week as c}
                 {#if c.inside}
-                  <td class="calendar-cell" data-today={c.today ? '' : undefined} data-count={c.count > 0 ? c.count : undefined}
+                  <td class="calendar-cell" data-today={c.today ? '' : undefined} data-count={c.count > 0 ? c.count : undefined} aria-current={c.marked ? 'date' : undefined}
                     ><span class="calendar-num num">{c.num}</span>{@render items(c.items)}{#if c.more > 0}<span class="calendar-more"
                         >{calendarMore(c.more)}</span
                       >{/if}</td
@@ -80,3 +102,19 @@
     {#if skipped}<p class="calendar-skipped">{skipped}</p>{/if}
   </div>
 {/if}
+
+<style>
+  /* THE DAY A LINK OPENED, ringed in the working accent and said by `aria-current`, so it is never told by colour alone.
+     GLOBAL, as `Cards.svelte`'s are: a scoped rule marks the cells it matches, and the twin's tree would differ by the
+     mark. An outline and not a border, so the week does not move by its width. */
+  :global(.calendar-cell[aria-current='date']) {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+    border-radius: var(--r-sm);
+    scroll-margin-block: var(--sp-8);
+  }
+
+  :global(.calendar-cell[aria-current='date'] .calendar-num) {
+    font-weight: 600;
+  }
+</style>

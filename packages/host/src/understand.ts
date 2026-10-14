@@ -32,6 +32,7 @@
  */
 
 import {
+  dayIn,
   isOrganisationAddress,
   keyOf,
   keysOf,
@@ -75,6 +76,18 @@ export const RUNS_PER_PASS = 10;
 
 /** The most questions one night's offers file. The rest are offered the nights that follow. */
 export const OFFERS_PER_PASS = 3;
+
+/**
+ * The most who-is-who questions of Slash's that wait at once (HD.224, "max 3 waiting"), as `WAITING_MOST` holds Slash's
+ * arrangements in `@braindog/record`'s `design-agent.ts`. Both passes file into what is left of it, and nothing more.
+ */
+export const WHO_WAITING_MOST = 3;
+
+/** The days a who-is-who question waits before it lapses (HD.579, "every proposal states a deadline"), `LAPSE_DAYS`. */
+export const WHO_LAPSE_DAYS = 14;
+
+/** What every who-is-who question's cause starts with, so the room is counted by it and a decline is remembered. */
+export const WHO_CAUSE = 'who:';
 
 /** How long after a pass whose model was not reached the next one tries again. */
 const NOTES_RETRY_MS = 3_600_000;
@@ -393,8 +406,51 @@ export async function settleResolve(
 
 /* ── the nightly notes pass ─────────────────────────────────────────────────────────────────────────────────────────── */
 
-/** The kernel methods the notes pass calls. */
-export type NotesKernel = Pick<Kernel, 'registers' | 'list' | 'meetsList' | 'propose'>;
+/**
+ * The kernel methods the notes pass calls. What waits and the record's zone are read to hold Slash to
+ * `WHO_WAITING_MOST`; a kernel that cannot list what waits is taken to have nothing waiting and files no day (`whoRoom`).
+ */
+export type NotesKernel = Pick<Kernel, 'registers' | 'list' | 'meetsList' | 'propose'> & Partial<Pick<Kernel, 'openSuggestions' | 'identity'>>;
+
+/** A day as the record's own zone spells it, `YYYY-MM-DD`. */
+const DAY_SAID = /^\d{4}-\d{2}-\d{2}$/u;
+const DAY_MS = 86_400_000;
+
+/** Today in the record's own zone, UTC for a record that has not said one, as `govern.ts` reads `lapses` against it. */
+const todayOf = (kernel: Pick<NotesKernel, 'identity'>, nowMs: number): string => dayIn(nowMs, kernel.identity?.()?.tz ?? 'UTC');
+
+/**
+ * Room for more who-is-who questions: `WHO_WAITING_MOST` less the open questions signed by Slash whose body is a rowset
+ * and whose cause starts `WHO_CAUSE`. Counted as `govern.ts` counts open arrangements, with what is put off past now left
+ * out as the kernel's open list leaves it out; ONE PAST ITS DAY IS NOT COUNTED, as an arrangement past its `lapses` is
+ * taken back by the daily sweep: it waits on nobody's screen as an ask Slash still makes.
+ *
+ * A KERNEL THAT CANNOT LIST WHAT WAITS gives the whole room, so a pass still files `WHO_WAITING_MOST` at most.
+ */
+export function whoRoom(kernel: Pick<NotesKernel, 'openSuggestions' | 'identity'>, nowMs: number = Date.now()): number {
+  if (typeof kernel.openSuggestions !== 'function') return WHO_WAITING_MOST;
+  const open = kernel.openSuggestions();
+  if (!open.ok) return 0;
+  const today = todayOf(kernel, nowMs);
+  let waiting = 0;
+  for (const s of open.value) {
+    if (s.opened_by !== SLASH || s.body_kind !== 'rowset' || typeof s.cause !== 'string' || !s.cause.startsWith(WHO_CAUSE)) continue;
+    const lapses = typeof s.body === 'object' && s.body !== null ? (s.body as { lapses?: unknown }).lapses : undefined;
+    if (typeof lapses === 'string' && DAY_SAID.test(lapses) && lapses < today) continue;
+    waiting++;
+  }
+  return Math.max(0, WHO_WAITING_MOST - waiting);
+}
+
+/**
+ * The day a who-is-who question filed now lapses, `WHO_LAPSE_DAYS` from today in the record's zone, or `undefined` for a
+ * kernel that cannot list what waits, which could never count it as lapsed.
+ */
+const lapsesOf = (kernel: Pick<NotesKernel, 'openSuggestions' | 'identity'>, nowMs: number): string | undefined =>
+  typeof kernel.openSuggestions === 'function' ? todayOf(kernel, nowMs + WHO_LAPSE_DAYS * DAY_MS) : undefined;
+
+/** A who-is-who cause, `who:<what>:<hash of the parts it rests on>`, held under the kernel's 200 characters. */
+const whoCause = (what: string, parts: readonly string[]): string => `${WHO_CAUSE}${what}:${fnv([...parts].sort().join('\n'))}`;
 
 export type NotesDeps = {
   mentions: NonNullable<ModelJobUnderstand['mentions']>;
@@ -632,6 +688,14 @@ export async function serveNotes(kernel: NotesKernel, deps: NotesDeps): Promise<
     mark(store, 'notes.next', new Date(now + NOTES_EVERY_MS).toISOString(), iso);
     return { ran: true, read: 0, asked: 0 };
   }
+  /* THREE WAIT ALREADY, so nothing is read and nothing is asked: the notes stay unread, the watermarks where they are,
+     and no ask of the understanding share is spent on names that could not be put to the owner tonight. */
+  const room = whoRoom(kernel, now);
+  if (room === 0) {
+    log(`notes: ${WHO_WAITING_MOST} who-is-who questions wait, so none is filed tonight.`);
+    mark(store, 'notes.next', new Date(now + NOTES_EVERY_MS).toISOString(), iso);
+    return { ran: true, read: 0, asked: 0, why: 'full' };
+  }
 
   const since = markOf(store, 'notes.since');
   const found: Found[] = [];
@@ -733,7 +797,7 @@ export async function serveNotes(kernel: NotesKernel, deps: NotesDeps): Promise<
   const meetsParts = (meets?.fields ?? {}) as unknown as Record<string, string | undefined>;
   const day = iso.slice(0, 10);
 
-  const byList = new Map<string, { list: NoteList; rows: Record<string, unknown>[]; names: string[]; from: Map<string, Source> }>();
+  const byList = new Map<string, { list: NoteList; rows: Record<string, unknown>[]; names: string[]; from: Map<string, Source>; notes: Set<string> }>();
   const held = new Map<string, Set<string>>();
   for (const m of kept) {
     const list = target(m.type);
@@ -745,7 +809,7 @@ export async function serveNotes(kernel: NotesKernel, deps: NotesDeps): Promise<
     if (markOf(store, asked) !== null) continue;
     const note = handed.get(m.note)!;
     const run = note.found.kind === 'run';
-    const group = byList.get(list.register) ?? { list, rows: [], names: [], from: new Map<string, Source>() };
+    const group = byList.get(list.register) ?? { list, rows: [], names: [], from: new Map<string, Source>(), notes: new Set<string>() };
     if (group.names.some((n) => nameKey(n) === k)) continue;
     const row: Record<string, unknown> = { [list.name]: m.name };
     if (list.kind === 'person' && meets && list.register === meets.register) {
@@ -760,25 +824,43 @@ export async function serveNotes(kernel: NotesKernel, deps: NotesDeps): Promise<
     group.rows.push(row);
     group.names.push(m.name);
     group.from.set(run ? `run:${note.found.row}` : `note:${note.about}`, { run, about: run ? note.found.about : note.about });
+    group.notes.add(note.found.key);
     byList.set(list.register, group);
   }
 
+  /* STRONGEST FIRST, INTO WHAT IS LEFT OF THE ROOM: the most names, then the most places they are named in. A question
+     not filed tonight keeps its notes unread and the watermarks where they are, so its names are asked when there is room. */
+  const groups = [...byList.values()].sort((a, b) => b.names.length - a.names.length || b.from.size - a.from.size);
+  const lapses = lapsesOf(kernel, now);
+  const unread = new Set<string>();
   let asked = 0;
-  for (const { list, rows, names, from } of byList.values()) {
+  for (const { list, rows, names, from, notes: behind } of groups) {
+    if (asked >= room) {
+      for (const n of behind) unread.add(n);
+      continue;
+    }
     const { said, many } = sourcesSaid([...from.values()]);
     const question =
       names.length === 1
         ? `Add ${names[0]} to ${list.plural}? ${capital(said)} ${many ? 'name' : 'names'} ${list.kind === 'person' ? 'them' : 'it'}.`
         : `Add ${names.length} names to ${list.plural}? ${namesSaid(names)}, named in ${said}.`;
-    const put = kernel.propose({ question: question.slice(0, 280), body_kind: 'rowset', body: { register: list.register, rows } }, SLASH, SLASH);
+    const body = { register: list.register, rows, ...(lapses === undefined ? {} : { lapses }) };
+    const cause = whoCause(`add:${list.register}`, names.map(nameKey));
+    const put = kernel.propose({ question: question.slice(0, 280), body_kind: 'rowset', body, cause }, SLASH, SLASH);
     if (!put.ok) {
       log(`notes: ${fixOf(put)}`);
       continue;
     }
-    asked++;
+    /* ASKED ALREADY, OR ANSWERED NO: the kernel files nothing (`cause`), the room is as it was, and the names are not
+       asked again. */
+    if (put.value.joined === undefined && put.value.answered === undefined) asked++;
     for (const n of names) mark(store, `asked:${list.register}:${nameKey(n)}`, put.value.id, iso);
   }
-  finish();
+  if (unread.size === 0) finish();
+  else {
+    for (const f of [...batch, ...runs]) if (!unread.has(f.key)) mark(store, f.key, f.hash, iso);
+    mark(store, 'notes.next', new Date(now + NOTES_EVERY_MS).toISOString(), iso);
+  }
   return { ran: true, read: notes.length, asked };
 }
 
@@ -1167,21 +1249,29 @@ export function serveOffers(kernel: OffersKernel, deps: OffersDeps): OffersServe
     });
   }
 
-  /* FILED UP TO THE NIGHT'S SHARE. A note behind a question not filed tonight stays unread, and the watermark stays. */
+  /* FILED UP TO THE NIGHT'S SHARE AND WHAT IS LEFT OF THE ROOM, strongest first: the most a yes adds, then the most notes
+     behind it, keys before links on a tie as they were gathered. A note behind a question not filed tonight stays
+     unread, and the watermark stays. */
+  const room = Math.min(OFFERS_PER_PASS, whoRoom(kernel, now));
+  if (room === 0 && offers.length > 0) log(`offers: ${WHO_WAITING_MOST} who-is-who questions wait, so none of ${offers.length} is filed tonight.`);
+  const ranked = offers.map((offer, at) => ({ offer, at })).sort((a, b) => b.offer.offered.length - a.offer.offered.length || b.offer.notes.size - a.offer.notes.size || a.at - b.at);
+  const lapses = lapsesOf(kernel, now);
   let asked = 0;
   const waiting = new Set<string>();
-  for (const offer of offers) {
-    if (asked >= OFFERS_PER_PASS) {
+  for (const { offer } of ranked) {
+    if (asked >= room) {
       for (const n of offer.notes) waiting.add(n);
       continue;
     }
-    const body = { register: offer.register, rows: offer.rows, ...(offer.keys === undefined ? {} : { offer: { keys: offer.keys } }) };
-    const put = kernel.propose({ question: offer.question.slice(0, 280), body_kind: 'rowset', body }, SLASH, SLASH);
+    const body = { register: offer.register, rows: offer.rows, ...(offer.keys === undefined ? {} : { offer: { keys: offer.keys } }), ...(lapses === undefined ? {} : { lapses }) };
+    const cause = whoCause(offer.keys === undefined ? 'link' : 'keys', offer.offered);
+    const put = kernel.propose({ question: offer.question.slice(0, 280), body_kind: 'rowset', body, cause }, SLASH, SLASH);
     if (!put.ok) {
       log(`offers: ${fixOf(put)}`);
       continue;
     }
-    asked++;
+    /* ASKED ALREADY, OR ANSWERED NO: nothing is filed and the room is as it was; what it offered is not offered again. */
+    if (put.value.joined === undefined && put.value.answered === undefined) asked++;
     for (const o of offer.offered) mark(store, `offered:${o}`, put.value.id, iso);
   }
   /* A PERSON LINKED TO A SECOND PROJECT, OR OFFERED KEYS AND A LINK, keeps their notes unread too: the rest is offered

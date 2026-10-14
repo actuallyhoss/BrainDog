@@ -22,7 +22,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   portfolio: [
     {
       version: '1.17.0',
-      notes: 'Projects says how many of those in play say what they earned in a year only once one of them does. With none saying, the line is not drawn. A project page lists up to six of its own keys, tools and skills under Runs on, and says which agents used each one. On Projects, the one line under each name can be typed straight on its card.',
+      notes: 'Projects says how many of those in play say what they earned in a year only once one of them does. With none saying, the line is not drawn. A project page lists up to six of its own keys, tools and skills under Runs on, and says which agents used each one. On Projects, the one line under each name can be typed straight on its card. Each project in play on Projects says how long since anybody worked on it.',
     },
     {
       version: '1.16.0',
@@ -204,7 +204,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   work: [
     {
       version: '1.19.0',
-      notes: "A thread can be an idea or planned before it is open, and moves only where it makes sense: an idea cannot be marked done in one step. A thread can say the day it aims for, and shows in Due this week. A follow-up takes its task's project, thread and owner where it names none. A step an agent adds under its own task stays with that agent. A thread that is held up can be marked done. Board has a line to add a task where the cards are.",
+      notes: "A thread can be an idea or planned before it is open, and moves only where it makes sense: an idea cannot go to done in one step. A thread can say the day it aims for, and shows in Due this week. A follow-up takes its task's project, thread and owner where it names none. A step an agent adds under its own task stays with that agent. A thread that is held up can be marked done. Board has a line to add a task. A project with nothing written on its tasks for more than thirty days is marked quiet.",
     },
     {
       version: '1.18.0',
@@ -258,7 +258,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     {
       version: '1.13.0',
       notes:
-        'Agents has a new page, How the brain changed, opened from What the brain learned. It says how many learnings arrived this month, how many skills changed and how many have faded, draws both week by week once there are three weeks to draw, and lists what changed, newest first, each with the failure that taught it. Faded lists what nobody confirmed in ninety days. A learning can be a rule, and a skill, tool or key added twice is one. Needs a look says what is here twice, and where to fold it.',
+        'Agents has a new page, How the brain changed, opened from What the brain learned. It says how many learnings arrived this month, how many skills changed and how many have faded, draws both week by week once there are three weeks, and lists what changed with the failure that taught it. Faded lists what nobody confirmed in ninety days. A learning can be a rule, and a skill, tool or key added twice is one. Needs a look says what is here twice, what was tidied this week and what is still stale.',
     },
     {
       version: '1.12.0',

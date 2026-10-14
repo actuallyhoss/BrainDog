@@ -28,6 +28,7 @@
  * thing that opens one is the code, which exists in one browser redirect for sixty seconds.
  */
 
+import type { TokenClient } from '@braindog/kernel';
 import { FRESH } from '@braindog/record';
 import type { CodeRequest, HeldRequest, OAuthAnswers, OAuthCall, OAuthClient } from '@braindog/record/oauth';
 
@@ -87,7 +88,7 @@ export type Approver =
       ok: true;
       record: string;
       provedAt: number;
-      mint: (args: { scope: OAuthScope; label: string; days: number }) => Promise<Minted>;
+      mint: (args: { scope: OAuthScope; label: string; days: number; client: TokenClient }) => Promise<Minted>;
       cookie?: string | undefined;
     }
   | { ok: false; status: 401 | 403 | 429 | 503; say: string; retryAfter?: number | undefined; cookie?: string | undefined };
@@ -127,7 +128,12 @@ export type Consent = {
   /** The one pre-chosen: `propose` or less, because an agent proposes and a person decides. */
   suggested: OAuthScope;
   expires: number;
+  /** How the app came, and the host that names it: proven for `cimd`, only named by the app for `dcr`. */
+  source: AppSource;
 };
+
+/** How an app came to the door and the host it is of; `null` for an app answered on the person's own machine. */
+export type AppSource = { kind: 'cimd' | 'dcr'; host: string | null };
 
 type Header = [string, string];
 
@@ -393,6 +399,21 @@ function registered(client: OAuthClient, asked: string): boolean {
       return false;
     }
   });
+}
+
+/**
+ * What the door proved about an app, for a token's stamp and the consent screen. For `cimd` the host of the client id
+ * itself, which served the document that names it; for `dcr` the host of the address the request is answered at,
+ * which the app chose. An address on this machine has no host to name.
+ */
+function sourceOf(client: OAuthClient, redirect: string): AppSource {
+  let url: URL;
+  try {
+    url = new URL(client.source === 'cimd' ? client.client_id : redirect);
+  } catch {
+    return { kind: client.source, host: null };
+  }
+  return { kind: client.source, host: url.protocol === 'https:' && !LOOPBACK.has(url.hostname) ? url.host.toLowerCase() : null };
 }
 
 /** The host a code goes to, as the consent screen names it. */
@@ -667,6 +688,7 @@ export async function consentFor(store: OAuthStore, id: string): Promise<Consent
     offers,
     suggested: offers.includes('propose') ? 'propose' : 'read',
     expires: held.expires,
+    source: sourceOf(client, held.redirect_uri),
   };
 }
 
@@ -720,7 +742,9 @@ async function approve(request: Request, deps: OAuthDeps): Promise<Response> {
   const taken = client === null ? null : await deps.store({ op: 'take', id });
   if (client === null || taken === null) return say(400, 'invalid_request', REQUEST_GONE, cookie(who.cookie));
 
-  const minted = await who.mint({ scope, label: client.name, days: TOKEN_DAYS });
+  /* THE STAMP IS WHAT THE DOOR PROVED, never what the app said of itself: its client id, how it came, and its host. */
+  const { kind, host } = sourceOf(client, taken.redirect_uri);
+  const minted = await who.mint({ scope, label: client.name, days: TOKEN_DAYS, client: { id: client.client_id, kind, host } });
   if (!minted.ok) return say(minted.status, 'access_denied', minted.say, cookie(who.cookie));
   const code = b64url(random(32));
   const answers: CodeRequest = { client_id: taken.client_id, redirect_uri: taken.redirect_uri, challenge: taken.challenge, scope };

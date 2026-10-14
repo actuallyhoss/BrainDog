@@ -26,9 +26,18 @@ export type Part = { text: string; needs?: true; href?: string };
 /** One open fault as the record's `faults()` answers it: its sentence, how many times, since when. */
 export type Fault = { cause: string; said: string; count: number; since: string; last: string; error?: string };
 
-/** The engine as `engineHealth()` answers it, the part this sentence reads. */
+/**
+ * The engine as `engineHealth()` answers it, the part this sentence and `engineLines` read. The four fields beside the
+ * state are `@braindog/slash`'s (ENG-A05, ENG-A06), each absent where the ledger had nothing to say or the host is older.
+ */
 export type Engine = {
-  health: { state: 'answering' | 'not_answering' | 'never_asked' | 'off' | 'key_closed' };
+  health: {
+    state: 'answering' | 'not_answering' | 'never_asked' | 'off' | 'key_closed';
+    answeredBy?: { model: string; at: string } | null | undefined;
+    lastWords?: string | null | undefined;
+    doubleShare?: number | undefined;
+    doubleOf?: { twice: number; asks: number } | undefined;
+  };
   said: { text: string; whose: 'ours' | 'yours' | null };
 };
 
@@ -215,4 +224,49 @@ export function healthSaid(copy: CopyState, usage: UsageState, more: More = {}):
     parts.push(...unreadSaid);
   }
   return parts;
+}
+
+const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** How long ago, by the reader's own calendar: today, yesterday, 2 days ago, and a date after four weeks. */
+export function dayAgo(iso: string, now: number): string | null {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const n = new Date(now);
+  const days = Math.round((Date.UTC(n.getFullYear(), n.getMonth(), n.getDate()) - Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())) / 86_400_000);
+  if (days <= 0) return 'today';
+  if (days === 1) return 'yesterday';
+  if (days < 28) return `${days} days ago`;
+  const day = `${d.getDate()} ${SHORT_MONTHS[d.getMonth()]}`;
+  return `on ${d.getFullYear() === n.getFullYear() ? day : `${day} ${d.getFullYear()}`}`;
+}
+
+/**
+ * A model by its own name: `@cf/vendor/glm-5.3-flash` reads `glm-5.3-flash`. The provider's path in front of it is an
+ * address, which a person never reads; the last part is the name the provider gives it.
+ */
+export const modelName = (model: string): string => model.split('/').filter((p) => p !== '').at(-1)?.replace(/^@/, '') ?? '';
+
+/**
+ * The lines under Slash's sentence in Settings (ENG-A05, ENG-A06, "health shown"): which model answered last and when,
+ * the provider's own words under a failure, and how often an ask needed a second model. "Rules are the fallback, not
+ * the engine." (D35.43), so a fallback that is doubling the bill is said, and only once it has happened.
+ *
+ * EACH LINE ONLY FROM WHAT WAS READ. A host older than these fields hands none of them, and nothing is drawn; `off` is
+ * said by Slash's own row. The provider's words are already scrubbed by the engine, and are shown only under a failure,
+ * since words from a failure the engine has since recovered from would read as one still going on.
+ */
+export function engineLines(engine: Engine | null | undefined, now: number): string[] {
+  if (!engine || engine.health.state === 'off') return [];
+  const h = engine.health;
+  const lines: string[] = [];
+  const by = h.answeredBy ? modelName(h.answeredBy.model) : '';
+  const when = h.answeredBy ? dayAgo(h.answeredBy.at, now) : null;
+  if (by !== '' && when !== null) lines.push(`Answered by ${by} ${when}.`);
+  const words = h.lastWords?.trim() ?? '';
+  if (DOWN.has(h.state) && words !== '') lines.push(`${h.state === 'key_closed' ? 'Your key’s provider' : 'The provider'} said: ${words}`);
+  const twice = h.doubleOf;
+  if ((h.doubleShare ?? 0) > 0 && twice && twice.twice > 0 && twice.asks > 0)
+    lines.push(`Needed a second model for ${twice.twice} of ${twice.asks} ${twice.asks === 1 ? 'ask' : 'asks'}.`);
+  return lines;
 }

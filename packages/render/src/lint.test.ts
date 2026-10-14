@@ -22,9 +22,9 @@ const red = (fs: readonly LintFinding[], rule: LintRule): LintFinding => {
   return f;
 };
 
-test('THE RULE LIST IS CLOSED AND SAYS ITSELF: sixteen rules, each named once, with a sentence and no em dash', () => {
+test('THE RULE LIST IS CLOSED AND SAYS ITSELF: seventeen rules, each named once, with a sentence and no em dash', () => {
   assert.deepEqual(LINT_RULES.map((r) => r.rule), [
-    'placeholder', 'braces', 'raw-key', 'raw-id', 'raw-instant', 'icon-word', 'only-a-dash', 'cut-money', 'em-dash', 'plain-words',
+    'placeholder', 'braces', 'raw-key', 'raw-id', 'raw-instant', 'icon-word', 'only-a-dash', 'cut-money', 'two-spellings', 'em-dash', 'plain-words',
     'system-word', 'dev-name', 'bare-key', 'one-word-button', 'title-stop', 'raw-fault',
   ]);
   for (const r of LINT_RULES) assert.match(r.says, /^[A-Z].*\.$/), assert.doesNotMatch(r.says, /—/);

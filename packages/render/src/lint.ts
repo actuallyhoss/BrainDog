@@ -31,6 +31,9 @@
  *
  * THE PRINT RULES OF THE WORDS (EXP-B07 job 3) sit beside the drawing rules. `long-dash` in the scope is `em-dash`
  * here, the rule that was already the page's; it keeps its name, since the sign and the gates already say it.
+ *
+ * MONEY IS WRITTEN ONE WAY (EXP-B06): `two-spellings` finds one currency drawn by its sign and by its code in one part,
+ * "E£1,086,213" beside "EGP 1,238,407.62" on his Today, and one amount written with and without its minor digits.
  */
 
 import { holeLabel } from './html.ts';
@@ -46,6 +49,7 @@ export type LintRule =
   | 'icon-word'
   | 'only-a-dash'
   | 'cut-money'
+  | 'two-spellings'
   | 'em-dash'
   | 'plain-words'
   | 'system-word'
@@ -145,6 +149,9 @@ function viewOf(part: LintPart): View {
   });
   /* A bar's hole row (`data-hole`) is not one: it is the bucket a person sorts, such as Uncategorised, and it prints
      its amount. Its value is a placeholder only when it is a path with no answer, and that is the hole lifted above. */
+  /* AN AMOUNT'S CODE IS PART OF ITS FIGURE: a drawer sets it quieter in a span of its own (`amount-code`, `bd-code`), and
+     read as a line apart, "EGP" and "1,200" would be two words and never one amount. */
+  html = html.replace(/<span\b[^>]*\bclass="(?:[^"]*\s)?(?:amount-code|bd-code)(?=[\s"])[^"]*"[^>]*>([^<]*)<\/span>/gi, '$1');
   html = html.replace(/<span\b([^>]*\bclass="(?:[^"]*\s)?missing(?=[\s"])[^"]*"[^>]*)>[\s\S]*?<\/span>/gi, () => {
     view.dashes++;
     return '\n';
@@ -232,6 +239,74 @@ const CUT_MONEY = [
   new RegExp(`(?:${SYMBOL}|€)\\s?\\d[\\d,.]*\\s?(?:…|\\.\\.\\.)`, 'g'),
   new RegExp(`(?:${SYMBOL})\\s?\\d{1,3}(?:,\\d{3})*,\\d{1,2}(?![\\d,])`, 'g'),
 ];
+
+/* ── one currency, one spelling (`two-spellings`) ─────────────────────────────────────────────────────────── */
+
+/* A figure's digits, grouped or not, with its fraction: "1,200.50", "1200". A comma or a full stop after it is the sentence's. */
+const DIGITS = '\\d+(?:,\\d+)*(?:\\.\\d+)?';
+/* A sign in front of a figure (`£12`, `E£1,070`, `CA$4`), and the code after it when the figure carries one (`$4,800 USD`). */
+const SIGNED = new RegExp(`(?<![\\p{L}\\p{N}])([A-Z]{0,2}\\p{Sc})\\s?(${DIGITS})(?:\\s([A-Z]{3})(?!\\p{L}))?`, 'gu');
+/* A code in front of a figure, the minus between them or in front: `EGP 1,200`, `−EGP 497.26`. */
+const CODED = new RegExp(`(?<![\\p{L}\\p{N}])([A-Z]{3})\\s[−-]?(${DIGITS})(?![\\d,]*\\d)`, 'gu');
+
+/** How English writes a currency in one display, or `''` for a code the runtime will not format. */
+const display = (code: string, currencyDisplay: 'symbol' | 'narrowSymbol'): string => {
+  try {
+    return new Intl.NumberFormat('en', { style: 'currency', currency: code, currencyDisplay }).formatToParts(0).find((p) => p.type === 'currency')?.value ?? '';
+  } catch {
+    return '';
+  }
+};
+let tender: Intl.DisplayNames | undefined;
+/** Three capitals the runtime names as a currency. "THE 100" and "USB 3" are words. */
+const isTender = (code: string): boolean => (tender ??= new Intl.DisplayNames('en', { type: 'currency', fallback: 'none' })).of(code) !== undefined;
+let owners: Map<string, string> | undefined;
+/** The currency whose own sign this is, as English writes it (`£` is sterling's, `$` the US dollar's), or none (`E£`). */
+const ownerOf = (sign: string): string | undefined =>
+  (owners ??= new Map(Intl.supportedValuesOf('currency').map((c) => [display(c, 'symbol'), c] as const).filter(([s, c]) => s !== c && /\p{Sc}/u.test(s)))).get(sign);
+/**
+ * Whether a sign alone in front of a figure is this currency. `£` is sterling. `$` alone is the US dollar's and never the
+ * Canadian's, which the writer draws "$4 CAD". `E£`, nobody's own, is the pound of the currency it is the short form of.
+ */
+const signFor = (sign: string, code: string): boolean => {
+  const owner = ownerOf(sign);
+  return owner !== undefined ? owner === code : display(code, 'narrowSymbol') === sign;
+};
+
+/**
+ * Each currency written two ways in one part, and each amount written with and without its minor digits there. Three
+ * spellings of a currency are told apart: its code in front ("EGP 12"), its sign with the code after ("£4 GBP"), and its
+ * sign alone ("£12"). One part holding two of them for one currency is a hit, and so is "£12" beside "£12.00". A rounded
+ * headline beside the exact figure ("£1,086,213" and "£1,086,213.41") is two amounts, each written its own way, and is not.
+ */
+function twoSpellings(lines: readonly string[]): Hit[] {
+  const ways = new Map<string, Set<string>>();
+  const bare = new Set<string>();
+  const minor = new Map<string, Set<boolean>>();
+  const way = (code: string, how: string): void => void (ways.get(code) ?? ways.set(code, new Set()).get(code)!).add(how);
+  const figure = (key: string, digits: string): void => {
+    const [whole, fraction] = digits.split('.');
+    if (fraction !== undefined && !/^0+$/u.test(fraction)) return;
+    const at = `${key} ${whole}`;
+    (minor.get(at) ?? minor.set(at, new Set()).get(at)!).add(fraction !== undefined);
+  };
+  for (const line of lines) {
+    for (const m of line.matchAll(SIGNED)) {
+      const [, sign, digits, code] = m as unknown as [string, string, string, string | undefined];
+      if (code !== undefined && isTender(code)) way(code, 'sign and code'), figure(`${sign} ${code}`, digits);
+      else bare.add(sign), figure(sign, digits);
+    }
+    for (const m of line.matchAll(CODED)) {
+      const [, code, digits] = m as unknown as [string, string, string];
+      if (isTender(code)) way(code, 'code'), figure(code, digits);
+    }
+  }
+  for (const sign of bare) for (const code of ways.keys()) if (signFor(sign, code)) way(code, 'sign');
+  return [
+    ...[...ways].filter(([, how]) => how.size > 1).map(([code]) => ({ raw: code, label: '' })),
+    ...[...minor].filter(([, both]) => both.size > 1).map(([at]) => ({ raw: at, label: '' })),
+  ];
+}
 /**
  * THE WORDS A PERSON NEVER READS ON A PAGE, as `tools/gates/words.json` lists them (its entries whose `page` names a
  * rule), each with the name a finding says and the rule that reads it: `plain-words` for the machinery's nouns for a
@@ -411,6 +486,14 @@ const RULES: readonly RuleSpec[] = [
     says: 'An amount cut off part way through its number.',
     find: (v) => taken(v.lines, CUT_MONEY),
     said: (n) => many(n, 'Cuts an amount off part way through its number.', 'Cuts # amounts off part way through their numbers.'),
+  },
+  {
+    rule: 'two-spellings',
+    copy: false,
+    says: 'One currency written two ways in one place, by its sign and by its code, or one amount with and without the digits after its point.',
+    /* In his own words, only a figure slot: how he writes money in a note is his. */
+    find: (v) => twoSpellings(v.part.theirs ? v.figures : v.lines),
+    said: () => 'Money is written two ways here. Write every amount the same way.',
   },
   {
     rule: 'em-dash',

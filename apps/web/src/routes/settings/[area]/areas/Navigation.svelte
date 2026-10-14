@@ -12,7 +12,9 @@
   import { copy } from '$lib/copy.ts';
   import { said as voiceSaid } from '$lib/voice.svelte.ts';
   import { navShapeSignals, recommendNavShape, type NavShape } from '$lib/design/nav-shape.ts';
-  import { glyphOf, iconOf, iconOffers, shapeOffer, waiting, type HeldList, type HeldPage, type Offer, type PenItem } from '$lib/design/pen.ts';
+  import { glyphOf, iconOf, penCount, shapeOffer, waiting, type Offer, type PenItem } from '$lib/design/pen.ts';
+  import { cardWords, todayOf } from '$lib/decide/card.ts';
+  import { shortDay } from 'braindog-render';
   import { penWords } from '$lib/design/words.ts';
   import type { Undone } from '$lib/design/keep.ts';
   import { forget } from '$lib/record/boot-live.ts';
@@ -47,9 +49,6 @@
     none: 'No pages in your nav yet',
     noneWhy: 'Pages arrive with the add-ons you turn on, and with the pages you make.',
   };
-
-  /* THE MOST LISTS WHOSE ICON IS READ FOR AN OFFER, one `schema` read each, the record's own cap on the pen. */
-  const ICON_LISTS_MOST = 24;
 
   /** A refusal is the record's own sentence, and a change it kept is said only once it kept it. */
   const said = (saved: Saved, done?: string) => {
@@ -120,10 +119,11 @@
   }
 
   /**
-   * THE DESIGN AGENT'S NAVIGATION RECOMMENDATION, one more offer in the pen (`nav-shape.ts`, rules unchanged).
+   * THE DESIGN AGENT'S NAVIGATION RECOMMENDATION, the one offer the browser may add (`nav-shape.ts`), and only while the
+   * record sends no shape of its own (`waiting`). Icons and every other kind are the record's to offer.
    *
-   * It is made here and not by the record because it reads the screen as well as the record: below 900px the tab bar is
-   * drawn whatever is chosen, so it answers nothing there. It is compared with the shape set now, so choosing the
+   * It reads the screen as well as the record: below `SHAPE_MIN_WIDTH` the tab bar is drawn whatever is chosen, so it
+   * answers nothing there. It is compared with the shape set now, so choosing the
    * recommended shape by hand makes the offer go on its own rather than nag about a choice just made.
    *
    * THE SHAPE SOMEBODY CHOSE, NOT THE ONE DRAWN (`navPrefs.chosen`). The drawn shape is the rail for a record that never
@@ -142,49 +142,6 @@
   );
   const shapeRow = $derived(navRec === null ? null : shapeOffer(navRec, copy.navShapeRecommend));
 
-  /**
-   * AN ICON FOR EVERY RAIL PAGE AND LIST THAT HAS NONE, read from the glyph set (`pen.ts` `iconOffers`).
-   *
-   * READ HERE, AND ONLY FOR AN OWNER ON A RECORD WITH THE SWITCH ON. Keeping one writes a declaration, which only an owner
-   * may do, and the whole bodies it needs are one `pages` read and one `schema` read per list, which is not a cost every
-   * screen of the shell should pay for a list nobody is looking at.
-   */
-  let icons = $state<PenItem[]>([]);
-  $effect(() => {
-    const lists = shell.index.registers.slice(0, ICON_LISTS_MOST).map((r) => ({ id: r.id, name: r.name }));
-    if (!navPrefs.suggest || !shell.me.owner || !shell.live) {
-      icons = [];
-      return;
-    }
-    let current = true;
-    void readIcons(lists)
-      .then((got) => {
-        if (current) icons = got;
-      })
-      .catch(() => {
-        /* An icon offer that cannot be read is an offer not made, which is the direction to fail in. */
-      });
-    return () => {
-      current = false;
-    };
-  });
-
-  async function readIcons(lists: readonly { id: string; name: string }[]): Promise<PenItem[]> {
-    const base = apiBase();
-    const [{ pagesReader }, { createClient }] = await Promise.all([import('$lib/record/pages-live.ts'), import('@braindog/client')]);
-    const client = createClient({ base });
-    const [read, schemas] = await Promise.all([
-      pagesReader(base).read(),
-      Promise.all(lists.map((l) => client.schema(l.id).catch(() => null))),
-    ]);
-    const pages: HeldPage[] = read.from === 'live' ? read.pages.map((p) => ({ slug: p.slug, title: p.title, body: { ...p.body } })) : [];
-    const held: HeldList[] = lists.flatMap((l, i) => {
-      const out = schemas[i];
-      return out?.ok && out.value !== null && typeof out.value === 'object' ? [{ id: l.id, name: l.name, body: { ...(out.value as Record<string, unknown>) } }] : [];
-    });
-    return iconOffers(pages, held, penWords.iconWhy);
-  }
-
   /* KEPT IN THIS VISIT, each with the one call that puts it back. The record stops offering a kept item on the next
      `boot`, so without this the row and its Put back would vanish together. */
   type KeptRow = { item: PenItem; putBack: () => Promise<Undone>; busy: boolean };
@@ -192,12 +149,23 @@
   /* ONE KEEP AT A TIME, so a double press writes once. */
   let keeping = $state<string | null>(null);
 
-  const offers = $derived(
-    navPrefs.suggest ? waiting(shapeRow, shell.pen, icons, (id) => navPrefs.isDismissed(id) || kept.some((k) => k.item.id === id)) : [],
-  );
+  /* ONE COUNT (ENG-B14): the list and its number read the same three inputs, so they cannot say two things. */
+  const gone = (id: string): boolean => navPrefs.isDismissed(id) || kept.some((k) => k.item.id === id);
+  const offers = $derived(navPrefs.suggest ? waiting(shapeRow, shell.pen, gone) : []);
+  const waitingCount = $derived(navPrefs.suggest ? penCount(shell.pen, shapeRow, gone) : 0);
   const idOf = (o: Offer): string => (o.from === 'shape' ? o.id : o.item.id);
   const titleOf = (o: Offer): string => (o.from === 'shape' ? o.title : o.item.title);
   const whyOf = (o: Offer): string => (o.from === 'shape' ? `${navShapeLabel(o.shape)}. ${o.why}` : o.item.why);
+  /**
+   * THE DAY AN OFFER STOPS WAITING, in Decide's own words ("Waits until 27 Oct", `card.ts`), on the reader's own calendar:
+   * a day already come is said as today. The browser's shape, and an offer from a host older than `lapses`, say nothing.
+   */
+  const lapseOf = (o: Offer): string | null => {
+    const last = o.from === 'change' ? o.item.lapses : undefined;
+    if (last === undefined) return null;
+    const today = todayOf(Date.now());
+    return last <= today ? cardWords.lapsesToday : cardWords.lapses(shortDay(last, today));
+  };
 
   /**
    * "Keep it": the offer's whole declaration, written by the owner (`keep.ts`), or for the shape, `nav.shape` set.
@@ -414,7 +382,7 @@
   THE HOLDING PEN. Every offer, whatever its kind, is one row: what it is, one sentence of why, and three presses, "Show
   it", "Keep it" and "Not this one". Nothing in it is ever applied without the second (`19 §3`).
 -->
-<Section title={copy.suggested} count={navPrefs.suggest ? offers.length : 0}>
+<Section title={copy.suggested} count={waitingCount}>
   {#if !navPrefs.suggest}
     <!-- NOT `no-data-yet`, WHICH WOULD BE A LIE ABOUT THE RECORD. `19 §6` separates the empty states precisely so that
          "nothing has happened yet" and "you turned this off" cannot read the same. -->
@@ -451,6 +419,7 @@
               <span class="line-main">
                 <span class="line-title">{titleOf(o)}</span>
                 <span class="line-detail">{whyOf(o)}</span>
+                {#if lapseOf(o) !== null}<span class="line-detail pen-lapse">{lapseOf(o)}</span>{/if}
               </span>
               <span class="line-amount"></span>
               <span class="line-when pen-acts">

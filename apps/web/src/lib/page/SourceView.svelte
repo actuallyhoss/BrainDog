@@ -25,9 +25,16 @@
   (`lib/dog/open.ts`). It writes nothing: the page is drawn from it, what differs from the record's text is listed under
   the box by the `diff` kind's drawer, and Apply is still the one write. A file that does not read as this page is
   refused in a sentence and the box is left as it was.
+
+  AND A READER WHO MAY NOT APPLY PROPOSES. `setDeclaration` is the owner's, so for anybody else the primary button reads
+  "Propose this change" and files the whole declaration as one change on Decide (`lib/dog/propose.ts`). After the press
+  it is a link to that question, reading "On Decide", until the text is changed again; a refusal is the record's own
+  sentence, said where Apply's would be.
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
+  import { page } from '$app/state';
+  import { createClient } from '@braindog/client';
   import { apiBase } from '../at.ts';
   import { read } from '$lib/data/read.svelte.ts';
   import { sourceOf } from '$lib/dog/read.ts';
@@ -35,6 +42,7 @@
   import '@braindog/skin/kinds/diff.css';
   import { Diff } from 'braindog-render/svelte';
   import { OPEN_ACCEPT, diffBlock, diffLines, openText, openWords } from '$lib/dog/open.ts';
+  import { proposePage, proposeWords, type Call } from '$lib/dog/propose.ts';
   import { dogName, dogText, saveDog, type PageBody as Body } from '$lib/dog/source.ts';
   import { copy } from '$lib/copy.ts';
   import type { Opened } from '$lib/record/page-live.ts';
@@ -105,7 +113,9 @@
   /** Why the text was not written, and the line it is about where it names one. */
   let fault = $state<{ fix: string; line: number | null } | null>(null);
   /** The write in flight, so a second press writes nothing and the pressed button says what it is doing. */
-  let busy = $state<'apply' | 'back' | null>(null);
+  let busy = $state<'apply' | 'back' | 'propose' | null>(null);
+  /** The question a press filed, and the text it filed, so the link stands only while the box still says that. */
+  let filed = $state<{ question: string; text: string } | null>(null);
   /** The versions the record keeps of this page, newest first, which History draws. None where the record lists none. */
   let versions = $state<PageVersion[]>([]);
   /** The version History is putting back now, which says so on its own button. */
@@ -132,6 +142,7 @@
       fault = null;
       opened = null;
       unopened = null;
+      filed = null;
       void readVersions();
     });
   });
@@ -145,6 +156,12 @@
   }
 
   const changed = $derived(held !== null && text !== held.text);
+  /* WHO MAY APPLY: the owner, whom the shell says is one (`me.owner`, or `me.level` spelt out, as `ownsRecord` reads
+     them). A tab with no shell to say asks the record, which refuses Apply in its own words, as it always has. */
+  const me = $derived(page.data.me as { owner?: boolean; level?: string } | undefined);
+  const mayApply = $derived(me === undefined || me.owner === true || me.level === 'owner');
+  /** The question this text waits as on Decide, or `null` once the text says anything else. */
+  const onDecide = $derived(filed !== null && filed.text === text ? filed.question : null);
   const list = $derived(held ? templateList(held.body) : null);
   /** The rows the box opens with: the whole text up to a screenful, so a short page is not a short box with a scrollbar. */
   const rows = $derived(Math.min(Math.max(text.split('\n').length + 1, 12), 40));
@@ -273,6 +290,23 @@
       return;
     }
     point({ fix: out.fix, line: out.from === 'refused' ? lineOf(typed, out.at) : null });
+  }
+
+  /* PROPOSING WRITES NOTHING ON THE PAGE: it files the text, read as Apply reads it, as one question, against the version
+     it was read at. The box keeps what was typed, so the reader sees what they sent beside the link to it. */
+  async function propose() {
+    if (busy || !held) return;
+    const checked = checkSource(text);
+    if (!checked.ok) return point({ fix: checked.fix, line: checked.line });
+    const typed = text;
+    const name = typeof checked.body.page === 'string' ? checked.body.page : slug;
+    const call = createClient({ base: apiBase() }).call as unknown as Call;
+    busy = 'propose';
+    const out = await proposePage(call, { id: `page.${name}`, kind: 'page', body: checked.body }, undefined, held.version);
+    busy = null;
+    if (!out.ok) return point({ fix: out.fix, line: null });
+    fault = null;
+    filed = { question: out.question, text: typed };
   }
 
   /* PUT BACK IS A WRITE LIKE APPLY, against the version Apply made, so a page somebody changed again meanwhile is
@@ -414,9 +448,19 @@
           {#if changed}
             <Button weight="quiet" disabled={busy !== null} onclick={discard}>{sourceWords.discard}</Button>
           {/if}
-          <Button weight="primary" disabled={busy !== null || !changed} onclick={() => void apply()}>
-            {busy === 'apply' ? sourceWords.applying : list ? sourceWords.applyTemplate(list) : sourceWords.apply}
-          </Button>
+          {#if mayApply}
+            <Button weight="primary" disabled={busy !== null || !changed} onclick={() => void apply()}>
+              {busy === 'apply' ? sourceWords.applying : list ? sourceWords.applyTemplate(list) : sourceWords.apply}
+            </Button>
+          {:else if onDecide}
+            <!-- THE QUESTION IT FILED, one press away, and what waiting means said beside it. -->
+            <span class="source-note" id="{uid}-filed">{proposeWords.onDecideNote}</span>
+            <Button weight="primary" href="/decide/{encodeURIComponent(onDecide)}" aria-describedby="{uid}-filed">{proposeWords.onDecide}</Button>
+          {:else}
+            <Button weight="primary" disabled={busy !== null || !changed} onclick={() => void propose()}>
+              {busy === 'propose' ? proposeWords.proposing : proposeWords.propose}
+            </Button>
+          {/if}
         </div>
         {#if difference}
           <!-- UNDER THE BOX AND ITS BUTTONS, QUIET: the lines taken out and put in against what the record holds, each
@@ -584,6 +628,7 @@
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-end;
+    align-items: center;
     gap: var(--sp-3);
   }
 

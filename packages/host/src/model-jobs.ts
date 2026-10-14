@@ -90,7 +90,7 @@ export type AskSpends = 'person' | 'background' | 'none';
 /** The kernel's job for a doubtful pair (`loop/contract-17.md`), migration 23's kind in `OUTBOX_KINDS`. */
 const RESOLVE: OutboxKind = 'infer.resolve';
 
-/** How many arrivals of one shape a finding's pattern is drafted from, newest first and handed over oldest first. */
+/** How many arrivals of one shape a finding's pattern is drafted from, the oldest of them, handed over oldest first. */
 const SHAPE_SAMPLES_MOST = 5;
 
 /** How far back through the inbox a shape's samples are looked for: five pages of 200, as `slashSamplesOf` walks. */
@@ -455,27 +455,29 @@ function payloadOf(job: OutboxRow): Record<string, unknown> | null {
 }
 
 /**
- * The newest arrivals still waiting whose shape is `shape`, oldest first, as `ingest.ts` `propose` orders its examples.
+ * The oldest arrivals still waiting whose shape is `shape`, oldest first, and how many of the shape wait.
  *
  * THE SHAPE IS THE KERNEL'S OWN `shapeOf`, over the same `from` and `to` headers the ingest keyed the finding by, so the
  * pass and the observation cannot come to disagree about which arrivals belong to it.
  */
-async function samplesOfShape(api: ModelJobsApi, shape: string): Promise<Result<DraftSample[]>> {
+async function samplesOfShape(api: ModelJobsApi, shape: string): Promise<Result<{ samples: DraftSample[]; waiting: number }>> {
   const found: DraftSample[] = [];
+  let waiting = 0;
   let cursor: number | undefined;
-  for (let page = 0; page < SHAPE_PAGES && found.length < SHAPE_SAMPLES_MOST; page++) {
+  for (let page = 0; page < SHAPE_PAGES; page++) {
     const read = await api.inbox({ state: 'untriaged', limit: 200, ...(cursor === undefined ? {} : { cursor }) }, RECORD_CTX);
     if (!read.ok) return read;
     for (const a of read.value.arrivals) {
-      if (found.length >= SHAPE_SAMPLES_MOST) break;
       const channel = a.channel as DraftSample['channel'];
       if (shapeOf(channel as Parameters<typeof shapeOf>[0], { from: a.from, to: a.to }) !== shape) continue;
       found.push({ id: a.id, channel, ts: a.ts, from: a.from === '' ? null : a.from, subject: a.subject === '' ? null : a.subject, body: a.body ?? '' });
+      waiting++;
+      if (found.length > SHAPE_SAMPLES_MOST) found.shift();
     }
     if (read.value.cursor === null) break;
     cursor = read.value.cursor;
   }
-  return { ok: true, value: found.reverse() };
+  return { ok: true, value: { samples: found.reverse(), waiting } };
 }
 
 /**
@@ -505,9 +507,14 @@ async function settleDraft(api: ModelJobsApi, inference: ModelJobInference, job:
   if (p === null) return { state: 'done' };
 
   let samples: Result<DraftSample[]>;
+  let waiting: number | undefined = typeof p.waiting === 'number' && Number.isSafeInteger(p.waiting) && p.waiting > 0 ? p.waiting : undefined;
   if (Array.isArray(p.examples) && p.examples.every((id) => typeof id === 'string' && id !== ''))
     samples = await slashSamplesOf(api, p.examples as string[], RECORD_CTX);
-  else if (p.signal === 'ingest.unmatched' && typeof p.subject === 'string') samples = await samplesOfShape(api, p.subject);
+  else if (p.signal === 'ingest.unmatched' && typeof p.subject === 'string') {
+    const shaped = await samplesOfShape(api, p.subject);
+    samples = shaped.ok ? { ok: true, value: shaped.value.samples } : shaped;
+    if (shaped.ok) waiting = shaped.value.waiting;
+  }
   else if (typeof p.signal === 'string') {
     log(`model job ${job.id}: noticed, and nothing to ask: ${findingReading(p)}`);
     return { state: 'done' };
@@ -530,7 +537,9 @@ async function settleDraft(api: ModelJobsApi, inference: ModelJobInference, job:
   }
   if (clean.length === 0) return { state: 'done' };
 
-  const out = await inference.draft(clean);
+  /* THE THREE OLDEST OF HOW MANY WAIT (ENG-B07): the engine sends the oldest three by `ts` and names the count; the
+     kernel's payload says `waiting` (`ingest.ts` `propose`), and a shape read here counts its own. */
+  const out = await inference.draft(clean, waiting);
   if (out.ok) return { state: 'done', result: out.value };
   /* A DRAFT THE ENGINE'S CHECKS REFUSED IS NOT RETRIED: the same samples would draft the same refusal, billed twice. */
   log(`model job ${job.id}: ${fixOf(out)}`);

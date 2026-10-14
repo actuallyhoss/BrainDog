@@ -625,7 +625,7 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
     const proposing = core.reserve(
       'propose',
       s0.tier,
-      s0.tier === 'a' ? PROMPTS.propose.model : (s0.model ?? PROMPTS.propose.model),
+      s0.model ?? PROMPTS.propose.model,
       PROPOSED,
       askId === undefined ? undefined : `${askId}:propose`,
     );
@@ -692,7 +692,7 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
       id: 'propose',
       slots: { '%INDEX%': indexLines(it.shown), '%FIGURES%': figureLines(it.readings, it.sums), '%QUESTION%': asked },
       inference: proposer.inference,
-      model: s.tier === 'a' ? undefined : (s.model ?? undefined),
+      model: s.model ?? undefined,
       trim: {
         slot: '%ROWS%',
         lines: printRows(it.rows),
@@ -1254,7 +1254,7 @@ export const setups = (core: Core, fallback: Inference): Setups => {
   ): Promise<Result<{ value: Record<string, unknown>; by: string }>> => {
     const s = core.settings();
     const template = PROMPTS[id];
-    const model = s.tier === 'a' ? template.model : (s.model ?? template.model);
+    const model = s.model ?? template.model;
     const held = core.reserve('read', s.tier, model, charge);
     try {
       const named = naming(inference ?? fallback);

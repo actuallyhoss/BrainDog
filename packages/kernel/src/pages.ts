@@ -23,7 +23,7 @@ import type { Leaf, Predicate, Schema } from '@braindog/where';
 
 import type { ActionRow } from './actions.ts';
 import type { Exception } from './exceptions.ts';
-import { ANSWER_KEYS, BLOCK_READS, FILTER_TYPES, blockKeyOf, feedSaysFault, forecastAxisFault, keyedBlocks, kindsReading, wrongKindKey } from './block-keys.ts';
+import { ANSWER_KEYS, BLOCK_READS, FILTER_TYPES, WHEN_DEPTH, blockKeyOf, feedSaysFault, forecastAxisFault, keyedBlocks, kindsReading, noteSaysFault, whenJoin, whenTreeFault, wrongKindKey } from './block-keys.ts';
 import { GROUPED_BY_FIELD, applyLook, composeLook, lookOf, mergeLook, type LookBody } from './compose.ts';
 import { HANDOFFS_OPEN, RECORD_ACTIVITY, builtInFigure, type OpenStep } from './built-in-figures.ts';
 import type { ActionBlocking } from './signs-actions.ts';
@@ -60,12 +60,27 @@ import { localDays } from './measures.ts';
 /** One test of one figure in a block's `when:`: the figure, and the one of `empty`, `beyond` or a comparison it is held to. */
 export type WhenLeaf = { metric: string; empty?: boolean; beyond?: boolean; gt?: number; gte?: number; lt?: number; lte?: number; is?: number; not?: number };
 
-/** The leaves of a `when:`, whether it is written as one or as `all:` of several. Anything that is not a leaf is left out. */
-export function whenLeaves(when: PageBlock['when']): WhenLeaf[] {
-  if (!when || typeof when !== 'object') return [];
-  const said = Array.isArray((when as { all?: unknown }).all) ? (when as { all: unknown[] }).all : 'all' in when ? [] : [when];
-  return said.filter((leaf): leaf is WhenLeaf => leaf !== null && typeof leaf === 'object' && typeof (leaf as WhenLeaf).metric === 'string');
+/**
+ * A block's `when:`: one leaf, or `all:` (every one holds) or `any:` (one does) of two or more, each a leaf or one join of
+ * leaves. Two levels deep at most (`block-keys.ts` `WHEN_DEPTH`).
+ */
+export type WhenTree = WhenLeaf | { all: WhenTree[] } | { any: WhenTree[] };
+
+/**
+ * The leaves of a `when:`, however it is joined, each once in the order written. Anything that is not a leaf is left
+ * out, and so is anything deeper than a `when:` may go, which never holds (`whenHolds`).
+ */
+export function whenLeaves(when: PageBlock['when'] | unknown, depth = 1): WhenLeaf[] {
+  if (!when || typeof when !== 'object' || depth > WHEN_DEPTH + 1) return [];
+  const join = whenJoin(when);
+  if (join === 'both') return [];
+  if (join === null) return typeof (when as WhenLeaf).metric === 'string' ? [when as WhenLeaf] : [];
+  const list = (when as Record<string, unknown>)[join];
+  return Array.isArray(list) ? list.flatMap((part) => whenLeaves(part, depth + 1)) : [];
 }
+
+/** One sentence of a note's `says:`: the condition it is said under, absent on the last, its words and its tone. */
+export type SaysLine = { when?: WhenTree; body: string; tone?: 'good' | 'warn' | 'bad' | 'info' };
 
 export type PageBlock = {
   kind: string;
@@ -177,8 +192,15 @@ export type PageBlock = {
      has one (PGS-C06): the one test a figure with nothing in it meets. */
   /* `beyond: true` holds while the reading carries `beyond` (`money-figures.ts` `beyondOf`): a walk to zero that looked
      as far as it walks and never went under, which has no value and so meets no comparison. `all:` is two or more
-     leaves, and the block draws only while every one holds. */
-  when?: WhenLeaf | { all: WhenLeaf[] };
+     leaves, and the block draws only while every one holds; `any:` is two or more, and it draws while one does. Either
+     may hold one join of the other kind, and no deeper (PGS-A13). */
+  when?: WhenTree;
+  /**
+   * A `note`'s sentences, read top to bottom: the first whose `when:` holds is the note's body, its `{{path}}` holes
+   * filled as any body's are, and its `tone` the block's. The last has no `when` and is the calm line, so every reader
+   * of the page is said the same sentence. Never beside `body:` (`block-keys.ts` `noteSaysFault`).
+   */
+  says?: SaysLine[];
   /** A `series`'s lines: figures grouped by one date bucket, and how many buckets back and ahead it draws. */
   series?: SeriesLine[];
   back?: number;
@@ -294,6 +316,15 @@ export type PageDecl = {
 
 export type BlockResult = PageBlock & {
   /**
+   * A note with `says:`: which of its sentences was said, counted from 0. Its words are the answer's `body` and its tone
+   * the answer's `tone`, so a host draws the note as it draws any other (`saidLine`).
+   */
+  says_at?: number;
+  /** A note with `says:`: the said sentence's words, its holes still to be filled from `values`. */
+  body?: string;
+  /** A note with `says:`: the said sentence's tone, when it has one. */
+  tone?: 'good' | 'warn' | 'bad' | 'info';
+  /**
    * The rows the block draws, cut to `limit`, each with every field it holds and a long text cut short (`leanRows`). A
    * row that says `clipped` holds less than the whole of one of its texts, and a reader that edits it reads it whole
    * first. A `section` sends none: what it draws of them is `matched`.
@@ -345,6 +376,11 @@ export type BlockResult = PageBlock & {
    * nought. `null` for a card whose figure has nothing in the buckets drawn, which draws no line.
    */
   trends?: ((number | null)[] | null)[];
+  /**
+   * A `cards` block's with a column `{ metric, as: when }`: that figure for each card, its one number and whether it
+   * met its target, aligned with `rows`. `null` for a card whose figure reads nothing, which draws no line.
+   */
+  whens?: ({ value: number; met: boolean | null } | null)[];
   /** A `steps` block's over a list that declares `steps:`: whether each row is done, aligned with `rows`. */
   done_now?: boolean[];
   /** And the index in `rows` of the first row not done, `null` when every row is. */
@@ -1854,14 +1890,38 @@ function narrowed(deps: PageDeps, block: PageBlock, clauses: ReadonlyMap<string,
  * not draw, because the author meant something and the block waits until they say what.
  */
 function drawnWhen(deps: PageDeps, block: PageBlock): boolean {
-  const when = block.when;
-  if (!when) return true;
-  /* TWO TESTS ARE ONE CONDITION: `all:` draws only while every leaf holds, and a leaf that cannot be read fails it as it
-     fails alone. A leaf that is not a leaf (`whenLeaves` leaves it out) fails it too, so an `all` never draws on less
-     than it says. */
-  const leaves = whenLeaves(when);
-  if ('all' in when) return leaves.length >= 2 && leaves.length === when.all.length && leaves.every((leaf) => leafHolds(deps, leaf));
-  return leaves.length === 1 && leafHolds(deps, leaves[0]!);
+  return !block.when || whenHolds(deps, block.when);
+}
+
+/**
+ * Whether a `when:` holds: a leaf of its figure, `all:` of every part, `any:` of one.
+ *
+ * TWO TESTS ARE ONE CONDITION: `all:` holds only while every part holds, and a leaf that cannot be read fails it as it
+ * fails alone. `any:` holds while one part does, so a figure that cannot be read is one part that does not, and the
+ * others still say. A WHEN WHOSE SHAPE THE INSTALL WOULD REFUSE NEVER HOLDS, whatever its parts read (`whenTreeFault`):
+ * a join of fewer than two parts, one that says both words, a join inside the same join, a part that names no figure,
+ * and anything deeper than `WHEN_DEPTH`. So an `any` never draws on less than it says either, on a page installed
+ * before it could be refused.
+ */
+export function whenHolds(deps: PageDeps, when: unknown): boolean {
+  return whenTreeFault(when, 'when') === null && treeHolds(deps, when);
+}
+
+/** Whether a `when:` of a shape already checked holds: a leaf of its figure, `all:` of every part, `any:` of one. */
+function treeHolds(deps: PageDeps, when: unknown): boolean {
+  const join = whenJoin(when);
+  if (join === null) return leafHolds(deps, when as WhenLeaf);
+  const parts = (when as Record<string, unknown[]>)[join]!;
+  return join === 'all' ? parts.every((part) => treeHolds(deps, part)) : parts.some((part) => treeHolds(deps, part));
+}
+
+/**
+ * The sentence of a note's `says:` that is said: the first whose `when:` holds, read top to bottom, or the last, which
+ * has none. The shape is checked first (`noteSaysFault`), so there is a last and it always says.
+ */
+function saidLine(deps: PageDeps, says: readonly SaysLine[]): { at: number; line: SaysLine } {
+  const at = says.findIndex((line, i) => i === says.length - 1 || (line.when !== undefined && whenHolds(deps, line.when)));
+  return { at, line: says[at]! };
 }
 
 /** Whether one leaf of a `when:` holds of the figure it names. */
@@ -1926,6 +1986,12 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
      declares and never carried past a read that filled nothing. */
   if (block !== null && typeof block === 'object' && Object.hasOwn(block, 'read_as')) {
     const { read_as: _earlier, ...rest } = block as PageBlock & { read_as?: unknown };
+    block = rest as PageBlock;
+  }
+  /* AND SO IS THE SENTENCE A NOTE'S `says:` WAS ANSWERED WITH (`saidLine`): a note handed in again with the body the read
+     wrote beside its `says_at` is read without both, so it chooses again rather than being refused for a body. */
+  if (block !== null && typeof block === 'object' && Object.hasOwn(block, 'says_at') && Object.hasOwn(block, 'says')) {
+    const { says_at: _said, body: _words, ...rest } = block as PageBlock & { says_at?: unknown; body?: unknown };
     block = rest as PageBlock;
   }
   try {
@@ -1998,7 +2064,7 @@ export type PageRow = Entry & {
 };
 
 /** The keys a block answers one to a row, which go with the rows a section does not send. */
-const ALIGNED = ['scopes', 'scope_marks', 'rings', 'nexts', 'trends', 'done_now', 'next', 'short_now', 'changes', 'working_now', 'quiet', 'files'] as const;
+const ALIGNED = ['scopes', 'scope_marks', 'rings', 'nexts', 'trends', 'whens', 'done_now', 'next', 'short_now', 'changes', 'working_now', 'quiet', 'files', 'helpers'] as const;
 
 /** A text cut at `ROW_TEXT_MOST` code points, or `null` when it is no longer than that. */
 function cutText(text: string): string | null {
@@ -2156,6 +2222,24 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
      matched nothing" are different facts and a renderer that cannot tell them apart draws the empty
      state of a block that was never meant to be on the page. */
   if (!drawnWhen(deps, block)) return { ...base, drawn: false, why: 'when' };
+
+  /* A NOTE THAT SAYS SEVERAL SENTENCES SAYS ONE (PGS-A13), the first whose `when:` holds, read here and not by each host,
+     so every reader of the page is said the same sentence: "3 questions wait for you" while they wait, and the calm line
+     only when nothing does. Its words become the body before the holes are filled, so they are filled as any body's
+     are, and its tone, when it has one, is the block's. A model's line put on a lead as `said` still wins over it, as it
+     wins over any body, because the record puts it on after this read. */
+  if (block.kind === 'note' && block.says !== undefined) {
+    const fault = noteSaysFault(block as unknown as Readonly<Record<string, unknown>>, 'This note');
+    if (fault) return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: fault.fix, at: fault.at, ...(fault.allowed ? { allowed: fault.allowed } : {}) }) };
+    const { at, line } = saidLine(deps, block.says);
+    const tone = line.tone ?? (block as { tone?: BlockResult['tone'] }).tone;
+    /* WITHOUT THE OTHER SENTENCES, so only the holes of the one said are read. */
+    const { says: _sentences, ...one } = block;
+    block = { ...one, body: line.body, ...(tone ? { tone } : {}) } as PageBlock;
+    base.body = line.body;
+    base.says_at = at;
+    if (tone) base.tone = tone;
+  }
 
   /* THE PAGE'S LIVE FIGURES ARE THE RECORD'S TO SAY, so the host does not answer them from a copy of
      its own. Only for a block that draws: a figure in a block that is not on the page is not read. */
@@ -2485,7 +2569,7 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
   const roled = roleFault(block, register, schema);
   if (roled) return { ...base, refusals: also(roled) };
   /* A CARD'S TREND IS A FIGURE, checked before any card reads it, so an unknown one is said once and not once a card. */
-  const trendFault = trendColumnFault(deps, block);
+  const trendFault = trendColumnFault(deps, block) ?? whenColumnFault(deps, block);
   if (trendFault) return { ...base, refusals: also(trendFault) };
 
   /* A SIGN IS READ FROM AN ENUM AND ONE OF ITS VALUES, or the figure would carry a sign nothing decides. */
@@ -2610,6 +2694,7 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
     ...ringsOf(deps, block, register, rows),
     ...nextsOf(deps, block, register, rows),
     ...trendsOf(deps, block, rows),
+    ...whensOf(deps, block, rows),
     ...(marks ? { done_now: marks, next: lead === undefined ? null : lead.at } : {}),
     ...(grouping && block.kind === 'cards' ? { fold: typeof block.fold === 'number' ? block.fold : CARD_FOLD } : {}),
     ...inShort,
@@ -2871,6 +2956,46 @@ function trendsOf(deps: PageDeps, block: PageBlock, rows: readonly Entry[]): { t
       const line = got.bars.values[0] ?? [];
       if (line.every((v) => v === null)) return null;
       return counted ? line.map((v) => v ?? 0) : line;
+    }),
+  };
+}
+
+/** A cards block's when column over a figure, or `undefined`. */
+const whenColumn = (block: PageBlock) => (block.kind === 'cards' ? block.columns?.find((c) => c.as === 'when' && typeof c.metric === 'string') : undefined);
+
+/**
+ * Why a card's when figure cannot be drawn, or `null`: no figure has the name, or it is grouped, so it is no one
+ * number a card. Asked of the declaration alone, before a card is read.
+ */
+function whenColumnFault(deps: PageDeps, block: PageBlock): Refusal | null {
+  const col = whenColumn(block);
+  if (!col) return null;
+  const { id } = trendNamed(col.metric!);
+  const decl = deps.metric(id);
+  if (!decl) return { code: 'METRIC_UNKNOWN', fix: `There is no figure called ${id} for a card's when to say.`, at: 'columns' };
+  if (decl.group_by !== undefined || decl.bucket !== undefined)
+    return { code: 'DECLARATION_INVALID', fix: `${id} is read in parts, so a card has no one number of it to say. Name a figure with no group_by.`, at: 'columns' };
+  return null;
+}
+
+/**
+ * EACH CARD'S WHEN (W096, REC-C16): the figure its when column names, with `{{field}}` filled from the card's own row,
+ * read once a card as the project page's own tile reads it, so "2 days" on a card and "Last worked 2 days" on the
+ * project's page are one reading. A card whose figure reads nothing, or is refused, draws no line, never nought.
+ */
+function whensOf(deps: PageDeps, block: PageBlock, rows: readonly Entry[]): { whens?: ({ value: number; met: boolean | null } | null)[] } {
+  const col = whenColumn(block);
+  if (!col) return {};
+  return {
+    whens: rows.map((row) => {
+      const filled = String(fill(col.metric!, row));
+      if (filled.includes('{{')) return null;
+      const { id, param } = trendNamed(filled);
+      const decl = deps.metric(id);
+      if (!decl) return null;
+      const read = deps.read(param === null ? decl : (fill(decl, null, param) as MetricDecl));
+      if (!read.ok || typeof read.value.value !== 'number' || !Number.isFinite(read.value.value)) return null;
+      return { value: read.value.value, met: read.value.met };
     }),
   };
 }
@@ -4370,8 +4495,10 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
       if (c !== null && typeof c === 'object' && typeof c.metric === 'string') addFigure(trendNamed(c.metric).id);
     /* A `when:` READS A FIGURE TOO, and a block that draws only when a number crosses a line is a
        statement about that number whether or not the block is on the page. */
-    /* EVERY LEAF'S, when it is `all:` of several: each is a statement about its own figure. */
-    for (const leaf of whenLeaves(block.when)) {
+    /* EVERY LEAF'S, when it is `all:` or `any:` of several: each is a statement about its own figure. AND EVERY SENTENCE'S
+       OF A NOTE'S `says:`, whichever is said: the one said tells the reader the others did not hold. */
+    const sentences = Array.isArray(block.says) ? block.says : [];
+    for (const leaf of [block.when, ...sentences.map((line) => (line !== null && typeof line === 'object' ? line.when : undefined))].flatMap((w) => whenLeaves(w))) {
       const at = leaf.metric.indexOf(':');
       addFigure(at < 0 ? leaf.metric : leaf.metric.slice(0, at));
     }
@@ -4469,7 +4596,9 @@ export function pathsOf(block: PageBlock, figure?: (id: string) => boolean, unfi
   /* AND A COLUMN'S LABEL IS READ AS A HEADING IS: `Open ({{tasks.open}})` over a column was drawn with the braces in
      it, because the heading above it was filled and the label beside it was never asked. */
   const labels = Array.isArray(block.columns) ? block.columns.map((c) => (c !== null && typeof c === 'object' ? (c as { label?: unknown }).label : undefined)) : [];
-  for (const text of [block.heading, (block as { body?: unknown }).body, block.empty, ...cells, ...notes, ...labels]) {
+  /* AND EVERY SENTENCE A NOTE'S `says:` MAY SAY, since any of them may be the body a reader sees. */
+  const sentences = Array.isArray(block.says) ? block.says.map((line) => (line !== null && typeof line === 'object' ? (line as { body?: unknown }).body : undefined)) : [];
+  for (const text of [block.heading, (block as { body?: unknown }).body, block.empty, ...cells, ...notes, ...labels, ...sentences]) {
     if (typeof text !== 'string') continue;
     /* CODE SPANS FIRST, as the renderer lifts them: a `{{…}}` in backticks is text, not a question. */
     const spanless = text.replace(/`[^`]*`/g, ' ');
@@ -5007,7 +5136,14 @@ function dayFieldOf(node: Predicate | undefined, schema: Schema): string | null 
  *   drops the clause (`leadOf`) as it does any figure it cannot read.
  */
 function rowsValue(deps: PageDeps, decl: MetricDecl, part: RowPart, field?: string): Json | undefined {
-  if (!decl.source.startsWith('register.') || !mayRead(deps, decl)) return undefined;
+  /* A FIGURE THAT SAYS ITS OWN NAMES (`TidyReading.names`, the tidy's `tidied-week` and `gone-stale`): its reading's words, for `.names` alone. */
+  if (!decl.source.startsWith('register.')) {
+    if (part !== 'names' || field !== undefined || !mayRead(deps, decl)) return undefined;
+    const read = deps.read(decl);
+    const names = read.ok ? (read.value as { names?: unknown }).names : undefined;
+    return typeof names === 'string' && names !== '' ? names : undefined;
+  }
+  if (!mayRead(deps, decl)) return undefined;
   const register = decl.source.slice('register.'.length);
   const schema = deps.schemaOf(register);
   const title = deps.titleOf(register);

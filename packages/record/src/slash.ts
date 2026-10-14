@@ -27,12 +27,14 @@ import type { FigureTest, Grows } from './arrange.ts';
 import { subjectOf } from './automations.ts';
 import type { Refusal, Result, Sql } from '@braindog/ports';
 import type { Json, Kernel, Tried } from '@braindog/kernel';
-import { coerce, slugify } from '@braindog/kernel';
+import { SLASH, coerce, slugify } from '@braindog/kernel';
 import { MODULE_WORDS, labelSetting, voiceSetting } from '@braindog/declare';
 import { KINDS, isKind } from 'braindog-render';
 import type { BriefInput } from './briefing.ts';
 import type { HeadlineInput } from './headlines.ts';
 import { clean } from './scrub.ts';
+import { stepsFrom, type Handoff } from './skill-steps.ts';
+import { SKILL_STEPS_KEPT } from './reach.ts';
 
 const DAY_MS = 86_400_000;
 
@@ -240,6 +242,13 @@ export type Usage = {
    * older one exactly as shipped. Absent on a reading made before they were read, and then nothing is offered again.
    */
   held?: HeldSkill[];
+  /**
+   * What agents' runs wrote when they handed off, oldest first, for a skill a use case only names to be offered with
+   * steps (`stepsFrom`). A reading made by hand may carry them here. `readUsage` keeps the ones it reads OFF the object
+   * (`HANDOFFS_READ`), because the whole reading is handed to the model and to the Slash page, and a run's notes are
+   * neither's to read. Absent, a skill with no text of its own is never offered.
+   */
+  handoffs?: readonly RunLeft[];
   /**
    * The people, organisations and projects met often enough or named by enough things to earn a page (`ENTITY_PAGE`),
    * strongest first, from the lists the caller reads. Absent on a reading made before they were read.
@@ -549,7 +558,7 @@ export function readUsage(
     }
   }
 
-  return {
+  const usage: Usage = {
     at: instantOf(nowMs),
     firstWrite,
     ageDays,
@@ -574,6 +583,59 @@ export function readUsage(
     held: kernel.register('skills') && reads('skills') ? heldSkills(sql, kernel.nameOf) : [],
     entities,
   };
+  if (kernel.register('skills') && reads('skills') && kernel.register(RUNS) && reads(RUNS)) HANDOFFS_READ.set(usage, handoffsOf(sql, kernel, nowMs));
+  return usage;
+}
+
+/** The kernel's register of agents' runs, whose `next`, `tried` and `notes` are what a run left when it handed off. */
+const RUNS = 'session';
+/** How far back, and how many, handoffs a skill's steps are read from. */
+const HANDOFF_DAYS = 60;
+const HANDOFFS_MOST = 200;
+
+/**
+ * THE HANDOFFS `readUsage` READ, kept beside the reading and not in it: the reading is handed whole to the model
+ * (`SlashModelInput.usage`) and answered to the Slash page, and neither is owed what runs wrote. Read by `noticeUsage`
+ * for the same object; a copy of the reading carries none, and then a skill with no text is not offered.
+ */
+const HANDOFFS_READ = new WeakMap<Usage, readonly RunLeft[]>();
+
+/**
+ * A run's handoff as Slash reads it: what it left (`text`, its step, what it tried and its notes, which steps are quoted
+ * from) and what it was `doing`, which says what the work was about and is never a step itself.
+ */
+export type RunLeft = Handoff & { doing?: string };
+
+/**
+ * The last `HANDOFF_DAYS` days of handoffs, at most `HANDOFFS_MOST`, oldest first: each run that left a step, by its
+ * spoken name, with the step, what it tried and its notes, one to a line, and what it was doing beside them.
+ */
+function handoffsOf(sql: Sql, kernel: Kernel, nowMs: number): RunLeft[] {
+  const prefix = String((kernel.register(RUNS) as { seq_prefix?: unknown } | undefined)?.seq_prefix ?? 'S');
+  const rows = sql.all<{ seq: number | null; fields: string }>(
+    `SELECT seq, fields FROM entry WHERE register = ? AND deleted_at IS NULL
+       AND trim(coalesce(json_extract(fields, '$.next'), '')) <> ''
+       AND julianday(coalesce(json_extract(fields, '$.next_at'), updated_at)) >= julianday(?)
+     ORDER BY seq DESC LIMIT ?`,
+    RUNS,
+    instantOf(nowMs - HANDOFF_DAYS * DAY_MS),
+    HANDOFFS_MOST,
+  );
+  const out: RunLeft[] = [];
+  for (const row of rows.reverse()) {
+    let f: Record<string, unknown>;
+    try {
+      f = JSON.parse(row.fields) as Record<string, unknown>;
+    } catch {
+      continue;
+    }
+    const lines = [f.next, ...(Array.isArray(f.tried) ? f.tried : []), ...(Array.isArray(f.notes) ? f.notes : [])].filter(
+      (x): x is string => typeof x === 'string' && x.trim() !== '',
+    );
+    if (row.seq !== null && lines.length > 0)
+      out.push({ run: `${prefix}${row.seq}`, text: lines.join('\n'), ...(typeof f.doing === 'string' && f.doing.trim() !== '' ? { doing: f.doing } : {}) });
+  }
+  return out;
 }
 
 /**
@@ -1047,7 +1109,8 @@ function noticeWhole(usage: Usage, offered: readonly Offered[]): { noticed: Noti
   /* THE SKILLS A USE CASE NAMES OR AN ADD-ON SHIPS, once it is on and the record keeps skills: each one it does not hold
      yet is an entry for the owner to accept, never one written for them. ONE THAT SHIPS ITS TEXT is offered with it, and
      every such skill missing goes in one question, written by the record (`managed`), so a record with agents on is asked
-     once and not once a skill. One a use case only names, with no text, is asked alone, its steps left to be written. */
+     once and not once a skill. One a use case only names, with no text, is asked alone, and only once three runs left the
+     same steps for it. */
   const shipped: SlashDraft[] = [];
   if (usage.skills !== null) {
     const held = new Set(usage.skills);
@@ -1065,17 +1128,23 @@ function noticeWhole(usage: Usage, offered: readonly Offered[]): { noticed: Noti
         text: `${capital(joinNames(naming))} ${byPack ? (naming.length === 1 ? 'ships' : 'ship') : naming.length === 1 ? 'names' : 'name'} ${once.length === 1 ? 'a skill' : 'skills'} for agents that you do not have in Skills yet: ${joinNames(once.map(({ s }) => s.name))}.`,
       });
     const written = once.filter(({ s }) => typeof s.body === 'string' && s.body.trim() !== '');
-    for (const { o, s } of once.filter((m) => !written.includes(m)))
+    /* ONE ONLY NAMED IS OFFERED ONLY WITH STEPS, quoted from what three or more runs that did it left (`stepsFrom`). The
+       rule that filed a skill whose body said "Its steps are not written yet." is gone: what it offered was a name. */
+    const handoffs = usage.handoffs ?? HANDOFFS_READ.get(usage) ?? [];
+    for (const { o, s } of once.filter((m) => !written.includes(m))) {
+      const steps = stepsFrom(handoffs.filter((h) => namesSkill(`${h.doing ?? ''}\n${h.text}`, s.name)));
+      if (steps === null || steps.length < SKILL_STEPS_KEPT) continue;
       drafts.push({
         key: '',
-        question: `Give your agents the skill ${s.name}? ${o.title} names it for ${momentOf(s.trigger)}, and Skills has none by that name yet.`,
+        question: `Give your agents the skill ${s.name}? ${capital(shipper(o))} names it for ${momentOf(s.trigger)}, and its ${steps.length} steps are quoted from what your agents left when they handed off.`,
         body_kind: 'rowset',
         body: {
           register: 'skills',
-          rows: [{ name: s.name, trigger: s.trigger, what: `A skill ${o.title} names for agents working here.`, kind: 'skill', body: `Use this skill ${s.trigger}.\n\n${o.title} names it. Its steps are not written yet.\n` }],
+          rows: [{ name: s.name, trigger: s.trigger, what: `A skill ${o.title} names for agents working here, in the steps they took.`, kind: 'skill', body: skillBody(s.trigger, steps) }],
         },
         by: 'rules',
       });
+    }
     if (written.length > 0) {
       const from = [...new Set(written.map(({ o }) => shipper(o)))];
       const one = written.length === 1;
@@ -1121,8 +1190,11 @@ function noticeWhole(usage: Usage, offered: readonly Offered[]): { noticed: Noti
      ADD-ON SHIPS, which are the add-on's own and no advice about how the record is used, so a record with agents on is
      offered them the first night. Young is read from a person's own use (`youngSaid`), never the oldest row. */
   const young = youngSaid(usage);
-  if (young !== null) return { noticed, drafts: keyed(shipped), quiet: young };
-  return { noticed, drafts: keyed(drafts), quiet: null };
+  /* NONE OF THE RULES' DRAFTS REACHES SLASH'S OWN LOOP TODAY, and each is held as a model's is, so one that comes to is
+     dropped here and not filed (`ownLoopFault`). */
+  const mine = (list: readonly SlashDraft[]): SlashDraft[] => keyed(list.filter((d) => ownLoopFault(d) === null));
+  if (young !== null) return { noticed, drafts: mine(shipped), quiet: young };
+  return { noticed, drafts: mine(drafts), quiet: null };
 }
 
 /**
@@ -1258,6 +1330,19 @@ export function entityDrafts(usage: Usage): SlashDraft[] {
 
 /** A skill's moment without what it then does: "when a ticket is opened, to set its priority" is "when a ticket is opened". */
 const momentOf = (trigger: string): string => trigger.split(', to ')[0]!.trim();
+
+/**
+ * Whether a handoff is about a skill: it says every word of the skill's name (`task-triage` is "task" and "triage"), as
+ * a word or the start of one ("triaged"). A run that never says the skill's words did something else.
+ */
+const namesSkill = (text: string, name: string): boolean => {
+  const words = name.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length >= 3);
+  return words.length > 0 && words.every((w) => new RegExp(`(?<![\\p{L}\\p{N}])${w.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}`, 'iu').test(text));
+};
+
+/** A skill's text: when to use it, then its steps, numbered, each as a run wrote it. */
+const skillBody = (trigger: string, steps: readonly string[]): string =>
+  `Use this skill ${trigger}.\n\n${steps.map((step, i) => `${i + 1}. ${step}`).join('\n')}\n`;
 
 /** Who ships a skill, as a sentence says it: "the Agents add-on", or a use case by its title. */
 const shipper = (o: Offered): string => (o.kind === 'pack' ? `the ${o.title} add-on` : o.title);
@@ -1427,7 +1512,9 @@ const QUESTION_MAX = 280;
  * example could not be drafted at all. Its every reach beyond the record is in its header, `egress` and `keys`
  * (`scriptBody` in `kernel/src/script.ts`), which the kernel refuses when computed and prints as the outside calls line
  * Decide draws (`egressOf`), so where it sends is never the model's to leave unsaid. Filing it runs nothing: a clock is
- * armed only when the owner accepts, and a trial is `scriptTry`, which nothing here calls.
+ * armed only when the owner accepts, and a trial is `scriptTry`, which nothing here calls. Its `keys` stay empty: one
+ * naming a key is dropped (`KEYED_SCRIPT`), and neither its own prefs nor its settings door is any draft's to reach
+ * (`ownLoopFault`).
  *
  * A theme, a digest or a block is still left to a person or an agent, because nothing Slash reads or hears says what one
  * should look like, and `kernel.propose` reviews a metric exactly as it reviews the page beside it.
@@ -1494,6 +1581,44 @@ function reachesOut(value: unknown, depth = 0): string | null {
   return null;
 }
 
+/** What a draft that would reach Slash's own limits is dropped with. */
+export const OWN_LIMITS = 'Slash does not change its own limits.';
+
+/**
+ * What names Slash's own loop in a key or a text: its prefs (`slash.reads`, `slash.daily`), the ladder's (`ladder:…`) and
+ * the rule that answers for it, the settings door (`/api/slash/settings`, `slash_settings`, `ask_cap`, `think_cap`) and
+ * the ladder's thresholds by name. NOT PRECEDED BY A DOT, A SLASH OR AN `@`, so an address at `slash.example` is a host.
+ */
+const OWN_LOOP = [
+  /(?<![\w./@-])(?:slash|ladder)[.:][a-z_]+/iu,
+  /\brule:ladder\b/iu,
+  /\/slash\/(?:settings|setup)\b/iu,
+  /\b(?:slash_settings|ask_cap|think_cap)\b/iu,
+  /\b(?:offer_after|offer_days|declines_drop|anomaly_writes|anomaly_ms)\b/iu,
+];
+/** The parts of a `pack` or `settings` body that name a pack: Slash's own is never a draft's to arrange. */
+const NAMES_PACK: ReadonlySet<string> = new Set(['pack', 'install', 'enable', 'disable']);
+
+/**
+ * Why a draft is dropped for reaching Slash's own loop, or `null` (ENG-A14, RQ-ENG-184: "Slash never drafts a change to
+ * its own loop, thresholds or budget"). Its budget was reached only by the owner's settings door, and nothing failed if a
+ * draft named it: a settings line raising `ask_cap`, a rule writing `slash.reads`, a script fetching the settings door.
+ * EVERY KEY AND EVERY TEXT of the body is read, its declarations, steps and settings included, as `reachesOut` reads a
+ * rule, and run on every draft before it is filed: a model's (`modelDraft`) and the rules' (`noticeUsage`).
+ */
+export function ownLoopFault(draft: { body_kind?: unknown; body?: unknown }): string | null {
+  const walk = (value: unknown, depth: number): boolean => {
+    if (typeof value === 'string') return OWN_LOOP.some((re) => re.test(value));
+    if (value === null || typeof value !== 'object' || depth > 32) return false;
+    for (const [k, v] of Object.entries(value)) {
+      if (!Array.isArray(value) && (OWN_LOOP.some((re) => re.test(k)) || (NAMES_PACK.has(k) && v === SLASH))) return true;
+      if (walk(v, depth + 1)) return true;
+    }
+    return false;
+  };
+  return walk(draft.body, 0) ? OWN_LIMITS : null;
+}
+
 /** How the owner calls each kind a description builds, in the line the record writes about what exists. */
 const OWNERS_WORD: Readonly<Record<string, string>> = { register: 'list', ingest: 'door', metric: 'figure', page: 'page', rule: 'rule', script: 'script' };
 
@@ -1554,20 +1679,19 @@ function describedScript(d: { id?: unknown; body?: unknown }, n: number): string
  * What a script would do on its own once accepted, in the record's words, added to the question Decide draws.
  *
  * THE MODEL'S QUESTION NAMES ONLY WHAT IT CHOOSES TO. The abused answer's was "Build the launch desk you described?"
- * over a change that called a collector, so which lists a script reads, where it fetches from, which keys go with it
- * and which lists it writes are said here from its own header, on every path, beside the kernel's line under "Calls
- * out" (`egressOf`). Every start the header names is said, because a script with a clock and a door runs on both. The
- * header is the model's, so each name is cut to a length; a header the kernel then refuses is never filed, and neither
- * is this line.
+ * over a change that called a collector, so which lists a script reads, where it fetches from and which lists it
+ * writes are said here from its own header, on every path, beside the kernel's line under "Calls out" (`egressOf`).
+ * Every start the header names is said, because a script with a clock and a door runs on both. The header is the
+ * model's, so each name is cut to a length; a header the kernel then refuses is never filed, and neither is this line.
+ * No key is said, because a script naming one is never filed (`KEYED_SCRIPT`).
  */
 function scriptSays(d: { id?: unknown; body?: unknown }): string {
-  const body = (d.body ?? {}) as { runs?: unknown; egress?: unknown; keys?: unknown; reads?: unknown; writes?: unknown };
+  const body = (d.body ?? {}) as { runs?: unknown; egress?: unknown; reads?: unknown; writes?: unknown };
   const id = String(d.id ?? '');
   const bare = id.slice(id.indexOf('.') + 1).slice(0, 40);
   const hosts = strings(body.egress).map((o) => o.replace(/^https:\/\//iu, '').slice(0, 80));
   const reads = strings(body.reads).map(listNamed);
   const writes = strings(body.writes).map(listNamed);
-  const keys = strings(body.keys).map((k) => `"${k.slice(0, 40)}"`);
   const runs = (body.runs !== null && typeof body.runs === 'object' ? body.runs : {}) as { every?: unknown; door?: unknown; rule?: unknown };
   const when = [
     ...(typeof runs.every === 'string' ? [`every ${runs.every.slice(0, 16)}`] : []),
@@ -1579,9 +1703,14 @@ function scriptSays(d: { id?: unknown; body?: unknown }): string {
     ...(hosts.length > 0 ? [`fetch from ${joinNames(hosts)}`] : []),
     ...(writes.length > 0 ? [`write to ${joinNames(writes)}`] : []),
   ];
-  const sent = keys.length > 0 ? `, sending your ${keys.length === 1 ? 'key' : 'keys'} ${joinNames(keys)} with each request` : '';
-  return `Accepting it lets the script "${bare}" ${does.length > 0 ? joinNames(does) : 'run'} ${joinNames(when)} on its own${sent}.`;
+  return `Accepting it lets the script "${bare}" ${does.length > 0 ? joinNames(does) : 'run'} ${joinNames(when)} on its own.`;
 }
+
+/** What a script that would send one of his keys is dropped with. Said as it is, never numbered. */
+export const KEYED_SCRIPT = 'It would send one of your keys, and a script Slash writes uses none. Ask an agent, or write it yourself.';
+
+/** Whether a script's `keys` names any: a list with an entry, or anything else written there but nothing. */
+const namesKey = (keys: unknown): boolean => keys !== undefined && keys !== null && !(Array.isArray(keys) && keys.length === 0) && keys !== '';
 
 /** An object's own keys, or none for anything else, so a header's nested part is read without a cast at every step. */
 const partOf = (value: unknown): Record<string, unknown> => (value !== null && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {});
@@ -1661,6 +1790,9 @@ function changeBody(
   const stray = listed.find((d) => typeof d?.kind !== 'string' || !BUILDS.has(d.kind));
   if (stray !== undefined)
     return { ok: false, why: `Proposal ${n} was a change to ${aKind(String(stray?.kind ?? 'unnamed kind')).slice(0, 40)}, and Slash changes only a register, an ingest, a rule, a metric, a page or a script.` };
+  /* A SCRIPT SLASH WRITES SENDS NONE OF HIS KEYS (H.735, "F8 Slash scripts proposal-only no vault keys"). The question
+     used to say "sending your key ..." and file it; on any path, pressed or described, one naming a key is dropped. */
+  if (listed.some((d) => d.kind === 'script' && namesKey(partOf(d.body).keys))) return { ok: false, why: KEYED_SCRIPT };
   /* THE WHOLE BODY AND NOT ONLY ITS DECLARATIONS, because every key a model writes beside `to` is filed with it (the
      kernel drops only `egress`, `approve` and `from_version`). THE SENTENCE NAMES NO DECLARATION, because the id is the
      model's too, and an id that is the key would be the key said back on the Slash page. */
@@ -1786,6 +1918,8 @@ function modelDraft(x: unknown, n: number, name: string, drawn: ((id: string) =>
   if (d.body_kind !== 'pack' && d.body_kind !== 'settings' && d.body_kind !== 'arrange' && d.body_kind !== 'change')
     return { why: `Proposal ${n} was a ${String(d.body_kind)} proposal, and Slash files only pack, settings, arrange and change.` };
   if (d.body === null || typeof d.body !== 'object' || Array.isArray(d.body)) return { why: `Proposal ${n} had no body.` };
+  const own = ownLoopFault(d);
+  if (own !== null) return { why: own };
   if (described && d.body_kind !== 'change')
     return { why: `Proposal ${n} was a ${d.body_kind} proposal, and from a description Slash files only a change that builds a list, a figure, a page, a rule, a script or a door that fetches on a clock.` };
   let body = d.body as Record<string, unknown>;

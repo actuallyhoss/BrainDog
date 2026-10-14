@@ -57,6 +57,12 @@ export type NavShapeRecommendation = {
 const TOP_BAR_SLOTS = 4;
 
 /**
+ * The narrowest screen a shape offer is shown on, in CSS pixels. Below it `19 §3` keeps the tab bar whatever is chosen, so
+ * the offer would change nothing anyone sees. THE ONE RULE THE BROWSER KEEPS (ENG-B14): the record cannot know the screen.
+ */
+export const SHAPE_MIN_WIDTH = 900;
+
+/**
  * Read the signals and answer with one shape and one sentence, or `null` when the shape already set
  * suits the record and there is nothing to say.
  */
@@ -65,7 +71,7 @@ export function recommendNavShape(signals: NavShapeSignals): NavShapeRecommendat
   /* NOBODY CHOSE, SO THE RAIL: what the shell draws for a record that keeps no shape (`nav-prefs.svelte.ts`). */
   const effective: NavShape = current ?? 'rail';
 
-  if (viewportWidth !== undefined && viewportWidth < 900) return null;
+  if (viewportWidth !== undefined && viewportWidth < SHAPE_MIN_WIDTH) return null;
 
   let best: NavShape;
   let reason: string;

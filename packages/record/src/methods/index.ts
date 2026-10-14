@@ -65,6 +65,7 @@ import { methods as inboxHints } from './inbox-hints.ts';
 import { methods as skillsBehindMethods } from './skills-behind.ts';
 import { methods as toolsSeenMethods } from './tools-seen.ts';
 import { methods as namedTwiceMethods } from './named-twice.ts';
+import { methods as exportPack } from './export-pack.ts';
 /* END METHODS */
 
 /**
@@ -194,6 +195,7 @@ export function methods(deps: RecordDeps) {
     ...skillsBehindMethods(deps),
     ...toolsSeenMethods(deps),
     ...namedTwiceMethods(deps),
+    ...exportPack(deps),
     /* END METHODS */
   };
 }

@@ -17,7 +17,8 @@
  *
  * VERSIONED, SO UNDO PUTS BACK THE ONE BEFORE. Every look Slash writes is a declaration (`by: 'slash'`) installed over
  * the live version it read, and Slash's pref `look.undo.<page>` keeps that version and the body it replaced. `undoLook`
- * reinstalls the body (or retires the look when there was none) only while the live look is still the one Slash wrote.
+ * reinstalls the body (or retires the look when there was none) while the live look is still the one Slash wrote, and
+ * any other look, the person's own included, goes back one kept version a press (Put back).
  * A look put back is a no: `look.undone.<page>` keeps what it was written from, and Slash writes none over that page
  * until that moves (`undoneFor`).
  *
@@ -36,7 +37,7 @@
 
 import type { BlockResult, Json, Kernel } from '@braindog/kernel';
 import { GROUPED_BY_FIELD, GROUP_VALUES_LEAST as VALUES_LEAST, GROUP_VALUES_MOST as VALUES_MOST, LOOK_GROUPS_MOST, SLASH, queuesKept } from '@braindog/kernel';
-import type { Refusal, Result } from '@braindog/ports';
+import type { Refusal, Result, Sql } from '@braindog/ports';
 import { ok } from '@braindog/ports';
 
 import {
@@ -67,6 +68,12 @@ export const lookUndoneKey = (page: string): string => `look.undone.${page}`;
 
 /** Slash's pref keeping who kept its look over a page and which version they kept, for the history line "Slash arranged · Mara kept". */
 export const lookKeptKey = (page: string): string => `look.kept.${page}`;
+
+/**
+ * The pref keeping where Put back last stepped to: the version it wrote and the older version it wrote again, so a
+ * second press walks on from that one and does not step back onto the look the first press took off.
+ */
+export const lookBackKey = (page: string): string => `look.back.${page}`;
 
 /** The next thing to do is a phrase under the headline, shorter than the line itself. */
 export const NEXT_MOST = 80;
@@ -664,27 +671,96 @@ export async function writeLook(kernel: Kept, page: string, title: string, given
   return ok({ written: true });
 }
 
+/** Who wrote the look a Put back took off, and when it was written. */
+export type LookWas = { by: LookBy; at: string };
+
 /**
- * Undo Slash's look over a page: the look it replaced installed again, or the page given back to the kernel's rules when
- * there was none. Only while the live look is still the version Slash wrote: a look the person or Slash changed since
- * is not put back over, and says so. `actor` is who pressed Undo, for the history. What the look put back was written
- * from is kept (`lookUndoneKey`), so the same look is not written again the next time the page is asked about.
+ * What a Put back answers: whether the look before came back or the page went back to the rules, and who wrote the look
+ * it took off and when. Slash's own Undo answers as it always did, without `was`.
  */
-export async function undoLook(kernel: Kept, page: string, title: string, actor: string): Promise<Result<{ restored: 'previous' | 'rules' }>> {
+export type PutBack = { restored: 'previous' | 'rules'; was?: LookWas };
+
+/** Where Put back last stepped to, as `lookBackKey` keeps it, or `null`. */
+const backOf = (raw: unknown): { version: number; to: number } | null => {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const { version, to } = raw as { version?: unknown; to?: unknown };
+  return Number.isInteger(version) && Number.isInteger(to) ? { version: version as number, to: to as number } : null;
+};
+
+/** A stored body as JSON, or `null` when it does not read. */
+const parsed = (text: string): unknown => {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * PUT BACK, ONE STEP, WHOEVER WROTE THE LOOK (DIRECTION §38: a composition is a proposal the person can pin, change or
+ * undo). The live look's version before it is installed again, held to the live version, or the page is given back to
+ * the kernel's rules when it had none. `actor` is who pressed it, for the history.
+ *
+ * SLASH'S OWN UNDO IS FIRST AND STAYS AS IT WAS: while the live look is still the version Slash wrote, the body Slash
+ * kept (`lookUndoKey`) comes back, and what the look was written from is kept (`lookUndoneKey`), so the same look is not
+ * written again the next time the page is asked about. A Slash look taken off by the longer way is kept the same.
+ *
+ * ANY OTHER LOOK, A PIN, AN ARRANGEMENT, ANY DAY AFTER, is read from the versions the kernel keeps, as `pageVersions`
+ * reads a page's: `sql` is the record's, and without it only Slash's Undo is there. The newest older version that says
+ * something else comes back; a retired version below means the page had no look before, so it goes back to the rules.
+ * Pressed again it walks on from the version it wrote back (`lookBackKey`), not onto the one it took off.
+ *
+ * A LOOK NOBODY WROTE IS NOT PUT BACK: none stored, or one an add-on shipped, is refused in words.
+ */
+export async function undoLook(kernel: Kept, page: string, title: string, actor: string, sql?: Pick<Sql, 'all'>): Promise<Result<PutBack>> {
   const key = lookUndoKey(page);
   const kept = undoOf(kernel.prefsOf(SLASH)[key], page);
-  if (kept === null) return no('DECLARATION_UNKNOWN', `Slash has not arranged ${title}, so there is nothing to put back.`);
   const live = liveLook(kernel, page);
-  if (live === null || live.version !== kept.version || live.body.by !== 'slash') {
-    kernel.setPref(SLASH, key, null);
-    return no('VERSION_STALE', `${title} was arranged again since Slash arranged it, so that is the one that stays.`);
-  }
   const id = lookId(page);
-  const done = kept.was === null ? kernel.retire([id], { actor }) : await kernel.install([{ id, kind: LOOK_KIND as never, body: kept.was as never }], { id, version: live.version }, { actor });
-  if (!done.ok) return done as Result<never>;
-  kernel.setPref(SLASH, key, null);
-  if (live.body.basis !== '') kernel.setPref(SLASH, lookUndoneKey(page), { basis: live.body.basis });
-  return ok({ restored: kept.was === null ? 'rules' : 'previous' });
+  if (kept !== null && live !== null && live.version === kept.version && live.body.by === 'slash') {
+    const done = kept.was === null ? kernel.retire([id], { actor }) : await kernel.install([{ id, kind: LOOK_KIND as never, body: kept.was as never }], { id, version: live.version }, { actor });
+    if (!done.ok) return done as Result<never>;
+    kernel.setPref(SLASH, key, null);
+    if (live.body.basis !== '') kernel.setPref(SLASH, lookUndoneKey(page), { basis: live.body.basis });
+    return ok({ restored: kept.was === null ? 'rules' : 'previous' });
+  }
+  if (kept !== null) kernel.setPref(SLASH, key, null);
+  if (sql === undefined)
+    return kept === null
+      ? no('DECLARATION_UNKNOWN', `Slash has not arranged ${title}, so there is nothing to put back.`)
+      : no('VERSION_STALE', `${title} was arranged again since Slash arranged it, so that is the one that stays.`);
+  if (live === null) return no('DECLARATION_UNKNOWN', `Nobody has arranged ${title}, so there is nothing to put back.`);
+  if (live.pack !== null) return no('DECLARATION_UNKNOWN', `${title} keeps the arrangement it came with, so there is nothing to put back.`);
+  const rows = sql.all<{ version: number; body: string; retired: number; created_at: string }>(
+    'SELECT version, body, retired, created_at FROM declaration WHERE id = ? AND kind = ? ORDER BY version DESC',
+    id,
+    LOOK_KIND,
+  );
+  const back = backOf(kernel.prefsOf(SLASH)[lookBackKey(page)]);
+  const from = back !== null && back.version === live.version ? back.to : live.version;
+  let before: { body: LookBody; version: number } | null = null;
+  for (const row of rows) {
+    if (row.version >= from) continue;
+    if (row.retired === 1) break;
+    const body = lookBodyOf(parsed(row.body), page);
+    if (body === null || sameLook(body, live.body)) continue;
+    before = { body, version: row.version };
+    break;
+  }
+  const was: LookWas = { by: live.body.by, at: rows.find((r) => r.version === live.version)?.created_at ?? '' };
+  if (before === null) {
+    const done = kernel.retire([id], { actor });
+    if (!done.ok) return done as Result<never>;
+    kernel.setPref(SLASH, lookBackKey(page), null);
+  } else {
+    const put = await kernel.install([{ id, kind: LOOK_KIND as never, body: before.body as never }], { id, version: live.version }, { actor });
+    if (!put.ok) return put as Result<never>;
+    const version = put.value.find((d) => d.id === id)?.version;
+    kernel.setPref(SLASH, lookBackKey(page), version === undefined ? null : { version, to: before.version });
+  }
+  /* SLASH'S LOOK TAKEN OFF IS A NO TO WHAT IT WAS WRITTEN FROM, as its Undo is. */
+  if (live.body.by === 'slash' && live.body.basis !== '') kernel.setPref(SLASH, lookUndoneKey(page), { basis: live.body.basis });
+  return ok({ restored: before === null ? 'rules' : 'previous', was });
 }
 
 /**

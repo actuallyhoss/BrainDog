@@ -40,6 +40,8 @@
  * AND THE TIDY AS NUMBERS (AGT-C18): `gone-stale`, how many things every finder in `tidy.ts` counts stale now, one
  * figure a finder beside it (`stale-runs-empty` and the rest, built from the registry when asked for), and `tidied-week`,
  * how many the record cleared in seven days, from the lines the hourly pass keeps. Both are reads and write nothing.
+ * One finder's week is `tidied-runs-empty` and the rest, built when asked for as the stale ones are, and both totals
+ * carry `names`, their count said finder by finder ("41 empty runs hidden and 3 steps nobody took closed").
  *
  * AND WHERE THINGS APPLY (AGT-D01): `projects-unplaced`, the projects that name no repository and no folder, so no run
  * can land in them, `keys-unopenable`, the keys whose sealed value names a grant revoked or gone, and `keys-unopened`
@@ -81,7 +83,7 @@ import { intervalMs } from './pull.ts';
 import { KEYS_IN_TEXT } from './key-scan.ts';
 import { holdDays } from './hold.ts';
 import { isUnknownMark } from './marks.ts';
-import { finderOf, staleNow, tidied } from './tidy.ts';
+import { finderOf, finders, tidied, tidyDays, type Finder } from './tidy.ts';
 /* `tidy-keys.ts` IMPORTS NOTHING AT RUN TIME, only `tidy.ts`'s types, so this adds no load ring. */
 import { countKeysUnopened, fieldOf, sealedLists } from './tidy-keys.ts';
 /* `people.ts` REACHES `ingest.ts` AND THROUGH IT MUCH OF THE KERNEL. Only a function is taken, called on a read and never
@@ -257,6 +259,88 @@ function staleFigure(id: string): TidyDecl | null {
   return { ...GONE_STALE, metric: id, name: finder.name ?? `Stale: ${words}`, finder: finder.id };
 }
 
+const TIDIED_PREFIX = 'tidied-';
+
+/** The id of what one finder cleared this week: `tidied-runs-empty` for the finder `runs-empty`. */
+export const tidiedFigureOf = (finder: string): string => `${TIDIED_PREFIX}${finder}`;
+
+/**
+ * What one finder cleared in seven days, BUILT WHEN ASKED FOR as `staleFigure` is. `tidied-week` is the table's own, so
+ * no finder called `week` is ever read through here.
+ */
+function tidiedFigure(id: string): TidyDecl | null {
+  if (!id.startsWith(TIDIED_PREFIX)) return null;
+  const finder = finderOf(id.slice(TIDIED_PREFIX.length));
+  if (finder === undefined) return null;
+  return { ...TIDIED_WEEK, metric: id, name: `Tidied this week: ${lowerFirst(finder.name ?? finder.id.replaceAll('-', ' '))}`, finder: finder.id };
+}
+
+const lowerFirst = (s: string): string => s.charAt(0).toLowerCase() + s.slice(1);
+/** "1 empty run" or "41 empty runs", and what was done to them after: "41 empty runs hidden". */
+const sayN =
+  (one: string, many: string, after?: string) =>
+  (n: number): string =>
+    `${n} ${n === 1 ? one : many}${after === undefined ? '' : ` ${after}`}`;
+
+/** How a finder's count is said in a sentence: what waits (`stale`), and what the record cleared (`cleared`). */
+type TidyWords = { stale: (n: number) => string; cleared: (n: number) => string };
+
+/**
+ * THE WORDS OF THE KERNEL'S OWN FINDERS, said for one and for many. A finder's `name` is a heading ("Ended runs that
+ * wrote nothing"), plural, and says nothing of what clearing did, so these are held beside its figure. A finder
+ * registered later and not here is said by its own name, lower-cased after the number.
+ */
+const TIDY_WORDS: Readonly<Record<string, TidyWords>> = {
+  'runs-stopped': { stale: sayN('silent run', 'silent runs'), cleared: sayN('silent run', 'silent runs', 'written off') },
+  'runs-empty': { stale: sayN('empty run', 'empty runs'), cleared: sayN('empty run', 'empty runs', 'hidden') },
+  'steps-old': { stale: sayN('step nobody took', 'steps nobody took'), cleared: sayN('step nobody took', 'steps nobody took', 'closed') },
+  'questions-old': { stale: sayN('question left open', 'questions left open'), cleared: sayN('old question', 'old questions', 'closed') },
+  'questions-moot': {
+    stale: sayN('question that no longer needs you', 'questions that no longer need you'),
+    cleared: sayN('settled question', 'settled questions', 'closed'),
+  },
+  'faults-open': { stale: sayN('fault still open', 'faults still open'), cleared: sayN('fault', 'faults', 'cleared') },
+  'keys-unopened': { stale: sayN('key nobody has opened', 'keys nobody has opened'), cleared: sayN('unused key', 'unused keys', 'retired') },
+  'rows-same': { stale: sayN('thing here twice', 'things here twice'), cleared: sayN('thing here twice', 'things here twice', 'folded') },
+};
+
+/** How many of a figure's finders `names` says before "and more". */
+const NAMED_MOST = 4;
+
+/**
+ * `names`, A FIGURE'S COUNT SAID FINDER BY FINDER: each finder above nought as "<n> <its words>", the largest first (in
+ * the order registered at a tie), at most four and then "and more". `undefined` when every finder reads nought, so a
+ * sentence over it says nothing, as `{{projects-need-you.names}}` does over no project.
+ */
+function namesSaid(parts: readonly { id: string; name?: string | undefined; n: number; at: number }[], how: keyof TidyWords): string | undefined {
+  const said = parts
+    .filter((p) => p.n > 0)
+    .sort((a, b) => b.n - a.n || a.at - b.at)
+    .map((p) => TIDY_WORDS[p.id]?.[how](p.n) ?? `${p.n} ${lowerFirst(p.name ?? p.id.replaceAll('-', ' '))}`);
+  if (said.length === 0) return undefined;
+  if (said.length > NAMED_MOST) return `${said.slice(0, NAMED_MOST).join(', ')} and more`;
+  return said.length === 1 ? said[0]! : `${said.slice(0, -1).join(', ')} and ${said.at(-1)!}`;
+}
+
+/** A reading over the tidy, which may say its count finder by finder (`namesSaid`), so a note writes `{{tidied-week.names}}`. */
+export type TidyReading = Reading & { names?: string };
+
+/** What one finder counts stale now, or nought when it cannot count. */
+function staleOf(finder: Finder, sql: Sql, nowMs: number): number {
+  try {
+    return finder.find(sql, nowMs).stale;
+  } catch {
+    return 0;
+  }
+}
+
+/** A reading with its `names`, left off when there are none. */
+function withNames(read: Result<Reading>, names: string | undefined): Result<Reading> {
+  if (!read.ok || names === undefined) return read;
+  const named: TidyReading = { ...read.value, names };
+  return ok(named);
+}
+
 /**
  * The tidy's numbers. ALWAYS NOW, as the finders count and as the open steps are read: a kept day's stale count is in
  * the pass's own lines, which `tidyDays` reads. A figure naming a finder that is gone reads nothing, never nought, and so
@@ -267,9 +351,22 @@ export function readTidy(sql: Sql, ctx: Pick<EvalContext, 'nowMs'>, decl: Metric
   const d = decl as TidyDecl;
   if (d.tidy === 'tidied') {
     const days = Math.max(1, Math.round((intervalMs(decl.window ?? '7d') ?? 7 * 86_400_000) / 86_400_000));
-    return judged(decl, tidied(sql, ctx.nowMs, days, d.finder), `cleared by the record in ${days === 1 ? 'the last day' : `${days} days`}`);
+    const read = judged(decl, tidied(sql, ctx.nowMs, days, d.finder), `cleared by the record in ${days === 1 ? 'the last day' : `${days} days`}`);
+    /* EACH FINDER'S SHARE, from the same kept lines: a finder no longer registered is said by its id's own words. */
+    if (d.finder !== undefined) return read;
+    const by = new Map<string, number>();
+    for (const line of tidyDays(sql, ctx.nowMs, days)) by.set(line.finder, (by.get(line.finder) ?? 0) + line.did);
+    const order = finders().map((f) => f.id);
+    const at = (id: string): number => (order.includes(id) ? order.indexOf(id) : order.length);
+    return withNames(read, namesSaid([...by].map(([id, n]) => ({ id, name: finderOf(id)?.name, n, at: at(id) })), 'cleared'));
   }
-  if (d.finder === undefined) return judged(decl, staleNow(sql, ctx.nowMs), 'stale now, every kind added up');
+  if (d.finder === undefined) {
+    /* EVERY FINDER COUNTED ONCE, the total and its parts from the same counts, so the two never disagree. One that
+       throws adds nothing and the others are still counted, as `staleNow` does. */
+    const parts = finders().map((f, at) => ({ id: f.id, name: f.name, n: staleOf(f, sql, ctx.nowMs), at }));
+    const total = parts.reduce((n, p) => n + p.n, 0);
+    return withNames(judged(decl, total, 'stale now, every kind added up'), namesSaid(parts, 'stale'));
+  }
   const finder = finderOf(d.finder);
   if (finder === undefined) return judged(decl, null, 'nothing on this record counts these');
   let one: number;
@@ -800,7 +897,8 @@ export const BUILT_IN_FIGURES: Readonly<Record<string, MetricDecl>> = {
 };
 
 /** The built-in figure called `id`, or `null`; never one `Object.prototype` lends. */
-export const builtInFigure = (id: string): MetricDecl | null => (Object.hasOwn(BUILT_IN_FIGURES, id) ? BUILT_IN_FIGURES[id]! : staleFigure(id));
+export const builtInFigure = (id: string): MetricDecl | null =>
+  Object.hasOwn(BUILT_IN_FIGURES, id) ? BUILT_IN_FIGURES[id]! : (staleFigure(id) ?? tidiedFigure(id));
 
 /**
  * How many questions are open now: not answered, and not put off past this moment. A deferred question is not waiting

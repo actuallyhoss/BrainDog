@@ -34,68 +34,29 @@
  * tree and are recorded in `wrangler.jsonc` beside the binding they justify.
  */
 
-import { no, ok, type Result } from '@braindog/ports';
-
-/* ── Borrowed from `packages/ports/src/inference.ts`, and it must all be deleted ──────────────── */
+import {
+  budgetSpent,
+  modelMissing,
+  ok,
+  schemaFailed,
+  type Completion,
+  type CompleteRequest,
+  type Embeddings,
+  type Inference,
+  type JsonSchema,
+  type Missing,
+  type Result,
+  type Usage,
+} from '@braindog/ports';
 
 /**
- * THE PORT EXISTS AND THIS FILE CANNOT IMPORT IT YET, WHICH IS THE ONLY REASON THIS BLOCK IS HERE.
- * `packages/ports/src/inference.ts` was written in this same batch and says in its own header that
- * the `export type * from './inference.ts'` line in the barrel is the caller's to add. Until that
- * line lands, `@braindog/ports` does not export these names, and `packages/ports/package.json`
- * exports `"."` and nothing else, so there is no subpath to reach them by and a relative import
- * across a package boundary is what `graph` calls an undeclared cross-package import.
- *
- * SO IT IS COPIED VERBATIM RATHER THAN ADAPTED, INCLUDING THE THREE REFUSAL SENTENCES. That is the
- * whole discipline of this block: when the barrel exports the port, replacing it is a deletion and
- * an import, not a reconciliation between two things that have drifted. The argument behind each
- * type is in the port's own header and is not repeated here, because a second copy of an argument
- * is the copy that goes stale.
+ * THE PORT IS IMPORTED, AND THE COPY THIS FILE CARRIED IS GONE (ENG-A06 job 1). It was here only while the barrel did not
+ * export `packages/ports/src/inference.ts`; the barrel does now (`export * from './inference.ts'`), so the three refusals
+ * are the port's own, sentence for sentence, and they carry `why` for a router as well. Re-exported so the Worker's own
+ * callers and tests keep the one import they had.
  */
-export type Msg = { role: 'system' | 'user'; content: string };
-export type JsonSchema = Record<string, unknown>;
-export type Budget = { neurons: number };
-export type Usage = { in: number; out: number; neurons: number | null };
-export type CompleteRequest = { model: string; messages: readonly Msg[]; maxTokens: number; schema: JsonSchema; budget: Budget };
-export type Completion = { text: string; model: string; usage: Usage };
-export type Embeddings = { model: string; dims: number; vectors: Int8Array[]; usage: Usage };
-
-export interface Inference {
-  complete(req: CompleteRequest): Promise<Result<Completion>>;
-  embed(texts: readonly string[]): Promise<Result<Embeddings>>;
-}
-
-/** The port's closed vocabulary for the ways a model can fail to be there. */
-export type Missing = 'no adapter on this host' | 'the provider did not answer' | 'the provider does not serve it';
-
-const refuse = <T>(code: 'NOT_IN_THIS_BUILD' | 'PROPOSAL_SCHEMA' | 'SLASH_BUDGET_SPENT', fix: string, at: string): Result<T> => no<T>(code, fix, { at });
-
-/** No model answered for this call. `NOT_IN_THIS_BUILD` is borrowed; the port's header argues for it. */
-export const modelMissing = <T>(model: string, why: Missing, raw = ''): Result<T> =>
-  no<T>('NOT_IN_THIS_BUILD', `No model answered for '${model}': ${why}. The repair is a deploy of a host that serves it, not an edit.`, {
-    at: 'model',
-    /* THE PROVIDER'S OWN WORDS, SCRUBBED AND CUT (`scrubRaw`), as `detail`, FOR THE OPERATOR ALONE: the Worker's hook
-       (`includedInference`) writes it in the operator's log line, and no route serialises a refusal's `detail` to a
-       member or a stranger (`test/inference-detail.test.ts` holds that reader as the only one). Absent where nothing
-       was thrown. */
-    ...(raw === '' ? {} : { detail: raw }),
-  });
-
-/** The answer is not the JSON the call pinned, and nobody is retrying it. */
-export const schemaFailed = <T>(model: string, why: string): Result<T> =>
-  refuse<T>(
-    'PROPOSAL_SCHEMA',
-    `The answer from '${model}' is not the JSON this call pinned: ${why}. It is not filed and not retried, because a second call bills twice for one payload.`,
-    'schema',
-  );
-
-/** This call would cost more than it may spend. Both figures ride the sentence, because the two repairs differ. */
-export const budgetSpent = <T>(neurons: number, cap: number): Result<T> =>
-  refuse<T>(
-    'SLASH_BUDGET_SPENT',
-    `This call would spend about ${neurons} neurons and its ceiling is ${cap}. Raise the ceiling for this job, or send fewer rows.`,
-    'budget',
-  );
+export type { Budget, Completion, CompleteRequest, Embeddings, Inference, JsonSchema, Missing, Msg, Usage } from '@braindog/ports';
+export { budgetSpent, modelMissing, schemaFailed } from '@braindog/ports';
 
 /* ── The adapter ──────────────────────────────────────────────────────────────────────────────── */
 

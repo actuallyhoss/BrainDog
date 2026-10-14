@@ -18,7 +18,10 @@ import { createClient } from '@braindog/client';
 import type { Row, RowRef } from 'braindog-render';
 
 import { copy } from '../copy.ts';
+import { writeLook } from '../page/look.ts';
+import { lookOfArrangement, lookUndo, type Laid, type LookUndo } from './arrange-look.ts';
 import { REGISTERS } from './held.ts';
+import type { LiveLook } from './page-live.ts';
 import { pagesReader, type BlockBody, type Fetch as ClientFetch, type PageBody } from './pages-live.ts';
 import { declaredValue } from './where.ts';
 
@@ -393,6 +396,39 @@ export async function saveArrangement(
   if (!body) return { from: 'refused', fix: copy.arrangeMoved };
   const out = await setBody(base, body, io, read.version);
   return out.from === 'written' ? { from: 'written', before: read.body, version: out.version, template: read.template } : out;
+}
+
+/** Done kept as the person's own look: `undo` is what Undo writes (`lookUndo`). */
+export type Looked = { from: 'written'; undo: LookUndo };
+
+/** What the whole-body write needs, for a record that cannot keep the arrangement as a look. */
+export type ByBody = { drawn: number; placed: readonly Placed[]; seen?: number | null; removed?: readonly string[] };
+
+/** A record older than a look's widths and columns, which names the key it does not know. */
+const olderLook = (code: string | undefined, fix: string): boolean => code === 'DECLARATION_INVALID' && /\b(span|area)\b/u.test(fix);
+
+/**
+ * Done, kept as the person's own look over the page (`arrange-look.ts`): one `setDeclaration` of `look.<page>`, and no
+ * page body, so a page an add-on wrote or added a block to is arranged and keeps taking that add-on's updates.
+ *
+ * A RECORD THAT REFUSES THE LOOK'S WIDTHS OR COLUMNS (a host older than them) is written the old way, through
+ * `saveArrangement`, and says what that says: nothing new is asked of the person for it.
+ */
+export async function saveLayout(
+  base: string,
+  slug: string,
+  live: LiveLook | null,
+  laid: readonly Laid[],
+  old: ByBody,
+  io?: ClientFetch,
+): Promise<Looked | Arranged> {
+  const undo = lookUndo(slug, live);
+  const out = await writeLook(base, lookOfArrangement(slug, live, laid, old.removed ?? []), io);
+  if (out.ok) return { from: 'written', undo };
+  if (olderLook(out.code, out.fix)) return saveArrangement(base, slug, old.drawn, old.placed, [], io, old.seen);
+  if (out.code === 'UNREACHABLE' || out.fix === copy.recordNotReached) return { from: 'unreachable', fix: copy.recordNotReached };
+  if (out.code === 'UNAUTHORIZED') return { from: 'refused', fix: copy.signInAgain };
+  return { from: 'refused', fix: out.fix };
 }
 
 /**

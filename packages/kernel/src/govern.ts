@@ -387,7 +387,7 @@ export function propose(deps: GovernDeps, actor: string | (() => string), p: Pro
   const wrong = checkBody(deps, p.body_kind, p.body ?? {}, p.cause ?? null);
   if (wrong) return { ok: false, refusal: wrong };
   /* A DAY IT LAPSES IS ONE STILL TO COME, in the record's own zone (ENG-B14). */
-  const past = p.body_kind === 'arrange' ? offerFault(p.body ?? {}, todayIn(deps)) : null;
+  const past = p.body_kind === 'arrange' || (p.body_kind === 'rowset' && p.body?.lapses !== undefined) ? offerFault(p.body ?? {}, todayIn(deps)) : null;
   if (past) return { ok: false, refusal: past };
 
   /* A ROWSET THAT CHANGES NOTHING IS NOT A QUESTION. SG69 on the owner's record proposed values its rows already held,
@@ -899,7 +899,7 @@ export function sweepLapsed(deps: Pick<GovernDeps, 'sql' | 'mint'>, nowMs: numbe
   const at = instant(nowMs);
   const withdrawn: string[] = [];
   const open = deps.sql.all<{ id: string; opened_by: string; body: string }>(
-    "SELECT id, opened_by, body FROM suggestion WHERE body_kind = 'arrange' AND status = 'open' AND (defer_until IS NULL OR defer_until <= ?) ORDER BY rowid",
+    "SELECT id, opened_by, body FROM suggestion WHERE body_kind IN ('arrange', 'rowset') AND status = 'open' AND (defer_until IS NULL OR defer_until <= ?) ORDER BY rowid",
     at,
   );
   for (const o of open) {

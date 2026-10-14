@@ -374,6 +374,13 @@
            BACKGROUND ASKS APART, each to this number of asks, AND THE TWO TOGETHER TO THIS NUMBER OF NEURONS, so neither
            spends the other's and one record never costs more than it. */
         "SLASH_INCLUDED_MONTH_NEURONS": "300000",
+        /* THE ROUTE (ENG-A06): SLASH_LARGE is his yes to the larger model's cost, and empty is no. The three after it name
+           the operator's second provider, asked when the included model fails, with its secret SLASH_FALLBACK_KEY; any
+           one empty is no second provider, and they stay empty until the published legal text names it. */
+        "SLASH_LARGE": "",
+        "SLASH_FALLBACK_URL": "",
+        "SLASH_FALLBACK_MODEL": "",
+        "SLASH_FALLBACK_PROVIDER": "",
         "BRAINDOG_BUILD": "",
         /* EMPTY IS NO SIGN-IN LINKS. The sender, on a domain Email Service sends for, switches them on
            with the `EMAIL` binding below (51 §5.8). */
@@ -406,6 +413,8 @@
            `apps/site/src/lib/plans.ts`. What a card is charged is whatever the Stripe price says. */
         "STRIPE_PRICE_HOSTED": "price_1UKiDwPop5yzbTmmSBwLkuFa",
         "STRIPE_PRICE_PLUS": "price_1UKiEhPop5yzbTmmOMMwOGJP",
+        "STRIPE_PRICE_PACK_100": "",
+        "STRIPE_PRICE_PACK_500": "",
         /* WHO MAY MAKE AN ACCOUNT, AND THIS IS ITS ONE SWITCH (`src/launch.ts`). `open` is anybody, `invite` is a new
            address with a code from `/account/ops/invite`, and anything else, empty included, is closed. Open here as in
            production (DIRECTION §42), so the walk kit signs up with no code, as a stranger does. */
@@ -592,6 +601,13 @@
            apart, each to this number of asks, and the two together to this number of neurons, so one record never costs
            more than it. */
         "SLASH_INCLUDED_MONTH_NEURONS": "300000",
+        /* THE ROUTE (ENG-A06): SLASH_LARGE is his yes to the larger model's cost, and empty is no. The three after it name
+           the operator's second provider, asked when the included model fails, with its secret SLASH_FALLBACK_KEY; any
+           one empty is no second provider, and they stay empty until the published legal text names it. */
+        "SLASH_LARGE": "",
+        "SLASH_FALLBACK_URL": "",
+        "SLASH_FALLBACK_MODEL": "",
+        "SLASH_FALLBACK_PROVIDER": "",
         "BRAINDOG_BUILD": "",
         /* EMPTY IS NO SIGN-IN LINKS. The sender, on a domain Email Service sends for, switches them on
            with the `EMAIL` binding below (51 §5.8). */
@@ -623,6 +639,8 @@
         /* THE STRIPE PRICES OF CLOUD AND CLOUD PLUS, as alpha's comment says, from the live mode of his Stripe account. */
         "STRIPE_PRICE_HOSTED": "price_1UKmaqPop5yzbTmmSOx5842B",
         "STRIPE_PRICE_PLUS": "",
+        "STRIPE_PRICE_PACK_100": "",
+        "STRIPE_PRICE_PACK_500": "",
         /* WHO MAY MAKE AN ACCOUNT, as alpha's comment says. OPEN TO STRANGERS ON HIS WORD (DIRECTION §42, 8 October):
            with no bot check keyed, the strikes are tightened until it is. The site's `LAUNCH.signup` mirrors this value,
            and a site test holds them equal and fails when this line is missing. */

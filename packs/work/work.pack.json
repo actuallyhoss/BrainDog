@@ -3,7 +3,7 @@
   "version": "1.19.0",
   "title": "Work",
   "summary": "Tasks, the threads of work they belong to, and how each thread is going.",
-  "changes": "A thread has six states and the moves between them, and a day it aims for. A follow-up takes its parent's project, thread and owner, each one it left empty, and its agent when that agent made it. The Board opens with the line to add work. Which project a task or a thread is for waits until Projects is there, and who owns a task until People is.",
+  "changes": "A thread has six states and the moves between them, and a day it aims for. A follow-up takes its parent's project, thread and owner, each one it left empty, and its agent when that agent made it. The Board opens with the line to add work. Which project a task or a thread is for waits until Projects is there, and who owns a task until People is. A project that has had nothing written on its tasks for more than thirty days is marked quiet.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": { "format": 1, "primitives": 1, "packs": {} },
@@ -438,7 +438,7 @@
       "where": "thing is {{it}}",
       "value": { "age": "updated_at" },
       "format": "days",
-      "target": { "gte": 0 },
+      "target": { "lte": 30 },
       "window": "30d",
       "compare": "none",
       "when": { "holds": [ "things" ] }

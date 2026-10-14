@@ -11,7 +11,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { navShapeSignals, recommendNavShape, type NavShapeSignals } from './nav-shape.ts';
+import { navShapeSignals, recommendNavShape, SHAPE_MIN_WIDTH, type NavShapeSignals } from './nav-shape.ts';
 
 const base: NavShapeSignals = { entries: 0, sections: 0, handArranged: false, current: undefined };
 
@@ -59,6 +59,13 @@ test('a hand-arranged nav is never told to hide behind a menu, even at one entry
 
 test('below 900px nothing is recommended, because no shape chosen there would be seen', () => {
   assert.equal(recommendNavShape({ ...base, entries: 18, sections: 6, viewportWidth: 480 }), null);
+});
+
+test('THE EDGE IS SHAPE_MIN_WIDTH: 899px gives nothing, 900px gives the offer', () => {
+  assert.equal(SHAPE_MIN_WIDTH, 900);
+  const studio = { ...base, entries: 18, sections: 6, current: 'bar' as const };
+  assert.equal(recommendNavShape({ ...studio, viewportWidth: 899 }), null);
+  assert.equal(recommendNavShape({ ...studio, viewportWidth: 900 })?.shape, 'rail');
 });
 
 test('never recommends without a stated reason, across the whole matrix', () => {

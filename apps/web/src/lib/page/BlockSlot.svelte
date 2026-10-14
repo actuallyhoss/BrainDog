@@ -79,6 +79,7 @@
     pick = null,
     walk = null,
     compact = false,
+    slug = null,
   }: {
     block: LiveBlock;
     /** The block's declared index, which its id, its heading's id and its held rows are keyed by. */
@@ -121,7 +122,24 @@
      * the page is about something else and sets them aside (`asks.ts`).
      */
     compact?: boolean;
+    /** The page's address, which the block's own menu reads the page by and writes its look under; else the route's. */
+    slug?: string | null;
   } = $props();
+
+  /* ── the block's own menu ──────────────────────────────────────────────────
+     MOVE, WIDTH, COLUMN AND HIDE FROM THE BLOCK'S HEAD (PGS-B08), the owner's on a page that writes and is not being
+     arranged, for a block with a key a look may name. BEHIND `?menu` until the board of a tile's head is agreed, since a
+     control in every head changes every declared screen; Edit layout stays the way in until then. LOADED BY `import()`,
+     so neither it nor its styles reach the entry chunk. */
+  const menuSlug = $derived(slug ?? (route.params as { slug?: string }).slug ?? null);
+  const menuOn = $derived(
+    writes !== null &&
+      !arranging &&
+      menuSlug !== null &&
+      route.url.searchParams.has('menu') &&
+      (route.data as { me?: { owner?: unknown } }).me?.owner === true &&
+      /^[a-z][a-z0-9_-]{0,47}$/u.test(block.key ?? ''),
+  );
 
   /* A `{{path}}` IS ANSWERED BY THE RECORD on the block's `values`; a missing value is marked. `now` is the clock the
      rows were read against, so `{{ago:}}` agrees with the dates beside it. A HOLE IS PRESSABLE WHERE THE PAGE WRITES
@@ -263,6 +281,8 @@
         ? /* AND ON A CARD WHOSE `who` THE BLOCK ANSWERED AS A RUN (`page-live.ts` `runFaces`): what a project runs on. */
           { runs: block.runFaces }
         : {}),
+    /* AND EACH RUN'S HELPERS, beside a block of runs at work (`sessions.working`), so its card says "9 helpers". */
+    ...(block.source === 'sessions.working' && block.helpers ? { helpers: block.helpers } : {}),
     /* A PICTURE IS SERVED BY THE RECORD THE PAGE IS ON: a gallery tile's or a card's file, found in what the
        block already holds (`fileAt`) and placed under this record's address. A file the block does not hold answers
        nothing, and the tile draws its caption. */
@@ -468,6 +488,12 @@
           <span class="block-where"><span class="block-where-lead">{copy.filter}</span> {whereOf(block)}</span>
         {/if}
       </a>
+    {/if}
+    {#if menuOn && writes && menuSlug}
+      {@const reread = writes.reread}
+      {#await import('./BlockMenu.svelte') then { default: BlockMenu }}
+        <BlockMenu block={block as LiveBlock & { key: string }} slug={menuSlug} name={headingText ?? ''} {reread} />
+      {/await}
     {/if}
   </header>
 {:else}

@@ -26,7 +26,7 @@ import { kindSpec } from './kind-spec.ts';
 import { cellNamesNothing, inline, magnitudeOfCell, text as plain, type Inline, type InlineOptions } from './inline.ts';
 import { glyphPath } from './inline.ts';
 import { MISSING, barFigure, day, figureChars, headlineFigure, leadingCode, symbolFigure, symbolText, valueWord } from './format.ts';
-import { CARDS_NEXT, CARDS_NONE, cardsCount, FOLD_HIDE, FOLD_SHOW, RUN_OPEN, TREND, agentMarkFill, cardLayout, cardTrend, counted, type AgentMark, initialOf, isDimmed, isQuiet, markGlyphOf, markOf, ringDash, ringOf, runFaceOf, runMarkOf, runTokens, trendOf, type RunCell, type RunFace } from './cards.ts';
+import { CARDS_NEXT, CARDS_NONE, cardsCount, helpersOf, type Helpers, FOLD_HIDE, FOLD_SHOW, RUN_OPEN, TREND, agentMarkFill, cardLayout, cardTrend, counted, type AgentMark, initialOf, isDimmed, isQuiet, markGlyphOf, markOf, ringDash, ringOf, runFaceOf, runMarkOf, runTokens, trendOf, type RunCell, type RunFace } from './cards.ts';
 import { FEED_DAY, FEED_EARLIER, feedBurst, feedCasedNodes, feedFold, feedNew, feedPlan } from './feed.ts';
 import { FILTERS_ALL, filtersMore, filtersPlan, type Filter } from './filters.ts';
 import { QUEUE_DOES, QUEUE_REASONS, QUEUE_RECOMMENDED, fileSrc, queueMore, queuePlan, queueReasoned, queueSuggested, queueWays, type QueueShows } from './queue.ts';
@@ -65,6 +65,8 @@ export type RenderOptions = InlineOptions & {
    * a record that has none, and left out by a host that does not say, which keeps each figure as its cell wrote it.
    */
   home?: string | null;
+  /** The day a link opened a calendar on (`?day=`, `YYYY-MM-DD`): its cell is marked `aria-current="date"`. */
+  day?: string | null;
   /** Turn a spoken id into an address. A link the host cannot resolve renders as plain text. */
   link?: (spoken: string) => string | null;
   /**
@@ -1087,7 +1089,7 @@ const markFor = (o: RenderOptions, name: string): AgentMark | null => (name.trim
  * one column with no breakpoint. `--cells` is not written: 05 §4 forbids inferring a count from the
  * space, and a card grid infers nothing, it only lets empty tracks stay empty.
  */
-function cards(b: Block, o: RenderOptions & { runs?: readonly (RunCell | null)[] | undefined }): string {
+function cards(b: Block, o: RenderOptions & { runs?: readonly (RunCell | null)[] | undefined; helpers?: readonly Helpers[] | undefined }): string {
   const [head, ...rows] = b.rows;
   if (rows.length === 0) return `<p class="cards-empty">${escape(CARDS_NONE)}</p>`;
   const L = cardLayout(head?.cells ?? []);
@@ -1161,6 +1163,9 @@ function cards(b: Block, o: RenderOptions & { runs?: readonly (RunCell | null)[]
       /* THE REPLY IS THE LINE UNDER THE HEAD and the next step the card's last word before who is on it, and an empty
          cell draws neither: "Next:" over nothing says there is a step nobody wrote down. */
       const reply = L.reply >= 0 && r.cells[L.reply] ? `<p class="cards-reply">${drawn(r, L.reply)}</p>` : '';
+      /* A RUN'S HELPERS ARE SAID UNDER ITS SENTENCE, in the reply's quieter voice (`helpersOf`), and none draws nothing. */
+      const helped = helpersOf(o.helpers, n);
+      const helpers = helped ? `<p class="cards-reply" data-helpers="">${escape(helped)}</p>` : '';
       const next = L.next >= 0 && r.cells[L.next] ? `<p class="cards-next">${CARDS_NEXT}: ${drawn(r, L.next)}</p>` : '';
       /* THE LEAD IS TOLD, NEVER INFERRED (05 §4): the first card of a `cards lead` block, and the host's grid decides
          what two tracks are, so a phone's one column keeps it one card wide. */
@@ -1172,7 +1177,7 @@ function cards(b: Block, o: RenderOptions & { runs?: readonly (RunCell | null)[]
       const tinted = hue === null ? '' : ` style="--hue:${hue}"`;
       const src = L.picture >= 0 ? pictureSrc(r.cells[L.picture] ?? '', o.file) : null;
       const picture = src ? `<img class="cards-picture" src="${escape(hrefFor(o, src))}" alt="" loading="lazy">` : '';
-      return `<li class="cards-item"${leading}${toneAttrs(r.tone)}${quiet}${tinted}>${picture}<div class="cards-head">${lead}${name}${toneGlyph(r.tone)}${when}</div>${reply}${middle}${facts}${next}${who}</li>`;
+      return `<li class="cards-item"${leading}${toneAttrs(r.tone)}${quiet}${tinted}>${picture}<div class="cards-head">${lead}${name}${toneGlyph(r.tone)}${when}</div>${reply}${helpers}${middle}${facts}${next}${who}</li>`;
     })
     .join('');
   return `<ul class="cards-grid" data-cards="${cardsCount(rows.length)}">${body}</ul>`;
@@ -1869,7 +1874,7 @@ function lanes(b: Block, o: RenderOptions): string {
  */
 function calendar(b: Block, o: RenderOptions): string {
   const said = (r: Row, i: number): string => plain(inline(r.cells[i] ?? '', o));
-  const plan = calendarPlan(b.rows, roadmapToday(o.now));
+  const plan = calendarPlan(b.rows, roadmapToday(o.now), o.day);
   const skipped = plan.skipped.length ? `<p class="calendar-skipped">${escape(calendarSkipped(plan.skipped.map((i) => said(b.rows[i]!, 0) || MISSING)))}</p>` : '';
   if (plan.empty) return `<div class="calendar"><p class="calendar-empty">${escape(CALENDAR_NONE)}</p>${skipped}</div>`;
   const item = (r: Row): string => `<li class="calendar-item"${toneAttrs(r.tone)}>${cell('calendar-title', r.cells[0] || MISSING, o)}${toneGlyph(r.tone)}</li>`;
@@ -1884,7 +1889,7 @@ function calendar(b: Block, o: RenderOptions): string {
               `<tr>${week
                 .map((c) =>
                   c.inside
-                    ? `<td class="calendar-cell"${c.today ? ' data-today=""' : ''}${c.count ? ` data-count="${c.count}"` : ''}><span class="calendar-num num">${c.num}</span>${items(c.items)}${
+                    ? `<td class="calendar-cell"${c.today ? ' data-today=""' : ''}${c.count ? ` data-count="${c.count}"` : ''}${c.marked ? ' aria-current="date"' : ''}><span class="calendar-num num">${c.num}</span>${items(c.items)}${
                         c.more ? `<span class="calendar-more">${escape(calendarMore(c.more))}</span>` : ''
                       }</td>`
                     : '<td class="calendar-cell" data-outside=""></td>',

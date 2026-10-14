@@ -164,5 +164,48 @@ this product and wrong for a calendar — which is exactly what §7's restated c
 
 ---
 
+## 9 · Three strangers' Mondays
+
+Three add-ons were written as files only, for jobs nobody here runs: a landlord (`packs/landlord`), a wedding
+photographer (`packs/photographer`) and a small agency (`packs/agency`). Each was asked its owner's Monday questions,
+and each README keeps the ones the grammar could not say under "What it cannot answer yet". They are gathered here,
+each with what was missing.
+
+**Landlord.**
+
+- A property's card cannot say its own rent due, rent received or next tenancy to end: only a trend may name a figure,
+  so a card fact that reads a figure filled from its row is missing.
+- What came in for one property this month: a payment points at a tenancy and the tenancy at the property, and `where:`
+  can ask what points at a row (`pointed`) but cannot follow a link forward and then another.
+- Who is late, and by how many days: a filter compares a field with a fixed day or a day word, never with a day built
+  from a field (`bom + rent_day`).
+- What each tenant owes, all told, and rent in less repairs out: no figure over two lists, no difference of two figures,
+  and no count of months between two days.
+- Which bank payments were rent, and for which flat: an `extends` sits on the manifest, outside the parts that may wait
+  on `when: { holds }`, so the Property link on Money's ledger is not laid.
+- Smaller: rent that is not monthly has no field of its own, and repairs this year count by the day reported, not paid.
+
+**Photographer.**
+
+- (6) Days until a day still to come: `age` only counts back and stops at nought.
+- (7) The oldest enquiry's wait: `age` reads the newest day, never the oldest.
+- (8, in part) A balance column for each shoot: no column worked out from two money fields on a row.
+- (9) Earnings counted by the day paid: no figure over the day a row moved into a state.
+- (11) Double-booking: `unique` cannot be narrowed by a `where`.
+
+**Agency.**
+
+- The client furthest over: no figure takes a field of one list from a sum over another and keeps the largest.
+- Who bills least of their time: a ratio is not grouped in this build.
+- Who has not logged hours: no sentence over one list that reads another.
+- Fee an hour per client: no per-row figure over two lists.
+- Billed over worked, written round two limits: a ratio's halves share one `where`, and a product rounds each row, so
+  hours are multiplied by 100.
+
+The same gaps come back across the three: a figure over two lists, a figure filled from a card's own row, a day built
+from a field, and a count forward to a day still to come.
+
+---
+
 *Next: [15-ROADMAP](15-ROADMAP.md) for what this costs, and
 [17-OPEN-QUESTIONS](17-OPEN-QUESTIONS.md) for what it leaves open.*

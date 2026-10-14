@@ -11,7 +11,7 @@
   import { apiBase, at } from '$lib/at.ts';
   import { goto } from '$app/navigation';
   import { page as route } from '$app/state';
-  import { tick, untrack } from 'svelte';
+  import { setContext, tick, untrack } from 'svelte';
   import PageView from '$lib/page/PageView.svelte';
   import PageTabs from '$lib/page/PageTabs.svelte';
   import { tabsOf } from '$lib/page/tabs.ts';
@@ -28,6 +28,7 @@
   import { forget } from '$lib/record/boot-live.ts';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
+  import { isDay } from '$lib/record/day-href.ts';
 
   const slug = $derived(route.params.slug ?? '');
   const showSource = $derived(route.url.searchParams.get('src') === '1');
@@ -37,6 +38,18 @@
    */
   const filter = $derived(filterOf(route.url.searchParams));
   let filtered: Record<string, string> = {};
+
+  /**
+   * THE DAY A DATE OPENED THE PAGE ON (`?day=2026-11-03`, which `dayHref` writes), handed to the page's calendar so it
+   * draws that day marked and scrolls it into view. Read by the validator that wrote it, so `?day=2030-13-01` marks
+   * nothing. It goes down as a context because the blocks' options are built further in (`BlockSlot.svelte`); the key is
+   * `CALENDAR_DAY` in `braindog-render`'s `calendar.ts`, spelled again here until the package exports it.
+   */
+  const day = $derived.by(() => {
+    const asked = route.url.searchParams.get('day')?.trim() ?? '';
+    return isDay(asked) ? asked : null;
+  });
+  setContext('braindog-render.calendar-day', () => day);
 
   /**
    * WHERE THE PAGE CAME FROM: the record's `page` answer, the record saying it has no such page, or the

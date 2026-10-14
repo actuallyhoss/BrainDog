@@ -31,6 +31,8 @@ export type Look = {
   scheme?: 'light' | 'dark' | undefined;
   text?: 'sm' | 'base' | 'md' | undefined;
   density?: 'compact' | 'comfortable' | 'roomy' | undefined;
+  /** Screenshot mode (`shot/mode.ts`), on in this tab or not. A display mode, so it is the screen's word and not the cookie's. */
+  shot?: boolean | undefined;
 };
 
 /** One place a person can open on, hide or rename, by the name their nav shows and its own title. */
@@ -65,6 +67,8 @@ export type LookKey = 'scheme' | 'text' | 'density';
 /** What pressing the row does. The palette switches on `kind`; `customise-apply.ts` makes the write. */
 export type Change =
   | { kind: 'look'; key: LookKey; value: string; name: string }
+  /** Screenshot mode on or off, kept as the person's `look.shot`. */
+  | { kind: 'shot'; on: boolean }
   | { kind: 'home'; href: string; name: string }
   | { kind: 'hide'; href: string; name: string }
   | { kind: 'show'; href: string; name: string }
@@ -97,6 +101,15 @@ const LOOKS: readonly LookRow[] = [
 
 /** Each setting's value when nothing is kept, so the row for it is absent on a fresh device. */
 const DEFAULTS: Record<LookKey, string> = { scheme: 'system', text: 'base', density: 'comfortable' };
+
+/**
+ * SCREENSHOT MODE, ONE ROW THAT SAYS WHAT A PRESS DOES: on while it is off, off while it is on. Its title and detail are
+ * `copy/palette.ts`'s (`customise.shot`, `customise.shotDetail`), where the mode's own list of legible words reads them.
+ */
+const SHOT = {
+  /* NOT "hide": "hide" alone is the verb that takes a page, and draws nothing until one is named. */
+  also: 'screenshot values shoulder screen private',
+};
 
 /** The words that find the two rows that go somewhere rather than change something. */
 const PAGE_ALSO = 'customize edit layout arrange change blocks';
@@ -169,6 +182,10 @@ export function customise(query: string, here: Here): Offer[] {
     if ((here.look[row.key] ?? DEFAULTS[row.key]) === row.value) continue;
     if (!names(said, `${row.title} ${row.also}`)) continue;
     out.push({ id: `cz-${row.key}-${row.value}`, title: row.title, detail: kept, icon: row.icon, change: { kind: 'look', key: row.key, value: row.value, name: row.title }, complete: row.title });
+  }
+  if (names(said, `${w.shot} ${SHOT.also}`)) {
+    const on = here.look.shot !== true;
+    out.push({ id: 'cz-shot', title: w.shot, detail: on ? w.shotDetail : copy.screenshotOn, icon: 'eye', change: { kind: 'shot', on }, complete: w.shot });
   }
   if (here.pageMenu && names(said, `${w.page} ${PAGE_ALSO}`))
     out.push({ id: 'cz-page', title: w.page, detail: w.pageDetail, icon: 'grid', change: { kind: 'page' }, complete: w.page });

@@ -145,6 +145,30 @@ export function historyOf(look: LiveLook | null, kept: string | null = null): st
   return null;
 }
 
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+/** A day as a person says it, "7 October", or `null` when the record sent none that reads. */
+const dayOf = (at: string | null | undefined): string | null => {
+  const d = typeof at === 'string' && at !== '' ? new Date(at) : null;
+  return d === null || Number.isNaN(d.getTime()) ? null : `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+};
+
+/**
+ * PUT BACK, NAMED BY WHOSE LOOK IT TAKES OFF (PGS-B12): "Put back: Slash's arrangement of 7 October", or "your
+ * arrangement" for the person's own pin or arrangement, any day after. `at` is when the look was written, when the record
+ * says; without it the line names no day. `null` where the rules arranged the page and there is nothing to put back.
+ */
+export function putBackWords(look: LiveLook | null, at: string | null | undefined): string | null {
+  if (look === null || (look.by !== 'slash' && look.by !== 'owner')) return null;
+  const whose = look.by === 'slash' ? "Slash's arrangement" : 'your arrangement';
+  const day = dayOf(at);
+  return `Put back: ${whose}${day === null ? '' : ` of ${day}`}`;
+}
+
+/** What came back once Put back was pressed, said over the page by its title. */
+export const putBackSaid = (title: string, restored: 'previous' | 'rules'): string =>
+  restored === 'rules' ? `${title} is back as BrainDog arranges it.` : `${title} is back as it was before.`;
+
 /**
  * Where the look's next action goes: a row it names by its handle (`tasks#4`), opened beside the page, else at its own
  * address; a question waiting on the reader, on Decide; anything else is the line alone.
@@ -230,6 +254,52 @@ export function pinBody(slug: string, look: LiveLook | null, keys: readonly stri
   });
 }
 
+/** A block the look hides, by its key and its heading, and whether the person's own look hid it or the engine did. */
+export type Hidden = { readonly key: string; readonly heading: string; readonly by: 'you' | 'engine' };
+
+/** A block as Hidden names it: its key, and its heading when it has one. */
+export type Headed = { readonly key: string; readonly heading?: string | null | undefined };
+
+/** A key in words, for a block whose heading the page did not hand over: `open-tasks` is "Open tasks". */
+const keyWords = (key: string): string => key.replace(/[-_]+/gu, ' ').trim().replace(/^./u, (c) => c.toUpperCase());
+
+/**
+ * WHAT THE LOOK HIDES, so the page menu can say "Hidden (2)" and offer Show beside each (PGS-B08). The person's own look
+ * hid what it hides, and any other look is the engine's (Slash's or the rules'). A pinned block is never hidden
+ * (`mergeLook`), so none is listed. Each by its heading, else its key in words, never the key itself.
+ */
+export function hiddenOf(look: LiveLook | null, blocks: readonly Headed[]): Hidden[] {
+  if (look === null) return [];
+  const pins = new Set(look.pinned);
+  const heads = new Map(blocks.map((b) => [b.key, b.heading?.trim() || null]));
+  const by = look.by === 'owner' ? 'you' : 'engine';
+  return [...new Set(look.hide)].filter((k) => !pins.has(k)).map((key) => ({ key, heading: heads.get(key) ?? keyWords(key), by }));
+}
+
+/**
+ * SHOW ONE HIDDEN BLOCK: the person's own look with that key out of `hide` and in `pinned`, the one way his look outranks
+ * the engine's hide (`mergeLook` hides nothing he pinned). The record answers the look already merged, his over the
+ * engine's, so a key on his own look may be the engine's to hide as well: it is pinned either way, or it would stay
+ * hidden. Over a look that is not his, his own is written with that one pin and nothing else, so the engine still
+ * arranges the rest. His headline and next action are left out, as Pin leaves them, for the engine to fill in.
+ */
+export function showBody(slug: string, look: LiveLook | null, key: string): Body {
+  const his = look?.by === 'owner';
+  const hide = (his ? look!.hide : []).filter((k) => k !== key);
+  const pinned = [...new Set([...(his ? look!.pinned : []), key])].filter((k) => BLOCK_KEY.test(k));
+  return bodyOf(slug, {
+    basis: look?.basis ?? null,
+    lead: his ? look!.lead : null,
+    order: his ? look!.order : [],
+    hide,
+    headline: null,
+    next: null,
+    pinned,
+    by: 'owner',
+    page: slug,
+  });
+}
+
 /* ── the writes ─────────────────────────────────────────────────────────── */
 
 export type Wrote = { ok: true } | { ok: false; fix: string; code?: string };
@@ -278,6 +348,22 @@ export async function undoLook(base: string, slug: string, io?: Fetch): Promise<
 export async function keepLook(base: string, slug: string, io?: Fetch): Promise<Wrote> {
   const out = await said(createClient({ base, ...(io ? { fetch: io } : {}) }).call('keepLook', { page: slug }));
   return unrouted(out) ? { ok: true } : out;
+}
+
+/** What Put back answers: what came back, or the record's sentence for why nothing did. */
+export type PutBack = { ok: true; restored: 'previous' | 'rules' } | { ok: false; fix: string; code?: string };
+
+/**
+ * PUT BACK, ANY DAY AFTER: the record's `undoLook`, one step back whoever wrote the look, the person's pin as much as
+ * Slash's arrangement. Unlike the six-second Undo it has no stand-in where the record does not route it: retiring the
+ * look is not one step back from a pin, so the line says the record cannot yet.
+ */
+export async function putBack(base: string, slug: string, io?: Fetch): Promise<PutBack> {
+  const got = (await createClient({ base, ...(io ? { fetch: io } : {}) }).call('undoLook', { page: slug })) as { ok: boolean; value?: { restored?: unknown } };
+  if (got.ok) return { ok: true, restored: got.value?.restored === 'rules' ? 'rules' : 'previous' };
+  const out = await said(Promise.resolve(got));
+  if (out.ok) return { ok: true, restored: 'previous' };
+  return unrouted(out) ? { ok: false, fix: 'This record cannot put a page back yet.', code: 'ROUTE_UNKNOWN' } : out;
 }
 
 /* ── the six seconds ────────────────────────────────────────────────────── */

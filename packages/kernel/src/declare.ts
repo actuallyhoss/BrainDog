@@ -53,7 +53,7 @@ import { pairsFault } from './pairs.ts';
 import { DELETE_RULES } from './referenced.ts';
 import { spanMs } from './vault.ts';
 import { actionsOf, callFault, flowFault, sealedAs, subjectOf } from './flow-lint.ts';
-import { BLOCK_INSTALLS, BLOCK_KEY, FILTER_CONTROLS, FILTER_TYPES, FILTERS_MOST, NAV_KEYS, PAGE_KEYS, PAGE_UNBUILT, feedSaysFault, forecastAxisFault, keyedBlocks, keysFor, kindsReading, unreadBlockKey, unreadPageKey, wrongKindKey } from './block-keys.ts';
+import { BLOCK_INSTALLS, BLOCK_KEY, FILTER_CONTROLS, FILTER_TYPES, FILTERS_MOST, NAV_KEYS, PAGE_KEYS, PAGE_UNBUILT, feedSaysFault, forecastAxisFault, keyedBlocks, keysFor, kindsReading, noteSaysFault, unreadBlockKey, unreadPageKey, whenTreeFault, wrongKindKey } from './block-keys.ts';
 import { LOOK_BASIS_BYTES, LOOK_BY, LOOK_GROUPS_MOST, LOOK_HEADLINE_BYTES, LOOK_KEYS, LOOK_KEYS_MOST, LOOK_NEXT_BYTES, withoutHoles } from './compose.ts';
 /* THE KINDS THAT READ THEMSELVES, admitted into `BLOCK_KINDS` and asked to check their own blocks at install. */
 import { BLOCK_KIND_MODULES, kindModule } from './kinds/index.ts';
@@ -1075,24 +1075,10 @@ function whenLeafFault(leaf: unknown, said: string): string | null {
  * nothing is a block that is either always drawn or never, and both of those are indistinguishable from the block
  * working.
  *
- * `all:` IS FLAT AND IS THE WHOLE WHEN. One leaf in it is the leaf written the long way, none is a block that never
- * draws, an `all` inside one says nothing the outer one does not, and a `metric:` or a test beside it would never be
- * read (`pages.ts` `drawnWhen` reads the leaves and nothing else). Each is refused with what to write instead.
+ * all: OR any:, TWO LEVELS DEEP AT MOST (block-keys.ts whenTreeFault), each leaf checked here by whenLeafFault.
  */
 function whenFault(when: unknown, said: string): string | null {
-  if (when === null || typeof when !== 'object' || !Object.hasOwn(when, 'all')) return whenLeafFault(when, said);
-  const all = (when as { all: unknown }).all;
-  const beside = Object.keys(when).filter((k) => k !== 'all');
-  if (beside.length > 0) return `${said} says all and ${beside.join(' and ')}. all is the whole when, so move ${beside.length > 1 ? 'them' : 'it'} into a leaf: { all: [{ metric, ... }, { metric, ... }] }.`;
-  if (!Array.isArray(all) || all.length < 2)
-    return `${said} has an all of ${Array.isArray(all) ? (all.length === 1 ? 'one leaf' : 'no leaves') : JSON.stringify(all ?? null)}, and all is two or more leaves that must every one hold. Write one test as the leaf alone, when: { metric, ... }.`;
-  for (const [i, leaf] of all.entries()) {
-    if (leaf !== null && typeof leaf === 'object' && Object.hasOwn(leaf, 'all'))
-      return `${said} all[${i}] is an all inside an all. Every leaf must hold either way, so write them as one all: { all: [leaf, leaf, leaf] }.`;
-    const fault = whenLeafFault(leaf, `${said} all[${i}]`);
-    if (fault) return fault;
-  }
-  return null;
+  return whenTreeFault(when, said, whenLeafFault);
 }
 
 /* ── a part that waits on what the record holds (SHL-A08) ──────────────────────────────────────────────────────── */
@@ -1862,6 +1848,9 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
     /* A FORECAST'S `axis` IS ONE OF TWO WORDS (`forecastAxisFault`): a stray one would draw as fitted and say nothing. */
     const axised = kind === 'forecast' ? forecastAxisFault(raw as Readonly<Record<string, unknown>>, `${id}.${at}`) : null;
     if (axised) return bad('DECLARATION_INVALID', axised.fix, `${at}.${axised.at}`, axised.allowed);
+    /* A NOTE'S says: IS CHECKED AS THE READ CHECKS IT (block-keys.ts noteSaysFault), each sentence's when with this file's leaf check. */
+    const sayed = kind === 'note' ? noteSaysFault(raw as Readonly<Record<string, unknown>>, `${id}.${at}`, whenLeafFault) : null;
+    if (sayed) return bad('DECLARATION_INVALID', sayed.fix, `${at}.${sayed.at}`, sayed.allowed);
     if (kind !== 'cards' && kind !== 'feed' && block.fold !== undefined && typeof block.fold !== 'boolean')
       return bad('DECLARATION_INVALID', `${id}.${at}'s fold is true or false: whether the section starts shut.`, at);
     const grouped = kind === 'cards' || kind === 'table' ? cardGroupFault(id, at, raw as Readonly<Record<string, unknown>>, installed) : null;
@@ -2052,7 +2041,7 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
             if (block.kind !== 'cards')
               return bad('DECLARATION_INVALID', `${id}.${at} is ${String(block.kind)} and gives a column edit: true, which only a card's line reads. Take edit: off, or draw the block as cards.`, at);
             if (column.metric !== undefined)
-              return bad('DECLARATION_INVALID', `${id}.${at} gives a trend column edit: true, and a trend is a figure the record works out, never typed. Take edit: off the trend.`, at);
+              return bad('DECLARATION_INVALID', `${id}.${at} gives a ${column.as === 'when' ? 'when' : 'trend'} column edit: true, and a ${column.as === 'when' ? 'when over a figure' : 'trend'} is a figure the record works out, never typed. Take edit: off the ${column.as === 'when' ? 'when' : 'trend'}.`, at);
             if (column.or !== undefined)
               return bad('DECLARATION_INVALID', `${id}.${at} gives a column edit: true and an or:, so a line typed on could be either field. Take the or: off, or edit: off.`, at);
             if (typeof column.field !== 'string' || column.field === '')
@@ -2068,20 +2057,22 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
           }
         }
         /* A CARD'S TREND MAY NAME A FIGURE IN PLACE OF A FIELD, grouped by a date bucket and read once a card with
-           `{{field}}` in its id filled from the card's row (`pages.ts` `trendsOf`). Nothing else draws a figure in a
-           column, so a `metric:` anywhere else would install and draw nothing. */
+           `{{field}}` in its id filled from the card's row (`pages.ts` `trendsOf`). AND SO MAY ITS WHEN (W096,
+           REC-C16): one number a card, the days since its project was worked on, read the same way (`whensOf`).
+           Nothing else draws a figure in a column, so a `metric:` anywhere else would install and draw nothing. */
         if (column !== null && typeof column === 'object' && column.metric !== undefined) {
-          if (block.kind !== 'cards' || column.as !== 'trend')
-            return bad('DECLARATION_INVALID', `${id}.${at} gives a column a metric:, which only a card's trend reads: { metric, as: trend } on a cards block.`, at);
+          if (block.kind !== 'cards' || (column.as !== 'trend' && column.as !== 'when'))
+            return bad('DECLARATION_INVALID', `${id}.${at} gives a column a metric:, which only a card's trend or its when reads: { metric, as: trend } or { metric, as: when } on a cards block.`, at);
           if (column.field !== undefined)
             return bad('DECLARATION_INVALID', `${id}.${at} gives a column both a field and a metric. A trend column names the figure alone.`, at);
           if (column.or !== undefined)
             return bad('DECLARATION_INVALID', `${id}.${at} gives a trend column an or:, which is a second field to read. A trend column names the figure alone.`, at);
           if (typeof column.metric !== 'string' || !METRIC_ID.test(metricNamed(column.metric)))
             return bad('DECLARATION_INVALID', `${id}.${at}'s trend names a figure by its id, with {{field}} after a colon for a figure of each card, as project-done-by-week:{{name}}.`, at);
-          const n = (roles.get('trend') ?? 0) + 1;
-          roles.set('trend', n);
-          if (n > 1) return bad('OUT_OF_BOUNDS', `${id}.${at} has ${n} columns as trend. A card takes one of each role, one figure among them, and at most ${CARD_FACTS} facts.`, at);
+          const role = column.as;
+          const n = (roles.get(role) ?? 0) + 1;
+          roles.set(role, n);
+          if (n > 1) return bad('OUT_OF_BOUNDS', `${id}.${at} has ${n} columns as ${role}. A card takes one of each role, one figure among them, and at most ${CARD_FACTS} facts.`, at);
           continue;
         }
         if (typeof column?.field !== 'string' || column.field === '')

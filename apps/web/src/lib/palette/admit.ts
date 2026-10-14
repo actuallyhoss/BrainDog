@@ -117,10 +117,26 @@ export type Command = {
   binding?: string;
   /** Present only on a command that can be unavailable. Absent means it can always run. */
   when?: (live: Live) => boolean;
+  /**
+   * THE OTHER WORDS A PERSON REACHES FOR (EXP-D13). Somebody after their mail types `mail`, not `Inbox`, and a
+   * palette that answers only to the screen's own name makes them learn the app's vocabulary first. Plain lower-case
+   * words, at most six, and never another command's name: `scoreOf` ranks an alias hit below every hit on a title, so
+   * a word that is somebody else's name would be a second door to the wrong place.
+   */
+  aliases?: readonly string[];
 };
 
-/** Which test a row failed, so a refusal can be reported rather than silently swallowed. */
-export type Refusal = 'object-first' | 'not-everywhere' | 'unsayable';
+/**
+ * Which test a row failed, so a refusal can be reported rather than silently swallowed. `alias` is the fourth, and it
+ * is about the other words rather than the name: one empty, too long, not plain lower-case, more than six, or another
+ * command's name.
+ */
+export type Refusal = 'object-first' | 'not-everywhere' | 'unsayable' | 'alias';
+
+/** An alias is plain lower-case words, a space between them, and short enough to be something a person types. */
+const ALIAS = /^[a-z]+(?: [a-z]+)*$/u;
+const ALIAS_MOST = 6;
+const ALIAS_LONGEST = 24;
 
 /**
  * The registry's own label for the undo binding, READ from the registry.
@@ -159,8 +175,13 @@ const typeable = (title: string): boolean => {
   return want.every((word) => has.some((token) => token.startsWith(word)));
 };
 
-/** The rule, as code. `null` is admitted; anything else names the test it failed. */
-export function admits(c: Command): Refusal | null {
+/**
+ * The rule, as code. `null` is admitted; anything else names the test it failed.
+ *
+ * `among` is the list an alias may not be a name in, `COMMANDS` unless a test asks of another. A command's own name
+ * is left out by its id, so a fixture that borrows a shipped row's words is not refused for being itself.
+ */
+export function admits(c: Command, among: readonly Command[] = COMMANDS): Refusal | null {
   const acts = c.act !== undefined && (ACTS as readonly string[]).includes(c.act);
 
   // 1. No object is required before it.
@@ -173,7 +194,65 @@ export function admits(c: Command): Refusal | null {
   // 3. It has a name somebody would type.
   if (!typeable(c.title)) return 'unsayable';
 
+  // 4. Its other words are words, and nobody else's name.
+  if (c.aliases !== undefined) {
+    if (c.aliases.length > ALIAS_MOST) return 'alias';
+    const names = new Set(among.filter((o) => o.id !== c.id).map((o) => plain(o.title)));
+    for (const a of c.aliases) if (a.length > ALIAS_LONGEST || !ALIAS.test(a) || names.has(a)) return 'alias';
+  }
+
   return null;
+}
+
+/** Words as the query grammar reads them, joined by one space: `Sign in` and `sign  in!` are both `sign in`. */
+const plain = (s: string): string => tokensOf(s).join(' ');
+
+/**
+ * HOW WELL A COMMAND ANSWERS WHAT WAS TYPED, or `null` when it does not answer at all (EXP-D13, HD.119's one matcher).
+ *
+ * The order is the order of how sure the hit is. The whole name typed is 5, the name's beginning 4, the beginning of a
+ * word in it 3 (every typed word starting one of the name's words, the rule the palette filtered with before), the
+ * name holding it somewhere 2, and one of the command's other words equal to it or starting with it 1. AN ALIAS IS
+ * LAST ON PURPOSE: a person who typed the start of a name meant that name, and the other words are for the person
+ * who did not know it.
+ *
+ * THE MIDDLE OF A WORD NEEDS THREE LETTERS. `ing` finding Settings is a guess worth showing; `e` finding every name
+ * with an e in it is the panel filling up with rows nobody asked for.
+ */
+export function scoreOf(c: Command, needle: string): number | null {
+  const want = terms(needle);
+  if (!want) return null;
+  const typed = want.join(' ');
+  const title = plain(c.title);
+  if (title === typed) return 5;
+  if (title.startsWith(typed)) return 4;
+  const has = tokensOf(c.title);
+  if (want.every((w) => has.some((tok) => tok.startsWith(w)))) return 3;
+  if (typed.length >= 3 && title.includes(typed)) return 2;
+  if ((c.aliases ?? []).some((a) => a.startsWith(typed))) return 1;
+  return null;
+}
+
+/** A command with how well it answered, so a caller can draw the best first and still say why. */
+export type Ranked = Command & { score: number };
+
+/**
+ * THE COMMANDS THAT ANSWER, BEST FIRST, in one ordered list within each group.
+ *
+ * The groups keep the order their first command was declared in, so the palette's headings do not swap places as a
+ * person types; inside a group the best hit leads and a tie keeps the declared order. With nothing typed every
+ * command answers with 0, in the order declared, which is the list a freshly opened palette shows. Something typed
+ * that holds no letter or digit answers nothing, the honest answer `starts()` gave.
+ */
+export function ranked(list: readonly Command[], needle: string): Ranked[] {
+  const blank = needle.trim() === '';
+  const groups = [...new Set(list.map((c) => c.group))];
+  const hits = list.flatMap((c, at) => {
+    const score = blank ? 0 : scoreOf(c, needle);
+    return score === null ? [] : [{ c, at, score }];
+  });
+  hits.sort((a, b) => groups.indexOf(a.c.group) - groups.indexOf(b.c.group) || b.score - a.score || a.at - b.at);
+  return hits.map((h) => ({ ...h.c, score: h.score }));
 }
 
 /**
@@ -188,27 +267,27 @@ export function commands(live: Live): Command[] {
 }
 
 export const COMMANDS: readonly Command[] = [
-  { id: 'c-home', title: copy.home, href: '/', group: copy.destinations, icon: 'today' },
-  { id: 'c-decide', title: copy.decide, href: '/decide', group: copy.destinations, icon: 'decide' },
-  { id: 'c-inbox', title: copy.inbox, href: '/inbox', group: copy.destinations, icon: 'inbox' },
-  { id: 'c-vault', title: copy.vault, href: '/vault', group: copy.destinations, icon: 'vault' },
-  { id: 'c-packs', title: copy.packs, href: '/packs', group: copy.destinations, icon: 'packs' },
+  { id: 'c-home', title: copy.home, href: '/', group: copy.destinations, icon: 'today', aliases: ['start', 'today', 'dashboard', 'overview'] },
+  { id: 'c-decide', title: copy.decide, href: '/decide', group: copy.destinations, icon: 'decide', aliases: ['questions', 'approve', 'approvals', 'pending'] },
+  { id: 'c-inbox', title: copy.inbox, href: '/inbox', group: copy.destinations, icon: 'inbox', aliases: ['mail', 'messages', 'email', 'incoming'] },
+  { id: 'c-vault', title: copy.vault, href: '/vault', group: copy.destinations, icon: 'vault', aliases: ['keys', 'secrets', 'passwords', 'tokens'] },
+  { id: 'c-packs', title: copy.packs, href: '/packs', group: copy.destinations, icon: 'packs', aliases: ['packs', 'extensions', 'plugins', 'install'] },
   /* SLASH'S PAGE, what it noticed and suggests; its title is its name, which is why it is not a copy key. */
-  { id: 'c-slash', title: 'Slash', href: '/slash', group: copy.destinations, icon: 'slash' },
+  { id: 'c-slash', title: 'Slash', href: '/slash', group: copy.destinations, icon: 'slash', aliases: ['suggestions', 'noticed'] },
   /* AUTOMATIONS, the canvas an owner and an agent both edit. Reachable only by its address
      until it was here and in the rail. */
-  { id: 'c-automations', title: copy.automations, href: '/automations', group: copy.destinations, icon: 'refresh' },
-  { id: 'c-settings', title: copy.settings, href: '/settings', group: copy.destinations, icon: 'settings' },
+  { id: 'c-automations', title: copy.automations, href: '/automations', group: copy.destinations, icon: 'refresh', aliases: ['rules', 'workflows', 'triggers', 'schedules'] },
+  { id: 'c-settings', title: copy.settings, href: '/settings', group: copy.destinations, icon: 'settings', aliases: ['preferences', 'configure', 'account', 'profile'] },
   /* THE FRONT DOOR, WHICH NOTHING LINKED TO. A screen with no way in is the same as no screen,
      and the palette is `19 §4`'s primary way to reach one. */
-  { id: 'c-signin', title: copy.signIn, href: '/signin', group: copy.destinations, icon: 'lock' },
+  { id: 'c-signin', title: copy.signIn, href: '/signin', group: copy.destinations, icon: 'lock', aliases: ['login', 'log in', 'signin'] },
   /* THE ROUTE THE SHORTCUT TEACHER DID NOT TEACH. `g s` was bound, the `?` sheet advertised it, and
      `/search` appeared in no nav, no tab bar, no More sheet and not here, so typing `sear` found
      nothing, and on a phone the route was reachable only from the palette's overflow row, which is
      to say only from inside the cap it exists to relieve. */
-  { id: 'c-search', title: copy.search, href: '/search', group: copy.destinations, icon: 'search' },
-  { id: 'c-audit', title: copy.audit, href: '/audit', group: copy.destinations, icon: 'activity' },
-  { id: 'c-keys', title: copy.keymap, href: '/settings/keyboard', group: copy.commands, icon: 'keyboard' },
+  { id: 'c-search', title: copy.search, href: '/search', group: copy.destinations, icon: 'search', aliases: ['find', 'lookup'] },
+  { id: 'c-audit', title: copy.audit, href: '/audit', group: copy.destinations, icon: 'activity', aliases: ['audit', 'history', 'log', 'changes'] },
+  { id: 'c-keys', title: copy.keymap, href: '/settings/keyboard', group: copy.commands, icon: 'keyboard', aliases: ['shortcuts', 'hotkeys', 'bindings'] },
   /**
    * THE FIRST ROW IN THIS PRODUCT'S PALETTE THAT DOES SOMETHING RATHER THAN GO SOMEWHERE.
    *
@@ -230,6 +309,7 @@ export const COMMANDS: readonly Command[] = [
     binding: 'undo',
     group: copy.commands,
     icon: 'back',
+    aliases: ['revert', 'reverse'],
     when: (live) => live.undoable,
   },
   /**

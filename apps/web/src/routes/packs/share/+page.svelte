@@ -51,6 +51,22 @@
   import Preview from '../browse/Preview.svelte';
   import { drawnOrder, exportShared, listWords, moduleTitle, offeredVersion, rowTitle, speakingOf, speakingStates } from '../sharing.ts';
   import { skillsOnce, words, type SkillOffer } from './share.ts';
+  import { replaceState } from '$app/navigation';
+  import Segmented from '$lib/ui/Segmented.svelte';
+  import AddonFrom from './AddonFrom.svelte';
+  import { ADDON_MODE, MODE_PARAM, modeOf, words as addonWords, type Mode } from './addon-from.ts';
+
+  /* TWO MODES, ONE SCREEN: the whole setup as a use case, or an add-on from what the person made. The Add-ons
+     screen's offer opens the second by `?mode=addon`, and a switch keeps the address in step without a reload. */
+  let mode = $state<Mode>(modeOf(page.url.searchParams));
+  function switchTo(next: Mode) {
+    if (next === mode) return;
+    mode = next;
+    const url = new URL(page.url);
+    if (next === 'addon') url.searchParams.set(MODE_PARAM, ADDON_MODE);
+    else url.searchParams.delete(MODE_PARAM);
+    replaceState(url, page.state);
+  }
 
   const AUDIENCES = ['individual', 'founder', 'team', 'starter', 'other'] as const;
   const EXAMPLES_MOST = 8;
@@ -281,10 +297,17 @@
 
 <svelte:head><title>{titleOf(copy.shareSetup)}</title></svelte:head>
 
-<PageHead icon="packs" kicker={copy.packs} back="/packs" title={copy.shareSetup} sentence={copy.shareWhat} />
+<PageHead icon="packs" kicker={copy.packs} back="/packs" title={copy.shareSetup} sentence={mode === 'addon' ? addonWords.sentence : copy.shareWhat} />
 
 <div class="page">
-  {#if refused}
+  <Segmented role="group" aria-label={addonWords.modeGroup}>
+    {#each [['usecase', addonWords.modeUseCase], ['addon', addonWords.modeAddon]] as const as [m, label] (m)}
+      <button type="button" class="segment" aria-pressed={mode === m} data-on={mode === m ? '' : undefined} onclick={() => switchTo(m)}>{label}</button>
+    {/each}
+  </Segmented>
+  {#if mode === 'addon'}
+    <AddonFrom />
+  {:else if refused}
     <Empty kind="error" title={refused} />
   {:else}
     {#if live && speaking === null}<p class="note">{copy.shareNoUseCase}</p>{/if}

@@ -165,14 +165,21 @@ export function alongside(arranged: Arrangement, proposed: UseCase | null): UseC
 export const MODULE_ORDER = ['portfolio', 'people', 'money-core', 'estate', 'work', 'agents'] as const;
 
 /**
- * The packs to install for a use case: its own modules and any the sentence named, the first-party ones in install order
+ * The modules a use case cannot stand without: its `needs`, or all of its `modules` when it says none (USE-B08). What a
+ * record starts with, before the person's words add to it; the rest of `modules` is what it grows into. Read wherever a
+ * use case's modules are INSTALLED, never where they are offered or described, which is still all of `modules`.
+ */
+export const standsOn = (u: UseCase): readonly string[] => u.needs ?? u.modules;
+
+/**
+ * The packs to install for a use case: what it stands on and any the sentence named, the first-party ones in install order
  * and then any other catalogue pack in the order it was named.
  *
  * A CATALOGUE PACK IS KEPT, since a use case may stand on any pack (`@braindog/declare` `MODULES`). It
  * goes after the first-party ones because it may point at their lists and they never point at its.
  */
 export function modulesFor(u: UseCase, named: readonly string[] = []): string[] {
-  const wanted = new Set([...u.modules, ...named]);
+  const wanted = new Set([...standsOn(u), ...named]);
   const first = new Set<string>(MODULE_ORDER);
   return [...MODULE_ORDER.filter((id) => wanted.has(id)), ...[...wanted].filter((id) => !first.has(id))];
 }

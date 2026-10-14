@@ -52,9 +52,16 @@
       "text": "24 Dec 2030 · in "
     },
     {
-      "rule": "Values: no day is a link, since no page of the app is a calendar",
+      "rule": "Values: a day is a link to the calendar on its day",
       "page": "Values",
-      "selector": "a .typed:is([data-form=\"date\"], [data-form=\"day\"])",
+      "selector": "a[href*=\"/p/calendar?day=2030-12-24\"] .typed[data-form=\"date\"]",
+      "count": 1
+    },
+    {
+      "rule": "Calendar: only a day the months hold is marked as the current date, so a day years ahead marks none",
+      "page": "Values",
+      "path": "/p/calendar?day=2030-12-24",
+      "selector": ".calendar-cell[aria-current]",
       "count": 0
     },
     {

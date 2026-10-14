@@ -27,7 +27,7 @@ import type { AccountCall, AccountClosed, AuthCall, AuthResult, Suspended, Who }
 import { no, ok } from '@braindog/ports';
 import { ulids } from '@braindog/kernel';
 
-import { PLANS, PLAN_TABLE, type Allowance, type Plan } from './plans.ts';
+import { PACKS, PLANS, PLAN_TABLE, type Allowance, type Plan } from './plans.ts';
 import { codeHash, createAuth, signInForgotten, type AuthConfig } from './identity.ts';
 import type { DirectoryAuth, SessionAsk } from './identity.ts';
 
@@ -82,7 +82,7 @@ const RESERVED = new Set([
      `/app/settings/agents` two pages at once, for ever. `fonts` and `catalogue` are the static folders served under
      `/app` beside the pages. `test/directory.test.ts` reads the app's route and static folders and fails for any this
      set does not hold, so a route added later cannot fall behind it. */
-  'activity', 'audit', 'automations', 'catalogue', 'connect', 'decide', 'fonts', 'inbox', 'invite', 'jobs', 'packs', 'scripts', 'search',
+  'activity', 'agents', 'audit', 'automations', 'catalogue', 'connect', 'decide', 'fonts', 'inbox', 'invite', 'jobs', 'packs', 'scripts', 'search',
   'settings', 'signin', 'signup', 'slash', 'start', 't', 'usage', 'v', 'vault',
 ]);
 
@@ -350,6 +350,24 @@ CREATE TABLE IF NOT EXISTS dir_billing (
 );
 CREATE INDEX IF NOT EXISTS dir_billing_customer ON dir_billing(customer);
 
+-- SLASH CREDITS BOUGHT: one row per pack paid for, keyed by the payment event, so Stripe delivering it twice adds once.
+-- A month's included credits are not here: they are the plan's figure against the month's asks in dir_usage_slash,
+-- and only what a pack adds on top is a balance to keep. left falls as asks spend it, oldest pack first, and to zero
+-- on a refund; the row stays, so a redelivered payment still finds its event. A pack does not end with the month. It
+-- ends with the record: closing one deletes its rows.
+-- A NEW TABLE AND NOT A COLUMN, for the reason dir_inbound gives above: created on the next open, DIRECTORY_VERSION
+-- unmoved, and no CHECK.
+CREATE TABLE IF NOT EXISTS dir_credit (
+  event     TEXT PRIMARY KEY,               -- the payment's own key: the Stripe cs_... session that paid for it
+  record    TEXT NOT NULL,                  -- rec_...
+  person    TEXT NOT NULL,                  -- who bought it
+  pack      TEXT NOT NULL,                  -- a PACKS id, checked in code
+  credits   INTEGER NOT NULL,               -- what the pack held when bought
+  left      INTEGER NOT NULL,               -- what is still unspent, never below zero
+  bought_at INTEGER NOT NULL                -- epoch ms; the spend order, oldest first
+);
+CREATE INDEX IF NOT EXISTS dir_credit_record ON dir_credit(record, bought_at);
+
 -- A webhook event already applied, by its evt_ id, so Stripe delivering one twice changes the account once.
 -- Pruned after forty days by the write that adds the next, the window dir_usage_run keeps a counted run's id for.
 CREATE TABLE IF NOT EXISTS dir_stripe_event (
@@ -453,8 +471,12 @@ export type RecordUsage = {
   /**
    * Slash's asks over the range and the neurons they spent, by day (`dir_usage_slash`): counted, and in none of the
    * totals above, because the record's own `ask_cap` holds them and the allowance never does.
+   *
+   * AND THE MONTH'S CREDITS BESIDE THEM, at the Directory's clock and not over the range: `included` is the plan's,
+   * `used` the month's asks, `packs` what is left of every pack bought, and `left = max(0, included - used) + packs`.
+   * `included` and `left` are `null` on a plan whose credits are `null`. `used` lags by up to a day (`dir_usage_slash`).
    */
-  slash: { asks: number; neurons: number; days: SlashDay[] };
+  slash: { included: number | null; used: number; packs: number; left: number | null; asks: number; neurons: number; days: SlashDay[] };
 };
 
 /** One UTC day of a record's Slash asks, as the record's own ledger totals it: what `meterSlash` takes and `usage` answers. */
@@ -687,6 +709,9 @@ export const CARRIED = [
      event a second time. */
   'dir_billing',
   'dir_stripe_event',
+  /* THE PACKS BOUGHT AND WHAT IS LEFT OF EACH: money paid, which a restore must not forget. Before `dir_inbound`, so a
+     copy still ends on a forwarding digest, as copies before it did; `load` reads the tables in any order. */
+  'dir_credit',
   'dir_inbound',
 ] as const;
 
@@ -724,6 +749,7 @@ const COPY_ORDER: Record<Carried, string> = {
   dir_billing: 'rowid',
   dir_stripe_event: 'rowid',
   dir_inbound: 'token_sha256',
+  dir_credit: 'rowid',
 };
 
 /** A copy's first line, then its version: `#dogdir 4`. Not `#dogl`, so `checkBrainl` and `verify` never take one for a record. */
@@ -761,8 +787,12 @@ const attempt = <T>(fn: () => T): T | null => {
  *
  * A RECORD WITH NO ROW IS IN NONE OF THEM, and that is not a fourth state written down: it is not billed and never
  * lapses. Every record the operator provisioned is one.
+ *
+ * `comp` IS A PLAN GIVEN AS A GIFT: a row with no Stripe customer and no subscription, so no Stripe event can find it
+ * (`byCustomer` answers nothing for an empty customer), `due` never answers it, and a lapse cannot be written over it.
+ * A gift never lapses and is never charged; `unbill` takes it back, and removes no other row.
  */
-const BILLING_STATES = ['active', 'past_due', 'lapsed'] as const;
+const BILLING_STATES = ['active', 'past_due', 'lapsed', 'comp'] as const;
 export type BillingState = (typeof BILLING_STATES)[number];
 
 /** The days of a lapse a notice goes out on, which is what `told` records: the last is the deletion's own letter. */
@@ -826,9 +856,21 @@ export type BillingCall =
   | { op: 'seen'; id: string; type: string }
   | { op: 'due'; now: number }
   | { op: 'told'; record: string; day: LadderDay }
-  | { op: 'lapsed'; record: string };
+  | { op: 'lapsed'; record: string }
+  | { op: 'credit'; record: string; person: string; pack: string; event: string; at: number }
+  | { op: 'refund'; event: string }
+  | { op: 'credits'; record: string }
+  | { op: 'spend'; record: string; at: number }
+  | { op: 'mayAsk'; record: string; at: number }
+  | { op: 'unbill'; record: string };
 
-/** What each `op` answers. */
+/**
+ * What each `op` answers.
+ *
+ * THE CREDIT OPS ARE SLASH'S METER. `credit` adds a pack bought, once per payment event, and `refund` takes back what
+ * is left of it; `mayAsk` is asked before a Cloud ask and `spend` after one, one ask one credit. `left` is `null` on
+ * a plan whose credits are `null`: nothing here holds it, the record's own `ask_cap` does.
+ */
 export type BillingAnswers = {
   of: BillingRow | null;
   for: BillingRow[];
@@ -838,6 +880,12 @@ export type BillingAnswers = {
   due: BillingDue[];
   told: Result<null>;
   lapsed: boolean;
+  credit: Result<{ added: boolean; left: number }>;
+  refund: Result<{ taken: number }>;
+  credits: { packs: number };
+  spend: Result<{ left: number | null }>;
+  mayAsk: { ok: boolean; left: number | null };
+  unbill: Result<{ removed: boolean }>;
 };
 export type BillingAnswer = BillingAnswers[BillingCall['op']];
 
@@ -1156,10 +1204,28 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
     sql.transactionSync(() => {
       if (typeof row?.record !== 'string' || row.record === '') return no<BillingRow>('VALUE_MALFORMED', 'A billing row names the record it is for.', { at: 'record' });
       if (row.state !== undefined && !(BILLING_STATES as readonly string[]).includes(row.state))
-        return no<BillingRow>('ENUM_VALUE_UNKNOWN', `${String(row.state)} is not a billing state. A paid record is ${BILLING_STATES.join(', ')}.`, { at: 'state' });
+        return no<BillingRow>('ENUM_VALUE_UNKNOWN', `${String(row.state)} is not a billing state. A billing row is ${BILLING_STATES.join(', ')}.`, { at: 'state' });
+      /* A GIFT HAS NO CUSTOMER: `''` is the only one a `comp` row may name, and the only state that may name it. */
+      const before = sql.one<BillingStored>(`SELECT ${BILLING_COLUMNS} FROM dir_billing b WHERE b.record = ?`, row.record);
+      const gift = (row.state ?? before?.state) === 'comp';
       for (const key of ['person', 'customer'] as const)
-        if (row[key] !== undefined && (typeof row[key] !== 'string' || row[key] === ''))
+        if (row[key] !== undefined && (typeof row[key] !== 'string' || (row[key] === '' && !(gift && key === 'customer'))))
           return no<BillingRow>('VALUE_MALFORMED', `${key} is an id, written as text.`, { at: key });
+      if (gift && ((row.customer !== undefined && row.customer !== '') || (row.subscription !== undefined && row.subscription !== null)))
+        return no<BillingRow>('VALUE_MALFORMED', 'A plan given as a gift has no Stripe customer and no subscription.', {
+          at: row.customer !== undefined && row.customer !== '' ? 'customer' : 'subscription',
+        });
+      if (before?.state === 'comp' && (row.state === 'lapsed' || row.state === 'past_due'))
+        return no<BillingRow>('VALUE_MALFORMED', 'A plan given as a gift never lapses. End the gift first, as a cancel does.', { at: 'state' });
+      /* AND A GIFT IS NEVER WRITTEN OVER A PLAN STILL CHARGED OR LAPSED: blanking the subscription here would leave Stripe
+         charging a record whose row no longer knows it, and clearing a lapse here would leave the record's own lapse
+         switch on under a row that says it is not lapsed. The gift door refuses both first; this holds the row to it. */
+      if (row.state === 'comp' && before !== undefined && before.state !== 'comp' && (before.subscription !== null || before.state === 'lapsed'))
+        return no<BillingRow>(
+          'ALREADY_KNOWN',
+          before.state === 'lapsed' ? 'This record lapsed on a paid plan, and a gift does not end a lapse.' : 'This record pays through a subscription. End it before giving the plan.',
+          { at: 'state' },
+        );
       for (const key of ['subscription', 'price'] as const)
         if (row[key] !== undefined && row[key] !== null && (typeof row[key] !== 'string' || row[key] === ''))
           return no<BillingRow>('VALUE_MALFORMED', `${key} is a Stripe id written as text, or null.`, { at: key });
@@ -1170,9 +1236,8 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
       if (row.person !== undefined && !sql.one('SELECT 1 AS x FROM dir_person WHERE id = ?', row.person))
         return no<BillingRow>('OUT_OF_BOUNDS', `There is no person ${row.person}.`, { at: 'person' });
 
-      const before = sql.one<BillingStored>(`SELECT ${BILLING_COLUMNS} FROM dir_billing b WHERE b.record = ?`, row.record);
       const person = row.person ?? before?.person;
-      const customer = row.customer ?? before?.customer;
+      const customer = gift ? '' : (row.customer ?? before?.customer);
       if (person === undefined || customer === undefined)
         return no<BillingRow>('VALUE_MALFORMED', 'A record paid for the first time names who checked out and their Stripe customer.', {
           at: person === undefined ? 'person' : 'customer',
@@ -1183,8 +1248,10 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
       const state: BillingState = row.state ?? before?.state ?? 'active';
       const entering = state !== before?.state;
       const held = numberOrNull(before?.lapsed_at);
-      const lapsed_at = state === 'active' ? null : state === 'lapsed' && entering ? (held ?? now) : held;
-      const told = state === 'active' || (state === 'lapsed' && entering) ? '' : (before?.told ?? '');
+      /* A GIFT IS IN NO LAPSE, as a record that paid is not. */
+      const clear = state === 'active' || state === 'comp';
+      const lapsed_at = clear ? null : state === 'lapsed' && entering ? (held ?? now) : held;
+      const told = clear || (state === 'lapsed' && entering) ? '' : (before?.told ?? '');
       const pick = <T>(given: T | undefined, kept: T | undefined): T | null => (given !== undefined ? given : (kept ?? null));
 
       sql.exec(
@@ -1197,8 +1264,8 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
         row.record,
         person,
         customer,
-        pick(row.subscription, before?.subscription),
-        pick(row.price, before?.price),
+        gift ? null : pick(row.subscription, before?.subscription),
+        gift ? null : pick(row.price, before?.price),
         state,
         pick(row.period_end, numberOrNull(before?.period_end) ?? undefined),
         lapsed_at,
@@ -1207,6 +1274,121 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
       );
       return ok(billingRow(row.record)!);
     });
+
+  /* ── Slash credits ── */
+
+  /** What is left of every pack a record bought: the balance `left` adds to the month's included credits. */
+  const packsOf = (record: string): number =>
+    Number(sql.one<{ n: number | null }>('SELECT SUM(left) AS n FROM dir_credit WHERE record = ?', record)?.n ?? 0);
+
+  /**
+   * A record's Slash month at `at`: the plan's included credits, the month's asks against them, the packs on top, and
+   * what is left of both. `null` included and left for a plan whose credits are `null`, which nothing here holds.
+   *
+   * THE MONTH'S ASKS ARE `dir_usage_slash`'s, WHICH LAG BY UP TO A DAY. The host hands a record's day totals across at
+   * night (`meterSlash`), so `used` is the month as the last night left it and today's asks are not yet in it. Every
+   * reader of the month reads that same figure, so the lag is one way only: an ask inside the included credits as the
+   * night counted them spends no pack, even when today's asks have already gone past them, and a pack is never spent
+   * while included credits are left. At most a day's asks past the month's credits go unspent from a pack, and the
+   * record's own `ask_cap`, which counts each ask as it happens, still holds the day.
+   */
+  const slashMonth = (record: string, plan: Plan, at: number): { included: number | null; used: number; packs: number; left: number | null } => {
+    const included = PLAN_TABLE[plan].credits;
+    const used = Number(
+      sql.one<{ n: number | null }>(
+        'SELECT SUM(asks) AS n FROM dir_usage_slash WHERE record = ? AND day >= ? AND day < ?',
+        record,
+        dayOf(monthStart(at)),
+        dayOf(nextMonth(at)),
+      )?.n ?? 0,
+    );
+    const packs = packsOf(record);
+    return { included, used, packs, left: included === null ? null : Math.max(0, included - used) + packs };
+  };
+
+  /** The record's plan, or `null` for a record this Directory does not know. */
+  const planFor = (record: string): Plan | null => {
+    const row = typeof record === 'string' ? sql.one<{ plan: string }>('SELECT plan FROM dir_record WHERE id = ?', record) : undefined;
+    return row ? planOf(row.plan) : null;
+  };
+
+  const atOr = (at: unknown): number => (typeof at === 'number' && Number.isFinite(at) ? at : clock.now());
+
+  /**
+   * A pack paid for: its credits from `PACKS`, added once per payment event.
+   *
+   * THE EVENT IS THE KEY, so the same payment delivered twice answers `added: false` with the balance it already made,
+   * and a redelivery after a refund adds nothing back. A closed record buys nothing: its credits have ended with it.
+   * Every refusal comes before the write, for the reason `billingSet` gives.
+   */
+  const creditAdd = (call: Extract<BillingCall, { op: 'credit' }>): Result<{ added: boolean; left: number }> =>
+    sql.transactionSync(() => {
+      type R = { added: boolean; left: number };
+      for (const key of ['record', 'person', 'event'] as const)
+        if (typeof call[key] !== 'string' || call[key] === '') return no<R>('VALUE_MALFORMED', `${key} is an id, written as text.`, { at: key });
+      const pack = PACKS.find((p) => p.id === call.pack);
+      if (!pack)
+        return no<R>('ENUM_VALUE_UNKNOWN', `${String(call.pack)} is not a pack of Slash credits. The packs are ${PACKS.map((p) => p.id).join(' and ')}.`, { at: 'pack' });
+      if (!Number.isSafeInteger(call.at)) return no<R>('VALUE_MALFORMED', 'at is a time in whole epoch milliseconds.', { at: 'at' });
+      const held = sql.one<{ left: number }>('SELECT left FROM dir_credit WHERE event = ?', call.event);
+      if (held) return ok({ added: false, left: Number(held.left) });
+      const record = sql.one<{ closed_at: string | null }>('SELECT closed_at FROM dir_record WHERE id = ?', call.record);
+      if (!record || record.closed_at !== null)
+        return no<R>('OUT_OF_BOUNDS', record ? 'This record is closed, and credits end with it.' : `There is no record ${call.record}.`, { at: 'record' });
+      if (!sql.one('SELECT 1 AS x FROM dir_person WHERE id = ?', call.person)) return no<R>('OUT_OF_BOUNDS', `There is no person ${call.person}.`, { at: 'person' });
+      sql.exec(
+        'INSERT INTO dir_credit (event, record, person, pack, credits, left, bought_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        call.event,
+        call.record,
+        call.person,
+        pack.id,
+        pack.credits,
+        pack.credits,
+        call.at,
+      );
+      return ok({ added: true, left: pack.credits });
+    });
+
+  /** A pack's payment refunded: what is left of it goes, never below zero, and the row stays so the event is still known. */
+  const creditRefund = (event: string): Result<{ taken: number }> =>
+    sql.transactionSync(() => {
+      if (typeof event !== 'string' || event === '') return no<{ taken: number }>('VALUE_MALFORMED', 'event is an id, written as text.', { at: 'event' });
+      const held = sql.one<{ left: number }>('SELECT left FROM dir_credit WHERE event = ?', event);
+      if (!held) return no<{ taken: number }>('OUT_OF_BOUNDS', 'No pack of Slash credits was bought by that payment.', { at: 'event' });
+      sql.exec('UPDATE dir_credit SET left = 0 WHERE event = ?', event);
+      return ok({ taken: Math.max(0, Number(held.left)) });
+    });
+
+  /**
+   * One ask made: one credit spent, the month's included first and then the oldest pack with any left.
+   *
+   * ASKED AFTER THE ASK, so it never refuses for want of credits: the ask has happened, and with nothing left it takes
+   * nothing and says `left: 0`. `left` counts this ask, so it is one less than `mayAsk` reads until the night's day
+   * totals catch up (`slashMonth` says why). A plan with `null` credits spends nothing and answers `left: null`.
+   */
+  const creditSpend = (record: string, at: number): Result<{ left: number | null }> =>
+    sql.transactionSync(() => {
+      const plan = planFor(record);
+      if (plan === null) return no<{ left: number | null }>('OUT_OF_BOUNDS', `There is no record ${String(record)}.`, { at: 'record' });
+      const month = slashMonth(record, plan, atOr(at));
+      if (month.included === null) return ok({ left: null });
+      if (month.used < month.included) return ok({ left: month.included - month.used - 1 + month.packs });
+      const oldest = sql.one<{ event: string }>('SELECT event FROM dir_credit WHERE record = ? AND left > 0 ORDER BY bought_at, event LIMIT 1', record);
+      if (oldest) sql.exec('UPDATE dir_credit SET left = left - 1 WHERE event = ?', oldest.event);
+      return ok({ left: packsOf(record) });
+    });
+
+  /**
+   * May this record ask Slash now? Asked before a Cloud ask: yes while the month's included credits or a pack has any.
+   * A plan with `null` credits, and a record this Directory does not know, as `mayRun` says of an allowance, is always
+   * yes with `left: null`.
+   */
+  const mayAsk = (record: string, at: number): { ok: boolean; left: number | null } => {
+    const plan = planFor(record);
+    if (plan === null) return { ok: true, left: null };
+    const { left } = slashMonth(record, plan, atOr(at));
+    return { ok: left === null || left > 0, left };
+  };
 
   /**
    * The billing group's one entry, as the doors and the night call it. Not generic, so each `op` narrows the call;
@@ -1229,7 +1411,9 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
           )
           .map(billingOf);
 
+      /* NO CUSTOMER FINDS NOTHING, so a gift's row, which has none, is out of every Stripe event's reach. */
       case 'byCustomer':
+        if (typeof call.customer !== 'string' || call.customer === '') return [];
         return sql.all<BillingStored>(`SELECT ${BILLING_COLUMNS} FROM dir_billing b WHERE b.customer = ? ORDER BY b.record`, call.customer).map(billingOf);
 
       case 'set':
@@ -1287,6 +1471,33 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
 
       case 'lapsed':
         return lapsedOn(call.record);
+
+      case 'credit':
+        return creditAdd(call);
+
+      case 'refund':
+        return creditRefund(call.event);
+
+      case 'credits':
+        return { packs: typeof call.record === 'string' ? packsOf(call.record) : 0 };
+
+      case 'spend':
+        return creditSpend(call.record, call.at);
+
+      case 'mayAsk':
+        return mayAsk(call.record, call.at);
+
+      /* A GIFT TAKEN BACK: its row goes, and the record is unbilled again, as one the operator provisioned. Only a
+         `comp` row: a paid record leaves its billing through Stripe's own events, never by this. No row is done. */
+      case 'unbill':
+        return sql.transactionSync(() => {
+          const row = sql.one<{ state: string }>('SELECT state FROM dir_billing WHERE record = ?', call.record);
+          if (!row) return ok({ removed: false });
+          if (row.state !== 'comp')
+            return no<{ removed: boolean }>('OUT_OF_BOUNDS', 'Only a plan given as a gift is taken back here. A paid plan ends through its subscription.', { at: 'record' });
+          sql.exec("DELETE FROM dir_billing WHERE record = ? AND state = 'comp'", call.record);
+          return ok({ removed: true });
+        });
 
       /* AN `op` THIS BUILD DOES NOT KNOW, arriving over RPC from a newer caller, answers nothing rather than throwing
          out of the Durable Object as a bare 500. */
@@ -1391,6 +1602,10 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
      */
     knows: (record: string): boolean =>
       sql.one<{ n: number }>('SELECT 1 AS n FROM dir_record WHERE id = ? AND closed_at IS NULL', record) !== undefined,
+
+    /** Who owns a record this installation holds open, or `null`: the operator's gift door asks it (`ops-plan.ts`). */
+    ownerOf: (record: string): string | null =>
+      sql.one<{ owner: string }>('SELECT owner FROM dir_record WHERE id = ? AND closed_at IS NULL', record)?.owner ?? null,
 
     /**
      * The record an inbound mail token names, by the token's SHA-256 in hex, or `null`.
@@ -1870,6 +2085,8 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
         const now = at();
         sql.exec('UPDATE dir_record SET closed_at = ? WHERE id = ? AND closed_at IS NULL', now, record);
         sql.exec('UPDATE dir_slug SET released_at = ? WHERE record = ? AND released_at IS NULL', now, record);
+        /* A PACK'S CREDITS END WITH THE RECORD, and nothing else ends them: the delete screen says how many go. */
+        sql.exec('DELETE FROM dir_credit WHERE record = ?', record);
         return ok(null);
       }),
 
@@ -2260,7 +2477,7 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
       const ranged = 'FROM dir_usage_day WHERE record = ? AND day >= ? AND day <= ?';
       const where = `${ranged} AND ${LIMITED}`;
       /* SLASH'S ASKS FROM THEIR OWN TABLE, by day and summed, and in no total beside them. */
-      const slashOf = (id: string, span: { from: string; to: string }): RecordUsage['slash'] => {
+      const slashOf = (id: string, plan: Plan, span: { from: string; to: string }): RecordUsage['slash'] => {
         const days = sql
           .all<{ day: string; asks: number; neurons: number }>(
             'SELECT day, asks, neurons FROM dir_usage_slash WHERE record = ? AND day >= ? AND day <= ? ORDER BY day',
@@ -2269,7 +2486,7 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
             span.to,
           )
           .map((d) => ({ day: d.day, asks: Number(d.asks), neurons: Number(d.neurons) }));
-        return { asks: days.reduce((n, d) => n + d.asks, 0), neurons: days.reduce((n, d) => n + d.neurons, 0), days };
+        return { ...slashMonth(id, plan, now), asks: days.reduce((n, d) => n + d.asks, 0), neurons: days.reduce((n, d) => n + d.neurons, 0), days };
       };
       const records = owned.map((r): RecordUsage => {
         const plan = planOf(r.plan);
@@ -2297,7 +2514,7 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
           counted: sql
             .all<{ action: string }>(`SELECT action, ${SUMS} ${ranged} AND (${COUNTED}) GROUP BY action ORDER BY action`, r.id, range.from, range.to)
             .map((g) => ({ action: g.action, ...totalsOf(g) })),
-          slash: slashOf(r.id, range),
+          slash: slashOf(r.id, plan, range),
         };
       });
       const totals = totalsOf({});

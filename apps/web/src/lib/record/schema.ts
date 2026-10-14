@@ -278,7 +278,7 @@ export type PageBlock = {
      * any other kind, draws where the row applies: its project, or Everywhere.
      */
     as?: 'title' | 'figure' | 'fact' | 'trend' | 'ring' | 'who' | 'when' | 'mark' | 'scope';
-    /** A card's `trend` column: the figure it draws, `{{field}}` filled from each card, read by the record as `trends`. */
+    /** A card's `trend` or `when` column: the figure it draws, `{{field}}` filled from each card, read by the record as `trends` or `whens`. */
     metric?: string;
     /** A money column's sign, read from an enum: the value that makes the amount go out draws `−`, any other `+`. */
     sign?: { field: string; minus: string };

@@ -71,6 +71,7 @@ export const KEY_KINDS: Readonly<Record<string, readonly string[]>> = {
   unset: ['bar', 'split'],
   tones: ['bar', 'split', 'cards', 'lanes'],
   document: ['note'],
+  says: ['note'],
   fold: ['section', 'cards', 'feed'],
   group: ['cards', 'table', 'feed'],
   box: ['section'],
@@ -136,13 +137,16 @@ const READ_BY: Readonly<Record<string, readonly string[]>> = (() => {
  *
  * `said` IS THE MODEL'S HEADLINE on a lead block, put on it by the record after the read, so a lead read
  * back from the page with its line on it is not refused for a key the record wrote, and a held block keeps no line.
+ *
+ * `says_at` IS WHICH OF A NOTE'S `says:` SENTENCES WAS SAID, whose words the read wrote into `body` (`pages.ts`
+ * `saidLine`). A note read back with both is read without the body it was answered, so it chooses again.
  */
 export const ANSWER_KEYS: readonly string[] = [
   'drawn', 'rows', 'matched', 'readings', 'walk', 'walks', 'walkFx', 'refusals', 'inherited', 'scopes',
   'scope_marks', 'feed', 'seen', 'history', 'values', 'said', 'bars', 'measures', 'latest', 'past', 'changes', 'working_now',
   'quiet', 'lateness', 'late_name', 'sells', 'fx',
   'fills', 'rings', 'queue', 'nexts', 'trends', 'done_now', 'next', 'open', 'types', 'home',
-  'short_now', 'window', 'files', 'lanes', 'wholeRead', 'read_as',
+  'short_now', 'window', 'files', 'lanes', 'wholeRead', 'read_as', 'says_at',
 ];
 
 /**
@@ -192,6 +196,7 @@ const WRONG_KIND: Readonly<Record<string, string>> = {
   group: 'Draw these rows as cards or a table to group them by a link, a choice or the state.',
   box: 'Put a section before this block and give the section box: true.',
   register: 'A block that reads rows names them with source: register.<id>.',
+  says: 'Sentences that each hold under a condition are a note\'s: { kind: note, lead: true, says: [{ when, body }, { body }] }.',
 };
 
 /** What a `feed` may say in `group:` and in `fold:`, the one word each. */
@@ -237,6 +242,109 @@ export function forecastAxisFault(block: Readonly<Record<string, unknown>>, who:
     at: 'axis',
     allowed: [...FORECAST_AXES],
   };
+}
+
+/* ── a `when:` tree, and a note's `says:` (PGS-A13) ──────────────────────────────────────────────────────── */
+
+/** The two ways a `when:` joins its tests: `all`, every one holds, and `any`, at least one does. */
+export const WHEN_JOINS = ['all', 'any'] as const;
+
+/** How deep a `when:` goes: a join, and inside it leaves or one other join of leaves. Deeper is refused. */
+export const WHEN_DEPTH = 2;
+
+/** What is wrong with one leaf of a `when:`, as a sentence, or `null`. `said` names the leaf. */
+export type WhenLeafFault = (leaf: unknown, said: string) => string | null;
+
+/** The leaf check when the caller has no fuller one: a leaf names its figure. The install hands `declare.ts`'s own. */
+const leafNamed: WhenLeafFault = (leaf, said) =>
+  leaf !== null && typeof leaf === 'object' && typeof (leaf as { metric?: unknown }).metric === 'string' ? null : `${said} is one leaf naming a metric.`;
+
+/** The join a `when:` part says, `all` or `any`, or `null` for a leaf. Both is `both`, which is refused. */
+export function whenJoin(when: unknown): 'all' | 'any' | 'both' | null {
+  if (when === null || typeof when !== 'object') return null;
+  const all = Object.hasOwn(when, 'all');
+  const any = Object.hasOwn(when, 'any');
+  return all && any ? 'both' : all ? 'all' : any ? 'any' : null;
+}
+
+/**
+ * What is wrong with a `when:`, or `null`: one leaf, or `all:` or `any:` of two or more, each a leaf or one join of
+ * leaves. `said` is how the refusal names it ("page.cash.blocks[0]'s when"), and a part inside it is named by its place
+ * ("…'s when any[1]"). The install and the read both ask here, the install with its fuller leaf check.
+ *
+ * TWO LEVELS AND NO MORE, because "three questions wait, or an agent is stuck and a run failed" is a sentence a person
+ * can hold and a third level is not. A join inside the same join says nothing the outer one does not, so it is refused
+ * with the flat way to write it; one join of one leaf is the leaf written the long way.
+ */
+export function whenTreeFault(when: unknown, said: string, leafFault: WhenLeafFault = leafNamed, depth = 1): string | null {
+  const join = whenJoin(when);
+  if (join === null) return leafFault(when, said);
+  if (join === 'both') return `${said} says all and any. A when is one of them, and the other goes inside it: { any: [{ all: [leaf, leaf] }, leaf] }.`;
+  const list = (when as Record<string, unknown>)[join];
+  const beside = Object.keys(when as object).filter((k) => k !== join);
+  if (beside.length > 0) return `${said} says ${join} and ${beside.join(' and ')}. ${join} is the whole when, so move ${beside.length > 1 ? 'them' : 'it'} into a leaf: { ${join}: [{ metric, ... }, { metric, ... }] }.`;
+  const holds = join === 'all' ? 'that must every one hold' : 'of which one must hold';
+  if (!Array.isArray(list) || list.length < 2)
+    return `${said} has an ${join} of ${Array.isArray(list) ? (list.length === 1 ? 'one leaf' : 'no leaves') : JSON.stringify(list ?? null)}, and ${join} is two or more leaves ${holds}. Write one test as the leaf alone, when: { metric, ... }.`;
+  for (const [i, item] of list.entries()) {
+    const inner = whenJoin(item);
+    if (inner === join)
+      return `${said} ${join}[${i}] is an ${join} inside an ${join}. ${join === 'all' ? 'Every leaf must hold' : 'One leaf holding is enough'} either way, so write them as one ${join}: { ${join}: [leaf, leaf, leaf] }.`;
+    if (inner !== null && depth >= WHEN_DEPTH)
+      return `${said} ${join}[${i}] is a third level, and a when is ${WHEN_DEPTH} levels deep at most: { any: [{ all: [leaf, leaf] }, leaf] }.`;
+    const fault = whenTreeFault(item, `${said} ${join}[${i}]`, leafFault, depth + 1);
+    if (fault) return fault;
+  }
+  return null;
+}
+
+/** The most sentences a note's `says:` holds. Past six it is a rule table, not a page's opening line. */
+export const SAYS_MOST = 6;
+
+/** The tones a said sentence may carry: `declare.ts`'s intents, the same four a note's own `tone` takes. */
+export const SAYS_TONES = ['good', 'warn', 'bad', 'info'] as const;
+
+/** The keys of one sentence of `says:`. */
+const SAYS_LINE_KEYS: ReadonlySet<string> = new Set(['when', 'body', 'tone']);
+
+/**
+ * Why a note's `says:` cannot be said, or `null`. `who` is what the sentence calls the block.
+ *
+ * READ TOP TO BOTTOM, THE FIRST THAT HOLDS IS THE BODY, so the order is the author's ranking: "3 questions wait for you"
+ * above "Nothing needs you". THE LAST HAS NO `when`, because it is what the page says on a day nothing else holds, and a
+ * note whose every sentence could fail would open the page on nothing. A sentence with no `when` above the last would be
+ * said every time and hide the rest, so it is refused too. A note with `body:` beside `says:` says two things where it
+ * means one: the body is the calm line, written last. The install and the read both ask here.
+ */
+export function noteSaysFault(block: Readonly<Record<string, unknown>>, who: string, leafFault: WhenLeafFault = leafNamed): { fix: string; at: string; allowed?: string[] } | null {
+  const says = block.says;
+  if (says === undefined) return null;
+  const shape = 'says: [{ when: { metric, gt: 0 }, body }, { body }]';
+  if (block.body !== undefined)
+    return { fix: `${who} has both a body and says. The first sentence of says that holds is its body, so take body off and write it as the last sentence: ${shape}.`, at: 'says' };
+  if (!Array.isArray(says) || says.length === 0 || says.length > SAYS_MOST)
+    return { fix: `${who}'s says is 1 to ${SAYS_MOST} sentences, read top to bottom, the last with no when: ${shape}.`, at: 'says' };
+  for (const [i, line] of says.entries()) {
+    const at = `says[${i}]`;
+    const named = `${who}'s sentence ${i + 1}`;
+    if (line === null || typeof line !== 'object' || Array.isArray(line)) return { fix: `${named} is not one sentence. Each is { when, body, tone }.`, at };
+    const s = line as { when?: unknown; body?: unknown; tone?: unknown };
+    const extra = Object.keys(s).filter((k) => !SAYS_LINE_KEYS.has(k));
+    if (extra.length > 0) return { fix: `${named} says ${extra.join(' and ')}, and a sentence has a when, a body and a tone only.`, at: `${at}.${extra[0]}`, allowed: [...SAYS_LINE_KEYS] };
+    if (typeof s.body !== 'string' || s.body.trim() === '') return { fix: `${named} has no words. Write them as its body: { when, body }.`, at: `${at}.body` };
+    if (s.tone !== undefined && !(SAYS_TONES as readonly unknown[]).includes(s.tone))
+      return { fix: `${named} has the tone ${JSON.stringify(s.tone)}, and a tone is good, warn, bad or info.`, at: `${at}.tone`, allowed: [...SAYS_TONES] };
+    const last = i === says.length - 1;
+    if (last && s.when !== undefined)
+      return { fix: `${who}'s last sentence has a when, so on a day none holds the note says nothing. Take the when off the last one: it is the calm line.`, at: `${at}.when` };
+    if (!last && s.when === undefined)
+      return { fix: `${named} has no when, so it is said every time and the sentences after it never are. Give it a when, or make it the last.`, at };
+    if (!last) {
+      const fault = whenTreeFault(s.when, `${named}'s when`, leafFault);
+      if (fault) return { fix: fault, at: `${at}.when` };
+    }
+  }
+  return null;
 }
 
 /** The sentence for a key this kind does not read, naming the kinds that do. */

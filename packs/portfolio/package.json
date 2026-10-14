@@ -1,0 +1,11 @@
+{
+  "name": "@braindog/pack-portfolio",
+  "version": "1.17.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test portfolio.test.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}

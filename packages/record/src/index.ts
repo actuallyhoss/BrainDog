@@ -1108,8 +1108,8 @@ export type Boot = {
    */
   counts: { decide: number; inbox: number | null; decided: number; arrived: number | null };
   /**
-   * The holding pen: what this record would add if somebody asked, ranked, one offer a list, the best `PEN_SHOWN` and any
-   * list opened in the last seven days (`penRanked` holds the rest) (`emergent.ts`). Placed by nobody: each item carries the whole declaration accepting it would write.
+   * The holding pen: what this record would add if somebody asked, ranked, one offer a list, what the one queue holds,
+   * `PEN_SHOWN` (three) at most, each with the day it lapses (`penRanked` holds the rest) (`emergent.ts`). Placed by nobody: each item carries the whole declaration accepting it would write.
    *
    * THE OWNER'S AND A WHOLE-RECORD READER'S, and empty for anybody else, because an item is a page over a list and a
    * reader held to some lists is not offered the rest. Empty too when the person turned `pen.suggest` off, and an item
@@ -9227,11 +9227,19 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
               kept: ((who) => (who === null ? null : (namesFor(ctx)?.[who] ?? 'Someone')))(keptBy(kernel, typeof shownLook.look === 'string' ? shownLook.look : args.slug)),
             }
           : shownLook;
+      /* THE DAY THE LIVE LOOK WAS WRITTEN, so the page menu's Put back says "of 7 October" (`ChangePage` reads `look.at`). */
+      const lookAt =
+        look === undefined
+          ? undefined
+          : sql.one<{ at: string }>(
+              'SELECT created_at AS at FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0',
+              `look.${typeof look.look === 'string' ? look.look : args.slug}`,
+            )?.at;
       return ok({
         ...out.value,
         ...(declared ? { declared_version: declared.version } : {}),
         ...(filters ? { filters: filters.map((f) => (unseen(f) ? { ...f, chosen: null, values: [], reads: [] } : f)) } : {}),
-        ...(look === undefined ? {} : { look }),
+        ...(look === undefined ? {} : { look: lookAt === undefined ? look : { ...look, at: lookAt } }),
         blocks: line === null ? blocks : blocks.map((b, i) => (i === line.at ? { ...b, said: line.text } : b)),
       });
     },
@@ -11117,16 +11125,16 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     },
 
     /**
-     * Put back how a page was arranged before Slash arranged it: the 6-second Undo the app offers when Slash's look lands
-     * while the person is looking (DIRECTION §37). The look it replaced comes back, or the page goes back to the rules when
-     * there was none, and only while Slash's look is still the one it wrote (`undoLook` in `compose-look.ts`).
+     * Put back how a page was arranged: one step back, whoever wrote the look and at any time. Slash's own 6-second Undo
+     * (DIRECTION §37) comes first, as it was; any other look, the person's pin or arrangement included, goes back to its
+     * version before, or the page to the rules when it had none (`undoLook` in `compose-look.ts`).
      */
     async undoLook(args: { page: string } | undefined, ctx: CallContext) {
-      const stop = admin(ctx, 'put back how Slash arranged a page');
+      const stop = admin(ctx, 'put back how a page was arranged');
       if (stop) return { ok: false as const, refusal: stop };
       if (typeof args?.page !== 'string' || args.page === '') return no('REQUIRED_MISSING', 'page is the page to put back.', { at: 'page' });
       const title = kernel.pages().find((p) => p.slug === args.page)?.title ?? args.page;
-      return tail(await undoLookOf(kernel, args.page, title, actorOf(ctx)));
+      return tail(await undoLookOf(kernel, args.page, title, actorOf(ctx), sql));
     },
 
     /**
@@ -11789,6 +11797,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     async revokeGrant(args: { id: string }, ctx: CallContext) {
       const stop = vault(ctx);
       if (stop) return { ok: false as const, refusal: stop };
+      if (typeof args?.id !== 'string' || args.id === '') return no('REQUIRED_MISSING', 'A credential is taken out of service by its id.', { at: 'id' });
       return tail(kernel.revokeGrant(args.id, actorOf(ctx)));
     },
 

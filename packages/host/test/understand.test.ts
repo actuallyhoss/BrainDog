@@ -334,6 +334,8 @@ async function record() {
     history: (id) => api.kernel.history(id),
     members: () => api.kernel.members(),
     orgsList: () => api.kernel.orgsList(),
+    openSuggestions: () => api.kernel.openSuggestions(),
+    identity: () => api.kernel.identity(),
     propose: (p, w, d) => {
       const out = api.kernel.propose(p, w, d);
       if (out.ok) filed.push({ question: p.question, body: p.body });
@@ -383,6 +385,7 @@ test('THE NOTES PASS ASKS, NEVER WRITES: one question for the one relation, with
   assert.deepEqual(r.filed[0]!.body, {
     register: 'people',
     rows: [{ name: 'Ahmed', met: ['2026-10-06 · note on Bake: "Ahmed runs our deliveries every weekend."'], projects: [r.bake.id] }],
+    lapses: '2026-10-20',
   });
   /* NOTHING WAS WRITTEN: People still holds Jo alone until the owner says yes on Decide. */
   const people = r.api.kernel.list({ register: 'people' });
@@ -546,8 +549,9 @@ test('WHAT A PERSON WROTE WORD FOR WORD IS OFFERED, ONCE, TO THE ONE IT IS ABOUT
     register: 'people',
     rows: [{ at: `people#${quill.value.seq}`, version: quill.value.version, patch: { email: 'quill.pixels@gmail.com', handles: ['discord:quillart', 'github:quillpx'] } }],
     offer: { keys: ['email:quillpixels@gmail.com', 'github:quillpx'] },
+    lapses: '2026-10-20',
   });
-  assert.deepEqual(r.filed[1]!.body, { register: 'people', rows: [{ at: `people#${r.jo.seq}`, version: r.jo.version, patch: { projects: [r.bake.id] } }] });
+  assert.deepEqual(r.filed[1]!.body, { register: 'people', rows: [{ at: `people#${r.jo.seq}`, version: r.jo.version, patch: { projects: [r.bake.id] } }], lapses: '2026-10-20' });
 
   /* NOTHING WAS WRITTEN until the owner says yes, and nothing is offered again. Quill's link to Bake, which the offer's
      update would not carry, is its own question the night after. */
@@ -631,7 +635,13 @@ test(`AT MOST ${OFFERS_PER_PASS} OFFERS A NIGHT, and the rest are offered the ni
   for (const name of ['Ana', 'Ben', 'Cy', 'Dee', 'Eli']) assert.ok((await r.api.create({ register: 'people', fields: { name, note: `${name} writes from ${name.toLowerCase()}@studio.example` } }, OWNER)).ok);
   const first = serveOffers(r.kernel, { store, now: () => T0, log: () => {} });
   assert.equal(first.asked, OFFERS_PER_PASS);
+  /* AS MANY WAIT AS MAY (`WHO_WAITING_MOST`), so the next night asks nothing until the owner answers them. */
   const second = serveOffers(r.kernel, { store, now: () => T0 + NOTES_EVERY_MS + 60_000, log: () => {} });
+  assert.equal(second.asked, 0);
+  const waiting = r.api.kernel.openSuggestions();
+  assert.ok(waiting.ok);
+  for (const open of waiting.value)
+    assert.ok((await r.api.decide({ id: open.id as string, decide: { option: 'reject', reason: 'Not now.' } } as never, OWNER)).ok);
   const third = serveOffers(r.kernel, { store, now: () => T0 + 2 * NOTES_EVERY_MS + 120_000, log: () => {} });
   /* FIVE ADDRESSES AND JO'S LINK TO BAKE: six questions over the nights, each asked once. */
   assert.equal(first.asked + second.asked + third.asked, 6);

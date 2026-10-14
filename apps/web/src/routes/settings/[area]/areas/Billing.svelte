@@ -10,8 +10,8 @@
   import { readUsage, words as actionWords, type Meter, type UsageView } from '$lib/record/actions.ts';
   import { read, type Result } from '$lib/data/read.svelte.ts';
   import {
-    billingLine, hostedHere, meterBars, monthDay, paymentPage, planLine, planShown, readBilling, shareOf, stateLine, thisRecord, tileWords,
-    upgradeOf, type BilledRecord,
+    backFromCheckout, billingLine, hostedHere, managedAtStripe, meterBars, monthDay, packPage, packsOf, paymentPage, planLine, planShown,
+    readBilling, shareOf, stateLine, thisRecord, tileWords, upgradeOf, words as billWords, type BilledRecord,
   } from '../../billing.ts';
   import { untrack } from 'svelte';
   import Section from '$lib/ui/Section.svelte';
@@ -25,6 +25,7 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { settingsState, type AreaProps } from '../settings-state.svelte.ts';
   import StateRow from './StateRow.svelte';
+  import { homeCurrency } from '$lib/record/api.ts';
 
   let { shell }: AreaProps = $props();
 
@@ -48,7 +49,7 @@
    * no tile rather than a refusal; a refusal is no tile too, because the bill below already says what the host said.
    */
   async function usageOf(): Promise<Result<UsageView | null>> {
-    const out = await readUsage((url, init) => fetch(url, init), Date.now(), '', apiBase(page.url));
+    const out = await readUsage((url, init) => fetch(url, init), Date.now(), '', apiBase(page.url), undefined, homeCurrency());
     if (out.ok === true) return { ok: true, value: out.view };
     if (out.ok === 'none') return { ok: true, value: null };
     return { ok: false, refusal: out.refusal };
@@ -66,7 +67,9 @@
   const month = $derived(monthDay(shell.now));
   /* THE ONE THE MONTH TURNS ON, whose own sentence joins the reading line once it is near its limit. */
   const nearest = $derived(meters.find((m) => m.binding) ?? null);
-  const figure = $derived(billed && (billed.state !== 'unbilled' || billed.plan === 'free') ? planLine(billed) : (allowed?.plan ?? null));
+  const figure = $derived(
+    billed && (billed.state !== 'unbilled' || billed.plan === 'free' || billed.gift) ? planLine(billed) : (allowed?.plan ?? null),
+  );
   const needs = $derived(nearest && nearest.share >= 0.8 ? nearest.said : null);
   const reading = $derived(
     [allowed?.binding ? actionWords.binding(allowed.binding) : `${actionWords.noUsage}.`, allowed?.slash ?? null, allowed?.extra ?? null]
@@ -114,6 +117,29 @@
     going = null;
     toasts.push(out.refusal.fix, { intent: 'warn' });
   }
+
+  /* A PACK OF SLASH CREDITS, bought on Stripe's page under the same one-page guard. `going` holds the record and the
+     pack, so only the pressed button says it is opening. Nothing is bought until the person pays there. */
+  async function goBuy(r: BilledRecord, pack: string) {
+    if (going !== null) return;
+    going = `${r.record} ${pack}`;
+    const out = await packPage(r.record, pack);
+    if (out.ok) {
+      location.assign(at(out.value));
+      return;
+    }
+    going = null;
+    toasts.push(out.refusal.fix, { intent: 'warn' });
+  }
+
+  /* BACK FROM STRIPE'S PAGE, the credits may land a moment after the person does: the webhook adds them, not the
+     redirect. So billing is read again twice, a little apart, and the address loses its mark so a reload asks nothing. */
+  $effect(() => {
+    if (!hosted || !backFromCheckout(location.hash)) return;
+    history.replaceState(history.state, '', location.pathname + location.search);
+    const timers = [2_000, 6_000].map((ms) => setTimeout(() => void bill.reread(), ms));
+    return () => timers.forEach(clearTimeout);
+  });
 </script>
 
 <!--
@@ -142,13 +168,16 @@
 {#if hosted}
   <Section title={copy.billingYours}>
     {#if bill.state === 'ready' && bill.value}
-      {#if !bill.value.open}<p class="hint">{copy.billingNotOpen}</p>{/if}
+      <!-- A HOST THAT SELLS PACKS AND NO PLAN is taking payments, for credits, so it is never told it is not. -->
+      {#if !bill.value.open && bill.value.packs.length === 0}<p class="hint">{copy.billingNotOpen}</p>{/if}
       <!-- ROWS ON THE GROUND: a well, the record and its plan, the state under them, and the verbs at the
            end. A bill that needs him wears the red well, and says so in its sentence, so red is never the only sign. -->
       <ul class="bills">
         {#each bill.value.records as r (r.record)}
           {@const late = r.state === 'past_due' || r.state === 'lapsed'}
           {@const upgrade = upgradeOf(r, bill.value)}
+          {@const credits = packsOf(r, bill.value)}
+          {@const said = r.state !== 'unbilled' || r.gift ? stateLine(r, shell.now) : ''}
           <li class="bill">
             <IconWell name="money" size="l" tone={late ? 'danger' : undefined} />
             <div class="bill-main">
@@ -158,8 +187,24 @@
               </div>
               {#if upgrade}
                 <p class="bill-state">{upgrade.line}</p>
-              {:else if r.state !== 'unbilled'}
-                <p class="bill-state" data-state={r.state}>{stateLine(r, shell.now)}</p>
+              {:else if said}
+                <p class="bill-state" data-state={r.state}>{said}</p>
+              {/if}
+              {#if credits.left}<p class="bill-state num">{credits.left}</p>{/if}
+              <!-- SLASH CREDIT PACKS (LCH-A10), under what the record says of its plan: one quiet rectangle a pack, each
+                   with its credits and the Worker's price. None while the host sells no pack, so that answer is today's. -->
+              {#if credits.buy.length > 0}
+                <div class="bill-packs" role="group" aria-labelledby="packs-{r.record}">
+                  <span class="bill-state" id="packs-{r.record}">{billWords.buyCredits}</span>
+                  <div class="bill-pack-buttons">
+                    {#each credits.buy as b (b.pack.id)}
+                      {@const mine = going === `${r.record} ${b.pack.id}`}
+                      <Button onclick={() => goBuy(r, b.pack.id)} aria-label={mine ? undefined : b.said} aria-busy={mine} disabled={going !== null}
+                        >{mine ? copy.billingOpening : b.label}</Button
+                      >
+                    {/each}
+                  </div>
+                </div>
               {/if}
             </div>
             <!-- A FREE RECORD'S ONE OFFER, as a quiet button: the page's one ink button stays the person's own act. -->
@@ -172,8 +217,8 @@
             {/if}
             <!-- THE ACTIONS STRIPE CAN TAKE, and only while this host is taking payments: with billing off every
                  billing door refuses, so a button here would be a press that can only fail. A record with no row
-                 has no customer at Stripe, so it has nothing to manage either. -->
-            {#if bill.value.open && r.state !== 'unbilled'}
+                 has no customer at Stripe, so it has nothing to manage either, and nor has a gift. -->
+            {#if managedAtStripe(r, bill.value)}
               <div class="bill-actions">
                 {#if r.state === 'lapsed'}
                   <Button weight="primary" onclick={() => goPay('checkout', r)} aria-busy={going === r.record} disabled={going !== null}
@@ -329,6 +374,19 @@
     gap: 6px;
   }
 
+  /* THE PACKS, a small heading and the buttons beside one another while they fit, under the record's own lines. */
+  .bill-packs {
+    display: grid;
+    gap: 6px;
+    margin-block-start: var(--sp-2);
+  }
+
+  .bill-pack-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
   /* WRAPPING, for the reason `/audit`'s segmented bar already wraps: two buttons that do not fit
      are two buttons off the edge. */
   .row-actions {
@@ -353,12 +411,14 @@
       align-items: stretch;
     }
 
-    .row-actions {
+    .row-actions,
+    .bill-pack-buttons {
       flex-direction: column;
       align-items: stretch;
     }
 
     .bill-actions :global(.btn),
+    .bill-pack-buttons :global(.btn),
     .row-actions :global(.btn) {
       justify-content: center;
       min-block-size: 44px;

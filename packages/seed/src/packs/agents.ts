@@ -592,8 +592,14 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
       /* WHAT HAS GONE STALE, SINCE 1.11.0 (AGT-C18): the record's own `gone-stale`, every finder's count added up (steps
          nobody took in a month, questions left open, runs that did nothing), and beside it what the record cleared in
          seven days (`tidied-week`), so the line says both what waits and that something is clearing it. Drawn only
-         while anything is stale; a record that cannot read the figure yet draws nothing, as for any `when:`. */
-      { kind: 'note', tone: 'warn', span: 12, when: { metric: 'gone-stale', gt: 0 }, body: 'Things gone stale: {{gone-stale}}. Tidied this week: {{tidied-week}}.' },
+         while anything is stale; a record that cannot read the figure yet draws nothing, as for any `when:`.
+
+         TWO LINES IN WORDS SINCE 1.13.0 (AGT-C18 item 5): the one line said two bare counts and nothing of what, so each
+         figure now has its own, said finder by finder (`.names`, "41 empty runs hidden and 3 steps nobody took closed"),
+         and each is drawn only while its own figure is above nought: a week the record cleared something says so even
+         with nothing stale, and nothing stale and nothing cleared draws neither. */
+      { kind: 'note', tone: 'warn', span: 12, when: { metric: 'tidied-week', gt: 0 }, body: 'Tidied this week: {{tidied-week.names}}.' },
+      { kind: 'note', tone: 'warn', span: 12, when: { metric: 'gone-stale', gt: 0 }, body: 'Still stale: {{gone-stale.names}}.' },
       /* WHAT IS HERE TWICE, SINCE 1.13.0 (AGT-C18, the kernel's `rows-same`): every row past the one kept in each group
          a list's `same:` folds, with the way to each of this pack's lists that says what makes two of its rows one. A
          line inside Needs a look, so it adds no tile. */

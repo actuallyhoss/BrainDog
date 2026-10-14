@@ -86,6 +86,7 @@ export const BINDINGS: Binding[] = [
   { id: 'goto-nav', scope: 'document', key: 'g then 1–9', label: 'The nth item of your nav, in your order', bare: true },
   { id: 'sidebar', scope: 'document', key: '⌘\\', label: 'Toggle the sidebar', bare: false },
   { id: 'undo', scope: 'document', key: '⌘Z', label: 'Undo the last change', bare: false },
+  { id: 'shot', scope: 'document', key: '⌘⇧S', label: 'Screenshot mode, on or off', bare: false },
   { id: 'commit', scope: 'document', key: '⌘↵', label: 'Commit the primary action of whatever is open', bare: false },
   { id: 'close', scope: 'document', key: 'Esc', label: 'Close the topmost layer, one per press', bare: false },
   { id: 'help', scope: 'document', key: '?', label: 'This sheet. It is help, not Slash', bare: true },

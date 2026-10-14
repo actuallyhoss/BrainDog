@@ -30,6 +30,7 @@ import type { Fetch } from '../record/row-live.ts';
 import type { Captured, Wrote } from '../record/rows-write.ts';
 import type { Entry, Fields, Level } from '../record/schema.ts';
 import type { Creation } from './admit.ts';
+import { chipFields, isQuestion, type Chip } from './tokens.ts';
 
 /** Kept here rather than in `copy.ts`, so the palette's add owns its own words. */
 export const words = {
@@ -39,6 +40,14 @@ export const words = {
   added: (list: string, title: string) => `Added “${title}” to ${list}.`,
   /** The heading over the row. It is drawn first, because a whole sentence of intent outranks a match on its words. */
   group: 'Add',
+  /** The heading over a plain line's row, which is drawn after every other heading. */
+  plainGroup: 'New',
+  /** What the chips under the field are, for a reader who hears them. */
+  chips: 'Read from the line',
+  /** The row a plain line makes, named by one of the capture list's own word: "Add as a task", "Add as an order". */
+  plain: (one: string) => `Add as ${/^[aeiou]/iu.test(one) ? 'an' : 'a'} ${one.toLowerCase()}`,
+  /** The receipt for a line that said more than its words: `Added “call the bank” to Tasks, due Thu 15 Oct.` */
+  addedWith: (list: string, title: string, said: readonly string[]) => `Added “${title}” to ${list}, ${said.join(', ')}.`,
 } as const;
 
 /**
@@ -66,6 +75,48 @@ export function creation(query: string, lists: readonly Pick<List, 'id' | 'name'
   const want = plain(named);
   const list = lists.find((l) => plain(l.name) === want) ?? lists.find((l) => plain(l.id) === want);
   return list ? { register: list.id, title } : null;
+}
+
+/** A row a plain line makes: the sentence's row, with the chips the line was read into (`tokens.ts`). */
+export type Plain = Creation & { plain: true; chips: readonly Chip[] };
+
+/** The list the record's own capture writes into, as the palette names it: its id, its name and one of it. */
+export type Into = { register: string; name: string; one?: string | undefined };
+
+/**
+ * THE LINES THAT ARE ANOTHER ROW'S SENTENCE, typed or half typed: `Add to Tasks: …` and `New page: …` are read by their
+ * own rows, so a line that is starting one is not also a task called "add to".
+ */
+const SENTENCES = ['add to', 'new page'];
+const startsSentence = (line: string): boolean => {
+  const said = plain(line.replace(/:.*$/su, ''));
+  return SENTENCES.some((s) => s.startsWith(said) || said === s || said.startsWith(`${s} `));
+};
+
+/**
+ * The row a plain line offers (EXP-D13): "call the bank tomorrow" is a row in the list the record's capture writes to.
+ *
+ * TWO WORDS OR MORE, NOT A QUESTION, NOT ANOTHER ROW'S SENTENCE. One word is a search, a question is Slash's
+ * (`isQuestion`, the same test Today's ask bar runs), and `Add to Tasks:` is the sentence row's. `into` is the list the
+ * record's Home page captures into (`homeCapture`), never a list named here: a record whose Home has no capture, or a
+ * caller who may not add to its list, is offered nothing.
+ *
+ * THE TITLE IS THE LINE, and the palette reads it into its words and chips (`tokens.ts`) before the row is drawn.
+ */
+export function plainAdd(query: string, into: Pick<Into, 'register'> | null): Plain | null {
+  const line = query.trim();
+  if (!into || line.split(/\s+/u).length < 2) return null;
+  if (isQuestion(line) || startsSentence(line) || SENTENCE.test(line)) return null;
+  return { register: into.register, title: line, plain: true, chips: [] };
+}
+
+/**
+ * The list the first `capture` block of a page writes into, or `null` where the page has none. The Home page's is the
+ * list a plain line goes into, because it is the line the record already offers for exactly that.
+ */
+export function homeCapture(blocks: readonly { kind: string; [key: string]: unknown }[]): string | null {
+  const block = blocks.find((b) => b.kind === 'capture');
+  return typeof block?.register === 'string' && block.register !== '' ? block.register : null;
 }
 
 /**
@@ -118,16 +169,21 @@ export function offered<T extends Pick<List, 'id'>>(shell: Offer<T>): T[] {
  *
  * THE LINE SAYS ITS FILLS IN THE ORDER THE DECLARATION HOLDS THEM, and with no filter every field after the title is one
  * it filled, so the two walk together and an amount leaves both the write and the receipt.
+ *
+ * AND WHAT THE LINE SAID WINS (`chips`), as on a page's capture (`page/capture.ts` `captureRow`): a line typed
+ * "tomorrow" is due tomorrow, not filled with today, and is not said to have been filled. An amount a chip read was
+ * typed with its currency, so it is written; only the guessed one is left out.
  */
-export async function addedFields(register: string, said: string, now: number): Promise<Captured> {
+export async function addedFields(register: string, said: string, now: number, chips: readonly Pick<Chip, 'field' | 'value'>[] = []): Promise<Captured> {
   const { capturedFields } = await import('../record/rows-write.ts');
   const line = capturedFields(register, said, [], now);
   const decl = REGISTERS[register];
   if (!decl) return line;
   const wrote = decl.fields.filter((f) => f.id !== decl.title && Object.hasOwn(line.fields, f.id));
+  const read = chipFields(chips.filter((c) => decl.fields.some((f) => f.id === c.field && f.id !== decl.title)));
   const fields: Fields = {};
   for (const [id, value] of Object.entries(line.fields)) if (decl.fields.find((f) => f.id === id)?.type !== 'money') fields[id] = value;
-  return { fields, filled: line.filled.filter((_, i) => wrote[i]?.type !== 'money') };
+  return { fields: { ...fields, ...read }, filled: line.filled.filter((_, i) => wrote[i]?.type !== 'money' && !Object.hasOwn(read, wrote[i]?.id ?? '')) };
 }
 
 /** What a press answered: the row, what was filled in for the reader, and its way back; or the record's sentence. */
@@ -140,9 +196,9 @@ export type Added = { ok: true; entry: Entry; filled: readonly string[]; back: (
  * record has no delete, so the row leaves every list and `restore` can still bring it back. It is handed back as a
  * function rather than run here, because it is the toast's to offer and the reader's to press.
  */
-export async function addRow(c: Creation, now: number, base: string, io?: Fetch): Promise<Added> {
+export async function addRow(c: Creation | Plain, now: number, base: string, io?: Fetch): Promise<Added> {
   const { rowWriter } = await import('../record/rows-write.ts');
-  const { fields, filled } = await addedFields(c.register, c.title, now);
+  const { fields, filled } = await addedFields(c.register, c.title, now, 'chips' in c ? c.chips : []);
   const writer = rowWriter(base, io);
   const out = await writer.create(c.register, fields);
   if (!out.ok) return { ok: false, fix: out.fix };

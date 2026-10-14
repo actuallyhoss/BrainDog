@@ -67,6 +67,7 @@
   import { heardWaits, waitsNow, workingNow } from '$lib/home/waits.svelte.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
   import { navPrefs } from '$lib/nav-prefs.svelte.ts';
+  import { penCount } from '$lib/design/pen.ts';
   import { spineOf } from '$lib/spine.ts';
   import { said } from '$lib/voice.svelte.ts';
   import Sheet from '$lib/ui/Sheet.svelte';
@@ -208,6 +209,23 @@
 
   /* THE PERSON'S OWN RAIL, as `boot` answered it, before anything draws it (`nav-prefs.svelte.ts`). */
   $effect.pre(() => navPrefs.adopt(data.me.prefs, apiBase()));
+  /* SCREENSHOT MODE WHEN THE PERSON'S OWN `look.shot` SAYS SO (`lib/shot/mode.ts`), loaded only then, so the own words and
+     the plate's sheet stay out of the entry. A boolean, so a navigation with the same answer starts nothing, and a bare
+     surface (a shared page) never takes it. The palette, the key and Settings turn it on and off themselves. */
+  const shotWanted = $derived(data.me.prefs?.['look.shot'] === true && !bare);
+  $effect(() => {
+    if (!shotWanted) return;
+    let stop: (() => void) | null = null;
+    let gone = false;
+    void import('$lib/shot/mode.ts')
+      .then((m) => m.applyShot(true, document.body))
+      .then((s) => (gone ? s() : (stop = s)))
+      .catch(() => undefined);
+    return () => {
+      gone = true;
+      stop?.();
+    };
+  });
   /* THE PAGE THIS PERSON OPENS ON (`home.page`): once per tab, and only when the tab opened on the bare front door, so
      the Today item still opens Today. */
   let homed = false;
@@ -671,12 +689,21 @@
       return;
     }
 
-    /* `⌘Z` — the newest undo the toast stack is still offering. The stack IS the undo history here,
-       which is the honest shape for it: an undo that outlives its own toast is an undo with no
-       label, and 02 §8 makes the unit a `batch` rather than a keystroke anyway. */
-    if (mod && e.key.toLowerCase() === 'z') {
+    /* `⌘Z` — the newest undo the toast stack is still offering, and past the stack the newest change this tab wrote. The
+       toast stack is no longer the whole undo history: `lib/data/undo.ts` holds the last sixty batches this tab wrote, and
+       `undo-replay.ts` takes back the newest of them when no toast offers one (02 §8 makes the unit a `batch`). */
+    if (mod && e.key.toLowerCase() === 'z' && !e.shiftKey) {
       e.preventDefault();
-      if (!toasts.undoLast()) toasts.push(copy.nothingToUndo);
+      if (!toasts.undoLast())
+        void import('$lib/data/undo-replay.ts').then(async (m) => {
+          if (!(await m.undoNewest())) toasts.push(copy.nothingToUndo);
+        });
+      return;
+    }
+    /* `⌘⇧S`: screenshot mode on or off (`lib/shot/mode.ts`'s `SHOT_KEY`), pressed as the palette's row presses it. */
+    if (mod && e.shiftKey && !e.altKey && e.key.toUpperCase() === 'S') {
+      e.preventDefault();
+      void import('$lib/palette/customise-apply.ts').then((m) => m.shot(!m.shotNow()));
       return;
     }
     if (typing()) return;
@@ -924,9 +951,9 @@
 
     <!-- THE HOLDING PEN, IN THE RAIL'S WORDS (USE-B03): an update that adds a page lands hidden, and on a phone this is
          the one line that says so. Near the head, because it is news, and only when something waits. -->
-    {#if data.pen.length > 0}
+    {#if penCount(data.pen, null, (id) => navPrefs.isDismissed(id)) > 0}
       <a class="more-row more-pen" href={at('/settings/navigation')}>
-        <Icon name="alert" size="m" /><span class="more-name">{suggested(data.pen.length)}</span><span class="more-tally">{copy.review}</span>
+        <Icon name="alert" size="m" /><span class="more-name">{suggested(penCount(data.pen, null, (id) => navPrefs.isDismissed(id)))}</span><span class="more-tally">{copy.review}</span>
       </a>
     {/if}
 

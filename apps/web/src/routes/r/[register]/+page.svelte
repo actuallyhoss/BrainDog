@@ -49,7 +49,7 @@
   import Icon from '$lib/ui/Icon.svelte';
   import { drew } from '../../../lib/ui/screen.svelte.ts';
   import { capturedFields, holdInPlace, inverseOf, rowWriter, type Held, type RowWriter, type Wrote } from '$lib/record/rows-write.ts';
-  import { draftOf, editable, patchOf, unchanged, wrongValue } from '$lib/record/field-draft.ts';
+  import { draftOf, editable, patchOf, runFact, runFactWhy, unchanged, wrongValue } from '$lib/record/field-draft.ts';
   import { spentPutBacks, type Change } from './put-back.ts';
   import { foldAsk, sameOf, thingWords, twiceLine } from './twice-fold.ts';
   import {
@@ -1579,14 +1579,14 @@
   /* AND ONLY FOR SOMEBODY WHO MAY CHANGE THE LIST, so a Reads colleague is drawn no pencil. */
   const editableHere = (field: string) => {
     const f = fieldOf(field);
-    return changes && f !== undefined && editable(f);
+    return changes && f !== undefined && editable(f, id);
   };
   /* THE CURRENCY A MONEY CELL IS TYPED IN WHEN ITS ROW SAYS NONE, the fallback the row page passes too. */
   const listCurrency = (field: string): string | null => currencyFor(id, field);
 
   /** Why a cell is not the editor, in the reader's words rather than as a type name. */
   const notEditableBecause = (field: string): string =>
-    copy.cellWhy[fieldOf(field)?.type ?? ''] ?? copy.cellWhyElse;
+    runFact(fieldOf(field), id) ? runFactWhy : (copy.cellWhy[fieldOf(field)?.type ?? ''] ?? copy.cellWhyElse);
 
   /**
    * THE VALUE THE READER IS LOOKING AT, which is not always the value the record holds.

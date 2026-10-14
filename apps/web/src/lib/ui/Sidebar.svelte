@@ -78,6 +78,7 @@
   import { said } from '../voice.svelte.ts';
   import { isHere, orderLists, placeOf, type FlatItem } from '../nav.ts';
   import { navPrefs } from '../nav-prefs.svelte.ts';
+  import { penCount, type PenItem } from '../design/pen.ts';
   import * as pref from '../pref.ts';
   import type { NavEntry } from '../record/api.ts';
   import AgentMark from './AgentMark.svelte';
@@ -122,7 +123,7 @@
     /** How many pages the reader hid from the nav, so the way back is on the rail. */
     hidden?: number | undefined;
     /** The holding pen's offers (`boot`'s `pen`); the rail says only how many. */
-    pen: readonly unknown[];
+    pen: readonly PenItem[];
     record: string;
     records?: SwitcherRow[];
     /** Why the rest of the records could not be listed, when they could not: the host's own sentence. */
@@ -727,12 +728,12 @@
     </a>
   {/if}
 
-  {#if pen.length}
+  {#if penCount(pen, null, (id) => navPrefs.isDismissed(id))}
     <!-- A holding pen: an update that adds a page lands hidden and nothing moves until somebody keeps it. Outside the
          fold, because it is the one thing at the foot that is news. -->
-    <a class="item pen tap" href={at('/settings/navigation')} data-label={words.suggested(pen.length)}>
+    <a class="item pen tap" href={at('/settings/navigation')} data-label={words.suggested(penCount(pen, null, (id) => navPrefs.isDismissed(id)))}>
       <span class="rail-glyph"><Icon name="alert" size="l" /></span>
-      <span class="item-name">{words.suggested(pen.length)}</span>
+      <span class="item-name">{words.suggested(penCount(pen, null, (id) => navPrefs.isDismissed(id)))}</span>
       <span class="pen-action">{copy.review}</span>
     </a>
   {/if}

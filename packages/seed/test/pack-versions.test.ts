@@ -1598,10 +1598,11 @@ const DECLARED: Record<string, Version> = {
       register.things
       rule.project-past-aim
     `,
-    declares: '88eb91d28c23081b',
+    declares: '9ace1e3844609180',
     history: [
       "`page.portfolio` draws the note beside What each one earns, open and folded, only while `projects-earning-said` is above nought, where it was drawn while `projects-live` was and read 0 of 11 on a record where nobody had said; the words are the same -> bc4e48dea660614a",
       "`page.portfolio`'s In play cards say `edit: true` on `about`, so a project's one line is typed on its card (PGS-C15) -> 88eb91d28c23081b",
+      "`page.portfolio`'s In play cards draw `project-last-worked` for each card as its when, Worked on 2 days ago or Quiet for 40 days, and nothing for a project with no task (projects-last-worked-96, REC-C16) -> 9ace1e3844609180",
     ],
   },
   /* WHAT WAS WORKED ON A PROJECT THIS WEEK, a figure over tasks and so Work's (batch 46, REC-C16). 1.17.0 IS RELEASED. */
@@ -1635,12 +1636,13 @@ const DECLARED: Record<string, Version> = {
       metric.tasks-week-yours metric.tasks-with-agents page.work page.work-board register.tasks register.tracks
       register.updates rule.close_follow_ups rule.start_with_parent script.close_follow_ups script.start_with_parent
     `,
-    declares: '6de550d0463bb74b',
+    declares: 'e20a7069ac0b3816',
     history: [
       "`register.tracks`: Status has six values (idea and planned before open) with their labels and the declared moves between them, and gains `target`, the day a thread aims for, a deadline reminded on the day; `script.start_with_parent` copies each of project, thread, owner and agent the follow-up left empty, and is titled Start a follow-up where its parent is; no id added or taken away -> 8299f07c756e0e85",
       "Inside the unreleased 1.19.0 (work-moves-62-63, audit 61 claim 6; integrate 63; commit 63423720, the deployed build, holds 1.18.0): on `register.tracks` holding leads to done, and `script.start_with_parent` no longer copies the agent; no id added or taken away -> 424cfe3512924e3b",
       "Inside the unreleased 1.19.0 (work-agent-follow-up-65, audit 63 claim 8; integrate 65; commit 63423720, the deployed build, holds 1.18.0): `script.start_with_parent` copies the parent's agent when the agent holding the parent made the follow-up, read from input.made_by; no id added or taken away -> 061458f472bc1a99",
       "Inside the unreleased 1.19.0 (board-capture-line-83, PGS-C08 job 3; commit 63423720, the deployed build, holds 1.18.0): `page.work-board` gains Work's capture line, What needs doing?, first after its sentence and before the board, adding to `register.tasks`; no id added or taken away -> 6de550d0463bb74b",
+      "Inside the unreleased 1.19.0 (projects-last-worked-96, REC-C16; commit 63423720, the deployed build, holds 1.18.0): `project-last-worked` has a target of at most 30 days where it had none, so a project with nothing written on its tasks for longer misses it and is drawn as quiet; no id added or taken away -> e20a7069ac0b3816",
     ],
   },
 };

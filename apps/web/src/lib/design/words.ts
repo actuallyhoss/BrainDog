@@ -15,7 +15,6 @@ export const penWords = {
   nothing: 'Nothing waiting',
   nothingWhy: 'When this record has something to suggest, it waits here until you keep it or say no.',
   /** An icon offer's why: the word in the name the glyph was read from. */
-  iconWhy: (name: string, word: string) => `${name} has no icon of its own, so the sidebar draws a plain one. This one matches the word "${word}".`,
   iconKept: (name: string) => `${name} has its new icon.`,
   kept: (title: string) => `Kept: ${title}.`,
   putBackDone: (title: string) => `${title} is as it was.`,

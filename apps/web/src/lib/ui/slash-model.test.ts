@@ -1,5 +1,5 @@
 /**
- * The owner's choice of how Slash is run, "Included", "Your own key" or a self-host's `byo`, without a browser.
+ * The owner's choice of how Slash is run, "Included" or "Your own key" on every host, without a browser.
  *
  * WHAT A BROWSER TEST WOULD MISS is what gets SENT. A name pasted with a trailing space once saved with a green toast and
  * then failed on every ask, and his own key is four fields where one left out keeps a stale address or sends none. The
@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import type { SlashSettings } from '@braindog/client';
-import { keysOf, kindsOn, modelSaid, nowSaid, patchOf, startOf, type Start } from './slash-model.ts';
+import { chosen, endpointSaid, keysOf, kindsOn, modelOn, modelSaid, nowSaid, patchOf, startOf, words, type Start } from './slash-model.ts';
 
 const GRANT = '01M33H56ZCMM62YT38ARN8JRM8';
 const saved = (over: Partial<SlashSettings> = {}): SlashSettings => ({
@@ -24,9 +24,21 @@ const saved = (over: Partial<SlashSettings> = {}): SlashSettings => ({
 const included: Start = { kind: 'included', provider: 'anthropic', base_url: '', model: '', grant_id: null };
 const keyed: Start = { kind: 'key', provider: 'anthropic', base_url: '', model: 'claude-x', grant_id: GRANT };
 
-test('the Cloud offers Included and his own key, and a self-host its endpoint as well', () => {
+test('every host offers the same two, Included and his own key', () => {
   assert.deepEqual(kindsOn('cloud'), ['included', 'key']);
-  assert.deepEqual(kindsOn('self-host'), ['included', 'byo', 'key']);
+  assert.deepEqual(kindsOn('self-host'), ['included', 'key']);
+  assert.deepEqual(kindsOn(undefined), ['included', 'key']);
+});
+
+test("the model field under Included is a self-host's alone", () => {
+  assert.equal(modelOn('cloud'), false);
+  assert.equal(modelOn('self-host'), true);
+});
+
+test('no word of the old third form is left on the form', () => {
+  const said = JSON.stringify(words);
+  assert.equal(/\bbyo\b|no limit, it is my endpoint|counts nothing/iu.test(said), false);
+  assert.equal(said.includes('\u2014'), false);
 });
 
 test('the form starts as it was saved, his own key with its provider, address, model and key', () => {
@@ -62,15 +74,45 @@ test('his own key with no key picked, or no model, sends nothing rather than a s
 test('nothing changed sends nothing, on every kind', () => {
   assert.equal(patchOf(included, included), null);
   assert.equal(patchOf(keyed, { ...keyed }), null);
-  assert.equal(patchOf({ ...included, kind: 'byo', model: 'llama3:8b' }, { ...included, kind: 'byo', model: ' llama3:8b ' }), null);
+  assert.equal(patchOf({ ...included, model: 'llama3:8b' }, { ...included, model: ' llama3:8b ' }, true), null);
 });
 
 test('back to Included sends the source alone, whatever is still in the fields', () => {
   assert.deepEqual(patchOf(keyed, { ...keyed, kind: 'included' }), { source: 'included' });
 });
 
-test('a name on byo is sent with its tier and trimmed', () => {
-  assert.deepEqual(patchOf(included, { ...included, kind: 'byo', model: '  llama3:8b \n' }), { tier: 'byo', model: 'llama3:8b' });
+test('a name under Included on a self-host is sent with the source, trimmed, and never the old tier', () => {
+  assert.deepEqual(patchOf(included, { ...included, model: '  llama3:8b \n' }, true), { source: 'included', model: 'llama3:8b' });
+  assert.deepEqual(patchOf({ ...included, model: 'llama3:8b' }, included, true), { source: 'included', model: null });
+  assert.deepEqual(patchOf(keyed, { ...keyed, kind: 'included', model: '' }, true), { source: 'included' });
+});
+
+test('on the Cloud a name under Included is never sent', () => {
+  assert.equal(patchOf(included, { ...included, model: 'llama3:8b' }), null);
+});
+
+test('a record kept on the old third form reads as Included with its model name in the field', () => {
+  const start = startOf(saved({ source: 'included', tier: 'byo', model: 'llama3:8b' }));
+  assert.deepEqual(start, { ...included, model: 'llama3:8b' });
+  assert.equal(nowSaid(start), 'Now: the included model, llama3:8b.');
+  assert.equal(startOf(saved({ tier: 'byo', model: 'llama3:8b' })).kind, 'included');
+});
+
+test("picking a kind puts that kind's own saved name in the field, never the other kind's", () => {
+  assert.equal(chosen(keyed, keyed, 'included').model, '');
+  assert.equal(chosen(keyed, { ...keyed, kind: 'included', model: '' }, 'key').model, 'claude-x');
+  const hosted = { ...included, model: 'llama3:8b' };
+  assert.equal(chosen(hosted, { ...hosted, kind: 'key', model: '' }, 'included').model, 'llama3:8b');
+});
+
+test("Included on a self-host names the endpoint boot gives, or says the host's own model", () => {
+  assert.equal(endpointSaid(undefined), "This host's own model");
+  assert.equal(endpointSaid('  '), "This host's own model");
+  assert.equal(endpointSaid('http://10.0.0.5:11434/v1'), "This host's own model");
+  assert.equal(endpointSaid('gpu-box.local:11434'), "This host's own model");
+  assert.equal(endpointSaid('10.0.0.5'), "This host's own model");
+  assert.equal(endpointSaid('gpu-box.local'), "This host's own model");
+  assert.equal(endpointSaid('Ollama'), "This host's endpoint: Ollama");
 });
 
 test('the picker offers live API tokens only, by label, never a password or a revoked key', () => {
@@ -91,7 +133,10 @@ test('what saving says names the model and provider on his key, and the limit on
     modelSaid(saved({ tier: 'b', provider: 'anthropic', model: 'claude-x', grant_id: GRANT })),
     'Slash answers on your own key now: claude-x, through Anthropic Messages.',
   );
-  assert.equal(modelSaid(saved({ tier: 'byo', model: 'llama3:8b' })), 'Slash asks llama3:8b on your own endpoint, with no monthly limit.');
+  assert.equal(
+    modelSaid(saved({ source: 'included', model: 'llama3:8b' })),
+    'Slash answers on the included model, llama3:8b, counted against the monthly limit, up to 80 a month.',
+  );
   assert.equal(modelSaid(saved({ ask_cap: 40 })), 'Slash answers on the included model, counted against the monthly limit, up to 40 a month.');
   assert.equal(modelSaid(saved({ ask_cap: 0 })), 'Slash answers on the included model, counted against the monthly limit, and the limit is zero, so it is off.');
 });

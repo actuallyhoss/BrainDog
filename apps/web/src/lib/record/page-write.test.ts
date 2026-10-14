@@ -14,7 +14,7 @@ import './fixtures/fill.ts';
 import { copy } from '../copy.ts';
 import { REGISTERS } from './fixtures/sample.ts';
 import type { Fetch as ClientFetch } from './pages-live.ts';
-import { arrangedBody, keepInPlace, movePatch, rowKey, saveArrangement, schemaOf, tickPatch, updateRow, type Fetch } from './page-write.ts';
+import { arrangedBody, keepInPlace, movePatch, rowKey, saveArrangement, saveLayout, schemaOf, tickPatch, updateRow, type Fetch } from './page-write.ts';
 
 const BASE = 'http://record.test';
 
@@ -365,4 +365,79 @@ test('ON A LIVE PAGE THE ROWS GO THROUGH keepInPlace AND A LANDED WRITE PUSHES A
   const view = readFileSync(fileURLToPath(new URL('../page/page-writes.ts', import.meta.url)), 'utf8');
   assert.match(view, /\.keepInPlace\(/);
   assert.match(view, /toasts\.push\(hold\.said\(m\.words\), \{ intent: 'good', undo:/);
+});
+
+/* ── Done as the person's own look ─────────────────────────────────────────
+   A page an add-on added a block to: the record stores two blocks and draws three, so the whole-body write refuses it
+   by its count. Kept as a look by key, the page body is never sent. */
+
+const GARDEN = {
+  page: 'garden',
+  title: 'Garden',
+  blocks: [
+    { kind: 'table', span: 12, source: 'register.beds' },
+    { kind: 'list', span: 6, source: 'register.seeds' },
+  ],
+};
+
+/* As drawn: the add-on's block (`frost`) third, moved to the top and made a third wide. */
+const LAID = [
+  { key: 'frost', kind: 'stat', span: 4, drawn: true },
+  { key: 'beds', kind: 'table', span: 12, drawn: true },
+  { key: 'seeds', kind: 'list', span: 6, drawn: true },
+];
+
+function gardenHost(look: () => Response): { io: ClientFetch; sets: { body: Record<string, unknown> }[]; reads: string[] } {
+  const sets: { body: Record<string, unknown> }[] = [];
+  const reads: string[] = [];
+  const io: ClientFetch = async (input, init) => {
+    const url = String(input);
+    if (url.includes('/api/page')) {
+      reads.push(url);
+      return json(200, { ok: true, value: { ...GARDEN, blocks: GARDEN.blocks.map((b) => ({ ...b, rows: [], drawn: true })) } });
+    }
+    const sent = init?.body ? (JSON.parse(String(init.body)) as { body: Record<string, unknown> }) : { body: {} };
+    sets.push(sent);
+    return 'look' in sent.body ? look() : json(200, { ok: true, value: [{ id: 'page.garden', version: 3 }] });
+  };
+  return { io, sets, reads };
+}
+
+test("A PAGE HOLDING AN ADD-ON'S BLOCK IS ARRANGED AS THE PERSON'S LOOK: one look written, and no page body", async () => {
+  const { io, sets, reads } = gardenHost(() => json(200, { ok: true, value: [{ id: 'look.garden', version: 1 }] }));
+  const out = await saveLayout(BASE, 'garden', null, LAID, { drawn: 3, placed: [{ i: 2, span: 4 }, { i: 0, span: 12 }, { i: 1, span: 6 }] }, io);
+  assert.deepEqual(out, { from: 'written', undo: { retire: 'garden' } });
+  assert.equal(sets.length, 1);
+  assert.equal(reads.length, 0, 'the stored page was read for a count the look does not need');
+  const body = sets[0]!.body;
+  assert.equal(Object.keys(body)[0], 'look');
+  assert.equal(body.look, 'garden');
+  assert.equal(body.by, 'owner');
+  assert.deepEqual(body.order, ['frost', 'beds', 'seeds']);
+  assert.deepEqual(body.span, { frost: 4, beds: 12, seeds: 6 });
+  assert.equal('blocks' in body, false);
+});
+
+test('A RECORD OLDER THAN A LOOK’S WIDTHS IS WRITTEN THE OLD WAY, once, and says what that says', async () => {
+  const older = () =>
+    json(422, { ok: false, refusal: { code: 'DECLARATION_INVALID', fix: 'look.garden: span: is not a key a look has.', at: 'span' } });
+  const { io, sets } = gardenHost(older);
+  const out = await saveLayout(BASE, 'garden', null, LAID.slice(1).reverse(), { drawn: 2, placed: [{ i: 1, span: 6 }, { i: 0, span: 12 }] }, io);
+  assert.equal(out.from, 'written');
+  assert.ok(out.from === 'written' && 'before' in out, 'the fall back answers what the whole-body write answers');
+  const bodies = sets.filter((s) => 'page' in s.body);
+  assert.equal(bodies.length, 1);
+  assert.deepEqual((bodies[0]!.body.blocks as { kind: string }[]).map((b) => b.kind), ['list', 'table']);
+
+  /* With the add-on's block on it, the old way refuses as it always did, and nothing new is said. */
+  const drawn = gardenHost(older);
+  assert.deepEqual(await saveLayout(BASE, 'garden', null, LAID, { drawn: 3, placed: [{ i: 2, span: 4 }, { i: 0, span: 12 }, { i: 1, span: 6 }] }, drawn.io), {
+    from: 'refused',
+    fix: copy.arrangeMoved,
+  });
+
+  /* Any other refusal of the look is the record's own sentence, and nothing else is written. */
+  const other = gardenHost(() => json(403, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'Only an owner sets a look.' } }));
+  assert.deepEqual(await saveLayout(BASE, 'garden', null, LAID, { drawn: 3, placed: [] }, other.io), { from: 'refused', fix: 'Only an owner sets a look.' });
+  assert.equal(other.sets.length, 1);
 });

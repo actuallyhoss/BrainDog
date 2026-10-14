@@ -106,7 +106,10 @@ Question: %QUESTION%
 
 Reply with the schema. body_kind is "query" when the rows or the figures themselves answer, and body is {}; "options" when a choice has to be made: body is { options: [...] }, two to four options, each { id: a short lower-case word, label, because }, "recommended": true on at most one and only with a cited reason; "rowset" when rows should be written: body is { register, rows: [...] }, each row { fields: { <field id>: <value> }, from: [<register#seq of every row it derives from>] }, and no brace inside fields.`;
 
-const PATTERN_USER = `%N% messages arrived that no declared pattern matched, and they are one shape. Each is inside its own <untrusted> fence, JSON-encoded.
+/* `%OLDEST%` IS EMPTY BELOW THREE SAMPLES, so a draft from one or two reads byte for byte as it did before ENG-B07. From
+   three it is the sentence `jobs.ts` `oldestLine` writes from a count, never from a sample, so nothing a sender wrote
+   reaches the prompt outside a fence. */
+const PATTERN_USER = `%N% messages arrived that no declared pattern matched, and they are one shape.%OLDEST% Each is inside its own <untrusted> fence, JSON-encoded.
 %SAMPLES%
 
 Registers you may write to:
@@ -446,7 +449,7 @@ export const PROMPTS: Readonly<Record<PromptId, Routed>> = {
     system: SYSTEM,
     user: PATTERN_USER,
     schema: PATTERN_SCHEMA,
-    slots: ['%N%', '%SAMPLES%', '%INDEX%'],
+    slots: ['%N%', '%OLDEST%', '%SAMPLES%', '%INDEX%'],
   },
   /* 200 TOKENS OUT IS A SENTENCE OF A FEW HUNDRED CHARACTERS AND ITS JSON, which is the most this job may say. 3,000 IN
      holds the kernel's longest question (4,096 characters, `VAR_BYTES`) with room for the fields, and the fields are

@@ -14,6 +14,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 
 import { openRecord, type Kernel } from '@braindog/kernel';
@@ -295,4 +296,61 @@ test('a colleague held to named lists is offered those, and the sample offers ev
   /* THE SAMPLE IS AN OWNER'S RECORD, and its press says nothing was saved, as every write there does. */
   const sample = { lists: registers.map((l) => ({ id: l.id, name: l.name })), me: { level: 'owner', lists: null } };
   assert.deepEqual(create.offered(sample).map((l) => l.id), create.addable(registers).map((l) => l.id));
+});
+
+/* ── the plain line (EXP-D13) ─────────────────────────────────────────────── */
+
+const INTO = { register: 'tasks' };
+
+test('A PLAIN LINE OFFERS ONE ROW, into the list the record\'s capture writes to, titled with the line', () => {
+  assert.equal(typeof create.plainAdd, 'function', 'create.ts exports no plainAdd, so a plain line offers nothing to add');
+  assert.deepEqual(create.plainAdd('call the bank tomorrow', INTO), { register: 'tasks', title: 'call the bank tomorrow', plain: true, chips: [] });
+  assert.deepEqual(create.plainAdd('  water the ferns  ', { register: 'chores' })?.register, 'chores', 'the list is the one handed in');
+  /* A LINE THAT STARTS WITH "ADD" IS STILL A THING TO DO, as long as it is not the sentence row's own words. */
+  assert.ok(create.plainAdd('add tomatoes to the order', INTO));
+  assert.equal(create.words.plain('task'), 'Add as a task');
+  assert.equal(create.words.plain('Order'), 'Add as an order');
+});
+
+test('a question offers no row, since it is Slash\'s; nor does one word, nor another row\'s sentence', () => {
+  for (const q of ['what is due this week', 'what is due this week?', 'have I paid the rent', 'who is on call'])
+    assert.equal(create.plainAdd(q, INTO), null, `"${q}" was offered as a row to add`);
+  for (const q of ['', 'bank', '   ferns  '])
+    assert.equal(create.plainAdd(q, INTO), null, `"${q}" is one word and was offered as a row to add`);
+  for (const q of ['add to', 'add to tas', 'add to tasks: buy milk', 'new page', 'new page: Wedding', 'new pa'])
+    assert.equal(create.plainAdd(q, INTO), null, `"${q}" is another row's sentence and was offered as a plain row`);
+});
+
+test('NO CAPTURE LIST OFFERS NONE: the list comes from the Home page, never from a name in code', async () => {
+  assert.equal(create.plainAdd('call the bank tomorrow', null), null);
+  assert.equal(create.homeCapture([{ kind: 'note', body: 'Hello' }, { kind: 'todo', register: 'tasks' }]), null);
+  assert.equal(create.homeCapture([{ kind: 'note' }, { kind: 'capture', register: 'chores' }, { kind: 'capture', register: 'tasks' }]), 'chores', 'the first capture wins');
+  /* TODAY'S BODY, which Home draws for a record with no Home page of its own, captures where the record keeps tasks a
+     reader may add to, and nowhere otherwise. */
+  const { todayHome } = await import('../home/default-home.ts');
+  assert.equal(create.homeCapture(todayHome({ tasks: true, adds: true, money: true }).blocks), 'tasks');
+  assert.equal(create.homeCapture(todayHome({ tasks: true, adds: false, money: true }).blocks), null);
+  assert.equal(create.homeCapture(todayHome({ tasks: false, adds: false, money: true }).blocks), null);
+});
+
+test('THE PLAIN ROW RANKS AFTER EVERY MATCH, so Enter runs a match before it adds', () => {
+  const code = readFileSync(new URL('./Palette.svelte', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//gu, '');
+  const cut = code.indexOf('const kept = out.slice(0, CAP);');
+  const pushed = code.indexOf("id: 'c-add-plain'");
+  assert.ok(cut > 0 && pushed > cut, 'the plain row is pushed before the matches are cut, so it is not last');
+  assert.match(code, /items\.every\(\(r\) => r\.plain === true\) \? Number\.MAX_SAFE_INTEGER/u, 'the plain row\'s heading is not sorted after every other heading');
+  assert.match(code, /r\.plain !== true\)\.length/u, 'the plain row counts as a place, so it hides Slash\'s row');
+});
+
+test('A PLAIN LINE ADDS WITH WHAT IT SAID: the day it named is written, and not said to have been filled', async () => {
+  const k = await tasks();
+  const chips = [{ kind: 'day' as const, field: 'by', label: 'tomorrow', said: 'due Fri 25 Sep', value: '2026-09-25', from: 14, to: 22, words: 'tomorrow' }];
+  const out = await create.addRow({ register: 'tasks', title: 'call the bank', plain: true, chips }, NOW, BASE, served(k));
+  assert.ok(out.ok, JSON.stringify(out));
+  const row = k.get('tasks#1');
+  assert.equal(row?.fields.what, 'call the bank');
+  assert.equal(row?.fields.by, '2026-09-25', 'the day the line named was not written');
+  assert.ok(!out.filled.some((f) => f.startsWith('by ') || f.startsWith('due ')), `the day was said to be filled: ${out.filled.join(', ')}`);
+  const back = await out.back();
+  assert.ok(back.ok, 'Put back did not take the row off the list');
 });

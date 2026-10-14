@@ -117,6 +117,7 @@ import { KERNEL_MIGRATION, type Ack } from '@braindog/kernel';
 import { doorPath, op, outboxFields, type AckedRow } from './oplog.ts';
 /* BILLING: the account's four billing doors, and the Stripe client they call through. */
 import { billingDoors, sells, type BillingDeps } from './billing.ts';
+import { opsPlan, type OpsPlanDeps } from './ops-plan.ts';
 import { stripeOf } from './stripe.ts';
 /* TELEMETRY: one Analytics Engine point per request, when `TELEMETRY` is bound. */
 import { telemetry } from './telemetry.ts';
@@ -2281,6 +2282,11 @@ export class Directory$ extends DurableObject<Env> {
     return this.#directory().resolve(slug);
   }
 
+  /** Who owns a record this installation holds open, or `null`: the operator's gift door asks it (`ops-plan.ts`). */
+  ownerOf(record: string): string | null {
+    return this.#directory().ownerOf(record);
+  }
+
   /**
    * Whether a name is free, a live record's or a released one's: what billing's checkout asks before anybody pays
    * (`billing.ts`).
@@ -2743,6 +2749,7 @@ const unauthorized = (env: Env): Response =>
       ok: false,
       refusal: {
         code: 'UNAUTHORIZED',
+        at: 'authorization',
         fix:
           (env.SESSION_SECRET ?? '').length >= 32
             ? 'This record takes a bearer token it already knows. If the record is yours, sign in and mint one in Settings, or run `braindog login`. https://brain.dog/changelog says what is built.'
@@ -3684,12 +3691,45 @@ async function account(request: Request, env: Env, ctx: ExecutionContext): Promi
     const over = await overLimit(env, null, request, 'write');
     if (over !== null) return over;
   }
+  const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
+  /* THE ALLOWANCE FOLLOWS THE PLAN: the Directory meters the record under the plan it now pays for. AND SO DO ITS SLASH
+     ASKS AND WHO MAY JOIN IT, AND ITS COUNT OF AGENTS, which are the record's own object's to keep (`Record$.planMoved`).
+     A record that misses the word reads the plan from the Directory the next time it asks for it (`#planOf`: on a wake
+     that finds no count of agents, at an invitation, at Slash), and writes the count of agents from it, so a failed
+     RPC is logged and the plan still stands. Billing and the operator's gift door share it. */
+  const setPlan: BillingDeps['setPlan'] = async (record, plan) => {
+    const refused = await directory.setPlan(record, plan);
+    if (refused !== null) return refused;
+    try {
+      await env.RECORD.get(env.RECORD.idFromName(record)).planMoved(plan);
+    } catch (e) {
+      op({ op: 'billing', did: 'plan.record', ok: false, rec: record, error: e instanceof Error ? e.message : String(e) }, 'error');
+    }
+    return null;
+  };
   if (OPS_INVITE.test(new URL(request.url).pathname)) return opsInvite(request, env);
+  /* THE OPERATOR'S GIFT OF A PLAN (`ops-plan.ts`): a record found by its name or id with who owns it, and the plan set
+     through the same `setPlan` billing uses, so the record's own object hears of it. */
+  if (OPS_PLAN.test(new URL(request.url).pathname))
+    return opsPlan(request, env, {
+      find: async (name) => {
+        const named = await directory.resolve(name);
+        const owner = named ? await directory.ownerOf(named.record) : null;
+        return named && owner ? { record: named.record, owner } : null;
+      },
+      billing: ((call: BillingCall) => directory.billing(call)) as unknown as OpsPlanDeps['billing'],
+      setPlan,
+      people: (record) => env.RECORD.get(env.RECORD.idFromName(record)).walkPeople(),
+      owned: async (person) => {
+        const today = new Date().toISOString().slice(0, 10);
+        const u = (await directory.usage(person, { from: today, to: today })) as unknown as Result<AccountUsage>;
+        return u.ok ? { ok: true, value: u.value.records.filter((r) => !r.closed) } : u;
+      },
+    });
   if (OPS_ALERT.test(new URL(request.url).pathname)) return opsAlertDoor(request, env);
   if (OPS_RESTORE_POINT.test(new URL(request.url).pathname)) return opsRestorePoint(request, env);
   if (OPS_DRILL.test(new URL(request.url).pathname)) return opsDrill(request, env);
   if (DRILL.test(new URL(request.url).pathname)) return drillRead(request, env);
-  const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
   const billing: BillingDeps = {
     clock: () => Date.now(),
     billing: ((call: BillingCall) => directory.billing(call)) as unknown as BillingDeps['billing'],
@@ -3698,21 +3738,7 @@ async function account(request: Request, env: Env, ctx: ExecutionContext): Promi
     claimed: async (slug) => directory.slugClaimed(slug),
     provisionable,
     provision: (args) => provision(env, args),
-    /* THE ALLOWANCE FOLLOWS THE PLAN: the Directory meters the record under the plan it now pays for. AND SO DO ITS SLASH
-       ASKS AND WHO MAY JOIN IT, AND ITS COUNT OF AGENTS, which are the record's own object's to keep (`Record$.planMoved`).
-       A record that misses the word reads the plan from the Directory the next time it asks for it (`#planOf`: on a wake
-       that finds no count of agents, at an invitation, at Slash), and writes the count of agents from it, so a failed
-       RPC is logged and the plan still stands. */
-    setPlan: async (record, plan) => {
-      const refused = await directory.setPlan(record, plan);
-      if (refused !== null) return refused;
-      try {
-        await env.RECORD.get(env.RECORD.idFromName(record)).planMoved(plan);
-      } catch (e) {
-        op({ op: 'billing', did: 'plan.record', ok: false, rec: record, error: e instanceof Error ? e.message : String(e) }, 'error');
-      }
-      return null;
-    },
+    setPlan,
     /* THE RECORD'S OWN SWITCH, over RPC to its object by id: while it is on, the record
        answers reads and refuses writes, and its alarm runs the drain and nothing else. */
     setLapsed: (record, on) => env.RECORD.get(env.RECORD.idFromName(record)).setLapsed(on),
@@ -3771,6 +3797,9 @@ async function account(request: Request, env: Env, ctx: ExecutionContext): Promi
 
 /** The operator's door to the sign-up codes, with the slashes every other door here forgives. */
 const OPS_INVITE = /^\/+account\/+ops\/+invite\/*$/;
+
+/** The operator's door to a plan given as a gift (`ops-plan.ts`), with the same forgiveness. */
+const OPS_PLAN = /^\/+account\/+ops\/+plan\/*$/;
 
 /**
  * `/account/ops/invite`: the sign-up codes, behind the provision key, beside `/auth/provision`.

@@ -362,6 +362,28 @@ export const runMarkOf = (f: RunFace, agentMark: ((name: string) => AgentMark | 
 };
 
 /**
+ * How many helpers a run has working with it, as the host hands them beside a block of runs (`sessions.working`), one
+ * a row as `opts.runs` is: a count, or the helpers themselves, whose length is the count.
+ */
+export type Helpers = number | readonly unknown[] | null | undefined;
+
+/**
+ * A run's helpers as its card says them, "1 helper" or "9 helpers", or null for none or none said.
+ *
+ * A RUN THAT STARTED NINE HELPERS READ AS ONE QUIET CARD (AGT-C12): the read folds each run's helpers under it, so the
+ * Agents page counted one agent at work and nothing on the card said how much was running under it. The line sits
+ * under the card's sentence in the reply's quieter voice, and a run with no helpers draws nothing, as an empty reply
+ * draws nothing.
+ */
+export function helpersSaid(helpers: Helpers): string | null {
+  const n = Array.isArray(helpers) ? helpers.length : typeof helpers === 'number' && Number.isFinite(helpers) ? Math.floor(helpers) : 0;
+  return n > 0 ? `${n} ${n === 1 ? CARDS_HELPER : CARDS_HELPERS}` : null;
+}
+
+/** The helpers line for card `n`, from what the host handed beside the block, or null. */
+export const helpersOf = (helpers: readonly Helpers[] | undefined, n: number): string | null => helpersSaid(helpers?.[n]);
+
+/**
  * Whether a card is drawn dimmed: its `quiet` cell says so, and it is not a run the host handed. A RUN'S FACE ALREADY
  * SAYS IT, with a dashed ring once it has gone quiet, and a run that has stopped sits under Today or Earlier, which say
  * when. Dimmed as well, a stopped run's card was grey words on a grey face, which nobody could read (DIRECTION §36).
@@ -390,6 +412,9 @@ export const FOLD_HIDE = 'Hide';
 export const TREND = 'Trend';
 /** The word before a card's next step. */
 export const CARDS_NEXT = 'Next';
+/** The words after a run's count of helpers, one and many. */
+export const CARDS_HELPER = 'helper';
+export const CARDS_HELPERS = 'helpers';
 /** A run's face is a door to the run, named by what it does since its ring is not read out. */
 export const RUN_OPEN = 'Open this run';
 

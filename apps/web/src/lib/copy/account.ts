@@ -140,6 +140,8 @@ export const account = {
   /* "A second palette, solved against a higher floor" was the comment above, said to the reader.
      What they get is the second sentence it already had, in the words of what they see. */
   contrastHint: 'Makes text and edges stand out more, and keeps the accent you chose.',
+  shot: 'Screenshot mode',
+  shotHint: 'Hides what your record holds on this screen. What is sent to this device does not change.',
 
   /* the settings areas `19 §2` says an earlier draft dropped */
   /* AND SO DOES THIS ONE. **Who can see this record · 4** stood over four rows, one of which is an

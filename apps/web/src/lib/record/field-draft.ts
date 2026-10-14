@@ -44,7 +44,32 @@ import { listFromDraft, listLine } from './tags.ts';
  * the record stores, in the box drawn for it (`QuantityBox.svelte`, `JsonBox.svelte`).
  */
 const UNBOXED: ReadonlySet<string> = new Set(['secret']);
-export const editable = (f: Pick<FieldDecl, 'type'>): boolean => !UNBOXED.has(f.type);
+
+/**
+ * What a run says about itself on the list of runs: the app, its version and session id, the repository, its remote,
+ * the folder, the machine, the branch and the commit.
+ *
+ * THE KERNEL'S `RUN_FACTS` (`session.ts`), HELD HERE AS A LITERAL because this app does not load the kernel at run time,
+ * and kept equal to it by `field-draft.test.ts`. The agent's token writes them as its run opens, and they are how its
+ * next write finds that run, so a person who rewrote the folder would move the run out of the place it works in. On
+ * every other list a field called `cwd` or `head` is that list's own, and a person's to change.
+ */
+export const RUN_FACTS: readonly string[] = ['client_id', 'client', 'client_version', 'repo', 'remote', 'cwd', 'host', 'branch', 'head'];
+const RUNS = 'session';
+
+/** Whether a field on a list is one of the facts a run reported about itself. */
+export const runFact = (f: { id?: string } | undefined, register: string | undefined): boolean =>
+  register === RUNS && typeof f?.id === 'string' && RUN_FACTS.includes(f.id);
+
+/** Why a run's own fact has no box, finishing `copy.cellNotEdited`'s "Folder is ..., so it cannot be changed here." */
+export const runFactWhy = 'what the run reported about itself';
+
+/**
+ * `register` is the list the field is drawn on. Every screen passes it, so a run's folder is a fact and not a box,
+ * while a type-only question (which types a box can hold at all) leaves it out.
+ */
+export const editable = (f: Pick<FieldDecl, 'type'> & { id?: string }, register?: string): boolean =>
+  !UNBOXED.has(f.type) && !runFact(f, register);
 
 /**
  * A `quantity` field, and a `json` one.

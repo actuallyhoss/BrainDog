@@ -18,6 +18,11 @@
  * operator's monthly ceiling counts it. A build that throws is let go, so the next pass builds again. On an endpoint the
  * key is opened as `system`, which `wireOf` in `slash.ts` keeps for callers with nobody asking, and a model job has nobody.
  *
+ * AND ON THE SAME FACTS AS EVERY ASK (ENG-A06): the engine is built with `includedRoute`, so a pattern is asked of the
+ * candidates `routeFor('pattern', includedCandidates(env))` names, which today is the included model alone: the operator's
+ * second provider is on the answering route only. A digest's prose is not walked at all, because `digestProse` calls its
+ * own model (`PROSE`, `llama-3.2-1b`) outside `core.run`, as it always did.
+ *
  * THE PACKAGE IS STILL IMPORTED ONLY BEHIND THE REFUSAL (`46 §5.1`): `workerSlashEngine` imports it, and nothing here
  * calls that before a job is leased.
  */
@@ -47,7 +52,7 @@ export function workerModelJobs(env: SlashEnv, api: () => RecordApi, deps: Slash
     return slash;
   };
   return {
-    draft: async (samples) => (await engine()).draftPattern(samples),
+    draft: async (samples, waiting) => (await engine()).draftPattern(samples, waiting),
     prose: async (digest) => (await engine()).digestProse(digest),
     /* THROUGH THE ENGINE, OVER THE `AI` BINDING (ENG-B18): the engine's own model embeds with `aiInference`'s `embed`
        wherever that binding is bound (`slash.ts` `embedOver`), and `embedTexts` writes each call's `slash_call` row, so

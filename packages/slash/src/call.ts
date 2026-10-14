@@ -98,6 +98,11 @@ export type RunArgs = {
    * template's schema would admit any string, and the rule's `if` would then compare an answer no choice spells.
    */
   schema?: object | undefined;
+  /**
+   * A caller's watch over a route candidate's own wire (ENG-A06), so what it reads off a throw is the last attempt's and
+   * not an earlier one's. Absent, a candidate's wire is asked as it came.
+   */
+  watch?: ((inference: Inference) => Inference) | undefined;
 };
 
 /** What every hold and every settled row says about itself: what the ask was for and whose allowance it spends. */
@@ -689,7 +694,7 @@ export const core = (
 
     let start = t0;
     for (const [i, candidate] of walk.entries()) {
-      const { ran, thrown } = await ask(candidate.model, candidate.inference ?? args.inference ?? fallback, start);
+      const { ran, thrown } = await ask(candidate.model, candidate.inference === undefined ? (args.inference ?? fallback) : (args.watch?.(candidate.inference) ?? candidate.inference), start);
       const tried: Ran = candidate.id === undefined ? ran : { ...ran, candidate: candidate.id };
       if (i === walk.length - 1 || !passedOver(ran, thrown)) return tried;
       /* THE ATTEMPT PASSED OVER IS ITS OWN ROW, under its own model and a fresh id, so the ledger holds one row an attempt

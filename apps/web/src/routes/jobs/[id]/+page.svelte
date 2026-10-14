@@ -63,6 +63,7 @@
   import type { IconName } from '$lib/ui/icons.ts';
   import { closed, drew, opened } from '$lib/ui/screen.svelte.ts';
   import { machineOf, outcomeOf, runTail, toolsOf, toolsSaid, words as runWords } from '../charts.ts';
+  import { costWords } from './cost.ts';
 
   const id = $derived(String(route.params.id ?? ''));
   const base = $derived(apiBase(route.url));
@@ -252,9 +253,10 @@
               </div>
             {/if}
             {#if row.cost_minor !== null && row.cost_currency !== null}
+              {@const saidCost = costWords(row.cost_minor, row.cost_currency)}
               <div class="fact">
                 <dt>{runWords.cost}</dt>
-                <dd><Money minor={row.cost_minor} currency={row.cost_currency} /></dd>
+                <dd>{#if saidCost !== null}{saidCost}{:else}<Money minor={row.cost_minor} currency={row.cost_currency} />{/if}</dd>
               </div>
             {/if}
             {#if args.length}

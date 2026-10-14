@@ -162,6 +162,12 @@ export type UseCase = {
   signals: string[];
   /** First-party packs installed before the use case's own, in dependency order. */
   modules: string[];
+  /**
+   * The part of `modules` this use case cannot stand without (USE-B08): a record starts with these and what the person
+   * named, and grows into the rest when its moment comes. Left out, it is all of `modules`, so a use case file shared
+   * before the key existed reads the same and normalises to the same object (`standsOn` in `packages/seed`).
+   */
+  needs?: string[];
   voice: Partial<Record<VoiceKey, string>>;
   /**
    * The words this use case gives lists, fields and states, by label key: `tickets`, `people.role`,
@@ -204,7 +210,7 @@ export type Over = { words?: Record<string, Partial<ListWords>>; config?: Record
 /** One link between two example rows, by their titles. `list` when the field holds a list of refs. */
 export type ExampleLink = { register: string; title: string; field: string; to: string; target: string; list?: true };
 
-const KEYS = ['usecase', 'version', 'title', 'summary', 'changes', 'author', 'license', 'audience', 'tone', 'signals', 'modules', 'voice', 'labels', 'over', 'pack', 'skills', 'nav', 'links'];
+const KEYS = ['usecase', 'version', 'title', 'summary', 'changes', 'author', 'license', 'audience', 'tone', 'signals', 'modules', 'needs', 'voice', 'labels', 'over', 'pack', 'skills', 'nav', 'links'];
 const OVER_KEYS = ['words', 'config', 'hide'];
 const WORD_KEYS = ['name', 'one'];
 /** A page id, as `index.ts` reads one in a pack file, for a page a use case hides. */
@@ -495,6 +501,16 @@ export function normaliseUseCase(doc: unknown): Result<UseCase> {
     return no('VALUE_MALFORMED', `Modules are the ids of up to ${MODULES_CEILING} packs in the catalogue, such as ${MODULES.join(', ')}.`, { at: 'modules', allowed: [...MODULES] });
   if (new Set(modules).size !== modules.length) return no('VALUE_MALFORMED', 'A module is listed twice.', { at: 'modules' });
   if (modules.includes(packIdOf(id))) return no('VALUE_MALFORMED', 'A use case does not stand on its own pack.', { at: 'modules' });
+  /* WHAT IT CANNOT STAND WITHOUT is named from `modules` and nothing else, so it is never a way in for a pack it does not name. */
+  const needs = doc.needs;
+  if (needs !== undefined) {
+    if (!Array.isArray(needs) || needs.some((m) => typeof m !== 'string' || !PACK_ID.test(m)))
+      return no('VALUE_MALFORMED', 'needs is a part of modules: the ids of the packs this use case cannot stand without.', { at: 'needs', allowed: [...(modules as string[])] });
+    const outside = needs.find((m) => !modules.includes(m));
+    if (outside !== undefined)
+      return no('VALUE_MALFORMED', `needs names ${outside}, which this use case does not stand on. Add it to modules, or take it out of needs.`, { at: 'needs', allowed: [...(modules as string[])] });
+    if (new Set(needs).size !== needs.length) return no('VALUE_MALFORMED', 'A module is listed twice in needs.', { at: 'needs', allowed: [...(modules as string[])] });
+  }
 
   const voice: Partial<Record<VoiceKey, string>> = {};
   if (doc.voice !== undefined) {
@@ -583,6 +599,7 @@ export function normaliseUseCase(doc: unknown): Result<UseCase> {
     tone: doc.tone as string,
     signals: [...(signals as string[])],
     modules: [...(modules as string[])],
+    ...(needs === undefined ? {} : { needs: [...(needs as string[])] }),
     voice,
     labels,
     pack,

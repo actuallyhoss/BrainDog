@@ -239,7 +239,7 @@ export type DraftedPattern = {
  * STRUCTURAL, AS `SlashAnswer` IS: each host builds it over its own engine, the Worker in `apps/worker/src/slash-jobs.ts`.
  */
 export type ModelJobInference = {
-  draft(samples: readonly DraftSample[]): Promise<Result<DraftedPattern>>;
+  draft(samples: readonly DraftSample[], waiting?: number): Promise<Result<DraftedPattern>>;
   prose(digest: unknown): Promise<Result<{ text: string }>>;
   /**
    * OPTIONAL, AND WIDENED HERE FOR TIDINESS ALONE: `serveModelJobs` already takes `ModelJobInference & ModelJobEmbed`

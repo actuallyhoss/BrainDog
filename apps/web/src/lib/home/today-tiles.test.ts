@@ -6,7 +6,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+import { writeAmount } from 'braindog-render';
+
 import {
+  aboutSaid,
   ageSaid,
   cashReading,
   counted,
@@ -145,8 +148,24 @@ test('SINCE YOU WERE HERE: when the oldest change was, who made them, and where 
   assert.equal(sinceIcon(rows[1]!, () => undefined), 'decide');
 });
 
+test('CASH, ROUGHLY: about a figure keeps its three significant figures and is spelled by the one writer', () => {
+  const writer = (minor: number, currency: string, home: string | null): string => `about ${writeAmount({ minor, currency }, home, 'read')!.text}`;
+  /* A currency written by its code, home or not, the code held to its figure by a space that does not break. */
+  assert.equal(aboutSaid(38_812_345, 'EGP', null), 'about EGP\u00a0388,000');
+  assert.equal(aboutSaid(38_812_345, 'EGP', null), writer(38_800_000, 'EGP', null));
+  assert.equal(aboutSaid(38_812_345, 'EGP', 'EGP'), writer(38_800_000, 'EGP', 'EGP'));
+  /* Three minor places, never a hundredth: 1,234.567 dinars is 1,235 whole and about 1,240, and the writer spells it the same. */
+  assert.equal(aboutSaid(1_234_567, 'KWD', 'KWD'), 'about KWD\u00a01,240');
+  assert.equal(aboutSaid(1_234_567, 'KWD', null), writer(1_240_000, 'KWD', null));
+  assert.equal(aboutSaid(-1_234_567, 'KWD', null), writer(-1_240_000, 'KWD', null));
+  /* The home currency by its sign, another by its sign and code: the spelling every other figure on the page has. */
+  assert.equal(aboutSaid(38_812_345, 'GBP', 'GBP'), 'about £388,000');
+  assert.equal(aboutSaid(38_812_345, 'GBP', 'EGP'), writer(38_800_000, 'GBP', 'EGP'));
+  assert.equal(aboutSaid(950, 'GBP', 'GBP'), 'about £10');
+});
+
 test('CASH: the low point in words, going under said as the one red phrase, and a share of the whole', () => {
-  const low = cashReading({ currency: 'EGP', values: [41_230_000, 38_812_345], weeks: 13, low: { value: 38_812_345, day: '2026-11-23' }, crossed: null });
+  const low = cashReading({ currency: 'EGP', values: [41_240_000, 38_812_345], weeks: 13, low: { value: 38_812_345, day: '2026-11-23' }, crossed: null });
   assert.equal(low.needs, '');
   assert.match(low.text, /^Lowest in the next 13 weeks: about .*388,000 on 23 Nov\.$/u);
   const under = cashReading({ currency: 'EGP', values: [100, -5], weeks: 13, low: { value: -5, day: '2026-11-02' }, crossed: '2026-11-02' });

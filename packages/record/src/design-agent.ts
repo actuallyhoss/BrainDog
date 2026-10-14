@@ -146,8 +146,11 @@ export const COLUMN = { rows: 20, filled: 0.8 } as const;
 const BAR_SLOTS = 4;
 
 const DAY_MS = 86_400_000;
-const TIER = { shape: 5000, page: 4000, block: 3000, column: 2000, icon: 1000 } as const;
-const within = (strength: number): number => Math.max(0, Math.min(999, Math.floor(strength)));
+/** Where each kind of offer ranks: a tier's base, and up to 999 above it by its strength (`within`). */
+export const TIER = { shape: 5000, page: 4000, block: 3000, column: 2000, icon: 1000 } as const;
+/** The most strength lifts an offer within its tier. */
+export const WITHIN_MOST = 999;
+const within = (strength: number): number => Math.max(0, Math.min(WITHIN_MOST, Math.floor(strength)));
 const dayOf = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
 const count = (n: number): string => n.toLocaleString('en');
 /** The address a name makes, as Slash drafts one: its letters and digits, lower case, joined by hyphens. */

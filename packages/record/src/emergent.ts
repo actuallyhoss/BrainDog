@@ -29,22 +29,31 @@
  * habit"), counted from a person's own writes (`usedOf`) and never from the oldest day its entries say, so an import,
  * an agent or the night's sweep does not make a record old. Its own reads on three different weeks are the days of use.
  *
- * ONE OFFER A LIST, IN ONE PLACE, THE BEST FEW AT ONCE (USE-B03). `penRanked` keeps one offer a list and drops a list Slash
- * already asked a page for on Decide; `penFor` shows its first `PEN_SHOWN`, and beside them the offer of any list the
- * person opened in the last day, so a list they are looking at never waits unseen behind three others. An offer's id is
- * made by `signatureOf` alone, so Slash's growing list can name the same offer and ask `pageSpokenFor` before it
- * drafts one.
+ * ONE OFFER A LIST, IN ONE PLACE, THREE AT ONCE (USE-B03, ENG-B14: "max 3 waiting"). `penRanked` keeps one offer a list
+ * and drops a list Slash already asked a page for on Decide; `penFor` shows what the one queue holds (`design-agent.ts`
+ * `queueOf` over `recommend`), `WAITING_MOST` at most, each with the day it lapses, so the rail, Settings and the Slash
+ * page count the same small number. An offer's id is made by `signatureOf` alone, so Slash's growing list can name the
+ * same offer and ask `pageSpokenFor` before it drafts one.
+ *
+ * THE PEN IS A VIEW OF THE QUEUE. It still draws each declaration a keep would write, since the recommender carries a
+ * draft and reads none; what is offered, how strong it is and when it lapses are the recommender's. An offer the
+ * recommender has no rule for (a page for a list that holds entries and grows slowly, a week) joins the queue at the
+ * foot or the head of the page tier, so nothing the pen offered before is lost, and nothing passes the cap of three.
  */
 
 import type { Declaration, Json, Kernel, RegisterDecl } from '@braindog/kernel';
 import { SLASH } from '@braindog/kernel';
 import type { Sql } from '@braindog/ports';
 
+import { groupingsOffered, growsWeighed, openRowsOffered } from './emergent-grows.ts';
+import { LAPSE_DAYS, TIER, WAITING_MOST, WITHIN_MOST, queueOf, recommend, type DrawnPage, type Earned, type GrowingList, type Held, type Offer as Recommended } from './design-agent.ts';
+
 /** One thing the pen offers, and the whole declaration accepting it would write. */
 export type PenItem = {
   /**
    * The dismissal signature, which is also how the item is told apart from every other: `page:<list>`,
-   * `block:<page>:<kind>:<list>`, `column:<page>:<block>:<field>` or `week:<list>`.
+   * `block:<page>:<kind>:<list>`, `block:<page>:group:<list>`, `column:<page>:<block>:<field>`, `page:<list>:open` or
+   * `week:<list>`.
    */
   id: string;
   kind: 'page' | 'block' | 'column';
@@ -62,15 +71,19 @@ export type PenItem = {
    */
   list?: string;
   draft?: { id: string; kind: string; body: Record<string, Json> };
+  /** The last day it waits, as `YYYY-MM-DD` (HD.579: "every proposal states a deadline"). Past it, it is not shown. */
+  lapses: string;
 };
 
-/** The most items the pen ranks, one a list; past it the rest wait until one is kept or dismissed (`29 §4` (b) 3). */
-export const PEN_MOST = 24;
 /**
- * The most items `boot` shows at once, the best of the ranked pen (USE-B03: "make sure that the braindog experience is
- * not overwhelming for new users"). The rest wait their turn, and `penRanked` still says how many wait in all.
+ * The most items `boot` shows at once: the queue's `WAITING_MOST` (HD.224, "max 3 waiting"; USE-B03: "make sure that
+ * the braindog experience is not overwhelming for new users"). The rest wait their turn, and `penRanked` says how many
+ * wait in all. THERE IS NO SECOND CAP: the 24 the pen once ranked to is gone, and every offer is weighed.
  */
-export const PEN_SHOWN = 3;
+export const PEN_SHOWN = WAITING_MOST;
+
+/** An item as a builder makes it, before the queue gives it the day it lapses. */
+type Made = Omit<PenItem, 'lapses'>;
 /** The most figures a proposed page opens with (`29 §5`, Figures). */
 export const PEN_FIGURES_MOST = 3;
 /** The most columns a proposed page's table draws. */
@@ -133,6 +146,12 @@ export type PenDeps = {
    * list's name (Settings, Words), `orders:one` for one of its entries. Absent, every list is said as it is declared.
    */
   labels?: Readonly<Record<string, string>> | undefined;
+  /**
+   * The offers already shown, each with the day it was given to lapse on, as the queue holds them (`Held`). An open
+   * one keeps its day, and once that day is past it is not shown, nor offered again until what it rests on moves
+   * (`basisMoved`). Absent, nothing is held open, and every offer is given its day from today.
+   */
+  open?: readonly Held[] | undefined;
 };
 
 const bytes = (text: string): number => new TextEncoder().encode(text).length;
@@ -186,13 +205,13 @@ function figuresByList(declared: readonly { kind: string; body: string }[], want
 
 /**
  * The pen's `kind: 'page'` items: one for each list the caller reads that holds a row and that no installed page reads,
- * strongest first (the most rows), at most `PEN_MOST`, and none whose id the person dismissed.
+ * strongest first (the most rows), every one of them, and none whose id the person dismissed.
  *
  * THE WALK IS ONE PASS OVER THE LISTS THE RECORD HOLDS, a row count each (`kernel.count`, which `boot` already asks of
  * every list), then one read of the declarations for the figures and the slugs, taken only when a list qualified, and
- * one lint of the whole answer. Only when that lint refuses is each item linted alone, so at most `PEN_MOST` more.
+ * one lint of the whole answer. Only when that lint refuses is each item linted alone.
  */
-function pagesOffered(deps: PenDeps): PenItem[] {
+function pagesOffered(deps: PenDeps): Made[] {
   const { kernel, reads, pages, dismissed } = deps;
   const readByAPage = new Set(pages.flatMap((p) => p.registers));
 
@@ -212,9 +231,8 @@ function pagesOffered(deps: PenDeps): PenItem[] {
   const lastIn = new Map<string, number>();
   for (const p of pages) if (p.nav) lastIn.set(p.nav.section, Math.max(lastIn.get(p.nav.section) ?? 0, p.nav.order));
 
-  const items: PenItem[] = [];
+  const items: Made[] = [];
   for (const list of waiting) {
-    if (items.length === PEN_MOST) break;
     const decl = list.decl;
     const slug = [list.id, `${list.id}-rows`].find((s) => !taken.has(s));
     if (slug === undefined) continue;
@@ -263,64 +281,151 @@ function pagesOffered(deps: PenDeps): PenItem[] {
   }
 
   /* EVERY ITEM PASSES THE LINT ITS ACCEPTANCE WOULD MEET, so nothing is offered that the record would then refuse. */
-  const asDecl = (item: PenItem): Declaration => ({ id: item.change.to.id, kind: 'page', body: item.change.to.body });
+  const asDecl = (item: Made): Declaration => ({ id: item.change.to.id, kind: 'page', body: item.change.to.body });
   if (items.length === 0 || kernel.lint(items.map(asDecl)) === null) return items;
   return items.filter((item) => kernel.lint([asDecl(item)]) === null);
 }
 
 /**
- * The whole holding pen, ranked: what `boot` shows the first `PEN_SHOWN` of, and what waits behind them.
+ * The rank an offer the recommender has no rule for takes in its page tier (`design-agent.ts`, pages from 4000 up to
+ * 4999): a week at the head, since it is what the person has been doing, and a page for a list that holds entries but
+ * does not grow at the foot, since a list no page draws is still a case (`29 §3` T1), below any list that grows.
+ */
+const WEEK_RANK = TIER.page + WITHIN_MOST;
+const HELD_RANK = TIER.page;
+
+/** The pen as the one queue holds it. */
+export type PenQueue = {
+  /** What `boot` shows: `WAITING_MOST` at most, strongest first, each with the day it lapses. */
+  waiting: PenItem[];
+  /**
+   * Every offer the pen makes, one a list, the waiting ones first and the rest in the queue's rank: what Slash yields,
+   * so a list the pen holds is asked a page in no second place. A lapsed one is among them, shown nowhere.
+   */
+  ranked: PenItem[];
+  /** The ids of the open offers whose day is past: not shown, and not offered again until what they rest on moves. */
+  lapsed: string[];
+};
+
+/**
+ * The holding pen through the one queue: `recommend` weighs what the pen would offer, `queueOf` says which three wait.
  *
- * WHAT IS OFFERED: a week page first, since it is what the person has been doing, then the pages, since a list no page
- * draws is the strongest case there is (`29 §3` T1), then the blocks and columns the record's own pages ask for,
- * strongest first.
+ * WHAT IS OFFERED: a week page, the pages, since a list no page draws is the strongest case there is (`29 §3` T1),
+ * then the blocks and columns the record's own pages ask for. A list that grows (`GROWS`) is weighed by how much it
+ * grew; a list that holds entries and grows slowly stays offered, at the foot of the page tier.
  *
  * ONE OFFER A LIST. A list offered its week is not offered a plain page beside it, and a list offered anything is not
- * offered a second thing beside it, so its screen holds one offer and the pen never counts one list twice. The first
- * kept is the strongest, in the order above; the next waits until that one is kept or dismissed.
+ * offered a second thing beside it, so its screen holds one offer and the pen never counts one list twice. The one kept
+ * is the strongest; the next waits until that one is kept or dismissed.
  *
  * ONE PLACE A LIST. A list Slash already asked a page for on Decide, still waiting or turned down there, is not offered
  * one here (`slashAsked`): the same question in two places is a nag, and an answer in one must hold in the other.
  *
- * THE RANK (USE-B03): a list the person opened in the last seven days first, then the list with the newest entry, and
- * where those tie, the order above. Both are read from the record's store, so without `use` the order above is the rank.
+ * WHERE TWO RANK THE SAME (USE-B03): a list the person opened in the last seven days first, then the list with the
+ * newest entry. Both are read from the record's store, so without `use` the order above is the rank.
+ *
+ * A DISMISSAL IS TERMINAL, as it was: a dismissed id is never made, so no basis brings it back. A LAPSE IS COMPUTED,
+ * never swept: an open offer past its day is simply not shown, and nothing is taken back at night by itself.
  */
-export function penRanked(deps: PenDeps): PenItem[] {
+export function penQueued(deps: PenDeps): PenQueue {
+  /* THE RECORD'S CLOCK, which `boot` always hands; without `use` only the day an offer lapses is read off the machine's. */
+  const nowMs = deps.use?.nowMs ?? Date.now();
   const weeks = weeksOffered(deps);
   const weekly = new Set(weeks.map((w) => w.register));
+  const pages = pagesOffered(deps).filter((p) => !weekly.has(p.register));
+  const shapes = shapesOffered(deps);
+  const grows = [...groupingsOffered(deps), ...openRowsOffered(deps)];
   const asked = slashAsked(deps);
-  const offered = [...weeks, ...pagesOffered(deps).filter((p) => !weekly.has(p.register)), ...shapesOffered(deps, PEN_MOST)];
+  const names = new Map([...deps.kernel.registers()].map(([id, decl]) => [id, decl.name]));
+
+  /* WHAT THE RECOMMENDER IS HANDED, from what the pen already read: the pages as drawn, how each list the pen would
+     draw a page for grew, and the one block or column each page earned. No names met, no navigation and no glyphs:
+     the pen reads none of them, and a shape or an icon is not an item it can draw. */
+  const earned: Earned[] = shapes.flatMap((o) =>
+    o.earned ? [{ ...o.earned, list: o.item.register, listName: names.get(o.item.register) ?? o.item.register, pageTitle: o.earned.page, label: o.earned.what, rows: o.rows, title: o.item.title, why: o.item.why }] : [],
+  );
+  const weighed = new Map(recommend({ nowMs, pages: drawnOf(deps), lists: grownOf(deps, pages, nowMs), earned }).map((o) => [o.key, o]));
+  /* THE GROWS OFFERS (USE-B13 jobs 5 and 7) are weighed beside the recommender's, so `asOffer` knows a grouping it never weighed. */
+  for (const o of growsWeighed(grows)) weighed.set(o.key, o);
+
+  const lapses = dayOf(nowMs + LAPSE_DAYS * DAY_MS);
+  const asOffer = (item: Made): Recommended | null => {
+    const known = weighed.get(item.id);
+    if (known) return known;
+    /* ONLY A PAGE IS MADE BESIDE THE RECOMMENDER: a block or a column it did not earn is not offered. */
+    if (item.kind !== 'page') return null;
+    const week = item.id === signatureOf('week', item.register);
+    const rows = deps.kernel.count(item.register);
+    return { key: item.id, class: 'arrange', rank: week ? WEEK_RANK : HELD_RANK, basis: `${week ? 'week' : 'rows'}@${rows}`, lapses, title: item.title, why: item.why, change: { kind: 'page', list: item.register } };
+  };
+
+  /* THE USE ORDER FIRST, then a stable sort by rank, so where two rank the same the one opened lately leads. */
+  const made = rank(deps, [...weeks, ...pages, ...grows, ...shapes.map((o) => o.item)])
+    .flatMap((item) => ((offer) => (offer ? [{ item, offer }] : []))(asOffer(item)))
+    .sort((a, b) => b.offer.rank - a.offer.rank);
   const lists = new Set<string>();
-  const one: PenItem[] = [];
-  for (const item of offered) {
-    if (lists.has(item.register) || (item.kind === 'page' && asked.has(item.register))) continue;
-    lists.add(item.register);
-    one.push(item);
+  const one = new Map<string, { item: Made; offer: Recommended }>();
+  for (const m of made) {
+    if (lists.has(m.item.register) || (m.item.kind === 'page' && asked.has(m.item.register))) continue;
+    lists.add(m.item.register);
+    one.set(m.item.id, m);
   }
-  return rank(deps, one).slice(0, PEN_MOST);
+
+  /* AN OPEN OFFER THE PEN NO LONGER MAKES holds no place: what answered it is the caller's to close. */
+  const open = (deps.open ?? []).filter((o) => one.has(o.key));
+  const queue = queueOf([...one.values()].map((m) => m.offer), open, [], nowMs);
+  const dayFor = new Map<string, string>([...open.map((o) => [o.key, o.lapses] as const), ...queue.waiting.map((o) => [o.key, o.lapses] as const)]);
+  /* THE RECOMMENDER'S SENTENCE where it said why; a page keeps the list's name as its title, which the card reads. */
+  const asItem = ({ item, offer }: { item: Made; offer: Recommended }): PenItem => ({
+    ...item,
+    why: offer.why,
+    ...(item.kind === 'page' ? {} : { title: offer.title }),
+    lapses: dayFor.get(item.id) ?? offer.lapses,
+  });
+  const waiting = queue.waiting.map((o) => asItem(one.get(o.key)!));
+  const shown = new Set(waiting.map((i) => i.id));
+  return {
+    waiting,
+    ranked: [...waiting, ...[...one.values()].filter((m) => !shown.has(m.item.id)).map(asItem)],
+    lapsed: queue.lapsed.map((o) => o.key),
+  };
+}
+
+/** Every offer the pen makes, ranked, the shown ones first: what Slash yields (`penQueued`'s `ranked`). */
+export const penRanked = (deps: PenDeps): PenItem[] => penQueued(deps).ranked;
+
+/**
+ * The holding pen `boot` answers: what the one queue holds, `PEN_SHOWN` at most, each with the day it lapses. The rest
+ * wait their turn, and a list the person has open waits with them: three is the most that wait, wherever it is counted.
+ */
+export const penFor = (deps: PenDeps): PenItem[] => penQueued(deps).waiting;
+
+/** The pages as drawn, as the recommender reads them. A page made for one entry is not told apart here: `PenPage` does not say. */
+const drawnOf = (deps: PenDeps): DrawnPage[] => deps.pages.map((p) => ({ slug: p.slug, title: p.slug, lists: p.registers }));
+
+/**
+ * How each list the pen would draw a page for grew in thirty days, and on how many days, as Slash reads it (`slash.ts`):
+ * the live entries made since, leaving out the example entries a pack seeds, which nobody added. Without `use`, none.
+ * THE LISTS GO AS ONE JSON VALUE (`json_each`), never a parameter each: a record of 300 lists would pass the store's 100.
+ */
+function grownOf(deps: PenDeps, pages: readonly Made[], nowMs: number): GrowingList[] {
+  const lists = [...new Set(pages.map((p) => p.register))];
+  if (!deps.use || lists.length === 0) return [];
+  const added = new Map<string, { n: number; days: number }>();
+  for (const r of deps.use.sql.all<{ register: string; n: number; days: number }>(
+    `SELECT register, count(*) AS n, count(DISTINCT substr(created_at, 1, 10)) AS days FROM entry
+      WHERE deleted_at IS NULL AND created_at >= ? AND coalesce(json_extract(fields, '$.tags'), '') NOT LIKE '%"example"%'
+      AND register IN (SELECT value FROM json_each(?)) GROUP BY register`,
+    new Date(nowMs - 30 * DAY_MS).toISOString(),
+    JSON.stringify(lists),
+  ))
+    added.set(r.register, { n: Number(r.n), days: Number(r.days) });
+  const name = new Map(pages.map((p) => [p.register, p.title]));
+  return lists.map((id) => ({ id, name: name.get(id) ?? id, rows: deps.kernel.count(id), added30: added.get(id)?.n ?? 0, addedDays30: added.get(id)?.days ?? 0 }));
 }
 
 /** How far back "opened lately" looks, in days: a week, counted from today, so a Monday does not forget a Sunday. */
 const OPENED_DAYS = 7;
-
-/**
- * The holding pen `boot` answers: the best `PEN_SHOWN` of `penRanked`, one a list, and after them the offer of every
- * list the person opened in the last `OPENED_DAYS` days, in the same rank. The rest wait their turn.
- *
- * WHY THE OPENED ONES ARE NOT CUT (batch 52, finding 4): Slash yields every list `penRanked` holds, shown or waiting
- * (`pageSpokenFor`), so a list ranked fourth had its page asked for nowhere: not on Decide, and not on its own screen
- * while the person stood on it. What Slash leaves to the pen for a list the person has open, the pen now shows. The
- * most this adds is what `penRanked` holds, `PEN_MOST`, and with no `use` it adds nothing.
- *
- * ONE WINDOW FOR SHOWN AND RANKED (batch 53, finding 3): "opened" is `OPENED_DAYS` here as it is in `rank`. It was two
- * days here, so a list opened three to seven days ago ranked as opened, was yielded by Slash, and was shown nowhere.
- */
-export function penFor(deps: PenDeps): PenItem[] {
-  const ranked = penRanked(deps);
-  if (!deps.use || ranked.length <= PEN_SHOWN) return ranked.slice(0, PEN_SHOWN);
-  const looking = openedSince(deps, ranked.slice(PEN_SHOWN).map((i) => i.register), OPENED_DAYS);
-  return ranked.filter((item, at) => at < PEN_SHOWN || looking.has(item.register));
-}
 
 /**
  * Which of `lists` the record's people opened in the last `days` days, today among them.
@@ -341,11 +446,11 @@ function openedSince(deps: PenDeps, lists: readonly string[], days: number): Rea
 }
 
 /**
- * The items in the rank `penRanked` describes. A STABLE SORT, so items whose lists tie keep the order they were made in.
+ * The items in the use order `penQueued` breaks a tie of rank by. A STABLE SORT, so items whose lists tie keep the order they were made in.
  *
  * OPENED is `openedSince` over the last `OPENED_DAYS`. THE NEWEST ENTRY is the latest `created_at` of a live entry, one grouped read for every list in the pen.
  */
-function rank(deps: PenDeps, items: readonly PenItem[]): PenItem[] {
+function rank<T extends Made>(deps: PenDeps, items: readonly T[]): T[] {
   const { use } = deps;
   if (!use || items.length < 2) return [...items];
   const lists = [...new Set(items.map((i) => i.register))];
@@ -353,13 +458,13 @@ function rank(deps: PenDeps, items: readonly PenItem[]): PenItem[] {
   const newest = new Map(
     use.sql
       .all<{ register: string; at: string | null }>(
-        `SELECT register, MAX(created_at) AS at FROM entry WHERE deleted_at IS NULL AND register IN (${lists.map(() => '?').join(', ')}) GROUP BY register`,
-        ...lists,
+        `SELECT register, MAX(created_at) AS at FROM entry WHERE deleted_at IS NULL AND register IN (SELECT value FROM json_each(?)) GROUP BY register`,
+        JSON.stringify(lists),
       )
       .map((r) => [r.register, r.at ?? '']),
   );
-  const tier = (i: PenItem): number => (opened.has(i.register) ? 0 : 1);
-  const at = (i: PenItem): string => newest.get(i.register) ?? '';
+  const tier = (i: T): number => (opened.has(i.register) ? 0 : 1);
+  const at = (i: T): string => newest.get(i.register) ?? '';
   return [...items].sort((a, b) => tier(a) - tier(b) || (at(a) === at(b) ? 0 : at(a) > at(b) ? -1 : 1));
 }
 
@@ -424,7 +529,7 @@ type HeldPage = { id: string; slug: string; title: string; body: Record<string, 
 type Asked = { kind: string; title: string; why: string; block: Block };
 
 /** One item before its lint, with the rows of its list that back it, which is how strong it is. */
-type Offer = { item: PenItem; rows: number };
+type Offer = { item: Made; rows: number; earned?: Pick<Earned, 'kind' | 'page' | 'what' | 'at' | 'filled'> };
 
 const isBlock = (value: Json | undefined): value is Block => value !== null && value !== undefined && typeof value === 'object' && !Array.isArray(value);
 const listOf = (block: Block): string | null =>
@@ -622,6 +727,7 @@ function columnAskedFor(page: HeldPage, list: string, decl: RegisterDecl, rows: 
   const share = Math.floor((best.filled / rows) * 100);
   return {
     rows,
+    earned: { kind: 'column', page: page.slug, what: best.field.id, at, filled: best.filled },
     item: {
       id: signatureOf('column', `${page.slug}:${at}:${best.field.id}`),
       kind: 'column',
@@ -634,18 +740,17 @@ function columnAskedFor(page: HeldPage, list: string, decl: RegisterDecl, rows: 
 }
 
 /**
- * The block and column items, at most `room`, over the pages the record holds declarations for, and only over the lists
+ * The block and column offers, each with the rows that back it, over the pages the record holds declarations for, and only over the lists
  * those pages draw by a block's `source`. A list a page only counts in a figure is not a list it draws, and a calendar
  * offered to a dashboard for it would be a second screen on the first.
  *
  * ONE ITEM PER PAGE IN EACH ANSWER, its strongest. Each item is the page's whole declaration with one thing added, so
  * two offered at once would each be written without the other, and keeping the second would take the first away again
- * with no click that asked for it (`29 §6`). The next waits for the next `boot`, as the rest past `PEN_MOST` do.
+ * with no click that asked for it (`29 §6`). The next waits for the next `boot`.
  *
  * EVERY ITEM PASSES THE LINT ITS ACCEPTANCE WOULD MEET, each alone, since two items over one page share an id.
  */
-function shapesOffered(deps: PenDeps, room: number): PenItem[] {
-  if (room <= 0) return [];
+function shapesOffered(deps: PenDeps): Offer[] {
   const { kernel, reads, dismissed } = deps;
   const lists = new Map(kernel.registers());
   const facts = factsOf(kernel);
@@ -666,6 +771,7 @@ function shapesOffered(deps: PenDeps, room: number): PenItem[] {
         spoken.add(asked.kind);
         offers.push({
           rows,
+          earned: { kind: 'block', page: page.slug, what: asked.kind },
           item: {
             id: idOf(asked.kind),
             kind: 'block',
@@ -684,11 +790,10 @@ function shapesOffered(deps: PenDeps, room: number): PenItem[] {
   }
   perPage.sort((a, b) => b[0]!.rows - a[0]!.rows || a[0]!.item.id.localeCompare(b[0]!.item.id));
 
-  const out: PenItem[] = [];
+  const out: Offer[] = [];
   for (const offers of perPage) {
-    if (out.length === room) break;
     const kept = offers.find(({ item }) => kernel.lint([{ id: item.change.to.id, kind: 'page', body: item.change.to.body }]) === null);
-    if (kept) out.push(kept.item);
+    if (kept) out.push(kept);
   }
   return out;
 }
@@ -976,7 +1081,7 @@ export const weekSaid = (n: number, name: string, one: string | undefined, due: 
  * has the pen off, since `penFor` is then not asked at all. The cheap questions are asked first: the age once, then for
  * each list its dismissal, its count and its pages, and only then its week and its reads.
  */
-function weeksOffered(deps: PenDeps): PenItem[] {
+function weeksOffered(deps: PenDeps): Made[] {
   const { kernel, reads, pages, dismissed, use, labels } = deps;
   if (!use) return [];
   const first = usedOf(use.sql).first;
@@ -1073,6 +1178,5 @@ function weeksOffered(deps: PenDeps): PenItem[] {
   }
   return offers
     .sort((a, b) => b.rows - a.rows || a.item.id.localeCompare(b.item.id))
-    .slice(0, PEN_MOST)
     .map((o) => o.item);
 }

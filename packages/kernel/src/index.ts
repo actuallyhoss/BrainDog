@@ -267,6 +267,7 @@ import {
   FINISHED,
   KERNEL_WRITTEN,
   REVIVED,
+  RUN_FACTS,
   SESSION,
   agentOf as runAgentOf,
   begun,
@@ -322,7 +323,11 @@ export { FORMAT_VERSION, KERNEL_MIGRATION, MIGRATIONS, canon, checksum, statemen
 export { checkBrainl, keyIdOf, b64url, manifestBytes, signBrainl, type Signature, type Signer } from './brainl.ts';
 export { SHAPE_MARK, Scrambler, isShape, shapeBrainl, type Published, type ShapeOptions } from './shape.ts';
 export { SLASH, SLASH_KINDS, slashMayWrite } from './slash.ts';
-export { KERNEL_WRITTEN, REVIVED, TITLE_MAX, agentOf, clipTitle, isHelper, leftFreshStep, provisionalTitle, runAge, sessionDeclaration } from './session.ts';
+export { KERNEL_WRITTEN, REVIVED, RUN_FACTS, TITLE_MAX, agentOf, clipTitle, isHelper, leftFreshStep, provisionalTitle, runAge, sessionDeclaration } from './session.ts';
+/* A FIELD WORKED OUT FROM OTHER FIELDS (SHL-B18): its shapes and refusals, and the rows filled at read. `shapeOf` is the
+   ingest's name here, so the derive's is exported as `deriveShapeOf`. */
+export { DERIVE_SHAPES, DERIVE_REFUSES, NORMALISE_HOW, deriveFault, derived, isDerived, shapeOf as deriveShapeOf, sourcesOf, type Derive, type DeriveField, type DeriveShape } from './derive.ts';
+export { withDerived, oneWithDerived, type DeriveResolve, type DerivableRow } from './derive-rows.ts';
 /* THE RECORD'S VITAL SIGNS (`signs.ts`): the closed list, and what a sign and a reading are. */
 export { VITAL_SIGNS, quietSign, type SignReading, type VitalSign } from './signs.ts';
 /* WHAT IS IN A PROJECT'S WAY (`signs-actions.ts`, REC-C09): its paused, failing or late actions, for a page source. */
@@ -3870,6 +3875,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
            the project it resolved to, and the token that opened it. */
         if (register === SESSION && KERNEL_WRITTEN.includes(key))
           return no<Entry>('IMMUTABLE_FIELD', `${key} is written by the record itself, and no caller sets it.`, { at: key });
+        /* WHAT A RUN REPORTED ABOUT ITSELF (`RUN_FACTS`): its agent sets it through a token, and a person never does. */
+        if (register === SESSION && RUN_FACTS.includes(key) && w.principal?.kind === 'person')
+          return no<Entry>('IMMUTABLE_FIELD', `${key} is what the run reported about itself, and only its agent sets it.`, { at: key });
         /* A SECRET FIELD IS THE VAULT DOOR'S, from every caller. It names the grant a key was sealed
            into, and `depositGrant` writes it in the transaction that seals the key, so a caller naming
            a grant could only point a row at a key sealed for another. `IMMUTABLE_FIELD`, the answer a

@@ -35,7 +35,6 @@ import {
   type Consent,
   type Minted,
   type OAuthDeps,
-  type OAuthScope,
   type OAuthStore,
 } from '@braindog/host/oauth';
 import { httpStatus } from '@braindog/host';
@@ -203,6 +202,9 @@ function recordNamed(chosen: string, here: OAuthHereOptions): string | null {
 /** What a person is told when minting answered and no bearer came back, which the record never does on purpose. */
 const NOT_MINTED = 'BrainDog could not connect this app to this record.';
 
+/** What the door mints with: the reach, the app's name, the days, and the app the door proved, forwarded as is. */
+type MintArgs = Parameters<Extract<Approver, { ok: true }>['mint']>[0];
+
 /**
  * `createToken` on this record, as the person the session named, with the host package's arguments: the bearer, or the
  * record's own sentence and the status `/api` would have answered it with.
@@ -210,7 +212,7 @@ const NOT_MINTED = 'BrainDog could not connect this app to this record.';
  * READ AS A `Result<unknown>` AND CHECKED, because the method's inferred answer joins its refusals' `Result<unknown>` to
  * the kernel's, so the bearer's type is not carried to here; the Worker reads the same field off JSON the same way.
  */
-async function mintAs(api: RecordApi, ctx: CallContext, args: { scope: OAuthScope; label: string; days: number }): Promise<Minted> {
+async function mintAs(api: RecordApi, ctx: CallContext, args: MintArgs): Promise<Minted> {
   const out: Result<unknown> = await api.createToken(args, ctx);
   if (!out.ok) return { ok: false, status: httpStatus(out), say: fixOf(out) || NOT_MINTED };
   const bearer = (out.value as { bearer?: unknown } | null)?.bearer;

@@ -49,6 +49,7 @@ import { ROUTES as inboxHints } from './inbox-hints.ts';
 import { ROUTES as SKILLS_BEHIND } from './skills-behind.ts';
 import { ROUTES as TOOLS_SEEN } from './tools-seen.ts';
 import { ROUTES as NAMED_TWICE } from './named-twice.ts';
+import { ROUTES as exportPack } from './export-pack.ts';
 /* END ROUTES */
 
 export const EXTRA_ROUTES: readonly Route[] = [
@@ -89,5 +90,6 @@ export const EXTRA_ROUTES: readonly Route[] = [
   ...SKILLS_BEHIND,
   ...TOOLS_SEEN,
   ...NAMED_TWICE,
+  ...exportPack,
   /* END ROUTES */
 ];

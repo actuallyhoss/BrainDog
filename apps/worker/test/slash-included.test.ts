@@ -156,7 +156,7 @@ test('A KEY THAT WILL NOT OPEN SENDS NOTHING, and the included model is not aske
     send: async (url) => (sent.push(String(url)), new Response('{}', { status: 200 })),
     open: () => async () => null,
   });
-  await assert.rejects(model!.draft({ usage: {} } as never), /would not open/u);
+  await assert.rejects(model!.draft({ usage: {} } as never), /did not open/u);
   assert.deepEqual(sent, [], 'a call went out with no key');
   assert.equal(ai.runs.length, 0);
   store.close();

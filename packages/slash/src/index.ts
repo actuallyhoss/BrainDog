@@ -174,10 +174,14 @@ const GRANT_ID = /^g_[0-9A-HJKMNP-TV-Z]{26}$/u;
 /**
  * The tier a patch asks for, or `undefined` for one that leaves it: `source` first, then the older `tier`.
  *
- * `included` IS `byo` WHERE THE PATCH SAYS `byo` TOO, since both are the host's own model and `byo` only names it.
+ * `included` IS `a` WHATEVER `tier` SAYS (ENG-A07, "tiers a/b/byo become included or own key"). It once answered `byo`
+ * where the patch said `byo` too, so a save from the settings door could still write the third form the owner retired.
+ * A row already stored on `byo` is left as it was saved and reads as `included` with its model name (`status`, and the
+ * save of nothing below), so a self-host that set it keeps its model and its count. A bare `tier` is the store's own
+ * word, kept for one release for the callers that still send it.
  */
 const tierAsked = (patch: SetupPatch): Tier | undefined =>
-  patch.source === 'key' ? 'b' : patch.source === 'included' ? (patch.tier === 'byo' ? 'byo' : 'a') : patch.tier;
+  patch.source === 'key' ? 'b' : patch.source === 'included' ? 'a' : patch.tier;
 
 /** A provider this package knows, read off a stored or a typed value. */
 const providerOf = (value: unknown): Provider | null =>
@@ -249,8 +253,9 @@ export function createSlash(deps: SlashDeps, options: SlashOptions = {}): Slash 
          the next time he picks his key, and naming it now would say a model answers that does not. */
       provider: key ? (own().provider ?? 'openai') : null,
       /* ON TIER `a` THE ROUTING TABLE DECIDES AND `settings.model` IS NULL, so the name a person is
-         shown is the model that would actually answer their next ask rather than an empty box. */
-      model: s.tier === 'a' ? 'glm-5.3-flash' : (s.model ?? 'glm-5.3-flash'),
+         shown is the model that would actually answer their next ask rather than an empty box. The one name tier `a`
+         keeps is the one a self-host's owner typed for its own endpoint under "Included" (`modelKept` in `configure`). */
+      model: s.model ?? 'glm-5.3-flash',
       /* ONE COUNT FOR WHAT IS SHOWN AND WHAT STOPS AN ASK. On the included model it is the count `spent()` refuses on
          (`propose.ts`); on his own key it is the same kinds of row on his tier, listed and never a limit. */
       asks: { used: key ? keyedAsks() : core.asksUsed(), cap: s.ask_cap, resets: core.resets(), capped: !key },
@@ -308,6 +313,18 @@ export function createSlash(deps: SlashDeps, options: SlashOptions = {}): Slash 
     const model = typed === null ? null : typed.trim();
     if (tier !== 'a' && (model === null || model === ''))
       return no('VALUE_MALFORMED', 'Name the model your key or your endpoint answers with.', { at: 'model' });
+    /* "INCLUDED" ON A SELF-HOST TAKES A MODEL NAME, the one its own endpoint serves, where `byo` used to (ENG-A07). A host
+       runs a typed name on its endpoint where it runs `byo` at all; the Cloud names `a` and `b` alone, and there a name on
+       tier `a` would go to the included model's own table, which is why it is dropped there. A name is kept where this
+       patch typed it, or where it was the host's own model's already and the patch leaves the tier (a new limit, or
+       Included again over a row stored on `byo`); going back from his own key never carries the key's model across, and
+       a bare `tier: 'a'` still clears it, as it always has. */
+    const modelKept =
+      tier === 'a' &&
+      tiers.includes('byo') &&
+      model !== null &&
+      model !== '' &&
+      (patch.model !== undefined || (patch.tier === undefined && before.tier !== 'b'));
 
     /* THE PROVIDER IS ONE OF TWO SHAPES, and a record set to its own key before there were two was set to the one there was,
        chat completions, which is what it reads as when it names none. */
@@ -329,8 +346,9 @@ export function createSlash(deps: SlashDeps, options: SlashOptions = {}): Slash 
       tier,
       source: tier === 'b' ? 'key' : 'included',
       /* TIER `a` HAS NO MODEL OF ITS OWN (`46 §4.1`): the routing table decides per job, so a name
-         left behind from a previous tier would be a setting that reads as though it were in force. */
-      model: tier === 'a' ? null : model,
+         left behind from a previous tier would be a setting that reads as though it were in force. The one it keeps is a
+         name this save typed, on a host whose own endpoint serves a typed name (`modelKept`). */
+      model: tier === 'a' ? (modelKept ? model : null) : model,
       grant_id: grant,
       ask_cap: askCap,
       updated_at: core.now(),

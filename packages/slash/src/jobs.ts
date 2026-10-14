@@ -85,21 +85,63 @@ const PRESSED = { purpose: 'ask', spends: 'person' } as const;
 /** What a pattern read, for the fold and the ledger: how many messages, and never what they said. */
 const readOf = (n: number): ReadTrace[] => [{ register: 'inbox_raw', rows: n, predicate: 'shape' }];
 
+/** How many arrivals of one shape the record's own draft is handed (ENG-B07). */
+const OLDEST = 3;
+
+/** An arrival's time as a number to order by, or `null` where it does not read as one. */
+const timeOf = (ts: string): number | null => {
+  const t = Date.parse(ts);
+  return Number.isNaN(t) ? null : t;
+};
+
+/**
+ * The three oldest of a shape's samples, oldest first, and the input left as it was.
+ *
+ * THE OLDEST AND NOT THE NEWEST, because a pattern drafted from the latest three reads what the sender writes this week,
+ * and the backlog it exists to clear is the older text. ON `ts`, which every `RawPayload` carries as it arrived, so a
+ * host hands the arrival time it already has. A time that does not parse orders by its text after those that do, and a
+ * tie keeps the order it was handed (the sort is stable).
+ */
+export function oldestThree<T extends { ts: string }>(samples: readonly T[]): T[] {
+  return [...samples]
+    .sort((a, b) => {
+      const ta = timeOf(a.ts);
+      const tb = timeOf(b.ts);
+      if (ta !== null && tb !== null) return ta - tb;
+      if (ta !== null) return -1;
+      if (tb !== null) return 1;
+      return a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0;
+    })
+    .slice(0, OLDEST);
+}
+
+/**
+ * The prompt's sentence saying the three are the oldest of how many wait, with its leading space, or nothing.
+ *
+ * NOTHING BELOW THREE, so a job handed one or two drafts with today's prompt byte for byte. Written from two numbers and
+ * never from a sample, which is why it is the one sentence about the samples that sits outside their fences.
+ */
+const oldestLine = (sent: number, waiting: number): string =>
+  sent < OLDEST ? '' : ` These are the three oldest of ${waiting} alike arrivals waiting. Write one pattern that reads all three.`;
+
 export const patterns = (
   core: Core,
   record: RecordApi,
   fallback: Inference,
 ): {
   proposePattern(samples: readonly RawPayload[], ctx: CallContext): Promise<Result<Proposal>>;
-  draftPattern(samples: readonly RawPayload[]): Promise<Result<PatternDraft>>;
+  draftPattern(samples: readonly RawPayload[], waiting?: number): Promise<Result<PatternDraft>>;
   digestProse(digest: unknown): Promise<Result<{ text: string }>>;
   embedTexts(texts: readonly string[]): Promise<Result<Embedding>>;
 } => {
   /**
    * Everything up to the filing: the model's draft, checked, overwritten where it is not the model's to say, and wrapped
    * as the declaration the accept installs. The one copy of the rules both entry points keep.
+   *
+   * `waiting` IS HOW MANY OF THE SHAPE WAIT, which the question names and the prompt says from three samples on; a press
+   * at the raw inbox hands none, and the count is the samples it chose.
    */
-  const drafting = async (samples: readonly RawPayload[], ctx: CallContext, charge: Charge): Promise<Result<Drafting>> => {
+  const drafting = async (samples: readonly RawPayload[], ctx: CallContext, charge: Charge, waiting = samples.length): Promise<Result<Drafting>> => {
     if (samples.length === 0)
       return no('VALUE_MALFORMED', 'A pattern is proposed from the messages it has to match, and none were given.', {
         at: 'samples',
@@ -139,6 +181,7 @@ export const patterns = (
       id: 'pattern',
       slots: {
         '%N%': String(samples.length),
+        '%OLDEST%': oldestLine(samples.length, waiting),
         '%SAMPLES%': samples.map((raw) => fenced(raw.id, sampleText(raw))).join('\n'),
         '%INDEX%': indexLines(known),
       },
@@ -226,7 +269,7 @@ export const patterns = (
 
     return ok({
       draft: {
-        question: `A pattern for the ${samples.length} messages nothing has parsed`,
+        question: `A pattern for the ${waiting} messages nothing has parsed`,
         body_kind: 'pattern',
         body: { ingest: declaration, samples: samples.map((raw) => raw.id) },
       },
@@ -265,8 +308,14 @@ export const patterns = (
 
     /* THE RECORD'S OWN JOB, SO NOBODY'S CONTEXT: the index is read as `slash`, which is how the kernel files what this
        drafts, and the row is settled `ok` with nothing in `filed`, because the filing is the ack's and happens after. */
-    async draftPattern(samples) {
-      const drafted = await drafting(samples, SLASH_CTX, DRAFTED);
+    /* THE THREE OLDEST, AND HOW MANY WAIT (ENG-B07): the model reads the backlog's own text and is told it is a backlog.
+       The anchor check is run on the three it was sent, so a sample it never saw cannot vouch for an anchor. `waiting` is
+       never fewer than the samples handed, so a host that says nothing reads as today; and nothing here retries a draft
+       that failed, which stays his press. */
+    async draftPattern(samples, waiting) {
+      const sent = oldestThree(samples);
+      const count = Math.max(samples.length, Number.isSafeInteger(waiting) ? (waiting as number) : 0);
+      const drafted = await drafting(sent, SLASH_CTX, DRAFTED, count);
       if (!drafted.ok) return drafted;
       drafted.value.account('ok');
       return ok(drafted.value.draft);

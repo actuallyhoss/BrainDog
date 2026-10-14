@@ -21,8 +21,36 @@ const w = copy.customise;
 /** How it looks on this device now, for `customise()` to leave out the rows that would change nothing. */
 export const lookNow = (): Look => {
   const held = pref.read();
-  return { scheme: held.scheme, text: held.text, density: held.density };
+  return { scheme: held.scheme, text: held.text, density: held.density, shot: shotNow() };
 };
+
+/** Whether screenshot mode is on in this tab: the mark `shot/mode.ts` puts on `<html>` while it is, read without loading it. */
+export const shotNow = (): boolean => typeof document !== 'undefined' && document.documentElement.hasAttribute('data-shot');
+
+/**
+ * THE PERSON'S `look.shot`, THROUGH THE LOOK'S OWN WRITER (`pref.keep`): queued, owed until the record keeps it, and sent
+ * again on the next boot if it did not arrive. The record has kept it since batch 62 (`look.shot` in `PREF_KEYS`).
+ */
+const SHOT_PREF = pref.LOOK_KEYS.shot;
+
+/* The mode itself, on this screen, loaded only now (`shot/mode.ts`). */
+const shown = (on: boolean): Promise<unknown> =>
+  import('../shot/mode.ts').then((m) => m.applyShot(on, document.body)).catch(() => undefined);
+
+/**
+ * Screenshot mode on or off: the palette's row, the key and Settings › Appearance all press this. The screen changes at
+ * once, the record keeps it for the next boot, and the toast says which with the way back.
+ */
+export function shot(on: boolean): Promise<unknown> {
+  if (typeof document === 'undefined') return Promise.resolve();
+  const put = (v: boolean) => {
+    void pref.keep(SHOT_PREF, v);
+    return shown(v);
+  };
+  const done = put(on);
+  toasts.push(on ? copy.screenshotOn : copy.screenshotOff, { undo: () => void put(!on) });
+  return done;
+}
 
 /** Where a look change would be kept now, for the line under each look row. */
 export const keptNow = (): 'record' | 'pending' | 'device' => pref.whereKept();
@@ -69,6 +97,8 @@ export function apply(change: Change): void {
   switch (change.kind) {
     case 'look':
       return look(change.key, change.value, change.name);
+    case 'shot':
+      return void shot(change.on);
     case 'home': {
       const before = navPrefs.home;
       void navPrefs.setHome(change.href).then((saved) => said(saved, w.homeSet(change.name), () => void navPrefs.setHome(before)));

@@ -10,9 +10,9 @@
 import type { Lane } from '../viz/swimlanes.ts';
 import type { WeekDay, WeekItem } from '../viz/weekstrip.ts';
 import { addDays, daySaid, daysBetween, weekdayOf } from '../work/board.ts';
-import { exponentOf } from 'braindog-render';
+import { exponentOf, writeAmount } from 'braindog-render';
 
-import { moneyInText } from '../record/money.ts';
+import { homeCurrency } from '../record/api.ts';
 import type { DayRow, DueRow, Forecast, SessionRow, SinceRow, TaskRow } from '../record/today-live.ts';
 
 /* ── words ──────────────────────────────────────────────────────────────── */
@@ -320,13 +320,19 @@ export function sinceIcon(row: Pick<SinceRow, 'key' | 'label'>, listIcon: (list:
 /**
  * A figure said roughly, for a line about the future: three significant figures of whole units, "about EGP 388,000".
  * A forecast is arithmetic over dated rows, and its pennies are not a fact anybody should read as one.
+ *
+ * THE ROUNDING IS THIS LINE'S, THE SPELLING IS THE ONE WRITER'S (`writeAmount`): the rounded figure goes back into minor
+ * units of its own currency (three places for a dinar) and is written as every other amount is, so "about £388,000"
+ * on a record kept in sterling and "about KWD 1,230" read as the figures beside them. `home` is the record's.
  */
-export function aboutSaid(minor: number, currency: string): string {
-  const whole = Math.round(minor / 10 ** exponentOf(currency));
+export function aboutSaid(minor: number, currency: string, home: string | null = homeCurrency()): string {
+  const exp = exponentOf(currency);
+  const whole = Math.round(minor / 10 ** exp);
   const size = Math.abs(whole);
   const step = size >= 1000 ? 10 ** (Math.floor(Math.log10(size)) - 2) : 1;
-  const rounded = Math.round(size / step) * step;
-  return `about ${moneyInText(`${currency.toUpperCase()} ${whole < 0 ? '−' : ''}${rounded.toLocaleString('en-GB')}`)}`;
+  const rounded = BigInt(Math.round(size / step) * step) * 10n ** BigInt(exp);
+  const said = writeAmount({ minor: whole < 0 ? -rounded : rounded, currency }, home, 'read');
+  return `about ${said?.text ?? `${currency.toUpperCase()} ${whole}`}`;
 }
 
 /**

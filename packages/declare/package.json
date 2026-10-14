@@ -8,6 +8,7 @@
     "./catalogue": "./src/catalogue.ts",
     "./job": "./src/job.ts",
     "./kennel": "./src/kennel.ts",
+    "./scrub": "./src/scrub.ts",
     "./yaml": "./src/yaml.ts"
   },
   "dependencies": {

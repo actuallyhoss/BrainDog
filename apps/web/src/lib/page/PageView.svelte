@@ -356,6 +356,12 @@
    * stores and the record refused it as a page somebody had changed. The note is always last, so each block keeps its place.
    */
   const declaredOnly = (blocks: readonly LiveBlock[]): LiveBlock[] => blocks.filter((b) => !b.synthetic);
+  /* EACH DECLARED BLOCK'S KEY AND HEADING, so the menu's Hidden names a block by its heading (`ChangePage` `heads`). */
+  function blockHeads() {
+    const blocks = arranged(declaredOnly(live?.page.blocks ?? []));
+    const keyed = blockKeys(blocks);
+    return blocks.map((b, i) => ({ key: keyed[i]!, heading: typeof (b as { heading?: unknown }).heading === 'string' ? (b as { heading: string }).heading : null }));
+  }
 
   /**
    * The blocks the page is laid out from: the home's body while it is arranged, else what the record answered.
@@ -555,7 +561,7 @@
              four controls in a row over every page, and a reader uses Share far more often than the other three. The
              menu is `ChangePage.svelte`; Edit layout's way in is `Arrange.svelte`'s, handed over as `entry()`. -->
         <ShareMenu {slug} />
-        <ChangePage {slug} title={live.page.page.title} {showSource} {reread} onarrange={arranger?.entry() ?? null} {look} keys={drawnKeys} />
+        <ChangePage {slug} title={live.page.page.title} {showSource} {reread} onarrange={arranger?.entry() ?? null} {look} keys={drawnKeys} heads={blockHeads} />
       {/if}
       <Arrange bind:this={arranger} {arrangement} {slug} page={live.page.page} declared={declaredOnly(live.page.blocks)} all={own} bind:extra {showSource} {reread} />
     {/snippet}
@@ -622,6 +628,7 @@
             change={kept.installed}
             {look}
             keys={drawnKeys}
+            heads={blockHeads}
             onarrange={arranger?.entry() ? () => void arrangeHome() : null}
           />
         {/if}

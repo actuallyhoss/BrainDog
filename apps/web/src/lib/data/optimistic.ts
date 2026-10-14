@@ -37,6 +37,7 @@
 
 import { batchOf, serverFirst } from '../record/undo-back.ts';
 import type { Undone } from '../record/undo-write.ts';
+import type { UndoStack } from './undo.ts';
 
 /** What a write answered: the value it landed with, or the record's one sentence about why not. */
 export type Sent<T> = { ok: true; value: T } | { ok: false; fix: string };
@@ -82,12 +83,22 @@ export const UNSENT = 'That change did not reach your BrainDog, so it has been p
  *
  * `run` RESOLVES WITH THE ANSWER, so a caller that needs to know (a capture line putting the typing back) can, and one
  * that does not can ignore it: every visible consequence has already been drawn or said by then.
+ *
+ * `history`, WHERE IT IS HANDED IN, holds each write that landed under a batch with its receipt (`undo.ts`), so ⌘Z can
+ * still put it back once its toast is gone (`undo-replay.ts`).
  */
 export function optimist(
   say: Say,
-  { life = UNDO_MS, undoBatch, reread }: { life?: number; undoBatch?: (batch: string) => Promise<Undone>; reread?: () => unknown } = {},
+  {
+    life = UNDO_MS,
+    undoBatch,
+    reread,
+    history,
+  }: { life?: number; undoBatch?: (batch: string) => Promise<Undone>; reread?: () => unknown; history?: UndoStack } = {},
 ) {
-  async function run<T>(change: Change<T>): Promise<Sent<T>> {
+  /* `putting` IS TRUE FOR AN UNDO'S OWN WRITE, which never goes on `history`: ⌘Z after an Undo reaches the change before
+     it, not the Undo, so two presses never put a change back and then forward again. */
+  async function go<T>(change: Change<T>, putting: boolean): Promise<Sent<T>> {
     change.apply();
     let out: Sent<T>;
     try {
@@ -105,19 +116,27 @@ export function optimist(
     /* THE RECORD PUTS BACK A WRITE IT LOGGED UNDER A BATCH (`undo-back.ts`); the screen's own inverse is the fallback.
        The record's undo skips a screen's self-drawing Put back, so the screen is read again (`reread`) or it would
        still draw the write until the next poll. */
+    const batch = batchOf(value);
     const own = change.undo?.(value) ?? null;
-    const back = undoBatch ? serverFirst(batchOf(value), own, undoBatch, change.reread ?? reread) : own;
+    const back = undoBatch ? serverFirst(batch, own, undoBatch, change.reread ?? reread) : own;
     const said = typeof change.said === 'function' ? change.said(value) : change.said;
+    /* THE TOAST'S UNDO LETS GO OF ITS BATCH ON `history` FIRST, so a press there and a ⌘Z later never put one batch back
+       twice. */
+    const press = back
+      ? () => {
+          if (batch !== null) history?.spend(batch);
+          if (typeof back === 'function') back();
+          else void go(back, true);
+        }
+      : null;
     /* AN EMPTY LINE RAISES NO TOAST. */
-    if (said) {
-      say.push(said, {
-        intent: 'good',
-        life,
-        ...(back ? { undo: typeof back === 'function' ? back : () => void run(back) } : {}),
-      });
-    }
+    if (said) say.push(said, { intent: 'good', life, ...(press ? { undo: press } : {}) });
+    /* ONLY A WRITE THE RECORD LOGGED UNDER A BATCH IS HELD FOR ⌘Z. A screen's own inverse is not: its screen may be gone
+       by the time the press comes. */
+    if (history && batch !== null && !putting) history.push({ batch, said: said ?? '' });
     return out;
   }
+  const run = <T>(change: Change<T>): Promise<Sent<T>> => go(change, false);
   return { run };
 }
 

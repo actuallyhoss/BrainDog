@@ -11,7 +11,8 @@ import { createHash } from 'node:crypto';
 import { normalise, type Pack } from '@braindog/declare';
 import { KEYS_IN_TEXT, openRecord, type Kernel, type WriteContext } from '@braindog/kernel';
 import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.ts';
-import { BUILT_IN_FIGURES, DOOR_FIGURE_SIGNS } from '../../kernel/src/built-in-figures.ts';
+import { BUILT_IN_FIGURES, DOOR_FIGURE_SIGNS, type TidyReading } from '../../kernel/src/built-in-figures.ts';
+import { TIDY_LINE_DDL } from '../../kernel/src/tidy.ts';
 import { markDoor } from '../../kernel/src/door.ts';
 
 import { AGENTS_PACK, AGENTS_PAGES, AGENTS_REGISTERS, NOW, ROWS, RUNS, agentsPackDocument, declarations, installAgentsPack, installSeed } from '../src/index.ts';
@@ -656,10 +657,22 @@ const listBefore13 = <T extends Record<string, unknown>>(list: T): T => {
 const listsBefore13 = (lists: Record<string, Record<string, unknown>>): Record<string, Record<string, unknown>> =>
   Object.fromEntries(Object.entries(lists).map(([id, list]) => [id, listBefore13(list)]));
 
+/**
+ * AND THE STALE LINE AS 1.11.0 WROTE IT, one line of two bare counts, which 1.13.0 made two lines in words (AGT-C18 item
+ * 5): put back in the place of the first of the two, and the second taken out.
+ */
+const STALE_11 = { kind: 'note', tone: 'warn', span: 12, when: { metric: 'gone-stale', gt: 0 }, body: 'Things gone stale: {{gone-stale}}. Tidied this week: {{tidied-week}}.' };
+const staleBefore13 = (blocks: { key?: string; when?: { metric?: string } }[]): unknown[] =>
+  blocks.flatMap((b) => (b.when?.metric === 'tidied-week' ? [STALE_11] : b.when?.metric === 'gone-stale' ? [] : [b]));
+
 const before13 = (declarations: Record<string, unknown>[]): Record<string, unknown>[] =>
   declarations
     .filter((d) => d.page !== 'brain' && !FIGURES_13.includes(String(d.metric)))
-    .map((d) => (d.page === 'agents' ? { ...d, blocks: (d.blocks as { key?: string; when?: { metric?: string } }[]).filter((b) => b.key !== 'brain-link' && b.when?.metric !== 'stale-rows-same') } : listBefore13(d)));
+    .map((d) =>
+      d.page === 'agents'
+        ? { ...d, blocks: staleBefore13((d.blocks as { key?: string; when?: { metric?: string } }[]).filter((b) => b.key !== 'brain-link' && b.when?.metric !== 'stale-rows-same')) }
+        : listBefore13(d),
+    );
 
 test('1.12.0 TAKES NOTHING AWAY: with Working, Today, Earlier and their two figures put back, the add-on declares what 1.11.0 did, to the letter', () => {
   type Block = { kind: string; heading?: string };
@@ -752,11 +765,13 @@ test('EARLIER IS FOLDED UNDER ITS OWN HEADING, which counts the runs, and Left f
    moved nothing 1.12.0 declared. The mark was set again for the lists' part (it was c5d81d3045627de5 with the page
    alone), since 1.13.0 is not released, and again for the skills that changed beside the learnings (AGT-C17 job c:
    two figures over the record's log, a second series on the chart and a clause in the line; it was 7c0c9cb8f919f32f),
-   and again for Needs a look's line of what is here twice (tidy-rows-same-92, AGT-C18; it was 421923fd971c9103). */
+   and again for Needs a look's line of what is here twice (tidy-rows-same-92, AGT-C18; it was 421923fd971c9103), and
+   again for the stale line made two lines in words (tidied-breakdown-96, AGT-C18 item 5; it was 7bc8400d00577416),
+   which `before13` puts back as 1.11.0 wrote it. */
 test('AGENTS 1.13.0 DECLARES WHAT IT DID WHEN IT WAS CUT, and 1.12.0 under it is as it was', () => {
   const doc = agentsPackDocument() as { version: string; declarations: Record<string, unknown>[] };
   assert.equal(doc.version, '1.13.0', 'a new version takes a mark of its own beside this one');
-  assert.equal(mark(doc.declarations), '7bc8400d00577416', 'the Agents add-on changed what it declares with no new version');
+  assert.equal(mark(doc.declarations), '111daac7b0d94aee', 'the Agents add-on changed what it declares with no new version');
   assert.equal(mark(before13(doc.declarations)), '42ceb4a21591e2e8', 'something 1.12.0 declared is changed beside what 1.13.0 put in');
   assert.equal(doc.declarations.length - before13(doc.declarations).length, 5, '1.13.0 put in a page and four figures');
 });
@@ -976,9 +991,9 @@ test('NEEDS A LOOK HOLDS THE KEYS AND TOOLS TO PUT RIGHT, each line drawn only w
   const box = declared.findIndex((b) => b.kind === 'section' && b.heading === 'Needs a look');
   assert.ok(box > 0 && declared[box]!.box === true, 'Needs a look is not a boxed section');
   assert.ok(box > declared.findIndex((b) => b.kind === 'cards' && b.heading === 'Today'), 'Needs a look is above the runs of today');
-  /* THE FOUR OF 1.10.0, then the stale line 1.11.0 put under them (its own test is below), then 1.13.0's line of what
-     is here twice, with the way to fold it on each list that says what makes two of its rows one. */
-  const BOX = [...NOTES, 'gone-stale', 'stale-rows-same'];
+  /* THE FOUR OF 1.10.0, then the stale line 1.11.0 put under them, two lines since 1.13.0 (their own test is below),
+     then 1.13.0's line of what is here twice, with the way to fold it on each list that says what makes two of its rows one. */
+  const BOX = [...NOTES, 'tidied-week', 'gone-stale', 'stale-rows-same'];
   assert.deepEqual(
     [...String(noteOn(declared as Drawn[], 'stale-rows-same')?.body).matchAll(/\]\(([^)]+)\)/gu)].map((m) => m[1]),
     ['/r/skills?twice=1', '/r/tools?twice=1', '/r/credentials?twice=1', '/r/learnings?twice=1'],
@@ -1039,32 +1054,67 @@ test('NEEDS A LOOK HOLDS THE KEYS AND TOOLS TO PUT RIGHT, each line drawn only w
 });
 
 /**
- * THE STALE LINE, SINCE 1.11.0 (AGT-C18): the fifth line of Needs a look, over the record's own `gone-stale` and
- * `tidied-week`. Declared as the other four are, its figure's name first, and drawn over nothing on a quiet record.
+ * THE STALE LINE, SINCE 1.11.0 (AGT-C18), TWO LINES IN WORDS SINCE 1.13.0 (item 5): Needs a look says what the record
+ * cleared this week and what is still stale, each finder by finder (`.names`), over the record's own `tidied-week` and
+ * `gone-stale`, and each line is drawn only while its own figure is above nought.
  */
-test('NEEDS A LOOK SAYS WHAT HAS GONE STALE, by the record’s own count, and what was tidied this week beside it', async () => {
+test('NEEDS A LOOK SAYS WHAT WAS TIDIED THIS WEEK AND WHAT IS STILL STALE, in words, each over its own figure', async () => {
   const declared = AGENTS_PAGES.agents!.blocks as { kind: string; tone?: string; span?: number; when?: unknown; body?: string }[];
-  const line = declared.filter((b) => b.kind === 'note' && JSON.stringify(b.when ?? {}).includes('gone-stale'));
-  assert.deepEqual(line, [{ kind: 'note', tone: 'warn', span: 12, when: { metric: 'gone-stale', gt: 0 }, body: 'Things gone stale: {{gone-stale}}. Tidied this week: {{tidied-week}}.' }]);
-  /* BOTH ARE THE RECORD'S FIGURES, declared by no add-on, and the line leads with the first one's own name. */
+  const lines = declared.filter((b) => b.kind === 'note' && /"(?:gone-stale|tidied-week)"/u.test(JSON.stringify(b.when ?? {})));
+  assert.deepEqual(lines, [
+    { kind: 'note', tone: 'warn', span: 12, when: { metric: 'tidied-week', gt: 0 }, body: 'Tidied this week: {{tidied-week.names}}.' },
+    { kind: 'note', tone: 'warn', span: 12, when: { metric: 'gone-stale', gt: 0 }, body: 'Still stale: {{gone-stale.names}}.' },
+  ]);
+  /* BOTH ARE THE RECORD'S FIGURES, declared by no add-on. */
   for (const id of ['gone-stale', 'tidied-week']) {
     assert.ok(Object.hasOwn(BUILT_IN_FIGURES, id), `${id} is not a figure the record holds`);
     assert.equal(AGENTS_MODULE.AGENTS_METRICS[id], undefined, `${id} is declared twice`);
   }
-  assert.ok(line[0]!.body!.startsWith(`${String(BUILT_IN_FIGURES['gone-stale']!.name)}: `));
-  for (const n of [1, 3]) {
-    const said = line[0]!.body!.replaceAll('{{gone-stale}}', String(n)).replaceAll('{{tidied-week}}', String(n));
-    assert.doesNotMatch(said, /\d+ \w+\(s\)|—|\{\{/u, `the line reads wrong for ${n}: ${said}`);
-    assert.match(said, /\.$/u);
-  }
-  /* A RECORD WITH NOTHING STALE draws no line and, with no key or tool to put right, no tile. */
+  for (const line of lines) assert.doesNotMatch(String(line.body), /—|\(s\)|\brow\b|session/iu);
+
+  /* A FRESH RECORD HAS NOTHING STALE AND NOTHING TIDIED: neither line is drawn, and neither figure names anything. */
   const fresh = await empty();
   value(await fresh.k.install(declarations().filter((d) => d.id === 'register.things')));
   value(await installAgentsPack(fresh.k));
   const page = opened(fresh.k, 'agents');
-  assert.equal(noteOn(page, 'gone-stale')?.drawn, false, 'the stale line is drawn on a fresh record');
-  assert.deepEqual(noteOn(page, 'gone-stale')?.refusals, []);
+  for (const id of ['tidied-week', 'gone-stale']) {
+    assert.equal(noteOn(page, id)?.drawn, false, `${id}'s line is drawn on a fresh record`);
+    assert.deepEqual(noteOn(page, id)?.refusals, []);
+    assert.equal(named(fresh.k, id), undefined, `${id} names something on a fresh record`);
+  }
   fresh.sql.close();
+});
+
+/* WHAT A FIGURE SAYS FINDER BY FINDER, as the record reads it. */
+const named = (k: Kernel, id: string): string | undefined => {
+  const r = k.metric(k.metricDecl(id)!);
+  assert.ok(r.ok, JSON.stringify(r));
+  return (r.value as TidyReading).names;
+};
+
+/* THE WEEK'S LINE OVER WHAT THE HOURLY PASS KEPT: three steps nobody took closed and forty-one empty runs hidden, the
+   larger first, drawn with nothing stale beside it; the stale line is not. */
+test('A WEEK THAT CLEARED STEPS AND EMPTY RUNS DRAWS THE TIDIED LINE ALONE, the larger first', async () => {
+  const { k, sql } = await empty();
+  value(await k.install(declarations().filter((d) => d.id === 'register.things')));
+  value(await installAgentsPack(k));
+  const keep = (finder: string, back: number, did: number): void => {
+    sql.exec(TIDY_LINE_DDL);
+    const at = new Date(NOW - back * DAY_MS).toISOString();
+    sql.exec('INSERT INTO tidy_line (finder, day, stale, did, low, at) VALUES (?, ?, 0, ?, 0, ?)', finder, at.slice(0, 10), did, at);
+  };
+  keep('steps-old', 1, 3);
+  keep('runs-empty', 2, 41);
+  assert.equal(reading(k, 'tidied-week'), 44);
+  assert.equal(named(k, 'tidied-week'), '41 empty runs hidden and 3 steps nobody took closed');
+  const page = opened(k, 'agents');
+  const tidiedLine = noteOn(page, 'tidied-week')!;
+  assert.notEqual(tidiedLine.drawn, false, 'a week that cleared something does not say so');
+  assert.deepEqual(tidiedLine.refusals, []);
+  assert.equal(tidiedLine.values?.['tidied-week.names'], '41 empty runs hidden and 3 steps nobody took closed');
+  assert.equal(reading(k, 'gone-stale'), 0);
+  assert.equal(noteOn(page, 'gone-stale')?.drawn, false, 'the stale line is drawn over nothing stale');
+  sql.close();
 });
 
 /* DRAWN SINCE THE RECORD READS `record.tidy` (`sourceReaders` in `packages/kernel/src/metrics.ts`, landed with batch 85):
@@ -1081,11 +1131,11 @@ test('A STEP NOBODY TOOK IN A MONTH DRAWS THE STALE LINE, with its count', async
   value(k.endRun(ctx, {}));
   clock.advance(31 * DAY_MS);
   assert.equal(reading(k, 'gone-stale'), 1);
+  assert.equal(named(k, 'gone-stale'), '1 step nobody took');
   const line = noteOn(opened(k, 'agents'), 'gone-stale')!;
   assert.notEqual(line.drawn, false, 'a step a month old is stale and the line is not drawn');
   assert.deepEqual(line.refusals, []);
-  assert.equal(typeof line.values?.['tidied-week'], 'number');
-  assert.deepEqual(line.values?.['gone-stale'], reading(k, 'gone-stale'));
+  assert.equal((line as { unnamed?: string[] }).unnamed, undefined, 'the line names a figure the record does not hold');
   sql.close();
 });
 

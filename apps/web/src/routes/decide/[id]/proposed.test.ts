@@ -13,10 +13,10 @@ import { egressOf, openRecord } from '@braindog/kernel';
 import '../../../lib/record/fixtures/fill.ts';
 import { sayStep, sayTrigger, words } from '../../../lib/flow/flow.ts';
 import { REGISTERS } from '../../../lib/record/api.ts';
-import type { Fetch } from '../../../lib/record/page-live.ts';
+import type { Fetch, LiveBlock, LiveLook } from '../../../lib/record/page-live.ts';
 import { copy } from '../../../lib/copy.ts';
 import { forget } from '../../../lib/record/boot-live.ts';
-import { drawnOf, previewOf, proposedOf } from './proposed.ts';
+import { drawnOf, openedOf, pinnedLine, pinnedTouched, previewOf, proposedOf, type Tried } from './proposed.ts';
 
 test('a page says where it lands in the sidebar and what it shows', () => {
   const out = proposedOf('change', {
@@ -465,4 +465,77 @@ test('A BOOT THAT CANNOT BE READ LEAVES THE FEED DRAWN, with no id in it, and a 
   forget();
   assert.equal(plain.from, 'live');
   assert.deepEqual(asked.filter((m) => m === 'boot'), []);
+});
+
+/* HIS PINS, READ BEFORE HE ACCEPTS: a change to a page he pinned names the blocks it would move or take off. */
+const tile = (key: string, heading: string, extra: Record<string, unknown> = {}) =>
+  ({ kind: 'table', key, heading, rows: [], matched: 0, refusals: [], ...extra }) as unknown as LiveBlock;
+const LATE = tile('late', 'Late');
+const CASH = tile('cash', 'Cash');
+const NOTES = tile('notes', 'Notes');
+const pinnedBy = (by: LiveLook['by'], pinned: string[]): LiveLook => ({ page: 'money', basis: null, lead: null, order: [], hide: [], headline: null, next: null, pinned, by, kept: null });
+const tried = (was: LiveBlock[] | null, got: LiveBlock[], look: LiveLook | null): Tried => ({ id: 'page.money', slug: 'money', got: openedOf({}, 'money', 'Money', got, CLOCK), was, look });
+
+test('A CHANGE THAT SWAPS TWO BLOCKS HE PINNED NAMES BOTH, by their headings, in one line', () => {
+  const touched = pinnedTouched(tried([LATE, CASH, NOTES], [CASH, LATE, NOTES], pinnedBy('owner', ['late', 'cash', 'notes'])));
+  assert.deepEqual(touched, { page: 'Money', blocks: ['Late', 'Cash'], dropped: [] });
+  assert.equal(pinnedLine(touched!), 'You pinned Money. This would move Late and Cash out of place.');
+  /* ONE BLOCK IS SAID ALONE. */
+  const one = pinnedTouched(tried([LATE, CASH], [LATE, tile('fresh', 'Fresh'), CASH], pinnedBy('owner', ['cash'])));
+  assert.equal(pinnedLine(one!), 'You pinned Money. This would move Cash out of place.');
+});
+
+test('A BLOCK ADDED UNDER HIS PINNED ONES MOVES NONE OF THEM, and a new page or one with no look says nothing', () => {
+  const look = pinnedBy('owner', ['late', 'cash', 'notes']);
+  assert.equal(pinnedTouched(tried([LATE, CASH, NOTES], [LATE, CASH, NOTES, tile('fresh', 'Fresh')], look)), null);
+  /* A RAIL BLOCK ADDED DOES NOT MOVE THE MAIN COLUMN. */
+  assert.equal(pinnedTouched(tried([LATE, CASH], [tile('side', 'Side', { area: 'rail' }), LATE, CASH], look)), null);
+  assert.equal(pinnedTouched(tried(null, [CASH, LATE], look)), null);
+  assert.equal(pinnedTouched(tried([LATE, CASH], [CASH, LATE], null)), null);
+});
+
+test('A PAGE SLASH HOLDS IN PLACE IS NOT HIS PIN, and a change to it says nothing', () => {
+  assert.equal(pinnedTouched(tried([LATE, CASH, NOTES], [CASH, LATE, NOTES], pinnedBy('slash', ['late', 'cash']))), null);
+  assert.equal(pinnedTouched(tried([LATE, CASH, NOTES], [CASH, LATE, NOTES], pinnedBy('rule', ['late', 'cash']))), null);
+});
+
+test('A PINNED BLOCK THE CHANGE TAKES OFF IS SAID AS TAKEN OFF, dropped or hidden, and beside one it moves', () => {
+  const look = pinnedBy('owner', ['late', 'cash']);
+  const dropped = pinnedTouched(tried([LATE, CASH, NOTES], [LATE, NOTES], look));
+  assert.deepEqual(dropped, { page: 'Money', blocks: [], dropped: ['Cash'] });
+  assert.equal(pinnedLine(dropped!), 'You pinned Money. This would take Cash off the page.');
+  const hidden = pinnedTouched(tried([LATE, CASH], [LATE, tile('cash', 'Cash', { drawn: false })], look));
+  assert.deepEqual(hidden?.dropped, ['Cash']);
+  const both = pinnedTouched(tried([LATE, CASH, NOTES], [NOTES, LATE], look));
+  assert.equal(pinnedLine(both!), 'You pinned Money. This would move Late out of place and take Cash off the page.');
+  for (const line of [pinnedLine(dropped!), pinnedLine(both!)]) assert.doesNotMatch(line, /\u2014|late\b|cash\b/u);
+});
+
+test('THE WHOLE CHANGE READS THE LOOK OF EACH PAGE IT REPLACES, as the page opens, and asks nothing for a new page', async () => {
+  const asked: string[] = [];
+  const io = (async (url: string | URL | Request) => {
+    const at = new URL(String(url));
+    const method = at.pathname.slice('/api/'.length);
+    asked.push(method);
+    if (method === 'previewChange')
+      return reply(200, {
+        ok: true,
+        value: {
+          pages: [
+            { id: 'page.money', slug: 'money', title: 'Money', nav: null, layout: null, icon: null, about: null, blocks: [CASH, LATE], was: [LATE, CASH] },
+            { id: 'page.fresh', slug: 'fresh', title: 'Fresh', nav: null, layout: null, icon: null, about: null, blocks: [], was: null },
+          ],
+        },
+      });
+    if (method === 'page') return reply(200, { ok: true, value: { page: 'money', title: 'Money', blocks: [LATE, CASH], look: { look: 'money', by: 'owner', pinned: ['late', 'cash'] } } });
+    return reply(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'No such method.' } });
+  }) as Fetch;
+  const out = await previewOf({ to: { id: 'page.money', kind: 'page', body: { page: 'money', title: 'Money', blocks: [] } } }, BASE, io);
+  assert.equal(out.from, 'live');
+  if (out.from !== 'live') return;
+  const [money, fresh] = out.pages;
+  assert.deepEqual(money?.look?.pinned, ['late', 'cash']);
+  assert.equal(fresh?.look, null);
+  assert.equal(asked.filter((m) => m === 'page').length, 1);
+  assert.equal(pinnedLine(pinnedTouched(money!)!), 'You pinned Money. This would move Late and Cash out of place.');
 });

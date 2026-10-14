@@ -25,6 +25,11 @@ export type EngineHealth = {
   state: 'answering' | 'not_answering' | 'never_asked' | 'off' | 'key_closed';
   last_ok: string | null;
   since: string | null;
+  answeredBy?: { model: string; at: string } | undefined;
+  lastWords?: string | undefined;
+  doubleShare?: number | undefined;
+  doubleOf?: { twice: number; asks: number } | undefined;
+  spent?: { person: number; background: number } | undefined;
 };
 
 /** `@braindog/slash`'s `EngineSaid`: one sentence, and whose it is to fix. */

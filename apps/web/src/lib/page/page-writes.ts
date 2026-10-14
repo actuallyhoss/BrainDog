@@ -30,6 +30,10 @@ import { optimist, UNDO_MS } from '../data/optimistic.ts';
 import { isQuestion } from '../work/capture.ts';
 import { words } from './words.ts';
 
+/* TODAY'S LIGHT SYNTAX, handed on so the palette's reader reaches `lib/work` through this one held file (SHL-A18). */
+export { captureOf, contextOf, isQuestion, projectNamed } from '../work/capture.ts';
+export { dayOf, daySaid, shapeOf } from '../work/board.ts';
+
 /** The page write module, loaded on the first gesture. */
 type PageWrite = typeof import('../record/page-write.ts');
 type Change = (m: PageWrite, ref: RowRef, decl: Declared | null) => Record<string, unknown> | null;

@@ -105,8 +105,8 @@ export const ALLOWED = new Map([
      Escape shows when an answer is cancelled, so it waits on the assistant, which is absent with no model for the
      reason `askBrainDog` above is. */
   ['copy.stopped', 'CORRECT. 23 §7: the assistant\'s cancel toast. With no model the assistant is absent (23 §3.1), so the word waits with it.'],
-  ['copy.screenshotOn', 'UNBUILT:19 §6\'s screenshot mode.'],
-  ['copy.screenshotOff', 'UNBUILT:same.'],
+  /* `screenshotOn` AND `screenshotOff` LEFT THIS LIST when screenshot mode got its row, its key and its switch: they are
+     the toast `palette/customise-apply.ts` shows for each press. */
 ]);
 
 /**

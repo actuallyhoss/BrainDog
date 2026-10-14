@@ -608,14 +608,20 @@ test('THE SKILLS A USE CASE NAMES are offered to the agents once each, as rows o
 
   await install({ install: 'agents' });
   uses('tickets', [20, 11, 6, 2]);
+  /* THREE RUNS LEFT THE SAME STEPS FOR BOTH SKILLS, so each is offered with them and never as a bare name (`stepsFrom`). */
+  for (const [i, n] of [5, 4, 3].entries()) {
+    day(n);
+    const run: CallContext = { principal: { kind: 'token', id: 'tok_team', scope: 'write', person: 'p_owner', level: 'owner' }, session: { client_id: `c-${i}`, host: 'team-mac', repo: 'tickets', agent: 'claude' } };
+    value(await api.handoff({ doing: 'Task triage and the standup digest.', next: 'Read the queue with `team queue --open`.\nPost the digest with `team post --standup`.', state: 'handoff' }, run));
+  }
   day(0);
   seen = value<Toned>(await api.slash({}, owner));
   assert.equal(seen.noticed.find((x) => x.kind === 'skills')?.text, 'Team names skills for agents that you do not have in Skills yet: task-triage and standup-digest.');
   assert.deepEqual(
     seen.drafts.filter((d) => d.body_kind === 'rowset').map((d) => d.question),
     [
-      'Give your agents the skill task-triage? Team names it for when a ticket is opened, and Skills has none by that name yet.',
-      'Give your agents the skill standup-digest? Team names it for each morning, and Skills has none by that name yet.',
+      'Give your agents the skill task-triage? Team names it for when a ticket is opened, and its 2 steps are quoted from what your agents left when they handed off.',
+      'Give your agents the skill standup-digest? Team names it for each morning, and its 2 steps are quoted from what your agents left when they handed off.',
     ],
   );
 

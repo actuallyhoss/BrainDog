@@ -13,6 +13,9 @@
   A HOST WITHOUT `previewChange` asks for each page alone (`drawnOf`, the record's `previewPage`), and a host
   without that either draws the lines and nothing more, which is what this screen drew before either.
 
+  A PAGE HE PINNED SAYS SO over its drawing (`pinnedTouched`), naming the blocks accepting would move out of place or
+  take off the page, so a press he did not read never undoes his pins.
+
   A PATTERN DRAWS ITS MESSAGES under its rule (`PatternReads.svelte`, loaded only then): who each is from and what the
   rule would take out of it, and how many more like them wait, so a yes is a yes to something seen.
 -->
@@ -21,7 +24,7 @@
   import { copy } from '$lib/copy.ts';
   import { words as patternWords } from '$lib/pattern/words.ts';
   import PageView from '$lib/page/PageView.svelte';
-  import { drawnOf, openedOf, previewOf, words, type Proposed, type Rehearsed, type Tried } from './proposed.ts';
+  import { drawnOf, openedOf, pinnedLine, pinnedTouched, previewOf, words, type Proposed, type Rehearsed, type Tried } from './proposed.ts';
 
   let { proposed }: { proposed: Proposed } = $props();
 
@@ -87,6 +90,9 @@
 </script>
 
 {#snippet drawing(tried: Tried)}
+  {@const touched = pinnedTouched(tried)}
+  <!-- HIS PINS, SAID BEFORE HE ACCEPTS: a change that would move or take off a block he pinned says which, over the page. -->
+  {#if touched}<p class="appear-pinned"><span class="pinned-mark" aria-hidden="true">!</span>{pinnedLine(touched)}</p>{/if}
   <div class="appear-drawn" role="group" aria-label={words.drawn(tried.got.page.page.title)}>
     <p class="appear-kind">{words.drawnHead}</p>
     <PageView slug={tried.slug} got={tried.got} mode="preview" was={tried.was} />
@@ -223,6 +229,31 @@
 
   .appear-drawn .appear-kind {
     margin: 0;
+  }
+
+  /* IN THE WARN TONE, WITH A MARK AND WORDS, never the colour alone. */
+  .appear-pinned {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-2);
+    margin: var(--sp-2) 0 0;
+    color: var(--warn);
+    font-size: var(--t-ui);
+    line-height: var(--lh-body);
+  }
+
+  .pinned-mark {
+    flex: none;
+    display: inline-grid;
+    place-items: center;
+    inline-size: 1.25em;
+    block-size: 1.25em;
+    border-radius: 50%;
+    background: var(--warn);
+    color: var(--tile);
+    font-size: var(--t-sm);
+    font-weight: 600;
+    line-height: 1;
   }
 
   .appear-note {

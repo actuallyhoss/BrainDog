@@ -47,6 +47,7 @@
   import HeatGrid from '$lib/viz/HeatGrid.svelte';
   import Ring from '$lib/viz/Ring.svelte';
   import Stacked from '$lib/viz/Stacked.svelte';
+  import { homeCurrency } from '$lib/record/api.ts';
   import { asksOf, daysSaid, heatOf, projectParts, projectsSaid, ringsOf, said as reading, sentenceOf, weekBars, weeksSaid } from './reading.ts';
 
   /* THE MONTH AND THE PROJECT ARE THE ADDRESS'S, so the switcher is two links, Back returns to the month before, and
@@ -63,7 +64,7 @@
    * `readUsage` reads through the client: the ledger is a host door, not a record method.
    */
   async function usageOf(): Promise<Result<UsageView | Fault | null>> {
-    const out = await readUsage((url, init) => fetch(url, init), Date.now(), '', apiBase(page.url), month);
+    const out = await readUsage((url, init) => fetch(url, init), Date.now(), '', apiBase(page.url), month, homeCurrency());
     if (out.ok === true) return { ok: true, value: out.view };
     if (out.ok === 'none') return { ok: true, value: null };
     /* AN ANSWER, NOT A REFUSAL: the record was reached, and the fault is this screen's, drawn below as one. */

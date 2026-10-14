@@ -121,7 +121,7 @@ const USAGE = keys({
       actions: list(keys({ scope: 'string', action: 'string', ...TOTALS })),
       days: list(keys({ day: 'day', ...TOTALS })),
       counted: list(keys({ action: 'string', ...TOTALS })),
-      slash: optional(keys({ asks: 'number', neurons: 'number', days: list(keys({ day: 'day', asks: 'number', neurons: 'number' })), cap: optional(or('number', 'null')) })),
+      slash: optional(keys({ included: optional(or('number', 'null')), used: optional('number'), packs: optional('number'), left: optional(or('number', 'null')), asks: 'number', neurons: 'number', days: list(keys({ day: 'day', asks: 'number', neurons: 'number' })), cap: optional(or('number', 'null')) })),
       extra: optional(keys({ on: 'boolean', units: 'number', cost: 'number', cap: 'number', currency: 'string' })),
     }),
   ),
@@ -136,7 +136,7 @@ const BILLING = keys({
     keys({
       record: 'string',
       slug: or('string', 'null'),
-      state: is('active', 'past_due', 'lapsed', 'unbilled'),
+      state: is('active', 'past_due', 'lapsed', 'unbilled', 'comp'),
       plan: is('free', 'cloud', 'plus'),
       price: 'string',
       period_end: optional(or('number', 'null')),
@@ -292,7 +292,7 @@ after(async () => {
   await c?.close();
 });
 
-type Ledger = { totals: { runs: number }; records: { slug: string; month: { used: { runs: number } }; projects: unknown[]; actions: unknown[]; days: unknown[]; slash?: { asks: number; days: unknown[] } }[] };
+type Ledger = { totals: { runs: number }; records: { slug: string; month: { used: { runs: number } }; projects: unknown[]; actions: unknown[]; days: unknown[]; slash?: { asks: number; neurons: number; days: unknown[] } }[] };
 
 test('USAGE, A MONTH WITH RUNS: every key `/usage` reads is there, and every list it walks has an entry that was checked', async () => {
   const value = await read(busy, `/account/usage?${THIS_MONTH}`);
@@ -318,7 +318,9 @@ test('USAGE, AN EMPTY MONTH: a person who ran nothing, and last month for the on
     assert.equal(ledger.totals.runs, 0, what);
     assert.equal(ledger.records.length, 1, `${what} still has a record to draw a plan line for`);
     assert.deepEqual([ledger.records[0]?.projects, ledger.records[0]?.actions, ledger.records[0]?.days], [[], [], []], what);
-    assert.deepEqual(ledger.records[0]?.slash, { asks: 0, neurons: 0, days: [] }, `${what}: Slash is said as nothing asked, not left out`);
+    /* THE MONTH'S CREDITS RIDE BESIDE IT (directory-credits-96): `included`, `used`, `packs` and `left`, the record's month whatever range was asked. */
+    const { asks, neurons, days } = ledger.records[0]?.slash ?? {};
+    assert.deepEqual({ asks, neurons, days }, { asks: 0, neurons: 0, days: [] }, `${what}: Slash is said as nothing asked, not left out`);
   }
   /* THE MONTH SO FAR IS THE RECORD'S, WHATEVER RANGE WAS ASKED: last month's answer still carries September's count. */
   const past = (await read(busy, `/account/usage?${LAST_MONTH}`)) as Ledger;

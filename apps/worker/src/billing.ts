@@ -20,6 +20,13 @@
  * already has a free record, goes read-only and onto the ladder as before. This is a DEFAULT TAKEN FOR THE OWNER
  * (DIRECTION §35, "Free leads"): he has not ruled on it, and `fitsFree` below is the one place to change it.
  *
+ * PACKS OF SLASH CREDITS ARE SOLD BESIDE THE PLANS (LCH-A10, "more is bought as credit packs rather than priced by the
+ * ask", D33.34): paid once, for any record its owner is signed in to, Free included. A pack makes no subscription and
+ * writes no billing row; the webhook adds its credits to the Directory's ledger once, and a refund takes back the rest.
+ *
+ * A GIFT (`comp`, LCH-A12) IS A ROW NO STRIPE EVENT MOVES: it has no customer and no subscription, never lapses, is
+ * never charged, offers no portal, and can buy packs.
+ *
  * NOTHING IS WRITTEN FOR A RECORD NOBODY PAID FOR. A record with no billing row is
  * not billed and never lapses; a row is written only when a checkout completes, and only a verified Stripe event moves
  * it after that.
@@ -32,7 +39,7 @@
 import { personName, type AccountDoor, type Provisioned } from '@braindog/host/auth';
 import { httpStatus } from '@braindog/host';
 import { verifyStripe } from '@braindog/host/stripe-sign';
-import { CURRENCY, PLAN_TABLE, priceOf as centsAsPrice } from '@braindog/record/plans';
+import { CURRENCY, PACKS, PLAN_TABLE, priceOf as centsAsPrice, type Pack } from '@braindog/record/plans';
 import { badSlug, type AccountUsage, type BillingAnswers, type BillingCall, type BillingRow, type BillingSet, type BillingState } from '@braindog/record/directory';
 import { no, ok, refused, type Refusal, type Result, type Who } from '@braindog/ports';
 
@@ -46,6 +53,7 @@ import {
   idAt,
   metadataOf,
   objectAt,
+  sessionOfPayment,
   startCheckout,
   startPortal,
   subscriptionOf,
@@ -147,6 +155,9 @@ export type BillingEnv = MailEnv & {
   STRIPE_WEBHOOK_SECRET?: string | undefined;
   STRIPE_PRICE_HOSTED?: string | undefined;
   STRIPE_PRICE_PLUS?: string | undefined;
+  /** The Stripe prices of the two packs of Slash credits (`PACK_SETTINGS`). Empty, that pack is not sold. */
+  STRIPE_PRICE_PACK_100?: string | undefined;
+  STRIPE_PRICE_PACK_500?: string | undefined;
   PUBLIC_HOST?: string | undefined;
   /** Who may make an account (`launch.ts`): while it is `closed`, nobody makes a free record either. */
   SIGNUP?: string | undefined;
@@ -235,6 +246,73 @@ function planAsked(asked: unknown): Result<HostedPlan> {
   return no('VALUE_MALFORMED', `plan is ${PLAN_IDS.join(' or ')}.`, { at: 'plan', allowed: PLAN_IDS });
 }
 
+/* ── the packs ───────────────────────────────────────────────────────────── */
+
+/**
+ * The packs of Slash credits this Worker sells, each with the setting that holds its Stripe price. The credits and the
+ * price a person reads are the one table's (`PACKS` in `packages/record/src/plans.ts`), never typed here, and a pack
+ * the table no longer holds is not sold.
+ */
+export const PACK_SETTINGS = { 'credits-100': 'STRIPE_PRICE_PACK_100', 'credits-500': 'STRIPE_PRICE_PACK_500' } as const;
+export type PackId = keyof typeof PACK_SETTINGS;
+const PACK_IDS = Object.keys(PACK_SETTINGS) as PackId[];
+
+/** A pack's figures from the one table, or `null` for one it does not hold. */
+const packOf = (id: PackId): Pack | null => PACKS.find((p) => p.id === id) ?? null;
+
+/** A pack as a person reads it: "100 Slash credits". */
+export const packName = (pack: Pack): string => `${String(pack.credits)} Slash credits`;
+
+/** A pack's Stripe price, or `null` while its setting is empty: that pack is not sold on this host. */
+export const packPrice = (env: BillingEnv, pack: PackId): string | null => {
+  const price = (env[PACK_SETTINGS[pack]] ?? '').trim();
+  return price === '' || packOf(pack) === null ? null : price;
+};
+
+/**
+ * Whether this host sells a pack at all: billing is on in a mode its key agrees with (`billingKey`: off sells nothing,
+ * test is Stripe's test mode), the origin reads, and at least one pack has a price.
+ */
+export const sellsPacks = (env: BillingEnv): boolean => billingKey(env).ok && originOf(env).ok && PACK_IDS.some((p) => packPrice(env, p) !== null);
+
+/** The packs on sale as the list names them: `{ id, credits, price }`, empty while none is sold. */
+const packsOnSale = (env: BillingEnv): { id: PackId; credits: number; price: string }[] =>
+  !sellsPacks(env)
+    ? []
+    : PACK_IDS.flatMap((id) => {
+        const pack = packOf(id);
+        return pack !== null && packPrice(env, id) !== null ? [{ id, credits: pack.credits, price: centsAsPrice(pack.cents) }] : [];
+      });
+
+/** The pack a body asked to buy, refused by name when it is none of them. */
+function packAsked(asked: unknown): Result<PackId> {
+  if (typeof asked === 'string' && (PACK_IDS as readonly string[]).includes(asked)) return ok(asked as PackId);
+  return no('VALUE_MALFORMED', `pack is ${PACK_IDS.join(' or ')}.`, { at: 'pack', allowed: PACK_IDS });
+}
+
+/**
+ * Whether the Stripe price a pack's setting names charges what the table says, once: `null` when it does, or the
+ * refusal that opens no payment page. The plans' check (`priceRefused`) for a payment made one time: one amount in
+ * `CURRENCY`, not recurring, on sale.
+ */
+async function packPriceRefused(stripe: Stripe, id: PackId, pack: Pack, price: string): Promise<Result<never> | null> {
+  const got = await stripe.read(`/v1/prices/${encodeURIComponent(price)}`);
+  const name = packName(pack);
+  if (!got.ok) {
+    op({ op: 'billing', door: 'checkout', ok: false, why: 'price', pack: id, status: got.status, code: got.code }, 'error');
+    if (got.status === 404) return no('NOT_IN_THIS_BUILD', `${PACK_SETTINGS[id]} names a price Stripe does not know, so ${name} are not sold on this host until it names one.`, { at: 'pack' });
+    return no('RECORD_UNAVAILABLE', STRIPE_DOWN);
+  }
+  const currency = typeof got.body['currency'] === 'string' ? got.body['currency'].toUpperCase() : '';
+  const once = got.body['recurring'] === null || got.body['recurring'] === undefined;
+  if (currency === CURRENCY && got.body['unit_amount'] === pack.cents && once && got.body['active'] === true) return null;
+  op({ op: 'billing', door: 'checkout', ok: false, why: 'price_differs', pack: id }, 'error');
+  return no('NOT_IN_THIS_BUILD', `${name} are ${centsAsPrice(pack.cents)} here and Stripe's price for them is not that, paid once, so no payment page opens until the two agree.`, { at: 'pack' });
+}
+
+/** A gift's row (`comp`, LCH-A12): the operator's, which no Stripe event moves. */
+export const isGift = (row: Pick<BillingRow, 'state'>): boolean => row.state === 'comp';
+
 /**
  * The secret key, when billing is on and its mode and its key agree; otherwise the sentence that says which setting
  * is wrong. THE KEY'S PREFIX IS ITS MODE (`sk_test_`, `rk_test_`, `sk_live_`, `rk_live_`), so a live key on a host set
@@ -279,6 +357,7 @@ const ACTS: ReadonlySet<string> = new Set([
   'customer.subscription.updated',
   'customer.subscription.deleted',
   'invoice.paid',
+  'charge.refunded',
 ]);
 
 /** The one sentence a Stripe call that failed is told as. Which call and why go in the line, never to the person. */
@@ -325,9 +404,9 @@ export type BillingDoors = Required<Pick<AccountDoor, 'billing' | 'checkout' | '
 
 /**
  * A row whose record went back to Free when its plan was cancelled: it keeps its customer and has no subscription. Any
- * row a payment wrote names one, so this is never a paid record.
+ * row a payment wrote names one, so this is never a paid record. A gift has none either and is not on Free.
  */
-export const backOnFree = (row: Pick<BillingRow, 'subscription' | 'state'>): boolean => row.subscription === null && row.state !== 'lapsed';
+export const backOnFree = (row: Pick<BillingRow, 'subscription' | 'state'>): boolean => row.subscription === null && row.state !== 'lapsed' && !isGift(row);
 
 export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
   const ownedRow = async (person: string, record: unknown): Promise<BillingRow | null> => {
@@ -405,6 +484,96 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
     return ok({ url: link, record: made.value.record, slug: made.value.slug });
   };
 
+  /**
+   * The Directory's credit ledger (`credit`, `refund`, `credits`), asked through the billing group, which forwards an op
+   * whole. A Directory object of an older build answers an op it does not know with `null`, read here as no ledger.
+   */
+  const ledger = <C extends Extract<BillingCall, { op: 'credit' | 'refund' | 'credits' }>>(call: C): Promise<BillingAnswers[C['op']] | null> => deps.billing(call);
+
+  /**
+   * FIVE PAYMENT PAGES AN HOUR A PERSON, plans and packs together, counted by Stripe: the person pays as one Stripe
+   * customer (`customerFor`), and that customer's newest checkouts are the count, so the limit holds on every Worker at
+   * once. `null` when one more may be opened.
+   */
+  const overLimit = async (stripe: Stripe, customer: string): Promise<Result<never> | null> => {
+    const now = deps.clock();
+    const recent = await checkoutsSince(stripe, customer, now - CHECKOUT_WINDOW_MS, CHECKOUTS_MOST);
+    if (recent === null) {
+      op({ op: 'billing', door: 'checkout', ok: false, why: 'count' }, 'error');
+      return no('RECORD_UNAVAILABLE', STRIPE_DOWN);
+    }
+    if (recent.count < CHECKOUTS_MOST) return null;
+    const wait = Math.max(1, Math.ceil(((recent.oldest ?? now) + CHECKOUT_WINDOW_MS - now) / 1000));
+    const minutes = Math.ceil(wait / 60);
+    return no('RATE_LIMITED', `${CHECKOUTS_MOST} payment pages an hour is the most one person can open. Try again in ${minutes === 1 ? 'a minute' : `${minutes} minutes`}.`, {
+      retry_after: wait,
+    });
+  };
+
+  /* ── POST /account/billing/checkout with a pack ───────────────────────── */
+
+  /**
+   * A Stripe Checkout page for a pack of Slash credits, `{ record, pack }`. Answers `{ url }`.
+   *
+   * ANY OPEN RECORD THIS PERSON OWNS, FREE AND A GIFT INCLUDED; a lapsed one pays for its plan first. Paid once
+   * (`payment` mode) as the record's Stripe customer, or any this person already pays as, or one made now: no
+   * subscription and no billing row, so nothing it does can lapse. The webhook adds the credits when the money is in.
+   *
+   * THE METADATA IS WHAT THE WEBHOOK READS: `{ kind: 'pack', record, pack, person }`, on the session and on its payment,
+   * so a refund of the charge finds the pack it paid for.
+   */
+  const buyPack = async (who: Who, body: Record<string, unknown>): Promise<Result<unknown>> => {
+    const key = billingKey(env);
+    if (!key.ok) return key;
+    const origin = originOf(env);
+    if (!origin.ok) return origin;
+    const asked = packAsked(body['pack']);
+    if (!asked.ok) return asked;
+    const id = asked.value;
+    const pack = packOf(id);
+    const price = packPrice(env, id);
+    if (pack === null || price === null) return no('NOT_IN_THIS_BUILD', `${PACK_SETTINGS[id]} is not set, so ${pack === null ? 'that pack is' : `${packName(pack)} are`} not sold on this host.`, { at: 'pack' });
+
+    /* THE SAME SENTENCE FOR A RECORD THAT IS NOT THIS PERSON'S AND ONE THAT DOES NOT EXIST. */
+    const owned = await ownedOpen(who.person);
+    if (!owned.ok) return owned;
+    const record = owned.value.find((r) => r.record === body['record']);
+    if (record === undefined || record.slug === null) return no('OUT_OF_BOUNDS', 'There is no record of yours to buy credits for by that id.', { at: 'record' });
+    const rows = await deps.billing({ op: 'for', person: who.person });
+    const row = rows.find((r) => r.record === record.record);
+    if (row?.state === 'lapsed') return no('FORBIDDEN', 'Billing for this record has lapsed. Pay for its plan again, and credits can be bought for it then.', { at: 'record' });
+
+    const stripe = deps.stripe(key.value);
+    /* A GIFT'S ROW HAS NO CUSTOMER, so the record's own is taken only when it has one. */
+    const paying = [row, ...rows].find((r) => r !== undefined && r.customer !== '')?.customer;
+    const customer = paying ?? (await customerFor(stripe, who.person, who.email));
+    if (customer === null) {
+      op({ op: 'billing', door: 'checkout', ok: false, why: 'customer', pack: id }, 'error');
+      return no('RECORD_UNAVAILABLE', STRIPE_DOWN);
+    }
+    const tooMany = await overLimit(stripe, customer);
+    if (tooMany !== null) return tooMany;
+    const differs = await packPriceRefused(stripe, id, pack, price);
+    if (differs !== null) return differs;
+
+    const back = `${origin.value}/app/${record.slug}/settings/billing`;
+    const started = await startCheckout(stripe, {
+      mode: 'payment',
+      customer,
+      person: who.person,
+      price,
+      metadata: { kind: 'pack', record: record.record, pack: id, person: who.person },
+      success: `${back}#credits={CHECKOUT_SESSION_ID}`,
+      cancel: `${back}#cancelled`,
+    });
+    if ('failed' in started) {
+      op({ op: 'billing', door: 'checkout', ok: false, why: 'stripe', pack: id, status: started.failed.status, code: started.failed.code }, 'error');
+      return no('RECORD_UNAVAILABLE', STRIPE_DOWN);
+    }
+    op({ op: 'billing', door: 'checkout', ok: true, pack: id });
+    return ok({ url: started.url });
+  };
+
   /* ── GET /account/billing ─────────────────────────────────────────────── */
 
   /**
@@ -416,6 +585,8 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
    * ANSWERED WHILE BILLING IS OFF, with `open: false`, because a row written while it was on still says what was paid.
    * `canMake` SAYS WHETHER THIS PERSON CAN MAKE A FREE RECORD NOW: sign-up is not closed and they own no free record.
    * Every "make another" control reads it, so none is drawn that checkout would refuse.
+   * `packs` ARE THE PACKS ON SALE, `{ id, credits, price }`, empty while billing is off or no pack has a price; each
+   * record says its pack `credits` left, and a gift says `gift: true`, which Settings names and offers no portal for.
    * REFUSED WHILE IT IS WRONG, as every billing door is: `BILLING` set with no key, or with a key of the other mode,
    * is a host set up by mistake, and a list that looked closed would hide that.
    */
@@ -426,28 +597,34 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
     const owned = await deps.usage(who.person, { from: today, to: today });
     if (!owned.ok) return owned;
     const rows = await deps.billing({ op: 'for', person: who.person });
-    const records = owned.value.records
-      .filter((r) => !r.closed)
-      .map((r) => {
-        /* A RECORD BACK ON FREE IS LISTED AS ONE MADE FREE, with nothing billed and no period, so it is offered the upgrade. */
-        const held = rows.find((b) => b.record === r.record);
-        const row = held && !(backOnFree(held) && r.plan === FREE_PLAN.directory) ? held : undefined;
-        const plan: ListedPlan = planOfPrice(env, row?.price ?? null) ?? planOfMeter(r.plan);
-        const lapsedAt = row?.state === 'lapsed' ? row.lapsed_at : null;
-        return {
-          record: r.record,
-          slug: r.slug,
-          state: row ? row.state : 'unbilled',
-          plan,
-          price: planPrice(plan),
-          ...(row && row.period_end !== null ? { period_end: row.period_end } : {}),
-          ...(lapsedAt !== null ? { lapsed_at: lapsedAt, delete_on: lapsedAt + LAPSE_DELETES_DAYS * DAY_MS } : {}),
-        };
-      });
+    const records = await Promise.all(
+      owned.value.records
+        .filter((r) => !r.closed)
+        .map(async (r) => {
+          /* A RECORD BACK ON FREE IS LISTED AS ONE MADE FREE, with nothing billed and no period, so it is offered the upgrade. */
+          const held = rows.find((b) => b.record === r.record);
+          const row = held && !(backOnFree(held) && r.plan === FREE_PLAN.directory) ? held : undefined;
+          const plan: ListedPlan = planOfPrice(env, row?.price ?? null) ?? planOfMeter(r.plan);
+          const lapsedAt = row?.state === 'lapsed' ? row.lapsed_at : null;
+          /* THE PACK CREDITS LEFT ON IT, which a Directory without the ledger answers as none. */
+          const credits = (await ledger({ op: 'credits', record: r.record }))?.packs ?? 0;
+          return {
+            record: r.record,
+            slug: r.slug,
+            state: row ? row.state : 'unbilled',
+            plan,
+            price: planPrice(plan),
+            credits,
+            ...(row && isGift(row) ? { gift: true } : {}),
+            ...(row && row.period_end !== null ? { period_end: row.period_end } : {}),
+            ...(lapsedAt !== null ? { lapsed_at: lapsedAt, delete_on: lapsedAt + LAPSE_DELETES_DAYS * DAY_MS } : {}),
+          };
+        }),
+    );
     const sold = PLAN_IDS.filter((p) => priceOf(env, p) !== null).map((p) => ({ id: p, name: planName(p), price: planPrice(p) }));
     const open = sells(env);
     const canMake = signupMode(env) !== 'closed' && !records.some((r) => r.plan === 'free');
-    return ok({ records, open, plans: open ? sold : [], canMake });
+    return ok({ records, open, plans: open ? sold : [], packs: packsOnSale(env), canMake });
   };
 
   /* ── POST /account/billing/checkout ───────────────────────────────────── */
@@ -470,6 +647,7 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
    */
   const checkout = async (who: Who, body: Record<string, unknown>): Promise<Result<unknown>> => {
     if (body['plan'] === 'free') return makeFree(who, body);
+    if (body['pack'] !== undefined) return buyPack(who, body);
     const key = billingKey(env);
     if (!key.ok) return key;
     const origin = originOf(env);
@@ -500,6 +678,7 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
         back = `${origin.value}/app/${free.slug}/settings/billing`;
       } else {
         if (row.slug === null) return no('OUT_OF_BOUNDS', 'There is no record of yours to pay for by that id.', { at: 'record' });
+        if (isGift(row)) return no('ALREADY_KNOWN', 'This record is a gift from BrainDog, so there is nothing to pay for.', { at: 'record' });
         if (row.state !== 'lapsed') return no('ALREADY_KNOWN', 'This record is paid for. Manage payment changes the card or the plan.', { at: 'record' });
         customer = row.customer;
         metadata = { person: who.person, record: row.record, plan: plan.value };
@@ -519,19 +698,8 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
       return no('RECORD_UNAVAILABLE', STRIPE_DOWN);
     }
 
-    const now = deps.clock();
-    const recent = await checkoutsSince(stripe, customer, now - CHECKOUT_WINDOW_MS, CHECKOUTS_MOST);
-    if (recent === null) {
-      op({ op: 'billing', door: 'checkout', ok: false, why: 'count' }, 'error');
-      return no('RECORD_UNAVAILABLE', STRIPE_DOWN);
-    }
-    if (recent.count >= CHECKOUTS_MOST) {
-      const wait = Math.max(1, Math.ceil(((recent.oldest ?? now) + CHECKOUT_WINDOW_MS - now) / 1000));
-      const minutes = Math.ceil(wait / 60);
-      return no('RATE_LIMITED', `${CHECKOUTS_MOST} payment pages an hour is the most one person can open. Try again in ${minutes === 1 ? 'a minute' : `${minutes} minutes`}.`, {
-        retry_after: wait,
-      });
-    }
+    const tooMany = await overLimit(stripe, customer);
+    if (tooMany !== null) return tooMany;
 
     /* THE PRICE STRIPE CHARGES IS THE ONE THE PAGE SAID, or no session is made. */
     const differs = await priceRefused(stripe, plan.value, price);
@@ -568,6 +736,7 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
     if (!origin.ok) return origin;
     const row = await ownedRow(who.person, body['record']);
     if (row === null || row.slug === null) return no('OUT_OF_BOUNDS', 'There is no record of yours with a payment to manage by that id.', { at: 'record' });
+    if (isGift(row)) return no('FORBIDDEN', 'This record is a gift from BrainDog, so there is no payment to manage.', { at: 'record' });
     const stripe = deps.stripe(key.value);
     const back = `${origin.value}/app/${row.slug}/settings/billing`;
 
@@ -648,6 +817,7 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
    * `checkout.session.async_payment_succeeded` when the money arrives, which comes here too.
    */
   const paid = async (session: StripeObject, stripe: Stripe): Promise<string> => {
+    if (textAt(session, 'mode') === 'payment') return packPaid(session);
     if (textAt(session, 'mode') !== 'subscription') return 'ignored';
     const payment = textAt(session, 'payment_status');
     if (payment !== 'paid' && payment !== 'no_payment_required') return 'waiting';
@@ -679,6 +849,11 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
         await planFollows(record, sub.price);
         await setRow({ record, person, customer, subscription: sub.id, price: sub.price, state, period_end: sub.period_end });
         return 'upgraded';
+      }
+      /* A GIFT IS NOT PAID FOR, so no payment moves it: checkout refuses one, and a session that names it anyway is a line. */
+      if (isGift(before)) {
+        op({ op: 'billing', did: 'paid', ok: false, why: 'gift', rec: record }, 'error');
+        return 'gift';
       }
       if (before.customer !== customer) throw new Error('a payment again for a record whose customer is another');
       await lapseSwitch(before, record, state);
@@ -739,6 +914,74 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
   };
 
   /**
+   * A pack paid for: its credits added to the record's ledger, once.
+   *
+   * ONLY ONCE THE MONEY IS IN (`payment_status: 'paid'`): a bank debit completes the session unpaid, adds nothing, and
+   * comes back as `checkout.session.async_payment_succeeded` when the money arrives.
+   *
+   * KEYED BY THE PAYMENT'S OWN SESSION, which is what the ledger's `event` holds: every delivery of this event, and the
+   * other event one payment may send, name the same session, so the credits are added once whichever arrives and however
+   * often. A refund finds the same session from its charge (`refunded`).
+   */
+  const packPaid = async (session: StripeObject): Promise<string> => {
+    const meta = metadataOf(session);
+    if (meta['kind'] !== 'pack') return 'ignored';
+    if (textAt(session, 'payment_status') !== 'paid') return 'waiting';
+    const person = meta['person'] ?? '';
+    if (person === '' || textAt(session, 'client_reference_id') !== person) {
+      op({ op: 'billing', did: 'credit', ok: false, why: 'foreign' }, 'error');
+      return 'foreign';
+    }
+    const id = textAt(session, 'id');
+    const record = meta['record'] ?? '';
+    const asked = packAsked(meta['pack']);
+    if (id === '' || idAt(session, 'customer') === '' || record === '' || !asked.ok) {
+      op({ op: 'billing', did: 'credit', ok: false, why: 'unnamed' }, 'error');
+      return 'ignored';
+    }
+    /* A RECORD CLOSED SINCE THE CHECKOUT, or one the payer no longer owns, gets nothing: the money is in, the line says
+       so, and a refund from Stripe's dashboard puts it right. Sending the event again would change nothing. */
+    const owned = await ownedOpen(person);
+    if (!owned.ok) throw new Error('the records of the person who paid could not be read');
+    if (!owned.value.some((r) => r.record === record)) {
+      op({ op: 'billing', did: 'credit', ok: false, why: 'record', rec: record }, 'error');
+      return 'gone';
+    }
+    const out = await ledger({ op: 'credit', record, person, pack: asked.value, event: id, at: deps.clock() });
+    if (out === null) throw new Error('the Directory keeps no credits in this build');
+    if (!out.ok) throw new Error(`the credits were refused: ${refused(out) ? out.refusal.code : 'refused'}`);
+    return out.value.added ? 'credited' : 'already';
+  };
+
+  /**
+   * A charge refunded: when it paid for a pack, what is left of that pack is taken back, never below nothing.
+   *
+   * THE PACK IS FOUND FROM THE CHARGE'S PAYMENT, by the session that took it, and only when that session is a pack's
+   * and the customer agrees: a refund of a plan's invoice has no session and changes nothing. A charge with no customer
+   * changes nothing. A refund in part is still the operator's word that the pack is given back, and takes the rest.
+   */
+  const refunded = async (charge: StripeObject, stripe: Stripe): Promise<string> => {
+    const customer = idAt(charge, 'customer');
+    const payment = idAt(charge, 'payment_intent');
+    if (customer === '' || payment === '') return 'ignored';
+    const session = await sessionOfPayment(stripe, payment);
+    if (session === null) return 'ignored';
+    if ('ok' in session) throw new Error('the payment a refund names could not be read from Stripe');
+    if (session.metadata['kind'] !== 'pack' || session.customer !== customer) return 'ignored';
+    const out = await ledger({ op: 'refund', event: session.id });
+    if (out === null) throw new Error('the Directory keeps no credits in this build');
+    /* A PACK WHOSE CREDITS NEVER LANDED (its record closed before the money came in, `packPaid`'s 'gone') is the very
+       refund the operator makes from Stripe's dashboard: nothing to take back, a line and a 200. Answered 500, Stripe
+       would send it again for days and change nothing. */
+    if (refused(out) && out.refusal.code === 'OUT_OF_BOUNDS') {
+      op({ op: 'billing', did: 'refund', ok: false, why: 'uncredited' }, 'error');
+      return 'none';
+    }
+    if (!out.ok) throw new Error(`the refund was refused: ${refused(out) ? out.refusal.code : 'refused'}`);
+    return out.value.taken > 0 ? 'refunded' : 'already';
+  };
+
+  /**
    * Whether a record whose plan was cancelled goes back to Free rather than lapsing: one person on it, and no other free
    * record of its owner's, since Free is one record and one person. `false` while nobody can count the people on it.
    * A count that fails throws, so Stripe sends the event again rather than the record lapsing on a guess.
@@ -780,7 +1023,8 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
     const id = textAt(object, 'id');
     const customer = idAt(object, 'customer');
     if (id === '' || customer === '') return 'ignored';
-    const before = (await deps.billing({ op: 'byCustomer', customer })).find((r) => r.subscription === id);
+    /* A GIFT IS NEVER FOUND HERE, whatever customer it kept: no subscription event lapses or moves it. */
+    const before = (await deps.billing({ op: 'byCustomer', customer })).find((r) => r.subscription === id && !isGift(r));
     if (before === undefined) return 'unknown';
     const sub: SubscriptionSeen | null = (await subscriptionOf(stripe, id, planPrices(env))) ?? subscriptionSeen(object, planPrices(env));
     if (sub === null) return 'ignored';
@@ -802,7 +1046,7 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
     const nested = objectAt(objectAt(invoice, 'parent') ?? {}, 'subscription_details');
     const subscription = idAt(invoice, 'subscription') || (nested ? idAt(nested, 'subscription') : '');
     if (customer === '' || subscription === '') return 'ignored';
-    const before = (await deps.billing({ op: 'byCustomer', customer })).find((r) => r.subscription === subscription);
+    const before = (await deps.billing({ op: 'byCustomer', customer })).find((r) => r.subscription === subscription && !isGift(r));
     if (before === undefined || before.state !== 'lapsed') return 'unchanged';
     await lapseSwitch(before, before.record, 'active');
     await setRow({ record: before.record, state: 'active' });
@@ -872,7 +1116,13 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
     const stripe = deps.stripe(key.value);
     try {
       const did =
-        type === 'invoice.paid' ? await invoicePaid(object) : type.startsWith('checkout.session.') ? await paid(object, stripe) : await changed(type, object, stripe);
+        type === 'invoice.paid'
+          ? await invoicePaid(object)
+          : type === 'charge.refunded'
+            ? await refunded(object, stripe)
+            : type.startsWith('checkout.session.')
+              ? await paid(object, stripe)
+              : await changed(type, object, stripe);
       op({ op: 'billing', door: 'webhook', ok: true, event: type, did });
       return answer(200, { received: true });
     } catch (e) {

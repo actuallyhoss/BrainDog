@@ -1137,7 +1137,7 @@ export type Heard = { kind: HeardKind; n?: number | undefined; ms?: number | und
  */
 export type EngineState = 'answering' | 'not_answering' | 'never_asked' | 'off' | 'key_closed';
 export type EngineHealth = {
-  health: { state: EngineState; last_ok: string | null; since: string | null };
+  health: { state: EngineState; last_ok: string | null; since: string | null; answeredBy?: { model: string; at: string }; lastWords?: string; doubleShare?: number; doubleOf?: { twice: number; asks: number }; spent?: { person: number; background: number } };
   said: { text: string; whose: 'ours' | 'yours' | null };
 };
 
@@ -1609,6 +1609,12 @@ export function createClient(options: ClientOptions) {
       } = {},
     ) =>
       call<unknown>('exportUseCase', args as Record<string, unknown>),
+    /**
+     * What a person made on this record that can be shared as an add-on, or, with ticks, the add-on file made from them
+     * (SHL-B09). Reads, and changes nothing.
+     */
+    exportPack: (args: { declarations?: string[]; rows?: Record<string, number[]>; title?: string; id?: string; version?: string } = {}) =>
+      call<unknown>('exportPack', args as Record<string, unknown>),
 
     /* THE ADMIN WRITES A SETTINGS SCREEN MAKES, SO A BROWSER SESSION FOR EACH. They were reachable through
        `call` and had no name, which left the argument names unchecked on the screens that change who may

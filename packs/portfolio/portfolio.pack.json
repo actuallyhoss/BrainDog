@@ -1,0 +1,565 @@
+{
+  "pack": "portfolio",
+  "version": "1.17.0",
+  "title": "Projects",
+  "summary": "The things you run, and the plan for each.",
+  "changes": "The line under What each one earns is drawn only once a project in play says what it earned in a year. A project's one line is typed on its card in In play. Each project in play on Projects says how long since anybody worked on it. That line and the line of the work finished on it each week wait until Work is there.",
+  "author": "BrainDog",
+  "license": "MIT",
+  "requires": { "format": 1, "primitives": 1, "packs": {} },
+  "words": { "things": { "name": "Projects", "one": "project" } },
+  "declarations": [
+    {
+      "register": "things",
+      "icon": "thing",
+      "name": "Projects",
+      "one": "project",
+      "holds": "what you are building, and the plan for each",
+      "title": "name",
+      "mobile": [ "name", "lane", "revenue" ],
+      "state": "lane",
+      "pack": "portfolio",
+      "identity": { "mark": "mark", "accent": "hue" },
+      "scopes": { "repos": "repos", "folders": "folders" },
+      "delete": "refuse_while_referenced",
+      "fields": [
+        { "id": "name", "type": "text", "required": true, "search": true },
+        { "id": "about", "label": "About", "type": "text", "search": true },
+        {
+          "id": "lane",
+          "label": "Status",
+          "type": "enum",
+          "values": [ "building", "earning", "parked", "retired" ],
+          "labels": { "building": "Building", "earning": "Earning", "parked": "Parked", "retired": "Finished" },
+          "index": true,
+          "required": true
+        },
+        { "id": "revenue", "label": "Earned in a year", "type": "money" },
+        { "id": "earned_before", "label": "Earned the year before", "type": "money" },
+        { "id": "since", "type": "day" },
+        {
+          "id": "health",
+          "label": "Health",
+          "type": "enum",
+          "values": [ "on_track", "at_risk", "off_track" ],
+          "labels": { "on_track": "On track", "at_risk": "At risk", "off_track": "Off track" },
+          "index": true
+        },
+        { "id": "next", "label": "Next step", "type": "text" },
+        { "id": "progress", "label": "How far along", "type": "decimal", "unit": "%", "min": 0, "max": 100 },
+        { "id": "aim", "label": "Aiming for", "type": "day", "index": true },
+        { "id": "agent", "label": "Agent", "type": "text", "index": true },
+        { "id": "mark", "type": "text" },
+        { "id": "hue", "type": "int" },
+        { "id": "note", "type": "document" },
+        { "id": "repos", "label": "Repositories", "type": "list", "of": "text" },
+        { "id": "folders", "label": "Folders", "type": "list", "of": "text" },
+        { "id": "domains", "label": "Domains", "type": "list", "of": "text" },
+        { "id": "tags", "type": "list", "of": "text" }
+      ]
+    },
+    {
+      "page": "portfolio",
+      "title": "Projects",
+      "nav": { "section": "Projects", "order": 5 },
+      "icon": "thing",
+      "requires": [ "register.things" ],
+      "pack": "portfolio",
+      "blocks": [
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": { "metric": "projects-live", "is": 0 },
+          "body": "No project is in play. Add one, or set a parked one building."
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": { "metric": "projects-need-you", "gt": 0 },
+          "body": "{{projects-need-you.names}} need(s) a push, {{projects-on-track.names}} is on track"
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": { "metric": "projects-need-you", "is": 0 },
+          "body": "Nothing needs you across {{projects-live}} project(s) in play"
+        },
+        {
+          "kind": "split",
+          "heading": "How they are going",
+          "icon": "activity",
+          "span": 12,
+          "source": "metric.projects-by-health",
+          "unset": "Not said yet",
+          "tones": { "on_track": "good", "at_risk": "warn", "off_track": "bad" },
+          "when": { "metric": "projects-live", "gt": 4 }
+        },
+        {
+          "kind": "cards",
+          "heading": "In play",
+          "icon": "rocket",
+          "span": 12,
+          "source": "register.things",
+          "where": "lane is building or earning",
+          "columns": [
+            { "field": "name", "as": "title" },
+            { "field": "mark", "as": "mark" },
+            { "field": "hue", "as": "hue" },
+            { "field": "about", "as": "reply", "edit": true },
+            { "field": "progress", "label": "", "as": "ring" },
+            { "field": "health", "label": "", "as": "fact" },
+            { "field": "revenue", "as": "fact" },
+            { "field": "next", "label": "Next step", "as": "fact" },
+            { "field": "agent", "label": "Agent", "as": "who" },
+            { "metric": "project-done-by-week:{{name}}", "as": "trend", "when": { "holds": [ "tasks" ] } },
+            { "metric": "project-last-worked:{{name}}", "as": "when", "label": "Worked on", "when": { "holds": [ "tasks" ] } }
+          ],
+          "order": [ { "field": "name", "dir": "asc" } ],
+          "limit": 12,
+          "when": { "metric": "projects-live", "gt": 0 }
+        },
+        {
+          "kind": "section",
+          "heading": "Earnings, agents and dates",
+          "icon": "rows",
+          "span": 12,
+          "box": true,
+          "key": "open-earnings",
+          "when": { "metric": "projects-looked-up", "lte": 4 }
+        },
+        {
+          "kind": "split",
+          "heading": "What each one earns",
+          "icon": "coins",
+          "span": 12,
+          "source": "register.things",
+          "where": "lane is building or earning, revenue is set",
+          "columns": [ { "field": "name" }, { "field": "revenue" } ],
+          "order": [ { "field": "revenue", "dir": "desc" } ],
+          "limit": 8,
+          "when": { "metric": "projects-earning-said", "gt": 0 },
+          "key": "open-earns"
+        },
+        {
+          "kind": "note",
+          "span": 12,
+          "when": { "metric": "projects-earning-said", "gt": 0 },
+          "body": "{{projects-earning-said}} of {{projects-live}} projects in play say what they earned in a year",
+          "key": "open-earns-said"
+        },
+        {
+          "kind": "table",
+          "heading": "With an agent",
+          "icon": "session",
+          "span": 6,
+          "source": "register.things",
+          "where": "lane is building or earning, agent is set",
+          "columns": [
+            { "field": "name", "label": "Project", "width": "minmax(14ch,1fr)" },
+            { "field": "agent", "label": "Agent", "width": "10ch" },
+            { "field": "changed", "label": "Changed by", "width": "16ch" }
+          ],
+          "order": [ { "field": "name", "dir": "asc" } ],
+          "limit": 4,
+          "when": { "metric": "projects-with-agent", "gt": 0 },
+          "key": "open-with-agent"
+        },
+        {
+          "kind": "table",
+          "heading": "Coming up",
+          "icon": "calendar-clock",
+          "span": 6,
+          "source": "register.things",
+          "where": "lane is building or earning, aim is set",
+          "columns": [
+            { "field": "name", "label": "Project", "width": "minmax(14ch,1fr)" },
+            { "field": "progress", "label": "How far along", "width": "14ch", "align": "end" },
+            { "field": "aim", "label": "Aiming for", "width": "14ch", "align": "end" }
+          ],
+          "order": [ { "field": "aim", "dir": "asc" } ],
+          "limit": 4,
+          "when": { "metric": "projects-aiming", "gt": 0 },
+          "key": "open-coming-up"
+        },
+        {
+          "kind": "section",
+          "heading": "Earnings, agents and dates",
+          "icon": "rows",
+          "span": 12,
+          "fold": true,
+          "when": { "metric": "projects-looked-up", "gt": 4 }
+        },
+        {
+          "kind": "split",
+          "heading": "What each one earns",
+          "icon": "coins",
+          "span": 12,
+          "source": "register.things",
+          "where": "lane is building or earning, revenue is set",
+          "columns": [ { "field": "name" }, { "field": "revenue" } ],
+          "order": [ { "field": "revenue", "dir": "desc" } ],
+          "limit": 8,
+          "when": { "metric": "projects-earning-said", "gt": 0 }
+        },
+        {
+          "kind": "note",
+          "span": 12,
+          "when": { "metric": "projects-earning-said", "gt": 0 },
+          "body": "{{projects-earning-said}} of {{projects-live}} projects in play say what they earned in a year",
+          "key": "earns-said"
+        },
+        {
+          "kind": "table",
+          "heading": "With an agent",
+          "icon": "session",
+          "span": 12,
+          "source": "register.things",
+          "where": "lane is building or earning, agent is set",
+          "columns": [
+            { "field": "name", "label": "Project", "width": "minmax(14ch,1fr)" },
+            { "field": "agent", "label": "Agent", "width": "10ch" },
+            { "field": "next", "label": "Next", "width": "minmax(20ch,2fr)" },
+            { "field": "changed", "label": "Changed by", "width": "16ch" }
+          ],
+          "order": [ { "field": "name", "dir": "asc" } ],
+          "limit": 12,
+          "when": { "metric": "projects-with-agent", "gt": 0 }
+        },
+        {
+          "kind": "table",
+          "heading": "Coming up",
+          "icon": "calendar-clock",
+          "span": 12,
+          "source": "register.things",
+          "where": "lane is building or earning, aim is set",
+          "columns": [
+            { "field": "name", "label": "Project", "width": "minmax(14ch,1fr)" },
+            { "field": "progress", "label": "How far along", "width": "14ch", "align": "end" },
+            { "field": "aim", "label": "Aiming for", "width": "14ch", "align": "end" }
+          ],
+          "order": [ { "field": "aim", "dir": "asc" } ],
+          "limit": 8,
+          "when": { "metric": "projects-aiming", "gt": 0 }
+        },
+        {
+          "kind": "section",
+          "heading": "Parked and finished",
+          "icon": "archive",
+          "span": 12,
+          "box": true,
+          "when": { "metric": "projects-not-in-play", "lte": 4 }
+        },
+        {
+          "kind": "table",
+          "span": 12,
+          "source": "register.things",
+          "where": "lane is parked or retired",
+          "columns": [
+            { "field": "name", "label": "Project", "width": "minmax(14ch,1fr)" },
+            { "field": "lane", "label": "Status", "width": "10ch" },
+            { "field": "next", "label": "Next", "width": "minmax(18ch,2fr)" },
+            { "field": "changed", "label": "Changed by", "width": "16ch" }
+          ],
+          "order": [ { "field": "name", "dir": "asc" } ],
+          "limit": 4,
+          "when": { "metric": "projects-not-in-play", "gt": 0 }
+        },
+        {
+          "kind": "section",
+          "heading": "Parked and finished",
+          "icon": "thing",
+          "span": 12,
+          "fold": true,
+          "source": "register.things",
+          "where": "lane is parked or retired",
+          "limit": 1,
+          "when": { "metric": "projects-not-in-play", "gt": 4 }
+        },
+        {
+          "kind": "table",
+          "heading": "Not in play",
+          "icon": "archive",
+          "span": 12,
+          "source": "register.things",
+          "where": "lane is parked or retired",
+          "columns": [
+            { "field": "name", "label": "Project", "width": "minmax(14ch,1fr)" },
+            { "field": "lane", "label": "Status", "width": "10ch" },
+            { "field": "next", "label": "Next", "width": "minmax(18ch,2fr)" },
+            { "field": "changed", "label": "Changed by", "width": "16ch" }
+          ],
+          "order": [ { "field": "name", "dir": "asc" } ],
+          "limit": 20,
+          "when": { "metric": "projects-not-in-play", "gt": 0 }
+        }
+      ]
+    },
+    {
+      "metric": "projects-live",
+      "name": "In play",
+      "source": "register.things",
+      "where": "lane is building or earning",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none",
+      "snapshot": { "grain": "day", "into": "series.projects-live" }
+    },
+    {
+      "metric": "projects-need-you",
+      "name": "Need you",
+      "source": "register.things",
+      "where": "lane is building or earning, health is at_risk or off_track",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "lte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "projects-on-track",
+      "name": "On track",
+      "source": "register.things",
+      "where": "lane is building or earning, health is on_track",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "projects-with-agent",
+      "name": "With an agent",
+      "source": "register.things",
+      "where": "lane is building or earning, agent is set",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "projects-aim-30d",
+      "name": "Aiming within 30 days",
+      "source": "register.things",
+      "where": "lane is building or earning, aim after yesterday, aim before +31d",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "projects-past-aim",
+      "name": "Past the day they aimed for",
+      "source": "register.things",
+      "where": "lane is building or earning, aim before today",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "lte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "projects-parked",
+      "name": "Parked",
+      "source": "register.things",
+      "where": "lane is parked",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "projects-aiming",
+      "name": "Aiming for a day",
+      "source": "register.things",
+      "where": "lane is building or earning, aim is set",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "projects-not-in-play",
+      "name": "Parked or finished",
+      "source": "register.things",
+      "where": "lane is parked or retired",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "projects-looked-up",
+      "name": "Earning, with an agent or aiming",
+      "source": "register.things",
+      "where": {
+        "all": [
+          { "field": "lane", "in": [ "building", "earning" ] },
+          {
+            "any": [
+              { "field": "revenue", "present": true },
+              { "field": "agent", "present": true },
+              { "field": "aim", "present": true }
+            ]
+          }
+        ]
+      },
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "projects-retired",
+      "name": "Finished",
+      "source": "register.things",
+      "where": "lane is retired",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "projects-by-health",
+      "name": "How they are going",
+      "source": "register.things",
+      "where": "lane is building or earning",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none",
+      "group_by": "health"
+    },
+    {
+      "metric": "projects-by-lane",
+      "name": "Where they are",
+      "source": "register.things",
+      "where": "lane is set",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none",
+      "group_by": "lane"
+    },
+    {
+      "metric": "projects-earning",
+      "name": "Earned in a year",
+      "source": "register.things",
+      "where": "lane is building or earning, revenue is set",
+      "value": { "sum": "revenue" },
+      "format": "money",
+      "target": { "gte": 0 },
+      "window": "12m",
+      "compare": "none",
+      "snapshot": { "grain": "day", "into": "series.projects-earning" }
+    },
+    {
+      "metric": "projects-earning-before",
+      "name": "Earned the year before",
+      "source": "register.things",
+      "where": "lane is building or earning, revenue is set",
+      "value": { "sum": "earned_before" },
+      "format": "money",
+      "target": { "gte": 0 },
+      "window": "12m",
+      "compare": "none"
+    },
+    {
+      "metric": "projects-earning-said",
+      "name": "Saying what they earn",
+      "source": "register.things",
+      "where": "lane is building or earning, revenue is set",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "projects-earning-change",
+      "name": "Against the year before",
+      "source": "register.things",
+      "where": "lane is building or earning, revenue is set",
+      "value": { "diff": { "of": { "sum": "revenue" }, "per": { "sum": "earned_before" } } },
+      "format": "money",
+      "target": { "gte": 0 },
+      "window": "12m",
+      "compare": "none"
+    },
+    {
+      "metric": "project-said",
+      "name": "Said where it stands",
+      "source": "register.things",
+      "where": {
+        "all": [
+          { "field": "name", "is": "{{it}}" },
+          {
+            "any": [
+              { "field": "health", "present": true },
+              { "field": "progress", "present": true },
+              { "field": "aim", "present": true },
+              { "field": "agent", "present": true }
+            ]
+          }
+        ]
+      },
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "rule": "project-past-aim",
+      "pack": "portfolio",
+      "register": "things",
+      "when": "lane is building or earning, aim before today",
+      "then": [
+        {
+          "suggest": {
+            "question": "{{name}} was aiming for {{ago:aim}}. Move the day, or park it?",
+            "options": [ "Move the day", "Park it" ]
+          }
+        }
+      ],
+      "once_per": [ "entry", "aim" ]
+    }
+  ],
+  "seeds": [
+    {
+      "register": "things",
+      "fields": {
+        "name": "Kiln",
+        "about": "A variable type family, licensed direct",
+        "lane": "earning",
+        "health": "at_risk",
+        "next": "Settle how Kiln is licensed, before the September issue announces it",
+        "progress": 60,
+        "aim": "2026-09-20",
+        "agent": "claude",
+        "revenue": { "amount": 1840000, "currency": "GBP" },
+        "earned_before": { "amount": 1412000, "currency": "GBP" },
+        "since": "2024-03-11",
+        "mark": "◆",
+        "hue": 214,
+        "note": "```chips\n● | 3 | cuts\n● | 2 | clients | good\n● | 1 | open question | warn\n```\n\n# Kiln\n\nEarning · a variable type family, licensed direct. {{money:1840000 GBP}} in the last twelve months, and\nearning since March 2024.\n\n## 1 · Where the money comes from\n\n```bar | Revenue by channel, twelve months\nDirect licences | 11200 | 61%\nStudio deals | 5300 | 29%\nSpecimen prints | 1900 | 10%\nUnattributed | 3400 | | hole\n```\n\nDirect licensing carries it, and that is the thing to protect. The unattributed row is not a\nchannel: it is three months of payouts that arrived before the reference field existed, and it\nsits outside the scale because a hole that sets the bar makes every real category a stub.\n\n## 2 · The licensing question\n\n```spec | What each model costs to run\nPer seat | Honour system | every foundry does this\nPer product | One number per shipped thing | needs a definition of \"shipped\"\nFlat studio | One price, no counting | hardest to raise later\n```\n\nOpen as SG31 and it blocks two quotes. The September issue announces whichever wins, so it is not\ndeferrable past {{date:2026-09-20}}.\n\n## 3 · What is on the roadmap\n\n```steps | Next three\nVariable axis QA | the new cut, all weights | doing\nSpecimen page | one screen, no marketing | open\nLicence generator | reads the tier, emits the PDF | blocked\n```\n\n## 4 · The estate underneath it\n\n```spec | Domains and hosting\nkiln.example | renews {{until:2026-09-15}} | the apex\nkilnfonts.example | lapsing {verified: renewal email, 8 Aug} | auto-renew is off\nObject storage | {{money:4100 GBP}} a month | the binaries\n```\n\n```note | Watch this | warn\n`kilnfonts.example` is the redirect every old licence PDF points at. Letting it lapse breaks\nlinks in files that have already been delivered, which is not a thing an apology fixes. Tracked\nas {{ref:tasks#3}}.\n```\n\n## What is not verified\n\n- The 61% direct share {estimate}; it excludes the unattributed rows above.\n- Whether studio deals renew at all {unknown}\n\n## Log\n\n```timeline | Recent\n{{ago:2026-08-14}} | Raised the studio tier | first increase since launch | good\n{{ago:2026-07-02}} | Shipped the italic | four weights | good\n{{ago:2026-05-19}} | Moved off the old CI | Hobnail cancelled\n```\n\nSettled by research. Do not run it again: the domain host comparison is D41.\n\n```stat | This block is wrong on purpose\nToo | many | cells | for | a | stat | row\n```",
+        "repos": [ "https://git.kiln.example/type/kiln-type.git", "git@git.kiln.example:type/kiln-site.git" ],
+        "folders": [ "/Users/studio/Code/kiln-type", "/Users/studio/Code/kiln-site" ],
+        "domains": [ "kiln.example", "kilnfonts.example" ]
+      }
+    }
+  ]
+}

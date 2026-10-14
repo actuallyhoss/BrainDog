@@ -27,6 +27,7 @@ import {
   SLASH_KEY_GONE,
   SLASH_KEY_LABEL,
   SlashKeyClosedError,
+  endpointInference,
   slashFromEnv as fromEnv,
   slashGuardedEngine,
   slashInferenceOf,
@@ -43,24 +44,97 @@ import {
   type SlashHostDeps,
 } from '@braindog/host/slash';
 import { slashAskDoor, type SlashAskDoor, type SlashRecordMeter } from '@braindog/host';
+import { routeFor, type Candidate, type RouteFacts } from '@braindog/host/infer';
 import type { ModelJobInference, SlashAnswer } from '@braindog/host/slash-answers';
 import { understandingOver } from '@braindog/host/understand';
 import type { ModelJobEmbed, ModelJobEmbeddings } from '@braindog/host/model-jobs';
 import { no, ok, type Clock, type Refusal, type Result, type Sql } from '@braindog/ports';
 import type { CallContext, RecordApi, SlashModel } from '@braindog/record';
-import type { Slash } from '@braindog/slash';
+import type { Slash, SlashCandidate, SlashRoute } from '@braindog/slash';
 
 import { keyOpener } from './actions.ts';
 import type { KeyStore } from './keys.ts';
 
 export { SLASH_KEY_LABEL };
 
+/** A second endpoint the operator named, asked when this host's own model does not answer (ENG-A06, ENG-A07). */
+export type SlashFallback = { url: string; model: string; key: string };
+
 export type SlashConfig = SlashHostConfig & {
   send?: ((input: URL, init: RequestInit) => Promise<Response>) | undefined;
+  fallback?: SlashFallback | undefined;
 };
 
-/** `SLASH_ENDPOINT`, `SLASH_MODEL`, `SLASH_KEY`, `SLASH_EMBED_MODEL`, `SLASH_EMBED_ENDPOINT`, or nothing. */
-export const slashFromEnv = (env: Record<string, string | undefined>): SlashConfig | undefined => fromEnv(env);
+const FALLBACK_VARS = ['SLASH_FALLBACK_ENDPOINT', 'SLASH_FALLBACK_MODEL', 'SLASH_FALLBACK_KEY'] as const;
+
+/**
+ * `SLASH_FALLBACK_ENDPOINT`, `SLASH_FALLBACK_MODEL` and `SLASH_FALLBACK_KEY`, all three or nothing.
+ *
+ * PART OF ONE IS NONE OF IT, SAID ONCE: a second endpoint with no key, or no model, would be asked and refuse every time
+ * the first failed, so it is left off and `log` is told which variable is missing. The line names variables and never a
+ * value, because one of the three is a key. An address that is not http or https is left off the same way, rather than
+ * refused at boot as `SLASH_ENDPOINT` is: the second endpoint is the operator's spare, and a typo in it must not stop the
+ * first from answering.
+ */
+function fallbackFromEnv(env: Record<string, string | undefined>, log: (line: string) => void): SlashFallback | undefined {
+  const set = (name: (typeof FALLBACK_VARS)[number]): boolean => typeof env[name] === 'string' && env[name].trim() !== '';
+  const missing = FALLBACK_VARS.filter((name) => !set(name));
+  if (missing.length === FALLBACK_VARS.length) return undefined;
+  if (missing.length > 0) {
+    log(`Slash's second endpoint is not used: ${missing.join(' and ')} ${missing.length === 1 ? 'is' : 'are'} not set, and it needs all three.`);
+    return undefined;
+  }
+  const url = env.SLASH_FALLBACK_ENDPOINT!.trim();
+  let protocol = '';
+  try {
+    protocol = new URL(url).protocol;
+  } catch {
+    /* read as not http below */
+  }
+  if (protocol !== 'http:' && protocol !== 'https:') {
+    log("Slash's second endpoint is not used: SLASH_FALLBACK_ENDPOINT is not an http or https address.");
+    return undefined;
+  }
+  return { url, model: env.SLASH_FALLBACK_MODEL!.trim(), key: env.SLASH_FALLBACK_KEY! };
+}
+
+/**
+ * `SLASH_ENDPOINT`, `SLASH_MODEL`, `SLASH_KEY`, `SLASH_EMBED_MODEL`, `SLASH_EMBED_ENDPOINT`, the second endpoint's three, or
+ * nothing. With no `SLASH_ENDPOINT` the second is not read either: a spare for a model this host does not have is no model.
+ */
+export const slashFromEnv = (
+  env: Record<string, string | undefined>,
+  log: (line: string) => void = (line) => console.warn(line),
+): SlashConfig | undefined => {
+  const config = fromEnv(env);
+  if (config === undefined) return undefined;
+  const fallback = fallbackFromEnv(env, log);
+  return fallback === undefined ? config : { ...config, fallback };
+};
+
+/** The handles the route writes on a ledger row's `candidate`, never shown to a person. */
+const ENDPOINT_ID = 'endpoint';
+const FALLBACK_ID = 'fallback';
+
+/**
+ * The model the package's templates ask for, sent to this host's endpoint as it is where `SLASH_MODEL` names none, which
+ * is what `endpointInference`'s `modelSent` does with it today; with `SLASH_MODEL` set, that name is the candidate's.
+ */
+const TEMPLATE_MODEL = 'glm-5.3-flash';
+
+/**
+ * What the router knows on this host (`@braindog/host/infer` `RouteFacts`), or nothing where no endpoint is configured.
+ *
+ * A SELF-HOST'S ROUTE IS ITS ENDPOINT, THEN ITS SECOND ENDPOINT WHERE ALL THREE OF ITS VARIABLES ARE SET, and nothing
+ * else: no larger model and no machine of his, so both switches are off. `routeFor` closes up the place of an absent one.
+ */
+export function selfhostFacts(config: SlashConfig | undefined): RouteFacts | undefined {
+  if (!config) return undefined;
+  const endpoint: Candidate = { id: ENDPOINT_ID, model: config.model ?? TEMPLATE_MODEL, tier: 'byo', source: 'included' };
+  const fallback: Candidate | undefined =
+    config.fallback === undefined ? undefined : { id: FALLBACK_ID, model: config.fallback.model, tier: 'byo', source: 'included' };
+  return { form: 'selfhost', models: { endpoint, ...(fallback ? { fallback } : {}) }, large: false, machine: false };
+}
 
 /**
  * The deps every port here is built from. Written once because the key discipline is the part that must not be copied.
@@ -75,6 +149,16 @@ const wireOf = (config: SlashConfig, api: () => RecordApi, store: KeyStore | und
   openKey: (grant: { id: string; label: string }) => keyOpener(api(), store, actor)(grant),
   send: config.send ?? ((input: URL, init: RequestInit) => fetch(input, init)),
 });
+
+/**
+ * The model name the owner typed under Included on this host, kept on tier a (ENG-A07), or `null` where none is kept, so
+ * the record names the model it is asked by and not the endpoint's default. Read on each ask, as the own key is.
+ */
+const typedModelOf = (sql: Sql): string | null => {
+  if (sql.one("SELECT 1 AS n FROM sqlite_master WHERE type = 'table' AND name = 'slash_settings'") === undefined) return null;
+  const row = sql.one<{ tier: string; model: string | null }>('SELECT tier, model FROM slash_settings WHERE singleton = 1');
+  return row?.tier === 'a' && typeof row.model === 'string' && row.model.trim() !== '' ? row.model.trim() : null;
+};
 
 /**
  * The model the record is handed, or `undefined`. An address that is not http or https is refused at boot, loudly.
@@ -104,7 +188,8 @@ export function slashModelFor(
   return {
     /* READ ON EACH ASK AS THE REST IS, because the record names who drafted by it. */
     get name() {
-      return slashOwnKeyOf(slash()) === null ? endpoint.name : 'your key';
+      if (slashOwnKeyOf(slash()) !== null) return 'your key';
+      return typedModelOf(slash()) ?? endpoint.name;
     },
     draft: async (input) => chosen().draft(input),
     form: async (input) => {
@@ -148,6 +233,41 @@ export type SlashEngineDeps = {
 };
 
 /**
+ * The route `createSlash` walks on this host (ENG-A06): `routeFor` over `selfhostFacts`, as the package's candidates.
+ *
+ * "RULES ARE THE FALLBACK, NOT THE ENGINE" (D35.43). When this host's endpoint does not answer, the ask goes to the second
+ * endpoint before Slash's rules speak. The first candidate carries no `inference`, so it is asked on the adapter the caller
+ * handed in, which is this host's endpoint as it always was; the second carries its own, on the same wire (`wireOf`'s
+ * `send`) with the operator's `SLASH_FALLBACK_KEY`. It opens no vault key, so no `grant.read` is signed for it.
+ *
+ * NEVER ON HIS OWN KEY. A question he sent to the provider he picked is not sent on to the operator's spare because his
+ * provider was slow: with his key chosen the route is empty and the core asks as before. The core holds the same rule on
+ * its own (tier `b` walks nothing), and this is read on each ask, so a key he picks or lets go counts on the next one.
+ */
+function slashRouteOf(config: SlashConfig, wire: SlashHostDeps, sql: Sql): SlashRoute | undefined {
+  const facts = selfhostFacts(config);
+  if (facts === undefined) return undefined;
+  const second = config.fallback;
+  const fallback =
+    second === undefined
+      ? undefined
+      : endpointInference({
+          url: second.url,
+          model: second.model,
+          key: async () => second.key,
+          send: wire.send,
+          name: FALLBACK_ID,
+          keyName: "this host's SLASH_FALLBACK_KEY",
+        });
+  return (purpose) => {
+    if (slashOwnKeyOf(sql) !== null) return [];
+    return routeFor(purpose, facts).candidates.map(
+      (c): SlashCandidate => (c.id === FALLBACK_ID && fallback !== undefined ? { id: c.id, model: c.model, inference: fallback } : { id: c.id, model: c.model }),
+    );
+  };
+}
+
+/**
  * `@braindog/slash` over this host's endpoint and this record's guarded reads, or nothing at all.
  *
  * THE IMPORT IS DYNAMIC AND THE REFUSAL COMES FIRST, in that order, which is the whole of `46 §5.1`: a self-host with no
@@ -165,13 +285,18 @@ export async function slashEngineFor(
   deps: SlashEngineDeps,
 ): Promise<Slash | undefined> {
   if (!config) return undefined;
-  const inference = slashInferenceOf(config, wireOf(config, api, store));
+  const wire = wireOf(config, api, store);
+  const inference = slashInferenceOf(config, wire);
   if (inference === undefined) return undefined;
   const { createSlash } = await import('@braindog/slash');
+  const route = slashRouteOf(config, wire, deps.sql);
   /* NAMED BY THIS HOST, because on tier `a` the package can only say `glm-5.3-flash` and what answers is `SLASH_MODEL`.
      Every door this engine is handed to reads the one `status()`. On his own key
      the name is the one he typed, and the wrap leaves it. */
-  const engine = slashNamedEngine(createSlash({ sql: deps.sql, clock: deps.clock, inference, record: slashRecord(api()) }), slashModelNameOf(config));
+  const engine = slashNamedEngine(
+    createSlash({ sql: deps.sql, clock: deps.clock, inference, record: slashRecord(api()) }, route === undefined ? {} : { route }),
+    slashModelNameOf(config),
+  );
   /* GUARDED BY THIS HOST, because `byo`'s asks are on this host's endpoint and the package meters tier `a` alone, and
      because `configure` checks a grant id's shape and never the vault (`slashGuardedEngine`). */
   return slashGuardedEngine(engine, { sql: deps.sql, clock: deps.clock, grants: () => api().kernel.grants() });
@@ -281,7 +406,7 @@ export function slashModelJobs(
     return slash;
   };
   return {
-    draft: async (samples) => (await engine()).draftPattern(samples),
+    draft: async (samples, waiting) => (await engine()).draftPattern(samples, waiting),
     prose: async (digest) => (await engine()).digestProse(digest),
     /* AND THE INDEX, WHERE THE ENDPOINT EMBEDS (`SLASH_EMBED_MODEL`): one `slash_call` row of kind `embed` a call,
        through the engine's `embedTexts`, so `backgroundMeter` counts it inside the month and its half-kept rule as on

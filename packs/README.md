@@ -128,6 +128,7 @@ Roughly from the simplest to the most involved, each with what it shows you how 
 | `estate` | Domains, hosting, subscriptions, memberships, insurance and bills, and when each one renews. | Parts that wait on what a record holds (`when: { holds }`), settings a figure is held to, and a test that holds the file equal to the module it replaces. |
 | `people` | Clients, contractors and accountants, the organisations they are with, and where each one was seen. | Parts that wait on two lists it does not own (`when: { holds }`), and a test that holds the file equal to the module it replaces on every record BrainDog makes. |
 | `work` | Tasks, the threads of work they belong to, and how each thread is going. | A module's whole file with every cut it can make written as `when: { holds }`, two scripts kept as files beside it, and a test over every mix of the neighbours it reads that says out loud what it cannot say yet. |
+| `portfolio` | What you are building, and the plan for each. | A module's whole file with its one cut written as `when: { holds }`, and a test that holds the file equal to the module on a record with Work and without it. |
 | `worked-numbers` | Numbers worked out from your other numbers every day: a change over a week, a ratio, a share, a sum or a difference. | A daily script that reads another add-on's list and writes into it, with a value laid on that list by `extends`. |
 | `count-cash` | A count of a cash box or an account, kept as a balance check with the difference in the ledger. | A script started by an automation on each new row, writing into another add-on's lists. |
 | `money-watch` | A charge made twice and a payment that repeats, each asked about once, with a flag that switches itself off after three answers in a row that change nothing. | A script that writes a line in its own list, asks about it on the next run, and acts when the answer is written on the line. |
@@ -140,6 +141,7 @@ Roughly from the simplest to the most involved, each with what it shows you how 
 | `live-feed` | Figures polled from a stats address every hour. | The same, as the smallest example of a poll. |
 | `launch-desk` | A desk for launching a thing in parts, with each part's next step, a calendar and a price check. | A whole set of pages and example rows for one use case, built on other add-ons. |
 | `task-tiers` | Four numbers on a task, and its priority worked out with the sum as the reason. | Optional fields laid on another add-on's list by `extends`, and a script that writes two fields its own automation does not watch. |
+| `landlord` | The flats you rent out, each tenancy's rent, deposit and end day, the rent that came in and the repairs. | A use case nobody here runs, as a file only, with figures that hop back through a link (`pointed`) and a page per row in a rail section of its own. |
 
 ## How the packs here reach a record
 

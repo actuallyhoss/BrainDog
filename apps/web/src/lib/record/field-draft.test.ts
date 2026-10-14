@@ -136,6 +136,37 @@ test('every type the record has is editable but a secret', () => {
   assert.deepEqual(not, ['secret']);
 });
 
+test("a run's own facts have no box on the list of runs, and the same field elsewhere is a person's", () => {
+  /* THE LIST OF RUNS OFFERED A PERSON ITS PLUMBING: a box for the folder an agent worked in, its commit and its
+     machine, which are what the run reported and how its agent's next write finds it. */
+  const cwd: FieldDecl = { id: 'cwd', type: 'text' };
+  assert.equal(draft.editable(cwd, 'session'), false);
+  assert.equal(draft.editable({ id: 'head', type: 'text' }, 'session'), false);
+  assert.equal(draft.editable(cwd, 'errands'), true, 'a field called cwd on another list is that list\'s own');
+  /* WHAT A RUN IS DOING STAYS A PERSON'S, which is its title and what making a run by hand for an agent writes. */
+  assert.equal(draft.editable({ id: 'doing', type: 'text' }, 'session'), true);
+  assert.equal(draft.editable({ id: 'next', type: 'text' }, 'session'), true);
+  /* AND A TYPE-ONLY QUESTION, with no list named, still answers for the type alone. */
+  assert.equal(draft.editable(cwd), true);
+  assert.equal(draft.runFact(cwd, 'session'), true);
+  assert.equal(copy.cellNotEdited('Cwd', draft.runFactWhy), 'Cwd is what the run reported about itself, so it cannot be changed here.');
+});
+
+test("the app's list of a run's facts is the kernel's", async () => {
+  /* THE APP DOES NOT LOAD THE KERNEL AT RUN TIME, so it keeps the list as a literal; the test reads the kernel's own. */
+  const kernel = await import('@braindog/kernel');
+  assert.deepEqual([...draft.RUN_FACTS], [...kernel.RUN_FACTS]);
+});
+
+test('every screen that asks which fields it edits names the list it is on', () => {
+  /* A CALL WITHOUT THE LIST answers for the type alone, which is the box the folder of a run came back in. */
+  for (const [name, text] of [['the list page', GRID], ['the row page', ROW]] as const) {
+    const bare = [...text.matchAll(/\beditable\(([^()]*)\)/gu)].filter((m) => !/,\s*id\s*$/u.test(m[1] ?? ''));
+    assert.deepEqual(bare.map((m) => m[0]), [], `${name} asks editable without its list`);
+    assert.ok(!/\.(filter|find)\(editable\)/u.test(text), `${name} hands editable a position for a list`);
+  }
+});
+
 test('a file opens as its value written out, and goes back as the object the record stores', () => {
   const f = { id: 'receipt', type: 'file' } as unknown as FieldDecl;
   const held = { sha256: 'a'.repeat(64), mime: 'image/png', bytes: 1200, name: 'receipt.png' };

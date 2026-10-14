@@ -23,8 +23,11 @@ export type Area = 'main' | 'rail';
  */
 export type Slot = { i: number; span: number; area?: Area };
 
-/** 12 · 6 · 4 — full, half, third. 21 §3.1's steps, and Home Assistant's multiplier of 3. */
-export const STEPS = [12, 6, 4] as const;
+/**
+ * 12 · 8 · 6 · 4 · 3: the whole row, two thirds, a half, a third and a quarter. The board's own widths (DIRECTION §39,
+ * `layout.ts` `TILE_SPANS`), so a width offered is a width the board draws rather than one it snaps to a neighbour.
+ */
+export const STEPS = [12, 8, 6, 4, 3] as const;
 
 export const COLUMNS = 12;
 
@@ -123,14 +126,15 @@ export const stepsFor = (kind: string, columns = 0): number[] => {
 };
 
 /**
- * `Full · Half · Third`, and the raw fraction for anything else.
+ * `Whole · Two thirds · Half · Third · Quarter`, and the raw fraction for anything else.
  *
  * Precise is INFERRED from the value, never stored — 21 §3.1, adopting Home Assistant's trick. No
  * extra state to keep in sync, and a span a pack wrote as 5 shows its own number rather than being
  * rounded to the nearest button.
  */
-export const spanLabel = (span: number): string =>
-  span === 12 ? 'Full' : span === 6 ? 'Half' : span === 4 ? 'Third' : `${span}/12`;
+export const spanLabel = (span: number): string => SPAN_NAMES[span] ?? `${span}/12`;
+
+const SPAN_NAMES: Readonly<Record<number, string>> = { 12: 'Whole', 8: 'Two thirds', 6: 'Half', 4: 'Third', 3: 'Quarter' };
 
 /**
  * The narrowest span a block survives, which for a table is a function of its own column count.

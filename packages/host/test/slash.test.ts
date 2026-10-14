@@ -480,11 +480,11 @@ test('HIS OWN KEY ASKS BOTH PASSES WITH THE KEY HE PICKED AND THE MODEL HE TYPED
      `authorization` at all is, to a provider, an anonymous call on the owner's account. */
   const sent = net.sent.length;
   const shut = slashOwnInference(OWN, { ...deps, openKey: async () => null })!;
-  await assert.rejects(shut.complete(ask('gpt-4o-mini')), /would not open/u);
+  await assert.rejects(shut.complete(ask('gpt-4o-mini')), /did not open/u);
   let vault = VAULT;
   const revoking = slashOwnInference(OWN, { ...deps, grants: () => vault })!;
   vault = VAULT.map((g) => (g.id === OWN_GRANT ? { ...g, revoked_at: '2026-09-22T09:00:00.000Z' } : g));
-  await assert.rejects(revoking.complete(ask('gpt-4o-mini')), /would not open/u);
+  await assert.rejects(revoking.complete(ask('gpt-4o-mini')), /did not open/u);
   assert.equal(net.sent.length, sent);
 
   sql.close();

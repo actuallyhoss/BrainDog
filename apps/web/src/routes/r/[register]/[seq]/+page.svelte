@@ -331,7 +331,7 @@
   function editTitle() {
     if (!live) return;
     const fields = readableFields(id);
-    const f = fields.find((x) => x.id === decl?.title) ?? fields.find(editable);
+    const f = fields.find((x) => x.id === decl?.title && editable(x, id)) ?? fields.find((x) => editable(x, id));
     if (f) startEdit(f);
   }
 
@@ -719,7 +719,7 @@
   );
   /* WHAT "Add a field" OFFERS: every field the row has not answered that this reader can write, prose included. */
   const addable = $derived(
-    changes ? [...unsetFields, ...documents.filter((f) => !writtenDocuments.includes(f)), ...knownElsewhere, ...saidAbove].filter(editable) : [],
+    changes ? [...unsetFields, ...documents.filter((f) => !writtenDocuments.includes(f)), ...knownElsewhere, ...saidAbove].filter((f) => editable(f, id)) : [],
   );
   /* WHAT THE RECORD KEEPS ABOUT WHO SOMEBODY IS, AND NOBODY TYPES: where they were met, the row they were merged into,
      and whether they are the person whose record it is. None is offered as a chip to fill in. */
@@ -843,7 +843,7 @@
   function fillHere(path: string): boolean {
     const head = path.trim().split('.')[0] ?? '';
     const f = readable.find((x) => x.id === head);
-    if (!f || !row || !changes || !editable(f)) return false;
+    if (!f || !row || !changes || !editable(f, id)) return false;
     startEdit(f);
     return true;
   }
@@ -1061,7 +1061,7 @@
       </dd>
       <!-- THE PENCIL IS ITS OWN CELL IN THE TRAILING COLUMN, so every pencil on the page shares one edge whatever the
            value beside it holds. A `dd`, because a `dl`'s groups hold nothing else. -->
-      {#if changes && editable(f) && editing !== f.id}
+      {#if changes && editable(f, id) && editing !== f.id}
         <dd class="fact-pencil">{@render pencil(f)}</dd>
       {/if}
     </div>
@@ -1168,7 +1168,7 @@
               {:else}
                 <div class="figure-line">
                   <p class="figure-value num"><Money minor={figure} currency={currencyOf(row.fields[figureField.id]) ?? ''} weight="strong" /></p>
-                  {#if changes && editable(figureField)}{@render pencil(figureField)}{/if}
+                  {#if changes && editable(figureField, id)}{@render pencil(figureField)}{/if}
                 </div>
               {/if}
             </div>
@@ -1187,7 +1187,7 @@
                     <div class="fact">
                       <dt class="fact-label">{k.label}</dt>
                       <dd class="fact-value" dir="auto">{k.value}</dd>
-                      {#if i === 0 && changes && editable(g.field)}<dd class="fact-pencil">{@render pencil(g.field)}</dd>{/if}
+                      {#if i === 0 && changes && editable(g.field, id)}<dd class="fact-pencil">{@render pencil(g.field)}</dd>{/if}
                     </div>
                   {/each}
                 {/if}

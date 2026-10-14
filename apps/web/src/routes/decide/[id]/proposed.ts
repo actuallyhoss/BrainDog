@@ -20,7 +20,8 @@ import { copy } from '../../../lib/copy.ts';
 import { pathOf, sayCondition, sayStep, sayTrigger, triggerOfBody, verbOf, words as canvas } from '../../../lib/flow/flow.ts';
 import { kindLines, kindWords } from '../../../lib/record/jobs.ts';
 import { readBoot } from '../../../lib/record/boot-live.ts';
-import { blockOf, type Fetch, type LiveBlock, type LivePageDecl, type Opened } from '../../../lib/record/page-live.ts';
+import { blockKeys } from '../../../lib/page/recompose.ts';
+import { blockOf, lookOf, type Fetch, type LiveBlock, type LiveLook, type LivePageDecl, type Opened } from '../../../lib/record/page-live.ts';
 import { learn, refMapOf, targetsOf, type RecordRow, type RefMap, type SchemaCall } from '../../../lib/record/remote.ts';
 import { builderPath } from '../../../lib/pattern/draft.ts';
 
@@ -309,7 +310,19 @@ export const words = {
   drawnHead: 'As it would look now',
   /** The group's name for a screen reader, which hears the drawing apart from the lines above it. */
   drawn: (title: string) => `${title}, as it would look now`,
+  /** Over the drawing of a page he pinned, when the change would move blocks he pinned in place. */
+  pinned: (page: string, names: readonly string[]) => `You pinned ${page}. This would move ${and(names)} out of place.`,
+  /** And when it would take one off the page: dropped, hidden, or put in its place under another name. */
+  pinnedDropped: (page: string, names: readonly string[]) => `You pinned ${page}. This would take ${and(names)} off the page.`,
+  /** Both at once, in one line. */
+  pinnedBoth: (page: string, moved: readonly string[], dropped: readonly string[]) =>
+    `You pinned ${page}. This would move ${and(moved)} out of place and take ${and(dropped)} off the page.`,
 } as const;
+
+/** Names as a person lists them: "A", "A and B", "A, B and C". */
+function and(names: readonly string[]): string {
+  return names.length < 2 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)!}`;
+}
 
 /** A page the reader draws, with nothing missing: what `PageView` takes as `got`. */
 export type LiveOpened = Extract<Opened, { from: 'live' }>;
@@ -323,15 +336,71 @@ export type Drawn = { from: 'live'; now: number; blocks: LiveBlock[] } | { from:
 /**
  * One page the whole change draws, as `PageView mode="preview"` takes it: `got` is the page as the change would make it,
  * and `was` the page as it stands now, `null` for a page the change makes new. `id` is its declaration's, which is how
- * the screen puts the drawing under the lines that name it.
+ * the screen puts the drawing under the lines that name it. `look` is how the page stands arranged now, for a page the
+ * change replaces, which is where his pins are read from (`pinnedTouched`); `null` where the record answered none.
  */
-export type Tried = { id: string; slug: string; got: LiveOpened; was: LiveBlock[] | null };
+export type Tried = { id: string; slug: string; got: LiveOpened; was: LiveBlock[] | null; look?: LiveLook | null };
 
 /**
  * The whole change as the record rehearsed it: `live` with every page it draws, `refused` with the record's sentence
  * for a change it would not install, or `none` from a host without `previewChange`, which falls back to `drawnOf`.
  */
 export type Rehearsed = { from: 'live'; pages: Tried[] } | { from: 'refused'; fix: string } | { from: 'none' };
+
+/** The blocks he pinned that a change would unpin: `blocks` moved out of place, `dropped` taken off the page, by name. */
+export type Touched = { page: string; blocks: string[]; dropped: string[] };
+
+/** Where each drawn block stands, by its key: its column, its place among the drawn blocks in that column, its name. */
+function placesOf(blocks: readonly LiveBlock[]): Map<string, { area: string; at: number; name: string }> {
+  const keys = blockKeys(blocks);
+  const count = new Map<string, number>();
+  const out = new Map<string, { area: string; at: number; name: string }>();
+  blocks.forEach((b, i) => {
+    if (b.drawn === false) return;
+    const area = (b as { area?: unknown }).area === 'rail' ? 'rail' : 'main';
+    const at = count.get(area) ?? 0;
+    count.set(area, at + 1);
+    out.set(keys[i]!, { area, at, name: text(b.heading) || text((b as { title?: unknown }).title) || copy.valueWord(b.kind) });
+  });
+  return out;
+}
+
+/**
+ * THE BLOCKS HE PINNED THAT ACCEPTING WOULD UNPIN, or `null` when the page has no pin of his or the change leaves them be.
+ *
+ * HIS PINS ALWAYS WIN (§38), but only over the engine: `applyLook` never moves, hides or leads past a pinned block for
+ * a look the rules or Slash wrote, while a change to the page itself is his to accept, and it lands as written. So a
+ * proposal that would swap two of his pinned blocks read like any other, and one press undid what he pinned. Only his
+ * own look counts (`by: 'owner'`, which is what a look carrying his pins is once `mergeLook` lays the engine's under
+ * it): a block Slash holds in place is Slash's arrangement, and a change to it says nothing.
+ *
+ * READ FROM WHAT THE RECORD REHEARSED, `was` against `got`, by key and by place, so the words say what accepting would
+ * really do once the record lays his look over the new page, not what the declaration's order alone suggests. A block
+ * whose key is gone, or that the new page hides, is taken off the page; one that stands in another place or column is
+ * moved out of place. A block added after his pinned ones moves none of them, and is not named.
+ */
+export function pinnedTouched(tried: Tried): Touched | null {
+  const look = tried.look;
+  if (!look || look.by !== 'owner' || look.pinned.length === 0 || tried.was === null) return null;
+  const pins = new Set(look.pinned);
+  const got = placesOf(tried.got.page.blocks);
+  const blocks: string[] = [];
+  const dropped: string[] = [];
+  for (const [key, was] of placesOf(tried.was)) {
+    if (!pins.has(key)) continue;
+    const now = got.get(key);
+    if (!now) dropped.push(was.name);
+    else if (now.area !== was.area || now.at !== was.at) blocks.push(was.name);
+  }
+  if (blocks.length === 0 && dropped.length === 0) return null;
+  return { page: tried.got.page.page.title, blocks: [...new Set(blocks)], dropped: [...new Set(dropped)] };
+}
+
+/** The one line said over a page whose pins a change would undo. */
+export function pinnedLine(t: Touched): string {
+  if (t.blocks.length && t.dropped.length) return words.pinnedBoth(t.page, t.blocks, t.dropped);
+  return t.blocks.length ? words.pinned(t.page, t.blocks) : words.pinnedDropped(t.page, t.dropped);
+}
 
 /** A refusal that says the host has no such method, or no record here, rather than anything about this page. */
 const UNSERVED = new Set(['ROUTE_UNKNOWN', 'NOT_IN_THIS_BUILD', 'UNREACHABLE', 'UNAUTHORIZED']);
@@ -452,6 +521,19 @@ export async function previewOf(change: Row, base: string, io?: Fetch): Promise<
   const now = Date.now();
   const runs = pages.flatMap((p) => [(Array.isArray(p.blocks) ? p.blocks : []) as Answered[], (Array.isArray(p.was) ? p.was : []) as Answered[]]);
   const live = await liveOf(client, runs, now, declaredLists(change.to), { base, ...(io ? { io } : {}) });
+  /* HOW EACH PAGE IT REPLACES STANDS ARRANGED NOW, for his pins. `previewChange` answers blocks and not the look, so the
+     page is read as it opens; a record that answers `look` beside a page is taken at its word, and a page that cannot be
+     read has no look, which says nothing rather than guessing at a pin. */
+  const looks = await Promise.all(
+    pages.map((p) => {
+      if (!Array.isArray(p.was)) return null;
+      if ('look' in p) return lookOf(p.look);
+      return client
+        .page(text(p.slug))
+        .then((r) => (r.ok && isRow(r.value) ? lookOf(r.value.look) : null))
+        .catch(() => null);
+    }),
+  );
   return {
     from: 'live',
     pages: pages.map((p, i) => {
@@ -462,6 +544,7 @@ export async function previewOf(change: Row, base: string, io?: Fetch): Promise<
         got: openedOf(p, slug, text(p.title) || named(slug), live[i * 2] ?? [], now),
         /* NO `was` IS NOT AN EMPTY ONE: a new page has nothing to be held against, and draws no switch. */
         was: Array.isArray(p.was) ? (live[i * 2 + 1] ?? []) : null,
+        look: looks[i] ?? null,
       };
     }),
   };

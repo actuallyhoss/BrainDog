@@ -63,13 +63,16 @@
   import type { IconName } from '../ui/Icon.svelte';
   import Result from './Result.svelte';
   import { listName } from '../record/names.ts';
-  import { commands, type Act, type Creation } from './admit.ts';
-  import { addRow, creation, offered, words as createWords } from './create.ts';
+  import { commands, ranked, type Act, type Creation } from './admit.ts';
+  import { addRow, creation, homeCapture, offered, plainAdd, words as createWords, type Into, type Plain } from './create.ts';
+  import { tokensOf as lineTokens, untoken, type Chip } from './tokens.ts';
+  import { homeSlugOf, labels as heardLabels, relabel, singularOf } from '../voice.ts';
+  import type { Shell } from '../record/boot-live.ts';
   import { customise, type Change, type Look, type Place } from './customise.ts';
   import { FILL, asked as pageAsked, maker as pageMaker, paging, pressed as pagePressed, rowTitle as pageRow, whoOf, type Paging } from './new-page.ts';
   import { apply as applyChange, keptNow, lookNow, pageMenu } from './customise-apply.ts';
   import { navPrefs } from '../nav-prefs.svelte.ts';
-  import { said as voiced } from '../voice.svelte.ts';
+  import { homePage, said as voiced } from '../voice.svelte.ts';
   import { spineOf, type SpineCounts } from '../spine.ts';
   import type { List, Recent } from '../record/palette.ts';
   import type { Hits, Reader } from '../record/palette-live.ts';
@@ -82,7 +85,7 @@
   import Cited from '../ui/Cited.svelte';
   import SlashOut from '$lib/ui/SlashOut.svelte';
   import DecisionCard from '$lib/decide/DecisionCard.svelte';
-  import type { About, SlashStatus } from '@braindog/client';
+  import type { About, Reading, SlashStatus } from '@braindog/client';
 
   let { open = $bindable(false), nav }: { open?: boolean; nav: NavEntry[] } = $props();
 
@@ -122,6 +125,8 @@
     change?: Change | undefined;
     /** The page the new page row makes or suggests (`new-page.ts`). Only that row carries it. */
     paging?: Paging | undefined;
+    /** Set on the row a plain line makes (EXP-D13), which is ranked after every match. */
+    plain?: true | undefined;
   };
 
   let el = $state<HTMLDialogElement>();
@@ -173,7 +178,7 @@
    */
   /** Pass 2 under the rows: `null` while it is being written, then the proposal or the refusal, never both. */
   type Second = { drawn: DrawnProposal | null; refused: { fix: string; without: string | null; spent?: boolean } | null };
-  let slash = $state<{ q: string; question: string; drawn: Drawn | null; fix: string | null; second: Second | null } | null>(null);
+  let slash = $state<{ q: string; question: string; drawn: Drawn | null; fix: string | null; second: Second | null; reading?: Reading | null } | null>(null);
   const slashShown = $derived(slash !== null && slash.q === q ? slash : null);
   const unreached = (e: unknown) => ({ ok: false as const, refusal: { code: 'UNREACHABLE', fix: e instanceof Error ? e.message : String(e) } });
   /* THE RECORD ON SCREEN, AT ITS OWN BASE. `page.url.origin` asked `/api/slash/*` at the bare host, which on the Cloud is
@@ -206,7 +211,7 @@
       /* THE ASK ID GOES BACK WITH PASS 2, so the engine re-runs the predicate it already drafted instead of asking the model
          for a second one, which would be a second draft and a second ask for the same question. */
       const more = secondPass(out.value);
-      slash = { q: asked, question, drawn: drawReading(out.value), fix: null, second: more ? { drawn: null, refused: null } : null };
+      slash = { q: asked, question, drawn: drawReading(out.value), fix: null, second: more ? { drawn: null, refused: null } : null, reading: out.value };
       if (!more) return;
       slashPropose.ask({ question, askId: out.value.ask_id }, (said) => {
         if (slash?.q !== asked || slash.second === null) return;
@@ -277,6 +282,45 @@
      or where no record answered. */
   const addLists = $derived(isLive ? offered(shell) : []);
   const addNamed = $derived(new Map(addLists.map((l) => [l.id, l.name])));
+
+  /**
+   * THE LIST A PLAIN LINE GOES INTO (EXP-D13): the one the record's Home page captures into, its first `capture` block.
+   * The Home page is the one `Home.svelte` draws: the speaking use case's or the record's own `home` page, read from the
+   * record, else Today's body built from what the shell says the record holds. Never a list named here, so a record
+   * whose Home captures into Orders is offered "Add as an order", and one whose Home has no capture is offered nothing.
+   * Read once for each record and Home the palette opens on, and only where somebody may add to it (`offered`).
+   */
+  let intoId = $state<string | null>(null);
+  let intoFor = '';
+  const into = $derived.by<Into | null>(() => {
+    const name = intoId === null ? undefined : addNamed.get(intoId);
+    if (intoId === null || name === undefined) return null;
+    const decl = REGISTERS[intoId];
+    return { register: intoId, name, one: decl ? relabel(decl, heardLabels()).one : singularOf(name) };
+  });
+  async function captureList(slug: string | null): Promise<string | null> {
+    if (slug === null) {
+      if (!shell.lists || !shell.pages || !shell.me) return null;
+      const [{ todayHome }, { holdsOf }] = await Promise.all([import('../home/default-home.ts'), import('../page/home-arrange.ts')]);
+      return homeCapture(todayHome(holdsOf(shell as unknown as Pick<Shell, 'lists' | 'pages' | 'me'>)).blocks);
+    }
+    const { pagesReader } = await import('../record/pages-live.ts');
+    const one = await pagesReader(apiBase(page.url)).readOne(slug);
+    return one.from === 'live' ? homeCapture(one.page.body.blocks) : null;
+  }
+  $effect(() => {
+    if (!open || !isLive) return;
+    const slug = homeSlugOf(homePage(), shell.pages ?? []);
+    const key = `${apiBase(page.url)} ${slug ?? ''} ${addLists.map((l) => l.id).join(',')}`;
+    if (key === intoFor) return;
+    intoFor = key;
+    void captureList(slug).then(
+      (id) => intoFor === key && (intoId = id),
+      () => {
+        if (intoFor === key) (intoFor = ''), (intoId = null);
+      },
+    );
+  });
   /** Who may ask for a page: the owner makes one, anybody else on the record suggests one, and with no record nobody. */
   const pageWho = $derived(whoOf(shell));
 
@@ -472,6 +516,34 @@
     page: parsed.prefix === null || parsed.prefix === '>' ? paging(parsed.text, pageWho) : null,
   });
 
+  /**
+   * THE PLAIN LINE'S ROW (EXP-D13), read with its chips: "call the bank tomorrow" is "call the bank", due tomorrow.
+   *
+   * `held` ARE THE CHIPS TAKEN OUT OF THE FIELD: a `#project`, a `!priority`, an `@name` or an amount leaves the box as a
+   * chip when a space follows it. A day stays in the box until the press, because a day is read only at the end and
+   * "Write the Monday newsletter" keeps its Monday. `given` are the words Backspace gave back, which stay words.
+   */
+  let held = $state<Chip[]>([]);
+  let given = $state<string[]>([]);
+  const plainLine = $derived(
+    parsed.prefix === null && live.creation === null ? plainAdd(held.reduce((line, chip) => untoken(line, chip), parsed.text), into) : null,
+  );
+  const plainRead = $derived.by(() => {
+    const decl = plainLine ? REGISTERS[plainLine.register] : undefined;
+    return decl ? lineTokens(parsed.text, { decl, now: Date.now() }, given) : null;
+  });
+  const plainMade = $derived<Plain | null>(plainLine && plainRead ? { ...plainLine, title: plainRead.text, chips: [...held, ...plainRead.chips] } : null);
+
+  /** A space after a tag takes it out of the field as a chip; the words left are the field. */
+  function oninput() {
+    const read = plainRead;
+    if (!read || !/\s$/u.test(q)) return;
+    const out = read.chips.filter((c) => c.kind !== 'day');
+    if (out.length === 0) return;
+    held = [...held, ...out];
+    q = `${lineTokens(parsed.text, { decl: REGISTERS[plainLine!.register]!, now: Date.now() }, [...given, ...read.chips.filter((c) => c.kind === 'day').map((c) => c.words)]).text} `;
+  }
+
   /** Whether this query is one the record's search answers: `#`, `@` or no prefix, and two characters or more. */
   const searching = $derived((parsed.prefix === null || parsed.prefix === '#' || parsed.prefix === '@') && parsed.text.length > 1);
 
@@ -613,9 +685,9 @@
     // keeps a growing action index from rotting (19 §7).
     if (prefix === null || prefix === '>') {
       /* THE FIFTH RULE IN A SURFACE SAID TO HAVE ONE. `19 §7`'s strict-prefix aliases outrank fuzzy
-         matching, and that is about ORDER rather than about membership, so the exact set is the
-         subset of what `starts()` already admits whose title begins with what was typed, rather than
-         a separate `.toLowerCase().startsWith()` answering a different question.
+         matching, and that is about ORDER rather than about membership: `ranked()` in `admit.ts` scores each
+         command against what was typed (the whole title, its start, every word's start, then an alias) and
+         orders them best first within each group.
 
          `commands(live)` and never `COMMANDS`: the admission rule and the standing rule are both
          applied in there, so no row this file draws can have skipped them. */
@@ -647,10 +719,9 @@
       const pageSaid = pageAsked(text);
       const pageFirst = pageSaid ? pageRowOf(createWords.group) : null;
       if (pageFirst) out.push(pageFirst);
-      const exact = admitted.filter((c) => starts(c.title) && c.title.toLowerCase().startsWith(needle));
-      const rest = admitted.filter((c) => !exact.includes(c) && starts(c.title));
+      const scored = ranked(admitted, needle);
       out.push(
-        ...[...exact, ...rest].map((c) => ({
+        ...scored.map((c) => ({
           id: c.id,
           title: c.title,
           href: c.href,
@@ -841,7 +912,14 @@
      * exist, which is `23 §8`'s absent rather than disabled, and the only way the word Slash reaches this panel.
      */
     const kept = out.slice(0, CAP);
-    const question = offersSlash({ slash: slashHere, prefix, text, pending, places: kept.filter((r) => r.group !== copy.commands).length });
+    /* THE PLAIN LINE'S ROW, LAST, AFTER EVERY MATCH (EXP-D13). It is made out of the query like the sentence's add row,
+       so `commands` is asked for it, which is asking the standing rule. Last, so it is never the row Enter runs while
+       any place or command matched: "Add as a task" on every line would make Enter a way to file stray tasks. With
+       nothing else drawn it is the first row, and Enter adds. It is not a place, so Slash's row may still follow it. */
+    const plainAt = plainMade ? commands({ ...live, creation: plainMade }).find((c) => c.act === 'add') : undefined;
+    if (plainMade && plainAt && into)
+      kept.push({ id: 'c-add-plain', title: createWords.plain(into.one ?? into.name), detail: plainMade.title, href: null, group: createWords.plainGroup, icon: plainAt.icon, act: plainAt.act, creation: plainMade, plain: true });
+    const question = offersSlash({ slash: slashHere, prefix, text, pending, places: kept.filter((r) => r.group !== copy.commands && r.plain !== true).length });
     if (question !== null) kept.push({ id: 'slash', title: copy.askSlash(question), href: null, group: '', icon: 'search', ask: question });
     return kept;
   });
@@ -896,8 +974,10 @@
       if (!out.has(r.group)) out.set(r.group, []);
       out.get(r.group)!.push(r);
     }
-    /* Stable, so two groups of the same rank keep the order `search()` handed them over in. */
-    return [...out].sort((a, b) => rankOf(a[0]) - rankOf(b[0]));
+    /* Stable, so two groups of the same rank keep the order `search()` handed them over in. THE PLAIN LINE'S ROW
+       GOES LAST whatever its heading's rank, since it is offered for any line and outranks nothing typed. */
+    const at = ([group, items]: [string, Row[]]): number => (items.every((r) => r.plain === true) ? Number.MAX_SAFE_INTEGER : rankOf(group));
+    return [...out].sort((a, b) => at(a) - at(b));
   });
 
   const flat = $derived([...groups.flatMap(([, r]) => r), ...(overflow ? [overflow] : [])]);
@@ -968,6 +1048,8 @@
       untrack(() => (opener.seed = ''));
       cursor = 0;
       slash = null;
+      held = [];
+      given = [];
       look = lookNow();
       lookKept = keptNow();
       pageHere = pageMenu() !== null;
@@ -1037,7 +1119,7 @@
    * WITH NO RECORD THE ROW IS NOT OFFERED (`addLists` is empty), where it used to toast that the row "would be added"
    * and nothing was saved. The guard stays for a press that raced a refusal.
    */
-  async function add(c: Creation) {
+  async function add(c: Creation | Plain) {
     const list = addNamed.get(c.register) ?? listName(c.register);
     if (!isLive) return;
     let out: Awaited<ReturnType<typeof addRow>>;
@@ -1048,7 +1130,9 @@
       return void toasts.push(copy.writeNotReached, { intent: 'warn' });
     }
     if (!out.ok) return void toasts.push(out.fix, { intent: 'warn' });
-    const said = createWords.added(list, c.title);
+    /* WHAT THE LINE SAID IS SAID BACK, "due Thu 15 Oct", so the chip under the field is in the receipt too. */
+    const read = 'chips' in c ? c.chips.map((chip) => chip.said) : [];
+    const said = read.length > 0 ? createWords.addedWith(list, c.title, read) : createWords.added(list, c.title);
     const back = out.back;
     toasts.push(out.filled.length > 0 ? `${said} ${copy.captureFilled(out.filled)}` : said, {
       intent: 'good',
@@ -1101,6 +1185,13 @@
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       cursor = Math.max(cursor - 1, filed ? -1 : 0);
+    } else if (e.key === 'Backspace' && held.length > 0 && input?.selectionStart === 0 && input.selectionEnd === 0) {
+      /* BACKSPACE AT THE START OF THE FIELD GIVES THE LAST CHIP BACK AS WORDS, which then stay words. */
+      e.preventDefault();
+      const last = held[held.length - 1]!;
+      held = held.slice(0, -1);
+      given = [...given, last.words];
+      q = untoken(q, last);
     } else if (e.key === 'Enter') {
       e.preventDefault();
       /* ON SLASH'S FILED PROPOSAL, Enter accepts it; where a key may not (money moves), it opens on Decide instead. */
@@ -1170,6 +1261,7 @@
       bind:this={input}
       bind:value={q}
       {onkeydown}
+      {oninput}
       class="p-input"
       type="text"
       role="combobox"
@@ -1202,6 +1294,14 @@
       <Icon name="close" size="m" />
     </button>
   </div>
+  <!-- WHAT THE PLAIN LINE WAS READ AS (EXP-D13): a chip for each, under the field, drawn only while the line makes a row. -->
+  {#if plainMade && plainMade.chips.length > 0}
+    <ul class="p-chips" aria-label={createWords.chips}>
+      {#each plainMade.chips as chip, i (i)}
+        <li class="p-chip" title={chip.said}>{chip.label}</li>
+      {/each}
+    </ul>
+  {/if}
 
   <!--
     THE SCROLLER AND THE LISTBOX ARE TWO ELEMENTS NOW, AND THEY USED TO BE ONE.
@@ -1246,6 +1346,8 @@
         <!-- NO ROW IS NOT NOTHING WHEN A FIGURE WAS READ: pass 2 is asked on that figure (`secondPass`), and a line saying
              nothing answers would sit above the answer it gives. -->
         {#if slashShown.drawn.rows.length === 0 && slashShown.second === null}<p class="p-none">{copy.slashNothing}</p>{/if}
+        <!-- PIN THE ANSWER (PGS-B12), loaded only once there is an answer to pin (`PinTo.svelte`). -->
+        {#if slashShown.reading}{#await import('./PinTo.svelte') then { default: PinTo }}<PinTo reading={slashShown.reading} asked={slashShown.q} proposal={slashShown.second?.drawn?.text ? slashShown.second.drawn : null} />{/await}{/if}
         <!-- PASS 2, UNDER THE ROWS AND NEVER INSTEAD OF THEM (`23 §7`): the rows were drawn by code before any of this was
              written, which is the only reason the budget sentence below can be true. -->
         {#if slashShown.second}
@@ -1485,6 +1587,24 @@
 
   .p-input::placeholder {
     color: var(--dim);
+  }
+
+  /* THE CHIPS A PLAIN LINE WAS READ INTO: rectangles at the control radius, flat on the board's sunk colour. */
+  .p-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    margin: 0;
+    padding: var(--sp-2) var(--sp-4);
+    list-style: none;
+  }
+
+  .p-chip {
+    padding: var(--sp-1) var(--sp-2);
+    border-radius: var(--r-ctl);
+    background: var(--sunk);
+    color: var(--ink);
+    font-size: var(--t-base);
   }
 
   /**

@@ -85,8 +85,11 @@ const nextMonth = (month: string): string => {
   return m === 12 ? `${String(y + 1).padStart(4, '0')}-01` : `${month.slice(0, 4)}-${String(m + 1).padStart(2, '0')}`;
 };
 
-/** One day of a month's grid. A day of the month either side is `inside: false` and holds nothing here. */
-export type CalendarCell<R> = { day: string; num: number; inside: boolean; today: boolean; items: R[]; more: number; count: number };
+/**
+ * One day of a month's grid. A day of the month either side is `inside: false` and holds nothing here. `marked` is the
+ * day the reader came to, a date pressed elsewhere on the record (`?day=`), and only ever a day inside its month.
+ */
+export type CalendarCell<R> = { day: string; num: number; inside: boolean; today: boolean; marked: boolean; items: R[]; more: number; count: number };
 export type CalendarMonth<R> = { month: string; label: string; weeks: CalendarCell<R>[][] };
 /** One day of the agenda: every row on it, in the order they came. */
 export type CalendarDay<R> = { day: string; said: string; today: boolean; items: R[] };
@@ -104,8 +107,11 @@ export type CalendarPlan<R> = {
  *
  * The order of the rows on a day is the order they came in, which is the reader's: the record sorts a block by its
  * `order:`, and a person typing a fence puts first what matters first.
+ *
+ * `mark` is the day a link opened the calendar on (`YYYY-MM-DD`): its cell reads `marked`, and a day outside the months
+ * drawn marks nothing, so the grids are never stretched to reach it.
  */
-export function calendarPlan<R extends { cells: readonly string[] }>(rows: readonly R[], today: string): CalendarPlan<R> {
+export function calendarPlan<R extends { cells: readonly string[] }>(rows: readonly R[], today: string, mark?: string | null): CalendarPlan<R> {
   const byDay = new Map<string, R[]>();
   const skipped: number[] = [];
   rows.forEach((row, i) => {
@@ -125,13 +131,15 @@ export function calendarPlan<R extends { cells: readonly string[] }>(rows: reado
   if (first === undefined || last === undefined) return { months: [], days: [], skipped, empty: true };
 
   const clock = isDay(today) ? today : NO_TODAY;
+  const marking = mark && isDay(mark) ? mark : null;
   const months: CalendarMonth<R>[] = [];
   for (let month = first.slice(0, 7), n = 0; month <= last.slice(0, 7) && n < CALENDAR_MONTHS_MOST; month = nextMonth(month), n++) {
     const grid = monthGrid(month, clock);
     const cells = grid.cells.map((c): CalendarCell<R> => {
       const items = c.inside ? (byDay.get(c.day) ?? []) : [];
       const shown = items.slice(0, DOTS_MOST);
-      return { day: c.day, num: Number(c.day.slice(8, 10)), inside: c.inside, today: c.today, items: shown, more: items.length - shown.length, count: items.length };
+      const marked = c.inside && c.day === marking;
+      return { day: c.day, num: Number(c.day.slice(8, 10)), inside: c.inside, today: c.today, marked, items: shown, more: items.length - shown.length, count: items.length };
     });
     months.push({ month: grid.month, label: grid.label, weeks: Array.from({ length: grid.weeks }, (_, w) => cells.slice(w * 7, w * 7 + 7)) });
   }
@@ -139,3 +147,20 @@ export function calendarPlan<R extends { cells: readonly string[] }>(rows: reado
   const days = keys.map((day) => ({ day, said: calendarSaid(day, today), today: day === today, items: byDay.get(day) ?? [] }));
   return { months, days, skipped, empty: false };
 }
+
+/**
+ * THE DAY A LINK OPENED THE CALENDAR ON: `?day=2026-11-03`, the address a date anywhere on the record writes
+ * (`dayHref` in the app). Only a day the calendar holds is one: `2030-13-01`, `2026-02-30` and words are none, and the
+ * calendar opens unmarked.
+ */
+export const dayParam = (url: URL): string | null => {
+  const day = url.searchParams.get('day')?.trim() ?? '';
+  return isDay(day) ? day : null;
+};
+
+/**
+ * Where a host that cannot reach a block's options hands the day down: a Svelte context under this key, holding a
+ * function that answers the day or null. `Calendar.svelte` reads `opts.day` first. The app's declared page sets it
+ * (`apps/web/src/routes/p/[slug]/+page.svelte`, which spells the key again, as `calendar-day.test.ts` holds).
+ */
+export const CALENDAR_DAY = 'braindog-render.calendar-day';

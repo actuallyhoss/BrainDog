@@ -36,7 +36,24 @@
   import type { LiveLook } from '$lib/record/page-live.ts';
   import AskPage from './AskPage.svelte';
   import { describeAsked, opensDescribe, withoutDescribe } from './change-open.ts';
-  import { bodyOf, historyOf, isPinned, keptHere, lookPage, offerKey, pinBody, retireLook, writeLook } from './look.ts';
+  import {
+    bodyOf,
+    hiddenOf,
+    historyOf,
+    isPinned,
+    keptHere,
+    lookPage,
+    offerKey,
+    pinBody,
+    putBack,
+    putBackSaid,
+    putBackWords,
+    retireLook,
+    showBody,
+    writeLook,
+    type Hidden,
+    type Headed,
+  } from './look.ts';
   import { words as pageWords } from './words.ts';
 
   let {
@@ -49,6 +66,7 @@
     change = true,
     look = null,
     keys = () => [],
+    heads = () => [],
   }: {
     /** The page's address, which the description is about. */
     slug: string;
@@ -68,6 +86,8 @@
     look?: LiveLook | null;
     /** The page's blocks by key, in the order they are drawn now, which Pin this keeps. */
     keys?: () => readonly string[];
+    /** The page's blocks by key with their headings, which Hidden names what the look hides by. */
+    heads?: () => readonly Headed[];
   } = $props();
 
   let open = $state(false);
@@ -136,17 +156,57 @@
            without the headline and next action the engine filled in around their pins (`mergeLook`), or putting it back
            would freeze the engine's line of that moment as theirs. */
         undo: () =>
-          void (
-            was && was.by !== 'rule'
-              ? writeLook(apiBase(), bodyOf(at, was.by === 'owner' ? { ...was, headline: null, next: null } : was))
-              : retireLook(apiBase(), at)
-          ).then(async (back) => {
-            if (!back.ok) toasts.push(back.fix, { intent: 'warn' });
-            await reread();
-          }),
+          void restore(at, was),
       });
     } finally {
       pinning = false;
+    }
+  }
+
+  /** Writes the look as it was before a pin or a Show, or retires it where the rules arranged the page, and reads again. */
+  async function restore(at: string, was: LiveLook | null) {
+    const back = await (was && was.by !== 'rule'
+      ? writeLook(apiBase(), bodyOf(at, was.by === 'owner' ? { ...was, headline: null, next: null } : was))
+      : retireLook(apiBase(), at));
+    if (!back.ok) toasts.push(back.fix, { intent: 'warn' });
+    await reread();
+  }
+
+  /* ── put back and hidden ───────────────────────────────────────────────────
+     PUT BACK IS ONE STEP BACK WHOEVER WROTE THE LOOK, any day after its toast has gone (PGS-B12): named by whose look it
+     takes off and the day it was written, when the record says (`look.at`). The owner's, as the pin is. */
+  const backLine = $derived(putBackWords(look, look?.at));
+  /* WHAT THE LOOK HIDES, read again as the menu opens, offered back one by one (PGS-B08). */
+  const hidden = $derived((void menu, hiddenOf(look, heads())));
+  let hiddenOpen = $state(false);
+  let writing = false;
+
+  async function putBackNow() {
+    if (writing) return;
+    writing = true;
+    try {
+      const out = await putBack(apiBase(), under);
+      if (!out.ok) return void toasts.push(out.fix, { intent: 'warn' });
+      await reread();
+      toasts.push(putBackSaid(title, out.restored));
+    } finally {
+      writing = false;
+    }
+  }
+
+  /** Shows one hidden block as the person's own look, and says so with the way back. */
+  async function show(h: Hidden) {
+    if (writing) return;
+    writing = true;
+    const was = look;
+    try {
+      const at = under;
+      const out = await writeLook(apiBase(), showBody(at, was, h.key));
+      if (!out.ok) return void toasts.push(out.fix, { intent: 'warn' });
+      await reread();
+      toasts.push(`${h.heading} is shown on ${title} again.`, { undo: () => void restore(at, was) });
+    } finally {
+      writing = false;
     }
   }
 
@@ -171,6 +231,22 @@
       >
       {#if history}<p class="change-history" aria-hidden="true">{history}</p>{/if}
     </div>
+    {#if backLine}<button type="button" class="mi" role="menuitem" onclick={() => void putBackNow()}><Icon name="history" size="s" />{backLine}</button>{/if}
+    {#if hidden.length > 0}
+      <!-- A CHECKABLE ITEM, so opening the short list leaves the menu open; each Show is a verb and closes it. -->
+      <button type="button" class="mi" role="menuitemcheckbox" aria-checked={hiddenOpen} onclick={() => (hiddenOpen = !hiddenOpen)}
+        ><Icon name="eye" size="s" />Hidden ({hidden.length})</button
+      >
+      {#if hiddenOpen}
+        <div role="group" aria-label="Hidden">
+          {#each hidden as h (h.key)}
+            <button type="button" class="mi change-hidden" role="menuitem" aria-label={`Show ${h.heading}`} onclick={() => void show(h)}
+              ><span class="change-hidden-name">{h.heading}</span><span class="change-show" aria-hidden="true">Show</span></button
+            >
+          {/each}
+        </div>
+      {/if}
+    {/if}
   {/if}
   {#if source === 'here'}
     <button type="button" class="mi" role="menuitem" onclick={() => toggle(!showSource)}
@@ -234,6 +310,24 @@
     color: var(--dim);
     font-size: var(--t-sm);
     line-height: 1.45;
+  }
+
+  /* WHAT THE LOOK HIDES, one line each under Hidden, set in as the history line is, with Show at the trailing edge in
+     the working accent, since it is the verb. */
+  .page-more .change-hidden {
+    padding-inline-start: calc(var(--sp-3) + 16px + var(--sp-2));
+  }
+
+  .change-hidden-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .change-show {
+    margin-inline-start: auto;
+    padding-inline-start: var(--sp-3);
+    color: var(--link);
   }
 
   .change-vh {

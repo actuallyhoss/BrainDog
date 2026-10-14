@@ -74,6 +74,7 @@
   import Export from './areas/Export.svelte';
   import Delete from './areas/Delete.svelte';
   import Words from './areas/Words.svelte';
+  import { homeCurrency } from '$lib/record/api.ts';
 
   /**
    * THE SHELL, AND NOT THE SAMPLE.
@@ -287,7 +288,7 @@
     const client = recordClient();
     const [copies, usage, eng, vital] = await Promise.all([
       hosted ? readSnapshots(apiBase()).catch(() => null) : null,
-      hosted ? readUsage((url, init) => fetch(url, init), now, '', apiBase(page.url)).catch(() => null) : null,
+      hosted ? readUsage((url, init) => fetch(url, init), now, '', apiBase(page.url), undefined, homeCurrency()).catch(() => null) : null,
       valueOf(() => client.engineHealth()),
       valueOf(() => client.call<{ signs: Sign[] }>('signs')),
       owns ? readFaults() : null,

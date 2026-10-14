@@ -4,6 +4,57 @@
   "entries": [
     {
       "kind": "pack",
+      "id": "agency",
+      "title": "Agency",
+      "summary": "Retainers and timesheets for a small agency: each client's hours used this month against the hours it bought, what was billed of what was worked, and what the retainers bring in a month.",
+      "author": "BrainDog",
+      "license": "MIT",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "0c2c0cc5f877ab6b072f8c561cd7a8d8918b6af13b478848061265b718953632",
+          "bytes": 11778,
+          "published_at": "2026-10-14T09:19:39.229Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "people"
+            ],
+            "lists": [
+              "Retainers",
+              "Timesheets"
+            ],
+            "pages": [
+              "Clients",
+              "Timesheets",
+              "{{name}}"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "waits": [
+              "things"
+            ]
+          },
+          "notes": "The first version.",
+          "preview": true
+        }
+      ],
+      "categories": [
+        "modules",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      }
+    },
+    {
+      "kind": "pack",
       "id": "agent-notes",
       "title": "Agent notes",
       "summary": "Two short notes a day, at 08:00 and 17:00 your time, of what your agents ask you, what they did and what is stuck. Nothing when there is nothing to say, and never by mail.",
@@ -766,6 +817,91 @@
       "categories": [
         "modules",
         "automations",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      }
+    },
+    {
+      "kind": "pack",
+      "id": "job-starter",
+      "title": "Starter jobs",
+      "summary": "Three kinds of job to run on your own machine: a review of your week, a sort of what arrived, and where a repository stands. Each one only reads and proposes, and you approve each kind once before it can run.",
+      "author": "BrainDog",
+      "license": "Apache-2.0",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "9302debe657431b5934db7dac4f15af544c348104878e936e8ab10b4f554a68c",
+          "bytes": 2721,
+          "published_at": "2026-10-14T09:45:51.041Z",
+          "bump": null,
+          "reach": {
+            "modules": [],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          }
+        }
+      ],
+      "categories": [
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      }
+    },
+    {
+      "kind": "pack",
+      "id": "landlord",
+      "title": "Landlord",
+      "summary": "The flats and houses you rent out, each tenancy with its rent, deposit and end day, the rent that came in and the repairs. Says what is due this month, what arrived, who has not paid, what is empty and which tenancy ends next.",
+      "author": "BrainDog",
+      "license": "MIT",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "b13b97e1261fbfb24a4efe190a325f0a45c39187c4615fb49dfe6acfe0cfa2c4",
+          "bytes": 14291,
+          "published_at": "2026-10-14T09:19:39.229Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "people"
+            ],
+            "lists": [
+              "Properties",
+              "Tenancies",
+              "Rent received",
+              "Repairs"
+            ],
+            "pages": [
+              "Lettings",
+              "{{name}}"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The first version.",
+          "preview": true
+        }
+      ],
+      "categories": [
+        "modules",
         "made-by-braindog"
       ],
       "publisher": {
@@ -1561,6 +1697,55 @@
     },
     {
       "kind": "pack",
+      "id": "photographer",
+      "title": "Photographer",
+      "summary": "Shoots from the first enquiry to the fee paid, what each one still owes the client and by when, and the gear with the day its cover ends.",
+      "author": "BrainDog",
+      "license": "MIT",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "84fbac31b6cf6e57069b367bc630c036feb3626d6d04a70e8fd49659d9e37f8c",
+          "bytes": 10851,
+          "published_at": "2026-10-14T09:19:39.229Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "people"
+            ],
+            "lists": [
+              "Shoots",
+              "Deliverables",
+              "Gear"
+            ],
+            "pages": [
+              "Shoots",
+              "Due",
+              "{{name}}"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The first version.",
+          "preview": true
+        }
+      ],
+      "categories": [
+        "modules",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      }
+    },
+    {
+      "kind": "pack",
       "id": "portfolio-bands",
       "title": "Revenue bands",
       "summary": "What your projects take a month now, and the room left in their forecasts next and later, worked out every day and drawn as one bar.",
@@ -2031,6 +2216,45 @@
       ],
       "categories": [
         "templates",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      }
+    },
+    {
+      "kind": "pack",
+      "id": "slash-desk",
+      "title": "Slash on your machine",
+      "summary": "Hands the heavy thinking of composing a page to your own machine. You press it on Slash, one job runs on a machine you enrolled, and what it would change waits for you in Decide. It writes nothing itself.",
+      "author": "BrainDog",
+      "license": "Apache-2.0",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "dbe6dd3b2da02768cb29a0d9e9938398d07063f5649f6fc36d5945f97813ae90",
+          "bytes": 1867,
+          "published_at": "2026-10-14T09:45:51.041Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "agents"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The first version."
+        }
+      ],
+      "categories": [
         "made-by-braindog"
       ],
       "publisher": {

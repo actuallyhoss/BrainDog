@@ -38,10 +38,13 @@ const ledger = () => {
 
 const MODEL = { model: true };
 
+/** The three fields the state is, without what the ledger says beside it, which the tests at the end hold. */
+const base = (h: EngineHealth): Pick<EngineHealth, 'state' | 'last_ok' | 'since'> => ({ state: h.state, last_ok: h.last_ok, since: h.since });
+
 test('NO ROWS IS never_asked, and no model is off before the ledger is read', () => {
   const { sql } = ledger();
   const clock = fixedClock(NOW);
-  assert.deepEqual(engineHealth(sql, clock, MODEL), { state: 'never_asked', last_ok: null, since: null });
+  assert.deepEqual(base(engineHealth(sql, clock, MODEL)), { state: 'never_asked', last_ok: null, since: null });
   assert.equal(engineSaid(engineHealth(sql, clock, MODEL), NOW).text, 'Slash has not needed its model yet.');
   const off = engineHealth(sql, clock, { model: false });
   assert.equal(off.state, 'off');
@@ -58,7 +61,7 @@ test('AN ANSWER IS answering, and two failures after it are still answering', ()
   row(NOW - 2 * HOUR, 'error', 'UNREACHABLE');
   row(NOW - HOUR, 'error', 'UNREACHABLE', '-');
   const h = engineHealth(sql, fixedClock(NOW), MODEL);
-  assert.deepEqual(h, { state: 'answering', last_ok: at(NOW - 3 * HOUR), since: null });
+  assert.deepEqual(base(h), { state: 'answering', last_ok: at(NOW - 3 * HOUR), since: null });
   assert.deepEqual(engineSaid(h, NOW), { text: "Slash's model answered 3 hours ago.", whose: null });
   /* A reply that broke its schema was still a model answering. */
   row(NOW - 30 * 60_000, 'error', 'PROPOSAL_SCHEMA');
@@ -78,7 +81,7 @@ test('THREE FAILURES AFTER THE LAST ANSWER, the newest under a day old, is not_a
   row(first + 5 * HOUR, 'nothing', null, '-');
   const clock = fixedClock(first + 6 * HOUR);
   const h = engineHealth(sql, clock, MODEL);
-  assert.deepEqual(h, { state: 'not_answering', last_ok: at(first - DAYS(2)), since: at(first) });
+  assert.deepEqual(base(h), { state: 'not_answering', last_ok: at(first - DAYS(2)), since: at(first) });
   const s = engineSaid(h, clock.now());
   assert.deepEqual(s, {
     text: "Slash's model has not answered since 6 October. That is ours to fix. Until it is back, BrainDog works from its rules.",
@@ -91,7 +94,7 @@ test('THREE FAILURES AFTER THE LAST ANSWER, the newest under a day old, is not_a
   /* And the next answer ends it. */
   row(first + 7 * HOUR, 'ok', null);
   clock.set(first + 8 * HOUR);
-  assert.deepEqual(engineHealth(sql, clock, MODEL), { state: 'answering', last_ok: at(first + 7 * HOUR), since: null });
+  assert.deepEqual(base(engineHealth(sql, clock, MODEL)), { state: 'answering', last_ok: at(first + 7 * HOUR), since: null });
 });
 
 test('HIS OWN KEY TURNED AWAY, or a host that says it will not open, is key_closed and his to fix', () => {
@@ -101,7 +104,7 @@ test('HIS OWN KEY TURNED AWAY, or a host that says it will not open, is key_clos
   row(first, 'error', 'PULL_REQUEST_REFUSED', '-', 'b');
   const clock = fixedClock(first + HOUR);
   const h: EngineHealth = engineHealth(sql, clock, { model: true, own_key: true });
-  assert.deepEqual(h, { state: 'key_closed', last_ok: at(first - HOUR), since: at(first) });
+  assert.deepEqual(base(h), { state: 'key_closed', last_ok: at(first - HOUR), since: at(first) });
   assert.deepEqual(engineSaid(h, clock.now()), {
     text: 'Your own key for Slash has not opened since 6 October. Open it in the vault, or switch to the included model.',
     whose: 'yours',
@@ -123,7 +126,7 @@ test('HOLDS IN FLIGHT ARE NEITHER, and a refusal on the included model is never 
   assert.equal(engineHealth(sql, clock, MODEL).state, 'never_asked');
   /* After an answer, three holds do not make three failures. */
   row(NOW - 4 * HOUR, 'ok', null);
-  assert.deepEqual(engineHealth(sql, clock, MODEL), { state: 'answering', last_ok: at(NOW - 4 * HOUR), since: null });
+  assert.deepEqual(base(engineHealth(sql, clock, MODEL)), { state: 'answering', last_ok: at(NOW - 4 * HOUR), since: null });
   /* The included model turned away while he has his own key set: ours, not his. */
   for (let i = 1; i <= FAILS_DOWN; i++) row(NOW - i * 60_000, 'error', 'PULL_REQUEST_REFUSED', '-', 'a');
   const h = engineHealth(sql, clock, { model: true, own_key: true });
@@ -164,7 +167,7 @@ test('AN ANSWER 20 DAYS OLD AND TWO FRESH FAILURES IS not_answering: a stale ans
   row(NOW - 3 * HOUR, 'error', 'UNREACHABLE');
   row(NOW - HOUR, 'error', 'UNREACHABLE');
   const h = engineHealth(sql, fixedClock(NOW), MODEL);
-  assert.deepEqual(h, { state: 'not_answering', last_ok: at(NOW - DAYS(20)), since: at(NOW - 3 * HOUR) });
+  assert.deepEqual(base(h), { state: 'not_answering', last_ok: at(NOW - DAYS(20)), since: at(NOW - 3 * HOUR) });
   assert.match(engineSaid(h, NOW).text, /^Slash's model has not answered since /u);
   assert.doesNotMatch(engineSaid(h, NOW).text, /20 days ago/u);
 
@@ -216,5 +219,132 @@ test('A SPENT MONTH IS ITS OWN CLAUSE (audit 40-42, 5): never an answer, never a
   c.row(NOW - 5 * HOUR, 'refused', 'SLASH_BUDGET_SPENT', '-');
   c.row(NOW - 2 * HOUR, 'ok', null);
   assert.deepEqual({ ...counts(c.sql) }, { yes: 1, no: 0, spent: 1 });
-  assert.deepEqual(engineHealth(c.sql, clock, MODEL), { state: 'answering', last_ok: at(NOW - 2 * HOUR), since: null });
+  assert.deepEqual(base(engineHealth(c.sql, clock, MODEL)), { state: 'answering', last_ok: at(NOW - 2 * HOUR), since: null });
+});
+
+/* ── What the ledger says beside the state (ENG-A05, ENG-A06: "health shown") ─────────────────────────────────────── */
+
+type Planted = { ms: number; status: string; code?: string | null; model?: string; tier?: string; spends?: string; route?: string | null; candidate?: string | null; raw?: string | null };
+
+/** A ledger at version 3, its rows planted with the columns a router writes, in the order they were settled. */
+const routed = () => {
+  const sql = openSqlite();
+  openStore(sql);
+  let n = 0;
+  const row = (r: Planted): void =>
+    sql.exec(
+      `INSERT INTO slash_call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, code, spends, route, candidate, raw)
+       VALUES (?, ?, 'read', ?, ?, 0, 0, 0, 0, ?, ?, ?, ?, ?, ?)`,
+      `p${String(++n).padStart(4, '0')}`,
+      at(r.ms),
+      r.tier ?? 'a',
+      r.model ?? 'glm-5.3-flash',
+      r.status,
+      r.code ?? null,
+      r.spends ?? 'person',
+      r.route ?? null,
+      r.candidate ?? null,
+      r.raw ?? null,
+    );
+  return { sql, row };
+};
+
+test('WHO ANSWERED LAST is the newest answering row, by the model on it, and none is said before one answers', () => {
+  const { sql, row } = routed();
+  const clock = fixedClock(NOW);
+  assert.equal(engineHealth(sql, clock, MODEL).answeredBy, undefined, 'an empty ledger names nobody');
+  row({ ms: NOW - 5 * HOUR, status: 'ok', model: 'llama-3.2-1b', route: 'answer.included', candidate: 'small' });
+  row({ ms: NOW - 2 * HOUR, status: 'ok', model: 'glm-5.3-flash', route: 'answer.included', candidate: 'flash' });
+  /* A failure after it, and a hold in flight, answer nothing. */
+  row({ ms: NOW - HOUR, status: 'error', code: 'UNREACHABLE', model: 'glm-5.3', spends: 'none', route: 'answer.included', candidate: 'second' });
+  core(sql, clock, canned()).reserve('read', 'a', 'glm-5.3', { purpose: 'ask', spends: 'person' });
+  assert.deepEqual(engineHealth(sql, clock, MODEL).answeredBy, { model: 'glm-5.3-flash', at: at(NOW - 2 * HOUR) });
+});
+
+test("A FAILURE'S OWN WORDS are carried, cut at 200, and anything shaped like a key is cut out of them", () => {
+  const { sql, row } = routed();
+  const clock = fixedClock(NOW);
+  row({ ms: NOW - 3 * HOUR, status: 'ok' });
+  row({ ms: NOW - 2 * HOUR, status: 'error', code: 'UNREACHABLE', spends: 'none', candidate: 'flash', raw: 'An older failure.' });
+  row({
+    ms: NOW - HOUR,
+    status: 'error',
+    code: 'UNREACHABLE',
+    spends: 'none',
+    candidate: 'flash',
+    raw: `Rate limited for this account. Authorization: Bearer sk-live-Q7d9Xk2Lm4 api_key=zz-1234567890 ${'and then some '.repeat(30)}`,
+  });
+  const words = engineHealth(sql, clock, MODEL).lastWords;
+  assert.ok(words !== undefined && words.startsWith('Rate limited for this account.'), 'the newest failure speaks');
+  assert.ok(!words.includes('sk-live') && !words.includes('Q7d9Xk2Lm4') && !words.includes('1234567890'), 'no key survives');
+  assert.ok(words.includes('[cut]'));
+  assert.ok(words.length <= 200);
+  /* An old row with no words on it says none: never the older row's words in its place. */
+  row({ ms: NOW - HOUR / 2, status: 'error', code: 'UNREACHABLE', spends: 'none', candidate: 'flash' });
+  assert.equal(engineHealth(sql, clock, MODEL).lastWords, undefined);
+});
+
+test('TWO ATTEMPTS FOR ONE ASK, AND ONE FOR ANOTHER, is a second model for one ask of two', () => {
+  const { sql, row } = routed();
+  const clock = fixedClock(NOW);
+  /* The first ask: the flash model does not answer, the second model does, on the same route. */
+  row({ ms: NOW - 4 * HOUR, status: 'error', code: 'UNREACHABLE', spends: 'none', route: 'answer.included', candidate: 'flash' });
+  row({ ms: NOW - 4 * HOUR, status: 'ok', model: 'glm-5.3', route: 'answer.included', candidate: 'second' });
+  /* The second ask answers first time. */
+  row({ ms: NOW - 2 * HOUR, status: 'ok', route: 'answer.included', candidate: 'flash' });
+  const h = engineHealth(sql, clock, MODEL);
+  assert.equal(h.doubleShare, 0.5);
+  assert.deepEqual(h.doubleOf, { twice: 1, asks: 2 });
+  /* A reply that broke its schema, asked again of the same model, is one model asked twice, never a second model. */
+  row({ ms: NOW - HOUR, status: 'refused', code: 'PROPOSAL_SCHEMA', spends: 'person', route: 'answer.included', candidate: 'flash' });
+  row({ ms: NOW - HOUR, status: 'ok', spends: 'none', route: 'answer.included', candidate: 'flash' });
+  assert.deepEqual(engineHealth(sql, clock, MODEL).doubleOf, { twice: 1, asks: 4 });
+});
+
+test("THE WALK AS core WRITES IT reads as a second model, and old rows with no route or candidate read as one model", async () => {
+  const sql = openSqlite();
+  openStore(sql);
+  sql.exec("INSERT INTO slash_settings (singleton, tier, model, grant_id, ask_cap, updated_at) VALUES (1, 'a', NULL, NULL, 80, '2026-11-14')");
+  const first = canned();
+  const second = canned();
+  first.say(new Error('model not served'));
+  second.say(JSON.stringify({ registers: ['obligations'], where: { all: [{ field: 'state', is: 'open' }] }, q: null }), { in: 300, out: 40 });
+  const c = core(sql, fixedClock(NOW), canned(), ['a'], ['a', 'b', 'byo'], () => [
+    { id: 'flash', model: 'glm-5.3-flash', inference: first },
+    { id: 'small', model: 'llama-3.2-1b', inference: second },
+  ]);
+  const out = await c.run({ id: 'predicate', slots: { '%INDEX%': 'obligations', '%FIGURES%': 'none', '%QUESTION%': 'What is still open?' } });
+  assert.ok(out.out.ok);
+  c.account({ id: c.mint(), kind: 'read', tier: 'a', model: out.model, usage: out.usage, ms: out.ms, status: 'ok', purpose: 'ask', spends: 'person', served: true, candidate: out.candidate });
+  /* An old row from before version 3: no route, no candidate, no words. */
+  sql.exec(
+    `INSERT INTO slash_call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, code) VALUES ('old1', ?, 'read', 'a', 'glm-5.3-flash', 0, 0, 0, 0, 'ok', NULL)`,
+    at(NOW - DAYS(3)),
+  );
+  const h = engineHealth(sql, fixedClock(NOW), MODEL);
+  assert.deepEqual(h.doubleOf, { twice: 1, asks: 2 });
+  assert.deepEqual(h.answeredBy, { model: 'llama-3.2-1b', at: at(NOW) });
+});
+
+test("THIS MONTH'S ASKS SPLIT BY WHOSE ALLOWANCE, counted as the meter counts them", () => {
+  const { sql, row } = routed();
+  const clock = fixedClock(NOW);
+  const c = core(sql, clock, canned());
+  row({ ms: NOW - HOUR, status: 'ok', spends: 'person' });
+  row({ ms: NOW - 2 * HOUR, status: 'ok', spends: 'person' });
+  row({ ms: NOW - 3 * HOUR, status: 'ok', spends: 'background' });
+  /* An attempt nobody answered, an ask on his own key (listed, not his allowance) and last month's ask spend nothing here. */
+  row({ ms: NOW - 4 * HOUR, status: 'error', code: 'UNREACHABLE', spends: 'none' });
+  row({ ms: NOW - 5 * HOUR, status: 'ok', spends: 'person', tier: 'b' });
+  row({ ms: Date.UTC(2026, 9, 30), status: 'ok', spends: 'person' });
+  const h = engineHealth(sql, clock, MODEL);
+  assert.deepEqual(h.spent, { person: 2, background: 1 });
+  assert.deepEqual(h.spent, { person: c.asksUsed(), background: c.backgroundUsed() }, "the meter's own two counts");
+});
+
+test('A LEDGER WITH NOTHING BESIDE THE STATE SAYS NOTHING BESIDE IT: no field, never a zero or a null', () => {
+  const { sql, row } = ledger();
+  for (let i = 0; i < 3; i++) row(NOW - (3 - i) * HOUR, 'error', 'UNREACHABLE', '-');
+  assert.deepEqual(engineHealth(sql, fixedClock(NOW), MODEL), { state: 'not_answering', last_ok: null, since: at(NOW - 3 * HOUR) });
+  assert.equal(engineHealth(sql, fixedClock(NOW), { model: false }).answeredBy, undefined);
 });

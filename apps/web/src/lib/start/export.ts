@@ -18,6 +18,7 @@ import { AGENTS_PACK } from '@braindog/seed/packs';
 
 import type { AskMapping, MappingAsked, MappingReply } from './ask.ts';
 import { allLists, decimalsOf, entryOf, FILLABLE, isDay, type Field, type List } from './lists.ts';
+import { readZip } from './zip.ts';
 
 /** A file as the first run reads it: its columns in order, and its entries as the text in each cell. */
 export type Export = { file: string; columns: string[]; entries: Record<string, string>[]; more: number };
@@ -100,28 +101,88 @@ export function csvCells(text: string): string[][] {
 type Json = unknown;
 const isMap = (v: Json): v is Record<string, Json> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
+/** The keys a nested thing is named by, in the order a cell reads them. */
+const NAMED_BY = ['name', 'title', 'plain_text', 'text', 'content', 'value', 'start'];
+
 /** A JSON value as the text a cell would hold: a nested thing by its name, a list by its names, joined. */
 function cellOf(v: Json): string {
   if (v === null || v === undefined) return '';
   if (typeof v === 'string') return v;
   if (typeof v === 'number' || typeof v === 'boolean') return String(v);
   if (Array.isArray(v)) return v.map(cellOf).filter((s) => s !== '').join(', ');
-  if (isMap(v)) for (const k of ['name', 'title', 'plain_text', 'text', 'content', 'value', 'start']) if (typeof v[k] === 'string' || typeof v[k] === 'number') return String(v[k]);
+  if (isMap(v)) for (const k of NAMED_BY) if (typeof v[k] === 'string' || typeof v[k] === 'number') return String(v[k]);
   return '';
 }
+
+const plain = (v: Json): boolean => v === null || typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean';
+
+/**
+ * WHETHER A MAP IN A CELL IS AN ENTRY'S OWN FIELDS, opened into columns one level deep (`fields.title` is the column
+ * "title"), and each value in it read as a cell is today. A small thing named by one of its keys, as a label
+ * `{ id, name, color }` or a span `{ start, end }`, is not: it stays one cell, read by its name.
+ */
+const opens = (v: Json): v is Record<string, Json> =>
+  isMap(v) && Object.keys(v).length > 0 && Object.values(v).some(plain) && !(Object.keys(v).length <= 3 && cellOf(v) !== '');
+
+/**
+ * THE KEEPING EVERY FILE GOES THROUGH: the columns some entry fills, forty at most, and a thousand entries with the count
+ * past them. A column every entry leaves empty is never offered.
+ */
+function kept(file: string, all: string[], entries: Record<string, string>[]): Export | { why: 'noEntries' } {
+  const columns = all.filter((c) => entries.some((e) => (e[c] ?? '').trim() !== '')).slice(0, COLUMNS_MOST);
+  if (columns.length === 0 || entries.length === 0) return { why: 'noEntries' };
+  const out = entries.slice(0, ENTRIES_MOST).map((e) => Object.fromEntries(columns.map((c) => [c, e[c] ?? ''])));
+  return { file, columns, entries: out, more: Math.max(0, entries.length - ENTRIES_MOST) };
+}
+
+/**
+ * THE COLUMN WALK OF A JSON LIST: each key of its first fifty objects is a column, and a key whose every filled cell is a
+ * map of the entry's own fields (`opens`) is its keys instead. A key one already names is said with its map's: a
+ * `fields.id` beside an `id` is "fields id".
+ */
+function tableOf(file: string, rows: readonly Record<string, Json>[]): Export | { why: 'noEntries' } {
+  const sample = rows.slice(0, 50);
+  const keys: string[] = [];
+  for (const e of sample) for (const k of Object.keys(e)) if (!keys.includes(k)) keys.push(k);
+  const opened = new Set(keys.filter((k) => {
+    const filled = sample.map((e) => e[k]).filter((v) => v !== null && v !== undefined && v !== '');
+    return filled.length > 0 && filled.every(opens);
+  }));
+  const taken = new Set(keys.filter((k) => !opened.has(k)));
+  const columns: { name: string; read: (e: Record<string, Json>) => string }[] = [];
+  for (const k of keys) {
+    if (!opened.has(k)) {
+      columns.push({ name: k, read: (e) => cellOf(e[k]) });
+      continue;
+    }
+    const inner: string[] = [];
+    for (const e of sample) {
+      const m = e[k];
+      if (isMap(m)) for (const i of Object.keys(m)) if (!inner.includes(i)) inner.push(i);
+    }
+    for (const i of inner) {
+      const name = taken.has(i) ? `${k} ${i}` : i;
+      taken.add(name);
+      columns.push({ name, read: (e) => (isMap(e[k]) ? cellOf((e[k] as Record<string, Json>)[i]) : '') });
+    }
+  }
+  const entries = rows.map((e) => Object.fromEntries(columns.map((c) => [c.name, c.read(e)])));
+  return kept(file, columns.map((c) => c.name), entries);
+}
+
+const objectsOf = (a: Json): Record<string, Json>[] | null => (Array.isArray(a) && a.length > 0 && a.every(isMap) ? (a as Record<string, Json>[]) : null);
 
 /**
  * THE ENTRIES OF A JSON EXPORT: an array of objects as it is, or the largest array of objects inside one object, one level
  * down, which is where Trello keeps its cards, Todoist its items and Notion its results.
  */
 function jsonEntries(v: Json): Record<string, Json>[] | null {
-  const objects = (a: Json): Record<string, Json>[] | null => (Array.isArray(a) && a.length > 0 && a.every(isMap) ? (a as Record<string, Json>[]) : null);
-  const top = objects(v);
+  const top = objectsOf(v);
   if (top) return top;
   if (!isMap(v)) return null;
   let best: Record<string, Json>[] | null = null;
   for (const inner of Object.values(v)) {
-    const found = objects(inner) ?? (isMap(inner) ? Object.values(inner).map(objects).find((x) => x !== null) ?? null : null);
+    const found = objectsOf(inner) ?? (isMap(inner) ? Object.values(inner).map(objectsOf).find((x) => x !== null) ?? null : null);
     if (found && (best === null || found.length > best.length)) best = found;
   }
   return best;
@@ -136,8 +197,6 @@ const columnName = (raw: string, i: number): string => (raw.trim() === '' ? `Col
  */
 export function readExport(file: string, text: string): Export | { why: string } {
   const body = text.replace(/^﻿/u, '');
-  let columns: string[] = [];
-  let entries: Record<string, string>[] = [];
   const json = /\.json$/iu.test(file) || /^\s*[[{]/u.test(body);
   if (json) {
     let parsed: Json;
@@ -147,23 +206,141 @@ export function readExport(file: string, text: string): Export | { why: string }
       return { why: 'notJson' };
     }
     const found = jsonEntries(parsed);
-    if (!found) return { why: 'noEntries' };
-    const seen: string[] = [];
-    for (const e of found.slice(0, 50)) for (const k of Object.keys(e)) if (!seen.includes(k)) seen.push(k);
-    columns = seen;
-    entries = found.map((e) => Object.fromEntries(columns.map((c) => [c, cellOf(e[c])])));
-  } else {
-    const cells = csvCells(body);
-    if (cells.length < 2) return { why: 'noEntries' };
-    columns = cells[0]!.map(columnName);
-    const unique = columns.map((c, i) => (columns.indexOf(c) === i ? c : `${c} ${i + 1}`));
-    columns = unique;
-    entries = cells.slice(1).map((r) => Object.fromEntries(columns.map((c, i) => [c, (r[i] ?? '').trim()])));
+    return found ? tableOf(file, found) : { why: 'noEntries' };
   }
-  columns = columns.filter((c) => entries.some((e) => (e[c] ?? '').trim() !== '')).slice(0, COLUMNS_MOST);
-  if (columns.length === 0 || entries.length === 0) return { why: 'noEntries' };
-  const kept = entries.slice(0, ENTRIES_MOST).map((e) => Object.fromEntries(columns.map((c) => [c, e[c] ?? ''])));
-  return { file, columns, entries: kept, more: Math.max(0, entries.length - ENTRIES_MOST) };
+  const cells = csvCells(body);
+  if (cells.length < 2) return { why: 'noEntries' };
+  const named = cells[0]!.map(columnName);
+  const columns = named.map((c, i) => (named.indexOf(c) === i ? c : `${c} ${i + 1}`));
+  return kept(file, columns, cells.slice(1).map((r) => Object.fromEntries(columns.map((c, i) => [c, (r[i] ?? '').trim()]))));
+}
+
+/* ── many lists from one file ──────────────────────────────────────────── */
+
+/** The lists one file or one zip brings, at most: eight tiles is already a long first screen. */
+export const EXPORTS_MOST = 8;
+
+/** The keys an entry names its kind by, so one array holding tasks and projects is two lists. */
+const KIND_KEYS = ['list', 'register', 'type', 'kind', 'collection'];
+
+/**
+ * ONE ARRAY OF MIXED KINDS SPLIT INTO ONE LIST A KIND: when every object names its kind by one key, with more than one
+ * value and each value held by two entries on average at least (a key every entry fills differently is not a kind). The
+ * key itself is dropped from each part, since every entry in it says the same.
+ */
+function byKind(name: string, rows: Record<string, Json>[]): { name: string; rows: Record<string, Json>[] }[] {
+  for (const key of KIND_KEYS) {
+    const values = rows.map((r) => r[key]);
+    if (!values.every((v): v is string => typeof v === 'string' && v.trim() !== '')) continue;
+    const kinds = [...new Set(values)];
+    if (kinds.length < 2 || kinds.length * 2 > rows.length) continue;
+    return kinds.map((k) => ({ name: k, rows: rows.filter((r) => r[key] === k).map(({ [key]: _, ...rest }) => rest) }));
+  }
+  return [{ name, rows }];
+}
+
+const sizeOf = (e: Export): number => e.entries.length + e.more;
+
+/**
+ * EVERY LIST IN ONE JSON FILE: each array of objects to two levels down, named from its key, split by kind, eight at
+ * most and the largest first, with the count of the rest. A file that holds one list names it `file`, so it reads
+ * exactly as `readExport` reads it.
+ */
+export function jsonExports(value: Json, file = 'export.json'): { exports: Export[]; arrays: number } {
+  const found: { name: string; rows: Record<string, Json>[] }[] = [];
+  const top = objectsOf(value);
+  if (top) found.push({ name: file, rows: top });
+  else if (isMap(value))
+    for (const [key, inner] of Object.entries(value)) {
+      const rows = objectsOf(inner);
+      if (rows) found.push({ name: key, rows });
+      else if (isMap(inner))
+        for (const [deeper, two] of Object.entries(inner)) {
+          const r = objectsOf(two);
+          if (r) found.push({ name: deeper, rows: r });
+        }
+    }
+  const read = found.flatMap((f) => byKind(f.name, f.rows)).map((f) => tableOf(f.name, f.rows)).filter((e): e is Export => !('why' in e));
+  read.sort((a, b) => sizeOf(b) - sizeOf(a));
+  if (read.length === 1) read[0] = { ...read[0]!, file };
+  return { exports: read.slice(0, EXPORTS_MOST), arrays: Math.max(0, read.length - EXPORTS_MOST) };
+}
+
+/** What a set of files brought, and what was left out of it, counted. */
+export type Exports = { exports: Export[]; left: { pages: number; tables: number; arrays: number } };
+
+const TABLE = /\.(?:csv|tsv|json)$/iu;
+const PAGE = /\.(?:md|markdown|html?|txt)$/iu;
+
+/**
+ * A FILE'S NAME AS A PERSON KNOWS IT, inside a zip: its folders cut, and the id an app puts after a name cut too (a space
+ * and 32 hex characters before the ending): `Work/Tasks 0123…cdef.csv` is `Tasks.csv`.
+ */
+export const fileOfEntry = (name: string): string => (name.split('/').filter((p) => p !== '').pop() ?? name).replace(/ [0-9a-f]{32}(?=\.[^.]+$)/iu, '');
+
+const isZip = (name: string, bytes: Uint8Array): boolean => /\.zip$/iu.test(name) || (bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 3 && bytes[3] === 4);
+
+/**
+ * EVERY LIST A FILE BRINGS. A zip gives one export for each table inside (`.csv`, `.tsv`, `.json`), eight at most and the
+ * largest first; its text pages (`.md`, `.html`, `.txt`) are counted and never written. One plain file reads as
+ * `readExport` reads it, and a JSON file of several lists gives each. A plain file refused says `readExport`'s why
+ * (`notJson`, `noEntries`); any other why is a sentence the screen shows as it is.
+ */
+export async function readExports(name: string, bytes: Uint8Array): Promise<Exports | { why: string }> {
+  const decoder = new TextDecoder();
+  if (!isZip(name, bytes)) {
+    if (bytes.byteLength > BYTES_MOST) return { why: `That file is more than ${BYTES_MOST / (1024 * 1024)} MB, which is past what one file may bring.` };
+    const text = decoder.decode(bytes);
+    const one = readExport(name, text);
+    if ('why' in one) return one;
+    const json = /\.json$/iu.test(name) || /^\s*[[{]/u.test(text.replace(/^﻿/u, ''));
+    const many = json ? jsonExports(JSON.parse(text.replace(/^﻿/u, '')), name) : { exports: [one], arrays: 0 };
+    return { exports: many.exports.length > 0 ? many.exports : [one], left: { pages: 0, tables: 0, arrays: many.arrays } };
+  }
+  const zip = await readZip(bytes);
+  if ('why' in zip) return zip;
+  const left = { pages: 0, tables: 0, arrays: 0 };
+  const read: { exp: Export; json: boolean }[] = [];
+  for (const entry of zip.entries) {
+    const file = fileOfEntry(entry.name);
+    if (PAGE.test(file)) left.pages++;
+    if (!TABLE.test(file)) continue;
+    const text = decoder.decode(entry.bytes).replace(/^﻿/u, '');
+    if (/\.json$/iu.test(file)) {
+      let parsed: Json;
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        left.tables++;
+        continue;
+      }
+      const got = jsonExports(parsed, file);
+      left.arrays += got.arrays;
+      if (got.exports.length === 0) left.tables++;
+      for (const exp of got.exports) read.push({ exp, json: true });
+    } else {
+      /* A TABLE THAT HOLDS NOTHING IS COUNTED AS LEFT OUT, never dropped without a word. */
+      const got = readExport(file, text);
+      if ('why' in got) left.tables++;
+      else read.push({ exp: got, json: false });
+    }
+  }
+  read.sort((a, b) => sizeOf(b.exp) - sizeOf(a.exp));
+  for (const r of read.slice(EXPORTS_MOST)) left[r.json ? 'arrays' : 'tables']++;
+  if (read.length === 0)
+    return { why: left.pages > 0 ? `That zip holds ${left.pages === 1 ? 'one page' : `${left.pages} pages`} of notes and no table; export the database as CSV and bring that.` : 'That zip holds no table: no .csv, .tsv or .json file is inside.' };
+  return { exports: read.slice(0, EXPORTS_MOST).map((r) => r.exp), left };
+}
+
+/** What was left out, said once in plain words, or `null` when nothing was: "14 pages of notes were left out." */
+export function leftSaid(left: Exports['left']): string | null {
+  const parts: string[] = [];
+  if (left.pages > 0) parts.push(left.pages === 1 ? 'one page of notes was left out' : `${left.pages} pages of notes were left out`);
+  if (left.tables > 0) parts.push(left.tables === 1 ? 'one more table was left out' : `${left.tables} more tables were left out`);
+  if (left.arrays > 0) parts.push(left.arrays === 1 ? 'one more list in a file was left out' : `${left.arrays} more lists in a file were left out`);
+  if (parts.length === 0) return null;
+  const said = parts.length === 1 ? parts[0]! : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)!}`;
+  return `${said.charAt(0).toUpperCase()}${said.slice(1)}.`;
 }
 
 /* ── reading a cell ────────────────────────────────────────────────────── */

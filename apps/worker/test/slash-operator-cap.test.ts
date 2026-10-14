@@ -189,8 +189,8 @@ test('(5b) BOTH ENVIRONMENTS DECLARE THE INCLUDED MODEL UNDER SLASH_ NAMES ALONE
   for (const name of ['alpha', 'production']) {
     const vars = config.env[name]?.vars ?? {};
     assert.deepEqual(
-      Object.keys(vars).filter((k) => /^[A-Z]+_(ENDPOINT|INCLUDED|INCLUDED_MONTH_NEURONS|MODEL|KEY)$/.test(k)).sort(),
-      ['SLASH_ENDPOINT', 'SLASH_INCLUDED', 'SLASH_INCLUDED_MONTH_NEURONS'],
+      Object.keys(vars).filter((k) => /^[A-Z]+_(ENDPOINT|INCLUDED|INCLUDED_MONTH_NEURONS|MODEL|KEY|LARGE|FALLBACK_URL|FALLBACK_MODEL|FALLBACK_PROVIDER)$/.test(k)).sort(),
+      ['SLASH_ENDPOINT', 'SLASH_FALLBACK_MODEL', 'SLASH_FALLBACK_PROVIDER', 'SLASH_FALLBACK_URL', 'SLASH_INCLUDED', 'SLASH_INCLUDED_MONTH_NEURONS', 'SLASH_LARGE'],
       `env.${name} declares the model under another name`,
     );
     assert.equal(vars['SLASH_INCLUDED'], 'yes', `env.${name} turned the included model off`);

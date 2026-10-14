@@ -13,15 +13,17 @@ import { undoChange } from '../record/undo-write.ts';
 import { toasts } from '../ui/toast.svelte.ts';
 import { reread } from './live.svelte.ts';
 import { arrivals, optimist, overlay, ARRIVED_MS } from './optimistic.ts';
+import { history } from './undo.ts';
 
 export { type Change, type Sent, type Pending, UNDO_MS } from './optimistic.ts';
 
 /**
  * Runs one optimistic change against the app's toasts (`optimist` in `optimistic.ts`). A write that landed under a batch
  * is undone by the record itself (`undoChange`), and the screen's own inverse is the fallback. A change that names no
- * `reread` has every screen read again once the record put it back (`live.svelte.ts` `reread`).
+ * `reread` has every screen read again once the record put it back (`live.svelte.ts` `reread`). Each write that landed
+ * under a batch is held on the tab's `history` (`undo.ts`), which ⌘Z reaches back through once its toast is gone.
  */
-export const run = optimist(toasts, { undoBatch: (batch) => undoChange(apiBase(), batch), reread }).run;
+export const run = optimist(toasts, { undoBatch: (batch) => undoChange(apiBase(), batch), reread, history }).run;
 
 /**
  * An overlay a component draws from. `draw` reads a rune, so a `$derived` over it redraws when a change is added or

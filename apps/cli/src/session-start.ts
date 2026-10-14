@@ -185,7 +185,8 @@ export type Outcome = 'ran' | 'already' | 'hooked' | 'away' | 'failed';
 export async function startFromServer(s: FromServer): Promise<Outcome> {
   const now = s.now ?? Date.now;
   const began = now();
-  const until = began + s.ms;
+  /* THE BUDGET RUNS ON THE MACHINE'S OWN CLOCK, as `startWork` reads it; `now` names the day the start is marked on. */
+  const until = Date.now() + s.ms;
   try {
     const client = s.agent ?? 'other';
     if (HOOKED.includes(client)) return 'hooked';
@@ -194,7 +195,7 @@ export async function startFromServer(s: FromServer): Promise<Outcome> {
     const machine = s.machine ?? (at.host || hostname());
     if (startedToday(home, machine, at.cwd, client, began)) return 'already';
     const headers = await s.headers().catch(() => ({}) as Record<string, string>);
-    const signal = AbortSignal.timeout(Math.max(1, until - now()));
+    const signal = AbortSignal.timeout(Math.max(1, until - Date.now()));
     const out = await clientFor(s.to, async () => headers, signal).context();
     if (!out.ok) {
       const away = signal.aborted || (refused(out) && out.refusal.code === 'UNREACHABLE');

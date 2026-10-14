@@ -30,7 +30,7 @@
     type Row,
   } from '../src/index.ts';
   /* From the module and not the root, which does not export it: the word is this drawer's and `html.ts`'s alone. */
-  import { CARDS_NEXT, RUN_OPEN, cardTrend, isDimmed, markGlyphOf, runFaceOf, runMarkOf, type RunCell, type RunFace } from '../src/cards.ts';
+  import { CARDS_NEXT, RUN_OPEN, cardTrend, helpersOf, isDimmed, markGlyphOf, runFaceOf, runMarkOf, type Helpers, type RunCell, type RunFace } from '../src/cards.ts';
   import { cellNamesNothing, glyphPath, glyphWaits } from '../src/inline.ts';
   import { hueOf } from '../src/cards.ts';
   import { pictureSrc } from '../src/gallery.ts';
@@ -63,6 +63,7 @@
     opts?: RenderOptions & {
       scope?: ScopeCells | undefined;
       runs?: readonly (RunCell | null)[] | undefined;
+      helpers?: readonly Helpers[] | undefined;
       edits?: readonly (CardEdit | null)[] | undefined;
       write?: CardWrite | undefined;
     };
@@ -352,6 +353,7 @@
       <!-- The reply and the next step as boxes, where the host hands this page a writer and the column says edit. -->
       {@const re = boxOf(r, L.reply)}
       {@const ne = boxOf(r, L.next)}
+      {@const helped = helpersOf(opts.helpers, n)}
       <!-- The lead is the first card of a `cards lead` block and no other, told rather than inferred (05 §4). The hue is a
            number the host draws the mark in, and a cell that is not one writes no style; the picture leads the card
            where the host serves the file, hidden from a screen reader because the title under it names the card. -->
@@ -387,6 +389,8 @@
              a box even while empty, since the box is where the line is written. -->
         {#if re}<p class="cards-reply">{@render box(r, n, L.reply, re, EMPTY_LINE)}</p>
         {:else if L.reply >= 0 && r.cells[L.reply]}<p class="cards-reply"><Text nodes={nodes(r, L.reply)} {opts} /></p>{/if}
+        <!-- A RUN'S HELPERS ARE SAID UNDER ITS SENTENCE, in the reply's quieter voice (`helpersOf`), as in `toHTML`. -->
+        {#if helped}<p class="cards-reply" data-helpers="">{helped}</p>{/if}
         {#if shows || newest || t || (L.ring >= 0 && r.cells[L.ring])}
           <div class="cards-body">
             {#if shows}

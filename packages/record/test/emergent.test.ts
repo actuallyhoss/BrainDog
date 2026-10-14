@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import type { Declaration } from '@braindog/kernel';
 
 import { createRecordApi, type Boot, type CallContext, type PenItem } from '../src/index.ts';
-import { PEN_DISMISSED_MOST, PEN_MOST, PEN_SHOWN, PEN_USE_DAYS, PEN_YOUNG_DAYS, penRanked, usedOf, youngOf } from '../src/emergent.ts';
+import { PEN_DISMISSED_MOST, PEN_SHOWN, PEN_USE_DAYS, PEN_YOUNG_DAYS, penRanked, usedOf, youngOf } from '../src/emergent.ts';
 import { COMPANIES, PROJECTS } from '../../../fixtures/names.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 import { NOW, installSeed } from '../../seed/src/index.ts';
@@ -208,10 +208,12 @@ test('OVER EVERY LIST THE SEED INSTALLS, each page offered passes the lint accep
     .map(([id]) => id);
   assert.ok(offered.length > 0, 'the seed filled no list');
 
-  /* BOOT SHOWS THE BEST `PEN_SHOWN`, AND THE RANKED PEN BEHIND IT HOLDS EVERY LIST, so the lint is asked of each. */
+  /* BOOT SHOWS THE QUEUE'S THREE AT MOST, AND THE RANKED PEN BEHIND IT HOLDS EVERY LIST, with no second cap, so the lint
+     is asked of each. */
   assert.equal((await bootOf(api, owner)).pen.length, Math.min(PEN_SHOWN, offered.length), 'boot showed more than the pen shows at once');
+  assert.equal(PEN_SHOWN, 3, 'the pen shows more than three at once');
   const pen = penRanked({ kernel: api.kernel, reads: () => true, pages: api.kernel.pages(), dismissed: new Set(), use: { sql, nowMs: NOW } });
-  assert.equal(pen.length, Math.min(PEN_MOST, offered.length), 'a list the seed fills was not offered, or its page was refused by the lint');
+  assert.equal(pen.length, offered.length, 'a list the seed fills was not offered, or its page was refused by the lint');
   for (const item of pen) {
     assert.ok(offered.includes(item.register), `${item.register} was offered and holds nothing a page could draw`);
     assert.equal(api.kernel.lint([asDecl(item)]), null, `${item.id} would be refused on accepting`);

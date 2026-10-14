@@ -129,15 +129,19 @@ test('a number in budgets.json with no line, and a line with no number, are each
 test('a held list larger than its line is red, smaller is red until a line records the fall, and a line may not rise', () => {
   const { book, budgets } = fresh();
   const m = measuredAsWritten(book);
-  m.held.set('web-lists.HELD', { size: 44 });
-  assert.match(run(book, budgets, m).findings.join('\n'), /web-lists\.HELD holds 44, and its newest line says 43\. A held list only shrinks/u);
-  m.held.set('web-lists.HELD', { size: 42 });
+  /* Read off the ledger's newest line, so a fall written there does not make this test about a number. */
+  const last = book.held['web-lists.HELD'].lines.at(-1);
+  const n = last.count;
+  const on = [day, last.on].sort().at(-1);
+  m.held.set('web-lists.HELD', { size: n + 1 });
+  assert.match(run(book, budgets, m).findings.join('\n'), new RegExp(`web-lists\\.HELD holds ${n + 1}, and its newest line says ${n}\\. A held list only shrinks`, 'u'));
+  m.held.set('web-lists.HELD', { size: n - 1 });
   assert.match(run(book, budgets, m).findings.join('\n'), /Write a line that records the fall/u);
-  book.held['web-lists.HELD'].lines.push({ count: 42, on: day, why: 'One file stopped naming a list.' });
+  book.held['web-lists.HELD'].lines.push({ count: n - 1, on, why: 'One file stopped naming a list.' });
   assert.deepEqual(run(book, budgets, m).findings, []);
-  book.held['web-lists.HELD'].lines.push({ count: 45, on: day, why: 'Grew.' });
-  m.held.set('web-lists.HELD', { size: 45 });
-  assert.match(run(book, budgets, m).findings.join('\n'), /its line rose from 42 to 45/u);
+  book.held['web-lists.HELD'].lines.push({ count: n + 2, on, why: 'Grew.' });
+  m.held.set('web-lists.HELD', { size: n + 2 });
+  assert.match(run(book, budgets, m).findings.join('\n'), new RegExp(`its line rose from ${n - 1} to ${n + 2}`, 'u'));
 });
 
 test('a held list a gate exports and the ledger has no line for is red, and the export is found in the text', () => {

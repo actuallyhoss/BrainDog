@@ -36,6 +36,7 @@
   import { takeFix } from '$lib/theme/staged.ts';
   import type { AreaProps } from '../settings-state.svelte.ts';
   import { ownsRecord } from '../../levels.ts';
+  import { shot, shotNow } from '$lib/palette/customise-apply.ts';
   import StateRow from './StateRow.svelte';
 
   /* EVERY AREA TAKES THE SAME PROPS. The device's own choices read none of them; the record's look asks whether the
@@ -120,6 +121,14 @@
     settle();
   }
 
+  /* SCREENSHOT MODE, AS THIS SCREEN SHOWS IT NOW: the mark the mode puts on the page, so the switch never claims a mode the
+     screen is not in. The press is the palette's and the key's (`customise-apply.ts`), kept as the person's `look.shot`. */
+  let shotOn = $state(shotNow());
+  function pickShot(on: boolean) {
+    shotOn = on;
+    void shot(on).then(() => (shotOn = shotNow()));
+  }
+
   function pickScheme(v: 'light' | 'system' | 'dark') {
     scheme = v;
     /* `system` IS AN ANSWER AND NOT AN ABSENCE, so it is written down: removing the attribute
@@ -160,6 +169,12 @@
     aria-checked={moreContrast}
     aria-label={copy.contrast}
     onclick={() => pickContrast(!moreContrast)}><span class="switch-track"></span></button
+  >
+{/snippet}
+
+{#snippet shotSwitch()}
+  <button type="button" class="switch" role="switch" aria-checked={shotOn} aria-label={copy.shot} onclick={() => pickShot(!shotOn)}
+    ><span class="switch-track"></span></button
   >
 {/snippet}
 
@@ -313,6 +328,8 @@
     the state said in something other than styling: `aria-checked` carries it.
   -->
   <StateRow icon="eye" title={copy.contrast} line={copy.contrastHint} action={contrastSwitch} />
+  <!-- A DISPLAY MODE FOR A SHOULDER, not a redaction: the sentence says both halves, so nobody takes it for a lock. -->
+  <StateRow icon="eye" title={copy.shot} line={copy.shotHint} action={shotSwitch} />
 </Section>
 
 <!--

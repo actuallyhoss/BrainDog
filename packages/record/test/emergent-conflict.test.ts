@@ -11,9 +11,8 @@
  * Decide's (declining Slash's page question writes `page:<list>` into `pen.dismissed`) are other files'. Their cases run
  * as `todo` until those lines land, and then the `todo` comes off.
  *
- * WHAT SLASH LEAVES TO THE PEN, THE PEN SHOWS WHERE THE PERSON IS (batch 52, finding 4). Slash yields every list the pen
- * ranks, and `boot` showed only the first `PEN_SHOWN`, so a list ranked fourth was asked a page in no place at all, even
- * on its own screen. The last case holds the two sets together for a list the person opened.
+ * WHAT SLASH LEAVES TO THE PEN WAITS IN THE ONE QUEUE (ENG-B14): three at most are shown, and the rest wait their turn,
+ * asked in no second place (`emergent-queue.test.ts`).
  */
 
 import { test } from 'node:test';
@@ -22,7 +21,7 @@ import assert from 'node:assert/strict';
 import type { Declaration } from '@braindog/kernel';
 
 import { createRecordApi, type Boot, type CallContext } from '../src/index.ts';
-import { PEN_SHOWN, pageSignatures, pageSpokenFor, penRanked, signatureOf } from '../src/emergent.ts';
+import { pageSignatures, pageSpokenFor, signatureOf } from '../src/emergent.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 const OWNER: CallContext = { principal: { kind: 'person', id: 'p_owner', level: 'owner' } };
@@ -144,51 +143,5 @@ test('NO ON DECIDE IS NOT NOW IN THE PEN: declining Slash\'s page writes page:ta
   value(await api.decide({ id: asked[0]!.id, resolved_as: 'wont-fix', reason: 'Not now.' }, OWNER));
   const prefs = value<Boot>(await api.boot(OWNER)).me.prefs;
   assert.ok(prefs?.['pen.dismissed']?.includes('page:tasks'), `pen.dismissed holds ${JSON.stringify(prefs?.['pen.dismissed'] ?? [])}`);
-  sql.close();
-});
-
-test('WHAT SLASH YIELDS FOR AN OPENED LIST IS SHOWN: a list ranked past PEN_SHOWN shows its offer while the person has it open', async () => {
-  const { sql, clock, api } = await growing();
-  /* FOUR OTHER LISTS NO PAGE DRAWS, three of them opened today with an entry newer than any of Tasks', so Tasks ranks
-     past the three shown; Easels is never opened, so it waits behind them whatever Tasks does. */
-  const others = ['anvils', 'barrels', 'crates', 'easels'];
-  value(
-    await api.kernel.install(
-      others.map((id) => ({ id: `register.${id}`, kind: 'register', body: { id, name: id, title: 'what', fields: [{ id: 'what', type: 'text', required: true }] } }) as never),
-    ),
-  );
-  for (const id of others) value(await api.create({ register: id, fields: { what: `One of ${id}` } }, OWNER));
-  for (const id of others.slice(0, 3)) value(await api.list({ register: id }, OWNER));
-
-  /* WHAT SLASH YIELDS: every offer the pen ranks, as `slashPropose` reads it, a page for Tasks among them. */
-  const held = (): string[] =>
-    penRanked({ kernel: api.kernel, reads: () => true, pages: api.kernel.pages(), dismissed: new Set(), use: { sql, nowMs: clock.now() } }).map((i) => i.id);
-  const lists = (ids: readonly string[]): string[] => ids.map((id) => id.split(':')[1]!).sort();
-  assert.ok(held().indexOf('page:tasks') >= PEN_SHOWN, 'the control failed: Tasks was not ranked past the shown ones');
-  assert.deepEqual(lists(await penOf(api)), ['anvils', 'barrels', 'crates'], 'the control failed: an unopened Tasks was shown');
-  assert.deepEqual(asksForTasks(await press(api)), [], 'the control failed: Slash filed a page the pen holds');
-
-  /* THE PERSON OPENS TASKS. Slash still yields it, so the pen must show it: one place, and that place is on screen. */
-  value(await api.list({ register: 'tasks' }, OWNER));
-  assert.deepEqual(lists(await penOf(api)), ['anvils', 'barrels', 'crates', 'tasks'], 'an opened list waited unseen behind the shown ones');
-  assert.equal((await penOf(api)).at(-1), 'page:tasks', 'the opened list was not shown after the best ones, in its rank');
-  assert.deepEqual(asksForTasks(await press(api)), [], 'Slash filed a page the pen shows');
-  assert.deepEqual(await placesOf(api, sql), ['pen'], 'an opened list was offered a page in no place, or in two');
-
-  /* THE TWO SETS AGREE: every offer Slash yields for a list opened today is one `boot` shows, and `boot` shows nothing
-     Slash does not yield. Easels, never opened, is yielded and waits its turn. */
-  const shown = await penOf(api);
-  const opened = new Set(sql.all<{ subject: string }>("SELECT subject FROM observation WHERE kind = 'register.read' AND day = ?", new Date(clock.now()).toISOString().slice(0, 10)).map((r) => r.subject));
-  assert.deepEqual(held().filter((id) => opened.has(id.split(':')[1]!) && !shown.includes(id)), [], 'Slash yields an opened list\'s offer the pen does not show');
-  assert.deepEqual(shown.filter((id) => !held().includes(id)), [], 'the pen shows an offer Slash does not yield');
-  assert.ok(held().includes('page:easels') && !shown.includes('page:easels'), 'a list nobody opened was shown past the best ones');
-
-  /* THE DAY AFTER IT IS STILL SHOWN, six days on it still is, and seven days on it waits its turn again. */
-  clock.set(clock.now() + DAY);
-  assert.ok((await penOf(api)).includes('page:tasks'), 'a list opened yesterday lost its offer at midnight');
-  clock.set(clock.now() + 5 * DAY);
-  assert.ok((await penOf(api)).includes('page:tasks'), 'a list opened six days ago lost its offer inside the week');
-  clock.set(clock.now() + DAY);
-  assert.equal((await penOf(api)).length, PEN_SHOWN, 'a list opened seven days ago still stood past the shown ones');
   sql.close();
 });

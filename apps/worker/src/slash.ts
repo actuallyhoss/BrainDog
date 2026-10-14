@@ -59,14 +59,14 @@ import {
   type SlashInference,
 } from '@braindog/host/slash';
 import type { OpenKey } from '@braindog/host/actions';
-import { PURPOSES } from '@braindog/host/infer';
+import { PURPOSES, routeFor, type Candidate, type RouteFacts } from '@braindog/host/infer';
 import { SLASH_MENTIONS_INSTRUCTIONS, SLASH_RESOLVE_INSTRUCTIONS, type UnderstandModel } from '@braindog/host/understand';
 import { slashAskDoor, type SlashAskDoor } from '@braindog/host';
 import type { SlashAnswer } from '@braindog/host/slash-answers';
 import { no, ok, type Clock, type Refusal, type Result, type Sql } from '@braindog/ports';
 import type { CallContext, RecordApi, SlashModel } from '@braindog/record';
 import { PLANS, PLAN_TABLE, type Plan } from '@braindog/record/plans';
-import type { Slash } from '@braindog/slash';
+import type { Slash, SlashOptions } from '@braindog/slash';
 
 import { keyOpener } from './actions.ts';
 import { aiInference, scrubRaw, type AiBinding, type JsonSchema } from './inference.ts';
@@ -81,6 +81,14 @@ export type SlashEnv = {
   SLASH_INCLUDED?: string | undefined;
   /** The most one record's asks may spend of the included model in a UTC month, in neurons. See `INCLUDED_MONTH_NEURONS`. */
   SLASH_INCLUDED_MONTH_NEURONS?: string | undefined;
+  /** `yes` where he said yes to the larger model's cost (HD.463). Unset, and today, the larger model is on no route. */
+  SLASH_LARGE?: string | undefined;
+  /** The operator's second provider (`includedCandidates`): its https address, its model, `openai` or `anthropic`. */
+  SLASH_FALLBACK_URL?: string | undefined;
+  SLASH_FALLBACK_MODEL?: string | undefined;
+  SLASH_FALLBACK_PROVIDER?: string | undefined;
+  /** And its key, a secret: read only to open the call, never logged, never on a row. */
+  SLASH_FALLBACK_KEY?: string | undefined;
 };
 
 /* ── the included model ───────────────────────────────────────────────────────────────────────────────────────────── */
@@ -576,6 +584,89 @@ export type SlashEngineDeps = SlashWire & {
  */
 export const CLOUD_TIERS = ['a', 'b'] as const;
 
+/* ── the route (ENG-A06) ─────────────────────────────────────────────────────────────────────────────────────────── */
+
+/** The included model's two rows (`inference.ts` `MODELS`), as the router names them. Tier `a`: the operator's account. */
+const FLASH: Candidate = { id: 'flash', model: INCLUDED_MODEL, tier: 'a', source: 'included' };
+const SMALL: Candidate = { id: 'small', model: 'llama-3.2-1b', tier: 'a', source: 'included' };
+
+/** The operator's second provider as its four settings say it, or `null` while any one of them is missing. */
+const fallbackOf = (env: SlashEnv): { url: string; model: string; provider: 'openai' | 'anthropic' } | null => {
+  const url = env.SLASH_FALLBACK_URL?.trim() ?? '';
+  const model = env.SLASH_FALLBACK_MODEL?.trim() ?? '';
+  const provider = env.SLASH_FALLBACK_PROVIDER?.trim() ?? '';
+  if (url === '' || model === '' || (env.SLASH_FALLBACK_KEY ?? '') === '') return null;
+  return provider === 'openai' || provider === 'anthropic' ? { url, model, provider } : null;
+};
+
+/**
+ * What the Cloud may try for an ask on the included model, in `routeFor`'s terms, or `undefined` where that model is off.
+ *
+ * "RULES ARE THE FALLBACK, NOT THE ENGINE" (D35.43). When the included model fails, the next model the operator set is
+ * asked before the rules speak. The table has two rows and no second chat row: which model would be second is the model
+ * checks' to choose (`tools/model-checks/run.mjs --routes`), so today the answering route is flash alone, and the operator's
+ * provider after it once he sets all four of its settings.
+ *
+ * THE LARGER MODEL STAYS OFF. `large` carries his yes (`SLASH_LARGE`), and the table holds no large row, so even a yes
+ * names none: the row is added beside the model checks that price it, never here.
+ *
+ * HIS OWN KEY IS NOT ON IT. A record set to his key is a route of one in the package (`core.run` walks nothing on tier
+ * `b`), so a question for his provider never falls to the included model or to the operator's.
+ */
+export function includedCandidates(env: SlashEnv): RouteFacts | undefined {
+  if (env.AI === undefined || env.SLASH_INCLUDED !== 'yes') return undefined;
+  const second = fallbackOf(env);
+  return {
+    form: 'included',
+    models: {
+      flash: FLASH,
+      small: SMALL,
+      ...(second === null ? {} : { provider: { id: 'provider', model: second.model, tier: 'a', source: 'included' } satisfies Candidate }),
+    },
+    large: env.SLASH_LARGE === 'yes',
+    machine: false,
+  };
+}
+
+/** The handle the operator's key goes by inside the keyed wire. It names no vault row: the key is the Worker's secret. */
+const FALLBACK_GRANT = 'operator.fallback';
+
+/**
+ * The operator's second provider on the keyed wire his own key uses (`slashOwnInference`), or `undefined` where it is not
+ * set or its address is not an https address on the public internet.
+ *
+ * THE KEY IS OPENED ON EACH CALL AND HELD NOWHERE ELSE: `openKey` reads the secret when the call is made, and the wire
+ * requires it, so an empty secret is a call never sent and never a request with no key.
+ */
+function fallbackWire(env: SlashEnv, send?: SlashWire['send']): SlashInference | undefined {
+  const second = fallbackOf(env);
+  if (second === null) return undefined;
+  return slashOwnInference(
+    { provider: second.provider, base_url: second.url, model: second.model, grant_id: FALLBACK_GRANT },
+    {
+      grants: () => [{ id: FALLBACK_GRANT, label: 'operator fallback', revoked_at: null }],
+      openKey: async () => env.SLASH_FALLBACK_KEY || null,
+      send: send ?? ((input, init) => fetch(input, init)),
+      keyRequired: true,
+    },
+  );
+}
+
+/**
+ * The route `createSlash` walks, built from `includedCandidates`, or `undefined` where there are no facts: then every ask
+ * is the one call it always was. A candidate on the operator's provider carries its own wire; the rest are asked on the
+ * engine's own adapter, the included model.
+ */
+export function includedRoute(env: SlashEnv, send?: SlashWire['send']): SlashOptions['route'] {
+  const facts = includedCandidates(env);
+  if (facts === undefined) return undefined;
+  const wire = facts.models.provider === undefined ? undefined : fallbackWire(env, send);
+  return (purpose) =>
+    routeFor(purpose, facts).candidates.flatMap((c) =>
+      c.id !== 'provider' ? [{ id: c.id, model: c.model }] : wire === undefined ? [] : [{ id: c.id, model: c.model, inference: wire }],
+    );
+}
+
 /**
  * `@braindog/slash` over the included model or his own key, and this record's guarded reads, or nothing at all.
  *
@@ -603,7 +694,13 @@ export async function workerSlashEngine(env: SlashEnv, api: () => RecordApi, dep
   const slash = await import('@braindog/slash');
   /* ONLY TIER `a` IS PRICED IN NEURONS, the package's default: those calls are Workers AI on the operator's account, and
      a call on his own key is on his provider's bill, which this host has no rate for. */
-  const engine = slash.createSlash({ sql: deps.sql, clock: deps.clock, inference, record: slashRecord(api()) }, { tiers: CLOUD_TIERS });
+  /* THE ROUTE, ON THE INCLUDED MODEL ALONE (ENG-A06): when it fails, the next model the operator set is asked before the
+     rules speak. On his own key there is no route, so his key never falls to another model. */
+  const route = included === undefined ? undefined : includedRoute(env, deps.send);
+  const engine = slash.createSlash(
+    { sql: deps.sql, clock: deps.clock, inference, record: slashRecord(api()) },
+    { tiers: CLOUD_TIERS, ...(route === undefined ? {} : { route }) },
+  );
   /* GUARDED BY THIS HOST, as on the self-host: `configure` checks a grant id's shape and never the vault, and the guard
      holds a save on his own key to a live API token (`slashGuardedEngine`). It reads the tiers this Worker runs as the
      package does, so a record saved on `byo` is counted where the package answers it. */

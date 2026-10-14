@@ -80,7 +80,7 @@ function arranged(slug: unknown): unknown {
 type Seen = { method: string; args: Record<string, unknown> };
 
 /** How the stub answers: `admin: false` is a token (the ADMIN gate refuses it), `named: false` a key handed a handle and no number. */
-type Opts = { admin?: boolean; named?: boolean; propose?: unknown };
+type Opts = { admin?: boolean; named?: boolean; propose?: unknown; polls?: unknown[] };
 
 async function stub(t: { after: (fn: () => void | Promise<void>) => void }, opts: Opts = {}) {
   const seen: Seen[] = [];
@@ -107,6 +107,11 @@ async function stub(t: { after: (fn: () => void | Promise<void>) => void }, opts
             ? { ok: false, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: 'Open this from the app; a token cannot change what this record is.', at: 'principal' } }
             : { ok: true, value: { id: 'page.invoicing', kind: 'page' } },
         );
+      /* ONE QUESTION BY ID, as `push --wait` reads it: the next of `polls` each time, the last one held. */
+      if (method === 'governance' && args.id !== undefined) {
+        const row = (opts.polls ?? []).length > 1 ? opts.polls?.shift() : opts.polls?.[0];
+        return answer({ ok: true, value: row ?? null });
+      }
       if (method === 'governance') return answer({ ok: true, value: open });
       if (method === 'propose') {
         if (opts.propose !== undefined) return answer(opts.propose);
@@ -285,4 +290,78 @@ test('page: a missing file or a wrong verb is exit 1 with a plain sentence', asy
   assert.equal(await page(['check', join(h.dir, 'nope.dog')], h.io), 1);
   assert.deepEqual(h.said, [`${join(h.dir, 'nope.dog')} could not be read.`]);
   assert.equal(await page(['rename', 'x'], h.io), 1);
+});
+
+/** A clock that waits no time: each sleep moves it on by what was asked, and is counted. */
+function clock() {
+  const c = { t: 0, slept: [] as number[] };
+  return { c, clock: { now: () => c.t, sleep: async (ms: number) => void (c.slept.push(ms), (c.t += ms)) } };
+}
+
+const OPEN = { id: 'SG1', status: 'open', resolved_as: null };
+
+test('page push --wait: a question accepted on the second read is Accepted, exit 0', async (t) => {
+  const h = await setup(t, { admin: false, polls: [OPEN, { id: 'SG1', status: 'resolved', resolved_as: 'addressed' }] });
+  const file = join(h.dir, 'invoicing.dog');
+  writeFileSync(file, dogText(BODY));
+  const k = clock();
+  assert.equal(await page(['push', file, '--wait'], h.io, k.clock), 0);
+  assert.deepEqual(h.out, ['invoicing asked as SG1. It waits on Decide.', 'Accepted.']);
+  const reads = calls(h, 'governance').filter((s) => s.args.id !== undefined);
+  assert.equal(reads.length, 2);
+  assert.equal(reads[0]?.args.id, 'SG1');
+  assert.deepEqual(k.c.slept, [5_000], 'one turn of five seconds between the two reads');
+  assert.doesNotMatch([...h.out, ...h.said].join(' '), /rec_01TEST|stub-bearer/, 'the key is never printed');
+});
+
+test('page push --wait: a declined question is Declined, exit 1', async (t) => {
+  const h = await setup(t, { admin: false, polls: [{ id: 'SG1', status: 'resolved', resolved_as: 'wont-fix' }] });
+  const file = join(h.dir, 'invoicing.dog');
+  writeFileSync(file, dogText(BODY));
+  const k = clock();
+  assert.equal(await page(['push', file, '--wait', '10m'], h.io, k.clock), 1);
+  assert.equal(h.out.at(-1), 'Declined.');
+  assert.deepEqual(k.c.slept, []);
+});
+
+test('page push --wait 10m: a question still open at the limit is Still waiting on Decide, exit 2', async (t) => {
+  const h = await setup(t, { admin: false, polls: [OPEN] });
+  const file = join(h.dir, 'invoicing.dog');
+  writeFileSync(file, dogText(BODY));
+  const k = clock();
+  assert.equal(await page(['push', '--wait', '10m', file], h.io, k.clock), 2);
+  assert.equal(h.out.at(-1), 'Still waiting on Decide.');
+  /* EVERY FIVE SECONDS FOR TEN MINUTES: 120 turns, 121 reads, and never past the limit. */
+  assert.equal(k.c.slept.length, 120);
+  assert.equal(k.c.t, 10 * 60_000);
+  assert.equal(calls(h, 'governance').filter((s) => s.args.id !== undefined).length, 121);
+});
+
+test('page push --wait: more than 30 minutes is refused before anything is sent, and an owner’s apply waits on nothing', async (t) => {
+  const h = await setup(t, { admin: false });
+  const file = join(h.dir, 'invoicing.dog');
+  writeFileSync(file, dogText(BODY));
+  assert.equal(await page(['push', file, '--wait', '2h'], h.io, clock().clock), 1);
+  assert.deepEqual(h.said, ['--wait takes a duration of at most 30m, as in --wait 10m, or nothing for 30m.']);
+  assert.equal(h.seen.length, 0);
+
+  const o = await setup(t, { admin: true });
+  const mine = join(o.dir, 'invoicing.dog');
+  writeFileSync(mine, dogText(BODY));
+  assert.equal(await page(['push', mine, '--wait'], o.io, clock().clock), 0);
+  assert.deepEqual(o.out, [`invoicing pushed to ${o.env.BRAINDOG_HOST}.`]);
+  assert.equal(calls(o, 'governance').length, 0);
+});
+
+test('page push --wait: a no the person gave before is said in the record’s words and exits 1, and without --wait 0', async (t) => {
+  const said = 'This was declined on 2 October 2026. No reason was given. Nothing was filed. If something has changed, propose it again and say what in again.';
+  const before = { ok: true, value: { id: 'SG4', answered: { said: 'No', reason: 'No reason was given.', at: '2026-10-02T09:00:00Z' }, said } };
+  const h = await setup(t, { admin: false, propose: before });
+  const file = join(h.dir, 'invoicing.dog');
+  writeFileSync(file, dogText(BODY));
+  const k = clock();
+  assert.equal(await page(['push', file, '--wait'], h.io, k.clock), 1);
+  assert.deepEqual(h.out, [said]);
+  assert.deepEqual(k.c.slept, [], 'nothing to wait on');
+  assert.equal(await page(['push', file], h.io), 0);
 });

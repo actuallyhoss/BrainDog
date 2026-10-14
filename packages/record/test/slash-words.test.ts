@@ -78,6 +78,8 @@ const USAGE: Usage = {
     },
   },
   skills: [],
+  /* THREE RUNS LEFT THE SAME STEPS FOR TRIAGE, so the skill Study names is offered with them (`stepsFrom`). */
+  handoffs: ['S1', 'S2', 'S3'].map((run) => ({ run, text: 'Read the new ticket with `desk show --new` first.\nThen filed the triage with `desk file --triage`.' })),
 };
 
 const OFFERED: Offered[] = [

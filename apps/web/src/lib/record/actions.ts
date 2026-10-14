@@ -22,7 +22,7 @@
  * PURE, for the reason `device.ts` gives: `node --test` cannot import a `.svelte.ts` file.
  */
 
-import { bytes as fmtBytes, since } from 'braindog-render';
+import { bytes as fmtBytes, since, writeAmount } from 'braindog-render';
 
 import { copy } from '../copy.ts';
 import type { RECONNECT_STATE, ReconnectState } from './vault.ts';
@@ -610,17 +610,17 @@ export const shareSaid = (share: number): string => shareWords(share);
 /** How far into its allowance a meter is before the page says the limit is near: the Directory's `NOTICE_AT`. */
 const NEAR = 0.8;
 
-/** A sum of money in minor units, as a person reads it in its own currency. */
-const money = (minor: number, currency: string): string => {
-  try {
-    return (minor / 100).toLocaleString('en-GB', { style: 'currency', currency });
-  } catch {
-    return `${(minor / 100).toFixed(2)} ${currency}`;
-  }
-};
+/**
+ * A sum of money in minor units, written by the one writer (`writeAmount`), so it reads as every other amount on
+ * every screen: the minor unit is the currency's own (three places for a dinar, none for a yen), never a hundredth.
+ * `home` is the currency the screen drops the code of; the ledger's is the account's, which no record names, so the
+ * page passes the record's home or nothing, and then every currency carries its code ("£12 GBP", "EGP 12").
+ */
+const money = (minor: number, currency: string, home: string | null): string =>
+  writeAmount({ minor: Math.round(minor), currency }, home, 'read')?.text ?? `${currency} ${minor}`;
 
 /** One record of the ledger, against its allowance: its four meters, the one nearest its limit, and its plan. */
-function allowedOf(r: AccountUsage['records'][number], current: boolean, month: string): Allowed {
+function allowedOf(r: AccountUsage['records'][number], current: boolean, month: string, home: string | null): Allowed {
   const allowance = r.month.allowance;
   const used = current ? r.month.used : r.totals;
   const resets = dayWords(r.month.resets);
@@ -640,7 +640,7 @@ function allowedOf(r: AccountUsage['records'][number], current: boolean, month: 
   const planName = Object.hasOwn(words.planName, r.plan) ? (words.planName[r.plan] ?? null) : null;
   const asks = r.slash ? { asks: r.slash.asks, neurons: r.slash.neurons, cap: typeof r.slash.cap === 'number' ? r.slash.cap : null } : null;
   const slash = asks ? words.slashLine(asks.asks, asks.neurons, asks.cap, current ? words.thisMonth : words.inMonth(monthWords(month))) : null;
-  const extra = r.extra?.on ? words.extraLine(r.extra.units, money(r.extra.cost, r.extra.currency), money(r.extra.cap, r.extra.currency)) : null;
+  const extra = r.extra?.on ? words.extraLine(r.extra.units, money(r.extra.cost, r.extra.currency, home), money(r.extra.cap, r.extra.currency, home)) : null;
   return {
     name: r.slug ?? r.record,
     plan: planName,
@@ -661,7 +661,7 @@ function allowedOf(r: AccountUsage['records'][number], current: boolean, month: 
 }
 
 /** The ledger, as one view over every record the person owns. */
-export function usageFromLedger(said: AccountUsage, month: string, through?: string, names: Names = NO_NAMES, current = true): UsageView {
+export function usageFromLedger(said: AccountUsage, month: string, through?: string, names: Names = NO_NAMES, current = true, home: string | null = null): UsageView {
   const totals = zero();
   totals.ms = 0;
   const projects = new Map<string, Named>();
@@ -689,7 +689,7 @@ export function usageFromLedger(said: AccountUsage, month: string, through?: str
     }
     for (const d of r.days) days.set(d.day, (days.get(d.day) ?? 0) + d.runs);
   }
-  const records: Allowed[] = said.records.filter((r) => !r.closed).map((r) => allowedOf(r, current, month));
+  const records: Allowed[] = said.records.filter((r) => !r.closed).map((r) => allowedOf(r, current, month, home));
   return {
     from: 'ledger',
     month,
@@ -783,8 +783,9 @@ function drawn(build: () => UsageView): UsageRead {
  *
  * TWO BASES SINCE THE RECORD IS IN THE ADDRESS. `base` is the bare host, where `/account/usage` and `/auth/methods` are the
  * person's; `api` is where the record answers, `/app/<slug>` under a slug, so the events counted are the record on screen.
+ * `home` is the record's home currency (`homeCurrency()`), whose code an amount of extra use then drops, as every screen does.
  */
-export async function readUsage(io: Fetch, now: number, base = '', api: string = base, month?: string): Promise<UsageRead> {
+export async function readUsage(io: Fetch, now: number, base = '', api: string = base, month?: string, home: string | null = null): Promise<UsageRead> {
   const range = monthRange(now, month);
   const current = range.to === new Date(now).toISOString().slice(0, 10);
   /* NOBODY SIGNED IN IS NO LEDGER TO ASK. An open self-host, or a browser with no session, would only be told 401, and
@@ -805,7 +806,7 @@ export async function readUsage(io: Fetch, now: number, base = '', api: string =
         scripts: scripts.ok && Array.isArray(scripts.value) ? scripts.value : undefined,
         actions: actions.ok && Array.isArray(actions.value) ? actions.value : undefined,
       });
-      return drawn(() => usageFromLedger(ledger.value, range.month, current ? range.to : undefined, names, current));
+      return drawn(() => usageFromLedger(ledger.value, range.month, current ? range.to : undefined, names, current, home));
     }
     /* A LEDGER WITH NO RECORD IN IT IS A MEMBER'S, since usage is the owner's (`directory.ts` `usage`). It read "Nothing
        has run this month" over a record that ran all month; now the record's own runs are drawn under the sentence. */

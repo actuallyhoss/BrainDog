@@ -141,6 +141,8 @@ export const palette = {
    */
   customise: {
     group: 'Customise',
+    shot: 'Screenshot mode',
+    shotDetail: 'Hides what your record holds on this screen.',
     dark: 'Dark mode',
     light: 'Light mode',
     system: 'Match the system',

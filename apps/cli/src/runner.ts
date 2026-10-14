@@ -696,7 +696,31 @@ export function distil(line: string, s: Stream): Line[] {
 /** Why a job stopped before it ended by itself: Cancel in the app, the record taking it back, or Ctrl+C here. */
 type Halt = 'cancelled' | 'lost' | 'stopped';
 
-type EndBody = { status: 'ok' | 'needs_decision' | 'refused' | 'limit' | 'error' | 'interrupted' | 'cancelled'; result?: Record<string, unknown>; error?: string; claude_session?: string; turns?: number; ms?: number };
+type EndBody = {
+  status: 'ok' | 'needs_decision' | 'refused' | 'limit' | 'error' | 'interrupted' | 'cancelled';
+  result?: Record<string, unknown>;
+  error?: string;
+  claude_session?: string;
+  turns?: number;
+  ms?: number;
+  cost_minor?: number;
+  cost_currency?: string;
+};
+
+/**
+ * What a run cost, from Claude Code's `result` line: `total_cost_usd` in whole cents, or nothing when it said none.
+ *
+ * ROUNDED UP, NEVER TO THE NEAREST. A run that cost $0.0042 is one cent here, so a run that cost anything is never
+ * nought on its page; the page says that one cent as "under $0.01". A cost that is missing, not a number, or below
+ * nought sends neither key, and the record takes the end without one (`cost_minor` and `cost_currency` come together).
+ */
+export function costOf(result: Record<string, unknown> | null): { cost_minor: number; cost_currency: 'USD' } | null {
+  const usd = result?.total_cost_usd;
+  if (typeof usd !== 'number' || !Number.isFinite(usd) || usd < 0) return null;
+  /* 1.23 * 100 is 123.00000000000001 in a float, and ceil would make it 124: the cents are rounded to a millionth
+     first, so only a real fraction of a cent rounds up. */
+  return { cost_minor: Math.ceil(Math.round(usd * 100 * 1e6) / 1e6), cost_currency: 'USD' };
+}
 
 type Reporter = {
   /** One line, sent after every line before it. */
@@ -1058,6 +1082,7 @@ async function runJob(to: RunnerTarget, claim: Claim, claude: Claude, io: Runner
     const session = s.session !== null && s.session.length <= SESSION_MOST ? { claude_session: s.session } : {};
     const r = s.result;
     const turns = r !== null && isCount(r.num_turns) ? { turns: r.num_turns } : {};
+    const cost = costOf(r) ?? {};
     const ms = { ms: r !== null && typeof r.duration_ms === 'number' && r.duration_ms >= 0 ? Math.round(r.duration_ms) : Math.max(0, now() - began) };
     const said = r !== null && typeof r.result === 'string' ? head(r.result, RESULT_MOST) : null;
     const result = {
@@ -1067,19 +1092,19 @@ async function runJob(to: RunnerTarget, claim: Claim, claude: Claude, io: Runner
     };
     const kept = Object.keys(result).length === 0 ? {} : { result };
 
-    if (why === 'cancelled') return await finish({ status: 'cancelled', ...kept, ...session, ...turns, ...ms });
-    if (why === 'stopped') return await finish({ status: 'interrupted', ...kept, ...session, ...turns, ...ms });
+    if (why === 'cancelled') return await finish({ status: 'cancelled', ...kept, ...session, ...turns, ...cost, ...ms });
+    if (why === 'stopped') return await finish({ status: 'interrupted', ...kept, ...session, ...turns, ...cost, ...ms });
     if (r !== null && r.subtype === 'success' && r.is_error !== true)
-      return await finish({ status: s.filed.length > 0 ? 'needs_decision' : 'ok', ...kept, ...session, ...turns, ...ms });
+      return await finish({ status: s.filed.length > 0 ? 'needs_decision' : 'ok', ...kept, ...session, ...turns, ...cost, ...ms });
     if (r !== null && r.subtype === 'error_max_turns') {
       report.post('limit', { turns: isCount(r.num_turns) ? r.num_turns : job.turns });
-      return await finish({ status: 'limit', ...kept, ...session, ...turns, ...ms });
+      return await finish({ status: 'limit', ...kept, ...session, ...turns, ...cost, ...ms });
     }
     if (r !== null) {
       const subtype = typeof r.subtype === 'string' ? head(r.subtype, 40) : 'error';
       const text = head(said ?? `Claude Code ended the run with ${subtype}.`, ERROR_MOST);
       report.post('error', { subtype, text });
-      return await finish({ status: 'error', error: text, ...kept, ...session, ...turns, ...ms });
+      return await finish({ status: 'error', error: text, ...kept, ...session, ...turns, ...cost, ...ms });
     }
     /* NO RESULT LINE. 143 is Claude Code's answer to SIGTERM from outside this runner (`26 §5`); anything else is a
        failure, said with the end of what it wrote to standard error. */

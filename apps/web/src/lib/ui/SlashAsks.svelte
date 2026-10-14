@@ -30,6 +30,7 @@
   import Section from '$lib/ui/Section.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Chip from '$lib/ui/Chip.svelte';
+  import { engineLines } from '../../routes/settings/[area]/health.ts';
 
   /* THE PAGE'S OWN `anOwner`, handed in, so there is one predicate for who owns the record and not a second one here. The
      engine decides again on every save and answers anyone else 403 `FORBIDDEN`, so this only decides what is offered. */
@@ -42,6 +43,7 @@
   let saving = $state(false);
   let capRefusal = $state('');
   let engine = $state<EngineHealth | null>(null);
+  const lines = $derived(engineLines(engine, Date.now()));
 
   /* NOT ANSWERING, OR HIS OWN KEY WILL NOT OPEN: the sentence's first sentence is what is wrong, and is marked. `off` is
      `words.noModel` above, so it is not said twice. */
@@ -124,6 +126,7 @@
         {#if engineSaid}
           <li><p class="engine-said" data-intent={down ? 'bad' : undefined}>{#if engineSaid.lead}<span data-needs>{engineSaid.lead}</span>{/if}{engineSaid.rest}</p></li>
         {/if}
+        {#each lines as line}<li><p class="engine-line">{line}</p></li>{/each}
         {#if asks}
           <li><span class="fact-key">{words.resets}</span><span class="fact-value num">{resetsWords(status.asks.resets)}</span></li>
         {/if}
@@ -199,6 +202,16 @@
     color: var(--ink2);
     font-size: var(--fs-body);
     line-height: var(--lh-body);
+  }
+
+  .engine-line {
+    grid-column: 1 / -1;
+    margin: 0;
+    max-inline-size: var(--measure);
+    color: var(--ink2);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    overflow-wrap: anywhere;
   }
 
   .engine-said [data-needs] {

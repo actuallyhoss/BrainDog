@@ -186,10 +186,6 @@ export const HELD = {
     ids: ['steps'],
     why: "an automation's `steps:` key, which is not the guide's list.",
   },
-  'apps/web/src/lib/design/pen.ts': {
-    ids: ['people'],
-    why: 'the `people` glyph a list of contacts, clients or a team is drawn with.',
-  },
   'apps/web/src/lib/home/today-tiles.ts': {
     ids: ['people'],
     why: 'the `people` icon on the line that says access changed.',

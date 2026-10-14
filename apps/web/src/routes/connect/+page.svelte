@@ -41,6 +41,7 @@
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
   import Entry from '../signin/Entry.svelte';
   import { answer, choicesOf, readConsent, type Scope } from './consent.ts';
+  import { provenLine } from './proven.ts';
 
   const shell = $derived(page.data as unknown as Shell);
   const request = $derived(page.url.searchParams.get('request'));
@@ -54,6 +55,9 @@
 
   const consent = $derived(held.value !== null && 'held' in held.value ? held.value.held : null);
   const gone = $derived(held.value !== null && 'gone' in held.value ? held.value.gone : null);
+  /* WHAT THE DOOR PROVED ABOUT THE APP, under the name it chose: checked for an app served from its own address, and
+     said plainly when it only named itself. */
+  const proven = $derived(consent === null ? null : provenLine(consent));
 
   /* THE RECORDS ON OFFER, and the one chosen before the person chooses: the record open in this tab when it is one of
      them, which is the record they were last working in. */
@@ -130,6 +134,12 @@
       <div class="state"><Empty kind="no-data-yet" title={copy.consentGone} body={gone} /></div>
     {:else if consent !== null}
       <p class="asks" dir="auto">{copy.consentAsks(consent.client_name, consent.redirect_host)}</p>
+      {#if proven !== null}
+        <p class="proven" data-intent={proven.tone}>
+          <span class="glyph" role="img" aria-label={TONES[proven.tone].label}>{TONES[proven.tone].glyph}</span>
+          {proven.text}
+        </p>
+      {/if}
       <form
         class="choose"
         onsubmit={(e) => {
@@ -346,6 +356,16 @@
       inline-size: 100%;
       justify-content: center;
     }
+  }
+
+  /* WHAT IS PROVEN, IN ITS TONE AND ITS MARK, never the colour alone: body size, so it is read and not skimmed. */
+  .proven {
+    margin: 0;
+    color: var(--tone, var(--ink2));
+    font-size: var(--t-row);
+    font-weight: 500;
+    line-height: 22px;
+    overflow-wrap: anywhere;
   }
 
   /* THE PRESS'S ANSWER, when there is one: the intent's dot and the host's sentence in the intent's colour. It stays in

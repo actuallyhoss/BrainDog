@@ -127,7 +127,7 @@ The EBNF is [34-GRAMMARS](34-GRAMMARS.md) §2. This is what an author needs of i
 
 | Kind | Cells, in order |
 |---|---|
-| `note` | heading = kicker; body lines are markdown, no cells. `note lead` is the page's opening sentence: drawn as a note, marked `data-form="lead"` on its figure for the host to set as the screen's one sentence. The plural and nought rules for the figures in it are the page's writer's, which knows which words are figures |
+| `note` | heading = kicker; body lines are markdown, no cells. `note lead` is the page's opening sentence: drawn as a note, marked `data-form="lead"` on its figure for the host to set as the screen's one sentence. The plural and nought rules for the figures in it are the page's writer's, which knows which words are figures. A lead note may say: [{ when, body, tone }], the first that holds; the last has no when. Its `when` is all or any, two levels deep. |
 | `quote` | text \| attribution |
 | `stat` | label \| figure \| note \| *trend* \| *tone* — six rows at most. The trend is optional, a run of numbers (`18 20 19 24`) drawn as a small line under the figure; a word there with no number degrades under `DIALECT_ARITY`. A tone straight after three cells is still the tone. `stat lead` draws the first figure as the screen's one hero figure, at `--t-2xl` |
 | `sparkline` | label \| run of numbers \| figure \| *tone*. A 120 by 28 line in `--dim` with a dot on the last point, no axes; under two points, the figure only |

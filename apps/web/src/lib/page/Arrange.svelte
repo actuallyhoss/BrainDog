@@ -63,7 +63,9 @@
   import Icon from '$lib/ui/Icon.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
   import BlockEditor from './BlockEditor.svelte';
+  import type { LookUndo } from '$lib/record/arrange-look.ts';
   import { layoutOf, slotOf } from './layout.ts';
+  import { retireLook, writeLook } from './look.ts';
   import { words } from './words.ts';
 
   let {
@@ -198,7 +200,8 @@
    * batch. Committing per drag would put four unrelated lines in the history for one act of tidying, and leave no single
    * thing to undo.
    *
-   * DONE SETS THE DECLARATION, whole, and the page is read again from the record. A refusal leaves the mode open with
+   * DONE KEEPS A MOVE, A WIDTH OR A COLUMN AS THE PERSON'S OWN LOOK (`asLook`), and only what a look cannot say (a block
+   * added or edited, a block moved under another heading) SETS THE DECLARATION, whole; either way the page is read again from the record. A refusal leaves the mode open with
    * the draft in it, so Cancel still means cancel. Undo sets the body that was there before. EACH BLOCK'S COLUMN GOES
    * WITH ITS PLACE, through the one write every page uses.
    */
@@ -222,6 +225,8 @@
   async function write(edit: { i: number; patch: Patch; name: string } | null): Promise<boolean> {
     if (saving) return false;
     if (install) return keep(install, edit);
+    const looked = !edit && extra.length === 0 ? await asLook() : null;
+    if (looked !== null) return looked;
     saving = true;
     const title = page.title;
     const m = await import('$lib/record/page-write.ts');
@@ -256,6 +261,60 @@
       else beginArrange();
     }
     return true;
+  }
+
+  /**
+   * DONE AS THE PERSON'S OWN LOOK (`arrange-look.ts`): the order, widths and columns by block key, laid by the record over
+   * the page as read, so a page an add-on wrote or added a block to is arranged too and keeps taking its updates. `null`
+   * where a look cannot say the arrangement (a block moved under another heading, a block with no key of its own), which
+   * goes the old way. Undo writes the look before, or retires this one, at any time the line is on screen.
+   */
+  async function asLook(): Promise<boolean | null> {
+    /* A ROW'S PAGE WHOSE LOOK NAMES NO TEMPLATE has no declaration to lay one over that this page knows: the old way. */
+    if (every && !page.look?.page) return null;
+    saving = true;
+    const [m, a, r] = await Promise.all([import('$lib/record/page-write.ts'), import('$lib/record/arrange-look.ts'), import('./recompose.ts')]);
+    const keys = r.blockKeys(all);
+    const laidOf = (i: number, span: number, area: Area | undefined) => ({
+      key: keys[i] ?? '',
+      span,
+      ...(layout ? { area: area ?? 'main' } : {}),
+      drawn: all[i]?.drawn !== false,
+      kind: all[i]?.kind ?? '',
+    });
+    const laid = arrangement.body.map((b) => laidOf(b.block, b.span, b.area));
+    const read = all.map((b, i) => slotOf(b, i, layout)).map((s) => laidOf(s.i, s.span, s.area));
+    if (!a.byLook(laid, read)) {
+      saving = false;
+      return null;
+    }
+    const kept = new Set(arrangement.body.map((b) => b.block));
+    const removed = read.filter((_, i) => !kept.has(i)).map((b) => b.key);
+    const placed = arrangement.body.map((b) => ({ i: b.block, span: b.span, ...(b.area ? { area: b.area } : {}) }));
+    const live = page.look ?? null;
+    const out = await m.saveLayout(apiBase(), slug, live, laid, { drawn: declared.length, placed, seen: page.declared_version ?? null, removed }, undefined);
+    saving = false;
+    if (out.from !== 'written') {
+      toasts.push(out.fix, { intent: 'warn' });
+      return false;
+    }
+    arrangement.commit();
+    await reread();
+    arrangement.slots = null;
+    const undo = 'undo' in out ? () => void putBack(out.undo) : () => void m.setBody(apiBase(), out.before, undefined, out.version).then(afterBack);
+    toasts.push(every ? blockWords.arrangedEvery(every) : copy.arranged(page.title), { undo });
+    return true;
+  }
+
+  /** Undo of a look: the person's look before it written again, or this one retired. */
+  async function putBack(undo: LookUndo) {
+    const back = 'write' in undo ? await writeLook(apiBase(), undo.write) : await retireLook(apiBase(), undo.retire);
+    await afterBack(back.ok ? { from: 'written' } : { from: 'refused', fix: back.fix });
+  }
+
+  async function afterBack(back: { from: string; fix?: string }) {
+    if (back.from !== 'written' && back.fix) toasts.push(back.fix, { intent: 'warn' });
+    await reread();
   }
 
   /**

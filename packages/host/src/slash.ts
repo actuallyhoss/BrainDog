@@ -94,32 +94,35 @@ export const SLASH_TOKENS_CEILING = 1_000_000;
 
 /**
  * THE ONE EXAMPLE PAGE THE MODEL IS SHOWN, so "a good page" (DIRECTION §35) is a body it can copy and not only a sentence.
- * A lead note with two figures, a stat with its trend beside the orders still to bake, every heading with its glyph, the
+ * A lead note with two figures, a stat with its trend beside the firings still to run, every heading with its glyph, the
  * rows tiling to 12 and the list saying what it says when it is empty. Every key is one `block-keys.ts` reads, so a model
  * that copies it draws clean.
+ *
+ * AN INVENTED PAGE, A POTTERY STUDIO'S KILN FIRINGS, and never a page of anybody's real work: this is sent on every ask, so
+ * an example that named a real project would be a real project's name in every prompt (`slash-instructions.test.ts`).
  */
-const GOOD_PAGE = {
-  id: 'page.bake',
+export const GOOD_PAGE = {
+  id: 'page.firings',
   kind: 'page',
   body: {
-    page: 'bake',
-    title: 'Bake',
+    page: 'firings',
+    title: 'Firings',
     icon: 'book',
-    requires: ['register.orders'],
+    requires: ['register.firings'],
     blocks: [
-      { kind: 'note', lead: true, span: 12, body: '{{orders-open}} orders to bake, {{orders-due-week}} of them due by Sunday.' },
-      { kind: 'stat', heading: 'Takings', icon: 'wallet', span: 4, back: 6, cells: [{ metric: 'takings-month', label: 'This month' }] },
+      { kind: 'note', lead: true, span: 12, body: '{{firings-open}} firings to run, {{firings-due-week}} of them due by Sunday.' },
+      { kind: 'stat', heading: 'Pieces fired', icon: 'chart-line', span: 4, back: 6, cells: [{ metric: 'pieces-fired-month', label: 'This month' }] },
       {
         kind: 'table',
-        heading: 'Still to bake',
+        heading: 'Still to fire',
         icon: 'calendar',
         span: 8,
-        source: 'register.orders',
+        source: 'register.firings',
         where: 'state is open',
         columns: [{ field: 'what' }, { field: 'due' }],
         order: [{ field: 'due', dir: 'asc' }],
         limit: 20,
-        empty: 'Nothing left to bake.',
+        empty: 'Nothing left to fire.',
       },
     ],
   },
@@ -147,7 +150,8 @@ export const SLASH_INSTRUCTIONS = [
   'Answer only JSON: {"drafts":[{"question":"...","body_kind":"pack"|"settings"|"arrange"|"change","body":{...}}]}. The rules\' drafts show the body shapes.',
   'pack bodies: {"install":"<offered id>"}, {"enable":"<id>"}, {"disable":"<id>"}. settings: {"pack":"<id>","values":{...}} or {"voice":{"home":"..."}}. arrange: {"why":["..."],"usecase"?,"packs"?,"pages"?,"settings"?,"voice"?}.',
   'change builds what the record does not have yet, such as a rate fetched on a schedule into a list: {"to":{"id":"ingest.<id>","kind":"ingest","body":{...}}} for one register, ingest, rule, metric, page or script, or {"to":{"declarations":[...]}} for several that belong together, like a list and the door that fills it, or a figure and the page that says it. Write each body whole, as the record declares that kind. Never write what a change calls out to beside its body: the record works that out and shows the owner.',
-  'A script is code the record runs on a clock to fetch from outside and write what it finds, such as a rate fetched every hour into a list, and goes in `to` as any kind does: {"id":"script.<id>","kind":"script","body":{"script":"<id>","title":"...","runs":{"every":"1h"},"egress":["https://<host>"],"keys":["<key label>"],"reads":[],"writes":["<list id>"],"source":"export default async function run(ctx) {...}"}}, and no other key. egress is every https origin it fetches from, each written out in full with no path. keys names each vault key it sends by its label, never the key itself, and never the label slash. runs.every is written like 1h or 1d, and never under 15m. reads stays empty when it fetches. source fetches with await ctx.fetch(url, {"key":"<key label>"}), which answers {status, ok, json(), text()}, and adds a row with ctx.write("<list id>", {"<field>":...}). The owner reads its origins and keys on Decide, and nothing runs until they accept.',
+  'A script is code the record runs on a clock to fetch from outside and write what it finds, such as a rate fetched every hour into a list, and goes in `to` as any kind does: {"id":"script.<id>","kind":"script","body":{"script":"<id>","title":"...","runs":{"every":"1h"},"egress":["https://<host>"],"keys":[],"reads":[],"writes":["<list id>"],"source":"export default async function run(ctx) {...}"}}, and no other key. egress is every https origin it fetches from, each written out in full with no path. A script you write sends no key: keys is always empty. runs.every is written like 1h or 1d, and never under 15m. reads stays empty when it fetches. source fetches with await ctx.fetch(url), which answers {status, ok, json(), text()}, and adds a row with ctx.write("<list id>", {"<field>":...}). The owner reads its origins on Decide, and nothing runs until they accept.',
+  'Never offer a page for something that already has one: usage.pages lists what has a page.',
   'When `asked` is present, it is the owner describing, in their own words, what they want built, and it comes before how the record is used. Then answer only change drafts that build the lists, figures, pages, rules, scripts and doors that fetch it describes, each body written in the grammar for its kind in `grammar` (grammar.register, grammar.metric, grammar.page, grammar.rule, grammar.ingest), or as a script is written above, reusing the lists in usage where they fit, with the pieces that belong together as one {"declarations":[...]} change. When `page` is present, the description is about that page, as it is declared: change it and keep its id. Ask in the question whether to build what they described, in their words. Build nothing they did not describe. Never an ingest that sends out or that others post to: only a poll or a pull that reads one address on a clock into a list, and never a rule that runs, calls, starts a script or asks Slash: a door like that is asked for on its own, and the record drops it here. A script built from a description runs only on runs.every and reads no list. Change a list, figure or page that exists only when the description asks for that change, and say in the question what it changes; the record adds a line naming what it replaces.',
   `A change draft may carry "rows" beside its body: {"<list id>":[{"<field>":...}]}, at most ${SAMPLE_ROWS_MOST} a list, sample rows the pages are drawn over so the owner sees them working. Nothing files them.`,
   'When `repair` is present, the record drew your drafts and refused some. repair.drafts are those drafts as you answered them, and repair.refusals each refusal: at names the declaration and the key, and fix says what the record needs. Answer those drafts again, mended, and nothing else.',
@@ -206,7 +210,8 @@ export const SLASH_COMPOSE_INSTRUCTIONS = [
   'A page may also have `items`, the titles of what is late or due on it, most pressing first, each marked late, today or tomorrow, and `question`, the first thing waiting on the person there.',
   'The page with id "home" is their day: how many things need them, how many are late, how many agents are working, the titles of what is late and the first thing waiting on them.',
   'For each page, write one plain sentence that says what matters on it right now: the thing the person would want to know first when they open it. When an item or the question is what matters, name it by its title, such as "The EDF bill is late".',
-  'Name their own things in their own words, as the titles, items and figures name them, such as Northbank or Bake. Never say row, list, register, block, entity or record about them.',
+  'Name their own things in their own words, as the titles, items and figures name them, such as Northbank or Kiln Room. Never say row, list, register, block, entity or record about them.',
+  'Write a figure as the {{path}} you were handed, never as digits.',
   'Write each number as the hole of its figure: {{<figure id>}} for the value of a figure of that page, and {{<figure id>.change}} for how far it moved when it has a `change`, such as "{{orders-open}} orders are waiting". A hole stands as a word of its own, never against a letter, a digit or another hole. The record puts the number in, written as the person reads it, with its currency.',
   'Never type a digit, nor a number in words such as two, both, half or a dozen: a line holding either is thrown away. Use only the ids of that page\'s own figures, and never work one out, add two up or round one. A title or an item that holds a number is said whole, exactly as it is given.',
   `At most ${HEADLINE_MOST} characters once the numbers are in. No dashes used as punctuation, no exclamation marks, no greeting. When nothing matters more than the rules line, give back the rules line with each of its numbers written as its hole.`,
@@ -1075,8 +1080,15 @@ const ownAddressOf = (own: SlashOwnKey, hostUrl: string | undefined): string | n
   return base.endsWith('/v1') ? `${base}/messages` : `${base}/v1/messages`;
 };
 
-/** The sentence for his own key when the vault would not open it, thrown before anything is sent. */
-const OWN_KEY_SHUT = 'Your own key for Slash would not open on this host, so nothing was sent.';
+/**
+ * The sentence for his own key when the vault would not open it, thrown before anything is sent, in his words.
+ *
+ * HIS OWN KEY IS A ROUTE OF ONE CANDIDATE. `routeFor` answers `[m.key]` alone for the `key` form (`infer.ts`), each host's
+ * `chosen()` throws where his key is gone rather than hand back the included model, and `infer` throws a closed key on as
+ * it came. So a key that will not open is this sentence and nothing sent, never a fall to the included model, which would
+ * spend the host's allowance on a record he moved off it (`slash-own-key-route.test.ts`).
+ */
+export const OWN_KEY_FAILED = 'Your own key did not open. Put it back in Keys, or switch Slash to Included in Settings.';
 
 /**
  * The options every call on his own key is built from, or `undefined` where no key could be had.
@@ -1104,8 +1116,9 @@ const ownOptionsOf = (own: SlashOwnKey, deps: SlashHostDeps, hostUrl: string | u
     model: own.model,
     key: async () => {
       const grant = live();
-      const key = grant ? await open(grant) : null;
-      if (!key) throw new SlashKeyClosedError(OWN_KEY_SHUT);
+      /* A VAULT THAT THROWS IS A KEY THAT DID NOT OPEN: the same sentence, and nothing sent. */
+      const key = grant ? await open(grant).catch(() => null) : null;
+      if (!key) throw new SlashKeyClosedError(OWN_KEY_FAILED);
       return key;
     },
     send: deps.send,
@@ -1417,7 +1430,7 @@ export function slashGuardedEngine<E extends Guarded>(engine: E, deps: SlashGuar
     if (Object.keys(patch).length === 0) return engine.configure(patch, ctx);
     if (ctx.principal.kind !== 'person' || ctx.principal.level !== 'owner') return engine.configure(patch, ctx);
     const before = tierOf();
-    const asked = patch['source'] === 'key' ? 'b' : patch['source'] === 'included' ? (patch['tier'] === 'byo' ? 'byo' : 'a') : patch['tier'];
+    const asked = patch['source'] === 'key' ? 'b' : patch['source'] === 'included' ? 'a' : patch['tier'];
     const tier = asked ?? before?.tier;
     const grant = patch['grant_id'] === undefined ? (before?.grant_id ?? null) : patch['grant_id'];
     if (tier !== 'b' || typeof grant !== 'string') return engine.configure(patch, ctx);

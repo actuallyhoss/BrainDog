@@ -37,6 +37,15 @@ import { words as usageWords, type Meter, type MeterKey } from '../../lib/record
 export const words = {
   /* TRUE ON BOTH HOSTS, which is why it is the default: a self-host is not charged either. */
   notChargedYet: 'BrainDog does not charge for this record yet.',
+  /* SLASH CREDIT PACKS (LCH-A10): the heading over the buttons, each button's own words, and what is left of them. */
+  buyCredits: 'Buy credits',
+  packButton: (credits: number, price: string) => `${credits.toLocaleString('en-GB')} credits, ${price}`,
+  /** The button's whole name for a screen reader, which keeps the words it shows. */
+  packSaid: (credits: number, price: string) => `Buy ${credits.toLocaleString('en-GB')} credits, ${price}`,
+  creditsLeft: (n: number) => `Credits from packs: ${n.toLocaleString('en-GB')}`,
+  /* A PLAN THAT IS A GIFT (LCH-A12): said where the plan's price is, and when it ends if it does. */
+  gift: (plan: string) => `${plan}, a gift from BrainDog`,
+  giftUntil: (day: string) => `Given until ${day}.`,
 };
 
 export type Billed = {
@@ -88,18 +97,26 @@ export type BilledRecord = {
   periodEnd: number | null;
   lapsedAt: number | null;
   deleteOn: number | null;
+  /** Slash credits left from packs, `null` from a host older than packs. They do not end with the month. */
+  credits: number | null;
+  /** The operator gave this plan (LCH-A12): never charged, nothing at Stripe to manage. */
+  gift: boolean;
 };
 
 /** A plan this host sells, in the Worker's own words: `{ id: 'cloud', name: 'Cloud', price: '$12 a month' }`. */
 export type SoldPlan = { id: string; name: string; price: string };
 
-/** The whole answer: each owned record, whether this host takes payment at all, and the plans it sells. */
-export type BillingAnswer = { records: BilledRecord[]; open: boolean; plans: SoldPlan[] };
+/** A pack of Slash credits this host sells: `{ id: 'credits-100', credits: 100, price: '$5' }`, the price in its words. */
+export type SoldPack = { id: string; credits: number; price: string };
+
+/** The whole answer: each owned record, whether this host takes payment at all, and the plans and packs it sells. */
+export type BillingAnswer = { records: BilledRecord[]; open: boolean; plans: SoldPlan[]; packs: SoldPack[] };
 
 /** The one fetch these calls need, so a test hands in its own and nothing here reaches for the page's. */
 export type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
 
-const STATES = new Set(['active', 'past_due', 'lapsed', 'unbilled']);
+/* `comp` IS THE DIRECTORY'S WORD FOR A GIFT, read as a plan that is on and given, so a host that sends it loses no row. */
+const STATES = new Set(['active', 'past_due', 'lapsed', 'unbilled', 'comp']);
 const isObj = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object';
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
@@ -111,17 +128,26 @@ const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFi
  */
 function billedOf(v: unknown): BilledRecord | null {
   if (!isObj(v) || typeof v.record !== 'string' || typeof v.state !== 'string' || !STATES.has(v.state)) return null;
+  const credits = num(v.credits);
   return {
     record: v.record,
     slug: typeof v.slug === 'string' ? v.slug : null,
-    state: v.state as BilledRecord['state'],
+    state: v.state === 'comp' ? 'active' : (v.state as BilledRecord['state']),
     plan: typeof v.plan === 'string' ? v.plan : 'cloud',
     price: typeof v.price === 'string' ? v.price : '',
     periodEnd: num(v.period_end),
     lapsedAt: num(v.lapsed_at),
     deleteOn: num(v.delete_on),
+    credits: credits === null ? null : Math.max(0, Math.floor(credits)),
+    gift: v.gift === true || v.state === 'comp',
   };
 }
+
+/** One pack on sale, or nothing: a pack with no whole number of credits or no price is not offered. */
+const packOf = (v: unknown): SoldPack | null =>
+  isObj(v) && typeof v.id === 'string' && v.id && Number.isInteger(v.credits) && (v.credits as number) > 0 && typeof v.price === 'string' && v.price
+    ? { id: v.id, credits: v.credits as number, price: v.price }
+    : null;
 
 /** One sold plan, or nothing when it is not one: a plan with no name or no price is not offered. */
 const soldOf = (v: unknown): SoldPlan | null =>
@@ -129,13 +155,17 @@ const soldOf = (v: unknown): SoldPlan | null =>
     ? { id: v.id, name: v.name, price: v.price }
     : null;
 
-/** Parse the answer's `value`, or `null` when it is not the shape the Worker sends. A host older than `plans` sells none. */
+/**
+ * Parse the answer's `value`, or `null` when it is not the shape the Worker sends. A host older than `plans` sells none,
+ * and a host older than `packs` sells no credits, so its answer draws the screen as it was before packs.
+ */
 export function billingOf(v: unknown): BillingAnswer | null {
   if (!isObj(v) || !Array.isArray(v.records)) return null;
   return {
     records: v.records.map(billedOf).filter((r): r is BilledRecord => r !== null),
     open: v.open === true,
     plans: Array.isArray(v.plans) ? v.plans.map(soldOf).filter((p): p is SoldPlan => p !== null) : [],
+    packs: Array.isArray(v.packs) ? v.packs.map(packOf).filter((p): p is SoldPack => p !== null) : [],
   };
 }
 
@@ -194,11 +224,32 @@ export async function paymentPage(
   /** The plan to pay for: a free record's upgrade names it, and paying again leaves it to the Worker's default. */
   plan?: string,
 ): Promise<Said<string>> {
-  const out = await door(io, `/account/billing/${kind}`, { record, ...(plan ? { plan } : {}) });
+  return pageOf(await door(io, `/account/billing/${kind}`, { record, ...(plan ? { plan } : {}) }));
+}
+
+/**
+ * Ask for Stripe's page that sells one pack of Slash credits to this record, and answer its address (LCH-A10).
+ *
+ * THE SAME CHECKOUT DOOR, NAMING A PACK AND NO PLAN, so the Worker starts a one-off payment and no subscription. The
+ * credits are added by Stripe's webhook, never by this screen: coming back only reads billing again.
+ */
+export async function packPage(record: string, pack: string, io: Fetch = (u, i) => globalThis.fetch(u, i)): Promise<Said<string>> {
+  return pageOf(await door(io, '/account/billing/checkout', { record, pack }));
+}
+
+/** A door's `{ url }` as the address to go to, and only Stripe's kind of address: `https`, never a path or a script. */
+function pageOf(out: Said<unknown>): Said<string> {
   if (!out.ok) return out;
   const url = isObj(out.value) && typeof out.value.url === 'string' ? out.value.url : null;
   return url && /^https:\/\//u.test(url) ? { ok: true, value: url } : { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: copy.billingUnread } };
 }
+
+/**
+ * Whether this address is the one Stripe sends a person back to after paying: `#paid=…` (the checkout's success
+ * address), or `#credits=…` should the pack's checkout name its own. The screen then reads billing again once the
+ * webhook has had a moment, because the person may land before the credits do.
+ */
+export const backFromCheckout = (hash: string): boolean => /^#(?:paid|credits|pack)=/u.test(hash);
 
 /**
  * A day as Billing says it: "24 October", with the year only when it is not this one.
@@ -220,6 +271,8 @@ export function dayOf(ms: number, now: number): string {
  * goes, and can always be exported. A record with no row was made by the operator and is not billed.
  */
 export function stateLine(r: BilledRecord, now: number): string {
+  /* A GIFT HAS NO BILL TO STAND ANYWHERE: it says when it ends, and nothing when it does not, never "Paid". */
+  if (r.gift) return r.periodEnd !== null ? words.giftUntil(dayOf(r.periodEnd, now)) : '';
   if (r.state === 'unbilled') return copy.billingNotBilled;
   if (r.state === 'past_due') return copy.billingPastDue;
   if (r.state === 'lapsed')
@@ -229,15 +282,39 @@ export function stateLine(r: BilledRecord, now: number): string {
   return r.periodEnd !== null ? copy.billingPaidThrough(dayOf(r.periodEnd, now)) : copy.billingPaid;
 }
 
-/** The plan in the person's words: "Cloud, $12 a month", and a free record's "Free" with no price beside it. */
+/**
+ * The plan in the person's words: "Cloud, $12 a month", a free record's "Free" with no price beside it, and a gift's
+ * "Cloud, a gift from BrainDog", where a price would only say what is never charged.
+ */
 export function planLine(r: BilledRecord): string {
   if (r.plan === 'free') return copy.billingPlanFree;
-  return copy.billingPlan(r.plan === 'plus' ? copy.billingPlanPlus : copy.billingPlanHosted, r.price);
+  const name = r.plan === 'plus' ? copy.billingPlanPlus : copy.billingPlanHosted;
+  return r.gift ? words.gift(name) : copy.billingPlan(name, r.price);
 }
 
 /** What a record's line says beside its name: its plan, or that it is not billed (a record the operator made). */
 export function planShown(r: BilledRecord): string {
-  return r.plan === 'free' || r.state !== 'unbilled' ? planLine(r) : copy.billingNotBilled;
+  return r.plan === 'free' || r.gift || r.state !== 'unbilled' ? planLine(r) : copy.billingNotBilled;
+}
+
+/** Whether Stripe's own page has anything to manage for this record: a gift and a record with no row have nothing there. */
+export const managedAtStripe = (r: BilledRecord, answer: BillingAnswer): boolean => answer.open && r.state !== 'unbilled' && !r.gift;
+
+/**
+ * What a record says of Slash credit packs: what is left of them, and the packs it can buy, or nothing at all.
+ *
+ * NOTHING IS OFFERED WHILE THE HOST SELLS NO PACK, so an answer from a host older than packs, or one with billing off
+ * or no pack price set, draws the screen as it was. The Worker sends `packs` only while it sells them, which needs no
+ * plan price, so `open` (which is the plans') is not asked: a host that sells packs and no plan still sells packs. A
+ * lapsed record is offered none: the checkout refuses it until it is paid. The credits left are said whenever there are some.
+ */
+export function packsOf(r: BilledRecord, answer: BillingAnswer): { left: string | null; buy: { pack: SoldPack; label: string; said: string }[] } {
+  const left = r.credits !== null && r.credits > 0 ? words.creditsLeft(r.credits) : null;
+  const buy =
+    r.state !== 'lapsed'
+      ? answer.packs.map((pack) => ({ pack, label: words.packButton(pack.credits, pack.price), said: words.packSaid(pack.credits, pack.price) }))
+      : [];
+  return { left, buy };
 }
 
 /**
@@ -247,7 +324,8 @@ export function planShown(r: BilledRecord): string {
  * price in the Worker's words. Nothing is offered while the host takes no payment, because the button could only fail.
  */
 export function upgradeOf(r: BilledRecord, answer: BillingAnswer): { plan: SoldPlan; line: string } | null {
-  if (r.plan !== 'free' || !answer.open) return null;
+  /* A GIFT IS OFFERED NOTHING TO PAY FOR: the checkout refuses one, so the button could only fail. */
+  if (r.plan !== 'free' || r.gift || !answer.open) return null;
   const plan = answer.plans[0];
   return plan ? { plan, line: copy.billingFreeOffer(plan.name, plan.price) } : null;
 }

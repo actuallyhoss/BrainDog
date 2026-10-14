@@ -145,6 +145,8 @@ export type ExportParts = {
   tone: string;
   signals?: readonly string[];
   modules: readonly string[];
+  /** The packs this use case cannot stand without, a part of `modules` (`UseCase.needs`). */
+  needs?: readonly string[];
   voice: Partial<Record<VoiceKey, string>>;
   labels: Record<string, string>;
   /** The carried pack's declarations, in a pack document's own shape: `{ register: 'courses', ... }`. */
@@ -188,6 +190,7 @@ export function exportUseCase(parts: ExportParts): Result<Record<string, unknown
     tone: parts.tone,
     signals: [...(parts.signals ?? [])],
     modules: [...parts.modules],
+    ...(parts.needs !== undefined ? { needs: [...parts.needs] } : {}),
     ...(hasPack && Object.keys(parts.voice).length > 0 ? { voice: parts.voice } : {}),
     ...(hasPack && Object.keys(parts.labels).length > 0 ? { labels: parts.labels } : {}),
     pack: hasPack

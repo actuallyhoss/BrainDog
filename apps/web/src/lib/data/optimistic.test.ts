@@ -11,6 +11,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { arrivals, optimist, overlay, UNDO_MS, UNSENT, type Say, type Sent } from './optimistic.ts';
+import { undoStack } from './undo.ts';
 
 /** A toast stack that keeps what it was told. */
 function said() {
@@ -169,6 +170,45 @@ test('WITH THE RECORD’S UNDO HANDED IN, a write that said no batch is undone b
   lines[0]?.undo?.();
   assert.equal(pressed, 1);
   assert.deepEqual(asked, []);
+});
+
+const putBack = async () => ({ from: 'undone' as const, put: 1, skipped: [], said: 'Put back 1 change.' });
+
+test('WITH A HISTORY HANDED IN, a write that landed under a batch is held with its receipt for ⌘Z', async () => {
+  const { say } = said();
+  const history = undoStack();
+  const { run } = optimist(say, { undoBatch: putBack, history });
+  await run({ apply: () => {}, revert: () => {}, send: async () => ({ ok: true, value: { batch: 'b7' } }), said: 'Archived Lamp repair.' });
+  await run({ apply: () => {}, revert: () => {}, send: async () => ({ ok: false, fix: 'Somebody changed it first.' }), said: 'Archived Shelf.' });
+  assert.equal(history.size, 1, 'a refused write is not held');
+  assert.deepEqual(history.pop(), { batch: 'b7', said: 'Archived Lamp repair.' });
+});
+
+test('WITH A HISTORY HANDED IN, the toast’s own Undo spends its batch, and the Undo’s write is never held', async () => {
+  const { say, lines } = said();
+  const history = undoStack();
+  const asked: string[] = [];
+  const undoBatch = async (b: string) => (asked.push(b), { from: 'undone' as const, put: 1, skipped: [], said: 'Put back 1 change.', batch: 'b9' });
+  const { run } = optimist(say, { undoBatch, history, reread: () => {} });
+  await run({ apply: () => {}, revert: () => {}, send: async () => ({ ok: true, value: { batch: 'b1' } }), said: 'Moved Bike tune to Later.' });
+  await run({ apply: () => {}, revert: () => {}, send: async () => ({ ok: true, value: { batch: 'b2' } }), said: 'Marked Bike tune done.' });
+  lines[1]?.undo?.();
+  assert.equal(history.size, 1, 'spent before the record is asked');
+  await settle();
+  await settle();
+  assert.deepEqual(asked, ['b2']);
+  assert.equal(lines.at(-1)?.text, 'Put back 1 change.');
+  assert.equal(history.size, 1, 'putting a change back is not itself held');
+  assert.equal(history.pop()?.batch, 'b1');
+});
+
+test('WITH A HISTORY HANDED IN, a write with no batch is never held: its screen’s own way back may be gone by the press', async () => {
+  const { say, lines } = said();
+  const history = undoStack();
+  const { run } = optimist(say, { undoBatch: putBack, history });
+  await run({ apply: () => {}, revert: () => {}, send: async () => ({ ok: true, value: { seq: 3 } }), said: 'Saved Pantry.', undo: () => () => {} });
+  assert.equal(history.size, 0);
+  assert.equal(typeof lines[0]?.undo, 'function', 'the toast still offers the screen’s own way back');
 });
 
 type Row = { id: string; state: string };

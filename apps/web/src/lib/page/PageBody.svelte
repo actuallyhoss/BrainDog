@@ -1031,6 +1031,7 @@
         verbs={verbsFor(slot.i)}
         pick={mode === 'preview' ? null : pick}
         walk={mode === 'preview' ? null : onwalk}
+        slug={mode === 'home' ? page.page : null}
       />
     </div>
     <!-- UNDER THE HEADLINE: the one next action the look names, wherever the headline is drawn. -->

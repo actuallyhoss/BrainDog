@@ -505,7 +505,12 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
   /* HOW LONG SINCE ANYBODY WORKED ON IT, SINCE portfolio 1.16.0 (REC-C16 part a): the days from the newest stamp the record
      put on a task of the project, made, moved or finished, to the reading's own day. Read off the record's own
      `updated_at` and never a typed day, so a project nobody describes still says "2 days" or "40 days". A project with no
-     task reads nothing, never nought. Filed with Work beside `project-moved-7d`, by the list it reads. */
+     task reads nothing, never nought. Filed with Work beside `project-moved-7d`, by the list it reads.
+     QUIET PAST THIRTY DAYS, SINCE work 1.19.0 (W096, REC-C16): the target is the most days a project in play may go
+     with nothing written on it, so a reading of 40 misses it and is drawn in the late tone beside its word, on the
+     project page's Where it stands and on its card in play. A declaration, so a person who means a fortnight writes 14.
+     TASKS ONLY: a figure reads one list, and no shape takes the newest of three figures, so a project worked through
+     its updates or readings alone still reads as quiet until one does. */
   'project-last-worked': {
     metric: 'project-last-worked',
     name: 'Last worked',
@@ -513,7 +518,7 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
     where: 'thing is {{it}}',
     value: { age: 'updated_at' },
     format: 'days',
-    target: { gte: 0 },
+    target: { lte: 30 },
     window: '30d',
     compare: 'none',
   },
@@ -914,6 +919,11 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
              `project-done-by-week`, the same numbers the project's own page charts. A record without Work, or a project
              nothing was finished on, draws no line, and the card is as it was. */
           { metric: 'project-done-by-week:{{name}}', as: 'trend' },
+          /* HOW LONG SINCE ANYBODY WORKED ON IT, SINCE portfolio 1.17.0 (W096, REC-C16): Work's `project-last-worked` for the
+             card's own project, the reading the project page's Where it stands draws, said in the card's head as "Worked on 2
+             days ago", or "Quiet for 40 days" in the late tone once it misses its thirty days. A project with no task reads
+             nothing and the card draws no line. So a quiet project is seen on the list. */
+          { metric: 'project-last-worked:{{name}}', as: 'when', label: 'Worked on' },
         ],
         order: [{ field: 'name', dir: 'asc' }],
         limit: 12,

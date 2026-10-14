@@ -250,7 +250,11 @@ export async function checkoutsSince(stripe: Stripe, customer: string, since: nu
   return { count: times.length, oldest: times.length === 0 ? null : Math.min(...times) };
 }
 
-/** What a checkout is for and where it returns to. `metadata` goes on the session and on the subscription it makes. */
+/**
+ * What a checkout is for and where it returns to. `metadata` goes on the session and on what it makes: the
+ * subscription, or in `payment` mode (a pack of credits, paid once) the payment, so its charge says what it bought.
+ * `mode` is `subscription` when it is left out.
+ */
 export type CheckoutAsk = {
   customer: string;
   person: string;
@@ -258,6 +262,7 @@ export type CheckoutAsk = {
   metadata: Record<string, string>;
   success: string;
   cancel: string;
+  mode?: 'subscription' | 'payment';
 };
 
 /**
@@ -282,10 +287,11 @@ const pageOf = (a: StripeAnswer): StripePage => {
   return url.startsWith('https://') ? { url } : { failed: NO_URL };
 };
 
-/** A Stripe Checkout Session for one plan's subscription: its page's address, or the failure. */
+/** A Stripe Checkout Session for one plan's subscription, or for one pack paid once: its page's address, or the failure. */
 export async function startCheckout(stripe: Stripe, ask: CheckoutAsk): Promise<StripePage> {
+  const mode = ask.mode ?? 'subscription';
   const form: Form = {
-    mode: 'subscription',
+    mode,
     customer: ask.customer,
     client_reference_id: ask.person,
     'line_items[0][price]': ask.price,
@@ -293,11 +299,26 @@ export async function startCheckout(stripe: Stripe, ask: CheckoutAsk): Promise<S
     success_url: ask.success,
     cancel_url: ask.cancel,
   };
+  const made = mode === 'payment' ? 'payment_intent_data' : 'subscription_data';
   for (const [k, v] of Object.entries(ask.metadata)) {
     form[`metadata[${k}]`] = v;
-    form[`subscription_data[metadata][${k}]`] = v;
+    form[`${made}[metadata][${k}]`] = v;
   }
   return pageOf(await stripe.create('/v1/checkout/sessions', form));
+}
+
+/**
+ * The Checkout Session that took a payment, as a refund finds what it gave back: its id, customer and metadata.
+ * `null` for a payment no session took (a subscription's invoice), and the failure when Stripe could not be asked, so
+ * the caller tells "not a pack" from "ask again".
+ */
+export async function sessionOfPayment(stripe: Stripe, payment: string): Promise<{ id: string; customer: string; metadata: Record<string, string> } | null | StripeFault> {
+  if (!/^pi_[A-Za-z0-9]{1,250}$/u.test(payment)) return null;
+  const got = await stripe.read('/v1/checkout/sessions', { payment_intent: payment, limit: 1 });
+  if (!got.ok) return got;
+  const session = listOf(got.body)[0];
+  if (session === undefined || textAt(session, 'id') === '') return null;
+  return { id: textAt(session, 'id'), customer: idAt(session, 'customer'), metadata: metadataOf(session) };
 }
 
 /**

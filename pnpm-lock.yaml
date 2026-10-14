@@ -394,6 +394,8 @@ importers:
         specifier: workspace:*
         version: link:../ports
 
+  packs/agency: {}
+
   packs/agent-notes: {}
 
   packs/bank-hsbc-eg: {}
@@ -410,6 +412,10 @@ importers:
 
   packs/holdings: {}
 
+  packs/job-starter: {}
+
+  packs/landlord: {}
+
   packs/launch-desk: {}
 
   packs/live-feed: {}
@@ -422,6 +428,10 @@ importers:
 
   packs/people: {}
 
+  packs/photographer: {}
+
+  packs/portfolio: {}
+
   packs/portfolio-bands: {}
 
   packs/project-brief: {}
@@ -433,6 +443,8 @@ importers:
   packs/roadmap: {}
 
   packs/rule-sheet: {}
+
+  packs/slash-desk: {}
 
   packs/standup: {}
 

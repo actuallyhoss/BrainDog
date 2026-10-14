@@ -108,7 +108,7 @@ export type OneOpened =
  */
 const RUN: ReadonlySet<string> = new Set([
   'rows', 'matched', 'readings', 'walk', 'inherited', 'scopes', 'feed', 'seen', 'history', 'values',
-  'refusals', 'drawn',
+  'refusals', 'drawn', 'why',
 ]);
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null;

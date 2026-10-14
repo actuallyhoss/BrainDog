@@ -22,6 +22,13 @@
  * key that is no run is not joined there, so the questions still open are read first and one already asking for this
  * same declaration is named instead of asked again (`feed.ts` does the same for a feed).
  *
+ * `push --wait` HOLDS UNTIL THE PERSON ANSWERS, so an agent's push can go on from what they said. It reads the one
+ * question every five seconds (`governance({ register: 'suggestion', id })`), for 30 minutes or the duration given
+ * (`--wait 10m`, at most 30m), and prints "Accepted.", "Declined." or "Still waiting on Decide.", exiting 0, 1 or 2.
+ * A push an owner's session applied, or a question the person already answered, has nothing to wait for, and a no
+ * given before exits 1 as a no waited for does. Without
+ * `--wait` nothing about a push changes. Nothing waited on prints the key: the question's number is all it names.
+ *
  * `check` runs the parse and the kernel's own validation locally and sends nothing at all: it is how somebody finds
  * out a `.dog` file is broken before it is anybody else's problem.
  */
@@ -43,13 +50,18 @@ const unread = (file: string, no: Extract<DogParsed, { ok: false }>): string => 
 /** The page a body declares. `parseDog` and `storedOf` both refuse a body whose `page` is not text. */
 const nameOf = (body: { page?: unknown }): string => (typeof body.page === 'string' ? body.page : '');
 
-const USAGE = 'braindog page takes pull <slug>, push <file> or check <file>, and --host and --out where a verb takes them.';
+const USAGE = 'braindog page takes pull <slug>, push <file> or check <file>, and --host, --out and --wait where a verb takes them.';
+
+/** How `push --wait` passes the time: the real clock, or a test's, so a half hour is not waited out in a test. */
+export type Clock = { now: () => number; sleep: (ms: number) => Promise<void> };
+
+const REAL: Clock = { now: () => Date.now(), sleep: (ms) => new Promise((done) => setTimeout(done, ms)) };
 
 /** `braindog page pull|push|check`, over the real terminal, and the exit code the command decides. */
-export async function page(args: string[], io: AgentIo): Promise<number> {
+export async function page(args: string[], io: AgentIo, clock: Clock = REAL): Promise<number> {
   const [verb, ...rest] = args;
   if (verb === 'pull') return pull(rest, io);
-  if (verb === 'push') return push(rest, io);
+  if (verb === 'push') return push(rest, io, clock);
   if (verb === 'check') return check(rest, io);
   io.say(USAGE);
   return 1;
@@ -96,13 +108,52 @@ async function pull(args: string[], io: AgentIo): Promise<number> {
   return 0;
 }
 
-async function push(args: string[], io: AgentIo): Promise<number> {
+/** How often `--wait` reads the question, and the longest it holds. */
+const POLL_MS = 5_000;
+const WAIT_MOST_MS = 30 * 60_000;
+const UNIT_MS: Record<string, number> = { s: 1_000, m: 60_000, h: 3_600_000 };
+const DURATION = /^([1-9][0-9]*)(s|m|h)$/u;
+const WAIT_USAGE = '--wait takes a duration of at most 30m, as in --wait 10m, or nothing for 30m.';
+
+/**
+ * `--wait` TAKES A DURATION OR NOTHING, which `parseArgs` cannot say: an option is a flag or always takes a value. So it
+ * is taken out first, with the word after it when that word is a duration, and the rest is parsed as before.
+ */
+function waitOf(args: string[]): { rest: string[]; wait: number | null } | { fix: string } {
+  const rest: string[] = [];
+  let wait: number | null = null;
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i] ?? '';
+    if (a !== '--wait' && !a.startsWith('--wait=')) {
+      rest.push(a);
+      continue;
+    }
+    let said = a.startsWith('--wait=') ? a.slice('--wait='.length) : null;
+    if (said === null && DURATION.test(args[i + 1] ?? '')) said = args[++i] ?? '';
+    if (said === null) {
+      wait = WAIT_MOST_MS;
+      continue;
+    }
+    const m = DURATION.exec(said);
+    const ms = m ? Number(m[1]) * (UNIT_MS[m[2] ?? ''] ?? 0) : 0;
+    if (ms <= 0 || ms > WAIT_MOST_MS) return { fix: WAIT_USAGE };
+    wait = ms;
+  }
+  return { rest, wait };
+}
+
+async function push(args: string[], io: AgentIo, clock: Clock): Promise<number> {
+  const waited = waitOf(args);
+  if ('fix' in waited) {
+    io.say(waited.fix);
+    return 1;
+  }
   let values: { host?: string | undefined };
   let positionals: string[];
   try {
-    ({ values, positionals } = parseArgs({ args, allowPositionals: true, strict: true, options: { host: { type: 'string' } } }));
+    ({ values, positionals } = parseArgs({ args: waited.rest, allowPositionals: true, strict: true, options: { host: { type: 'string' } } }));
   } catch {
-    io.say('braindog page push takes one file, and --host.');
+    io.say('braindog page push takes one file, and --host and --wait.');
     return 1;
   }
   const [file, ...more] = positionals;
@@ -137,7 +188,43 @@ async function push(args: string[], io: AgentIo): Promise<number> {
   }
   /* ONLY THE REFUSAL THAT SAYS "A TOKEN": anything else the record said about the file itself is the answer. */
   if (!refused(out) || out.refusal.code !== 'NEEDS_BROWSER_SESSION') return refuse(io, out);
-  return ask(at.client, name, parsed.value, io);
+  const asked = await ask(at.client, name, parsed.value, io);
+  if (typeof asked === 'number') return asked;
+  if (waited.wait === null || asked.question === null) {
+    io.answer?.({ value: asked.value });
+    /* A NO GIVEN BEFORE IS STILL A NO: an agent that waits reads the exit code, and 0 would tell it the page went in. */
+    return waited.wait !== null && asked.declined === true ? 1 : 0;
+  }
+  return waitFor(at.client, asked.question, waited.wait, asked.value, io, clock);
+}
+
+/** What the person made of a question: its row as `governance` answers one, or `null` for one this caller cannot see. */
+function settled(row: unknown): 'accepted' | 'declined' | null {
+  if (!isObject(row) || row.status === 'open' || row.status === undefined) return null;
+  return row.resolved_as === 'addressed' ? 'accepted' : 'declined';
+}
+
+/**
+ * Read the question every five seconds until it is answered or the time is up. A record that cannot be reached for a
+ * moment is read again at the next turn; any other refusal is the record's answer and ends the wait.
+ */
+async function waitFor(client: Connected['client'], question: string, ms: number, value: Record<string, unknown>, io: AgentIo, clock: Clock): Promise<number> {
+  const until = clock.now() + ms;
+  for (;;) {
+    const got = await client.governance({ register: 'suggestion', id: question });
+    if (!got.ok && !(refused(got) && got.refusal.code === 'UNREACHABLE')) return refuse(io, got);
+    const said = got.ok ? settled(got.value) : null;
+    if (said !== null) {
+      io.out(said === 'accepted' ? 'Accepted.' : 'Declined.');
+      io.answer?.({ value: { ...value, waits: false, answered: said } });
+      return said === 'accepted' ? 0 : 1;
+    }
+    if (clock.now() + POLL_MS > until) break;
+    await clock.sleep(POLL_MS);
+  }
+  io.out('Still waiting on Decide.');
+  io.answer?.({ value: { ...value, waits: true } });
+  return 2;
 }
 
 const isObject = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -180,19 +267,26 @@ async function waitingChange(client: Connected['client'], id: string, to: unknow
 /** A question's number as a person says it. A handle (`q.<id>`) is not one, and is left out of the sentence. */
 const numbered = (id: unknown): string | null => (typeof id === 'string' && /^SG[1-9][0-9]*$/u.test(id) ? id : null);
 
+/**
+ * What a key's push filed: the question to wait on (its id as the record handed it, which `governance` reads back, or
+ * `null` when there is nothing to wait on), and the machine-readable answer, which the caller hands on once.
+ * `declined` is a question the person already said no to, which `--wait` exits on as it exits on a no it waited for.
+ */
+type Asked = { question: string | null; value: Record<string, unknown>; declined?: boolean };
+
 /** A key's push: the declaration filed as one change on Decide, or the question already waiting for it named. */
-async function ask(client: Connected['client'], name: string, body: Record<string, unknown>, io: AgentIo): Promise<number> {
+async function ask(client: Connected['client'], name: string, body: Record<string, unknown>, io: AgentIo): Promise<Asked | number> {
   const id = `page.${name}`;
   const to = { id, kind: 'page', body };
-  const before = (found: string | null): number => {
+  const before = (raw: unknown): Asked => {
+    const found = numbered(raw);
     io.out(`${name} is already waiting${found === null ? '' : ` as ${found}`}. It waits on Decide.`);
-    io.answer?.({ value: { page: name, waits: true, asked: false, ...(found === null ? {} : { question: found }) } });
-    return 0;
+    return { question: typeof raw === 'string' && raw !== '' ? raw : null, value: { page: name, waits: true, asked: false, ...(found === null ? {} : { question: found }) } };
   };
 
   const waiting = await waitingChange(client, id, to);
   if (!waiting.ok) return refuse(io, waiting);
-  if (waiting.value !== null) return before(numbered(waiting.value));
+  if (waiting.value !== null) return before(waiting.value);
 
   /* A TEMPLATE'S TITLE IS A PATTERN (`{{name}}`), which is no name for a page, so its own name is said instead. */
   const title = typeof body.title === 'string' && body.title.trim() !== '' && !body.title.includes('{{') ? body.title : name;
@@ -200,16 +294,18 @@ async function ask(client: Connected['client'], name: string, body: Record<strin
   if (!filed.ok) return refuse(io, filed);
   const value = isObject(filed.value) ? filed.value : {};
   const number = numbered(value.id);
-  if (value.joined === true) return before(number);
+  if (value.joined === true) return before(value.id);
   /* ANSWERED BEFORE, AND NOTHING FILED: the record says what the person said, and that is passed on as it came. */
   if (value.answered !== undefined && typeof value.said === 'string') {
     io.out(value.said);
-    io.answer?.({ value: { page: name, waits: false, asked: false, said: value.said } });
-    return 0;
+    const no = isObject(value.answered) && value.answered.said === 'No';
+    return { question: null, value: { page: name, waits: false, asked: false, said: value.said }, declined: no };
   }
   io.out(`${name} asked${number === null ? '' : ` as ${number}`}. It waits on Decide.`);
-  io.answer?.({ value: { page: name, waits: true, asked: true, ...(number === null ? {} : { question: number }) } });
-  return 0;
+  return {
+    question: typeof value.id === 'string' && value.id !== '' ? value.id : null,
+    value: { page: name, waits: true, asked: true, ...(number === null ? {} : { question: number }) },
+  };
 }
 
 async function check(args: string[], io: AgentIo): Promise<number> {
