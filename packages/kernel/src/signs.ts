@@ -349,10 +349,15 @@ function seriesName(sql: Sql, series: string): string {
    here it would be a series that cannot go red, and enough of them would hide a quarter gone quiet.
    The figures' (series, source) pairs are read once per query, not once per point: parsing every declaration for
    every point was most of a night's signs read on a record with a few thousand points. */
-const DECLARED = `WITH declared AS MATERIALIZED (SELECT json_extract(body, '$.metric') AS m, json_extract(body, '$.source') AS s
-  FROM declaration WHERE kind = 'metric' AND superseded_at IS NULL AND json_valid(body))`;
+/* AND EACH (series, source) PAIR IS JUDGED ONCE, not once per point: a point was matched against every figure, 161
+   figures by 11,624 points on a lived record, 45 ms a query and three queries a read of the signs. The pairs that
+   arrived are kept beside the figures' and a point is asked only whether its pair is one of them. */
 /* AND NOT WHAT THE NIGHT COUNTS OF THE RECORD ITSELF (`night-counts.ts`, sources night.counts and night.paths): written every night, it can never be late. */
-const ARRIVED = "NOT EXISTS (SELECT 1 FROM declared d WHERE d.m = mp.series AND d.s = mp.source) AND mp.source NOT LIKE 'night.%'";
+const DECLARED = `WITH declared AS MATERIALIZED (SELECT json_extract(body, '$.metric') AS m, json_extract(body, '$.source') AS s
+  FROM declaration WHERE kind = 'metric' AND superseded_at IS NULL AND json_valid(body)),
+  arrived AS MATERIALIZED (SELECT series, source FROM (SELECT DISTINCT series, source FROM metric_point) mp
+    WHERE NOT EXISTS (SELECT 1 FROM declared d WHERE d.m = mp.series AND d.s = mp.source) AND mp.source NOT LIKE 'night.%')`;
+const ARRIVED = '(mp.series, mp.source) IN (SELECT series, source FROM arrived)';
 
 function readNumbers(sql: Sql, nowMs: number, tz: string): SignReading {
   const feeds = feedsOn(sql);
@@ -380,8 +385,18 @@ function readNumbers(sql: Sql, nowMs: number, tz: string): SignReading {
   if (feeds.length === 0 && series.length === 0 && young.length === 0) return reading('none', null, 'No numbers come in on this record yet.');
   const stale: { name: string; newestMs: number }[] = [];
   const judged: { series: string; newest: string; every?: number }[] = [...series, ...young];
+  /* EACH SERIES' LAST THIRTY TIMES IN ONE READ, newest first. A read a series made the figures' declarations again for
+     each series, and Health asked it on every read of a sign: 26 series were 26 of them. */
+  const recent = new Map<string, number[]>();
+  if (series.length > 0)
+    for (const r of sql.all<{ series: string; at: string }>(
+      `${DECLARED}, times AS (SELECT DISTINCT series, at FROM metric_point mp WHERE ${ARRIVED}),
+         ranked AS (SELECT series, at, row_number() OVER (PARTITION BY series ORDER BY at DESC) AS n FROM times)
+       SELECT series, at FROM ranked WHERE n <= 30 ORDER BY series, at DESC`,
+    ))
+      recent.set(r.series, [...(recent.get(r.series) ?? []), Date.parse(r.at)]);
   for (const s of judged) {
-    const ats = s.every !== undefined ? [] : sql.all<{ at: string }>(`${DECLARED} SELECT DISTINCT at FROM metric_point mp WHERE series = ? AND ${ARRIVED} ORDER BY at DESC LIMIT 30`, s.series).map((r) => Date.parse(r.at));
+    const ats = s.every !== undefined ? [] : (recent.get(s.series) ?? []);
     const gaps = ats.slice(1).map((at, i) => ats[i]! - at).sort((a, b) => a - b);
     const gap = s.every ?? gaps[Math.floor(gaps.length / 2)] ?? DAY;
     const newestMs = Date.parse(s.newest);

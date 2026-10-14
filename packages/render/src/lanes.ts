@@ -36,6 +36,8 @@ export const LANES_NOW = 'Now';
 export const lanesSince = (when: string): string => `Since ${when}`;
 export const lanesSkipped = (titles: readonly string[]): string => `Not shown, because the times do not read: ${titles.join(', ')}.`;
 export const lanesOutside = (titles: readonly string[]): string => `Outside this time: ${titles.join(', ')}.`;
+/** Under lanes the record drew the newest of: how many in the same time it left out, all of them started earlier. */
+export const lanesMore = (n: number): string => `And ${n} more that started earlier.`;
 
 /** The most names along the top, and how near now's line, as a share of the width, a name gives way to it. */
 const TICKS_MOST = 8;

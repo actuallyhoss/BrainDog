@@ -62,9 +62,14 @@ export function methods(deps: RecordDeps) {
   const everyList = (ctx: CallContext): boolean =>
     deps.readsEveryList?.(ctx) ?? (whole(ctx) && Object.keys(ctx.levels ?? {}).every((list) => readable(ctx, list) === null));
 
+  /** The lists a block reads, as the kernel names them: over the call's one walk (`pageWalk`), so declarations are read once. */
+  type Lists = (block: PageBlock) => string[];
+  /** The call's one walk over the pages, blocks and lists (`kernel.pageWalk`). */
+  type Walk = ReturnType<typeof kernel.pageWalk>;
+
   /** Whether a block is held from the caller, as the census holds it, so its words are not read for them. */
-  const held = (ctx: CallContext, b: BlockResult): boolean => {
-    const lists = kernel.blockRegisters(b as unknown as PageBlock);
+  const held = (ctx: CallContext, b: BlockResult, listsOf: Lists): boolean => {
+    const lists = listsOf(b as unknown as PageBlock);
     const source = typeof b.source === 'string' && b.source.startsWith('register.') ? b.source.slice('register.'.length) : null;
     return (
       (typeof b.source === 'string' && ACROSS.has(b.source) && !(b.source.startsWith('governance.') ? everyList(ctx) : whole(ctx))) ||
@@ -74,8 +79,8 @@ export function methods(deps: RecordDeps) {
   };
 
   /** Whether a path reads a list the caller may not, which names nothing to them. */
-  const hidden = (ctx: CallContext, path: string): boolean =>
-    kernel.blockRegisters({ kind: 'note', body: `{{${path}}}` } as unknown as PageBlock).some((id) => readable(ctx, id) !== null);
+  const hidden = (ctx: CallContext, path: string, listsOf: Lists): boolean =>
+    listsOf({ kind: 'note', body: `{{${path}}}` } as unknown as PageBlock).some((id) => readable(ctx, id) !== null);
 
   /** When a page's declaration was last written, as milliseconds, or `null` when it cannot be read. */
   const writtenAt = (page: string): number | null => {
@@ -95,7 +100,7 @@ export function methods(deps: RecordDeps) {
    * Every document field of every list the caller may read, each with the paths in it that name nothing to them. A row
    * is read through the caller's own grant on the list (`whereFor`), so a member held to some rows reads only those.
    */
-  const documents = (ctx: CallContext, start: number): (LongText & { key: string })[] => {
+  const documents = (ctx: CallContext, start: number, walk: Walk): (LongText & { key: string })[] => {
     const out: (LongText & { key: string })[] = [];
     for (const [id, list] of kernel.registers()) {
       if (readable(ctx, id) !== null) continue;
@@ -117,12 +122,12 @@ export function methods(deps: RecordDeps) {
             if (typeof text !== 'string' || (!text.includes('{{') && !/^(?:`{3,}|~{3,})/m.test(text))) continue;
             let unnamed: string[];
             try {
-              unnamed = kernel.block({ kind: 'note', body: text } as unknown as PageBlock, { here: row }).unnamed ?? [];
+              unnamed = walk.block({ kind: 'note', body: text } as unknown as PageBlock, { here: row }).unnamed ?? [];
             } catch {
               unnamed = [];
             }
             const paths = [...text.replace(/`[^`]*`/g, ' ').matchAll(/\{\{([^{}:]*)\}\}/g)].map((m) => (m[1] ?? '').trim());
-            const shut = paths.filter((p) => !own.includes(p) && !unnamed.includes(p) && hidden(ctx, p));
+            const shut = paths.filter((p) => !own.includes(p) && !unnamed.includes(p) && hidden(ctx, p, walk.blockRegisters));
             out.push({
               key: `${id}#${row.seq}`, ...(typeof row.seq === 'number' ? { at: { list: id, seq: row.seq } } : {}), list: list.name, row: name, field: f.label?.trim() || words(f.id), text,
               unnamed: [...unnamed.filter((p) => !own.includes(p)), ...shut], own, ownLists,
@@ -136,7 +141,7 @@ export function methods(deps: RecordDeps) {
   };
 
   /** The names the caller may be told of: the figures, and each list they read with its count and its states. */
-  const namesFor = (ctx: CallContext, texts: readonly string[]) => {
+  const namesFor = (ctx: CallContext, texts: readonly string[], walk: Walk) => {
     const all: string[] = [];
     const states: Record<string, string[]> = {};
     for (const [id, list] of kernel.registers()) {
@@ -148,8 +153,8 @@ export function methods(deps: RecordDeps) {
     const declared = kernel.declarations().filter((d) => d.kind === 'metric').map((d) => d.id.slice('metric.'.length));
     /* A FIGURE ASKED WITH ITS PARAMETER, `{{plan-left:Flat}}`: a built-in one is asked of the kernel, once a word. */
     const asked = new Set(texts.flatMap((t) => [...t.matchAll(/\{\{\s*([a-z][a-z0-9_-]*)\s*:/g)].map((m) => m[1]!)).filter((w) => !NOT_FIGURES.has(w)));
-    const built = [...asked].filter((w) => !declared.includes(w) && (kernel.block({ kind: 'note', body: `{{${w}}}` } as unknown as PageBlock).unnamed ?? []).length === 0);
-    const figures = [...declared, ...built].filter((f) => !hidden(ctx, f));
+    const built = [...asked].filter((w) => !declared.includes(w) && (walk.block({ kind: 'note', body: `{{${w}}}` } as unknown as PageBlock).unnamed ?? []).length === 0);
+    const figures = [...declared, ...built].filter((f) => !hidden(ctx, f, walk.blockRegisters));
     return { all: [...all, ...figures], figures, states };
   };
 
@@ -158,7 +163,7 @@ export function methods(deps: RecordDeps) {
    * document per block it draws and does not hold from them. A part that is a document already gathered for the row the
    * page is about is left out, and that document is told the page's title.
    */
-  const pagesFor = (ctx: CallContext, docs: (LongText & { key: string })[], start: number): TextPage[] => {
+  const pagesFor = (ctx: CallContext, docs: (LongText & { key: string })[], start: number, walk: Walk): TextPage[] => {
     const opens = (p: { registers: string[]; about: { register: string } | null }): boolean =>
       (p.registers.length === 0 || p.registers.some((id) => readable(ctx, id) === null)) && (p.about === null || readable(ctx, p.about.register) === null);
     const listed = kernel.pages().filter(opens);
@@ -167,7 +172,7 @@ export function methods(deps: RecordDeps) {
       if (out.length > 0 && clock.now() - start > ROUND_MS) break;
       let answer: PageResult;
       try {
-        const got = kernel.page(p.slug);
+        const got = walk.page(p.slug);
         if (!got.ok) continue;
         answer = got.value;
       } catch {
@@ -181,7 +186,7 @@ export function methods(deps: RecordDeps) {
       const days = at > 0 ? Math.floor((clock.now() - at) / DAY_MS) : null;
       const parts: TextPart[] = [];
       for (const b of answer.blocks) {
-        if (b.drawn === false || held(ctx, b)) continue;
+        if (b.drawn === false || held(ctx, b, walk.blockRegisters)) continue;
         const name = typeof b.heading === 'string' && b.heading.trim() !== '' ? b.heading.trim() : answer.title;
         const unnamed = [...(b.unnamed ?? [])];
         if (typeof b.heading === 'string' && b.heading.includes('{{')) parts.push({ name, text: b.heading, unnamed, page: true });
@@ -216,9 +221,12 @@ export function methods(deps: RecordDeps) {
       const extra = args !== null && typeof args === 'object' ? Object.keys(args)[0] : undefined;
       if (extra !== undefined) return no('FIELD_UNKNOWN', `${extra} is not something this call takes. It takes nothing.`, { at: extra, allowed: [] });
       const start = clock.now();
-      const docs = documents(ctx, start);
-      const pages = pagesFor(ctx, docs, start);
-      const names = namesFor(ctx, [...docs.map((d) => d.text), ...pages.flatMap((p) => p.parts.map((x) => x.text))]);
+      /* ONE WALK FOR THE WHOLE CALL (`pageWalk`): a figure two pages read is read once, and so is every declaration the
+         lists of a block are named from. It writes nothing, so nothing it kept can change under it. */
+      const walk = kernel.pageWalk();
+      const docs = documents(ctx, start, walk);
+      const pages = pagesFor(ctx, docs, start, walk);
+      const names = namesFor(ctx, [...docs.map((d) => d.text), ...pages.flatMap((p) => p.parts.map((x) => x.text))], walk);
       const found = textFaults(pages, docs.map(({ key: _key, ...d }) => d), names);
       return {
         ok: true,

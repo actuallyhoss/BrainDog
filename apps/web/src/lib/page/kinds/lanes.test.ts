@@ -176,3 +176,22 @@ test('lanes are registered, and a page\'s block reaches the writer with the reco
   assert.match(html, /Import the bank file/u);
   assert.doesNotMatch(html, /window/u);
 });
+
+test('A BUSY STRETCH IS ITS NEWEST LANES AND ONE LINE UNDER THEM: "And 87 more that started earlier."', () => {
+  const drawn = lanes.draw(
+    answer({
+      lanes: [{ title: 'Sort the receipts', start: '2026-10-07T10:00:00.000Z', end: '2026-10-07T10:30:00.000Z', href: '/r/session/9' }],
+      matched: 88,
+      more: 87,
+    }),
+    OPTS,
+  );
+  assert.equal(drawn.refusal, null);
+  assert.equal(drawn.segments.length, 2);
+  assert.equal(drawn.segments[0]?.type, 'block');
+  const html = toHTML(drawn.segments, {});
+  assert.match(html, /And 87 more that started earlier\./u);
+  /* NO COUNT, OR ONE THAT IS NOT A WHOLE NUMBER ABOVE NOUGHT, SAYS NOTHING MORE. */
+  for (const more of [undefined, 0, -3, 2.5, '87'])
+    assert.equal(lanes.draw(answer({ lanes: [{ title: 'Sort the receipts', start: '2026-10-07T10:00:00.000Z', end: null }], more }), OPTS).segments.length, 1, String(more));
+});

@@ -831,6 +831,11 @@ export type PageDeps = {
    */
   signs?: () => readonly VitalSign[];
   /**
+   * Every page resolved, once for a walk over many (`pageWalk` in `index.ts`). Absent, each page read resolves them
+   * itself, as one read alone should.
+   */
+  resolved?: () => ReturnType<typeof resolvePages>;
+  /**
    * The next steps runs left and nobody has taken, newest first, each marked `next` or `earlier`: in one project (its
    * spoken id, as a run holds it) or, with `null`, on the whole record (`openSteps` in `built-in-figures.ts`, over
    * `handoff.ts`'s `openHandoffs`). A `handoffs.open` block reads them.
@@ -1430,7 +1435,7 @@ export function railRoom(): (about: { register: string; section: string } | null
 export function readPage(host: PageDeps, slug: string, filter?: Readonly<Record<string, string>>): Result<PageResult> {
   /* A RUN IS READ ONCE FOR THE PAGE (`runsOnce`), whichever of its blocks names it first. */
   const deps = runsOnce(host);
-  const every = resolvePages(deps);
+  const every = host.resolved?.() ?? resolvePages(deps);
   const found = every.find((p) => p.slug === slug);
   /* THE SLUGS OFFERED ARE THE PAGES SOMEBODY WROTE, AND NEVER THE ONES A TEMPLATE MADE OUT OF ROWS. A page per row is
      named after the row's title, so listing those slugs listed every row title of every templated list, and this

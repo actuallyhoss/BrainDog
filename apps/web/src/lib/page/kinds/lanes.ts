@@ -15,12 +15,15 @@
  * spelled, so no bar moves; the drawer says its hours in the offset the window was written in, because it does not
  * know where the reader is and this app does, as a calendar's writer puts an instant on the reader's day.
  *
+ * A BUSY STRETCH IS ITS NEWEST LANES AND A COUNT: past the most a block draws, the record answers the lanes that started
+ * last and how many more there were (`more`), and the count is said in a line under the drawing.
+ *
  * A lane whose start does not read, or that ends before it starts, is not written: there is nowhere on an axis to
  * put it. A tone that is not one of the four and a door that is not a path of this BrainDog are left off, and the lane
  * is still drawn.
  */
 
-import { LANES_WINDOW, TONES, lanesInstant } from 'braindog-render';
+import { LANES_WINDOW, TONES, lanesInstant, lanesMore, parse } from 'braindog-render';
 
 import type { KindDrawer } from './index.ts';
 import { escapeCell, fenced } from './dialect.ts';
@@ -97,12 +100,24 @@ export function windowRow(result: unknown, fallback: number): string | null {
   return `${LANES_WINDOW} | ${written(a)} | ${written(b)} | ${at === null ? '' : written(at)}`;
 }
 
+/**
+ * How many rows in the hours the record did not draw, or 0: on a busy stretch it answers the newest lanes it draws and
+ * counts the rest as `more` (`packages/kernel/src/kinds/lanes.ts`). A count that is not a whole number above nought is none.
+ */
+export function moreOf(result: unknown): number {
+  const more = result !== null && typeof result === 'object' ? (result as { more?: unknown }).more : undefined;
+  return typeof more === 'number' && Number.isInteger(more) && more > 0 ? more : 0;
+}
+
 export const lanes: KindDrawer = {
   draw(result, opts) {
     /* NO LANE IS THE EMPTY STATE EVERY KIND SAYS, whatever the window: an axis with nothing on it says less. */
     const rows = lanesRows(result);
     if (rows.length === 0) return fenced('lanes', [], opts);
     const window = windowRow(result, opts.now);
-    return fenced('lanes', window === null ? rows : [window, ...rows], opts);
+    const drawn = fenced('lanes', window === null ? rows : [window, ...rows], opts);
+    /* AND WHAT A BUSY STRETCH LEFT OUT IS SAID UNDER THE LANES, as a count: the drawing is the newest of them. */
+    const more = moreOf(result);
+    return more === 0 ? drawn : { ...drawn, segments: [...drawn.segments, ...parse(lanesMore(more), { page: true })] };
   },
 };

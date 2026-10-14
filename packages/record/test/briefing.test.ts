@@ -196,3 +196,25 @@ test('the basis moves when a fact does, and not with the order they were gathere
   assert.notEqual(briefBasis(morning), briefBasis([{ ...bill, figures: { ...bill.figures, days: '4' } }, q1, q2, run]));
   assert.notEqual(briefBasis(morning), briefBasis([{ ...bill, title: 'Studio rent, October' }, q1, q2, run]));
 });
+
+test('two rows that say one thing are one line: the first is kept and opens its row, and the next fact takes the place', () => {
+  /* ONE CHEQUE KEPT TWICE: as an obligation, and as the recurring pay due the same day. Same name, amount and day. */
+  const owed = fact('l2', 'late', 'Harbour retainer', { figures: { amount: 'EUR 900.00', days: '5' }, row: 'obligations#2' });
+  const again = fact('l3', 'late', 'Harbour retainer', { figures: { amount: 'EUR 900.00', days: '5' }, row: 'recurring#3' });
+  const others = ['Kiln lease', 'Vellum fees', 'Orchard tax', 'Saltmarsh rates'].map((title, i) => fact(`d${i}`, 'due', title, { figures: { days: String(i + 2) }, row: `bills#${i + 1}` }));
+  const cards = rulesBrief([owed, again, ...others]);
+  const said = cards.map((c) => c.line);
+  assert.equal(said.filter((l) => l === 'Harbour retainer (EUR 900.00) is 5 days late.').length, 1, JSON.stringify(said));
+  assert.equal(new Set(said).size, said.length, JSON.stringify(said));
+  assert.equal(cards[0]!.row, 'obligations#2');
+  /* THE PLACE THE SECOND LINE TOOK IS THE NEXT FACT'S, so five lines are still five things. */
+  assert.equal(cards.length, BRIEF_RULES_MOST);
+  assert.deepEqual(cards.slice(1).map((c) => c.row).sort(), ['bills#1', 'bills#2', 'bills#3', 'bills#4']);
+
+  /* A MODEL'S TWO CARDS OF ONE SENTENCE ARE ONE TOO, the first kept. */
+  const kept = briefOf({ cards: [{ h: 'l3', line: 'Harbour retainer is {{days}} days late.' }, { h: 'l2', line: 'Harbour retainer is {{days}} days late.' }] }, briefCandidates([owed, again]));
+  assert.deepEqual(kept.map((c) => [c.line, c.row]), [['Harbour retainer is 5 days late.', 'recurring#3']]);
+  /* AND THE WHOLE BRIEFING SAYS IT ONCE, whichever wrote it. */
+  const whole = briefFrom(null, [owed, again], '2026-10-14T08:00:00.000Z');
+  assert.deepEqual(whole.cards.map((c) => c.row), ['obligations#2']);
+});

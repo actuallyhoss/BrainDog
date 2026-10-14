@@ -6037,12 +6037,12 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * it, and a declared vital was never listed. `signs-red` still counts the built-in signs alone: a declared figure is
    * read through `evalContext`, and that would read itself.
    */
-  const everySign = (): VitalSign[] => {
+  /* `built` IS THE BUILT-IN SIGNS ALREADY READ, by a walk that read them for a figure (`pageWalk`), so they are not read twice. */
+  const everySign = (built: VitalSign[] = readSigns(sql, clock.now(), recordTz())): VitalSign[] => {
     const ctx = evalContext();
     const decls = sql
       .all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'metric' AND superseded_at IS NULL AND retired = 0 ORDER BY id")
       .map((r) => liveTarget(sql, JSON.parse(r.body) as MetricDecl, ctx));
-    const built = readSigns(sql, clock.now(), recordTz());
     const taken = new Set(built.map((s) => s.sign));
     const own = readDeclaredSigns(sql, decls, ctx)
       .filter((d) => !taken.has(d.sign))
@@ -6056,8 +6056,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * the projects a scope column or an inherited read is drawn from, and the list of projects a live run is named from.
    * DECLARATIONS ONLY, so naming them reads no row.
    */
-  const beside = (): ListsBeside => {
-    const deps = pageDeps();
+  const beside = (deps: PageDeps = pageDeps()): ListsBeside => {
     return {
       ...(deps.stepsOf ? { stepsOf: deps.stepsOf } : {}),
       ...(deps.scopeOf ? { scopeOf: deps.scopeOf } : {}),
@@ -6277,6 +6276,30 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
   /** The lists a read of what went quiet watches: every one this record declares but the kernel's own list of runs. */
   const watchedLists = (): { id: string; name: string }[] => [...registers.values()].filter((r) => r.id !== SESSION).map((r) => ({ id: r.id, name: r.name }));
+
+  /**
+   * The page layer's reads with what only the declarations say read once: every figure as the record declares it, and
+   * the add-on each declaration came with. ONE SYNCHRONOUS READ ONLY, so nothing is declared under it: `pages` asked
+   * both again for every figure-like path on every page (161 figures and a query each, per path), and a walk of the pages
+   * asked them for every block it held from a reader.
+   */
+  const declaredOnce = (deps: PageDeps): PageDeps => {
+    const { metrics, packOf } = deps;
+    let figures: readonly MetricDecl[] | undefined;
+    const packs = new Map<string, string | null>();
+    return {
+      ...deps,
+      ...(metrics ? { metrics: () => (figures ??= metrics()) } : {}),
+      ...(packOf
+        ? {
+            packOf: (id: string) => {
+              if (!packs.has(id)) packs.set(id, packOf(id));
+              return packs.get(id) ?? null;
+            },
+          }
+        : {}),
+    };
+  };
 
   const pageDeps = (): PageDeps => ({
     pages: () =>
@@ -8168,11 +8191,14 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     /* AND THE RESOLVER GOES WITH IT, because a `stat` block names its registers through the metric
        declarations in its `cells` rather than through a `source` of its own. Without it a page made
        of figures named no register, was treated as prose, and was listed to everybody. */
-    pages: () =>
-      resolvePages(pageDeps()).map((p) => ({
+    pages: () => {
+      /* ONE READ OF THE DECLARATIONS FOR EVERY PAGE (`declaredOnce`): each page asked every figure again. */
+      const deps = declaredOnce(pageDeps());
+      const near = beside(deps);
+      return resolvePages(deps).map((p) => ({
         slug: p.slug,
         title: p.decl.title,
-        registers: registersOf(p.decl, pageDeps().metric, beside()),
+        registers: registersOf(p.decl, deps.metric, near),
         /* WHERE IT SITS IN THE RAIL, for `boot`. A declaration's `nav` is checked at install, so only its shape is asked here. */
         nav: navOf(p.decl.nav),
         /* AND WHICH ROW IT IS A PAGE OF, which is not one of the registers above: those are the
@@ -8189,7 +8215,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
            the template's, so a reader of a page's source (`arrangement({ page })`) finds it by this. `fill` leaves
            `page` untouched, so this is the template's own id. */
         template: p.row ? p.decl.page : null,
-      })),
+      }));
+    },
 
     /**
      * One page, with every block run.
@@ -8207,6 +8234,87 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       opts: { walk?: number | 'last'; reader?: PageDeps['reader'] } = {},
     ): Result<PageResult> =>
       readPage({ ...pageDeps(), ...(opts.walk === undefined ? {} : { walk: opts.walk }), ...(opts.reader ? { reader: opts.reader } : {}) }, slug, filter),
+
+    /**
+     * A reader of many pages in one walk, each answered as `page` answers it, the figures they share read once.
+     *
+     * `page` reads one page as `page` does, `block` one block as `block` does (with no walk or inbox to say), and
+     * `blockRegisters` names a block's lists as `blockRegisters` does, each over the walk's one set of reads.
+     *
+     * A WALK OVER EVERY PAGE READ THE SAME FIGURES ON EACH. Health's notes each asked `signs-red`, which reads every vital
+     * sign, and each person's page asked who may be written twice, so the record's check of its own words read the signs
+     * ten times and the people once a page, and every page resolved every other: on a lived record of 3,914 rows the walk
+     * took 2.7 s, most of it reading what it had read already. Here a figure
+     * is read once for the walk, by its declaration whole (a parameter filled in is another figure), and so are the vital
+     * signs, the money's rates, each figure's declaration and the pages a template makes; every page is still read whole,
+     * block by block.
+     *
+     * ONLY FOR ONE SYNCHRONOUS WALK THAT WRITES NOTHING, which is the one thing that keeps a kept reading true: nothing can
+     * change under it. Each reading is handed out as a copy, so a block that reshapes one never reshapes the next's.
+     */
+    pageWalk: (): {
+      page: (slug: string, filter?: Readonly<Record<string, string>>) => Result<PageResult>;
+      block: (decl: PageBlock, opts?: { here?: Entry }) => BlockResult;
+      blockRegisters: (block: PageBlock) => string[];
+    } => {
+      const base = declaredOnce(pageDeps());
+      let built: VitalSign[] | undefined;
+      let every: VitalSign[] | undefined;
+      let rates: ReturnType<NonNullable<EvalContext['fx']>> | undefined;
+      const fx = base.ctx.fx;
+      const ctx: EvalContext = {
+        ...base.ctx,
+        signs: () => (built ??= readSigns(sql, clock.now(), recordTz())),
+        ...(fx ? { fx: () => (rates ??= fx()) } : {}),
+      };
+      const readings = new Map<string, Result<Reading>>();
+      const metrics = new Map<string, MetricDecl | null>();
+      const signs = base.signs;
+      const activity = base.activity;
+      const lines = new Map<number, ReturnType<NonNullable<PageDeps['activity']>>>();
+      const deps: PageDeps = {
+        ...base,
+        ctx,
+        metric: (id) => {
+          if (!metrics.has(id)) metrics.set(id, base.metric(id));
+          return metrics.get(id) ?? null;
+        },
+        read: (decl) => {
+          const key = JSON.stringify(decl);
+          let got = readings.get(key);
+          if (got === undefined) {
+            got = evaluateMetric(sql, decl, ctx);
+            readings.set(key, got);
+          }
+          return structuredClone(got);
+        },
+        /* THE RECORD'S OWN SIGNS ARE READ OVER THE BUILT-IN ONES THE FIGURES READ, never a second read of them. */
+        ...(signs ? { signs: () => structuredClone((every ??= everySign(structuredClone(ctx.signs!() as VitalSign[])))) } : {}),
+        /* AND THE LOG A FEED IS DRAWN FROM, by how many lines it asks: every feed asks the same, and every look its seen. */
+        ...(activity
+          ? {
+              activity: (limit: number) => {
+                if (!lines.has(limit)) lines.set(limit, activity(limit));
+                return structuredClone(lines.get(limit)!);
+              },
+            }
+          : {}),
+      };
+      /* AND THE PAGES ARE RESOLVED ONCE: each read resolved every page, a template's one a row, to find its own. */
+      let resolved: ReturnType<typeof resolvePages> | undefined;
+      deps.resolved = () => (resolved ??= resolvePages(deps));
+      /* AND THE LISTS A BLOCK READS, as `blockRegisters` names them, over the same declarations read once. */
+      const near = beside(deps);
+      let watched: string[] | undefined;
+      return {
+        page: (slug, filter) => readPage(deps, slug, filter),
+        block: (decl, opts = {}) => readBlock(opts.here === undefined ? deps : { ...deps, here: opts.here }, decl),
+        blockRegisters: (block) => [
+          ...registersOfBlock(block, deps.metric, near),
+          ...(sourceModule(block.source)?.everyList ? (watched ??= watchedLists().map((l) => l.id)) : []),
+        ],
+      };
+    },
 
     /** One metric document by its id, so a caller can fill a parameter and read it. */
     metricDecl: (id: string): MetricDecl | null => pageDeps().metric(id),

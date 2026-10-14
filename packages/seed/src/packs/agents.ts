@@ -475,7 +475,7 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
          it started (`started`, which the record stamps as a run opens) to when it was last heard from, the runs still
          working in the accent and every other left neutral. Over the list of runs itself and not `sessions.live`, so a
          run that finished this morning keeps its lane. No `limit:`, which lanes refuse: they draw every run in their
-         hours or none. Only while a run was heard from today (`runs-heard-today`), so a quiet day draws no empty track.
+         hours, and on a busy day the newest of them and how many more. Only while a run was heard from today (`runs-heard-today`), so a quiet day draws no empty track.
          It shares its heading with the group of runs that stopped today further down: both are today. */
       {
         kind: 'lanes',

@@ -20,8 +20,12 @@
  * record's own. A record in UTC writes `Z`. Now is the as-of instant when the read has one: the clock every other
  * block on the page is read by.
  *
- * EVERY ROW OR NONE, as a calendar is (`calendar.ts`): lanes that drew the first rows read would show an hour as idle
- * that was not, so past `LANES_MOST` the block is refused and it takes no `limit:`.
+ * EVERY ROW, OR THE NEWEST `LANES_MOST` AND HOW MANY MORE. Lanes that drew the first rows read would show the newest
+ * hours as idle when they were the busiest, so a block never draws the oldest and stops. Past `LANES_MOST` it draws the
+ * `LANES_MOST` that started last, in start order, and says the rest as a count (`more`), which a host prints under the
+ * drawing ("and 87 more"). It refused instead, and a busy day of agents' runs, 287 in a day where lanes draw 200, left
+ * the agents home with a refusal where its day belonged. The cap stands, so one block never reads more than
+ * `LANES_MOST` rows, and the block still takes no `limit:`.
  *
  * A LEAF: nothing of the kernel is imported at run time, for the reason `kinds/listed.ts` gives.
  */
@@ -63,7 +67,12 @@ export type Lane = {
 export type LanesWindow = { from: string; to: string; now: string };
 
 /** A `lanes` block's answer: every block's, with its lanes and the window they were read in. */
-export type LanesAnswer = Omit<BlockResult, 'window'> & { lanes: Lane[]; window: LanesWindow };
+export type LanesAnswer = Omit<BlockResult, 'window'> & {
+  lanes: Lane[];
+  window: LanesWindow;
+  /** How many rows in the hours are not drawn: those that started before the newest `LANES_MOST`. Absent when none. */
+  more?: number;
+};
 
 /** An instant as a row written out may say it: a day, a time and a zone, so it is one moment wherever it is read. */
 const INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/u;
@@ -141,7 +150,7 @@ export const lanes: KindModule = {
         at: 'hours',
       };
     if (block.limit !== undefined)
-      return invalid(`Lanes draw every row in their hours, up to ${LANES_MOST}, so they take no limit:. Narrow them with where:, or show fewer hours with hours:.`, 'limit');
+      return invalid(`Lanes draw every row in their hours, the newest ${LANES_MOST} on a busy stretch, so they take no limit:. Narrow them with where:, or show fewer hours with hours:.`, 'limit');
 
     const tones = block.tones;
     if (tones !== undefined) {
@@ -205,29 +214,29 @@ export const lanes: KindModule = {
     };
     const when = { types: ['instant'], said: '' };
     /* `matched` COUNTS EVERY ROW IN THE HOURS, whatever was handed back, as a calendar's does (`calendar.ts`). */
-    const listed = readListed(deps, block, 'lanes', {
-      rules: [
-        { types: ['text', 'enum'], said: 'the title, a text field' },
-        { ...when, said: 'when it started, an instant field' },
-        { ...when, said: 'when it ended, an instant field' },
-        { types: ['enum', 'text', 'bool'], said: 'what picks its colour, a choice, a text or a yes or no field' },
-      ],
-      limit: LANES_MOST,
-      within,
-      order: [{ field: start ?? '', dir: 'asc' }],
-    });
-    if ('refusals' in listed) return answer({ refusals: [...base.refusals, ...listed.refusals] });
-    if (listed.matched > LANES_MOST)
-      return answer({
-        refusals: [
-          ...base.refusals,
-          {
-            code: 'OUT_OF_BOUNDS',
-            fix: `Lanes draw every row in their hours, and ${listed.register} has ${listed.matched} in these where lanes draw ${LANES_MOST}. Narrow them with where:, or show fewer hours with hours:.`,
-            at: 'where',
-          },
+    const read = (dir: 'asc' | 'desc') =>
+      readListed(deps, block, 'lanes', {
+        rules: [
+          { types: ['text', 'enum'], said: 'the title, a text field' },
+          { ...when, said: 'when it started, an instant field' },
+          { ...when, said: 'when it ended, an instant field' },
+          { types: ['enum', 'text', 'bool'], said: 'what picks its colour, a choice, a text or a yes or no field' },
         ],
+        limit: LANES_MOST,
+        within,
+        order: [{ field: start ?? '', dir }],
       });
+    const first = read('asc');
+    if ('refusals' in first) return answer({ refusals: [...base.refusals, ...first.refusals] });
+    /* A BUSY STRETCH IS READ AGAIN FROM ITS NEWEST END, `LANES_MOST` rows and no more, and drawn in start order. Only
+       then: a stretch that fits is the one read it always was. */
+    let listed = first;
+    if (first.matched > LANES_MOST) {
+      const newest = read('desc');
+      if ('refusals' in newest) return answer({ refusals: [...base.refusals, ...newest.refusals] });
+      listed = { ...newest, rows: [...newest.rows].reverse() };
+    }
+    const more = Math.max(0, listed.matched - listed.rows.length);
 
     /* ONE LANE A ROW, IN THE ROWS' ORDER, so a host that wants more of a row than its lane reads `rows` at the same place. */
     const drawn = listed.rows.map((row): Lane => {
@@ -241,6 +250,6 @@ export const lanes: KindModule = {
         ...(row.seq === null ? {} : { href: `/r/${row.register}/${row.seq}` }),
       };
     });
-    return answer({ lanes: drawn, rows: listed.rows, matched: listed.matched });
+    return answer({ lanes: drawn, rows: listed.rows, matched: listed.matched, ...(more > 0 ? { more } : {}) });
   },
 };

@@ -169,7 +169,7 @@ export {
 } from './progress.ts';
 export { PATH_DONE, PATH_EVERYTHING, PATH_NEXT, PATH_STEP, PATH_VIEWS, pathFault, pathMore, pathPlan, pathRest, pathShort, unvalued, type PathMark } from './path.ts';
 export { CALENDAR_DAY, CALENDAR_MONTHS_MOST, CALENDAR_NONE, WEEKDAYS, dayParam, calendarDay, calendarMore, calendarPlan, calendarSaid, calendarSkipped, type CalendarCell, type CalendarDay, type CalendarMonth, type CalendarPlan } from './calendar.ts';
-export { LANES_NONE, LANES_NOW, LANES_WINDOW, lanesFault, lanesInstant, lanesOutside, lanesPlan, lanesSentence, lanesSince, lanesSkipped, type Lane, type LanesPlan, type LanesTick } from './lanes.ts';
+export { LANES_NONE, LANES_NOW, LANES_WINDOW, lanesFault, lanesInstant, lanesMore, lanesOutside, lanesPlan, lanesSentence, lanesSince, lanesSkipped, type Lane, type LanesPlan, type LanesTick } from './lanes.ts';
 export { LINK_ADDRESS, LINKS_NONE, linkFault, linkHost, linkHref, linkPlan, type LinkLine } from './links.ts';
 export { GALLERY_NONE, PICTURE_MIMES, fileRef, galleryPlan, isPictureMime, pictureSrc, type GalleryTile } from './gallery.ts';
 export { EMBED_ASPECTS, EMBED_NONE, EMBED_PROVIDERS, embedAspect, embedFault, embedLoad, embedOf, embedOpen, embedPlan, type EmbedAspect, type EmbedPlan, type EmbedProvider } from './embed.ts';

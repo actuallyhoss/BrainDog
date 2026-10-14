@@ -232,10 +232,27 @@ export function briefOf(answer: unknown, handed: readonly BriefFact[]): BriefCar
     const { h, line } = card as { h: string; line: string };
     if (out.some((c) => c.h === h)) continue;
     const fact = byHandle.get(h)!;
+    const said = filled(line, fact);
+    /* A LINE ALREADY SAID IS NOT SAID AGAIN (`sameLine`), whichever fact it was written of. */
+    if (out.some((c) => sameLine(c.line, said))) continue;
     if (fact.kind === 'asked' && ++asked > most) continue;
-    out.push({ h, line: filled(line, fact), row: fact.row, cause: fact.cause, by: 'slash' });
+    out.push({ h, line: said, row: fact.row, cause: fact.cause, by: 'slash' });
   }
   return out;
+}
+
+/**
+ * Whether two lines are one sentence to a reader: the same words, whatever the spaces between them.
+ *
+ * TWO ROWS CAN SAY ONE THING. A cheque kept as an obligation and the same pay kept as a recurring item due that day are
+ * two facts with one name, one amount and one day, so the rules wrote "… is 5 days late." twice, one under the other.
+ * The briefing says each line once, and the card that stays is the first, opening the first row: a card opens one row.
+ */
+const sameLine = (a: string, b: string): boolean => a.replace(/\s+/gu, ' ').trim() === b.replace(/\s+/gu, ' ').trim();
+
+/** The cards with every line already said left out, the first kept (`sameLine`). */
+function onceEach(cards: readonly BriefCard[]): BriefCard[] {
+  return cards.filter((c, i) => !cards.slice(0, i).some((d) => sameLine(d.line, c.line)));
 }
 
 /** How a sentence that closes on a quoted name ends: a question's own mark closes it, and anything else takes a full stop. */
@@ -298,9 +315,8 @@ function ruleLine(f: BriefFact): string {
  * cards (`briefCandidates`), each in the rules' own sentence and opening its row. This is what a record with no model reads, and what stands when none of a model's cards is kept.
  */
 export function rulesBrief(facts: readonly BriefFact[]): BriefCard[] {
-  return briefCandidates(facts)
-    .slice(0, BRIEF_RULES_MOST)
-    .map((f) => ({ h: f.h, line: ruleLine(f), row: f.row, cause: f.cause, by: 'rule' as const }));
+  /* EACH LINE ONCE BEFORE THE CUT, so a line said twice leaves its place to the next fact rather than to nothing. */
+  return onceEach(briefCandidates(facts).map((f) => ({ h: f.h, line: ruleLine(f), row: f.row, cause: f.cause, by: 'rule' as const }))).slice(0, BRIEF_RULES_MOST);
 }
 
 /**

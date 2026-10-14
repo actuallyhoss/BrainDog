@@ -142,7 +142,15 @@ test('forty questions no longer push what is due out of the thirty a model is ha
 test('a model\'s cards are held to the same cap', () => {
   const at = '2026-10-14T08:00:00.000Z';
   /* Handed the facts as they were gathered, a model that writes five question cards keeps two, in its order. */
-  const five = { cards: ['q05', 'q04', 'l1', 'q03', 'q02', 'q01'].map((h) => ({ h, line: h === 'l1' ? 'Studio rent is {{days}} days late.' : 'This is still waiting on you.' })) };
+  /* EACH IN ITS OWN WORDS: a briefing never says one sentence twice (`briefing.test.ts`), so lines alike would be one. */
+  const said: Record<string, string> = {
+    q05: 'The lease is still waiting on you.',
+    q04: 'The refund is still waiting on you.',
+    q03: 'The supplier is still waiting on you.',
+    q02: 'The invoice is still waiting on you.',
+    q01: 'The contract is still waiting on you.',
+  };
+  const five = { cards: ['q05', 'q04', 'l1', 'q03', 'q02', 'q01'].map((h) => ({ h, line: h === 'l1' ? 'Studio rent is {{days}} days late.' : said[h]! })) };
   const kept = briefOf(five, lived);
   assert.deepEqual(kept.map((c) => c.h), ['q05', 'q04', 'l1']);
   /* With nothing but questions handed, three stand. */
@@ -151,8 +159,8 @@ test('a model\'s cards are held to the same cap', () => {
   const brief = briefFrom({ cards: [...five.cards, { h: 'q01', line: '{{count}} questions are still open.' }] }, lived, at);
   assert.deepEqual(brief.cards.map((c) => [c.h, c.line, c.by]), [
     ['l1', 'Studio rent is 3 days late.', 'slash'],
-    ['q02', 'This is still waiting on you.', 'slash'],
-    ['q01', 'This is still waiting on you.', 'slash'],
+    ['q02', 'The invoice is still waiting on you.', 'slash'],
+    ['q01', 'The contract is still waiting on you.', 'slash'],
   ]);
   assert.equal(askedIn(lived, briefFrom(null, lived, at).cards), 2);
 });

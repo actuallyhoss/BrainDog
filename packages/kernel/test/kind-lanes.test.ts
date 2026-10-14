@@ -220,19 +220,31 @@ test('lanes written out are drawn as written, inside the hours, and one with no 
   sql.close();
 });
 
-test('lanes draw every row in their hours or none: past the most, the block says to narrow itself', async () => {
+test('a busy stretch draws its newest lanes, the most there are, and counts the rest; it never refuses', async () => {
   const { k, sql } = await record(false);
-  for (let i = 0; i <= LANES_MOST; i++) assert.ok(k.create('runs', { what: `Run ${i}`, started: at(25, 9), ended: at(25, 10) }, OWNER).ok);
+  /* MORE RUNS THAN LANES DRAW, each started a minute after the last, so the newest are the last made. */
+  const more = 87;
+  const minute = (n: number): string => new Date(Date.UTC(2026, 8, 25, 2) + n * 60_000).toISOString();
+  for (let i = 0; i < LANES_MOST + more; i++) assert.ok(k.create('runs', { what: `Run ${i}`, started: minute(i), ended: minute(i + 1) }, OWNER).ok);
   const read = answerOf(k.block(block(LANES)));
-  assert.equal(read.refusals[0]?.code, 'OUT_OF_BOUNDS');
-  assert.match(read.refusals[0]?.fix ?? '', new RegExp(`runs has ${LANES_MOST + 1} in these where lanes draw ${LANES_MOST}\\.`, 'u'));
-  assert.deepEqual(read.lanes, []);
-  assert.equal(read.rows.length, 0);
+  assert.deepEqual(read.refusals, []);
+  assert.equal(read.lanes.length, LANES_MOST);
+  assert.equal(read.rows.length, LANES_MOST);
+  assert.equal(read.matched, LANES_MOST + more);
+  assert.equal((read as { more?: number }).more, more);
+  /* THE NEWEST, IN START ORDER: the first drawn is the oldest of them, the last the newest run of all. */
+  assert.equal(read.lanes[0]?.title, `Run ${more}`);
+  assert.equal(read.lanes.at(-1)?.title, `Run ${LANES_MOST + more - 1}`);
+  assert.deepEqual(read.lanes.map((l) => l.start), [...read.lanes.map((l) => l.start)].sort());
 
-  /* EXACTLY THE MOST IS DRAWN, every one. */
+  /* A NARROWER WHERE COUNTS ONE FEWER LEFT OUT, and a stretch that fits draws every row and says no more. */
   const narrowed = answerOf(k.block(block({ ...LANES, where: 'what is not "Run 0"' })));
-  assert.deepEqual(narrowed.refusals, []);
-  assert.equal(narrowed.lanes.length, LANES_MOST);
+  assert.equal((narrowed as { more?: number }).more, more - 1);
+  const fits = answerOf(k.block(block({ ...LANES, where: 'what is not "Run 0"', hours: 7 })));
+  assert.deepEqual(fits.refusals, []);
+  assert.equal((fits as { more?: number }).more, undefined);
+  assert.equal(fits.lanes.length, fits.matched);
+  assert.ok(fits.matched > 0 && fits.matched <= LANES_MOST, String(fits.matched));
   sql.close();
 });
 

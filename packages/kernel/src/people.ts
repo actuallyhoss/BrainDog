@@ -2166,8 +2166,10 @@ function foldUndone(deps: Pick<PeopleDeps, 'sql'>, list: Keyed, a: Row, b: Row):
   );
   if (set !== undefined) return true;
   /* THE FOLDS TAKEN BACK THAT POINTED AT ONE OF THE PAIR, read from `undone` by its batch (a fold with no batch is
-     kept there under its own line's id). Few on any record, so the keys are compared here. */
-  const pointed = `SELECT e.target AS target, e.to_v AS into_v FROM undone u JOIN event e ON e.{on} = u.batch
+     kept there under its own line's id). Few on any record, so the keys are compared here. FROM THE FEW UNDONE OUT
+     (`CROSS JOIN` keeps that order): left to choose, SQLite walked the whole log and looked each line up in `undone`,
+     0.6 ms a pair on 10,000 lines, and every pair of people a walk of the pages asked was one such walk. */
+  const pointed = `SELECT e.target AS target, e.to_v AS into_v FROM undone u CROSS JOIN event e ON e.{on} = u.batch
      WHERE e.kind = 'edit' AND e.field = ? AND e.to_v IS NOT NULL AND (instr(e.to_v, ?) > 0 OR instr(e.to_v, ?) > 0)`;
   const taken = deps.sql.all<{ target: string; into_v: string }>(
     `${pointed.replace('{on}', 'batch')} UNION ${pointed.replace('{on}', 'id')}`,
