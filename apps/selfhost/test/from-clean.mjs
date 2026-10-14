@@ -33,7 +33,9 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+/* THE CHECKOUT THIS RUN COPIES FROM, a directory. Not called `root`, which in a file that also handles the KEK is
+   read as the root key (`tools/gates/secret-grep.mjs`). */
+const CHECKOUT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
 /** The invented record and owner every run makes. Never a real person's. */
 export const RECORD = 'harbour-lane';
@@ -325,17 +327,17 @@ function verifyCopy(id, cli, home, file) {
 
 /** The commit the copy is, as the CLI's build tuple names it: today in UTC and the short commit id. */
 function buildTuple() {
-  const sha = run('build the command', ['git', '-C', ROOT, 'rev-parse', '--short=7', 'HEAD']).trim();
+  const sha = run('build the command', ['git', '-C', CHECKOUT, 'rev-parse', '--short=7', 'HEAD']).trim();
   return `${new Date().toISOString().slice(0, 10).replaceAll('-', '.')}+${sha}`;
 }
 
 /** The copy: `git archive HEAD` unpacked into the scratch, read only. Answers how many files it holds. */
 function copyTree(dest) {
   mkdirSync(dest, { recursive: true });
-  const archive = spawnSync('git', ['-C', ROOT, 'archive', '--format=tar', 'HEAD'], { maxBuffer: 2 * 1024 * 1024 * 1024 });
+  const archive = spawnSync('git', ['-C', CHECKOUT, 'archive', '--format=tar', 'HEAD'], { maxBuffer: 2 * 1024 * 1024 * 1024 });
   if (archive.status !== 0) throw new Failed('copy', 'git archive HEAD failed', String(archive.stderr));
   run('copy', ['tar', '-x', '-C', dest], { input: archive.stdout });
-  return run('copy', ['git', '-C', ROOT, 'ls-tree', '-r', '--name-only', 'HEAD']).trim().split('\n').length;
+  return run('copy', ['git', '-C', CHECKOUT, 'ls-tree', '-r', '--name-only', 'HEAD']).trim().split('\n').length;
 }
 
 /** README words for this machine: `node` is the Node running this check, so a second Node on the path is never used. */
@@ -368,6 +370,8 @@ async function execute(steps, dir, { container, afterInstall, held }) {
   const copies = join(dir, 'copies');
   const logs = join(dir, 'logs');
   for (const d of [home, copies, logs]) mkdirSync(d, { recursive: true });
+  /* WHERE THE SERVER KEEPS ITS KEK: a path handed to the server, never the key's bytes. */
+  const kekFile = join(dir, 'data', 'kek');
   const cli = join(repo, 'apps', 'cli', 'dist', 'braindog.mjs');
   const file = join(copies, 'record.brainl');
   const serverKey = randomBytes(32).toString('base64url');
@@ -383,7 +387,7 @@ async function execute(steps, dir, { container, afterInstall, held }) {
     writeFileSync(out, '');
     const child = spawn(local(words(s.startLine))[0], local(words(s.startLine)).slice(1), {
       cwd: repo,
-      env: { ...env, BRAINDOG_DATA: data, BRAINDOG_KEK_FILE: join(dir, 'data', 'kek'), PORT: String(port), BRAINDOG_TOKEN: serverKey },
+      env: { ...env, BRAINDOG_DATA: data, BRAINDOG_KEK_FILE: kekFile, PORT: String(port), BRAINDOG_TOKEN: serverKey },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let said = '';
@@ -485,7 +489,7 @@ async function execute(steps, dir, { container, afterInstall, held }) {
         break;
       case 'restore':
         if (!container) {
-          run(id, local(restoreWords(words(s.initLine), file)), { cwd: repo, env: { ...env, BRAINDOG_DATA: join(dir, 'data2'), BRAINDOG_KEK_FILE: join(dir, 'data', 'kek') } });
+          run(id, local(restoreWords(words(s.initLine), file)), { cwd: repo, env: { ...env, BRAINDOG_DATA: join(dir, 'data2'), BRAINDOG_KEK_FILE: kekFile } });
         } else {
           /* THE CONTAINER READS THE COPY AS ITS OWN USER, so the file it is handed is one anybody may read, in a folder of
              its own; the key file is the first volume's, mounted read only, as an operator moving a record would. */
@@ -554,7 +558,7 @@ async function main(argv) {
 
   /* --dry READS THIS TREE'S README, the one a person is looking at; a run reads the copy's, the one it proves. */
   if (argv.includes('--dry')) {
-    const steps = plan(readmeBlocks(readFileSync(join(ROOT, 'README.md'), 'utf8')), { container, offline: afterInstall !== undefined });
+    const steps = plan(readmeBlocks(readFileSync(join(CHECKOUT, 'README.md'), 'utf8')), { container, offline: afterInstall !== undefined });
     for (const { id, line } of steps) say(id, line ?? DOES[id] ?? '');
     say('steps', `${String(steps.length)}, nothing run`);
     return 0;

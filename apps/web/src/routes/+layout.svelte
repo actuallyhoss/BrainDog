@@ -652,11 +652,14 @@
   const recordsRefused = $derived(reachable ? reachable.refused : data.recordsRefused);
 
   /** Where `g` then a letter lands. `g 1`–`g 9` address the nth item of YOUR nav, in YOUR order. */
-  /* `g s` IS HERE NOW. It was removed on the grounds that "search is not a place you go, it is the
-     thing under the launcher" — true while the palette was the only search, and contradicted by
-     `19 §2`, which lists `/search?q=` in the screen inventory, and by `19 §4`, which has `g s` in
-     its own chord list. The palette caps its record hits; the cap needs somewhere to point. */
-  const GOTO: Record<string, string> = { h: '/', d: '/decide', i: '/inbox', s: '/search', v: '/vault', p: '/packs', ',': '/settings/appearance' };
+  /* EVERY PLACE IN THE RAIL HAS A LETTER NOW, read from the rail by `lib/a11y/goto.ts` (EXP-D09): the seven of the old
+     table first and unmoved, `g s` among them, then a letter of each place's own name. It was a table of seven here, so
+     Money, Work or a page somebody put in the rail had none. Loaded when `g` arms or `?` asks for the sheet, never in
+     the entry; the sheet is drawn again (`sheetSays`) once its `g` row says this rail's letters. */
+  let lead: typeof import('$lib/a11y/goto.ts') | undefined;
+  let sheetSays = $state(0);
+  const leadIn = () => import('$lib/a11y/goto.ts').then((m) => (lead = m));
+  const railRows = () => [...rail.places, ...rail.more].map((i) => ({ href: i.href, name: i.label }));
 
   function onkeydown(e: KeyboardEvent) {
     const mod = e.metaKey || e.ctrlKey;
@@ -720,21 +723,25 @@
         go.disarm();
         return;
       }
-      const target = GOTO[e.key.toLowerCase()];
-      const digit = Number(e.key);
+      const key = e.key;
+      const digit = Number(key);
       go.disarm();
-      if (target) {
-        e.preventDefault();
-        goto(at(target));
-      } else if (digit >= 1 && digit <= 9 && numbered[digit - 1]) {
-        e.preventDefault();
-        goto(at(numbered[digit - 1]!.href));
-      }
+      /* Taken at once, as the table's letters were, so a screen's own `d` stands down (`defaultPrevented`); a key
+         pressed before the file has landed is taken too, and goes where it leads when it does. */
+      const target = digit >= 1 && digit <= 9 ? numbered[digit - 1]?.href : lead?.hrefOf(railRows(), key);
+      if (target || !lead) e.preventDefault();
+      if (target) goto(at(target));
+      else if (!lead)
+        void leadIn().then((m) => {
+          const href = m.hrefOf(railRows(), key);
+          if (href) goto(at(href));
+        });
       return;
     }
 
     if (e.key === 'g') {
       go.arm();
+      void leadIn();
       return;
     }
     if (e.key === '/') {
@@ -745,7 +752,9 @@
     // `?` is help. It is never "ask the assistant".
     if (e.key === '?') {
       e.preventDefault();
-      keymapOpen = true;
+      void leadIn()
+        .then((m) => (m.sayGoto(railRows()), sheetSays++))
+        .finally(() => (keymapOpen = true));
     }
   }
 </script>
@@ -890,7 +899,7 @@
 </svelte:head>
 
 <Sheet bind:open={keymapOpen} title={copy.keymap} subtitle={copy.keymapHint}>
-  {#if Keymap}<Keymap />{/if}
+  {#if Keymap}{#key sheetSays}<Keymap />{/key}{/if}
 </Sheet>
 
 <!--

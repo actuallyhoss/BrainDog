@@ -41,6 +41,8 @@ import { signs } from './signs.ts';
 export type Also = (...more: readonly Refusal[]) => Refusal[];
 
 export type Source = {
+  /** What the source reads, in one line, for the grammar an agent is handed. */
+  says?: string;
   /**
    * Set when the source belongs to no list: it reads across the whole record, so a block over it is named `*` to
    * whoever asks which lists it reads (`pages.ts` `WHOLE_RECORD`), and only a reader of the whole record is shown it.

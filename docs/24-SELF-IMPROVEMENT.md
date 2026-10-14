@@ -439,7 +439,7 @@ discovered broken the first time it is needed.
 
 ---
 
-## 8 · What this costs, and when it is built
+## 8 · What it cost, and the decision as built
 
 | # | Thing | Nominal | At the corpus's own ×2.4 correction |
 |---|---|---|---|
@@ -449,8 +449,43 @@ discovered broken the first time it is needed.
 | 4 | A fourth suggestion body — **`change`**: a declaration diff with its prediction | 2d | ~5d |
 | | **Total** | **9d** | **≈22d** |
 
-**This is Phase C, gated on gate 4.** A self-improving loop on a record nobody uses is the purest
-possible waste, and gate 4 is the *is anyone using it* gate.
+The table is the estimate it was planned on. It is built now (ENG-B17), as one loop under one set
+of governors, and this is the decision as it stands.
+
+**One question before Slash files anything.** `mayPropose` in `packages/kernel/src/observe.ts`
+answers whether Slash may file another question now, and when it may not, one sentence saying why.
+It reads and writes nothing, so asking twice answers the same. It holds, in order:
+
+1. **The floor.** Fourteen days since a person first used the record, and use on five separate
+   days. Use is a person's own events, never an import, an agent or `system`, so a record that
+   brings in a year of rows on its first day is as young as its owner's use ("a fortnight of use
+   is not a habit").
+2. **The brake.** `slashBrake` reads Slash's last twenty questions he answered, oldest first. A
+   question he took up counts as a yes; one he turned down, marked wrong or let lapse counts as a
+   no. Under 60% yes, the brake goes on; it comes off only at 70%. The history is the state: no
+   row keeps it, so nothing can disagree with what he did. Under twenty answers it never brakes.
+3. **One arrangement a week**, unless he asked for one.
+
+The weekly analysis keeps its own governors in `analyse` (§4.3, and the scored brake of §4.7,
+whose suspension and resumption are notes by `system`).
+
+**Where it is asked.** A pattern draft asks it: the host's model jobs
+(`packages/host/src/model-jobs.ts`) ask the governor, which each host hands in over the record's
+sql (`deps.mayPropose`), before a draft goes to the model, because the
+kernel's ack files whatever the model drafts as Slash's question. The daily look holds the same
+floor by its own young rule, read from a person's use (`youngSaid` in `packages/record/src/slash.ts`),
+and does not ask the brake yet: that is the next wiring, in `slashFiling` in
+`packages/record/src/index.ts`, for the daily run and never for his own press. When it says no, the model is not called, nothing is filed, and the pass logs
+how many it held and the governor's sentence. The arrivals stay in the inbox, so the pattern is
+noticed again once Slash may ask. A finding of the weekly analysis that is not an unmatched arrival
+files nothing: it is logged as a reading.
+
+**Where he sees it.** The record hands the brake on in `engineReadings` as `braked`: on or off,
+the share, and how many answers it was read from. When it is on, the Slash tile (on `/slash` and in
+Settings, agents) says so in one plain line under its sentence: "Slash is asking less: you turned
+down 7 of its last 10 suggestions. It asks again as you accept more." When it is off, nothing is
+said. The line is words only. Nothing lifts the brake or changes Slash's limits by itself: it comes
+off when he accepts more of what Slash asks.
 
 ---
 

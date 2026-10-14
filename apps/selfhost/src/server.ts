@@ -44,7 +44,7 @@ import { gate, serveMcp, unauthorized } from '@braindog/mcp/http';
 import { MIN_CLI } from '@braindog/mcp/build';
 import { OPERATION_METHOD, type Execute, type OutboxKind, type OutboxRow, type PagedRun, type ScriptRunner, type Signer } from '@braindog/kernel';
 import { createRecordApi, type CallContext } from '@braindog/record';
-import { cutOffReadable } from '@braindog/kernel';
+import { cutOffReadable, mayPropose } from '@braindog/kernel';
 import { readFileSync as readWhole, existsSync as present, renameSync as moveFile, rmSync as removeTree } from 'node:fs';
 import { basename as baseOf, dirname as dirOf, join as joinPath } from 'node:path';
 import { catalogueAnswer, catalogueFolder, catalogueOffersFrom, catalogueShelfFrom } from './catalogue.ts';
@@ -1548,6 +1548,8 @@ export async function start(options: {
           health: engineHealth,
           /* HIS SWITCH FOR SLASH READING ON ITS OWN (ENG-A09): off, nothing is leased and no model is asked or tested. */
           reads: () => api.kernel.prefsOf('slash')['slash.reads'] !== false,
+          /* THE KERNEL'S GOVERNOR (ENG-B17): a pattern draft is held, never filed, while the floor or the brake says no. */
+          mayPropose: (at) => mayPropose(sql, at),
           log: (line) => console.error('slash jobs:', line),
         });
       } catch (e) {

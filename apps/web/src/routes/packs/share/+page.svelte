@@ -51,21 +51,27 @@
   import Preview from '../browse/Preview.svelte';
   import { drawnOrder, exportShared, listWords, moduleTitle, offeredVersion, rowTitle, speakingOf, speakingStates } from '../sharing.ts';
   import { skillsOnce, words, type SkillOffer } from './share.ts';
-  import { replaceState } from '$app/navigation';
+  import { goto } from '$app/navigation';
   import Segmented from '$lib/ui/Segmented.svelte';
   import AddonFrom from './AddonFrom.svelte';
   import { ADDON_MODE, MODE_PARAM, modeOf, words as addonWords, type Mode } from './addon-from.ts';
 
   /* TWO MODES, ONE SCREEN: the whole setup as a use case, or an add-on from what the person made. The Add-ons
-     screen's offer opens the second by `?mode=addon`, and a switch keeps the address in step without a reload. */
+     screen's offer opens the second by `?mode=addon`, and a switch keeps the address in step without a reload. By
+     `goto` in place, as every other screen's choice in the address is kept: Kit's shallow `replaceState`, used here
+     alone, sat in the chunk every screen loads. A navigation unsettles the screen (`leaving`), so it is drawn again
+     once the address has moved. */
   let mode = $state<Mode>(modeOf(page.url.searchParams));
   function switchTo(next: Mode) {
     if (next === mode) return;
     mode = next;
-    const url = new URL(page.url);
-    if (next === 'addon') url.searchParams.set(MODE_PARAM, ADDON_MODE);
-    else url.searchParams.delete(MODE_PARAM);
-    replaceState(url, page.state);
+    const q = new URLSearchParams(page.url.searchParams);
+    if (next === 'addon') q.set(MODE_PARAM, ADDON_MODE);
+    else q.delete(MODE_PARAM);
+    void goto(`?${q}`, { replaceState: true, noScroll: true, keepFocus: true }).then(
+      () => drew('ready'),
+      () => undefined,
+    );
   }
 
   const AUDIENCES = ['individual', 'founder', 'team', 'starter', 'other'] as const;

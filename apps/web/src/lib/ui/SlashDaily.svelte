@@ -9,6 +9,10 @@
   chart. The switch sits at the end of the tile's heading, where a tile's own control goes, and the sentence is the body.
 
   `daily` is handed in where the page has already read Slash; otherwise it is read here.
+
+  AND THE BRAKE IN ONE LINE UNDER THE SENTENCE (ENG-B17), muted, when his answers have made Slash ask less
+  (`slash-brake.ts`); off, or not read, nothing. Read where Slash is, on a live record and never the sample. Words only:
+  nothing here lifts it.
 -->
 <script lang="ts">
   import { apiBase, at } from '../at.ts';
@@ -16,6 +20,7 @@
   import { page } from '$app/state';
   import { createClient } from '@braindog/client';
   import { dailySaid, readSlash, setDaily, words, type Daily, type SlashClient } from '$lib/record/slash.ts';
+  import { brakeLine, readBrake } from '$lib/record/slash-brake.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import Tile from '$lib/ui/Tile.svelte';
@@ -25,6 +30,7 @@
   let client: SlashClient | null = null;
   let read = $state<Daily | null>(null);
   let busy = $state(false);
+  let braked = $state<string | null>(null);
   const shown = $derived(read ?? daily);
 
   onMount(() => {
@@ -34,6 +40,7 @@
       void readSlash(client).then((out) => {
         if (out.ok && out.reading.daily) read = out.reading.daily;
       });
+    void readBrake(client).then((brake) => (braked = brakeLine(brake)));
   });
 
   async function flip() {
@@ -68,6 +75,7 @@
       >
     {/snippet}
     <p class="slash-daily-said" id="slash-daily-said">{dailySaid(shown)}</p>
+    {#if braked}<p class="slash-daily-brake" data-part="slash-brake">{braked}</p>{/if}
     {#if link}<a class="slash-daily-link tap" href={at('/slash')}>{words.dailyMore}<Icon name="arrow" size="s" /></a>{/if}
   </Tile>
 {/if}
@@ -78,6 +86,15 @@
     margin: 0;
     max-inline-size: var(--measure);
     color: var(--ink2);
+    font-size: var(--t-base);
+    line-height: 20px;
+  }
+
+  /* THE BRAKE'S LINE, under the sentence and quieter than it: the dim ink, the same size, the same measure. */
+  .slash-daily-brake {
+    margin: 0;
+    max-inline-size: var(--measure);
+    color: var(--dim);
     font-size: var(--t-base);
     line-height: 20px;
   }

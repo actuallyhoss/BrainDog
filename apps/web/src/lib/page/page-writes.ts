@@ -29,6 +29,7 @@ import type { toasts } from '../ui/toast.svelte.ts';
 import { optimist, UNDO_MS } from '../data/optimistic.ts';
 import { isQuestion } from '../work/capture.ts';
 import { words } from './words.ts';
+import type { ActAction, OpenSheet } from './act-sheet.ts';
 
 /* TODAY'S LIGHT SYNTAX, handed on so the palette's reader reaches `lib/work` through this one held file (SHL-A18). */
 export { captureOf, contextOf, isQuestion, projectNamed } from '../work/capture.ts';
@@ -104,7 +105,33 @@ export type WritesDeps = {
    * minutes (`row-host.svelte.ts`). Absent, nothing is kept.
    */
   touched?: (ref: { register: string; seq: number }, mark: string, title: string) => void;
+  /** Opens the sheet a declared action asks first or shows after (`act-sheet.ts`). Absent, `openSheet` mounts the real one. */
+  sheet?: OpenSheet;
 };
+
+/** Where a declared action was pressed: the block, its place on the page, and the rows it drew then. */
+export type Pressed = { block: LiveBlock; at: number; before: readonly Row[] };
+
+/**
+ * THE ONE TABLE OF VERBS A PRESS SENDS TO THE RECORD BY THEIR OWN CLIENT METHOD (PGS-A12). The row verbs are the six
+ * writes above said as verbs (`row.tick` is the tick write, `row.move` a card moved, `row.create` a captured line or a
+ * new row), and `suggestion.answer` is the option write a question's card makes (`decide-write.ts`); every other verb a
+ * page may name goes to the record through the method named here. `null` is a verb this host has no single change for
+ * yet (`VERBS` in `packages/record/src/verbs.ts`): a press on it says what it would do and runs nothing.
+ */
+export const ACT_CALLS: Readonly<Record<string, string | null>> = Object.freeze({
+  'rule.from_arrivals': null,
+});
+
+/** The verbs the six writes carry, and the option write's. */
+const ROW_VERBS: ReadonlySet<string> = new Set(['row.create', 'row.update', 'row.delete', 'row.tick', 'row.move']);
+const ANSWER_VERB = 'suggestion.answer';
+
+/** Whether this host can carry out `verb` at all. */
+export const actable = (verb: string): boolean => ROW_VERBS.has(verb) || verb === ANSWER_VERB || (Object.hasOwn(ACT_CALLS, verb) && ACT_CALLS[verb] !== null);
+
+/** What a press was made on, as `act` reads it: the drawn row, the record row, a question's id, its name and fields. */
+type On = { drawn: Row | null; ref: RowRef | null; id: string | null; title: string | null; fields: Readonly<Record<string, unknown>>; block: LiveBlock | null };
 
 /** The writes one page makes, over what the page hands in. */
 export function pageWrites(deps: WritesDeps) {
@@ -324,8 +351,8 @@ export function pageWrites(deps: WritesDeps) {
     change: Change,
     title: string,
     hold: { at: number; before: readonly Row[]; what: Kept; back: Back; undone: Kept; said: (w: PageWrite['words']) => string; early?: boolean; mark?: string },
-  ) {
-    if (!ref) return void toasts.push(copy.pageRowUnknown, { intent: 'warn' });
+  ): Promise<boolean> {
+    if (!ref) return (toasts.push(copy.pageRowUnknown, { intent: 'warn' }), false);
     /* THE PAGE THE GESTURE WAS MADE ON. A write that lands after the reader has opened another page holds nothing,
        because its place was read off a block that page does not have. */
     const on = deps.slug();
@@ -341,7 +368,7 @@ export function pageWrites(deps: WritesDeps) {
     const patch = change(m, ref, decl);
     if (!patch) {
       undraw();
-      return void toasts.push(copy.pageRowNoState, { intent: 'warn' });
+      return (toasts.push(copy.pageRowNoState, { intent: 'warn' }), false);
     }
     const out = await m.updateRow(deps.base(), ref, patch, title);
     if (out.from !== 'written') {
@@ -356,6 +383,8 @@ export function pageWrites(deps: WritesDeps) {
     }
     if (out.from === 'written' || out.from === 'conflict') await deps.reread();
     if (out.from === 'written' && hold.early && on === deps.slug()) settleRow(m, hold.at, ref);
+    /* WHETHER IT LANDED, for a declared press that shows its answer once only after the write is in (`act`). */
+    return out.from === 'written';
   }
 
   /**
@@ -394,7 +423,7 @@ export function pageWrites(deps: WritesDeps) {
        `done` that names no day, so a task finished on 1 September came back finished on the day of the undo.
        `moveBackOf` names the day the row held, as a tick's undo does. */
     const held = block.entries.find((e) => e.seq === row.ref?.seq && e.version === row.ref.version);
-    void writeRow(row.ref, (m, ref, decl) => (field ? m.movePatch(ref, field, to, decl) : null), title, {
+    return writeRow(row.ref, (m, ref, decl) => (field ? m.movePatch(ref, field, to, decl) : null), title, {
       at,
       before,
       what: { to },
@@ -532,7 +561,7 @@ export function pageWrites(deps: WritesDeps) {
     const title = row.cells[0] ?? copy.cardFallback;
     if (deps.now() === null) return;
     const held = block.entries.find((e) => e.seq === row.ref?.seq && e.version === row.ref.version);
-    void writeRow(row.ref, (m, ref, decl) => m.tickPatch(ref, done, decl), title, {
+    return writeRow(row.ref, (m, ref, decl) => m.tickPatch(ref, done, decl), title, {
       at,
       before,
       what: { done },
@@ -652,10 +681,214 @@ export function pageWrites(deps: WritesDeps) {
     return true;
   }
 
+  /* ── a declared action pressed (PGS-A12 jobs 7 and 8) ───────────────────────── */
+
+  /**
+   * What a press was made on. A drawn row carries its record row (`ref`), and its fields are read off the block that
+   * drew it; a question carries its id. `on` is the block the press came from, where the host says; without it the
+   * block is the one that holds the row.
+   */
+  function onOf(row: unknown, on?: Pressed): On {
+    const none: On = { drawn: null, ref: null, id: null, title: null, fields: {}, block: on?.block ?? null };
+    if (!row || typeof row !== 'object') return none;
+    const r = row as Record<string, unknown>;
+    const said = (v: unknown): string | null => (typeof v === 'string' && v.trim() !== '' ? v.trim() : null);
+    if (typeof r.id === 'string' && !('ref' in r)) return { ...none, id: r.id, title: said(r.question) ?? said(r.title) };
+    const drawn = Array.isArray(r.cells) ? (row as Row) : null;
+    const ref = drawn?.ref ?? (typeof r.register === 'string' && Number.isInteger(r.seq) ? ({ register: r.register, seq: r.seq as number, version: Number(r.version ?? 0) } as RowRef) : null);
+    if (!ref) return { ...none, drawn };
+    const block = on?.block ?? deps.blocks().find((b) => b.register === ref.register && b.entries.some((e) => e.seq === ref.seq)) ?? null;
+    const entry = block?.entries.find((e) => e.seq === ref.seq);
+    const fields = entry?.fields ?? (r.fields && typeof r.fields === 'object' ? (r.fields as Record<string, unknown>) : {});
+    const titled = REGISTERS[ref.register]?.title;
+    const cell = drawn ? (block?.kind === 'board' ? drawn.cells[1] : drawn.cells[0]) : undefined;
+    return { drawn, ref, id: null, title: (titled ? said(fields[titled]) : null) ?? said(cell) ?? null, fields, block };
+  }
+
+  /** A way back taken from a receipt: said put back when it was, and "Could not undo" with what when it was not. */
+  async function undoBack(what: string, run: () => Promise<{ from: string; fix?: string }>) {
+    const out = await run().catch(() => ({ from: 'refused' as const, fix: undefined }));
+    if (out.from === 'undone') toasts.push(actWordsOf().undone(what), { intent: 'good' });
+    else toasts.push(actWordsOf().undoFailed(what, out.fix), { intent: 'warn' });
+    await deps.reread();
+  }
+
+  /* THE PRESS'S WORDS, from the module its first press loaded (`act` loads it before anything here is reached). */
+  let sheetMod: typeof import('./act-sheet.ts') | null = null;
+  const actWordsOf = () => sheetMod!.actWords;
+
+  /**
+   * ONE PRESS ON A DECLARED ACTION, with its one step and its Undo (`act-sheet.ts` `stepOf`).
+   *
+   * THE STEPS FIRST, THEN THE PRESS. Sign in again, a look at what will change, or the sheet that names the loss each
+   * answer yes or no, and a no runs nothing. Then the verb runs once, through the write a screen already makes for it,
+   * so a declared page's tick, move or answer is held, refused and taken back exactly as the hand-written one is. A
+   * verb shown once opens its value after it lands, and the value is never kept.
+   *
+   * A VERB THIS HOST CANNOT CARRY OUT SAYS WHAT IT WOULD DO AND RUNS NOTHING, before any sheet asks a question it has no
+   * answer to. `value` is a switch's or a choice's new value; `on` is the block the press came from.
+   */
+  async function act(action: ActAction, row?: unknown, value?: unknown, on?: Pressed): Promise<void> {
+    if (deps.now() === null || !action || typeof action.verb !== 'string') return;
+    const sheets = (sheetMod ??= await import('./act-sheet.ts'));
+    const at = onOf(row, on);
+    const args = sheets.argsOf(action, at, value);
+    if (!actable(action.verb)) return void toasts.push(sheets.actWords.cannot(action.label.trim(), sheets.lookOf(action, at.title, args).join(' ')), { intent: 'warn' });
+    const open = deps.sheet ?? sheets.openSheet;
+    let a = action;
+    for (;;) {
+      const { step, said } = sheets.stepOf(a);
+      const ask =
+        step === 'again'
+          ? ({ kind: 'again', label: a.label } as const)
+          : step === 'look_first'
+            ? ({ kind: 'look', label: a.label, lines: sheets.lookOf(a, at.title, args) } as const)
+            : step === 'confirm'
+              ? ({ kind: 'confirm', label: a.label, said: said ?? sheets.HARD_PLAIN } as const)
+              : null;
+      if (!ask) break;
+      if (!(await open(ask))) return;
+      a = sheets.pastStep(a, step);
+    }
+    const out = await pressed(a, at, args, value, on);
+    if (a.once === true && out.ok) await open({ kind: 'once', label: a.label, value: sheets.answeredValue(out.value) });
+  }
+
+  /**
+   * The verb run once, through the write its kind already has. Answers whether it was sent and what it answered, for a
+   * value shown once; a refusal has been said by then, in the record's own words, and nothing is left changed.
+   */
+  async function pressed(a: ActAction, at: On, args: Record<string, unknown>, value: unknown, on?: Pressed): Promise<{ ok: boolean; value?: unknown }> {
+    const w = sheetMod!.actWords;
+    const label = a.label.trim();
+    const what = at.title ? `${label}, “${at.title}”` : label;
+    const place = on?.at ?? -1;
+    const before = on?.before ?? [];
+    const keepsUndo = a.undo !== false;
+    if (a.verb === ANSWER_VERB) {
+      const option = typeof args.option === 'string' ? args.option : '';
+      if (!at.id || option === '') return (toasts.push(w.noRow, { intent: 'warn' }), { ok: false });
+      const [{ answerQuestion }, { undoDecision }] = await Promise.all([import('../record/decide-write.ts'), import('../record/undo-write.ts')]);
+      const reason = typeof args.reason === 'string' && args.reason.trim() !== '' ? args.reason : undefined;
+      const out = await optimist(toasts).run<{ decision: string | null }>({
+        apply: () => {},
+        revert: () => {},
+        send: () => answerQuestion(deps.base(), at.id!, option, reason).then((x) => (x.from === 'written' ? { ok: true as const, value: x } : { ok: false as const, fix: x.fix })),
+        said: w.done(label, at.title ?? option),
+        undo: (x) => (keepsUndo && x.decision ? () => void undoBack(what, () => undoDecision(deps.base(), x.decision!)) : null),
+      });
+      await deps.reread();
+      return out.ok ? { ok: true, value: out.value } : { ok: false };
+    }
+    if (!ROW_VERBS.has(a.verb)) return generic(a, at, args, what, keepsUndo);
+    if (a.verb === 'row.create') {
+      const register = at.block?.register ?? at.ref?.register;
+      if (!register) return (toasts.push(w.noRow, { intent: 'warn' }), { ok: false });
+      /* A LINE TYPED IS A CAPTURE, the same write a capture field makes, with its receipt and its Undo. */
+      if (typeof args.fields === 'string' && at.block && capturable(at.block)) return (await captureLine(register, args.fields, {}), { ok: true });
+      /* A LINE ON A LIST WITH NO CAPTURE IS ITS TITLE, where the list names one; a press that sends nothing adds nothing,
+         rather than a blank one somebody has to find and delete. */
+      const titled = REGISTERS[register]?.title;
+      const typed = typeof args.fields === 'string' && args.fields.trim() !== '' ? args.fields.trim() : null;
+      const fields = args.fields && typeof args.fields === 'object' ? (args.fields as Record<string, unknown>) : typed && titled ? { [titled]: typed } : {};
+      if (Object.keys(fields).length === 0) return (toasts.push(w.noAdd, { intent: 'warn' }), { ok: false });
+      const { rowWriter } = await import('../record/rows-write.ts');
+      const writer = rowWriter(deps.base());
+      const out = await optimist(toasts).run<{ seq: number; version: number }>({
+        apply: () => {},
+        revert: () => {},
+        send: () => writer.create(register, fields as never).then((x) => (x.ok ? { ok: true as const, value: x.entry } : { ok: false as const, fix: x.fix })),
+        said: w.done(label, null),
+        undo: (made) =>
+          keepsUndo ? () => void undoBack(label, () => writer.archive(register, made.seq, made.version).then((x) => (x.ok ? { from: 'undone' } : { from: 'refused', fix: x.fix }))) : null,
+      });
+      await deps.reread();
+      return out.ok ? { ok: true, value: out.value } : { ok: false };
+    }
+    if (!at.ref) return (toasts.push(w.noRow, { intent: 'warn' }), { ok: false });
+    /* A TICK IS THE TICK WRITE, and a move on a board's own column is the card moved: held, refused and undone as they are. */
+    if (a.verb === 'row.tick' && at.drawn && at.block) {
+      const done = sheetMod!.doneOf(args.done) ?? !at.drawn.done;
+      return { ok: (await tickTask(at.block, at.drawn, done, place, before)) === true };
+    }
+    const column = at.block?.kind === 'board' ? at.block.columns[0]?.field : undefined;
+    if (a.verb === 'row.move' && at.drawn && at.block && column && (args.field === undefined || args.field === column) && typeof args.to === 'string') {
+      return { ok: (await moveCard(at.block, at.drawn, args.to, place, before)) === true };
+    }
+    const now = deps.now();
+    let patch: Record<string, unknown> | null = null;
+    let back: Record<string, unknown> | null = null;
+    if (a.verb === 'row.delete') {
+      patch = { deleted_at: new Date(now ?? Date.now()).toISOString() };
+      back = { deleted_at: null };
+    } else if (a.verb === 'row.tick') {
+      /* A TICK ON A ROW NO CHECKLIST DREW: the list's own states, as `tickPatch` reads them, sent as the same write. */
+      const done = sheetMod!.doneOf(args.done);
+      if (done === null) return (toasts.push(copy.pageRowNoState, { intent: 'warn' }), { ok: false });
+      const landed = await writeRow(at.ref, (m, ref, decl) => m.tickPatch(ref, done, decl), at.title ?? label, {
+        at: place,
+        before,
+        what: {},
+        back: (m, ref, decl) => m.tickPatch(ref, !done, decl),
+        undone: {},
+        said: () => w.done(label, at.title),
+        mark: label,
+      });
+      return { ok: landed };
+    } else {
+      const field = typeof args.field === 'string' ? args.field : '';
+      const to = a.verb === 'row.move' ? args.to : args.value;
+      if (field === '' || to === undefined) return (toasts.push(w.noChange, { intent: 'warn' }), { ok: false });
+      patch = { [field]: to };
+      back = Object.hasOwn(at.fields, field) ? { [field]: at.fields[field] ?? null } : null;
+    }
+    const sent = patch;
+    /* AWAITED, so a value shown once opens only over a write that landed, never over a refusal. */
+    const landed = await writeRow(at.ref, () => sent, at.title ?? label, {
+      at: place,
+      before,
+      what: {},
+      /* NO WAY BACK IS SAID, NOT SENT EMPTY: a row read without the field has no value to put back. */
+      back: () => {
+        if (!back) toasts.push(w.undoFailed(what), { intent: 'warn' });
+        return back;
+      },
+      undone: {},
+      said: () => w.done(label, at.title),
+      mark: label,
+    });
+    return { ok: landed };
+  }
+
+  /**
+   * A verb the table sends by its own method: one call to the record with the press's args and the row it was made on.
+   * The record says the batch it wrote under, and the receipt's Undo puts that batch back (`undo-back.ts`).
+   */
+  async function generic(a: ActAction, at: On, args: Record<string, unknown>, what: string, keepsUndo: boolean): Promise<{ ok: boolean; value?: unknown }> {
+    const method = ACT_CALLS[a.verb]!;
+    const [{ createClient }, { undoChange }] = await Promise.all([import('@braindog/client'), import('../record/undo-write.ts')]);
+    const client = createClient({ base: deps.base() });
+    const params = { ...args, ...(at.ref ? { register: at.ref.register, seq: at.ref.seq } : {}), ...(at.id ? { id: at.id } : {}) };
+    const out = await optimist(toasts, {
+      ...(keepsUndo
+        ? /* A WAY BACK REFUSED IS SAID WITH WHAT IT WAS: the runner says this sentence, so it is "Could not undo" and the thing. */
+          { undoBatch: (batch: string) => undoChange(deps.base(), batch).then((u) => (u.from === 'undone' ? u : { ...u, fix: sheetMod!.actWords.undoFailed(what, u.fix) })) }
+        : {}),
+      reread: deps.reread,
+    }).run<unknown>({
+      apply: () => {},
+      revert: () => {},
+      send: () => client.call<unknown>(method, params).then((x) => (x.ok ? { ok: true as const, value: x.value } : { ok: false as const, fix: 'refusal' in x ? x.refusal.fix : copy.writeRaced })),
+      said: sheetMod!.actWords.done(a.label.trim(), at.title),
+    });
+    await deps.reread();
+    return out.ok ? { ok: true, value: out.value } : { ok: false };
+  }
+
   /* THE PAGE READ AGAIN, for a host panel that changed the record from beside a block (a run put back). */
   const reread = (): Promise<void> => deps.reread();
 
-  return { forPage, warm, keptSegment, heldDone, arrivedTable, moveCard, capturable, captureLine, typeInto, saidOf, tickTask, rescheduleBar, onpath, stepable, addStep, reread };
+  return { forPage, warm, keptSegment, heldDone, arrivedTable, moveCard, capturable, captureLine, typeInto, saidOf, tickTask, rescheduleBar, onpath, stepable, addStep, act, reread };
 }
 
 /**

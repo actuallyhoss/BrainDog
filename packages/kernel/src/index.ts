@@ -258,6 +258,7 @@ import { builtInFigure, openSteps, readOpenQuestions } from './built-in-figures.
 import { openExceptions } from './exceptions.ts';
 import { finders, tidyHour } from './tidy.ts';
 import { sourceModule } from './sources/index.ts';
+export { SOURCE_MODULES, sourceModule, type Source } from './sources/index.ts';
 import { beatRun, workingRuns } from './presence.ts';
 import { agentOf as ladderAgentOf, keysOfStamp, kindOfEvent, kindsOfProposal, madeByIn, personOf, recordReader, shapeIn, tokenOfRun } from './change-kind.ts';
 import { undoApply as applyUndo, undoPlan as planUndo, undoStaged as stageUndo, type UndoApplied, type UndoDeclared, type UndoOptions, type UndoPlan, type UndoScope } from './undo.ts';
@@ -9223,7 +9224,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * THE RECORD OPENS SUGGESTIONS FROM THREE PLACES and until this existed nothing could read one.
      * A proposal nobody can see is a proposal that was never made.
      */
-    governance: (register: GovernRegister, opts: { status?: string; limit?: number; every?: boolean; cursor?: string } = {}) =>
+    governance: (register: GovernRegister, opts: { status?: string; limit?: number; every?: boolean; cursor?: string; order?: 'wait' } = {}) =>
       listGovernance({ sql, nowMs: clock.now() }, register, opts),
 
     /** How many rows a governance register holds, all of them. */

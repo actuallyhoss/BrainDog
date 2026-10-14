@@ -49,6 +49,7 @@ import { linkOf, REST_MARK, staleOf } from './blocks.ts';
 import { bylineOf } from './byline.ts';
 import { METRICS } from './declared.ts';
 import { readBoot } from './boot-live.ts';
+import { kept as keptAnswers, pageKey } from './kept-pages.ts';
 import { beyondOf, format, fxNote, hrefFor, leadOf, noteOf, partsShown, partsText, targetSaid, walksNote, withParam, type MetricDecl } from './metrics.ts';
 import { moneyInText } from './money.ts';
 import { entryOf, learn, namesOf, refMapOf, targetsOf, type RecordRow, type RefMap } from './remote.ts';
@@ -2079,7 +2080,11 @@ function staleSaid(b: Answered): string[] {
  * Every block over a list with that field is narrowed by the kernel, and the answer's `filters` carries what may be
  * chosen next; an empty choice is no choice, and the page is asked for by its slug alone.
  */
-export type PageReader = { read(slug: string, filter?: Readonly<Record<string, string>>, opts?: { walk?: Walked }): Promise<Opened> };
+export type PageReader = {
+  read(slug: string, filter?: Readonly<Record<string, string>>, opts?: { walk?: Walked }): Promise<Opened>;
+  /** The last live answer this tab drew of the page as this choice narrowed it, else `null`: drawn while `read` is out. */
+  kept(slug: string, filter?: Readonly<Record<string, string>>): Opened | null;
+};
 
 /** A length a reader picked on a forecast's horizon knob: whole days, or `last`, to the last dated movement. */
 export type Walked = number | 'last';
@@ -2141,8 +2146,8 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
     return map;
   }
 
-  return {
-    async read(slug, filter, opts = {}) {
+  const answer = {
+    async read(slug: string, filter?: Readonly<Record<string, string>>, opts: { walk?: Walked } = {}): Promise<Opened> {
       /* `client.page` drops an empty choice, so the page is asked for by its slug alone. A record that does not read
          `filter` answers the whole page.
 
@@ -2268,6 +2273,22 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
         },
       };
     },
+  };
+
+  /* EVERY ANSWER HANDED BACK IS KEPT FOR THE TAB (`kept-pages.ts`), so the page opened again draws at once while this
+     read is out. A page the record does not have, or one it refused, lets its kept answer go. A write's re-read comes
+     through here too, so what is kept is the page as the write left it. A walked read is a forecast, not the page, and
+     is neither kept nor lets the page's kept answer go. */
+  return {
+    async read(slug, filter, opts) {
+      const out = await answer.read(slug, filter, opts);
+      if (opts?.walk !== undefined) return out;
+      const key = pageKey(base, slug, filter);
+      if (out.from === 'live') keptAnswers.put(key, out);
+      else keptAnswers.drop(key);
+      return out;
+    },
+    kept: (slug, filter) => keptAnswers.get(pageKey(base, slug, filter)),
   };
 }
 

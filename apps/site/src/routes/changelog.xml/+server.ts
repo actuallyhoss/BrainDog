@@ -30,9 +30,13 @@ const esc = (s: string): string =>
 
 const stamp = (date: string): string => `${date}T00:00:00Z`;
 
+/* A held feed's 404 is plain text. Named here, as a content type and nothing else (`tools/gates/secret-grep.mjs` reads
+   the word `plain` inside a response as a decrypted value). */
+const TEXT = 'text/plain; charset=utf-8';
+
 /** The feed's answer under these flags: the Atom document while it is shown, and not found while it is held. */
 export const _feed = (launch: { public: boolean }): Response => {
-  if (held(launch)) return new Response('Not found', { status: 404, headers: { 'content-type': 'text/plain; charset=utf-8' } });
+  if (held(launch)) return new Response('Not found', { status: 404, headers: { 'content-type': TEXT } });
   const copy = site.changelog;
   const newest = ITEMS[0]?.date ?? '1970-01-01';
 

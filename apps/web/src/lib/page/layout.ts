@@ -401,3 +401,42 @@ export function railDrawn(layout: Layout | null, blocks: readonly Drawn[]): { ma
   if (main && rail) return boardRail(layout);
   return { main: main ? COLUMNS : 0, rail: rail ? COLUMNS : 0 };
 }
+
+/** What `flowAfterRail` reads off a block of the main column: its drawn height, and its top in the column where measured. */
+export type Measured = { readonly height: number; readonly top?: number };
+
+/**
+ * WHERE THE SIDE COLUMN CLOSES: the index of the first main block that starts below the rail's last tile, or
+ * `main.length` when none does. "No narrow column floating in empty space" (DIRECTION §36.22): Money's side column
+ * ended while its main column ran on at two thirds, so the right third of the board was bare below the first screen.
+ * The blocks from here on are drawn across the whole board under both columns (`areasWithFlow`).
+ *
+ * A BLOCK'S `top` IS ITS MEASURED PLACE IN THE MAIN COLUMN, so two halves of one row share it and the column never
+ * closes between them, nor inside a boxed run, whose blocks are measured by their one surface. A block with no `top`
+ * (one already drawn after the rail, at another width) starts one `gap` under the lowest foot before it, which is
+ * where it would stand back in the column. With nothing measured, every top is that stack.
+ *
+ * NOTHING FLOWS with no rail (`railHeight` nought), with a rail as tall as the whole main column, or at the first
+ * block, since a main column with nothing beside the rail is not a column. PURE, so `layout-flow.test.ts` holds it.
+ */
+export function flowAfterRail(main: readonly Measured[], railHeight: number, gap: number): number {
+  if (!(railHeight > 0)) return main.length;
+  let foot = 0;
+  for (let k = 0; k < main.length; k++) {
+    const block = main[k]!;
+    const top = block.top ?? (k === 0 ? 0 : foot + gap);
+    if (k > 0 && top >= railHeight) return k;
+    foot = Math.max(foot, top + Math.max(0, block.height));
+  }
+  return main.length;
+}
+
+/**
+ * The main column split where the side column closes: the blocks drawn beside the rail, and the blocks after it, which
+ * take all twelve columns of the board and are paired as whole rows are (`paired`). Declared order is kept: the first
+ * block after is the one under the last beside. An index that flows nothing, or everything, leaves the column whole.
+ */
+export function areasWithFlow<T>(main: readonly T[], at: number): { beside: T[]; after: T[] } {
+  if (at <= 0 || at >= main.length) return { beside: [...main], after: [] };
+  return { beside: main.slice(0, at), after: main.slice(at) };
+}

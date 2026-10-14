@@ -32,7 +32,7 @@ import { ACROSS, ANY_LIST, touches, type Resolve } from './reach.ts';
 import { egressChanged } from './script.ts';
 import { SLASH, slashMayWrite } from './slash.ts';
 import { causeFault, causeOf, canon, noop } from './cause.ts';
-import { costOf, costRows, optionCosts, pickCost, type Cost } from './weigh.ts';
+import { costOf, costRows, optionCosts, pickCost, WAIT_RANK_SQL, WAIT_SQL, waitParams, WAITS, type Cost } from './weigh.ts';
 import { askOf, retypedBody, retypeShapeFault } from './api/retype.ts';
 import { configValue, readPackConfig } from './declare.ts';
 import { dayIn } from './finished.ts';
@@ -204,6 +204,15 @@ const ORDER: Record<GovernRegister, string> = {
 const WHEN: Record<GovernRegister, string> = { suggestion: 'opened_at', decision: 'ts', prediction: 'score_at' };
 
 /**
+ * THE ORDER AN AGENT READS THE QUESTIONS IN when it asks for `order: 'wait'` (AGT-C08): what costs most to leave
+ * waiting first, by the very rank Decide's queue orders by (`weigh.ts` `WAIT_RANK_SQL`, never a second formula), then
+ * newest first. Newest first alone handed an agent the question opened a minute ago while the one moving money since
+ * yesterday waited under it, so the agent and the person looked at different top questions. A closed question has
+ * nothing left to wait for and follows every open one, newest first as before. It takes `waitParams(nowMs)`.
+ */
+const WAIT_ORDER = `(CASE WHEN status = 'open' THEN ${WAIT_RANK_SQL} ELSE ${WAITS.length} END)`;
+
+/**
  * The governance rows, read like a register.
  *
  * `open` IS THE DEFAULT VIEW OF SUGGESTIONS, and a deferred one is not open until its day comes.
@@ -213,7 +222,7 @@ const WHEN: Record<GovernRegister, string> = { suggestion: 'opened_at', decision
 export function listGovernance(
   deps: Pick<GovernDeps, 'sql' | 'nowMs'>,
   register: GovernRegister,
-  opts: { status?: string | undefined; limit?: number | undefined; every?: boolean | undefined; cursor?: string | undefined } = {},
+  opts: { status?: string | undefined; limit?: number | undefined; every?: boolean | undefined; cursor?: string | undefined; order?: 'wait' | undefined } = {},
 ): Result<Record<string, unknown>[]> {
   if (!(GOVERNANCE as readonly string[]).includes(register))
     return no('REGISTER_UNKNOWN', `${register} is not a governance register.`, { at: 'register', allowed: GOVERNANCE });
@@ -235,16 +244,33 @@ export function listGovernance(
      this list has: its time, then the order it was written in. Keyset rather than an offset, so a question opened
      while somebody reads page two does not push a row they already saw onto page three. An id this register does not
      hold is refused, never read as the first page. */
+  /* BY WAIT, the cursor carries the row's rank as well, read at the same instant as the page, and the next page is every
+     row after it in that order: a higher rank, or the same rank and later by time and then by the order written. */
+  const byWait = register === 'suggestion' && opts.order === 'wait';
+  const waitAt = byWait ? waitParams(deps.nowMs) : [];
   if (opts.cursor !== undefined) {
-    const at = deps.sql.one<{ w: string; r: number }>(`SELECT COALESCE(${WHEN[register]}, '') AS w, rowid AS r FROM ${register} WHERE id = ?`, opts.cursor);
+    const at = deps.sql.one<{ w: string; r: number; k: number | null }>(
+      `SELECT COALESCE(${WHEN[register]}, '') AS w, rowid AS r${byWait ? `, ${WAIT_ORDER} AS k` : ''} FROM ${register} WHERE id = ?`,
+      ...waitAt,
+      opts.cursor,
+    );
     if (!at) return no('VALUE_MALFORMED', 'A cursor is the id of the last row the page above answered with. Start from the first page.', { at: 'cursor' });
-    where.push(`(COALESCE(${WHEN[register]}, '') < ? OR (COALESCE(${WHEN[register]}, '') = ? AND rowid < ?))`);
-    params.push(at.w, at.w, at.r);
+    const after = `(COALESCE(${WHEN[register]}, '') < ? OR (COALESCE(${WHEN[register]}, '') = ? AND rowid < ?))`;
+    if (byWait) {
+      where.push(`(${WAIT_ORDER} > ? OR (${WAIT_ORDER} = ? AND ${after}))`);
+      params.push(...waitAt, Number(at.k), ...waitAt, Number(at.k), at.w, at.w, at.r);
+    } else {
+      where.push(after);
+      params.push(at.w, at.w, at.r);
+    }
   }
 
+  /* AND EACH OPEN QUESTION SAYS HOW LONG IT CAN WAIT (`waits`), read in this query by `WAIT_SQL`, as Decide's card says it. */
   const rows = deps.sql.all<Record<string, unknown>>(
-    `SELECT ${COLUMNS[register]} FROM ${register}${where.length ? ` WHERE ${where.join(' AND ')}` : ''} ORDER BY ${ORDER[register]} LIMIT ?`,
+    `SELECT ${COLUMNS[register]}${byWait ? `, CASE WHEN status = 'open' THEN ${WAIT_SQL} END AS waits` : ''} FROM ${register}${where.length ? ` WHERE ${where.join(' AND ')}` : ''} ORDER BY ${byWait ? `${WAIT_ORDER} ASC, ${ORDER[register]}` : ORDER[register]} LIMIT ?`,
+    ...waitAt,
     ...params,
+    ...waitAt,
     limit,
   );
   const out = rows.map((r) => hydrate(register, r));
@@ -256,7 +282,14 @@ export function listGovernance(
   const withheld = costRows(deps.sql);
   /* AND WHAT EACH OPTION COSTS TO HAVE PICKED (`option_costs`, by the option's id), on a question of options: one hard
      option no longer makes the question `undo`, so the reader marks the option that is hard and words only that press. */
-  return ok(out.map((r) => ({ ...r, cost: costOfRow(deps.sql, r, withheld), ...(r.body_kind === 'options' ? { option_costs: optionCosts(r.body, withheld) } : {}) })));
+  return ok(
+    out.map(({ waits, ...r }) => ({
+      ...r,
+      ...(typeof waits === 'string' ? { waits } : {}),
+      cost: costOfRow(deps.sql, r, withheld),
+      ...(r.body_kind === 'options' ? { option_costs: optionCosts(r.body, withheld) } : {}),
+    })),
+  );
 }
 
 /**

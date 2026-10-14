@@ -81,8 +81,11 @@ export const BINDINGS: Binding[] = [
      thing under the launcher"* — which was true while the palette was the only search, and which
      contradicted `19 §2`'s screen inventory and `19 §4`'s own chord list, both of which name
      `/search?q=`. The palette caps its record hits and now has somewhere to overflow to, so the
-     screen exists and the chord reaches it. */
-  { id: 'goto', scope: 'document', key: 'g then h d i s v p ,', label: 'Go to Home, Decide, Inbox, Search, Vault, Packs, Settings', bare: true },
+     screen exists and the chord reaches it.
+     AND THESE ARE TODAY'S WORDS ONLY UNTIL THE LAYOUT HANDS THE RAIL OVER: the letters are read from the rail now
+     (`goto.ts`), and `sayGoto` writes `chordOf` of that list into this row before the sheet is drawn, so the sheet
+     prints every place's letter. The seven here lead that list and keep their letters. */
+  { id: 'goto', scope: 'document', key: 'g then h d i s v p ,', label: 'Go to Home, Decide, Inbox, Search, Vault, Add-ons, Settings', bare: true },
   { id: 'goto-nav', scope: 'document', key: 'g then 1–9', label: 'The nth item of your nav, in your order', bare: true },
   { id: 'sidebar', scope: 'document', key: '⌘\\', label: 'Toggle the sidebar', bare: false },
   { id: 'undo', scope: 'document', key: '⌘Z', label: 'Undo the last change', bare: false },

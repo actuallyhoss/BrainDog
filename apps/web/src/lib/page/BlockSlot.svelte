@@ -588,6 +588,7 @@
         onpath={w ? (row, done) => w.onpath(block, row, done, i, shown.rows) : undefined}
         onopen={w ? verbs?.onopen : undefined}
         onmenu={w ? verbs?.onmenu : undefined}
+        act={w ? (action, row, value) => void w.act(action, row, value, { block, at: i, before: shown.rows }) : undefined}
       />
       {#if more}<button type="button" class="block-more tap" onclick={(e) => void unfold(e, more.shown)}>{words.more(more.more)}</button>{/if}
       {#if w && segment.kind === 'steps' && w.stepable(block)}<AddStep {block} writes={w} />{/if}

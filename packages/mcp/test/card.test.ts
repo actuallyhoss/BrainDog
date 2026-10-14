@@ -147,7 +147,9 @@ test('ON A RECORD LIKE THE OWNER\'S, context is a card and a few lines, under 1,
   assert.doesNotMatch(slots.get('Next') ?? '', /Sign off instances/u, `a step a fortnight old was handed over: ${slots.get('Next') ?? ''}`);
   assert.match(slots.get('Next') ?? '', /^Variable axis QA on the new cut \(tasks#\d+, handed to you\)/u);
   const waiting = slots.get('Waiting') ?? '';
-  assert.match(waiting, /^\d+ on [^:]+: bank-card-used-sms could not read account out of this one\. · /u);
+  /* WHAT COSTS MOST TO LEAVE WAITING LEADS (AGT-C08, `govern.ts` `order: 'wait'`), not the newest: by Decide's own rank
+     the seed's change to Kiln and Portage is said before the four questions this run asked a moment ago. */
+  assert.match(waiting, /^\d+ on [^:]+: Update Kiln’s note and move Portage to earning\? · bank-card-used-sms could not read account out of this one\. · /u);
   assert.equal(waiting.split('bank-card-used-sms').length, 2, `one question was said twice: ${waiting}`);
   /* LEARNED IS THE SEED'S TWO METHODS, though fifty facts were written after them: a method comes before a fact, and
      `context` now cuts what it hands in that order (`learnedSorted`), where it used to hand the twenty last changed. */

@@ -20,8 +20,91 @@ import { no, ok } from '@braindog/ports';
 import { KINDS, KIND_LINES, REACH_FOR, isKind, kindLine, type Kind } from 'braindog-render';
 import { VOICE_KEYS } from '@braindog/declare';
 import { AGGREGATIONS, CAPABILITIES, FIELD_TYPES } from '@braindog/kernel';
+import * as kernel from '@braindog/kernel';
+import * as render from 'braindog-render';
 
 import { REACHES_OUT } from './slash.ts';
+
+/**
+ * A registry a package exports, or `undefined` while it does not. THE SOURCES AND THE GLYPH GROUPS ARE READ FROM THE
+ * PACKAGES THAT HOLD THEM: the kernel's `SOURCE_MODULES` (`sources/index.ts`) and the renderer's `markGroups`
+ * (`glyphs/groups.ts`). Asked by name on the module, so this file builds the day either package says nothing of it
+ * and reads the registry itself, with no edit here, from the day it does.
+ */
+const exported = (ns: object, name: string): unknown => (Object.hasOwn(ns, name) ? (ns as Record<string, unknown>)[name] : undefined);
+
+/** One source as the page grammar says it: the word a block's `source:` writes, and what it reads when that is said. */
+export type SourceSaid = { readonly name: string; readonly says?: string };
+
+/**
+ * What each registered source reads, in words, by its name, in the registry's order (`SOURCE_MODULES`). A source with
+ * nothing to say past its name is `null`. A module that carries its own `says` is read before this table, and a source
+ * the registry gains with neither is said by its name alone, so it still reaches every agent the day it is registered.
+ */
+const SOURCE_SAYS: Readonly<Record<string, string | null>> = {
+  'forecast.runway': null,
+  activity: null,
+  'sessions.live': null,
+  'sessions.working': 'the runs working now, a helper folded under the run that started it, most recently heard from first; columns and limit only, no where or order',
+  actions: null,
+  'governance.open': null,
+  'governance.later': 'questions put off, soonest back first, on a queue',
+  'governance.decided': 'what was answered, latest first, as rows: question, answer, answer_label, reason, who, at, kind, about, list',
+  runs_on: 'the keys, tools, skills and scheduled actions of the project about: names, then those that apply everywhere; on a table or cards, with no order',
+  deadlines: 'what falls due across the lists; horizon: days ahead, 14 when it says nothing; where: list is tasks',
+  'figures.home': 'the figures pinned to Home, on a stat with no cells',
+  signs: "the record's vital signs as rows: sign, name, state, value, said; in the list's order, no order:",
+  'handoffs.open': 'the next steps runs left and nobody has taken, newest first, as rows: run, agent, next, left_at, mark; about: one project; no order:',
+  'actions.blocking': "one project's scheduled actions that are paused, failing or late, as rows: name, why, since, status, said; about: the project, required; no order:",
+  exceptions: 'what went quiet on this record, the longest quiet first, as rows: subject, since, was, and kind, which is list, door, schedule or stale; no order:',
+};
+
+/** Each name with what it reads: the module's own `says` first, then this file's line, then nothing. */
+export function sourcesSaid(names: readonly string[], modules?: Readonly<Record<string, unknown>>): SourceSaid[] {
+  return names.map((name) => {
+    const module = modules !== undefined && Object.hasOwn(modules, name) ? modules[name] : undefined;
+    const own = typeof module === 'object' && module !== null ? (module as { says?: unknown }).says : undefined;
+    const says = typeof own === 'string' && own.trim() !== '' ? own : Object.hasOwn(SOURCE_SAYS, name) ? SOURCE_SAYS[name] : null;
+    return says ? { name, says } : { name };
+  });
+}
+
+/** The page grammar's `source:` line: the three forms a page writes itself, then every registered source in order. */
+export function sourcesLine(sources: readonly SourceSaid[]): string {
+  const named = [
+    'register.<id>',
+    'metric.<id> (or metric.<id>:<parameter> on a bar or a split, such as metric.project-cost:{{name}} on a project page)',
+    'block.<n>',
+    ...sources.map((s) => (s.says ? `${s.name} (${s.says})` : s.name)),
+  ];
+  return `${named.slice(0, -1).join(', ')} or ${named.at(-1)!}`;
+}
+
+const REGISTERED = exported(kernel, 'SOURCE_MODULES') as Readonly<Record<string, unknown>> | undefined;
+
+/** The sources this build registers, said: the kernel's registry when it is exported, this file's table until then. */
+export const SOURCES: readonly SourceSaid[] = sourcesSaid(REGISTERED ? Object.keys(REGISTERED) : Object.keys(SOURCE_SAYS), REGISTERED);
+
+/** The glyph names by group, one line a group: what the group is, then its names, in the registry's order. */
+export function glyphLines(groups: Readonly<Record<string, readonly string[]>>, says: Readonly<Record<string, string>> = {}): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(groups)
+      .filter(([, names]) => names.length > 0)
+      .map(([group, names]) => [group, `${says[group] ?? group}: ${names.join(', ')}`]),
+  );
+}
+
+const MARK_GROUPS = exported(render, 'markGroups') as (() => Readonly<Record<string, readonly string[]>>) | undefined;
+const GROUP_SAYS = exported(render, 'GROUP_SAYS') as Readonly<Record<string, string>> | undefined;
+
+/** The names a mark may use, by group, or `undefined` while the renderer does not export them. */
+export const GLYPHS: Readonly<Record<string, string>> | undefined =
+  typeof MARK_GROUPS === 'function'
+    ? {
+        use: "a glyph name for a page's icon, a card's mark or {{icon:<glyph>}} in any text; a control, such as x, pencil or a chevron, is never a mark",
+        ...glyphLines(MARK_GROUPS(), GROUP_SAYS),
+      }
+    : undefined;
 
 /**
  * The grammars `arrangement({ grammar })` answers, in the order a refusal names them.
@@ -46,7 +129,7 @@ const PAGE = {
     nav: '{section: text of at most 40 bytes, order: 0 to 9999, tabs?: true}; leave it off and the page has no place on the rail. tabs: true draws every page of that section as a strip of tabs over each of them, in nav order',
     layout: '{rail: 3, 4 or 5, sticky?: true}: a main column and a side rail, the rail in twelfths; sticky keeps the rail in view. Leave it off for one column',
     for: "{register: <id>, where?}: one page per row of that list, in the list's steps order or else the order the rows were written; {{field}} in any text is that row's field, and {{spoken}} is its id, such as parts#2",
-    icon: 'a glyph name, such as board',
+    icon: GLYPHS ? 'a glyph name, such as board; glyphs below names every one a mark may use, by group' : 'a glyph name, such as board',
     tone: 'good, warn, bad or info',
     requires: '["register.<id>"], 1 to 16: every register a block reads',
     filters: '[{field, control: chips or segmented}], at most 4, each a field of the lists the blocks read: the reader narrows every block over a list with that field to one value',
@@ -59,7 +142,7 @@ const PAGE = {
     heading: 'the words over it; on a section, the section itself',
     empty: 'the sentence drawn when it has no rows',
     body: "a note's own prose",
-    source: 'register.<id>, metric.<id> (or metric.<id>:<parameter> on a bar or a split, such as metric.project-cost:{{name}} on a project page), block.<n>, forecast.runway, activity, sessions.live, sessions.working (the runs working now, a helper folded under the run that started it, most recently heard from first; columns and limit only, no where or order), actions, governance.open, governance.later (questions put off, soonest back first, on a queue), governance.decided (what was answered, latest first, as rows: question, answer, answer_label, reason, who, at, kind, about, list), runs_on (the keys, tools, skills and scheduled actions of the project about: names, then those that apply everywhere; on a table or cards, with no order), deadlines (what falls due across the lists; horizon: days ahead, 14 when it says nothing; where: list is tasks), figures.home (the figures pinned to Home, on a stat with no cells), handoffs.open (the next steps runs left and nobody has taken, newest first, as rows: run, agent, next, left_at, mark; about: one project; no order:), actions.blocking (one project\'s scheduled actions that are paused, failing or late, as rows: name, why, since, status, said; about: the project, required; no order:) or signs (the record\'s vital signs as rows: sign, name, state, value, said; in the list\'s order, no order:)',
+    source: sourcesLine(SOURCES),
     where: 'a filter, such as state is open, or a predicate tree. On a capture, what the new row is preset with: about is parts#2 presets a link',
     register: 'the list a capture adds to, or the list whose one row inputs edits',
     row: "on inputs, the row it edits by its id, such as checks#1; the list's first row when it says nothing",
@@ -92,6 +175,7 @@ const PAGE = {
     when: "{metric, gt|gte|lt|lte|is|not: <n>}: drawn only while that figure meets the test. {metric, empty: true}: drawn only while the figure has no value, in no currency, and nothing else holds then; empty: false once it has one. Empty is the leaf's whole test. {all: [...]} or {any: [...]} of two or more tests: all or any, two levels deep. Or {holds: [people]}: the block is there only while the record holds those lists; the add-on's plan decides.",
   },
   paths: '{{<metric>}} in any text is that figure, {{<metric>.first}} the first row it counts and {{<metric>.first_<field>}} a field of that row, {{<list>.count}} how many rows the list has, {{<list>.<value>}} how many are in that value of its state, {{<list>#<n>.<field>}} a field of one row, {{<list>#<n>.<field>.<part>}} one step into that field (a field of the row a link points at, a money\'s amount or currency, or a list field\'s count, and no further), {{<module>.<figure>}} a figure an installed module or add-on declares, read over the whole record on any page (by its id, its id after <module>-, or its one total of a field of that name), and {{icon:<glyph>}} a glyph. Two words are read in one order: a list and count or a state it holds, then a figure and change, first, names, more or since, then a module and its figure, then on a page about a row a field of it and a part, then a measure and a period; anything else answers nothing. On a page about a row, {{<field>}} is that row\'s field when its list declares one, {{<field>.count}} how many a list field holds and {{<field>.<part>}} one step into it, and {{<measure>.<period>}} is the newest reading about that row named the period and the measure (revenue.monthly reads Monthly revenue), money in the currency it was written in, with {{<measure>.<period>.since}} the day it was read; a document is never read',
+  ...(GLYPHS ? { glyphs: GLYPHS } : {}),
   example: {
     id: 'page.reading',
     kind: 'page',

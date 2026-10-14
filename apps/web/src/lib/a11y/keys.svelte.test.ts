@@ -364,8 +364,8 @@ test('AND IT EXPIRES AT THE DEADLINE, so a `g` nobody followed does not eat the 
   go.arm();
   t.mock.timers.tick(WINDOW);
   /* A prefix that never expires IS the mode the header rules out: the `j` somebody presses a minute
-     later is swallowed by a `g` they have forgotten pressing, or navigates the app if it is in the
-     GOTO map. */
+     later is swallowed by a `g` they have forgotten pressing, or navigates the app if it is one of the
+     rail's `g` letters (`goto.ts`). */
   assert.equal(go.armed, false, 'the prefix was still armed a full second after the g, so an unrelated key later was read as the second half of a chord');
 });
 

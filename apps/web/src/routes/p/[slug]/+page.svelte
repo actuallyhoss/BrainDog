@@ -56,6 +56,8 @@
    * record's own sentence. Nothing draws until it answers.
    */
   let got = $state<Opened | null>(null);
+  /* A READ IS OUT OVER A PAGE DRAWN FROM WHAT THIS TAB KEPT OF IT (`kept-pages.ts`): marked busy, never dimmed. */
+  let reading = $state(false);
   let reader: ReturnType<typeof pageReader> | null = null;
 
   /* A RE-READ OF THE PAGE'S OWN, after one of its writes landed, counted so the record moving under it does not read
@@ -67,14 +69,16 @@
 
   async function readLive(asked: string) {
     const at = opened();
-    got = null;
     reader ??= pageReader(apiBase());
+    got = reader.kept(asked, filtered);
+    reading = true;
     const mine = ++started;
     const out = await reader.read(asked, filtered);
     /* An answer for a page somebody has already left draws nothing, and nor does one a later read, with a choice made
        while this was out, has already drawn over. */
     if ((route.params.slug ?? '') !== asked || (mine !== started && got !== null)) return closed(true, at);
     got = out;
+    reading = false;
     closed(out.from !== 'refused', at);
   }
 
@@ -104,7 +108,10 @@
     const mine = ++started;
     try {
       const out = await reader.read(asked, filtered);
-      if (mine === started && (route.params.slug ?? '') === asked && out.from === 'live') got = out;
+      if (mine === started && (route.params.slug ?? '') === asked) {
+        reading = false;
+        if (out.from === 'live') got = out;
+      }
     } finally {
       own -= 1;
     }
@@ -151,7 +158,7 @@
    * says; `Empty` says `refused` for the state it draws.
    */
   $effect(() => {
-    if (got && got.from !== 'refused') drew('ready');
+    if (got && got.from !== 'refused' && !reading) drew('ready');
   });
 
   /**
@@ -204,5 +211,10 @@
 <!-- THE OFFER SITS UNDER THE PAGE'S OWN BLOCKS (PageView's `offer`), as one quiet line that opens on tap, so the page's
      content comes first on a phone and on a laptop alike. -->
 {#snippet offerCard()}{#if offer}<OfferCard item={offer} acts={offerActions} busy={offerBusy} compact />{/if}{/snippet}
-<PageView {slug} {showSource} {got} {reread} offer={offer ? offerCard : undefined} />
+<div class="read" aria-busy={reading ? 'true' : undefined}><PageView {slug} {showSource} {got} {reread} offer={offer ? offerCard : undefined} /></div>
 
+<style>
+  .read {
+    display: contents;
+  }
+</style>

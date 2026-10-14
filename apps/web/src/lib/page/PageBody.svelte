@@ -32,7 +32,8 @@
   import Icon from '$lib/ui/Icon.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import BlockSlot from './BlockSlot.svelte';
-  import { areaOf, boxesOf, layoutOf, leadChartAt, ONE_UNDER, PAIR_FROM, paired, railDrawn, slotOf, snapped, splitAreas, sticks, widened, type Run } from './layout.ts';
+  import { areaOf, areasWithFlow, boxesOf, flowAfterRail, layoutOf, leadChartAt, ONE_UNDER, PAIR_FROM, paired, railDrawn, slotOf, snapped, splitAreas, sticks, widened, type Measured, type Run } from './layout.ts';
+  import { FOLD_LINES, foldOf, foldWords, linesOf, mayFold } from './fold.ts';
   import { arranged, emptyHidden, openOf, optionOf, rowKeys, stepRow, wholeKey } from './home.ts';
   import type { Writes } from './page-writes.ts';
   import type { Picked } from './picked.svelte.ts';
@@ -302,7 +303,8 @@
 
   /**
    * THE ORDER A READER MEETS THE BLOCKS IN, which is the headline, the main column and then the rail (the rail first on
-   * a phone): the order the page draws them in, and so the order `j` and `k` walk. On a page with no rail it is `laid`.
+   * a phone), then the board under both: the order the page draws them in, and so the order `j`, `k` and Tab walk. On a
+   * page with no rail it is `laid`.
    *
    * ONLY THE BLOCKS THAT ARE DRAWN. A block whose `when:` said no has no element, so a cursor on it is a cursor nobody
    * can see, and `j` on a page that opens with three of them pressed three times before anything moved.
@@ -311,7 +313,9 @@
     if (!layout) return pairs.filter((x) => x.block.drawn);
     const top = lifted ? [lifted] : [];
     const first = leadFirst ? [leadFirst] : [];
-    return (railFirst ? [...top, ...first, ...railRest, ...mainAfter] : [...top, ...mainRest, ...railRest]).filter((x) => x.block.drawn);
+    /* AT A DESK WITH THE COLUMN CLOSED, the board under both columns comes after the rail, where the eye meets it. */
+    const desk = [...top, ...flowSplit.beside, ...railRest, ...flowSplit.after];
+    return (railFirst ? [...top, ...first, ...railRest, ...mainAfter] : desk).filter((x) => x.block.drawn);
   });
 
   /**
@@ -416,6 +420,20 @@
   const narrow = $derived(workWidth !== null && workWidth < ONE_UNDER && mode !== 'preview');
 
   /**
+   * THE SIDE COLUMN CLOSES WHERE ITS LAST TILE ENDS (`layout.ts` `flowAfterRail`, DIRECTION §36.22): the main blocks
+   * that start below it are drawn in a third area across the whole board, paired as whole rows are, so Money is not a
+   * tall column beside an empty third. Only on a page at its own address at a desk's width, two columns side by side,
+   * and never while arranging (each column is a list being moved) or with a rail pinned in view (it would ride over the
+   * board under it). `flowAt` is where the main column is cut, by its place in `mainRest`, for the page it was measured
+   * on; `null` draws the two columns to the foot, as before. Measured below, before the page is painted.
+   */
+  let flowAt = $state<{ on: string; at: number } | null>(null);
+  const mayFlow = $derived(mode === 'page' && !arranging && layout !== null && railShown && wide.current && !narrow && workWidth !== null);
+  const flowSplit = $derived(
+    mayFlow && flowAt !== null && flowAt.on === page.page ? areasWithFlow(mainRest, flowAt.at) : { beside: mainRest, after: [] as Laid[] },
+  );
+
+  /**
    * THE WIDTHS A ROW IS DRAWN AT ONCE ITS HIDDEN BLOCKS ARE GONE, by declared index, for the blocks whose width changes
    * (`layout.ts` `widened`): a half whose partner's `when:` said no takes the whole row rather than sitting beside a
    * hole. Each twelve-column flow on its own: the main column (or the page, with no rail) and each box in it. The rail
@@ -427,9 +445,13 @@
   const spans = $derived.by(() => {
     const out = new Map<number, number>();
     if (arranging) return out;
-    for (const run of runsOf(layout ? mainRest : pairs)) {
+    /* THE MAIN COLUMN BESIDE THE RAIL AND THE BOARD UNDER IT ARE TWO FLOWS (`flowSplit`), and the one under it pairs its
+       whole rows as a page with no rail does, since it has the board's whole width. */
+    const after = flowSplit.after;
+    const flows = layout ? [flowSplit.beside, after] : [pairs];
+    for (const run of flows.flatMap((list) => runsOf(list).map((r) => ({ ...r, wide: list === after })))) {
       let got = widened(run.items.map((x) => ({ span: x === lifted ? COLUMNS : x.slot.span, drawn: x.block.drawn })));
-      if (twoUp) {
+      if (twoUp || (run.wide && workWidth !== null && workWidth >= PAIR_FROM)) {
         /* THE QUESTIONS SET BESIDE THE FIGURE THAT OPENS THE PAGE, and the figure beside them (`asks.ts`): set before the
            pairing, so neither is paired with the block after it and that block is not left half a row beside a hole. */
         const now = run.items.map((x, n) => asks.spans.get(x.slot.i) ?? got[n]!);
@@ -468,6 +490,8 @@
   let wasArranging = false;
   /** Whether the work column had been measured when the page was last drawn: its first measure is part of the first draw. */
   let wasSized = false;
+  /** Where the side column closed when the page was last drawn: a column closing is its first measure, never a move. */
+  let wasCut = 0;
   /* A YES OR NO, DERIVED, so the change below reads whether the column is measured and not its width: read as the
      width, every frame of a window being dragged wider ran it again, and its `stop` cut short the recomposition that
      pairing or unpairing the page had just started. */
@@ -483,13 +507,15 @@
     const on = page.page;
     const moving = arranging;
     const isSized = sized;
+    const cut = flowSplit.after.length;
     untrack(() => {
       const el = pageEl;
-      const same = drewFor === on && wasArranging === moving && wasSized === isSized;
+      const same = drewFor === on && wasArranging === moving && wasSized === isSized && wasCut === cut;
       const swap = same ? rewritten(saidWas, said) : new Set<string>();
       drewFor = on;
       wasArranging = moving;
       wasSized = isSized;
+      wasCut = cut;
       saidWas = said;
       if (mode === 'preview' || !el || !same) return motion.stop();
       const play = motion.before(el, shown, swap);
@@ -518,6 +544,126 @@
     return () => watch.disconnect();
   });
   const stuck = $derived(sticks(layout, railHeight, room));
+
+  /* WHERE THE SIDE COLUMN CLOSES, measured as the pairing measures (`flowAt`, above): each drawn main block by its own
+     surface (a boxed run's blocks by their one box, so the column never closes inside it), its top in the main column
+     where it is drawn there, and the rail's height. A ResizeObserver answers before the frame is painted, so the page is
+     first seen with the column closed; drawn closed, the blocks under the board have no top in the column, and stand
+     where they would come back to (`flowAfterRail`), so the cut holds still and never swings back and forth. */
+  let mainEl = $state<HTMLElement | null>(null);
+  let afterEl = $state<HTMLElement | null>(null);
+  /** The desk's main column is the one measured: a phone draws the main column twice, around its rail, and never cuts it. */
+  function measuredMain(node: HTMLElement, desk: boolean) {
+    const take = (on: boolean) => {
+      if (on) mainEl = node;
+      else if (mainEl === node) mainEl = null;
+    };
+    take(desk);
+    return {
+      update: take,
+      destroy: () => take(false),
+    };
+  }
+  $effect(() => {
+    const main = mainEl;
+    const rail = railEl;
+    const under = afterEl;
+    const list = mainRest;
+    const on = page.page;
+    if (!mayFlow || stuck || !main || !rail || typeof ResizeObserver === 'undefined') {
+      untrack(() => {
+        if (flowAt !== null) flowAt = null;
+      });
+      return;
+    }
+    const measure = () => {
+      const base = main.getBoundingClientRect().top;
+      const gap = Number.parseFloat(getComputedStyle(main).rowGap) || 0;
+      const drawn = list.filter((x) => x.block.drawn);
+      const seen: Measured[] = drawn.map((x) => {
+        const el = slotEl(x.slot.i);
+        const unit = el?.parentElement?.classList.contains('box') ? el.parentElement : el;
+        if (!unit) return { height: 0 };
+        const r = unit.getBoundingClientRect();
+        return main.contains(unit) ? { height: r.height, top: r.top - base } : { height: r.height };
+      });
+      const k = flowAfterRail(seen, rail.getBoundingClientRect().height, gap);
+      let at = k < drawn.length ? list.indexOf(drawn[k]!) : -1;
+      /* A HIDDEN BLOCK JUST BEFORE THE CUT GOES UNDER WITH WHAT FOLLOWS IT, so a boxed run keeps its section. */
+      while (at > 0 && !list[at - 1]!.block.drawn) at--;
+      const was = untrack(() => flowAt);
+      const next = at > 0 ? { on, at } : null;
+      if (next?.at !== was?.at || next?.on !== was?.on) flowAt = next;
+    };
+    const watch = new ResizeObserver(measure);
+    watch.observe(main);
+    watch.observe(rail);
+    if (under) watch.observe(under);
+    return () => watch.disconnect();
+  });
+
+  /* ── a long note, folded ───────────────────────────────────────────────────
+     A NOTE OR A DOCUMENT OF MORE THAN TWELVE LINES ON A PAGE SHOWS ITS FIRST TWELVE (`fold.ts`, DIRECTION §35.19): an
+     imported document poured down a project page whole. Measured where it is drawn, by its prose's own line, so the
+     cut falls under a line and never through one; "Read all" opens it in place. Per visit: what was opened is held
+     here by the block's key and goes with the page, never stored. Not while arranging, where a block is being placed.
+     A plain Map and Set, replaced whole on each change: Svelte's reactive SvelteMap and SvelteSet put its tracing
+     helpers in the chunk every screen loads. */
+  let foldSeen = $state.raw<ReadonlyMap<string, { lines: number; clip: number }>>(new Map());
+  let foldOpen = $state.raw<ReadonlySet<string>>(new Set());
+  /** A block's measure kept, or let go with `null`. */
+  function seeFold(at: string, seen: { lines: number; clip: number } | null): void {
+    const next = new Map(foldSeen);
+    if (seen) next.set(at, seen);
+    else next.delete(at);
+    foldSeen = next;
+  }
+  /** A block opened past its fold, or shut again. */
+  function openFold(key: string, open: boolean): void {
+    if (foldOpen.has(key) === open) return;
+    const next = new Set(foldOpen);
+    if (open) next.add(key);
+    else next.delete(key);
+    foldOpen = next;
+  }
+  let foldFor: string | null = null;
+  $effect.pre(() => {
+    const on = page.page;
+    untrack(() => {
+      if (foldFor !== null && foldFor !== on && foldOpen.size > 0) foldOpen = new Set();
+      foldFor = on;
+    });
+  });
+
+  /** Measures a foldable block's lines and where twelve of them end, as it is drawn and each time it changes size. */
+  function foldMeasure(el: HTMLElement, key: string) {
+    let at = key;
+    const measure = () => {
+      const text = el.querySelector<HTMLElement>('p, li, pre, blockquote');
+      if (!text) return void (foldSeen.has(at) && seeFold(at, null));
+      const line = Number.parseFloat(getComputedStyle(text).lineHeight) || 0;
+      const top = text.getBoundingClientRect().top - el.getBoundingClientRect().top;
+      const lines = linesOf(el.scrollHeight - top, line);
+      const clip = Math.round(top + FOLD_LINES * line);
+      const was = foldSeen.get(at);
+      if (!was || was.lines !== lines || was.clip !== clip) seeFold(at, { lines, clip });
+    };
+    const watch = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    const observe = () => {
+      watch?.observe(el);
+      for (const child of el.children) watch?.observe(child);
+    };
+    observe();
+    return {
+      update(next: string) {
+        at = next;
+        measure();
+      },
+      destroy() {
+        watch?.disconnect();
+      },
+    };
+  }
 
   /** A block's element, by the id its slot writes. */
   const slotEl = (i: number): HTMLElement | null => document.getElementById(`${ids}b-${i + 1}`);
@@ -852,6 +998,12 @@
           enter(Number(under.id.slice(`${ids}b-`.length)) - 1);
           break;
         }
+        /* A ROW THAT CARRIES ITS OWN ACTIONS PRESSES THE FIRST ONE (PGS-A12), as a click on it would. */
+        const first = under.querySelector<HTMLElement>('[data-row-action]');
+        if (first) {
+          first.click();
+          break;
+        }
         /* ON A PAGE A ROW OF THE RECORD OPENS BESIDE THE PAGE, in the panel, and the page stays where it was. */
         if (record && host?.open(record)) break;
         const to = openOf(under.dataset.open, under.dataset.row);
@@ -943,6 +1095,12 @@
   {@const pos = peers.findIndex((x) => x.at === at)}
   {@const count = peers.length}
   {@const stacked = rail || slot.span >= COLUMNS}
+  <!-- Whether the block folds at twelve lines (`fold.ts`): never the page's sentence, never while arranging. -->
+  {@const key = keys[slot.i] ?? String(slot.i)}
+  {@const foldable = !arranging && !isLead(block) && mayFold(block.kind, mode)}
+  {@const seen = foldable ? foldSeen.get(key) : undefined}
+  {@const folds = seen !== undefined && foldOf(block.kind, seen.lines, mode)}
+  {@const shut = folds && !foldOpen.has(key)}
   <!-- `drawn: false` means the record evaluated `when:` and said no. A page that shows a warning that does not apply
        teaches people to ignore warnings (06 §1). -->
   {#if block.drawn}
@@ -1016,23 +1174,34 @@
           </div>
         {/if}
       {/if}
-      <BlockSlot
-        block={sectioned.get(at) ?? block}
-        i={slot.i}
-        {ids}
-        {writes}
-        param={page.param}
-        {arranging}
-        {now}
-        {level}
-        fold={mode === 'home'}
-        compact={compactAt(slot.i, block.kind)}
-        rows={mode === 'home' || (mode === 'page' && host) ? { cursor: cursorIn(slot.i), onrowfocus: rowFocus(slot.i) } : null}
-        verbs={verbsFor(slot.i)}
-        pick={mode === 'preview' ? null : pick}
-        walk={mode === 'preview' ? null : onwalk}
-        slug={mode === 'home' ? page.page : null}
-      />
+      {#if foldable}
+        <!-- A LONG NOTE, CUT UNDER ITS TWELFTH LINE on the tile's own ground, and one button under it that says what a
+             press does (`fold.ts`). -->
+        <div class="fold" id="{ids}f-{slot.i + 1}" data-shut={shut ? '' : undefined} style:--fold-at={seen ? `${seen.clip}px` : undefined}
+          use:foldMeasure={key}
+          onfocusin={(e) => {
+            /* A KEY THAT TABS INTO THE CUT-OFF PART OPENS IT, so nothing focused is out of sight. */
+            if (shut && seen && (e.target as HTMLElement).getBoundingClientRect().bottom - e.currentTarget.getBoundingClientRect().top > seen.clip) openFold(key, true);
+          }}
+        >
+          {@render tile(slot, block, at)}
+        </div>
+        {#if folds}
+          <button
+            type="button"
+            class="fold-toggle tap"
+            aria-expanded={!shut}
+            aria-controls="{ids}f-{slot.i + 1}"
+            onclick={() => {
+              if (shut) return void openFold(key, true);
+              openFold(key, false);
+              slotEl(slot.i)?.scrollIntoView({ block: 'nearest' });
+            }}>{shut ? foldWords.open : foldWords.shut}</button
+          >
+        {/if}
+      {:else}
+        {@render tile(slot, block, at)}
+      {/if}
     </div>
     <!-- UNDER THE HEADLINE: the one next action the look names, wherever the headline is drawn. -->
     {#if next && !arranging && headline?.at === at}<NextStep {next} host={mode === 'page' ? host : null} />{/if}
@@ -1046,6 +1215,27 @@
       {#if host && mode === 'page'}<JustChanged {host} />{/if}
     {/if}
   {/if}
+{/snippet}
+
+<!-- THE BLOCK ITSELF, inside its tile: one snippet, so a folded note and every other block draw the same part. -->
+{#snippet tile(slot: Slot, block: LiveBlock, at: number)}
+  <BlockSlot
+    block={sectioned.get(at) ?? block}
+    i={slot.i}
+    {ids}
+    {writes}
+    param={page.param}
+    {arranging}
+    {now}
+    {level}
+    fold={mode === 'home'}
+    compact={compactAt(slot.i, block.kind)}
+    rows={mode === 'home' || (mode === 'page' && host) ? { cursor: cursorIn(slot.i), onrowfocus: rowFocus(slot.i) } : null}
+    verbs={verbsFor(slot.i)}
+    pick={mode === 'preview' ? null : pick}
+    walk={mode === 'preview' ? null : onwalk}
+    slug={mode === 'home' ? page.page : null}
+  />
 {/snippet}
 
 <!-- A COLUMN'S BLOCKS, run by run. A boxed section and the blocks after it are one surface, drawn only when one of them
@@ -1064,8 +1254,10 @@
   {/each}
 {/snippet}
 
-<!-- THE MAIN COLUMN AND THE RAIL, each a snippet so a phone can draw the rail first without a second copy of either. -->
-{#snippet mainArea(list: Laid[])}
+<!-- THE MAIN COLUMN AND THE RAIL, each a snippet so a phone can draw the rail first without a second copy of either.
+     `desk` is passed at every call and has no default: a default makes the build keep Svelte's `fallback` in the chunk
+     every screen loads. -->
+{#snippet mainArea(list: Laid[], desk: boolean)}
   {#if layout && list.some((x) => x.block.drawn)}
     <div
       class="area"
@@ -1073,7 +1265,17 @@
       style="--area-span:{columns.main}"
       role={arranging ? 'list' : undefined}
       aria-label={arranging ? copy.mainColumn : undefined}
+      use:measuredMain={desk}
     >
+      {@render column(list)}
+    </div>
+  {/if}
+{/snippet}
+
+<!-- THE BOARD UNDER BOTH COLUMNS, once the side column has closed: the main column's later blocks, across the board. -->
+{#snippet afterArea(list: Laid[])}
+  {#if list.some((x) => x.block.drawn)}
+    <div class="area" data-area="after" bind:this={afterEl}>
       {@render column(list)}
     </div>
   {/if}
@@ -1115,12 +1317,14 @@
     {#if lifted}{@render slotted(lifted)}{/if}
     {#if railFirst}
       <!-- A PHONE: the chart the main column opens on, the rail, then the rest of the main column. -->
-      {#if leadFirst}{@render mainArea([leadFirst])}{/if}
+      {#if leadFirst}{@render mainArea([leadFirst], false)}{/if}
       {@render railArea()}
-      {@render mainArea(mainAfter)}
+      {@render mainArea(mainAfter, false)}
     {:else}
-      {@render mainArea(mainRest)}
+      <!-- A DESK: the main column beside the rail, and once the rail has ended, the rest of it across the board. -->
+      {@render mainArea(flowSplit.beside, true)}
       {@render railArea()}
+      {@render afterArea(flowSplit.after)}
     {/if}
   {:else}
     {@render column(pairs)}
@@ -1207,6 +1411,39 @@
 
   .area[data-area='rail'] .block-slot {
     grid-column: auto;
+  }
+
+  /* THE BOARD UNDER BOTH COLUMNS, once the side column has closed (`flowAfterRail`): the whole width, a twelve-column
+     flow of its own as a page with no rail is, so its whole rows pair the same way. */
+  .area[data-area='after'] {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+
+  /* ── a long note, folded ───────────────────────────────────────────────────
+     CUT UNDER ITS TWELFTH LINE (`--fold-at`, measured), on the tile's own ground: no fade, no veil, since a gradient is
+     not the board's. The button under it is words, a press opens the rest in place. */
+  .fold[data-shut] {
+    max-block-size: var(--fold-at, none);
+    overflow: hidden;
+  }
+
+  .fold-toggle {
+    display: block;
+    margin: 0;
+    padding: var(--sp-3) 0 0;
+    border: 0;
+    background: none;
+    color: var(--link);
+    font: inherit;
+    font-size: var(--t-base);
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .fold-toggle:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
   }
 
   /* STICKY ONLY WHERE THERE ARE TWO COLUMNS. Under 900px the rail follows the main column, and a rail pinned at the top
@@ -1348,6 +1585,15 @@
     }
   }
 
+  /* And the same note inside its fold (`fold.ts`), one step down. */
+  @media (pointer: coarse) {
+    .block-slot > .fold > :global(.block[data-kind='note'] p > a:only-child) {
+      display: inline-flex;
+      align-items: center;
+      min-block-size: var(--tap);
+    }
+  }
+
   /* THE WELL SAYS WHAT IS UNDER IT, in the washes a tile's well takes (`ui/IconWell.svelte`): red where something under
      the section is late or needs the person, the working accent's tint over questions waiting, the earn green over
      cash. The row names the tone (`blocks.ts` `sectionWell`) and the renderer writes it on the well, naming no colour.
@@ -1463,6 +1709,7 @@
     .area,
     .area[data-area='main'],
     .area[data-area='rail'],
+    .area[data-area='after'],
     .box {
       grid-column: 1 / -1;
       grid-template-columns: minmax(0, 1fr);
@@ -1479,7 +1726,7 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .page[data-narrow] :is(.area, .area[data-area='main'], .area[data-area='rail'], .box) {
+  .page[data-narrow] :is(.area, .area[data-area='main'], .area[data-area='rail'], .area[data-area='after'], .box) {
     grid-column: 1 / -1;
     grid-template-columns: minmax(0, 1fr);
   }

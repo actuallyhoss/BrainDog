@@ -6043,8 +6043,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * project of the run that asked it, and the projects of the rows it is about, by their handles, so this project's
    * questions lead and are counted. Held as `waitingFor` holds them; the places are never sent.
    */
-  const placedWaiting = (ctx: CallContext): ({ id: string; question: string } & Placed)[] => {
-    const rows = kernel.openSuggestions();
+  const placedWaiting = (ctx: CallContext): ({ id: string; question: string; waits?: string } & Placed)[] => {
+    const rows = kernel.governance('suggestion', { status: 'open', every: true, order: 'wait' });
     if (!rows.ok) return [];
     return rows.value
       .filter((row) => !holds(ctx, row))
@@ -6053,7 +6053,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         if (id === null) return [];
         const raw = row.body;
         const body = (typeof raw === 'string' ? (() => { try { return JSON.parse(raw) as unknown; } catch { return null; } })() : raw) as Record<string, unknown> | null;
-        return [{ id, question: kernel.question(String(row.id)) ?? '', ...placedBy(row.opened_by, body) }];
+        return [{ id, question: kernel.question(String(row.id)) ?? '', ...(typeof row.waits === 'string' ? { waits: row.waits } : {}), ...placedBy(row.opened_by, body) }];
       });
   };
 
@@ -10383,6 +10383,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const rows = kernel.governance(register, {
         ...(args?.status === undefined ? {} : { status: String(args.status) }),
         ...(args?.limit === undefined ? {} : { limit: Number(args.limit) }),
+        ...(register === 'suggestion' && (args?.status === undefined || String(args.status) === 'open') ? { order: 'wait' as const } : {}),
         ...after,
       });
       if (!rows.ok) return rows;
@@ -10401,7 +10402,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* AND THE PAGE IS FILLED FROM WHAT IS LEFT. Trimmed to the limit and then filtered, a token
          scoped to one register was handed an empty page whenever the newest fifty were about
          another, with its own questions still open behind them. */
-      const every = kernel.governance(register, { ...(args?.status === undefined ? {} : { status: String(args.status) }), every: true, ...after });
+      const every = kernel.governance(register, { ...(args?.status === undefined ? {} : { status: String(args.status) }), ...(register === 'suggestion' && (args?.status === undefined || String(args.status) === 'open') ? { order: 'wait' as const } : {}), every: true, ...after });
       if (!every.ok) return every;
       return ok(shownRows(every.value).slice(0, rows.value.length));
     },

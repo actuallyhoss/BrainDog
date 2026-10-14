@@ -12,6 +12,8 @@
  * project's first, read from every learning and not only the five shown, so an old rule is never cut by new lessons.
  */
 
+import { WAITS, waitOf, waitRank, type Wait } from '@braindog/kernel';
+
 import { oneLine, words } from './card.ts';
 
 /** The rows of one list the brief answer holds, this project's and everywhere's together. */
@@ -105,12 +107,38 @@ export type Placed = { project?: string | null | undefined; projects?: readonly 
 export const isHere = (p: Placed, project: string | null): boolean => project !== null && (p.project === project || (p.projects ?? []).includes(project));
 
 /**
- * The open questions `context` sends: this project's first, each half in the order handed in (newest first), at most
- * `n`, and how many of all of them are this project's. Outside any project nothing is here and the order is kept.
+ * What a question carries for its wait to be read (AGT-C08): the `waits` the record's read said (`listGovernance` with
+ * `order: 'wait'`, which reads the rows too), or what `waitOf` reads of a question (`WaitingQuestion`) with the instant.
  */
-export function projectWaiting<T extends Placed>(questions: readonly T[], project: string | null, n = 8): { waiting: T[]; here: number } {
-  const mine = questions.filter((q) => isHere(q, project));
-  const theirs = questions.filter((q) => !isHere(q, project));
+export type Weighed = { waits?: string | undefined; body_kind?: unknown; body?: unknown; opened_at?: unknown };
+
+/** A question's wait, as the record said it or as `waitOf` reads it at `nowMs`, or `null` when it carries neither. */
+export function waitHeld(q: Weighed, nowMs?: number): Wait | null {
+  if ((WAITS as readonly string[]).includes(q.waits ?? '')) return q.waits as Wait;
+  if (nowMs === undefined || typeof q.body_kind !== 'string' || typeof q.opened_at !== 'string') return null;
+  return waitOf({ body_kind: q.body_kind, body: q.body, opened_at: q.opened_at }, nowMs);
+}
+
+/**
+ * Questions in the order waiting costs: what costs most to leave waiting first, by Decide's own rank (`waitRank`), ties
+ * in the order handed in; a question with no weighing keeps its place after every weighed one.
+ */
+function byWait<T extends Weighed>(questions: readonly T[], nowMs?: number): T[] {
+  const ranked = questions.map((q, at) => ({ q, at, wait: waitHeld(q, nowMs) }));
+  const weighed = ranked.filter((r) => r.wait !== null).sort((a, b) => waitRank(a.wait!) - waitRank(b.wait!) || a.at - b.at);
+  return [...weighed, ...ranked.filter((r) => r.wait === null)].map((r) => r.q);
+}
+
+/**
+ * The open questions `context` sends: this project's first, each half in the order waiting costs (`byWait`), at most
+ * `n`, and how many of all of them are this project's. Outside any project nothing is here. An agent reads its Waiting
+ * slot from the top, so newest first handed it a question opened a minute ago while one moving money since yesterday
+ * waited under it; by wait it picks up the one Decide shows first. Questions that carry no weighing keep the order
+ * handed in (newest first).
+ */
+export function projectWaiting<T extends Placed & Weighed>(questions: readonly T[], project: string | null, n = 8, nowMs?: number): { waiting: T[]; here: number } {
+  const mine = byWait(questions.filter((q) => isHere(q, project)), nowMs);
+  const theirs = byWait(questions.filter((q) => !isHere(q, project)), nowMs);
   return { waiting: [...mine, ...theirs].slice(0, Math.max(0, n)), here: mine.length };
 }
 

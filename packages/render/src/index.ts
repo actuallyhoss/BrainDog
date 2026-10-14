@@ -270,3 +270,5 @@ export { LINT_RULES, lintHtml, lintPage, lintPart, lintText, type LintFinding, t
 export { FAILED_RUN, SHEET_DAY, SHEET_FORMS, SHEET_KINDS, SHEET_NOW, SHEET_POINTS, SHEET_STALE_STEPS, SHEET_STATES, SPECIMEN, chartSpecimen, chartSpecimens, partSpecimens, planSpecimen, planSpecimens, sheetKey, specimenFor, specimenSegments, specimenStale, type SheetAge, type SheetForm, type SheetKind, type SheetState, type Specimen } from './sheet.ts';
 /* A declared block's actions (PGS-A12): the plan Block.svelte draws them by, and the quiet line of labels without a host. */
 export * from './actions.ts';
+/* The glyph groups (PGS-A08): which glyphs are the core, the set and the shell's, read by the grammar an agent is handed. */
+export { GLYPH_GROUPS, GROUP_SAYS, glyphGroups, groupOf, markGlyphs, markGroups, type GlyphGroup } from './glyphs/groups.ts';

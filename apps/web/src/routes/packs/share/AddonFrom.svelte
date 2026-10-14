@@ -127,7 +127,9 @@
         void download();
       }}
     >
-      <Section title={words.picks} {...ticks.size > 0 ? { count: ticks.size } : {}}>
+      <!-- A ZERO IS NO COUNT, which Section already draws as none; a spread here would put Svelte's prop merging in the
+           chunk every screen loads. -->
+      <Section title={words.picks} count={ticks.size}>
         {#each groups as group (group.kind)}
           <fieldset class="group">
             <legend class="group-h">{group.heading}</legend>

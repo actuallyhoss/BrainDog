@@ -33,7 +33,7 @@
  * `apps/selfhost/src/slash.ts` `slashModelJobs`), so a host with no model never evaluates the package (`46 §5.1`).
  */
 
-import { shapeOf, type Kernel, type OutboxKind, type OutboxRow } from '@braindog/kernel';
+import { shapeOf, type Kernel, type MayPropose, type OutboxKind, type OutboxRow } from '@braindog/kernel';
 import { codeOf, fixOf, type Result, type Scheduler, type Sql } from '@braindog/ports';
 import type { CallContext, RecordApi } from '@braindog/record';
 
@@ -189,6 +189,13 @@ export type ModelJobsDeps = {
    * `pending` with its attempts as they were and the model is neither asked nor tested. ABSENT IS ON.
    */
   reads?: Reads | undefined;
+  /**
+   * The kernel's governor (`observe.ts` `mayPropose`, over the record's sql), asked before a pattern draft goes to the
+   * model, because the kernel's ack files what it drafts as Slash's question. No, and the draft is held: no model call,
+   * nothing filed, the job done, and the pass says how many it held and why. The arrivals stay in the inbox, so the
+   * pattern is noticed again once Slash may ask. ABSENT, as a host built by hand is, every draft is sent as before.
+   */
+  mayPropose?: ((nowMs: number) => MayPropose) | undefined;
 };
 
 /**
@@ -197,8 +204,11 @@ export type ModelJobsDeps = {
  */
 export const MODEL_TEST_EVERY_MS = 30 * 60_000;
 
-/** The ack for one job, without its id and lease. */
-type Settled = { state: 'done'; result?: unknown } | { state: 'failed'; error: string };
+/** The ack for one job, without its id and lease. `held` is the governor's sentence for a draft it held (never acked). */
+type Settled = { state: 'done'; result?: unknown; held?: string } | { state: 'failed'; error: string };
+
+/** The governor as one pass asks it: once, on the first draft that would file, and the same answer for the rest. */
+type Governor = () => MayPropose;
 
 /** The first instant of the month `add` months from `ms`, as the package's `call.ts` `monthOf` writes it, so the counts agree. */
 const monthOf = (ms: number, add: number): string => {
@@ -501,7 +511,7 @@ function refusedAck<T>(out: Result<T>, onRefused: Settled): Settled {
 }
 
 /** What one draft comes to. Every throw in `draft` or the inbox is a `failed` ack here, never a lost batch. */
-async function settleDraft(api: ModelJobsApi, inference: ModelJobInference, job: OutboxRow, log: (line: string) => void): Promise<Settled> {
+async function settleDraft(api: ModelJobsApi, inference: ModelJobInference, job: OutboxRow, log: (line: string) => void, governor?: Governor): Promise<Settled> {
   const p = payloadOf(job);
   /* A DRAFT NOBODY CAN READ HAS NOTHING TO FILE, and a retry reads the same bytes: done, with nothing on it. */
   if (p === null) return { state: 'done' };
@@ -539,6 +549,11 @@ async function settleDraft(api: ModelJobsApi, inference: ModelJobInference, job:
 
   /* THE THREE OLDEST OF HOW MANY WAIT (ENG-B07): the engine sends the oldest three by `ts` and names the count; the
      kernel's payload says `waiting` (`ingest.ts` `propose`), and a shape read here counts its own. */
+  /* AND ONLY WHERE SLASH MAY ASK (ENG-B17 job 4): the floor and the brake (`mayPropose`) are asked before the model,
+     because what it drafts is filed as Slash's question by the ack. Held, nothing is sent and nothing filed; the pass
+     counts it and says why, and the arrivals wait in the inbox to be noticed again. Nothing here lifts the brake. */
+  const may = governor?.();
+  if (may && !may.may) return { state: 'done', held: may.why };
   const out = await inference.draft(clean, waiting);
   if (out.ok) return { state: 'done', result: out.value };
   /* A DRAFT THE ENGINE'S CHECKS REFUSED IS NOT RETRIED: the same samples would draft the same refusal, billed twice. */
@@ -590,6 +605,7 @@ async function settle(
   log: (line: string) => void,
   store: UnderstandStore | undefined,
   now: number,
+  governor?: Governor,
 ): Promise<Settled> {
   try {
     if (job.kind === RESOLVE)
@@ -597,7 +613,7 @@ async function settle(
     if (job.kind === 'infer.embed')
       return inference.embed ? await settleEmbed(inference.embed, job, log) : { state: 'failed', error: 'This host has no model to embed with.' };
     if (job.kind === 'infer.prose') return await settleProse(inference, job, log);
-    return await settleDraft(api, inference, job, log);
+    return await settleDraft(api, inference, job, log, governor);
   } catch (e) {
     return { state: 'failed', error: said(e) };
   }
@@ -716,10 +732,15 @@ export async function serveModelJobs(api: ModelJobsApi, deps: ModelJobsDeps): Pr
   const room = Math.min(n - asked.length - judged.length, embedRoom(meter, now, leased));
   const jobs = [...asked, ...judged, ...(inference.embed && room > 0 ? api.kernel.leaseOutbox(['infer.embed'], room) : [])];
   let acked = 0;
+  /* THE GOVERNOR ONCE A PASS, and only when a draft would file: it reads and writes nothing, so one answer holds. */
+  let ruled: MayPropose | undefined;
+  const governor: Governor | undefined = deps.mayPropose && (() => (ruled ??= deps.mayPropose!(now)));
+  const held: string[] = [];
 
   await Promise.all(
     jobs.map(async (job) => {
-      const settled = await settle(api, inference, job, log, deps.store, now);
+      const { held: why, ...settled } = await settle(api, inference, job, log, deps.store, now, governor) as Settled & { held?: string };
+      if (why !== undefined) held.push(why);
       try {
         const landed = api.kernel.ackOutbox({ id: job.id, ...settled, leasedUntil: job.leasedUntil });
         if (landed.ok) acked++;
@@ -731,6 +752,9 @@ export async function serveModelJobs(api: ModelJobsApi, deps: ModelJobsDeps): Pr
   );
 
   if (acked > 0 && deps.scheduler) await api.kernel.tail(deps.scheduler);
+  /* HELD, NEVER DROPPED SILENTLY: one line a pass with the count and the governor's own sentence. */
+  if (held.length > 0)
+    log(`Slash held ${held.length === 1 ? 'one pattern' : `${held.length} patterns`} it noticed and asked you nothing: ${held[0]} The arrivals stay in the inbox.`);
 
   /* THE NOTES, AFTER THE JOBS AND ON WHAT THE MONTH STILL HAS: the understanding share, held under the work's. */
   if (inference.mentions && deps.store && meter.understand && registers && list && meetsList && propose) {

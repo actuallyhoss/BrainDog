@@ -33,7 +33,7 @@ import type { AccountClosed } from '@braindog/ports';
 import { gate, serveMcp as answerMcp, unauthorized as unknownAgent } from '@braindog/mcp/http';
 /* The oldest command this door still works with (AGT-A02), one day for both hosts, answered at the build address. */
 import { MIN_CLI } from '@braindog/mcp/build';
-import { INVITE_GONE, placeholderName as recordPlaceholder, ulids, type Arrival, type Arrived, type CreateRecordArgs, type DeviceCode, type Exchanged, type LeasedSeal, type OperationGrant, type OutboxRow, type VaultGrant, type Waiting } from '@braindog/kernel';
+import { INVITE_GONE, mayPropose, placeholderName as recordPlaceholder, ulids, type Arrival, type Arrived, type CreateRecordArgs, type DeviceCode, type Exchanged, type LeasedSeal, type OperationGrant, type OutboxRow, type VaultGrant, type Waiting } from '@braindog/kernel';
 import { createRecordApi, type CallContext, type Deposited, type IngestVerification, type Limited, type OpenedForGrant, type RecordApi, type SealTarget, type Sealed } from '@braindog/record';
 import { fixOf, ok, refused } from '@braindog/ports';
 import type { Auth, AuthCall, AuthResult, Param, Refusal, Result, Row, Scheduler, Snapshots, Sql, Who } from '@braindog/ports';
@@ -1115,6 +1115,8 @@ export class Record$ extends DurableObject<Env> {
         health: this.#engineHealth,
         /* HIS SWITCH FOR SLASH READING ON ITS OWN (ENG-A09): off, nothing is leased and no model is asked or tested. */
         reads: () => api.kernel.prefsOf('slash')['slash.reads'] !== false,
+        /* THE KERNEL'S GOVERNOR (ENG-B17): a pattern draft is held, never filed, while the floor or the brake says no. */
+        mayPropose: this.#jobsStore ? (at) => mayPropose(this.#jobsStore!, at) : undefined,
         log: (line) => op({ op: 'slash.jobs', rec, ok: false, error: line }),
       });
     } catch (e) {
