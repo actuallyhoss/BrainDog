@@ -16,7 +16,7 @@
  * `held.ts`'s, which only the record fills in a shipped tab, and a module's name is `modules.ts`'s.
  */
 
-import { agentDoing, day as fmtDay, diffRows, money, relative, shortDay, since, integer, MISSING } from 'braindog-render';
+import { addDays, agentDoing, day as fmtDay, diffRows, money, relative, shortDay, since, integer, MISSING } from 'braindog-render';
 import type { Column, TableRow } from 'braindog-render/svelte';
 import { asPartOf, namesSaid, ruleAsked, ruleDone, ruleFolded, useCaseName } from '@braindog/seed/usecases/names';
 import { firstPartyModule as moduleOf } from '@braindog/seed/packs/modules';
@@ -296,7 +296,7 @@ export function runWho(fields: Readonly<Record<string, unknown>>): string | null
 }
 
 /** How long after one instant another came, said short: "5 min", "2h", "3 days". */
-function gapSaid(from: string, to: string): string | null {
+export function gapSaid(from: string, to: string): string | null {
   const ms = Date.parse(to) - Date.parse(from);
   if (!Number.isFinite(ms) || ms < 0) return null;
   const mins = Math.round(ms / 60_000);
@@ -1530,6 +1530,10 @@ export type FeedRow = {
    * from a row no run signed and from a record on an older build, and such a run is An agent as before.
    */
   run_by?: RunBy | null;
+  /** On a feed that says `group: day`: the day the line was written, in the record's own time zone. */
+  day?: string;
+  /** On a feed that says `fold: run`: how many more lines the run that signed this one wrote, which this line stands for. */
+  run_more?: number;
 };
 
 /** One step of a cash walk, as this build's walk and the record's both send it. */
@@ -1762,29 +1766,98 @@ export function setupSaid(target: string | null, rows: number): string {
 /** When a feed row happened, in words: a day against today, and an instant as how long ago. */
 const whenOf = (at: string, now: number): string => (/^\d{4}-\d{2}-\d{2}$/u.test(at) ? relative(at, now) : since(at, now));
 
+/** The first cell of the row that heads a day's lines, which the renderer draws as a heading (`render/src/feed.ts`). */
+const FEED_DAY = 'day';
+
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+
+/**
+ * THE READER'S OWN DAY AT `now`, as `relative()` counts it: in the zone named, else the browser's own, else UTC where
+ * there is no window (a test, a worker). A zone nobody knows is UTC, because a formatter never stops a page.
+ */
+function todayIn(now: number, zone?: string): string {
+  const parts = (timeZone: string | undefined) => new Intl.DateTimeFormat('en-u-nu-latn-ca-gregory', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now);
+  let found: Intl.DateTimeFormatPart[];
+  try {
+    found = parts(zone ?? ('window' in globalThis ? undefined : 'UTC'));
+  } catch {
+    found = parts('UTC');
+  }
+  const part = (type: Intl.DateTimeFormatPartTypes): string => found.find((p) => p.type === type)?.value ?? '';
+  return `${part('year')}-${part('month')}-${part('day')}`;
+}
+
+/**
+ * A DAY AS THE HEAD OF ITS LINES: Today, Yesterday, then the weekday and the day of the month (`Mon 12 Oct`), with the
+ * year only when it is another year (`Wed 31 Dec 2025`). The date is `shortDay`'s and `day`'s, so a day is spelled
+ * here as it is everywhere else. A day past the reader's today (the record keeps another zone) is its date, never a guess.
+ */
+export function feedDay(day: string, today: string): string {
+  if (day === today) return 'Today';
+  if (day === addDays(today, -1)) return 'Yesterday';
+  const t = Date.parse(`${day}T12:00:00Z`);
+  if (!Number.isFinite(t)) return day;
+  return `${WEEKDAYS[new Date(t).getUTCDay()]} ${day.slice(0, 4) === today.slice(0, 4) ? shortDay(day) : fmtDay(day)}`;
+}
+
+/** What a run's newest line says of the lines folded under it. */
+const feedMore = (n: number): string => `and ${integer(n)} more`;
+
+/** Where the run that signed a line opens, or nothing where the record named no run a person could open. */
+function runHref(r: FeedRow): string | undefined {
+  const run = r.run_by?.run ?? r.who ?? '';
+  return /^S[1-9][0-9]*$/u.test(run) ? `/r/session/${run.slice(1)}` : undefined;
+}
+
 /**
  * A feed's rows as the renderer reads them, `by | who | count | what | when`, with the `seen` row.
  *
  * ONE SHAPE FOR THE SAMPLE'S FEED AND A RECORD'S. On a feed that marks what is new, the `seen` row sits
  * below the rows newer than the reader's read mark, which the renderer draws as new, and says when that
  * was. A reader with no mark yet gets it at the end with no time, which is the renderer's "not looked yet".
+ *
+ * A FEED THAT SAYS ITS DAYS (`group: day`, so each row carries `day`) gets one more kind of row, `day | words`, before
+ * each day's first line. "Today" is the reader's, counted from `now` in their own zone. The `seen` row stays under the
+ * last new line, so where the first line already read opens a day it sits above that day's heading.
+ *
+ * A RUN FOLDED TO ITS NEWEST LINE (`fold: run`, `run_more`) ends with one more cell, the words for the rest, which open
+ * the run. THE LINK IS IN THE CELL, because a feed's rows reach the renderer as the dialect's text (`blocks.ts`) and a
+ * row's `href` does not travel with them; the row carries it too, for a reader of the rows themselves. A row with
+ * neither key is the five cells it always was.
  */
-export function feedTable(feed: readonly FeedRow[], marks: boolean, seen: string | null, now: number, me: string | null = null, names: ReadonlyMap<string, string> = new Map()): Pick<BlockResult, 'rows' | 'shown'> {
-  const rows: TableRow[] = feed.map((r, i) => {
+export function feedTable(
+  feed: readonly FeedRow[],
+  marks: boolean,
+  seen: string | null,
+  now: number,
+  me: string | null = null,
+  names: ReadonlyMap<string, string> = new Map(),
+  zone?: string,
+): Pick<BlockResult, 'rows' | 'shown'> {
+  const at = !marks || seen === null ? -1 : feed.findIndex((r) => r.at <= seen);
+  const mark = (): TableRow => ({ key: 'seen', cells: ['seen', seen === null ? '' : whenOf(seen, now)], href: undefined, tone: undefined });
+  const today = feed.some((r) => r.day !== undefined) ? todayIn(now, zone) : '';
+  const rows: TableRow[] = [];
+  let day: string | undefined;
+  feed.forEach((r, i) => {
+    if (marks && i === at) rows.push(mark());
+    if (r.day !== undefined && r.day !== day) {
+      day = r.day;
+      rows.push({ key: `day-${r.day}-${i}`, cells: [FEED_DAY, feedDay(r.day, today)], href: undefined, tone: undefined });
+    }
     const line = feedLine(r);
-    return {
+    const more = r.run_more !== undefined && r.run_more > 0 ? r.run_more : 0;
+    const run = more > 0 ? runHref(r) : undefined;
+    rows.push({
       key: `${r.at}-${i}`,
       /* A LINE THAT SAYS ITS OWN NUMBER IS ONE LINE, so the renderer does not draw "6" in front of "Categorised 6
          payments" as well (`feedBurst`). */
-      cells: [r.by, r.who === null || line.whole ? '' : feedWho(r.who, me, names, r.run_by ?? null), line.counted ? '1' : String(r.count), line.what, whenOf(r.at, now)],
-      href: undefined,
+      cells: [r.by, r.who === null || line.whole ? '' : feedWho(r.who, me, names, r.run_by ?? null), line.counted ? '1' : String(r.count), line.what, whenOf(r.at, now), ...(more > 0 ? [run ? `[${feedMore(more)}](${run})` : feedMore(more)] : [])],
+      href: run,
       tone: undefined,
-    };
+    });
   });
-  if (marks) {
-    const at = seen === null ? -1 : feed.findIndex((r) => r.at <= seen);
-    rows.splice(at === -1 ? rows.length : at, 0, { key: 'seen', cells: ['seen', seen === null ? '' : whenOf(seen, now)], href: undefined, tone: undefined });
-  }
+  if (marks && at === -1) rows.push(mark());
   return { rows, shown: feed.length };
 }
 

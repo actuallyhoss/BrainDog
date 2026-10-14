@@ -46,7 +46,8 @@ const GENERAL = [
  * of a `cards` block, the opening sentence of a `note` and a `queue`'s first question drawn whole, with what accepting
  * it does; `first` cuts a `feed`'s or an `agents` block's groups and
  * a `steps` block's open rows; `range` draws a `progress` block's rows as bands; `box` puts the blocks after a `section`
- * on one surface, and a `cards` block's `fold` is how many cards each of its `group`s shows before the rest fold; `tiles` draws a `queue` as tiles; `who` draws a `heat` as a line a person, columns `day | who`; `register` is the list a `capture` adds to and an `inputs` block
+ * on one surface, and a `cards` block's `fold` is how many cards each of its `group`s shows before the rest fold; a
+ * `feed`'s `group` is `day`, a heading each day, and its `fold` is `run`, one line a run (`feedSaysFault`); `tiles` draws a `queue` as tiles; `who` draws a `heat` as a line a person, columns `day | who`; `register` is the list a `capture` adds to and an `inputs` block
  * edits; `row` is a `diff`'s row and an `inputs` block's.
  *
  * LEFT GENERAL ON PURPOSE: `opening`, `from` and `horizon` are read by whatever kind sits over `forecast.runway`, and a
@@ -68,8 +69,8 @@ export const KEY_KINDS: Readonly<Record<string, readonly string[]>> = {
   unset: ['bar', 'split'],
   tones: ['bar', 'split', 'cards', 'lanes'],
   document: ['note'],
-  fold: ['section', 'cards'],
-  group: ['cards'],
+  fold: ['section', 'cards', 'feed'],
+  group: ['cards', 'feed'],
   box: ['section'],
   panel: ['section'],
   tiles: ['queue'],
@@ -190,8 +191,34 @@ const WRONG_KIND: Readonly<Record<string, string>> = {
   register: 'A block that reads rows names them with source: register.<id>.',
 };
 
+/** What a `feed` may say in `group:` and in `fold:`, the one word each. */
+export const FEED_GROUP = 'day' as const;
+export const FEED_FOLD = 'run' as const;
+
+/** What a feed may say, as the sentence every refusal about a feed's `group` or `fold` ends on. */
+const FEED_SAYS = `a feed may say group: ${FEED_GROUP}, for a heading each day, and fold: ${FEED_FOLD}, for one line a run`;
+
+/**
+ * Why a `feed`'s `group` or `fold` cannot be drawn, or `null`. `who` is what the sentence calls the block.
+ *
+ * A FEED'S TWO WORDS ARE NOT A CARDS BLOCK'S. Cards group by a link field of their list and fold at a count; a feed
+ * reads the record's events, which have no fields to link by, so it groups by the day a line was written and folds a
+ * run's lines to its newest. One word each, so `group: week` or `fold: agent` is refused in a sentence that names
+ * both rather than drawn as if nothing had been said. The install and the read both ask here.
+ */
+export function feedSaysFault(block: Readonly<Record<string, unknown>>, who: string): { fix: string; at: string; allowed: string[] } | null {
+  if (block.group !== undefined && block.group !== FEED_GROUP)
+    return { fix: `${who}'s group is ${JSON.stringify(block.group)}; ${FEED_SAYS}.`, at: 'group', allowed: [FEED_GROUP] };
+  if (block.fold !== undefined && block.fold !== FEED_FOLD)
+    return { fix: `${who}'s fold is ${JSON.stringify(block.fold)}; ${FEED_SAYS}.`, at: 'fold', allowed: [FEED_FOLD] };
+  return null;
+}
+
 /** The sentence for a key this kind does not read, naming the kinds that do. */
 export function wrongKindKey(key: string, kind: string): string {
+  /* AN `agents` BLOCK IS A FEED'S NEIGHBOUR, one group an agent, so the nearest true thing to say is what a feed may. */
+  if (kind === 'agents' && (key === 'group' || key === 'fold'))
+    return `${key}: is read by a feed, and an agents block does nothing with it: ${FEED_SAYS}. Take it off, or draw these lines as a feed.`;
   const kinds = own(READ_BY, key) ?? [];
   const said = kinds.length === 1 ? kinds[0] : `${kinds.slice(0, -1).join(', ')} and ${kinds.at(-1)}`;
   return `${key}: is read by ${said} blocks, and a ${kind} block does nothing with it. ${own(WRONG_KIND, key) ?? 'Take it off.'}`;

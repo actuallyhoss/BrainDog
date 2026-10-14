@@ -347,12 +347,19 @@ export function briefed(b: Briefing): { value: Record<string, unknown>; text: st
      every question past them, which it could not compare. */
   const distinct = questions.length + (total - asked.length);
 
-  /* ── the learnings, newest first, this project's before everywhere's ──── */
+  /* ── the learnings, in the order `braindog:learnings` reads them (AGT-C14): the kind the list declares first before the
+     next (a method before a fact), this project's before everywhere's, then the newest. The kinds are the list's own,
+     so no kind is named here, and a list that declares none is newest first as it was. The sort is stable. ──── */
 
   const learned = groups.filter((g) => g.kind === 'learned');
-  const lessons = learned.flatMap((g) =>
-    [...newest(g.rows), ...newest(g.inherited)].map((r) => ({ spoken: String(r.spoken), words: titleOf(shapedOf(r).fields, g.decl) })),
-  );
+  const lessons = learned.flatMap((g) => {
+    const kinds = g.decl?.fields.find((f) => f.id === 'kind' && f.type === 'enum' && f.retired !== true)?.values ?? [];
+    const rank = (r: Record<string, unknown>): number => {
+      const at = typeof r.kind === 'string' ? kinds.indexOf(r.kind) : -1;
+      return at === -1 ? kinds.length : at;
+    };
+    return [...newest(g.rows), ...newest(g.inherited)].sort((a, z) => rank(a) - rank(z)).map((r) => ({ spoken: String(r.spoken), words: titleOf(shapedOf(r).fields, g.decl) }));
+  });
   const shownLessons = lessons.filter((l) => l.words !== '').slice(0, LEARNED_SHOWN);
 
   /* ── the card ──────────────────────────────────────────────────────────── */

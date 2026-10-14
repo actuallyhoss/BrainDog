@@ -64,10 +64,10 @@ const line = (out: ReturnType<typeof tidy>, id: string) => {
   return found;
 };
 
-test('the registry holds this part\'s four finders, each { id, find }', () => {
+test('the registry holds this part\'s six finders, each { id, find }', () => {
   assert.deepEqual(
     finders().map((f) => f.id),
-    ['runs-stopped', 'runs-empty', 'steps-old', 'questions-old'],
+    ['runs-stopped', 'runs-empty', 'steps-old', 'questions-old', 'questions-moot', 'faults-open'],
   );
   for (const f of finders()) assert.equal(typeof f.find, 'function');
   assert.equal(finderOf('runs-empty')?.id, 'runs-empty');

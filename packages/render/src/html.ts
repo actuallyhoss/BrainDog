@@ -27,7 +27,7 @@ import { cellNamesNothing, inline, magnitudeOfCell, text as plain, type Inline, 
 import { glyphPath } from './inline.ts';
 import { MISSING, barFigure, day, figureChars, headlineFigure, leadingCode, symbolFigure, symbolText, valueWord } from './format.ts';
 import { CARDS_NEXT, CARDS_NONE, cardsCount, FOLD_HIDE, FOLD_SHOW, RUN_OPEN, TREND, agentMarkFill, cardLayout, cardTrend, counted, type AgentMark, initialOf, isDimmed, isQuiet, markGlyphOf, markOf, ringDash, ringOf, runFaceOf, runMarkOf, runTokens, trendOf, type RunCell, type RunFace } from './cards.ts';
-import { FEED_EARLIER, feedBurst, feedCasedNodes, feedNew, feedPlan } from './feed.ts';
+import { FEED_DAY, FEED_EARLIER, feedBurst, feedCasedNodes, feedFold, feedNew, feedPlan } from './feed.ts';
 import { FILTERS_ALL, filtersMore, filtersPlan, type Filter } from './filters.ts';
 import { QUEUE_DOES, QUEUE_REASONS, QUEUE_RECOMMENDED, fileSrc, queueMore, queuePlan, queueReasoned, queueSuggested, queueWays, type QueueShows } from './queue.ts';
 import { PATH_DONE, PATH_NEXT, pathMore, pathPlan, unvalued } from './path.ts';
@@ -1169,6 +1169,9 @@ function capture(b: Block, o: RenderOptions): string {
  *
  * The count leads the row. A new row's count takes the accent, and the words say it too: the head
  * says how many are new, and a line says where the ones you had seen begin.
+ *
+ * A feed the host parted by day (`day | Today`) is drawn under a heading a day, its lines in the order they came and
+ * each with its own actor's mark. A line that stands for a run's work says its fold after its words ("and 39 more").
  */
 function feed(b: Block, o: RenderOptions): string {
   const plan = feedPlan(b.rows);
@@ -1177,22 +1180,29 @@ function feed(b: Block, o: RenderOptions): string {
   const drawn = (v: string | undefined): string => renderInline(inline(v ?? '', o), o);
   const body = plan.groups
     .map((g) => {
+      /* A DAY'S HEAD COUNTS ONLY WHAT IS NEW. A tally beside "Yesterday" would count the lines drawn and not the work
+         folded into them, which is a figure that says less than the day's name. */
       const head =
-        g.fresh > 0 ? `<span class="feed-new num">${escape(feedNew(g.fresh))}</span>` : `<span class="feed-tally num" data-calm="">${g.total}</span>`;
+        g.fresh > 0
+          ? `<span class="feed-new num">${escape(feedNew(g.fresh))}</span>`
+          : g.by === FEED_DAY
+            ? ''
+            : `<span class="feed-tally num" data-calm="">${g.total}</span>`;
       const rows = g.rows
-        .map(({ row: r, fresh }, i) => {
+        .map(({ row: r, fresh, by }, i) => {
+          const more = feedFold(r.cells);
           const who = r.cells[1] ?? '';
           /* A RULE WEARS NO LETTER, and an agent its maker's mark where the host draws one: `1 C` led every rule's line. */
           const run = runFaceOf(who, null, false);
-          const mark = g.by === 'rule' ? null : markFor(o, said(who));
-          const face = g.by === 'rule' ? null : initialOf(said(who));
+          const mark = by === 'rule' ? null : markFor(o, said(who));
+          const face = by === 'rule' ? null : initialOf(said(who));
           /* AND NO FACE AT ALL, not an empty one: an empty slot kept the column, and every rule's line sat indented
              under nothing (`feed.css` gives a line with no face its column back). */
           const lead = run
             ? runFaceHtml(run, o)
             : mark
               ? agentFaceHtml(mark, 'feed-face')
-              : g.by === 'rule'
+              : by === 'rule'
                 ? ''
                 : `<span class="feed-face" aria-hidden="true">${face ? escape(face) : ''}</span>`;
           const line = i === g.earlier ? `<li class="feed-seen">${escape(FEED_EARLIER)}</li>` : '';
@@ -1201,12 +1211,15 @@ function feed(b: Block, o: RenderOptions): string {
           }</span>${lead}<span class="feed-what">${
             /* A RULE THAT WORDED ITS OWN LINE SENDS NO WHO ("Tallyard categorised"), and draws none: a dash in front of
                every rule's line read as something missing when nothing was. Anyone else without a name is still one. */
-            who || g.by !== 'rule' ? `<span class="feed-who">${who ? drawn(who) : MISSING}</span> ` : ''
-          }${renderInline(feedCasedNodes(inline(r.cells[3] ?? '', o)), o)}${toneGlyph(r.tone)}</span><span class="feed-when" data-calm="">${drawn(r.cells[4])}</span></li>`;
+            who || by !== 'rule' ? `<span class="feed-who">${who ? drawn(who) : MISSING}</span> ` : ''
+          }${renderInline(feedCasedNodes(inline(r.cells[3] ?? '', o)), o)}${toneGlyph(r.tone)}${
+            /* THE FOLD FOLLOWS THE LINE IT FOLDED INTO, as its own part so the sheet can set it quieter than the words. */
+            more ? ` <span class="feed-more">${drawn(more)}</span>` : ''
+          }</span><span class="feed-when" data-calm="">${drawn(r.cells[4])}</span></li>`;
         })
         .join('');
-      /* ONE GROUP DRAWS NO HEAD (`feedPlan`'s `lone`). */
-      const named = plan.lone ? '' : `<h3 class="feed-head">${escape(g.label)}${head}</h3>`;
+      /* ONE GROUP DRAWS NO HEAD (`feedPlan`'s `lone`), and neither do the lines above the first day, which have no name. */
+      const named = plan.lone || g.label === '' ? '' : `<h3 class="feed-head">${escape(g.label)}${head}</h3>`;
       return `<div class="feed-group" data-by="${g.by}">${named}<ul class="feed-rows">${rows}</ul></div>`;
     })
     .join('');

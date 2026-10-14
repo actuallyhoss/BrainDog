@@ -13,6 +13,11 @@
  *   - `questions`: for an agent, the questions its own key asked that have waited more than a week, which only it can
  *     take back (`withdraw`); for a person, the ones that have waited more than a fortnight, which are theirs to answer
  *     (`decide`).
+ *   - a line for each list whose things fade (one with a `confirmed_on` day, as `context` finds it and never by the
+ *     list's name): the ones still held true that nobody has confirmed in sixty days. Cleared by `update` with today
+ *     as the day, for each that still holds.
+ *   - a line for the skills that are behind what was learned since (`skillBearings`, which the nightly draft reads
+ *     too): each with the proposal that writes its next version, so a skill changes with no model in the room.
  *   - a line a finder for the rest (`runs-empty`, `runs-stopped`, and whatever an add-on registers), told only to a
  *     caller who reads the whole record, because a finder counts with no caller to stand in.
  *
@@ -28,6 +33,7 @@ import { causeOfFinder, finders, openHandoffs, sessionDeclaration, tokenOfRun, w
 import type { Finder, HandoffPlace, Json, OpenHandoff } from '@braindog/kernel';
 
 import type { CallContext } from '../index.ts';
+import { skillBearings } from '../slash.ts';
 import { scrubbed } from '../scrub.ts';
 import type { RecordDeps } from './index.ts';
 
@@ -49,6 +55,15 @@ export const OLD_QUESTION_MS = 14 * DAY_MS;
 const READ_MOST = 100;
 const NAMED_MOST = 8;
 
+/** The day field a list fades by, which is how `context` finds one too (`FADES` in `index.ts`), whatever it is called. */
+const FADES = 'confirmed_on';
+/** A thing on a fading list is worth confirming again once nobody has for this many days. */
+export const UNCONFIRMED_DAYS = 60;
+/** The most handles the call for a fading list or for the skills spells out. The rest are counted. */
+export const STALE_NAMED_MOST = 20;
+/** The longest the first words of a thing are said at. */
+const WORDS_MOST = 90;
+
 /** The finders whose things this read says itself, a caller at a time, and so never counts a second time. */
 const SAID_HERE: ReadonlySet<string> = new Set(['steps-old', 'questions-old']);
 
@@ -66,11 +81,28 @@ const waited = (ms: number): string => {
   return days === 1 ? '1 day' : `${days} days`;
 };
 
-/** The call for one name, or for each of several: `handoff with drop S4 and why` or `..., once for each of S4 and S9`. */
-const each = (names: readonly string[], one: (name: string) => string, several: string): string => {
-  if (names.length === 1) return one(names[0]!);
-  const shown = names.slice(0, NAMED_MOST);
-  const rest = names.length - shown.length;
+/** The first words of a longer text, cut at a word and never in one. */
+const firstWords = (text: string): string => {
+  if (text.length <= WORDS_MOST) return text;
+  const cut = text.slice(0, WORDS_MOST);
+  const space = cut.lastIndexOf(' ');
+  return `${(space > WORDS_MOST / 2 ? cut.slice(0, space) : cut).replace(/[\s,;:.]+$/u, '')}...`;
+};
+
+/** What a list calls one of its things and several, in the words its own declaration gives: "learning", "learnings". */
+const wordsOf = (decl: { name: string }): { one: string | null; many: string } => {
+  const one = (decl as { one?: unknown }).one;
+  return { one: typeof one === 'string' && one.trim() !== '' ? one.trim() : null, many: decl.name.toLowerCase() };
+};
+
+/**
+ * The call for one name, or for each of several: `handoff with drop S4 and why` or `..., once for each of S4 and S9`.
+ * `most` is how many are spelled out, and `total` how many there are when more were found than were read.
+ */
+const each = (names: readonly string[], one: (name: string) => string, several: string, most = NAMED_MOST, total = names.length): string => {
+  if (names.length === 1 && total === 1) return one(names[0]!);
+  const shown = names.slice(0, most);
+  const rest = Math.max(total, names.length) - shown.length;
   return `${several}, once for each of ${listed(shown)}${rest > 0 ? `, then ask again for the other ${rest}` : ''}`;
 };
 
@@ -156,6 +188,88 @@ export function staleFor(deps: RecordDeps, ctx: CallContext, nowMs: number, list
         token === null
           ? each(names, (name) => `decide with id ${name} and your answer`, 'decide with id and your answer')
           : each(names, (name) => `withdraw with id ${name}, if it no longer needs an answer`, 'withdraw with id, where it no longer needs an answer'),
+    });
+  }
+
+  /* WHAT FADES AND NOBODY HAS CONFIRMED. A list fades when it has the `confirmed_on` day, whatever the list is called,
+     and a thing on it is stale when it is still held true (in no finished state) and was neither confirmed nor made in
+     the last sixty days. Read under the caller's own grant, the one that has waited longest said out loud. */
+  const today = new Date(nowMs).toISOString().slice(0, 10);
+  const cutMs = nowMs - UNCONFIRMED_DAYS * DAY_MS;
+  const cutDay = new Date(cutMs).toISOString().slice(0, 10);
+  for (const [id, decl] of kernel.registers()) {
+    if (!decl.fields.some((f) => f.id === FADES && f.type === 'day' && !f.retired) || readable(ctx, id) !== null) continue;
+    const held: Json[] = decl.state !== undefined && decl.done !== undefined && decl.done.length > 0 ? [{ field: decl.state, not_in: [...decl.done] }] : [];
+    const unconfirmed: Json = {
+      any: [{ field: FADES, before: cutDay }, { all: [{ field: FADES, empty: true }, { field: 'created_at', before: new Date(cutMs).toISOString() }] }],
+    };
+    const got = kernel.list(
+      { register: id, where: { all: [...held, unconfirmed] } as never, order: [{ field: 'created_at', dir: 'asc' }], limit: READ_MOST },
+      whereFor(ctx.wheres, id),
+    );
+    if (!got.ok || got.value.rows.length === 0) continue;
+    const aged = got.value.rows
+      .map((row) => {
+        const on = row.fields[FADES];
+        const since = typeof on === 'string' && on !== '' ? Date.parse(today) - Date.parse(on) : nowMs - Date.parse(row.created_at);
+        return { row, age: Number.isFinite(since) ? since : UNCONFIRMED_DAYS * DAY_MS, name: kernel.nameOf(row.id) };
+      })
+      .sort((a, b) => b.age - a.age || (a.row.seq ?? 0) - (b.row.seq ?? 0));
+    const total = Math.max(got.value.matched, aged.length);
+    const longest = aged[0]!;
+    const title = longest.row.fields[decl.title];
+    const said = typeof title === 'string' ? scrubbed(title) : null;
+    const tail = said === null ? '.' : `: ${firstWords(said)}`;
+    const { one, many } = wordsOf(decl);
+    lines.push({
+      kind: id,
+      said:
+        total === 1
+          ? `1 ${one ?? `of the ${many}`} has not been confirmed in ${waited(longest.age)}, ${longest.name}${tail}`
+          : `${total} ${many} have not been confirmed in ${UNCONFIRMED_DAYS} days. The oldest is ${longest.name}, not confirmed in ${waited(longest.age)}${tail}`,
+      count: total,
+      clear: each(aged.map((a) => a.name), (name) => `update ${name} with ${FADES} ${today}`, `update with ${FADES} ${today}`, STALE_NAMED_MOST, total),
+    });
+  }
+
+  /* THE SKILLS BEHIND WHAT WAS LEARNED, read only through `skillBearings`, which is what the nightly draft reads: a
+     skill with lessons that bear on it and that its own list of them does not carry. That read stands in no caller, so
+     it is told only to one who reads both lists whole. The call is a proposal, since a skill's text and version change
+     by the owner's press alone, and it names the skill and each lesson as a person says them. */
+  /* EVERY SKILL BEHIND IS COUNTED, AND THE FIRST FEW ARE NAMED, so the number is the true one and the sentence stays one. */
+  const everyBehind = skillBearings(sql, kernel, Number.POSITIVE_INFINITY);
+  const behind = everyBehind.slice(0, NAMED_MOST);
+  const unnamed = everyBehind.length - behind.length;
+  const skillsIn = behind[0] === undefined ? null : (kernel.get(behind[0].at)?.register ?? null);
+  const lessonsIn = behind[0]?.learnings[0] === undefined ? null : (kernel.get(behind[0].learnings[0].id)?.register ?? null);
+  const readsWhole = (list: string): boolean => readable(ctx, list) === null && whereFor(ctx.wheres, list) === undefined;
+  const skillsAre = skillsIn === null ? undefined : kernel.register(skillsIn);
+  const lessonsAre = lessonsIn === null ? undefined : kernel.register(lessonsIn);
+  if (skillsIn !== null && lessonsIn !== null && skillsAre && lessonsAre && readsWhole(skillsIn) && readsWhole(lessonsIn)) {
+    const skill = wordsOf(skillsAre);
+    const lesson = wordsOf(lessonsAre);
+    const lessons = (n: number): string => `${n} ${n === 1 ? (lesson.one ?? lesson.many) : lesson.many}`;
+    const called = (name: string): string => scrubbed(name) ?? name;
+    let left = STALE_NAMED_MOST;
+    const calls = behind.map((b) => {
+      const names = b.learnings.slice(0, left).map((l) => l.spoken);
+      left -= names.length;
+      const rest = b.learnings.length - names.length;
+      const more = rest === 0 ? '' : names.length === 0 ? `${rest} more` : ` and ${rest} more`;
+      const kept = b.carried.length === 0 ? '' : `, after the ${b.carried.length} it holds`;
+      return `${kernel.nameOf(b.at)} with body, rev ${b.rev + 1} and because [${names.join(', ')}${more}]${kept}`;
+    });
+    lines.push({
+      kind: skillsIn,
+      said:
+        everyBehind.length === 1
+          ? `The ${skill.one ?? skill.many} ${called(behind[0]!.name)} is behind ${lessons(behind[0]!.learnings.length)}`
+          : `${everyBehind.length} ${skill.many} are behind what was learned: ${listed([...behind.map((b) => `${called(b.name)} by ${lessons(b.learnings.length)}`), ...(unnamed > 0 ? [`${unnamed} more`] : [])])}`,
+      count: everyBehind.length,
+      clear:
+        everyBehind.length === 1
+          ? `propose a rowset on ${calls[0]!}`
+          : `propose a rowset on each: ${calls.join('; ')}${unnamed > 0 ? `; then ask again for the other ${unnamed}` : ''}`,
     });
   }
 

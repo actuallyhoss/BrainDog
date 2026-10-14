@@ -10,11 +10,17 @@
   since, then Put back sends the plan that was read, by its hash, so a write that slipped in between is never undone
   blind. The record's sentence is the receipt; the page is read again and the plan with it.
 
-  WHAT THE RUN LEFT COMES FIRST (AGT-C05): the next step it handed on, when, and what became of it ("Taken by Claude
-  Code, 2h later"), read off the run's own row (`api.ts` `stepLeft`). A step nobody has taken yet can be closed here,
-  with a reason, through the record's `handoff` `drop`.
+  THE RUN AS A CONVERSATION, TOP TO BOTTOM (AGT-C12 build 5, `run-talk.ts`): who it was and where it worked; its
+  stretches; what it said it is doing; what it changed, with Undo; what it asked; its dead ends; the step it left and
+  what became of it; its helpers; the run whose step it took. A part with nothing true to say is not drawn, heading and
+  all, so a run that only started says who and when.
 
-  A LIST WITHOUT A BOX under the section's own heading ("What it did"), with no second heading of its own, and no red:
+  WHAT THE RUN LEFT (AGT-C05): the next step it handed on, when, and what became of it ("Taken by Claude Code, 2h
+  later"), read off the run's own row (`api.ts` `stepLeft`). A step nobody has taken yet can be closed here, with a
+  reason, through the record's `handoff` `drop`.
+
+  A LIST WITHOUT A BOX under the section's own heading ("What it did"), each part under a 13px line of its own once the
+  run's row is read (what it changed says "What it changed" then, and nothing before), and no red:
   putting a run back is a choice, not an alarm. A HOST PANEL (`panel-of.ts`), drawn by `BlockSlot.svelte` only on a page
   drawn for a run, and imported by it alone.
 -->
@@ -28,6 +34,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
   import { runLines, runWords } from './run-lines.ts';
+  import { readRunParts, runTalk, type RunParts, type RunRow, type TalkKey } from './run-talk.ts';
 
   let {
     run,
@@ -72,10 +79,21 @@
   });
 
   const said = $derived(plan ? runLines(plan.steps) : { lines: [], more: null });
+  /** The heading over what it changed, said once the conversation's other parts stand round it. */
+  const didSaid = 'What it changed';
 
   /* ── the step it left ──────────────────────────────────────────────────── */
 
   let step = $state.raw<StepLeft | null>(null);
+  /* THE RUN'S OWN ROW AND WHAT WAS READ BESIDE IT, which the conversation is said from (`run-talk.ts`). */
+  let held = $state.raw<RunRow | null>(null);
+  let parts = $state.raw<RunParts>({});
+  let beside = false;
+  const talk = $derived(held ? runTalk(held, parts) : []);
+  /** The parts said before what it changed, between that and the step it left, and after the step. */
+  const BEFORE: readonly TalkKey[] = ['who', 'stretches', 'doing'];
+  const BETWEEN: readonly TalkKey[] = ['asked', 'tried'];
+  const AFTER: readonly TalkKey[] = ['helpers', 'took'];
   let closing = $state(false);
   let why = $state('');
   let shutting = $state(false);
@@ -89,19 +107,27 @@
     closed: 'Step closed.',
   } as const;
 
-  /** A run's row by its handle, `S42`, as `{ state, fields }`, or `null` where this reader may not open it. */
-  async function runRow(handle: string): Promise<{ state: unknown; fields: Record<string, unknown> } | null> {
+  /** A run's row by its handle, `S42`, as its number, state and fields, or `null` where this reader may not open it. */
+  async function runRow(handle: string): Promise<RunRow | null> {
     const seq = Number(/^S([1-9][0-9]*)$/u.exec(handle)?.[1]);
     if (!Number.isInteger(seq)) return null;
     const out = await createClient({ base: apiBase() }).get('session', seq);
     const row = out.ok && typeof out.value === 'object' && out.value !== null ? (out.value as { state?: unknown; fields?: unknown }) : null;
-    return row && typeof row.fields === 'object' && row.fields !== null ? { state: row.state, fields: row.fields as Record<string, unknown> } : null;
+    return row && typeof row.fields === 'object' && row.fields !== null ? { seq, state: row.state, fields: row.fields as Record<string, unknown> } : null;
   }
 
   async function readStep(handle: string) {
     const row = await runRow(handle);
     if (handle !== run) return;
+    held = row;
     if (!row) return void (step = null);
+    /* WHAT IS SAID BESIDE THE ROW is read once for a run, and drawn as it lands: the row's own parts do not wait. */
+    if (!beside) {
+      beside = true;
+      void readRunParts(apiBase(), row).then((read) => {
+        if (handle === run) parts = read;
+      });
+    }
     /* WHO TOOK IT, BY NAME: the taker's own row, read once, and never its handle. */
     const by = typeof row.fields.taken_by === 'string' ? await runRow(row.fields.taken_by) : null;
     if (handle !== run) return;
@@ -112,6 +138,9 @@
     const handle = run;
     untrack(() => {
       step = null;
+      held = null;
+      parts = {};
+      beside = false;
       closing = false;
       why = '';
       void readStep(handle);
@@ -152,9 +181,50 @@
   }
 </script>
 
+{#snippet spoken(keys: readonly TalkKey[])}
+  {#each talk.filter((t) => keys.includes(t.key)) as part (part.key)}
+    <div class="run-part" role="group" aria-label={part.heading}>
+      <h3 class="run-meta run-head">{part.heading}</h3>
+      {#if part.lines.length === 1}
+        <p class="run-next">{part.lines[0]}</p>
+      {:else}
+        <ul class="run-lines">
+          {#each part.lines as line}<li class="run-line">{line}</li>{/each}
+        </ul>
+      {/if}
+    </div>
+  {/each}
+{/snippet}
+
 <section class="run" aria-label={runWords.heading} aria-busy={from === 'reading'}>
+  {@render spoken(BEFORE)}
+  <div class="run-part" role="group" aria-label={didSaid}>
+    {#if talk.length > 0}<h3 class="run-meta run-head">{didSaid}</h3>{/if}
+    {#if from === 'reading'}
+      <Waiting rows={3} />
+    {:else if from === 'refused'}
+      <p class="run-said" role="status">{fix}</p>
+    {:else if plan && plan.steps.length === 0}
+      <p class="run-said">{runWords.nothing}</p>
+    {:else if plan}
+      <ul class="run-lines">
+        {#each said.lines as line}<li class="run-line">{line}</li>{/each}
+      </ul>
+      {#if said.more}<p class="run-said">{said.more}</p>{/if}
+      <div class="run-do" role="group" aria-label={runWords.undo}>
+        {#if confirming}
+          <p class="run-sure" role="status">{runWords.sure(plan.steps.length, plan.skipped.length)}</p>
+          <Button size="sm" onclick={() => (confirming = false)}>{runWords.keep}</Button>
+          <Button size="sm" weight="primary" disabled={busy} onclick={() => void putBack()}>{runWords.putBack}</Button>
+        {:else}
+          <Button size="sm" aria-label="{runWords.undo}: {title}" onclick={() => (confirming = true)}>{runWords.undo}</Button>
+        {/if}
+      </div>
+    {/if}
+  </div>
+  {@render spoken(BETWEEN)}
   {#if step}
-    <div class="run-step" role="group" aria-label={stepSaid.heading}>
+    <div class="run-part run-step" role="group" aria-label={stepSaid.heading}>
       <p class="run-meta">{step.left ?? stepSaid.heading}</p>
       <p class="run-next">{step.next}</p>
       {#if step.fate}<p class="run-said" role="status">{step.fate}.</p>{/if}
@@ -173,27 +243,7 @@
       {/if}
     </div>
   {/if}
-  {#if from === 'reading'}
-    <Waiting rows={3} />
-  {:else if from === 'refused'}
-    <p class="run-said" role="status">{fix}</p>
-  {:else if plan && plan.steps.length === 0}
-    <p class="run-said">{runWords.nothing}</p>
-  {:else if plan}
-    <ul class="run-lines">
-      {#each said.lines as line}<li class="run-line">{line}</li>{/each}
-    </ul>
-    {#if said.more}<p class="run-said">{said.more}</p>{/if}
-    <div class="run-do" role="group" aria-label={runWords.undo}>
-      {#if confirming}
-        <p class="run-sure" role="status">{runWords.sure(plan.steps.length, plan.skipped.length)}</p>
-        <Button size="sm" onclick={() => (confirming = false)}>{runWords.keep}</Button>
-        <Button size="sm" weight="primary" disabled={busy} onclick={() => void putBack()}>{runWords.putBack}</Button>
-      {:else}
-        <Button size="sm" aria-label="{runWords.undo}: {title}" onclick={() => (confirming = true)}>{runWords.undo}</Button>
-      {/if}
-    </div>
-  {/if}
+  {@render spoken(AFTER)}
 </section>
 
 <style>
@@ -204,12 +254,21 @@
     padding-block-start: var(--sp-2);
   }
 
-  /* THE STEP IT LEFT, above what it did: a 13px line saying when, the step at the body size, then what became of it. */
-  .run-step {
+  /* ONE PART OF THE CONVERSATION: its heading as a 13px line, then what it says, a hairline between it and the part
+     above. The step it left is one of them: when, the step at the body size, then what became of it. */
+  .run-part {
     display: grid;
     gap: var(--sp-1);
-    padding-block-end: var(--sp-2);
-    border-block-end: 1px solid var(--line-soft);
+    min-inline-size: 0;
+  }
+
+  .run-part + .run-part {
+    padding-block-start: var(--sp-2);
+    border-block-start: 1px solid var(--line-soft);
+  }
+
+  .run-head {
+    font-weight: 500;
   }
 
   .run-meta {

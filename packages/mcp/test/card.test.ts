@@ -195,13 +195,16 @@ test('ON A RECORD LIKE THE OWNER\'S, context is a card and a few lines, under 1,
   const waiting = slots.get('Waiting') ?? '';
   assert.match(waiting, /^\d+ on [^:]+: bank-card-used-sms could not read account out of this one\. · /u);
   assert.equal(waiting.split('bank-card-used-sms').length, 2, `one question was said twice: ${waiting}`);
-  assert.match(slots.get('Learned') ?? '', /^Lesson 49 of the card test\. · Lesson 48 of the card test\.$/u);
+  /* LEARNED IS THE SEED'S TWO METHODS, though fifty facts were written after them: a method comes before a fact, and
+     `context` now cuts what it hands in that order (`learnedSorted`), where it used to hand the twenty last changed. */
+  assert.match(slots.get('Learned') ?? '', /^Run the mastering pass before signing off an axis instance\. · Attach the rows a proposal read, or the record refuses it\.$/u);
 
   /* A KEPT LIST IS A COUNT AND THIS PROJECT'S ROWS: the forty keys that apply everywhere are a number, not forty lines,
      and the number says it is a floor where the record stopped counting them. */
   const keys = result.structuredContent.registers.find((r) => r.id === 'credentials') as { rows: unknown[]; everywhere?: number; more?: boolean } | undefined;
   assert.ok(keys && (keys.everywhere ?? 0) >= 20 && keys.more === true && keys.rows.length <= 10, JSON.stringify(keys));
-  assert.match(slots.get('More') ?? '', /^\d+\+ learnings · \d+\+ keys by name\b/u);
+  /* MORE LEADS WITH WHAT WENT STALE (AGT-C18, `card.ts`), since a count is the one thing in it a session can act on. */
+  assert.match(slots.get('More') ?? '', /^\d+ stale, read braindog:stale · \d+\+ learnings · \d+\+ keys by name\b/u);
   assert.doesNotMatch(text, /Deploy key \d+/u, 'a key that applies everywhere was listed by name');
   assert.doesNotMatch(text, /tool-\d+/u, 'a tool was listed as work');
   sql.close();

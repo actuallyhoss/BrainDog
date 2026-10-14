@@ -23,7 +23,7 @@ import type { Leaf, Predicate, Schema } from '@braindog/where';
 
 import type { ActionRow } from './actions.ts';
 import type { Exception } from './exceptions.ts';
-import { ANSWER_KEYS, BLOCK_READS, FILTER_TYPES, blockKeyOf, keyedBlocks, kindsReading, wrongKindKey } from './block-keys.ts';
+import { ANSWER_KEYS, BLOCK_READS, FILTER_TYPES, blockKeyOf, feedSaysFault, keyedBlocks, kindsReading, wrongKindKey } from './block-keys.ts';
 import { applyLook, composeLook, lookOf, mergeLook, type LookBody } from './compose.ts';
 import { HANDOFFS_OPEN, builtInFigure, type OpenStep } from './built-in-figures.ts';
 import type { ActionBlocking } from './signs-actions.ts';
@@ -112,12 +112,14 @@ export type PageBlock = {
   box?: boolean;
   /**
    * A `section`'s: whether it starts shut. A grouped `cards` block's: how many cards each group shows before the rest
-   * fold, `CARD_FOLD` when it does not say (answered either way).
+   * fold, `CARD_FOLD` when it does not say (answered either way). A `feed`'s: `run`, one row for each run's lines, its
+   * newest, with how many more that run wrote (`FeedRow.run_more`).
    */
-  fold?: boolean | number;
+  fold?: boolean | number | 'run';
   /**
    * A `cards` block's: a link field of its list, which draws the cards in groups, one a row it points at, named by that
-   * row's title. Each answered row says its group (`PageRow.group`), in the order the rows were read.
+   * row's title. Each answered row says its group (`PageRow.group`), in the order the rows were read. A `feed`'s: `day`,
+   * and every row says the day it was written in the record's own zone (`FeedRow.day`).
    */
   group?: string;
   /** Any block's: the glyph in the well beside its heading. */
@@ -509,6 +511,18 @@ export type FeedRow = {
    * is the kind of actor a feed groups by. Absent from a row no run signed, and where the host reads no runs (`runOf`).
    */
   run_by?: RunBy | null;
+  /**
+   * On a feed that says `group: day`, the day this row was written, `2026-10-13`, in the record's own zone: a host draws
+   * one heading a day from it and counts no hours itself. Every row of such a feed has one, the row that folds a group's
+   * remainder past `first:` too, and each day's rows sit together, the newest day first.
+   */
+  day?: string;
+  /**
+   * On a feed that says `fold: run`, on the one row a run's lines are answered as, its newest: how many more lines that
+   * run wrote, `0` where this is all of them. `count` and `run_more` together are every line of the run (of the run that
+   * day, where the feed groups by day). Absent from a row no run signed.
+   */
+  run_more?: number;
 };
 
 /** One way to answer a question, as a queue draws it. `because` is the reason its author gave for it. */
@@ -1479,6 +1493,7 @@ function lookedAt(
     seen: deps.reader?.seen !== undefined ? deps.reader.seen : (deps.activity?.(0).seen ?? null),
     ...(deps.lists ? { lists: deps.lists() } : {}),
     titleOf: deps.titleOf,
+    stateOf: (list) => deps.schemaOf(list)?.state ?? null,
     ...(stored?.by === 'owner' && stored.pinned ? { pinned: stored.pinned } : {}),
   });
   return applyLook(blocks, stored?.by === 'owner' ? mergeLook(stored, composed) : composed);
@@ -1524,6 +1539,7 @@ function rekeyedLook(look: LookBody | null, rekeyed: ReadonlyMap<string, string>
     ...(look.order ? { order: look.order.map(as) } : {}),
     ...(look.hide ? { hide: look.hide.map(as) } : {}),
     ...(look.pinned ? { pinned: look.pinned.map(as) } : {}),
+    ...(look.group ? { group: Object.fromEntries(Object.entries(look.group).map(([k, f]) => [as(k), f])) } : {}),
   };
 }
 
@@ -3672,6 +3688,29 @@ function runsBy(runOf: RunReader | undefined): (who: string | null) => { run_by?
   };
 }
 
+/** A run's handle, `S42`, which is what signs a run's lines. */
+const RUN_HANDLE = /^S\d+$/u;
+
+/**
+ * What a `feed` block said of its days and its runs, and the zone its days are counted in.
+ *
+ * `group: 'day'` AND `fold: 'run'` ARE THE ONLY WORDS (`block-keys.ts` `feedSaysFault`), and `zone` is the record's own,
+ * an IANA name, `UTC` when it is absent or names no zone.
+ */
+export type FeedSays = { group?: 'day'; fold?: 'run'; zone?: string | undefined };
+
+/**
+ * The day an event was written, in `zone`: a write at 23:30 UTC is the next day in Cairo. A stamp that is no instant
+ * answers its own first ten characters, so one bad line never throws a whole feed away.
+ */
+function feedDays(zone: string | undefined): (ts: string) => string {
+  const days = localDays(readableZone(zone));
+  return (ts) => {
+    const ms = Date.parse(ts);
+    return Number.isNaN(ms) ? ts.slice(0, 10) : days(ms);
+  };
+}
+
 /** Whether a rule's line may take `e` in as one more row: the same rule, the same kind of write, no words of its own. */
 const foldsInto = (last: FeedRow, e: ActivityEvent): boolean =>
   last.by === 'rule' &&
@@ -3694,14 +3733,33 @@ const foldsInto = (last: FeedRow, e: ActivityEvent): boolean =>
  * line now, and the host words it (`Categorised 6 payments: Tallyard, Northern Rail and 4 more`). Only a rule's, and
  * only where neither line wrote words of its own: a note a rule wrote is that row's, and a person's or an agent's
  * edits to different rows are different work.
+ *
+ * `says` IS WHAT THE BLOCK SAID OF ITS DAYS AND ITS RUNS (`FeedSays`), and a feed that said neither is answered as it
+ * always was. With `group: day` every row says its `day` and nothing is one row across midnight: not a burst, not a
+ * rule's run, not a remainder. With `fold: run` a run's lines are one row, its newest, and `run_more` counts the rest;
+ * with both, one row a run a day. A person's, a rule's and a token's lines are never folded by it, and a run's line
+ * between two of theirs still parts them, as it does unfolded.
  */
-export function feedRows(events: readonly ActivityEvent[], first?: number, runOf?: RunReader): FeedRow[] {
+export function feedRows(events: readonly ActivityEvent[], first?: number, runOf?: RunReader, says?: FeedSays): FeedRow[] {
   const bursts: FeedRow[] = [];
   const runBy = runsBy(runOf);
+  const dayOf = says?.group === 'day' ? feedDays(says.zone) : null;
+  const folding = says?.fold === 'run';
   /* THE ROWS EACH FOLDED LINE NAMES, by target, so a row the rule wrote twice is named once. */
   const named = new Map<FeedRow, Set<string | null>>();
+  /* THE ONE ROW EACH RUN IS ANSWERED AS, a day where the feed groups by day. */
+  const runs = new Map<string, FeedRow>();
+  /* THE ROW THE NEXT LINE MAY JOIN: the newest, unless a line folded into an older row came between. */
+  let last: FeedRow | undefined;
   for (const e of events) {
-    const last = bursts.at(-1);
+    const day = dayOf?.(e.ts);
+    const held = folding && RUN_HANDLE.test(e.actor) ? runs.get(`${e.actor} ${day ?? ''}`) : undefined;
+    if (held && !(held === last && (held.run_more ?? 0) === 0 && held.kind === e.kind && held.target === e.target)) {
+      held.run_more = (held.run_more ?? 0) + 1;
+      last = undefined;
+      continue;
+    }
+    if (last && last.day !== day) last = undefined;
     if (last && last.who === e.actor && last.kind === e.kind && last.target === e.target) last.count += 1;
     else if (last && foldsInto(last, e)) {
       const seen = named.get(last) ?? new Set([last.target]);
@@ -3711,8 +3769,8 @@ export function feedRows(events: readonly ActivityEvent[], first?: number, runOf
         seen.add(e.target);
         last.things = [...(last.things ?? [last.thing as string]), e.thing as string];
       }
-    } else
-      bursts.push({
+    } else {
+      last = {
         by: byOf(e.actor),
         who: e.actor,
         count: 1,
@@ -3723,24 +3781,37 @@ export function feedRows(events: readonly ActivityEvent[], first?: number, runOf
         ...(e.thing === undefined ? {} : { thing: e.thing }),
         ...(e.rows === undefined ? {} : { rows: e.rows }),
         ...runBy(e.actor),
-      });
+        ...(day === undefined ? {} : { day }),
+      };
+      if (folding && RUN_HANDLE.test(e.actor)) {
+        last.run_more = 0;
+        runs.set(`${e.actor} ${day ?? ''}`, last);
+      }
+      bursts.push(last);
+    }
   }
   if (first === undefined) return bursts;
   const cap = Math.min(50, Math.max(1, Math.floor(first)));
   const kept: FeedRow[] = [];
-  const rest = new Map<FeedBy, FeedRow>();
+  /* ONE REMAINDER A GROUP, and a day where the feed groups by day, so a heading's count is that day's own. */
+  const rest = new Map<string, FeedRow>();
   const taken = new Map<FeedBy, number>();
   for (const row of bursts) {
     const n = taken.get(row.by) ?? 0;
     taken.set(row.by, n + 1);
     if (n < cap) kept.push(row);
     else {
-      const folded = rest.get(row.by);
-      if (folded) folded.count += row.count;
-      else rest.set(row.by, { by: row.by, who: null, count: row.count, kind: null, target: null, note: null, at: row.at });
+      /* A FOLDED RUN'S OTHER LINES ARE COUNTED TOO, so no line is lost past `first`. */
+      const lines = row.count + (row.run_more ?? 0);
+      const folded = rest.get(`${row.by} ${row.day ?? ''}`);
+      if (folded) folded.count += lines;
+      else
+        rest.set(`${row.by} ${row.day ?? ''}`, { by: row.by, who: null, count: lines, kind: null, target: null, note: null, at: row.at, ...(row.day === undefined ? {} : { day: row.day }) });
     }
   }
-  return [...kept, ...rest.values()];
+  const rows = [...kept, ...rest.values()];
+  /* EACH DAY'S ROWS SIT TOGETHER, its remainders after its own rows. The sort is stable, and the rows are newest first. */
+  return dayOf ? rows.sort((a, b) => (a.day === b.day ? 0 : (a.day ?? '') < (b.day ?? '') ? 1 : -1)) : rows;
 }
 
 /**
@@ -4913,6 +4984,7 @@ const SOURCE_KIT = {
   listOf,
   agentRows,
   feedRows,
+  feedSaysFault,
   /* the questions */
   staleAt,
   BODY_KINDS,
@@ -4954,7 +5026,11 @@ export type SourceKit = typeof SOURCE_KIT;
 function sourceKit(deps: PageDeps): SourceKit {
   const runOf = deps.runOf;
   if (!runOf) return SOURCE_KIT;
-  return { ...SOURCE_KIT, feedRows: (events, first) => feedRows(events, first, runOf), agentRows: (events, first) => agentRows(events, first, runOf) };
+  return {
+    ...SOURCE_KIT,
+    feedRows: (events, first, own, says) => feedRows(events, first, own ?? runOf, says),
+    agentRows: (events, first) => agentRows(events, first, runOf),
+  };
 }
 
 /**

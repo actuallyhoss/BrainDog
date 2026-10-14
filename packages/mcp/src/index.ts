@@ -277,6 +277,12 @@ export type McpSurface<C> = {
    */
   stale?(args: Record<string, never>, ctx: C): Answer;
   /**
+   * The lessons that stand where the caller is, in the order to read them: method before fact, here before everywhere,
+   * newest first, forty unless `limit` says otherwise (the record's `learnings`, READ+, AGT-C14). It backs
+   * `braindog:learnings`. Optional as the reads above are.
+   */
+  learnings?(args: { limit?: number }, ctx: C): Answer;
+  /**
    * Take back a question this run asked, while it is still open (the record's `withdraw`, DATA, AGT-C07). It backs
    * `propose`'s `withdraw`. Optional for the command line's reason above, and a surface without it answers that
    * `NOT_IN_THIS_BUILD`. Who may is the record's to say, and its refusal is said as it came.
@@ -991,6 +997,9 @@ const unbuilt = (name: string, instead: string): Result<never> => ({
   refusal: { code: 'NOT_IN_THIS_BUILD', fix: `This record does not answer ${name} yet. ${instead}` },
 });
 
+/** The most lessons one read of the record's `learnings` answers, which is the most its `limit` takes (`methods/learnings.ts`). */
+const LEARNED_MOST = 200;
+
 /** The most hits one search answers, whatever `limit` asked: the clamp in the kernel's `fts.ts` search. */
 const SEARCH_MOST = 100;
 
@@ -1031,6 +1040,8 @@ const TTL = new Map([
   ['handoffs', 0],
   /* NEVER HELD EITHER: a step dropped or a question withdrawn a moment ago is not stale any more. */
   ['stale', 0],
+  /* HELD A MINUTE, as the briefing is: a lesson stands for months, and the session that records one is told its handle. */
+  ['learnings', MINUTE],
   ['briefing', MINUTE],
   ['exceptions', MINUTE],
   ['about', MINUTE],
@@ -1105,6 +1116,12 @@ const FIXED: readonly Resource[] = [
   resource('briefing', 'What matters here now: what is late, what is due, what stopped and what waits, a line each.'),
   resource('exceptions', 'What stopped: what went quiet or has not run, the longest first, each in a sentence.'),
   resource('stale', 'What went stale where you stand, each with the one call that clears it.'),
+  /* THE DESCRIPTION IS THE TEST FOR RECORDING ONE (AGT-C14, `docs/32-PARITY.md`), said where a session looks before it
+     adds to them. All four hold, or it is not a lesson. */
+  resource(
+    'learnings',
+    'The lessons that stand here, in the order to read them. Record one only when it changes what a session does, it generalises, a session without it would get it wrong, not merely slower, and it has no other home.',
+  ),
   resource('about', 'What one thing is, by its name: read about/<name>, with a space as %20.'),
   resource(
     'sessions/live',
@@ -3065,6 +3082,52 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     });
     return { ok: true, value: { stale, ...(stale.length === 0 ? { said: 'Nothing is stale where you stand.' } : {}) } };
   };
+  /**
+   * THE STANDING LESSONS, A LINE EACH, as `braindog:learnings`: `LN12 · method · here · <lesson> · because <failure>`,
+   * in the order the record answered, which is the order to read them in (method before fact, here before everywhere,
+   * newest first). The record is asked its own default and the door names no limit of its own.
+   *
+   * ONLY WHAT AN AGENT FOLLOWS OR CITES IS PASSED ON. The handle is the one `get` and `update` take; a row with none,
+   * or with no lesson, is left out. Where it applies is one of two words, so a project's id never stands in for them.
+   * The day it was made or confirmed stays behind: the order already says which is newer. A lesson with no kind is a
+   * fact, as the card sorts it.
+   *
+   * WHAT IS LEFT IS SAID LAST: how many more stand, with the call that reads them, then how many faded. The record
+   * answers `truncated` and may count what is left (`more`, or `total` of all that stand). When it says only that more
+   * stand, it is asked once more for the most one read holds (`LEARNED_MOST`), and the difference is the number. If
+   * that read is refused the line gives no number it would have to invent, and if it is cut short too it says "over".
+   * `resources` asks only to see that the address answers (`lean` false), and counts nothing.
+   */
+  const learningsRead = async (ctx: C, lean: boolean): Promise<Result<unknown>> => {
+    if (!surface.learnings) return unbuilt('braindog:learnings', 'Read braindog:context, whose card names the lessons that bear on where you stand.');
+    const out = await surface.learnings({}, ctx);
+    if (!out.ok) return out;
+    const v = isObject(out.value) ? out.value : {};
+    const rows = Array.isArray(v.rows) ? v.rows : [];
+    const one = (x: unknown): string => (typeof x === 'string' ? x.replace(/\s+/gu, ' ').trim() : '');
+    const lines = rows.flatMap((r: unknown) => {
+      if (!isObject(r)) return [];
+      const spoken = one(r.spoken);
+      const lesson = one(r.lesson);
+      if (!PREFIXED.test(spoken) || lesson === '') return [];
+      const where = r.where === 'here' || r.where === 'everywhere' ? [r.where] : [];
+      const because = one(r.because).replace(/^because\s+/iu, '');
+      return [[spoken, one(r.kind) || 'fact', ...where, lesson, ...(because === '' ? [] : [`because ${because}`])].join(' · ')];
+    });
+    const count = (x: unknown): number => (typeof x === 'number' && Number.isInteger(x) && x > 0 ? x : 0);
+    let left = count(v.more) || count(v.total) - rows.length;
+    let over = '';
+    if (left <= 0 && v.truncated === true && lean) {
+      const all = await surface.learnings({ limit: LEARNED_MOST }, ctx);
+      const whole = all.ok && isObject(all.value) ? all.value : {};
+      left = (Array.isArray(whole.rows) ? whole.rows.length : 0) - rows.length;
+      if (whole.truncated === true) over = 'over ';
+    }
+    const more = left > 0 ? [`and ${over}${String(left)} more, call context`] : v.truncated === true ? ['and more, call context'] : [];
+    const faded = count(v.faded) > 0 ? [`${String(count(v.faded))} faded`] : [];
+    const learnings = [...lines, ...more, ...faded];
+    return { ok: true, value: { learnings, ...(learnings.length === 0 ? { said: 'No lesson stands here yet.' } : {}) } };
+  };
 
   /**
    * A page, a block of one, or the Home page, as a resource reads it.
@@ -3165,6 +3228,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     if (head === 'briefing' && !rest) return briefingRead(ctx);
     if (head === 'exceptions' && !rest) return exceptionsRead(ctx);
     if (head === 'stale' && !rest) return staleRead(ctx);
+    if (head === 'learnings' && !rest) return learningsRead(ctx, lean);
     if (head === 'context' && !rest) {
       if (!surface.context) return unbuilt('context', 'Read braindog:boot instead.');
       const raw = await surface.context({}, ctx);

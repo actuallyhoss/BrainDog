@@ -1237,11 +1237,12 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
            1.8.0 who worked on it and its notes, its money, and what it runs on were three sections folded shut, each a
            tile 56px tall holding only its name and a Show button, which read as unfinished. Now they are one boxed tile
            under the plan, its parts on one surface, each short: the last few changes and runs, the notes, the money by
-           month and the next bills, what keeps it running and the keys, tools and skills it uses. A part with nothing
-           in it is not drawn, so a new project's tile is its notes.
+           month and the next bills, and what keeps it running. A part with nothing in it is not drawn, so a new project's
+           tile is its notes.
 
-           WHAT IT RUNS ON LEFT THE RAIL FOR IT, with the scheduled actions (Resume, Pause), which the host draws under
-           this heading (`panel: actions`). The rail keeps the short tiles beside the plan. */
+           THE SCHEDULED ACTIONS LEFT THE RAIL FOR IT (Resume, Pause), which the host draws under this heading
+           (`panel: actions`). The rail keeps the short tiles beside the plan. ITS KEYS, TOOLS AND SKILLS ARE THE
+           SECTION AFTER THIS ONE, "Runs on", under a heading of their own. */
         kind: 'section',
         heading: 'More about {{name}}',
         icon: 'notebook-pen',
@@ -1263,16 +1264,26 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
       },
       {
         /* CARDS, because an agent working on the project is a face and a sentence, not a row in a log. The last three
-           runs, beside what changed. */
+           runs, beside what changed.
+
+           ONE CARD FOR A RUN AND ITS HELPERS (AGT-C12 job d). The tile read every run placed in the project, so a run
+           and each helper it started were a card apiece, and so was a run that opened and wrote nothing; and each was
+           titled by `doing`, which on a run nobody named is the record's own name for it. A project's page listed six
+           cards with one title. A CARD IS THE AGENT AND WHAT IT SAID, as on Agents: `doing_said` is the column the
+           record works out over the list of runs, empty where the name is the record's own or reads as a path. */
         kind: 'cards',
         heading: 'Agents',
         icon: 'bot',
         span: 6,
-        columns: [{ field: 'doing', as: 'title' }, { field: 'agent', as: 'who' }, { field: 'last_seen', as: 'when' }],
+        columns: [{ field: 'agent', as: 'title' }, { field: 'doing_said', as: 'reply' }, { field: 'last_seen', as: 'when' }],
         source: 'register.session',
         /* BY `project`, WHICH HOLDS THE PROJECT'S SPOKEN ID, `things#1`. `{{spoken}}` is that id for the
-           row the template is about, filled by both engines. */
-        where: 'project is {{spoken}}',
+           row the template is about, filled by both engines.
+
+           A RUN OF ITS OWN THAT DID SOMETHING, in the Agents page's own words (`RAN` in `packs/agents.ts`): not a
+           helper, whose work is its parent's, and not a run that signed no write. `is not 0`, so a run whose writes
+           the record has not counted yet is kept. */
+        where: 'project is {{spoken}}, parent is empty, wrote is not 0',
         order: [{ field: 'last_seen', dir: 'desc' }],
         limit: 3,
       },
@@ -1291,11 +1302,14 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         /* ITS MONEY MONTH BY MONTH, in and out, from what moved in the twelve months to now, with what was left each month
            as a line. Read from Money's transactions, so a record that keeps no Money has the page without it
            (`PROJECT_LINKS`). A line names its figure with this project as its parameter, as a tile's cell does. HALF THE
-           TILE SINCE work 1.15.0, beside the bills and invoices. */
+           TILE FROM work 1.15.0, beside the bills and invoices, AND THE TILE'S WIDTH AGAIN since the keys, tools and
+           skills left for Runs on: five halves were left here, so the last of them sat beside a hole over the next
+           heading (`apps/web/src/lib/record/layout.test.ts`). A chart of twelve months reads better wide, and the four
+           halves left pair up in whatever order the page's look puts them. */
         kind: 'series',
         heading: 'Money by month',
         icon: 'chart-column',
-        span: 6,
+        span: 12,
         series: [
           { metric: 'project-in-by-month:{{name}}', label: 'Money in' },
           { metric: 'project-out-by-month:{{name}}', label: 'Money out', dir: 'out' },
@@ -1343,28 +1357,47 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         limit: 3,
       },
       {
+        /* WHAT IT RUNS ON, UNDER ITS OWN HEADING (AGT-D12 job 2: "Each project page has a Runs on section listing its
+           keys, MCP servers and skills, with the global ones it inherits shown faintly beneath"). The three tiles sat
+           among the money under "More about" the project, and what reaches a project from everywhere was said nowhere
+           on its page. One boxed tile now: the project's own keys, tools and skills, three of each, and under them
+           the five that apply everywhere.
+
+           NO `when:` AND NO PANEL: a section whose every block went is not drawn (`emptyHidden` in the kernel's
+           `drawn.ts`), so a project with nothing of its own on a record with nothing for everybody has no heading
+           over nothing. The scheduled actions stay the panel of "More about", which the host counts for. */
+        kind: 'section',
+        heading: 'Runs on',
+        icon: 'plug',
+        span: 12,
+        box: true,
+      },
+      {
         /* `{{spoken}}` IS THIS PROJECT'S OWN ROW, `things#1`, which `runs_on` takes as `about:` and reads every kind
            from, so the blocks below narrow one read to a kind apiece by `where:` rather than asking the kernel three
            times. `about:` is read by a `cards` block (`block-keys.ts` `KEY_KINDS`), as it is by `table`.
 
-           NO BLOCK HERE NAMES `kind is action`: the scheduled actions are the panel the section above draws, with
-           Resume and Pause, so a card for each as well would say every action twice.
+           NO BLOCK HERE NAMES `kind is action`: the scheduled actions are the panel "More about" draws, with Resume and
+           Pause, so a card for each as well would say every action twice.
 
            EACH CARD SAYS WHERE IT APPLIES AND WHO USED IT LAST. `scope` is the chip, the project's mark, and it is
            the project's on every card here: the kernel answers the project's own first and the ones that apply
            everywhere after them, and all three blocks ask for `scope is project` (PGS-C31). A key or a skill that
-           applies everywhere is in its own list, which Agents stands over, said once; under every project it was the
-           same three of everybody's, and a record with many keys offered all of them on each.
+           applies everywhere is under them, in And from everywhere, faint and without the chip; mixed in under every
+           project it was the same three of everybody's, read as the project's own.
            `used_by` is the run that last opened a key or called a tool, `S47`, which the card draws as that run's face,
            and `used_at` when anybody last did; a skill has no use the record counts, so it names neither.
 
            THREE OF EACH SINCE work 1.15.0, and none that says it is empty: a project with no key, tool or skill of
            its own draws none of the three, where the rail said three sentences of nothing and then, until each was
-           narrowed, three of everybody's. */
+           narrowed, three of everybody's.
+
+           A THIRD OF THE TILE EACH, since they are three under a heading of their own: at a half each the third sat
+           beside a hole, in any order the page's look put them. */
         kind: 'cards',
         heading: 'Keys',
         icon: 'key',
-        span: 6,
+        span: 4,
         source: 'runs_on',
         about: '{{spoken}}',
         where: 'kind is key, scope is project',
@@ -1381,12 +1414,13 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         kind: 'cards',
         heading: 'Tools and servers',
         icon: 'plug',
-        span: 6,
+        span: 4,
         source: 'runs_on',
         about: '{{spoken}}',
         /* THE PROJECT'S OWN ALONE: the kernel answers what applies everywhere after a project's
            own, so a project with no tool of its own listed three of everybody's under its name, and they were not
-           its. A tool that applies everywhere is on Agents, said once. With none of its own the card is not drawn. */
+           its. A tool that applies everywhere is in And from everywhere, below. With none of its own the card is not
+           drawn. */
         where: 'kind is tool, scope is project',
         columns: [
           { field: 'name', as: 'title' },
@@ -1401,7 +1435,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         kind: 'cards',
         heading: 'Skills',
         icon: 'skill',
-        span: 6,
+        span: 4,
         source: 'runs_on',
         about: '{{spoken}}',
         where: 'kind is skill, scope is project',
@@ -1411,6 +1445,31 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
           { field: 'detail', label: 'Version', as: 'fact' },
         ],
         limit: 3,
+      },
+      {
+        /* AND WHAT REACHES IT FROM EVERYWHERE, SAID ONCE AND FAINT, under the project's own: the keys, tools and
+           skills that name no project, which an agent working here is handed all the same. FIVE, by name and kind,
+           with the agent that last used each and when; the rest are in the lists Agents stands over. The kernel
+           answers `quiet` on every one of them, which is what a host dims a card by (`runs-on.ts`), and none carries
+           the project's chip, so nobody reads them as the project's.
+
+           NOT THE SCHEDULED ACTIONS: one that runs for every project is already in the panel "More about" draws,
+           with Resume and Pause, and a card here would say it twice. With nothing that applies everywhere the block
+           is not drawn. */
+        kind: 'cards',
+        heading: 'And from everywhere',
+        icon: 'globe',
+        span: 12,
+        source: 'runs_on',
+        about: '{{spoken}}',
+        where: 'kind is not action, scope is global',
+        columns: [
+          { field: 'name', as: 'title' },
+          { field: 'kind', label: 'Kind', as: 'fact' },
+          { field: 'used_agent', label: 'Last used by', as: 'who' },
+          { field: 'used_at', label: 'Last used', as: 'when' },
+        ],
+        limit: 5,
       },
     ],
   },

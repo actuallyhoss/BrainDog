@@ -35,7 +35,7 @@
  */
 
 import type { BlockResult, Json, Kernel } from '@braindog/kernel';
-import { SLASH, queuesKept } from '@braindog/kernel';
+import { GROUPED_BY_FIELD, GROUP_VALUES_LEAST as VALUES_LEAST, GROUP_VALUES_MOST as VALUES_MOST, LOOK_GROUPS_MOST, SLASH, queuesKept } from '@braindog/kernel';
 import type { Refusal, Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
 
@@ -91,6 +91,8 @@ export type LookBody = {
   headline?: string;
   next?: LookNext;
   pinned?: string[];
+  /** Which parts are drawn in groups, and by which field of their list (the kernel's `LookBody.group`). */
+  group?: Record<string, string>;
 };
 
 /** The live look over a page as the record holds it: its version, the pack that shipped it, and its body. */
@@ -113,6 +115,7 @@ type ReadBlock = {
   drawn?: unknown;
   refusals?: unknown;
   rows?: unknown;
+  group?: unknown;
 };
 
 /** A block key the kernel reads (`block-keys.ts` `BLOCK_KEY`), so a look naming it installs. */
@@ -145,8 +148,12 @@ const shown = (b: ReadBlock): boolean => b.drawn !== false && !(Array.isArray(b.
  * since the model could only name it by something a person does not read.
  *
  * `titleOf` IS THE LIST'S TITLE FIELD, so the title is the one the record shows for the row, never a field picked here.
+ *
+ * `lists` ARE THE LISTS AS DECLARED (`groupListsOf`). Handed them, a part that could be drawn in groups says the fields
+ * it may be grouped by in `group` (`groupChoices`), so the model names a field it was handed and never guesses one.
  */
-export function lookInputOf(blocks: readonly unknown[], titleOf: (list: string) => string | null): { blocks: HeadlineBlock[]; rows: HeadlineRow[] } {
+export function lookInputOf(blocks: readonly unknown[], titleOf: (list: string) => string | null, lists?: GroupLists): { blocks: HeadlineBlock[]; rows: HeadlineRow[] } {
+  const choices = lists === undefined ? {} : groupChoices(blocks, lists);
   const out: HeadlineBlock[] = [];
   const rows: HeadlineRow[] = [];
   const keys = new Set<string>();
@@ -170,6 +177,7 @@ export function lookInputOf(blocks: readonly unknown[], titleOf: (list: string) 
         kind: typeof b.kind === 'string' ? b.kind : 'block',
         ...(heading === null ? {} : { heading }),
         ...(isLead ? { lead: true as const } : {}),
+        ...(Object.hasOwn(choices, key) ? { group: choices[key]! } : {}),
       });
     if (!Array.isArray(b.rows)) continue;
     for (const r of b.rows) {
@@ -195,7 +203,7 @@ export function lookInputOf(blocks: readonly unknown[], titleOf: (list: string) 
 }
 
 /** What a page's answer arranged, each part only when it passed, and why each part that did not was dropped. */
-export type LookAnswer = { headline?: string; lead?: string; order?: string[]; hide?: string[]; next?: LookNext; faults: string[] };
+export type LookAnswer = { headline?: string; lead?: string; order?: string[]; hide?: string[]; next?: LookNext; group?: Record<string, string>; faults: string[] };
 
 /** The kinds a look neither leads with nor leaves out: the page's own words, the line a thing is typed into, its forms and its headings (the kernel's `STAYS`). */
 const STAYS: ReadonlySet<string> = new Set(['note', 'capture', 'inputs', 'section']);
@@ -339,22 +347,164 @@ export function hideFault(
   return { hide: keys };
 }
 
+/* ── grouping ────────────────────────────────────────────────────────────── */
+
+/** The kinds a look may draw in groups: the kernel's own `GROUPED_BY_FIELD`, under the name this file has always said. */
+export const GROUP_KINDS: ReadonlySet<string> = GROUPED_BY_FIELD;
+
+/** The most parts one look groups, and how many values the things shown may hold of the field: the kernel's own. */
+export const GROUPS_MOST = LOOK_GROUPS_MOST;
+export const GROUP_VALUES_LEAST = VALUES_LEAST;
+export const GROUP_VALUES_MOST = VALUES_MOST;
+
+/** The field types that make groups: a choice and a link. A list's state is a choice. */
+const GROUP_TYPES: ReadonlySet<string> = new Set(['enum', 'ref']);
+
+/** What a list says of itself that a grouping is checked against: the field its state is kept in, and its live fields. */
+export type GroupList = { state: string | null; fields: readonly { id: string; type: string }[] };
+
+/** A list by its id, or `null` for one the record does not declare. */
+export type GroupLists = (list: string) => GroupList | null;
+
+/**
+ * Every list's own declaration, read once and asked by id. A retired field is no field of its list, and a declaration
+ * that cannot be read is a list nothing is grouped over.
+ */
+export function groupListsOf(kernel: Pick<Kernel, 'declarations'>): GroupLists {
+  let all: Map<string, GroupList> | undefined;
+  const read = (): Map<string, GroupList> => {
+    const out = new Map<string, GroupList>();
+    for (const d of kernel.declarations()) {
+      if (d.kind !== 'register' || !d.id.startsWith('register.')) continue;
+      let body: unknown = d.body;
+      if (typeof body === 'string')
+        try {
+          body = JSON.parse(body);
+        } catch {
+          continue;
+        }
+      if (body === null || typeof body !== 'object' || Array.isArray(body)) continue;
+      const { state, fields } = body as { state?: unknown; fields?: unknown };
+      if (!Array.isArray(fields)) continue;
+      const live = fields.flatMap((f) => {
+        const { id, type, retired } = (f ?? {}) as { id?: unknown; type?: unknown; retired?: unknown };
+        return typeof id === 'string' && typeof type === 'string' && retired !== true ? [{ id, type }] : [];
+      });
+      out.set(d.id.slice('register.'.length), { state: typeof state === 'string' && live.some((f) => f.id === state) ? state : null, fields: live });
+    }
+    return out;
+  };
+  return (list) => (all ??= read()).get(list) ?? null;
+}
+
+/** How many values of `field` the things a part shows hold. One that holds none is not counted (the kernel's `valuesShown`). */
+function valuesShown(b: ReadBlock, field: string): number {
+  const met = new Set<string>();
+  for (const r of Array.isArray(b.rows) ? b.rows : []) {
+    const fields = (r as { fields?: unknown } | null)?.fields;
+    if (fields === null || typeof fields !== 'object') continue;
+    const v = Object.hasOwn(fields, field) ? (fields as Record<string, unknown>)[field] : undefined;
+    if (v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0)) continue;
+    met.add(typeof v === 'string' ? v : JSON.stringify(v));
+  }
+  return met.size;
+}
+
+/** The list a part is over, by its id, or `null`. */
+const listOfPart = (b: ReadBlock): string | null => (typeof b.source === 'string' && b.source.startsWith('register.') ? b.source.slice('register.'.length) : null);
+
+/** The page's parts as read, by key, the first of two alike. */
+function readByKey(read: readonly unknown[]): Map<string, ReadBlock> {
+  const out = new Map<string, ReadBlock>();
+  for (const raw of read) {
+    if (raw === null || typeof raw !== 'object') continue;
+    const key = blockKeyOf(raw);
+    if (!out.has(key)) out.set(key, raw as ReadBlock);
+  }
+  return out;
+}
+
+/**
+ * What each part of a page could be grouped by, by key: the fields of its list that `groupFault` would pass for the
+ * things it shows now, its state first. For whoever hands the model the page, so it names a field and does not guess
+ * one. A part that draws no groups, names its own, or has nothing to group by is left out.
+ */
+export function groupChoices(read: readonly unknown[], lists: GroupLists): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const [key, b] of readByKey(read)) {
+    const list = listOfPart(b);
+    const shape = list === null ? null : lists(list);
+    if (shape === null || typeof b.kind !== 'string' || !GROUP_KINDS.has(b.kind) || b.group !== undefined || !shown(b)) continue;
+    const fields = shape.fields.filter((f) => GROUP_TYPES.has(f.type)).map((f) => f.id);
+    const good = [...fields.filter((f) => f === shape.state), ...fields.filter((f) => f !== shape.state)].filter((f) => {
+      const n = valuesShown(b, f);
+      return n >= GROUP_VALUES_LEAST && n <= GROUP_VALUES_MOST;
+    });
+    if (good.length > 0) out[key] = good;
+  }
+  return out;
+}
+
+/**
+ * Why a grouping the model answered is not kept, or the map to keep: a part of the page by its key, and the field of
+ * its list it is drawn in groups by. Each part is one the page was handed, of a kind that draws groups, over a list,
+ * and could be drawn; each field is one its list has, a choice, a link or the state, with two to eight values among the
+ * things shown. One is a heading over everything, and past eight most headings stand over a single thing. ONE BAD NAME
+ * AND NOTHING IS GROUPED, as with what is left out.
+ *
+ * A PART THAT NAMES ITS OWN GROUP IS PASSED OVER, not refused: the page's own declaration stands over any look
+ * (`applyLook`), and the model is not told which parts those are.
+ *
+ * `read` is the page's blocks as its read answered them and `lists` the lists as they are declared (`groupListsOf`).
+ * Without both nothing can be counted or told apart, so nothing is grouped.
+ */
+export function groupFault(raw: unknown, page: HeadlinePage, read?: readonly unknown[], lists?: GroupLists): { fault: string } | { group: Record<string, string> | null } {
+  const said = (why: string): { fault: string } => ({ fault: `How to group ${page.title} ${why}` });
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return said('did not say which part is grouped by what.');
+  const entries = Object.entries(raw as Record<string, unknown>);
+  if (entries.some(([, f]) => typeof f !== 'string' || f === '')) return said('did not say which part is grouped by what.');
+  if (entries.length > GROUPS_MOST) return said(`named more than ${GROUPS_MOST} parts.`);
+  if (entries.length === 0) return { group: null };
+  if (read === undefined || lists === undefined) return said('could not be checked against what the page shows.');
+  const handed = new Set((page.blocks ?? []).map((b) => b.key));
+  const parts = readByKey(read);
+  const group: Record<string, string> = {};
+  for (const [key, field] of entries as [string, string][]) {
+    const part = parts.get(key);
+    if (part !== undefined && Array.isArray(part.refusals) && part.refusals.length > 0) return said('named a part that could not be drawn.');
+    if (!handed.has(key) || part === undefined) return said('named a part the page does not have.');
+    const list = listOfPart(part);
+    const shape = list === null ? null : lists(list);
+    if (typeof part.kind !== 'string' || !GROUP_KINDS.has(part.kind) || shape === null) return said('named a part that is not drawn in groups.');
+    if (part.group !== undefined) continue;
+    const spec = shape.fields.find((f) => f.id === field);
+    if (spec === undefined) return said('named a field its list does not have.');
+    if (!GROUP_TYPES.has(spec.type)) return said('named a field that is not a choice, a link or the state.');
+    const n = valuesShown(part, field);
+    if (n < GROUP_VALUES_LEAST) return said('would put everything shown under one heading.');
+    if (n > GROUP_VALUES_MOST) return said(`would make more than ${GROUP_VALUES_MOST} groups.`);
+    group[key] = field;
+  }
+  return { group: Object.keys(group).length === 0 ? null : group };
+}
+
 /**
  * One page's answer read as a look: the headline when `headlineFault` passes it, the order when `orderFault` does, and the
- * next when `nextFault` does, the lead when `leadFault` does and what is left out when `hideFault` does. A bare line is a
+ * next when `nextFault` does, the lead when `leadFault` does, what is left out when `hideFault` does and how its lists
+ * are grouped when `groupFault` does. A bare line is a
  * headline and nothing else, as it always was. The headline's own fault is not among `faults`, since the headline step
  * says it already.
  *
- * `at` IS WHAT THE CHECKS ON A HIDE ARE READ AGAINST: the keys the person pinned, and the page's blocks as its read
- * answered them. Whoever writes the answer as a look asks `undoneFor` first: a look he put back is not written again.
+ * `at` IS WHAT THE CHECKS ON A HIDE AND A GROUPING ARE READ AGAINST: the keys the person pinned, the page's blocks as
+ * its read answered them, and the lists as they are declared. Whoever writes the answer as a look asks `undoneFor` first: a look he put back is not written again.
  */
-export function lookAnswerOf(answer: unknown, page: HeadlinePage, at: { pinned?: readonly string[]; read?: readonly unknown[] } = {}): LookAnswer {
+export function lookAnswerOf(answer: unknown, page: HeadlinePage, at: { pinned?: readonly string[]; read?: readonly unknown[]; lists?: GroupLists } = {}): LookAnswer {
   const faults: string[] = [];
   const line = typeof answer === 'string' ? answer : answer !== null && typeof answer === 'object' && !Array.isArray(answer) ? (answer as { headline?: unknown }).headline : undefined;
   const out: LookAnswer = { faults };
   if (headlineFault(line, page) === null) out.headline = (line as string).trim();
   if (answer === null || typeof answer !== 'object' || Array.isArray(answer)) return out;
-  const { lead, order, hide, next } = answer as { lead?: unknown; order?: unknown; hide?: unknown; next?: unknown };
+  const { lead, order, hide, next, group } = answer as { lead?: unknown; order?: unknown; hide?: unknown; next?: unknown; group?: unknown };
   if (lead !== undefined && lead !== null) {
     const got = leadFault(lead, page, at.read);
     if ('fault' in got) faults.push(`${got.fault} The page keeps its lead.`);
@@ -374,6 +524,11 @@ export function lookAnswerOf(answer: unknown, page: HeadlinePage, at: { pinned?:
     const fault = nextFault(next, page);
     if (fault) faults.push(`${fault} No next step is shown.`);
     else out.next = { row: (next as LookNext).row, text: (next as LookNext).text.trim() };
+  }
+  if (group !== undefined && group !== null) {
+    const got = groupFault(group, page, at.read, at.lists);
+    if ('fault' in got) faults.push(`${got.fault} The page keeps its lists as they are.`);
+    else if (got.group !== null) out.group = got.group;
   }
   return out;
 }
@@ -437,6 +592,10 @@ export function lookBodyOf(raw: unknown, page: string): LookBody | null {
   if (next && typeof next.row === 'string' && typeof next.text === 'string') out.next = { row: next.row, text: next.text };
   const pinned = keys(b.pinned);
   if (pinned) out.pinned = pinned;
+  /* A MAP OF TEXT TO TEXT, its keys sorted so two looks that group alike read alike (`sameLook`). */
+  const group = b.group !== null && typeof b.group === 'object' && !Array.isArray(b.group) ? Object.entries(b.group as Record<string, unknown>) : [];
+  if (group.length > 0 && group.every(([, f]) => typeof f === 'string'))
+    out.group = Object.fromEntries((group as [string, string][]).sort(([a], [z]) => (a < z ? -1 : a > z ? 1 : 0)));
   return out;
 }
 
@@ -556,7 +715,7 @@ export function keptBy(kernel: Pick<Kernel, 'declarations' | 'prefsOf'>, page: s
 
 /**
  * THE LOOK STEP, after the headline step has read the model's answer: each page that was handed its blocks and answered
- * more than a line gets Slash's look, with the lead, the order, what is left out and the next that passed, written from
+ * more than a line gets Slash's look, with the lead, the order, what is left out, the next and the grouping that passed, written from
  * the basis it was asked at. A page whose answer was a bare line arranges nothing, a page set by its owner is left alone
  * with a line in the log, and so is a page whose look from this same basis the person put back (`undoneFor`).
  *
@@ -578,12 +737,13 @@ export async function composeLooks(
 ): Promise<{ said: string[]; dropped: string[] }> {
   const said: string[] = [];
   const dropped: string[] = [];
+  const lists = groupListsOf(kernel);
   for (const d of due) {
     if (d.page.page === HOME_PAGE || d.page.blocks === undefined) continue;
     const answer = Object.hasOwn(lines, d.page.page) ? lines[d.page.page] : undefined;
     if (answer === null || typeof answer !== 'object' || Array.isArray(answer)) continue;
     const pinned = liveLook(kernel, d.page.page)?.body.pinned ?? [];
-    const got = lookAnswerOf(answer, d.page, { pinned, ...(d.read === undefined ? {} : { read: d.read }) });
+    const got = lookAnswerOf(answer, d.page, { pinned, lists, ...(d.read === undefined ? {} : { read: d.read }) });
     dropped.push(...got.faults);
     /* THE QUESTIONS KEEP THEIR PLACE on a page that is about something else, as the kernel lays any look of Slash's. */
     const held = lookKept(
@@ -600,7 +760,7 @@ export async function composeLooks(
       if (held.order === undefined) delete got.order;
       else got.order = held.order;
     }
-    if (got.lead === undefined && got.order === undefined && got.hide === undefined && got.next === undefined) continue;
+    if (got.lead === undefined && got.order === undefined && got.hide === undefined && got.next === undefined && got.group === undefined) continue;
     const basis = lookBasis(d.basis, d.facts);
     /* HE PUT THIS ONE BACK. The same page read from the same figures and the same named things is answered much the same,
        and a look he undid that came back the next night would be Slash not listening. */
@@ -619,6 +779,7 @@ export async function composeLooks(
       ...(got.hide === undefined ? {} : { hide: got.hide }),
       ...(got.next === undefined ? {} : { next: got.next }),
       ...(pinned.length === 0 ? {} : { pinned: [...pinned] }),
+      ...(got.group === undefined ? {} : { group: got.group }),
     };
     /* REHEARSED FIRST, when the caller can (`compose-rehearse.ts`): a look that would print a fault is not written, and
        the caller's sentence says why in the log. */

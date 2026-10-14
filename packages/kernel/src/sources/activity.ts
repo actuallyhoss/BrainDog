@@ -31,7 +31,7 @@ const ACTIVITY: Schema = {
 };
 
 function activityBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: Also, kit: SourceKit): BlockResult {
-  const { predicateOf, byOf, listOf, agentRows, feedRows } = kit;
+  const { predicateOf, byOf, listOf, agentRows, feedRows, feedSaysFault } = kit;
   if (!deps.activity)
     return { ...base, refusals: also({ code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read its activity onto a page yet.', at: 'source' }) };
   const said = predicateOf(block.where, ACTIVITY, deps.ctx);
@@ -45,9 +45,18 @@ function activityBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also
     const theirs = kept.filter((e) => byOf(e.actor) === 'agent');
     return { ...base, feed: listed(agentRows(theirs, block.first)), matched: theirs.length };
   }
+  /* A FEED'S DAYS AND RUNS (PGS-C24): `group: day` is a heading each day, counted in the record's own zone as the page
+     holds it, and `fold: run` is one line a run. Any other word is refused here as the install refuses it, so a block
+     handed straight to the read never draws a fold nobody asked for. A feed that says neither is read as it was. */
+  const fault = feedSaysFault(block, 'This feed');
+  if (fault) return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: fault.fix, at: fault.at, allowed: fault.allowed }) };
+  const says =
+    block.group === undefined && block.fold === undefined
+      ? undefined
+      : { ...(block.group === 'day' ? { group: 'day' as const } : {}), ...(block.fold === 'run' ? { fold: 'run' as const } : {}), zone: deps.ctx.tz ?? deps.tz };
   return {
     ...base,
-    feed: listed(feedRows(kept, block.first)),
+    feed: listed(feedRows(kept, block.first, undefined, says)),
     matched: kept.length,
     ...(block.since === 'seen' ? { seen: read.seen } : {}),
   };

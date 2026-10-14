@@ -66,11 +66,11 @@ test('FOLD IS A COUNT OF CARDS FROM 1 TO 50, AND ONLY ON CARDS THAT GROUP', () =
 });
 
 test('GROUP AND FOLD ARE NAMED WHERE EVERY KIND KEY IS (`KEY_KINDS`), so a table carrying group hears where it belongs', () => {
-  assert.deepEqual(KEY_KINDS.group, ['cards']);
-  assert.deepEqual(KEY_KINDS.fold, ['section', 'cards']);
+  assert.deepEqual(KEY_KINDS.group, ['cards', 'feed']);
+  assert.deepEqual(KEY_KINDS.fold, ['section', 'cards', 'feed']);
   const table = validate(page({ kind: 'table', group: 'project' }), KNOWN)!;
   assert.deepEqual([table.code, table.at], ['DECLARATION_INVALID', 'blocks[0].group']);
-  assert.match(table.fix, /group: is read by cards blocks, and a table block does nothing with it\. Draw these rows as cards/u);
+  assert.match(table.fix, /group: is read by cards and feed blocks, and a table block does nothing with it\. Draw these rows as cards/u);
   const folded = validate(page({ kind: 'table', fold: 3 }), KNOWN)!;
-  assert.match(folded.fix, /fold: is read by section and cards blocks/u);
+  assert.match(folded.fix, /fold: is read by section, cards and feed blocks/u);
 });

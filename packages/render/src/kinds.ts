@@ -296,9 +296,10 @@ const TABLE = {
 
   /* The agent path's two more, on existing primitives for the same reason. A `feed` row is
      `by | who | count | what | when`, plus a `seen` row where the reader last looked (`src/feed.ts`);
-     it is page-only, because its rows are the record's activity. A `diff` is verbatim rows marked
+     it is page-only, because its rows are the record's activity. A sixth cell is the words of a line's fold
+     ("and 39 more"), and a `day | Today` row is a heading (`src/feed.ts`). A `diff` is verbatim rows marked
      `- `, `+ ` or two spaces (`src/diff.ts`), so a write-up can carry one too. */
-  feed: { primitive: 'list', cells: 5, tone: true, pageOnly: true, minSpan: 4, purpose: 'list' },
+  feed: { primitive: 'list', cells: 6, optional: 1, tone: true, pageOnly: true, minSpan: 4, purpose: 'list' },
   diff: { primitive: 'media', cells: 0, tone: false, verbatim: true, minSpan: 4, purpose: 'media' },
   /* What each agent did, one group per agent (`src/agents.ts`): `who | count | what | when`. Page-only, as `feed` is. */
   agents: { primitive: 'list', cells: 4, tone: true, pageOnly: true, minSpan: 4, purpose: 'list' },

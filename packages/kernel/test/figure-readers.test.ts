@@ -35,6 +35,7 @@ test('EVERY SOURCE THAT IS NO LIST’S HAS ONE READER BY ITS WORD, the door’s 
   assert.deepEqual(Object.keys(sourceReaders()).sort(), [
     'governance.open',
     'handoffs.open',
+    'record.activity',
     'record.door',
     'record.key-scan',
     'record.keys',

@@ -26,7 +26,7 @@ const home = bare(raw);
 const door = bare(source('../../routes/+page.svelte'));
 const classic = bare(source('./Today.svelte'));
 
-type Reads = (briefing: number, matched: number) => string[];
+type Reads = (briefing: number, matched: number, stale?: number) => string[];
 
 /** Home's module script, run as it is written. */
 async function helper(): Promise<Reads> {
@@ -54,6 +54,34 @@ test('a record with neither draws its page and nothing around it', async () => {
   assert.deepEqual(homeReads(undefined as unknown as number, null as unknown as number), ['page']);
 });
 
+test('WHAT WENT STALE STANDS UNDER THE PAGE AND OVER WHO WAS MATCHED, and only where something is', async () => {
+  const homeReads = await helper();
+  assert.deepEqual(homeReads(3, 2, 4), ['briefing', 'page', 'stale', 'matched']);
+  assert.deepEqual(homeReads(0, 0, 1), ['page', 'stale']);
+  assert.deepEqual(homeReads(2, 0, 3), ['briefing', 'page', 'stale']);
+  assert.deepEqual(homeReads(0, 5, 2), ['page', 'stale', 'matched']);
+  /* NOTHING STALE IS NO TILE: none, a read still out, and an answer that was no count. */
+  assert.deepEqual(homeReads(3, 2, 0), ['briefing', 'page', 'matched']);
+  assert.deepEqual(homeReads(3, 2, -1), ['briefing', 'page', 'matched']);
+  assert.deepEqual(homeReads(3, 2, Number.NaN), ['briefing', 'page', 'matched']);
+  assert.deepEqual(homeReads(0, 0, null as unknown as number), ['page']);
+  /* A CALL WRITTEN BEFORE THERE WAS ONE answers as it did. */
+  assert.deepEqual(homeReads(3, 2), ['briefing', 'page', 'matched']);
+  assert.deepEqual(homeReads(0, 0), ['page']);
+  assert.deepEqual(homeReads(0, 0, undefined), ['page']);
+});
+
+test('what went stale is drawn once, from its own read, between the page and who was matched', () => {
+  assert.match(home, /\{#each homeReads\(brief\?\.cards\.length \?\? 0, matched\?\.rows\.length \?\? 0, stale\?\.rows\.length \?\? 0\) as part \(part\)\}/u);
+  assert.equal(home.split('<stale.Part').length - 1, 1, 'what went stale is drawn once');
+  assert.match(home, /\{:else if part === 'stale'\}\s*\{#if stale\}<stale\.Part rows=\{stale\.rows\} \/>\{\/if\}/u);
+  /* IN THE FILE AS ON THE SCREEN IT IS AFTER THE BRIEFING; the page is the each's last branch, placed by the helper. */
+  assert.ok(home.indexOf('<stale.Part') > home.indexOf("part === 'briefing'"));
+  /* ASKED WITH THE OTHER TWO, and the screen is closed as read only when all three are in. */
+  assert.match(home, /const out = await m\.readStale\(base\);\s*if \(here\) stale = \{ rows: out\.value, Part: part\.default \};/u);
+  assert.match(home, /Promise\.allSettled\(\[briefing, matches, stales\]\)\.then\(\(\) => closed\(true, at\)\)/u);
+});
+
 test('the template draws from the helper, each part once and keyed, so a read landing late moves nothing drawn', () => {
   assert.match(home, /\{#each homeReads\([^)]*\) as part \(part\)\}/u);
   assert.equal(home.split('<brief.Part').length - 1, 1, 'the briefing is drawn once');
@@ -79,23 +107,25 @@ test("THE PAGE'S OWN SENTENCE STAYS UNDER THE HEAD: the reader draws the briefin
 });
 
 test('neither read comes with the screen: each is fetched when asked for, parts and all', () => {
-  for (const name of ['briefing', 'Briefing', 'matched', 'Matched']) {
+  for (const name of ['briefing', 'Briefing', 'matched', 'Matched', 'stale', 'Stale']) {
     assert.doesNotMatch(home, new RegExp(`^\\s*import (?!type\\b)[^;]*from '[^']*/${name}(\\.svelte|\\.ts)';$`, 'mu'), `${name} is imported with the screen`);
   }
   assert.match(home, /import\('\.\/briefing\.ts'\)/u);
   assert.match(home, /import\('\.\/Briefing\.svelte'\)/u);
   assert.match(home, /import\('\.\/matched\.ts'\)/u);
   assert.match(home, /import\('\.\/Matched\.svelte'\)/u);
+  assert.match(home, /import\('\.\/stale\.ts'\)/u);
+  assert.match(home, /import\('\.\/Stale\.svelte'\)/u);
 });
 
 test('the page read waits on neither', () => {
   const body = /async function readBody\([\s\S]*?\n {2}\}\n/u.exec(home);
   assert.ok(body, 'readBody is gone');
-  assert.doesNotMatch(body[0], /riefing|atched/u, 'the page read reads the briefing or the matches itself');
+  assert.doesNotMatch(body[0], /riefing|atched|[sS]tale/u, 'the page read reads the briefing, the matches or what went stale itself');
   const reread = /async function reread\(\)[\s\S]*?\n {2}\}\n/u.exec(home);
   assert.ok(reread, 'reread is gone');
-  assert.doesNotMatch(reread[0], /riefing|atched/u);
-  assert.doesNotMatch(home, /await\s+around\b|await\s+brief\b|await\s+matched\b/u);
+  assert.doesNotMatch(reread[0], /riefing|atched|[sS]tale/u);
+  assert.doesNotMatch(home, /await\s+around\b|await\s+brief\b|await\s+matched\b|await\s+stale\b/u);
 });
 
 test('no address draws the briefing twice: Today as it was is a screen of its own, and Home is not under it', () => {

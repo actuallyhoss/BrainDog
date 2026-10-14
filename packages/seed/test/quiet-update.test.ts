@@ -992,10 +992,20 @@ const projectBefore = (doc: Body, id: string): Body =>
     now.flatMap((b) => {
       if (b.kind === 'roadmap') return [DONE_BY_WEEK, b];
       /* TOOLS AND SERVERS LISTED EVERYBODY'S TOOLS until batch 60 (sketchpad-60), where it now reads the project's own. */
-      if (b.heading === 'Tools and servers') return [{ ...b, where: 'kind is tool' }];
+      /* AND UNTIL BATCH 87 (project-runs-tile-87) the three were halves under More about, with no heading of their own
+         and nothing said of what reaches a project from everywhere; Money by month was a half beside the bills; and
+         Agents read every run placed in the project, titled by what it was doing. */
+      if (b.kind === 'section' && b.heading === 'Runs on') return [];
+      if (b.heading === 'And from everywhere') return [];
+      if (b.heading === 'Money by month') return [{ ...b, span: 6 }];
+      if (b.heading === 'Agents' && b.source === 'register.session')
+        return [{ ...b, columns: [{ field: 'doing', as: 'title' }, { field: 'agent', as: 'who' }, { field: 'last_seen', as: 'when' }], where: 'project is {{spoken}}' }];
+      if (b.heading === 'Tools and servers') return [{ ...b, span: 6, where: 'kind is tool' }];
       /* KEYS AND SKILLS LISTED EVERYBODY'S until batch 72 (project-own-cards-72, PGS-C31), as Tools and servers had. */
-      if (b.heading === 'Keys' && b.source === 'runs_on') return [{ ...b, where: 'kind is key' }];
-      if (b.heading === 'Skills' && b.source === 'runs_on') return [{ ...b, where: 'kind is skill' }];
+      /* A TEAM'S KEYS WERE THE WHOLE ROW: the half Keeping it alive left, on a record that holds no services, went to the
+         tile beside it (`projectTemplate`). Under Runs on nothing is beside a block that goes, so it is a third. */
+      if (b.heading === 'Keys' && b.source === 'runs_on') return [{ ...b, span: id === 'team' ? 12 : 6, where: 'kind is key' }];
+      if (b.heading === 'Skills' && b.source === 'runs_on') return [{ ...b, span: 6, where: 'kind is skill' }];
       if (b.heading !== 'At a glance') return [b];
       const cells = (b.cells as Body[]).flatMap((c) => (c.metric !== 'project-done-7d:{{name}}' ? [c] : id === 'founder' ? [] : [(({ trend: _trend, ...cell }) => cell)(c)]));
       return [{ ...b, cells }];

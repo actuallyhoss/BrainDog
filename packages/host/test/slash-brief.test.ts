@@ -83,6 +83,8 @@ test('A 503 THROWS on both, so the record lets its rules speak', async () => {
 
 test('WHAT THE MODEL IS TOLD reads as the record checks: seven at most, one line of 140, titles as handed, holes for numbers, handed handles only, the answer shape', () => {
   const told = SLASH_BRIEF_INSTRUCTIONS;
+  /* A QUESTION'S COUNT MAY STAND FOR EVERY ONE STILL OPEN (`askedHeld`), so no line may say where they came from. */
+  assert.match(told, /or every question still open when one card stands for the rest/u);
   assert.match(told, /Pick at most seven/u);
   assert.match(told, /most pressing first/u);
   assert.match(told, /one plain line a card, at most 140 characters/u);

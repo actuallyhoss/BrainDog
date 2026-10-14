@@ -6,7 +6,7 @@
  *   Next     Cut page answers to block summaries. (S729, Claude Code, 5h ago, check before acting)
  *   Waiting  2 on Mara: Change how copperleaf starts? · ...
  *   Learned  Money is minor units plus currency. Never add two currencies.
- *   More     3 dead ends · 5 learnings · 4 keys by name · call context
+ *   More     4 stale, read braindog:stale · 3 dead ends · 5 learnings · call context
  *
  * LINE ONE SAYS WHO AND WHERE: the run, the app on the machine as a person names it, the project, the branch. Then the
  * line about another run working in the same tree, only when it is true. Then the slots in this order, each left out
@@ -37,8 +37,11 @@ export const CARD_MOST = 150;
 /** The most things one slot names. */
 const PER_SLOT = 3;
 
-/** Learnings are the newest two: the card is for what a session would otherwise get wrong, not for all of them. */
+/** Learnings are the first two by `learnedFirst`: the card is for what a session would otherwise get wrong, not for all of them. */
 const LEARNED = 2;
+
+/** The read that says, one by one, what the card's stale count added up, with the call that clears each. */
+const STALE_READ = 'braindog:stale';
 
 /** Said word for word whenever another run is working in the same repository (`docs/32-PARITY.md:142`). */
 export const TWO_SESSIONS = 'Two sessions in one working tree overwrite each other. Coordinate or stop.';
@@ -160,7 +163,7 @@ export function machineOf(network: string): string {
 }
 
 /* The words a row is said by: the named field when there is one, else its first string field. */
-const NOT_WORDS = new Set(['spoken', 'scope', 'state', 'version']);
+const NOT_WORDS = new Set(['spoken', 'scope', 'state', 'version', 'created_at']);
 const wordsOf = (row: Brief, field?: string): string => {
   const named = field === undefined ? undefined : row[field];
   if (typeof named === 'string' && named.trim()) return named;
@@ -414,11 +417,33 @@ function bearing(c: Context): { skill: string; learnings: number } | null {
   return null;
 }
 
-/** Learned and More: the two newest lessons still standing, then what is there on demand, three at most. */
+/** The day the record wrote a row, when the row carries it; '' when it does not, which sorts as the oldest. */
+const writtenOn = (row: Brief): string => (typeof row.created_at === 'string' ? row.created_at : '');
+
+/**
+ * WHICH LESSON COMES FIRST (AGT-C14 build 3, the order `braindog:learnings` reads in): a method before a fact, this
+ * project's before the ones that apply everywhere, then the newest. Read off the row's own `kind`, `scope` and
+ * `created_at`, so it costs no read. A lesson with no kind, or a kind that is not a method, is a fact: nothing unnamed
+ * outranks a method. Two the record gives no day for are equal, and a stable sort leaves them as the record sent them,
+ * which is newest first.
+ */
+export function learnedFirst(a: Brief, z: Brief): number {
+  const fact = (row: Brief): number => (row.kind === 'method' ? 0 : 1);
+  const far = (row: Brief): number => (row.scope === 'project' ? 0 : 1);
+  const [on, zon] = [writtenOn(a), writtenOn(z)];
+  return fact(a) - fact(z) || far(a) - far(z) || (on === zon ? 0 : on > zon ? -1 : 1);
+}
+
+/**
+ * Learned and More: the two lessons still standing that matter most (`learnedFirst`), then what is there on demand,
+ * three at most. More leads with how many things went stale where the session stands (AGT-C18) and the read that names
+ * them, said only for a whole number above zero: the count is the one thing in More a session can act on at once.
+ */
 function learnedAndMore(c: Context, at: CardAt, handedLeft: number): Slot[] {
-  const lessons = rowsOf(c, 'learnings').filter((row) => row.state === null || row.state === 'active');
+  const lessons = rowsOf(c, 'learnings').filter((row) => row.state === null || row.state === 'active').sort(learnedFirst);
   const learned = lessons.map((row) => words(plainly(wordsOf(row, 'lesson'), c, true, at), 120)).filter(Boolean).slice(0, LEARNED);
   const more: string[] = [];
+  if (typeof c.stale === 'number' && Number.isInteger(c.stale) && c.stale > 0) more.push(`${String(c.stale)} stale, read ${STALE_READ}`);
   const tried = c.handoff?.tried.length ?? 0;
   if (tried > 0) more.push(count(tried, 'dead end'));
   if (handedLeft > 0) more.push(`${String(handedLeft)} more handed to you`);

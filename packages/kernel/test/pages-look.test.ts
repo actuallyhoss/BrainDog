@@ -302,3 +302,23 @@ test('A BLOCK ALREADY REFUSED AND THEN HELD STILL COUNTS AS HELD: the shell answ
   assert.ok(page.blocks.some((b) => b.heading === 'Now' && b.refusals.length === 1));
   assert.equal(page.look?.by, 'rule', "Slash's look, written from the whole page, is not hers");
 });
+
+test('ON A REAL PAGE THE RULES GROUP A LONG LIST OF CARDS BY ITS STATE, which the page learns from the list as declared', async () => {
+  const k = await record();
+  for (let i = 0; i < 14; i++) {
+    const made = k.create('tasks', { what: `Thing ${i}`, by: '2026-11-01' }, OWNER);
+    assert.ok(made.ok, JSON.stringify(made));
+    if (i % 2 === 0) assert.ok(k.update('tasks', made.value.id, { state: 'done' }, OWNER).ok);
+  }
+  const long: PageDecl = {
+    page: 'desk',
+    title: 'Desk',
+    blocks: [note({ lead: true, body: 'Your desk.' }), { kind: 'cards', source: 'register.tasks', heading: 'Everything', key: 'all', limit: 40 } as PageBlock],
+  };
+  const page = read(depsOver(k, { pages: () => [long], look: () => null }));
+  assert.deepEqual(page.look?.group, { all: 'state' });
+  assert.equal(page.blocks.find((b) => b.key === 'all')?.group, 'state');
+  /* AND A LOOK STORED WITH A GROUPING IS LAID THE SAME. */
+  const stored = read(depsOver(k, { pages: () => [long], look: () => ({ look: 'desk', basis: 'b', by: 'slash', group: { all: 'state' } }) }));
+  assert.equal(stored.blocks.find((b) => b.key === 'all')?.group, 'state');
+});

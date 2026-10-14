@@ -56,6 +56,11 @@
  * AND `held-twice-shown`, THE PEOPLE THAT COUNT IS ABOUT: two of one name are 1 too many and 2 people to look at, so a note
  * can say both ("3 people, 2 too many"). Read from the same pass, and nothing at all where nobody is held twice.
  *
+ * AND THE LOG AS THREE NUMBERS (PGS-C24, AGT-C17): `activity-by-who`, `activity-by-kind` and `activity-by-hour`, the
+ * record's own log over thirty days cut by who wrote each line, by the kind of write and by the hour of the day, each a
+ * figure in parts. Activity's three side tiles were worked out inside one screen, from the page of the log the browser
+ * had read; now any page draws them and any agent reads them. A feed's own lines only (`readActivity`).
+ *
  * `signs.ts` IS NOT IMPORTED, only its types. It reaches `flow.ts` and `digest.ts`, which import `metrics.ts`, which
  * imports this, and the loop that made broke the kernel's own load (`flow.ts` read a pattern before it was set). So the
  * signs now come in through the reader, `EvalContext.signs`, as the rates come in through `fx`; the kept readings are
@@ -69,7 +74,7 @@ import { DOOR_KEPT_DAYS, DOOR_WINDOW_DAYS, doorMarks } from './door.ts';
 import { openHandoffs, type OpenHandoff } from './handoff.ts';
 import type { EvalContext, MetricDecl, Reading } from './metrics.ts';
 import { workingRuns } from './presence.ts';
-import { SESSION } from './session.ts';
+import { SESSION, isRunName } from './session.ts';
 import { intervalMs } from './pull.ts';
 /* `key-scan.ts` IMPORTS ONLY `coerce.ts` AT RUN TIME, and `coerce.ts` only types, so this adds no load ring. */
 import { KEYS_IN_TEXT } from './key-scan.ts';
@@ -251,7 +256,9 @@ function staleFigure(id: string): TidyDecl | null {
 
 /**
  * The tidy's numbers. ALWAYS NOW, as the finders count and as the open steps are read: a kept day's stale count is in
- * the pass's own lines, which `tidyDays` reads. A figure naming a finder that is gone reads nothing, never nought.
+ * the pass's own lines, which `tidyDays` reads. A figure naming a finder that is gone reads nothing, never nought, and so
+ * does one whose finder could not count: `staleNow` skips a finder that throws so the others are still added up, which
+ * for a figure of that one finder alone would be a nought nobody counted.
  */
 export function readTidy(sql: Sql, ctx: Pick<EvalContext, 'nowMs'>, decl: MetricDecl): Result<Reading> {
   const d = decl as TidyDecl;
@@ -262,7 +269,248 @@ export function readTidy(sql: Sql, ctx: Pick<EvalContext, 'nowMs'>, decl: Metric
   if (d.finder === undefined) return judged(decl, staleNow(sql, ctx.nowMs), 'stale now, every kind added up');
   const finder = finderOf(d.finder);
   if (finder === undefined) return judged(decl, null, 'nothing on this record counts these');
-  return judged(decl, staleNow(sql, ctx.nowMs, [finder]), 'stale now');
+  let one: number;
+  try {
+    one = finder.find(sql, ctx.nowMs).stale;
+  } catch {
+    return judged(decl, null, 'this could not be counted on this record');
+  }
+  return judged(decl, one, 'stale now');
+}
+
+/* ── the log as numbers (PGS-C24, AGT-C17) ─────────────────────────────── */
+
+/** The source the three figures over the record's own log read. No list holds a line of it. */
+export const RECORD_ACTIVITY = 'record.activity';
+
+/** How a figure over the log cuts it: by who wrote each line, by the kind of write, or by the hour of the day. */
+export const ACTIVITY_BY = ['who', 'kind', 'hour'] as const;
+export type ActivityBy = (typeof ACTIVITY_BY)[number];
+
+/** A figure over the log: which cut it is. Its window is how far back it reads, in whole days ending today. */
+export type ActivityDecl = MetricDecl & { activity: ActivityBy };
+
+/** NO TARGET: a busy month is not a good one or a bad one, so none of the three is ever judged. */
+const activity = (id: string, name: string, by: ActivityBy): ActivityDecl => ({
+  metric: id,
+  name,
+  source: RECORD_ACTIVITY,
+  value: { count: 'id' },
+  window: '30d',
+  compare: 'none',
+  format: 'int',
+  activity: by,
+});
+
+/** Who a line is by, as a feed groups it (`FEED_BY` in `sources/activity.ts`), and what a feed calls each group. */
+const WHO_SAID = { agent: 'Agents', rule: 'Rules', you: 'You' } as const;
+
+/**
+ * What each kind of write a feed holds is called, the words Activity says them in. A kind with no word here is said by
+ * its key, which is a word already. The owner's kinds (keys, access, links) are never counted, so they need none.
+ */
+const KIND_SAID: Readonly<Record<string, string>> = {
+  create: 'Created',
+  edit: 'Changed',
+  state: 'Moved',
+  link: 'Linked',
+  tag: 'Tagged',
+  untag: 'Untagged',
+  delete: 'Deleted',
+  restore: 'Restored',
+  purge: 'Purged',
+  note: 'Noted',
+  decide: 'Decided',
+  supersede: 'Superseded',
+  suggest: 'Asked',
+  resolve: 'Closed',
+  predict: 'Predicted',
+  score: 'Scored',
+  install: 'Installed',
+  uninstall: 'Uninstalled',
+  upgrade: 'Upgraded',
+  declare: 'Changed the page',
+  retire: 'Retired',
+  arrive: 'Arrived',
+  match: 'Matched',
+  extract: 'Read a message',
+  propose: 'Proposed',
+  pull: 'Fetched',
+  export: 'Backed up',
+  import: 'Imported',
+  erase: 'Erased',
+  migrate: 'Migrated',
+  'restore.pitr': 'Put the record back',
+};
+
+/** How many kinds "What changed" says by name before the rest are one part, and that part's key, which no kind is. */
+const KINDS_SAID = 8;
+const KINDS_REST = 'other';
+
+/** A quarter of an hour: every zone's offset is a whole number of them, so a quarter falls in one hour of one day. */
+const QUARTER_MS = 900_000;
+
+/** As `STAMP_MS` in `index.ts`: how far an agent's clock may sit from the record's for an instant it wrote to be a stamp. */
+const ACTIVITY_STAMP_MS = 10 * 60_000;
+
+/**
+ * THE LINES A FEED NEVER SHOWS, as `activity` in `index.ts` leaves them out, written once more here because that read
+ * is the kernel's own and this file is read by `metrics.ts`, which the kernel imports. The owner's lines (keys, access,
+ * links, members), a script's quiet night, and the sweep writing a run off. `test/activity-figures.test.ts` holds this
+ * and the kernel's `bookkeeping` to one answer.
+ */
+const ACTIVITY_SHOWN = `e.kind NOT LIKE 'grant.%' AND e.kind NOT LIKE 'access.%' AND e.kind NOT LIKE 'share.%'
+  AND COALESCE(e.target_kind, '') NOT IN ('grant', 'vault_key', 'device_grant', 'member', 'person')
+  AND NOT (e.kind = 'pull' AND substr(COALESCE(e.target, ''), 1, 19) = 'declaration:script.'
+           AND COALESCE(CASE WHEN json_valid(e.to_v) THEN json_type(e.to_v, '$.quiet') = 'integer' AND json_extract(e.to_v, '$.quiet') = 1 END, 0))
+  AND NOT (e.kind = 'state' AND e.actor = 'system' AND substr(COALESCE(e.target, ''), 1, 6) = 'entry:'
+           AND COALESCE((SELECT r.register FROM entry r WHERE r.id = substr(e.target, 7)), '') = '${SESSION}')`;
+
+/** A value of the log as it was written: JSON, or the words themselves where it is not. As `read` in `index.ts`. */
+const logged = (v: string | null): unknown => {
+  if (v === null) return null;
+  try {
+    return JSON.parse(v) as unknown;
+  } catch {
+    return v;
+  }
+};
+
+/** Who a line is by, as a feed groups it: `byOf` in `pages.ts`, which is not imported here (that file imports `metrics.ts`). */
+const activityBy = (actor: string): keyof typeof WHO_SAID => {
+  if (/^S\d+$/u.test(actor) || actor.startsWith('agent:') || actor === 'slash') return 'agent';
+  if (actor.startsWith('rule:') || actor.startsWith('ingest:') || actor.startsWith('script:') || actor === 'system' || actor === 'p_seed') return 'rule';
+  return 'you';
+};
+
+/**
+ * The record's own log over the figure's window, cut one of three ways: who wrote each line (`activity-by-who`), what
+ * kind of write it was (`activity-by-kind`), and the hour of the day it was written in (`activity-by-hour`).
+ *
+ * THE ANSWER IS A FIGURE IN PARTS, the shape `events.<list>` and every grouped figure answer: `value` is every line
+ * counted and `groups` the cut. Who is always three parts, in a feed's own order, and the hours always twenty-four, in
+ * the order of the day, so a chart of either keeps its places on a quiet month; a nought there is a count, not a gap.
+ * The kinds are the ones that happened, the largest first, the eight largest by name and the rest as one part.
+ *
+ * WHAT A FEED LEAVES OUT IS LEFT OUT (`ACTIVITY_SHOWN`, and a run's stamp below), so "Who worked" and the feed beside
+ * it count the same lines, and a sweep that wrote ten runs off at three in the morning is not a busy hour.
+ *
+ * THE WINDOW IS WHOLE DAYS ENDING TODAY, in the record's zone, as `events.<list>` reads its own: `30d` is today so far
+ * and the twenty-nine days before it. The hour is the record's too. Read as of a past day it counts what the log held
+ * then, since the log keeps every line.
+ *
+ * COUNTED IN THE DATABASE, a quarter of an hour at a time, never line by line: his record wrote thousands of lines a
+ * month. Only a run's edits of an instant field are read one by one, to tell a stamp from a change.
+ */
+export function readActivity(sql: Sql, ctx: Pick<EvalContext, 'nowMs' | 'asOfMs' | 'tz'>, decl: MetricDecl): Result<Reading> {
+  const cut = (decl as ActivityDecl).activity;
+  if (!(ACTIVITY_BY as readonly unknown[]).includes(cut))
+    return no<Reading>('VALUE_MALFORMED', `${decl.metric}: activity names how the log is cut, one of ${ACTIVITY_BY.join(', ')}.`, {
+      at: 'activity',
+      allowed: [...ACTIVITY_BY],
+    });
+  const DAY = 86_400_000;
+  const days = Math.max(1, Math.round((intervalMs(decl.window ?? '30d') ?? 30 * DAY) / DAY));
+  const clock = ctx.asOfMs ?? ctx.nowMs;
+  const local = new Intl.DateTimeFormat('en-CA', { timeZone: ctx.tz ?? 'UTC', hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit' });
+  /** The day and the hour an instant falls in, on the record's clock. */
+  const placed = (ms: number): { day: string; hour: number } => {
+    const p = Object.fromEntries(local.formatToParts(new Date(ms)).map((x) => [x.type, x.value]));
+    return { day: `${p.year}-${p.month}-${p.day}`, hour: Number(p.hour) % 24 };
+  };
+  const first = new Date(Date.parse(`${placed(clock).day}T12:00:00Z`) - (days - 1) * DAY).toISOString().slice(0, 10);
+  /* A DAY MORE THAN THE WINDOW IS READ AND THE FIRST DAY CUT BY ITS NAME, so no start of a day is worked out in a zone. */
+  const since = new Date(clock - (days + 1) * DAY).toISOString();
+  const until = new Date(clock).toISOString();
+  const quarters = new Map<number, { day: string; hour: number }>();
+  const at = (quarter: number): { day: string; hour: number } => {
+    let got = quarters.get(quarter);
+    if (got === undefined) quarters.set(quarter, (got = placed(quarter * QUARTER_MS)));
+    return got;
+  };
+
+  const who = { agent: 0, rule: 0, you: 0 };
+  const kinds = new Map<string, number>();
+  const hours = Array.from({ length: 24 }, () => 0);
+  let total = 0;
+  const count = (quarter: number, actor: string, kind: string, n: number): void => {
+    const slot = at(quarter);
+    if (slot.day < first) return;
+    who[activityBy(actor)] += n;
+    kinds.set(kind, (kinds.get(kind) ?? 0) + n);
+    hours[slot.hour]! += n;
+    total += n;
+  };
+  const counted = sql.all<{ quarter: number; actor: string; kind: string; n: number }>(
+    `SELECT CAST(strftime('%s', e.ts) AS INTEGER) / 900 AS quarter, e.actor AS actor, e.kind AS kind, COUNT(*) AS n
+       FROM event e WHERE e.ts >= ? AND e.ts <= ? AND ${ACTIVITY_SHOWN} GROUP BY 1, 2, 3`,
+    since,
+    until,
+  );
+  for (const c of counted) count(Number(c.quarter), c.actor, c.kind, Number(c.n));
+
+  /*
+   * A RUN'S STAMP IS TAKEN BACK OUT (`bookkeeping` in `index.ts`): an agent's run writing when it last saw something, an
+   * edit of an instant field to the moment of the write over an earlier moment it held. Told by the line's shape, so a
+   * pack's own stamp is quiet with no pack named. A run setting a day ahead, and an instant a person writes, stay in.
+   */
+  const instants = new Set<string>();
+  const stamped = new Set<string>();
+  for (const r of sql.all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'register' AND superseded_at IS NULL AND retired = 0 AND json_valid(body)")) {
+    const body = JSON.parse(r.body) as { id?: unknown; fields?: unknown };
+    if (typeof body.id !== 'string' || !Array.isArray(body.fields)) continue;
+    for (const f of body.fields as { id?: unknown; type?: unknown }[]) {
+      if (typeof f?.id !== 'string' || f.type !== 'instant') continue;
+      instants.add(`${body.id}\n${f.id}`);
+      stamped.add(f.id);
+    }
+  }
+  if (stamped.size > 0) {
+    /* THE FIELD IDS ARE ONE BOUND ARRAY, so a record with many instant fields stays inside the Durable Object's 100. */
+    const edits = sql.all<{ ts: string; actor: string; field: string; from_v: string | null; to_v: string | null; list: string }>(
+      `SELECT e.ts AS ts, e.actor AS actor, e.field AS field, e.from_v AS from_v, e.to_v AS to_v, r.register AS list
+         FROM event e JOIN entry r ON r.id = substr(e.target, 7)
+        WHERE e.ts >= ? AND e.ts <= ? AND e.kind = 'edit' AND substr(e.target, 1, 6) = 'entry:'
+          AND COALESCE(e.target_kind, '') NOT IN ('grant', 'vault_key', 'device_grant', 'member', 'person')
+          AND e.field IN (SELECT value FROM json_each(?))`,
+      since,
+      until,
+      JSON.stringify([...stamped]),
+    );
+    for (const e of edits) {
+      if (!isRunName(e.actor) || !instants.has(`${e.list}\n${e.field}`)) continue;
+      const to = logged(e.to_v);
+      const from = logged(e.from_v);
+      if (typeof to !== 'string' || typeof from !== 'string') continue;
+      const wrote = Date.parse(e.ts);
+      const moment = Date.parse(to);
+      if (!Number.isFinite(moment) || Math.abs(moment - wrote) > ACTIVITY_STAMP_MS || !(Date.parse(from) < moment)) continue;
+      count(Math.floor(Math.floor(wrote / 1000) / 900), e.actor, 'edit', -1);
+    }
+  }
+  for (const [kind, n] of kinds) if (n <= 0) kinds.delete(kind);
+
+  const part = (key: string, label: string, n: number): NonNullable<Reading['groups']>[number] => ({ key, label, value: n, rows: n, state: 'full' });
+  const two = (h: number): string => String(h).padStart(2, '0');
+  const span = days === 1 ? 'today' : `in the last ${days} days`;
+  let groups: NonNullable<Reading['groups']>;
+  let why: string;
+  if (cut === 'who') {
+    groups = (Object.keys(WHO_SAID) as (keyof typeof WHO_SAID)[]).map((by) => part(by, WHO_SAID[by], who[by]));
+    why = `changes written ${span}, by who wrote them`;
+  } else if (cut === 'hour') {
+    groups = hours.map((n, h) => part(two(h), `${two(h)}:00`, n));
+    why = `changes written ${span}, by the hour of the day`;
+  } else {
+    /* THE LARGEST FIRST, THEN THE KEY, as every grouping by a word is drawn (`largestFirst` in `metrics.ts`). */
+    const ranked = [...kinds].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+    groups = ranked.slice(0, KINDS_SAID).map(([kind, n]) => part(kind, KIND_SAID[kind] ?? kind, n));
+    const rest = ranked.slice(KINDS_SAID).reduce((sum, [, n]) => sum + n, 0);
+    if (rest > 0) groups.push(part(KINDS_REST, 'Everything else', rest));
+    why = `changes written ${span}, by what kind of change`;
+  }
+  /* HELD IS WHETHER THERE WAS ANYTHING TO READ, as `judged` has it: a month with no line is nothing to draw. */
+  return ok({ value: total, unit: null, rows: total, held: total, delta: null, why, met: null, refusals: [], groups });
 }
 
 /* ── the signs of a living record (REC-A01) ────────────────────────────── */
@@ -527,6 +775,9 @@ export const BUILT_IN_FIGURES: Readonly<Record<string, MetricDecl>> = {
   'held-twice-shown': PEOPLE_TWICE_SHOWN,
   'lists-shrunk': LISTS_SHRUNK,
   'documents-dead-paths': DOCUMENTS_DEAD_PATHS,
+  'activity-by-who': activity('activity-by-who', 'Who worked', 'who'),
+  'activity-by-kind': activity('activity-by-kind', 'What changed', 'kind'),
+  'activity-by-hour': activity('activity-by-hour', 'Busy hours', 'hour'),
 };
 
 /** The built-in figure called `id`, or `null`; never one `Object.prototype` lends. */

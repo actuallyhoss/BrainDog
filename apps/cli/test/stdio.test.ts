@@ -408,6 +408,7 @@ const ANSWERS: Record<string, unknown> = {
   briefing: { cards: [] },
   exceptions: { exceptions: [] },
   stale: { lines: [], count: 0 },
+  learnings: { rows: [], truncated: false, faded: 0 },
   understandPlan: { dry: true, kinds: [], writes: [], more: 0, questions: [], asks: {}, done: true },
   previewPage: { page: 'handoffs', title: 'Next steps left', blocks: [] },
 };

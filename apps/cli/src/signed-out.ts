@@ -88,6 +88,7 @@ export function signedOutSurface(fix: string): McpSurface<Ctx> {
     briefing: no,
     exceptions: no,
     stale: no,
+    learnings: no,
     withdraw: no,
     heard: no,
     doorHeard: no,

@@ -173,6 +173,26 @@
     font-weight: 400;
   }
 
+  /* A FOLD'S WORDS ARE QUIETER THAN THE LINE THEY FOLLOW, and never hidden: they say how much the line stands for. */
+  .feed-more {
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  /* AND UNDER A THUMB THE FOLD'S LINK IS A 44px TARGET, though its words are a few: `.tap`'s invisible box grown round
+     it, so the line keeps its look. */
+  @media (pointer: coarse) {
+    .feed-more a {
+      position: relative;
+    }
+
+    .feed-more a::before {
+      content: '';
+      position: absolute;
+      inset: min(0px, calc((100% - var(--tap)) / 2));
+    }
+  }
+
   .feed-what > .glyph {
     margin-inline-start: var(--sp-1);
   }

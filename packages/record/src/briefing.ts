@@ -32,6 +32,13 @@ export const BRIEF_CARDS_MOST = 7;
 /** How many cards the rules say when no model does. */
 export const BRIEF_RULES_MOST = 5;
 
+/**
+ * How many cards the questions take where anything else is worth saying, and where nothing else is. The briefing says
+ * what matters, and the screen that answers questions already counts them: past these, the first card is their count.
+ */
+export const BRIEF_ASKED_MOST = 2;
+export const BRIEF_ASKED_ALONE = 3;
+
 /** A card's line is a headline's length: what fits on a phone. */
 export const BRIEF_LINE_MOST = HEADLINE_MOST;
 
@@ -82,10 +89,32 @@ const countOf = (f: BriefFact): number => {
   return Number.isInteger(n) && n > 0 ? n : 1;
 };
 
+/** How many cards the questions may take among these facts: `BRIEF_ASKED_MOST`, or `BRIEF_ASKED_ALONE` where they are all there is. */
+const askedMost = (facts: readonly BriefFact[]): number => (facts.some((f) => f.kind !== 'asked') ? BRIEF_ASKED_MOST : BRIEF_ASKED_ALONE);
+
+/**
+ * The questions held to their cards (`askedMost`), the facts already one a cause and the most pressing first. Within
+ * the cap they stand as they are. Past it the most pressing is the count card, and beside it stand only questions that
+ * are one question each, the most pressing of them: a second pile would be a second count. The count card's count is
+ * every question no card beside it says, so the cards add up to what is open.
+ */
+function askedHeld(facts: readonly BriefFact[]): BriefFact[] {
+  const most = askedMost(facts);
+  const asked = facts.filter((f) => f.kind === 'asked');
+  if (asked.length <= most) return [...facts];
+  const first = asked[0]!;
+  const beside = asked.slice(1).filter((f) => countOf(f) === 1).slice(0, most - 1);
+  const folded = asked.reduce((n, f) => n + countOf(f), 0) - beside.length;
+  return facts
+    .filter((f) => f.kind !== 'asked' || f === first || beside.includes(f))
+    .map((f) => (f === first ? { ...f, figures: { ...f.figures, count: String(folded) } } : f));
+}
+
 /**
  * The facts one ask is handed: the questions of one cause made one fact with their count, the most pressing first
- * (rank, then kind, then title, then handle, so the order never depends on how they were gathered), `BRIEF_FACTS_MOST`
- * at most. Gathering what was already gathered changes nothing.
+ * (rank, then kind, then title, then handle, so the order never depends on how they were gathered), the questions held
+ * to their cards (`askedHeld`) so they never crowd out what is late or due, `BRIEF_FACTS_MOST` at most. Gathering what
+ * was already gathered changes nothing.
  */
 export function briefCandidates(facts: readonly BriefFact[]): BriefFact[] {
   const sorted = [...facts].sort(
@@ -108,7 +137,7 @@ export function briefCandidates(facts: readonly BriefFact[]): BriefFact[] {
       out[at] = { ...first, figures: { ...first.figures, count: String(countOf(first) + countOf(f)) } };
     }
   }
-  return out.slice(0, BRIEF_FACTS_MOST);
+  return askedHeld(out).slice(0, BRIEF_FACTS_MOST);
 }
 
 /** The hash of what a briefing was written from. It moves when a fact's name, figures, row or cause does, and not with the order they were gathered in. */
@@ -189,17 +218,21 @@ export function briefFault(answer: unknown, handed: readonly BriefFact[]): strin
 
 /**
  * The cards of a model's answer that pass, in its order, with their holes filled: a card at fault is left out and the
- * rest stand, a fact said twice is kept once, and nothing past `BRIEF_CARDS_MOST` is kept. Empty when none passes.
+ * rest stand, a fact said twice is kept once, the questions are held to the cards the rules give them (`askedMost`),
+ * and nothing past `BRIEF_CARDS_MOST` is kept. Empty when none passes.
  */
 export function briefOf(answer: unknown, handed: readonly BriefFact[]): BriefCard[] {
   const byHandle = byHandleOf(handed);
   const out: BriefCard[] = [];
+  const most = askedMost(handed);
+  let asked = 0;
   for (const card of cardsOf(answer) ?? []) {
     if (out.length === BRIEF_CARDS_MOST) break;
     if (cardFault(card, byHandle) !== null) continue;
     const { h, line } = card as { h: string; line: string };
     if (out.some((c) => c.h === h)) continue;
     const fact = byHandle.get(h)!;
+    if (fact.kind === 'asked' && ++asked > most) continue;
     out.push({ h, line: filled(line, fact), row: fact.row, cause: fact.cause, by: 'slash' });
   }
   return out;
@@ -261,8 +294,8 @@ function ruleLine(f: BriefFact): string {
 }
 
 /**
- * The briefing with no model: the `BRIEF_RULES_MOST` most pressing facts, each in the rules' own sentence and opening
- * its row. This is what a record with no model reads, and what stands when none of a model's cards is kept.
+ * The briefing with no model: the `BRIEF_RULES_MOST` most pressing facts, the questions among them held to their
+ * cards (`briefCandidates`), each in the rules' own sentence and opening its row. This is what a record with no model reads, and what stands when none of a model's cards is kept.
  */
 export function rulesBrief(facts: readonly BriefFact[]): BriefCard[] {
   return briefCandidates(facts)

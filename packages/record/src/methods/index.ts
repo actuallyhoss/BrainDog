@@ -57,6 +57,7 @@ import { methods as briefing } from './briefing.ts';
 import { methods as exceptions } from './exceptions.ts';
 import { methods as matched } from './matched.ts';
 import { methods as stale } from './stale.ts';
+import { methods as learnings } from './learnings.ts';
 /* END METHODS */
 
 /**
@@ -173,6 +174,7 @@ export function methods(deps: RecordDeps) {
     ...exceptions(deps),
     ...matched(deps),
     ...stale(deps),
+    ...learnings(deps),
     /* END METHODS */
   };
 }

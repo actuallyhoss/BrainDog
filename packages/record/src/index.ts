@@ -187,7 +187,7 @@ import {
 } from './headlines.ts';
 import { nameOnly, scrubbed, spokenName } from './scrub.ts';
 import { lookRefusedKey, noteRefusal, refusedFor, rehearse } from './compose-rehearse.ts';
-import { composeLooks, keepLook as keepLookOf, keptBy, lookBasis, lookHeld, lookInputOf, undoLook as undoLookOf, type LookBody, type LookNext } from './compose-look.ts';
+import { composeLooks, groupListsOf, keepLook as keepLookOf, keptBy, lookBasis, lookHeld, lookInputOf, undoLook as undoLookOf, type LookBody, type LookNext } from './compose-look.ts';
 import {
   BODY_DEPTH,
   SAID_DEPTH,
@@ -209,6 +209,7 @@ import { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, 
 import type { Directory } from './directory.ts';
 import { methods, type RecordDeps as MethodDeps } from './methods/index.ts';
 import { staleCount, staleFor as staleLines } from './methods/stale.ts';
+import { learnedSorted } from './methods/learnings.ts';
 import { briefFactsFor } from './methods/briefing.ts';
 import { briefTick } from './brief-write.ts';
 import type { EngineHealthRead } from './methods/engine.ts';
@@ -4239,7 +4240,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (figures.length === 0) continue;
       /* AND WHAT ITS LOOK IS MADE OF, in the same ask (`compose-look.ts`): its blocks by key and a few rows it draws, so the
          model may answer an order and one next step beside the line, at no ask beyond it. */
-      const look = lookInputOf(read.value.blocks, (list) => kernel.register(list)?.title ?? null);
+      const look = lookInputOf(read.value.blocks, (list) => kernel.register(list)?.title ?? null, groupListsOf(kernel));
       due.push({
         page: {
           page: p.slug,
@@ -7564,8 +7565,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         faded += rows.length - kept.length;
         return kept;
       };
-      const rows = fresh(got.value.rows);
-      const inherited = fresh(got.value.inherited);
+      /* WHAT FADES IS HANDED IN THE ORDER `learnings` READS IT (`learnedSorted`): the kind the list declares first, then
+         the newest made, so the twenty a place kept here, and the card's two, are the ones that read would lead with. */
+      const placed = (rows: Entry[], where: 'here' | 'everywhere'): Entry[] => (fades ? learnedSorted(decl.fields as never, rows, where, (row) => kernel.nameOf(row)) : rows);
+      const rows = placed(fresh(got.value.rows), 'here');
+      const inherited = placed(fresh(got.value.inherited), 'everywhere');
       if (fades && rows.length + inherited.length > 0) fading = true;
       registers.push({
         id,

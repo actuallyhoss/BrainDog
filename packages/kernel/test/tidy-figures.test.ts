@@ -174,3 +174,18 @@ test('a finder registered later has its figure too, named by its own words', asy
   assert.equal(value(sql, 'stale-figures-test-extra'), 5);
   assert.equal(value(sql, 'gone-stale'), 5);
 });
+
+test('a finder that cannot count reads nothing in its own figure, never a nought, and the total still adds the others', async () => {
+  const { sql } = await record();
+  registerFinder({
+    id: 'figures-test-broken',
+    find: () => {
+      throw new Error('a finder that cannot count');
+    },
+  });
+  assert.equal(value(sql, 'stale-figures-test-broken'), null);
+  const read = readTidy(sql, { nowMs: NOW }, builtInFigure('stale-figures-test-broken')!);
+  assert.ok(read.ok);
+  assert.equal(read.value.held, 0);
+  assert.equal(value(sql, 'gone-stale'), 5, 'the finder the test above registered is still counted');
+});

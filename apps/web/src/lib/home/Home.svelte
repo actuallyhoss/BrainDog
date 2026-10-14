@@ -19,24 +19,29 @@
   IT LISTENS. A write from an agent, a rule or another tab moves the record's version, and Home reads its page again
   without a reload and without blanking it (`listen`).
 
-  TWO READS OF THEIR OWN STAND AROUND THE PAGE: the briefing over it, what matters today as the record wrote it, and
-  who the record matched as the board's last line. Each is asked for beside the page and never by its read, each is
-  fetched with its own part when it is asked for, and each draws nothing for a record that answers none (`homeReads`).
+  THREE READS OF THEIR OWN STAND AROUND THE PAGE: the briefing over it, what matters today as the record wrote it;
+  what went stale under it; and who the record matched as the board's last line. Each is asked for beside the page and
+  never by its read, each is fetched with its own part when it is asked for, and each draws nothing for a record that
+  answers none (`homeReads`).
 -->
 <script module lang="ts">
   /** What Today draws, top to bottom. */
-  export type HomePart = 'briefing' | 'page' | 'matched';
+  export type HomePart = 'briefing' | 'page' | 'stale' | 'matched';
 
   /**
-   * What Today draws and in what order, from how many briefing cards and how many matches the record answered: the
-   * briefing first, the page, and who was matched last. A read still out, a refusal and an empty answer are all none,
-   * and a record with neither draws its page as it did before there was either.
+   * What Today draws and in what order, from how many briefing cards, how many matches and how many kinds of stale
+   * thing the record answered: the briefing first, the page, what went stale under it, and who was matched last. A
+   * read still out, a refusal and an empty answer are all none, and a record with none of them draws its page as it
+   * did before there was any.
+   *
+   * `stale` IS LAST AND MAY BE LEFT OUT, so a caller written before there was one answers as it did.
    *
    * IT IMPORTS NOTHING, so `home-reads.test.ts` runs it as it is written.
    */
-  export function homeReads(briefing: number, matched: number): HomePart[] {
+  export function homeReads(briefing: number, matched: number, stale = 0): HomePart[] {
     const parts: HomePart[] = ['page'];
     if (briefing > 0) parts.unshift('briefing');
+    if (stale > 0) parts.push('stale');
     if (matched > 0) parts.push('matched');
     return parts;
   }
@@ -94,6 +99,7 @@
   import { cutLine, homeLineOf } from '$lib/home/home-line.ts';
   import type { BriefingRow } from '$lib/home/briefing.ts';
   import type { MatchedRow } from '$lib/home/matched.ts';
+  import type { StaleRow } from '$lib/home/stale.ts';
   import { untrack } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import { typing } from '$lib/a11y/keys.svelte.ts';
@@ -411,29 +417,32 @@
   const wide = new MediaQuery('(width >= 900px)', true);
 
   /**
-   * THE TWO READS AROUND THE PAGE, each with the part that draws it: the briefing (`briefing.ts`) and who the record
-   * matched (`matched.ts`). `null` until one has answered, and an answer of none draws nothing.
+   * THE THREE READS AROUND THE PAGE, each with the part that draws it: the briefing (`briefing.ts`), what went stale
+   * (`stale.ts`) and who the record matched (`matched.ts`). `null` until one has answered, and an answer of none
+   * draws nothing.
    *
-   * BESIDE THE PAGE READ AND NEVER IN IT. The page is asked for in its own effect and waits on neither, so Today
+   * BESIDE THE PAGE READ AND NEVER IN IT. The page is asked for in its own effect and waits on none of them, so Today
    * paints as fast as it did; what lands later is put in its place by `homeReads`, keyed, and moves nothing drawn.
    *
    * FETCHED WHEN ASKED FOR, the reader and its part alike, as `Today.svelte` fetches the briefing's: this screen is the
-   * front door, and nothing here is added to what it loads first. Neither read can fail the screen, since each
+   * front door, and nothing here is added to what it loads first. No read of them can fail the screen, since each
    * answers none for a host without the call, a reader it refuses and a line that dropped.
    *
    * ASKED AGAIN WHEN THE RECORD MOVES, and what is drawn stays until the new answer lands.
    */
   type BriefingPart = typeof import('./Briefing.svelte').default;
   type MatchedPart = typeof import('./Matched.svelte').default;
+  type StalePart = typeof import('./Stale.svelte').default;
   let brief = $state.raw<{ cards: readonly BriefingRow[]; foot: string | null; Part: BriefingPart } | null>(null);
   let matched = $state.raw<{ rows: readonly MatchedRow[]; Part: MatchedPart } | null>(null);
+  let stale = $state.raw<{ rows: readonly StaleRow[]; Part: StalePart } | null>(null);
   $effect(() => {
     if (data.refused) return;
     void moving.version;
     const base = apiBase();
     let here = true;
     /* BRACKETED AS A READ OF THIS SCREEN, so the screen is not measured with a tile still on its way, and closed as
-       fine whatever came back: neither read refuses the screen. */
+       fine whatever came back: none of the reads refuses the screen. */
     const at = untrack(opened);
     const briefing = Promise.all([import('./briefing.ts'), import('./Briefing.svelte')]).then(async ([m, part]) => {
       const out = await m.readBriefingSaid(base);
@@ -443,7 +452,11 @@
       const out = await m.readMatched(base);
       if (here) matched = { rows: out.value, Part: part.default };
     });
-    void Promise.allSettled([briefing, matches]).then(() => closed(true, at));
+    const stales = Promise.all([import('./stale.ts'), import('./Stale.svelte')]).then(async ([m, part]) => {
+      const out = await m.readStale(base);
+      if (here) stale = { rows: out.value, Part: part.default };
+    });
+    void Promise.allSettled([briefing, matches, stales]).then(() => closed(true, at));
     return () => {
       here = false;
     };
@@ -567,14 +580,17 @@
     </Empty>
   {:else}
     <!--
-      TOP TO BOTTOM AS `homeReads` SAYS: the briefing, the page, who was matched. Keyed by the part, so a read that
+      TOP TO BOTTOM AS `homeReads` SAYS: the briefing, the page, what went stale, who was matched. Keyed by the part, so a read that
       lands after the page is put over or under it and the page drawn is the page that stays. The briefing is the first
       tile either way: handed to the page's reader where one draws the blocks (`paged`), under the page's own sentence.
     -->
-    {#each homeReads(brief?.cards.length ?? 0, matched?.rows.length ?? 0) as part (part)}
+    {#each homeReads(brief?.cards.length ?? 0, matched?.rows.length ?? 0, stale?.rows.length ?? 0) as part (part)}
       {#if part === 'briefing'}
         <!-- WHAT MATTERS TODAY, first, and nothing where the record wrote no briefing. -->
         {#if !paged}{@render briefed()}{/if}
+      {:else if part === 'stale'}
+        <!-- WHAT WENT STALE AND WHERE EACH IS CLEARED, under the page, and nothing where nothing is stale. -->
+        {#if stale}<stale.Part rows={stale.rows} />{/if}
       {:else if part === 'matched'}
         <!-- WHO THE RECORD MATCHED ON ITS OWN, the board's last line, and nothing where it matched nobody. -->
         {#if matched}<matched.Part rows={matched.rows} />{/if}

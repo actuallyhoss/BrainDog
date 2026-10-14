@@ -104,6 +104,7 @@ export {
 } from './table.ts';
 export {
   FEED_BY,
+  FEED_DAY,
   FEED_EARLIER,
   FEED_GROUPS,
   FEED_NO_MARK,
@@ -113,6 +114,7 @@ export {
   feedCased,
   feedCasedNodes,
   feedFault,
+  feedFold,
   feedNew,
   feedPlan,
   type FeedBy,

@@ -185,7 +185,7 @@ export const SLASH_SKILL_INSTRUCTIONS = [
  * handed is not kept, so these rules are the ones that check holds it to, said first.
  *
  * AND THE SAME ASK ARRANGES THE PAGE (DIRECTION §38, `packages/record/src/compose-look.ts`). A page handed `blocks` and
- * `rows` may be answered as `{ headline, lead, order, hide, next }`: a lead and an order of the keys handed, each once,
+ * `rows` may be answered as `{ headline, lead, order, hide, next, group }`: a lead and an order of the keys handed, each once,
  * the lead line first; a hide of keys handed, never the lead line nor what leads; a next naming a row handed, in one
  * plain phrase of at most `NEXT_MOST` characters, 80, with no number it was not handed.
  */
@@ -205,8 +205,9 @@ export const SLASH_COMPOSE_INSTRUCTIONS = [
   '`lead` is the key of the one part that should come straight after the lead line, because it holds what matters most right now. Leave `lead` out when the right part is there already.',
   '`order` is the keys of its blocks with what matters most right now first, each key once, only keys it was handed, and the lead line first. Leave `order` out when the page already leads with what matters.',
   '`hide` is the keys of parts that say nothing the person needs today, such as one with nothing in it. Never hide the lead line, the part you lead with, or the last part left showing. Leave `hide` out when every part earns its place.',
+  '`group` names, for a long part that draws cards, the one thing to gather them under headings by, as in {"<key>":"<field>"}: only a field handed in that part\'s `group`, and only when it reads faster in groups. Leave `group` out when nothing is long.',
   '`next` is the one thing to do next on it, with `row`, the handle of one of its rows exactly as handed, and `text`, a short plain phrase of at most 80 characters that names it by its title, such as "Pay the EDF bill". Type no number in it beyond what its title holds. Leave `next` out when nothing on the page wants doing.',
-  'Answer only JSON: {"lines":{"<page id>":"<the line>"}}, one entry for each page you were handed and no other. For a page you arrange, its entry is an object instead, with only the parts you give, as in {"headline":"<the line>","order":["<key>"],"next":{"row":"<handle>","text":"<the phrase>"}}. Every part it may hold: {"headline":"<the line>","lead":"<key>","order":["<key>"],"hide":["<key>"],"next":{"row":"<handle>","text":"<the phrase>"}}.',
+  'Answer only JSON: {"lines":{"<page id>":"<the line>"}}, one entry for each page you were handed and no other. For a page you arrange, its entry is an object instead, with only the parts you give, as in {"headline":"<the line>","order":["<key>"],"next":{"row":"<handle>","text":"<the phrase>"}}. Every part it may hold: {"headline":"<the line>","lead":"<key>","order":["<key>"],"hide":["<key>"],"next":{"row":"<handle>","text":"<the phrase>"},"group":{"<key>":"<field>"}}.',
 ].join('\n');
 
 /**
@@ -228,7 +229,7 @@ export type SlashHeadlineModel = SlashModel & { headline: NonNullable<SlashModel
 export const SLASH_BRIEF_INSTRUCTIONS = [
   'You are Slash, writing the briefing of a BrainDog, the record one person keeps of their work and life: the few cards their day opens on, each one line about one thing that matters now.',
   'You are handed `today`, `most` and `facts`. Each fact is one thing worth saying, with `h`, its handle, `kind`, `title`, the person\'s own name for it, and `figures`, the values a line about it may say, each under its name and written as the person reads it.',
-  'A kind is one of: late, past its day; asked, a question waiting on the person, where the figure `count` is how many wait from the same cause; exception, something that went wrong; step, the next step a piece of work left; due, coming within a week; changed, moved since they last looked.',
+  'A kind is one of: late, past its day; asked, a question waiting on the person, where the figure `count` is how many wait from the same cause, or every question still open when one card stands for the rest, so say how many wait and never where they came from, never "an import left {{count}} questions"; exception, something that went wrong; step, the next step a piece of work left; due, coming within a week; changed, moved since they last looked.',
   'Pick at most seven, and never more than `most`, the most pressing first: what is late, then what waits on the person or went wrong, then the rest. Leave out what can wait. Say each fact once at most.',
   `Write one plain line a card, at most ${HEADLINE_MOST} characters once the numbers are in: what it is and why it matters today, as you would say it to the person. No dashes used as punctuation, no exclamation marks, no greeting, and no markup, brackets or line breaks: a line holding any is thrown away.`,
   'Name each thing by its title as handed, whole and exactly as it is given, such as "The EDF bill". Never say row, list, register, block, entity or record about their things.',

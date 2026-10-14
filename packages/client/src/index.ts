@@ -501,6 +501,14 @@ export type Exceptions = Answer<'exceptions'>;
 export type Stale = Answer<'stale'>;
 
 /**
+ * `learnings`: what the record's agents learned and still stands where the caller is, as `{ rows, truncated, faded }`.
+ * Each of `rows` is `{ spoken, lesson, because, kind, topic, where, confirmed_on, made }`: what it is called, the lesson
+ * and the failure behind it, and `where` as `here` or `everywhere`. `truncated` says more stand than were answered, and
+ * `faded` is how many were left out for being neither confirmed nor made in ninety days.
+ */
+export type Learnings = Answer<'learnings'>;
+
+/**
  * `briefing`: what matters today as cards, in the record's order, seven at most. `h` is the card's handle, `line` its
  * one sentence, `row` the thing it opens as a record says one (`tasks#12`) or `null`, `cause` what several questions
  * share, and `by` whether the model wrote the line or the rules did. `at` is when it was written and `basis` what it
@@ -1749,6 +1757,12 @@ export function createClient(options: ClientOptions) {
      * hourly tidy counts, a line a kind with the one call that clears it. It changes nothing. READ+.
      */
     stale: () => call<Stale>('stale', {}),
+    /**
+     * What was learned that still stands where the caller is: a method before a fact, this project before everywhere,
+     * the newest first, forty unless `limit` asks for another count. One that was replaced, taken back or faded is
+     * left out. Refused to a caller who may not read them, and it changes nothing. READ+.
+     */
+    learnings: (args?: { limit?: number }) => call<Learnings>('learnings', (args ?? {}) as Record<string, unknown>),
 
     /* THE SCHEDULED ACTIONS. `actions` is READ+; `resumeAction` is ADMIN, so a browser session, and it is the only
        thing that starts a paused action again. */

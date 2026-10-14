@@ -50,11 +50,35 @@ export type LookBody = {
   headline?: string;
   next?: LookNext;
   pinned?: string[];
+  /**
+   * Which long lists are drawn in groups, each under its own heading: a block's key, and the field of its list the
+   * groups are the values of. Laid only on a block whose kind draws groups and that names none itself (`applyLook`).
+   */
+  group?: Record<string, string>;
   by: LookBy;
 };
 
 /** The keys a look may carry. */
-export const LOOK_KEYS: ReadonlySet<string> = new Set(['look', 'basis', 'lead', 'order', 'hide', 'headline', 'next', 'pinned', 'by']);
+export const LOOK_KEYS: ReadonlySet<string> = new Set(['look', 'basis', 'lead', 'order', 'hide', 'headline', 'next', 'pinned', 'group', 'by']);
+
+/**
+ * The kinds whose `group` is a field of the list they are over, so a look may name one for them. A kind is added here
+ * when `pages.ts` reads that key for it the way it does for cards.
+ */
+export const GROUPED_BY_FIELD: ReadonlySet<string> = new Set(['cards']);
+
+/** The most blocks one look groups. */
+export const LOOK_GROUPS_MOST = 12;
+
+/** The rules group a list only when it shows more of its rows than this. */
+export const GROUP_ROWS_OVER = 12;
+
+/**
+ * How many values of a field the rows shown may hold for it to group them. One is a heading over everything, and past
+ * eight most headings stand over a single row.
+ */
+export const GROUP_VALUES_LEAST = 2;
+export const GROUP_VALUES_MOST = 8;
 
 /** The most keys one of its lists names: a page's own 24 blocks and the 64 other packs may add. */
 export const LOOK_KEYS_MOST = 88;
@@ -164,6 +188,54 @@ function groupsOf(blocks: readonly BlockResult[]): number[] {
 const keyList = (v: unknown): string[] | undefined =>
   Array.isArray(v) ? unique(v.filter((k): k is string => typeof k === 'string' && BLOCK_KEY.test(k))).slice(0, LOOK_KEYS_MOST) : undefined;
 
+/** A field's id, as a list declares one (`declare.ts`). */
+const FIELD_ID = /^[a-z][a-z0-9_]{0,63}$/u;
+
+/**
+ * A look's `group` as written, or `undefined` for one that is not a map of block keys to field ids, holds none, or
+ * holds more than a look may. ALL OR NOTHING, so a map half read never groups a page by half of what was meant.
+ */
+function groupMap(v: unknown): Record<string, string> | undefined {
+  if (v === null || typeof v !== 'object' || Array.isArray(v)) return undefined;
+  const entries = Object.entries(v as Record<string, unknown>);
+  if (entries.length === 0 || entries.length > LOOK_GROUPS_MOST) return undefined;
+  if (!entries.every(([k, f]) => BLOCK_KEY.test(k) && typeof f === 'string' && FIELD_ID.test(f))) return undefined;
+  return Object.fromEntries(entries) as Record<string, string>;
+}
+
+/** The list a block is over, by its id, or `null` for a block over anything else. */
+const listOf = (b: BlockResult): string | null => (typeof b.source === 'string' && b.source.startsWith('register.') ? b.source.slice('register.'.length) : null);
+
+/**
+ * WHETHER A BLOCK MAY BE DRAWN IN GROUPS BY A LOOK: its kind draws groups by a field of its list, it is over a list, it
+ * is drawn and refused nothing, and it names no group of its own. What a page says of itself stands over any look.
+ *
+ * `GROUPED_BY_FIELD` AND NOT EVERY KIND THAT READS A KEY CALLED `group` (`block-keys.ts`): a feed's `group` is one word
+ * for the heading its lines are gathered under, and a field's id written there would be read as that word.
+ */
+const groupable = (b: BlockResult): boolean =>
+  GROUPED_BY_FIELD.has(b.kind) && listOf(b) !== null && b.group === undefined && b.drawn !== false && b.refusals.length === 0;
+
+/**
+ * How many values of `field` the rows a block shows hold. A row that holds none is not counted: it is drawn under no
+ * heading, or under the one that says so, and is no reason to group. A link to several rows is one value as a whole.
+ */
+export function valuesShown(b: BlockResult, field: string): number {
+  const met = new Set<string>();
+  for (const r of b.rows) {
+    const v = Object.hasOwn(r.fields, field) ? r.fields[field] : undefined;
+    if (v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0)) continue;
+    met.add(typeof v === 'string' ? v : JSON.stringify(v));
+  }
+  return met.size;
+}
+
+/** Whether the rows a block shows hold enough values of `field` to be grouped by it, and not too many. */
+export const groupsWell = (b: BlockResult, field: string): boolean => {
+  const n = valuesShown(b, field);
+  return n >= GROUP_VALUES_LEAST && n <= GROUP_VALUES_MOST;
+};
+
 /**
  * A stored look as a read takes it, or `null` when it is not one. FORGIVING WHERE THE INSTALL IS STRICT: the install
  * refuses a malformed look (`declare.ts`), and one stored under an earlier build keeps what still reads and drops the
@@ -177,6 +249,7 @@ export function lookOf(raw: unknown): LookBody | null {
   const order = keyList(r.order);
   const hide = keyList(r.hide);
   const pinned = keyList(r.pinned);
+  const group = groupMap(r.group);
   return {
     look: r.look,
     basis: typeof r.basis === 'string' ? r.basis : '',
@@ -189,6 +262,7 @@ export function lookOf(raw: unknown): LookBody | null {
       ? { next: { row: next.row, text: next.text } }
       : {}),
     ...(pinned ? { pinned } : {}),
+    ...(group ? { group } : {}),
   };
 }
 
@@ -282,6 +356,8 @@ export type ComposeInput = {
   lists?: readonly ListShape[];
   /** The field that names a row of a list, for the next action's words. */
   titleOf?: (register: string) => string | null;
+  /** The field a list keeps its state in, or `null` for a list with none. Absent, the rules group nothing. */
+  stateOf?: (register: string) => string | null;
   /** The owner's pinned keys, which the rules never hide, move or lead past. */
   pinned?: readonly string[];
 };
@@ -387,6 +463,8 @@ function lateSaid(late: Late, today: string): string {
  * - HIDE is every block that drew nothing, and a heading whose blocks this look hid, or a `when:` hid beside them. Never a pinned, refused or lead
  *   block, and never the last block of the main column: a page with nothing in it still says what its quiet is.
  * - NEXT is the single most pressing row: the one late longest, else the first question waiting on the reader.
+ * - GROUP is a long list drawn by its state: a block that draws groups, over a list, showing more than
+ *   `GROUP_ROWS_OVER` rows that hold two to eight states among them. A short list reads faster flat.
  */
 export function composeLook(input: ComposeInput): LookBody {
   const blocks = input.blocks;
@@ -453,8 +531,25 @@ export function composeLook(input: ComposeInput): LookBody {
   const asks = weighed.find((w) => w.asks)?.asks;
   const next: LookNext | undefined = late ? { row: late.row, text: lateSaid(late, input.today) } : asks;
 
+  /* GROUP. Two blocks of one key are the first of them, as a look names them. */
+  const group: Record<string, string> = {};
+  blocks.forEach((b, i) => {
+    const key = keys[i]!;
+    if (keys.indexOf(key) !== i || Object.keys(group).length >= LOOK_GROUPS_MOST) return;
+    if (!groupable(b) || b.rows.length <= GROUP_ROWS_OVER) return;
+    const list = listOf(b)!;
+    const field = input.stateOf?.(list) ?? null;
+    if (field === null || !FIELD_ID.test(field)) return;
+    /* THE LIST'S OWN DECLARATION, where the rules hold it: a state it retired is no field to draw by. */
+    const shape = input.lists?.find((l) => l.id === list);
+    if (shape && !shape.fields.some((f) => f.id === field && f.retired !== true)) return;
+    if (groupsWell(b, field)) group[key] = field;
+  });
+  const grouped = Object.keys(group).length > 0;
+
   const hide = keys.filter((k) => hidden.has(k));
-  const facts = { lead: lead ?? null, order, hide, next: next ?? null };
+  /* A PAGE THAT GROUPS NOTHING KEEPS THE BASIS IT HAD before a look could group. */
+  const facts = { lead: lead ?? null, order, hide, next: next ?? null, ...(grouped ? { group } : {}) };
   return {
     look: input.page,
     basis: `r${shortHash(JSON.stringify(facts))}`,
@@ -463,13 +558,15 @@ export function composeLook(input: ComposeInput): LookBody {
     ...(order.length ? { order } : {}),
     ...(hide.length ? { hide } : {}),
     ...(next ? { next } : {}),
+    ...(grouped ? { group } : {}),
   };
 }
 
 /**
  * AN OWNER'S LOOK WITH THE ENGINE'S FILLING WHAT HE LEFT. What the owner set wins field by field: his lead, his order,
  * his headline, his next action. What he left unset is the engine's, and what he pinned is never hidden or moved by it
- * (the engine's look was composed knowing his pins, and they are taken out again here in case it was not).
+ * (the engine's look was composed knowing his pins, and they are taken out again here in case it was not). A list he
+ * grouped his way is grouped his way, and the engine groups the ones he said nothing of, while a look has room.
  */
 export function mergeLook(owner: LookBody, engine: LookBody): LookBody {
   const pinned = new Set(owner.pinned ?? []);
@@ -478,6 +575,8 @@ export function mergeLook(owner: LookBody, engine: LookBody): LookBody {
   const hide = unique([...(owner.hide ?? []), ...(engine.hide ?? [])]).filter((k) => !pinned.has(k) && k !== lead);
   const headline = owner.headline ?? engine.headline;
   const next = owner.next ?? engine.next;
+  const his = owner.group ?? {};
+  const group = Object.fromEntries([...Object.entries(his), ...Object.entries(engine.group ?? {}).filter(([k]) => !Object.hasOwn(his, k))].slice(0, LOOK_GROUPS_MOST));
   return {
     look: owner.look,
     basis: owner.basis,
@@ -488,6 +587,7 @@ export function mergeLook(owner: LookBody, engine: LookBody): LookBody {
     ...(headline !== undefined ? { headline } : {}),
     ...(next !== undefined ? { next } : {}),
     ...(owner.pinned?.length ? { pinned: owner.pinned } : {}),
+    ...(Object.keys(group).length ? { group } : {}),
   };
 }
 
@@ -520,15 +620,26 @@ function handlesOf(blocks: readonly BlockResult[]): Set<string> {
  * - NEXT is kept only when a block still drawn after the hide holds the row it names.
  * - HEADLINE has its holes filled from the page's own figures as they read now (`fillHoles`). One that cannot be
  *   filled is left out, so the rules' line stands.
+ * - GROUP says `group` on a block whose kind draws groups, over a list, that names none of its own, while the rows it
+ *   shows hold two to eight values of the field. Anything else is left as the page declared it, whoever's look it is:
+ *   a stored look is laid over the page as it reads later, when all but one of the values may have gone.
  *
  * Nothing is added and nothing is taken out of the list, so a host keyed by `key` sees the same blocks, moved.
  */
-export function applyLook(blocks: readonly BlockResult[], look: LookBody): { blocks: BlockResult[]; look: LookBody } {
-  const keys = blocks.map(keyOf);
+export function applyLook(read: readonly BlockResult[], look: LookBody): { blocks: BlockResult[]; look: LookBody } {
+  const keys = read.map(keyOf);
   const at = new Map<string, number>();
   keys.forEach((k, i) => {
     if (!at.has(k)) at.set(k, i);
   });
+  /* GROUP FIRST, on the block each key names (the first of two alike): it moves and hides nothing, so the rest reads the
+     page with its groups said, and the blocks handed in are not written on. */
+  const group: Record<string, string> = {};
+  for (const [key, field] of Object.entries(look.group ?? {}).slice(0, LOOK_GROUPS_MOST)) {
+    const block = at.has(key) ? read[at.get(key)!]! : undefined;
+    if (block && FIELD_ID.test(field) && groupable(block) && groupsWell(block, field)) group[key] = field;
+  }
+  const blocks: readonly BlockResult[] = Object.keys(group).length === 0 ? read : read.map((b, i) => (at.get(keys[i]!) === i && Object.hasOwn(group, keys[i]!) ? { ...b, group: group[keys[i]!]! } : b));
   const pinned = (look.pinned ?? []).filter((k) => at.has(k));
   const pins = new Set(pinned);
   /* THE ENGINE'S LOOK NEVER LEADS WITH A QUEUE, NOR MOVES ONE, on a page that is about something else (`questionsLead`):
@@ -632,6 +743,7 @@ export function applyLook(blocks: readonly BlockResult[], look: LookBody): { blo
       ...(headline !== null ? { headline } : {}),
       ...(next !== undefined ? { next } : {}),
       ...(pinned.length ? { pinned } : {}),
+      ...(Object.keys(group).length ? { group } : {}),
     },
   };
 }

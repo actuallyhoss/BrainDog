@@ -27,6 +27,7 @@ const NOTES = defaultBlockKey(DESK[2]);
 test('A LOOK THAT SAYS WHAT CONTRACT 17 SAYS INSTALLS', () => {
   assert.equal(validate(look({ lead: 'now', order: ['now', NOTES], hide: [NOTES], headline: 'Two things are late', next: { row: 'tasks#4', text: 'Pay HSBC' } }), KNOWN), null);
   assert.equal(validate(look({ by: 'owner', pinned: [NOTES] }), KNOWN), null, 'the owner pins');
+  assert.equal(validate(look({ group: { now: 'state' } }), KNOWN), null, 'a look may group a part by one field of its list');
   assert.equal(validate(look({ by: 'rule' })), null, 'a look with nothing in it yet says nothing, and needs no record to say it');
 });
 
@@ -47,6 +48,11 @@ test('EACH WAY A LOOK IS WRONG IS SAID, BY NAME', () => {
   assert.deepEqual(at(look({ headline: 'x'.repeat(201) })), ['OUT_OF_BOUNDS', 'headline']);
   assert.deepEqual(at(look({ next: { row: 'tasks#4' } })), ['DECLARATION_INVALID', 'next.text']);
   assert.deepEqual(at(look({ next: { row: 'tasks#4', text: 'Pay', why: 'x' } })), ['DECLARATION_INVALID', 'next']);
+  assert.deepEqual(at(look({ group: ['now'] })), ['DECLARATION_INVALID', 'group'], 'a grouping is a map');
+  assert.deepEqual(at(look({ group: Object.fromEntries(Array.from({ length: 13 }, (_, i) => [`k${i}`, 'state'])) })), ['DECLARATION_INVALID', 'group'], 'of twelve at most');
+  assert.deepEqual(at(look({ group: { now: 'Not A Field' } })), ['DECLARATION_INVALID', 'group.now']);
+  assert.deepEqual(at(look({ group: { now: 7 } })), ['DECLARATION_INVALID', 'group.now']);
+  assert.deepEqual(at(look({ group: { 'Not a key': 'state' } })), ['DECLARATION_INVALID', 'group.Not a key']);
   assert.deepEqual(at(look({}), new Map()), ['PAGE_UNKNOWN', 'look'], 'a look over a page the record does not have');
   assert.deepEqual(at({ id: 'look.money', kind: 'look', body: { look: 'desk', basis: 'b', by: 'rule' } }), ['DECLARATION_INVALID', 'id']);
 });

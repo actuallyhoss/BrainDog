@@ -27,7 +27,7 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
   founder: [
     {
       version: '2.6.0',
-      notes: "Home is called Today. What is late has its own table, Late, ahead of Due this week, which now starts today. Lapsing no longer has a Cost column. A project page lists only its own keys, tools and skills. A number can say which service it is about. Renewals shows those under Server and provider numbers while there is one. Numbers dated after today are left out everywhere. A project's money on its way is named Still to come in. Today says the money lasts the year when nothing due runs it out.",
+      notes: "Home is called Today, and says the money lasts the year when nothing due runs it out. What is late has its own table, Late, ahead of Due this week. Lapsing has no Cost column. A number can say which service it is about. Numbers dated after today are left out. A project page shows one card for each agent run that changed something, with what it said it was doing. Its keys, tools and skills sit under Runs on, with up to five that apply everywhere. Its money on its way is named Still to come in.",
     },
     {
       version: '2.5.0',
@@ -43,7 +43,7 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
   team: [
     {
       version: '2.21.0',
-      notes: "Tools and servers on a project page lists the project's own tools only. Keys and Skills on a project page list the project's own only, and a project with none shows neither.",
+      notes: "A project page shows one card for each agent run, not one for every helper it started, and leaves out a run that changed nothing. Each card says which agent it was and what it said it was doing. What the project runs on has its own heading, Runs on: its own keys, tools and skills only, and under them up to five that apply to every project.",
     },
     {
       version: '2.20.0',

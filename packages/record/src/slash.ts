@@ -2459,14 +2459,15 @@ export type SkillBearing = {
 const textOf = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
 
 /**
- * The skills whose next version is waiting to be written, oldest skill first, `SKILL_DRAFTS_A_DAY` at most.
+ * The skills whose next version is waiting to be written, oldest skill first, `SKILL_DRAFTS_A_DAY` at most unless the
+ * caller says how many (`stale` counts every one behind; the nightly draft writes a few).
  *
  * THE BRIEFING'S RULE, READ OVER THE WHOLE RECORD (`bearing` in `apps/cli/src/brief.ts`, which reads one project's
  * context): a learning bears on a skill when its `topic` is the skill's name, whatever the case and the space around it,
  * only an active lesson bears on anything, and a lesson the skill's `because` already names is in the skill. A skill of
  * the same name as one weighed before it is left for the next look, so two rows are never drafted from one lesson at once.
  */
-export function skillBearings(sql: Sql, kernel: Kernel): SkillBearing[] {
+export function skillBearings(sql: Sql, kernel: Kernel, most = SKILL_DRAFTS_A_DAY): SkillBearing[] {
   if (!kernel.register('skills') || !kernel.register('learnings')) return [];
   const prefix = kernel.register('learnings')?.seq_prefix;
   const spoken = (seq: number) => (prefix && prefix !== '#' ? `${prefix}${seq}` : `learnings#${seq}`);
@@ -2495,7 +2496,7 @@ export function skillBearings(sql: Sql, kernel: Kernel): SkillBearing[] {
     "SELECT id, version, fields FROM entry WHERE register = 'skills' AND deleted_at IS NULL ORDER BY seq LIMIT ?",
     SKILLS_WEIGHED_MOST,
   )) {
-    if (out.length >= SKILL_DRAFTS_A_DAY) break;
+    if (out.length >= most) break;
     let f: Record<string, unknown>;
     try {
       f = JSON.parse(row.fields) as Record<string, unknown>;

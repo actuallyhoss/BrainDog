@@ -90,8 +90,9 @@ export const HEADLINE_ROWS_MOST = 5;
 /**
  * One block of a page as the model is handed it: its `key` (declared, or the kernel's hash of kind, source and heading),
  * its kind, the heading a person reads, and `lead` on the lead note, which stays first whatever order comes back.
+ * `group` is the fields of its list it may be drawn in groups by, on a long part that draws cards and on no other.
  */
-export type HeadlineBlock = { key: string; kind: string; heading?: string; lead?: true };
+export type HeadlineBlock = { key: string; kind: string; heading?: string; lead?: true; group?: string[] };
 
 /**
  * One row a page draws, as the model is handed it: `row` is its handle (`tasks#4`), never shown to a person, beside the

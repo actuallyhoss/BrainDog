@@ -21,7 +21,8 @@
 
 import type { Sql } from '@braindog/ports';
 
-import { causeFault } from './cause.ts';
+import { RECHECK_BOUND, causeFault, moot } from './cause.ts';
+import { openFaults } from './fault.ts';
 import { EXPIRE_MS } from './handoff.ts';
 import { ABANDON_MS, unheardRuns } from './presence.ts';
 import { SWEPT_NOTE, SWEPT_STEP_NOTE } from './schedule.ts';
@@ -199,7 +200,54 @@ const questionsOld: Finder = {
   },
 };
 
-for (const finder of [runsStopped, runsEmpty, stepsOld, questionsOld]) registerFinder(finder);
+/** The kinds `moot` can find already so, as `cause.ts` `recheck` walks them. */
+const MOOTABLE = "status = 'open' AND body_kind IN ('rowset', 'change', 'pack', 'settings')";
+
+/**
+ * `questions-moot`: open questions that are already so, or that ask about things since deleted (`cause.ts` `moot`).
+ * Stale: the ones the sweep's `recheck` would close if it ran now, so it reads the same questions in the same order
+ * from the same place in the queue, and never more than `RECHECK_BOUND` of them. On a queue longer than the bound
+ * that is this hour's stretch of it, not the whole.
+ *
+ * COUNTED ONLY. It closes none: `recheck` does, each hour, and signs the close. And it asks nothing: a question about
+ * questions that need no answer is one more thing waiting on the person.
+ */
+const questionsMoot: Finder = {
+  id: 'questions-moot',
+  name: 'Questions that no longer need you',
+  find(sql, nowMs) {
+    const total = count(sql, `SELECT COUNT(*) AS n FROM suggestion WHERE ${MOOTABLE}`);
+    if (total === 0) return { stale: 0, did: 0, ask: null };
+    type Open = { body_kind: string; body: string };
+    const read = (offset: number, limit: number): Open[] =>
+      limit <= 0 ? [] : sql.all<Open>(`SELECT body_kind, body FROM suggestion WHERE ${MOOTABLE} ORDER BY opened_at ASC, id ASC LIMIT ? OFFSET ?`, limit, offset);
+    const from = total <= RECHECK_BOUND ? 0 : (Math.floor(nowMs / 3_600_000) * RECHECK_BOUND) % total;
+    const walked = [...read(from, RECHECK_BOUND), ...read(0, Math.min(from, from + RECHECK_BOUND - total))];
+    return { stale: walked.filter((q) => moot(q, sql)).length, did: 0, ask: null };
+  },
+};
+
+/**
+ * `faults-open`: work of the record's own that failed and has not gone through since, as the Faults list reads it
+ * (`fault.ts` `openFaults`: the open ones, and the dead or failed kinds no fault was filed for). Counted only: a fault
+ * clears when its work next succeeds, and nothing here clears one or asks about one.
+ */
+const faultsOpen: Finder = {
+  id: 'faults-open',
+  name: 'Faults still open',
+  find: (sql) => ({ stale: openFaults(sql).length, did: 0, ask: null }),
+};
+
+for (const finder of [runsStopped, runsEmpty, stepsOld, questionsOld, questionsMoot, faultsOpen]) registerFinder(finder);
+
+/** What a finder found, or `null` when it threw: one finder that cannot count never stops the others being counted. */
+function counted(finder: Finder, sql: Sql, nowMs: number): Found | null {
+  try {
+    return finder.find(sql, nowMs);
+  } catch {
+    return null;
+  }
+}
 
 /* ── the tick's part ────────────────────────────────────────────────────── */
 
@@ -242,8 +290,10 @@ export function tidy(deps: TidyDeps, list: readonly Finder[] = finders()): TidyL
 
 function pass(deps: TidyDeps, list: readonly Finder[], again: Again): TidyLine[] {
   const at = iso(deps.nowMs);
-  return list.map((finder) => {
-    const found = finder.find(deps.sql, deps.nowMs);
+  return list.flatMap((finder): TidyLine[] => {
+    /* A FINDER THAT THROWS HAS NO LINE THIS PASS, rather than a line saying nothing is stale, which nobody counted. */
+    const found = counted(finder, deps.sql, deps.nowMs);
+    if (found === null) return [];
     const cause = causeOfFinder(finder.id);
     const was = deps.sql.one<Was>(
       'SELECT id, status, body, resolved_as, opened_at FROM suggestion WHERE cause = ? ORDER BY rowid DESC LIMIT 1',
@@ -255,10 +305,10 @@ function pass(deps: TidyDeps, list: readonly Finder[], again: Again): TidyLine[]
         const body = JSON.stringify(bodyOf(finder.id, { ...found, ask: found.ask }));
         if (body !== was.body) deps.sql.exec('UPDATE suggestion SET body = ? WHERE id = ?', body, was.id);
       }
-      return { ...line, asked: was.id };
+      return [{ ...line, asked: was.id }];
     }
-    if (found.ask === null || found.stale <= 0) return { ...line, asked: null };
-    if (was !== undefined && !again(finder, found, was)) return { ...line, asked: null };
+    if (found.ask === null || found.stale <= 0) return [{ ...line, asked: null }];
+    if (was !== undefined && !again(finder, found, was)) return [{ ...line, asked: null }];
     const id = `SG${deps.allocate('suggestion')}`;
     deps.sql.exec(
       "INSERT INTO suggestion (id, body_kind, body, status, opened_by, opened_at, cause) VALUES (?, 'options', ?, 'open', 'system', ?, ?)",
@@ -274,7 +324,7 @@ function pass(deps: TidyDeps, list: readonly Finder[], again: Again): TidyLine[]
       `suggestion:${id}`,
       found.ask.question,
     );
-    return { ...line, asked: id };
+    return [{ ...line, asked: id }];
   });
 }
 
@@ -373,10 +423,11 @@ export function tidyDays(sql: Sql, nowMs: number, days = 7): TidyDay[] {
 /**
  * How many things are stale now: every finder's `stale`, added up. A READ: it files no question, keeps no line and makes
  * no table, so a figure or a page may call it at any moment and the hourly pass is still the only thing that asks.
+ * A finder that throws adds nothing, and the others are still counted.
  */
 export function staleNow(sql: Sql, nowMs: number, list: readonly Finder[] = finders()): number {
   let n = 0;
-  for (const finder of list) n += finder.find(sql, nowMs).stale;
+  for (const finder of list) n += counted(finder, sql, nowMs)?.stale ?? 0;
   return n;
 }
 

@@ -26,7 +26,7 @@ import { compile, jsonPath, type Schema } from '@braindog/where';
 
 import { GROUP_CAP } from './buckets.ts';
 import { fill } from './fill.ts';
-import { GOVERNANCE_OPEN, HANDOFFS_OPEN, RECORD_DOOR, RECORD_KEYS, RECORD_LISTS, RECORD_MARKS, RECORD_PATHS, RECORD_PEOPLE, RECORD_PLACES, RECORD_SIGNS, RECORD_TIDY, RECORD_VITALS, SESSIONS_WORKING } from './built-in-figures.ts';
+import { GOVERNANCE_OPEN, HANDOFFS_OPEN, RECORD_ACTIVITY, RECORD_DOOR, RECORD_KEYS, RECORD_LISTS, RECORD_MARKS, RECORD_PATHS, RECORD_PEOPLE, RECORD_PLACES, RECORD_SIGNS, RECORD_TIDY, RECORD_VITALS, SESSIONS_WORKING } from './built-in-figures.ts';
 import { runway, type Leg, type Runway } from './forecast.ts';
 import { RECORD_KEY_SCAN } from './key-scan.ts';
 import { across, type Amount, type Part } from './fx.ts';
@@ -907,6 +907,8 @@ export function figureLists(
     decl.source === RECORD_PLACES ||
     /* AND THE TIDY (AGT-C18): its finders count runs and questions across the whole record. */
     decl.source === RECORD_TIDY ||
+    /* AND THE LOG (PGS-C24): its counts say what was done on every list, and by whom. */
+    decl.source === RECORD_ACTIVITY ||
     decl.source === RECORD_VITALS
   )
     return ['*'];

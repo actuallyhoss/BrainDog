@@ -990,14 +990,24 @@ export function lookOf(v: unknown): LiveLook | null {
 const FEED_BY: readonly FeedRow['by'][] = ['agent', 'rule', 'you'];
 const textOrNull = (v: unknown): v is string | null => v === null || typeof v === 'string';
 
-/** An `activity` block's `feed`, when every row is one the renderer can file under a group. */
-function feedOf(v: unknown): FeedRow[] | null {
+/** A day as the record writes one, which is the only thing a feed's day heading is made from. */
+const FEED_DAY = /^\d{4}-\d{2}-\d{2}$/u;
+
+/**
+ * An `activity` block's `feed`, when every row is one the renderer can file under a group.
+ *
+ * `day` AND `run_more` ARE CHECKED AS THE REST ARE (a feed that says `group: day` or `fold: run`): a heading made from
+ * something that is no day, or "and NaN more", is worse than a block that says it cannot be drawn.
+ */
+export function feedOf(v: unknown): FeedRow[] | null {
   if (!Array.isArray(v)) return null;
   const ok = v.every(
     (r) =>
       isObject(r) && FEED_BY.includes(r.by as FeedRow['by']) && Number.isFinite(r.count) && typeof r.at === 'string' &&
       textOrNull(r.who) && textOrNull(r.kind) && textOrNull(r.target) && textOrNull(r.note) && (r.thing === undefined || textOrNull(r.thing)) &&
-      (r.things === undefined || (Array.isArray(r.things) && r.things.every((t) => typeof t === 'string'))),
+      (r.things === undefined || (Array.isArray(r.things) && r.things.every((t) => typeof t === 'string'))) &&
+      (r.day === undefined || (typeof r.day === 'string' && FEED_DAY.test(r.day))) &&
+      (r.run_more === undefined || (Number.isSafeInteger(r.run_more) && (r.run_more as number) >= 0)),
   );
   return ok ? (v as FeedRow[]) : null;
 }

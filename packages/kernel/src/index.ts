@@ -433,6 +433,7 @@ export { SESSIONS_WORKING, readRunsWorking } from './built-in-figures.ts';
 export { HANDOFFS_OPEN, openSteps, readHandoffsOpen, type OpenStep } from './built-in-figures.ts';
 /* THE TIDY AS FIGURES (AGT-C18): the source, its reader, and the id of one finder's own figure. */
 export { RECORD_TIDY, readTidy, staleFigureOf, type TidyDecl } from './built-in-figures.ts';
+export { ACTIVITY_BY, RECORD_ACTIVITY, readActivity, type ActivityBy, type ActivityDecl } from './built-in-figures.ts';
 export { KEYS_IN_TEXT, RECORD_KEY_SCAN, keysInText, placeOf, readKeysInText, scanKeys, type KeyFinding, type KeyScan } from './key-scan.ts';
 export { CROSSCHECK_ENTRIES_MOST, CROSSCHECK_NOTHING, CROSSCHECK_TOO_MANY, ROLLED_ACCOUNTS_MOST, ROLLED_CHECKS_MOST, WALKS, WALK_SOURCE, beyondOf, figureLists } from './money-figures.ts';
 export type { Beyond, Crosscheck, Rolled, RolledCheck, RolledMoves, Walked, WalkReading } from './money-figures.ts';
@@ -447,6 +448,8 @@ export { KEEP, WHY, arranged, bare, emptyHidden, gone, holdsNothing, keeps, lead
 export { ANSWER_KEYS, BLOCK_KEY, blockKeyOf, defaultBlockKey, keyedBlocks } from './block-keys.ts';
 /* THE LOOK OVERLAY (DIRECTION §38, `compose.ts`): what Slash and the owner write over a page, and the rules' own look. */
 export { applyLook, composeLook, drewNothing, lookOf, mergeLook, questionsLead, queuesKept, LOOK_BY, RANK, type ComposeInput, type LookBody, type LookBy, type LookNext } from './compose.ts';
+/* A LOOK'S GROUPING (ENG-B10, `compose.ts`): which kinds a look may group, how many, and over how many values. */
+export { GROUPED_BY_FIELD, GROUP_ROWS_OVER, GROUP_VALUES_LEAST, GROUP_VALUES_MOST, LOOK_GROUPS_MOST, groupsWell, valuesShown } from './compose.ts';
 /* THE HOLES IN A LOOK'S HEADLINE (ENG-B09, `compose.ts`): a number a line says is a hole the record fills from the page's own figures. */
 export { figureSaid, figuresOf, fillHoles, holesIn, withoutHoles } from './compose.ts';
 /* WHAT WENT QUIET (ENG-B13, `exceptions.ts`): the read, what it answers and the lists a caller hands it to watch. */

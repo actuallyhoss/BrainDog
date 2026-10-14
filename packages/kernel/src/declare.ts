@@ -53,8 +53,8 @@ import { pairsFault } from './pairs.ts';
 import { DELETE_RULES } from './referenced.ts';
 import { spanMs } from './vault.ts';
 import { actionsOf, callFault, flowFault, sealedAs, subjectOf } from './flow-lint.ts';
-import { BLOCK_INSTALLS, BLOCK_KEY, FILTER_CONTROLS, FILTER_TYPES, FILTERS_MOST, NAV_KEYS, PAGE_KEYS, PAGE_UNBUILT, keyedBlocks, keysFor, kindsReading, unreadBlockKey, unreadPageKey, wrongKindKey } from './block-keys.ts';
-import { LOOK_BASIS_BYTES, LOOK_BY, LOOK_HEADLINE_BYTES, LOOK_KEYS, LOOK_KEYS_MOST, LOOK_NEXT_BYTES, withoutHoles } from './compose.ts';
+import { BLOCK_INSTALLS, BLOCK_KEY, FILTER_CONTROLS, FILTER_TYPES, FILTERS_MOST, NAV_KEYS, PAGE_KEYS, PAGE_UNBUILT, feedSaysFault, keyedBlocks, keysFor, kindsReading, unreadBlockKey, unreadPageKey, wrongKindKey } from './block-keys.ts';
+import { LOOK_BASIS_BYTES, LOOK_BY, LOOK_GROUPS_MOST, LOOK_HEADLINE_BYTES, LOOK_KEYS, LOOK_KEYS_MOST, LOOK_NEXT_BYTES, withoutHoles } from './compose.ts';
 /* THE KINDS THAT READ THEMSELVES, admitted into `BLOCK_KINDS` and asked to check their own blocks at install. */
 import { BLOCK_KIND_MODULES, kindModule } from './kinds/index.ts';
 /* THE PAGE WORDS THE INSTALL AND THE READ REFUSE IN ONE SENTENCE: a section's host panel, a path's short view and a roadmap's columns. */
@@ -1241,7 +1241,7 @@ function lookBody(decl: Declaration, installed?: Known): Refusal | null {
   const id = decl.id;
   for (const key of Object.keys(body))
     if (!LOOK_KEYS.has(key))
-      return bad('DECLARATION_INVALID', `${id}: ${key}: is not a key a look has. A look is { look, basis, by, lead, order, hide, headline, next, pinned }.`, key, [...LOOK_KEYS]);
+      return bad('DECLARATION_INVALID', `${id}: ${key}: is not a key a look has. A look is { look, basis, by, lead, order, hide, headline, next, pinned, group }.`, key, [...LOOK_KEYS]);
   if (typeof body.look !== 'string' || !/^[a-z][a-z0-9_-]{0,63}$/u.test(body.look))
     return bad('DECLARATION_INVALID', `${id} names ${JSON.stringify(body.look ?? null)} as its page; a look names the page it is laid over by its id.`, 'look');
   if (!(LOOK_BY as readonly unknown[]).includes(body.by))
@@ -1269,6 +1269,16 @@ function lookBody(decl: Declaration, installed?: Known): Refusal | null {
   for (const [i, key] of (lists.hide ?? []).entries()) {
     if (pinned.has(key)) return bad('DECLARATION_INVALID', `${id} pins ${key} and hides it. A pinned block stays drawn; take it out of hide.`, `hide[${i}]`);
     if (key === body.lead) return bad('DECLARATION_INVALID', `${id} leads with ${key} and hides it. Take it out of hide, or lead with another.`, `hide[${i}]`);
+  }
+  /* A GROUPING IS A MAP FROM A BLOCK'S KEY TO ONE FIELD OF THAT BLOCK'S LIST. Whether the field is one the list has is
+     the read's to say (`applyLook`), since a look outlives the page it was written over. */
+  if (body.group !== undefined) {
+    const g = body.group;
+    if (g === null || typeof g !== 'object' || Array.isArray(g) || Object.keys(g).length > LOOK_GROUPS_MOST)
+      return bad('DECLARATION_INVALID', `${id}'s group is a map of at most ${LOOK_GROUPS_MOST} block keys, each to one field of that block's list.`, 'group');
+    for (const [key, field] of Object.entries(g))
+      if (!BLOCK_KEY.test(key) || typeof field !== 'string' || !/^[a-z][a-z0-9_]{0,63}$/u.test(field))
+        return bad('DECLARATION_INVALID', `${id}'s group names ${JSON.stringify(field)} for ${key}; it is a block's key and one field of that block's list.`, `group.${key}`);
   }
   if (body.headline !== undefined) {
     const said = textFault(body.headline, LOOK_HEADLINE_BYTES, 'headline', `${id}'s headline`, 'It is the page\'s one line, in words.');
@@ -1826,7 +1836,11 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
     /* A `section`'s fold, and the icon any block may carry. Another kind carrying `fold` is refused above by
        `KEY_KINDS`; here only the shape is checked, because `fold: 'yes'` would draw a section shut by accident and an
        icon that names no glyph draws an empty well. */
-    if (kind !== 'cards' && block.fold !== undefined && typeof block.fold !== 'boolean')
+    /* A FEED'S `group` AND `fold` ARE ONE WORD EACH (`day`, `run`), checked apart from a cards block's, which name a
+       link field and a count, and from a section's, which is shut or not (`feedSaysFault`). */
+    const fed = kind === 'feed' ? feedSaysFault(raw as Readonly<Record<string, unknown>>, `${id}.${at}`) : null;
+    if (fed) return bad('DECLARATION_INVALID', fed.fix, `${at}.${fed.at}`, fed.allowed);
+    if (kind !== 'cards' && kind !== 'feed' && block.fold !== undefined && typeof block.fold !== 'boolean')
       return bad('DECLARATION_INVALID', `${id}.${at}'s fold is true or false: whether the section starts shut.`, at);
     const grouped = kind === 'cards' ? cardGroupFault(id, at, raw as Readonly<Record<string, unknown>>, installed) : null;
     if (grouped) return grouped;

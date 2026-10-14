@@ -208,9 +208,12 @@ test('A FOUNDER’S PROJECT HAS A PAGE, with Estate since founder 1.4.0: what is
     'Money by month',
     'Bills and invoices',
     'Keeping it alive',
+    /* SINCE founder 2.6.0's last step: what it runs on has a heading of its own, with what reaches it from everywhere. */
+    'Runs on',
     'Keys',
     'Tools and servers',
     'Skills',
+    'And from everywhere',
   ]);
   for (const b of blocks) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
   assert.deepEqual((blocks.find((b) => b.heading === 'At a glance') as unknown as { cells: { label: string }[] }).cells.map((c) => c.label), ['Open', 'Still to come in', 'Costs a year', 'Done this week'], 'with Estate present, what it costs a year takes the place the task figures held');

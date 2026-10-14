@@ -37,12 +37,15 @@ test('IT KEEPS THE RULE FOR CALM: leave out what the page already does well', ()
   assert.match(SLASH_COMPOSE_INSTRUCTIONS, /Leave out whatever the page already does well/u);
 });
 
-test('THE ANSWER’S SHAPE HOLDS lead, order, hide AND next, and a bare line is still an answer', () => {
+test('THE ANSWER’S SHAPE HOLDS lead, order, hide, next AND group, and a bare line is still an answer', () => {
   assert.match(SLASH_COMPOSE_INSTRUCTIONS, /\{"lines":\{"<page id>":"<the line>"\}\}/u);
   assert.match(
     SLASH_COMPOSE_INSTRUCTIONS,
-    /\{"headline":"<the line>","lead":"<key>","order":\["<key>"\],"hide":\["<key>"\],"next":\{"row":"<handle>","text":"<the phrase>"\}\}/u,
+    /\{"headline":"<the line>","lead":"<key>","order":\["<key>"\],"hide":\["<key>"\],"next":\{"row":"<handle>","text":"<the phrase>"\},"group":\{"<key>":"<field>"\}\}/u,
   );
+  /* AND THE THIRD LEVER (ENG-B10): a field it was handed for that part, and none where nothing is long. */
+  assert.match(SLASH_COMPOSE_INSTRUCTIONS, /only a field handed in that part's `group`/u);
+  assert.match(SLASH_COMPOSE_INSTRUCTIONS, /Leave `group` out when nothing is long/u);
   /* WHAT THE RECORD'S CHECKS HOLD EACH PART TO, said first. */
   assert.match(SLASH_COMPOSE_INSTRUCTIONS, /each key once, only keys it was handed, and the lead line first/u);
   assert.match(SLASH_COMPOSE_INSTRUCTIONS, /the handle of one of its rows exactly as handed/u);

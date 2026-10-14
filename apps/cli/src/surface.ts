@@ -63,6 +63,9 @@ const reachable = <T>(r: Result<T>): Result<T> =>
  * `briefing`, `exceptions`, `stale` AND `about` JOINED WITH THEIR ADDRESSES (`braindog:briefing`, `braindog:exceptions`,
  * `braindog:stale`, `braindog:about/<name>`), for `actions`'s lesson: each backs a resource and no tool, so left off
  * this list the address is simply absent from a stdio session. The probe keeps each off until the client routes it.
+ *
+ * `learnings` JOINED WITH ITS ADDRESS (`braindog:learnings`), for the same lesson: an agent he runs from the command
+ * line reads the standing lessons before it works, as an agent over HTTP does.
  */
 const LATER = [
   'context',
@@ -85,6 +88,7 @@ const LATER = [
   'exceptions',
   'stale',
   'about',
+  'learnings',
 ] as const;
 
 export async function surfaceOver(clientFor: (ctx: Ctx) => Client): Promise<McpSurface<Ctx>> {

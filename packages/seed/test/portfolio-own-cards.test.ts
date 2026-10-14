@@ -7,7 +7,9 @@
  * project's own alone now, and a project with none draws neither.
  *
  * WHAT APPLIES EVERYWHERE IS NOT LOST: it stays in the record's own lists of keys and of skills, the lists Agents
- * stands over, and an agent working in the project is still handed it (`inScope`). It is said there, once.
+ * stands over, and an agent working in the project is still handed it (`inScope`). SINCE AGT-D12 the page says it
+ * too, in a block of its own under the three, And from everywhere, faint and without the project's mark
+ * (`portfolio-runs-tile.test.ts`); the three cards still hold the project's own alone.
  */
 
 import { test } from 'node:test';
@@ -121,7 +123,7 @@ test('WHAT APPLIES EVERYWHERE IS STILL IN THE LISTS AGENTS STANDS OVER, and stil
   }
 });
 
-test('THE THREE CARDS OVER WHAT A PROJECT RUNS ON ASK FOR THE PROJECT’S OWN, each in its own words', () => {
+test('THE THREE CARDS OVER WHAT A PROJECT RUNS ON ASK FOR THE PROJECT’S OWN, each in its own words, and one block for everybody’s', () => {
   const blocks = (PORTFOLIO_PAGES.project!.blocks as { source?: string; heading?: string; where?: string }[]).filter((b) => b.source === 'runs_on');
   assert.deepEqual(
     blocks.map((b) => [b.heading, b.where]),
@@ -129,6 +131,8 @@ test('THE THREE CARDS OVER WHAT A PROJECT RUNS ON ASK FOR THE PROJECT’S OWN, e
       ['Keys', 'kind is key, scope is project'],
       ['Tools and servers', 'kind is tool, scope is project'],
       ['Skills', 'kind is skill, scope is project'],
+      /* WHAT APPLIES EVERYWHERE IS ONE BLOCK AND NEVER ONE OF THE THREE, less the scheduled actions the panel draws. */
+      ['And from everywhere', 'kind is not action, scope is global'],
     ],
   );
 });

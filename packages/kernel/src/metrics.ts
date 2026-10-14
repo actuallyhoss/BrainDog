@@ -35,6 +35,7 @@ import { KERNEL_FIELDS, compile, evaluate, jsonPath, lookupRef, parseWhere, reso
 import { GROUP_CAP, bucketOf, bucketRun, bucketStart, isBucket, nextBucket, type Bucket } from './buckets.ts';
 import {
   GOVERNANCE_OPEN,
+  RECORD_ACTIVITY,
   HANDOFFS_OPEN,
   RECORD_DOOR,
   RECORD_KEYS,
@@ -48,6 +49,7 @@ import {
   RECORD_TIDY,
   RECORD_VITALS,
   SESSIONS_WORKING,
+  readActivity,
   readDeadPaths,
   readDoor,
   readHandoffsOpen,
@@ -1287,6 +1289,7 @@ export const sourceReaders = (): Readonly<Record<string, SourceReader>> => (read
   [RECORD_KEY_SCAN]: readKeysInText,
   [RECORD_LISTS]: readListsShrunk,
   [RECORD_PATHS]: readDeadPaths,
+  [RECORD_ACTIVITY]: readActivity,
 });
 
 /**

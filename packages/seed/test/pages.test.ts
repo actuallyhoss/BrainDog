@@ -205,8 +205,9 @@ test('and every column a block draws is a field the register declares', async ()
   const { k, sql } = await seeded();
   const missing: string[] = [];
   /* The ones the renderer supplies rather than the register: a row's number, who changed it last, and,
-     for the cash walk, its own three. Named, so another is a failure. */
-  const DERIVED = new Set(['seq', 'day', 'what', 'delta', 'balance', 'changed']);
+     for the cash walk, its own three. And what a run said it is doing, a column the record works out over the list
+     of runs (`withSaid`), no field of it. Named, so another is a failure. */
+  const DERIVED = new Set(['seq', 'day', 'what', 'delta', 'balance', 'changed', 'doing_said']);
 
   for (const [slug, page] of Object.entries(PAGES))
     for (const block of blocksOf(page as Record<string, unknown>)) {
