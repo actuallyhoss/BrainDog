@@ -93,7 +93,10 @@ function isFile(path: string): boolean {
 export function onPath(program: string, env: Env, platform: string = process.platform, cwd: string = process.cwd()): boolean {
   if (program.trim() === '') return false;
   const win = platform === 'win32';
-  const endings = win ? ['', ...(env.PATHEXT ?? '.COM;.EXE;.BAT;.CMD').split(';').filter((x) => x !== '')] : [''];
+  /* WINDOWS READS AN ENDING IN EITHER CASE, so `.CMD` finds `kiln.cmd`; each is tried as written and in lower case,
+     which a case-sensitive disk (a Linux runner) needs and a Windows or Mac disk does not mind. */
+  const listed = win ? (env.PATHEXT ?? '.COM;.EXE;.BAT;.CMD').split(';').filter((x) => x !== '') : [];
+  const endings = win ? ['', ...new Set(listed.flatMap((x) => [x, x.toLowerCase()]))] : [''];
   if (/[\\/]/.test(program)) return endings.some((x) => isFile(resolve(cwd, program + x)));
   const dirs = (env.PATH ?? env.Path ?? '').split(win ? ';' : ':').filter((d) => d !== '');
   return dirs.some((d) => endings.some((x) => isFile(join(d, program + x))));

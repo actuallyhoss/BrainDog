@@ -211,7 +211,11 @@ jobs:
     # 10 October: raised to 45 after batches 35 to 50 landed together and this leg ran past its old ceiling.
     timeout-minutes: 45
     steps:
+      # THE WHOLE HISTORY: the gate runner's own tests run `catalogue-immutable` against the released commit (SHL-B03),
+      # which a shallow checkout does not hold, as in the `gates` job above.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: ./.github/actions/setup
 
       - run: pnpm --filter @braindog/web build
