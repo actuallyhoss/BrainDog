@@ -10,7 +10,10 @@ export const QUEUE: Record<string, unknown>[] = [
        3.3.0, because it is the one tile here that needs the person, and three questions drawn whole were then the
        first screen of Money, with no number on it (the design review's fix 1). The questions are still on the first
        screen, beside the walk, and the app draws them compact there (`asks.ts`): the question and its suggested
-       answer, one press each. */
+       answer, one press each.
+
+       NOT PLACED ON MONEY SINCE REC-B23 step 7: the questions are answered in Decide, and its block went to the costs by
+       category (`pages/money.ts`). It stays declared for a page that wants it. */
     kind: 'queue',
     heading: 'Waiting on you',
     icon: 'ask',

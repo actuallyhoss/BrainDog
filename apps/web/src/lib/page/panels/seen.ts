@@ -10,8 +10,12 @@
  * renewal", after the day it was seen, "3 Oct", with its year when that is not this year. The read already passes no
  * id and no address; a place that still holds one is left out rather than printed.
  *
- * NOTHING AT NOUGHT, NOTHING ON A REFUSAL. A record that saw it nowhere, a reader the read refuses, and a host with no
- * `about` all answer `null`, and `null` draws nothing.
+ * WHAT WAITS ON HIM IS A PLACE TOO. The read answers an open question that names the thing as "Waiting on you: Renew
+ * Copperleaf's domain for another year?", and it is drawn as it came, after its day, among the other places.
+ *
+ * ONE SENTENCE AT NOUGHT, NOTHING ON A REFUSAL. One thing seen nowhere says "Nothing on the record mentions Copperleaf
+ * yet." under the heading, so the tile never stands over an empty body. A reader the read refuses, an answer that is
+ * candidates, and a host with no `about` all answer `null`, and `null` draws nothing.
  *
  * PURE, AND NODE LOADS IT: no import at all, so the panel's chunk carries it and the entry chunk never does.
  */
@@ -25,8 +29,11 @@ export type SeenPlace = { day: string; where: string };
 /** What the panel draws from: the thing's name and its other names, the first places, and how many more there are. */
 export type Seen = { name: string; also: string[]; places: SeenPlace[]; more: number };
 
-/** What a reader is shown: one line a place, the other names in one sentence, and the count of the rest. */
-export type SeenLines = { lines: string[]; also: string | null; more: string | null };
+/**
+ * What a reader is shown: one line a place, the other names in one sentence, the count of the rest, and the one
+ * sentence said when the thing was seen nowhere.
+ */
+export type SeenLines = { lines: string[]; also: string | null; more: string | null; none: string | null };
 
 /** How many places are drawn before "and N more". */
 export const SEEN_SHOWN = 8;
@@ -57,7 +64,8 @@ export function seenOf(answer: unknown): Seen | null {
     if (!day || where === '' || ROW_ID.test(where) || ADDRESS.test(where)) continue;
     all.push({ day, where });
   }
-  if (all.length === 0) return null;
+  /* ONE THING SEEN NOWHERE is still that thing: the panel says so in one sentence (`seenLines`). */
+  if (all.length === 0) return name === '' ? null : { name, also, places: [], more: 0 };
   /* NEWEST FIRST, whatever order they came in. */
   all.sort((x, y) => (x.day < y.day ? 1 : x.day > y.day ? -1 : 0));
   return { name, also, places: all.slice(0, SEEN_SHOWN), more: Math.max(0, all.length - SEEN_SHOWN) };
@@ -86,7 +94,8 @@ const joined = (names: readonly string[]): string =>
 
 /** The lines the panel draws: "3 Oct · Notes: Spoke to Sara at Northbank", "Also known as Sara I.", "and 4 more". */
 export function seenLines(found: Seen | null, now: number): SeenLines {
-  if (!found || found.places.length === 0) return { lines: [], also: null, more: null };
+  if (!found) return { lines: [], also: null, more: null, none: null };
+  if (found.places.length === 0) return { lines: [], also: null, more: null, none: found.name === '' ? null : `Nothing on the record mentions ${found.name} yet.` };
   const lines = found.places.slice(0, SEEN_SHOWN).map((p) => `${seenDay(p.day, now)} · ${p.where}`);
   const rest = found.more + Math.max(0, found.places.length - SEEN_SHOWN);
   const names = joined(found.also);
@@ -94,5 +103,6 @@ export function seenLines(found: Seen | null, now: number): SeenLines {
     lines,
     also: names === '' ? null : `Also known as ${names}${names.endsWith('.') ? '' : '.'}`,
     more: rest > 0 ? `and ${rest.toLocaleString('en-GB')} more` : null,
+    none: null,
   };
 }

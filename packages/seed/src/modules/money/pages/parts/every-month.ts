@@ -27,9 +27,8 @@ export const EVERY_MONTH: Record<string, unknown>[] = [
        cell above reads, so the parts add up to it (`every-month-by-category`). What nobody gave a category is the whole
        less the parts, named and never left out, as This month's spending names it.
 
-       DECLARED AND NOT PLACED YET: Money stands at the most blocks a page declares (`BLOCK_CEILING` in
-       `packages/kernel/src/declare.ts`), and the walk of the next thirty days gave up one, which the cells above took.
-       It comes in with the next block the page gives up. */
+       PLACED SINCE REC-B23 step 7, straight after the cells above, in the block Waiting on you gave up when the
+       questions went to Decide (`pages/money.ts`). */
     kind: 'bar',
     heading: 'Every month, by category',
     icon: 'chart-bar',

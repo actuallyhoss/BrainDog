@@ -72,10 +72,39 @@ test('EIGHT PLACES, THEN "and N more"', () => {
   assert.equal(seenLines(seenOf(answer(seen.slice(0, 8))), NOW).more, null);
 });
 
-test('SEEN NOWHERE DRAWS NOTHING', () => {
-  assert.equal(seenOf(answer([])), null);
-  assert.deepEqual(seenLines(null, NOW), { lines: [], also: null, more: null });
+test('SEEN NOWHERE SAYS ONE SENTENCE, and draws no lines', () => {
+  const found = seenOf(answer([], ['Sara I.']));
+  assert.deepEqual(found, { name: 'Sara Idris', also: ['Sara I.'], places: [], more: 0 });
+  assert.deepEqual(seenLines(found, NOW), { lines: [], also: null, more: null, none: 'Nothing on the record mentions Sara Idris yet.' });
+  /* A PLACE THAT IS LEFT OUT LEAVES NOTHING, so it is the same sentence. */
+  assert.equal(seenLines(seenOf(answer([{ at: 'never', where: 'Notes: Undated' }])), NOW).none, 'Nothing on the record mentions Sara Idris yet.');
+  assert.deepEqual(seenLines(null, NOW), { lines: [], also: null, more: null, none: null });
   assert.equal(seenOf({ ok: true, value: { is: null, candidates: [] } }), null, 'nothing the reader may read answers');
+  /* A THING WITH NO NAME is not said by one. */
+  assert.equal(seenOf({ ok: true, value: { is: { kind: 'person', name: '', also: [], seen: [] }, candidates: [] } }), null);
+  /* PLACES, AND NO SENTENCE. */
+  assert.equal(seenLines(seenOf(answer([{ at: '2026-10-03T00:00:00Z', where: 'Notes: Kickoff' }])), NOW).none, null);
+});
+
+test('WHAT WAITS ON HIM IS A LINE WITH ITS DAY, as it came', () => {
+  const out = seenLines(
+    seenOf(
+      answer([
+        { at: '2026-10-01T00:00:00Z', where: 'Notes: Kickoff' },
+        { at: '2026-10-12T08:00:00.000Z', where: "Waiting on you: Renew Quillmark's domain for another year?" },
+      ]),
+    ),
+    NOW,
+  );
+  assert.deepEqual(out.lines, ["12 Oct · Waiting on you: Renew Quillmark's domain for another year?", '1 Oct · Notes: Kickoff']);
+  assert.equal(out.none, null);
+});
+
+test('A REFUSAL AND A CANDIDATES ANSWER STILL SAY NOTHING, not the sentence', async () => {
+  const refused = await readSeen(asked({ ok: false, refusal: { code: 'FORBIDDEN', message: 'No.' } }).call, ROW);
+  assert.deepEqual(seenLines(refused, NOW), { lines: [], also: null, more: null, none: null });
+  const two = { ok: true, value: { is: null, candidates: [{ kind: 'person', name: 'Sara Idris', also: [], seen: [], register: 'contacts', seq: 4 }] } };
+  assert.equal(seenLines(await readSeen(asked(two).call, ROW), NOW).none, null);
 });
 
 test('A REFUSAL, A HOST WITH NO `about`, AND A CALL THAT THREW ALL ANSWER NULL', async () => {

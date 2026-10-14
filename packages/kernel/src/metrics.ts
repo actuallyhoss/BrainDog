@@ -73,6 +73,7 @@ import type { VitalSign } from './signs.ts';
 import { across, convertMinor, dayFieldOf, isAtLeast, pairParts, partsOf, rateFor, rateIsStale, type Across as Added, type Amount, type Part, type Rate, type Reduce } from './fx.ts';
 /* THE TWO FIGURES THAT ARE NOT A SUM OVER ONE LIST, read in their own file, which imports this one back (it says why that is safe). */
 import { isCrosscheck, isRolled, isWalked, readCrosscheck, readRolled, readWalk } from './money-figures.ts';
+import { fill } from './fill.ts';
 import { TREND_POINTS, trendOf, type Trend } from './trend.ts';
 
 /** The six this build reads. The other five are `08` §2.2's and are refused by name. */
@@ -122,6 +123,17 @@ export type Before = (typeof BEFORE)[number];
  * one source and one predicate still, which is what a half's own `where` would not be (`declare.ts`).
  */
 export type Value = Aggregation | { ratio: { of: Aggregation; per: Aggregation } } | { diff: { of: Aggregation; per: Aggregation; before?: Before | undefined } };
+
+/**
+ * A FIGURE THAT ADDS OTHER FIGURES (REC-B06): cash held less what is owed out is a net position, `{ sum_of: [{ metric:
+ * cash-now }, { metric: owed-out, minus: true }] }`. Each part is an installed figure by its id, with a parameter after
+ * the first colon as a walk's opening takes one (`book-cash:Kiln`), and `minus` takes it away (`readSumOf`).
+ *
+ * A VALUE OF ITS OWN, BESIDE `Value` AND NOT IN IT, as cash rolled forward and a trend are: every reader of `Value`
+ * narrows it to an aggregation over one list (`rules.ts` `addsMoney`, `fieldsOf`), and a sum of figures is none.
+ * `evaluateMetric` reads it before any of them is reached, and `isSumOf` is how a reader tells.
+ */
+export type SumOf = { sum_of: { metric: string; minus?: boolean | undefined }[] };
 
 export type MetricDecl = {
   metric: string;
@@ -1375,6 +1387,11 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
 
   /* CASH ROLLED FORWARD AND THE WALK AHEAD ARE READ IN THEIR OWN FILE (`money-figures.ts`), after the two keys every
      figure needs and before anything that assumes one aggregation over one list. */
+  /* A SUM OF FIGURES (REC-B06) reads each part back through here and adds the readings (`readSumOf`). */
+  if (isSumOf(decl.value)) {
+    if (refusals.length) return { ok: false, refusal: refusals[0]! };
+    return readSumOf(sql, decl, ctx);
+  }
   if (isRolled(decl.value) || isWalked(decl)) {
     if (refusals.length) return { ok: false, refusal: refusals[0]! };
     return isWalked(decl) ? readWalk(sql, decl, ctx) : readRolled(sql, decl, ctx);
@@ -1986,6 +2003,153 @@ function readTrend(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result<Reading
     refusals: [],
     ...(shown.value.fx ? { fx: shown.value.fx } : {}),
     trend,
+  });
+}
+
+/* ── a sum of figures (REC-B06) ────────────────────────────────── */
+
+/** How many figures one sum adds, and how many sums deep a sum of sums may go. */
+export const SUM_OF_PARTS_MOST = 8;
+export const SUM_OF_DEPTH_MOST = 3;
+
+/** Whether a value is a sum of other figures: `{ sum_of: [...] }` at its top. */
+export const isSumOf = (value: unknown): value is SumOf => isShape(value, 'sum_of');
+
+/** A part's id and its parameter: THE FIRST COLON SEPARATES, as in a walk's opening (`book-cash:Kiln`). */
+const partOf = (said: string): { named: string; param: string | undefined } => {
+  const colon = said.indexOf(':');
+  return colon < 0 ? { named: said, param: undefined } : { named: said.slice(0, colon), param: said.slice(colon + 1) };
+};
+
+/**
+ * What is wrong with a sum of figures, in words, or `null`: the one check install and the reader both make.
+ *
+ * `bodyOf` is the installed (or staged) body of a figure by its id, or `null`. A part that names the figure itself, a
+ * part nobody installed, money added to a figure that is not money, more than `SUM_OF_PARTS_MOST` parts and a chain of
+ * sums deeper than `SUM_OF_DEPTH_MOST` are each refused, and the depth is what ends a loop of sums naming each other.
+ */
+export function sumOfFault(value: SumOf, self: string, bodyOf: (id: string) => MetricDecl | null, depth = 1): string | null {
+  const parts: unknown = (value as { sum_of?: unknown }).sum_of;
+  if (!Array.isArray(parts) || parts.length === 0) return 'a sum of figures names them, as sum_of: [{ metric: cash-now }, { metric: owed-out, minus: true }]';
+  if (parts.length > SUM_OF_PARTS_MOST) return `a sum of figures adds ${SUM_OF_PARTS_MOST} at most, and this one names ${parts.length}`;
+  if (depth > SUM_OF_DEPTH_MOST) return `a sum of sums goes ${SUM_OF_DEPTH_MOST} deep at most, and ${self} is ${depth} deep`;
+  let money: string | null = null;
+  let plain: string | null = null;
+  for (const part of parts as unknown[]) {
+    const p = part as { metric?: unknown; minus?: unknown } | null;
+    const shaped = p !== null && typeof p === 'object' && !Array.isArray(p) && keysOf(p).every((k) => k === 'metric' || k === 'minus');
+    if (!shaped || typeof p.metric !== 'string' || p.metric === '' || (p.minus !== undefined && typeof p.minus !== 'boolean'))
+      return 'each part is { metric: <a figure> }, with minus: true when it is taken away';
+    const { named } = partOf(p.metric);
+    if (named === self) return `a sum adds other figures, and ${named} is this one`;
+    const body = bodyOf(named);
+    if (!body) return `there is no figure called ${named} to add`;
+    if (isMoneyFormat(body.format)) money ??= named;
+    else plain ??= named;
+    if (isSumOf(body.value)) {
+      const deeper = sumOfFault(body.value, named, bodyOf, depth + 1);
+      if (deeper) return deeper;
+    }
+  }
+  if (money !== null && plain !== null) return `${money} is money and ${plain} is not: a sum adds money to money, or numbers to numbers`;
+  return null;
+}
+
+/** An installed figure's body by its id, read off its live declaration as a walk's opening is. */
+const installedFigure = (sql: Sql, id: string): MetricDecl | null => {
+  const row = sql.one<{ body: string }>("SELECT body FROM declaration WHERE id = ? AND kind = 'metric' AND superseded_at IS NULL AND retired = 0", `metric.${id}`);
+  return row ? (JSON.parse(row.body) as MetricDecl) : null;
+};
+
+/**
+ * A SUM OF FIGURES: each part read through `evaluateMetric` with the same context, as any page reads it, then added.
+ *
+ * EACH READING BECOMES SIGNED AMOUNTS, its value in its unit or its `parts` one a currency, and they are added by
+ * `across` and said by `acrossSaid`, so the sum converts, is at least, or comes back in parts exactly as a sum over a
+ * list does. Two currencies are never added as they are. A part's own reading has converted what it could at the rates
+ * of its rows' days; what is still in another currency is priced at the sum's day.
+ *
+ * AT LEAST ONLY WHILE NOTHING UNPRICED IS TAKEN AWAY. A lower bound less an amount nobody could price is a bound on
+ * nothing, so a negative amount in another currency left without a rate gives the parts, never `atLeast`.
+ *
+ * A KEPT POINT (`ctx.point`) IS A NUMBER ONLY WHEN EVERY PART IS ONE: a part that named a pair it had no rate of names
+ * it again here, and the night writes no point.
+ */
+function readSumOf(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result<Reading> {
+  /* Each refusal is `no(` and its code, written out, because the gate that counts emitted codes reads them there. */
+  const mine = (fix: string): string => `${decl.metric}: ${fix}`;
+  const parts = ((decl.value as unknown as SumOf).sum_of ?? []) as SumOf['sum_of'];
+  for (const p of Array.isArray(parts) ? parts : []) {
+    const named = typeof p?.metric === 'string' && p.metric !== '' ? partOf(p.metric).named : null;
+    if (named !== null && named !== decl.metric && installedFigure(sql, named) === null)
+      return no<Reading>('METRIC_UNKNOWN', mine(`there is no figure called ${named} to add`), { at: 'value' });
+  }
+  const fault = sumOfFault(decl.value as unknown as SumOf, decl.metric, (id) => installedFigure(sql, id));
+  if (fault) return no<Reading>('DECLARATION_INVALID', mine(fault), { at: 'value' });
+  if (decl.compare !== undefined && decl.compare !== 'none')
+    return no<Reading>('DECLARATION_INVALID', mine('a sum of figures is not compared with a window before: write compare: none'), { at: 'compare' });
+  if (decl.group_by !== undefined || decl.bucket !== undefined)
+    return no<Reading>('DECLARATION_INVALID', mine('a sum of figures is one number: leave group_by and bucket out'), { at: decl.group_by !== undefined ? 'group_by' : 'bucket' });
+  if (decl.where !== undefined) return no<Reading>('DECLARATION_INVALID', mine('a sum of figures chooses no entries of its own: leave where out'), { at: 'where' });
+
+  const held = ctx.fx?.() ?? { home: null, rates: [] };
+  const today = new Date(clockOf(ctx)).toISOString().slice(0, 10);
+  const amounts: Amount[] = [];
+  const missing = new Set<string>();
+  let count = 0;
+  let money = false;
+  let rows = 0;
+  let scope = 0;
+  let unread: string | null = null;
+  for (const p of parts) {
+    const { named, param } = partOf(p.metric);
+    /* A HOLE NOBODY FILLED IS NO NAME TO ASK ABOUT, as a walk's opening says (`readWalk`). */
+    if (param !== undefined && /\{\{\w+\}\}/.test(param))
+      return no<Reading>('REQUIRED_MISSING', mine(`this figure is read once for each of something and adds ${named} for the same one. Ask for it by name, as ${decl.metric}:<name>.`), { at: 'value' });
+    const body = installedFigure(sql, named)!;
+    const figure = param === undefined ? body : (fill(body, null, param) as MetricDecl);
+    const read = evaluateMetric(sql, figure, ctx);
+    if (!read.ok) return read;
+    const r = read.value;
+    rows += r.rows;
+    scope += r.held;
+    for (const pair of r.fx?.missing ?? []) missing.add(pair);
+    const sign = p.minus === true ? -1 : 1;
+    if (!isMoneyFormat(figure.format)) {
+      if (r.value === null) unread ??= figure.name || named;
+      else count += sign * r.value;
+      continue;
+    }
+    money = true;
+    if (r.value !== null && r.unit !== null) amounts.push({ currency: r.unit, amount: sign * r.value, day: null });
+    else if (r.value === null && r.parts) for (const part of r.parts) amounts.push({ currency: part.currency, amount: sign * part.amount, day: null });
+    /* A SUM OVER NOTHING IS NOUGHT WITH NO CURRENCY, and adds nothing. Any other money with no currency is no amount. */
+    else if (r.value !== 0) unread ??= figure.name || named;
+  }
+
+  const sum: AcrossSaid = (() => {
+    if (unread !== null || !money) return { value: unread === null ? count : null, unit: null };
+    const pairs = (): FxRead => ({ into: held.home, home: held.home, asOf: null, forward: false, stale: false, missing: [...missing].sort() });
+    if (ctx.point && missing.size > 0) return { value: null, unit: null, parts: partsOf(amounts), fx: pairs() };
+    const gap = ctx.point ? pointSaid(amounts, held.home, held.home, held.rates, today) : null;
+    if (gap) return gap;
+    const priced = !amounts.some((a) => a.amount < 0 && a.currency !== held.home);
+    const said = acrossSaid(across(amounts, held.home, held.rates, today, held.home !== null), amounts, held.home, held.home, priced);
+    /* A PAIR A PART COULD NOT PRICE IS STILL NAMED when the sum has no value either: which rate would add it up. */
+    if (said.value === null && said.fx && missing.size > 0) return { ...said, fx: { ...said.fx, missing: [...new Set([...said.fx.missing, ...missing])].sort() } };
+    return said;
+  })();
+
+  const { met, targetIn } = verdictOf({ format: decl.format, target: decl.target }, sum.value, sum.unit, held.rates, today);
+  return ok({
+    ...sum,
+    rows,
+    held: scope,
+    delta: null,
+    why: unread !== null ? `${unread} has no number to add` : 'a sum of figures is not compared with a window before',
+    met: heldVerdict(met, scope),
+    refusals: [],
+    ...(targetIn ? { targetIn } : {}),
   });
 }
 
@@ -3232,9 +3396,19 @@ const NO_RATE_SOURCE = 'night.no-rate';
 
 /**
  * `missing` is every day asked for that got no point, and `noRate` is how many of those are missing for want of a rate
- * of that day (REC-B05): the figure had its rows and no way to price them as that day's.
+ * of that day (REC-B05): the figure had its rows and no way to price them as that day's. `rewrote` is how many days of
+ * the night's window (`REWRITE_DAYS`) held a point whose value or unit the night moved.
  */
-export type Snapshot = { series: string; wrote: number; backfilled: number; missing: number; noRate: number };
+export type Snapshot = { series: string; wrote: number; backfilled: number; rewrote: number; missing: number; noRate: number };
+
+/**
+ * HOW MANY DAYS, YESTERDAY FIRST, EACH NIGHT READS AGAIN AND CORRECTS (REC-B06): yesterday and the two before it.
+ *
+ * A bank's text for a Friday lands on the Saturday, and an entry dated Thursday is written down on Saturday morning. Kept
+ * fill-only, the point of Thursday was the cash before that entry for as long as the line lasted. Three is a weekend and
+ * the day each side of it; a later entry than that is a correction a person makes, and the backfill fills gaps only.
+ */
+export const REWRITE_DAYS = 3;
 
 /**
  * Yesterday's reading, written down.
@@ -3250,6 +3424,11 @@ export type Snapshot = { series: string; wrote: number; backfilled: number; miss
  * AND IT BACKFILLS, thirty days, once. A series that starts the day somebody turned it on has no
  * shape for a month, and the record already holds the rows every one of those days is a question
  * about. The backfill never overwrites: a day that has a point keeps it.
+ *
+ * AND IT CORRECTS THE LAST THREE NIGHTS, BY THREE RULES. Yesterday and the two days before it (`REWRITE_DAYS`) are read
+ * again every night and written only where the value or the unit stored differs, so a day nothing changed keeps its
+ * `wrote_at`. A point this writer did not write (its `source` is not the figure's) is never overwritten. Every day
+ * before the three is fill-only, as the backfill always was.
  */
 /**
  * The unit a fractional figure is stored in, and the factor that gets it there.
@@ -3627,9 +3806,15 @@ export function snapshot(
   const yesterday = back(at(ctx.nowMs), 1);
 
   let noRate = 0;
-  const write = (day: string, overwrite: boolean): 'wrote' | 'kept' | 'missing' => {
-    if (!overwrite && sql.one("SELECT 1 AS x FROM metric_point WHERE series = ? AND grain = 'day' AND at = ?", decl.metric, day))
-      return 'kept';
+  /* `wrote` a day that held no point, `rewrote` one whose value or unit moved, `same` one read again and found as kept. */
+  const write = (day: string, overwrite: boolean): 'wrote' | 'rewrote' | 'same' | 'kept' | 'missing' => {
+    const held = sql.one<{ value: number; unit: string | null; source: string | null }>(
+      "SELECT value, unit, source FROM metric_point WHERE series = ? AND grain = 'day' AND at = ?",
+      decl.metric,
+      day,
+    );
+    /* A POINT ANOTHER WRITER KEPT IS ITS OWN (an import, a figure fetched from a provider): this night never moves it. */
+    if (held && (!overwrite || held.source !== decl.source)) return 'kept';
 
     /**
      * AND THE QUESTION IS ASKED OF THAT DAY'S DATE, NOT OF AN INSTANT IN IT.
@@ -3650,6 +3835,9 @@ export function snapshot(
     /* A NULL VALUE IS NO ROW. A series with a zero on every day nothing happened is a series that
        cannot tell "nothing" from "no answer", and the difference is the whole of a trend. */
     if (!read.ok || read.value.value === null) {
+      /* A DAY THAT HAS ITS POINT KEEPS IT when the night reads it again and finds no number: a rate gone quiet or a late
+         entry in a currency with no rate makes the day unknown, not nothing, and the point it had is still the best said. */
+      if (held) return 'kept';
       /* THE REASON IS "NO RATE" when the figure named a pair it could not price, or left amounts out and is at least:
          a lower bound is not that day's number either. A night with no rate is counted, and a later night with one
          fills the day in, since the backfill writes every day that holds no point. */
@@ -3672,6 +3860,8 @@ export function snapshot(
     sql.exec("DELETE FROM metric_point WHERE series = ? AND grain = 'day' AND at = ?", noRateLine(decl.metric), day);
 
     const wrote = point(read.value.value, read.value.unit);
+    /* THE SAME ANSWER IS NOT WRITTEN AGAIN, so `wrote_at` still says when the day last moved. */
+    if (held && Number(held.value) === wrote.value && (held.unit ?? '') === (wrote.unit ?? '')) return 'same';
 
     sql.exec(
       `INSERT INTO metric_point (series, grain, at, value, unit, n, source, wrote_at) VALUES (?, 'day', ?, ?, ?, ?, ?, ?)
@@ -3686,20 +3876,24 @@ export function snapshot(
       decl.source,
       deps.nowAt,
     );
-    return 'wrote';
+    return held ? 'rewrote' : 'wrote';
   };
 
-  /* YESTERDAY IS OVERWRITTEN, because a snapshot that ran twice in one day should agree with itself
-     rather than refuse the second time. Every earlier day is kept. */
+  /* YESTERDAY AND THE TWO DAYS BEFORE IT ARE READ AGAIN (`REWRITE_DAYS`), so a snapshot that ran twice in one day agrees
+     with itself and a Thursday entry that lands on Saturday moves Thursday. No further back than the backfill reaches:
+     a night asked for no days behind yesterday reads yesterday alone. Every earlier day is kept. */
   const today = write(yesterday, true);
   let backfilled = 0;
+  let rewrote = today === 'rewrote' ? 1 : 0;
   let missing = today === 'missing' ? 1 : 0;
 
   for (let n = 1; n <= backfillDays; n++) {
-    const out = write(back(yesterday, n), false);
+    const out = write(back(yesterday, n), n < REWRITE_DAYS);
     if (out === 'wrote') backfilled++;
+    if (out === 'rewrote') rewrote++;
     if (out === 'missing') missing++;
   }
 
-  return ok({ series: decl.metric, wrote: today === 'wrote' ? 1 : 0, backfilled, missing, noRate });
+  /* `wrote` is whether yesterday holds this figure's point after the night, written now or found as it was kept. */
+  return ok({ series: decl.metric, wrote: today === 'wrote' || today === 'rewrote' || today === 'same' ? 1 : 0, backfilled, rewrote, missing, noRate });
 }

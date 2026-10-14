@@ -180,7 +180,7 @@ test('INSTALLED IN ORDER ON AN EMPTY RECORD, each through its own plan, they mak
   assert.deepEqual(own(shapes(one.k)), own(shapes(whole.k)));
   /* And those legs and blocks are the only difference: every other declaration is the starter's byte for byte. */
   const differ = shapes(one.k).filter(([id, body]) => shapes(whole.k).find(([w]) => w === id)?.[1] !== body).map(([id]) => id);
-  assert.deepEqual(differ, ['metric.arriving-30d', 'metric.leaving-30d', 'metric.runs-out-on', 'metric.runway-days', 'page.relation']);
+  assert.deepEqual(differ, ['metric.arriving-30d', 'metric.lasts-no-income', 'metric.leaving-30d', 'metric.runs-out-on', 'metric.runway-days', 'page.relation']);
 
   /* Each pack's claims are its own, so turning one off later retires only what it brought. */
   for (const id of FIRST_PARTY) assert.deepEqual([...one.k.packClaims(id)].sort(), firstPartyManifest(id).provides);

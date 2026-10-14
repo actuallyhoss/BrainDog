@@ -49,6 +49,7 @@ import { methods as capture } from './capture.ts';
 import { methods as shape } from './shape.ts';
 import { methods as countBy } from './count-by.ts';
 import { methods as trust } from './trust.ts';
+import { methods as importsMethods } from './imports.ts';
 import { methods as sameOne } from './same-one.ts';
 import { methods as offered } from './offered.ts';
 import { methods as heldTwice } from './held-twice.ts';
@@ -63,6 +64,7 @@ import { methods as learned } from './learned.ts';
 import { methods as inboxHints } from './inbox-hints.ts';
 import { methods as skillsBehindMethods } from './skills-behind.ts';
 import { methods as toolsSeenMethods } from './tools-seen.ts';
+import { methods as namedTwiceMethods } from './named-twice.ts';
 /* END METHODS */
 
 /**
@@ -176,6 +178,7 @@ export function methods(deps: RecordDeps) {
     ...shape(deps),
     ...countBy(deps),
     ...trust(deps),
+    ...importsMethods(deps),
     ...sameOne(deps),
     ...offered(deps),
     ...heldTwice(deps),
@@ -190,6 +193,7 @@ export function methods(deps: RecordDeps) {
     ...inboxHints(deps),
     ...skillsBehindMethods(deps),
     ...toolsSeenMethods(deps),
+    ...namedTwiceMethods(deps),
     /* END METHODS */
   };
 }

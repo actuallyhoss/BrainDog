@@ -67,6 +67,7 @@
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
   import { since } from 'braindog-render';
   import { createClient } from '@braindog/client';
+  import { words as kindWords } from '$lib/agents/new-kind.ts';
   import {
     detailOf,
     enrolAddress,
@@ -386,6 +387,7 @@
     {/if}
     {#if fix}<p class="sheet-fix" role="status">{fix}</p>{/if}
   {/if}
+  <a class="link" href={at('/agents/new-kind')}>{kindWords.open}</a>
   {#snippet footer()}
     <Button weight="primary" disabled={busy || kind === null} onclick={() => void start()}>{kind ? words.start(kind.title) : words.startAny}</Button>
   {/snippet}
@@ -734,6 +736,18 @@
     font-weight: 500;
   }
 
+  .link {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: var(--ctl-h);
+    margin-block-start: var(--sp-3);
+    color: var(--link);
+  }
+  @media (pointer: coarse) {
+    .link {
+      min-block-size: var(--tap);
+    }
+  }
   .arg {
     display: flex;
     flex-direction: column;

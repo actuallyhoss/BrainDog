@@ -439,6 +439,8 @@
   type FaultsFound = import('./text-faults.ts').TextFaults;
   type LearnedPart = typeof import('./Learned.svelte').default;
   type LearnedFound = import('./learned.ts').Learned;
+  type NamedPart = typeof import('./NamedTwice.svelte').default;
+  type NamedFound = import('./named-twice.ts').NamedTile;
   let brief = $state.raw<{ cards: readonly BriefingRow[]; foot: string | null; Part: BriefingPart } | null>(null);
   let matched = $state.raw<{ rows: readonly MatchedRow[]; Part: MatchedPart } | null>(null);
   let stale = $state.raw<{ rows: readonly StaleRow[]; Part: StalePart } | null>(null);
@@ -446,6 +448,8 @@
   let faults = $state.raw<{ found: FaultsFound; Part: FaultsPart } | null>(null);
   /* WHAT THE ANSWERS TAUGHT, kept only when there is something: nought draws nothing. */
   let learned = $state.raw<{ found: LearnedFound; Part: LearnedPart } | null>(null);
+  /* WHAT MAY BE ONE, kept only when there is something: nought draws nothing. */
+  let named = $state.raw<{ found: NamedFound; Part: NamedPart } | null>(null);
   $effect(() => {
     if (data.refused) return;
     void moving.version;
@@ -475,6 +479,11 @@
     void Promise.all([import('./learned.ts'), import('./Learned.svelte')]).then(async ([m, part]) => {
       const found = await m.loadLearned(base);
       if (here) learned = found && found.rows.length > 0 ? { found, Part: part.default } : null;
+    }, () => undefined);
+    /* AND LAST, WHAT MAY BE ONE, out of the bracket the same way. */
+    void Promise.all([import('./named-twice.ts'), import('./NamedTwice.svelte')]).then(async ([m, part]) => {
+      const found = await m.loadNamedTwice(base);
+      if (here) named = found && found.lines.length > 0 ? { found, Part: part.default } : null;
     }, () => undefined);
     void Promise.allSettled([briefing, matches, stales]).then(() => closed(true, at));
     return () => {
@@ -661,8 +670,10 @@
       nothing at nought.
     -->
     {#if faults}<faults.Part found={faults.found} lists={data.lists} />{/if}
-    <!-- WHAT THE ANSWERS TAUGHT, the board's very last tile: what the record will not ask again. Nothing at nought. -->
+    <!-- WHAT THE ANSWERS TAUGHT, after the faults: what the record will not ask again. Nothing at nought. -->
     {#if learned}<learned.Part found={learned.found} />{/if}
+    <!-- WHAT MAY BE ONE, the board's very last tile: a pair he can put to Decide. Nothing at nought. -->
+    {#if named}<named.Part found={named.found} />{/if}
   {/if}
 </div>
 

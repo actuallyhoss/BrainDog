@@ -57,9 +57,11 @@ const POUNDS: Side = { currency: 'GBP', word: 'pounds', times: 1, savings: 0 };
 /* DOLLARS ARE THREE TIMES THE POUNDS, so a part that came from the wrong currency, or a bare sum, is never the right number
    by chance. AND ONLY THE DOLLARS SAVE: rows in the same shape in both currencies run out on the same day however they are
    added, so the runway of a bare sum could not be told from a converted one without money that is in one currency only.
-   Measured: with 700,000 saved the bare sum runs out in 248 days and the converted amount in 218. Most savings below it
-   give both the same day, since the walk steps a month at a time. */
-const DOLLARS: Side = { currency: 'USD', word: 'dollars', times: 3, savings: 700_000 };
+   Measured: with 1,100,000 saved the bare sum runs out in 340 days and the converted amount in 309, and with no income
+   (money-core 3.17.0's `lasts-no-income`) in 279 and 248. Most savings give both the same day for one of the two, since
+   the walk steps a month at a time: 700,000, the amount before, kept the runways apart and gave 187 for both with no
+   income. Only about 1,080,000 to 1,120,000 keeps both pairs apart and still runs out inside the runway's year. */
+const DOLLARS: Side = { currency: 'USD', word: 'dollars', times: 3, savings: 1_100_000 };
 /** What a bare sum reads: the dollars' rows, written as pounds. */
 const DOLLARS_AS_POUNDS: Side = { ...DOLLARS, currency: 'GBP' };
 

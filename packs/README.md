@@ -121,6 +121,7 @@ Roughly from the simplest to the most involved, each with what it shows you how 
 | `project-brief` | On each project, one line on what it is, the plan, and what is in the way. | `extends`: optional fields laid on another add-on's list, and a block added to its page. |
 | `pad` | Notes beside the work, with a second opinion from Slash under each one. | An automation that asks Slash and writes the answer back, with no code. |
 | `standup` | One message every morning: what moved, what is blocked, and what agents finished. | A daily digest whose sections are left out when empty, so a quiet morning sends nothing. |
+| `agent-notes` | Two short notes a day about your agents: what they ask you, what they did, what is stuck. | Two daily digests over computed sources, every section left out when empty, in the app and by push, never by mail. |
 | `week-in-money` | One message every Monday: cash now, what fell due each way, and what money arrived. | A weekly digest with a figure, and two sentences from Slash on top (`prose: slash`). |
 | `holdings` | What you hold rather than spend, with what each one cost and what they cost together. | Figures over a list, and a small script run by a rule and once a day. |
 | `dates` | The days somebody else fixed: a deadline, a window with a last day, and a date that comes round. | A script started by a rule on a daily clock, and a row moved by an update so its history keeps every turn. |

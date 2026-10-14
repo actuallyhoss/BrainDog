@@ -62,7 +62,7 @@ import { panelFault, roadmapFault, shortFault } from './kinds/words.ts';
 import type { FlowDecl } from './rules.ts';
 import { alsoFault, linkFault } from './rule-link.ts';
 /* THE FORMAT, THE WINDOW AND THE TWO FIGURES THAT ARE NOT A SUM, checked here by the same functions that read them. */
-import { clockOf, isMoneyFormat, kindOf, pastFault, TREND_AHEAD_MOST, windowMs, type EvalContext } from './metrics.ts';
+import { clockOf, isMoneyFormat, isSumOf, kindOf, pastFault, sumOfFault, TREND_AHEAD_MOST, windowMs, type EvalContext, type MetricDecl } from './metrics.ts';
 import { WALKS, WALK_SOURCE, crosscheckFault, isCrosscheck, isRolled, rolledFault, walksToZero, type Rolled } from './money-figures.ts';
 import { INDEX_CEILING } from './observe.ts';
 import { SOURCE_MODULES, sourceModule } from './sources/index.ts';
@@ -551,6 +551,12 @@ function metricBody(decl: Declaration, installed?: Known): Refusal | null {
 
   /* CASH ROLLED FORWARD is read over a list of accounts, and its body names every field it reads. */
   const walks = body.source === WALK_SOURCE;
+  /* A SUM OF FIGURES IS CHECKED AT INSTALL against what is installed, the one check the reader makes too (`metrics.ts`). */
+  if (isSumOf(body.value) && installed !== undefined) {
+    const self = String((decl.body as { metric?: unknown }).metric ?? id.replace(/^metric\./u, ''));
+    const fault = sumOfFault(body.value, self, (part) => (installed.get(`metric.${part}`) as unknown as MetricDecl | undefined) ?? null);
+    if (fault) return bad('DECLARATION_INVALID', `${id}: ${fault}`, 'value');
+  }
   if (isRolled(body.value)) {
     if (walks || !String(body.source).startsWith('register.'))
       return bad('DECLARATION_INVALID', `${id} rolls cash forward over a list of accounts, so its source is register.<id>.`, 'source');

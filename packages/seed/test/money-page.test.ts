@@ -7,8 +7,12 @@
  * out every month after the chart, the walk of thirty days is off the page, and the chart reads six months back and
  * three ahead. The page is at the most blocks a page declares still, with the same tiles before its fold.
  *
+ * AND WHAT THE COSTS ARE FOR, WITH THE QUESTIONS IN DECIDE (REC-B23 step 7): Waiting on you is off the side column, and
+ * its block went to the bar of what repeats by category, straight after Every month.
+ *
  * RED FIRST, against money.ts before this change: no block was headed Every month, a bridge stood under Coming and
- * going, and the chart read twelve months back.
+ * going, and the chart read twelve months back; and, before step 7, the queue stood in the side column and the bar
+ * was declared and not placed.
  */
 
 import { test } from 'node:test';
@@ -109,11 +113,24 @@ test('MONEY HOLDS EVERY MONTH AFTER INSTALMENTS, inside Coming and going, and no
   ]);
   assert.deepEqual(block.when, { metric: 'every-month-out', gt: 0 });
 
-  /* THE COSTS BY CATEGORY ARE DECLARED AND NOT PLACED: 24 blocks held the two figures and not the bar. When this fails
-     somebody placed it, and the page has to have given up a block for it. */
-  const bar = EVERY_MONTH[1] as Declared;
-  assert.deepEqual([bar.kind, bar.source], ['bar', 'metric.every-month-by-category']);
-  assert.ok(!BLOCKS.includes(bar as never), 'the costs by category are on Money with no block given up for them');
+});
+
+test('THE COSTS BY CATEGORY STAND STRAIGHT AFTER EVERY MONTH, the file\'s own bar, and the page is 24 blocks at the most', () => {
+  /* REC-B23 step 7: the queue's block went to the bar, so the page holds it and is no longer. */
+  assert.ok(BLOCKS.length <= 24, `Money declares ${BLOCKS.length} blocks, and a page declares 24 at the most`);
+  const every = at('Every month');
+  const bar = BLOCKS[every + 1]!;
+  assert.equal(bar, EVERY_MONTH[1], 'what stands after Every month is not its own bar');
+  assert.deepEqual([bar.kind, bar.heading, bar.source], ['bar', 'Every month, by category', 'metric.every-month-by-category']);
+  assert.ok(!BLOCKS.slice(every, every + 2).some((b) => b.kind === 'section'), 'a heading stands between Every month and its bar');
+  /* THE SAME CONDITION AS THE FIGURES OVER IT, so the bar is never drawn under a tile that is not. */
+  assert.deepEqual(bar.when, BLOCKS[every]!.when);
+});
+
+test('NO QUESTION IS ASKED ON MONEY: the questions are answered in Decide, and the side column holds no queue', () => {
+  assert.deepEqual(BLOCKS.filter((b) => b.kind === 'queue').map((b) => b.heading), [], 'Money places a queue again');
+  assert.equal(at('Waiting on you'), -1, 'Waiting on you is on Money again');
+  assert.deepEqual(BLOCKS.filter((b) => b.area === 'rail').map((b) => b.heading), ['Runs out', 'Accounts']);
 });
 
 test('THE CHART READS SIX MONTHS BACK AND THREE AHEAD, and Cash ahead keeps its lengths and controls', () => {
@@ -160,6 +177,28 @@ test('ON THE SAMPLE, EVERY MONTH READS ITS TWO CELLS FROM THE TWO FIGURES, and n
   const outs = reading(k, 'every-month-out');
   assert.ok(typeof ins === 'number' && typeof outs === 'number' && outs > 0, `nothing to hold the cells to: ${String(ins)}, ${String(outs)}`);
   assert.deepEqual(said, { 'every-month-in': ins, 'every-month-out': outs });
+});
+
+test('ON THE SAMPLE, THE COSTS BY CATEGORY ARE DRAWN, and their parts add up to Going out in one currency', async () => {
+  const k = await openRecord(openSqlite(), fixedClock(NOW));
+  const seeded = await installSeed(k);
+  assert.ok(seeded.ok, sayOf(seeded));
+  const blocks = drawn(k);
+  assert.ok(!blocks.some((b) => b.kind === 'queue'), 'the record draws a queue on Money');
+  const bar = blocks.find((b) => b.heading === 'Every month, by category')!;
+  assert.ok(bar, 'the record does not draw the costs by category');
+  assert.notEqual(bar.drawn, false, 'the sample repeats costs and draws no bar of them');
+  assert.deepEqual(bar.refusals, []);
+
+  type Grouped = { value: number | null; unit: string | null; groups?: { value: number | null }[] };
+  const read = (bar.readings ?? []).find((r) => r.metric === 'every-month-by-category')?.reading as Grouped | null | undefined;
+  assert.ok(read && (read.groups ?? []).length > 1, 'the bar has one category or none to draw');
+  const whole = value<{ value: number | null; unit: string | null }>(k.metric(METRICS['every-month-out'] as never));
+  assert.ok(typeof whole.value === 'number' && whole.value > 0);
+  assert.equal(read.groups!.reduce((n, g) => n + (g.value ?? 0), 0), whole.value, 'the parts are not Going out');
+  /* ONE CURRENCY: two are never added, so the parts and the whole are in the same one. */
+  assert.ok(typeof whole.unit === 'string' && whole.unit.length === 3, `Going out is in no one currency: ${String(whole.unit)}`);
+  assert.equal(read.unit, whole.unit, 'the bar is in another currency than Going out');
 });
 
 test('A RECORD WITH ONE ACCOUNT SHUTS COMING AND GOING UNTIL SOMETHING REPEATS, and then draws Every month at its monthly share', async () => {

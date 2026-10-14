@@ -106,7 +106,7 @@ test('TRUST ANSWERS EACH AGENT BY NAME WITH ITS KINDS IN WORDS: one climbed, one
     { kind: 'mark tasks done', rung: 'ask', since: iso(NOW + 3 * HOUR), lifted: false, dropped: { at: iso(NOW + 3 * HOUR), why: 'A change like this was undone.' } },
   ]);
   /* AN AGENT WITH NO RUNG YET HAS NO KIND TO NAME: everything it does asks. */
-  assert.deepEqual(said.agents[1], { agent: 'Cursor', connected: '2026-10-01T00:00:00.000Z', kinds: [] });
+  assert.deepEqual(said.agents[1], { agent: 'Cursor', connected: '2026-10-01T00:00:00.000Z', asking: null, kinds: [] });
   sql.close();
 });
 

@@ -27,8 +27,10 @@ import { moneyText } from './ingest.ts';
 import { instant } from './migrate.ts';
 import type { EvalContext, MetricDecl, Reading } from './metrics.ts';
 import { predicateOf } from './metrics.ts';
+import { computedPart, digestSource } from './digest-sources.ts';
 import type { Entry } from './index.ts';
 import type { OutboxKind } from './outbox.ts';
+import type { BlockResult, PageBlock } from './pages.ts';
 import { slashMayWrite } from './slash.ts';
 
 export const CHANNELS = ['in-app', 'email', 'push', 'webhook', 'mcp'] as const;
@@ -36,9 +38,12 @@ export type Channel = (typeof CHANNELS)[number];
 
 export type DigestSection = {
   heading: string;
-  /** `metric.<id>` or `register.<id>`. */
+  /** `metric.<id>`, `register.<id>`, or a computed source named in `DIGEST_SOURCES` (`governance.open`, `activity`). */
   source: string;
-  where?: string;
+  /** Words, or over a computed source a tree too, as the agents add-on's own blocks say who asked. */
+  where?: string | Predicate;
+  /** Over a computed source: only what is newer than this, a whole number of hours or days (`15h`, `2d`). */
+  within?: string;
   /** One of the block kinds in `packages/render/src/kinds.ts`. `table` is the one bound to a source with columns. */
   as?: string;
   columns?: { field: string; label?: string }[];
@@ -63,6 +68,8 @@ export type DigestPart = {
   source: string;
   as: string;
   rows: Entry[];
+  /** How many the source matched, which `rows` may be fewer than. Absent, `rows` is all of them. */
+  matched?: number;
   reading?: Reading;
   columns?: { field: string; label?: string }[];
   refusals: Refusal[];
@@ -79,6 +86,13 @@ export type DigestDeps = {
   schemaOf: (register: string) => Schema | null;
   /** A list's title field and what one row of it is called, so a column with no label is headed as a page heads it. */
   listOf?: (register: string) => { title: string; one?: string } | null;
+  /**
+   * One block read as a page reads it (`readBlock`), which a section over a computed source is answered through.
+   *
+   * OPTIONAL: a host that cannot read one drops a section that said `omit_when_empty`, since it has nothing to say, and
+   * refuses one that did not, as it refused every computed source before.
+   */
+  block?: (block: PageBlock) => BlockResult;
   ctx: EvalContext;
   /** Where an email would go: the owners, by address. Empty means the email channel cannot fire. */
   owners: () => string[];
@@ -145,6 +159,12 @@ const SECTION_LIMIT = 50;
 /** And how many sections. Twelve headings is already more than anybody reads on a Monday. */
 const MAX_SECTIONS = 12;
 
+/** How many lines a section draws; the rest are counted, `And 4 more.` A digest is read on a phone. */
+export const SECTION_LINES = 5;
+
+/** And how many words a whole digest says, headings and cells. Past them it ends `More in BrainDog.` */
+export const WORDS_MOST = 150;
+
 /**
  * Build the sections, drop the ones that asked to be dropped when empty.
  *
@@ -191,6 +211,29 @@ export function sectionsOf(deps: DigestDeps, decl: DigestDecl): DigestPart[] {
          news the digest exists to carry, and dropping it would leave a week's digest saying nothing
          on the week everything went right. */
       out.push({ ...base, reading: read.value });
+      continue;
+    }
+
+    /* A COMPUTED SOURCE IS READ AS ITS PAGE READS IT, one block, so a digest never says a question the queue would not.
+       Cards are handed their columns, which is what has a working run say what it is doing. */
+    const computed = digestSource(section.source);
+    if (computed) {
+      if (!deps.block) {
+        if (section.omit_when_empty) continue;
+        out.push({ ...base, refusals: [{ code: 'SOURCE_UNKNOWN', fix: `${section.source} is not a source a digest reads here.`, at: 'source' }] });
+        continue;
+      }
+      const columns = section.columns ?? computed.columns;
+      const answer = deps.block({
+        kind: computed.kind,
+        source: section.source,
+        ...(section.where !== undefined ? { where: section.where as string } : {}),
+        ...(computed.kind === 'cards' ? { columns: columns.map((c) => ({ field: c.field })) } : {}),
+        limit: SECTION_LIMIT,
+      });
+      const part = computedPart(section, answer, deps.nowMs);
+      if (part.rows.length === 0 && part.refusals.length === 0 && section.omit_when_empty) continue;
+      out.push(part);
       continue;
     }
 
@@ -463,7 +506,7 @@ export function headline(name: string, sections: DigestPart[], held: readonly st
       ? `${s.heading} —`
       : s.reading
         ? `${s.heading} ${figure(s.reading)}`
-        : `${s.heading} ${s.rows.length}`,
+        : `${s.heading} ${s.matched ?? s.rows.length}`,
   );
   const parts = held.length > 0 ? [`${HELD_HEADING} ${held.length}`, ...own] : own;
   return `${name}: ${parts.join(' · ')}`.slice(0, 280);
@@ -480,40 +523,92 @@ function figure(r: Reading): string {
   return r.unit ? `${r.value} ${r.unit}` : String(r.value);
 }
 
-/** The body, as the block dialect — so an email and a page are drawn from the same text. */
+/** The words a person reads in one line: a fence, a pipe or a heading's marks is none. */
+function wordsIn(line: string): number {
+  return line.split(/[\s|]+/u).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
+}
+
+const MORE_IN = 'More in BrainDog.';
+
+/**
+ * The body, as the block dialect — so an email and a page are drawn from the same text.
+ *
+ * FIVE LINES A SECTION AND 150 WORDS IN ALL, because a digest is read on a phone: a section draws `SECTION_LINES` and
+ * counts the rest, and once the words would pass `WORDS_MOST` nothing more is drawn and it ends `More in BrainDog.`
+ * The words counted are the ones a person reads, headings and cells; the closing line's own are kept back for it.
+ */
 export function render(name: string, sections: DigestPart[], held: readonly string[] = []): string {
   const out: string[] = [`# ${name}`, ''];
+  let left = WORDS_MOST - wordsIn(name) - wordsIn(MORE_IN);
+  let cut = false;
+  /** Whether `line` still fits, counting it when it does. Once one does not, none after it does either. */
+  const fits = (line: string): boolean => {
+    if (cut) return false;
+    const n = wordsIn(line);
+    if (n > left) {
+      cut = true;
+      return false;
+    }
+    left -= n;
+    return true;
+  };
   /* WHAT WAS HELD LEADS, because it is the part somebody was meant to hear last night. Five lines and a count of the
      rest: a night that held twenty is a night to open the record, not one to read in a mail. */
-  if (held.length > 0) {
+  if (held.length > 0 && fits(HELD_HEADING)) {
     out.push(`## ${HELD_HEADING}`, '');
-    for (const say of held.slice(0, HELD_LINES)) out.push(`- ${say}`);
-    if (held.length > HELD_LINES) out.push('', `And ${held.length - HELD_LINES} more.`);
+    let said = 0;
+    for (const say of held.slice(0, HELD_LINES)) {
+      if (!fits(say)) break;
+      out.push(`- ${say}`);
+      said += 1;
+    }
+    if (held.length > said && !cut && fits(`And ${held.length - said} more.`)) out.push('', `And ${held.length - said} more.`);
     out.push('');
   }
   for (const s of sections) {
+    const from = out.length;
+    if (!fits(s.heading)) break;
     out.push(`## ${s.heading}`);
     if (s.refusals.length) {
-      out.push('', s.refusals[0]!.fix, '');
+      if (fits(s.refusals[0]!.fix)) out.push('', s.refusals[0]!.fix, '');
+      else out.length = from;
       continue;
     }
     if (s.reading) {
-      out.push('', '```stat', `${s.heading} | ${figure(s.reading)}`, '```', '');
+      const stat = `${s.heading} | ${figure(s.reading)}`;
+      if (fits(stat)) out.push('', '```stat', stat, '```', '');
+      else out.length = from;
       continue;
     }
     const columns = s.columns ?? [];
     out.push('', '```table');
+    if (columns.length && !fits(columns.map((c) => c.label ?? c.field).join(' '))) {
+      out.length = from;
+      break;
+    }
     if (columns.length) out.push(columns.map((c) => c.label ?? c.field).join(' | '));
-    for (const row of s.rows)
+    let drawn = 0;
+    for (const row of s.rows.slice(0, SECTION_LINES)) {
       /* BOTH BRANCHES THROUGH `cell`. The fallback interpolated raw, so a value with a pipe in it
          split into two columns — in the one branch that exists because nobody said which columns. */
-      out.push(
-        columns.length
-          ? columns.map((c) => cell(row, c.field)).join(' | ')
-          : `${cell(row, 'seq')} | ${cell(row, Object.keys(row.fields)[0] ?? '')}`,
-      );
-    out.push('```', '');
+      const line = columns.length
+        ? columns.map((c) => cell(row, c.field)).join(' | ')
+        : `${cell(row, 'seq')} | ${cell(row, Object.keys(row.fields)[0] ?? '')}`;
+      if (!fits(line)) break;
+      out.push(line);
+      drawn += 1;
+    }
+    /* A HEADING OVER NOTHING IS TAKEN BACK: the words ran out before its first line. */
+    if (drawn === 0 && s.rows.length > 0) {
+      out.length = from;
+      break;
+    }
+    out.push('```');
+    const more = (s.matched ?? s.rows.length) - drawn;
+    if (more > 0 && fits(`And ${more} more.`)) out.push('', `And ${more} more.`);
+    out.push('');
   }
+  if (cut) out.push(MORE_IN);
   return out.join('\n');
 }
 

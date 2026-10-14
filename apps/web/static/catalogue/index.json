@@ -4,6 +4,45 @@
   "entries": [
     {
       "kind": "pack",
+      "id": "agent-notes",
+      "title": "Agent notes",
+      "summary": "Two short notes a day, at 08:00 and 17:00 your time, of what your agents ask you, what they did and what is stuck. Nothing when there is nothing to say, and never by mail.",
+      "author": "BrainDog",
+      "license": "Apache-2.0",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "ae4e99e6a913c97a0af9554669b68244ea4dbd7acd22251a4fb0ae0782ce29c6",
+          "bytes": 3884,
+          "published_at": "2026-10-14T08:26:53.414Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "agents"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The first version."
+        }
+      ],
+      "categories": [
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      }
+    },
+    {
+      "kind": "pack",
       "id": "bank-hsbc-eg",
       "title": "HSBC Egypt alerts",
       "summary": "Reads HSBC Egypt alert mails and text messages into Money as transactions, each with the balance it prints, and a message that only prints a balance as a balance check.",

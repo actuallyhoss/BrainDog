@@ -125,6 +125,7 @@ export async function readTrust(client: TrustClient): Promise<TrustStanding | nu
     agents: answer.value.agents.map((a) => ({
       agent: a.agent,
       connected: typeof a.connected === 'string' ? a.connected : null,
+      asking: a.asking && typeof a.asking.from === 'string' ? { from: a.asking.from, at: String(a.asking.at ?? '') } : null,
       kinds: a.kinds.map((k) => ({ kind: k.kind, rung: k.rung, since: k.since, lifted: k.lifted === true, dropped: k.dropped && typeof k.dropped.at === 'string' ? { at: k.dropped.at, why: typeof k.dropped.why === 'string' ? k.dropped.why : null } : null })),
     })),
   };

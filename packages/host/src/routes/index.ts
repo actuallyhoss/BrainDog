@@ -34,6 +34,7 @@ import { ROUTES as door } from './door.ts';
 import { ROUTES as engine } from './engine.ts';
 import { ROUTES as capture } from './capture.ts';
 import { ROUTES as trust } from './trust.ts';
+import { ROUTES as IMPORTS } from './imports.ts';
 import { ROUTES as sameOne } from './same-one.ts';
 import { ROUTES as heldTwice } from './held-twice.ts';
 import { ROUTES as about } from './about.ts';
@@ -47,6 +48,7 @@ import { ROUTES as learned } from './learned.ts';
 import { ROUTES as inboxHints } from './inbox-hints.ts';
 import { ROUTES as SKILLS_BEHIND } from './skills-behind.ts';
 import { ROUTES as TOOLS_SEEN } from './tools-seen.ts';
+import { ROUTES as NAMED_TWICE } from './named-twice.ts';
 /* END ROUTES */
 
 export const EXTRA_ROUTES: readonly Route[] = [
@@ -72,6 +74,7 @@ export const EXTRA_ROUTES: readonly Route[] = [
   ...engine,
   ...capture,
   ...trust,
+  ...IMPORTS,
   ...sameOne,
   ...heldTwice,
   ...about,
@@ -85,5 +88,6 @@ export const EXTRA_ROUTES: readonly Route[] = [
   ...inboxHints,
   ...SKILLS_BEHIND,
   ...TOOLS_SEEN,
+  ...NAMED_TWICE,
   /* END ROUTES */
 ];

@@ -337,12 +337,12 @@ test('A KEPT POINT OF CASH NEEDS A RATE OF ITS OWN DAY OR THE DAY BEFORE, or the
   const kept = () => sql.all<{ at: string; value: number; unit: string }>("SELECT at, value, unit FROM metric_point WHERE series = 'cash' ORDER BY at").map((p) => ({ ...p }));
 
   /* THE 19TH, WITH A RATE NINE DAYS OLD, and then with a later one standing in: no number either way. */
-  assert.deepEqual(night([dollar('2026-09-10')]), { series: 'cash', wrote: 0, backfilled: 0, missing: 1, noRate: 1 });
-  assert.deepEqual(night([dollar('2026-09-20')]), { series: 'cash', wrote: 0, backfilled: 0, missing: 1, noRate: 1 });
+  assert.deepEqual(night([dollar('2026-09-10')]), { series: 'cash', wrote: 0, backfilled: 0, rewrote: 0, missing: 1, noRate: 1 });
+  assert.deepEqual(night([dollar('2026-09-20')]), { series: 'cash', wrote: 0, backfilled: 0, rewrote: 0, missing: 1, noRate: 1 });
   assert.deepEqual(kept(), []);
 
   /* A RATE OF THE DAY BEFORE: 165,000.00 pounds as the 19th closed, and 1,000.00 dollars at 50. */
-  assert.deepEqual(night([dollar('2026-09-10'), dollar('2026-09-18')]), { series: 'cash', wrote: 1, backfilled: 0, missing: 0, noRate: 0 });
+  assert.deepEqual(night([dollar('2026-09-10'), dollar('2026-09-18')]), { series: 'cash', wrote: 1, backfilled: 0, rewrote: 0, missing: 0, noRate: 0 });
   assert.deepEqual(kept(), [{ at: '2026-09-19', value: 16_500_000 + 5_000_000, unit: 'EGP' }]);
   sql.close();
 });

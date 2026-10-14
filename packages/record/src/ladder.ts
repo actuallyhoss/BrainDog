@@ -54,6 +54,15 @@ export const ANOMALY_MS = 2 * 60_000;
 const KEPT = (agent: string): string => `ladder:${agent}`;
 const OFFERS = 'ladder:offers';
 const MARKS = 'ladder:untrusted';
+/** What the owner said of each import, by its run: his own, or outside text (`adopt`). */
+const IMPORTS = 'ladder:imports';
+/** How the client id of `braindog import`'s run begins, as the kernel's `metrics.ts` reads it (`apps/cli/src/import.ts`). */
+const IMPORT_CLIENT = 'braindog-import-';
+/** How many imports `importsFound` answers, newest first. */
+const IMPORTS_SHOWN = 20;
+/** The kernel's register of runs, and the states a run does not come back from (`session.ts`, `FINISHED`). */
+const RUNS = 'session';
+const RUN_ENDED = ['done', 'abandoned'] as const;
 /** Why each kind was last taken back, one name an agent, since the `ladder` table has a column for when and none for why. */
 const DROPPED = (agent: string): string => `ladder:dropped:${agent}`;
 
@@ -83,8 +92,16 @@ export type StandingKind = { kind: string; rung: Rung; since: string; lifted: bo
 /**
  * `agent` is said once in an answer: a second grant under a name already said carries a number after it, in the order
  * the two were connected. `connected` is when the grant was made, and `null` for Slash, which no grant connects.
+ * `asking` is what outside text the agent read, said in words, and when, while that keeps every change of its asking.
  */
-export type Standing = { agents: { agent: string; connected: string | null; kinds: StandingKind[] }[] };
+export type Standing = { agents: { agent: string; connected: string | null; asking: { from: string; at: string } | null; kinds: StandingKind[] }[] };
+
+/**
+ * One import made into the record (ENG-A13): the run it wrote as, said as a person reads a run (`S12`), when it first
+ * wrote, how many rows it brought into each list by the list's name, and what the owner said of it: `true` his own,
+ * `false` outside text, `null` not said yet.
+ */
+export type FoundImport = { run: string; at: string; lists: { list: string; rows: number }[]; rows: number; adopted: boolean | null };
 
 /** The rungs in order, lowest first, and the one above each. */
 const ORDER: readonly Rung[] = ['ask', 'tell', 'quiet'];
@@ -92,10 +109,10 @@ const above = (r: Rung): Rung | null => ORDER[ORDER.indexOf(r) + 1] ?? null;
 const lower = (a: Rung, b: Rung): Rung => (ORDER.indexOf(a) <= ORDER.indexOf(b) ? a : b);
 
 /** One agent of `standing` as the ladder holds it: its grant (or Slash), and each kind's key and the rung its row holds. */
-type Listed = { id: string; agent: string; connected: string | null; kinds: (StandingKind & { key: string; held: Rung })[] };
+type Listed = { id: string; agent: string; connected: string | null; asking: { from: string; at: string } | null; kinds: (StandingKind & { key: string; held: Rung })[] };
 
 /** One agent as a person reads it, with the grant and the keys set aside. */
-const plain = (a: Listed): Standing['agents'][number] => ({ agent: a.agent, connected: a.connected, kinds: a.kinds.map(({ key: _key, held: _held, ...k }) => k) });
+const plain = (a: Listed): Standing['agents'][number] => ({ agent: a.agent, connected: a.connected, asking: a.asking, kinds: a.kinds.map(({ key: _key, held: _held, ...k }) => k) });
 
 /** What the ladder needs of the record. */
 export type LadderDeps = { sql: Sql; kernel: Kernel; now: () => number };
@@ -159,6 +176,94 @@ export function ladder(deps: LadderDeps) {
     if (untrusted(c) !== null) return;
     kernel.setPref(MARKS, c.run ?? `token:${c.token}`, { from, at: iso() });
   };
+
+  /** A mark as it is kept, or `null`: where the text came from, said in words, and when it was read. */
+  const markOf = (key: string): { from: string; at: string } | null => {
+    const m = prefRead(MARKS, key) as { from?: unknown; at?: unknown } | undefined;
+    return m && typeof m.from === 'string' ? { from: m.from, at: typeof m.at === 'string' ? m.at : '' } : null;
+  };
+
+  /**
+   * What keeps an agent asking about everything, for `standing`: the token's own mark, which its next run adopts, or the
+   * mark on its newest run still open. READ-ONLY, unlike `untrusted`, which moves a token's mark onto its run: reading
+   * where an agent stands must not change where it stands.
+   */
+  const askingOf = (token: string): { from: string; at: string } | null => {
+    const held = markOf(`token:${token}`);
+    if (held !== null) return held;
+    const run = sql.one<{ id: string }>(
+      `SELECT id FROM entry WHERE register = ? AND json_extract(fields, '$.token_id') = ? AND (state IS NULL OR state NOT IN (${RUN_ENDED.map(() => '?').join(', ')}))
+       ORDER BY seq DESC LIMIT 1`,
+      RUNS,
+      token,
+      ...RUN_ENDED,
+    );
+    return run === undefined ? null : markOf(kernel.nameOf(run.id));
+  };
+
+  /* ── imports, and whether the owner said each is his own ────────────── */
+
+  /**
+   * The runs `braindog import` wrote as, newest first: a run whose client id says import and which names no agent, as
+   * the kernel's `makerOf` tells one apart (a named agent that happens to carry the prefix is still that agent).
+   * `limit` bounds the answer; `importActors` asks for every one.
+   */
+  const importRuns = (limit: number): { id: string; run: string; opened: string }[] =>
+    sql
+      .all<{ id: string; created_at: string }>(
+        `SELECT id, created_at FROM entry WHERE register = ? AND substr(json_extract(fields, '$.client_id'), 1, ?) = ?
+           AND COALESCE(json_extract(fields, '$.agent'), '') IN ('', 'other')
+         ORDER BY seq DESC LIMIT ?`,
+        RUNS,
+        IMPORT_CLIENT.length,
+        IMPORT_CLIENT,
+        limit,
+      )
+      .map((r) => ({ id: r.id, run: kernel.nameOf(r.id), opened: r.created_at }));
+
+  /** What the owner said of one import: `true` his own, `false` outside text, `null` nothing yet. */
+  const adoptedOf = (run: string): boolean | null => {
+    const said = prefRead(IMPORTS, run) as { yes?: unknown } | undefined;
+    return typeof said?.yes === 'boolean' ? said.yes : null;
+  };
+
+  /**
+   * Every import made into the record (ENG-A13), `IMPORTS_SHOWN` at most, newest first, each with what it brought in:
+   * the rows its run created, counted by the list they are in, from the history its writes are signed in. ONE QUERY AN
+   * IMPORT, bounded by the run's own signature. READ-ONLY. An import that created nothing is still one made, with none.
+   */
+  const importsFound = (): FoundImport[] => {
+    const out: FoundImport[] = [];
+    for (const r of importRuns(IMPORTS_SHOWN)) {
+      const counted = sql.all<{ list: string; n: number; first: string | null }>(
+        `SELECT n.register AS list, COUNT(*) AS n, (SELECT MIN(ts) FROM event WHERE actor = ?) AS first
+           FROM event e JOIN entry n ON e.target_kind = 'entry' AND n.id = substr(e.target, 7)
+          WHERE e.actor = ? AND e.kind = 'create' AND n.register <> ?
+          GROUP BY n.register`,
+        r.run,
+        r.run,
+        RUNS,
+      );
+      const lists = counted
+        .map((c) => ({ list: kernel.register(c.list)?.name ?? c.list, rows: c.n }))
+        .sort((a, b) => b.rows - a.rows || (a.list < b.list ? -1 : a.list > b.list ? 1 : 0));
+      const first = counted[0]?.first ?? sql.one<{ ts: string | null }>('SELECT MIN(ts) AS ts FROM event WHERE actor = ?', r.run)?.ts ?? null;
+      out.push({ run: r.run, at: first ?? r.opened, lists, rows: lists.reduce((s, l) => s + l.rows, 0), adopted: adoptedOf(r.run) });
+    }
+    return out.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
+  };
+
+  /**
+   * The owner's word on one import, by his own press (ENG-A13, D37.116): `yes` it is his own, `no` it is outside text.
+   * Kept with when and by whom; it moves no rung and files nothing. `run` is one `importsFound` names (the method checks).
+   */
+  const adopt = (run: string, yes: boolean, by: string): void => kernel.setPref(IMPORTS, run, { yes, at: iso(), by });
+
+  /**
+   * The runs of every import the owner has not said is his own, by the name its writes are signed with (`S12`), for a
+   * reading run to be marked by (the owner's to rule: nothing calls this on a read yet). Not limited to `IMPORTS_SHOWN`.
+   */
+  const importActors = (): string[] => importRuns(-1).filter((r) => adoptedOf(r.run) !== true).map((r) => r.run);
 
   /* ── the rung a write stands on ─────────────────────────────────────── */
 
@@ -488,7 +593,7 @@ export function ladder(deps: LadderDeps) {
         at,
       )
       .filter((t) => !endedByCutOff(validFrom, t.created_at))
-      .map((t) => ({ id: t.id, agent: (t.label ?? '').trim() || 'Your agent', connected: t.created_at, kinds: kindsOf(t.id, t.scope as Scope) }));
+      .map((t) => ({ id: t.id, agent: (t.label ?? '').trim() || 'Your agent', connected: t.created_at, asking: askingOf(t.id), kinds: kindsOf(t.id, t.scope as Scope) }));
     const slash = kindsOf(SLASH, null);
     /* SLASH'S NAME IS TAKEN FIRST, listed or not, so a grant's name does not move the day Slash earns a rung. A number
        another grant already has for its own name is passed over. */
@@ -509,7 +614,7 @@ export function ladder(deps: LadderDeps) {
       said.add(fold(name));
       a.agent = name;
     }
-    if (slash.length > 0) agents.push({ id: SLASH, agent: 'Slash', connected: null, kinds: slash });
+    if (slash.length > 0) agents.push({ id: SLASH, agent: 'Slash', connected: null, asking: null, kinds: slash });
     return agents;
   };
 
@@ -551,7 +656,7 @@ export function ladder(deps: LadderDeps) {
     return { agent: plain(after ?? found) };
   };
 
-  return { standing, takeBack, grantOf, untrusted, markUntrusted, gate, rungFor, noteFault, kept, declined, drop, anomaly, clientChanged, answered, agentOfActor };
+  return { standing, takeBack, importsFound, adopt, importActors, grantOf, untrusted, markUntrusted, gate, rungFor, noteFault, kept, declined, drop, anomaly, clientChanged, answered, agentOfActor };
 }
 
 /** The floors as a person reads them, each the start of a sentence. */

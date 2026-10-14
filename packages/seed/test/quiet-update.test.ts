@@ -24,6 +24,7 @@ import { carriedDocument, dayOf, moduleDocument } from '../src/usecases/install.
 import { peopleBefore3 } from './people-before-3.ts';
 import { CHASING } from '../src/modules/money/pages/parts/chasing.ts';
 import { NEXT_30 } from '../src/modules/money/pages/parts/next30.ts';
+import { QUEUE } from '../src/modules/money/pages/parts/queue.ts';
 
 type Body = Record<string, unknown>;
 const TODAY = dayOf(NOW);
@@ -724,6 +725,27 @@ const withoutBatch92 = (doc: Body): Body => {
   const money = withPage(doc, 'money', (now) => now.filter((b) => b.heading !== 'Every month').flatMap((b) => (b.heading === 'Coming and going' ? [b, NEXT_30.find((x) => x.kind === 'bridge') as Body] : [b])).map((b) => (b.heading === 'In and out, by month' ? { ...b, back: 12 } : b)));
   return { ...money, declarations: (money.declarations as Body[]).filter((d) => d.script !== 'unsettle' && d.rule !== 'payment-unsettles') };
 };
+/**
+ * AND BATCH 95'S, folded into the same unreleased step and undone first (money-board-place-95, REC-B23 step 7;
+ * money-lasts-no-income-95, REC-B07 step 8). Waiting on you stands under Accounts in the side column again and the
+ * costs by category leave Money; and the line loses how long the cash lasts with no income, its figure with it, each of
+ * the three lead notes ending where it ended before. On a document without the second job both find nothing.
+ */
+const NO_INCOME_95: readonly (readonly [string, string])[] = [
+  [', and it lasts {{lasts-no-income}} with no income.', '.'],
+  [', or {{lasts-no-income}} with no income.', '.'],
+];
+const withoutBatch95 = (doc: Body): Body =>
+  withPage(
+    doc,
+    'money',
+    (now) =>
+      now
+        .filter((b) => b.heading !== 'Every month, by category')
+        .flatMap((b) => (b.heading === 'Accounts' && b.area === 'rail' ? [b, QUEUE[0] as Body] : [b]))
+        .map((b) => (b.kind === 'note' && b.lead === true && typeof b.body === 'string' ? { ...b, body: NO_INCOME_95.reduce((body, [ends, was]) => (body.endsWith(ends) ? body.slice(0, -ends.length) + was : body), b.body) } : b)),
+    (d) => d.metric !== 'lasts-no-income',
+  );
 /** Batch 63's four figures of this month's spending against last (spend-figures-63), new in the unreleased money-core 3.17.0. */
 const SPEND_VS_LAST: ReadonlySet<string> = new Set(['spent-last-month', 'spent-by-category-last-month', 'spent-by-category-to-date-last-month', 'spent-vs-last-month']);
 const LATEST: Record<string, { version: string; released: string; undo: (doc: Body) => Body }> = {
@@ -732,7 +754,7 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
     version: '3.13.0',
     released: '2e09983b40aba73e',
     undo: (raw) => {
-      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(withoutPlanLeads(withoutBatch73(withoutBatch74(withoutBatch75(withoutBatch76(withoutBatch77(withoutBatch78(withoutBatch92(raw)))))))))))))))))));
+      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(withoutPlanLeads(withoutBatch73(withoutBatch74(withoutBatch75(withoutBatch76(withoutBatch77(withoutBatch78(withoutBatch92(withoutBatch95(raw))))))))))))))))))));
       return {
       ...doc,
       /* AND THE SCRIPT THAT MARKS A BILL PAID, WITH THE RULE THAT STARTS IT (settle-rule-60), both newer than 3.13.0. */

@@ -11,7 +11,7 @@ const at = (day: string): string => `${day}T12:00:00.000Z`;
 type Agent = TrustStanding['agents'][number];
 type Kind = Agent['kinds'][number];
 const kind = (k: string, rung: Kind['rung'], day: string, more: Partial<Kind> = {}): Kind => ({ kind: k, rung, since: at(day), lifted: false, dropped: null, ...more });
-const agent = (name: string, kinds: Kind[], day: string | null = '2026-09-20'): Agent => ({ agent: name, connected: day === null ? null : at(day), kinds });
+const agent = (name: string, kinds: Kind[], day: string | null = '2026-09-20'): Agent => ({ agent: name, connected: day === null ? null : at(day), asking: null, kinds });
 const said = (agents: Agent[]): string[] => trustLines({ agents }, NOW).map((l) => l.text);
 
 test('a standing becomes one line an agent and kind, in words', () => {
@@ -87,6 +87,13 @@ test('the owner is answered, and no agent connected reads as an empty ladder', a
   assert.deepEqual(await readTrust({ trust: async () => ({ ok: true as const, value }) }), value);
   assert.deepEqual(trustLines({ agents: [] }, NOW), []);
   assert.match(words.empty, /^[^.]+\.$/u);
+});
+
+test('an agent marked asking keeps where its run read from, and one sent without it reads as not asking', async () => {
+  const asking = { ...agent('Codex', []), asking: { from: 'the inbox', at: at('2026-10-12') } };
+  const value = { agents: [asking, { agent: 'Cursor', connected: null, kinds: [] }] };
+  const out = await readTrust({ trust: async () => ({ ok: true as const, value }) });
+  assert.deepEqual(out?.agents.map((a) => a.asking), [{ from: 'the inbox', at: at('2026-10-12') }, null]);
 });
 
 test('the owner\'s way down and what never climbs, in his words', () => {

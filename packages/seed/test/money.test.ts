@@ -700,11 +700,10 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
     'What you have, by book',
     'Add an account',
     'Cash ahead',
-    /* THE SIDE COLUMN, SINCE money-core 3.11.0: when the money runs out, where it sits, and the questions, beside the
-       walk. */
+    /* THE SIDE COLUMN, SINCE money-core 3.11.0: when the money runs out and where it sits, beside the walk. The
+       questions went to Decide (REC-B23 step 7). */
     'Runs out',
     'Accounts',
-    'Waiting on you',
     /* THE CHECK, DRAWN SINCE cash-page-54 (REC-A17): one tile while the two ways of adding cash up disagree. The line
        it drew while no balance is typed went for the lead above: Money is at the most blocks a page declares. */
     'Cash now does not add up',
@@ -737,11 +736,13 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
     'In and out, by month',
     /* WHAT REPEATS, SINCE REC-B23: in and out every month, after the chart whose months ahead it is. */
     'Every month',
+    /* AND WHAT THE REPEATING COSTS ARE FOR, ONE BAR A CATEGORY, SINCE REC-B23 step 7, in the block the questions gave up. */
+    'Every month, by category',
   ]);
   /* WHAT STANDS BESIDE THE WALK, AND WHAT IS FOLDED. */
   const blocks = page.blocks as { heading?: string; area?: string; fold?: boolean; box?: boolean }[];
   assert.deepEqual((page as { layout?: unknown }).layout, { rail: 4 });
-  assert.deepEqual(blocks.filter((b) => b.area === 'rail').map((b) => b.heading), ['Runs out', 'Accounts', 'Waiting on you']);
+  assert.deepEqual(blocks.filter((b) => b.area === 'rail').map((b) => b.heading), ['Runs out', 'Accounts']);
   assert.deepEqual(blocks.filter((b) => b.fold === true).map((b) => b.heading), [], 'a folded heading over one chart is back');
   assert.deepEqual(blocks.filter((b) => b.box === true).map((b) => b.heading), ['Heads up', 'Coming and going']);
   /* UNDER COMING AND GOING, SINCE REC-B23, THE CALENDAR AND NO WALK: the walk of thirty days is off the page
@@ -814,7 +815,7 @@ test("MONEY HOLDS NO MORE BLOCKS THAN A PAGE MAY, and this month's spending and 
 
   /* NOTHING THAT LEADS THE PAGE MOVED: the line, the walk, the side column, the check and the Ledger, then Heads up. */
   assert.deepEqual(
-    blocks.slice(0, 12).map((b) => [b.kind, b.heading, b.area]),
+    blocks.slice(0, 11).map((b) => [b.kind, b.heading, b.area]),
     [
       ['note', undefined, undefined],
       ['note', undefined, undefined],
@@ -824,7 +825,6 @@ test("MONEY HOLDS NO MORE BLOCKS THAN A PAGE MAY, and this month's spending and 
       ['forecast', 'Cash ahead', undefined],
       ['stat', 'Runs out', 'rail'],
       ['split', 'Accounts', 'rail'],
-      ['queue', 'Waiting on you', 'rail'],
       ['stat', 'Cash now does not add up', undefined],
       ['timeline', 'Ledger', undefined],
       ['section', 'Heads up', undefined],
@@ -937,17 +937,20 @@ test('MONEY OPENS WITH ONE LINE OF WHAT THE MONEY IS DOING, and what is paid in 
   assert.notEqual(lead.drawn, false, 'a record with one set of money reads no line about it');
   /* NO DAY COUNT IN IT SINCE money-core 3.11.0: Runs out says it, beside the walk. */
   /* AND HOW FAR CASH MOVED ON A MONTH AGO, since the sample holds its nights from the moment it is made (`cashPoints`). */
-  assert.deepEqual(Object.keys(lead.values ?? {}).sort(), ['cash-accounts', 'cash-now', 'cash-now.change']);
+  /* AND HOW LONG IT LASTS WITH NO INCOME, SINCE money-core 3.17.0 (money-lasts-no-income-95), said only while the walk
+     reads a value for it: past five years, or over two currencies with no rate, its clause drops. */
+  const lasts = reading(k, 'lasts-no-income');
+  assert.deepEqual(Object.keys(lead.values ?? {}).sort(), ['cash-accounts', 'cash-now', 'cash-now.change', ...(lasts === null ? [] : ['lasts-no-income'])]);
   assert.equal(lead.values?.['cash-accounts'], reading(k, 'cash-accounts'));
   const monthAgo = cashSeries().find((p) => p.at === new Date(NOW - 30 * 86_400_000).toISOString().slice(0, 10))!.value;
   const moved = Math.round(((reading(k, 'cash-now')! - monthAgo) / monthAgo) * 100);
   assert.ok(moved < 0, 'the sample held less a month ago, so this proves no sign');
   assert.equal(lead.values?.['cash-now.change'], `−${-moved}%`);
   /* HOW FAR CASH MOVED IN A MONTH IS ITS OWN CLAUSE, so a record that has no night a month back to measure from loses
-     that clause and keeps the rest. */
+     that clause and keeps the rest; and so is how long the cash lasts with no income. */
   assert.deepEqual(
     lead.body?.split(/,\s+/u).map((c) => [...c.matchAll(/\{\{([a-z0-9.-]+)\}\}/gu)].map((m) => m[1])),
-    [['cash-now', 'cash-accounts'], ['cash-now.change']],
+    [['cash-now', 'cash-accounts'], ['cash-now.change'], ['lasts-no-income']],
   );
 
   /* THE LINE'S FIGURES REMEMBER THEIR NIGHTS, so Cash ahead draws how cash moved up to today and a book's tile its line. */
@@ -1007,8 +1010,8 @@ test('THE ACCOUNTS ADD UP TO CASH NOW, the calendar is the next thirty days, and
 
 /**
  * A FRESH RECORD READS A CALM PAGE: no tile whose question has no answer yet. What is left is the headline tile and the
- * box to add the first account, which is the one thing to do. Waiting on you is drawn only while something is asked
- * (`questions-open`), so a record nobody has asked anything of draws no band saying so.
+ * box to add the first account, which is the one thing to do. No question is asked on Money since REC-B23 step 7 (they
+ * are Decide's), so a record nobody has asked anything of draws no band saying so.
  */
 test('A BLOCK WITH NOTHING TO SAY IS NOT DRAWN, so a fresh record reads its line and the box to add an account', async () => {
   const k = await openRecord(openSqlite(), { now: () => NOW });
@@ -1317,9 +1320,9 @@ test("A BOOK'S PAGE READS WHOLE, and with two books the Money page's headline is
   assert.ok(!two.includes(undefined), 'one Cash now over two books is still said');
   /* AND THE LINE SAYS WHERE THE MONEY IS KEPT INSTEAD, SINCE money-core 3.17.0: two counts, never the sum. */
   assert.equal(two[0], 'kept in');
-  /* WHAT IS WAITING ON THE PERSON MAY LEAD, wherever the page declares it: the record's own look puts the questions
-     first while there are any (`look.<page>`'s `lead`, `loop/contract-17.md`), so the books' figure is held beside the
-     walk among the rest. */
+  /* WHAT IS WAITING ON THE PERSON MAY LEAD, wherever a page declares it, and Money declares it nowhere since REC-B23
+     step 7. The filter stays for a look that puts the questions first while there are any (`look.<page>`'s `lead`,
+     `loop/contract-17.md`): the books' figure is held beside the walk among the rest either way. */
   assert.deepEqual(two.filter((h) => h !== 'Waiting on you').slice(0, 3), ['kept in', 'What you have, by book', 'Cash ahead']);
 });
 

@@ -394,6 +394,8 @@ importers:
         specifier: workspace:*
         version: link:../ports
 
+  packs/agent-notes: {}
+
   packs/bank-hsbc-eg: {}
 
   packs/card-alerts: {}

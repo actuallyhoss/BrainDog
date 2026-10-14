@@ -209,6 +209,12 @@ function summed(amounts: readonly Amount[], into: string | null, home: string | 
 
 type EvalRates = Parameters<typeof across>[2];
 
+/** The one currency every amount of a group carries, or `null` when they carry two or there are none. */
+const ownCurrency = (amounts: readonly Amount[]): string | null => {
+  const seen = new Set(amounts.map((a) => a.currency));
+  return seen.size === 1 ? [...seen][0]! : null;
+};
+
 /** The comparison a rolled figure makes, in the words `evaluateMetric` uses for the same cases. */
 function compared(decl: MetricDecl, now: Summed, before: (clockMs: number) => Summed | null, anchor: number): { delta: number | null; why: string } {
   const shift = decl.window ? windowMs(decl.window) : null;
@@ -403,7 +409,14 @@ export function readRolled(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result
   };
 
   /* THE WHOLE FIGURE AND ITS GROUPS AS OF ONE CLOCK. A rate is taken as of the day asked about, because a balance held
-     in another currency is worth what it converts to on that day, whichever day it was stated on. */
+     in another currency is worth what it converts to on that day, whichever day it was stated on.
+
+     EACH ACCOUNT'S OWN AMOUNT (REC-B23, `loop/scope/area-record-b.md`:1755-1760): a group the grouping names no
+     currency for, whose money is all in one currency, is read in that currency, unconverted, so on the Accounts tile
+     "Cash (USD)" reads in dollars beside the pound accounts, never turned into pounds. A grouping by a ref is the row's
+     to speak for (`groupNames`): a book that says nothing is read in the home currency, as it was. A group holding two
+     currencies is converted as before, and the whole, Cash now itself, is untouched. */
+  const byRow = decl.group_by !== undefined && accounts?.fields[decl.group_by]?.type === 'ref';
   const rollAt = (clockMs: number, grouped: boolean): { whole: Summed; since: string | null; groups: Group[] | null; more: number } => {
     const on = new Date(clockMs).toISOString().slice(0, 10);
     const all: Amount[] = [];
@@ -437,7 +450,7 @@ export function readRolled(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result
     }
     const whole = summed(all, into ?? home.home, home.home, home.rates, on, ctx.point === true);
     if (!grouped || decl.group_by === undefined) return { whole, since, groups: null, more: 0 };
-    const sums = [...byKey].map(([key, slot]) => ({ key, rows: slot.rows, s: summed(slot.amounts, names?.currency(key) ?? into ?? home.home, home.home, home.rates, on, ctx.point === true) }));
+    const sums = [...byKey].map(([key, slot]) => ({ key, rows: slot.rows, s: summed(slot.amounts, names?.currency(key) ?? (byRow ? null : ownCurrency(slot.amounts)) ?? into ?? home.home, home.home, home.rates, on, ctx.point === true) }));
     /* ONE GROUP IN ANOTHER CURRENCY PUTS EVERY GROUP IN PARTS, as `groupsOf` keeps it: bars ranked on raw minor units of
        two currencies are ranked on nothing. */
     const units = new Set(sums.map((g) => g.s.unit).filter((u): u is string => u !== null));

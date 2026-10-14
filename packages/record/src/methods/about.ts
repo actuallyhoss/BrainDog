@@ -23,6 +23,11 @@
  * project is a place the project was seen, with nothing written to make it so. Such a row is one thing's only when
  * that thing alone answers to the name, as the kernel holds a sighting (`seenOf`).
  *
+ * WHAT WAITS ON HIM ABOUT IT IS A PLACE IT WAS SEEN, for a caller who reads every list. An open question whose words
+ * name the thing, by the same whole-name rule, is said "Waiting on you: Renew Copperleaf's domain for another year?" at
+ * the time it was opened, among the other places; never its id, its handle or who opened it. Questions live under no
+ * list's grant, so somebody held to some lists is not answered them. Nothing is written to find them.
+ *
  * IN NAMES. A row's id, an address, a repository and a folder are never answered: the kernel's read passes none, and a
  * place said here is a list's name and a row's title.
  */
@@ -31,6 +36,7 @@ import type { Result } from '@braindog/ports';
 import { aboutOfRow, candidatesFor, entityLists, ftsQuery, nameWords, whereFor, type About, type AboutDeps, type AboutKind, type AboutSeen } from '@braindog/kernel';
 
 import type { CallContext } from '../index.ts';
+import { scrubbed } from '../scrub.ts';
 import type { RecordDeps } from './index.ts';
 
 /** One thing as `about` answers it: the kernel's reading, and where the row is, by its list and its number there. */
@@ -48,6 +54,8 @@ const ASKED = 200;
 const SEEN = 20;
 const READ = 60;
 const PHRASE = 80;
+/** How a question that waits on the owner is said as a place. */
+const ASKED_OF = 'Waiting on you: ';
 /** A row's id, as the record mints one: a title holding one is not said as a place. */
 const ROW_ID = /(?<![0-9A-Za-z])[0-9A-HJKMNP-TV-Z]{26}(?![0-9A-Za-z])/i;
 
@@ -117,6 +125,32 @@ export function methods(deps: RecordDeps) {
     return [...out.values()];
   };
 
+  /**
+   * The open questions whose own words name the thing, each as a place: "Waiting on you: " and the question, opened at.
+   * Only for a caller who reads every list, as the kept sightings are: a question is the record's, under no list's grant.
+   * Never its id, its handle or who opened it.
+   */
+  const askedOf = (ctx: CallContext, names: readonly string[]): AboutSeen[] => {
+    if (deps.readsEveryList?.(ctx) !== true) return [];
+    const keys = [...new Set(names.map((n) => nameWords(n)))].filter((k) => k !== '');
+    if (keys.length === 0) return [];
+    const open = kernel.openSuggestions();
+    if (!open.ok) return [];
+    const out: AboutSeen[] = [];
+    for (const q of open.value) {
+      const asked = kernel.question(String(q.id ?? ''));
+      if (asked === null) continue;
+      const said = (scrubbed(asked) ?? '').replace(/\s+/gu, ' ').trim();
+      const words = wordsOf({ said });
+      /* THE WHOLE NAME, as `namedIn` holds it, and its own: "Renew Copperleaf's domain" names Copperleaf. */
+      if (said === '' || !keys.some((k) => words.includes(` ${k} `) || words.includes(` ${k}'s `))) continue;
+      const where = `${ASKED_OF}${said}`.slice(0, PHRASE);
+      if (ROW_ID.test(where)) continue;
+      out.push({ at: String(q.opened_at ?? ''), where });
+    }
+    return out;
+  };
+
   /** A row as a caller is answered it, or `null` when it is not hers to read or is nothing the kernel's read knows. */
   const said = (ctx: CallContext, about: AboutDeps, id: string): AboutSaid | null => {
     const row = kernel.get(id);
@@ -130,7 +164,7 @@ export function methods(deps: RecordDeps) {
     });
     const kept = deps.readsEveryList?.(ctx) === true ? what.seen : [];
     const places = new Map<string, AboutSeen>();
-    for (const s of [...kept, ...namedIn(ctx, row, names)]) if (!places.has(s.where)) places.set(s.where, s);
+    for (const s of [...kept, ...namedIn(ctx, row, names), ...askedOf(ctx, names)]) if (!places.has(s.where)) places.set(s.where, s);
     const seen = [...places.values()].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : a.where < b.where ? -1 : 1)).slice(0, SEEN);
     return { ...what, seen, register: row.register, seq: row.seq };
   };

@@ -14,7 +14,6 @@ import { HISTORY } from './parts/history.ts';
 import { INSTALMENTS } from './parts/instalments.ts';
 import { LEDGER } from './parts/ledger.ts';
 import { NEXT_30 } from './parts/next30.ts';
-import { QUEUE } from './parts/queue.ts';
 import { RUNWAY } from './parts/runway.ts';
 import { SPENDING } from './parts/spending.ts';
 
@@ -100,10 +99,17 @@ import { SPENDING } from './parts/spending.ts';
  * visualized", "i dont want a very 'busy' looking ui"). The walk of the next thirty days under Coming and going went:
  * it was Cash ahead's arithmetic again over a shorter horizon, one tile above it, and the thirty days are still the
  * calendar's and Cash ahead's own. Its block went to Every month (`parts/every-month.ts`), what comes in and goes out
- * every month at its monthly share, after the chart whose months ahead it is, so the page is twenty-four still and
- * the same five tiles before the fold. THE COSTS BY CATEGORY ARE DECLARED AND NOT PLACED: the page had one block to
- * give, and the two figures are the answer. And the chart reads six months back where it read twelve
+ * every month at its monthly share, after the chart whose months ahead it is. Straight under the two figures, what the
+ * repeating costs are for, one bar a category, whose parts add up to Going out (`every-month-by-category`), so a
+ * person reads what a month costs and then on what. And the chart reads six months back where it read twelve
  * (`parts/history.ts`), with three ahead, as the Money board draws it.
+ *
+ * THE QUESTIONS ARE DECIDE'S (REC-B23 step 7). Waiting on you stood third in the side column, under where the money is,
+ * and asked again on Money what Decide already holds whole, three at a time and compact. The Money board puts it off
+ * the page, so the side column holds when the money runs out and where it is, and nothing else. Its block went to the
+ * costs by category, so the page is twenty-four blocks still, with the same six tiles before the fold. Waiting on you
+ * stays declared and not placed (`parts/queue.ts`). When the money runs out, the accounts and Heads up stay until the
+ * page has a lead tile of the cash there is.
  */
 export const MONEY_PAGE: SeedPage = {
   page: 'money',
@@ -124,7 +130,6 @@ export const MONEY_PAGE: SeedPage = {
     ...FORECAST,
     ...RUNWAY,
     ...ACCOUNTS_TILE,
-    ...QUEUE,
     ...CROSS_CHECK,
     ...LEDGER,
     /* Every line of it but the one on categories marked the other way, given up for the line above. */
@@ -137,7 +142,7 @@ export const MONEY_PAGE: SeedPage = {
     ...BUDGET.filter((b) => b.kind === 'progress'),
     /* The chart, and no folded heading over it alone. */
     ...HISTORY.filter((b) => b.kind !== 'section'),
-    /* What repeats, as two figures, and not yet by category (see above). */
-    ...EVERY_MONTH.filter((b) => b.kind === 'stat'),
+    /* What repeats, as two figures, then by category (see above). */
+    ...EVERY_MONTH,
   ],
 };

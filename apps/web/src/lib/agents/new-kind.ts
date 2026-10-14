@@ -1,0 +1,248 @@
+/**
+ * Writing a job kind in the app: `/agents/new-kind`, opened from "Run a job".
+ *
+ * THE SAME ROAD AN AGENT TAKES, AND NO NEW METHOD. A kind is a `job` declaration, and it is filed with `propose` as a
+ * `change` to `job.<id>`, exactly the body an agent's change carries, so "Run a job" reads it back from the accepted
+ * change (`kindsIn` in `record/jobs.ts`) the moment it lands.
+ *
+ * FILED, NEVER ACCEPTED HERE. A script the owner writes is accepted in his own press (`record/script-draft.ts`); a kind
+ * is approved once by him in Decide, so this file files the change, signed by whoever pressed, and stops. Nothing here
+ * calls `decide`.
+ *
+ * A SKIPPED PERMISSION IS NEVER OFFERED. The two choices are the kernel's own `JOB_PERMISSIONS`, which does not hold
+ * one, and the kernel's check runs on the body before anything is sent, so its sentence is drawn under the field it
+ * names rather than coming back as a refusal.
+ *
+ * PURE, for the reason `scripts.ts` gives: `node --test` cannot import a `.svelte.ts` file.
+ */
+
+import { createClient } from '@braindog/client';
+import { JOB_MCP_PREFIX, JOB_PERMISSIONS, jobBody, type JobBody } from '@braindog/kernel';
+
+import type { Fetch } from '../record/jobs.ts';
+
+/** How a run may ask: the kernel's two, `dontAsk` and `acceptEdits`. */
+export type JobPermission = (typeof JOB_PERMISSIONS)[number];
+
+/** One argument as the form holds it: the slot's id, the words a person types it in by, and how long it may be. */
+export type KindArg = { id: string; label: string; max: number };
+
+/** What the form holds. `commands` is the text a person typed, one command a line, and is split when it is sent. */
+export type KindDraft = {
+  title: string;
+  prompt: string;
+  args: KindArg[];
+  repo: string;
+  tools: string[];
+  commands: string;
+  turns: number;
+  permission: JobPermission;
+  writes: boolean;
+};
+
+/** The file tools a kind may name as they are (the kernel's `JOB_FILE_TOOLS`, which its index does not export). */
+export const FILE_TOOLS = ['Read', 'Grep', 'Glob'] as const;
+/** The most turns a kind may give one run (the kernel's `JOB_TURNS_MOST`). */
+export const TURNS_MOST = 40;
+/** The longest an argument may be, and what a new one is given (the kernel's `JOB_ARG_CHARS_MOST`). */
+const ARG_MOST = 64;
+/** The most characters in an argument's label (the kernel's `JOB_ARG_LABEL_CHARS_MOST`). */
+const LABEL_MOST = 40;
+
+/**
+ * The record's own tools a run may be given: every tool that only reads, and `propose`, which asks the owner and
+ * changes nothing until he answers. A tool that writes on its own is not offered, since a run nobody watches would
+ * write with it.
+ */
+export const RECORD_TOOLS: readonly string[] = ['record_index', 'context', 'schema', 'get', 'list', 'search', 'history', 'activity', 'governance', 'propose'].map(
+  (name) => JOB_MCP_PREFIX + name,
+);
+
+/** The permissions offered, which are the kernel's, so a skipped permission is never one of them. */
+export const PERMISSIONS: readonly JobPermission[] = JOB_PERMISSIONS;
+
+/** A kind's own id, as the kernel's grammar takes it. */
+const ID = /^[a-z][a-z0-9_-]{0,31}$/u;
+/** One slot in a prompt, as the kernel reads one. */
+const SLOT = /%([a-z][a-z0-9_]{0,31})%/gu;
+
+/** An empty draft: eight turns, and the permission that runs only the tools it names. */
+export function blankKind(): KindDraft {
+  return { title: '', prompt: '', args: [], repo: '', tools: [], commands: '', turns: 8, permission: 'dontAsk', writes: false };
+}
+
+/** A slot's id in words a person reads as a label: `repo_name` is "Repo name". */
+const labelOf = (id: string): string => {
+  const said = id.replace(/_+/gu, ' ').trim();
+  return (said.charAt(0).toUpperCase() + said.slice(1)).slice(0, LABEL_MOST);
+};
+
+/**
+ * The arguments the prompt's `%slot%`s ask for, in the order it first says them.
+ *
+ * IN STEP, AND KEEPING WHAT WAS TYPED. A slot the draft already has keeps its label and length; a new one gets its id
+ * in words; one the prompt no longer says goes, since the kernel refuses an argument no slot names.
+ */
+export function slotsOf(prompt: string, args: readonly KindArg[] = []): KindArg[] {
+  const out: KindArg[] = [];
+  for (const m of prompt.matchAll(SLOT)) {
+    const id = m[1] ?? '';
+    if (id === '' || out.some((a) => a.id === id)) continue;
+    out.push(args.find((a) => a.id === id) ?? { id, label: labelOf(id), max: ARG_MOST });
+  }
+  return out;
+}
+
+/** A kind's id from its title: lower case, a hyphen between words, starting with a letter, at most 32. */
+export function kindId(title: string): string {
+  const slug = title
+    .normalize('NFKD')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gu, '-')
+    .replace(/^[^a-z]+/u, '')
+    .slice(0, 32)
+    .replace(/-+$/u, '');
+  return ID.test(slug) ? slug : '';
+}
+
+/** The commands typed, one a line, each as the tool that runs only it. A line already written as `Bash(...)` stays. */
+function commandTools(commands: string): string[] {
+  const out: string[] = [];
+  for (const raw of commands.split('\n')) {
+    const line = raw.trim();
+    if (line === '') continue;
+    const tool = /^Bash\(.*\)$/su.test(line) ? line : `Bash(${line})`;
+    if (!out.includes(tool)) out.push(tool);
+  }
+  return out;
+}
+
+/** Whether a run of this draft changes files: always under "Accept edits", which the kernel holds it to. */
+export const writesOf = (d: Pick<KindDraft, 'permission' | 'writes'>): boolean => d.permission === 'acceptEdits' || d.writes;
+
+/** The declaration's body, exactly as the kernel checks and Decide shows it. */
+export function kindBody(d: KindDraft): JobBody {
+  const args = slotsOf(d.prompt, d.args).map((a) => ({ id: a.id, label: a.label.trim(), max: a.max }));
+  const repo = d.repo.trim();
+  return {
+    job: kindId(d.title),
+    title: d.title.trim(),
+    prompt: d.prompt,
+    ...(args.length > 0 ? { args } : {}),
+    ...(repo !== '' ? { repo } : {}),
+    tools: [...d.tools, ...commandTools(d.commands)],
+    turns: d.turns,
+    permission: d.permission,
+    ...(writesOf(d) ? { writes: true } : {}),
+  };
+}
+
+/** The field on the form a kernel refusal is about: `args[0].label` is the prompt's slots, `job` is the title. */
+function fieldOf(at: string): string {
+  const head = at.split(/[.[]/u)[0] ?? at;
+  if (head === 'job') return 'title';
+  if (head === 'args') return 'prompt';
+  return head;
+}
+
+/**
+ * What is wrong with the draft and where, or `null` when the kernel would take it.
+ *
+ * THE KERNEL'S OWN SENTENCE, with the kind's id said as "This kind": a person reads names, and the id is made from
+ * the title they are still typing.
+ */
+export function kindFaultAt(d: KindDraft): { at: string; fix: string } | null {
+  const job = kindId(d.title);
+  if (job === '') return { at: 'title', fix: words.needTitle };
+  const id = `job.${job}`;
+  const refused = jobBody({ id, body: kindBody(d) as unknown as Record<string, unknown> });
+  if (refused === null) return null;
+  return { at: fieldOf(refused.at ?? ''), fix: refused.fix.split(id).join(words.thisKind) };
+}
+
+/** The kernel's sentence for the draft, or `null` when it would take it. */
+export const kindFault = (d: KindDraft): string | null => kindFaultAt(d)?.fix ?? null;
+
+/** The change `propose` files: a new `job.<id>`, from version 0, so a kind of that id filed first is a conflict. */
+export function kindProposal(d: KindDraft) {
+  const id = `job.${kindId(d.title)}`;
+  return {
+    question: words.ask(d.title.trim()),
+    body_kind: 'change' as const,
+    body: { declaration_id: id, to: { id, kind: 'job', body: kindBody(d) }, from_version: 0 },
+  };
+}
+
+/** What filing answered: the question it opened in Decide, or the sentence to fix. */
+export type Filed = { kind: 'filed'; question: string | null } | { kind: 'refused'; fix: string };
+
+/**
+ * File the kind for Decide. ONE CALL, AND NEVER AN ANSWER: nothing is sent while the kernel would refuse it, and the
+ * question it opens is the owner's to approve.
+ */
+export async function fileKind(base: string, d: KindDraft, io?: Fetch): Promise<Filed> {
+  const fault = kindFault(d);
+  if (fault !== null) return { kind: 'refused', fix: fault };
+  const client = createClient({ base, ...(io ? { fetch: io } : {}) });
+  const filed = await client.call<{ id?: unknown }>('propose', kindProposal(d) as unknown as Record<string, unknown>);
+  if (!filed.ok) return { kind: 'refused', fix: 'refusal' in filed ? filed.refusal.fix : words.notSent };
+  const value: unknown = filed.value;
+  const question = value !== null && typeof value === 'object' && typeof (value as { id?: unknown }).id === 'string' ? (value as { id: string }).id : null;
+  return { kind: 'filed', question };
+}
+
+export const words = {
+  open: 'New kind',
+  heading: 'New kind',
+  parent: 'Jobs',
+  headline: 'Write a job once, approve it in Decide, and Run a job offers it from then on.',
+  title: 'Title',
+  titleHelp: 'What Decide and the list of jobs call it.',
+  prompt: 'What to do',
+  promptHelp: 'Write %name% where a person fills something in when they start a run.',
+  slots: 'Filled in at each run',
+  slotLabel: (id: string) => `Words for %${id}%`,
+  repo: 'Repository',
+  repoHelp: 'The name your machine gives the folder it works in. Leave it empty to work in an empty folder.',
+  recordTools: 'Tools on your record',
+  fileTools: 'File tools',
+  commands: 'Commands',
+  commandsHelp: 'One a line, like git log. A run may use only the commands named here.',
+  turns: 'Turns',
+  turnsHelp: `How many turns one run may take, from 1 to ${TURNS_MOST}.`,
+  permission: 'Permission',
+  dontAsk: 'Only these tools',
+  dontAskHelp: 'A run uses only the tools above and stops at anything else.',
+  acceptEdits: 'Accept edits',
+  acceptEditsHelp: 'A run uses the tools above and changes files without asking.',
+  writes: 'Changes files',
+  writesHelp: 'Decide shows this in red before anybody approves the kind.',
+  writesForced: 'Accept edits changes files, so this stays on.',
+  send: 'Send to Decide',
+  busy: 'Filing',
+  sent: 'Sent to Decide',
+  sentLine: 'Approve it there once, and Run a job offers it.',
+  notSent: 'The record did not answer, so nothing was sent. Try again.',
+  needTitle: 'Give it a title that starts with a letter.',
+  thisKind: 'This kind',
+  ask: (title: string) => `Approve the job ${title}?`,
+  toolRecord: {
+    record_index: 'See what is kept here',
+    context: 'Get your briefing',
+    schema: 'See the fields',
+    get: 'Open one thing',
+    list: 'Browse what is kept',
+    search: 'Search everything',
+    history: 'See how one thing changed',
+    activity: 'See recent changes',
+    governance: 'See questions and decisions',
+    propose: 'Ask the owner to decide',
+  } as Readonly<Record<string, string>>,
+  toolFile: { Read: 'Read files', Grep: 'Search in files', Glob: 'Find files' } as Readonly<Record<string, string>>,
+};
+
+/** A record tool's words, from its `mcp__braindog__<name>`. */
+export const recordToolWords = (tool: string): string => {
+  const name = tool.slice(JOB_MCP_PREFIX.length);
+  return words.toolRecord[name] ?? name.replace(/_/gu, ' ');
+};

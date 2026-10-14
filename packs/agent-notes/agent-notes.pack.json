@@ -1,0 +1,166 @@
+{
+  "pack": "agent-notes",
+  "version": "1.0.0",
+  "title": "Agent notes",
+  "summary": "Two short notes a day, at 08:00 and 17:00 your time, of what your agents ask you, what they did and what is stuck. Nothing when there is nothing to say, and never by mail.",
+  "changes": "The first version.",
+  "author": "BrainDog",
+  "license": "Apache-2.0",
+  "requires": {
+    "format": 1,
+    "primitives": 1,
+    "packs": {
+      "agents": "^1.0.0"
+    }
+  },
+  "declarations": [
+    {
+      "digest": "agent-notes-morning",
+      "name": "Agents, this morning",
+      "schedule": {
+        "at": "08:00"
+      },
+      "channels": [
+        "in-app",
+        "push"
+      ],
+      "sections": [
+        {
+          "heading": "Needs you",
+          "source": "governance.open",
+          "where": {
+            "any": [
+              {
+                "field": "who",
+                "starts": "agent:"
+              },
+              {
+                "field": "who",
+                "starts": "s1"
+              },
+              {
+                "field": "who",
+                "starts": "s2"
+              },
+              {
+                "field": "who",
+                "starts": "s3"
+              },
+              {
+                "field": "who",
+                "starts": "s4"
+              },
+              {
+                "field": "who",
+                "starts": "s5"
+              },
+              {
+                "field": "who",
+                "starts": "s6"
+              },
+              {
+                "field": "who",
+                "starts": "s7"
+              },
+              {
+                "field": "who",
+                "starts": "s8"
+              },
+              {
+                "field": "who",
+                "starts": "s9"
+              }
+            ]
+          },
+          "omit_when_empty": true
+        },
+        {
+          "heading": "Done by agents",
+          "source": "activity",
+          "within": "15h",
+          "omit_when_empty": true
+        },
+        {
+          "heading": "Stuck",
+          "source": "handoffs.open",
+          "where": "mark is earlier",
+          "omit_when_empty": true
+        }
+      ]
+    },
+    {
+      "digest": "agent-notes-evening",
+      "name": "Agents, this evening",
+      "schedule": {
+        "at": "17:00"
+      },
+      "channels": [
+        "in-app",
+        "push"
+      ],
+      "sections": [
+        {
+          "heading": "Needs you",
+          "source": "governance.open",
+          "where": {
+            "any": [
+              {
+                "field": "who",
+                "starts": "agent:"
+              },
+              {
+                "field": "who",
+                "starts": "s1"
+              },
+              {
+                "field": "who",
+                "starts": "s2"
+              },
+              {
+                "field": "who",
+                "starts": "s3"
+              },
+              {
+                "field": "who",
+                "starts": "s4"
+              },
+              {
+                "field": "who",
+                "starts": "s5"
+              },
+              {
+                "field": "who",
+                "starts": "s6"
+              },
+              {
+                "field": "who",
+                "starts": "s7"
+              },
+              {
+                "field": "who",
+                "starts": "s8"
+              },
+              {
+                "field": "who",
+                "starts": "s9"
+              }
+            ]
+          },
+          "omit_when_empty": true
+        },
+        {
+          "heading": "Done by agents",
+          "source": "activity",
+          "within": "9h",
+          "omit_when_empty": true
+        },
+        {
+          "heading": "Stuck",
+          "source": "handoffs.open",
+          "where": "mark is earlier",
+          "omit_when_empty": true
+        }
+      ]
+    }
+  ]
+}

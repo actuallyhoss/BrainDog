@@ -1,0 +1,26 @@
+<!--
+  A new job kind: `/agents/new-kind`, opened from "Run a job" on `/jobs`.
+
+  THE FORM IS `NewKind`, and this screen is its header and its room. It reads nothing: every choice the form offers is
+  the kernel's or the record's own tools, so it draws at once. The route is its own chunk, loaded when it is opened, so
+  nothing here is in what every screen loads.
+-->
+<script lang="ts">
+  import { titleOf } from '$lib/title.ts';
+  import { words } from '$lib/agents/new-kind.ts';
+  import NewKind from '$lib/agents/NewKind.svelte';
+  import PageHead from '$lib/ui/PageHead.svelte';
+</script>
+
+<svelte:head><title>{titleOf(words.heading)}</title></svelte:head>
+
+<PageHead icon="play" title={words.heading} kicker={words.parent} back="/jobs" sentence={words.headline} />
+<div class="page">
+  <NewKind />
+</div>
+
+<style>
+  .page {
+    padding: var(--sp-4) var(--gutter) var(--sp-9);
+  }
+</style>

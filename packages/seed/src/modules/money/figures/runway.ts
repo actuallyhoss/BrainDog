@@ -1,7 +1,7 @@
 /** Money's figures over the walk ahead: how long the money lasts, the day it runs out, what arrives and leaves. */
 
 import type { SeedMetric } from '../../base.ts';
-import { CASH_LEGS } from '../legs.ts';
+import { CASH_LEGS, OUT_LEGS } from '../legs.ts';
 import { MONEY, RUNS_OUT_NEVER } from './shared.ts';
 
 export const RUNWAY_FIGURES: Record<string, SeedMetric> = {
@@ -31,6 +31,34 @@ export const RUNWAY_FIGURES: Record<string, SeedMetric> = {
        weeks. A night the money lasts past the year has no value and writes no point, so the line is drawn only across
        the nights it did not, which is when it matters. */
     snapshot: { grain: 'day', into: 'series.runway-days' },
+  },
+
+  /**
+   * HOW LONG THE CASH LASTS IF NOTHING COMES IN, SINCE money-core 3.17.0: the days from today until the walk from Cash
+   * now goes under over the legs that take money off (`OUT_LEGS`), which is Cash ahead's walk with every line of money
+   * in left out. Money's first sentence says it ("and it lasts 412 days with no income").
+   *
+   * IN DAYS AND NOT MONTHS because no figure is written in months: there is no `months` format, and a count of days
+   * divided on the page would be a second arithmetic beside the walk's. Five years ahead, so a record that spends little
+   * still reads a number; past five years, or across two currencies with no rate, it has no value and its clause drops.
+   *
+   * A TARGET NO READING MISSES, `gte: 0`, AND SO NO DANGER COLOUR: it is not a miss for money to run out once income
+   * stops, it is the measure. `target: {}` is refused for a count of days (a bound or a setting, `evaluateMetric`), and a
+   * walk opening below zero is day 0, which still meets it, as `arriving-30d`'s does.
+   * NOT REMEMBERED EACH NIGHT, as `runs-out-on` is not: nothing draws its line.
+   */
+  'lasts-no-income': {
+    metric: 'lasts-no-income',
+    name: 'Days the money lasts with no income',
+    pack: 'money-core',
+    source: 'forecast.runway',
+    legs: OUT_LEGS,
+    opening: { metric: 'cash-now' },
+    value: { walk: 'days_to_zero', within: '1825d' },
+    format: 'days',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
   },
 
   /**

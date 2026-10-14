@@ -66,6 +66,8 @@ export type Drawable = {
   area?: unknown;
   panel?: unknown;
   box?: unknown;
+  /** The glyph a block names for its tile's heading, which a box's own glyph may echo (`unechoed`). */
+  icon?: unknown;
 };
 
 type Obj = Record<string, unknown>;
@@ -375,7 +377,30 @@ export function emptyHidden<B extends Drawable>(blocks: readonly B[], own = fals
  * (`why: 'when'`), so every reader of the answer, an agent's as much as the screen, draws the same blocks.
  */
 export function markDrawn<B extends Drawable>(blocks: readonly B[], own = true): B[] {
-  return emptyHidden(blocks.map((b) => (on(b) || b.why !== undefined ? b : ({ ...b, why: 'when' } as B))), own);
+  return unechoed(emptyHidden(blocks.map((b) => (on(b) || b.why !== undefined ? b : ({ ...b, why: 'when' } as B))), own));
+}
+
+/**
+ * NO TILE DRAWS ONE GLYPH TWICE. Inside a boxed section (a `section` with `box: true`, over the blocks `headed` gives
+ * it), a block naming the box's own glyph is answered without its `icon`, so the drawer gives it its kind's: "More about
+ * Copperleaf" and its "Notes" both said `notebook-pen` and the tile showed the same mark twice. A block outside a box, or
+ * with a glyph of its own, keeps it; the indexes and every other key stay.
+ */
+export function unechoed<B extends Drawable>(blocks: readonly B[]): B[] {
+  const out = [...blocks];
+  blocks.forEach((b, n) => {
+    if (b.kind !== 'section' || b.box !== true || typeof b.icon !== 'string' || b.icon === '') return;
+    const area = areaOf(b);
+    for (let at = n + 1; at < blocks.length; at++) {
+      const next = blocks[at]!;
+      if (areaOf(next) !== area) continue;
+      if (next.kind === 'section') break;
+      if (next.icon !== b.icon) continue;
+      const { icon: _echo, ...rest } = out[at]!;
+      out[at] = rest as B;
+    }
+  });
+  return out;
 }
 
 /**

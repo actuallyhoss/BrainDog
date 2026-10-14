@@ -126,6 +126,31 @@ const EVERYDAY: Leg = {
 /** THE ONE ARRAY EVERYTHING WALKS: the lists that hold a dated amount, and after them what is spent with no day ahead of it. */
 export const CASH_LEGS: Leg[] = [...DATED, EVERYDAY];
 
+/** What narrows each dated leg to the money that goes out: a condition added to the leg's own `where`. */
+const GOING_OUT: Record<string, string> = {
+  obligations: 'direction is owed by me',
+  recurring: 'direction is out',
+  installments: 'direction is out',
+};
+
+/**
+ * THE SAME WALK WITH NOTHING COMING IN, SINCE money-core 3.17.0, for how long the cash lasts with no income
+ * (`lasts-no-income`): every dated leg narrowed to the money it takes off, then everyday spending as Cash ahead walks it.
+ *
+ * MONEY ON ITS WAY INTO AN ACCOUNT IS LEFT OUT WHOLE, because that leg is only ever money in. A subscription is only ever
+ * money out, so its leg stays as it is. Everyday spending measures what went out and walks it out, and what it counts as
+ * already walked is the legs beside it, which are now the money-out legs alone. `CASH_LEGS` does not change: Cash ahead
+ * and every figure over it still walk both ways.
+ */
+export const OUT_LEGS: Leg[] = [
+  ...DATED.flatMap((leg): Leg[] => {
+    if (leg.register === 'accounts') return [];
+    const out = GOING_OUT[leg.register];
+    return [out === undefined ? leg : { ...leg, where: `${leg.where}, ${out}` }];
+  }),
+  EVERYDAY,
+];
+
 /**
  * THE REPEATING LINES A MONTHLY FIGURE COUNTS: live, going the one way, and not past their last day.
  *

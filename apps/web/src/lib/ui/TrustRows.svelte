@@ -15,6 +15,11 @@
 
   A KIND PUT BACK TO ASKING CARRIES THE WORDS, never the colour alone: "Put back" in the deeper red, then why, as the
   record worded it.
+
+  OUTSIDE TEXT SAYS SO (ENG-A13, D37.116): under an agent whose run read the inbox, or anything else from outside the
+  record, one muted line says it asks about everything in that run and why. Under the floors, each import asks whether
+  all of it is his (`ImportAsk.svelte`), loaded only when the record holds one, so no other screen carries it. A host
+  that sends neither draws exactly what it drew before.
 -->
 <script lang="ts">
   import { apiBase } from '../at.ts';
@@ -24,6 +29,7 @@
   import { readTrust, takeBack, trustLines, words, type TrustLine } from '$lib/record/trust.ts';
   import Button from '$lib/ui/Button.svelte';
   import Tile from '$lib/ui/Tile.svelte';
+  import { markedLine, readImports, type ImportRow } from './imports.ts';
 
   let standing = $state<TrustStanding | null>(null);
   /** The line whose press is on its way, so it is not sent twice. */
@@ -33,7 +39,27 @@
 
   const lines = $derived(standing ? trustLines(standing, Date.now()) : []);
 
+  /** Each agent's marked line, by its place in the record's order, read off the standing `readTrust` keeps. */
+  const marked = $derived(standing ? standing.agents.map(markedLine) : []);
+  /** The imports the record holds, or `null` when it sent none or has no such call. */
+  let imports = $state<ImportRow[] | null>(null);
+
+  /* The marked line goes after an agent's last line: an agent's lines are keyed by its place, `0` or `0:1`. */
+  const markedAfter = (i: number): string | null => {
+    const at = lines[i]?.key.split(':')[0];
+    if (at === undefined || lines[i + 1]?.key.split(':')[0] === at) return null;
+    return marked[Number(at)] ?? null;
+  };
+
   const client = () => createClient({ base: apiBase() });
+
+  /* ONE READ: `readTrust` carries each agent's `asking` beside its ladder, and the marked line is read off that. */
+  const read = () => readTrust(client());
+
+  const rereadImports = async (): Promise<void> => {
+    const out = await readImports(client());
+    imports = out && out.length > 0 ? out : null;
+  };
 
   /* REREAD AFTER THE PRESS, not patched in place: the record says the new day and why, and every other line as it is. */
   async function askAgain(l: TrustLine): Promise<void> {
@@ -42,7 +68,7 @@
     failed = null;
     const out = await takeBack(client(), l.take);
     if (out.ok) {
-      const again = await readTrust(client());
+      const again = await read();
       if (again) standing = again;
     } else failed = { key: l.key, fix: out.fix };
     pressing = null;
@@ -50,8 +76,9 @@
 
   onMount(() => {
     if (!page.data.live) return;
-    void readTrust(client()).then((out) => {
+    void read().then((out) => {
       standing = out;
+      if (out) void rereadImports();
     });
   });
 </script>
@@ -62,7 +89,7 @@
       <p class="trust-empty">{words.empty}</p>
     {:else}
       <ul class="trust-lines">
-        {#each lines as l (l.key)}
+        {#each lines as l, i (l.key)}
           <li class="trust-line">
             <div class="trust-text">
               <!-- `dir="auto"`: the name is the owner's and the list's name is too, in whatever script they chose. -->
@@ -78,6 +105,9 @@
               <!-- The label says the verb and the line says what it is for, so a screen reader hears both. -->
               <Button size="sm" disabled={pressing !== null} aria-label={`${words.askAgain}: ${l.text}`} onclick={() => void askAgain(l)}>{words.askAgain}</Button>
             {/if}
+            {#if markedAfter(i)}
+              <p class="trust-marked" dir="auto">{markedAfter(i)}</p>
+            {/if}
           </li>
         {/each}
       </ul>
@@ -85,6 +115,11 @@
         <p class="trust-floor">{words.asksFirst}</p>
         <p class="trust-floor">{words.alwaysAsks}</p>
       </div>
+      {#if imports}
+        {#await import('./ImportAsk.svelte') then loaded}
+          <loaded.default {imports} {client} reread={rereadImports} />
+        {/await}
+      {/if}
     {/if}
   </Tile>
 {/if}
@@ -152,6 +187,16 @@
   }
 
   .trust-floor {
+    margin: 0;
+    max-inline-size: var(--measure);
+    color: var(--ink2);
+    font-size: var(--t-base);
+    line-height: 22px;
+  }
+
+  /* THE MARK ON A RUN, its own line under the agent's last one, quiet as the floors: the words say it, no colour. */
+  .trust-marked {
+    flex-basis: 100%;
     margin: 0;
     max-inline-size: var(--measure);
     color: var(--ink2);

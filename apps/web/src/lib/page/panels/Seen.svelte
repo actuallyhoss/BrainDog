@@ -3,10 +3,12 @@
 
   UNDER A SECTION THAT DECLARES `panel: seen` (`panel-of.ts`), on a person's, an organisation's or a project's page:
   "3 Oct · Notes: Spoke to Sara at Northbank about the renewal", eight lines at most, then "and N more", and the
-  thing's other names in one sentence under them (`seen.ts`).
+  thing's other names in one sentence under them (`seen.ts`). What waits on the owner about it is a line too ("Waiting
+  on you: ...").
 
   A QUIET LIST, NOT A TILE: the section above it is the tile and says the heading, so this draws lines in the board's
-  text colours and nothing more. Nothing is drawn while it reads, at nought, or on a refusal.
+  text colours and nothing more. Seen nowhere, it says so in one muted line, so the tile is never a heading over
+  nothing. Nothing is drawn while it reads or on a refusal.
 
   IT ONLY READS, so it is drawn on a page that does not write as well. A HOST PANEL loaded by `import()` from
   `BlockSlot.svelte` only, so neither this nor its styles reach the entry chunk.
@@ -48,6 +50,8 @@
     {#if shown.more}<p class="seen-more">{shown.more}</p>{/if}
     {#if shown.also}<p class="seen-also">{shown.also}</p>{/if}
   </div>
+{:else if shown.none}
+  <p class="seen-none">{shown.none}</p>
 {/if}
 
 <style>
@@ -70,6 +74,13 @@
     color: var(--ink);
     font-size: var(--t-ui);
     overflow-wrap: anywhere;
+  }
+
+  /* SEEN NOWHERE: one quiet line under the heading, in the board's muted text. */
+  .seen-none {
+    margin: var(--sp-2) 0 0;
+    color: var(--ink2);
+    font-size: var(--t-ui);
   }
 
   .seen-more,

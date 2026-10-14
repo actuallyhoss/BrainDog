@@ -51,6 +51,8 @@ import { agentOf, kindOfEvent, shapeIn } from './change-kind.ts';
 import type { Json } from './coerce.ts';
 import { jcs, type Declaration } from './declare.ts';
 import type { Patch } from './index.ts';
+import { keyedLists, mergeFieldOf } from './entities.ts';
+import type { RoleList } from './roles.ts';
 import type { KernelParts } from './parts.ts';
 import { reopenedTail } from './ingest.ts';
 import { SESSION, SESSION_PREFIX } from './session.ts';
@@ -270,6 +272,20 @@ type ListDecl = { id: string; name: string; one: string | null; title: string | 
 
 /** The field every list takes, declared or not (`index.ts`'s `withTags`). */
 const TAGS: FieldShape = { id: 'tags', type: 'list', of: 'text', label: 'Tags' };
+
+/**
+ * The field a list's rows are merged by, read the way the kernel's merge door reads it (`entities.ts`'s `keyedLists`
+ * over every live list, since a role is resolved across them), or `undefined` for a list whose rows are never merged.
+ */
+function mergeFieldIn(sql: Sql, register: string): string | undefined {
+  const all: RoleList[] = [];
+  for (const row of sql.all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'register' AND superseded_at IS NULL AND retired = 0")) {
+    const body = parse(row.body);
+    if (isMap(body) && typeof body.id === 'string') all.push(body as unknown as RoleList);
+  }
+  const list = keyedLists(all).find((l) => l.register === register);
+  return list === undefined ? undefined : mergeFieldOf(list);
+}
 
 function listsOf(sql: Sql): (register: string) => ListDecl | null {
   const seen = new Map<string, ListDecl | null>();
@@ -823,6 +839,9 @@ function worked(sql: Sql, scope: UndoScope, opts: UndoOptions): Result<Worked> {
         }
         if (way?.by === 'decide') w.decided = true;
       }
+      /* UNDOING THE DECISION THAT MERGED IT IS DECIDING TOO: the merge door moves a merge field only by a decision or by
+         undoMerge, so the decision's own undo writes it back through the decided door. */
+      if ('decision' in scope && mergeFieldIn(sql, decl.id) === field) w.decided = true;
       /* A LINK BACK TO A ROW DELETED SINCE would be refused by the write; the plan says so first. */
       if ((f.type === 'ref' || f.of === 'ref') && from !== null) {
         const ids = (Array.isArray(from) ? from : [from]).filter((x): x is string => typeof x === 'string');

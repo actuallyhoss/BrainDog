@@ -475,10 +475,13 @@ export {
   render,
   runDigest,
   sectionsOf,
+  SECTION_LINES,
   sendDigest,
   twoSentences,
   URGENT_NOTE,
+  WORDS_MOST,
 } from './digest.ts';
+export { DIGEST_SOURCES, computedPart } from './digest-sources.ts';
 export { CREATE_CEILING, applyRule, dryRun, fill as fillTemplate, linkFault, linkPatternFault, marker, order as orderRules, runRules } from './rules.ts';
 export { runway } from './forecast.ts';
 export { anchorDayOf, cycleAfter, restDaysOf } from './forecast.ts';
@@ -6777,6 +6780,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         const one = typeof said === 'string' && said.trim() !== '' ? said : decl.one;
         return { title: decl.title, ...(typeof one === 'string' ? { one } : {}) };
       },
+      /* A COMPUTED SECTION'S BLOCK, read the way a page reads it (`digest-sources.ts`). */
+      block: (b) => readBlock(deps, b),
       ctx: deps.ctx,
       /* THE OWNERS, BY ADDRESS. A digest with nowhere to go is not sent rather than sent to the
          first person the record can name — which on a shared record would be somebody else. */

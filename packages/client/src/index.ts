@@ -1173,7 +1173,7 @@ export type EngineReadings = {
  * `Standing` in `packages/record/src/ladder.ts`.
  */
 export type TrustStanding = {
-  agents: { agent: string; connected: string | null; kinds: { kind: string; rung: 'ask' | 'tell' | 'quiet'; since: string; lifted: boolean; dropped: { at: string; why: string | null } | null }[] }[];
+  agents: { agent: string; connected: string | null; asking: { from: string; at: string } | null; kinds: { kind: string; rung: 'ask' | 'tell' | 'quiet'; since: string; lifted: boolean; dropped: { at: string; why: string | null } | null }[] }[];
 };
 
 /**
@@ -1917,6 +1917,14 @@ export function createClient(options: ClientOptions) {
     trust: () => call<AnswerOr<'trust', TrustStanding>>('trust'),
     /** Put an agent back to asking on one kind it does on its own, or on every such kind with none named (ENG-A12). An owner's in a browser. */
     trustTakeBack: (args: { agent: string; kind?: string }) => call<TrustStanding>('trustTakeBack', args),
+    /** Every import made into the record, newest first, and whether the owner said it is his own (ENG-A13). It writes nothing. */
+    imports: () => call<unknown>('imports', {}),
+    /** The owner's press saying an import is his own or outside text (ENG-A13). An owner's in a browser; it files no question. */
+    importAdopt: (args: { run: string; yes: boolean }) => call<unknown>('importAdopt', args),
+    /** What may be here twice: pairs of rows that may be one (named-twice). It writes nothing. */
+    namedTwice: (args?: { limit?: number }) => call<unknown>('namedTwice', args ?? {}),
+    /** File one question on Decide asking whether a pair is one, signed by the person who pressed. Nothing is folded until it is answered. */
+    askNamedSame: (args: { pair: string }) => call<{ question: string }>('askNamedSame', args),
     changeEmail: (email: string) => accountDoor<Record<string, never>>('email', { email }),
     confirmEmail: (token: string) => accountDoor<{ email: string; unreached: number }>('email/confirm', { token }),
 
