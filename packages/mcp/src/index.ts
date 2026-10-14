@@ -100,12 +100,15 @@ import { SCRIPT_GRAMMAR } from '../grammars/script.ts';
 import { ANSWERED_GRAMMAR, AUTOMATION_GRAMMAR } from './automations.ts';
 import {
   activityBrief,
+  arrivalWhole,
   conflictBrief,
   figureBrief,
   governanceBrief,
   GROUPS_SHOWN,
   handoffBrief,
   historyBrief,
+  inboxDigestLines,
+  inboxStateLines,
   indexBrief,
   listBrief,
   loggedBrief,
@@ -226,9 +229,10 @@ export type McpSurface<C> = {
   /**
    * What arrived and no rule filed, in one state or all of them, with a count for each. The record's own rung, which is
    * the owner and a token its owner gave the `inbox` reach, and optional for the command line's reason above: its surface
-   * is a fixed list.
+   * is a fixed list. `digest` asks every state at once, its newest hundred each with the body cut to 180 characters,
+   * and `id` one arrival whole (batch 88); a record older than those refuses them at their own key.
    */
-  inbox?(args: { state?: string }, ctx: C): Answer;
+  inbox?(args: { state?: string; limit?: number; digest?: boolean; id?: string }, ctx: C): Answer;
   /**
    * What each pattern did with the last 14 days of arrivals, door by door: filed, skipped with its reason, waiting, and
    * how many no pattern read (the record's `inboxPatterns`, REC-A03). READ+ on the inbox's own reach, so who may read it is
@@ -1023,6 +1027,10 @@ const split = (uri: string) => {
 /* The argument grammar. `schema/../../x` reaching the method would be refused there too, but by a
    sentence about a register nobody has, which reads like a fact about the record. */
 const NAMED = /^[a-z][a-z0-9_-]{0,63}$/;
+/** An arrival's id, a ULID in capitals, which no state's name can be: `braindog:inbox/<id>` reads that arrival whole. */
+const ARRIVAL = /^[0-9A-HJKMNP-TV-Z]{26}$/u;
+/** The most of one state `braindog:inbox/<state>` reads, the hundred the digest keeps of each. */
+const INBOX_STATE_READ = 100;
 /**
  * A figure as `get` takes it: a name, and a parameter after the first colon, which is where the record splits it.
  * The parameter is anything, because one is a project's path (`C:\Repos`) and the record reads it as said.
@@ -1129,7 +1137,10 @@ const FIXED: readonly Resource[] = [
   ),
   resource('digest/today', 'What the digest would say if it went now.'),
   resource('decisions', 'What has been proposed and not yet answered.'),
-  resource('inbox', 'What arrived and nothing filed yet, newest first, with how many arrivals are in each state.'),
+  resource(
+    'inbox',
+    'Every state of the inbox in one answer: how many in each, then each state newest first, what waits first. inbox/<state> reads one state, inbox/<id> one arrival whole.',
+  ),
   resource('inbox/patterns', 'What each pattern did with the last 14 days of messages: what it filed, what it skipped and why, what waits, and how many none of them read.'),
   resource('actions', 'Every scheduled action: what it calls, how often, whether it is paused and why, and this month so far. Keys by name only.'),
   resource('automations', 'Every automation: what starts it, when it runs next, and how its runs went this month.'),
@@ -1165,7 +1176,8 @@ export const TEMPLATES = [
   {
     uriTemplate: 'braindog:inbox/{state}',
     name: 'inbox',
-    description: 'The arrivals in one state: untriaged, review, skipped, matched, proposed, ignored, or all. Skipped is where a wrong skip rule shows.',
+    description:
+      "The newest hundred in one state: untriaged, review, skipped, matched, proposed, ignored, or all. Skipped is where a wrong skip rule shows. An arrival's id in place of the state reads it whole.",
   },
 ] as const;
 
@@ -3137,6 +3149,40 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
    * that reads it whole, `braindog:page/<slug>/<n>`: the owner's portfolio page measured 760 KB, five times what
    * claude.ai takes from one result, and Notion's server answers the same way rather than with a part of it.
    */
+  /**
+   * The inbox at its three addresses (AGT-B13 job 4), each one read of the record said as lines.
+   *
+   * `braindog:inbox` IS THE DIGEST: the counts of all six states and each state's lines, held to `ANSWER_MOST` by
+   * `inboxDigestLines`, so 32 waiting arrivals are one read and a busy inbox cannot blow the answer. `<state>` is that
+   * state's hundred, and an arrival's id in its place answers that arrival whole.
+   *
+   * A RECORD OLDER THAN THE DIGEST IS READ AS TODAY. It refuses `digest` at its own key, and is then asked the page it
+   * has always answered, handed back as it came; an answer that is no digest is handed back the same way. Who may read is
+   * still the record's to say, so a token without the reach is answered in the record's sentence, word for word.
+   */
+  const inboxRead = async (rest: string, uri: string, ctx: C): Promise<Result<unknown>> => {
+    const inbox = surface.inbox;
+    if (!inbox) return unbuilt(uri, 'Nothing else lists what arrived yet.');
+    if (ARRIVAL.test(rest)) {
+      const one = await inbox.call(surface, { id: rest }, ctx);
+      if (!one.ok)
+        return refused(one) && one.refusal.at === 'id' && one.refusal.code !== 'OUT_OF_BOUNDS'
+          ? unbuilt('one arrival by its id', 'Read braindog:inbox/all for every arrival, each with its words.')
+          : one;
+      return isObject(one.value) ? { ok: true, value: { arrival: arrivalWhole(one.value, Date.now(), ANSWER_MOST - 4_000) } } : one;
+    }
+    if (rest) {
+      const page = await inbox.call(surface, { state: rest, limit: INBOX_STATE_READ }, ctx);
+      if (!page.ok || !isObject(page.value) || !Array.isArray(page.value.arrivals)) return page;
+      return { ok: true, value: { inbox: inboxStateLines(page.value, rest, ANSWER_MOST) } };
+    }
+    const digest = await inbox.call(surface, { digest: true }, ctx);
+    if (!digest.ok)
+      return refused(digest) && digest.refusal.at === 'digest' && digest.refusal.code !== 'FORBIDDEN' ? inbox.call(surface, {}, ctx) : digest;
+    if (!isObject(digest.value) || !isObject(digest.value.states) || !isObject(digest.value.counts)) return digest;
+    return { ok: true, value: { inbox: inboxDigestLines(digest.value, ANSWER_MOST) } };
+  };
+
   const pageRead = async (rest: string, uri: string, ctx: C): Promise<Result<unknown>> => {
     const parts = rest.split('/');
     const [asked, block] = [parts[0] ?? '', parts[1]];
@@ -3252,10 +3298,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     /* THE STATE IS THE RECORD'S TO CHECK. The segment is held to a name here so a path never reaches it, and a name that
        is not a state is refused by the record, with the seven words it takes; a second list of states here would be a second
        list to keep in step. Who may read it is the record's too, so an agent's token is refused in the record's words. */
-    if (head === 'inbox' && (!rest || NAMED.test(rest)))
-      return surface.inbox
-        ? surface.inbox(rest ? { state: rest } : {}, ctx)
-        : unbuilt(uri, 'Nothing else lists what arrived yet.');
+    if (head === 'inbox' && (!rest || NAMED.test(rest) || ARRIVAL.test(rest))) return inboxRead(rest, uri, ctx);
     /* THE SCRIPT GRAMMAR IS THIS PACKAGE'S OWN TEXT (`grammars/script.ts` says why it is not the record's), and it is
        still asked of the record before it is answered. `version` is `guard(ctx, 'read')`, the rung `arrangement` puts
        the other two grammars on, and unlike `arrangement` every surface has it, so the command line serves this too. */

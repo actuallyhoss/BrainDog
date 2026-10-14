@@ -32,6 +32,7 @@
   import { ariaSort, cardCells, cardPlan, chunkRows, moveCell, type CardCell, type Cell, type Column, type TableRow } from '../types.ts';
   import { glyphColumn, intrinsicRows, tableCellBody, TABLE_CHUNK, TABLE_ROWS_LABEL } from '../../src/table.ts';
   import { MISSING } from '../../src/format.ts';
+  import { rowGroup, tableLines } from '../../src/html.ts';
   import { AMOUNT_SPACE } from '../../src/money.ts';
   import { WORKING_GLYPH, WORKING_LABEL } from '../../src/working.ts';
 
@@ -110,7 +111,20 @@
   /* One function for the groups AND the step they are counted in, because `aria-rowindex` is
      `group * step + i` and the two disagreeing is a table that announces a different row than the
      one on screen. It is also where `chunk={0}` stops being an endless loop during render. */
-  const grouped = $derived(chunkRows(rows, chunk));
+  /* EACH GROUP UNDER ITS HEADING, where the host put `group` on its rows (`tableLines`, which the static mirror draws
+     from too). A heading is a row of the grid, so the chunks are cut from the lines and `aria-rowindex` counts it. NO
+     ROW IN A GROUP, and the lines are the rows in their own order: every table that carries none is drawn as it was. */
+  const lines = $derived(tableLines(rows, rowGroup));
+  const grouped = $derived(chunkRows(lines, chunk));
+  /* THE CARET WALKS THE ROWS AS DRAWN, `at`, which is the rows' own index wherever no row is grouped, so a host that
+     binds `focus` to its own rows (the register grid, which groups nothing) reads the same row it always did. Each
+     row's `aria-rowindex` is its line plus two, the header being row 1, and the two maps turn one into the other. */
+  const ariaAt = $derived(lines.flatMap((l, n) => (l.kind === 'row' ? [n + 2] : [])));
+  const atOfAria = $derived(new Map(ariaAt.map((aria, at) => [aria, at])));
+  const heads = $derived(lines.length - rows.length);
+  /* A GROUP'S COUNT ONLY WHERE THE TABLE HOLDS ALL ITS ROWS: drawn from a slice (a page of a longer list, or a block
+     folded to its first few), a count would be the slice's. A cut table heads a group by its name alone, as cards do. */
+  const counted = $derived(total === rows.length);
 
   /**
    * DOES ANY ROW CARRY A TONE? If none does, no row pays for the gutter one would sit in.
@@ -159,12 +173,12 @@
 
   let grid = $state<HTMLElement | undefined>(undefined);
 
-  /* BY `aria-rowindex`, which every row already carries and which is the data row plus two, the
+  /* BY `aria-rowindex`, which every row already carries and which is its line plus two (`ariaAt`), the
      header is row 1. A `data-*` attribute per cell would be the obvious handle and costs one
      attribute on every one of them, which on a 2,614-row register is the measurement this file
      exists to respect. The column is the cell's place among its siblings. */
   const cellAt = (c: Cell): HTMLElement | null =>
-    (grid?.querySelector(`.tr[aria-rowindex="${c.row + 2}"]`)?.children[c.col] as HTMLElement | undefined) ?? null;
+    (grid?.querySelector(`.tr[aria-rowindex="${ariaAt[c.row] ?? c.row + 2}"]`)?.children[c.col] as HTMLElement | undefined) ?? null;
 
   /**
    * The arrows, `Home` and `End`, and nothing else. The move itself is `moveCell` in `../types.ts`.
@@ -205,7 +219,7 @@
     }
     const cell = e.target instanceof Element ? e.target.closest('.td') : null;
     const tr = cell?.parentElement;
-    const row = Number(tr?.getAttribute('aria-rowindex') ?? Number.NaN) - 2;
+    const row = atOfAria.get(Number(tr?.getAttribute('aria-rowindex') ?? Number.NaN)) ?? Number.NaN;
     if (!cell || !tr || !Number.isInteger(row) || row < 0) return;
     const col = [...tr.children].indexOf(cell);
     if (col < 0 || (at.row === row && at.col === col)) return;
@@ -317,7 +331,12 @@
 -->
 {#if rowsAsCards()}
 <ul class="table-cards">
-  {#each rows as row (row.key)}
+  {#each lines as line (line.kind === 'group' ? `\u0000${line.name}` : line.row.key)}
+    {#if line.kind === 'group'}
+      <!-- THE SAME HEADING ON A PHONE, over its group's cards. -->
+      <li class="table-card-group"><span class="group-name">{line.name}</span>{#if counted}{' '}<span class="group-count">{line.count}</span>{/if}</li>
+    {:else}
+    {@const row = line.row}
     <li>
       <!-- AN ANCHOR OR A BUTTON, never a `div` with a click handler. A row that has somewhere to go
            is a link and gets the browser's whole contract — middle-click, copy the address, the
@@ -345,6 +364,7 @@
         </div>
       {/if}
     </li>
+    {/if}
   {/each}
 
   <!-- THE PHONE PAGES TOO, and this sentinel was deleted while the grid's was kept.
@@ -368,7 +388,7 @@
     role="grid"
     bind:this={grid}
     data-toned={toned ? '' : undefined}
-    aria-rowcount={total === undefined || total < 0 ? -1 : total + 1}
+    aria-rowcount={total === undefined || total < 0 ? -1 : total + 1 + heads}
     aria-colcount={columns.length}
     style="--cols:{tracks}"
     tabindex="-1"
@@ -400,8 +420,14 @@
         role="rowgroup"
         style={intrinsicRows(group.length)}
       >
-        {#each group as row, i}
-          {@const index = g * grouped.step + i}
+        {#each group as line, i}
+          {#if line.kind === 'group'}
+            <!-- A GROUP'S HEADING, ONE CELL ACROSS THE COLUMNS: its name and, where the table holds all its rows, its
+                 count. Not in the caret's walk, which is the rows'; `groupHead` in `../../src/html.ts` is its mirror. -->
+            <div class="tr tr-group" role="row" aria-rowindex={g * grouped.step + i + 2}><span class="td" role="gridcell" aria-colspan={columns.length} style="grid-column:1/-1"><span class="group-name">{line.name}</span>{#if counted}{' '}<span class="group-count">{line.count}</span>{/if}</span></div>
+          {:else}
+          {@const row = line.row}
+          {@const index = line.at}
           <!-- `data-focused` IS THE HOST'S CARET, and deliberately not the internal one. A caller
                that binds `focus` is drawing a caret line down its list and this marks it; a caller
                that binds nothing never drew one, and marking row 0 of every `comparison` block on
@@ -410,7 +436,7 @@
           <div
             class="tr"
             role="row"
-            aria-rowindex={index + 2}
+            aria-rowindex={g * grouped.step + i + 2}
             aria-selected={selected ? selected.has(row.key) : undefined}
             data-intent={row.tone}
             data-focused={focus?.row === index ? '' : undefined}
@@ -481,6 +507,7 @@
                 {#if c === glyphAt && row.tone}<span class="td-glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>{/if}{@render cellBody(row, column, value)}</span>
             {/each}
           </div>
+          {/if}
         {/each}
       </div>
     {/each}

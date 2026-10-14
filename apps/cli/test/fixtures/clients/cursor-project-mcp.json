@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "repo-tool": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${workspaceFolder}/tools/repo-mcp.mjs"],
+      "envFile": "${workspaceFolder}/.env"
+    }
+  }
+}

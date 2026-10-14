@@ -1,9 +1,12 @@
 /**
  * `braindog tools scan` and `braindog tools write`: the MCP servers this machine runs, recorded as rows of `tools`,
- * and the record's tools written back as Claude Code entries that hold no key.
+ * and the record's tools written back as entries that hold no key.
  *
- * SCAN ONLY READS CONFIGS. `<top-level>/.mcp.json` is the project's, and `~/.claude.json` is read and never written:
- * its `mcpServers` are global and its `projects[<path>].mcpServers` are this project's.
+ * EVERY APP GOES THROUGH THE CLIENTS TABLE (`clients/index.ts`). Which files an app keeps its servers in, how they are
+ * read and how an entry is written into them is that app's module (`clients/claude.ts` for Claude Code); this file
+ * decides what is recorded, proposed and written, and knows no app's files of its own.
+ *
+ * SCAN ONLY READS CONFIGS. Every client in the table is read, and none is written by a scan.
  *
  * A KEY FOUND IN A CONFIG GOES TO THE VAULT OR NOWHERE (question 4). A key-named or key-shaped env or header value is
  * deposited through `braindog keys put`, the one door, and the row keeps `NAME=credentials#N`. Any other entry keeps
@@ -17,14 +20,16 @@
  * starts the same way, when there is one: that row is stamped as seen and nothing is added. A row is asked about only
  * when how it starts would change, as "Change how <name> starts?".
  *
- * WRITE IS A DRY RUN UNTIL A SCOPE IS NAMED (question 5). `--scope user` applies the global tools through
- * `claude mcp add-json`, and `--scope project` this repository's, into its `.mcp.json`, only when typed by hand. An
- * entry already there is replaced only when it is still what BrainDog last wrote, by `~/.braindog/tools-lock.json`,
- * or still the entry the scan read.
+ * WRITE IS A DRY RUN UNTIL A SCOPE IS NAMED (question 5). `--scope user` applies the global tools into the client's
+ * place for the person, and `--scope project` this repository's, only when typed by hand. An entry already there is
+ * replaced only when it is still what BrainDog last wrote, by `~/.braindog/tools-lock.json`, or still the entry the
+ * scan read.
+ *
+ * NOTHING DEAD OR FOREIGN IS WRITTEN (AGT-A07 build 4). A tool whose program is neither on this machine's path nor a
+ * file here, or which starts from another system's path (a drive letter off Windows, another system's home folder),
+ * is left out with one line naming it, so a new machine is never handed what only ran on another one.
  */
 
-import { spawn } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -32,6 +37,7 @@ import { parseArgs } from 'node:util';
 import type { Brief, Client, Context } from '@braindog/client';
 
 import { hostsPath, readHosts } from './http.ts';
+import { CLIENTS, clientOf, DEFAULT_CLIENT, foreignPath, onPath, runClaude, type ClaudeRunner, type Env as ClientEnv } from './clients/index.ts';
 import { HEADER_NAME, keys } from './keys.ts';
 import { asking, causeOf, connect, fixOf, isObject, joinedSaid, QUESTION, readLock, samePath, sha256, spokenOf, Stopped, thisMachine, valueOf, writeLock, type AgentIo } from './skills.ts';
 
@@ -132,18 +138,6 @@ function serversOf(servers: unknown, scope: Found['scope'], source: string, line
   return out;
 }
 
-/** A config file's JSON, `undefined` when there is none, and a sentence when it cannot be read. */
-function readConfig(file: string, label: string, lines: string[]): Record<string, unknown> | undefined {
-  if (!existsSync(file)) return undefined;
-  try {
-    const parsed: unknown = JSON.parse(readFileSync(file, 'utf8'));
-    if (isObject(parsed)) return parsed;
-  } catch {
-    /* JSON.parse quotes the text around the fault, and the text holds keys. */
-  }
-  lines.push(`${label} is not valid JSON, so its servers were not read.`);
-  return undefined;
-}
 
 /* ── the deposit ───────────────────────────────────────────────────────── */
 
@@ -317,14 +311,11 @@ export async function scanTools(s: ToolScan): Promise<string[]> {
   /* Found in precedence order, so a later one of the same scope and name replaces an earlier one. */
   const found = new Map<string, Found>();
   const keep = (list: Found[]) => list.forEach((f) => found.set(`${f.scope}|${f.name}`, f));
-  if (s.top !== null) keep(serversOf(readConfig(join(s.top, '.mcp.json'), join(s.top, '.mcp.json'), lines)?.mcpServers, 'project', '.mcp.json', lines));
-  const claude = readConfig(join(s.home, '.claude.json'), '~/.claude.json', lines);
-  if (claude !== undefined) {
-    keep(serversOf(claude.mcpServers, 'global', '~/.claude.json', lines));
-    const here = [s.top, s.cwd].filter((p): p is string => p !== null).map(samePath);
-    const mine = Object.entries(isObject(claude.projects) ? claude.projects : {}).find(([path]) => here.includes(samePath(path)))?.[1];
-    if (isObject(mine)) keep(serversOf(mine.mcpServers, 'project', '~/.claude.json', lines));
-  }
+  for (const app of CLIENTS)
+    for (const set of app.servers(s.home, s.top, s.cwd)) {
+      if (set.fault !== null) lines.push(set.fault);
+      else keep(serversOf(set.servers, set.scope, set.source, lines));
+    }
 
   const project = s.context.project;
   const listed = [...reg.rows, ...reg.inherited];
@@ -591,19 +582,8 @@ function severalAsked(names: string[]): string {
 
 /* ── write ─────────────────────────────────────────────────────────────── */
 
-/** Run `claude` with these arguments in this folder, and settle with its exit code, or -1 when it did not start. */
-export type ClaudeRunner = (args: string[], cwd: string) => Promise<number>;
-
-/**
- * The real one. NO SHELL, so the JSON argument is passed as it is, and its output is not relayed, because
- * `claude mcp remove` may describe the entry it removed, and an entry the scan read can hold a key.
- */
-export const runClaude: ClaudeRunner = (args, cwd) =>
-  new Promise((done) => {
-    const child = spawn('claude', args, { cwd, stdio: 'ignore', shell: false, windowsHide: true });
-    child.on('error', () => done(-1));
-    child.on('exit', (code) => done(code ?? 1));
-  });
+/* Claude Code's runner lives with its client; `setup.ts` and the tests take it from here, as before. */
+export { runClaude, type ClaudeRunner };
 
 const VARIABLE = /^[A-Z_][A-Z0-9_]*$/;
 
@@ -671,8 +651,32 @@ export type ToolWrite = {
   dryRun: boolean;
   /** The path of `main.ts`, which each wrapper runs. */
   cli: string;
+  /** How the app's own program is run, for the app this writes into. */
   claude: ClaudeRunner;
+  /** The app whose entries are written, by its id in the clients table; Claude Code's when none is named. */
+  app?: string | undefined;
+  /** The environment whose path a tool's program is looked for on: this process's when none is given. */
+  env?: ClientEnv | undefined;
+  /** The system the entries are for: this one when none is given. */
+  platform?: string | undefined;
+  /** The files already copied aside this run by the caller (setup), so a file it made or copied is not copied again. */
+  copied?: Set<string> | undefined;
 };
+
+/**
+ * Why a tool cannot run on this machine, as the line that leaves it out, or `null` when it can. An HTTP tool has no
+ * program here. The program's own name is said, never its path.
+ */
+function deadOrForeign(name: string, fields: Record<string, unknown>, env: ClientEnv, platform: string, cwd: string): string | null {
+  if (fields.transport === 'http' || typeof fields.command !== 'string') return null;
+  const paths = [fields.command, ...strings(fields.args)];
+  const foreign = paths.map((p) => foreignPath(p, platform)).find((f) => f !== null);
+  if (foreign === 'windows') return `Tool ${name} was not written, because it starts from a Windows path and this machine is not Windows.`;
+  if (foreign === 'home') return `Tool ${name} was not written, because it starts from a home folder of another computer.`;
+  if (onPath(fields.command, env, platform, cwd)) return null;
+  const program = fields.command.split(/[\\/]/).at(-1) ?? fields.command;
+  return `Tool ${name} was not written, because its program ${program} is neither on this machine's path nor a file here.`;
+}
 
 /** Render every tool, apply the ones in the named scope, and the lines that say what changed or would. */
 export async function writeTools(s: ToolWrite): Promise<string[]> {
@@ -682,10 +686,15 @@ export async function writeTools(s: ToolWrite): Promise<string[]> {
   const lockFile = join(s.home, '.braindog', 'tools-lock.json');
   const lock = toolsLock(lockFile);
   if (lock === null) return [`${lockFile} is not valid JSON, so no tool was written. Delete it and run tools write again.`];
-  const configs: Record<'user' | 'project', Record<string, unknown> | undefined> = {
-    user: readConfig(join(s.home, '.claude.json'), '~/.claude.json', lines),
-    project: s.top === null ? undefined : readConfig(join(s.top, '.mcp.json'), join(s.top, '.mcp.json'), lines),
-  };
+  const app = clientOf(s.app ?? DEFAULT_CLIENT);
+  if (app === undefined) return [`BrainDog does not know the app ${s.app ?? ''}, so no tool was written.`];
+  /* The places a write goes, read once: the person's, then the repository's, each said when it cannot be read. */
+  const read = app.servers(s.home, s.top, s.cwd);
+  const places = { user: read.find((r) => r.writes === 'user'), project: s.top === null ? undefined : read.find((r) => r.writes === 'project') };
+  for (const place of [places.user, places.project]) if (place?.fault) lines.push(place.fault);
+  const env = s.env ?? process.env;
+  const platform = s.platform ?? process.platform;
+  const copied = s.copied ?? new Set<string>();
   let applied = false;
 
   try {
@@ -700,10 +709,10 @@ export async function writeTools(s: ToolWrite): Promise<string[]> {
       if (!isObject(got) || !isObject(got.fields)) continue;
       const { entry, notes } = renderEntry(name, got.fields, s.cli);
       if (entry === null) continue;
-      const json = JSON.stringify(entry);
-      const servers = configs[scope]?.mcpServers;
+      const servers = places[scope]?.servers;
       const existing = isObject(servers) ? servers[name] : undefined;
-      const key = `${scope === 'project' ? 'project' : 'global'}|${scope === 'project' ? samePath(s.top ?? s.cwd) : ''}|${name}`;
+      /* THE LOCK KEY NAMES THE APP, other than Claude Code's, whose keys stay as they were, so two apps never share one. */
+      const key = `${app.id === 'claude' ? '' : `${app.id}|`}${scope === 'project' ? 'project' : 'global'}|${scope === 'project' ? samePath(s.top ?? s.cwd) : ''}|${name}`;
       const apply = !s.dryRun && s.scope === scope;
 
       let action: 'add' | 'replace' | 'kept' | 'same';
@@ -724,35 +733,30 @@ export async function writeTools(s: ToolWrite): Promise<string[]> {
         continue;
       }
       if (action === 'kept') {
-        lines.push(`Tool ${name} at ${scope} scope was changed by hand since BrainDog wrote it, so it is left. Remove it with claude mcp remove ${name} --scope ${scope} to take the record's.`);
+        lines.push(`Tool ${name} at ${scope} scope was changed by hand since BrainDog wrote it, so it is left. Remove it with ${app.remove(name, scope)} to take the record's.`);
+        continue;
+      }
+      const at = scope === 'project' && s.top !== null ? s.top : s.cwd;
+      const cannot = deadOrForeign(name, got.fields, env, platform, at);
+      if (cannot !== null) {
+        lines.push(cannot);
         continue;
       }
       lines.push(...notes);
+      const plan = app.plan({ name, scope, entry, replace: action === 'replace', home: s.home, top: s.top, cwd: s.cwd });
       if (!apply) {
-        lines.push(`${action === 'add' ? '+' : '~'} ${name} at ${scope} scope${action === 'replace' ? ', replacing the entry there' : ''}: ${json}`);
+        lines.push(...plan.lines);
         continue;
       }
-      const cwd = scope === 'project' && s.top !== null ? s.top : s.cwd;
-      if (action === 'replace') {
-        const removed = await s.claude(['mcp', 'remove', name, '--scope', scope], cwd);
-        if (removed !== 0) {
-          lines.push(removed === -1 ? 'claude was not found, so nothing was applied.' : `claude mcp remove did not remove ${name} (exit ${String(removed)}), so it is left.`);
-          if (removed === -1) break;
-          continue;
-        }
-      }
-      const added = await s.claude(['mcp', 'add-json', name, json, '--scope', scope], cwd);
-      if (added === -1) {
-        lines.push('claude was not found, so nothing was applied.');
-        break;
-      }
-      if (added !== 0) {
-        lines.push(`claude mcp add-json did not add ${name} (exit ${String(added)}), so it is left.`);
-        continue;
-      }
-      lock.written[key] = sha256(canonical(entry));
+      const done = await app.apply(plan, { run: s.claude, copied });
+      lines.push(...done.lines);
+      if (done.stop) break;
+      if (!done.written) continue;
+      /* WHAT THE APP NOW HOLDS IS HASHED, not the rendered entry: Codex and Cursor take an HTTP tool by its url alone, so
+         the rendered entry's hash would make the next run call it changed by hand. */
+      const back = app.servers(s.home, s.top, s.cwd).find((r) => r.writes === scope)?.servers;
+      lock.written[key] = sha256(canonical(isObject(back) && back[name] !== undefined ? back[name] : entry));
       applied = true;
-      lines.push(`Tool ${name} ${action === 'add' ? 'added' : 'replaced'} at ${scope} scope.`);
     }
   } catch (e) {
     if (!(e instanceof Stopped)) throw e;
@@ -808,7 +812,7 @@ export async function tools(args: string[], io: AgentIo & { cli: string; claude?
   const lines =
     verb === 'scan'
       ? await scanTools({ ...base, deposit: depositor({ file: hostsPath(io.env), env: io.env, host: at.to.key, headers: await io.headers(at.to.key) }) })
-      : await writeTools({ ...base, scope: scope ?? null, cli: io.cli, claude: io.claude ?? runClaude });
+      : await writeTools({ ...base, scope: scope ?? null, cli: io.cli, claude: io.claude ?? runClaude, env: io.env });
   for (const line of lines) io.out(line);
   if (lines.length === 0) io.out(verb === 'scan' ? 'Every server found is recorded as it is.' : 'Every tool is written as the record has it.');
   if (dryRun) io.out('That was a dry run, so nothing was deposited, written, sent or proposed.');

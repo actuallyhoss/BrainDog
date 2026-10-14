@@ -104,6 +104,15 @@
   /* WHEN THE READER'S MARK MOVES: stamped as they leave, with the newest line this page held. The rule is every
      screen's (`lib/page/read-mark.ts`), and Home stamps through it too. */
   import { readMarkOf, seenAfter, stampOf as markStamp } from '$lib/page/read-mark.ts';
+  /* WHICH OF THE TWO THIS VISIT DRAWS, and the way across. Small and pure; the page itself is fetched when asked for. */
+  import { declaredHref, wantsDeclared, words as declaredWords } from './declared.ts';
+
+  /**
+   * WHETHER THIS VISIT DRAWS ACTIVITY AS THE RECORD'S PAGE (PGS-C24 job 8, `DeclaredActivity.svelte`), which the address
+   * asks for by one key (`?declared`). The screen as it was stays the default until his yes. While the page is drawn,
+   * nothing below is, and this screen's reads, its listener and its mark stand down: the page reads and marks its own.
+   */
+  const composed = $derived(wantsDeclared(route.url));
 
   /**
    * What an event kind is called, and what it looks like — all forty of them.
@@ -240,6 +249,7 @@
   let asked = 0;
   $effect(() => {
     if (!route.data.live) return;
+    if (composed) return;
     const all = everything;
     const n = ++asked;
     /* UNTRACKED, or the effect reads the pending count it writes, and every answer opens the read again. */
@@ -267,6 +277,7 @@
   let unseen = $state<{ actors: string[]; capped: boolean; byWho: ByWho | null; upTo?: Cursor | null } | null>(null);
   $effect(() => {
     if (!route.data.live) return;
+    if (composed) return;
     const at = untrack(opened);
     void readUnseen(apiBase())
       .then((out) => {
@@ -297,6 +308,8 @@
     const stamp = markStamp((upTo) => markAll(base, upTo));
     const leave = () => {
       if (!route.data.live) return;
+      /* LEFT FROM THE PAGE, which stamps its own feed's mark: this screen held no line to stamp with. */
+      if (composed) return;
       const held = (live?.events ?? []).reduce((top, e) => Math.max(top, e.seq), 0);
       const upTo = readMarkOf(unseen?.upTo ?? route.data.upTo, unseen ? unseen.actors.length : null, held);
       void stamp.leave(upTo).then((landed) => {
@@ -347,6 +360,7 @@
   listen(
     async () => {
       if (!route.data.live || !live) return;
+      if (composed) return;
       const at = opened();
       try {
         const out = await logOf(null, everything);
@@ -555,12 +569,15 @@
    *
    * IT STOPS BEING AVAILABLE WHEN IT STOPS BEING TRUE. A screen that starts fetching brackets its
    * reads with `opened()` and `closed()`, and a call still out takes the attribute away whatever
-   * this line says.
+   * this line says. Not for the record's page, which says it once its own read has answered.
    */
-  $effect(() => drew('ready'));
+  $effect(() => {
+    if (!composed) drew('ready');
+  });
 </script>
 
-<svelte:head><title>{titleOf(copy.audit)}</title></svelte:head>
+<!-- THE PAGE NAMES ITSELF when it is drawn (`PageView`), so the screen as it was names only itself. -->
+<svelte:head>{#if !composed}<title>{titleOf(copy.audit)}</title>{/if}</svelte:head>
 
 {#snippet tools()}
   <div class="tools">
@@ -720,6 +737,15 @@
   </li>
 {/snippet}
 
+<!-- THE WAY ACROSS, one quiet line under the sentence: the same address with the one key, every filter kept. -->
+{#snippet asPage()}
+  <p class="as-page"><a href={at(declaredHref(route.url))}>{declaredWords.asPage}</a></p>
+{/snippet}
+
+{#if composed}
+  <!-- ACTIVITY AS THE RECORD'S PAGE, fetched when the address asks for it and never otherwise. -->
+  {#await import('./DeclaredActivity.svelte') then loaded}<loaded.default />{/await}
+{:else}
 <PageHead
   icon="history"
   title={copy.audit}
@@ -727,6 +753,7 @@
   total={kept.length}
   sentence={lead}
   actions={actors.length > 1 || kinds.length > 1 || days.length > 1 || list || offerAll ? tools : undefined}
+  below={asPage}
 />
 
 <div class="page">
@@ -844,8 +871,24 @@
     </div>
   </div>
 </div>
+{/if}
 
 <style>
+  /* QUIETER THAN THE SENTENCE OVER IT, and still body size; a finger's height on a phone. */
+  .as-page {
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-base);
+  }
+
+  @media (pointer: coarse) {
+    .as-page a {
+      display: inline-flex;
+      align-items: center;
+      min-block-size: 44px;
+    }
+  }
+
   /**
    * THE PAGE IS A CONTAINER, so the stream and its tiles decide their columns by the room the page actually has (the
    * rail and a docked panel both take from it), not by the window's width.

@@ -1,0 +1,5 @@
+# A repository's .codex/config.toml (trusted projects only), every value invented.
+[mcp_servers.tallyrepo]
+command = "node"
+args = ["scripts/tally-mcp.mjs"]
+env = { TALLY_MODE = "read" }

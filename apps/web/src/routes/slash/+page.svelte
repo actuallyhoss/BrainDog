@@ -21,7 +21,9 @@
   owner's. What the press left off Decide is said under the list it pressed.
 
   THE ASK TILE: the field, and under it the answer with its sources, what it read drawn by code, then Slash's sentence
-  beside its face with the model named.
+  beside its face with the model named. An answer that proposes a change draws the one decision card under it, where he
+  asked (`in-place.ts`): Enter accepts, a six-second Undo follows, and Decide is only its second action. Left
+  unanswered, it waits on Decide, where the record filed it.
 
   A MODEL THAT DOES NOT ANSWER IS SAID ABOVE THE ASK TILE (ENG-A02): the record's `engineHealth` sentence, "Slash's
   model has not answered since 6 October. That is ours to fix. Until it is back, BrainDog works from its rules." Its
@@ -61,6 +63,10 @@
   import Stacked from '$lib/viz/Stacked.svelte';
   import { listName } from '$lib/record/names.ts';
   import { byLine, foldOf, sentenceOf, suggestedOf, tallyOf, words as lineWords } from './lines.ts';
+  import { cardInPlace, enterOn, leftUnanswered, words as inPlaceWords, type InPlace } from './in-place.ts';
+  import { beforeNavigate } from '$app/navigation';
+  /* A TYPE ONLY: the card itself is fetched when an answer first needs it (`loadCard`), so no screen loads it for this one. */
+  import type DecisionCardType from '$lib/decide/DecisionCard.svelte';
   import { drew } from '../../lib/ui/screen.svelte.ts';
 
   let client: SlashClient | null = null;
@@ -179,9 +185,66 @@
       : null,
   );
 
+  /**
+   * THE ONE DECISION CARD, WHERE HE ASKED (ENG-B16, his D37.129 to D37.133): an answer that proposes a change draws the
+   * palette's own card (`in-place.ts` `cardInPlace`, through `filedCard`) under the Ask field. Enter in the field accepts
+   * it while the field still holds its question, a six-second Undo follows on its line, and once answered it reads
+   * "Slash suggested · Mara accepted". The record filed it when it answered, so a card left unanswered, by asking again or
+   * by leaving the page, already waits on Decide, and the page says so in one line. Nothing here files a question.
+   *
+   * LOADED WHEN FIRST NEEDED, held in state and drawn through `{#if}` (an `{#await}` is a runtime of its own), so the card
+   * costs the screens that never show one nothing.
+   */
+  let inPlace = $state<InPlace | null>(null);
+  let Card = $state<typeof DecisionCardType | null>(null);
+  let cardRef = $state<ReturnType<typeof DecisionCardType> | null>(null);
+  let cardAt = $state<HTMLElement | null>(null);
+  /** Whether Enter in the field is the card's: drawn, unanswered, and the field still holding the question it answers. */
+  const enterAccepts = $derived(Card !== null && enterOn(inPlace, question, answer?.question ?? '') === 'accept');
+
+  async function loadCard() {
+    if (Card) return;
+    try {
+      Card = (await import('$lib/decide/DecisionCard.svelte')).default;
+    } catch {
+      /* A CHUNK THAT DID NOT ARRIVE leaves the card's second action, the same question on Decide. */
+    }
+  }
+
+  /** Whether he answered the card, held for its Undo or sent: the card knows before the record does. */
+  const settledInPlace = (c: InPlace): InPlace => ({ ...c, answered: c.answered || cardRef?.answered() === true });
+
+  /** The card put away for a new ask: what it leaves on Decide, said once. Answered, it leaves nothing. */
+  function letGo() {
+    if (inPlace === null) return;
+    const left = leftUnanswered(settledInPlace(inPlace));
+    inPlace = null;
+    if (left) toasts.push(left.said);
+  }
+
+  /** Enter on the card: its answer, or, where no key may give one (money moves), the focus on its first choice. */
+  function acceptInPlace() {
+    if (cardRef?.accept()) return;
+    if (!cardRef?.answered()) cardAt?.querySelector<HTMLElement>('button, a[href]')?.focus();
+  }
+
+  /** Answered and written: the card's line stays, the second action goes, and the suggestions tile reads again. */
+  function answeredInPlace() {
+    if (inPlace) inPlace.answered = true;
+    void load();
+  }
+
+  /* LEAVING THE PAGE with the card unanswered: it waits on Decide, said on the screen he goes to, unless that is its own. */
+  beforeNavigate(({ to, type }) => {
+    if (inPlace === null || type === 'leave') return;
+    const left = leftUnanswered(settledInPlace(inPlace));
+    if (left && !(to?.url.pathname.endsWith(left.decide) ?? false)) toasts.push(left.said);
+  });
+
   async function askQuestion(text: string) {
     const q = text.trim();
     if (!door || asking || q.length < 2) return;
+    letGo();
     asking = true;
     question = q;
     let shown: Answered = { question: q, drawn: null, fix: null, second: null };
@@ -197,6 +260,10 @@
       answer = shown;
       if (!more) return;
       const said = await door.slashAnswer(q, out.value.ask_id);
+      if (said.ok) {
+        inPlace = cardInPlace(said.value, q, Date.now());
+        if (inPlace) void loadCard();
+      }
       answer = {
         ...shown,
         second: said.ok
@@ -300,10 +367,16 @@
                 spellcheck="true"
                 placeholder={askWords.placeholder}
                 bind:value={question}
+                onkeydown={(e) => {
+                  /* ENTER IS THE CARD'S while the field still holds the question it answers; a new question is asked. */
+                  if (e.key !== 'Enter' || e.isComposing || !enterAccepts) return;
+                  e.preventDefault();
+                  acceptInPlace();
+                }}
               />
             </div>
             <div class="slash-ask-go">
-              <Button type="submit" kbd="↵" disabled={asking || question.trim().length < 2}>{asking ? askWords.asking : askWords.ask}</Button>
+              <Button type="submit" kbd={enterAccepts ? undefined : '↵'} disabled={asking || question.trim().length < 2}>{asking ? askWords.asking : askWords.ask}</Button>
             </div>
           </div>
         </form>
@@ -359,7 +432,16 @@
                       {#if answer.second.drawn.text}
                         <p class="slash-text"><Cited text={answer.second.drawn.text} figures={answer.second.drawn.figures} /></p>
                       {/if}
-                      {#if answer.second.drawn.decide}
+                      {#if inPlace}
+                        <!-- THE ONE DECISION CARD, where he asked: Enter accepts, a six-second Undo follows. Decide is its second action. -->
+                        <div class="slash-card" bind:this={cardAt} data-armed={enterAccepts ? '' : undefined}>
+                          {#if Card}<Card bind:this={cardRef} question={inPlace.question} whole={false} onanswered={answeredInPlace} />{/if}
+                        </div>
+                        {#if !inPlace.answered}
+                          <div class="slash-second-do"><Button size="sm" href={inPlace.decide}>{inPlaceWords.open}</Button></div>
+                        {/if}
+                      {:else if answer.second.drawn.decide}
+                        <!-- FILED, BUT NOTHING THE CARD CAN DRAW (options with none to choose): the question is on Decide. -->
                         <div class="slash-second-do"><Button size="sm" href={answer.second.drawn.decide}>{slashWords.decide}</Button></div>
                       {/if}
                       <!-- `23 §8`: every answer names its model in the footer. `drawProposal` never leaves it empty. -->
@@ -908,6 +990,26 @@
 
   .slash-second-do {
     display: flex;
+  }
+
+  /* THE CARD IN PLACE, its own container as in the palette, washed while Enter in the field is its answer. */
+  .slash-card {
+    container-type: inline-size;
+    padding: var(--sp-3);
+    border-radius: var(--r-md);
+  }
+
+  .slash-card:empty {
+    display: none;
+  }
+
+  .slash-card[data-armed] {
+    background: var(--hover-wash);
+  }
+
+  .slash-card > :global(.queue-card) {
+    padding-block: 0;
+    border-block-start: 0;
   }
 
   /* `23 §8`'s footer: receded and small, but always there. */

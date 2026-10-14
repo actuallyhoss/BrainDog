@@ -1493,8 +1493,8 @@ export type BlockResult = PageBlock & {
   /** On a live record: the record's own title for each row a ref on this block points at, so a group is never named from the sample. */
   names?: Names;
   /**
-   * A `cards` block with `group:`: the name of the row each card's group field points at, as the record answered it,
-   * aligned with `rows`, `null` for a card with none. Absent, the names are read from `names`.
+   * A `cards` block with `group:`, or a `table` whose rows carry their group: the name each row is grouped under,
+   * aligned with `rows`, `null` for one in none. Absent, a card's names are read from `names`.
    */
   groups?: readonly (string | null)[];
   /**

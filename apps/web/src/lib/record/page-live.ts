@@ -167,7 +167,7 @@ type Reading = {
   beyond?: unknown;
 };
 
-/* `group` IS A GROUPED CARD'S, the row its link points at by handle and title (`PageRow.group`), narrowed by `groupsOf`. */
+/* `group` IS A GROUPED CARD'S OR TABLE ROW'S, what it is grouped under by value and name (`PageRow.group`), narrowed by `groupsOf`. */
 type Row = RecordRow & { updated_at?: string; group?: unknown };
 
 /**
@@ -1078,6 +1078,18 @@ function groupsOf(rows: readonly Row[], beside: unknown): (string | null)[] | nu
   return null;
 }
 
+/**
+ * A table's rows by group name, aligned with the rows, or `null` when no row says one, and the table is drawn as it was.
+ *
+ * READ OFF THE ROWS ALONE (`PageRow.group`, `{ value, name }`), as a card's is, and a row whose group points at
+ * nothing (`value: ''`) is in no group. NEVER BESIDE THE ROWS: no build answered a table's names there, so a table has
+ * no older form to fall back to. The groups stand in the order of their first rows, which is the order of the rows.
+ */
+function tableGroupsOf(rows: readonly Row[]): (string | null)[] | null {
+  const named = groupsOf(rows, undefined);
+  return named?.some((g) => g !== null) ? named : null;
+}
+
 /** A series the record sent, when it is one: a name, a unit, aligned buckets, and numbers or gaps. */
 function isSeries(v: unknown): v is MeasureSeries {
   if (v === null || typeof v !== 'object') return false;
@@ -1785,7 +1797,15 @@ export function blockOf(
      record says points at nothing (`value: ''`, "No project") and a group that is not text are drawn among the
      ungrouped rather than under a heading of something else. A record on an older build answered the names beside the
      rows, `groups`, which is read the same way when no row says its own. */
-  const cardGroups = kind === 'cards' ? groupsOf(got, groupNames) : null;
+  const cardGroups = kind === 'cards' ? groupsOf(got, groupNames) : kind === 'table' ? tableGroupsOf(got) : null;
+  /* A TABLE'S ROWS SAY THEIR GROUP THEMSELVES, `group` on each drawn row, which the table reads (`tableLines` in the
+     renderer): a page slices a folded table's rows and marks the ones that arrived, and a name on the row goes where
+     the row goes, where a list beside the rows would have to be cut the same way at every step. */
+  if (kind === 'table' && cardGroups)
+    rows.forEach((row, n) => {
+      const name = cardGroups[n];
+      if (name) Object.assign(row, { group: name });
+    });
   /* WHO CHANGED EACH ROW LAST, AS A BYLINE (`bylineOf`): an agent, an app, a rule or Slash, for whom, and whether the
      reader has seen it. Only where the record said a change for some row; a row you changed yourself carries none. */
   const lines = Array.isArray(changed) && changed.length === got.length ? got.map((_r, n) => bylineOf(changed[n], me, names, now, typeof mark === 'string' ? mark : null)) : null;

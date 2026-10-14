@@ -1024,7 +1024,7 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
     }
     if (Object.keys(words).length > 0) manifest.words = words;
   }
-  /* A CARDS BLOCK'S `group` IS A REF ON THE LIST IT READS, asked here of the lists this pack declares (`cards.ts`). */
+  /* A CARDS OR TABLE BLOCK'S `group` IS A LINK, A CHOICE OR THE STATE OF THE LIST IT READS, asked here of the lists this pack declares (`cards.ts`). */
   for (const d of declarations) {
     const grouped = d.kind === 'page' ? cardsFault(d.id, d.body, registers) : null;
     if (grouped) return grouped as Result<Pack>;

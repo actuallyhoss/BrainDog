@@ -63,9 +63,10 @@ export const LOOK_KEYS: ReadonlySet<string> = new Set(['look', 'basis', 'lead', 
 
 /**
  * The kinds whose `group` is a field of the list they are over, so a look may name one for them. A kind is added here
- * when `pages.ts` reads that key for it the way it does for cards.
+ * when `pages.ts` reads that key for it the way it does for cards, which is also where it reads it (`rowGrouping`): a
+ * link, a choice or the list's state. Lanes are drawn by their own field and are not grouped again.
  */
-export const GROUPED_BY_FIELD: ReadonlySet<string> = new Set(['cards']);
+export const GROUPED_BY_FIELD: ReadonlySet<string> = new Set(['cards', 'table']);
 
 /** The most blocks one look groups. */
 export const LOOK_GROUPS_MOST = 12;

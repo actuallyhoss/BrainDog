@@ -1472,7 +1472,7 @@ const DECLARED: Record<string, Version> = {
       metric.project-numbers-7d metric.projects-earning-silent adds.page.portfolio.4
       adds.page.estate.5 metric.service-numbers
     `,
-    declares: '48875c311c09ba01',
+    declares: '6bb5b7dec0fe3e2b',
     history: [
       "`setting.voice_home` and the title of `page.home-founder` say Today where both said Overview; `due-this-week` and Due this week start today; `late-money` is added with a Late table ahead of the week, oldest first; Lapsing loses its Cost column -> 1a6e6f8b5a7311cc",
       "Folded into the unreleased 2.6.0 (sketchpad-60; integrate 60): `page.project`'s Tools and servers reads the project's own tools alone (`kind is tool, scope is project`), so a project with none of its own draws no card where it listed everybody's -> 11f22bd8f6e3f8d2",
@@ -1484,6 +1484,7 @@ const DECLARED: Record<string, Version> = {
       "Folded into the unreleased 2.6.0 (batch 74, integrate 74; commit 63423720 still holds 2.5.0), one fingerprint for two changes, no id added or taken away: `page.project`'s At a glance cell over `project-owed` is labelled Still to come in, where it said Owed to you (owed-words-74); and `page.home-founder`'s line of what there is ends \"it lasts the year\" when the walk reached its last day above zero, a second lead note drawn on `all:` of one book and `runway-days` carrying `beyond`, the line with the days stepping aside on `beyond: false` (founder-lasts-74, REC-B07) -> dee2ed32ad8a72ee",
       "Inside the unreleased 2.6.0 (project-runs-tile-87, AGT-C12 job d and AGT-D12 job 2; integrate 87; commit 63423720 holds 2.5.0): `page.project`'s Agents reads a run of its own that wrote something (`parent is empty, wrote is not 0`), titled by the agent with `doing_said` under it; Keys, Tools and servers and Skills sit under a boxed section Runs on, a third of the tile each where each was a half, with And from everywhere under them (`kind is not action, scope is global`, five); Money by month is the tile's width where it was a half, so no row is left with a hole over the new heading; no id added or taken away -> 86861bc4c9e643e6",
       "Inside the unreleased 2.6.0 (founder-home-quiet-88, ENG-B13 'Seen'; batch 88; commit 63423720 holds 2.5.0, and the task asked for 2.7.0, which this file's own rule refuses for a version never released): `page.home-founder` draws Gone quiet, a table over the source `exceptions` with What, Last seen and Before, six lines at most, straight under what the money is and not drawn while nothing is quiet; it was a seventh tile, so Working now is folded shut under a section Agents at work, held to `runs-working` as its table is; two blocks added, no id added or taken away -> 48875c311c09ba01",
+      "Inside the unreleased 2.6.0 (runs-on-section-89, AGT-D12 job 2; batch 89; commit 63423720 holds 2.5.0): `page.project`'s Keys, Tools and servers and Skills draw six rows each where they drew three, and Keys, Tools and servers and And from everywhere name who used each by `used_agents`, labelled Used by, where Keys and Tools named `used_by` and And from everywhere `used_agent`, each labelled Last used by; no id added or taken away -> 6bb5b7dec0fe3e2b",
     ],
   },
   'team@2.19.0': {
@@ -1549,12 +1550,13 @@ const DECLARED: Record<string, Version> = {
       setting.voice_overdue setting.voice_pen_waits setting.voice_right_now setting.voice_since_away
       setting.voice_working_now
     `,
-    declares: '1d4ea792097cdc3f',
+    declares: '5670bdbb3a98c6a6',
     history: [
       "`page.project`'s Tools and servers reads the project's own tools alone (`kind is tool, scope is project`), where it listed everybody's (sketchpad-60, written into 2.20.0 by batch 60 and moved here by integrate 61) -> 11f9e7507ab3a446",
       "Folded into the unreleased 2.21.0 (project-own-cards-72, PGS-C31; integrate 72; commit 63423720 still holds 2.20.0): `page.project`'s Keys and Skills read the project's own alone (`kind is key, scope is project`, `kind is skill, scope is project`), where each listed everybody's -> 2cb324c057827f0d",
       "Inside the unreleased 2.21.0 (project-runs-tile-87, AGT-C12 job d and AGT-D12 job 2; integrate 87; commit 63423720 holds 2.20.0): `page.project`'s Agents reads a run of its own that wrote something (`parent is empty, wrote is not 0`), titled by the agent with `doing_said` under it; Keys, Tools and servers and Skills sit under a boxed section Runs on, a third of the tile each where each was a half, with And from everywhere under them (`kind is not action, scope is global`, five); Money by month is the tile's width where it was a half, so no row is left with a hole over the new heading; no id added or taken away -> 89c71e2ca313fac9",
       "Inside the unreleased 2.21.0 (founder-home-quiet-88; integrate 88; commit 63423720 holds 2.20.0): `page.home-team` draws Gone quiet, the founder's table word for word over the source `exceptions` with What, Last seen and Before, six lines at most, straight under its line and not drawn while nothing is quiet; a block added, no id added or taken away -> 1d4ea792097cdc3f",
+      "Inside the unreleased 2.21.0 (runs-on-section-89, AGT-D12 job 2; batch 89; commit 63423720 holds 2.20.0): `page.project`'s Keys, Tools and servers and Skills draw six rows each where they drew three, and Keys, Tools and servers and And from everywhere name who used each by `used_agents`, labelled Used by, where Keys and Tools named `used_by` and And from everywhere `used_agent`, each labelled Last used by; no id added or taken away -> 5670bdbb3a98c6a6",
     ],
   },
   'business@1.6.0': {

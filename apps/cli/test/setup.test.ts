@@ -12,12 +12,17 @@
 
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { createServer, type Server } from 'node:http';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { HOOK_STATUS } from '../src/install.ts';
-import { setup, type SetupIo } from '../src/setup.ts';
+import { CLIENTS, type Client } from '../src/clients/index.ts';
+import { hostKey } from '../src/http.ts';
+import { HOOK_STATUS, keepCopy } from '../src/install.ts';
+import { profilesFile, setup, type ProfileRunner, type SetupIo } from '../src/setup.ts';
 
 const scratch = mkdtempSync(join(tmpdir(), 'braindog-setup-'));
 after(() => rmSync(scratch, { recursive: true, force: true }));
@@ -63,7 +68,7 @@ test('the plan is printed, then asked about, before the settings file exists; a 
   const hooks = (JSON.parse(readFileSync(m.settings, 'utf8')) as { hooks: Record<string, unknown> }).hooks;
   assert.deepEqual(Object.keys(hooks), ['SessionStart', 'SessionEnd', 'PostToolUse']);
   assert.ok(m.out.includes("   Written: the BrainDog hooks and Agent Skill are in Claude Code's settings."), m.out.join('\n'));
-  assert.ok(m.out.some((l) => l.startsWith('3. MCP server: braindog is registered')), m.out.join('\n'));
+  assert.ok(m.out.some((l) => l.startsWith('3. MCP server, Claude Code in ~/.claude: braindog is registered')), m.out.join('\n'));
 });
 
 test('a no writes nothing and stops at step 2', async () => {
@@ -106,4 +111,265 @@ test('--dry-run still only shows, and a second run with nothing to add asks noth
   await setup([HOST], again.io);
   assert.ok(again.out.includes("2. Hooks: Claude Code's settings already run the BrainDog hooks and Agent Skill."), again.out.join('\n'));
   assert.ok(!again.out.join('\n').includes('rec_test-setup-never-printed'));
+});
+
+/* ── every app and every profile (AGT-A07 Build 2 and 5, AGT-D11 job 4) ── */
+
+/**
+ * A record with a tools register: three tools for everywhere (one handed a key, one whose program is a Windows path)
+ * and two of the repository's own, one handed a key. Every call answers from memory; nothing leaves this machine.
+ */
+async function stubRecord() {
+  const rows = [
+    { seq: 1, scope: 'global', fields: { kind: 'mcp', name: 'search', transport: 'stdio', command: 'node', args: ['search.js'] } },
+    { seq: 2, scope: 'global', fields: { kind: 'mcp', name: 'mail', transport: 'stdio', command: 'node', args: ['mail.js'], needs: ['MAIL_KEY=credentials#4'] } },
+    { seq: 3, scope: 'global', fields: { kind: 'mcp', name: 'old', transport: 'stdio', command: 'C:\\tools\\old.exe', args: [] } },
+    { seq: 4, scope: 'project', fields: { kind: 'mcp', name: 'kiln-a', transport: 'stdio', command: 'node', args: ['a.js'] } },
+    { seq: 5, scope: 'project', fields: { kind: 'mcp', name: 'kiln-b', transport: 'stdio', command: 'node', args: ['b.js'], needs: ['B_KEY=credentials#5'] } },
+  ];
+  const brief = (r: (typeof rows)[number]) => ({ spoken: `tools#${String(r.seq)}`, version: 1, scope: r.scope, state: 'active', name: r.fields.name, kind: 'mcp', project: null });
+  const server: Server = createServer((req, res) => {
+    const url = new URL(req.url ?? '/', 'http://stub');
+    const method = url.pathname.replace(/^\/api\//, '');
+    const chunks: Buffer[] = [];
+    req.on('data', (c: Buffer) => chunks.push(c));
+    req.on('end', () => {
+      const raw = Buffer.concat(chunks).toString('utf8');
+      const args = (raw ? JSON.parse(raw) : {}) as Record<string, unknown>;
+      for (const [k, v] of url.searchParams) {
+        try {
+          args[k] = JSON.parse(v);
+        } catch {
+          args[k] = v;
+        }
+      }
+      res.writeHead(200, { 'content-type': 'application/json' });
+      if (method === 'context')
+        return res.end(
+          JSON.stringify({
+            ok: true,
+            value: {
+              session: null,
+              project: { spoken: 'things#1', name: 'Kiln', mark: null, hue: null, how: 'folder' },
+              ambiguous: [],
+              handoff: null,
+              live: { same_repo: [], elsewhere: [] },
+              waiting: [],
+              people: [],
+              registers: [{ id: 'tools', name: 'Tools', rows: rows.map(brief), inherited: [], truncated: false }],
+            },
+          }),
+        );
+      const row = rows.find((r) => r.seq === args.seq);
+      if (method === 'get' && row) return res.end(JSON.stringify({ ok: true, value: { id: `e_${String(row.seq)}`, register: 'tools', seq: row.seq, state: 'active', version: 1, fields: row.fields } }));
+      res.end(JSON.stringify({ ok: false, refusal: { code: 'REF_UNKNOWN', fix: 'There is no such row.' } }));
+    });
+  });
+  await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
+  after(() => new Promise<void>((done) => (server.closeAllConnections(), server.close(() => done()))));
+  return `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`;
+}
+
+/** A second app for the table, keeping its servers in `~/.fakeapp/mcp.json`: present when that folder is. */
+const fakeApp: Client = {
+  id: 'fakeapp',
+  title: 'Fake App',
+  found: (home) => existsSync(join(home, '.fakeapp')),
+  servers: (home) => {
+    const file = join(home, '.fakeapp', 'mcp.json');
+    const json = existsSync(file) ? (JSON.parse(readFileSync(file, 'utf8')) as { mcpServers?: unknown }) : undefined;
+    return [{ scope: 'global', source: '~/.fakeapp/mcp.json', writes: 'user', servers: json?.mcpServers, fault: null }];
+  },
+  plan: (want) => ({ want, file: join(want.home, '.fakeapp', 'mcp.json'), lines: [`+ ${want.name}: ${JSON.stringify(want.entry)}`] }),
+  apply: async (plan, { copied }) => {
+    const file = plan.file!;
+    if (!copied.has(file)) keepCopy(file);
+    copied.add(file);
+    const json = existsSync(file) ? (JSON.parse(readFileSync(file, 'utf8')) as { mcpServers?: Record<string, unknown> }) : {};
+    json.mcpServers = { ...json.mcpServers, [plan.want.name]: plan.want.entry };
+    writeFileSync(file, `${JSON.stringify(json, null, 2)}\n`);
+    return { lines: [`Tool ${plan.want.name} added.`], written: true, stop: false };
+  },
+  remove: (name) => `fakeapp mcp remove ${name}`,
+};
+
+/*
+ * THE FAKE APP JOINS THE TABLE FOR THIS FILE, because setup and `writeTools` go through `CLIENTS` and nothing else: it
+ * is what Codex or Cursor is once its line is in the table, present in a home with its folder and absent without.
+ */
+(CLIENTS as Client[]).push(fakeApp);
+after(() => void (CLIENTS as Client[]).splice(CLIENTS.indexOf(fakeApp), 1));
+
+/**
+ * A home with Claude Code in two profiles, `~/.claude` and `~/.claude-work`, the fake app when `fake` is set, and a
+ * repository to run in. `claude` is a stand-in that writes `add-json` into the servers file of the profile its
+ * environment names, as the real one does, so a second run reads what the first registered.
+ */
+function home2(fake: boolean) {
+  const home = join(scratch, `two${String(n++)}`);
+  const work = join(home, '.claude-work');
+  for (const dir of [join(home, '.claude'), work, join(home, 'kiln')]) mkdirSync(dir, { recursive: true });
+  execFileSync('git', ['init', '-q', join(home, 'kiln')]);
+  writeFileSync(join(home, '.claude.json'), `${JSON.stringify({ numStartups: 3, mcpServers: { theirs: { command: 'their-server' } } }, null, 2)}\n`);
+  if (fake) {
+    mkdirSync(join(home, '.fakeapp'));
+    writeFileSync(join(home, '.fakeapp', 'mcp.json'), `${JSON.stringify({ mcpServers: { theirs: { command: 'their-server' } } }, null, 2)}\n`);
+  }
+  const calls: { args: string[]; profile: string | undefined }[] = [];
+  const claude: ProfileRunner = async (args, _cwd, env) => {
+    const profile = env?.CLAUDE_CONFIG_DIR;
+    calls.push({ args, profile });
+    const file = profile ? join(profile, '.claude.json') : join(home, '.claude.json');
+    const json = existsSync(file) ? (JSON.parse(readFileSync(file, 'utf8')) as { mcpServers?: Record<string, unknown> }) : {};
+    if (args[1] === 'add-json') json.mcpServers = { ...json.mcpServers, [args[2]!]: JSON.parse(args[3]!) as unknown };
+    if (args[1] === 'remove') delete json.mcpServers?.[args[2]!];
+    writeFileSync(file, `${JSON.stringify(json, null, 2)}\n`);
+    return 0;
+  };
+  const out: string[] = [];
+  const io: SetupIo = {
+    env: { XDG_CONFIG_HOME: join(home, '.config'), PATH: process.env.PATH, BRAINDOG_TOKEN: 'rec_test-setup-never-printed', BRAINDOG_TIMEOUT_MS: '2000' },
+    cwd: join(home, 'kiln'),
+    home,
+    out: (line) => out.push(line),
+    say: (line) => out.push(`! ${line}`),
+    headers: async () => ({}),
+    cli: join(scratch, 'main.ts'),
+    scripts: join(scratch, 'hooks'),
+    claude,
+    ask: async () => assert.fail('asked, with --yes given'),
+  };
+  return { home, work, io, out, calls };
+}
+
+/** Every file under a folder with its bytes, so "writes nothing" is compared whole. */
+function snapshot(dir: string, into: Record<string, string> = {}): Record<string, string> {
+  for (const name of readdirSync(dir)) {
+    const path = join(dir, name);
+    if (statSync(path).isDirectory()) snapshot(path, into);
+    else into[path] = readFileSync(path, 'utf8');
+  }
+  return into;
+}
+
+/* The issuers' shapes `looksLikeToken` names first in install.ts, asked of each word of a written file. */
+const TOKEN = /^(?:hb|sk|pk|rk|ghp|gho|ghs|ghu|github_pat|glpat|xox[a-z]|rec|AKIA)[_-][A-Za-z0-9]{6,}/i;
+const tokensIn = (text: string) => text.split(/[^A-Za-z0-9_-]+/).filter((word) => TOKEN.test(word));
+
+test('a dry run says one line per app and profile, and the two things left, and writes nothing', async () => {
+  const host = await stubRecord();
+  const m = home2(true);
+  const before = snapshot(m.home);
+  assert.equal(await setup([host, '--dry-run', '--profile', m.work], m.io), 0, m.out.join('\n'));
+  assert.deepEqual(snapshot(m.home), before, 'the dry run wrote');
+  assert.deepEqual(m.calls, [], 'the dry run ran claude');
+  const text = m.out.join('\n');
+  for (const line of [
+    '3. MCP server, Claude Code in ~/.claude: braindog would be registered at user scope, with a copy of its servers file kept first:',
+    '3. MCP server, Claude Code in ~/.claude-work: braindog would be registered at user scope, with a copy of its servers file kept first:',
+    '3. MCP server, Fake App: braindog would be registered, with a copy of the file kept first:',
+    '4. Tools, Fake App: what would be written at user scope, from the tools the record applies everywhere:',
+    '   Tool old was not written, because it starts from a Windows path and this machine is not Windows.',
+  ])
+    assert.ok(text.includes(line), `missing: ${line}\n${text}`);
+  const key = hostKey(host);
+  assert.deepEqual(m.out.slice(-3), [
+    'This repository has 2 tools of its own. Write them with braindog tools write --scope project.',
+    `2 tools need keys. Approve this machine for them with braindog login ${key} --vault things#1.`,
+    'That was a dry run, so nothing was signed in, written, registered or proposed.',
+  ]);
+});
+
+test('apply registers the server in both profiles and the other app, keeps a .pre-braindog copy of each file it changed, and a second run changes nothing', async () => {
+  const host = await stubRecord();
+  const m = home2(true);
+  const before = { claudeJson: readFileSync(join(m.home, '.claude.json'), 'utf8'), fake: readFileSync(join(m.home, '.fakeapp', 'mcp.json'), 'utf8') };
+  assert.equal(await setup([host, '--yes', '--profile', m.work], m.io), 0, m.out.join('\n'));
+  const text = m.out.join('\n');
+
+  /* ONE add-json A PROFILE, each with its own CLAUDE_CONFIG_DIR, the default one with none. */
+  const adds = m.calls.filter((c) => c.args[1] === 'add-json' && c.args[2] === 'braindog');
+  assert.deepEqual(adds.map((c) => c.profile), [undefined, m.work]);
+  /* THE RECORD'S TOOLS GO INTO THE DEFAULT PROFILE, whose file Claude Code's reader reads back. */
+  assert.deepEqual(m.calls.filter((c) => c.args[2] === 'search').map((c) => c.profile), [undefined]);
+  for (const line of [
+    '3. MCP server, Claude Code in ~/.claude: braindog is registered, running this command.',
+    `   The servers file as it was is kept at ${join(m.home, '.claude.json')}.pre-braindog.`,
+    '3. MCP server, Claude Code in ~/.claude-work: braindog is registered, running this command.',
+    '3. MCP server, Fake App: braindog is registered, running this command.',
+  ])
+    assert.ok(text.includes(line), `missing: ${line}\n${text}`);
+  assert.equal(readFileSync(join(m.home, '.claude.json.pre-braindog'), 'utf8'), before.claudeJson);
+  assert.equal(readFileSync(join(m.home, '.fakeapp', 'mcp.json.pre-braindog'), 'utf8'), before.fake);
+  const fake = JSON.parse(readFileSync(join(m.home, '.fakeapp', 'mcp.json'), 'utf8')) as { mcpServers: Record<string, { args?: string[] }> };
+  assert.deepEqual(Object.keys(fake.mcpServers).sort(), ['braindog', 'mail', 'search', 'theirs']);
+  assert.deepEqual(fake.mcpServers.braindog!.args!.slice(-3), ['mcp', '--agent', 'fakeapp']);
+  assert.deepEqual(JSON.parse(readFileSync(profilesFile(m.home), 'utf8')), { profiles: [join(m.home, '.claude'), m.work] });
+  assert.ok(m.out.at(-1)!.startsWith(`This machine is set up from ${hostKey(host)}.`), text);
+
+  /* NO TOKEN IN ANY FILE IT WROTE, and the login's own value nowhere. */
+  for (const [file, body] of Object.entries(snapshot(m.home))) {
+    assert.deepEqual(tokensIn(body), [], `${file} holds a token shape`);
+    assert.ok(!body.includes('rec_test-setup-never-printed'), `${file} holds the login`);
+  }
+
+  /* A SECOND RUN, WITH NO --profile: the work profile is reached from profiles.json, and nothing is written. */
+  const again = home2(false);
+  again.io.home = m.home;
+  again.io.cwd = m.io.cwd;
+  again.io.claude = m.io.claude;
+  const settled = snapshot(m.home);
+  const calls = m.calls.length;
+  assert.equal(await setup([host, '--yes'], again.io), 0, again.out.join('\n'));
+  assert.ok(again.out.includes('3. MCP server, Claude Code in ~/.claude-work: braindog is already registered, running this command.'), again.out.join('\n'));
+  assert.equal(again.out.at(-1), `Nothing changed: this machine was already set up from ${hostKey(host)}.`);
+  assert.equal(m.calls.length, calls, 'the second run ran claude');
+  assert.deepEqual(snapshot(m.home), settled, 'the second run wrote');
+});
+
+test('an app not on this machine is one line and is left alone; --only names the apps; a kept profile now gone is left out', async () => {
+  const host = await stubRecord();
+  const m = home2(false);
+  /* A PROFILE KEPT FROM AN EARLIER RUN that is no longer here, beside the work one. */
+  mkdirSync(join(m.home, '.braindog'), { recursive: true });
+  writeFileSync(profilesFile(m.home), `${JSON.stringify({ profiles: [m.work, join(m.home, '.claude-gone')] })}\n`);
+  assert.equal(await setup([host, '--yes'], m.io), 0, m.out.join('\n'));
+  assert.ok(m.out.includes('3. MCP server, Fake App: not on this machine, so setup leaves it.'), m.out.join('\n'));
+  assert.ok(m.out.includes('   The profile ~/.claude-gone was set up before and is no longer on this machine, so it is left out.'), m.out.join('\n'));
+  assert.ok(m.out.includes('3. MCP server, Claude Code in ~/.claude-work: braindog is registered, running this command.'), m.out.join('\n'));
+  assert.ok(!existsSync(join(m.home, '.fakeapp')) && !existsSync(join(m.home, '.claude-gone')));
+  assert.deepEqual(JSON.parse(readFileSync(profilesFile(m.home), 'utf8')), { profiles: [join(m.home, '.claude'), m.work] });
+
+  /* --only fakeapp IN A HOME THAT HAS IT: Claude Code is not touched, and no hook or profile is written. */
+  const only = home2(true);
+  assert.equal(await setup([host, '--yes', '--only', 'fakeapp'], only.io), 0, only.out.join('\n'));
+  assert.deepEqual(only.calls, []);
+  assert.ok(only.out.includes('2. Hooks: --only leaves Claude Code out, so no hooks were placed.'), only.out.join('\n'));
+  assert.ok(!existsSync(join(only.home, '.claude', 'settings.json')), 'hooks were written with --only fakeapp');
+  assert.ok(only.out.includes('3. MCP server, Fake App: braindog is registered, running this command.'), only.out.join('\n'));
+
+  const wrong = home2(true);
+  assert.equal(await setup([host, '--only', 'nope'], wrong.io), 1);
+  assert.equal(wrong.out[0], '! braindog setup --only takes claude, codex, cursor, fakeapp, and not nope.');
+});
+
+test('with Codex and Cursor in the table, a home holding both gets the server in each, and a second run changes nothing', async () => {
+  /* THE TWO APPS ARE IN THE TABLE FOR GOOD (batch 89's integration), so the test only gives the home their folders. */
+  assert.deepEqual(CLIENTS.map((c) => c.id).slice(0, 3), ['claude', 'codex', 'cursor']);
+  const host = await stubRecord();
+  const m = home2(false);
+  mkdirSync(join(m.home, '.codex'));
+  mkdirSync(join(m.home, '.cursor'));
+  m.io.env.CODEX_HOME = join(m.home, '.codex');
+  assert.equal(await setup([host, '--yes'], m.io), 0, m.out.join('\n'));
+  for (const title of ['Codex', 'Cursor']) assert.ok(m.out.includes(`3. MCP server, ${title}: braindog is registered, running this command.`), m.out.join('\n'));
+  assert.ok(readFileSync(join(m.home, '.codex', 'config.toml'), 'utf8').includes('[mcp_servers.braindog]'));
+  for (const [file, body] of Object.entries(snapshot(m.home))) assert.deepEqual(tokensIn(body), [], `${file} holds a token shape`);
+
+  const settled = snapshot(m.home);
+  m.out.length = 0;
+  assert.equal(await setup([host, '--yes'], m.io), 0, m.out.join('\n'));
+  for (const title of ['Codex', 'Cursor']) assert.ok(m.out.includes(`3. MCP server, ${title}: braindog is already registered, running this command.`), m.out.join('\n'));
+  assert.equal(m.out.at(-1), `Nothing changed: this machine was already set up from ${hostKey(host)}.`);
+  assert.deepEqual(snapshot(m.home), settled, 'the second run wrote');
 });

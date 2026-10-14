@@ -171,7 +171,7 @@ export const agents = {
         { uri: 'braindog:skill/{name}', said: 'The text of one skill, and when to reach for it.' },
         { uri: 'braindog:declaration/{slug}', said: 'One page as declared, to change and propose back.' },
         { uri: 'braindog:automation/{id}', said: 'One automation as declared, with its last ten runs, each step with its outcome.' },
-        { uri: 'braindog:inbox/{state}', said: 'The arrivals in one state: untriaged, review, skipped, matched, proposed, ignored, or all. Skipped is where a wrong skip rule shows.' },
+        { uri: 'braindog:inbox/{state}', said: "The newest hundred in one state: untriaged, review, skipped, matched, proposed, ignored, or all. Skipped is where a wrong skip rule shows. An arrival's id in place of the state reads it whole." },
       ],
     },
 

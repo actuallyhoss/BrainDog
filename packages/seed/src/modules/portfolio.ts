@@ -1360,7 +1360,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         /* WHAT IT RUNS ON, UNDER ITS OWN HEADING (AGT-D12 job 2: "Each project page has a Runs on section listing its
            keys, MCP servers and skills, with the global ones it inherits shown faintly beneath"). The three tiles sat
            among the money under "More about" the project, and what reaches a project from everywhere was said nowhere
-           on its page. One boxed tile now: the project's own keys, tools and skills, three of each, and under them
+           on its page. One boxed tile now: the project's own keys, tools and skills, six of each, and under them
            the five that apply everywhere.
 
            NO `when:` AND NO PANEL: a section whose every block went is not drawn (`emptyHidden` in the kernel's
@@ -1385,12 +1385,17 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
            everywhere after them, and all three blocks ask for `scope is project` (PGS-C31). A key or a skill that
            applies everywhere is under them, in And from everywhere, faint and without the chip; mixed in under every
            project it was the same three of everybody's, read as the project's own.
-           `used_by` is the run that last opened a key or called a tool, `S47`, which the card draws as that run's face,
-           and `used_at` when anybody last did; a skill has no use the record counts, so it names neither.
 
-           THREE OF EACH SINCE work 1.15.0, and none that says it is empty: a project with no key, tool or skill of
-           its own draws none of the three, where the rail said three sentences of nothing and then, until each was
-           narrowed, three of everybody's.
+           WHO USED IT IS SAID BY THE AGENT'S NAME, "Claude Code", and `used_at` says when anybody last did (AGT-D12
+           job 2, batch 89: "Claude Code, 2 days ago"). It was `used_by`, the run's handle, `S731`, which said nothing
+           to a person. `used_agents` is the agents whose runs used it in ninety days, newest first and three at most,
+           "Claude Code, Codex" (AGT-D12 job 1, `runs-on.ts`), so the label is "Used by" and not "Last used by". A
+           skill has no use the record counts, so it names neither.
+
+           SIX OF EACH SINCE portfolio 1.17.0 (batch 89), where it was three since work 1.15.0, and none that says it is
+           empty: a project with no key, tool or skill of its own draws none of the three, where the rail said three
+           sentences of nothing and then, until each was narrowed, three of everybody's. Past six, the host's line
+           under the card says how many more, as under any block cut short.
 
            A THIRD OF THE TILE EACH, since they are three under a heading of their own: at a half each the third sat
            beside a hole, in any order the page's look put them. */
@@ -1405,10 +1410,10 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
           { field: 'name', as: 'title' },
           { field: 'scope', label: 'Applies to', as: 'scope' },
           { field: 'detail', label: 'Opens', as: 'fact' },
-          { field: 'used_by', label: 'Last used by', as: 'who' },
+          { field: 'used_agents', label: 'Used by', as: 'who' },
           { field: 'used_at', label: 'Last used', as: 'when' },
         ],
-        limit: 3,
+        limit: 6,
       },
       {
         kind: 'cards',
@@ -1426,10 +1431,10 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
           { field: 'name', as: 'title' },
           { field: 'scope', label: 'Applies to', as: 'scope' },
           { field: 'detail', label: 'Reached by', as: 'fact' },
-          { field: 'used_by', label: 'Last used by', as: 'who' },
+          { field: 'used_agents', label: 'Used by', as: 'who' },
           { field: 'used_at', label: 'Last used', as: 'when' },
         ],
-        limit: 3,
+        limit: 6,
       },
       {
         kind: 'cards',
@@ -1444,14 +1449,21 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
           { field: 'scope', label: 'Applies to', as: 'scope' },
           { field: 'detail', label: 'Version', as: 'fact' },
         ],
-        limit: 3,
+        limit: 6,
       },
       {
         /* AND WHAT REACHES IT FROM EVERYWHERE, SAID ONCE AND FAINT, under the project's own: the keys, tools and
            skills that name no project, which an agent working here is handed all the same. FIVE, by name and kind,
-           with the agent that last used each and when; the rest are in the lists Agents stands over. The kernel
-           answers `quiet` on every one of them, which is what a host dims a card by (`runs-on.ts`), and none carries
-           the project's chip, so nobody reads them as the project's.
+           with the agents that used each and when; the rest are in the lists Agents stands over.
+
+           AND HOW MANY MORE, IN ONE LINE UNDER THEM: the block's count is every row that applies everywhere, read
+           before the cut to five (`matched`, since `where:` keeps only those, and the kernel's `inherited` on the
+           answer says the same number), so the host's line under a block cut short says "7 more", and says
+           nothing while five or fewer apply. No sentence is declared here, since that line is every block's and a
+           second one would say it twice.
+
+           The kernel answers `quiet` on every one of them, which is what a host dims a card by (`runs-on.ts`), and
+           none carries the project's chip, so nobody reads them as the project's.
 
            NOT THE SCHEDULED ACTIONS: one that runs for every project is already in the panel "More about" draws,
            with Resume and Pause, and a card here would say it twice. With nothing that applies everywhere the block
@@ -1466,7 +1478,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         columns: [
           { field: 'name', as: 'title' },
           { field: 'kind', label: 'Kind', as: 'fact' },
-          { field: 'used_agent', label: 'Last used by', as: 'who' },
+          { field: 'used_agents', label: 'Used by', as: 'who' },
           { field: 'used_at', label: 'Last used', as: 'when' },
         ],
         limit: 5,

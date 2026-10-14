@@ -958,8 +958,8 @@ test('INSTALL IS A DRY RUN BY DEFAULT, and with --apply keeps a copy, keeps othe
 
   const applied = await run(['install', '--apply', '--config-dir', profile], env, '');
   assert.equal(applied.code, 0, applied.stderr);
-  assert.ok(applied.stdout.includes(`The file as it was is kept at ${file}.bak.`));
-  assert.equal(readFileSync(`${file}.bak`, 'utf8'), before);
+  assert.ok(applied.stdout.includes(`The file as it was is kept at ${file}.pre-braindog.`));
+  assert.equal(readFileSync(`${file}.pre-braindog`, 'utf8'), before);
   const now = JSON.parse(readFileSync(file, 'utf8')) as { model: string; hooks: Record<string, { hooks: { command: string }[] }[]> };
   assert.equal(now.model, 'opus');
   assert.deepEqual(now.hooks.SessionStart!.map((g) => g.hooks[0]!.command), ['echo other', start]);
@@ -967,7 +967,7 @@ test('INSTALL IS A DRY RUN BY DEFAULT, and with --apply keeps a copy, keeps othe
 
   const again = await run(['install', '--apply', '--config-dir', profile], env, '');
   assert.ok(again.stdout.startsWith(`${file} already runs every BrainDog hook. Nothing to change.`));
-  assert.deepEqual(readdirSync(profile).sort(), ['settings.json', 'settings.json.bak', 'skills']);
+  assert.deepEqual(readdirSync(profile).sort(), ['settings.json', 'settings.json.pre-braindog', 'skills']);
 
   /* A settings file that is not JSON is left alone, and its text is not quoted. */
   const broken = folder('claude');
@@ -1117,10 +1117,10 @@ test('INSTALL --REPLACE --APPLY copies each file beside itself, removes only Tal
 
   const lines = installInto(dir, { apply: true, replace: REPLACE, scripts, home });
   const text = lines.join('\n');
-  assert.ok(text.includes(`The file as it was is kept at ${settings}.bak.`), text);
-  assert.ok(text.includes(`The file as it was is kept at ${claudeJson}.bak.`), text);
-  assert.equal(readFileSync(`${settings}.bak`, 'utf8'), before);
-  assert.equal(readFileSync(`${claudeJson}.bak`, 'utf8'), mcpBefore);
+  assert.ok(text.includes(`The file as it was is kept at ${settings}.pre-braindog.`), text);
+  assert.ok(text.includes(`The file as it was is kept at ${claudeJson}.pre-braindog.`), text);
+  assert.equal(readFileSync(`${settings}.pre-braindog`, 'utf8'), before);
+  assert.equal(readFileSync(`${claudeJson}.pre-braindog`, 'utf8'), mcpBefore);
 
   type Group = { matcher?: string; hooks: { command: string }[] };
   const now = JSON.parse(readFileSync(settings, 'utf8')) as { model: string; hooks: Record<string, Group[]> };
@@ -1143,7 +1143,7 @@ test('INSTALL --REPLACE --APPLY copies each file beside itself, removes only Tal
     `${settings} already runs every BrainDog hook and no Tallybook hook. Nothing to change.`,
     `${claudeJson} registers no Tallybook MCP server. Nothing to change.`,
   ]);
-  assert.deepEqual(readdirSync(dir).sort(), ['.claude.json', '.claude.json.bak', 'settings.json', 'settings.json.bak', 'skills']);
+  assert.deepEqual(readdirSync(dir).sort(), ['.claude.json', '.claude.json.pre-braindog', 'settings.json', 'settings.json.pre-braindog', 'skills']);
 
   /* Without --replace, install leaves Tallybook's entries where they are, as it always has. */
   const plain = folder('home');
@@ -1151,7 +1151,7 @@ test('INSTALL --REPLACE --APPLY copies each file beside itself, removes only Tal
   installInto(join(plain, '.claude'), { apply: true, scripts, home: plain });
   assert.ok(readFileSync(kept.settings, 'utf8').includes('session-start.ps1'));
   assert.equal(readFileSync(join(plain, '.claude.json'), 'utf8'), kept.mcpBefore);
-  assert.ok(!existsSync(join(plain, '.claude.json.bak')));
+  assert.ok(!existsSync(join(plain, '.claude.json.pre-braindog')));
 });
 
 /* ── install --replace --mcp-json, the one file the cut-over used to leave ── */
@@ -1219,8 +1219,8 @@ test('INSTALL --REPLACE --MCP-JSON names the Tallybook servers in a .mcp.json ou
 
   const applied = await run(['install', '--replace', REPLACE_FILE, '--apply', '--config-dir', profile, '--mcp-json', file], env, '');
   assert.equal(applied.code, 0, applied.stderr);
-  assert.ok(applied.stdout.includes(`The file as it was is kept at ${file}.bak.`), applied.stdout);
-  assert.equal(readFileSync(`${file}.bak`, 'utf8'), before);
+  assert.ok(applied.stdout.includes(`The file as it was is kept at ${file}.pre-braindog.`), applied.stdout);
+  assert.equal(readFileSync(`${file}.pre-braindog`, 'utf8'), before);
   const now = JSON.parse(readFileSync(file, 'utf8')) as { mcpServers: Record<string, unknown>; note: string };
   /* No `braindog` here: a new name in this file is only a prompt to approve, and the profile holds the entry instead. */
   assert.deepEqual(Object.keys(now.mcpServers), ['figma', 'brainy']);
@@ -1230,7 +1230,7 @@ test('INSTALL --REPLACE --MCP-JSON names the Tallybook servers in a .mcp.json ou
 
   const again = await run(['install', '--replace', REPLACE_FILE, '--apply', '--config-dir', profile, '--mcp-json', file], env, '');
   assert.ok(again.stdout.includes(`${file} registers no Tallybook MCP server. Nothing to change.`), again.stdout);
-  assert.deepEqual(readdirSync(outside).sort(), ['.mcp.json', '.mcp.json.bak']);
+  assert.deepEqual(readdirSync(outside).sort(), ['.mcp.json', '.mcp.json.pre-braindog']);
 });
 
 test('INSTALL --MCP-JSON IS REFUSED inside a git working tree, without --replace, and for a missing file, and each refusal changes no other file', async () => {

@@ -71,7 +71,7 @@ const PAGE: HeadlinePage = {
   blocks: [
     { key: 'lead', kind: 'note', lead: true },
     { key: 'all', kind: 'cards', heading: 'Everything' },
-    { key: 'soon', kind: 'table', heading: 'Soon' },
+    { key: 'soon', kind: 'lanes', heading: 'Soon' },
     { key: 'own', kind: 'cards', heading: 'By project' },
     { key: 'dates', kind: 'cards', heading: 'Dates' },
   ],
@@ -86,11 +86,11 @@ const thing = (seq: number, more: Record<string, unknown> = {}) => ({
 });
 const things = (n: number, more: (seq: number) => Record<string, unknown> = () => ({})) => Array.from({ length: n }, (_, i) => thing(i + 1, more(i + 1)));
 
-/** The page as its read answered it: 35 things as cards, the same as a table, cards that name their own group, and cards over no list. */
+/** The page as its read answered it: 35 things as cards, the same as lanes, cards that name their own group, and cards over no list. */
 const read = (rows: unknown[] = things(35)): unknown[] => [
   { key: 'lead', kind: 'note', lead: true, rows: [], refusals: [] },
   { key: 'all', kind: 'cards', source: 'register.tasks', heading: 'Everything', rows, matched: rows.length, refusals: [] },
-  { key: 'soon', kind: 'table', source: 'register.tasks', heading: 'Soon', rows, matched: rows.length, refusals: [] },
+  { key: 'soon', kind: 'lanes', source: 'register.tasks', heading: 'Soon', rows, matched: rows.length, refusals: [] },
   { key: 'own', kind: 'cards', source: 'register.tasks', heading: 'By project', group: 'project', rows, matched: rows.length, refusals: [] },
   { key: 'dates', kind: 'cards', source: 'deadlines', heading: 'Dates', rows: [], matched: 0, refusals: [] },
 ];

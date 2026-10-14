@@ -27,7 +27,7 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
   founder: [
     {
       version: '2.6.0',
-      notes: "Home is called Today and says the money lasts the year when nothing due runs it out. Home says what stopped reporting, and folds Working now under Agents at work. What is late has its own table, Late, above Due this week. Lapsing has no Cost column. A number can say which service it is about. Numbers dated after today are left out. A project page shows one card for each agent run that changed something. Its keys, tools and skills sit under Runs on. Its money on its way is named Still to come in.",
+      notes: "Home is called Today and says the money lasts the year when nothing due runs it out. It says what stopped reporting and folds Working now under Agents at work. What is late has its own table above Due this week. Lapsing has no Cost column. A number can name its service. Numbers dated after today are left out. A project page has a card per agent run that changed something, and six of its keys, tools and skills under Runs on, with which agents used each. Its money on its way is Still to come in.",
     },
     {
       version: '2.5.0',
@@ -43,7 +43,7 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
   team: [
     {
       version: '2.21.0',
-      notes: "A project page shows one card for each agent run, not one for every helper it started, and leaves out a run that changed nothing. Each card says which agent it was and what it said it was doing. What the project runs on has its own heading, Runs on: its own keys, tools and skills only, and under them up to five that apply to every project. Home says what stopped reporting, under Gone quiet.",
+      notes: "A project page shows one card for each agent run, not one for every helper it started, and leaves out a run that changed nothing. Each card says which agent it was and what it said it was doing. What the project runs on has its own heading, Runs on: its own keys, tools and skills only, six of each with which agents used each one and when, and under them up to five that apply to every project and how many more. Home says what stopped reporting, under Gone quiet.",
     },
     {
       version: '2.20.0',

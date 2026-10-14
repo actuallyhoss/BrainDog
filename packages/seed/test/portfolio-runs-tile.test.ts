@@ -159,7 +159,7 @@ test('WHAT A PROJECT RUNS ON IS ONE SECTION HEADED Runs on: the three tiles of i
   const quiet = held.at(-1)!;
   assert.equal(quiet.limit, 5);
   assert.match(quiet.where ?? '', /(^|, )scope is global(,|$)/u);
-  assert.deepEqual([role(quiet, 'title'), role(quiet, 'fact'), role(quiet, 'who'), role(quiet, 'when')], [['name'], ['kind'], ['used_agent'], ['used_at']]);
+  assert.deepEqual([role(quiet, 'title'), role(quiet, 'fact'), role(quiet, 'who'), role(quiet, 'when')], [['name'], ['kind'], ['used_agents'], ['used_at']]);
 });
 
 test('AND FROM EVERYWHERE LISTS FIVE AT MOST, by name and kind, drawn quiet, under the project’s own', async () => {

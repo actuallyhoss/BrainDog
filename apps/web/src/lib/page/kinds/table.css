@@ -1,0 +1,53 @@
+/*
+ * A `table` whose rows carry their group (group-table-draw-89): `Table.svelte`, in its grid and its phone card list,
+ * draws a heading row per group, one cell across the columns holding the group's name and its count as a pill.
+ *
+ * HERE AND NOT IN `blocks.css`, so the rules arrive with the screens that draw a block (`styles.ts`) and the entry
+ * stylesheet does not carry them: they put it over its 12 KB line. Only a page's block is drawn grouped (a list's own
+ * table and a view hand `Table` no group), and every screen that draws one imports `styles.ts`.
+ *
+ * The group's name at the table's own size, weight 600, its count as a pill. No rule, no wash, no colour of its own.
+ */
+
+@layer components {
+  .tr-group {
+    border-block-end-color: transparent;
+  }
+
+  .tr-group > .td {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: var(--sp-3) var(--sp-3) var(--sp-1);
+  }
+
+  .rowgroup .tr-group:hover {
+    background: none;
+  }
+
+  .rowgroup .tr:has(+ .tr-group:hover) {
+    border-block-end-color: var(--rule);
+  }
+
+  .table-card-group {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: var(--sp-3) 0 var(--sp-1);
+    list-style: none;
+  }
+
+  :is(.tr-group, .table-card-group) .group-name {
+    font-weight: 600;
+  }
+
+  :is(.tr-group, .table-card-group) .group-count {
+    padding-inline: var(--sp-2);
+    border-radius: var(--r-round);
+    background: var(--field);
+    color: var(--dim);
+    font-size: var(--t-sm);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+}

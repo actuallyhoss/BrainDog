@@ -47,6 +47,7 @@ const GENERAL = [
  * it does; `first` cuts a `feed`'s or an `agents` block's groups and
  * a `steps` block's open rows; `range` draws a `progress` block's rows as bands; `box` puts the blocks after a `section`
  * on one surface, and a `cards` block's `fold` is how many cards each of its `group`s shows before the rest fold; a
+ * `cards` or a `table` block's `group` is a link, a choice or the state of its list, a heading each value; a
  * `feed`'s `group` is `day`, a heading each day, and its `fold` is `run`, one line a run (`feedSaysFault`); `tiles` draws a `queue` as tiles; `who` draws a `heat` as a line a person, columns `day | who`; `register` is the list a `capture` adds to and an `inputs` block
  * edits; `row` is a `diff`'s row and an `inputs` block's.
  *
@@ -70,7 +71,7 @@ export const KEY_KINDS: Readonly<Record<string, readonly string[]>> = {
   tones: ['bar', 'split', 'cards', 'lanes'],
   document: ['note'],
   fold: ['section', 'cards', 'feed'],
-  group: ['cards', 'feed'],
+  group: ['cards', 'table', 'feed'],
   box: ['section'],
   panel: ['section'],
   tiles: ['queue'],
@@ -186,7 +187,7 @@ const WRONG_KIND: Readonly<Record<string, string>> = {
   first: 'To draw fewer rows, write limit: instead.',
   lead: 'Take it off, or draw these rows as cards.',
   fold: 'Put a section before this block and fold the section.',
-  group: 'Draw these rows as cards to group them by a link field.',
+  group: 'Draw these rows as cards or a table to group them by a link, a choice or the state.',
   box: 'Put a section before this block and give the section box: true.',
   register: 'A block that reads rows names them with source: register.<id>.',
 };

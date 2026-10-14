@@ -332,8 +332,14 @@ export type InboxArgs =
   | { digest: true }
   | { id: string };
 
+/**
+ * `inbox({ id })`: one arrival whole, its body never cut, in the state it is in now. The same line a page and a digest
+ * send, so an agent that read a cut body on a digest reads it to its end here.
+ */
+export type InboxArrival = InboxLine;
+
 /** What `inbox` answers for what it was asked: a digest, one arrival whole, or a page. */
-export type InboxAnswer<A> = A extends { digest: true } ? InboxDigest : A extends { id: string } ? InboxLine : InboxPage;
+export type InboxAnswer<A> = A extends { digest: true } ? InboxDigest : A extends { id: string } ? InboxArrival : InboxPage;
 
 /**
  * One figure as `figures` lists it: never its reading, which `metric` answers. `format` is how the declaration says to
@@ -1481,7 +1487,7 @@ export function createClient(options: ClientOptions) {
      * above answered with. `repeats: true` pages through the arrivals set aside as repeats alone, so a page of skipped
      * balance alerts cannot push a real second charge out of sight.
      *
-     * `{ digest: true }` answers every state at once (`InboxDigest`) and `{ id }` one arrival whole (`InboxLine`). Each
+     * `{ digest: true }` answers every state at once (`InboxDigest`) and `{ id }` one arrival whole (`InboxArrival`). Each
      * goes alone. An older host refuses either with the keys it takes.
      */
     inbox: <const A extends InboxArgs = Record<never, never>>(args?: A) => call<InboxAnswer<A>>('inbox', (args ?? {}) as Record<string, unknown>),

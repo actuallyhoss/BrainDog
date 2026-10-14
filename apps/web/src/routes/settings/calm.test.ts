@@ -63,12 +63,15 @@ test('each Navigation section draws at most one hint', () => {
   }
 });
 
-test("the Agents area's ways in show their hints on hover or focus under a pointer, and always under a thumb", () => {
-  const agents = area('Agents');
-  assert.match(agents, /@media \(hover: hover\) and \(pointer: fine\) \{\s*\.door > \.hint \{\s*opacity: 0;/u);
-  assert.match(agents, /\.door:hover > \.hint,\s*\.door:focus-within > \.hint \{\s*opacity: 1;/u);
+test("the Agents area's ways in read as titles until one is chosen, and the chosen one's hint shows under its title", () => {
+  /* THE WAYS IN ARE THE CONNECT SHEET'S (connect-sheet-89): Agents draws one button, and the sheet draws each way as its
+     title alone, with its hint and its lines only in the one tile that is open. */
+  assert.match(markup('Agents'), /<ConnectSheet\b/u);
+  const sheet = strip(readFileSync(new URL('../../lib/agents/ConnectSheet.svelte', import.meta.url), 'utf8'));
+  const drawn = sheet.slice(sheet.indexOf('</script>'));
+  assert.match(drawn, /\{#if on\}\s*<div class="way-body"[^>]*>\s*<p class="hint">\{t\.hint\}<\/p>/u);
   /* THE INBOX SWITCH'S SENTENCE IS ITS VISIBLE LABEL, inside a `.setting-row`, so it is never one of the hints hidden. */
-  assert.match(markup('Agents'), /<div class="setting-row">\s*<p class="hint">\{copy\.connectInboxHint\}<\/p>/u);
+  assert.match(drawn, /<div class="setting-row">\s*<p class="hint">\{copy\.connectInboxHint\}<\/p>/u);
 });
 
 test('Export and What comes in name the things a person keeps, not rows', () => {

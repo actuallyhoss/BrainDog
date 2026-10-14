@@ -167,13 +167,23 @@ export const standing = (rows: readonly TokenRow[]): TokenRow[] => rows.filter((
  * THE SETUP LINE NAMES THE RECORD when the screen knows it. The Cloud device flow is refused without a slug, and a line
  * with the bare origin did not work where most people would paste it. `setup` logs in, installs the hooks, registers
  * the MCP server and syncs the skills in one command.
+ *
+ * AND THE LINES PER APP, for the connect sheet (AGT-A07): `codex` is Codex's own command for an HTTP server, `cursor`
+ * the entry its server file takes (`~/.cursor/mcp.json`), and `web` and `other` the address, which is all Claude on the
+ * web and any other app are given. Each is the line for doing it by hand; `setup` finds Codex and Cursor itself.
  */
-export function connectLines(origin: string, slug?: string | null): { mcp: string; claude: string; setup: string } {
+export type ConnectLines = { mcp: string; claude: string; setup: string; codex: string; cursor: string; web: string; other: string };
+
+export function connectLines(origin: string, slug?: string | null): ConnectLines {
   const mcp = `${origin}/mcp`;
   return {
     mcp,
     claude: `claude mcp add --transport http braindog ${mcp}`,
     setup: `braindog setup ${slug ? `${origin}${BASE}/${slug}` : origin}`,
+    codex: `codex mcp add braindog --url ${mcp}`,
+    cursor: JSON.stringify({ mcpServers: { braindog: { url: mcp } } }),
+    web: mcp,
+    other: mcp,
   };
 }
 

@@ -996,17 +996,19 @@ const projectBefore = (doc: Body, id: string): Body =>
       /* AND UNTIL BATCH 87 (project-runs-tile-87) the three were halves under More about, with no heading of their own
          and nothing said of what reaches a project from everywhere; Money by month was a half beside the bills; and
          Agents read every run placed in the project, titled by what it was doing. */
+      /* AND UNTIL BATCH 89 (runs-on-section-89) the three drew three rows each and named who by the run, `used_by`, Last used by. */
+      const runsOn89 = (x: Body): Body => ({ ...x, limit: 3, columns: (x.columns as Body[]).map((c) => (c.as === 'who' ? { field: 'used_by', label: 'Last used by', as: 'who' } : c)) });
       if (b.kind === 'section' && b.heading === 'Runs on') return [];
       if (b.heading === 'And from everywhere') return [];
       if (b.heading === 'Money by month') return [{ ...b, span: 6 }];
       if (b.heading === 'Agents' && b.source === 'register.session')
         return [{ ...b, columns: [{ field: 'doing', as: 'title' }, { field: 'agent', as: 'who' }, { field: 'last_seen', as: 'when' }], where: 'project is {{spoken}}' }];
-      if (b.heading === 'Tools and servers') return [{ ...b, span: 6, where: 'kind is tool' }];
+      if (b.heading === 'Tools and servers') return [{ ...runsOn89(b), span: 6, where: 'kind is tool' }];
       /* KEYS AND SKILLS LISTED EVERYBODY'S until batch 72 (project-own-cards-72, PGS-C31), as Tools and servers had. */
       /* A TEAM'S KEYS WERE THE WHOLE ROW: the half Keeping it alive left, on a record that holds no services, went to the
          tile beside it (`projectTemplate`). Under Runs on nothing is beside a block that goes, so it is a third. */
-      if (b.heading === 'Keys' && b.source === 'runs_on') return [{ ...b, span: id === 'team' ? 12 : 6, where: 'kind is key' }];
-      if (b.heading === 'Skills' && b.source === 'runs_on') return [{ ...b, span: 6, where: 'kind is skill' }];
+      if (b.heading === 'Keys' && b.source === 'runs_on') return [{ ...runsOn89(b), span: id === 'team' ? 12 : 6, where: 'kind is key' }];
+      if (b.heading === 'Skills' && b.source === 'runs_on') return [{ ...runsOn89(b), span: 6, where: 'kind is skill' }];
       if (b.heading !== 'At a glance') return [b];
       const cells = (b.cells as Body[]).flatMap((c) => (c.metric !== 'project-done-7d:{{name}}' ? [c] : id === 'founder' ? [] : [(({ trend: _trend, ...cell }) => cell)(c)]));
       return [{ ...b, cells }];

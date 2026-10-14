@@ -42,7 +42,8 @@
  * how many the record cleared in seven days, from the lines the hourly pass keeps. Both are reads and write nothing.
  *
  * AND WHERE THINGS APPLY (AGT-D01): `projects-unplaced`, the projects that name no repository and no folder, so no run
- * can land in them, and `keys-unopenable`, the keys whose sealed value names a grant revoked or gone. The agents add-on
+ * can land in them, `keys-unopenable`, the keys whose sealed value names a grant revoked or gone, and `keys-unopened`
+ * (AGT-D17), the sealed keys nobody has opened in six months, the tidy's finder of that name as a number. The agents add-on
  * cannot declare either, since it does not know another list's field names. AND `record.door`, the reader the add-on's
  * figures over the agent door's signs read (AGT-B01).
  *
@@ -81,6 +82,8 @@ import { KEYS_IN_TEXT } from './key-scan.ts';
 import { holdDays } from './hold.ts';
 import { isUnknownMark } from './marks.ts';
 import { finderOf, staleNow, tidied } from './tidy.ts';
+/* `tidy-keys.ts` IMPORTS NOTHING AT RUN TIME, only `tidy.ts`'s types, so this adds no load ring. */
+import { countKeysUnopened, fieldOf, sealedLists } from './tidy-keys.ts';
 /* `people.ts` REACHES `ingest.ts` AND THROUGH IT MUCH OF THE KERNEL. Only a function is taken, called on a read and never
    as this file loads, so the ring it closes meets no word before it is set. */
 
@@ -655,6 +658,21 @@ const KEYS_UNOPENABLE: MetricDecl = {
   format: 'int',
 };
 
+/**
+ * Keys nobody has opened in six months (AGT-D17): sealed more than 180 days ago and never opened since, or last opened
+ * before that. Read by the same count as the tidy's `keys-unopened` finder, so the figure and the finder never disagree.
+ */
+const KEYS_UNOPENED: MetricDecl = {
+  metric: 'keys-unopened',
+  name: 'Sealed keys nobody has opened',
+  source: RECORD_KEYS,
+  value: { count: 'id' },
+  target: { lte: 0 },
+  window: '30d',
+  compare: 'none',
+  format: 'int',
+};
+
 /** The source of `marks-unknown`: every list that declares `identity.mark`, read by the field it names. */
 export const RECORD_MARKS = 'record.marks';
 
@@ -769,6 +787,7 @@ export const BUILT_IN_FIGURES: Readonly<Record<string, MetricDecl>> = {
   'tidied-week': TIDIED_WEEK,
   'projects-unplaced': PROJECTS_UNPLACED,
   'keys-unopenable': KEYS_UNOPENABLE,
+  'keys-unopened': KEYS_UNOPENED,
   'keys-in-text': KEYS_IN_TEXT,
   'marks-unknown': MARKS_UNKNOWN,
   'held-twice': PEOPLE_TWICE,
@@ -1034,22 +1053,20 @@ export function readProjectsUnplaced(sql: Sql, _ctx: unknown, decl: MetricDecl):
  * `keys-unopenable`: rows of any list with a sealed field, not deleted and not finished, whose sealed field names a
  * grant that was revoked or is gone. An empty sealed field is not counted here: a key that holds no value says so in
  * its own figure. NOTHING, NEVER NOUGHT, on a record where no list seals a value.
+ *
+ * AND `keys-unopened` (AGT-D17), the same lists read for the keys nobody has opened in six months, counted by
+ * `tidy-keys.ts` `countKeysUnopened`, the count the tidy's finder of that name answers.
  */
-export function readKeysUnopenable(sql: Sql, _ctx: unknown, decl: MetricDecl): Result<Reading> {
-  const lists = sql
-    .all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'register' AND superseded_at IS NULL AND retired = 0 AND json_valid(body)")
-    .flatMap((r) => {
-      const body = JSON.parse(r.body) as { id?: unknown; done?: unknown; fields?: unknown };
-      const sealed = (Array.isArray(body.fields) ? (body.fields as { id?: unknown; type?: unknown; retired?: unknown }[]) : [])
-        .filter((f) => f?.type === 'secret' && f.retired !== true && typeof f.id === 'string')
-        .map((f) => f.id as string);
-      const done = Array.isArray(body.done) ? body.done.filter((d): d is string => typeof d === 'string') : [];
-      return typeof body.id === 'string' && sealed.length > 0 ? [{ list: body.id, sealed, done }] : [];
-    });
+export function readKeysUnopenable(sql: Sql, ctx: Pick<EvalContext, 'nowMs'>, decl: MetricDecl): Result<Reading> {
+  if (decl.metric === KEYS_UNOPENED.metric) {
+    const unopened = countKeysUnopened(sql, ctx.nowMs);
+    return judged(decl, unopened, unopened === null ? 'no list on this record seals a value' : 'sealed keys nobody has opened in six months');
+  }
+  const lists = sealedLists(sql);
   if (lists.length === 0) return judged(decl, null, 'no list on this record seals a value');
   let n = 0;
   for (const { list, sealed, done } of lists) {
-    const named = sealed.map((f) => `json_extract(fields, '$."${f.replaceAll('"', '""').replaceAll("'", "''")}"')`);
+    const named = sealed.map(fieldOf);
     const broken = named.map((g) => `(coalesce(${g}, '') <> '' AND NOT EXISTS (SELECT 1 FROM grant WHERE id = ${g} AND revoked_at IS NULL))`);
     n += Number(
       sql.one<{ n: number }>(

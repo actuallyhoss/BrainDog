@@ -1,14 +1,15 @@
 <!--
-  Settings > Agents: connecting an agent three ways, approving a machine, everything that is connected, and what Slash
-  may do on its own.
+  Settings > Agents: one button that connects an agent, approving a machine, everything that is connected, and what
+  Slash may do on its own.
 
-  THREE WAYS IN, ONE UNDER ANOTHER. Any MCP client takes the record's address and signs in through OAuth, which the owner
-  allows on `/connect`; Claude Code with its hooks and skills is one install line and one `braindog setup`, which
-  shows six digits to approve here; a script or a server is given a key, shown once, with the header it is sent in.
+  ONE BUTTON, CONNECT AN AGENT (AGT-A07), where three boxes of text stood. It opens the connect sheet
+  (`lib/agents/ConnectSheet.svelte`), loaded with `import()` on the first press so the entry carries none of it: six
+  ways in, each line with its Copy, a script's key made in its own tile, and a live row that says Connected when the
+  app makes its first call.
 
   THE SIX DIGITS LEAD WHILE A MACHINE IS WAITING. A person arriving from a terminal is holding a code and looking for
-  the box, so while a machine waits the field is the first thing on the screen; otherwise it is the setup card's last
-  step, which is where the code turns up.
+  the box, so while a machine waits the field is the first thing on the screen; otherwise it is drawn in the sheet under
+  the setup line, which is where the code turns up.
 
   ONE LIST OF WHAT IS CONNECTED. A machine, a key and an app are three ways of letting something act on the record,
   and `connected` in `record/device.ts` folds them into rows that each say what it is, what it can do, when it last
@@ -21,18 +22,16 @@
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
-  import * as clipboard from '$lib/clipboard.ts';
   import { read, type Result } from '$lib/data/read.svelte.ts';
-  import { INSTALL_LINES, OSES, osOf, type Os } from '$lib/device.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import {
-    CODE_DIGITS, LABEL_MAX, RUNS_READ, TOKEN_DAYS, connectLines, connected, headerLine, nameOf, reachKey, reachOf, reportKeyOf,
+    CODE_DIGITS, RUNS_READ, connectLines, connected, nameOf, reachKey, reachOf, reportKeyOf,
     runName, runsOf, standing, waiting, type Answer, type Connection, type DeviceRow, type Run, type TokenRow,
   } from '$lib/record/device.ts';
   /* THE APPROVAL `/vault` SENDS TOO, from one module, so the two screens cannot drift apart. */
   import { answerLine as lineOf, approve, planOf, reprove, revoke, words as vaultWords, type Plan } from '$lib/record/vault.ts';
   import { callsOutOf, type CallOut } from '$lib/record/actions.ts';
-  import { mintAgent, wrote } from '$lib/record/settings-write.ts';
+  import { wrote } from '$lib/record/settings-write.ts';
   import { hostedHere } from '../../billing.ts';
   import CallsOut from '$lib/ui/CallsOut.svelte';
   import { AGENTS_PACK, agentsPackDocument } from '@braindog/seed/packs';
@@ -45,7 +44,6 @@
   import { methods, passkeySignIn, support } from '$lib/auth.ts';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
   import Section from '$lib/ui/Section.svelte';
-  import Segmented from '$lib/ui/Segmented.svelte';
   import SlashAsks from '$lib/ui/SlashAsks.svelte';
   import SlashModel from '$lib/ui/SlashModel.svelte';
   import SlashDaily from '$lib/ui/SlashDaily.svelte';
@@ -131,13 +129,6 @@
   let typed = $state('');
   let approving = $state(false);
   let answer = $state<Answer | null>(null);
-  /* THE BEARER LIVES HERE AND NOWHERE ELSE, and only until Done or leaving the area, which unmounts this component. */
-  let minted = $state<{ label: string; bearer: string } | null>(null);
-  let mintLabel = $state('');
-  /* OFF UNTIL THE OWNER TURNS IT ON, and off again for the next key: reading the inbox is chosen per key. */
-  let mintInbox = $state(false);
-  let minting = $state(false);
-  let mintRefusal = $state('');
   /* ONE REVOKE AT A TIME, so a double press sends one. */
   let revoking = $state<string | null>(null);
 
@@ -145,8 +136,6 @@
   const origin = bareOrigin();
   /* THE SETUP LINE NAMES THIS RECORD, which the Cloud device flow needs; a shell with no record names none. */
   const lines = $derived(connectLines(origin, shell.live ? SLUG : null));
-  /* THE INSTALLER FOR THE COMPUTER THIS BROWSER IS ON, and one press away from the other one. */
-  let os = $state<Os>(osOf(globalThis.navigator));
 
   /**
    * THE WORDS THE CONNECTED TILE ADDS: what each key can do in two words, at the end of its row, and
@@ -287,26 +276,45 @@
     revoking = null;
   }
 
-  async function makeKey(e: SubmitEvent) {
-    e.preventDefault();
-    const label = mintLabel.trim().slice(0, LABEL_MAX);
-    if (!label || minting) return;
-    minting = true;
-    mintRefusal = '';
-    const busy = opened();
-    /* THE BEARER IS SHOWN ONCE, from this answer, and never stored, logged or written anywhere else. */
-    const out = await mintAgent(apiBase(), { label, inbox: mintInbox, days: TOKEN_DAYS });
-    closed(true, busy);
-    minting = false;
-    if (!out.ok) {
-      mintRefusal = out.fix;
-      return;
+  /*
+   * THE CONNECT SHEET, a chunk of its own: imported on the first press, so nothing of it is in what every screen loads.
+   * The key form moved into it (its script tile), with the bearer it shows once.
+   */
+  let ConnectSheet = $state<typeof import('$lib/agents/ConnectSheet.svelte').default | null>(null);
+  let sheetOpen = $state(false);
+  let loadingSheet = $state(false);
+  async function openSheet() {
+    if (ConnectSheet === null) {
+      loadingSheet = true;
+      const loaded = await import('$lib/agents/ConnectSheet.svelte').catch(() => null);
+      loadingSheet = false;
+      if (loaded === null) {
+        toasts.push(copy.screenFailed, { intent: 'warn' });
+        return;
+      }
+      ConnectSheet = loaded.default;
     }
-    minted = { label, bearer: out.value.bearer };
-    mintLabel = '';
-    mintInbox = false;
-    await held.reread();
+    sheetOpen = true;
   }
+
+  /* WHAT THE SHEET'S LIVE ROW ASKS every two seconds: the newest runs, and the keys once a key was made in it. A read that
+     fails is no answer, and the row keeps what it last said. */
+  const LISTEN_RUNS = 20;
+  async function listen(keys: boolean) {
+    const c = clientOf();
+    const runs = await c.list({ register: 'session', limit: LISTEN_RUNS, order: [{ field: 'last_seen', dir: 'desc' }] });
+    if (!runs.ok) return null;
+    const tokens = keys ? await c.listTokens() : null;
+    return { rows: runs.value.rows, keys: tokens?.ok ? (tokens.value as TokenRow[]) : [] };
+  }
+
+  /* THE LIST IS READ AGAIN WHEN THE SHEET CLOSES, so what connected while it was open is in it. */
+  let sheetWas = false;
+  $effect(() => {
+    const now = sheetOpen;
+    if (!now && sheetWas) untrack(() => void held.reread());
+    sheetWas = now;
+  });
 
   /*
    * THE AGENTS ADD-ON, OFFERED ONCE SOMETHING IS CONNECTED, when this record does not have it, and on every visit
@@ -376,9 +384,6 @@
       offerSaid = offer ? out.fix : '';
     } else offerSaid = out.fix;
   }
-
-  /* A LINE IS COPIED WITH ITS OWN SENTENCE, and the line is never quoted in the toast: the key is one of them. */
-  const put = (line: string, said: string): void => void clipboard.put(line, line, said);
 </script>
 
 <!--
@@ -426,15 +431,6 @@
         </div>
       {/if}
     </form>
-  {/snippet}
-
-  <!-- A LINE TO COPY: the text in the code face, breaking anywhere so a long line never pushes the page sideways, and
-       its button beside it, or under it where the two do not fit. -->
-  {#snippet copyable(line: string, button: string, said: string)}
-    <div class="copy-line">
-      <code class="mono">{line}</code>
-      <Button onclick={() => put(line, said)}>{button}</Button>
-    </div>
   {/snippet}
 
   {#if first}
@@ -535,74 +531,14 @@
     </div>
   {/if}
 
-  <Section title={copy.connectTitle}>
-    <ul class="doors">
-      <li class="door">
-        <h3 class="door-title"><IconWell name="globe" />{copy.doorAny}</h3>
-        <p class="hint">{copy.doorAnyHint}</p>
-        {@render copyable(lines.mcp, copy.copyAddress, copy.lineCopied)}
-        <p class="step">{copy.doorAnyClaude}</p>
-        {@render copyable(lines.claude, copy.copyCommand, copy.lineCopied)}
-      </li>
-      <li class="door">
-        <h3 class="door-title"><IconWell name="session" />{copy.doorSetup}</h3>
-        <p class="hint">{copy.doorSetupHint}</p>
-        <p class="step">{copy.doorInstall}</p>
-        <Segmented role="group" aria-label={copy.doorOs}>
-          {#each OSES as o (o)}
-            <button type="button" class="segment" aria-pressed={os === o} data-on={os === o ? '' : undefined} onclick={() => (os = o)}>{copy.osNames[o]}</button>
-          {/each}
-        </Segmented>
-        {@render copyable(INSTALL_LINES[os], copy.copyCommand, copy.lineCopied)}
-        <p class="step">{copy.doorSetupRun}</p>
-        {@render copyable(lines.setup, copy.copyCommand, copy.lineCopied)}
-        {#if !first}{@render codeForm()}{/if}
-      </li>
-      <li class="door">
-        <h3 class="door-title"><IconWell name="key" />{copy.doorKey}</h3>
-        <!-- THE KEY IS DRAWN ONCE, from `minted`, which Done and leaving the area both empty; nothing else on this
-             screen holds it. -->
-        {#if minted}
-          {@const bearer = minted.bearer}
-          <div class="minted" role="status">
-            <p class="step">{copy.tokenOnce}</p>
-            {@render copyable(bearer, copy.copyKey, copy.keyCopied)}
-            <p class="step">{copy.doorKeyHeader}</p>
-            {@render copyable(headerLine(bearer), copy.copyHeader, copy.lineCopied)}
-            <div class="row-actions">
-              <Button weight="bare" onclick={() => (minted = null)}>{copy.connectDone}</Button>
-            </div>
-          </div>
-        {:else}
-          <p class="hint">{copy.doorKeyHint}</p>
-          <form class="field-row" onsubmit={makeKey}>
-            <label class="field-row-label" for="agent-label">{copy.doorKeyLabel}</label>
-            <div class="field-row-controls">
-              <div class="field">
-                <input class="field-input" id="agent-label" type="text" maxlength={LABEL_MAX} bind:value={mintLabel} aria-describedby="agent-label-said" />
-              </div>
-              <Button type="submit" disabled={minting || mintLabel.trim() === ''}>{copy.doorKeyGo}</Button>
-            </div>
-            <!-- THE INBOX IS ONE THING ON OR OFF, so it is the switch the rest of Settings uses, and it starts off. -->
-            <div class="setting-row">
-              <p class="hint">{copy.connectInboxHint}</p>
-              <button
-                type="button"
-                class="switch"
-                role="switch"
-                aria-checked={mintInbox}
-                aria-label={copy.connectInbox}
-                onclick={() => (mintInbox = !mintInbox)}><span class="switch-track"></span></button
-              >
-            </div>
-            <p class="code-said" id="agent-label-said" role="status" data-intent={mintRefusal ? 'bad' : undefined}>
-              {#if mintRefusal}<span role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span> {mintRefusal}{/if}
-            </p>
-          </form>
-        {/if}
-      </li>
-    </ul>
-  </Section>
+  <!-- CONNECT AN AGENT: one primary button where the three boxes stood. The sheet it opens is a chunk of its own, asked
+       for on the first press; the six-digit field rides in it under the setup line while no machine waits above. -->
+  <div class="connect">
+    <Button weight="primary" disabled={loadingSheet} onclick={() => void openSheet()}>{copy.connectTitle}</Button>
+  </div>
+  {#if ConnectSheet}
+    <ConnectSheet bind:open={sheetOpen} {lines} {listen} code={first ? undefined : codeForm} onchanged={() => void held.reread()} />
+  {/if}
 
 {:else}
   <!-- A COLLEAGUE CONNECTS THEIR OWN AGENT, with a key of their own capped by their own levels, rather than being shown
@@ -822,109 +758,6 @@
     font-size: var(--t-xs);
   }
 
-  /* THE ONE PLACE A MONOSPACE FACE IS RIGHT. `Money.svelte` argues against it for figures (a mono
-     face gives the thousands separator a full character width), and a key or a command is not a
-     figure: it is a string somebody compares character by character against another screen, or
-     pastes into a terminal. `--font-id` is the theme's face for exactly that.
-
-     A BASE64 KEY HAS NO SPACES IN IT, so it is one 43-character word, and it reached 432px inside a
-     400px screen: every line here breaks anywhere and keeps its own spaces, so the page body never
-     scrolls sideways (`13 §10`, the layout gate's first rule). */
-  .mono {
-    flex: 1 1 24ch;
-    min-inline-size: 0;
-    margin: 0;
-    padding-block: var(--sp-2);
-    padding-inline: var(--sp-3);
-    background: var(--bg);
-    border-radius: var(--r-md);
-    color: var(--ink);
-    font-family: var(--font-id);
-    font-size: var(--t-sm);
-    letter-spacing: 0;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-  }
-
-  /* A LINE AND ITS COPY BUTTON on one row where both fit, the button under the line where they do not. */
-  .copy-line {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--sp-2);
-  }
-
-  /* THE THREE WAYS IN, one under another at every width, each holding a line too long to share a row with another's.
-     UNBOXED, as the rows below them are: each was a bordered card inside the section, the box in a box design 6.8.6
-     rules out, so a way in is now a block with a soft hairline above the next one. */
-  .doors {
-    display: flex;
-    flex-direction: column;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .door {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-2);
-    min-inline-size: 0;
-    padding-block: var(--sp-4);
-  }
-
-  .door:first-child {
-    padding-block-start: 0;
-  }
-
-  .door + .door {
-    border-block-start: 1px solid var(--line-soft);
-  }
-
-  /* EACH WAY IN'S HINTS ARE THERE WHEN IT IS, under a pointer: on hover, or once anything in it has focus, so the
-     three ways in read as three titles and their lines until one is chosen (DIRECTION §35). The words keep their place,
-     so nothing below moves when they arrive, and a screen reader hears them all the time. Under a thumb there is no
-     hover to ask with, so they are always drawn.
-     THE DOOR'S OWN HINT ONLY (`>`), never the inbox switch's sentence: in a `.setting-row` that sentence is the only
-     words a sighted person reads beside the switch, and a switch drawn bare until hovered says nothing of what it does. */
-  @media (hover: hover) and (pointer: fine) {
-    .door > .hint {
-      opacity: 0;
-      transition: opacity var(--d-state) var(--ease-out);
-    }
-
-    .door:hover > .hint,
-    .door:focus-within > .hint {
-      opacity: 1;
-    }
-  }
-
-  /* EACH WAY IN HEADS WITH ITS WELL, as a tile's heading does: the 28px well, then the title at the row's size. */
-  .door-title {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-3);
-    margin: 0;
-    color: var(--ink);
-    font-size: var(--t-row);
-    font-weight: 600;
-    line-height: 20px;
-  }
-
-  /* WHAT THE NEXT LINE IS FOR, as a label is drawn above its field. */
-  .step {
-    margin: 0;
-    margin-block-start: var(--sp-1);
-    color: var(--ink2);
-    font-size: var(--t-sm);
-  }
-
-  .minted {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-2);
-  }
-
   /* THE FACTS UNDER A NAME WRAP AS WHOLE ITEMS, with space between them and no separator to lead a line. */
   .who-facts {
     display: flex;
@@ -947,22 +780,18 @@
     font-size: var(--t-sm);
   }
 
-  /* THE SENTENCE AND ITS SWITCH (`.setting-row`) ARE LAID OUT BY `settings.css`, which every area shares. */
-
-  .hint {
-    margin: 0 0 var(--sp-3);
-    max-inline-size: var(--measure);
-    color: var(--dim);
-    font-size: var(--t-sm);
-    line-height: var(--lh-body);
-  }
-
   /* WRAPPING, for the reason `/audit`'s segmented bar already wraps: two buttons that do not fit
      are two buttons off the edge. */
   .row-actions {
     flex-wrap: wrap;
     display: flex;
     gap: var(--sp-2);
+    margin-block-start: var(--sp-3);
+  }
+
+  /* THE ONE BUTTON THAT CONNECTS AN AGENT, on the board under the list it adds to. */
+  .connect {
+    display: flex;
     margin-block-start: var(--sp-3);
   }
 </style>

@@ -14,18 +14,14 @@
  */
 
 export const agents = {
-  /* THE THREE WAYS IN, each a card of its own: an address any MCP client takes, the command that sets Claude Code up
-     with its hooks and skills, and a key for a program that has no browser to sign in from. */
-  doorAny: 'Any MCP client',
+  /* THE WAYS IN, as the connect sheet (`agents/ConnectSheet.svelte`) draws them: an address any MCP client takes, the
+     command that sets Claude Code up with its hooks and skills, and a key for a program that has no browser to sign in from. */
   doorAnyHint: 'Give an app this address where it asks for a server. The app then sends you here to allow it.',
-  doorAnyClaude: 'In Claude Code',
-  doorSetup: 'Claude Code with hooks and skills',
   doorSetupHint: 'Install the braindog command on the computer, then set it up for this record. It shows six digits for you to approve here.',
   doorInstall: 'Install the command',
   doorOs: 'The computer it goes on',
   osNames: { windows: 'Windows', unix: 'macOS or Linux' },
   doorSetupRun: 'Set it up for this record',
-  doorKey: 'A key for a script or a server',
   doorKeyHint: 'For a program with no browser to sign in from. The key can read and change your record for ninety days.',
   doorKeyLabel: 'Name the script or server',
   doorKeyGo: 'Make a key',

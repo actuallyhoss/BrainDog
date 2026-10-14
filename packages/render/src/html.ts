@@ -723,6 +723,49 @@ function inputs(b: Block, o: RenderOptions): string {
 }
 
 /**
+ * One line of a table as drawn: a group's heading, or a row and its place among the rows drawn (`at`, the caret's).
+ *
+ * HERE AND NOT IN `table.ts`, because both tables already read this file: `Table.svelte` takes `hrefFor` from it.
+ */
+export type TableLine<R> = { kind: 'group'; name: string; count: number } | { kind: 'row'; row: R; at: number };
+
+/**
+ * A table's rows in groups, as both renderers draw them: each group under one heading with its count, the groups in
+ * the order the first row of each stands, and a group's rows in the order the record read them.
+ *
+ * A ROW IN NO GROUP IS DRAWN BEFORE THE FIRST HEADING, in the record's order. A table has no edge under a group, so a
+ * row drawn after a heading reads as that group's: before them all is the one place a row stands under no heading.
+ * A GROUP OF ONE IS STILL A GROUP: a table of states heads every state it holds, where a card of one stays loose.
+ * NO ROW IN ANY GROUP, and the lines are the rows as they came, which is the table drawn exactly as it was.
+ */
+export function tableLines<R>(rows: readonly R[], groupOf: (row: R) => string | null | undefined): TableLine<R>[] {
+  const named = rows.map((r) => groupOf(r)?.trim() || null);
+  const members = new Map<string, R[]>();
+  rows.forEach((r, i) => {
+    const g = named[i];
+    if (g) members.set(g, [...(members.get(g) ?? []), r]);
+  });
+  if (members.size === 0) return rows.map((row, at) => ({ kind: 'row', row, at }));
+  const lines: TableLine<R>[] = rows.flatMap((row, i): TableLine<R>[] => (named[i] ? [] : [{ kind: 'row', row, at: 0 }]));
+  for (const [name, held] of members) lines.push({ kind: 'group', name, count: held.length }, ...held.map((row): TableLine<R> => ({ kind: 'row', row, at: 0 })));
+  let at = 0;
+  return lines.map((l) => (l.kind === 'row' ? { ...l, at: at++ } : l));
+}
+
+/**
+ * A group's heading in a table, as `Table.svelte` writes it: one cell across the columns, the group's name and its
+ * count. `at` is its `aria-rowindex`.
+ */
+export const groupHead = (name: string, count: number, at: number, columns: number): string =>
+  `<div class="tr tr-group" role="row" aria-rowindex="${at}"><span class="td" role="gridcell" aria-colspan="${columns}" style="grid-column:1/-1"><span class="group-name">${escape(name)}</span> <span class="group-count">${count}</span></span></div>`;
+
+/** A row's group as a host put it on the row, by name: `group` when it is words, and nothing otherwise. */
+export const rowGroup = (row: object): string | null => {
+  const g = (row as { group?: unknown }).group;
+  return typeof g === 'string' && g.trim() !== '' ? g.trim() : null;
+};
+
+/**
  * `table` — the static mirror of `svelte/p/Table.svelte`, drawn from the same decisions.
  *
  * IT USED TO BE A SECOND, SMALLER TABLE and that was the largest hole in this package's "equal by
@@ -752,12 +795,20 @@ function table(b: Block, o: RenderOptions): string {
       return `<span class="th" role="columnheader"${sorted ? ` aria-sort="${sorted}"` : ''} data-align="${c.align ?? 'start'}">${escape(c.label)}</span>`;
     })
     .join('');
-  const grouped = chunkRows(rows, TABLE_CHUNK);
+  /* EACH GROUP UNDER ITS HEADING (`tableLines`), a heading being a row of the grid, so `aria-rowindex` counts it. A
+     group comes from the row the host built, `group` on it, which the dialect never writes: no group, no heading. */
+  const lines = tableLines(
+    rows.map((row, i) => ({ row, group: rowGroup(b.rows[i + 1] ?? {}) })),
+    (r) => r.group,
+  );
+  const grouped = chunkRows(lines, TABLE_CHUNK);
   const body = grouped.groups
     .map((group, g) => {
       const trs = group
-        .map((row, i) => {
+        .map((line, i) => {
           const index = g * grouped.step + i;
+          if (line.kind === 'group') return groupHead(line.name, line.count, index + 2, columns.length);
+          const { row } = line.row;
           const tds = columns
             .map((column, c) => {
               const drawn = tableCellBody(row.cells[c] ?? null, o.home);
@@ -785,7 +836,7 @@ function table(b: Block, o: RenderOptions): string {
   const tracks = columns.map((c) => c.width).join(' ');
   return (
     `<div class="table-region" role="group" tabindex="0" aria-label="${escape(label)}">` +
-    `<div class="table" role="grid" aria-rowcount="${rows.length + 1}" aria-colcount="${columns.length}" style="--cols:${tracks}" tabindex="-1">` +
+    `<div class="table" role="grid" aria-rowcount="${lines.length + 1}" aria-colcount="${columns.length}" style="--cols:${tracks}" tabindex="-1">` +
     `<div class="tr th-row" role="row" aria-rowindex="1">${th}</div>${body}</div></div>`
   );
 }

@@ -1,11 +1,24 @@
 /**
- * `braindog setup <url> [--dry-run | --yes]`: one command sets a machine up from the record.
+ * `braindog setup <url> [--dry-run | --yes] [--only <app>] [--profile <folder>]`: one command sets a machine up from
+ * the record, in every app on it and every Claude Code profile he uses.
  *
  * THE STEPS IN ORDER, EACH ONE ALREADY A COMMAND OF ITS OWN: sign in unless a live login for the host is held,
- * `install --apply` into the user profile, the `braindog` MCP server registered at user scope, `tools write --scope
- * user`, and `skills sync`. Each step prints one line saying what it did or found, with the lines its command would
- * print indented under it, and the run stops at the first step that fails, with that step's sentence. Nothing here
- * decides anything those commands do not already decide: this file only puts them in order and says so.
+ * `install --apply` into every profile, the `braindog` MCP server registered in every profile and every other app,
+ * `tools write --scope user` with the record's global tools in every app, and `skills sync`. Each step prints one line
+ * saying what it did or found, ONE LINE PER APP AND PROFILE where a step touches several, with the lines its command
+ * would print indented under it, and the run stops at the first step that fails, with that step's sentence.
+ *
+ * EVERY APP THE TABLE HOLDS (`clients/index.ts`) that is on this machine, or those named with `--only`. THE PROFILES
+ * (AGT-A07) are the default one, `~/.claude`, the one `CLAUDE_CONFIG_DIR` names, each `--profile <folder>` given, and
+ * those kept from earlier runs in `~/.braindog/profiles.json`, which a run that writes keeps up to date, so a second
+ * machine-wide run reaches a profile named once. A kept profile no longer on this machine is left out and said.
+ *
+ * A COPY OF EVERY FILE IT CHANGES, the first one named `<file>.pre-braindog`, his word for it (`backupOf` in
+ * `install.ts`): install's writer keeps one for the settings, and a profile's servers file is copied before
+ * `claude mcp add-json` changes it, since that program writes the file and nothing here sees it written.
+ *
+ * ITS LAST LINES SAY WHAT IS LEFT, IN THE WORDS TO TYPE (AGT-D11): this repository's own tools, which only `tools write
+ * --scope project` writes, and the tools whose keys need a vault grant this machine does not hold.
  *
  * A SECOND RUN CHANGES NOTHING AND SAYS SO. Every step reads before it writes: a login held is not asked for again,
  * hooks already in the settings are not added again, a registration that already runs this command is left, and
@@ -23,18 +36,23 @@
  * entry holds a command and no `env`, and a tool's key is named by the command that opens it, never held.
  */
 
-import { readFileSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createInterface } from 'node:readline/promises';
-import { join } from 'node:path';
+import { isAbsolute, join, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
+import { CLIENTS, type Client } from './clients/index.ts';
 import { hostKey, hostsPath, readHosts, sameHost, saveHosts, target } from './http.ts';
-import { BRAINDOG_SERVER, HOOKS_HELD, installProfiles, PLACES_SKILL, profilesOf, serversFileOf } from './install.ts';
+import { BRAINDOG_SERVER, HOOKS_HELD, installProfiles, keepCopy, PLACES_SKILL, serversFileOf } from './install.ts';
 import { login } from './login.ts';
-import { connect, isObject, syncSkills, type AgentIo } from './skills.ts';
-import { runClaude, writeTools, type ClaudeRunner } from './tools.ts';
+import { connect, isObject, syncSkills, valueOf, type AgentIo, type Connected } from './skills.ts';
+import { writeTools } from './tools.ts';
 
 type Env = Record<string, string | undefined>;
+
+/** How `claude` is run, with `env` as its whole environment when given, so `CLAUDE_CONFIG_DIR` picks the profile. */
+export type ProfileRunner = (args: string[], cwd: string, env?: Env) => Promise<number>;
 
 /** What `setup` needs from its process, passed in so a test can hold all of it. */
 export type SetupIo = AgentIo & {
@@ -44,8 +62,8 @@ export type SetupIo = AgentIo & {
   scripts: string;
   /** Aborted by Ctrl+C, which ends the wait for the six digits with one sentence. */
   signal?: AbortSignal | undefined;
-  /** How `claude` is run: `runClaude` unless a test holds it. */
-  claude?: ClaudeRunner | undefined;
+  /** How `claude` is run: `runIn` unless a test holds it. */
+  claude?: ProfileRunner | undefined;
   /** How step 1 signs in: `login` unless a test holds it. */
   signIn?: typeof login | undefined;
   /** Step 2's question: true for yes, false for anything else, null when no one is at a terminal. `askTerminal` unless a test holds it. */
@@ -70,7 +88,91 @@ export async function askTerminal(question: string, signal?: AbortSignal): Promi
   }
 }
 
-const USAGE = 'braindog setup takes the address of one record, as in braindog setup https://brain.dog/app/<slug>, and --dry-run or --yes, and nothing else.';
+const USAGE =
+  'braindog setup takes the address of one record, as in braindog setup https://brain.dog/app/<slug>, with --dry-run or --yes, --only <app> and --profile <folder>, and nothing else.';
+
+/**
+ * The real `claude`, run in the profile `env` names. NO SHELL, and its output is not relayed, as `runClaude` in
+ * `clients/claude.ts`, which takes no environment: `claude mcp add-json --scope user` writes into the profile its own
+ * `CLAUDE_CONFIG_DIR` names, so registering in every profile means one run per profile, each with its own.
+ */
+export const runIn: ProfileRunner = (args, cwd, env) =>
+  new Promise((done) => {
+    const child = spawn('claude', args, { cwd, stdio: 'ignore', shell: false, windowsHide: true, ...(env ? { env: Object.fromEntries(Object.entries(env).filter(([, v]) => v !== undefined)) } : {}) });
+    child.on('error', () => done(-1));
+    child.on('exit', (code) => done(code ?? 1));
+  });
+
+/* Paths compared as the file system compares them: without case on Windows. */
+const fold = (path: string) => (process.platform === 'win32' ? path.toLowerCase() : path);
+
+/** Where the profiles of earlier runs are kept, under the home `setup` is given, so a test's home holds its own. */
+export const profilesFile = (home: string): string => join(home, '.braindog', 'profiles.json');
+
+/** The profiles kept from earlier runs. A file that does not read keeps none, and the next run that writes replaces it. */
+function keptProfiles(file: string): string[] {
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(file, 'utf8'));
+    const list = isObject(parsed) && Array.isArray(parsed.profiles) ? parsed.profiles : [];
+    return list.filter((p): p is string => typeof p === 'string' && isAbsolute(p));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Every Claude Code profile setup reaches, each once: the default, the environment's, each `--profile`, then each kept
+ * one. A KEPT ONE NO LONGER ON THIS MACHINE IS LEFT OUT (`gone`), since writing it would make a profile nobody starts;
+ * a folder typed now, or the environment's, is made when missing, as `install --config-dir` makes it.
+ */
+function profilesFor(named: string[], io: SetupIo): { list: string[]; gone: string[]; kept: string[] } {
+  const kept = keptProfiles(profilesFile(io.home));
+  const seen = new Set<string>();
+  const list: string[] = [];
+  const gone: string[] = [];
+  const add = (dir: string, mustExist: boolean) => {
+    const abs = resolve(io.cwd, dir);
+    if (seen.has(fold(abs))) return;
+    if (mustExist && !existsSync(abs)) {
+      gone.push(abs);
+      return;
+    }
+    seen.add(fold(abs));
+    list.push(abs);
+  };
+  add(join(io.home, '.claude'), false);
+  if (io.env.CLAUDE_CONFIG_DIR) add(io.env.CLAUDE_CONFIG_DIR, false);
+  for (const dir of named) add(dir, false);
+  for (const dir of kept) add(dir, true);
+  return { list, gone, kept };
+}
+
+/** A profile as a person reads it: `~/<folder>` under the home, else the folder. */
+function nameOf(dir: string, home: string): string {
+  const rel = relative(home, dir);
+  return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel) ? `~/${rel.replaceAll('\\', '/')}` : dir;
+}
+
+/**
+ * The environment `claude` runs in for one profile: the shell's, with `CLAUDE_CONFIG_DIR` naming the profile, or with
+ * none for the default one, because Claude Code keeps the default profile's servers in `~/.claude.json` only when the
+ * variable is unset (`serversFileOf`), and set to `~/.claude` it writes inside the folder.
+ */
+function profileEnv(dir: string, io: SetupIo): Env {
+  const { CLAUDE_CONFIG_DIR: _, ...rest } = io.env;
+  return serversFileOf(dir, io.home) === join(io.home, '.claude.json') ? rest : { ...rest, CLAUDE_CONFIG_DIR: dir };
+}
+
+/** BrainDog's server as another app runs it: this command, with that app's name after `--agent`. No env, so no token. */
+export const serverFor = (agent: string): Record<string, unknown> => ({ type: 'stdio', command: BRAINDOG_SERVER.command, args: [BRAINDOG_SERVER.args[0], 'mcp', '--agent', agent] });
+
+/** Whether an entry runs the same server as `want`: the type may be left out of a stdio one, and an empty `env` is no change. */
+function sameServer(held: unknown, want: Record<string, unknown>): boolean {
+  if (!isObject(held)) return false;
+  const args = Array.isArray(held.args) ? held.args : [];
+  const wanted = Array.isArray(want.args) ? want.args : [];
+  return (held.type ?? 'stdio') === want.type && held.command === want.command && args.length === wanted.length && wanted.every((arg, i) => args[i] === arg);
+}
 
 /** Whether a login the next command would send is held for this host now: the hosts file's, unexpired, or `BRAINDOG_TOKEN`. */
 function loginHeld(key: string, env: Env, file: string): boolean {
@@ -110,25 +212,80 @@ function registration(file: string): 'same' | 'other' | 'none' {
   }
   const servers: Record<string, unknown> = isObject(config) && isObject(config.mcpServers) ? config.mcpServers : {};
   if (!Object.hasOwn(servers, 'braindog')) return 'none';
-  const held = servers.braindog;
-  const args = isObject(held) && Array.isArray(held.args) ? held.args : [];
   /* THE TYPE IS OPTIONAL IN CLAUDE CODE'S FILE, where a stdio entry may leave it out, and an empty `env` is what
      `claude mcp add` was measured writing beside the entry (`install.ts`, `handRun`), so neither makes a registration
      differ. */
-  const same =
-    isObject(held) &&
-    (held.type ?? 'stdio') === BRAINDOG_SERVER.type &&
-    held.command === BRAINDOG_SERVER.command &&
-    args.length === BRAINDOG_SERVER.args.length &&
-    BRAINDOG_SERVER.args.every((arg, i) => args[i] === arg);
-  return same ? 'same' : 'other';
+  return sameServer(servers.braindog, { ...BRAINDOG_SERVER, args: [...BRAINDOG_SERVER.args] }) ? 'same' : 'other';
 }
 
-/** `braindog setup <url> [--dry-run | --yes]`, and the exit code: the first failing step's, or 0. */
-export async function setup(args: string[], io: SetupIo): Promise<number> {
-  let parsed: { values: { 'dry-run'?: boolean | undefined; yes?: boolean | undefined }; positionals: string[] };
+/** An app's own person-wide entry of this name, as its reader reads it: the last place that writes at user scope wins. */
+function heldIn(client: Client, name: string, io: SetupIo): unknown {
+  let held: unknown;
+  for (const set of client.servers(io.home, null, io.cwd)) if (set.writes === 'user' && isObject(set.servers) && Object.hasOwn(set.servers, name)) held = set.servers[name];
+  return held;
+}
+
+/** One of the record's tools, read whole once, for the other apps' writes and the closing lines. */
+type ToolRow = { name: string; scope: 'global' | 'project'; fields: Record<string, unknown> };
+
+const TOOL_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+
+/** The record's tools of the kind every app runs, each read whole. A row that does not read is left out. */
+async function toolRows(conn: Connected): Promise<ToolRow[]> {
+  const reg = conn.context.registers.find((r) => r.id === 'tools');
+  if (!reg) return [];
+  const rows: ToolRow[] = [];
+  for (const row of [...reg.rows, ...reg.inherited]) {
+    if (row.kind !== undefined && row.kind !== 'mcp') continue;
+    const name = typeof row.name === 'string' ? row.name : '';
+    if (!TOOL_NAME.test(name)) continue;
+    const got = valueOf(await conn.client.get('tools', Number(row.spoken.slice(row.spoken.indexOf('#') + 1))));
+    if (isObject(got) && isObject(got.fields)) rows.push({ name, scope: row.scope === 'global' ? 'global' : 'project', fields: got.fields });
+  }
+  return rows;
+}
+
+/** Whether a tool is handed a key from the vault when it starts: a `needs` entry naming a credential. */
+const needsKey = (fields: Record<string, unknown>): boolean =>
+  Array.isArray(fields.needs) && fields.needs.some((n) => typeof n === 'string' && /=credentials#\d+$/u.test(n));
+
+/** Names as a sentence says them: `A`, `A and B`, `A, B and C`. */
+const listOf = (names: string[]): string => (names.length < 2 ? (names[0] ?? 'no app') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)!}`);
+
+/** The closing lines: what setup leaves, each with the exact command that does it. */
+function whatIsLeft(rows: ToolRow[], conn: Connected, key: string, io: SetupIo): string[] {
+  const lines: string[] = [];
+  const own = conn.top === null ? 0 : rows.filter((r) => r.scope === 'project').length;
+  if (own > 0) lines.push(`This repository has ${String(own)} ${own === 1 ? 'tool' : 'tools'} of its own. Write ${own === 1 ? 'it' : 'them'} with braindog tools write --scope project.`);
+  const keyed = rows.filter((r) => (r.scope === 'global' || conn.top !== null) && needsKey(r.fields)).length;
+  /* THE PROJECT HERE, or `*` for the keys of no project, as `login --vault` takes it; a grant held and unexpired is no line. */
+  const scope = conn.context.project?.spoken ?? '*';
+  let granted = false;
   try {
-    parsed = parseArgs({ args, allowPositionals: true, strict: true, options: { 'dry-run': { type: 'boolean' }, yes: { type: 'boolean' } } });
+    const grant = readHosts(hostsPath(io.env)).hosts[key]?.vault?.[scope];
+    granted = grant !== undefined && Date.parse(grant.expires) > Date.now();
+  } catch {
+    /* A hosts file that does not read holds no grant, and the line stays. */
+  }
+  if (keyed > 0 && !granted)
+    lines.push(
+      keyed === 1
+        ? `1 tool needs a key. Approve this machine for it with braindog login ${key} --vault ${scope}.`
+        : `${String(keyed)} tools need keys. Approve this machine for them with braindog login ${key} --vault ${scope}.`,
+    );
+  return lines;
+}
+
+/** `braindog setup <url> [--dry-run | --yes] [--only <app>] [--profile <folder>]`, and the exit code: the first failing step's, or 0. */
+export async function setup(args: string[], io: SetupIo): Promise<number> {
+  let parsed: { values: { 'dry-run'?: boolean | undefined; yes?: boolean | undefined; only?: string[] | undefined; profile?: string[] | undefined }; positionals: string[] };
+  try {
+    parsed = parseArgs({
+      args,
+      allowPositionals: true,
+      strict: true,
+      options: { 'dry-run': { type: 'boolean' }, yes: { type: 'boolean' }, only: { type: 'string', multiple: true }, profile: { type: 'string', multiple: true } },
+    });
   } catch {
     /* parseArgs quotes what it could not read, and that could be a token pasted in the wrong place. */
     io.say(USAGE);
@@ -146,7 +303,22 @@ export async function setup(args: string[], io: SetupIo): Promise<number> {
     io.say(e instanceof Error ? e.message : 'The BrainDog host is not an address.');
     return 1;
   }
+  /* THE APPS: each one `--only` names (a comma list or the flag again), else every one in the table. */
+  const table = CLIENTS;
+  const only = (parsed.values.only ?? []).flatMap((o) => o.split(',')).map((o) => o.trim()).filter((o) => o !== '');
+  const unknown = only.filter((id) => !table.some((c) => c.id === id));
+  if (unknown.length > 0) {
+    io.say(`braindog setup --only takes ${table.map((c) => c.id).join(', ')}, and not ${unknown.join(', ')}.`);
+    return 1;
+  }
+  const named = only.length > 0;
+  const apps = table.filter((c) => !named || only.includes(c.id));
+  const here = apps.filter((c) => c.found(io.home, io.env));
+  const claude = here.find((c) => c.id === 'claude');
+  const others = here.filter((c) => c.id !== 'claude');
   const dryRun = parsed.values['dry-run'] === true;
+  /* THE FILES COPIED ASIDE THIS RUN, shared by every write, so each file is copied once, before its first change. */
+  const copied = new Set<string>();
   const file = hostsPath(io.env);
   const detail = (lines: string[]) => {
     for (const line of lines) io.out(`   ${line}`);
@@ -198,10 +370,16 @@ export async function setup(args: string[], io: SetupIo): Promise<number> {
     io.out(`1. Sign-in: this machine is signed in to ${key}.`);
   }
 
-  /* ── 2. the hooks, as `install --apply` writes them into the user profile ── */
+  /* ── 2. the hooks, as `install --apply` writes them into every profile ── */
   if (stoppedBefore(2)) return 1;
-  const profiles = profilesOf([], io.env);
-  try {
+  const { list: profiles, gone, kept: keptBefore } = claude ? profilesFor(parsed.values.profile ?? [], io) : { list: [], gone: [], kept: [] };
+  /* WHY CLAUDE CODE IS LEFT, when it is: --only left it out, or it is not here. Its hooks and skills are its own. */
+  const noClaude = named && !only.includes('claude') ? '--only leaves Claude Code out' : 'Claude Code is not on this machine';
+  if (!claude) io.out(`2. Hooks: ${noClaude}, so no hooks were placed.`);
+  if (!claude && (parsed.values.profile ?? []).length > 0) io.out(`   --profile names a Claude Code profile, and ${noClaude}, so it was not used.`);
+  for (const dir of gone) io.out(`   The profile ${nameOf(dir, io.home)} was set up before and is no longer on this machine, so it is left out.`);
+  if (claude)
+    try {
     /*
      * PLANNED DRY FIRST, WHICH WRITES NOTHING, so a run with nothing to add is said as one and applies nothing. Each
      * entry it would add is its own `  + hooks.` line, and an older BrainDog entry it would rewrite its own `  ~ hooks.`
@@ -213,7 +391,7 @@ export async function setup(args: string[], io: SetupIo): Promise<number> {
      * already there. On a terminal the step asks; `--yes` is the answer given ahead; off a terminal with no `--yes` it
      * stops after the plan and says how to go on, because a yes nobody typed is not one.
      */
-    const planned = installProfiles(profiles, [], { apply: false, scripts: io.scripts }).lines;
+    const planned = installProfiles(profiles, [], { apply: false, scripts: io.scripts, home: io.home }).lines;
     const pending = planned.some((line) => line.startsWith('  + hooks.') || line.startsWith('  ~ hooks.') || line.startsWith(PLACES_SKILL));
     const rest = (lines: string[]) => lines.filter((line) => !line.startsWith('Nothing was changed.') && !line.includes(HOOKS_HELD));
     if (!pending) {
@@ -234,7 +412,7 @@ export async function setup(args: string[], io: SetupIo): Promise<number> {
         io.out(`   Nothing was written to Claude Code's settings, so setup stopped there. Run braindog setup ${key} again to be asked again.`);
         return 1;
       }
-      const applied = installProfiles(profiles, [], { apply: true, scripts: io.scripts }).lines;
+      const applied = installProfiles(profiles, [], { apply: true, scripts: io.scripts, home: io.home }).lines;
       changed = true;
       io.out("   Written: the BrainDog hooks and Agent Skill are in Claude Code's settings.");
       detail(rest(applied).filter((line) => !line.startsWith('  ') && !line.endsWith(':')));
@@ -246,38 +424,98 @@ export async function setup(args: string[], io: SetupIo): Promise<number> {
     return 1;
   }
 
-  /* ── 3. the MCP server, at user scope ────────────────────────────────── */
+  /* ── 3. the MCP server, in every profile and every other app ─────────── */
   if (stoppedBefore(3)) return 1;
-  const [profile] = profiles;
-  const now = profile === undefined ? 'none' : registration(serversFileOf(profile, io.home));
   const entry = JSON.stringify(BRAINDOG_SERVER);
-  if (now === 'same') io.out('3. MCP server: braindog is already registered at user scope, running this command.');
-  else if (dryRun)
-    io.out(`3. MCP server: braindog would be registered at user scope${now === 'other' ? ' in place of the braindog entry there, which runs something else' : ''}: ${entry}`);
-  else {
-    const claude = io.claude ?? runClaude;
+  const run = io.claude ?? runIn;
+  for (const c of apps.filter((app) => !here.includes(app))) io.out(`3. MCP server, ${c.title}: not on this machine, so setup leaves it.`);
+  for (const dir of profiles) {
+    const where = `Claude Code in ${nameOf(dir, io.home)}`;
+    const file = serversFileOf(dir, io.home);
+    const now = registration(file);
+    if (now === 'same') {
+      io.out(`3. MCP server, ${where}: braindog is already registered, running this command.`);
+      continue;
+    }
+    if (dryRun) {
+      io.out(
+        `3. MCP server, ${where}: braindog would be registered at user scope${now === 'other' ? ' in place of the braindog entry there, which runs something else' : ''}, with a copy of its servers file kept first: ${entry}`,
+      );
+      continue;
+    }
+    /*
+     * A COPY BEFORE `claude` CHANGES THE FILE (AGT-A07 build 3), since it writes the file itself and install's writer
+     * never sees it. Once per file a run, so a profile reached twice is copied once, before its first change.
+     */
+    let kept: string | null = null;
+    if (!copied.has(file)) {
+      try {
+        kept = keepCopy(file);
+      } catch {
+        io.out(`3. MCP server, ${where}: a copy of its servers file could not be kept first, so nothing was registered there and setup stopped.`);
+        return 1;
+      }
+      copied.add(file);
+    }
+    const env = profileEnv(dir, io);
+    const failed = (code: number, what: string) =>
+      io.out(
+        code === -1
+          ? `3. MCP server, ${where}: claude was not found, so setup stopped there. Install Claude Code, then run setup again.`
+          : `3. MCP server, ${where}: claude mcp ${what} (exit ${String(code)}), so setup stopped there.`,
+      );
     if (now === 'other') {
-      const removed = await claude(['mcp', 'remove', 'braindog', '--scope', 'user'], io.cwd);
+      const removed = await run(['mcp', 'remove', 'braindog', '--scope', 'user'], io.cwd, env);
       if (removed !== 0) {
-        io.out(
-          removed === -1
-            ? '3. MCP server: claude was not found, so setup stopped there. Install Claude Code, then run setup again.'
-            : `3. MCP server: claude mcp remove did not remove the braindog entry there (exit ${String(removed)}), so setup stopped there.`,
-        );
+        failed(removed, 'remove did not remove the braindog entry there');
         return 1;
       }
     }
-    const added = await claude(['mcp', 'add-json', 'braindog', entry, '--scope', 'user'], io.cwd);
+    const added = await run(['mcp', 'add-json', 'braindog', entry, '--scope', 'user'], io.cwd, env);
     if (added !== 0) {
-      io.out(
-        added === -1
-          ? '3. MCP server: claude was not found, so setup stopped there. Install Claude Code, then run setup again.'
-          : `3. MCP server: claude mcp add-json did not register braindog (exit ${String(added)}), so setup stopped there.`,
-      );
+      failed(added, 'add-json did not register braindog');
       return 1;
     }
     changed = true;
-    io.out(`3. MCP server: braindog ${now === 'other' ? 'replaced the entry there and is' : 'is'} registered at user scope, running this command.`);
+    io.out(`3. MCP server, ${where}: braindog ${now === 'other' ? 'replaced the entry there and is' : 'is'} registered, running this command.`);
+    if (kept !== null) detail([`The servers file as it was is kept at ${kept}.`]);
+  }
+  /* KEPT FOR THE NEXT RUN, every profile this one reached, once a run that writes has reached them all. */
+  if (!dryRun && claude && profiles.join('\n') !== keptBefore.join('\n')) {
+    try {
+      mkdirSync(join(io.home, '.braindog'), { recursive: true });
+      writeFileSync(profilesFile(io.home), `${JSON.stringify({ profiles }, null, 2)}\n`);
+    } catch {
+      io.say(`${profilesFile(io.home)} could not be written, so the next run reaches these profiles only when they are named again.`);
+    }
+  }
+  for (const c of others) {
+    /* THE APP'S OWN WORD FOR BRAINDOG'S ENTRY when its module gives one (`server`), else this command with its name. */
+    const own = (c as { server?: unknown }).server;
+    const want = isObject(own) ? own : serverFor(c.id);
+    const held = heldIn(c, 'braindog', io);
+    if (sameServer(held, want)) {
+      io.out(`3. MCP server, ${c.title}: braindog is already registered, running this command.`);
+      continue;
+    }
+    const plan = c.plan({ name: 'braindog', scope: 'user', entry: want, replace: held !== undefined, home: io.home, top: null, cwd: io.cwd });
+    if (dryRun) {
+      io.out(`3. MCP server, ${c.title}: braindog would be registered${held !== undefined ? ' in place of the braindog entry there, which runs something else' : ''}, with a copy of the file kept first:`);
+      detail(plan.lines);
+      continue;
+    }
+    /* ITS OWN PROGRAM IS NOT RUN BY SETUP: an app whose writer needs one says so, and the run stops on its line. */
+    const applied = await c.apply(plan, { run: async () => -1, copied });
+    if (!applied.written) {
+      io.out(`3. MCP server, ${c.title}: braindog was not registered, so setup stopped there.`);
+      detail(applied.lines);
+      return 1;
+    }
+    changed = true;
+    /* A FILE THIS RUN MADE OR COPIED NEEDS NO COPY AGAIN: a later write's copy would be of BrainDog's own text. */
+    if (plan.file !== null) copied.add(plan.file);
+    io.out(`3. MCP server, ${c.title}: braindog ${held !== undefined ? 'replaced the entry there and is' : 'is'} registered, running this command.`);
+    detail(applied.lines);
   }
 
   /* ── 4 and 5. what the record holds for every machine ────────────────── */
@@ -288,29 +526,58 @@ export async function setup(args: string[], io: SetupIo): Promise<number> {
     return 0;
   }
 
-  /* ONE CONNECTION PER STEP, so each has the whole of its own deadline (`connect`), and `top` is left out of both, so
-     neither reads or writes anything at project scope. */
+  /* ONE CONNECTION PER STEP, so each has the whole of its own deadline (`connect`), and `top` is left out of both
+     writes, so neither reads or writes anything at project scope. The repository it found is only counted, below. */
   if (stoppedBefore(4)) return 1;
   const tools = await connect(key, io);
   if (typeof tools === 'number') {
     io.out('4. Tools: the record could not be read, so setup stopped there.');
     return tools;
   }
+  let rows: ToolRow[] = [];
   if (!tools.context.registers.some((r) => r.id === 'tools')) io.out('4. Tools: this record has no tools register, so there is nothing to write.');
   else {
-    const lines = await writeTools({ client: tools.client, context: tools.context, top: null, cwd: io.cwd, home: io.home, scope: 'user', dryRun, cli: io.cli, claude: io.claude ?? runClaude });
-    /* ANY LINE IS COUNTED AS A CHANGE, because `writeTools` is silent when every entry is as the record has it. */
-    if (lines.length > 0) changed = true;
-    io.out(
-      lines.length === 0
-        ? '4. Tools: every tool the record applies everywhere is already in Claude Code as the record has it.'
-        : dryRun
-          ? '4. Tools: what would be written at user scope, from the tools the record applies everywhere:'
-          : '4. Tools: the tools the record applies everywhere, written at user scope:',
-    );
-    detail(lines.filter((line) => !line.startsWith('Nothing was changed.')));
+    /*
+     * EVERY APP THROUGH `writeTools`, which reads each through the table and writes only what differs, leaves an entry
+     * changed by hand, and leaves out a tool whose program is not here or names another system, one line each. Its
+     * own program is run for Claude Code alone: no other app's writer here needs one.
+     */
+    for (const c of here) {
+      const lines = await writeTools({
+        client: tools.client,
+        context: tools.context,
+        top: null,
+        cwd: io.cwd,
+        home: io.home,
+        scope: 'user',
+        dryRun,
+        cli: io.cli,
+        /* IN THE DEFAULT PROFILE, the one whose `~/.claude.json` Claude Code's reader reads, so what is written is what is read back. */
+        claude: c === claude ? (argv, cwd) => run(argv, cwd, profileEnv(join(io.home, '.claude'), io)) : async () => -1,
+        app: c.id,
+        env: io.env,
+        /* STEP 3'S SET, so a file it made or copied (Codex's config.toml) gets no copy of BrainDog's own text here. */
+        copied,
+      });
+      const shown = lines.filter((line) => !line.startsWith('Nothing was changed.'));
+      /* A LINE SAYING A TOOL WENT IN IS A CHANGE; one saying a tool was left out or left as it is, is not. */
+      const wrote = !dryRun && shown.some((line) => /^Tool \S+ (?:added|replaced)\b/u.test(line));
+      if (wrote) changed = true;
+      io.out(
+        shown.length === 0
+          ? `4. Tools, ${c.title}: every tool the record applies everywhere is already there as the record has it.`
+          : dryRun
+            ? `4. Tools, ${c.title}: what would be written at user scope, from the tools the record applies everywhere:`
+            : wrote
+              ? `4. Tools, ${c.title}: the tools the record applies everywhere, written at user scope:`
+              : `4. Tools, ${c.title}: nothing new was written, and this is why:`,
+      );
+      detail(shown);
+    }
+    rows = await toolRows(tools);
   }
 
+  /* SKILLS GO INTO EVERY PROFILE, one line each: each folder's files are their own entries in the skills lock. */
   if (stoppedBefore(5)) return 1;
   const skills = await connect(key, io);
   if (typeof skills === 'number') {
@@ -318,16 +585,21 @@ export async function setup(args: string[], io: SetupIo): Promise<number> {
     return skills;
   }
   if (!skills.context.registers.some((r) => r.id === 'skills')) io.out('5. Skills: this record has no skills register, so there is nothing to sync.');
-  else {
-    const configDir = io.env.CLAUDE_CONFIG_DIR || join(io.home, '.claude');
-    const lines = await syncSkills({ client: skills.client, context: skills.context, home: io.home, configDir, top: null, dryRun });
-    if (lines.length > 0) changed = true;
-    io.out(lines.length === 0 ? `5. Skills: ${configDir} already holds every skill as the record has it.` : `5. Skills: ${dryRun ? 'what would be synced into' : 'synced into'} ${configDir}:`);
-    detail(lines);
-  }
+  else if (profiles.length === 0) io.out(`5. Skills: ${noClaude}, so no skill was synced.`);
+  else
+    for (const dir of profiles) {
+      const where = nameOf(dir, io.home);
+      const lines = await syncSkills({ client: skills.client, context: skills.context, home: io.home, configDir: dir, top: null, dryRun });
+      if (lines.length > 0) changed = true;
+      io.out(lines.length === 0 ? `5. Skills, Claude Code in ${where}: it already holds every skill as the record has it.` : `5. Skills, Claude Code in ${where}: ${dryRun ? 'what would be synced' : 'synced'}:`);
+      detail(lines);
+    }
 
+  /* WHAT IS LEFT, IN THE WORDS TO TYPE, before the closing line, so the last thing read is whether anything changed. */
+  for (const line of whatIsLeft(rows, tools, key, io)) io.out(line);
   if (dryRun) io.out('That was a dry run, so nothing was signed in, written, registered or proposed.');
   else if (!changed) io.out(`Nothing changed: this machine was already set up from ${key}.`);
-  else io.out(`This machine is set up from ${key}. Every Claude Code session started from now on has it.`);
+  else io.out(`This machine is set up from ${key}. Every session started from now on in ${listOf(here.map((c) => c.title))} has it.`);
   return 0;
 }
+

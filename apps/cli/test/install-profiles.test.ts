@@ -189,7 +189,7 @@ test('--APPLY OVER HIS THREE PROFILES, through main.ts: every .claude.json ends 
   assert.equal(again.code, 0, again.stderr);
   for (const p of [studio, client, work]) {
     assert.ok(again.stdout.includes(`${p.claudeJson} registers no Tallybook MCP server. Nothing to change.`), again.stdout);
-    assert.deepEqual(readdirSync(p.dir).sort(), ['.claude.json', '.claude.json.bak', 'settings.json', 'settings.json.bak', 'skills']);
+    assert.deepEqual(readdirSync(p.dir).sort(), ['.claude.json', '.claude.json.pre-braindog', 'settings.json', 'settings.json.pre-braindog', 'skills']);
   }
 });
 
@@ -203,7 +203,7 @@ test('A PROFILE ALREADY HOLDING braindog is left byte for byte beside two that g
   const lines = installEvery([settled.dir, studio.dir, client.dir], [], { apply: true, replace: REPLACE, scripts, home });
   assert.ok(lines.includes(`${settled.claudeJson} registers no Tallybook MCP server. Nothing to change.`), lines.join('\n'));
   assert.equal(readFileSync(settled.claudeJson, 'utf8'), settled.before);
-  assert.ok(!existsSync(`${settled.claudeJson}.bak`));
+  assert.ok(!existsSync(`${settled.claudeJson}.pre-braindog`));
   assert.deepEqual(servers(studio.claudeJson), { braindog: BRAINDOG });
   assert.deepEqual(servers(client.claudeJson), { figma: FIGMA, braindog: BRAINDOG });
 });

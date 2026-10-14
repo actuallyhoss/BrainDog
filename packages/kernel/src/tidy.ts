@@ -27,6 +27,8 @@ import { EXPIRE_MS } from './handoff.ts';
 import { ABANDON_MS, unheardRuns } from './presence.ts';
 import { SWEPT_NOTE, SWEPT_STEP_NOTE } from './schedule.ts';
 import { SESSION } from './session.ts';
+/* `tidy-keys.ts` IMPORTS ONLY THIS FILE'S TYPES, so the finder it lends adds no load ring. */
+import { keysUnopened } from './tidy-keys.ts';
 
 const DAY_MS = 86_400_000;
 
@@ -238,7 +240,8 @@ const faultsOpen: Finder = {
   find: (sql) => ({ stale: openFaults(sql).length, did: 0, ask: null }),
 };
 
-for (const finder of [runsStopped, runsEmpty, stepsOld, questionsOld, questionsMoot, faultsOpen]) registerFinder(finder);
+/* AND THE SEALED KEYS NOBODY OPENS (AGT-D17), counted only: its own file says why it asks nothing. */
+for (const finder of [runsStopped, runsEmpty, stepsOld, questionsOld, questionsMoot, faultsOpen, keysUnopened]) registerFinder(finder);
 
 /** What a finder found, or `null` when it threw: one finder that cannot count never stops the others being counted. */
 function counted(finder: Finder, sql: Sql, nowMs: number): Found | null {

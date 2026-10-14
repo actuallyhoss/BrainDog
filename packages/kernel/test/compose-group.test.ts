@@ -108,9 +108,9 @@ test('AND SET NOTHING for twelve or fewer, one state, nine, or a list with no st
   none(block({ kind: 'cards', source: 'register.tasks', key: 'all', rows: [...rows(15, ['open']), ...Array.from({ length: 20 }, (_, i) => row(100 + i, { what: 'Bare' }))] }));
 });
 
-test('ONLY A PART THAT DRAWS GROUPS AND NAMES NONE OF ITS OWN: a table, a refused part and one not drawn are left', () => {
+test('ONLY A PART THAT DRAWS GROUPS AND NAMES NONE OF ITS OWN: lanes, a refused part and one not drawn are left', () => {
   const none = (b: BlockResult): void => assert.equal(composeLook(input(keyed(b))).group, undefined);
-  none(block({ kind: 'table', source: 'register.tasks', key: 'all', rows: rows(35, STAGES) }));
+  none(block({ kind: 'lanes', source: 'register.tasks', key: 'all', rows: rows(35, STAGES) }));
   none(cards(35, STAGES, { group: 'project' }));
   none(cards(35, STAGES, { refusals: [{ code: 'FIELD_UNKNOWN', fix: 'x' }] as never }));
   none(cards(35, STAGES, { drawn: false }));
@@ -142,9 +142,9 @@ test('applyLook SETS group ON A PART WHOSE KIND READS IT, and answers what it la
   assert.deepEqual(ruled.look.group, { all: 'stage' });
 });
 
-test('AND LEAVES UNTOUCHED a table, a part that names its own group, and a key the page does not have', () => {
+test('AND LEAVES UNTOUCHED lanes, a part that names its own group, and a key the page does not have', () => {
   const blocks = keyed(
-    block({ kind: 'table', source: 'register.tasks', key: 'table', rows: rows(20, STAGES) }),
+    block({ kind: 'lanes', source: 'register.tasks', key: 'table', rows: rows(20, STAGES) }),
     cards(20, STAGES, { key: 'own', group: 'project' }),
     cards(20, STAGES, { key: 'all' }),
   );

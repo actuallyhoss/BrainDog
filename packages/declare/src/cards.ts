@@ -1,13 +1,15 @@
 /**
- * A `cards` block's grouping: `group: <ref field>` puts its cards under the thing each one points at (a client's
- * projects under the client, a person's tasks under the person), and `fold: <n>` shows that many cards of a group
+ * A `cards` or a `table` block's grouping: `group: <field>` puts its rows under the thing each one points at (a client's
+ * projects under the client, a person's tasks under the person) or under the value of a choice or of the list's state,
+ * and `fold: <n>` (cards only) shows that many cards of a group
  * before the rest fold behind "n more", and is only said with a group. DIRECTION §37's "lists without boxes grouped
  * under quiet headings", said in the block grammar so the engine can compose it and a pack can declare it. The rules
  * are the kernel's `cardGroupFault`, asked here first so a pack is refused when it is written, not when it is installed.
  *
- * A GROUP IS A REF, BECAUSE A HEADING NAMES A THING. A text or enum field would group by a word nobody can open, and a
- * `list<ref>` would put one card under three headings, which reads as three cards. So the field is a single `ref` on the
- * list the block reads, and anything else is refused with the ref fields the list does have.
+ * A GROUP IS A LINK, A CHOICE OR THE STATE, BECAUSE A HEADING HAS A NAME: the thing pointed at, or the label of the
+ * value. A text field would be a heading a row long, and a `list<ref>` would put one card under three headings, which
+ * reads as three cards. So the field is a single `ref`, an `enum` or the list's state on the list the block reads, and
+ * anything else is refused with the fields the list has that could group.
  *
  * ASKED HERE OF THE LISTS THIS PACK DECLARES. A block reading a list another pack declares is held to that list where
  * the record knows it, at install; this check would have to guess, so it does not.
@@ -37,17 +39,18 @@ function fieldsOf(register: Body): Map<string, Body> {
 }
 
 /**
- * The first fault in a page's `cards` blocks' `group` and `fold`, or `null`. `page` is the declaration id the refusal
+ * The first fault in a page's `cards` and `table` blocks' `group` and `fold`, or `null`. `page` is the declaration id the refusal
  * names, and `registers` the lists this pack declares, by id.
  */
 export function cardsFault(page: string, body: unknown, registers: ReadonlyMap<string, unknown>): Result<never> | null {
   if (!isObject(body) || !Array.isArray(body.blocks)) return null;
   for (const [i, block] of body.blocks.entries()) {
-    if (!isObject(block) || block.kind !== 'cards') continue;
+    if (!isObject(block) || (block.kind !== 'cards' && block.kind !== 'table')) continue;
+    const cards = block.kind === 'cards';
     const at = `${page}.blocks[${i}]`;
     const said = typeof block.heading === 'string' && block.heading !== '' ? `${page}'s ${block.heading}` : at;
 
-    if (block.fold !== undefined) {
+    if (cards && block.fold !== undefined) {
       const n = block.fold;
       if (typeof n !== 'number' || !Number.isInteger(n) || n < 1 || n > CARDS_FOLD_MOST)
         return no<never>(
@@ -56,7 +59,7 @@ export function cardsFault(page: string, body: unknown, registers: ReadonlyMap<s
           { at: `${at}.fold` },
         );
       if (block.group === undefined)
-        return no<never>('DECLARATION_INVALID', `${said} folds its groups and draws none. Give it group: a link field of its list, or take fold off.`, { at: `${at}.fold` });
+        return no<never>('DECLARATION_INVALID', `${said} folds its groups and draws none. Give it group: a link, a choice or the state of its list, or take fold off.`, { at: `${at}.fold` });
     }
 
     if (block.group === undefined) continue;
@@ -74,17 +77,19 @@ export function cardsFault(page: string, body: unknown, registers: ReadonlyMap<s
     const register = registers.get(list);
     if (!isObject(register)) continue;
     const fields = fieldsOf(register);
-    const refs = [...fields.values()].filter((f) => f.type === 'ref').map((f) => f.id as string);
+    const state = typeof register.state === 'string' ? register.state : null;
+    const groups = (f: Body): boolean => f.type === 'ref' || f.type === 'enum' || f.id === state;
+    const may = [...fields.values()].filter(groups).map((f) => f.id as string);
     const named = fields.get(field);
     if (named === undefined)
-      return no<never>('FIELD_UNKNOWN', `${said} groups by ${field}, and ${list} has no field called ${field}.`, { at: `${at}.group`, allowed: refs });
-    if (named.type !== 'ref')
+      return no<never>('FIELD_UNKNOWN', `${said} groups by ${field}, and ${list} has no field called ${field}.`, { at: `${at}.group`, allowed: may });
+    if (!groups(named))
       return no<never>(
         'DECLARATION_INVALID',
-        refs.length === 0
-          ? `${said} groups by ${field}, which is not a link to one thing, and ${list} links to nothing it could group by. Take group off.`
-          : `${said} groups by ${field}, which is not a link to one thing. Cards group under the thing they point at: ${refs.join(', ')}.`,
-        { at: `${at}.group`, allowed: refs },
+        may.length === 0
+          ? `${said} groups by ${field}, which is not a link, a choice or the state, and ${list} has none it could group by. Take group off.`
+          : `${said} groups by ${field}, which is not a link, a choice or the state. ${cards ? 'Cards' : 'Rows'} group under the thing they point at or the value they hold: ${may.join(', ')}.`,
+        { at: `${at}.group`, allowed: may },
       );
   }
   return null;

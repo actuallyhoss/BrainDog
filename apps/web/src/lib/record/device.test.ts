@@ -121,7 +121,7 @@ test('the words on this screen carry no em dash and no schema word', () => {
     copy.approveTitle, copy.codeLabel, copy.codeGo, copy.codeEmpty, copy.codeOther, copy.codeWrong, copy.codeTries,
     copy.codeExpired, copy.signInAgainWhy, copy.signInAgain, copy.connectedTitle, copy.connectedNone,
     copy.connectedNoneWhy, copy.connectTitle, copy.doorKeyLabel, copy.doorKeyGo, copy.tokenOnce, copy.copyKey,
-    copy.doorAny, copy.doorSetup, copy.doorKey, copy.connectDone, copy.unnamedMachine, copy.unnamedKey,
+    copy.connectDone, copy.unnamedMachine, copy.unnamedKey,
   ];
   for (const w of words) {
     assert.doesNotMatch(w, /—/, w);
@@ -170,6 +170,24 @@ test('the lines to copy name the origin and carry no key', () => {
   assert.equal(lines.mcp, 'https://record.example/mcp');
   assert.equal(lines.claude, 'claude mcp add --transport http braindog https://record.example/mcp');
   for (const line of Object.values(lines)) assert.doesNotMatch(line, /token|bearer|bd_/i);
+});
+
+test('each app is handed its own line, the address in every one and never a key', () => {
+  const lines = connectLines('https://brain.dog', 'acme');
+  /* THE THREE LINES THERE WERE ARE UNCHANGED, for the screens that already read them. */
+  assert.equal(lines.mcp, 'https://brain.dog/mcp');
+  assert.equal(lines.claude, 'claude mcp add --transport http braindog https://brain.dog/mcp');
+  assert.equal(lines.setup, 'braindog setup https://brain.dog/app/acme');
+  /* CODEX TAKES AN HTTP SERVER BY ITS OWN COMMAND, and Cursor's server file takes an entry with the address. */
+  assert.equal(lines.codex, 'codex mcp add braindog --url https://brain.dog/mcp');
+  assert.deepEqual(JSON.parse(lines.cursor), { mcpServers: { braindog: { url: 'https://brain.dog/mcp' } } });
+  /* CLAUDE ON THE WEB AND ANY OTHER APP ARE GIVEN THE ADDRESS ALONE. */
+  assert.equal(lines.web, lines.mcp);
+  assert.equal(lines.other, lines.mcp);
+  for (const [app, line] of Object.entries(lines)) {
+    assert.match(line, /https:\/\/brain\.dog/u, app);
+    assert.doesNotMatch(line, /token|bearer|bd_/iu, app);
+  }
 });
 
 test('a token minted here is a ninety-day write token with a label the kernel accepts', () => {

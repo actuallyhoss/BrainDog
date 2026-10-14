@@ -103,18 +103,21 @@ test('EACH CARD SAYS ITS GROUP BY NAME AND HANDLE, in the order the list read th
   assert.equal(plain.fold, undefined);
 });
 
-test('A GROUP THAT IS NO LINK OF THE LIST IS SAID ON THE BLOCK, as the install says it', async () => {
+test('A GROUP THAT IS NO LINK, CHOICE OR STATE OF THE LIST IS SAID ON THE BLOCK, as the install says it', async () => {
   const k = await record();
   const said = (b: PageBlock) => readBlock(depsOver(k), b).refusals.map((r) => [r.code, r.at]);
-  assert.deepEqual(said({ ...CARDS, group: 'state' }), [['DECLARATION_INVALID', 'group']]);
+  /* A CHOICE GROUPS NOW (`pages-group-choice.test.ts`); a text does not. */
+  assert.deepEqual(said({ ...CARDS, group: 'state' }), []);
+  assert.deepEqual(said({ ...CARDS, group: 'what' }), [['DECLARATION_INVALID', 'group']]);
   assert.deepEqual(said({ ...CARDS, group: 'client' }), [['FIELD_UNKNOWN', 'group']]);
   assert.deepEqual(said({ ...CARDS, fold: 0 }), [['OUT_OF_BOUNDS', 'fold']]);
   assert.deepEqual(said({ kind: 'cards', source: 'register.tasks', columns: [{ field: 'what' }], fold: 2 }), [['DECLARATION_INVALID', 'fold']]);
   assert.deepEqual(said({ ...CARDS, source: 'actions' }), [['DECLARATION_INVALID', 'group']]);
-  /* AND A TABLE CARRYING group IS TOLD WHICH KIND READS IT, at read as at install (`KEY_KINDS`). */
-  const table = readBlock(depsOver(k), { kind: 'table', source: 'register.tasks', columns: [{ field: 'what' }], group: 'project' } as PageBlock);
-  assert.deepEqual(table.refusals.map((r) => [r.code, r.at]), [['DECLARATION_INVALID', 'group']]);
-  assert.match(table.refusals[0]!.fix, /Draw these rows as cards/u);
+  /* AND LANES CARRYING group ARE TOLD WHICH KINDS READ IT, at read as at install (`KEY_KINDS`): a table now does. */
+  const lanes = readBlock(depsOver(k), { kind: 'lanes', source: 'register.tasks', columns: [{ field: 'what' }], group: 'project' } as PageBlock);
+  const grouped = lanes.refusals.filter((r) => r.at === 'group');
+  assert.deepEqual(grouped.map((r) => r.code), ['DECLARATION_INVALID']);
+  assert.match(grouped[0]!.fix, /Draw these rows as cards or a table/u);
 });
 
 test('A READER WHO MAY NOT READ THE LIST THE GROUPS ARE NAMED FROM IS TOLD NO NAME, and the block names that list for the hold', async () => {

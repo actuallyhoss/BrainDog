@@ -1,5 +1,6 @@
 /**
- * A cards block's `group: <ref field>` and `fold: <n>`: the grouping is a ref on the list the block reads, and the fold
+ * A cards block's `group: <field>` and `fold: <n>`: the grouping is a ref, a choice or the state of the list the block
+ * reads (a table's too), and the fold
  * is a small whole number, 3 when it is left out (`src/cards.ts`).
  */
 
@@ -49,16 +50,22 @@ test('a group that is not a field of the list is refused, naming the ones it cou
   const no = await refusal({ group: 'owner' });
   assert.equal(no.code, 'FIELD_UNKNOWN');
   assert.equal(no.at, 'page.work.blocks[0].group');
-  assert.deepEqual(no.allowed, ['client']);
+  assert.deepEqual(no.allowed, ['client', 'stage']);
   assert.match(no.fix, /projects has no field called owner/);
 });
 
-test('a group that is not a single ref is refused: text, an enum and a list of refs alike', async () => {
-  for (const field of ['what', 'stage', 'helpers']) {
-    const no = await refusal({ group: field });
+test('a cards block or a table groups by a choice too', async () => {
+  assert.ok((await normalise(DOC({ group: 'stage' }))).ok);
+  assert.ok((await normalise(DOC({ kind: 'table', group: 'stage' }))).ok);
+  assert.ok((await normalise(DOC({ kind: 'table', group: 'client' }))).ok);
+});
+
+test('a group that is not a ref, a choice or the state is refused: text and a list of refs alike, on a table too', async () => {
+  for (const [field, kind] of [['what', 'cards'], ['helpers', 'cards'], ['what', 'table']] as const) {
+    const no = await refusal({ group: field, kind });
     assert.equal(no.code, 'DECLARATION_INVALID', field);
-    assert.deepEqual(no.allowed, ['client']);
-    assert.match(no.fix, /not a link to one thing/);
+    assert.deepEqual(no.allowed, ['client', 'stage']);
+    assert.match(no.fix, /not a link, a choice or the state/);
     assert.doesNotMatch(no.fix, /—/);
   }
 });
@@ -97,7 +104,7 @@ test('a list another pack declares is left to the record, which knows it', () =>
   assert.equal(cardsFault('page.x', page, new Map()), null);
 });
 
-test('only cards blocks are read', () => {
+test('only cards and table blocks are read', () => {
   const page = { blocks: [{ kind: 'section', fold: true }, { kind: 'table', source: 'register.projects' }] };
   assert.equal(cardsFault('page.x', page, new Map()), null);
 });

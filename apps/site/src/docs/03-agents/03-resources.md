@@ -18,7 +18,7 @@ braindog:context | The briefing for where the agent is: its session, its project
 braindog:sessions/live | Who else is working now, on what, and in which repository | Read fresh
 braindog:digest/today | What the digest would say if it went now. It sends nothing | A minute
 braindog:decisions | What has been proposed and not yet answered | A minute
-braindog:inbox | What arrived that nothing filed, newest first, with a count for each state | Read fresh
+braindog:inbox | Every state in one answer: how many in each, then each state newest first, what waits first; a busy inbox keeps ten a state and names each state's address | Read fresh
 braindog:inbox/patterns | What each pattern did with the last 14 days of messages: what it filed, what it skipped and why, what waits, and how many none of them read | Read fresh
 braindog:actions | Every scheduled action: what it calls, how often, whether it is paused and why, and this month so far | A minute
 braindog:automations | Every automation: what starts it, when it runs next, and how its runs went this month | A minute
@@ -55,7 +55,7 @@ braindog:metric/{id} | One figure, with its target and how it compares
 braindog:skill/{name} | The text of one skill, and when to reach for it
 braindog:declaration/{slug} | One page as declared, to change and propose back
 braindog:automation/{id} | One automation as declared, with its last ten runs, each step with its outcome
-braindog:inbox/{state} | The arrivals in one state
+braindog:inbox/{state} | The newest hundred in one state, or one arrival whole by its id
 ```
 
 The inbox states are `untriaged`, `review`, `skipped`, `matched`, `proposed`, `ignored` and `all`. `skipped` is where a skip rule that is too wide shows itself.

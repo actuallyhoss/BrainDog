@@ -24,7 +24,7 @@ import type { Leaf, Predicate, Schema } from '@braindog/where';
 import type { ActionRow } from './actions.ts';
 import type { Exception } from './exceptions.ts';
 import { ANSWER_KEYS, BLOCK_READS, FILTER_TYPES, blockKeyOf, feedSaysFault, keyedBlocks, kindsReading, wrongKindKey } from './block-keys.ts';
-import { applyLook, composeLook, lookOf, mergeLook, type LookBody } from './compose.ts';
+import { GROUPED_BY_FIELD, applyLook, composeLook, lookOf, mergeLook, type LookBody } from './compose.ts';
 import { HANDOFFS_OPEN, RECORD_ACTIVITY, builtInFigure, type OpenStep } from './built-in-figures.ts';
 import type { ActionBlocking } from './signs-actions.ts';
 import { KEEP, markDrawn, type Why } from './drawn.ts';
@@ -117,8 +117,9 @@ export type PageBlock = {
    */
   fold?: boolean | number | 'run';
   /**
-   * A `cards` block's: a link field of its list, which draws the cards in groups, one a row it points at, named by that
-   * row's title. Each answered row says its group (`PageRow.group`), in the order the rows were read. A `feed`'s: `day`,
+   * A `cards` or a `table` block's: a field of its list that draws its rows in groups. A link groups them by the row it
+   * points at, named by that row's title; a choice, or the list's state, by its value, named by the choice's label. Each
+   * answered row says its group (`PageRow.group`), in the order the rows were read. A `feed`'s: `day`,
    * and every row says the day it was written in the record's own zone (`FeedRow.day`).
    */
   group?: string;
@@ -316,7 +317,7 @@ export type BlockResult = PageBlock & {
    */
   walks?: (Runway & { past?: { at: string; value: number }[]; sells?: { label: string; value: number }[] })[];
   walkFx?: { home: string | null; missing: string[] };
-  /** On a block that inherits: how many of `rows`, at the end, apply everywhere rather than to the project. */
+  /** On a block that inherits: how many of rows, at the end, apply everywhere rather than to the project. Over runs_on, how many it kept that apply everywhere, counted before limit: cut them. */
   inherited?: number;
   /**
    * Where each row applies, aligned with `rows`: its project's title, or `null` for everywhere. On
@@ -805,6 +806,8 @@ export type PageDeps = {
    * nobody has. `runs_on` asks it with the grant's id and answers only who and when, never the grant.
    */
   keyOpened?: (grant: string) => { actor: string; ts: string } | null;
+  /** Every open of a key since an instant, newest first: the grant.read events on the grant a key's row points at, as the record's usedBy walks them. runs_on counts the runs among them and answers no grant. */
+  keyUses?: (grant: string, since: string) => readonly { actor: string; ts: string }[];
   /** The fields a list marks its rows by, its `identity:` (`{ mark, accent }`), or `null` when it declares none. */
   identityOf?: (register: string) => { mark?: string; accent?: string } | null;
   /**
@@ -1485,7 +1488,7 @@ function lookedAt(
   /* A LOOK SLASH WROTE WAS WRITTEN FROM THE WHOLE PAGE, so it is laid only for a reader shown the whole page. Laid for a
      member held from a block, its order, its lead and its basis said whether that block held something late: the rules
      answer her instead, from what she is shown. An owner's look is his arrangement and not a reading, so it stands. */
-  if (stored !== null && stored.by !== 'owner' && !shown?.held) return applyLook(blocks, stored);
+  if (stored !== null && stored.by !== 'owner' && !shown?.held) return laidGroups(deps, applyLook(blocks, stored));
   const composed = composeLook({
     page,
     blocks,
@@ -1496,7 +1499,31 @@ function lookedAt(
     stateOf: (list) => deps.schemaOf(list)?.state ?? null,
     ...(stored?.by === 'owner' && stored.pinned ? { pinned: stored.pinned } : {}),
   });
-  return applyLook(blocks, stored?.by === 'owner' ? mergeLook(stored, composed) : composed);
+  return laidGroups(deps, applyLook(blocks, stored?.by === 'owner' ? mergeLook(stored, composed) : composed));
+}
+
+/**
+ * THE GROUPS A LOOK LAID, SAID ON EVERY ROW as a block's own `group:` says them (`groupedRows`), so a look that groups
+ * fourteen cards by their state draws them under each state's name and not only says it would.
+ *
+ * A look names a block's `group` after the block was read (`applyLook`), so its rows are grouped here, by the same read
+ * of the list's field a block's own group takes. A block that grouped itself has said its rows already and is passed
+ * by. A FIELD THE READ CANNOT GROUP BY IS TAKEN OFF AND NOT REFUSED: a look is laid over a page and never stops it
+ * drawing, so the block is drawn as it was read. Grouped cards fold as a block's own grouped cards do.
+ */
+function laidGroups(deps: PageDeps, looked: { blocks: BlockResult[]; look: LookBody }): { blocks: BlockResult[]; look: LookBody } {
+  const blocks = looked.blocks.map((b): BlockResult => {
+    if (!GROUPED_BY_FIELD.has(b.kind) || typeof b.group !== 'string' || b.rows.length === 0 || b.rows.some((r) => r.group !== undefined)) return b;
+    const register = typeof b.source === 'string' && b.source.startsWith('register.') ? b.source.slice('register.'.length) : null;
+    const schema = register === null ? null : deps.schemaOf(register);
+    const g = register === null || schema === null ? null : rowGrouping(b, register, schema);
+    if (g === null || 'code' in g) {
+      const { group: _group, ...ungrouped } = b;
+      return ungrouped;
+    }
+    return { ...b, rows: groupedRows(deps, b.rows, g), ...(b.kind === 'cards' && b.fold === undefined ? { fold: CARD_FOLD } : {}) };
+  });
+  return { ...looked, blocks };
 }
 
 /**
@@ -1937,8 +1964,10 @@ export const ROW_TEXT_MOST = 280;
 export type PageRow = Entry & {
   clipped?: true;
   /**
-   * On a grouped `cards` block (`group:`): the row its link points at, by its handle (`projects#7`), and that row's
-   * title. `value` is `''` and `name` says "No project" for a card that points at nothing. ON THE ROW AND NOT BESIDE
+   * On a grouped `cards` or `table` block (`group:`, its own or its look's): by a link, the row it points at, by its
+   * handle (`projects#7`), and that row's title; by a choice or the state, the value it holds (`in_progress`) and the
+   * choice's label for it, else the value in plain words ("In progress"). `value` is `''` and `name` says "No project"
+   * for a row that points at or holds nothing. ON THE ROW AND NOT BESIDE
    * THE ROWS, so a block held from a reader, whose rows are taken off, keeps no name of the list she may not read.
    */
   group?: { value: string; name: string };
@@ -2117,13 +2146,15 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
      `readPage`. */
   const worded = panelFault(block.panel, null) ?? shortFault(block.short) ?? (block.kind === 'roadmap' ? roadmapFault(block) : null);
   if (worded) return { ...base, refusals: also(worded) };
-  /* CARDS ARE GROUPED BY A LINK FIELD OF THEIR LIST, so cards over anything but a list draw no groups, and say so rather
-     than drawing ungrouped under a `group:` the author wrote. The field itself is checked where the list is in hand. */
-  if (block.kind === 'cards' && block.group !== undefined && !(typeof block.source === 'string' && block.source.startsWith('register.')))
+  /* CARDS AND TABLES ARE GROUPED BY A FIELD OF THEIR LIST, so over anything but a list they draw no groups, and say so
+     rather than drawing ungrouped under a `group:` the author wrote. The field itself is checked where the list is in hand. */
+  if (GROUPED_BY_FIELD.has(block.kind) && block.group !== undefined && !(typeof block.source === 'string' && block.source.startsWith('register.'))) {
+    const what = block.kind === 'cards' ? 'cards' : 'rows';
     return {
       ...base,
-      refusals: also({ code: 'DECLARATION_INVALID', fix: `group: draws cards in groups by a link field of their list, and these cards are over no list. Give them source: register.<id>, or take group: off.`, at: 'group' }),
+      refusals: also({ code: 'DECLARATION_INVALID', fix: `group: draws ${what} in groups by a field of their list, and these ${what} are over no list. Give them source: register.<id>, or take group: off.`, at: 'group' }),
     };
+  }
 
   /* A SOURCE THAT SAYS `first` IS ANSWERED BEFORE ANY KIND READS THE BLOCK (`sources/index.ts` `Source.first`): the figures
      pinned to Home, which a `stat` names no cells for, and what falls due, which is one answer whatever draws it. Each
@@ -2237,8 +2268,8 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
     }
   }
 
-  /* A CARD'S GROUP IS A LINK FIELD OF THIS LIST, checked here where the list is in hand, as the install checks it. */
-  const grouping = block.kind === 'cards' ? cardGrouping(block, register, schema) : null;
+  /* A CARD'S OR A TABLE ROW'S GROUP IS A LINK, A CHOICE OR THE STATE OF THIS LIST, checked here where the list is in hand. */
+  const grouping = GROUPED_BY_FIELD.has(block.kind) ? rowGrouping(block, register, schema) : null;
   if (grouping && 'code' in grouping) return { ...base, refusals: also(grouping) };
 
   /* A HOLE STILL IN THE `where` IS A FIELD THE PAGE'S ROW HOLDS NOTHING IN, since only a template page is filled and
@@ -2459,7 +2490,7 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
   const read = short && !(drawn > 0) ? [] : listed.value.rows;
   const ranged = block.kind === 'progress' && block.range === true ? rangeFault(block, register, schema, read) : null;
   if (ranged) return { ...base, refusals: also(ranged) };
-  /* EACH GROUPED CARD SAYS ITS GROUP (`groupedRows`). */
+  /* EACH GROUPED CARD OR TABLE ROW SAYS ITS GROUP (`groupedRows`). */
   const grouped = grouping ? groupedRows(deps, read, grouping) : read;
   const rows = staleDays ? datedRows(grouped, staleDays.field, staleDays.days) : grouped;
   const marks = path ? rows.map((r) => r.fields[path.done] === true) : null;
@@ -2555,7 +2586,7 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
     ...nextsOf(deps, block, register, rows),
     ...trendsOf(deps, block, rows),
     ...(marks ? { done_now: marks, next: lead === undefined ? null : lead.at } : {}),
-    ...(grouping ? { fold: typeof block.fold === 'number' ? block.fold : CARD_FOLD } : {}),
+    ...(grouping && block.kind === 'cards' ? { fold: typeof block.fold === 'number' ? block.fold : CARD_FOLD } : {}),
     ...inShort,
   };
 }
@@ -2603,37 +2634,69 @@ function datedRows(rows: readonly PageRow[], field: string, days: StaleDays): Pa
 }
 
 /**
- * The link a `cards` block groups by, or why it cannot, or `null` when it groups by nothing. Said again at read for a
- * page installed before the install checked it (`declare.ts` `cardGroupFault`), in the same words.
+ * WHAT A BLOCK'S ROWS ARE GROUPED BY: a link, each group a row of the list it points at and named by that row's title,
+ * or a choice of the list (its state among them), each group one of its values and named by the choice's own label.
  */
-function cardGrouping(block: PageBlock, register: string, schema: Schema): { field: string; to: string; label: string } | Refusal | null {
+type Grouping = { field: string; label: string } & ({ to: string } | { labels: Readonly<Record<string, string>> });
+
+/** Whether a field may group a block's rows: a link to another list, a choice, or the list's state whatever it is. */
+const groupsBy = (spec: Schema['fields'][string], state: boolean): boolean =>
+  (spec.type === 'ref' && typeof spec.to === 'string' && spec.to !== '') || spec.type === 'enum' || state;
+
+/**
+ * The field a `cards` or a `table` block groups by, or why it cannot, or `null` when it groups by nothing. Said again at
+ * read for a page installed before the install checked it (`declare.ts` `cardGroupFault`). Only cards fold their groups.
+ *
+ * A LINK, A CHOICE OR THE STATE, because each group then has a name a person reads: the row pointed at, or the label of
+ * the value. A text, a number or a day would be a heading a row long, and the filters already pick one value of those.
+ */
+function rowGrouping(block: PageBlock, register: string, schema: Schema): Grouping | Refusal | null {
+  const cards = block.kind === 'cards';
   const fold = block.fold;
-  if (fold !== undefined && !(typeof fold === 'number' && Number.isInteger(fold) && fold >= 1 && fold <= CARD_FOLD_MOST))
+  if (cards && fold !== undefined && !(typeof fold === 'number' && Number.isInteger(fold) && fold >= 1 && fold <= CARD_FOLD_MOST))
     return { code: 'OUT_OF_BOUNDS', fix: `fold: is how many cards each group shows before the rest fold, from 1 to ${CARD_FOLD_MOST}.`, at: 'fold' };
   if (block.group === undefined)
-    return fold === undefined ? null : { code: 'DECLARATION_INVALID', fix: 'fold: folds the groups of cards, and these cards draw none. Give them group: a link field of their list, or take fold: off.', at: 'fold' };
-  const links = Object.entries(schema.fields).flatMap(([id, f]) => (f.type === 'ref' && typeof f.to === 'string' && f.to !== '' ? [id] : []));
+    return !cards || fold === undefined
+      ? null
+      : { code: 'DECLARATION_INVALID', fix: 'fold: folds the groups of cards, and these cards draw none. Give them group: a link, a choice or the state of their list, or take fold: off.', at: 'fold' };
+  const may = Object.entries(schema.fields).flatMap(([id, f]) => (groupsBy(f, id === schema.state) ? [id] : []));
+  const what = cards ? 'these cards' : 'these rows';
   const spec = typeof block.group === 'string' && Object.hasOwn(schema.fields, block.group) ? schema.fields[block.group] : undefined;
-  if (!spec) return { code: 'FIELD_UNKNOWN', fix: `${register} has no field called ${String(block.group)} to group these cards by.`, at: 'group', allowed: links };
-  if (spec.type !== 'ref' || typeof spec.to !== 'string' || spec.to === '')
-    return {
-      code: 'DECLARATION_INVALID',
-      fix: `Cards are grouped by a link to another list, so each group is a row with a name, and ${block.group} is ${spec.type}. ${links.length ? `Group by ${links.join(' or ')}.` : `${register} has no link field.`}`,
-      at: 'group',
-      allowed: links,
-    };
-  return { field: block.group as string, to: spec.to, label: wordsOf(spec.label ?? (block.group as string)) };
+  if (!spec) return { code: 'FIELD_UNKNOWN', fix: `${register} has no field called ${String(block.group)} to group ${what} by.`, at: 'group', allowed: may };
+  const field = block.group as string;
+  const label = wordsOf(spec.label ?? field);
+  if (spec.type === 'ref' && typeof spec.to === 'string' && spec.to !== '') return { field, label, to: spec.to };
+  if (groupsBy(spec, field === schema.state)) return { field, label, labels: spec.labels ?? {} };
+  return {
+    code: 'DECLARATION_INVALID',
+    fix: `${cards ? 'Cards' : 'Rows'} are grouped by a link to another list, a choice or the list's state, so each group has a name, and ${field} is ${spec.type}. ${may.length ? `Group by ${may.join(' or ')}.` : `${register} has none of those.`}`,
+    at: 'group',
+    allowed: may,
+  };
 }
 
 /**
- * EACH CARD WITH ITS GROUP: the row its link points at, by its handle and its title. A row no longer there is nothing,
- * and so is a link to a list the reader may not read, whose titles she is not told: the record holds the whole block
- * from her anyway, by the list `registersOf` names for it.
+ * EACH ROW WITH ITS GROUP. By a choice: the value it holds, named by the choice's label, else the value in plain words.
+ * By a link: the row it points at, by its handle and its title. A row no longer there is nothing, and so is a link to a
+ * list the reader may not read, whose titles she is not told: the record holds the whole block from her anyway, by the
+ * list `registersOf` names for it.
  *
- * THE CARDS STAY IN THE ORDER THEY WERE READ. A host draws a group where its first card stands and the cards in no group
+ * THE ROWS STAY IN THE ORDER THEY WERE READ. A host draws a group where its first row stands and the rows in no group
  * where the record put them, so a block ordered by the last day in touch still reads the most recent first.
  */
-function groupedRows(deps: PageDeps, rows: readonly Entry[], g: { field: string; to: string; label: string }): PageRow[] {
+function groupedRows(deps: PageDeps, rows: readonly Entry[], g: Grouping): PageRow[] {
+  /* "No project", and "No CRM deal" as its label says it: only a capital that starts a word is taken down. */
+  const said = /^[A-Z][^A-Z]/u.test(g.label) ? g.label[0]!.toLowerCase() + g.label.slice(1) : g.label;
+  const none = { value: '', name: `No ${said}` };
+  if ('labels' in g) {
+    const { labels } = g;
+    return rows.map((r): PageRow => {
+      const v = r.fields[g.field];
+      if (typeof v !== 'string' || v === '') return { ...r, group: none };
+      const named = Object.hasOwn(labels, v) ? labels[v]!.trim() : '';
+      return { ...r, group: { value: v, name: named !== '' ? named : wordsOf(v) } };
+    });
+  }
   if (deps.ctx.reads !== undefined && !deps.ctx.reads(g.to)) return [...rows];
   const first = (v: unknown): string | null =>
     Array.isArray(v) ? ((v.find((x) => typeof x === 'string' && x !== '') as string | undefined) ?? null) : typeof v === 'string' && v !== '' ? v : null;
@@ -2641,9 +2704,6 @@ function groupedRows(deps: PageDeps, rows: readonly Entry[], g: { field: string;
   const title = deps.titleOf(g.to);
   const listed = ids.length ? deps.list({ register: g.to, where: { field: 'id', in: ids }, limit: ids.length }) : null;
   const found = new Map(listed?.ok ? listed.value.rows.map((r) => [r.id, r] as const) : []);
-  /* "No project", and "No CRM deal" as its label says it: only a capital that starts a word is taken down. */
-  const said = /^[A-Z][^A-Z]/u.test(g.label) ? g.label[0]!.toLowerCase() + g.label.slice(1) : g.label;
-  const none = { value: '', name: `No ${said}` };
   return rows.map((r): PageRow => {
     const id = first(r.fields[g.field]);
     const to = id === null ? undefined : found.get(id);

@@ -169,7 +169,7 @@ const emit = (envelope: unknown): void => writeFileSync(1, `${JSON.stringify(env
 
 const usage = () =>
   [
-    'braindog setup <host> [--dry-run | --yes]',
+    'braindog setup <host> [--dry-run | --yes] [--only <app>] [--profile <folder>]',
     "  Set this machine up from one record, in order: sign in unless it already is, add the two hooks to Claude Code's settings, register the braindog MCP server, write the tools the record applies everywhere, and sync its skills. One line per step, and it stops at the first that fails.",
     'braindog login <host> [--vault <project|*>]',
     '  Sign this machine in. It prints six digits to approve in the app, and keeps the token in the hosts file.',
@@ -250,6 +250,8 @@ const usage = () =>
     '  Start a script paused by three refused runs in a row again. A browser session only, as run and cancel are.',
     'braindog export [--kek <id> | --redact-grants] [--sections <data,origin,governance>] [-o <file.brainl>] [--key <pubkey|url>] [--host <host>]',
     '  Take the record as a .brainl file and check it here. A backup carries the sealed bytes and names the key they are wrapped by; with --redact-grants it is a copy to share, and cannot put the keys back.',
+    'braindog export --mirror <folder> [--host <host>]',
+    '  Write the whole record into the folder as plain files a person can read and git can diff: one file for each thing a list holds. Only what changed is written, and it asks for no approval, so it can run every night.',
     'braindog export --shape [-o <file.shape.brainl>] [--host <host>]',
     "  Take a copy of the record's shape, with every word, number and date made up, to test on. The six digits are asked once, for a standing grant that takes shape copies and reads nothing else.",
     'braindog import <file.brainl> [--key <pubkey|url>] [--host <host>]',
@@ -494,7 +496,8 @@ async function brainfileCommand(which: 'export' | 'import' | 'token', args: stri
     answer: json?.answer,
     signal: stopping.signal,
   };
-  const code = which === 'export' ? await exportFile(args, io) : which === 'token' ? await tokenCommand(args, io) : await importFile(args, io);
+  /* `--mirror` IS LOADED ONLY WHEN ASKED (`mirror-read.ts`): plain files of the whole record, read by the machine's own sign-in, with no approval. */
+  const code = which === 'export' && args.some((a) => a === '--mirror' || a.startsWith('--mirror=')) ? await (await import('./mirror-read.ts')).exportMirror(args, io) : which === 'export' ? await exportFile(args, io) : which === 'token' ? await tokenCommand(args, io) : await importFile(args, io);
   if (json) emit(json.envelope(code));
   /* LEFT TO END ON ITS OWN, for the reason `hook` gives. */
   process.exitCode = code;
@@ -502,7 +505,7 @@ async function brainfileCommand(which: 'export' | 'import' | 'token', args: stri
 }
 
 /**
- * `braindog setup <host> [--dry-run]`, over the real terminal, and the exit code of the first step that failed.
+ * `braindog setup <host> [--dry-run | --yes] [--only <app>] [--profile <folder>]`, over the real terminal, and the exit code of the first step that failed.
  *
  * NOT ONE OF `agentCommand`'s, because its first step may run the device flow and wait for six digits, so it needs
  * the hosts file and Ctrl+C, as `login` does. NO `--json`: each step prints for the person at the terminal, and its

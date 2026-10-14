@@ -22,7 +22,8 @@
   THREE READS OF THEIR OWN STAND AROUND THE PAGE: the briefing over it, what matters today as the record wrote it;
   what went stale under it; and who the record matched as the board's last line. Each is asked for beside the page and
   never by its read, each is fetched with its own part when it is asked for, and each draws nothing for a record that
-  answers none (`homeReads`).
+  answers none (`homeReads`). Under them all, the board's last tile: what the record found wrong in its own pages and
+  notes (`TextFaults.svelte`), fetched the same way and drawn only when it found something.
 -->
 <script module lang="ts">
   /** What Today draws, top to bottom. */
@@ -433,9 +434,13 @@
   type BriefingPart = typeof import('./Briefing.svelte').default;
   type MatchedPart = typeof import('./Matched.svelte').default;
   type StalePart = typeof import('./Stale.svelte').default;
+  type FaultsPart = typeof import('./TextFaults.svelte').default;
+  type FaultsFound = import('./text-faults.ts').TextFaults;
   let brief = $state.raw<{ cards: readonly BriefingRow[]; foot: string | null; Part: BriefingPart } | null>(null);
   let matched = $state.raw<{ rows: readonly MatchedRow[]; Part: MatchedPart } | null>(null);
   let stale = $state.raw<{ rows: readonly StaleRow[]; Part: StalePart } | null>(null);
+  /* WHAT THE RECORD FOUND WRONG IN ITS OWN PAGES AND NOTES, kept only when there is something: nought draws nothing. */
+  let faults = $state.raw<{ found: FaultsFound; Part: FaultsPart } | null>(null);
   $effect(() => {
     if (data.refused) return;
     void moving.version;
@@ -456,6 +461,11 @@
       const out = await m.readStale(base);
       if (here) stale = { rows: out.value, Part: part.default };
     });
+    /* THE BOARD'S LAST TILE, so it is out of the screen's bracket: landing late, it moves nothing drawn over it. */
+    void Promise.all([import('./text-faults.ts'), import('./TextFaults.svelte')]).then(async ([m, part]) => {
+      const found = await m.loadTextFaults(base);
+      if (here) faults = found && found.count > 0 ? { found, Part: part.default } : null;
+    }, () => undefined);
     void Promise.allSettled([briefing, matches, stales]).then(() => closed(true, at));
     return () => {
       here = false;
@@ -635,6 +645,12 @@
         {#if steps.length > 0}<WantMore {steps} onhide={() => (prefs = readPref())} />{/if}
       {/if}
     {/each}
+    <!--
+      WHAT THE RECORD FOUND WRONG IN ITS OWN PAGES AND NOTES, after what went stale and who was matched: the board's last
+      tile, so the six a page shows before its fold are never pushed down by it. A tile and never a question, and
+      nothing at nought.
+    -->
+    {#if faults}<faults.Part found={faults.found} lists={data.lists} />{/if}
   {/if}
 </div>
 

@@ -6393,6 +6393,10 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
        reads it. `runs_on` answers who and when, never the grant. */
     keyOpened: (grant) =>
       sql.one<{ actor: string; ts: string }>("SELECT actor, ts FROM event WHERE target = ? AND kind = 'grant.read' ORDER BY rowid DESC LIMIT 1", `grant:${grant}`) ?? null,
+    /* EVERY OPEN OF A KEY SINCE AN INSTANT, newest first, as the record's `usedBy` walks them (5000, its `USED_BY_WALK`).
+       `runs_on` counts the runs among them and answers no grant. */
+    keyUses: (grant, since) =>
+      sql.all<{ actor: string; ts: string }>("SELECT actor, ts FROM event WHERE target = ? AND kind = 'grant.read' AND ts >= ? ORDER BY rowid DESC LIMIT 5000", `grant:${grant}`, since),
     /* THE FIELDS A LIST MARKS ITS ROWS BY, its `identity:`, which the chip beside a row's scope is drawn from (`scope_marks`). */
     identityOf: (register) => {
       const decl: Readonly<Record<string, unknown>> | undefined = registers.get(register);

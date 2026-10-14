@@ -83,7 +83,7 @@ test('an older BrainDog entry is rewritten where it stands, as one ~ line, with 
   );
 
   installAt(file, options(true));
-  assert.deepEqual(JSON.parse(readFileSync(`${file}.bak`, 'utf8')), before, 'no copy of the file as it was');
+  assert.deepEqual(JSON.parse(readFileSync(`${file}.pre-braindog`, 'utf8')), before, 'no copy of the file as it was');
   const now = read(file);
   assert.deepEqual(now.hooks.SessionStart, [{ matcher: 'startup', hooks: [other, hook('start')] }], 'not in place, or another hook lost');
   assert.deepEqual(now.hooks.SessionEnd, [{ hooks: [hook('end')] }]);

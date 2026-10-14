@@ -73,10 +73,10 @@ const found = (id: string, sql: Sql, nowMs = NOW) => {
 const n = (sql: NodeSql, query: string): number => Number(sql.one<{ n: number }>(query)?.n ?? 0);
 const openQuestions = (sql: NodeSql): number => n(sql, "SELECT COUNT(*) AS n FROM suggestion WHERE status = 'open'");
 
-test('the registry now holds six finders, the two new ones last, each with a name a person can read', () => {
+test('the registry now holds seven finders, keys-unopened last, each with a name a person can read', () => {
   assert.deepEqual(
     finders().map((f) => f.id),
-    ['runs-stopped', 'runs-empty', 'steps-old', 'questions-old', 'questions-moot', 'faults-open'],
+    ['runs-stopped', 'runs-empty', 'steps-old', 'questions-old', 'questions-moot', 'faults-open', 'keys-unopened'],
   );
   assert.equal(finderOf('questions-moot')?.name, 'Questions that no longer need you');
   assert.equal(finderOf('faults-open')?.name, 'Faults still open');

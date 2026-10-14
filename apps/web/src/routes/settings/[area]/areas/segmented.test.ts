@@ -35,7 +35,7 @@ const styles = (text: string): string => (/<style[^>]*>([\s\S]*?)<\/style>/u.exe
 
 test('the areas are read, and the ones known to hold a track are among them', () => {
   const holding = AREAS.filter((a) => SEGMENT.test(markup(a.text))).map((a) => a.name);
-  for (const name of ['Agents.svelte', 'Appearance.svelte', 'Look.svelte', 'MyTokens.svelte', 'People.svelte']) {
+  for (const name of ['Appearance.svelte', 'Look.svelte', 'MyTokens.svelte', 'People.svelte']) {
     assert.ok(holding.includes(name), `${name} no longer draws a segment; re-measure`);
   }
 });

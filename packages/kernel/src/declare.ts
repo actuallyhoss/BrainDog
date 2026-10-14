@@ -1422,37 +1422,43 @@ export const CARD_FOLD_MOST = 50;
 /**
  * Why a `cards` block's `group` or `fold` cannot be drawn, or `null`.
  *
- * A GROUP IS A LINK FIELD OF THE LIST THE CARDS ARE OVER, so each group is a row of the list it points at, named by that
- * row's title: tasks grouped by their project. A text or a choice would be a group with no page to open and no name of
- * its own, and the filters already pick one value of those. The list is checked when the record knows it, as a
- * filter's field is (`filtersFault`). `fold` is a count of cards from 1 to `CARD_FOLD_MOST`, and only folds a group.
+ * A GROUP IS A LINK, A CHOICE OR THE STATE OF THE LIST THE ROWS ARE OVER, so each group has a name a person reads: the
+ * row the link points at (tasks grouped by their project), or the label of the value. A text or a number would be a
+ * heading a row long, and the filters already pick one value of those. Said for `cards` and for a `table`, as the read
+ * says it again (`pages.ts` `rowGrouping`). The list is checked when the record knows it, as a filter's field is
+ * (`filtersFault`). `fold` is a count of cards from 1 to `CARD_FOLD_MOST`, and only folds a group of cards.
  */
 function cardGroupFault(id: string, at: string, block: Readonly<Record<string, unknown>>, installed?: Known): Refusal | null {
   const { group, fold, source } = block;
-  if (fold !== undefined && !isInt(fold, 1, CARD_FOLD_MOST))
+  const cards = block.kind !== 'table';
+  const what = cards ? 'cards' : 'rows';
+  if (cards && fold !== undefined && !isInt(fold, 1, CARD_FOLD_MOST))
     return bad('OUT_OF_BOUNDS', `${id}.${at}'s fold is ${JSON.stringify(fold)}; it is how many cards each group shows before the rest fold, from 1 to ${CARD_FOLD_MOST}.`, `${at}.fold`);
   if (group === undefined) {
-    if (fold !== undefined)
-      return bad('DECLARATION_INVALID', `${id}.${at} folds its groups and draws none. Give it group: a link field of its list, or take fold: off.`, `${at}.fold`);
+    if (cards && fold !== undefined)
+      return bad('DECLARATION_INVALID', `${id}.${at} folds its groups and draws none. Give it group: a link, a choice or the state of its list, or take fold: off.`, `${at}.fold`);
     return null;
   }
   if (typeof group !== 'string' || !/^[a-z][a-z0-9_]{0,63}$/u.test(group))
-    return bad('DECLARATION_INVALID', `${id}.${at}'s group is ${JSON.stringify(group)}; it names one link field of the list the cards are over.`, `${at}.group`);
+    return bad('DECLARATION_INVALID', `${id}.${at}'s group is ${JSON.stringify(group)}; it names one link, choice or the state of the list the ${what} are over.`, `${at}.group`);
   const list = typeof source === 'string' && source.startsWith('register.') ? source.slice('register.'.length) : null;
   if (list === null)
-    return bad('DECLARATION_INVALID', `${id}.${at} groups by ${group}, and only cards over a list are grouped: give it source: register.<id>.`, `${at}.group`);
+    return bad('DECLARATION_INVALID', `${id}.${at} groups by ${group}, and only ${what} over a list are grouped: give it source: register.<id>.`, `${at}.group`);
   const shape = installed?.get(`register.${list}`);
   if (shape === undefined || !Array.isArray(shape.fields)) return null;
+  const state = typeof shape.state === 'string' ? shape.state : null;
   const fields = (shape.fields as { id?: unknown; type?: unknown; retired?: unknown }[]).filter((f) => f?.retired !== true);
-  const links = fields.filter((f) => f?.type === 'ref' && typeof f.id === 'string').map((f) => f.id as string);
+  const may = fields
+    .filter((f) => typeof f.id === 'string' && (f.type === 'ref' || f.type === 'enum' || f.id === state))
+    .map((f) => f.id as string);
   const field = fields.find((f) => f?.id === group);
-  if (!field) return bad('FIELD_UNKNOWN', `${id}.${at} groups by ${group}, and ${list} has no field called ${group}.`, `${at}.group`, links);
-  if (field.type !== 'ref')
+  if (!field) return bad('FIELD_UNKNOWN', `${id}.${at} groups by ${group}, and ${list} has no field called ${group}.`, `${at}.group`, may);
+  if (field.type !== 'ref' && field.type !== 'enum' && field.id !== state)
     return bad(
       'DECLARATION_INVALID',
-      `${id}.${at} groups by ${group}, which is ${String(field.type)}. Cards are grouped by a link to another list, so each group is a row with a name: ${links.length ? `${links.join(', ')} on ${list}` : `${list} has none`}.`,
+      `${id}.${at} groups by ${group}, which is ${String(field.type)}. ${cards ? 'Cards' : 'Rows'} are grouped by a link to another list, a choice or the list's state, so each group has a name: ${may.length ? `${may.join(', ')} on ${list}` : `${list} has none`}.`,
       `${at}.group`,
-      links,
+      may,
     );
   return null;
 }
@@ -1842,7 +1848,7 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
     if (fed) return bad('DECLARATION_INVALID', fed.fix, `${at}.${fed.at}`, fed.allowed);
     if (kind !== 'cards' && kind !== 'feed' && block.fold !== undefined && typeof block.fold !== 'boolean')
       return bad('DECLARATION_INVALID', `${id}.${at}'s fold is true or false: whether the section starts shut.`, at);
-    const grouped = kind === 'cards' ? cardGroupFault(id, at, raw as Readonly<Record<string, unknown>>, installed) : null;
+    const grouped = kind === 'cards' || kind === 'table' ? cardGroupFault(id, at, raw as Readonly<Record<string, unknown>>, installed) : null;
     if (grouped) return grouped;
     if (block.icon !== undefined && (typeof block.icon !== 'string' || !GLYPH.test(block.icon)))
       return bad('DECLARATION_INVALID', `${id}.${at}'s icon is a glyph name: lower-case letters, digits and dashes.`, at);

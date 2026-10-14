@@ -69,7 +69,8 @@ of four codes (§4.4).
 | `init <slug>` | self-host only | spawns the self-host entry: `init <slug>` (§5.14) | the child's output | the child's |
 | `serve [<file>]` | self-host only | spawns the self-host entry: `serve [<file>]` (§5.14) | the child's output | the child's |
 | `dev` | self-host only; `--port <n>` (default 8080) | spawns the self-host entry: `dev` | the child's output | the child's |
-| `export` | `--sections data,origin,governance` · `--redact-grants` · `--with-attachments` · `--mirror` · `-o <file.brain>` · `--key <pubkey \| url>` | `POST /api/export` — one streamed body, under an operation grant (§5.2) · `GET /a/<sha256>` for attachments | the verify block of §5.6, then the paths written | 0 · 1 · 3 |
+| `export` | `--sections data,origin,governance` · `--redact-grants` · `--with-attachments` · `-o <file.brain>` · `--key <pubkey \| url>` | `POST /api/export` — one streamed body, under an operation grant (§5.2) · `GET /a/<sha256>` for attachments | the verify block of §5.6, then the paths written | 0 · 1 · 3 |
+| `export --mirror <folder>` | `--host <host>` | `boot`, then `schema` and `list` page by page for every list it names, under the machine's own sign-in and no approval (§5.9) | one line: the lists, how many they hold, the files changed since the folder was last written, and any list not read | 0 · 1 · 3 |
 | `import <file.brain \| file.brainl>` | `--key <pubkey \| url>` | offline verify, then `POST /api/import` — one streamed body (operation grant) | `imported <tables> tables, <rows> rows · event <id>` | 0 · 1 · 3 |
 | `verify <file>` | `--key <pubkey \| url>` (optional: unpinned without it) | nothing — offline; the URL form of `--key` is the one network call | the verify block | 0 · 1 |
 | `pack lint <dir \| file>` | — | nothing — offline, `@braindog/declare` | `ok <pack> <version> · <n> declarations · <checksum[0..16]>`, or one sentence per refusal | 0 · 1 |
@@ -291,7 +292,9 @@ apps/cli/
 ├── src/
 │   ├── main.ts           ~200 lines  parseArgs, the command table, dispatch, exit codes, --version, the four error classes
 │   ├── http.ts           ~220 lines  host resolution, hosts.json (0600, atomic), call() and stream(), the device flow, admin()
-│   ├── brain.ts          ~360 lines  the .brainl reader, the canonical projection, hashing, verify, materialise, toBrainl, mirror
+│   ├── brain.ts          ~360 lines  the .brainl reader, the canonical projection, hashing, verify, materialise, toBrainl
+│   ├── mirror.ts         ~270 lines  the mirror's files from lists and rows, and writing only what changed (§5.9)
+│   ├── mirror-read.ts    ~190 lines  export --mirror: boot, schema and list page by page under the machine's sign-in (§5.9)
 │   ├── pack.ts           ~180 lines  source resolution (path · url · git · Kennel), lint, plan, install (--with-deps), uninstall, the diff screen
 │   ├── runner.ts         enrol, repos, allow, the claim loop, the pin, the claude spawn, distil(); kinds linted by jobBody from @braindog/kernel
 │   └── print.ts          ~120 lines  the refusal sentence, conflict and unreachable lines, tables, the verify block; the --json envelope is json.ts's (§4.5)
@@ -461,7 +464,7 @@ would have printed, and a command whose answer has a real shape hands one over w
 branches on is the envelope: `ok`, the refusal codes and the exit code, and those are right for every command from
 the first day. Where §4.2 does name a reply type, that is what `value` holds; for the offline commands, `verify` →
 `Verified`; `pack lint` → `{ pack, version, declarations, checksum }`; `export` → `{ dogl, dog, verified: Verified,
-files?: { fetched: number; missing: string[] }, mirror?: { rows: number } }`.
+files?: { fetched: number; missing: string[] } }`; `export --mirror` → `{ lists, held, changed, unread }`.
 
 **Seven commands take no envelope, because they have no stdout of their own to put one on.** `mcp` is a transport
 and its stdout is the protocol. `keys exec` and its alias `run` hand stdout to a child process. `hook start` and
@@ -541,8 +544,7 @@ parses the `Result` that comes back.
 4. Rename to `${base}.brainl`; `verify()` it (§5.6). A refusal exits 1 and leaves the `.brainl` in place.
 5. `materialise(`${base}.brainl`, `${base}.brain`)` (§5.5).
 6. `--with-attachments`: `SELECT fields FROM entry WHERE deleted_at IS NULL`; every JSON object shaped `{ sha256: /^[0-9a-f]{64}$/, mime, bytes, name }` is a `file` value ([34-GRAMMARS](34-GRAMMARS.md) §3). `GET ${origin}/a/${sha256}`, four at a time, into `${base}.files/${sha256}` after the bytes hash to their name; a 404 goes to `missing`. The route is unauthenticated — the URL is the capability (12 §8).
-7. `--mirror`: `mirror(dog, `${base}.mirror/`)` (§5.9).
-8. Print the verify block, then `wrote <base>.brainl · <base>.brain[ · n files (m missing)][ · mirror n rows]`.
+7. Print the verify block, then `wrote <base>.brainl · <base>.brain[ · n files (m missing)]`. The mirror is its own command, `export --mirror <folder>` (§5.9), and takes no `.brain`.
 
 On a self-host the same route serves the same stream (33 §6); the CLI cannot tell which it spoke to.
 
@@ -668,14 +670,53 @@ With `--strict` an import that leaves any part unread writes nothing, so a map i
 that is wrong is refused before anything is read, in one sentence naming the field (`sections.items in map.json names
 the list it fills ("register").`). A map with no `sections` needs an adapter beside it, and says so.
 
-### 5.9 · `--mirror` (`mirror`)
+### 5.9 · `export --mirror <folder>` (`mirror-read.ts`, `mirror.ts`)
 
-1. Read active register declarations: `SELECT id, body FROM declaration WHERE kind = 'register' AND superseded_at IS NULL AND retired = 0`; `body.title` names the title field; `body.fields[]` give ids and types in declared order.
-2. `<dir>/README.md`: the record's name and slug, `dog_meta.created_at`, one line per register with its live row count.
-3. `<dir>/<register>/README.md`: `| # | title | state | updated |`, live rows by `seq`.
-4. `<dir>/<register>/<seq>.md`: `# <register>#<seq> · <title>`; a `| field | value |` table of the non-`document` fields in declared order; then `## <field>` and the verbatim text for each `document` field — the dialect is already markdown, so it is written, not rendered.
-5. Values: `money` → `<currency> <amount / 10^d>` with `d = new Intl.NumberFormat('en', { style: 'currency', currency }).resolvedOptions().maximumFractionDigits`; `list<T>` joined by `, `; `file` → `<name> (<bytes> B)`; `secret` → `grant <id>`; `ref` → the target's `<register>#<seq>` by one `SELECT register, seq FROM entry WHERE id = ?`; `bool` → `yes`/`no`; everything else verbatim; a missing value → `—`.
-6. Deleted rows are skipped; `local` tables are not in the file; `grant.ciphertext` is not a register and never reaches the mirror.
+The whole record as plain files a person can read and git can diff, so a changed row is one changed file and a
+nightly run in a git repository is a history of the record (AGT-A13). It is not a `.brain`: no operation grant, no
+stream, no signature. It reads what an agent reads.
+
+**How it reads.**
+
+1. Host and bearer as every command finds them (§4.1): the machine's own sign-in. No session headers, so the reads
+   name no run. No approval is asked, so a script can run it every night; it holds exactly what that sign-in may read.
+2. `boot`: the record's own index of lists, each by id and name. There is no list of lists in the code, so a list
+   added to the record is in the next mirror with nothing changed here.
+3. For each list, four at a time: `schema { register }` for its name, title field, `seq_prefix` and fields in
+   declared order; then `list { register, limit: 50, cursor }` page by page until the cursor is null, 2,000 pages at
+   most. Fifty because a read of a hundred has answered `INTERNAL` on the Cloud (RQ-AGT-243), as `keys list` reads.
+   Each read has its own budget (`BRAINDOG_TIMEOUT_MS`, 20 seconds), so a long record is read to the end.
+4. A list whose `schema` or `list` refuses, or whose pages do not end, is not read: it is named in the top README with
+   the record's sentence (`- Keys: not read. <fix>`), never left out in silence, and its folder is left as it was.
+   A refusal of `boot` itself is the command's refusal: exit 1, or 3 when the host does not answer.
+
+**What it writes** (`mirrorFiles(lists, rowsOf, day)`, a map from path to text):
+
+5. `README.md`: `Written on <day>.`, then one line per list in id order, `- [<name>](<id>/README.md): <count>`, or
+   the not-read line.
+6. `<list>/README.md`: the list's name, `<name> holds <count>.`, and its fields in declared order with the kind of
+   value each takes in words (`a link to People`, `money`, `a day`).
+7. `<list>/<seq>.md`, one per live row by number: `# <title>`, `<list name> <spoken number>`, then each non-document
+   field in declared order as `<label>: <value>`, then each `document` field as `## <label>` and its text byte for
+   byte. A list whose rows have no number (a series) is one `<list>/series.md`, its points in the order they were made.
+8. Values: `money` → `<currency> <amount / 10^d>` grouped in threes, `d` the currency's own decimals (`Intl`), never
+   converted and never added to another currency; `day` and `instant` as written; `ref` → the other row's list,
+   number and title, `People #1, Mara Lindqvist`; `list` joined by `, `; `bool` → `yes` / `no`; `enum` → its label;
+   `file` → `<name> (<bytes> bytes)`; `json` with its keys sorted; a missing value → `not set`. A label missing is
+   the field's id said as words.
+9. Deleted rows are skipped. A `secret` field says `sealed` and nothing of its grant; a field the declaration does
+   not name, or names as retired, is never written. Nothing of a grant, a sealed value or a token is in any file.
+10. Order and names are fixed, so two mirrors of an unchanged record are the same bytes.
+
+**How it writes** (`writeMirror(folder, files)`, answering how many files changed):
+
+11. Only a file whose text differs is written. A row file (`<seq>.md`, `series.md`) whose row is gone is removed,
+    inside a list read this run. Nothing else in the folder is touched: not `.git`, not a note of the person's own.
+    Every path is checked to resolve inside the folder.
+12. The top README is not rewritten for its day alone, so a night with nothing new changes no file at all.
+13. It prints one line: `Mirrored <n> lists, <m> in all. <k> files changed since the folder was last written.`,
+    then `Not read: <names>.` when any list was not read. No path and no host. Under `--json` the value is
+    `{ lists, held, changed, unread }`. Exit 0 · 1 · 3.
 
 ### 5.10 · `pack lint | plan | install | uninstall` (`pack.ts`)
 
@@ -1039,7 +1080,7 @@ test Ed25519 key held in `test/`. Golden files are compared as parsed JSON.
 | T20 | runner distil | `stream-json.ndjson` (nine line types) → the nine expected events, `seq` 1..n, `out.len` = the untruncated length |
 | T21 | runner loop | mock claim → job → a stub `claude` on PATH → events posted in order, `end` carries `claude_session`; `cancel: 1` on an ack → SIGTERM sent, `end { cancelled }`; stub exits 143 → `end { interrupted }`; kind `frob`, an arg with a space, or `Bash` in `mcp.tools` → `error`, `end { refused }`, `claude` never spawned; `--version` 2.1.200 → local error |
 | T22 | startup | 10 spawns of `dist/braindog.mjs --version` → p95 ≤ 120 ms |
-| T23 | `--mirror` | `seed.brain` → `README.md`, one directory per register, one file per live row, deleted rows absent, a `money` value rendered `EGP 1,299.00`-style |
+| T23 | `export --mirror` | the seed record over `boot`, `schema` and `list` → `README.md`, a folder per list, a file per live row, a deleted row absent, money in JPY and KWD in their own decimals, a document byte for byte, a second run changing no file, a list added later appearing, a list not read named, no grant id in any file (`apps/cli/test/mirror.test.ts`) |
 | T24 | attachments | two `file` values, one served, one 404 → one file written under its hash, `missing: [sha]` |
 
 Twenty-four, counted. CI rows ([33-CONTRACTS](33-CONTRACTS.md) §8): `ci.yml` runs T1–T16, T18–T24 on every
@@ -1196,7 +1237,7 @@ and `dev [--port]` as subcommands of its entry. *Amend:* 33 §5 (the two rows sa
 `%APPDATA%\braindog\hosts.json` on Windows unless `XDG_CONFIG_HOME` is set. Shape §4.1: `default` plus a map
 whose keys are `origin/slug` and whose values hold `token` and `runner` separately. *Amend:* 33 §5.
 
-**D7 · `--mirror` layout.** `<base>.mirror/README.md`, `<register>/README.md`, `<register>/<seq>.md`; §5.9's
+**D7 · `--mirror` layout.** `<folder>/README.md`, `<list>/README.md`, `<list>/<seq>.md`; §5.9's
 value rendering; verbatim `document` fields; live rows only; no `braindog-render`. *Amend:* 33 §5, 32 §2.
 
 **D8 · The runner, v1.** Long-poll only — 33 §11's fallback one, the socket a §10 ceiling. The protocol is

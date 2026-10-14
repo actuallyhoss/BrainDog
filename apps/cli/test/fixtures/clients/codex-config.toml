@@ -1,0 +1,33 @@
+# A Codex config.toml as its documents describe it, every value invented.
+model = "gpt-5-codex"
+approval_policy = "on-request"
+
+[profiles.quiet]
+model_reasoning_effort = "low"
+
+# The servers this person added by hand.
+[mcp_servers.context7]
+command = "npx"
+args = ["-y", "@upstash/context7-mcp"]
+env_vars = ["LOCAL_TOKEN"]
+
+[mcp_servers.context7.env]
+MY_ENV_VAR = "MY_ENV_VALUE"
+CONTEXT7_API_KEY = "ctx7-invented-value-not-a-key"
+
+[mcp_servers.figma]
+url = "https://mcp.figma.example/mcp"
+bearer_token_env_var = "FIGMA_OAUTH_TOKEN"
+http_headers = { "X-Figma-Region" = "us-east-1" }
+
+[mcp_servers."docs.search"]
+command = 'uvx'
+args = [
+  "docs-search-mcp",   # the package
+  "--port", "0",
+]
+startup_timeout_sec = 20
+enabled = false
+
+[projects."/Users/someone/work"]
+trust_level = "trusted"

@@ -59,7 +59,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, constants, copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -293,12 +293,33 @@ export function hookCommand(which: Which, scripts: string, platform: string = pr
 
 const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
 
-/* The first free name beside the file, so an earlier copy is never overwritten. */
-const backupOf = (file: string): string => {
+/** The suffix of the first copy BrainDog keeps of a file it changes, his word for it (AGT-A07: "`*.pre-braindog` backups"). */
+export const FIRST_COPY = '.pre-braindog';
+
+/**
+ * The first free name beside the file, so an earlier copy is never overwritten. THE FIRST COPY IS `<file>.pre-braindog`,
+ * the file as it was before BrainDog touched it, and later ones keep the names they always had, `.bak`, `.bak1` and on,
+ * so the one he looks for is never the one a later run takes.
+ */
+export const backupOf = (file: string): string => {
+  if (!existsSync(`${file}${FIRST_COPY}`)) return `${file}${FIRST_COPY}`;
   let n = 0;
   while (existsSync(n === 0 ? `${file}.bak` : `${file}.bak${String(n)}`)) n++;
   return n === 0 ? `${file}.bak` : `${file}.bak${String(n)}`;
 };
+
+/**
+ * A copy of `file` under `backupOf`'s name, and that name, or null when there is no file to copy. FOR A FILE ANOTHER
+ * PROGRAM WRITES, such as the servers file `claude mcp add-json` changes, which `commit` never sees. EXCLUSIVE, so a
+ * name taken between the look and the copy fails rather than writing over an earlier copy.
+ */
+export function keepCopy(file: string): string | null {
+  if (!existsSync(file)) return null;
+  const kept = backupOf(file);
+  copyFileSync(file, kept, constants.COPYFILE_EXCL);
+  chmodSync(kept, statSync(file).mode & 0o777);
+  return kept;
+}
 
 type Options = { apply: boolean; scripts: string; platform?: string; replace?: Replace | undefined; home?: string; checkout?: string };
 

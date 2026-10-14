@@ -57,7 +57,8 @@ function slice(area: string): string {
 /** One control per owner's area that a colleague was offered and cannot use. */
 const OFFERED: Record<string, string[]> = {
   people: ['id="invite-email"', 'id="erase-person"'],
-  agents: ['id="user-code"', 'id="agent-label"'],
+  /* THE KEY FORM (id="agent-label") IS THE CONNECT SHEET'S NOW, so the guard is that the sheet is drawn in the arm. */
+  agents: ['id="user-code"', '<ConnectSheet'],
   ingest: ['mailWords.mint'],
   backups: ['copy.snapshotNow'],
   billing: ['href="/settings/export"'],

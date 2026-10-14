@@ -25,6 +25,10 @@ import type { Also, Source } from './index.ts';
  * `quiet` IS THE EVALUATOR'S AND NOT AN AUTHOR'S: it holds a word on every row that applies everywhere and nothing on
  * the project's own, so a host fills the card's `quiet` role from it and draws the global rows faint, as it draws a run
  * gone quiet on `sessions.live`. A declaration does not name that role (`declare.ts` `CARD_ROLES`).
+ *
+ * `used_runs` AND `used_agents` SAY WHO USED IT, AND HOW OFTEN, over ninety days (AGT-D12): how many runs, and the agents
+ * of those runs by name, newest first and three at most, "Claude Code, Codex". `used_agent` stays beside them, the one
+ * agent of the run that used it last, for the pages that name it. A thing nobody used has 0 and nothing.
  */
 const RUNS_ON: Schema = {
   register: 'runs_on',
@@ -37,6 +41,8 @@ const RUNS_ON: Schema = {
     used_by: { type: 'text' },
     used_agent: { type: 'text' },
     used_at: { type: 'instant' },
+    used_runs: { type: 'int' },
+    used_agents: { type: 'text' },
     spoken: { type: 'text' },
     quiet: { type: 'text' },
   },
@@ -62,6 +68,27 @@ export const RUNS_ON_LISTS = [
  * The scheduled actions are the record's whole schedule, which its declarations bound.
  */
 const RUNS_ON_EACH = 50;
+
+/** How far back a use counts toward a row's `used_runs` and `used_agents`: ninety days, as his scope says it. */
+const USED_DAYS = 90;
+
+/** The most agents `used_agents` names, the ones whose runs used the thing last. */
+const USED_AGENTS_MOST = 3;
+
+/**
+ * One thing's use: the run that used it last, when anybody last did, and every run that used it since the window opened,
+ * by its handle, the newest use first and each run once. A person's use or an agent's with no run is in `at` and in no
+ * run, as `used_by` has it.
+ */
+type Use = { by: string | null; at: string | null; runs: readonly string[] };
+const NOT_USED: Use = { by: null, at: null, runs: [] };
+
+/** The distinct runs among uses read newest first, each once, in the order they last used it. */
+const runsAmong = (uses: readonly { actor: string; ts: string }[], since: string, SESSION_PREFIX: string): string[] => {
+  const runs: string[] = [];
+  for (const u of uses) if (u.ts >= since && isRun(u.actor, SESSION_PREFIX) && !runs.includes(u.actor)) runs.push(u.actor);
+  return runs;
+};
 
 /**
  * Whether an actor is a run's name as an event is signed with it, `S47`: the only actor `used_by` answers, because a
@@ -131,6 +158,18 @@ function runsOnBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: 
     }
     return agents.get(run)!;
   };
+  /* THE AGENTS OF THE RUNS, newest first, each named once and three at most: "Claude Code, Codex". A run whose agent is
+     not read is counted in `used_runs` and names nobody here, so the line is never a handle. */
+  const agentsNamed = (runs: readonly string[]): string | null => {
+    const names: string[] = [];
+    for (const run of runs) {
+      const agent = agentNamed(run);
+      if (agent !== null && !names.includes(agent)) names.push(agent);
+      if (names.length === USED_AGENTS_MOST) break;
+    }
+    return names.length ? names.join(', ') : null;
+  };
+  const since = new Date(deps.ctx.nowMs - USED_DAYS * 86_400_000).toISOString();
   const own: Entry[] = [];
   const everywhere: Entry[] = [];
   for (const list of RUNS_ON_LISTS) {
@@ -141,7 +180,8 @@ function runsOnBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: 
     const title = deps.titleOf(list.register) ?? '';
     const secret = Object.keys(schema.fields).find((f) => schema.fields[f]?.type === 'secret');
     const shaped = (r: Entry, scope: 'project' | 'global'): Entry => {
-      const used = list.kind === 'key' ? keyUse(deps, r, secret, SESSION_PREFIX) : list.kind === 'tool' ? toolUse(deps, list.register, r, SESSION_PREFIX) : { by: null, at: null };
+      const used: Use =
+        list.kind === 'key' ? keyUse(deps, r, secret, SESSION_PREFIX, since) : list.kind === 'tool' ? toolUse(deps, list.register, r, SESSION_PREFIX, since) : NOT_USED;
       return {
         ...r,
         fields: {
@@ -153,6 +193,8 @@ function runsOnBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: 
           used_by: used.by,
           used_agent: agentNamed(used.by),
           used_at: used.at,
+          used_runs: used.runs.length,
+          used_agents: agentsNamed(used.runs),
           spoken: r.seq === null ? r.id : `${list.register}#${r.seq}`,
           quiet: scope === 'global' ? 'global' : null,
         },
@@ -170,7 +212,7 @@ function runsOnBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: 
     if (scope === null) continue;
     acts[scope].push({
       ...actionEntry(a),
-      fields: { kind: 'action', name: a.ingest, scope, state: a.state, detail: a.next, used_by: null, used_agent: null, used_at: null, spoken: a.ingest, quiet: scope === 'global' ? 'global' : null },
+      fields: { kind: 'action', name: a.ingest, scope, state: a.state, detail: a.next, used_by: null, used_agent: null, used_at: null, used_runs: 0, used_agents: null, spoken: a.ingest, quiet: scope === 'global' ? 'global' : null },
     });
   }
   const all = [...own, ...acts.project.sort(byName), ...everywhere, ...acts.global.sort(byName)];
@@ -179,6 +221,9 @@ function runsOnBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: 
   const kept = all.filter((r) => evaluate(said.predicate, r.fields, RUNS_ON, r));
   const limit = block.limit === undefined ? 50 : Math.max(0, Math.floor(block.limit));
   const rows = kept.slice(0, limit);
+  /* HOW MANY THAT APPLY EVERYWHERE THE BLOCK'S SENTENCE KEPT, COUNTED BEFORE THE CUT, so a block that shows five of them
+     can say how many more there are. They come last, so the rows that apply everywhere among `rows` are a tail of it. */
+  const inherited = kept.filter((r) => r.fields.scope === 'global').length;
   /* EACH ROW'S CHIP IS THE PROJECT'S OR NONE, as `scopesOf` answers a block over one of these lists. */
   const name = scalar(home.fields[deps.titleOf(projects) ?? '']) ?? spoken;
   const mark = markOf(home, deps.identityOf?.(projects) ?? null);
@@ -186,6 +231,7 @@ function runsOnBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: 
     ...base,
     rows,
     matched: kept.length,
+    inherited,
     types: typesOf(RUNS_ON),
     scopes: rows.map((r) => (r.fields.scope === 'project' ? name : null)),
     scope_marks: rows.map((r) => (r.fields.scope === 'project' ? mark : null)),
@@ -195,29 +241,38 @@ function runsOnBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: 
 /**
  * Who opened a key last, when that was a run, and when it was last opened by anybody; `null` in both when nobody has.
  * The grant's id is the value of the key row's secret field, and it is asked about and never answered.
+ *
+ * THE RUNS THAT OPENED IT IN THE WINDOW come from every open the host hands (`keyUses`), or from the last one alone.
  */
-function keyUse(deps: PageDeps, row: Entry, secret: string | undefined, SESSION_PREFIX: string): { by: string | null; at: string | null } {
+function keyUse(deps: PageDeps, row: Entry, secret: string | undefined, SESSION_PREFIX: string, since: string): Use {
   const grant = secret === undefined ? undefined : row.fields[secret];
-  const last = typeof grant === 'string' && grant !== '' ? (deps.keyOpened?.(grant) ?? null) : null;
-  return last ? { by: isRun(last.actor, SESSION_PREFIX) ? last.actor : null, at: last.ts } : { by: null, at: null };
+  if (typeof grant !== 'string' || grant === '') return NOT_USED;
+  const last = deps.keyOpened?.(grant) ?? null;
+  if (!last) return NOT_USED;
+  const runs = runsAmong(deps.keyUses ? deps.keyUses(grant, since) : [last], since, SESSION_PREFIX);
+  return { by: isRun(last.actor, SESSION_PREFIX) ? last.actor : null, at: last.ts, runs };
 }
 
 /**
- * When a tool was last seen, as its own `seen` says, and the run that wrote that, from the row's history.
+ * When a tool was last seen, as its own `seen` says, the run that wrote that, from the row's history, and every run that
+ * wrote it in the window, the newest first.
  *
- * THE HISTORY IS READ ONLY FOR A TOOL SEEN AT ALL, so a tool nobody has used costs no read.
+ * THE HISTORY IS READ ONLY FOR A TOOL SEEN AT ALL, so a tool nobody has used costs no read. A WRITE OF `seen` IS A USE,
+ * as `usedBy` counts one (`SEEN_WRITTEN` in the record's `methods/agents.ts`): an edit of the field, or a create that
+ * arrived holding it.
  */
-function toolUse(deps: PageDeps, register: string, row: Entry, SESSION_PREFIX: string): { by: string | null; at: string | null } {
+function toolUse(deps: PageDeps, register: string, row: Entry, SESSION_PREFIX: string, since: string): Use {
   const seen = row.fields.seen;
   const at = typeof seen === 'string' && seen !== '' ? seen : null;
-  if (at === null || row.seq === null || !deps.history) return { by: null, at };
+  if (at === null || row.seq === null || !deps.history) return { ...NOT_USED, at };
   const events = deps.history(register, `${register}#${row.seq}`);
   const wrote = events.ok
     ? events.value
         .filter((e) => e.field === 'seen' || (e.field === null && e.to !== null && typeof e.to === 'object' && !Array.isArray(e.to) && Object.hasOwn(e.to, 'seen')))
-        .at(-1)
-    : undefined;
-  return { by: wrote && isRun(wrote.actor, SESSION_PREFIX) ? wrote.actor : null, at };
+        .reverse()
+    : [];
+  const last = wrote[0];
+  return { by: last && isRun(last.actor, SESSION_PREFIX) ? last.actor : null, at, runs: runsAmong(wrote, since, SESSION_PREFIX) };
 }
 
 /* NOT `whole`, THOUGH A BLOCK OVER IT IS NAMED `*`: `registersOf` adds that name itself, after the lists this reads. */

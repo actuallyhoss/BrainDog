@@ -1167,3 +1167,171 @@ export function understoodBrief(value: Record<string, unknown>, look: Look): str
   out.push(`Nothing was changed.${rest}`);
   return out.join('\n');
 }
+
+/* ── The inbox at the agent door (AGT-B13 job 4) ──────────────────────────────────────────────────────────────────── */
+
+/**
+ * The six states in the order the door says them: what waits on a person first, then what was settled. `proposed` waits
+ * too, on the question it was put to the person as, so it comes before the three nothing waits on.
+ */
+export const INBOX_ORDER = ['untriaged', 'review', 'proposed', 'skipped', 'matched', 'ignored'] as const;
+
+/** Each state in the Inbox screen's own words for it, so an agent passes on what the person reads there. */
+const INBOX_WORDS: Readonly<Record<string, string>> = {
+  untriaged: 'waiting',
+  review: 'to review',
+  proposed: 'asked on Decide',
+  skipped: 'skipped',
+  matched: 'filed',
+  ignored: 'archived',
+};
+
+/** How many of each state a digest keeps when the whole would pass the answer's limit, and the most a state's read holds. */
+export const INBOX_FOLDED = 10;
+const INBOX_STATE_MOST = 100;
+/** The body characters a line carries (the record's `INBOX_DIGEST_BODY`), and what a sender and a subject are held to. */
+const INBOX_BODY = 180;
+const INBOX_FROM = 60;
+const INBOX_SUBJECT = 120;
+/** What a line ends its words with when the body went on past them. */
+const CUT_MARK = '... (cut)';
+
+const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
+const textOf = (v: unknown): string => (typeof v === 'string' ? v : '');
+
+/** The day an arrival came, `7 Oct`, and its year only when that is not this one. */
+function arrivalDay(ts: string, now: number): string {
+  const at = new Date(ts);
+  if (!/^\d{4}-\d{2}-\d{2}T/u.test(ts) || Number.isNaN(at.getTime())) return '';
+  const year = at.getUTCFullYear() === new Date(now).getUTCFullYear() ? '' : ` ${String(at.getUTCFullYear())}`;
+  return `${String(at.getUTCDate())} ${MONTH_SHORT[at.getUTCMonth()] ?? ''}${year}`;
+}
+
+/** A body's first `INBOX_BODY` characters on one line, marked when it went on, whether the record cut it or not. */
+function bodyHead(a: Record<string, unknown>): string {
+  const points = [...oneLine(textOf(a.body))];
+  const cut = a.cut === true || points.length > INBOX_BODY;
+  const head = points.slice(0, INBOX_BODY).join('').trimEnd();
+  return cut ? `${head}${CUT_MARK}` : head;
+}
+
+/**
+ * One arrival on one line: the day, who sent it, its words, and its id last, the one handle an agent reads it whole or
+ * files it by. `why` adds the reason a pattern gave, which is where a skip that is too wide shows; `state` says which
+ * state it is in, for the read of every state at once.
+ */
+function arrivalLine(a: Record<string, unknown>, now: number, why: boolean, state: boolean): string {
+  const from = clip(textOf(a.from), INBOX_FROM) || 'an unknown sender';
+  const subject = clip(textOf(a.subject), INBOX_SUBJECT);
+  const body = bodyHead(a);
+  const words = subject && body ? `${subject}: ${body}` : subject || body || 'no words';
+  const said = state ? sentence(INBOX_WORDS[textOf(a.state)] ?? textOf(a.state)) : '';
+  const reason = why && textOf(a.reason) ? clip(textOf(a.reason), INBOX_SUBJECT) : '';
+  return [arrivalDay(textOf(a.ts), now), from, words, said, reason, textOf(a.id)].filter(Boolean).join(' · ');
+}
+
+/** The one line of counts, every state in the door's order and in the Inbox's words: `32 waiting · 3 to review · ...`. */
+function countsLine(counts: Record<string, unknown>): string {
+  return INBOX_ORDER.map((s) => `${grouped(countOf(counts[s]))} ${INBOX_WORDS[s] ?? s}`).join(' · ');
+}
+
+/** What a reader is told once when a line on the answer was cut. */
+const CUT_SAID = `A line whose words end ${CUT_MARK} was cut: read braindog:inbox/<its id> for that arrival whole.`;
+
+/**
+ * `braindog:inbox`: the record's digest (`inbox({ digest: true })`) as lines. The counts line for all six states, then
+ * each state that holds anything, waiting ones first, a heading and its arrivals newest first.
+ *
+ * NEVER PAST `limit`, the characters one answer carries, measured as the JSON it travels in. The record sends each
+ * state's newest hundred, which a busy inbox fills: then every state keeps its ten newest and its heading names its own
+ * address, `braindog:inbox/<state>`, where the hundred are read. One answer still says the whole inbox by its counts.
+ */
+export function inboxDigestLines(digest: Record<string, unknown>, limit: number, now = Date.now()): string[] {
+  const counts = isObject(digest.counts) ? digest.counts : {};
+  const states = isObject(digest.states) ? digest.states : {};
+  const build = (keep: number | null): string[] => {
+    const out = [countsLine(counts)];
+    let cut = false;
+    for (const s of INBOX_ORDER) {
+      const lines = Array.isArray(states[s]) ? (states[s] as unknown[]).filter(isObject) : [];
+      if (lines.length === 0) continue;
+      const n = Math.max(countOf(counts[s]), lines.length);
+      const shown = keep === null ? lines : lines.slice(0, keep);
+      const word = sentence(INBOX_WORDS[s] ?? s);
+      const address = keep !== null && n > shown.length ? `, and braindog:inbox/${s} reads the newest ${grouped(Math.min(n, INBOX_STATE_MOST))}` : '';
+      out.push(n > shown.length ? `${word}: the newest ${grouped(shown.length)} of ${grouped(n)}${address}` : `${word}: ${grouped(n)}`);
+      for (const a of shown) {
+        const line = arrivalLine(a, now, false, false);
+        cut ||= line.includes(CUT_MARK);
+        out.push(line);
+      }
+    }
+    if (out.length === 1) out.push('Nothing has arrived yet.');
+    if (cut) out.push(CUT_SAID);
+    return out;
+  };
+  const whole = build(null);
+  return JSON.stringify(whole).length <= limit ? whole : build(INBOX_FOLDED);
+}
+
+/**
+ * `braindog:inbox/<state>`: one state's page (`inbox({ state, limit: 100 })`) as lines, the counts line first, then the
+ * state's heading and its arrivals, each with the reason a pattern gave where it gave one. Held to `limit` as the digest
+ * is: a page whose lines would pass it keeps its newest that fit, and the heading says how many those are.
+ */
+export function inboxStateLines(page: Record<string, unknown>, state: string, limit: number, now = Date.now()): string[] {
+  const counts = isObject(page.counts) ? page.counts : {};
+  const arrivals = Array.isArray(page.arrivals) ? page.arrivals.filter(isObject) : [];
+  const all = state === 'all';
+  const n = all ? INBOX_ORDER.reduce((sum, s) => sum + countOf(counts[s]), 0) : countOf(counts[state]);
+  const word = all ? 'Every state' : sentence(INBOX_WORDS[state] ?? state);
+  const lines = arrivals.map((a) => arrivalLine(a, now, true, all));
+  const said = (shown: number): string[] => {
+    const total = Math.max(n, shown);
+    const head = shown === 0 ? `${word}: none` : total > shown ? `${word}: the newest ${grouped(shown)} of ${grouped(total)}` : `${word}: ${grouped(total)}`;
+    const body = lines.slice(0, shown);
+    return [countsLine(counts), head, ...body, ...(body.some((l) => l.includes(CUT_MARK)) ? [CUT_SAID] : [])];
+  };
+  let shown = lines.length;
+  while (shown > 1 && JSON.stringify(said(shown)).length > limit) shown = Math.max(1, Math.floor(shown * 0.8));
+  return said(shown);
+}
+
+/**
+ * `braindog:inbox/<id>`: one arrival whole (`inbox({ id })`). Who sent it and to whom, its subject, when it came, the
+ * state it is in and why, what became of it when it was settled, and the body last as it arrived.
+ *
+ * NAMES, NEVER IDS: who settled it is said as a person or an agent and never by their id, and the entry a filing made
+ * by its list and number, with the version `triage` takes back to put it back. The arrival's own id ends the first line,
+ * the handle an agent files it by. A body longer than `most` is cut there, and the last line says so.
+ */
+export function arrivalWhole(arrival: Record<string, unknown>, now = Date.now(), most = Number.POSITIVE_INFINITY): string[] {
+  const out: string[] = [];
+  const from = oneLine(textOf(arrival.from)) || 'an unknown sender';
+  out.push([`From ${from}`, textOf(arrival.id)].filter(Boolean).join(' · '));
+  if (textOf(arrival.to)) out.push(`To ${oneLine(textOf(arrival.to))}`);
+  if (textOf(arrival.subject)) out.push(`Subject: ${oneLine(textOf(arrival.subject))}`);
+  const ts = textOf(arrival.ts);
+  const day = arrivalDay(ts, now);
+  if (day) out.push(`Arrived ${day} at ${ts.slice(11, 16)} UTC`);
+  const state = textOf(arrival.state);
+  const reason = oneLine(textOf(arrival.reason));
+  out.push(`${sentence(INBOX_WORDS[state] ?? (state || 'waiting'))}${reason ? `: ${reason}` : ''}`);
+  if (typeof arrival.repeats === 'string') out.push('Set aside as a second copy of an entry already filed.');
+  const settled = isObject(arrival.settled) ? arrival.settled : null;
+  if (settled) {
+    const by = textOf(settled.by).startsWith('p_') ? 'a person' : 'an agent';
+    const on = arrivalDay(textOf(settled.at), now);
+    const row = isObject(settled.row) ? settled.row : null;
+    const handle = row && typeof row.seq === 'number' ? ` (${textOf(row.register)}#${String(row.seq)})` : '';
+    const entry = row
+      ? `, as version ${String(countOf(row.version) || 1)} of an entry in ${textOf(row.register)}${handle}${row.archived === true ? ', archived since' : ''}`
+      : '';
+    out.push(`${state === 'ignored' ? 'Archived' : 'Filed'} by ${by}${on ? ` on ${on}` : ''}${entry}`);
+  }
+  const body = textOf(arrival.body);
+  if (arrival.body === null) out.push('Its body is not kept.');
+  else if (body.length > most) out.push(body.slice(0, most).replace(/[\uD800-\uDBFF]$/u, ''), `The body is ${grouped(body.length)} characters, past what one answer carries, so it was cut at ${grouped(most)}.`);
+  else if (body) out.push(body);
+  return out;
+}
