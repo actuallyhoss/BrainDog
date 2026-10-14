@@ -23,6 +23,10 @@
  * in (the install, and the image build), so the workflow can block outbound calls there: a run that then fails needed
  * the Cloud by accident (the scope's risk). One line a step, counts only. A token, the server key and the inbound email
  * token never print: every line said is scrubbed of each secret this run made.
+ *
+ * EVERY WAIT HAS A DEADLINE (`DEADLINE`), and one missed fails as a sentence naming its step: a process that does not
+ * finish, a server that does not answer, a call `braindog mcp` never answers, a container never healthy. A child still
+ * running once the run is over is killed, so the check always ends.
  */
 
 import { spawn, spawnSync } from 'node:child_process';
@@ -147,6 +151,37 @@ export function plan(blocks, { container = false, offline = false } = {}) {
 
 /* ── RUNNING ────────────────────────────────────────────────────────────────────────────────────────────────────── */
 
+/**
+ * How long each wait may take, in ms. The install and the builds fetch or compile; everything once outbound is blocked
+ * talks to this machine only and answers in seconds, so a minute or two there is already a hang. Each sits well inside
+ * its job's ceiling in `.github/workflows/selfhost.yml` (30 and 45 minutes), so a hang says its step before the job dies.
+ */
+export const DEADLINE = {
+  install: 600_000,
+  build: 600_000,
+  image: 1_500_000,
+  step: 120_000,
+  docker: 120_000,
+  inspect: 30_000,
+  healthz: 90_000,
+  boxHealthy: 180_000,
+  fetch: 5_000,
+  rpc: 60_000,
+  exit: 10_000,
+};
+
+/** Every child this run spawned that has not exited yet, so none can keep the check from ending. */
+const LIVE = new Set();
+function track(child) {
+  LIVE.add(child);
+  child.once('exit', () => LIVE.delete(child));
+  child.once('error', () => LIVE.delete(child));
+  return child;
+}
+
+/** A deadline in words. */
+const secs = (ms) => `${String(Math.round(ms / 1000))} s`;
+
 /** Every secret this run made, so no line it says can carry one. */
 const SECRETS = new Set();
 export function scrub(text) {
@@ -165,9 +200,14 @@ class Failed extends Error {
   }
 }
 
-/** Run a command to its end. Answers its stdout; throws `Failed` with its output on a non-zero exit. */
-function run(id, argv, { cwd, env = process.env, input, timeout = 900_000 } = {}) {
-  const r = spawnSync(argv[0], argv.slice(1), { cwd, env, input, encoding: 'utf8', timeout, maxBuffer: 64 * 1024 * 1024 });
+/**
+ * Run a command to its end, at most `timeout` ms. Answers its stdout; throws `Failed` with its output on a non-zero exit,
+ * and one naming the deadline when it does not finish (it is killed).
+ */
+function run(id, argv, { cwd, env = process.env, input, timeout = DEADLINE.step } = {}) {
+  const r = spawnSync(argv[0], argv.slice(1), { cwd, env, input, encoding: 'utf8', timeout, killSignal: 'SIGKILL', maxBuffer: 64 * 1024 * 1024 });
+  if (r.error?.code === 'ETIMEDOUT')
+    throw new Failed(id, `${argv.slice(0, 3).join(' ')} did not finish in ${secs(timeout)}, so it was stopped`, `${r.stdout ?? ''}\n${r.stderr ?? ''}`);
   if (r.error) throw new Failed(id, `${argv[0]} could not be run: ${r.error.message}`);
   if (r.status !== 0) throw new Failed(id, `${argv.slice(0, 3).join(' ')} exited ${String(r.status)}`, `${r.stdout}\n${r.stderr}`);
   return r.stdout;
@@ -187,20 +227,23 @@ export function freePort() {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/** Wait for `/healthz` to answer ok, at most `ms`; `alive` says whether the server is still running. */
-async function healthy(id, base, alive, ms = 90_000) {
+/**
+ * Wait for `/healthz` to answer ok, at most `ms`; `alive` says whether the server is still running. Each ask is cut at
+ * `DEADLINE.fetch`, so a server that takes the call and never answers cannot hold the wait past its deadline.
+ */
+async function healthy(id, base, alive, ms = DEADLINE.healthz) {
   const until = Date.now() + ms;
   while (Date.now() < until) {
     if (!alive()) throw new Failed(id, 'the server stopped before it answered');
     try {
-      const r = await fetch(`${base}/healthz`);
+      const r = await fetch(`${base}/healthz`, { signal: AbortSignal.timeout(Math.min(DEADLINE.fetch, Math.max(1, until - Date.now()))) });
       if (r.ok && (await r.json()).ok === true) return;
     } catch {
       /* not listening yet */
     }
     await sleep(500);
   }
-  throw new Failed(id, `${base}/healthz did not answer ok in ${String(ms / 1000)} s`);
+  throw new Failed(id, `${base}/healthz did not answer ok in ${secs(ms)}`);
 }
 
 /* ── THE REAL COMMAND ───────────────────────────────────────────────────────────────────────────────────────────── */
@@ -216,8 +259,11 @@ function cliEnv(home, host, token) {
 
 /** One `braindog ... --json` call: its parsed document, or `Failed` naming the step. */
 function cliJson(id, cli, args, env, cwd) {
-  const r = spawnSync(process.execPath, [cli, ...args, '--json'], { cwd, env, encoding: 'utf8', timeout: 120_000, maxBuffer: 64 * 1024 * 1024 });
-  const last = r.stdout.trim().split('\n').at(-1) ?? '';
+  const timeout = DEADLINE.step;
+  const r = spawnSync(process.execPath, [cli, ...args, '--json'], { cwd, env, encoding: 'utf8', timeout, killSignal: 'SIGKILL', maxBuffer: 64 * 1024 * 1024 });
+  if (r.error?.code === 'ETIMEDOUT') throw new Failed(id, `braindog ${args[0]} did not finish in ${secs(timeout)}, so it was stopped`, `${r.stdout ?? ''}\n${r.stderr ?? ''}`);
+  if (r.error) throw new Failed(id, `braindog ${args[0]} could not be run: ${r.error.message}`);
+  const last = (r.stdout ?? '').trim().split('\n').at(-1) ?? '';
   try {
     return JSON.parse(last);
   } catch {
@@ -237,13 +283,25 @@ function signIn(id, cli, home, base, serverKey) {
 
 /**
  * `braindog mcp` as an agent starts it, over standard input and output, answering each call in turn. The folder it runs
- * in is the scratch home, so the run it opens names no repository.
+ * in is the scratch home, so the run it opens names no repository. Each call waits at most `DEADLINE.rpc`, and a child
+ * that exits, cannot start or says a line that is not JSON fails the call waiting on it at once.
  */
 async function mcp(id, cli, home, base, token, calls) {
-  const child = spawn(process.execPath, [cli, 'mcp', '--agent', 'other'], { cwd: home, env: cliEnv(home, base, token), stdio: ['pipe', 'pipe', 'pipe'] });
+  const child = track(spawn(process.execPath, [cli, 'mcp', '--agent', 'other'], { cwd: home, env: cliEnv(home, base, token), stdio: ['pipe', 'pipe', 'pipe'] }));
   let buf = '';
   let err = '';
+  let gone = null;
   const waiting = new Map();
+  const failAll = (why) => {
+    gone ??= why;
+    for (const w of waiting.values()) w.fail(why);
+    waiting.clear();
+  };
+  child.on('error', (e) => failAll(`braindog mcp could not be run: ${e.message}`));
+  child.on('close', (code, signal) => failAll(`braindog mcp exited (${signal ?? String(code)}) before it answered`));
+  child.stdin.on('error', () => {
+    /* the child is gone; its exit fails the call */
+  });
   child.stderr.on('data', (d) => void (err += d));
   child.stdout.on('data', (d) => {
     buf += d;
@@ -251,17 +309,30 @@ async function mcp(id, cli, home, base, token, calls) {
       const line = buf.slice(0, at).trim();
       buf = buf.slice(at + 1);
       if (line === '') continue;
-      const m = JSON.parse(line);
-      waiting.get(m.id)?.(m);
+      let m;
+      try {
+        m = JSON.parse(line);
+      } catch {
+        failAll('braindog mcp said a line that is not JSON');
+        return;
+      }
+      waiting.get(m.id)?.done(m);
       waiting.delete(m.id);
     }
   });
   let n = 0;
   const rpc = (method, params) =>
     new Promise((resolve, reject) => {
+      if (gone !== null) return reject(new Failed(id, `${gone} ${method}`, err));
       const at = ++n;
-      const timer = setTimeout(() => reject(new Failed(id, `braindog mcp did not answer ${method} in 60 s`, err)), 60_000);
-      waiting.set(at, (m) => (clearTimeout(timer), resolve(m)));
+      const timer = setTimeout(() => {
+        waiting.delete(at);
+        reject(new Failed(id, `braindog mcp did not answer ${method} in ${secs(DEADLINE.rpc)}`, err));
+      }, DEADLINE.rpc);
+      waiting.set(at, {
+        done: (m) => (clearTimeout(timer), resolve(m)),
+        fail: (why) => (clearTimeout(timer), reject(new Failed(id, `${why} ${method}`, err))),
+      });
       child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id: at, method, params })}\n`);
     });
   try {
@@ -275,7 +346,7 @@ async function mcp(id, cli, home, base, token, calls) {
     }
     return out;
   } finally {
-    child.kill();
+    child.kill('SIGKILL');
   }
 }
 
@@ -334,7 +405,8 @@ function buildTuple() {
 /** The copy: `git archive HEAD` unpacked into the scratch, read only. Answers how many files it holds. */
 function copyTree(dest) {
   mkdirSync(dest, { recursive: true });
-  const archive = spawnSync('git', ['-C', CHECKOUT, 'archive', '--format=tar', 'HEAD'], { maxBuffer: 2 * 1024 * 1024 * 1024 });
+  const archive = spawnSync('git', ['-C', CHECKOUT, 'archive', '--format=tar', 'HEAD'], { timeout: DEADLINE.step, killSignal: 'SIGKILL', maxBuffer: 2 * 1024 * 1024 * 1024 });
+  if (archive.error?.code === 'ETIMEDOUT') throw new Failed('copy', `git archive HEAD did not finish in ${secs(DEADLINE.step)}, so it was stopped`);
   if (archive.status !== 0) throw new Failed('copy', 'git archive HEAD failed', String(archive.stderr));
   run('copy', ['tar', '-x', '-C', dest], { input: archive.stdout });
   return run('copy', ['git', '-C', CHECKOUT, 'ls-tree', '-r', '--name-only', 'HEAD']).trim().split('\n').length;
@@ -385,34 +457,38 @@ async function execute(steps, dir, { container, afterInstall, held }) {
   const serve = async (id, data, port) => {
     const out = join(logs, `${id.replaceAll(' ', '-')}.log`);
     writeFileSync(out, '');
-    const child = spawn(local(words(s.startLine))[0], local(words(s.startLine)).slice(1), {
-      cwd: repo,
-      env: { ...env, BRAINDOG_DATA: data, BRAINDOG_KEK_FILE: kekFile, PORT: String(port), BRAINDOG_TOKEN: serverKey },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
+    const child = track(
+      spawn(local(words(s.startLine))[0], local(words(s.startLine)).slice(1), {
+        cwd: repo,
+        env: { ...env, BRAINDOG_DATA: data, BRAINDOG_KEK_FILE: kekFile, PORT: String(port), BRAINDOG_TOKEN: serverKey },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      }),
+    );
     let said = '';
+    let failed = false;
+    child.once('error', (e) => void ((failed = true), (said += `${e.message}\n`)));
     child.stdout.on('data', (d) => void (said += d));
     child.stderr.on('data', (d) => void (said += d));
     s.children.push(child);
     const base = `http://127.0.0.1:${String(port)}`;
     try {
-      await healthy(id, base, () => child.exitCode === null);
+      await healthy(id, base, () => !failed && child.exitCode === null && child.signalCode === null);
     } catch (e) {
       e.tail = scrub(said).split('\n').slice(-20).join('\n');
       throw e;
     }
     return base;
   };
-  const docker = (id, argv) => run(id, argv, { cwd: repo, env, timeout: 1_800_000 });
+  const docker = (id, argv, timeout = DEADLINE.docker) => run(id, argv, { cwd: repo, env, timeout });
   const boxHealthy = async (id, container, base) => {
-    const until = Date.now() + 180_000;
+    const until = Date.now() + DEADLINE.boxHealthy;
     while (Date.now() < until) {
-      const state = docker(id, ['docker', 'inspect', '-f', '{{.State.Status}} {{.State.Health.Status}}', container]).trim();
+      const state = docker(id, ['docker', 'inspect', '-f', '{{.State.Status}} {{.State.Health.Status}}', container], DEADLINE.inspect).trim();
       if (state === 'running healthy') return healthy(id, base, () => true, 30_000);
-      if (!state.startsWith('running')) throw new Failed(id, `the container is ${state}`, run(id, ['docker', 'logs', container], { env }));
+      if (!state.startsWith('running')) throw new Failed(id, `the container is ${state}`, run(id, ['docker', 'logs', container], { env, timeout: DEADLINE.inspect }));
       await sleep(2_000);
     }
-    throw new Failed(id, 'the container was not healthy in 180 s');
+    throw new Failed(id, `the container was not healthy in ${secs(DEADLINE.boxHealthy)}`);
   };
 
   for (const step of steps) {
@@ -424,20 +500,20 @@ async function execute(steps, dir, { container, afterInstall, held }) {
       case 'install':
       case 'build the app':
       case 'readme line':
-        run(id, local(words(line)), { cwd: repo, env });
+        run(id, local(words(line)), { cwd: repo, env, timeout: id === 'install' ? DEADLINE.install : DEADLINE.build });
         say(id, `ran the README line (${String(words(line).length)} words)`);
         break;
       case 'offline':
-        run(id, ['sh', afterInstall], { env });
+        run(id, ['sh', afterInstall], { env, timeout: DEADLINE.inspect });
         say(id, 'outbound calls blocked from here on');
         break;
       case 'build the command':
-        run(id, ['pnpm', '--filter', 'braindog-cli', 'build'], { cwd: repo, env: { ...env, BRAINDOG_BUILD: buildTuple() } });
+        run(id, ['pnpm', '--filter', 'braindog-cli', 'build'], { cwd: repo, env: { ...env, BRAINDOG_BUILD: buildTuple() }, timeout: DEADLINE.build });
         if (!existsSync(cli)) throw new Failed(id, 'the build wrote no braindog.mjs');
         say(id, '1 file, braindog.mjs');
         break;
       case 'image':
-        docker(id, dockerWords(line, { ...box, port: 0 }));
+        docker(id, dockerWords(line, { ...box, port: 0 }), DEADLINE.image);
         say(id, '1 image built');
         break;
       case 'init':
@@ -527,14 +603,15 @@ async function execute(steps, dir, { container, afterInstall, held }) {
   return s;
 }
 
-/** Everything a run started, stopped, and every volume it made, removed. */
+/** Everything a run started, stopped, and every volume it made, removed, each at most `DEADLINE.docker`. */
 function tidy(s, container, keep) {
   for (const child of s?.children ?? []) child.kill();
   if (!container) return;
-  for (const c of s?.containers ?? []) spawnSync('docker', ['rm', '-f', c], { stdio: 'ignore' });
-  for (const v of s?.volumes ?? []) spawnSync('docker', ['volume', 'rm', '-f', v], { stdio: 'ignore' });
+  const quiet = { stdio: 'ignore', timeout: DEADLINE.docker, killSignal: 'SIGKILL' };
+  for (const c of s?.containers ?? []) spawnSync('docker', ['rm', '-f', c], quiet);
+  for (const v of s?.volumes ?? []) spawnSync('docker', ['volume', 'rm', '-f', v], quiet);
   /* AND THE IMAGE, so a run on somebody's own machine leaves no gigabyte behind. */
-  if (!keep) spawnSync('docker', ['rmi', '-f', 'braindog-from-clean'], { stdio: 'ignore' });
+  if (!keep) spawnSync('docker', ['rmi', '-f', 'braindog-from-clean'], quiet);
 }
 
 /* ── THE COMMAND ────────────────────────────────────────────────────────────────────────────────────────────────── */
@@ -592,4 +669,12 @@ async function main(argv) {
   }
 }
 
-if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) process.exitCode = await main(process.argv.slice(2));
+/* THE CHECK ALWAYS ENDS: a server or a call that outlives `tidy` is killed `DEADLINE.exit` after the run is over. */
+if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  process.exitCode = await main(process.argv.slice(2));
+  setTimeout(() => {
+    say('exit', `a process the run started was still running ${secs(DEADLINE.exit)} after it ended, so it was killed`);
+    for (const child of LIVE) child.kill('SIGKILL');
+    process.exit(process.exitCode === 0 ? 1 : process.exitCode);
+  }, DEADLINE.exit).unref();
+}

@@ -11,8 +11,13 @@ name: selfhost
 #
 # OUTBOUND CALLS ARE BLOCKED ONCE WHAT NEEDS THE NETWORK IS IN (the scope's risk): the install for the plain run, and the
 # image build too for the container. A run that fails after that line needed the Cloud by accident, a font or a
-# catalogue fetch, and the step it failed at says which. Loopback and the runner's own Docker bridge stay open; the
-# runner's resolver is on loopback, and what it would ask upstream is blocked with everything else.
+# catalogue fetch, and the step it failed at says which. Loopback and the runner's own Docker bridge stay open; a name
+# asked of the runner's resolver on loopback is refused.
+#
+# ONLY THE RUN IS BLOCKED, NEVER THE RUNNER. The check runs as the group `braindog-offline` (`sg`), and every rule matches
+# that group's packets alone. A rule for everybody cut the runner's own calls to GitHub too: no log upload, no step
+# finished, and both jobs sat to their ceiling with no log at all. `offline.sh` refuses to run outside the group, so the
+# rules can never block nothing.
 #
 # NOTHING IS PUSHED, DEPLOYED OR SIGNED IN AS ANYBODY. The image is built and thrown away; no secret is read.
 
@@ -60,17 +65,23 @@ jobs:
 
       - name: Write the outbound block
         run: |
+          sudo groupadd braindog-offline
+          sudo gpasswd -a "$(id -un)" braindog-offline
           cat > "$RUNNER_TEMP/offline.sh" <<'EOF'
           set -eu
+          g=braindog-offline
+          if [ "$(id -gn)" != "$g" ]; then echo "offline.sh runs only as the group $g, or its rules would block nothing." >&2; exit 1; fi
           for t in iptables ip6tables; do
-            sudo "$t" -A OUTPUT -o lo -j ACCEPT
-            sudo "$t" -A OUTPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
-            sudo "$t" -A OUTPUT -j REJECT
+            sudo -n "$t" -A OUTPUT -m owner --gid-owner "$g" -o lo -p udp --dport 53 -j REJECT
+            sudo -n "$t" -A OUTPUT -m owner --gid-owner "$g" -o lo -p tcp --dport 53 -j REJECT
+            sudo -n "$t" -A OUTPUT -m owner --gid-owner "$g" -o lo -j ACCEPT
+            sudo -n "$t" -A OUTPUT -m owner --gid-owner "$g" -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+            sudo -n "$t" -A OUTPUT -m owner --gid-owner "$g" -j REJECT
           done
           EOF
 
       - name: From a clean clone, outbound blocked after the install
-        run: node apps/selfhost/test/from-clean.mjs --after-install "$RUNNER_TEMP/offline.sh"
+        run: sg braindog-offline -c 'node apps/selfhost/test/from-clean.mjs --after-install "$RUNNER_TEMP/offline.sh"'
 
   container:
     runs-on: ubuntu-latest
@@ -88,17 +99,26 @@ jobs:
       # runner's calls into a container over its bridge stay open.
       - name: Write the outbound block
         run: |
+          sudo groupadd braindog-offline
+          sudo gpasswd -a "$(id -un)" braindog-offline
           cat > "$RUNNER_TEMP/offline.sh" <<'EOF'
           set -eu
+          g=braindog-offline
+          if [ "$(id -gn)" != "$g" ]; then echo "offline.sh runs only as the group $g, or its rules would block nothing." >&2; exit 1; fi
           for t in iptables ip6tables; do
-            sudo "$t" -A OUTPUT -o lo -j ACCEPT
-            sudo "$t" -A OUTPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
-            sudo "$t" -A OUTPUT -o docker0 -j ACCEPT
-            sudo "$t" -A OUTPUT -j REJECT
+            sudo -n "$t" -A OUTPUT -m owner --gid-owner "$g" -o lo -p udp --dport 53 -j REJECT
+            sudo -n "$t" -A OUTPUT -m owner --gid-owner "$g" -o lo -p tcp --dport 53 -j REJECT
+            sudo -n "$t" -A OUTPUT -m owner --gid-owner "$g" -o lo -j ACCEPT
+            sudo -n "$t" -A OUTPUT -m owner --gid-owner "$g" -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+            sudo -n "$t" -A OUTPUT -m owner --gid-owner "$g" -o docker0 -j ACCEPT
+            sudo -n "$t" -A OUTPUT -m owner --gid-owner "$g" -j REJECT
           done
-          sudo iptables -I DOCKER-USER 1 -i docker0 ! -o docker0 -j REJECT
-          sudo iptables -I DOCKER-USER 1 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+          sudo -n iptables -I DOCKER-USER 1 -i docker0 ! -o docker0 -j REJECT
+          sudo -n iptables -I DOCKER-USER 1 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
           EOF
 
+      # DOCKER MUST ANSWER AS THE GROUP TOO, or the run would say `skipped: no docker` and pass having checked nothing.
       - name: The container from a clean clone, outbound blocked after the image is built
-        run: node apps/selfhost/test/from-clean.mjs --container --after-install "$RUNNER_TEMP/offline.sh"
+        run: |
+          sg braindog-offline -c 'docker info >/dev/null || { echo "docker does not answer as the group braindog-offline, so the container run would only be skipped." >&2; exit 1; }
+          node apps/selfhost/test/from-clean.mjs --container --after-install "$RUNNER_TEMP/offline.sh"'

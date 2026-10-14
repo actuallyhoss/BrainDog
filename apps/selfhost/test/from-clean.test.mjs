@@ -8,9 +8,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { DOES, OWNER, RECORD, dockerWords, kindOf, plan, readmeBlocks, restoreWords, scrub, words } from './from-clean.mjs';
+import { DEADLINE, DOES, OWNER, RECORD, dockerWords, kindOf, plan, readmeBlocks, restoreWords, scrub, words } from './from-clean.mjs';
 
 const README = readFileSync(fileURLToPath(new URL('../../../README.md', import.meta.url)), 'utf8');
+const WORKFLOW = readFileSync(fileURLToPath(new URL('../../../.github/workflows/selfhost.yml', import.meta.url)), 'utf8');
 const ids = (steps) => steps.map((s) => s.id);
 
 test("TODAY'S README: the self-host and container lines are read out of it, and every one is placed", () => {
@@ -67,4 +68,42 @@ test('the placeholders are an invented record and owner, and the container is th
 
 test('a line said never carries the inbound email token', () => {
   assert.equal(scrub('record harbour-lane created · inbound email token at in_abc123'), 'record harbour-lane created · inbound email token at [hidden]');
+});
+
+/** Each job of the workflow: its `timeout-minutes` and its text up to the next job. */
+function jobs(text) {
+  const out = {};
+  const at = [...text.matchAll(/^ {2}([a-z-]+):\n/gm)];
+  at.forEach((m, i) => {
+    const body = text.slice(m.index, at[i + 1]?.index ?? text.length);
+    out[m[1]] = { body, minutes: Number(/timeout-minutes: (\d+)/.exec(body)?.[1]) };
+  });
+  return out;
+}
+
+test('THE OUTBOUND BLOCK CUTS THE RUN ONLY, NEVER THE RUNNER: every OUTPUT rule matches the run’s group, and the run is that group', () => {
+  const { plain, container } = jobs(WORKFLOW);
+  for (const [name, job] of [['plain', plain], ['container', container]]) {
+    assert.ok(job, `selfhost.yml has no ${name} job`);
+    const rules = job.body.split('\n').filter((l) => /"\$t" -A OUTPUT/.test(l));
+    assert.ok(rules.length >= 4, `${name}: the outbound block has no OUTPUT rules`);
+    for (const r of rules) assert.match(r, /-m owner --gid-owner "\$g"/, `${name}: an OUTPUT rule for everybody cuts the runner off GitHub too: ${r.trim()}`);
+    assert.match(job.body, /-m owner --gid-owner "\$g" -j REJECT/, `${name}: the group's last OUTPUT rule refuses`);
+    assert.match(job.body, /g=braindog-offline/);
+    assert.match(job.body, /if \[ "\$\(id -gn\)" != "\$g" \]; then .*exit 1; fi/, `${name}: offline.sh must refuse outside the group, or its rules block nothing`);
+    assert.match(job.body, /sudo groupadd braindog-offline/);
+    assert.match(job.body, /sg braindog-offline -c '[^]*node apps\/selfhost\/test\/from-clean\.mjs[^']*--after-install "\$RUNNER_TEMP\/offline\.sh"'/, `${name}: the run is not made as the group`);
+  }
+  assert.match(container.body, /-o docker0 -j ACCEPT/);
+  assert.match(container.body, /DOCKER-USER 1 -i docker0 ! -o docker0 -j REJECT/, 'the containers’ own calls are no longer blocked');
+  assert.match(container.body, /docker info >\/dev\/null \|\|/, 'a docker the group cannot reach would let the container run skip and pass');
+});
+
+test('EVERY DEADLINE ENDS INSIDE ITS JOB’S CEILING, so a hang says its step before the job is cancelled', () => {
+  const { plain, container } = jobs(WORKFLOW);
+  const ms = (job) => job.minutes * 60_000;
+  /* THE LONGEST A PLAIN RUN WAITS ON ONE HANG: the install, or a build after a normal install. */
+  assert.ok(DEADLINE.install < ms(plain) && DEADLINE.build < ms(plain), `${JSON.stringify(DEADLINE)} against ${String(plain.minutes)} minutes`);
+  assert.ok(DEADLINE.image < ms(container), `${JSON.stringify(DEADLINE)} against ${String(container.minutes)} minutes`);
+  for (const k of ['step', 'docker', 'inspect', 'healthz', 'boxHealthy', 'fetch', 'rpc', 'exit']) assert.ok(DEADLINE[k] > 0 && DEADLINE[k] <= 180_000, `${k}: once outbound is blocked a wait is seconds, not ${String(DEADLINE[k])} ms`);
 });
