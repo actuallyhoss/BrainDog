@@ -144,7 +144,8 @@ export const patterns = (
       },
       inference: engine,
     });
-    const used = sent ?? ran.model;
+    /* A CANDIDATE ON ITS OWN WIRE (ENG-A06) BYPASSES `engine`, whose `sent` would still hold an earlier attempt's name. */
+    const used = ran.candidate !== undefined ? ran.model : (sent ?? ran.model);
 
     const account = (status: 'ok' | 'refused' | 'error', code?: string, filed?: string): void =>
       core.account({
@@ -162,6 +163,7 @@ export const patterns = (
         filed,
         ...charge,
         served: ran.served,
+        candidate: ran.candidate,
       });
 
     /* SETTLED THE MOMENT THE MODEL ANSWERED, as `propose.ts` settles its three sites since `538bc705`. A filing that threw
@@ -386,6 +388,7 @@ const PROSE_SCHEMA = {
  * is far under the pattern template's, so leaving it out moves nothing that ceiling counts.
  */
 export const PROSE: PromptTemplate = {
+  purpose: 'prose',
   model: 'llama-3.2-1b',
   maxTokens: 120,
   capIn: 4000,

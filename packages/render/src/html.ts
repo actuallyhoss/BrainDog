@@ -45,7 +45,7 @@ import { SERIES_NET, SERIES_NONE, seriesPlan, type SeriesPlan } from './series.t
 import { LINES_AGAINST, LINES_NONE, LINES_NUMBERS, linesOnly, linesPlan } from './lines.ts';
 import { PROGRESS_NONE, PROGRESS_OF, PROGRESS_TOTAL, progressPlan, progressRangeSaid, progressSentence, progressSpentSaid, rangePlan, rangeSentence } from './progress.ts';
 import { AMOUNT_SPACE, writeFigure, type AmountSetting, type WrittenAmount } from './money.ts';
-import { FORECAST_BALANCE, FORECAST_MOVE, FORECAST_NONE, FORECAST_NUMBERS, FORECAST_PAINT, FORECAST_WHAT, FORECAST_WHEN, baseKnobs, forecastEveryday, forecastFigure, forecastModel, forecastPlan, listedSteps, scenario, underNote } from './forecast.ts';
+import { FORECAST_AXIS_BREAK, FORECAST_AXIS_BREAK_STYLE, FORECAST_BALANCE, FORECAST_MOVE, FORECAST_NONE, FORECAST_NUMBERS, FORECAST_PAINT, FORECAST_WHAT, FORECAST_WHEN, baseKnobs, forecastEveryday, forecastFigure, forecastModel, forecastPlan, listedSteps, scenario, underNote } from './forecast.ts';
 import { DIFF_GLYPHS, DIFF_WORDS, diffFolded, diffPlan, type DiffLine } from './diff.ts';
 import { ROADMAP_LEGEND, ROADMAP_NONE, ROADMAP_TODAY, roadmapAxis, roadmapFlip, roadmapLegend, roadmapLines, roadmapPlan, roadmapRow, roadmapSentence, roadmapShare, roadmapSkipped, roadmapToday } from './roadmap.ts';
 import { RING_NONE, RING_OF, RING_PAINT, RING_STEP_OPACITY, ringPlan } from './ring.ts';
@@ -1631,8 +1631,15 @@ function forecast(b: Block, o: RenderOptions): string {
   const said = plan.legend ? `<p class="forecast-said"${plan.warn ? ' data-intent="warn"' : ''}>${plan.warn ? toneGlyph('warn') : ''}${escape(plan.said)}</p>` : '';
   /* A CROSSING NEAR TODAY SETS THE TWO LABELS APART: today's balance under its dot, the flag's day after its rule. */
   const near = plan.cross?.near ? ' data-near-flag=""' : '';
+  /* THE END OF THE AXIS NEAREST ZERO, WHERE ZERO IS OFF IT, carries a break beside its real amount (`cut`), and the
+     chart's name says where the axis starts, as `Forecast.svelte` draws it. */
   const axis = `<ol class="forecast-axis" aria-hidden="true">${plan.axis
-    .map((a) => `<li class="forecast-axis-tick"${a.zero ? ' data-zero=""' : ''} style="--at:${a.at}">${escape(a.label)}</li>`)
+    .map(
+      (a) =>
+        `<li class="forecast-axis-tick"${a.zero ? ' data-zero=""' : ''}${a.cut ? ' data-cut=""' : ''} style="--at:${a.at}">${
+          a.cut ? `<span class="forecast-axis-break" style="${FORECAST_AXIS_BREAK_STYLE}">${escape(FORECAST_AXIS_BREAK)}</span>` : ''
+        }${escape(a.label)}</li>`,
+    )
     .join('')}</ol>`;
   const chart = `<div class="forecast-plot"><svg class="forecast-chart" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(plan.sentence)}">${path('forecast-grid', plan.grid, painted(FORECAST_PAINT.grid))}${path('forecast-area', plan.area, painted(FORECAST_PAINT.area))}${path('forecast-area', plan.below, ` data-below=""${painted(FORECAST_PAINT.area)}`)}${path('forecast-zero', `M0 ${plan.zero}H1000`)}${plan.cross ? path('forecast-cross-rule', plan.cross.rule, painted(FORECAST_PAINT.rule)) : ''}${path('forecast-base', plan.base)}${path('forecast-past', plan.past)}${path('forecast-walk', plan.walk, painted(FORECAST_PAINT.walk))}${path('forecast-future', plan.future)}${path('forecast-low', plan.low)}${path('forecast-now', plan.now.d, painted(FORECAST_PAINT.now))}${plan.cross ? path('forecast-cross', plan.cross.d) : ''}</svg><span class="forecast-now-label num"${near} style="--at:${plan.now.at};--y:${plan.now.y}" aria-hidden="true">${escape(plan.now.label)}</span>${axis}${
     plan.cross ? `<span class="forecast-pin"${plan.cross.near ? ' data-side="end"' : ''} style="--at:${plan.cross.at}" aria-hidden="true">${TONES.warn.glyph} ${escape(plan.cross.day)}</span>` : ''

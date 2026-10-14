@@ -21,7 +21,7 @@ import { no, ok, type Clock, type Result, type Sql } from '@braindog/ports';
 
 import { PROMPTS, MODELS, fill, type ModelId, type PromptId } from './prompts.ts';
 import { checkSchema, isRecord, tokens } from './project.ts';
-import type { Inference, Purpose, ReadTrace, Settings, Spends, Tier } from './types.ts';
+import type { Inference, Purpose, ReadTrace, Settings, SlashRoute, Spends, Tier } from './types.ts';
 
 /** Every tier the `slash_settings` CHECK admits, and the ones a host answers unless it says fewer (`SlashOptions.tiers`). */
 export const TIERS: readonly Tier[] = ['a', 'b', 'byo'];
@@ -71,6 +71,8 @@ export type Ran = {
    * model that did not answer, and `account` spends nothing for it.
    */
   served: boolean;
+  /** The host's handle for the candidate that ended a route's walk (ENG-A06), for the caller's row. Absent with no route. */
+  candidate?: string | undefined;
 };
 
 export type RunArgs = {
@@ -467,11 +469,47 @@ const MINTED_MOST = 1_000;
 const unspent = (row: AccountRow): boolean =>
   row.model === '-' || row.code === 'PULL_REQUEST_REFUSED' || (row.code === 'UNREACHABLE' && row.served !== true);
 
+/** The kind each template's caller writes on its row, for the row `run` writes for an attempt its walk passed over. */
+const KINDS: Readonly<Record<PromptId, CallKind>> = {
+  predicate: 'read',
+  propose: 'propose',
+  pattern: 'pattern',
+  answer: 'read',
+  setup: 'read',
+  mapping: 'read',
+};
+
+/** A throw the host marked as a ceiling saying no before anything was sent: true of every candidate after it too. */
+const budgetIn = (e: unknown): boolean => typeof e === 'object' && e !== null && (e as { code?: unknown }).code === 'SLASH_BUDGET_SPENT';
+
+/** A throw the host marked as nothing sent at all (`sent: false`, as `answer.ts` reads it). */
+const sentNothing = (e: unknown): boolean => typeof e === 'object' && e !== null && (e as { sent?: unknown }).sent === false;
+
+/**
+ * Whether the walk passes an attempt over and asks the next candidate.
+ *
+ * ONLY A MODEL THAT DID NOT ANSWER: a throw with no `answered` mark, which settles as `UNREACHABLE` and spends nothing. An
+ * answer, a reply that broke the schema, a throw marked `answered` (it counts once and is final) and a budget refusal all
+ * end the walk, so no ask is answered twice and no refusal true of every model is asked of each.
+ */
+const passedOver = (ran: Ran, thrown: unknown): boolean =>
+  !ran.served && refusedWith(ran.out) === 'UNREACHABLE' && !budgetIn(thrown);
+
+const refusedWith = (out: Result<unknown>): string | undefined => ('refusal' in out ? out.refusal.code : undefined);
+
 /**
  * `priced` IS THE HOST'S ANSWER TO WHOSE NEURONS EACH TIER SPENDS, and `['a']` is `46 §4.1`'s. `tiers` IS ITS ANSWER TO
- * WHICH TIERS IT RUNS AT ALL. See `SlashOptions` in `index.ts` for the host that answers otherwise.
+ * WHICH TIERS IT RUNS AT ALL. See `SlashOptions` in `index.ts` for the host that answers otherwise. `route` IS ITS ROUTER
+ * (ENG-A06), the candidates `run` walks before a caller's rules speak; absent, every ask goes to its template's model.
  */
-export const core = (sql: Sql, clock: Clock, fallback: Inference, priced: readonly Tier[] = ['a'], tiers: readonly Tier[] = TIERS): Core => {
+export const core = (
+  sql: Sql,
+  clock: Clock,
+  fallback: Inference,
+  priced: readonly Tier[] = ['a'],
+  tiers: readonly Tier[] = TIERS,
+  route?: SlashRoute,
+): Core => {
   const now = (): string => new Date(clock.now()).toISOString();
 
   /* THE IDS THIS LEDGER HANDED OUT, the only ones `account` may settle over a row that is already there (`account`). */
@@ -591,53 +629,90 @@ export const core = (sql: Sql, clock: Clock, fallback: Inference, priced: readon
     const content = fill(template.user, slots);
     const estimate = tokens(system) + tokens(content);
 
-    let reply;
-    try {
-      reply = await (args.inference ?? fallback).complete({
-        model,
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content },
-        ],
-        maxTokens: template.maxTokens,
-        jsonSchema: schema,
+    /** One model asked once: what came back, read against the schema, and the throw, where there was one, for the walk. */
+    const ask = async (model: string, inference: Inference, t0: number): Promise<{ ran: Ran; thrown?: unknown }> => {
+      let reply;
+      try {
+        reply = await inference.complete({
+          model,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content },
+          ],
+          maxTokens: template.maxTokens,
+          jsonSchema: schema,
+        });
+      } catch (e) {
+        /* A PROVIDER THAT DID NOT ANSWER IS NOT A REFUSAL ABOUT THE ASK, and saying `PROPOSAL_SCHEMA`
+           here would send a person looking at their question for a fault that is in the network. The
+           estimate is billed as `tokens_in` so a month of outages is visible in the meter. `answer`
+           settles that row under `-`, so there it keeps `tokens_in` and no neurons (`asksUsed`), unless the
+           host marked the throw `reached`, and then `answer` settles it as `read` does, under the model's name. */
+        const ran: Ran = {
+          model,
+          ms: clock.now() - t0,
+          usage: { in: estimate, out: 0 },
+          /* THE HOST'S `answered` MARK, read structurally as `answer.ts` reads it (`heardIn`): the endpoint answered and
+             the reply was too large, unreadable or cut off, or the clock ran out on a model that may have run to the end. */
+          served: typeof e === 'object' && e !== null && (e as { answered?: unknown }).answered === true,
+          out: no(
+            'UNREACHABLE',
+            `The model did not answer${e instanceof Error && e.message !== '' ? `: ${e.message}` : ''}. Nothing was filed; ask again.`,
+          ),
+        };
+        return { ran, thrown: e };
+      }
+
+      const usage = reply.usage;
+      const ms = clock.now() - t0;
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(reply.text);
+      } catch {
+        return { ran: { model, ms, usage, served: true, out: no('PROPOSAL_SCHEMA', 'The model did not answer with JSON. Nothing was filed; ask again.') } };
+      }
+
+      const fault = checkSchema(schema, parsed);
+      if (fault) return { ran: { model, ms, usage, served: true, out: { ok: false, refusal: fault } } };
+      if (!isRecord(parsed))
+        return { ran: { model, ms, usage, served: true, out: no('PROPOSAL_SCHEMA', 'The model did not answer with an object. Nothing was filed; ask again.') } };
+
+      return { ran: { model, ms, usage, served: true, out: ok(parsed) } };
+    };
+
+    /* THE WALK (ENG-A06), only where the host handed a route and the ask is the template's own: his own key (`b`) and a
+       model he named are his choice and never fall to another, so either is asked as before. No route, or an empty one,
+       is the one call this function always made. */
+    const walk = route === undefined || model !== template.model || settings().tier === 'b' ? [] : route(template.purpose);
+    if (walk.length === 0) return (await ask(model, args.inference ?? fallback, t0)).ran;
+
+    let start = t0;
+    for (const [i, candidate] of walk.entries()) {
+      const { ran, thrown } = await ask(candidate.model, candidate.inference ?? args.inference ?? fallback, start);
+      const tried: Ran = candidate.id === undefined ? ran : { ...ran, candidate: candidate.id };
+      if (i === walk.length - 1 || !passedOver(ran, thrown)) return tried;
+      /* THE ATTEMPT PASSED OVER IS ITS OWN ROW, under its own model and a fresh id, so the ledger holds one row an attempt
+         and the caller's row is the attempt that ended the walk. It spends nothing (`unspent`), and its neurons are its
+         model's, as a caller's `UNREACHABLE` row's are. A throw the host marked as nothing sent is under `-`. */
+      account({
+        id: ulid(clock.now()),
+        kind: KINDS[args.id],
+        tier: settings().tier,
+        model: sentNothing(thrown) ? '-' : candidate.model,
+        usage: ran.usage,
+        ms: ran.ms,
+        status: 'error',
+        code: 'UNREACHABLE',
+        purpose: template.purpose,
+        spends: 'none',
+        served: false,
+        candidate: candidate.id,
       });
-    } catch (e) {
-      /* A PROVIDER THAT DID NOT ANSWER IS NOT A REFUSAL ABOUT THE ASK, and saying `PROPOSAL_SCHEMA`
-         here would send a person looking at their question for a fault that is in the network. The
-         estimate is billed as `tokens_in` so a month of outages is visible in the meter. `answer`
-         settles that row under `-`, so there it keeps `tokens_in` and no neurons (`asksUsed`), unless the
-         host marked the throw `reached`, and then `answer` settles it as `read` does, under the model's name. */
-      return {
-        model,
-        ms: clock.now() - t0,
-        usage: { in: estimate, out: 0 },
-        /* THE HOST'S `answered` MARK, read structurally as `answer.ts` reads it (`heardIn`): the endpoint answered and
-           the reply was too large, unreadable or cut off, or the clock ran out on a model that may have run to the end. */
-        served: typeof e === 'object' && e !== null && (e as { answered?: unknown }).answered === true,
-        out: no(
-          'UNREACHABLE',
-          `The model did not answer${e instanceof Error && e.message !== '' ? `: ${e.message}` : ''}. Nothing was filed; ask again.`,
-        ),
-      };
+      start = clock.now();
     }
-
-    const usage = reply.usage;
-    const ms = clock.now() - t0;
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(reply.text);
-    } catch {
-      return { model, ms, usage, served: true, out: no('PROPOSAL_SCHEMA', 'The model did not answer with JSON. Nothing was filed; ask again.') };
-    }
-
-    const fault = checkSchema(schema, parsed);
-    if (fault) return { model, ms, usage, served: true, out: { ok: false, refusal: fault } };
-    if (!isRecord(parsed))
-      return { model, ms, usage, served: true, out: no('PROPOSAL_SCHEMA', 'The model did not answer with an object. Nothing was filed; ask again.') };
-
-    return { model, ms, usage, served: true, out: ok(parsed) };
+    /* NOT REACHED: the last candidate always returns above. */
+    throw new Error("Slash's route offered no model to ask.");
   };
 
   return {

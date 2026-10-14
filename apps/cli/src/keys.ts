@@ -1,7 +1,8 @@
 /**
  * `braindog keys put <label>`, `braindog keys exec <label> -- <command>` and `braindog keys headers <credential> --as
  * <Header>`: a key into the vault, a key handed to one command, and a key handed to one program as the header it asks
- * for, through the host's key doors, under a vault grant (`docs/48-SPEC-CLI.md` §2).
+ * for, through the host's key doors, under a vault grant (`docs/48-SPEC-CLI.md` §2). `put --from` and `scan` have
+ * files of their own (`keys-many.ts`, `keys-scan.ts`), and a value they read reaches the host only through `sealOne`.
  *
  * `put` WITH NO VAULT GRANT TO USE SENDS THE LOGIN INSTEAD. The deposit door takes a
  * `write` token too, and the record puts the key in this run's project as a NEW key: a label already there is refused
@@ -42,6 +43,8 @@ import { parseArgs } from 'node:util';
 import { hostKey, inTheClear, readHosts, target } from './http.ts';
 import type { Answering } from './json.ts';
 import { keysList } from './keys-list.ts';
+import { keysPutMany } from './keys-many.ts';
+import { keysScan } from './keys-scan.ts';
 
 /** A key in the clear. */
 type Plaintext = string & { readonly brand: 'Plaintext' };
@@ -82,6 +85,13 @@ export type KeysIo = {
   fetch?: typeof globalThis.fetch | undefined;
   now?: (() => number) | undefined;
   signal?: AbortSignal | undefined;
+  /**
+   * `put --from` ONLY: one yes or no from the person at the terminal, before each key is sent, or `null` when there is
+   * no terminal to ask at, and then nothing is sent. A credential is his, so nothing deposits a folder of them unasked.
+   */
+  confirm?: ((question: string) => Promise<boolean | null>) | undefined;
+  /** The folder a relative `--from` or `scan` path is read from: `process.cwd()` unless a test says. */
+  cwd?: string | undefined;
 };
 
 /** `48 §4.4`: a refusal or a local failure is 1, and a host that did not answer is 3. */
@@ -308,6 +318,45 @@ async function depositOne(door: Door, ask: { label: string; opens?: string; kind
   return answerOf(res);
 }
 
+/** The door `put --from` sends every key of one file or folder through: what `put` would use, read once. */
+export type ManyDoor = { readonly door: Door; readonly host: string; readonly replaces: boolean };
+
+/**
+ * `put --from`'s door, or the one sentence that says why there is none. A PROJECT NAMED IS THAT PROJECT'S VAULT GRANT
+ * OR NOTHING, as `--vault` is for `put`, because under the login a key goes to the run's project and not the one typed.
+ * With no project it is `put`'s door: the one grant kept, or the login. Under a grant a key the project already holds
+ * has its value replaced (`replaces`); under the login it is refused at the door, and `put --from` counts it skipped.
+ */
+export function manyDoor(flags: { host?: string | undefined; project?: string | undefined }, io: KeysIo): ManyDoor | string {
+  const door = doorFor({ host: flags.host, vault: flags.project }, io, true);
+  return typeof door === 'string' ? door : { door, host: door.key, replaces: !door.login };
+}
+
+/** What became of one key `put --from` sent. */
+export type SealedOne = { sealed: 'new' | 'replaced' } | { held: true } | { refused: string; unreachable?: true };
+
+/**
+ * One key of a file or a folder through the deposit door. THE VALUE IS BRANDED HERE AND LEAVES ONLY IN `depositOne`'s
+ * request, so `keys-many.ts` hands it in and gets back what the record did, never the value and never the label.
+ */
+export async function sealOne(many: ManyDoor, ask: { label: string; opens?: string | undefined; kind?: string | undefined }, value: string, io: KeysIo): Promise<SealedOne> {
+  const { door } = many;
+  const sent = { label: ask.label, ...(ask.opens ? { opens: ask.opens } : {}), ...(ask.kind ? { kind: ask.kind } : {}) };
+  let answer: Answer;
+  try {
+    answer = await depositOne(door, sent, value as Plaintext, await io.headers(door.key), io);
+  } catch {
+    /* The error could quote the request, and the request holds the value. */
+    return { refused: io.signal?.aborted ? 'Stopped before the host answered.' : `${door.key} did not answer.`, unreachable: true };
+  }
+  const kept = answer.body?.ok === true && isObject(answer.body.value) ? answer.body.value : null;
+  if (kept !== null && typeof kept.credential === 'string') return { sealed: kept.rotated === true ? 'replaced' : 'new' };
+  /* A LABEL ALREADY WITHIN THE LOGIN'S REACH is the one refusal that means the record holds the key already. */
+  const refusal = answer.body?.ok === false && isObject(answer.body.refusal) ? answer.body.refusal : null;
+  if (door.login && refusal?.code === 'FORBIDDEN' && refusal.at === 'label') return { held: true };
+  return { refused: refusedLine(door, answer) };
+}
+
 /** Read one key back: its value, or the answer that refused it. */
 async function getOne(door: Door, ask: { label: string } | { credential: string }, headers: Record<string, string>, io: KeysIo): Promise<{ value: Plaintext } | { refused: Answer }> {
   const fetch = io.fetch ?? globalThis.fetch;
@@ -406,13 +455,17 @@ const USAGE_PUT = 'braindog keys put takes one label, --opens, --kind, --vault a
 const USAGE_EXEC = 'braindog keys exec takes one label or spoken id, --as, --vault and --host, then -- and the command to run.';
 const USAGE_HEADERS = 'braindog keys headers takes one spoken id or label, --as with the header name, --vault and --host, and nothing else.';
 
-/** `braindog keys list|put|exec|headers`, and the exit code: for `exec`, the command's own once it has run. */
+/** `braindog keys list|put|scan|exec|headers`, and the exit code: for `exec`, the command's own once it has run. */
 export async function keys(args: string[], io: KeysIo): Promise<number> {
   const [verb, ...all] = args;
   /* `list` READS THE INDEX AND OPENS NOTHING, so it has a file and a path of its own (`keys-list.ts`). */
   if (verb === 'list') return keysList(all, io);
+  /* `scan` READS NAMES AND SENDS NOTHING, and `put --from` READS A FILE OR A FOLDER OF KEYS, so each has a file of its
+     own (`keys-scan.ts`, `keys-many.ts`); the value still leaves only through `sealOne` here. */
+  if (verb === 'scan') return keysScan(all, io);
+  if (verb === 'put' && all.some((a) => a === '--from' || a.startsWith('--from='))) return keysPutMany(all, io);
   if (verb !== 'put' && verb !== 'exec' && verb !== 'headers') {
-    io.say('braindog keys takes put <label>, with the value on standard input, exec <label> -- <command>, headers <credential> --as <Header>, or list.');
+    io.say('braindog keys takes put <label>, with the value on standard input, put --from <file or folder>, scan [<folder>], exec <label> -- <command>, headers <credential> --as <Header>, or list.');
     return REFUSED;
   }
   const usage = verb === 'put' ? USAGE_PUT : verb === 'exec' ? USAGE_EXEC : USAGE_HEADERS;

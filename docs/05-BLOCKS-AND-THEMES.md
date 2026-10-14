@@ -312,24 +312,29 @@ In the skill, not in the schema — a schema that teaches is a schema nobody rea
 
 | Names | Example |
 |---|---|
-| a field on this row | `{{status}}` · `{{effortDays}}` |
+| a field on this row | `{{status}}` · `{{effortDays}}` · `{{revenue.amount}}` · `{{client.name}}`: on a page about a row, its field, and one step into it as from a row by spoken id |
 | a metric | `{{due-30d}}` |
 | a row by spoken id, then a field | `{{tasks#125.state}}` — **the register is required**, because every register has a `#1`. *An earlier draft also wrote `{{shop.revenue.monthly}}`; `shop` is a row's title, not its id, and a bare row id is not a path* |
 | a **count**, never the contents | `{{blockers.count}}` — `register.count` |
 | the rows in one state, counted | `{{tasks.open}}` — `register.<state value>` |
 | one step into a row's field | `{{tasks#1.project.name}}` · `{{tasks#1.cost.amount}}` · `{{tasks#1.tags.count}}`: a field of the row a link points at, a money's `amount` or `currency`, a list field's `count`. One step and no further: a link on the far row is not followed, and a fourth part names nothing |
 | the whole record, by module | `{{portfolio.revenue}}`: `<module>.<figure>`: an installed module or add-on, then a figure it declares |
+| the newest reading about this row | `{{revenue.monthly}}` · `{{revenue.monthly.since}}`: `<measure>.<period>`, on a page about a row: the newest reading named the period and the measure ("Monthly revenue", or the same and a comma and the row's title) about that row, money in the currency it was written in; `.since` is the day it was read |
 | a figure's part | `{{cash-now.change}}` · `{{tasks-late-yours.first}}`: `change`, `first`, `names`, `more`, `since`, `first_<field>` |
 
-Eight forms. **One order for two words**, written down once and kept: (1) a list and `count`, or a state its list
-holds; (2) a figure and `change`, `first`, `names`, `more`, `since` or `first_<field>`; (3) a module and a figure it
-declares; (4) then a list's state, which past (1) answers nothing. A path two rules could read is read by the first
-that answers, never guessed, and a path no rule answers still names nothing. A module's figure is found by its id
-(`{{work.open-tasks}}`), by its id after the module's own word (`portfolio.live` for `portfolio-live`), or as the one
-figure of that module that totals a field of that name (`portfolio.revenue` is what the projects say they earn); two
-such totals, or a figure that waits for a parameter, answer nothing. A step through a link reads the far row only for
-a reader of both lists. *Amended October 14th 2026 (PGS-B13). The newest reading of a measure, `<measure>.<period>`,
-is not a form yet.*
+Nine forms. **One order for two words**, written down once and walked (`PATH_ORDER` in the kernel): (1) a list and
+`count`, or a state its list holds; (2) a figure and `change`, `first`, `names`, `more`, `since` or `first_<field>`;
+(3) a module and a figure it declares; (4) on a page about a row, a field of that row and a part; (5) then, on that
+page, a measure and a period, read only when the record holds such a reading; (6) then nothing: a list's state its
+list does not hold is not a count of nought. A path two rules could read is read by the first that answers, never
+guessed, and a path no rule answers still names nothing. Every filled path says which rule read it (`read_as`:
+`count`, `state`, `figure`, `module`, `field` or `reading`), so a check can list a path two rules match. A module's
+figure is found by its id (`{{work.open-tasks}}`), by its id after the module's own word (`portfolio.live` for
+`portfolio-live`), or as the one figure of that module that totals a field of that name (`portfolio.revenue` is what
+the projects say they earn); two such totals, or a figure that waits for a parameter, answer nothing. A step through a
+link reads the far row only for a reader of both lists, and a reading only for a reader of its list. A reading is one
+reading, never a sum: a reading in another currency beside it is not added or converted. *Amended October 14th 2026
+(PGS-B13, twice).*
 
 **Lexically**, a path is `segment ('.' segment)*`; a segment is
 `[A-Za-z][A-Za-z0-9_-]*` or `register#digits`. Anything after `{{` that is not a path, or one of the

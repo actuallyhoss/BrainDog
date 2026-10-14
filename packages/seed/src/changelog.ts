@@ -22,7 +22,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   portfolio: [
     {
       version: '1.17.0',
-      notes: 'Projects says how many of those in play say what they earned in a year only once one of them does. With none saying, the line is not drawn. A project page lists up to six of its own keys, tools and skills under Runs on, and says which agents used each one.',
+      notes: 'Projects says how many of those in play say what they earned in a year only once one of them does. With none saying, the line is not drawn. A project page lists up to six of its own keys, tools and skills under Runs on, and says which agents used each one. On Projects, the one line under each name can be typed straight on its card.',
     },
     {
       version: '1.16.0',

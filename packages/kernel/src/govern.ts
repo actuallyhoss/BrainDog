@@ -35,6 +35,8 @@ import { causeFault, causeOf, canon, noop } from './cause.ts';
 import { costOf, costRows, optionCosts, pickCost, type Cost } from './weigh.ts';
 import { askOf, retypedBody, retypeShapeFault } from './api/retype.ts';
 import { configValue, readPackConfig } from './declare.ts';
+import { dayIn } from './finished.ts';
+import { recordIdentity } from './provision.ts';
 
 /** The three tables that are read like registers and are not registers. */
 export const GOVERNANCE = ['suggestion', 'decision', 'prediction'] as const;
@@ -384,6 +386,9 @@ export function propose(deps: GovernDeps, actor: string | (() => string), p: Pro
 
   const wrong = checkBody(deps, p.body_kind, p.body ?? {}, p.cause ?? null);
   if (wrong) return { ok: false, refusal: wrong };
+  /* A DAY IT LAPSES IS ONE STILL TO COME, in the record's own zone (ENG-B14). */
+  const past = p.body_kind === 'arrange' ? offerFault(p.body ?? {}, todayIn(deps)) : null;
+  if (past) return { ok: false, refusal: past };
 
   /* A ROWSET THAT CHANGES NOTHING IS NOT A QUESTION. SG69 on the owner's record proposed values its rows already held,
      and answering it would have written nothing; the proposer is told so instead of the owner being asked. */
@@ -483,6 +488,11 @@ export function propose(deps: GovernDeps, actor: string | (() => string), p: Pro
   const asked = askedAlready(deps, by, p, body, cause);
   if (!asked.ok) return asked;
   if (asked.value !== null) return ok(asked.value);
+  /* AT THE CAP A STRONGER ONE TAKES THE PLACE OF THE ASKER'S OWN WEAKEST, in this write (ENG-B14), or is refused. */
+  if (p.body_kind === 'arrange') {
+    const full = makeRoom(deps, by, body, cause);
+    if (full) return { ok: false, refusal: full };
+  }
 
   const id = `SG${deps.allocate('suggestion')}`;
   const at = instant(deps.nowMs);
@@ -773,10 +783,133 @@ export function withdraw(sql: Sql, deps: Pick<GovernDeps, 'mint'>, id: string, b
     return no<Out>('FORBIDDEN', `${id} was asked by another agent, so only that agent can take it back. Otherwise it waits for the owner's answer.`, { at: 'id' });
   if (joinersOf(sql, id).some((j) => !sameAgent(sql, row.opened_by, j) && !sameAgent(sql, by, j)))
     return no<Out>('FORBIDDEN', 'Another agent asked the same thing, so it stays open for the owner.', { at: 'id' });
-  const at = instant(nowMs);
-  sql.exec("UPDATE suggestion SET status = 'resolved', resolved_as = 'withdrawn' WHERE id = ? AND status = 'open'", id);
-  event({ sql, mint: deps.mint }, at, by, 'resolve', `suggestion:${id}`, 'suggestion', 'withdrawn', 'Taken back by the agent that asked it.');
+  takeBack({ sql, mint: deps.mint }, id, by, instant(nowMs), 'Taken back by the agent that asked it.');
   return ok({ id, state: 'withdrawn' });
+}
+
+/** Close an open question as `withdrawn`, signed by `by`, with the line history reads. No decision is written. */
+function takeBack(deps: Pick<GovernDeps, 'sql' | 'mint'>, id: string, by: string, at: string, note: string): void {
+  deps.sql.exec("UPDATE suggestion SET status = 'resolved', resolved_as = 'withdrawn' WHERE id = ? AND status = 'open'", id);
+  event(deps, at, by, 'resolve', `suggestion:${id}`, 'suggestion', 'withdrawn', note);
+}
+
+/* ── an asker takes back its own suggestion (ENG-B14) ─────────────────────── */
+
+/** The most an arrangement's `rank` says: the recommender's strength for it, a whole number from 0. */
+const RANK_MOST = 1000;
+/** A day as an arrangement's `lapses` spells it. */
+const DAY = /^(\d{4})-(\d{2})-(\d{2})$/u;
+/** The line under one a stronger suggestion took the place of. */
+export const DISPLACED_NOTE = 'Taken back: a stronger suggestion took its place.';
+/** The line under one nobody answered by its day, `day` being the day it was taken back. */
+export const lapsedNote = (day: string): string => `Taken back on ${spokenDay(day)}: nobody answered it.`;
+
+/** `2026-10-14` as a person says it, "14 October". */
+const spokenDay = (day: string): string => new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(Date.parse(`${day}T12:00:00Z`));
+
+/** Whether `s` is a real day, `YYYY-MM-DD`: the 31st of September is not one. */
+const isDay = (s: string): boolean => DAY.test(s) && new Date(`${s}T00:00:00Z`).toISOString().slice(0, 10) === s;
+
+/** Today in the record's own zone, UTC for a record that has not said one. */
+const todayIn = (deps: Pick<GovernDeps, 'sql' | 'nowMs'>): string => dayIn(deps.nowMs, recordIdentity(deps.sql)?.tz);
+
+/**
+ * What is wrong with an arrangement's `rank` or `lapses`, or `null`. With `today`, a `lapses` before it is wrong too:
+ * a suggestion is filed with a day still to come, while one already waiting keeps its day when it is widened.
+ */
+function offerFault(body: Record<string, unknown>, today: string | null): Refusal | null {
+  const rank = body.rank;
+  if (rank !== undefined && !(typeof rank === 'number' && Number.isInteger(rank) && rank >= 0 && rank <= RANK_MOST))
+    return { code: 'VALUE_MALFORMED', fix: `rank is how strong this suggestion is, a whole number from 0 to ${RANK_MOST}, or leave it out.`, at: 'body.rank' };
+  const lapses = body.lapses;
+  if (lapses === undefined) return null;
+  const from = today === null ? '' : ` from today, ${today},`;
+  if (typeof lapses !== 'string' || !isDay(lapses) || (today !== null && lapses < today))
+    return { code: 'VALUE_MALFORMED', fix: `lapses is the day it is taken back if nobody answers it, a real day as YYYY-MM-DD${from} or leave it out.`, at: 'body.lapses' };
+  return null;
+}
+
+/** An arrangement's rank, or -1 for one that carries none, so it is the weakest. */
+const rankOf = (body: string): number => {
+  const rank = parse(body)?.rank;
+  return typeof rank === 'number' && Number.isInteger(rank) ? rank : -1;
+};
+
+/**
+ * Whether `opener` may sign the take-back of its own question. Slash signs only what `slashMayWrite` lets it, so until
+ * that lets it sign a withdrawn close, Slash's own suggestions wait for the owner as they always did.
+ */
+function maySign(opener: string): boolean {
+  try {
+    slashMayWrite(opener, 'resolve', { kind: 'withdrawn' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Whether only its opener asks a question: nobody else joined it, so taking it back closes nobody else's ask. */
+const onlyItsOpeners = (sql: Sql, id: string, opener: string): boolean => joinersOf(sql, id).every((j) => sameAgent(sql, opener, j));
+
+/** The open arrangements a new one is counted against: every one but the one holding its cause, which it joins. */
+const openArrangements = (sql: Sql, cause: string | null) =>
+  sql.all<{ id: string; opened_by: string; body: string }>(
+    "SELECT id, opened_by, body FROM suggestion WHERE body_kind = 'arrange' AND status = 'open' AND (? IS NULL OR cause IS NOT ?) ORDER BY rowid",
+    cause,
+    cause,
+  );
+
+/** The refusal at the cap, as it has always read. */
+const capRefusal = (open: readonly { id: string }[]): Refusal => ({
+  code: 'OUT_OF_BOUNDS',
+  fix: `${open.map((o) => o.id).join(', ')} already wait on the person, and ${OPEN_ARRANGEMENTS} open arrangements is the most. Wait until one is answered, then propose again.`,
+  at: 'body_kind',
+});
+
+/**
+ * Room for one more arrangement from `by`: nothing to do under the cap; at it, the weakest of `by`'s own open ones is
+ * taken back when the new one outranks it, and otherwise the filing is refused as it always was.
+ *
+ * ONLY ITS OWN, AND ONLY ONE NOBODY ELSE JOINED. Taking back another agent's or a person's question is answering it,
+ * which is the owner's. A new one with no rank outranks nothing. Ties go to the oldest. In the filing's own write, so a
+ * filing refused later takes nothing back.
+ */
+function makeRoom(deps: GovernDeps, by: string, body: Record<string, unknown>, cause: string | null): Refusal | null {
+  const open = openArrangements(deps.sql, cause);
+  if (open.length < OPEN_ARRANGEMENTS) return null;
+  const rank = typeof body.rank === 'number' ? body.rank : -1;
+  const weakest = open
+    .filter((o) => sameAgent(deps.sql, o.opened_by, by) && maySign(o.opened_by) && onlyItsOpeners(deps.sql, o.id, o.opened_by))
+    .map((o) => ({ ...o, rank: rankOf(o.body) }))
+    .reduce<{ id: string; opened_by: string; rank: number } | null>((w, o) => (w === null || o.rank < w.rank ? o : w), null);
+  if (rank < 0 || weakest === null || weakest.rank >= rank) return capRefusal(open);
+  takeBack(deps, weakest.id, weakest.opened_by, instant(deps.nowMs), DISPLACED_NOTE);
+  return null;
+}
+
+/**
+ * Take back every open arrangement nobody answered by its `lapses` day: one whose day is before today in `tz`.
+ *
+ * BY ITS OWN OPENER, AS `withdraw` IS, and so neither a yes nor a no: it closes as `withdrawn`, no decision is written, and
+ * the brake and the ladder read nothing from it. One the person put off past today waits for that day; one another agent
+ * joined stays open for the owner. It writes no row, asks nothing and files nothing.
+ */
+export function sweepLapsed(deps: Pick<GovernDeps, 'sql' | 'mint'>, nowMs: number, tz: string): { withdrawn: string[] } {
+  const today = dayIn(nowMs, tz);
+  const at = instant(nowMs);
+  const withdrawn: string[] = [];
+  const open = deps.sql.all<{ id: string; opened_by: string; body: string }>(
+    "SELECT id, opened_by, body FROM suggestion WHERE body_kind = 'arrange' AND status = 'open' AND (defer_until IS NULL OR defer_until <= ?) ORDER BY rowid",
+    at,
+  );
+  for (const o of open) {
+    const lapses = parse(o.body)?.lapses;
+    if (typeof lapses !== 'string' || !isDay(lapses) || lapses >= today) continue;
+    if (!maySign(o.opened_by) || !onlyItsOpeners(deps.sql, o.id, o.opened_by)) continue;
+    takeBack(deps, o.id, o.opened_by, at, lapsedNote(today));
+    withdrawn.push(o.id);
+  }
+  return { withdrawn };
 }
 
 /** What a join note holds in `to_v`, so a join is told from any other note on the question. */
@@ -1938,16 +2071,20 @@ function checkArranging(deps: GovernDeps, kind: Arranging, body: Record<string, 
       at: 'body',
     };
 
-  /* THE ONE HOLDING THIS CAUSE IS NOT COUNTED: the proposal joins it, or widens it (step 8), and opens nothing. */
-  const open = deps.sql
-    .all<{ id: string }>("SELECT id FROM suggestion WHERE body_kind = 'arrange' AND status = 'open' AND (? IS NULL OR cause IS NOT ?) ORDER BY rowid", cause, cause)
-    .map((r) => r.id);
-  if (open.length >= OPEN_ARRANGEMENTS)
-    return {
-      code: 'OUT_OF_BOUNDS',
-      fix: `${open.join(', ')} already wait on the person, and ${OPEN_ARRANGEMENTS} open arrangements is the most. Wait until one is answered, then propose again.`,
-      at: 'body_kind',
-    };
+  /* HOW STRONG IT IS AND THE DAY IT LAPSES (ENG-B14), in shape here; a day already past is `propose`'s to refuse. */
+  if (kind === 'arrange') {
+    const bad = offerFault(body, null);
+    if (bad) return bad;
+  }
+
+  /* THE ONE HOLDING THIS CAUSE IS NOT COUNTED: the proposal joins it, or widens it (step 8), and opens nothing. AT THE CAP
+     a ranked arrangement that outranks a waiting one is let through, and `makeRoom` decides once the asker is known,
+     since only the asker's own may give way. */
+  const open = openArrangements(deps.sql, cause);
+  if (open.length >= OPEN_ARRANGEMENTS) {
+    const rank = kind === 'arrange' && typeof body.rank === 'number' ? body.rank : -1;
+    if (!open.some((o) => rankOf(o.body) < rank)) return capRefusal(open);
+  }
   return null;
 }
 
@@ -3125,7 +3262,8 @@ function event(
   note?: string,
   batch?: string,
 ): void {
-  slashMayWrite(actor, kind);
+  /* A CLOSE IS ASKED ABOUT WITH WHAT IT CLOSES AS, so Slash may be let take back its own suggestion and close nothing else. */
+  slashMayWrite(actor, kind, kind === 'resolve' ? { kind: to } : undefined);
   deps.sql.exec(
     'INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v, note, batch) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
     deps.mint(),

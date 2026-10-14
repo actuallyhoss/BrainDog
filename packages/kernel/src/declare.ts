@@ -53,7 +53,7 @@ import { pairsFault } from './pairs.ts';
 import { DELETE_RULES } from './referenced.ts';
 import { spanMs } from './vault.ts';
 import { actionsOf, callFault, flowFault, sealedAs, subjectOf } from './flow-lint.ts';
-import { BLOCK_INSTALLS, BLOCK_KEY, FILTER_CONTROLS, FILTER_TYPES, FILTERS_MOST, NAV_KEYS, PAGE_KEYS, PAGE_UNBUILT, feedSaysFault, keyedBlocks, keysFor, kindsReading, unreadBlockKey, unreadPageKey, wrongKindKey } from './block-keys.ts';
+import { BLOCK_INSTALLS, BLOCK_KEY, FILTER_CONTROLS, FILTER_TYPES, FILTERS_MOST, NAV_KEYS, PAGE_KEYS, PAGE_UNBUILT, feedSaysFault, forecastAxisFault, keyedBlocks, keysFor, kindsReading, unreadBlockKey, unreadPageKey, wrongKindKey } from './block-keys.ts';
 import { LOOK_BASIS_BYTES, LOOK_BY, LOOK_GROUPS_MOST, LOOK_HEADLINE_BYTES, LOOK_KEYS, LOOK_KEYS_MOST, LOOK_NEXT_BYTES, withoutHoles } from './compose.ts';
 /* THE KINDS THAT READ THEMSELVES, admitted into `BLOCK_KINDS` and asked to check their own blocks at install. */
 import { BLOCK_KIND_MODULES, kindModule } from './kinds/index.ts';
@@ -956,6 +956,11 @@ function blockBody(decl: Declaration): Refusal | null {
    `reply` is a field drawn under the card's title in a quieter voice, the second opinion under a note. */
 const CARD_ROLES = ['title', 'figure', 'fact', 'trend', 'ring', 'who', 'when', 'mark', 'next', 'reply', 'hue', 'picture'] as const;
 const CARD_FACTS = 3;
+/* THE LINES A CARD DRAWS AS WORDS, the only ones `edit: true` may say a person types on in place (`render/src/card-edit.ts`).
+   A figure, a trend, a ring, a hue, a picture or a mark is drawn from its value and never as the words it holds, and a
+   person, a time or where a row applies is drawn with a face, a clock or a chip, so a box over any of them would install
+   and type nothing a reader sees. A column with no role is a fact. */
+const CARD_EDIT_ROLES: readonly string[] = ['title', 'fact', 'reply', 'next'];
 
 /** The field types a list may be put in order by (`order: { field, dir }`). */
 const LIST_ORDERS: readonly string[] = ['int', 'decimal', 'duration', 'day', 'instant', 'text'];
@@ -1848,6 +1853,9 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
        link field and a count, and from a section's, which is shut or not (`feedSaysFault`). */
     const fed = kind === 'feed' ? feedSaysFault(raw as Readonly<Record<string, unknown>>, `${id}.${at}`) : null;
     if (fed) return bad('DECLARATION_INVALID', fed.fix, `${at}.${fed.at}`, fed.allowed);
+    /* A FORECAST'S `axis` IS ONE OF TWO WORDS (`forecastAxisFault`): a stray one would draw as fitted and say nothing. */
+    const axised = kind === 'forecast' ? forecastAxisFault(raw as Readonly<Record<string, unknown>>, `${id}.${at}`) : null;
+    if (axised) return bad('DECLARATION_INVALID', axised.fix, `${at}.${axised.at}`, axised.allowed);
     if (kind !== 'cards' && kind !== 'feed' && block.fold !== undefined && typeof block.fold !== 'boolean')
       return bad('DECLARATION_INVALID', `${id}.${at}'s fold is true or false: whether the section starts shut.`, at);
     const grouped = kind === 'cards' || kind === 'table' ? cardGroupFault(id, at, raw as Readonly<Record<string, unknown>>, installed) : null;
@@ -2027,7 +2035,32 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
       if (!Array.isArray(columns) || columns.length === 0 || columns.length > COLUMN_CEILING)
         return bad('DECLARATION_INVALID', `${id}.${at} draws one to ${COLUMN_CEILING} columns.`, at);
       const roles = new Map<string, number>();
-      for (const column of columns as { field?: unknown; or?: unknown; as?: unknown; metric?: unknown }[]) {
+      for (const column of columns as { field?: unknown; or?: unknown; as?: unknown; metric?: unknown; edit?: unknown }[]) {
+        /* `edit: true` IS A CARD'S LINE TYPED ON IN PLACE (PGS-C15), written to the one field it draws, so it is a card's,
+           it names that field alone, and it is a line drawn as words. Whether the field is text is the read's to say,
+           where the list is in hand: a field that is not text draws as text, as on a reader who cannot write. */
+        if (column !== null && typeof column === 'object' && column.edit !== undefined) {
+          if (typeof column.edit !== 'boolean')
+            return bad('DECLARATION_INVALID', `${id}.${at} gives a column edit: ${JSON.stringify(column.edit)}, and edit is true or false. Write edit: true.`, at);
+          if (column.edit) {
+            if (block.kind !== 'cards')
+              return bad('DECLARATION_INVALID', `${id}.${at} is ${String(block.kind)} and gives a column edit: true, which only a card's line reads. Take edit: off, or draw the block as cards.`, at);
+            if (column.metric !== undefined)
+              return bad('DECLARATION_INVALID', `${id}.${at} gives a trend column edit: true, and a trend is a figure the record works out, never typed. Take edit: off the trend.`, at);
+            if (column.or !== undefined)
+              return bad('DECLARATION_INVALID', `${id}.${at} gives a column edit: true and an or:, so a line typed on could be either field. Take the or: off, or edit: off.`, at);
+            if (typeof column.field !== 'string' || column.field === '')
+              return bad('DECLARATION_INVALID', `${id}.${at} gives a column edit: true and no field, and a line typed on is written to the field it names. Name the field with field:.`, at);
+            const role = column.as === undefined ? 'fact' : column.as;
+            if (typeof role !== 'string' || !CARD_EDIT_ROLES.includes(role))
+              return bad(
+                'DECLARATION_INVALID',
+                `${id}.${at} gives a column as ${JSON.stringify(column.as)} edit: true, and only a line drawn as words is typed on: ${CARD_EDIT_ROLES.join(', ')}. Take edit: off, or put it on one of those.`,
+                at,
+                CARD_EDIT_ROLES as string[],
+              );
+          }
+        }
         /* A CARD'S TREND MAY NAME A FIGURE IN PLACE OF A FIELD, grouped by a date bucket and read once a card with
            `{{field}}` in its id filled from the card's row (`pages.ts` `trendsOf`). Nothing else draws a figure in a
            column, so a `metric:` anywhere else would install and draw nothing. */

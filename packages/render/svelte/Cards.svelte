@@ -36,6 +36,7 @@
   import { pictureSrc } from '../src/gallery.ts';
   import { hrefFor, trendNewest, written } from '../src/html.ts';
   import { AMOUNT_SPACE } from '../src/money.ts';
+  import { CARD_EDIT_PAUSE, editAfter, type CardEdit } from '../src/card-edit.ts';
   import Text from './Text.svelte';
 
   /**
@@ -45,8 +46,27 @@
    */
   type ScopeCells = { columns: readonly number[]; everywhere: string; glyph: string | null; marks: ReadonlyMap<string, { mark: string | null; hue: number | null }> };
 
+  /**
+   * A LINE TYPED ON IN PLACE (PGS-C15) IS HANDED IN `opts` TOO, for the reason a scope is: `edits` is, by the header's
+   * columns, the field a box writes and its own max (`cardEdit`, `src/card-edit.ts`), and `write` is the page's writer,
+   * which answers the record's sentence when it refuses and nothing when the line was kept. With no `write`, a reader who
+   * cannot write and the mirror alike, every line is text, as `toHTML` draws it.
+   */
+  type CardWrite = (row: Row, field: string, value: string) => Promise<string | null | undefined | void> | string | null | undefined | void;
+
   /* A BLOCK OF RUNS COMES WITH ITS RUNS: the host hands one a row, which the `who` face is drawn from. */
-  let { block, opts = {} }: { block: Block; opts?: RenderOptions & { scope?: ScopeCells | undefined; runs?: readonly (RunCell | null)[] | undefined } } = $props();
+  let {
+    block,
+    opts = {},
+  }: {
+    block: Block;
+    opts?: RenderOptions & {
+      scope?: ScopeCells | undefined;
+      runs?: readonly (RunCell | null)[] | undefined;
+      edits?: readonly (CardEdit | null)[] | undefined;
+      write?: CardWrite | undefined;
+    };
+  } = $props();
 
   const L = $derived(cardLayout(block.rows[0]?.cells ?? []));
   const rows = $derived(block.rows.slice(1));
@@ -78,6 +98,147 @@
 
   /** The mark the host draws for the name in a cell, or `null`, as `markFor` in `src/html.ts`. */
   const markFor = (name: string): AgentMark | null => (name.trim() && opts.agentMark ? opts.agentMark(name.trim()) : null);
+
+  /* ── A LINE TYPED ON IN PLACE ── */
+
+  /** The words under a card when the record would not keep what was typed and gave no sentence of its own. */
+  const NOT_KEPT = 'That line was not kept. The old one is back.';
+  const EMPTY_LINE = 'Add a line';
+  const EMPTY_NAME = 'Add a name';
+
+  /* A BOX ONLY OVER A ROW THE HOST CAN NAME, since the writer is handed the row and writes by its ref. */
+  const boxOf = (r: Row, i: number): CardEdit | null => (i >= 0 && opts.write && r.ref ? (opts.edits?.[i] ?? null) : null);
+  /* KEYED BY THE ROW'S REF AND THE COLUMN, never by its place, since a write reads the page again and the cards move. */
+  const cardKey = (r: Row, n: number): string => (r.ref ? `${r.ref.register}#${r.ref.seq}` : `#${n}`);
+  const boxKey = (r: Row, n: number, i: number): string => `${cardKey(r, n)}.${i}`;
+  /* A box is named for a screen reader by its column's label, or by the card it is on. */
+  const boxName = (r: Row, i: number): string => label(i) || (i === L.name ? 'Name' : said(r, L.name) ? `Line under ${said(r, L.name)}` : 'Line');
+
+  /**
+   * What was typed into a box: the text, the line as it was drawn when the typing began (`from`, which Escape puts back),
+   * the line drawn under it now (`since`), and what was last written (`sent`), so a second pause over the same words
+   * sends nothing.
+   */
+  type Draft = { text: string; from: string; since: string; sent?: string | undefined };
+  let drafts = $state<Record<string, Draft>>({});
+  /** The sentence said under a card, by `cardKey`, until something is typed on it again. */
+  let refused = $state<Record<string, string>>({});
+  /** The box being typed into. Any other is readonly, so a tap that only meant to land on a phone opens no keyboard. */
+  let armed = $state<string | null>(null);
+  /** The pause each box is waiting out, and the write it ends in, so a card that goes mid-pause still sends it. */
+  const waits = new Map<string, { at: number; handle: ReturnType<typeof setTimeout>; run: () => void }>();
+  /** How the last press on a box landed: by touch, and on a box already focused. */
+  let pressed: { key: string; touch: boolean; focused: boolean } | null = null;
+
+  /* WHILE A BOX IS BEING TYPED INTO, WHAT WAS TYPED; once left, what was typed until the record draws a new line. */
+  const shown = (key: string, cell: string): string => {
+    const d = drafts[key];
+    return d && (armed === key || d.since === cell) ? d.text : cell;
+  };
+
+  function hush(key: string) {
+    const w = waits.get(key);
+    if (w) clearTimeout(w.handle);
+    waits.delete(key);
+  }
+
+  /** Writes what the box holds, if the pause is over and it says something new. */
+  function send(r: Row, n: number, i: number, e: CardEdit, ms: number) {
+    const key = boxKey(r, n, i);
+    const d = drafts[key];
+    hush(key);
+    if (!d || !opts.write) return;
+    const step = editAfter(d.sent ?? d.since, d.text, ms, e.max);
+    if (step.wait > 0) return wait(r, n, i, e, Date.now() - (CARD_EDIT_PAUSE - step.wait));
+    if (step.send === null) return;
+    put(r, n, key, e.field, step.send);
+  }
+
+  function put(r: Row, n: number, key: string, field: string, value: string) {
+    const ck = cardKey(r, n);
+    const write = opts.write;
+    if (!write) return;
+    if (drafts[key]) drafts[key] = { ...drafts[key]!, sent: value };
+    delete refused[ck];
+    /* A REFUSAL IS SAID UNDER THE CARD AND THE OLD LINE IS PUT BACK, which is the line the record still holds. */
+    const back = (fix: string) => {
+      refused[ck] = fix;
+      delete drafts[key];
+    };
+    Promise.resolve()
+      .then(() => write(r, field, value))
+      .then(
+        (fix) => {
+          if (typeof fix === 'string' && fix.trim()) back(fix.trim());
+        },
+        () => back(NOT_KEPT),
+      );
+  }
+
+  function wait(r: Row, n: number, i: number, e: CardEdit, at = Date.now()) {
+    const key = boxKey(r, n, i);
+    hush(key);
+    const run = () => send(r, n, i, e, Date.now() - at);
+    waits.set(key, { at, handle: setTimeout(run, Math.max(0, CARD_EDIT_PAUSE - (Date.now() - at))), run });
+  }
+
+  function typed(r: Row, n: number, i: number, e: CardEdit, cell: string, text: string) {
+    const key = boxKey(r, n, i);
+    const d = drafts[key];
+    drafts[key] = { text, from: d?.from ?? cell, since: cell, sent: d?.sent };
+    delete refused[cardKey(r, n)];
+    wait(r, n, i, e);
+  }
+
+  /* ESCAPE PUTS THE OLD LINE BACK: dropped before the pause, and written back over what a pause already wrote. */
+  function undo(r: Row, n: number, i: number, e: CardEdit) {
+    const key = boxKey(r, n, i);
+    const d = drafts[key];
+    hush(key);
+    delete drafts[key];
+    if (d?.sent !== undefined && d.sent !== d.from.trim()) put(r, n, key, e.field, d.from.trim());
+  }
+
+  /* A PRESS BY TOUCH ON A BOX NOT YET FOCUSED ONLY LANDS ON IT, and the second opens it (the risk PGS-C15 names: a line
+     pressed by mistake on a phone). A mouse, a pen and the keyboard open it at once. */
+  function press(ev: PointerEvent, key: string) {
+    pressed = { key, touch: ev.pointerType === 'touch', focused: document.activeElement === ev.currentTarget };
+  }
+  function focused(key: string) {
+    if (!(pressed?.key === key && pressed.touch && !pressed.focused)) armed = key;
+  }
+  function tapped(ev: MouseEvent, key: string) {
+    if (armed === key || !pressed || pressed.key !== key || !pressed.focused) return;
+    armed = key;
+    const box = ev.currentTarget as HTMLInputElement;
+    box.readOnly = false;
+    box.focus();
+  }
+  function left(r: Row, n: number, i: number, e: CardEdit) {
+    const key = boxKey(r, n, i);
+    if (armed === key) armed = null;
+    pressed = null;
+    send(r, n, i, e, Infinity);
+  }
+  function keyed(ev: KeyboardEvent, r: Row, n: number, i: number, e: CardEdit) {
+    if (ev.key === 'Enter') {
+      ev.preventDefault();
+      (ev.currentTarget as HTMLInputElement).blur();
+    } else if (ev.key === 'Escape') {
+      ev.preventDefault();
+      undo(r, n, i, e);
+      (ev.currentTarget as HTMLInputElement).blur();
+    }
+  }
+
+  /* A CARD THAT GOES MID-PAUSE STILL SENDS WHAT WAS TYPED, as leaving the box would. */
+  $effect(() => () => {
+    for (const w of [...waits.values()]) {
+      clearTimeout(w.handle);
+      w.run();
+    }
+    waits.clear();
+  });
 </script>
 
 <!-- AN AGENT'S FACE AS ITS MAKER'S MARK, as `agentFaceHtml` in `src/html.ts` draws one: the host's path, filled in the
@@ -87,6 +248,28 @@
       ><path d={m.d} fill-rule={m.rule} clip-rule={m.rule}></path></svg
     ></span
   >{/snippet}
+
+<!-- A LINE TYPED ON IN PLACE: a box that looks like the text it replaces, the same type and no box until it is focused,
+     when the board's field outline shows (`a11y.css`). Readonly until it is opened, so a tap that only lands opens no
+     keyboard. Its `maxlength` is a loose bound; `editAfter` holds the field's own max in the bytes the record counts. -->
+{#snippet box(r: Row, n: number, i: number, e: CardEdit, empty: string)}{@const key = boxKey(r, n, i)}{@const cell = said(r, i)}<input
+    class="cards-edit"
+    type="text"
+    value={shown(key, cell)}
+    maxlength={e.max}
+    readonly={armed !== key}
+    placeholder={empty}
+    aria-label={boxName(r, i)}
+    autocomplete="off"
+    enterkeyhint="done"
+    data-armed={armed === key ? '' : undefined}
+    onpointerdown={(ev) => press(ev, key)}
+    onfocus={() => focused(key)}
+    onclick={(ev) => tapped(ev, key)}
+    oninput={(ev) => typed(r, n, i, e, cell, ev.currentTarget.value)}
+    onblur={() => left(r, n, i, e)}
+    onkeydown={(ev) => keyed(ev, r, n, i, e)}
+  />{/snippet}
 
 {#snippet labelled(i: number)}{#if label(i)}<span class="cards-label">{label(i)}</span>{/if}{/snippet}
 
@@ -166,6 +349,9 @@
       {@const whoMark = L.who >= 0 ? markFor(said(r, L.who)) : null}
       {@const hue = L.hue >= 0 ? hueOf(said(r, L.hue)) : null}
       {@const picture = L.picture >= 0 ? pictureSrc(r.cells[L.picture] ?? '', opts.file) : null}
+      <!-- The reply and the next step as boxes, where the host hands this page a writer and the column says edit. -->
+      {@const re = boxOf(r, L.reply)}
+      {@const ne = boxOf(r, L.next)}
       <!-- The lead is the first card of a `cards lead` block and no other, told rather than inferred (05 §4). The hue is a
            number the host draws the mark in, and a cell that is not one writes no style; the picture leads the card
            where the host serves the file, hidden from a screen reader because the title under it names the card. -->
@@ -193,12 +379,14 @@
           {:else if L.nameIsWho && run}{@render runFace(run)}
           {:else if nameMark}{@render agentFace(nameMark, 'cards-face')}
           {:else if face}<span class="cards-face" aria-hidden="true">{face}</span>{/if}
-          {#if L.name >= 0}<h3 class="cards-title">{#if r.cells[L.name]}<Text nodes={nodes(r, L.name)} {opts} />{:else}{MISSING}{/if}</h3>{/if}
+          {#if L.name >= 0}{@const te = boxOf(r, L.name)}<h3 class="cards-title">{#if te}{@render box(r, n, L.name, te, EMPTY_NAME)}{:else if r.cells[L.name]}<Text nodes={nodes(r, L.name)} {opts} />{:else}{MISSING}{/if}</h3>{/if}
           {#if r.tone}<span class="glyph" role="img" aria-label={TONES[r.tone].label}>{TONES[r.tone].glyph}</span>{/if}
           {#if L.when >= 0 && r.cells[L.when]}<span class="cards-when"><Text nodes={nodes(r, L.when)} {opts} /></span>{/if}
         </div>
-        <!-- The reply is the line under the head, and an empty one draws nothing, as in `toHTML`. -->
-        {#if L.reply >= 0 && r.cells[L.reply]}<p class="cards-reply"><Text nodes={nodes(r, L.reply)} {opts} /></p>{/if}
+        <!-- The reply is the line under the head, and an empty one draws nothing, as in `toHTML`; one typed on in place is
+             a box even while empty, since the box is where the line is written. -->
+        {#if re}<p class="cards-reply">{@render box(r, n, L.reply, re, EMPTY_LINE)}</p>
+        {:else if L.reply >= 0 && r.cells[L.reply]}<p class="cards-reply"><Text nodes={nodes(r, L.reply)} {opts} /></p>{/if}
         {#if shows || newest || t || (L.ring >= 0 && r.cells[L.ring])}
           <div class="cards-body">
             {#if shows}
@@ -247,28 +435,89 @@
         {/if}
         <!-- A FACT NOBODY WROTE IS NOT DRAWN: "Met in —" on a person met in no project said a field was missing where
              there was nothing to say. A card with no fact written draws no list at all. -->
-        {#if L.facts.some((i) => r.cells[i])}
+        {#if L.facts.some((i) => r.cells[i] || boxOf(r, i))}
           <dl class="cards-facts">
             {#each L.facts as i}
-              {#if r.cells[i]}
+              {@const fe = scoped(i) ? null : boxOf(r, i)}
+              {#if r.cells[i] || fe}
                 {@const scope = scoped(i) ? opts.scope : undefined}
                 <div class="cards-fact">
                   <dt>{label(i)}</dt>
-                  <dd>{#if scope}{@render scopeChip(scope, r.cells[i] ?? '')}{:else}<Text nodes={nodes(r, i)} {opts} />{/if}</dd>
+                  <dd>{#if fe}{@render box(r, n, i, fe, EMPTY_LINE)}{:else if scope}{@render scopeChip(scope, r.cells[i] ?? '')}{:else}<Text nodes={nodes(r, i)} {opts} />{/if}</dd>
                 </div>
               {/if}
             {/each}
           </dl>
         {/if}
         <!-- "Next:" over nothing would say there is a step nobody wrote down, so an empty next draws no line. -->
-        {#if L.next >= 0 && r.cells[L.next]}<p class="cards-next">{CARDS_NEXT}: <Text nodes={nodes(r, L.next)} {opts} /></p>{/if}
+        {#if ne}<p class="cards-next" data-edit="">{CARDS_NEXT}: {@render box(r, n, L.next, ne, EMPTY_LINE)}</p>
+        {:else if L.next >= 0 && r.cells[L.next]}<p class="cards-next">{CARDS_NEXT}: <Text nodes={nodes(r, L.next)} {opts} /></p>{/if}
         {#if L.who >= 0 && r.cells[L.who]}
           <div class="cards-who">
             {#if run}{@render runFace(run)}{:else if whoMark}{@render agentFace(whoMark, 'cards-face')}{:else if whoFace}<span class="cards-face" aria-hidden="true">{whoFace}</span>{/if}
             <span class="cards-name"><Text nodes={nodes(r, L.who)} {opts} /></span>
           </div>
         {/if}
+        <!-- WHAT THE RECORD WOULD NOT KEEP IS SAID UNDER THE CARD, in its own words, and the old line is back above it. -->
+        {#if refused[cardKey(r, n)]}<p class="cards-said" role="alert">{refused[cardKey(r, n)]}</p>{/if}
       </li>
     {/each}
   </ul>
 {/if}
+
+<style>
+  /* A LINE TYPED ON IN PLACE LOOKS LIKE THE LINE IT REPLACES: its type, its colour and no box, until it is focused,
+     when it takes the board's field and the focus outline every field wears (`a11y.css`). Pulled out by its own padding,
+     so the words sit where the text did. GLOBAL, since a scoped rule marks every element whose class is not fixed, the
+     agent's face among them, and the mirror's tree would differ by the mark. The names are this drawer's alone. */
+  :global(.cards-edit) {
+    display: block;
+    inline-size: calc(100% + 2 * var(--sp-1));
+    min-inline-size: 0;
+    margin: 0;
+    margin-inline: calc(-1 * var(--sp-1));
+    padding: 0;
+    padding-inline: var(--sp-1);
+    background: none;
+    border: 0;
+    border-radius: var(--r-sm);
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    text-overflow: ellipsis;
+  }
+
+  :global(.cards-edit::placeholder) {
+    color: var(--ink2);
+  }
+
+  :global(.cards-edit[data-armed]) {
+    background: var(--field);
+    text-overflow: clip;
+  }
+
+  :global(.cards-next[data-edit]) {
+    display: flex;
+    gap: 0.25em;
+    align-items: baseline;
+  }
+
+  :global(.cards-next[data-edit] .cards-edit) {
+    flex: 1;
+    inline-size: auto;
+    margin-inline-start: 0;
+  }
+
+  /* A BOX IS A CONTROL, so on a finger it is the tap's height, as every control is. */
+  @media (pointer: coarse) {
+    :global(.cards-edit) {
+      min-block-size: var(--tap);
+    }
+  }
+
+  :global(.cards-said) {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--t-base);
+  }
+</style>

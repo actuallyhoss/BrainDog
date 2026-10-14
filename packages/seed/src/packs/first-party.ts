@@ -520,7 +520,9 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   one project in play says what it earned (`projects-earning-said` above nought), where it was drawn while any was in
  *   play and read "0 of 11 projects in play say what they earned in a year" on a record that never meant to say. The
  *   words are the same. PORTFOLIO 1.16.0 IS RELEASED, so this is a version of its own. One `when` changed on the two
- *   keyed copies of a block that is there, nothing added or taken away, so a minor step.
+ *   keyed copies of a block that is there, nothing added or taken away, so a minor step. And Projects' In play cards
+ *   say `edit: true` on `about` (card-edit-wire-93, PGS-C15, inside the unreleased step), so a project's one line is
+ *   typed on its card where the reader may write the list: one key on a column that is there, so no version of its own.
  * - work 1.19.0 (W061, REC-C10): a thread has six states and declared moves, a day it aims for, and a follow-up takes
  *   its parent's project, thread and owner one by one (and the agent, when the agent holding the parent made the
  *   follow-up), and a thread that is holding may be marked

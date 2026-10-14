@@ -25,11 +25,14 @@
   import { read, type Result } from '$lib/data/read.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import {
-    CODE_DIGITS, RUNS_READ, connectLines, connected, nameOf, reachKey, reachOf, reportKeyOf,
-    runName, runsOf, standing, waiting, type Answer, type Connection, type DeviceRow, type Run, type TokenRow,
+    RUNS_READ, connectLines, connected, nameOf, reachKey, reachOf, reportKeyOf,
+    runName, runsOf, standing, waiting, type Connection, type DeviceRow, type Run, type TokenRow,
   } from '$lib/record/device.ts';
-  /* THE APPROVAL `/vault` SENDS TOO, from one module, so the two screens cannot drift apart. */
-  import { answerLine as lineOf, approve, planOf, reprove, revoke, words as vaultWords, type Plan } from '$lib/record/vault.ts';
+  import { planOf, revoke, words as vaultWords, type Plan } from '$lib/record/vault.ts';
+  /* THE SIX-DIGIT FIELD, ONE COMPONENT that Home's connect sheet draws too; it approves through `vault.ts` `approve`,
+     the approval `/vault` sends, so the screens cannot drift apart. */
+  import CodeForm from '$lib/agents/CodeForm.svelte';
+  import { approverOf } from '$lib/agents/code-form.ts';
   import { callsOutOf, type CallOut } from '$lib/record/actions.ts';
   import { wrote } from '$lib/record/settings-write.ts';
   import { hostedHere } from '../../billing.ts';
@@ -42,7 +45,6 @@
   import { isQuiet } from '@braindog/kernel';
   import { liveOf, type RunLive } from '$lib/ui/face.ts';
   import { untrack } from 'svelte';
-  import { methods, passkeySignIn, support } from '$lib/auth.ts';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
   import Section from '$lib/ui/Section.svelte';
   import SlashAsks from '$lib/ui/SlashAsks.svelte';
@@ -127,9 +129,10 @@
   const machines = $derived(held.value?.machines ?? []);
   const first = $derived(waiting(machines, Date.now()).length > 0);
 
-  let typed = $state('');
-  let approving = $state(false);
-  let answer = $state<Answer | null>(null);
+  /* ONE APPROVAL OF THE SIX DIGITS over this screen's own client, made when first asked; a refusal keeps the code
+     typed, and an approval reads the list again (`CodeForm.svelte`). */
+  const approveCode = (typed: string) => approverOf(clientOf())(typed);
+
   /* ONE REVOKE AT A TIME, so a double press sends one. */
   let revoking = $state<string | null>(null);
 
@@ -224,40 +227,6 @@
     facts.push(c.used ? copy.usedWhen(since(c.used, nowMs)) : copy.neverUsed);
     if (c.token?.expires_at) facts.push(copy.endsWhen(relative(c.token.expires_at.slice(0, 10), nowMs)));
     return facts;
-  }
-
-  /* A new keystroke clears the last answer, so the field is never marked wrong for a value it no longer holds. */
-  function retype(value: string) {
-    typed = value;
-    answer = null;
-  }
-
-  async function tryCode(e?: SubmitEvent) {
-    e?.preventDefault();
-    if (approving) return;
-    approving = true;
-    const busy = opened();
-    answer = await approve(typed, clientOf());
-    closed(true, busy);
-    approving = false;
-    /* THE CODE STAYS IN THE FIELD ON A REFUSAL: six digits with one wrong is a thing to correct. */
-    if (answer.kind === 'approved') {
-      typed = '';
-      await held.reread();
-    }
-  }
-
-  /* What the status line under the field says, or nothing. */
-  const answerLine = $derived(lineOf(answer));
-
-  /* SIGNING IN AGAIN WITHOUT LEAVING, where a passkey can do it: the code stays typed and is sent again. */
-  let reproving = $state(false);
-  async function signInAgain() {
-    if (reproving) return;
-    reproving = true;
-    const back = await reprove({ support, methods, passkeySignIn }, (href) => location.assign(href));
-    reproving = false;
-    if (back) await tryCode();
   }
 
   /**
@@ -388,47 +357,16 @@
 {#if anOwner}
   <!--
     THE SIX-DIGIT FIELD, drawn once, in one of two places: first on the screen while a machine is waiting, and as the
-    setup card's last step otherwise. A `<form>`, so Enter sends it. Paste is never blocked and there is no
-    `maxlength`: the CLI prints the code in two groups, and seven digits is refused out loud rather than trimmed to a
-    different code.
+    setup card's last step otherwise. One component (`CodeForm.svelte`), which Home's connect sheet draws too: a `<form>`,
+    so Enter sends it, with paste never blocked and no `maxlength`, since the CLI prints the code in two groups and seven
+    digits is refused out loud rather than trimmed to a different code. The sheet takes it as a snippet.
   -->
   {#snippet codeForm()}
-    <form class="code-form field-row" onsubmit={tryCode} novalidate>
-      <label class="field-row-label" for="user-code">{copy.codeLabel}</label>
-      <div class="field-row-controls">
-        <div class="field field-lg">
-          <input
-            class="field-input code-input"
-            id="user-code"
-            type="text"
-            inputmode="numeric"
-            autocomplete="one-time-code"
-            autocapitalize="off"
-            spellcheck="false"
-            placeholder={'0'.repeat(CODE_DIGITS)}
-            value={typed}
-            oninput={(e) => retype((e.currentTarget as HTMLInputElement).value)}
-            aria-describedby="user-code-said"
-            aria-invalid={answerLine?.tone === 'bad' ? 'true' : undefined}
-          />
-        </div>
-        <Button weight="primary" type="submit" disabled={approving}>{copy.codeGo}</Button>
-      </div>
-      <!-- Always in the document: a live region inserted with its first sentence is not reliably announced. The mark
-           beside the sentence carries its tone, so the tone is never colour alone. -->
-      <p class="code-said" id="user-code-said" role="status" data-intent={answerLine?.tone}>
-        {#if answerLine}<span role="img" aria-label={TONES[answerLine.tone].label}>{TONES[answerLine.tone].glyph}</span> {answerLine.line}{/if}
-      </p>
-      {#if answer?.kind === 'signin'}
-        <div class="row-actions">
-          <Button weight="quiet" disabled={reproving} onclick={() => void signInAgain()}>{copy.signInAgain}</Button>
-        </div>
-      {/if}
-    </form>
+    <CodeForm id="user-code" approve={approveCode} onchanged={() => held.reread()} />
   {/snippet}
 
   {#if first}
-    <Section title={copy.approveTitle}>{@render codeForm()}</Section>
+    <Section title={copy.approveTitle}><CodeForm id="user-code" approve={approveCode} onchanged={() => held.reread()} /></Section>
   {/if}
 
   <!--
@@ -662,13 +600,9 @@
     font-size: var(--t-sm);
   }
 
-  /* THE CODE-ENTRY CONTROL.
-
-     The label, the field and its button are `settings.css`'s field row, which puts the field and the
-     button at one height and wraps them to two lines where they stop fitting side by side. Nothing
-     here sets a colour: the ring is `controls.css`'s, on the wrapper, and the answer's tone comes
-     from `[data-intent]`. `.code-form` and `.code-label` stay for the blocks below the form that
-     show a key once and offer an install, which are not field rows. */
+  /* THE BLOCKS BELOW THE SIX-DIGIT FIELD, which show a key once and offer an install: not field rows. The field itself
+     is `CodeForm.svelte`'s, with its own styles, since Home's connect sheet draws it too. Nothing here sets a colour:
+     the answer's tone comes from `[data-intent]`. */
   .code-form {
     display: flex;
     flex-direction: column;
@@ -679,23 +613,6 @@
   .code-label {
     color: var(--ink2);
     font-size: var(--t-sm);
-  }
-
-  /* THE SIX-DIGIT FIELD KEEPS ITS OWN WIDTH rather than taking the row as a field row's field does
-     (`settings.css`), for the reason `.code-input` gives below. */
-  .field-row-controls :global(.field:has(.code-input)) {
-    flex: 0 1 auto;
-  }
-
-  /* SIX DIGITS AND NO MORE ROOM THAN SIX DIGITS NEED. A field stretched across the panel invites a
-     sentence; one sized to its content says what belongs in it without a word. `ch` on a tabular
-     face is the honest unit, and `font-variant-numeric` keeps the six from jumping about as they
-     are typed: proportional digits reflow the whole field on every keystroke. */
-  .code-input {
-    flex: 0 1 12ch;
-    font-size: var(--t-md);
-    font-variant-numeric: tabular-nums;
-    letter-spacing: 0.18em;
   }
 
   /* WHAT THE ADD-ON WOULD ADD, as label and value on the page with nothing round them: a filled, bordered panel

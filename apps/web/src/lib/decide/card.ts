@@ -23,7 +23,7 @@
  */
 
 import type { QueueQuestion } from '@braindog/kernel';
-import { money, queueCost, since } from 'braindog-render';
+import { money, queueCost, shortDay, since } from 'braindog-render';
 
 import { moneyInText } from '../record/money.ts';
 import type { ActorKind } from '../record/names.ts';
@@ -73,6 +73,13 @@ export const cardWords = {
   changes: 'What it changes',
   /** The same heading where the changes are drawn as lines and the record's sentence, which named the list, is not. */
   changesIn: (list: string) => `What it changes in ${list}`,
+  /**
+   * HOW LONG AN OFFER WAITS (ENG-B14, "every proposal states a deadline"): the last day it waits, as the Slash page says
+   * it. It promises no taking back, because nothing takes an offer back by itself yet. `day` is already a day in words.
+   */
+  lapses: (day: string) => `Waits until ${day}`,
+  /** The same once that day has come. */
+  lapsesToday: 'Waits until today',
 } as const;
 
 /** Who asked, as the by-line says it: the face and name, the app it ran in, the run, each only where it is a name. */
@@ -145,6 +152,11 @@ export type Card = {
   filed: string;
   /** Whether Slash drafted it, which the answered line says. */
   slash: boolean;
+  /**
+   * The one quiet line of how long an arrangement waits, or `null`: set only where its body holds a real day
+   * (`lapses`), so a question with none draws what it always drew.
+   */
+  lapses: string | null;
 };
 
 /** What the card is told by its host: who is reading, the names the shell holds, the clock and the record's currency. */
@@ -405,6 +417,35 @@ function arrangementOf(q: QueueQuestion, kind: string, body: unknown): string {
   return `${spoken(`${line} ·`) === line ? line : spoken(line)}.`;
 }
 
+/** `YYYY-MM-DD` where it is a day on the calendar, or `null`: `2026-02-30` and `2026-13-01` are no day. */
+export function realDay(v: unknown): string | null {
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/u.test(v)) return null;
+  const at = Date.parse(`${v}T12:00:00Z`);
+  return !Number.isNaN(at) && new Date(at).toISOString().slice(0, 10) === v ? v : null;
+}
+
+/** The reader's own day, as `YYYY-MM-DD`: the day a card is read on is the one on the reader's wall. */
+export function todayOf(now: number): string {
+  const d = new Date(now);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * HOW LONG AN ARRANGEMENT WAITS (ENG-B14), from the `lapses` its body holds: the last day it waits, in words, the same
+ * line the Slash page draws ("Waits until 27 Oct"). A day already come is said as today, never as a day past. It names
+ * nobody and promises no taking back: nothing takes an offer back by itself yet. `null` for anything that is not an
+ * arrangement or whose body holds no real day.
+ */
+function lapseLine(q: QueueQuestion, kind: string, body: unknown, now: number): string | null {
+  if (!isArranging(kind)) return null;
+  const filed = body ?? field(q, 'arranged');
+  if (filed === null || typeof filed !== 'object' || Array.isArray(filed)) return null;
+  const last = realDay((filed as Record<string, unknown>).lapses);
+  if (last === null) return null;
+  const today = todayOf(now);
+  return last <= today ? cardWords.lapsesToday : cardWords.lapses(shortDay(last, today));
+}
+
 /**
  * THE CARD, from one question.
  *
@@ -470,6 +511,7 @@ export function cardOf(q: QueueQuestion, ctx: CardContext): Card {
     seeWhole: changesSomething(q),
     filed,
     slash: bySlash(q, by.kind),
+    lapses: lapseLine(q, filed, ctx.body, ctx.now),
   };
 }
 

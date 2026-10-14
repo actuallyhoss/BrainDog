@@ -497,7 +497,7 @@
                 <span class="line-main">
                   <span class="line-title slash-question">{s.question}</span>
                   <span class="line-detail slash-state"
-                    ><span class="dot" data-state={s.state} aria-hidden="true"></span>{s.said}{#if by}<span class="slash-by">{by}</span>{/if}</span
+                    ><span class="dot" data-state={s.state} aria-hidden="true"></span>{s.said}{#if by}<span class="slash-by">{by}</span>{/if}{#if s.waits}<span class="slash-by">{s.waits}</span>{/if}</span
                   >
                 </span>
                 {#if s.href}
@@ -577,6 +577,7 @@
                       <span class="line-mark"><IconWell name="check" size="l" tone="earn" /></span>
                       <span class="line-main">
                         <span class="line-title slash-question">{s.question}</span>
+                        {#if s.taken}<span class="line-detail">{s.taken}</span>{/if}
                         {#if by}<span class="line-detail">{by}</span>{/if}
                       </span>
                     {/snippet}

@@ -18,7 +18,8 @@
 <script lang="ts">
   /* `at` IS THE BLOCK INDEX WHERE THE PAGE BODY LAYS BLOCKS OUT, so the address helper goes by another name here too. */
   import { tick } from 'svelte';
-  import { at as inApp } from '../at.ts';
+  import { apiBase, at as inApp } from '../at.ts';
+  import { cardEditsOf, cardWrite, drawnWrite } from './card-writes.ts';
   import { Block, Degraded, Markdown, Table, Text } from 'braindog-render/svelte';
   import { EMPTY_KEEP, inline, text } from 'braindog-render';
   import QueueAnswer from './QueueAnswer.svelte';
@@ -176,6 +177,41 @@
   /* Where each file the block holds is served, record-relative (`page-live.ts` `fileAt`), read by `opts.file` below. */
   const filed = $derived(fileAt(block));
 
+  /* A CARD'S LINE TYPED ON IN PLACE (PGS-C15): by column, the field a box writes (`card-writes.ts` `cardEditsOf`), and
+     the page's writer as the card's `write`, only where the page writes and the reader may write the list. The row
+     writer loads on the first edit, as `typeInto`'s does, so a page nobody types on never pulls it in. A LIST WHOSE
+     DECLARATION THIS TAB HAS NOT LEARNED YET (`REGISTERS` fills as the record answers `schema`) is read off the block's
+     own entries: a field every card holds as words, or none, is text. */
+  const cardEdits = $derived(
+    block.kind === 'cards'
+      ? cardEditsOf(block.columns ?? [], (id) => {
+          const known = REGISTERS[block.register ?? '']?.fields.find((d) => d.id === id);
+          if (known) return known;
+          return (block.entries ?? []).every((e) => e.fields[id] === undefined || e.fields[id] === null || typeof e.fields[id] === 'string') ? { type: 'text' } : undefined;
+        })
+      : [],
+  );
+  const cardLabel = (field: string): string => {
+    const said = block.columns?.find((c) => c.field === field)?.label;
+    const f = REGISTERS[block.register ?? '']?.fields.find((d) => d.id === field);
+    const named = typeof said === 'string' && said !== '' ? said : (f?.label ?? field.replaceAll('_', ' '));
+    return named.charAt(0).toUpperCase() + named.slice(1);
+  };
+  const cardWriter = $derived(
+    writes && cardEdits.some((f) => f !== null)
+      ? cardWrite(
+          {
+            update: async (register, seq, patch, version) => (await import('$lib/record/rows-write.ts')).rowWriter(apiBase()).update(register, seq, patch, version),
+            held: (seq, field) => block.entries?.find((e) => e.seq === seq)?.fields[field],
+            label: cardLabel,
+            reread: writes.reread,
+          },
+          block.register,
+          may(route.data as unknown as Shell, 'write', block.register),
+        )
+      : null,
+  );
+
   const opts = $derived({
     /* A PATH THAT NAMES NOTHING OF THE RECORD IS ANSWERED `UNNAMED` (the kernel's `unnamed`), never a dash: the author's
        words in prose, and no figure in a chip, a tile or a bar. */
@@ -217,6 +253,8 @@
     cellHref: (n: number) => block.metrics?.[n]?.href ?? null,
     /* WHERE A ROW APPLIES, AS A CHIP, in a card grid's scope facts (`page-live.ts` `scopeCells`). */
     ...(block.scopeCells ? { scope: block.scopeCells } : {}),
+    /* A CARD'S LINE A PERSON TYPES ON, where the page can write its list: absent, every line is text. */
+    ...(cardWriter ? { write: drawnWrite(cardWriter), edits: cardEdits } : {}),
     /* A RUN'S FACE, ON A CARD OF RUNS: the run and whether it is working, gone quiet or stopped, so
        `Cards.svelte` draws the run's glyph in the `who` cell instead of a plain initial. */
     ...((block.source === 'sessions.live' || block.source === 'sessions.working') && block.entries

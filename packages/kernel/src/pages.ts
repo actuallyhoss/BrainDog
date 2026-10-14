@@ -23,7 +23,7 @@ import type { Leaf, Predicate, Schema } from '@braindog/where';
 
 import type { ActionRow } from './actions.ts';
 import type { Exception } from './exceptions.ts';
-import { ANSWER_KEYS, BLOCK_READS, FILTER_TYPES, blockKeyOf, feedSaysFault, keyedBlocks, kindsReading, wrongKindKey } from './block-keys.ts';
+import { ANSWER_KEYS, BLOCK_READS, FILTER_TYPES, blockKeyOf, feedSaysFault, forecastAxisFault, keyedBlocks, kindsReading, wrongKindKey } from './block-keys.ts';
 import { GROUPED_BY_FIELD, applyLook, composeLook, lookOf, mergeLook, type LookBody } from './compose.ts';
 import { HANDOFFS_OPEN, RECORD_ACTIVITY, builtInFigure, type OpenStep } from './built-in-figures.ts';
 import type { ActionBlocking } from './signs-actions.ts';
@@ -39,7 +39,8 @@ import { panelFault, roadmapFault, shortFault } from './kinds/words.ts';
 import { BODY_KINDS, type Shows } from './govern.ts';
 import { CARD_FOLD, CARD_FOLD_MOST } from './declare.ts';
 import { fill } from './fill.ts';
-import type { Json } from './coerce.ts';
+import { isCurrencyCode, type Json } from './coerce.ts';
+import { exponentOf } from './ingest.ts';
 import { across, dayFieldOf as datedBy, isAtLeast, partsOf, type Amount, type Part, type Rate } from './fx.ts';
 import type { Entry } from './index.ts';
 import { predicateOf, windowMs, wordsOf, type EvalContext, type FxRead, type MetricDecl, type Reading } from './metrics.ts';
@@ -92,7 +93,7 @@ export type PageBlock = {
    * `or:` names a second field of the same list, read where `field` holds nothing: a bank line's clean name, or the
    * words the bank wrote where nobody was matched to it. The entry carries both and the host falls back.
    */
-  columns?: { field: string; or?: string; metric?: string; label?: string; as?: string; sign?: { field: string; minus: string } }[];
+  columns?: { field: string; or?: string; metric?: string; label?: string; as?: string; edit?: boolean; sign?: { field: string; minus: string } }[];
   /** A `stat`'s figures. `trend: 12w` draws how the figure moved over that window, from its daily series. */
   cells?: { metric: string; label?: string; trend?: string; note?: string }[];
   /**
@@ -213,6 +214,8 @@ export type PageBlock = {
    * note on the same page is drawn (`headlineHeld`), since a line that is not drawn says nothing.
    */
   headline?: 'under';
+  /** A `forecast`'s: where its value axis starts, `fit` (what saying nothing draws) or `zero`, always from nought. */
+  axis?: 'fit' | 'zero';
   /** A `bar` or `split`'s: the label of the row that holds what no part does, drawn last and linked to those rows. */
   unset?: string;
   /** A `bar` or `split`'s: the intent a part is drawn in, by the value it groups, such as `{ off_track: bad }`. A part not named is neutral.
@@ -454,6 +457,12 @@ export type BlockResult = PageBlock & {
    * sentence could not know its rates are out of date, where a tile's figure says it. Absent when no path was converted.
    */
   values_fx?: Record<string, FxRead>;
+  /**
+   * WHICH RULE OF THE ORDER READ EACH FILLED `{{path}}`, by the path as written (`ReadAs`, `PATH_ORDER`): a list's
+   * `count` or `state`, a `figure`, a `module`'s figure, a row's `field`, or a row's newest `reading`. Every key of
+   * `values` has one, so a check can list a path two rules match. Absent when no path holds a value.
+   */
+  read_as?: Record<string, ReadAs>;
   /**
    * Every `{{path}}` of the block that names nothing the record has: no figure, list, row, field or value of a list's
    * state. A host draws each as the author wrote it, marked, and leaves it out of a chip, a tile or a bar, where a path
@@ -1912,6 +1921,13 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
   /* AND EVERY ANSWER CARRIES ITS KEY, the one it declares or its default (`block-keys.ts`), so a block read on its own
      is named as the page would name it. */
   const key = blockKeyOf(block);
+  /* WHICH RULE READ A PATH IS THIS READ'S OWN (`read_as`): a block handed in again with the one an earlier read wrote on
+     it, as the record reads a reader's own rows over, is read without it, so it is never refused as a key nobody
+     declares and never carried past a read that filled nothing. */
+  if (block !== null && typeof block === 'object' && Object.hasOwn(block, 'read_as')) {
+    const { read_as: _earlier, ...rest } = block as PageBlock & { read_as?: unknown };
+    block = rest as PageBlock;
+  }
   try {
     return { ...leanRows(deps, readBlockAsWritten(deps, renamed(block))), key };
   } catch (e) {
@@ -2143,9 +2159,10 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
 
   /* THE PAGE'S LIVE FIGURES ARE THE RECORD'S TO SAY, so the host does not answer them from a copy of
      its own. Only for a block that draws: a figure in a block that is not on the page is not read. */
-  const { values, values_fx, unnamed } = valuesOf(deps, block);
+  const { values, values_fx, read_as, unnamed } = valuesOf(deps, block);
   if (values) base.values = values;
   if (values_fx) base.values_fx = values_fx;
+  if (read_as) base.read_as = read_as;
   if (unnamed) base.unnamed = unnamed;
 
   /* THE PAGE WORDS THE INSTALL CHECKS ARE CHECKED AGAIN HERE, for a page installed under an earlier build, in the
@@ -3039,6 +3056,8 @@ function recordedOf(deps: PageDeps, block: PageBlock): { past?: { at: string; va
     };
   if (block.headline !== undefined && block.headline !== 'under')
     return { refusal: { code: 'DECLARATION_INVALID', fix: "headline: is under, when the page's opening line says when the money runs out.", at: 'headline', allowed: ['under'] } };
+  const axised = forecastAxisFault(block as unknown as Readonly<Record<string, unknown>>, 'This forecast');
+  if (axised) return { refusal: { code: 'DECLARATION_INVALID', fix: axised.fix, at: axised.at, allowed: axised.allowed } };
   if (block.recorded === undefined) return {};
   const id = typeof block.recorded === 'string' ? block.recorded.replace(/^series\./u, '') : '';
   const opening = block.opening !== null && typeof block.opening === 'object' ? block.opening.metric : null;
@@ -4364,7 +4383,9 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
         addFigure(said.metric);
         continue;
       }
-      if ('own' in said) continue;
+      /* A ROW'S OWN FIELD, AND THE DAY OF A ROW'S NEWEST READING, name no list here: which list holds a row's readings is
+         known only on the row's page, and each is held where it is read (`ctx.reads` in `newestReading`). */
+      if ('own' in said || 'measure' in said) continue;
       /* `<module>.<figure>` NAMES THE LISTS ITS FIGURE READS, read over the declarations `beside` hands, and its first word
          is a list only when the record has a list of that name. */
       const two = twoOf(said);
@@ -4494,6 +4515,7 @@ function pathOf(
   | { register: string; count: true }
   | { register: string; state: string }
   | { own: string; count?: true }
+  | { measure: string; period: string; since: true }
   | null {
   /* A FIGURE WITH ITS PARAMETER, before the path is cut at its full stops: the parameter is a name and may hold one. */
   const asked = figureAsked(path);
@@ -4508,6 +4530,8 @@ function pathOf(
   if (parts.length === 3) {
     const row = /^([a-z][a-z0-9_]*)#([1-9][0-9]*)$/.exec(parts[0]!);
     const [, field, then] = parts as [string, string, string];
+    /* `<measure>.<period>.since` IS THE DAY A ROW'S NEWEST READING WAS READ (PGS-B13), on a page with a row. */
+    if (!row && then === 'since' && /^[a-z][a-z0-9_-]*$/.test(parts[0]!) && /^[A-Za-z][A-Za-z0-9_-]*$/.test(field)) return { measure: parts[0]!, period: field, since: true };
     return row && /^[a-z][a-z0-9_]*$/.test(then) ? { register: row[1]!, seq: Number(row[2]), field, then } : null;
   }
   if (parts.length !== 2) return null;
@@ -4544,8 +4568,11 @@ function figure(v: Json | undefined): Json | undefined {
  * NOTHING IS COMPUTED HERE THAT THE RECORD DOES NOT ALREADY ANSWER: a declared metric's reading, a
  * stored field, a count `list` already returns. A field is read from the row's OWN properties and only
  * when the register declares it, so `tasks#1.constructor` is nothing rather than the prototype.
+ *
+ * AND WHICH RULE READ IT, on `how.as` (`ReadAs`), for every path that holds a value: what the block answers as
+ * `read_as`, so a later check can list a path two rules match.
  */
-function valueAt(deps: PageDeps, path: string, how?: { fx?: FxRead }): Json | undefined {
+function valueAt(deps: PageDeps, path: string, how: { fx?: FxRead; as?: ReadAs } = {}): Json | undefined {
   const here = deps.here;
   const parsed = pathOf(path, here ? deps.schemaOf(here.register)?.fields : undefined);
   if (!parsed) return undefined;
@@ -4554,19 +4581,29 @@ function valueAt(deps: PageDeps, path: string, how?: { fx?: FxRead }): Json | un
   if ('own' in parsed) {
     const spec = deps.schemaOf(here!.register)!.fields[parsed.own]!;
     const held = Object.hasOwn(here!.fields, parsed.own) ? here!.fields[parsed.own] : undefined;
+    how.as = 'field';
     if (parsed.count) return Array.isArray(held) ? held.length : 0;
     return FIGURES.has(spec.type) ? figure(held) : undefined;
   }
-  if ('then' in parsed) return stepValue(deps, parsed);
+  if ('measure' in parsed) {
+    how.as = 'reading';
+    return newestReading(deps, parsed.measure, parsed.period)?.day;
+  }
+  if ('then' in parsed) {
+    how.as = 'field';
+    return stepValue(deps, parsed);
+  }
   const two = twoOf(parsed);
   if (two) return twoValue(deps, parsed, two, how);
   if ('metric' in parsed) {
     const named = deps.metric(parsed.metric);
     /* The declaration with its parameter filled, as a figure cell reads `project-owed:Kiln`. */
     const decl = named && parsed.param !== undefined ? (fill(named, null, parsed.param) as MetricDecl) : named;
+    how.as = 'figure';
     return decl ? figureValue(deps, decl, how) : undefined;
   }
   if (!('seq' in parsed)) return undefined;
+  how.as = 'field';
   const schema = deps.schemaOf(parsed.register);
   if (!schema) return undefined;
   const decl = Object.hasOwn(schema.fields, parsed.field) ? schema.fields[parsed.field] : undefined;
@@ -4602,21 +4639,8 @@ type PathSaid = NonNullable<ReturnType<typeof pathOf>>;
 
 /**
  * The two words of a path the order below decides, `tasks` and `open`, or `null` for a path of another form.
- *
- * THE ORDER FOR TWO WORDS, written down here once and kept (PGS-B13, `05 §7.1`). A path two rules could read is read by
- * the first that answers, and never guessed:
- *
- * 1. A list and `count`, or a state its list's state field holds: `tasks.count`, `tasks.open`.
- * 2. A figure and `change`, `first`, `names`, `more`, `since` or `first_<field>`: `cash-now.change`.
- * 3. An installed module or add-on and a figure it declares (`moduleFigure`): `work.open-tasks`, read over the whole
- *    record on any page.
- * 4. Then a list's state, which past the first rule answers nothing: a state its list does not hold is not a count of
- *    nought, which would read as true.
- *
- * `valueAt` reads by it, `namedAt` says whether anything answers by it, and `registersOf` names every list a reading by
- * it could reach, so a block is held from a reader by whichever rule answers.
  */
-function twoOf(said: PathSaid): { head: string; tail: string } | null {
+function twoOf(said: PathSaid): Two | null {
   if ('change' in said) return { head: said.change, tail: 'change' };
   if ('rowsOf' in said) return { head: said.rowsOf, tail: said.field === undefined ? said.part : `first_${said.field}` };
   if ('count' in said && 'register' in said) return { head: said.register, tail: 'count' };
@@ -4624,33 +4648,219 @@ function twoOf(said: PathSaid): { head: string; tail: string } | null {
   return null;
 }
 
-/** One path of two words, read by `twoOf`'s order. */
-function twoValue(deps: PageDeps, said: PathSaid, two: { head: string; tail: string }, how?: { fx?: FxRead }): Json | undefined {
-  /* 1. A LIST'S COUNT, OR THE COUNT OF ITS ROWS IN A STATE IT HOLDS, asked of the list by the field it mirrors its state
-     onto, as the whole count is. */
-  const schema = LIST_ID.test(two.head) ? deps.schemaOf(two.head) : null;
-  if (schema && 'count' in said) {
-    const listed = deps.list({ register: two.head, limit: 1 });
-    return listed.ok ? listed.value.matched : undefined;
+type Two = { head: string; tail: string };
+
+/** Which rule of `PATH_ORDER` read a path, as a block answers it in `read_as`. A row's field by spoken id is `field`. */
+export type ReadAs = 'count' | 'state' | 'figure' | 'module' | 'field' | 'reading';
+
+/**
+ * One rule of the order: `reads` is `null` when the rule does not take the path, else what it reads, which may be
+ * nothing held (a dash); `names` says whether the rule names the path whatever it holds now, for `namedAt`.
+ */
+type PathRule = {
+  as: ReadAs;
+  reads: (deps: PageDeps, said: PathSaid, two: Two, how: { fx?: FxRead }) => { value: Json | undefined } | null;
+  names: (deps: PageDeps, said: PathSaid, two: Two) => boolean;
+};
+
+/** The list a path's first word names, when it is one, which rule 1 reads. */
+const listNamed = (deps: PageDeps, head: string): Schema | null => (LIST_ID.test(head) ? deps.schemaOf(head) : null);
+
+/**
+ * THE ORDER FOR TWO WORDS, written down here once and walked (PGS-B13, `05 §7.1`). A path two rules could read is read
+ * by the first that takes it, and never guessed:
+ *
+ * 1. A list and `count`, or a state its list's state field holds: `tasks.count`, `tasks.open`.
+ * 2. A figure and `change`, `first`, `names`, `more`, `since` or `first_<field>`: `cash-now.change`.
+ * 3. An installed module or add-on and a figure it declares (`moduleFigure`): `work.open-tasks`, read over the whole
+ *    record on any page.
+ * 4. On a page with a row, a field of that row and a part (`stepSpec`): `client.name`, `revenue.amount`.
+ * 5. On a page with a row, a measure and a period (`newestReading`): `revenue.monthly`, the newest monthly revenue
+ *    reading the record holds about that row.
+ * 6. Then nothing: a state its list does not hold is not a count of nought, which would read as true.
+ *
+ * `valueAt` reads by it (`twoValue`), `namedAt` says whether anything answers by it, and `registersOf` names every list
+ * a reading by it could reach, so a block is held from a reader by whichever rule answers. A reading's list is held
+ * where it is read (`ctx.reads`), because which list holds a row's readings is known only on the row's page.
+ */
+const PATH_ORDER: readonly PathRule[] = [
+  {
+    /* A LIST'S COUNT, asked of the list as a whole. */
+    as: 'count',
+    reads: (deps, said, two) => {
+      if (!('count' in said) || !listNamed(deps, two.head)) return null;
+      const listed = deps.list({ register: two.head, limit: 1 });
+      return { value: listed.ok ? listed.value.matched : undefined };
+    },
+    names: (deps, said, two) => 'count' in said && listNamed(deps, two.head) !== null,
+  },
+  {
+    /* THE COUNT OF A LIST'S ROWS IN A STATE IT HOLDS, asked by the field it mirrors its state onto. */
+    as: 'state',
+    reads: (deps, _said, two) => {
+      const schema = listNamed(deps, two.head);
+      if (!schema || !stateNamed(deps, two.head, two.tail)) return null;
+      const listed = deps.list({ register: two.head, where: { field: schema.state!, is: two.tail }, limit: 1 });
+      return { value: listed.ok ? listed.value.matched : undefined };
+    },
+    names: (deps, _said, two) => stateNamed(deps, two.head, two.tail),
+  },
+  {
+    /* A FIGURE'S PART, when a figure has the name: how far it moved, or the rows it counts. */
+    as: 'figure',
+    reads: (deps, said) => {
+      const decl = 'change' in said ? deps.metric(said.change) : 'rowsOf' in said ? deps.metric(said.rowsOf) : null;
+      if (!decl) return null;
+      return { value: 'rowsOf' in said ? rowsValue(deps, decl, said.part, said.field) : changeOf(deps, decl) };
+    },
+    names: (deps, said) => {
+      if ('change' in said) return figureNamed(deps, said.change);
+      if (!('rowsOf' in said) || !figureNamed(deps, said.rowsOf)) return false;
+      if (said.field === undefined) return true;
+      /* `first_<field>` NAMES A FIELD THE FIGURE'S LIST DECLARES, so `first_ownd` is the author's typo and not a dash. */
+      const decl = deps.metric(said.rowsOf);
+      const schema = decl?.source.startsWith('register.') ? deps.schemaOf(decl.source.slice('register.'.length)) : null;
+      return schema !== null && Object.hasOwn(schema.fields, said.field);
+    },
+  },
+  {
+    /* A MODULE'S FIGURE, over the whole record, and only to a reader of every list behind it. */
+    as: 'module',
+    reads: (deps, _said, two, how) => {
+      const owned = moduleFigure(deps, two.head, two.tail);
+      return owned ? { value: mayRead(deps, owned) ? figureValue(deps, owned, how) : undefined } : null;
+    },
+    names: (deps, _said, two) => moduleFigure(deps, two.head, two.tail) !== null,
+  },
+  {
+    /* A FIELD OF THE PAGE'S ROW AND A PART, one step as `<list>#<n>.<field>.<part>` takes it from a row by spoken id. */
+    as: 'field',
+    reads: (deps, _said, two) => {
+      const spec = ownStep(deps, two);
+      return spec ? { value: stepOn(deps, spec, deps.here!, two.head, two.tail) } : null;
+    },
+    names: (deps, _said, two) => ownStep(deps, two) !== null,
+  },
+  {
+    /* THE NEWEST READING OF A MEASURE FOR A PERIOD ABOUT THE PAGE'S ROW, and only when the record holds one. */
+    as: 'reading',
+    reads: (deps, _said, two) => {
+      const newest = newestReading(deps, two.head, two.tail);
+      return newest ? { value: newest.value } : null;
+    },
+    names: (deps, _said, two) => newestReading(deps, two.head, two.tail) !== null,
+  },
+];
+
+/** One path of two words, read by `PATH_ORDER`: the first rule that takes it says its value, and `how.as` which it was. */
+function twoValue(deps: PageDeps, said: PathSaid, two: Two, how: { fx?: FxRead; as?: ReadAs }): Json | undefined {
+  for (const rule of PATH_ORDER) {
+    const read = rule.reads(deps, said, two, how);
+    if (read === null) continue;
+    how.as = rule.as;
+    return read.value;
   }
-  if (schema && stateNamed(deps, two.head, two.tail)) {
-    const listed = deps.list({ register: two.head, where: { field: schema.state!, is: two.tail }, limit: 1 });
-    return listed.ok ? listed.value.matched : undefined;
-  }
-  /* 2. A FIGURE'S PART, when a figure has the name: how far it moved, or the rows it counts. */
-  if ('change' in said) {
-    const decl = deps.metric(said.change);
-    if (decl) return changeOf(deps, decl);
-  }
-  if ('rowsOf' in said) {
-    const decl = deps.metric(said.rowsOf);
-    if (decl) return rowsValue(deps, decl, said.part, said.field);
-  }
-  /* 3. A MODULE'S FIGURE, over the whole record, and only to a reader of every list behind it. */
-  const owned = moduleFigure(deps, two.head, two.tail);
-  if (owned) return mayRead(deps, owned) ? figureValue(deps, owned, how) : undefined;
-  /* 4. A list's state it does not hold: nothing. */
   return undefined;
+}
+
+/** The field of the page's row a two-word path steps through, `revenue` of `revenue.amount`, or `null`. */
+function ownStep(deps: PageDeps, two: Two): { type: string; to?: string | undefined } | null {
+  return deps.here ? stepSpec(deps, { register: deps.here.register, field: two.head, then: two.tail }) : null;
+}
+
+/* ── the newest reading about a row ──────────────────────────────────────── */
+
+/** Past every reading's instant, so the record answers each measure's newest as `latest` and no period of them. */
+const AFTER_EVERY = '9999-12-31T23:59:59.999Z';
+
+/**
+ * A measure's words as a reading's name says them: `dailyRunRate` and `daily_run_rate` are `daily run rate`, in small
+ * letters, so `revenue.monthly` finds "Monthly revenue".
+ */
+const spokenAs = (s: string): string =>
+  s
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+
+/**
+ * A list of readings about rows of `about`, by its declared shape and never by its id: an `at` that is an instant or a
+ * day, a `value` that is a number or an `amount` that is money (or both), an optional `unit`, its title as the
+ * measure's name, and the fields that point at `about`. `null` for any other list.
+ */
+function readingShape(list: ListShape, about: string): { refs: string[]; value: string; amount: boolean; unit: boolean } | null {
+  const live = list.fields.filter((f) => !f.retired);
+  const has = (id: string, types: readonly string[]): boolean => live.some((f) => f.id === id && types.includes(f.type));
+  const refs = live.filter((f) => f.type === 'ref' && f.to === about).map((f) => f.id);
+  const value = has('value', ['decimal', 'number', 'integer']);
+  const amount = has('amount', ['money']);
+  if (refs.length === 0 || !has('at', ['instant', 'date']) || (!value && !amount)) return null;
+  return { refs, value: value ? 'value' : 'amount', amount, unit: has('unit', ['text']) };
+}
+
+/**
+ * One reading as a sentence says it: money as integer minor units and the currency it was written in, never converted,
+ * or the number as it was read. An older reading is a decimal whose unit is a currency code, and is turned into minor
+ * units by that currency's digits, as `measures.ts` turns one the other way.
+ */
+function readingSaid(r: RawReading): Json | undefined {
+  let held = r.amount;
+  if (typeof held === 'string' && held.startsWith('{')) {
+    try {
+      held = JSON.parse(held) as unknown;
+    } catch {
+      held = undefined;
+    }
+  }
+  const money = held !== null && typeof held === 'object' ? (held as { amount?: unknown; currency?: unknown }) : null;
+  if (money && typeof money.amount === 'number' && Number.isInteger(money.amount) && typeof money.currency === 'string' && money.currency.trim() !== '')
+    return { amount: money.amount, currency: money.currency.trim().toUpperCase() };
+  const n = typeof r.value === 'number' ? r.value : typeof r.value === 'string' && r.value.trim() !== '' ? Number(r.value) : Number.NaN;
+  if (!Number.isFinite(n)) return undefined;
+  const unit = typeof r.unit === 'string' ? r.unit.trim().toUpperCase() : '';
+  return isCurrencyCode(unit) ? { amount: Math.round(n * 10 ** exponentOf(unit)), currency: unit } : n;
+}
+
+/**
+ * `<measure>.<period>` on a page with a row (rule 5 of `PATH_ORDER`): the newest reading of that measure for that period
+ * about the row, and the day it was read in the record's zone, or `null` when the record holds none.
+ *
+ * BY ITS NAME WHOLE, OR ITS NAME, A COMMA AND THE ROW'S TITLE, the rule the bands script reads by
+ * (`packs/portfolio-bands/bands.js`), since an import names a project's reading "Monthly revenue, <project>". The name is
+ * the period and the measure in either order, so `revenue.monthly` is "Monthly revenue" and "Revenue monthly".
+ *
+ * ONE READING, NEVER A SUM: the newest is said in the currency it was written in, and a reading in another currency
+ * beside it is not added, converted or averaged in. Each list of readings is asked once, for this row, through
+ * `deps.readings`, and a list the reader may not open is not asked.
+ */
+function newestReading(deps: PageDeps, measure: string, period: string): { value: Json; day: string } | null {
+  const here = deps.here;
+  if (!here || !deps.readings || !deps.lists) return null;
+  const reads = deps.ctx.reads;
+  const own = deps.titleOf(here.register);
+  const title = own && typeof here.fields[own] === 'string' ? spokenAs(here.fields[own]) : '';
+  const words = [`${spokenAs(period)} ${spokenAs(measure)}`, `${spokenAs(measure)} ${spokenAs(period)}`];
+  const wanted = new Set(words.flatMap((w) => (title === '' ? [w] : [w, `${w}, ${title}`])));
+  let best: { ms: number; at: string; value: Json } | null = null;
+  for (const list of deps.lists()) {
+    const shape = readingShape(list, here.register);
+    const name = shape ? deps.titleOf(list.id) : null;
+    if (!shape || !name || (reads !== undefined && !reads(list.id))) continue;
+    const about: Predicate = shape.refs.length === 1 ? { field: shape.refs[0]!, is: here.id } : { any: shape.refs.map((f) => ({ field: f, is: here.id })) };
+    const read = deps.readings({ register: list.id, where: about, when: 'at', value: shape.value, name, ...(shape.unit ? { unit: 'unit' } : {}), ...(shape.amount ? { amount: 'amount' } : {}), since: AFTER_EVERY });
+    if (!read.ok) continue;
+    for (const r of [...read.value.latest, ...read.value.readings]) {
+      if (typeof r.name !== 'string' || !wanted.has(spokenAs(r.name)) || typeof r.at !== 'string') continue;
+      const ms = Date.parse(r.at.length === 10 ? `${r.at}T00:00:00Z` : r.at);
+      const value = readingSaid(r);
+      if (!Number.isFinite(ms) || value === undefined || (best !== null && best.ms >= ms)) continue;
+      best = { ms, at: r.at, value };
+    }
+  }
+  if (best === null) return null;
+  return { value: best.value, day: best.at.length === 10 ? best.at : localDays(readableZone(deps.tz))(best.ms) };
 }
 
 /** What a declaration reads of the modules a record has installed: `PageDeps` and `ListsBeside` both hand these. */
@@ -4709,18 +4919,26 @@ function stepValue(deps: PageDeps, said: { register: string; seq: number; field:
   const reads = deps.ctx.reads;
   if (!spec || (reads !== undefined && !reads(said.register))) return undefined;
   const row = rowAt(deps, said.register, said.seq);
-  if (!row) return undefined;
-  const held = Object.hasOwn(row.fields, said.field) ? row.fields[said.field] : undefined;
+  return row ? stepOn(deps, spec, row, said.field, said.then) : undefined;
+}
+
+/**
+ * The step itself, from a row in hand: a row by spoken id, or the page's own row (`<field>.<part>`, rule 4 of
+ * `PATH_ORDER`). The list a link points at is still held to a reader of it.
+ */
+function stepOn(deps: PageDeps, spec: { type: string; to?: string | undefined }, row: Entry, field: string, then: string): Json | undefined {
+  const reads = deps.ctx.reads;
+  const held = Object.hasOwn(row.fields, field) ? row.fields[field] : undefined;
   if (spec.type === 'list') return Array.isArray(held) ? held.length : 0;
   if (spec.type === 'money') {
     const m = figure(held);
-    return m !== null && typeof m === 'object' && !Array.isArray(m) ? m[said.then] : undefined;
+    return m !== null && typeof m === 'object' && !Array.isArray(m) ? m[then] : undefined;
   }
   const to = spec.to!;
   if (typeof held !== 'string' || held === '' || (reads !== undefined && !reads(to))) return undefined;
   const far = deps.list({ register: to, where: { field: 'id', is: held }, limit: 1 });
   const hit = far.ok ? far.value.rows[0] : undefined;
-  return hit && Object.hasOwn(hit.fields, said.then) ? figure(hit.fields[said.then]) : undefined;
+  return hit && Object.hasOwn(hit.fields, then) ? figure(hit.fields[then]) : undefined;
 }
 
 /**
@@ -4900,19 +5118,22 @@ function rowNamed(deps: PageDeps, row: Entry | undefined, read: BlockResult): Bl
  * this the two answered the same, so 48 paths on the owner's record drew a dash for a typo. Only a path with no value is
  * asked whether it names anything, so a block whose paths all hold values costs no read more than it did.
  */
-function valuesOf(deps: PageDeps, block: PageBlock): { values?: Record<string, Json>; values_fx?: Record<string, FxRead>; unnamed?: string[] } {
+function valuesOf(deps: PageDeps, block: PageBlock): { values?: Record<string, Json>; values_fx?: Record<string, FxRead>; read_as?: Record<string, ReadAs>; unnamed?: string[] } {
   const out: Record<string, Json> = {};
   const fx: Record<string, FxRead> = {};
+  const as: Record<string, ReadAs> = {};
   const unnamed: string[] = [];
   for (const path of pathsOf(block, (id) => figureNamed(deps, id))) {
-    const how: { fx?: FxRead } = {};
+    const how: { fx?: FxRead; as?: ReadAs } = {};
     const v = valueAt(deps, path, how);
     if (v !== undefined) out[path] = v;
     else if (!namedAt(deps, path)) unnamed.push(path);
+    /* AND WHICH RULE READ IT, for every path that holds a value (PGS-B13). */
+    if (v !== undefined && how.as) as[path] = how.as;
     /* A FIGURE'S CONVERSION GOES OUT BESIDE ITS AMOUNT (rates-foot-note-80), so a sentence can say its rates are old. */
     if (v !== undefined && how.fx) fx[path] = how.fx;
   }
-  return { ...(Object.keys(out).length ? { values: out } : {}), ...(Object.keys(fx).length ? { values_fx: fx } : {}), ...(unnamed.length ? { unnamed } : {}) };
+  return { ...(Object.keys(out).length ? { values: out } : {}), ...(Object.keys(fx).length ? { values_fx: fx } : {}), ...(Object.keys(as).length ? { read_as: as } : {}), ...(unnamed.length ? { unnamed } : {}) };
 }
 
 /** A figure by its id, declared or built in, as `registersOf` finds one. */
@@ -4938,24 +5159,16 @@ function namedAt(deps: PageDeps, path: string): boolean {
   const parsed = pathOf(path, deps.here ? deps.schemaOf(deps.here.register)?.fields : undefined);
   if (!parsed) return false;
   if ('own' in parsed) return true;
+  if ('measure' in parsed) return newestReading(deps, parsed.measure, parsed.period) !== null;
   if ('metric' in parsed) return figureNamed(deps, parsed.metric);
   /* ONE STEP NAMES SOMETHING WHEN THE STEP IS ONE THE RECORD READS and the row is there: `tasks#1.project.nmae` is the
      author's typo, and a link through a list the caller may not open is named and draws its dash. */
   if ('then' in parsed) return stepSpec(deps, parsed) !== null && rowThere(deps, parsed.register, parsed.seq);
   const two = twoOf(parsed);
   if (two) {
-    /* BY THE SAME ORDER `valueAt` READS BY, so a path one rule names is never drawn as words nobody knows. */
-    if ('count' in parsed && LIST_ID.test(two.head) && deps.schemaOf(two.head)) return true;
-    if (stateNamed(deps, two.head, two.tail)) return true;
-    if ('change' in parsed && figureNamed(deps, parsed.change)) return true;
-    if ('rowsOf' in parsed && figureNamed(deps, parsed.rowsOf)) {
-      if (parsed.field === undefined) return true;
-      /* `first_<field>` NAMES A FIELD THE FIGURE'S LIST DECLARES, so `first_ownd` is the author's typo and not a dash. */
-      const decl = deps.metric(parsed.rowsOf);
-      const schema = decl?.source.startsWith('register.') ? deps.schemaOf(decl.source.slice('register.'.length)) : null;
-      if (schema !== null && Object.hasOwn(schema.fields, parsed.field)) return true;
-    }
-    return moduleFigure(deps, two.head, two.tail) !== null;
+    /* BY THE SAME ORDER `valueAt` READS BY (`PATH_ORDER`), so a path one rule names is never drawn as words nobody
+       knows. A reading the record does not hold names nothing, and draws as the author wrote it. */
+    return PATH_ORDER.some((rule) => rule.names(deps, parsed, two));
   }
   if (!('seq' in parsed)) return false;
   const schema = deps.schemaOf(parsed.register);

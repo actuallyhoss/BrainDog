@@ -21,7 +21,18 @@
 export type ModelId = 'llama-3.2-1b' | 'glm-5.3-flash' | 'glm-5.3' | 'bge-m3';
 export type ModelRate = { in: number; out: number };
 export type PromptId = 'predicate' | 'propose' | 'pattern' | 'answer' | 'setup' | 'mapping';
+/**
+ * What a template's ask is for, in the host router's own names (`packages/host/src/infer.ts`, `PURPOSES`), restated
+ * because this file imports nothing. It is the purpose a host's route is asked for (`SlashRoute`, `types.ts`).
+ */
+export type TemplatePurpose = 'ask' | 'plan' | 'automation' | 'pattern' | 'prose';
 export type PromptTemplate = {
+  /**
+   * The purpose the host's route is asked for (ENG-A06). OPTIONAL ON THE TYPE for a template outside `PROMPTS` that
+   * `core.run` never takes (`jobs.ts`'s `PROSE`); every template in `PROMPTS` says one (`Routed`).
+   */
+  purpose?: TemplatePurpose;
+  /** The model asked where the host hands no route, and the one priced on the hold before a route says otherwise. */
   model: ModelId;
   maxTokens: number;
   capIn: number;
@@ -399,8 +410,16 @@ const MAPPING_SCHEMA = {
  * `llama-3.2-1b` DRAFTS NO PREDICATE. The table's own note: it is too weak for the grammar, and a
  * predicate that does not validate costs a second projection and a fallback to keyword search.
  */
-export const PROMPTS: Readonly<Record<PromptId, PromptTemplate>> = {
+/** A template `core.run` takes, which says its purpose. */
+export type Routed = PromptTemplate & { purpose: TemplatePurpose };
+
+/* EACH TEMPLATE'S PURPOSE IS ITS CALLER'S (ENG-A06): `predicate`, `propose` and `mapping` are a person's question or his
+   file (`propose.ts` `ASKED`), `setup` the first plan (`PLANNED`), `answer` an automation's step (`answer.ts`), and
+   `pattern` the record drafting its own (`jobs.ts` `DRAFTED`; a pressed pattern is still charged as `ask`, and only the models
+   it is sent to are the pattern's). */
+export const PROMPTS: Readonly<Record<PromptId, Routed>> = {
   predicate: {
+    purpose: 'ask',
     model: 'glm-5.3-flash',
     maxTokens: 200,
     capIn: 1200,
@@ -410,6 +429,7 @@ export const PROMPTS: Readonly<Record<PromptId, PromptTemplate>> = {
     slots: ['%INDEX%', '%FIGURES%', '%QUESTION%'],
   },
   propose: {
+    purpose: 'ask',
     model: 'glm-5.3-flash',
     maxTokens: 1500,
     capIn: 12000,
@@ -419,6 +439,7 @@ export const PROMPTS: Readonly<Record<PromptId, PromptTemplate>> = {
     slots: ['%INDEX%', '%ROWS%', '%FIGURES%', '%QUESTION%'],
   },
   pattern: {
+    purpose: 'pattern',
     model: 'glm-5.3-flash',
     maxTokens: 2048,
     capIn: 8000,
@@ -431,6 +452,7 @@ export const PROMPTS: Readonly<Record<PromptId, PromptTemplate>> = {
      holds the kernel's longest question (4,096 characters, `VAR_BYTES`) with room for the fields, and the fields are
      what comes off the end when a row's are longer than that. */
   answer: {
+    purpose: 'automation',
     model: 'glm-5.3-flash',
     maxTokens: 200,
     capIn: 3000,
@@ -443,6 +465,7 @@ export const PROMPTS: Readonly<Record<PromptId, PromptTemplate>> = {
      or a file's columns and its first entries; what comes off the end when it does not is entries, one at a time. Both
      stay under `propose`'s worst case, so the Worker's ceiling counts no fewer asks for them (`worstAsk`). */
   setup: {
+    purpose: 'plan',
     model: 'glm-5.3-flash',
     maxTokens: 1200,
     capIn: 6000,
@@ -452,6 +475,7 @@ export const PROMPTS: Readonly<Record<PromptId, PromptTemplate>> = {
     slots: ['%USECASES%', '%MODULES%', '%TODAY%', '%SAID%'],
   },
   mapping: {
+    purpose: 'ask',
     model: 'glm-5.3-flash',
     maxTokens: 800,
     capIn: 6000,

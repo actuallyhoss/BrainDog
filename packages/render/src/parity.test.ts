@@ -755,6 +755,12 @@ test('A RUN TOO SHORT TO DRAW PRINTS ITS NEWEST NUMBER where the card has no fig
   for (const drawn of [toHTML([beside]), render(Block, { props: { block: beside } }).body].map(tree)) assert.deepEqual(figures(drawn), ['12 Done', '2 Done', '3 Done', '0 Done']);
 });
 
+test("A CARD WITH EDIT AND NO WRITER IS THE MIRROR'S TEXT (PGS-C15): the box is drawn only where the host hands a writer", () => {
+  const src = '```cards\ntitle: Name | reply\nOxbow | A kiln for hire\n```';
+  const opts = { edits: [null, { field: 'about', max: 120 }] };
+  assert.equal(tree(render(Block as Component<{ block: BlockSegment; opts?: unknown }>, { props: { block: page(src), opts } }).body), tree(toHTML([page(src)])));
+});
+
 test('EVERY ROW CARRIES ITS KEY, and only the host\'s cursor marks one: the record\'s own key where it has one', () => {
   const block = page('```todo\n[ ] Check the export\n[ ] Send the quote\n```');
   block.rows[1] = { ...block.rows[1]!, ref: { register: 'tasks', seq: 12, version: 3 } };

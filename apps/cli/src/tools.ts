@@ -20,6 +20,10 @@
  * starts the same way, when there is one: that row is stamped as seen and nothing is added. A row is asked about only
  * when how it starts would change, as "Change how <name> starts?".
  *
+ * THE RECORD DOES THAT MATCHING WHEN IT CAN (AGT-D02 job 4). A scan sends everything it found in one `toolsSeen` call,
+ * 50 a call, matched there against every row rather than the ones one context shows, and says one line an answer. A
+ * record or a command line without `toolsSeen` is scanned as below, unchanged.
+ *
  * WRITE IS A DRY RUN UNTIL A SCOPE IS NAMED (question 5). `--scope user` applies the global tools into the client's
  * place for the person, and `--scope project` this repository's, only when typed by hand. An entry already there is
  * replaced only when it is still what BrainDog last wrote, by `~/.braindog/tools-lock.json`, or still the entry the
@@ -187,15 +191,16 @@ export function depositor(o: { file: string; env: Env; host: string; headers: Re
 /**
  * `written`: the SHA-256 of each entry BrainDog applied. `asked`: the config shape each proposal was made for.
  * `same`: the row a tool found under another name was matched to, by how it starts. `missed`: the rows such a tool was
- * looked for among and not found, so they are read again only once one of them has changed.
+ * looked for among and not found, so they are read again only once one of them has changed. `said`: the hash of the
+ * last line said of a tool the record answered for (`toolsSeen`), so a question waiting or a tool skipped is said once.
  */
-type ToolsLock = { written: Record<string, string>; asked: Record<string, string>; same: Record<string, string>; missed: Record<string, string> };
+type ToolsLock = { written: Record<string, string>; asked: Record<string, string>; same: Record<string, string>; missed: Record<string, string>; said: Record<string, string> };
 
 function toolsLock(file: string): ToolsLock | null {
   const held = readLock(file);
   if (held === null) return null;
   const strings = (x: unknown) => Object.fromEntries(Object.entries(isObject(x) ? x : {}).filter((e): e is [string, string] => typeof e[1] === 'string'));
-  return { written: strings(held.written), asked: strings(held.asked), same: strings(held.same), missed: strings(held.missed) };
+  return { written: strings(held.written), asked: strings(held.asked), same: strings(held.same), missed: strings(held.missed), said: strings(held.said) };
 }
 
 /** JSON with its keys in order, so the same entry always hashes the same. */
@@ -246,6 +251,38 @@ const startWords = (s: Start, home: string): string => {
 };
 
 const DAY_MS = 86_400_000;
+
+/* ── what the record is told ───────────────────────────────────────────── */
+
+/** The most tools one `toolsSeen` call carries. */
+const SEEN_PER_CALL = 50;
+
+/** The refusals of a record, or of a command line, that has no `toolsSeen`: the scan then goes on as it did before. */
+const NO_SEEN = new Set(['ROUTE_UNKNOWN', 'NOT_IN_THIS_BUILD']);
+
+/** A found tool as `toolsSeen` takes it: how it starts and the names of the keys it needs, never a value. */
+function seenOf(f: Found): Record<string, unknown> {
+  return {
+    name: f.name,
+    kind: f.kind,
+    scope: f.scope,
+    ...(f.transport === null ? {} : { transport: f.transport }),
+    ...(f.command === null ? {} : { command: f.command, args: f.args }),
+    ...(f.endpoint === null ? {} : { endpoint: f.endpoint }),
+    needs: f.entries.map(needName),
+    source: f.source,
+  };
+}
+
+/** Whether any text of a found tool, as it would be sent, looks like a key. A server holding one is never sent. */
+const keyedSeen = (f: Found): boolean => [f.name, f.source, f.command ?? '', f.endpoint ?? '', ...f.args, ...f.entries.map(needName)].some(looksLikeKey);
+
+/** The record's reason a tool was skipped, as a line can carry it: its own words, or a fixed sentence. */
+function whyOf(why: unknown): string {
+  if (typeof why !== 'string' || why.trim() === '' || looksLikeKey(why)) return 'the record did not say why.';
+  const said = why.trim().slice(0, 280);
+  return /[.?!]$/.test(said) ? said : `${said}.`;
+}
 
 /* ── scan ──────────────────────────────────────────────────────────────── */
 
@@ -441,8 +478,108 @@ export async function scanTools(s: ToolScan): Promise<string[]> {
   const keysSaid = (n: { deposited: number; would: number }) =>
     n.deposited > 0 ? `, with ${String(n.deposited)} key${n.deposited === 1 ? '' : 's'} deposited` : n.would > 0 ? `, and ${String(n.would)} key${n.would === 1 ? '' : 's'} would be deposited` : '';
 
+  /**
+   * A key of a tool the record answered for, deposited into the row it names when that row names no key for it yet,
+   * and the words saying so. Only where the key belongs, as below: a global tool from a run in a project has none.
+   */
+  const depositInto = async (f: Found, spoken: string): Promise<{ said: string; fault: string | null }> => {
+    const allow = f.scope === 'project' ? project !== null : project === null;
+    const seq = Number(/^tools#([1-9][0-9]*)$/.exec(spoken)?.[1] ?? Number.NaN);
+    if (!allow || s.deposit === null || !Number.isInteger(seq) || !f.entries.some((e) => e.secret && e.given !== null)) return { said: '', fault: null };
+    const got = valueOf(await s.client.get('tools', seq));
+    if (!isObject(got) || !isObject(got.fields) || typeof got.version !== 'number') return { said: '', fault: null };
+    const prior = strings(got.fields.needs);
+    const n = await needsFor(f, prior, allow);
+    if (n.deposited === 0) return { said: '', fault: null };
+    const label = (need: string) => need.split('=')[0] ?? need;
+    const here = new Set(n.needs.map(label));
+    const out = await s.client.update({ register: 'tools', seq, patch: { needs: [...n.needs, ...prior.filter((p) => !here.has(label(p)))] }, version: got.version });
+    return valueOf(out) === null ? { said: '', fault: `${f.name} could not name its deposited keys in the record: ${fixOf(out)}` } : { said: keysSaid(n), fault: null };
+  };
+
+  /**
+   * THE RECORD MATCHES WHAT THIS MACHINE HOLDS (AGT-D02 job 4). Every tool found is sent in `toolsSeen`, 50 a call, and
+   * each answer is one line. The record matches a tool to its row by what it runs, among all of its rows and not the
+   * ones one context shows, so a new server is always recorded, nothing past that cut is lost, and a second machine's
+   * path is not a change to ask about. `false` when the record, or this command line, has no `toolsSeen`: the scan
+   * below then goes on exactly as before.
+   *
+   * ONLY NAMES AND HOW A TOOL STARTS ARE SENT, its keys by name. A tool any part of which looks like a key is not sent.
+   * A key is deposited after the answer, into the row the answer names. The lock keeps only what was said, so a
+   * question waiting or a tool skipped is said once, and said again when the answer changes.
+   */
+  const viaSeen = async (): Promise<boolean> => {
+    const said: string[] = [];
+    const once = (key: string, line: string) => {
+      const hash = sha256(line);
+      if (lock.said[key] !== hash) said.push(line);
+      lock.said[key] = hash;
+    };
+    const sending: { f: Found; key: string }[] = [];
+    for (const f of found.values()) {
+      if (f.scope === 'project' && project === null) continue;
+      if (f.scope === 'global' && project !== null && listed.some((r) => r.scope === 'project' && r.name === f.name)) continue;
+      if (keyedSeen(f)) {
+        said.push(`${toolSaid(f)} carries what looks like a key, so it was not recorded.`);
+        continue;
+      }
+      sending.push({ f, key: `${f.scope}|${f.scope === 'project' ? place : ''}|${f.name}` });
+    }
+    const projectServers = [...found.values()].filter((f) => f.scope === 'project').length;
+    if (project === null && projectServers > 0)
+      said.unshift(`This folder is in no project in the record, so the ${String(projectServers)} server${projectServers === 1 ? '' : 's'} of its project config ${projectServers === 1 ? 'was' : 'were'} not recorded.`);
+    if (sending.length === 0) {
+      lines.push(...said);
+      return true;
+    }
+    const device = s.machine ?? (await (await import('./hooks.ts')).deviceName(process.env, s.once?.host ?? null));
+    let handled = false;
+    try {
+      for (let at = 0; at < sending.length; at += SEEN_PER_CALL) {
+        const batch = sending.slice(at, at + SEEN_PER_CALL);
+        const out = await s.client.call<{ tools: unknown }>('toolsSeen', { machine: device, found: batch.map((b) => seenOf(b.f)) });
+        if (!out.ok && 'refusal' in out && NO_SEEN.has(out.refusal.code) && !handled) return false;
+        handled = true;
+        const value = valueOf(out);
+        const answers = isObject(value) && Array.isArray(value.tools) ? value.tools.filter(isObject) : null;
+        if (answers === null) {
+          said.push(`The rest of the tools were not recorded: ${fixOf(out)}`);
+          break;
+        }
+        for (const [i, { f, key }] of batch.entries()) {
+          const a = answers.length === batch.length && answers[i]?.name === f.name ? answers[i] : answers.find((x) => x.name === f.name);
+          if (a === undefined) continue;
+          const row = typeof a.row === 'string' ? a.row : null;
+          if (a.did === 'added' || a.did === 'seen' || a.did === 'seen-here') {
+            delete lock.said[key];
+            const kept = row === null ? { said: '', fault: null } : await depositInto(f, row);
+            if (a.did === 'added') said.push(`${f.name} was recorded ${f.scope === 'project' && project !== null ? `in ${project.name}` : 'for use everywhere'}${kept.said}.`);
+            else if (kept.said !== '') said.push(`${f.name} is recorded${kept.said}.`);
+            if (kept.fault !== null) said.push(kept.fault);
+          } else if (a.did === 'asked')
+            once(key, row !== null ? `${f.name} runs something else now; the question is on Decide.` : `${f.name} applies everywhere, so recording it was asked on Decide.`);
+          else if (a.did === 'waiting') once(key, `${f.name} waits on a question already on Decide.`);
+          else if (a.did === 'skipped') once(key, `${f.name} was not recorded: ${whyOf(a.why)}`);
+        }
+      }
+    } catch (e) {
+      handled = true;
+      if (!(e instanceof Stopped)) throw e;
+      said.push('BrainDog stopped answering part way, so the rest of the tools wait for the next scan.');
+    } finally {
+      if (handled) {
+        /* The values go out of reach here, whatever happened above. */
+        for (const f of found.values()) for (const e of f.entries) e.given = null;
+        writeLock(lockFile, lock);
+      }
+    }
+    lines.push(...said);
+    return true;
+  };
+
   const everywhere: { f: Found; key: string; shape: string; row: Record<string, unknown> }[] = [];
-  try {
+  /* A dry run sends nothing, so it says what it would do from the context, as before. */
+  if (s.dryRun || !(await viaSeen())) try {
     const projectServers = [...found.values()].filter((f) => f.scope === 'project');
     if (project === null && projectServers.length > 0)
       lines.push(`This folder is in no project in the record, so the ${String(projectServers.length)} server${projectServers.length === 1 ? '' : 's'} of its project config ${projectServers.length === 1 ? 'was' : 'were'} not recorded.`);

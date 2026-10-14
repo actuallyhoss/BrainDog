@@ -1596,9 +1596,10 @@ const DECLARED: Record<string, Version> = {
       register.things
       rule.project-past-aim
     `,
-    declares: 'bc4e48dea660614a',
+    declares: '88eb91d28c23081b',
     history: [
       "`page.portfolio` draws the note beside What each one earns, open and folded, only while `projects-earning-said` is above nought, where it was drawn while `projects-live` was and read 0 of 11 on a record where nobody had said; the words are the same -> bc4e48dea660614a",
+      "`page.portfolio`'s In play cards say `edit: true` on `about`, so a project's one line is typed on its card (PGS-C15) -> 88eb91d28c23081b",
     ],
   },
   /* WHAT WAS WORKED ON A PROJECT THIS WEEK, a figure over tasks and so Work's (batch 46, REC-C16). 1.17.0 IS RELEASED. */

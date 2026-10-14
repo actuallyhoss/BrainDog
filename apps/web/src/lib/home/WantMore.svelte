@@ -17,6 +17,11 @@
   one Settings hands it (`agents/listen.ts`). The step is still a link to Settings, Agents: a press with a modifier, a
   sheet that cannot load, and a reader who is not the record's owner (who may not make keys, `ownsRecord`, the rule
   Agents.svelte holds as `anOwner`) all go there.
+
+  THE SIX DIGITS ARE TYPED HERE TOO (first-run-connect-91): `braindog setup` shows a code to approve, and the sheet draws
+  the field under its setup line (`CodeForm.svelte`, the one Settings, Agents draws), loaded in the same chunk as the
+  sheet. So the setup line, then the six digits, then "Connected", all without leaving Home; once a code is approved the
+  step reads as done.
 -->
 <script lang="ts">
   import { goto } from '$app/navigation';
@@ -26,6 +31,7 @@
   import type { Shell } from '$lib/record/boot-live.ts';
   import type { ConnectLines } from '$lib/record/device.ts';
   import type { Listened } from '$lib/agents/listen.ts';
+  import type { Approve } from '$lib/agents/code-form.ts';
   import type { MadeStep } from '$lib/start/made.ts';
   import { createClient } from '@braindog/client';
   import { ownsRecord } from '../../routes/settings/levels.ts';
@@ -51,6 +57,9 @@
     hideLabel: 'Hide these next steps',
     agent: (name: string) => `Connect ${name}`,
     agentGo: 'Connect',
+    /* THE STEP DONE, said in words beside its tick in the well, so it is never a colour alone. */
+    agentDone: (name: string) => `${name} is connected`,
+    agentDoneDoes: 'Approved just now. It can reach this record.',
     bank: "Forward your bank's texts",
     mail: 'Forward your mail',
     file: 'Bring in a file from another app',
@@ -63,11 +72,16 @@
   };
 
   /** One step as its line draws it: the glyph, the name, what it would do, and where its button goes. */
-  type Line = { key: string; icon: IconName; name: string; does: string; go: string; href: string };
+  type Line = { key: string; icon: IconName; name: string; does: string; go: string; href: string; done?: true };
+
+  /* A CODE APPROVED IN THE SHEET, which turns the agent's step to done for this visit. */
+  let approved = $state(false);
 
   const lineOf = (s: MadeStep): Line =>
     s.kind === 'agent'
-      ? { key: 'agent', icon: 'plug', name: say.agent(s.agent.name), does: s.agent.finds, go: say.agentGo, href: '/settings/agents' }
+      ? approved
+        ? { key: 'agent', icon: 'check', name: say.agentDone(s.agent.name), does: say.agentDoneDoes, go: '', href: '', done: true }
+        : { key: 'agent', icon: 'plug', name: say.agent(s.agent.name), does: s.agent.finds, go: say.agentGo, href: '/settings/agents' }
       : {
           key: s.source.kind,
           icon: s.source.kind === 'bank' ? 'money' : s.source.kind === 'mail' ? 'inbox' : 'download',
@@ -97,21 +111,34 @@
     Sheet: typeof import('$lib/agents/ConnectSheet.svelte').default;
     lines: ConnectLines;
     listen: (keys: boolean) => Promise<Listened | null>;
+    /* THE SIX-DIGIT FIELD and its approval, in the sheet's chunk: Home's own entry carries neither. */
+    Form: typeof import('$lib/agents/CodeForm.svelte').default;
+    approve: Approve;
   };
   let connect = $state<Connect | null>(null);
   let sheetOpen = $state(false);
   let loading = $state(false);
 
   async function load(): Promise<Connect | null> {
-    const [sheet, device, listen] = await Promise.all([
+    const [sheet, device, listen, form, code] = await Promise.all([
       import('$lib/agents/ConnectSheet.svelte'),
       import('$lib/record/device.ts'),
       import('$lib/agents/listen.ts'),
-    ]).catch(() => [null, null, null] as const);
-    if (sheet === null || device === null || listen === null) return null;
+      import('$lib/agents/CodeForm.svelte'),
+      import('$lib/agents/code-form.ts'),
+    ]).catch(() => [null, null, null, null, null] as const);
+    if (sheet === null || device === null || listen === null || form === null || code === null) return null;
     /* THE BARE HOST, as Settings' lines carry it; the setup line names this record when there is one. */
     const slug = shell.live === true ? (shell.index?.slug ?? null) : null;
-    return { Sheet: sheet.default, lines: device.connectLines(page.url.origin, slug), listen: listen.listenFor(createClient({ base: apiBase() })) };
+    /* ONE CLIENT for the live row's ask and the approval, as Settings, Agents makes one for both. */
+    const client = createClient({ base: apiBase() });
+    return {
+      Sheet: sheet.default,
+      lines: device.connectLines(page.url.origin, slug),
+      listen: listen.listenFor(client),
+      Form: form.default,
+      approve: code.approverOf(client),
+    };
   }
 
   /* A PRESS WITH A MODIFIER OPENS THE LINK where the person asked for it; a sheet that cannot load goes there too. */
@@ -142,7 +169,9 @@
             <span class="want-more-name">{line.name}</span>
             <span class="want-more-does">{line.does}</span>
           </span>
-          {#if line.key === 'agent' && mayConnect}
+          {#if line.done}
+            <!-- DONE: the tick in the well and the name saying so; there is nowhere left for a button to go. -->
+          {:else if line.key === 'agent' && mayConnect}
             <Button size="sm" href={line.href} aria-busy={loading || undefined} onclick={(e) => void openSheet(e, line.href)}>{line.go}</Button>
           {:else}
             <Button size="sm" href={line.href}>{line.go}</Button>
@@ -153,8 +182,13 @@
   </Tile>
 {/if}
 
+<!-- THE SIX DIGITS UNDER THE SETUP LINE, the owner's only, as on Settings, Agents: the sheet opens for nobody else. -->
+{#snippet codeField()}
+  {#if connect}<connect.Form id="home-user-code" approve={connect.approve} onchanged={() => (approved = true)} />{/if}
+{/snippet}
+
 {#if connect}
-  <connect.Sheet bind:open={sheetOpen} lines={connect.lines} listen={connect.listen} />
+  <connect.Sheet bind:open={sheetOpen} lines={connect.lines} listen={connect.listen} code={mayConnect ? codeField : undefined} />
 {/if}
 
 <style>

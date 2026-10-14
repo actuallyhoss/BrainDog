@@ -11,12 +11,13 @@
 
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 
 import type { Client, Context } from '@braindog/client';
 import { refused } from '@braindog/ports';
 
+import { allowedPrograms, owedCommands, readAllowed, sentOf, usedTools, type SentCommands } from './commands-used.ts';
 import { briefing, cardOf, nextLine, words, type Moved, type Where } from './brief.ts';
 import { budgetOf, clientFor, hostsPath, readHosts, sameHost, target, type Target } from './http.ts';
 import { authoredIn, childHeads, commitsBy, joinedAt, listedBy, localRepo, LOG_FORMAT, meeter, meetingOf, MIN_COMMITS, ownerOf, readLayout, type Layout, type MeetCall, type Meeting, type Owner, type Reader } from './people.ts';
@@ -64,7 +65,8 @@ export const unreachable = (ms: number): string =>
  * hook ran under (`CLAUDE_PID`). `cwd`, `repo` and `remote` are where the session started, for a subagent working in a
  * scratch folder (`parentOf`), and `heads` the HEAD of each repository under a folder that is not one, so the end hook
  * reads the commits of every one that moved. `hook_ms` is how long the start hook that wrote it took, until a later hook
- * of the same session sends it as the door's `hook` mark (`owedMark`).
+ * of the same session sends it as the door's `hook` mark (`owedMark`). `commands` is the list of the project's command
+ * lines the end hook last sent, by name only, and when, so the same list goes once a day for a folder (`sendCommands`).
  */
 export type SessionFile = {
   host: string;
@@ -79,6 +81,7 @@ export type SessionFile = {
   remote?: string;
   heads?: Record<string, string>;
   hook_ms?: number;
+  commands?: SentCommands;
 };
 
 const SPOKEN = /^S[1-9][0-9]*$/;
@@ -131,6 +134,7 @@ export function readSession(file: string): SessionFile | null {
     ...(typeof x.remote === 'string' && PRINTABLE.test(x.remote) ? { remote: x.remote } : {}),
     ...(isObject(x.heads) ? { heads: headsOf(x.heads) } : {}),
     ...(typeof x.hook_ms === 'number' && Number.isInteger(x.hook_ms) && x.hook_ms >= 0 && x.hook_ms <= HOOK_MARK_MAX_MS ? { hook_ms: x.hook_ms } : {}),
+    ...(sentOf(x.commands) === undefined ? {} : { commands: sentOf(x.commands)! }),
   };
 }
 
@@ -509,6 +513,8 @@ export async function hookStart(io: Io): Promise<void> {
     ...(at.repo === null ? {} : { repo: at.repo }),
     ...(at.remote === null ? {} : { remote: at.remote }),
     ...(same && before.heads !== undefined ? { heads: before.heads } : Object.keys(fresh).length > 0 ? { heads: fresh } : {}),
+    /* WHAT THE FOLDER'S COMMAND LINES LAST SENT carries over, to the same host, so a new session does not send them again. */
+    ...(before !== null && before.host === to.key && before.commands !== undefined ? { commands: before.commands } : {}),
   };
   /* THE SESSION'S OWN FILE, THE FOLDER'S, AND THE WINDOW'S. A subagent's run is never its window's. */
   const files = [...(id === null ? [] : [sessionPath(io.env, event.cwd, id)]), sessionPath(io.env, event.cwd), ...(pid === null || child ? [] : [windowPath(io.env, pid)])];
@@ -727,11 +733,90 @@ export async function hookEnd(io: Io): Promise<void> {
   const until = Date.now() + budget / 2;
   /* Beside the harvest and the end, on the same deadline, so the mark adds no wait to the hook. */
   const marked = owedMark(to, held, at, io.env, AbortSignal.timeout(budget));
+  /* THE PROJECT'S COMMAND LINES, beside the harvest and done before the end, on the harvest's deadline: `toolsSeen` is a
+     write, and one landing after the end would bring a run that waits as a handoff back to active. Only for a session
+     that stands in a repository, whose own settings they are. */
+  const listed = here.repo === null ? null : sendCommands(io, to, at, run, [file, sessionPath(io.env, event.cwd)], Math.max(1, until - Date.now()));
   if (moved.length > 0) await harvest(moved, client, (args) => client.call('meet', args), until);
+  await listed;
   const where = { ...(at.branch === null ? {} : { branch: at.branch }), ...(at.head === null ? {} : { head: at.head }) };
   const ended = await client.call('end', where);
   if (refused(ended) && OLDER_HOST.has(ended.refusal.code)) await client.handoff({ state: 'idle', ...where });
   await marked;
+}
+
+/**
+ * The programs this project's own Claude Code settings allow by name, sent once as `toolsSeen`'s command lines
+ * (AGT-D10 job 5, its settings half; `commands-used.ts`). By name only: nothing else of an entry leaves the machine.
+ *
+ * NO TRANSCRIPT. The scope also counts the shell calls in the session's log; his "transcripts never read" wins, so
+ * only the folder's `.claude/settings.json` and `.claude/settings.local.json` are read.
+ *
+ * ONCE A DAY FOR A FOLDER. The list sent is remembered in the session's own file and the folder's, and the start hook
+ * carries it to the next session, so the same list is not sent again within the day. Only a list the host took is
+ * remembered.
+ *
+ * NEVER FAILS THE HOOK, AND PRINTS NOTHING: the end hook says nothing to the session. A host that has no `toolsSeen`,
+ * that refuses it or that does not answer in time is one line in the hook's log (`hookLog`), and nothing else changes.
+ */
+export async function sendCommands(
+  io: Io,
+  to: Target,
+  at: Position,
+  run: { spoken: string; client_id?: string | undefined },
+  files: readonly string[],
+  ms: number,
+  send: SendSeen = (args) => clientFor(to, async () => sessionHeaders(at, 'claude', run, { env: io.env }), AbortSignal.timeout(ms)).call<unknown>('toolsSeen', args),
+): Promise<void> {
+  try {
+    const names = allowedPrograms(readAllowed(at.cwd));
+    const sent = files.map((f) => readSession(f)?.commands).find((c) => c !== undefined);
+    if (!owedCommands(names, sent, Date.now())) return;
+    /* The machine by the name the tools scan gives it (`tools.ts`), so both kinds of row name the same one. */
+    const out = await send({ machine: at.host, found: usedTools(names) });
+    if (!out.ok) {
+      const code = refused(out) ? out.refusal.code : '';
+      return hookLog(
+        io.env,
+        OLDER_HOST.has(code)
+          ? 'This host does not record command lines yet, so this project\'s were not recorded.'
+          : code === 'UNREACHABLE' || code === 'TIMEOUT'
+            ? 'The host did not answer in time, so this project\'s command lines were not recorded.'
+            : `The host did not record this project's command lines: ${refused(out) ? out.refusal.fix : 'no answer it could read.'}`,
+      );
+    }
+    const commands: SentCommands = { names, at: new Date().toISOString() };
+    for (const f of new Set(files)) {
+      const there = readSession(f);
+      if (there !== null && there.host === to.key) writeSession(f, { ...there, commands });
+    }
+  } catch {
+    hookLog(io.env, "This project's command lines could not be sent, so none were recorded.");
+  }
+}
+
+/** How the command lines are sent: `toolsSeen` on the run's own client, or a test's stand-in. */
+export type SendSeen = (args: { machine: string; found: ReturnType<typeof usedTools> }) => Promise<Awaited<ReturnType<Client['call']>>>;
+
+/* The hook's log keeps its last lines, so a machine never fills with them. */
+const HOOK_LOG_MAX_BYTES = 64 * 1024;
+
+/**
+ * One quiet line in the hook's own log, `hook.log` beside the session files, which nobody is shown and a person can
+ * read when the record lacks something. Never throws: a log that cannot be written loses the line.
+ */
+export function hookLog(env: Env, line: string): void {
+  try {
+    const file = join(dirname(hostsPath(env)), 'hook.log');
+    mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
+    if (existsSync(file) && statSync(file).size > HOOK_LOG_MAX_BYTES) {
+      const kept = readFileSync(file, 'utf8').split('\n').slice(-200).join('\n');
+      writeFileSync(file, kept, { mode: 0o600 });
+    }
+    appendFileSync(file, `${new Date().toISOString()} ${line.replace(/\s+/gu, ' ').slice(0, 300)}\n`, { mode: 0o600 });
+  } catch {
+    /* The line is lost, and nothing else. */
+  }
 }
 
 /**

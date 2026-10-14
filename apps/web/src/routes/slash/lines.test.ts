@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { suggestionsOf, words as slash, type Reading } from '../../lib/record/slash.ts';
-import { byLine, foldOf, sentenceOf, suggestedOf, tallyOf, words } from './lines.ts';
+import { byLine, foldOf, sentenceOf, suggestedOf, tallyOf, takenOf, waitsOf, words } from './lines.ts';
 
 const READING: Reading = {
   model: null,
@@ -162,4 +162,60 @@ test('NO EM DASH in anything this screen adds', () => {
     const line = typeof w === 'function' ? (w as (x: unknown) => string)(2) : w;
     assert.ok(!line.includes('—'), line);
   }
+});
+
+/* Noon, so the reader's day is the same in any zone the suite runs in. */
+const NOON = Date.parse('2026-10-14T12:00:00Z');
+
+test('EACH SUGGESTION ON DECIDE SAYS HOW LONG IT WAITS (ENG-B14), from the day the record hands, in words', () => {
+  const dated: Reading = {
+    ...READING,
+    drafts: [READING.drafts[0]!, { ...READING.drafts[1]!, asked: { id: 'SG3', status: 'open', lapses: '2026-10-28' } } as Reading['drafts'][number], READING.drafts[2]!],
+    waiting: [{ id: 'SG3', question: 'Add Watch?' }, { id: 'SG9', question: 'Add a desk for the launch?', lapses: '2026-10-20' } as Reading['waiting'][number]],
+  };
+  const all = suggestedOf(dated, [], NOON);
+  const of = (q: string) => all.find((s) => s.question === q);
+  assert.equal(of('Add Watch?')?.waits, 'Waits until 28 Oct', 'the day the draft was asked with');
+  assert.equal(of('Add a desk for the launch?')?.waits, 'Waits until 20 Oct', 'the record\u2019s own waiting, with no draft');
+  assert.equal(of('Give Logbook a page of its own?')?.waits, null, 'one not asked yet waits on nobody');
+  assert.equal(of('Turn off Notes?')?.waits, null, 'one answered waits no more');
+  /* NONE HANDED, NONE SAID: the reading as it is today draws exactly what it drew. */
+  for (const s of suggestedOf(READING, [], NOON)) assert.deepEqual([s.waits, s.taken], [null, null], s.question);
+  assert.equal(waitsOf('2026-10-14', NOON), 'Waits until today');
+  assert.equal(waitsOf('2026-10-02', NOON), 'Waits until today', 'a day gone by is never drawn');
+  assert.equal(waitsOf('2027-01-04', NOON), 'Waits until 4 Jan 2027');
+  for (const bad of ['2026-02-30', '28 Oct', '', null, 20261028]) assert.equal(waitsOf(bad, NOON), null, String(bad));
+});
+
+test('ONE THE RECORD TOOK BACK SAYS SO AMONG WHAT YOU ANSWERED, in the record\u2019s two notes, and nothing for any other', () => {
+  const closed: Reading = {
+    ...READING,
+    drafts: [
+      { question: 'Pin Kiln to Today?', body_kind: 'arrange', asked: { id: 'SG5', status: 'withdrawn', note: 'Taken back: a stronger suggestion took its place.' } },
+      { question: 'Give Logbook a page of its own?', body_kind: 'arrange', asked: { id: 'SG6', status: 'withdrawn', note: 'Taken back on 2026-10-12: nobody answered it.' } },
+      { question: 'Give Ledgerline a page?', body_kind: 'arrange', asked: { id: 'SG7', status: 'withdrawn' }, note: 'Taken back on 12 Oct: nobody answered it.' },
+      { question: 'Turn off Notes?', body_kind: 'pack', asked: { id: 'SG4', status: 'resolved', note: 'Taken back by the agent that asked it.' } },
+      { question: 'Add Diary?', body_kind: 'pack', asked: { id: 'SG8', status: 'withdrawn' } },
+    ] as Reading['drafts'],
+    waiting: [],
+  };
+  const all = suggestedOf(closed, [], NOON);
+  const of = (q: string) => all.find((s) => s.question === q);
+  assert.ok(all.every((s) => s.state === 'answered'), 'each is among what you answered');
+  assert.equal(of('Pin Kiln to Today?')?.taken, 'Taken back: a stronger suggestion took its place.');
+  assert.equal(of('Give Logbook a page of its own?')?.taken, 'Taken back on 12 Oct: nobody answered it.', 'the record\u2019s day, in words');
+  assert.equal(of('Give Ledgerline a page?')?.taken, 'Taken back on 12 Oct: nobody answered it.', 'a note handed with the draft');
+  assert.equal(of('Turn off Notes?')?.taken, null, 'another note is not ours to say');
+  assert.equal(of('Add Diary?')?.taken, null, 'the host handed none, so nothing is said');
+  for (const s of all) assert.doesNotMatch(s.taken ?? '', /\d{4}-\d{2}-\d{2}|\u2014/u, s.question);
+  assert.equal(takenOf('Taken back on 2026-02-30: nobody answered it.', NOON), 'Taken back: nobody answered it.', 'a day it cannot read is left out');
+  assert.equal(takenOf(undefined, NOON), null);
+});
+
+test('THE PAGE DRAWS HOW LONG IT WAITS BESIDE WHO DRAFTED IT, and why it was taken back among what you answered', async () => {
+  const { readFileSync } = await import('node:fs');
+  const screen = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
+  assert.match(screen, /\{#if by\}<span class="slash-by">\{by\}<\/span>\{\/if\}\{#if s\.waits\}<span class="slash-by">\{s\.waits\}<\/span>\{\/if\}/u);
+  const answered = screen.slice(screen.indexOf('pageWords.answeredTitle'));
+  assert.match(answered, /\{#if s\.taken\}<span class="line-detail">\{s\.taken\}<\/span>\{\/if\}/u);
 });

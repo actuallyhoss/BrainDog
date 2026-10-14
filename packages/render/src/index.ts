@@ -39,6 +39,7 @@ export {
   type CardRole,
 } from './cards.ts';
 export { hueOf } from './cards.ts';
+export { CARD_EDIT_PAUSE, CARD_EDIT_ROLES, cardEdit, editAfter, editable, type CardEdit, type EditColumn, type EditField } from './card-edit.ts';
 export { AGENTS_EARLIER, AGENTS_NOTHING, AGENT_VERBS, agentDoing, agentsPlan, type AgentGroup } from './agents.ts';
 export {
   QUEUE_CLEARED,

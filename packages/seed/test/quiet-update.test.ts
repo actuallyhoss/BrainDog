@@ -764,7 +764,12 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
           declarations: (raw.declarations as Body[]).map((d) => (d.register === 'things' ? (({ delete: _rule, ...rest }) => rest)(d) : d)),
         },
         'portfolio',
-        (now) => now.filter((b) => b.key !== 'open-earns-said' && b.key !== 'earns-said'),
+        /* AND THE ONE LINE TYPED ON AN IN PLAY CARD comes off with it, added inside the unreleased 1.17.0
+           (card-edit-wire-93, PGS-C15): `about` was text alone. */
+        (now) =>
+          now
+            .filter((b) => b.key !== 'open-earns-said' && b.key !== 'earns-said')
+            .map((b) => (b.kind === 'cards' && Array.isArray(b.columns) ? { ...b, columns: (b.columns as Body[]).map(({ edit: _edit, ...c }) => c) } : b)),
         (d) => d.metric !== 'project-said',
       ),
   },

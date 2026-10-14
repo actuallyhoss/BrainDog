@@ -7,7 +7,19 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-import { STALE_SHOWN, readStale, staleLine, staleRows, staleShown } from './stale.ts';
+import {
+  STALE_SHOWN,
+  keepOnce,
+  lessonRows,
+  readLessons,
+  readStale,
+  staleAll,
+  staleLine,
+  staleRows,
+  staleShown,
+  type Call,
+  type StaleRow,
+} from './stale.ts';
 
 const STEPS = {
   kind: 'steps',
@@ -140,4 +152,142 @@ test('THE TILE IS QUIET AND FLAT: no red, no border, no shadow, and a link is 44
   assert.match(tile, /@media \(pointer: coarse\) \{\s*a\.s-line \{\s*min-block-size: var\(--tap\);/u);
   /* NOTHING THE RECORD SAYS FOR A CALLER IS DRAWN. */
   assert.doesNotMatch(tile, /\.clear\b/u);
+});
+
+/* ── What the lessons say: a skill behind its lessons, and one lesson two projects learned ─ */
+
+/* INVENTED NAMES, written inline: a web test may not import the shared fixtures. */
+const DEPLOY = { skill: 'skills#3', name: 'Ship it', project: 'Larkfield', behind: [{ learning: 'learnings#12', lesson: 'Run the checks first' }, { learning: 'learnings#14', lesson: 'Tag the build' }], count: 2 };
+const TIDY = { skill: 'skills#5', name: 'Tidy up', project: null, behind: [{ learning: 'learnings#20', lesson: 'Keep the old notes' }], count: 1 };
+/* THE RECORD'S OWN SHAPE (learningsTwice): each side its handle, its words and its project's name, older first. */
+const side = (spoken: string, project: string) => ({ spoken, lesson: 'Ask before moving a file', project });
+const PAIR = { older: side('learnings#7', 'Kestrel'), newer: side('learnings#31', 'Wrenmoor'), topic: 'moving files', question: 'Kestrel and Wrenmoor learned the same thing. Keep it once, for everywhere?', parts: [] };
+const behind = (...skills: unknown[]) => ({ skills, total: skills.length });
+const twice = (...pairs: unknown[]) => ({ pairs });
+const linked = (spoken: string) => `/r/${spoken.replace('#', '/')}`;
+
+/** A stand-in client: each method answers what `answers` holds, and any other is a host built before it. */
+function host(answers: Record<string, unknown>) {
+  const asked: { name: string; args: Record<string, unknown> }[] = [];
+  const call: Call = async (name, args) => {
+    asked.push({ name, args });
+    if (!Object.hasOwn(answers, name)) return { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: `There is no method called ${name}.` } };
+    const a = answers[name];
+    return a instanceof Error ? Promise.reject(a) : (a as { ok: true; value: unknown });
+  };
+  return { call, asked };
+}
+const yes = (value: unknown) => ({ ok: true as const, value });
+
+test('A SKILL BEHIND ITS LESSONS IS ONE LINE BY ITS NAME: two lessons, and one said as "a lesson", each a link to the skill', () => {
+  const rows = lessonRows({ behind: behind(DEPLOY, TIDY), twice: null }, undefined, linked);
+  assert.deepEqual(rows, [
+    { key: 'behind:skills#3', said: 'Ship it has 2 lessons it does not take in yet', count: 2, href: '/r/skills/3' },
+    { key: 'behind:skills#5', said: 'Tidy up has a lesson it does not take in yet', count: 1, href: '/r/skills/5' },
+  ]);
+  /* WITH NO COUNT, the lessons it names are counted. */
+  assert.equal(lessonRows({ behind: behind({ ...DEPLOY, count: undefined }), twice: null }, undefined, linked)[0]!.count, 2);
+  /* A SKILL ON NO LIST THIS TAB HOLDS is words alone, never a dead link. */
+  assert.equal(lessonRows({ behind: behind(DEPLOY), twice: null })[0]!.href, null);
+});
+
+test('ONE LESSON TWO PROJECTS LEARNED IS ONE LINE BY THE PROJECTS, with the press and no place of its own', () => {
+  const { call } = host({});
+  const [row] = lessonRows({ behind: null, twice: twice(PAIR) }, call, linked);
+  assert.equal(row!.said, 'Kestrel and Wrenmoor learned the same thing');
+  assert.equal(row!.href, null);
+  assert.equal(row!.count, 1);
+  assert.deepEqual(row!.pair, { older: 'learnings#7', newer: 'learnings#31' });
+  assert.equal(typeof row!.keep, 'function');
+  /* WITHOUT A CLIENT the line is words alone. */
+  assert.equal(lessonRows({ behind: null, twice: twice(PAIR) })[0]!.keep, undefined);
+});
+
+test('NAMES, NEVER HANDLES, IN WHAT IS DRAWN; and a part the screen cannot say is nothing', () => {
+  const rows = lessonRows({ behind: behind(DEPLOY, TIDY), twice: twice(PAIR) }, undefined, linked);
+  for (const r of rows) assert.doesNotMatch(r.said, /#|learnings|skills/u, r.said);
+  for (const none of [null, undefined, 'skills', 7, {}, { skills: 'three' }, { pairs: null }]) {
+    assert.deepEqual(lessonRows({ behind: none, twice: none }, undefined, linked), [], JSON.stringify(none));
+  }
+  assert.deepEqual(
+    lessonRows(
+      {
+        behind: behind(null, { ...DEPLOY, name: '  ' }, { ...DEPLOY, skill: '' }, { ...DEPLOY, count: 0, behind: [] }, { ...DEPLOY, count: 1.5, behind: 'two' }),
+        twice: twice(null, { ...PAIR, newer: null }, { ...PAIR, newer: side('learnings#31', ' ') }, { ...PAIR, older: side('', 'Kestrel') }, { ...PAIR, older: 'learnings#7' }),
+      },
+      undefined,
+      linked,
+    ),
+    [],
+  );
+  /* THE SAME SKILL OR PAIR TWICE IS ONE LINE. */
+  assert.equal(lessonRows({ behind: behind(DEPLOY, DEPLOY), twice: twice(PAIR, PAIR) }, undefined, linked).length, 2);
+});
+
+test('THE TWO READS ARE ASKED ONCE EACH, and a refusal, a host without them and one that threw are each nothing', async () => {
+  const both = host({ skillsBehind: yes(behind(DEPLOY)), learningsTwice: yes(twice(PAIR)) });
+  assert.deepEqual(await readLessons(both.call), { behind: behind(DEPLOY), twice: twice(PAIR) });
+  assert.deepEqual(both.asked, [{ name: 'skillsBehind', args: { limit: 3 } }, { name: 'learningsTwice', args: {} }]);
+  assert.deepEqual(await readLessons(host({}).call), { behind: null, twice: null });
+  const refused = host({ skillsBehind: { ok: false, refusal: { code: 'FORBIDDEN', fix: 'No.' } }, learningsTwice: new Error('offline') });
+  assert.deepEqual(await readLessons(refused.call), { behind: null, twice: null });
+  const half = host({ learningsTwice: yes(twice(PAIR)) });
+  assert.deepEqual(lessonRows(await readLessons(half.call), half.call, linked).map((r) => r.said), ['Kestrel and Wrenmoor learned the same thing']);
+});
+
+test('A HOST WITH NEITHER READ DRAWS WHAT HOME DREW: the record\'s own lines, and nothing after them', async () => {
+  const { call, asked } = host({});
+  const rows = await staleAll(async () => answer([STEPS, ASKED, RUNS], 6), call);
+  assert.deepEqual(rows, staleRows(answer([STEPS, ASKED, RUNS], 6)));
+  assert.equal(staleLine(rows), '6 things went stale');
+  assert.deepEqual(asked.map((a) => a.name), ['skillsBehind', 'learningsTwice']);
+  /* AND THROUGH THE REAL CLIENT, which answers a call its host table lacks without asking the record. */
+  const got = await readStale('http://record.test', async () => json(200, answer([STEPS, ASKED], 4)));
+  assert.deepEqual(got.value.map((r) => r.key), ['steps', 'questions']);
+});
+
+test('BOTH KINDS OF LINE WITH A STAND-IN CLIENT, after the record\'s; six lines at most, and the rest counted under them', async () => {
+  const both = host({ skillsBehind: yes(behind(DEPLOY, TIDY)), learningsTwice: yes(twice(PAIR)) });
+  const rows = await staleAll(async () => answer([STEPS, ASKED, RUNS]), both.call);
+  assert.deepEqual(rows.map((r) => r.said.split(' ').slice(0, 2).join(' ')), ['3 steps', '1 question', 'Runs that', 'Ship it', 'Tidy up', 'Kestrel and']);
+  /* A STALE RECORD THAT FAILED is nothing, and the lessons still draw. */
+  assert.equal((await staleAll(async () => Promise.reject(new Error('offline')), both.call)).length, 3);
+  const many = Array.from({ length: 5 }, (_, n) => ({ kind: `finder-${String(n)}`, said: `Finder ${String(n)}: 1`, count: 1, clear: '' }));
+  const full = await staleAll(async () => answer(many), both.call);
+  const { shown, more } = staleShown(full);
+  assert.equal(shown.length, STALE_SHOWN);
+  assert.equal(shown.at(-1)!.said, 'Ship it has 2 lessons it does not take in yet');
+  /* TIDY UP'S ONE LESSON AND THE ONE PAIR are in the line under them. */
+  assert.equal(more, 2);
+});
+
+test('THE PRESS IS THE RECORD\'S promoteLearnings AND OPENS DECIDE; a pair answered already, and a refusal, are plain words', async () => {
+  const filed = host({ promoteLearnings: yes({ asked: [{ said: PAIR.question, opened: true }], open: 1 }) });
+  const [row] = lessonRows({ behind: null, twice: twice(PAIR) }, filed.call, linked) as [StaleRow];
+  assert.deepEqual(await row.keep!(), { ok: true, href: '/decide' });
+  assert.deepEqual(filed.asked, [{ name: 'promoteLearnings', args: {} }]);
+  /* ASKED BEFORE AND STILL WAITING: nothing new is filed, and the press opens Decide where it waits. */
+  assert.deepEqual(await keepOnce(host({ promoteLearnings: yes({ asked: [], open: 2 }) }).call), { ok: true, href: '/decide' });
+  /* ASKED BEFORE AND ANSWERED: nothing is filed and nothing waits, so the press goes. */
+  assert.deepEqual(await keepOnce(host({ promoteLearnings: yes({ asked: [], open: 0 }) }).call), { ok: false, said: 'You answered this one already.', gone: true });
+  assert.deepEqual(await keepOnce(host({}).call), { ok: false, said: 'This BrainDog cannot keep these once yet.', gone: true });
+  const refuse = (code: string) => host({ promoteLearnings: { ok: false, refusal: { code, fix: 'learnings#7 and learnings#31 are not a pair.' } } }).call;
+  for (const code of ['VALUE_MALFORMED', 'NEEDS_BROWSER_SESSION', 'FORBIDDEN']) {
+    const out = await keepOnce(refuse(code));
+    assert.equal(out.ok, false, code);
+    /* THE RECORD'S FIX IS SAID FOR A CALLER and names handles, so it is never drawn. */
+    assert.ok(!out.ok && !out.said.includes('#'), code);
+  }
+  assert.deepEqual(await keepOnce(host({ promoteLearnings: new Error('offline') }).call), { ok: false, said: 'Could not reach your BrainDog. Try again.', gone: false });
+  assert.equal((await keepOnce(host({ promoteLearnings: yes(null) }).call)).ok, false);
+});
+
+test('THE TILE: a lesson pair is its sentence and one quiet press, held while it waits, its refusal said under it', () => {
+  assert.match(tile, /\{:else if row\.keep\}\s*<div class="s-line s-pair"/u);
+  assert.match(tile, /<Button weight="quiet" size="sm" disabled=\{waiting !== null\}[^>]*onclick=\{\(\) => void keep\(row\)\}>\s*\{words\.keep\}/u);
+  assert.match(tile, /keep: 'Keep it once'/u);
+  assert.match(tile, /\{#if refused\[row\.key\]\}<p class="s-no" role="status">\{refused\[row\.key\]\}<\/p>\{\/if\}/u);
+  assert.match(tile, /void goto\(at\(out\.href\)\)/u);
+  /* NOTHING ASKS WITHOUT A PRESS: the one call is inside the press. */
+  assert.equal(tile.match(/row\.keep\(\)/gu)?.length, 1);
 });

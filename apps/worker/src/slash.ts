@@ -300,7 +300,8 @@ export function includedInference(
       const budget = refusal?.code === 'SLASH_BUDGET_SPENT';
       if (!ran) {
         if (!budget) told(onFail, { model: call.model, provider: '', why: phraseOf(fix), raw, sent: false, whose: 'operator', streak: 0 });
-        throw new NotSent(fix, budget ? fix : phraseOf(fix), raw);
+        /* THE CEILING'S NO CARRIES ITS CODE, so a route's walk stops here (ENG-A06): every candidate after it hears the same no. */
+        throw Object.assign(new NotSent(fix, budget ? fix : phraseOf(fix), raw), budget ? { code: 'SLASH_BUDGET_SPENT' } : {});
       }
       if (refusal?.code === 'PROPOSAL_SCHEMA') {
         streak += 1;

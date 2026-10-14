@@ -5,7 +5,8 @@
  * balance, one solid line as far as the record knows the movements, dashed only beyond it, over a soft wash down to the
  * zero rule, split there so what is under zero can be tinted on its own. The value axis is a few round steps fitted to
  * the balances, said short (`£50k`, `£0`, `−£50k`), and holds zero only where the walk crosses it or comes near
- * (`axisFit`); today is a dot with its balance beside it; and the first day the balance goes under is marked, said in
+ * (`axisFit`), or always where the block says `axis: zero`; an axis that leaves zero out marks its end nearest zero as
+ * cut and says where it starts in the chart's name (`cut`, `foot`); today is a dot with its balance beside it; and the first day the balance goes under is marked, said in
  * words, and tied to the line by a thin rule.
  *
  * DASHED ONLY BEYOND WHAT IS KNOWN. The whole walk was dashed from today, so a year of entered bills and invoices read
@@ -142,6 +143,11 @@ export type ForecastModel = {
    * fact three times, "runs out in 57 days" over "Goes under on 30 Oct" over a flag reading 30 Oct (visual review 3).
    */
   headline: boolean;
+  /**
+   * Where the value axis starts, from an `axis | zero |  |` row: `zero` holds nought whatever the walk does, and `fit`,
+   * what a block that says nothing gets, fits the axis to the balances and marks its end as cut where nought is off it.
+   */
+  axis: 'fit' | 'zero';
 };
 
 /** Growth a year, in percent, of money going out and of money coming in. */
@@ -261,6 +267,8 @@ export function forecastModel(rows: readonly (readonly string[])[]): ForecastMod
     measured: measuredOf(rows.find((r) => r[0]?.trim() === 'spent'), opening[3]!),
     known: knownOf(rows.find((r) => r[0]?.trim() === 'known'), today),
     headline: rows.some((r) => r[0]?.trim() === 'headline' && r[1]?.trim() === 'under'),
+    /* ANY OTHER WORD IS FITTED, the board's own axis: the record refuses one at install, so a stray word here is a host's. */
+    axis: rows.some((r) => r[0]?.trim() === 'axis' && r[1]?.trim() === 'zero') ? 'zero' : 'fit',
   };
 }
 
@@ -895,7 +903,14 @@ export type ForecastPlan = {
    * each the walk's own extreme to the penny (`£31,035.00 GBP` over `−£127,489.90 GBP`), which no reader could read
    * a level between.
    */
-  axis: { at: string; label: string; zero: boolean }[];
+  axis: { at: string; label: string; zero: boolean; cut?: true }[];
+  /**
+   * Whether nought is off the value axis: a fitted axis over a walk that stays one side of it. The axis's end nearest
+   * nought is then its real amount and carries `cut`, which both drawers mark with a break, and `foot` says it in words
+   * for a screen reader (`The axis starts at E£980,000.`), in the chart's name. `false` and `''` where nought is held.
+   */
+  cut: boolean;
+  foot: string;
   sentence: string;
 };
 
@@ -938,8 +953,11 @@ export type AxisFit = { lo: number; hi: number; step: number; levels: number[] }
  * `said` answers whether a level reads exactly as the axis writes it. An axis says `£31.5k` as `£32k`, so a step of
  * five hundred there would name two levels alike; a step whose levels are not all said exactly is passed over for the
  * next rounder one. Left out, every level is taken as said.
+ *
+ * `zero` IS A BLOCK'S `axis: zero`, and holds nought however far the walk is from it, which any page may ask for
+ * (HD.251). Fitted is still what a block that says nothing gets, because it is what the board draws.
  */
-export function axisFit(min: number, max: number, said: (level: number) => boolean = () => true): AxisFit {
+export function axisFit(min: number, max: number, said: (level: number) => boolean = () => true, zero = false): AxisFit {
   let low = Math.min(min, max);
   let high = Math.max(min, max);
   if (!Number.isFinite(low) || !Number.isFinite(high)) low = high = 0;
@@ -949,6 +967,7 @@ export function axisFit(min: number, max: number, said: (level: number) => boole
     low = mid - flat / 2;
     high = mid + flat / 2;
   }
+  if (zero) return axisOver(Math.min(low, 0), Math.max(high, 0), said);
   const range = high - low;
   const own = axisOver(low, high, said);
   const near = low > 0 ? low <= range * ZERO_NEAR : high < 0 && -high <= range * ZERO_NEAR;
@@ -1032,7 +1051,10 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
   const end = addDays(model.today, shown.horizon);
   const span = Math.max(1, daysBetween(start, end));
   const values = [...model.past.map((p) => p.value), ...shown.days.map((p) => p.balance), ...(base?.days.filter((p) => p.day <= end).map((p) => p.balance) ?? [])];
-  const { lo, hi, levels } = axisFit(Math.min(...values), Math.max(...values), axisSays);
+  const { lo, hi, levels } = axisFit(Math.min(...values), Math.max(...values), axisSays, model.axis === 'zero');
+  /* NOUGHT OFF THE AXIS IS SAID, never left to the eye: a line across a chart from £980k reads as near nothing unless
+     the foot says it is not nought. A walk under zero throughout is cut at its top, the end nearest nought. */
+  const offAxis = lo > 0 || hi < 0;
   /* THE RULE THE WASH RUNS TO: zero where the axis holds it, else the end of the axis nearest zero. */
   const floor = Math.min(hi, Math.max(lo, 0));
   const x = (day: string) => at((daysBetween(start, day) / span) * 1000);
@@ -1101,7 +1123,15 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
   const nowAt = daysBetween(start, model.today) / span;
   const figure = (v: number) => forecastFigure(model, v);
   /* `--at` IS A SHARE, as every chart's ticks read it, and `y` answers in the box's hundred units. */
-  const axis = levels.map((v) => ({ at: String(Math.round(Number(y(v)) * 100) / 10_000), label: forecastFigure(model, v, 'axis'), zero: v === 0 }));
+  /* TOP FIRST, so the foot is the last level and the top the first. */
+  const cutIndex = !offAxis ? -1 : lo > 0 ? levels.length - 1 : 0;
+  const axis: ForecastPlan['axis'] = levels.map((v, i) => ({
+    at: String(Math.round(Number(y(v)) * 100) / 10_000),
+    label: forecastFigure(model, v, 'axis'),
+    zero: v === 0,
+    ...(i === cutIndex ? { cut: true as const } : {}),
+  }));
+  const foot = !offAxis ? '' : lo > 0 ? forecastAxisFrom(forecastFigure(model, lo, 'read')) : forecastAxisTo(forecastFigure(model, hi, 'read'));
   const sentence = [
     `${model.label || FORECAST_BALANCE} ${figure(model.opening)} ${FORECAST_TODAY}`,
     model.past.length ? forecastRecorded(shortDay(model.past[0]!.day, model.today), figure(model.past[0]!.value)) : '',
@@ -1145,7 +1175,9 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
     lo,
     hi,
     axis,
-    sentence: `${sentence}.`,
+    cut: offAxis,
+    foot,
+    sentence: `${sentence}.${foot ? ` ${foot}` : ''}`,
   };
 }
 
@@ -1257,3 +1289,17 @@ export const forecastRecorded = (day: string, figure: string): string => `record
 export const forecastUnderIn = (n: number): string => (n <= 0 ? 'Cash goes under today' : `Cash goes under in ${n} ${n === 1 ? 'day' : 'days'}`);
 export const forecastAverage = (n: number): string => (n <= 0 ? 'on average so far: on time' : `on average so far: ${n} ${n === 1 ? 'day' : 'days'}`);
 export const forecastLowest = (figure: string, day: string): string => `Lowest ${figure} on ${day}`;
+/** Where a value axis that leaves zero out starts, said in the chart's name: `The axis starts at E£980,000.` */
+export const forecastAxisFrom = (figure: string): string => `The axis starts at ${figure}.`;
+/** And where one under zero throughout stops, at its top. */
+export const forecastAxisTo = (figure: string): string => `The axis stops at ${figure}.`;
+/**
+ * The break both drawers set beside the cut end of the value axis, the mark a chart draws where its axis does not run
+ * to zero. Never the colour alone: the end's label is the real amount, and the chart's name says where it starts.
+ */
+export const FORECAST_AXIS_BREAK = '//';
+/**
+ * The break's own place, beside the label and over the chart's edge, written on the element so the string drawer, which
+ * has no sheet of its own, sets it where the component does. No colour: it is the label's.
+ */
+export const FORECAST_AXIS_BREAK_STYLE = 'position:absolute;inset-inline-end:100%;padding-inline-end:0.25em;letter-spacing:-0.1em';

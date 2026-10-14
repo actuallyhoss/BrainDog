@@ -293,6 +293,8 @@ type Drew = Drafted & {
   code?: string | undefined;
   /** `Ran.served` of the drafting call, kept beside its code so the ledger can tell a timeout from a model not reached. */
   served?: boolean | undefined;
+  /** `Ran.candidate` of the drafting call: the host's handle for the model on its route that answered (ENG-A06). */
+  candidate?: string | undefined;
 };
 
 type Read = Drew & {
@@ -377,6 +379,7 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
     let ms = 0;
     let code: string | undefined;
     let served: boolean | undefined;
+    let candidate: string | undefined;
 
     if (stored) {
       registers = stored.registers.filter((id) => !FORBIDDEN_REGISTERS.has(id));
@@ -415,10 +418,12 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
         slots: { '%INDEX%': indexLines(known), '%FIGURES%': figureNameLines(keeps), '%QUESTION%': question },
         inference: drafter.inference,
       });
-      model = drafter.sent() ?? ran.model;
+      /* A CANDIDATE ON ITS OWN WIRE BYPASSES THE NAME-WATCHER, whose `sent()` would still hold an earlier attempt's name. */
+      model = ran.candidate !== undefined ? ran.model : (drafter.sent() ?? ran.model);
       usage = ran.usage;
       ms = ran.ms;
       served = ran.served;
+      candidate = ran.candidate;
       /* NO RETRY, AND A FALLBACK RATHER THAN A REFUSAL (`46 §10`). A predicate that did not come back,
          or came back ungrammatical, costs the ask its filter and not its answer: the keywords still
          search, and a second model call to fix the first one doubles the bill for one question. */
@@ -462,6 +467,7 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
       status: 'nothing',
       code: code ?? ended,
       served,
+      candidate,
     });
     const drafting = stored === undefined ? hold : undefined;
     if (drafting !== undefined) accountRead(drew([GRANT], UNSETTLED), question, drafting);
@@ -515,6 +521,7 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
       status: rows.value.rows.length === 0 && readings.length === 0 ? 'nothing' : 'ok',
       ...(code === undefined ? {} : { code }),
       served,
+      candidate,
     });
   };
 
@@ -544,6 +551,7 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
       read: it.read,
       ...ASKED,
       served: it.served,
+      candidate: it.candidate,
     });
     return askId;
   };
@@ -695,7 +703,7 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
     });
     /* THE ROW AND THE PROPOSAL BOTH SAY IT, because `model` ships with every output (`23 §1`) and a proposal naming a
        model nothing was sent is the ledger's fault again, one screen further out. */
-    const used = proposer.sent() ?? ran.model;
+    const used = ran.candidate !== undefined ? ran.model : (proposer.sent() ?? ran.model);
 
     const account = (status: 'ok' | 'refused' | 'error', code?: string, filed?: string): void =>
       core.account({
@@ -711,6 +719,7 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
         predicate: draftText(it),
         read: trimmedRead(it.read, kept.rows),
         filed,
+        candidate: ran.candidate,
         ...PROPOSED,
       });
 
@@ -1250,7 +1259,7 @@ export const setups = (core: Core, fallback: Inference): Setups => {
     try {
       const named = naming(inference ?? fallback);
       const ran = await core.run({ id, slots, inference: named.inference, model, ...(trim ? { trim } : {}) });
-      const by = named.sent() ?? ran.model;
+      const by = ran.candidate !== undefined ? ran.model : (named.sent() ?? ran.model);
       core.account({
         id: held,
         kind: 'read',
@@ -1263,6 +1272,7 @@ export const setups = (core: Core, fallback: Inference): Setups => {
         question,
         ...charge,
         served: ran.served,
+        candidate: ran.candidate,
       });
       return ran.out.ok ? ok({ value: ran.out.value, by }) : ran.out;
     } finally {

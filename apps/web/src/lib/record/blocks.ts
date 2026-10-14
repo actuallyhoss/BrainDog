@@ -462,6 +462,7 @@ function forecastRows(block: BlockResult): string[] {
   const said = (minor: number) => (currency ? money(minor, currency) : String(minor));
   /* THE DAY THE BLOCK WAS READ, which is the record's clock on a live page and the sample's here. */
   const today = block.stale_at.slice(0, 10);
+  const axis = block.axis;
   return [
     `opening | ${today} | ${escapeCell(copy.bridgeStart)} | ${said(walk.from)}`,
     ...(block.past ?? []).map((p) => `past | ${p.at} |  | ${said(p.value)}`),
@@ -513,6 +514,9 @@ function forecastRows(block: BlockResult): string[] {
     /* THE PAGE'S OPENING LINE ALREADY SAYS WHEN IT RUNS OUT (`headline: under`, which the record answers only while that
        line is drawn), so the sentence over the chart is left off and the flag on the crossing stays. */
     ...(block.headline === 'under' ? ['headline | under |  | '] : []),
+    /* WHERE THE VALUE AXIS STARTS, as the block declares it (`axis:`, `fit` or `zero`, which the record checks at
+       install); none written is fitted, and the renderer marks its foot as cut where zero is off it. */
+    ...(axis === 'fit' || axis === 'zero' ? [`axis | ${axis} |  | `] : []),
   ];
 }
 

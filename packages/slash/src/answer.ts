@@ -247,7 +247,8 @@ export const answering = (core: Core, fallback: Inference): { answer(ask: Ask, i
          assign them. */
       const reached = heard as Heard | null;
       const refusedBy = stopped as Stopped | null;
-      const used = (sent as string | undefined) ?? reached?.model ?? ran.model;
+      /* A CANDIDATE ON ITS OWN WIRE (ENG-A06) BYPASSES `watched`, whose `sent` would still hold an earlier attempt's name. */
+      const used = ran.candidate !== undefined ? ran.model : ((sent as string | undefined) ?? reached?.model ?? ran.model);
       /* ONE BINDING THROW HAD TWO PRICES UNTIL THIS LINE. Measured:
          the Worker's included model threw after `AI.run` was called, and a person's read settled it under
          `glm-5.3-flash`, priced 9 neurons on the prompt estimate and counted, while this path settled the same throw
@@ -270,6 +271,7 @@ export const answering = (core: Core, fallback: Inference): { answer(ask: Ask, i
           status,
           code,
           question: `rule.${ask.rule} step ${step}`,
+          candidate: ran.candidate,
           ...CHARGE,
         });
 

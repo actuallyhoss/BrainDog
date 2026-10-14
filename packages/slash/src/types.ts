@@ -80,6 +80,9 @@ export type ModelRate = { in: number; out: number };
 export type PromptId = 'predicate' | 'propose' | 'pattern' | 'answer' | 'setup' | 'mapping';
 
 export type PromptTemplate = {
+  /** The purpose the host's route is asked for; every template in `PROMPTS` says one (`SlashPurpose` below). */
+  purpose?: SlashPurpose;
+  /** The model asked where the host hands no route. */
   model: ModelId;
   maxTokens: number;
   /** The ceiling on the prompt, in the local token estimate. Over it, rows are dropped from the end. */
@@ -242,6 +245,28 @@ export const BACKGROUND_ASKS_MONTH = 600;
  * column takes any of them.
  */
 export type Purpose = 'ask' | 'automation' | 'plan' | 'headline' | 'understand' | 'look' | 'compose' | 'skill' | 'pattern' | 'prose' | 'embed' | 'probe';
+
+/**
+ * The purposes this package's own templates ask a route for (`prompts.ts` `TemplatePurpose`, restated there because that
+ * file imports nothing). Each is a name in the host router's `PURPOSES`, so a host hands `routeFor` the value as it is.
+ */
+export type SlashPurpose = 'ask' | 'plan' | 'automation' | 'pattern' | 'prose';
+
+/**
+ * One model a host's route offers, shaped to the host router's `Candidate` (`packages/host/src/infer.ts`) without
+ * importing it: `id` is the host's handle, written on the row's `candidate` and never shown to a person, `model` the
+ * short name sent, and `inference` the wire it is on, where that is not the adapter the caller handed `core.run`.
+ */
+export type SlashCandidate = { id?: string | undefined; model: string; inference?: Inference | undefined };
+
+/**
+ * The host's router, handed to the core (ENG-A06): the candidates for one purpose, in the order they are tried.
+ *
+ * "RULES ARE THE FALLBACK, NOT THE ENGINE" (D35.43). When the first candidate is not served, `core.run` asks the next
+ * before its caller's rules speak. THE HOST DECIDES WHAT IS ON IT: his own key is a route of one, and the larger model is
+ * on none unless he said yes to its cost (HD.463). No route, or an empty one, is the template's own model as before.
+ */
+export type SlashRoute = (purpose: SlashPurpose) => readonly SlashCandidate[];
 
 /**
  * Whose monthly allowance a ledger row spends: `person` is one of his asks (`ask_cap`), `background` one of the

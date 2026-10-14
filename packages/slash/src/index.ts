@@ -59,6 +59,7 @@ import {
   type SetupPatch,
   type Slash,
   type SlashDeps,
+  type SlashRoute,
   type Source,
   type Status,
   type Tier,
@@ -72,7 +73,7 @@ export type { Charge, StoreStep } from './call.ts';
 export { cite, citable, shapeOf, tokens } from './project.ts';
 export { answerSchema } from './answer.ts';
 export { ANSWER_SYSTEM, MODELS, PROMPTS, SYSTEM } from './prompts.ts';
-export type { ModelId, ModelRate, PromptId, PromptTemplate } from './prompts.ts';
+export type { ModelId, ModelRate, PromptId, PromptTemplate, Routed, TemplatePurpose } from './prompts.ts';
 export type {
   Ask,
   Asked,
@@ -97,7 +98,10 @@ export type {
   Setup,
   SetupPatch,
   Slash,
+  SlashCandidate,
   SlashDeps,
+  SlashPurpose,
+  SlashRoute,
   Source,
   Spends,
   Status,
@@ -141,7 +145,7 @@ const SOURCES: readonly Source[] = ['included', 'key'];
  *
  * Arguments and not fields of `SlashDeps` because `SlashDeps` is the ports, and neither of these is a port.
  */
-export type SlashOptions = { priced?: readonly Tier[] | undefined; tiers?: readonly Tier[] | undefined };
+export type SlashOptions = { priced?: readonly Tier[] | undefined; tiers?: readonly Tier[] | undefined; route?: SlashRoute | undefined };
 
 /** Each tier as a sentence names it, for the refusal that lists the ones a host runs. */
 const TIER_NAMED: Record<Tier, string> = { a: 'the included model', b: 'your own key', byo: 'your own endpoint' };
@@ -206,7 +210,7 @@ export function createSlash(deps: SlashDeps, options: SlashOptions = {}): Slash 
   );
 
   const tiers = options.tiers ?? TIERS;
-  const core = makeCore(deps.sql, deps.clock, deps.inference, options.priced, tiers);
+  const core = makeCore(deps.sql, deps.clock, deps.inference, options.priced, tiers, options.route);
   const asking = palette(core, deps.record, deps.inference);
   const pattern = patterns(core, deps.record, deps.inference);
   const automation = answering(core, deps.inference);

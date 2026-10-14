@@ -891,12 +891,14 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         where: LIVE,
         /* EACH CARD WEARS THE PROJECT'S OWN MARK IN ITS OWN HUE, SINCE portfolio 1.6.0, the identity the list declares
            (`identity: { mark, accent }`), and says what the project is under its name (`about`, drawn as the quieter
-           line under a title). Neither is a fact, so the three facts below are unchanged. */
+           line under a title). Neither is a fact, so the three facts below are unchanged.
+           THE ONE LINE IS TYPED ON THE CARD, SINCE portfolio 1.17.0 (PGS-C15): `edit: true` on `about`, written after a
+           pause through the page's own writer where the reader may write the list, and text everywhere else. */
         columns: [
           { field: 'name', as: 'title' },
           { field: 'mark', as: 'mark' },
           { field: 'hue', as: 'hue' },
-          { field: 'about', as: 'reply' },
+          { field: 'about', as: 'reply', edit: true },
           /* NO LABELS ON HOW IT IS GOING, SINCE portfolio 1.12.0: "At risk" and a ring at 60% say what they are, and
              "Health" and "How far along" under them on every card read as a form. An empty label draws none. */
           { field: 'progress', label: '', as: 'ring' },

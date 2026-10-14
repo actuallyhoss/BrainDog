@@ -21,6 +21,7 @@
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { createInterface } from 'node:readline/promises';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -181,6 +182,10 @@ const usage = () =>
     '  The keys your record holds, one line each: what each opens, where it applies, whether it is sealed, and the day it expires. Never a value.',
     'braindog keys put <label> [--opens <what>] [--kind <kind>] [--vault <project>] [--host <host>]',
     '  Deposit the value on standard input as a key. The host seals it, and it is never an argument.',
+    'braindog keys put --from <file or folder> [--project <name>] [--opens <what>] [--kind <kind>] [--dry-run] [--host <host>]',
+    '  Seal every key in a file of NAME=value lines, or a folder of one key a file, asking you about each on the terminal first. Names are printed, never a value.',
+    'braindog keys scan [<folder>] [--project <name>] [--deposit] [--host <host>]',
+    '  Name every key lying in a repository\'s files (.env, .secrets, .pem) and the file it lies in, and the command that seals them. It sends nothing unless --deposit.',
     'braindog keys exec <label | credentials#n> [--as <ENV_NAME>] [--vault <project>] [--host <host>] -- <command> [args...]',
     '  Run the command with the key in one environment variable, named from the label unless --as names it. It is never printed.',
     'braindog run <label | credentials#n> [--as <ENV_NAME>] [--vault <project>] [--host <host>] -- <command> [args...]',
@@ -423,7 +428,7 @@ async function signIn(args: string[]): Promise<void> {
   setTimeout(() => process.exit(code), 1_000).unref();
 }
 
-/** `braindog keys list|put|exec|headers`, over the real terminal, and the exit code `keys` decides. */
+/** `braindog keys list|put|scan|exec|headers`, over the real terminal, and the exit code `keys` decides. */
 async function keysCommand(args: string[]): Promise<void> {
   const cwd = process.cwd();
   const code = await keys(args, {
@@ -445,6 +450,17 @@ async function keysCommand(args: string[]): Promise<void> {
     spawn: spawnInherit,
     /* The run the session file names, sent only to the host that wrote it and only while it is the caller's, as `mcp` does. */
     headers: (host: string) => headersHere(cwd, host),
+    /* `put --from` ASKS ABOUT EACH KEY HERE, on stderr and the terminal's own input, and with no terminal it is not asked. */
+    confirm: async (question: string) => {
+      if (!process.stdin.isTTY) return null;
+      const asking = createInterface({ input: process.stdin, output: process.stderr });
+      try {
+        return /^y(?:es)?$/i.test((await asking.question(`${question} [y/N] `)).trim());
+      } finally {
+        asking.close();
+      }
+    },
+    cwd,
   });
   if (json) emit(json.envelope(code));
   /* LEFT TO END ON ITS OWN, for the reason `hook` gives. */
@@ -734,8 +750,8 @@ const [command, ...rest] = process.argv.slice(2);
 /* ONE DECISION, TAKEN BEFORE DISPATCH (`48 §4.5`, `json.ts`): the flag is answered here and removed,
    so no command's own `parseArgs` has to know a global exists. */
 const cut = takeJson(rest);
-/* `keys put` AND `keys list` ARE THE TWO VERBS OF THEIR COMMAND THAT HAVE AN ANSWER: the first deposits a key and reports which
-   credential row it became, and the second reads the keys the record holds, never a value. `keys exec` hands stdout to a child process and takes no envelope (§4.5),
+/* `keys put`, `keys list` AND `keys scan` ARE THE THREE VERBS OF THEIR COMMAND THAT HAVE AN ANSWER: the first deposits a key and reports which
+   credential row it became (or, with --from, the names sealed), the second reads the keys the record holds, never a value, and the third names the keys lying in files. `keys exec` hands stdout to a child process and takes no envelope (§4.5),
    and `keys headers` prints the one header document a program reads there, so the flag is offered on
    the verb rather than on the command. */
 /* `usecase preview`, AND `pack preview` BESIDE IT, IS A SEVENTH COMMAND WITH NOTHING TO PUT IN AN ENVELOPE, for the reason §4.5 gives
@@ -745,7 +761,7 @@ const cut = takeJson(rest);
    it, and `JSON.parse` over that buffer throws. Left out of the flag, the verb's own strict
    `parseArgs` refuses `--json` in its own words, exactly as `keys exec` does. */
 const noEnvelope = (command === 'usecase' || command === 'pack') && rest[0] === 'preview';
-const takesJson = !noEnvelope && (JSON_COMMANDS.has(command ?? '') || (command === 'keys' && (rest[0] === 'put' || rest[0] === 'list')));
+const takesJson = !noEnvelope && (JSON_COMMANDS.has(command ?? '') || (command === 'keys' && (rest[0] === 'put' || rest[0] === 'list' || rest[0] === 'scan')));
 const args = takesJson ? cut.rest : rest;
 if (takesJson && cut.json) json = machine(say);
 try {

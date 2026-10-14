@@ -61,6 +61,8 @@ import { methods as learnings } from './learnings.ts';
 import { methods as textFaults } from './text-faults.ts';
 import { methods as learned } from './learned.ts';
 import { methods as inboxHints } from './inbox-hints.ts';
+import { methods as skillsBehindMethods } from './skills-behind.ts';
+import { methods as toolsSeenMethods } from './tools-seen.ts';
 /* END METHODS */
 
 /**
@@ -186,6 +188,8 @@ export function methods(deps: RecordDeps) {
     ...textFaults(deps),
     ...learned(deps),
     ...inboxHints(deps),
+    ...skillsBehindMethods(deps),
+    ...toolsSeenMethods(deps),
     /* END METHODS */
   };
 }

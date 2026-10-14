@@ -405,6 +405,8 @@ export type PageBlock = {
   horizons?: readonly (number | 'last')[];
   /** A `forecast`'s: the page's opening line already says when the money runs out, so the chart leaves its sentence off. */
   headline?: 'under';
+  /** A `forecast`'s: where its value axis starts, `fit` (what saying nothing draws) or `zero`, always from nought. */
+  axis?: 'fit' | 'zero';
 
   /** Mandatory on every source-bound block. An empty state that says nothing is a dead end, and a
       record is MOSTLY empty on day one (06 §1). */

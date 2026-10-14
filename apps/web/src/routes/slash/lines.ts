@@ -9,6 +9,9 @@
  * PURE, SO `node --test` CAN IMPORT IT.
  */
 
+import { addDays, shortDay } from 'braindog-render';
+
+import { realDay, todayOf } from '../../lib/decide/card.ts';
 import { suggestionsOf, words as slashWords, type Reading, type Suggestion } from '../../lib/record/slash.ts';
 
 export const words = {
@@ -38,6 +41,12 @@ export const words = {
   /* Who drafted a suggestion: Slash's own rules, or the model it names. */
   byRules: 'From how you use BrainDog',
   byModel: (name: string) => `Drafted by ${name}`,
+  /* HOW LONG ONE ON DECIDE WAITS (ENG-B14), beside who drafted it, and why one he did not answer was taken back. */
+  waits: (day: string) => `Waits until ${day}`,
+  waitsToday: 'Waits until today',
+  takenStronger: 'Taken back: a stronger suggestion took its place.',
+  takenLapsed: (day: string) => `Taken back on ${day}: nobody answered it.`,
+  takenLapsedDay: 'Taken back: nobody answered it.',
   /* The one fold under the list. */
   more: 'More from Slash',
   foldTally: 'where each suggestion stands',
@@ -119,8 +128,43 @@ export function byLine(by: string | null | undefined): string | null {
   return name === 'rules' ? words.byRules : words.byModel(name);
 }
 
-/** A suggestion and who drafted it (`byLine`'s input), or `null` where the record does not say. */
-export type Drafted = Suggestion & { by: string | null };
+/**
+ * A suggestion and who drafted it (`byLine`'s input), or `null` where the record does not say. `waits` is how long one
+ * on Decide waits ("Waits until 28 Oct"), and `taken` why one nobody answered was taken back, each `null` where the
+ * record hands no day or no note.
+ */
+export type Drafted = Suggestion & { by: string | null; waits: string | null; taken: string | null };
+
+/** A field the record may hand beside what `slash.ts` names, read and not trusted. */
+const got = (o: unknown, key: string): unknown => (o !== null && typeof o === 'object' ? (o as Record<string, unknown>)[key] : undefined);
+
+/**
+ * THE LAST DAY IT WAITS, IN WORDS (ENG-B14): the record's `lapses`, a real `YYYY-MM-DD`, said as the app says a day
+ * (`shortDay`, the year only when it is another), and today once that day has come. Never an ISO day; `null` without one.
+ */
+export function waitsOf(lapses: unknown, now: number): string | null {
+  const last = realDay(lapses);
+  if (last === null) return null;
+  const today = todayOf(now);
+  return last <= today ? words.waitsToday : words.waits(shortDay(last, today));
+}
+
+/**
+ * WHY THE RECORD TOOK ONE BACK, from the history note it hands with the suggestion (`packages/kernel/src/govern.ts`):
+ * one of its two notes, said again with its day in words, or `null` for any other note and for none. The day in the
+ * note may be the record's `YYYY-MM-DD`, which is never drawn as it is; a day it does not read leaves the day out.
+ */
+export function takenOf(note: unknown, now: number): string | null {
+  if (typeof note !== 'string') return null;
+  const said = note.trim();
+  if (said === words.takenStronger) return said;
+  const lapsed = /^Taken back on (.+): nobody answered it\.?$/u.exec(said);
+  if (!lapsed) return null;
+  const text = lapsed[1]!.trim();
+  const iso = realDay(/^(\d{4}-\d{2}-\d{2})(?:T[\d:.]+Z?)?$/u.exec(text)?.[1]);
+  if (iso !== null) return words.takenLapsed(shortDay(iso, todayOf(now)));
+  return /^\d{1,2} [A-Z][a-z]{2,8}(?: \d{4})?$/u.test(text) ? words.takenLapsed(text) : words.takenLapsedDay;
+}
 
 const decideHref = (id: string): string => `/decide/${encodeURIComponent(id)}`;
 const idOf = (href: string | null): string | null => (href === null ? null : decodeURIComponent(href.slice('/decide/'.length)));
@@ -140,27 +184,39 @@ const idOf = (href: string | null): string | null => (href === null ? null : dec
  * record's own (`waiting[].by`, kept when it was filed), and nothing where neither says, as for a question filed before
  * the record kept it.
  */
-export function suggestedOf(reading: Reading, filed: readonly { id: string; by: string }[] = []): Drafted[] {
+export function suggestedOf(reading: Reading, filed: readonly { id: string; by: string }[] = [], now: number = Date.now()): Drafted[] {
   const filedBy = new Map(filed.map((f) => [f.id, f.by]));
   /* THE RECORD'S WORD OUTRANKS A DRAFT'S, since it was kept when the question was filed; only the press is fresher. */
   for (const w of reading.waiting) if (!filedBy.has(w.id) && typeof w.by === 'string' && w.by.trim() !== '') filedBy.set(w.id, w.by);
+  /* THE DAY EACH WAITS TO, by id: the record's own `waiting[].lapses`, then the draft's, where the host hands either. */
+  const lapsesOf = new Map<string, unknown>();
+  for (const w of reading.waiting) if (realDay(got(w, 'lapses')) !== null) lapsesOf.set(w.id, got(w, 'lapses'));
   const byId = new Map<string, string | undefined>();
   const byQuestion = new Map<string, string | undefined>();
+  /* THE NOTE IT WAS CLOSED WITH, by id, which the record hands with the question it asked or with the draft. */
+  const noteOf = new Map<string, unknown>();
   for (const d of reading.drafts) {
     const own = (d as { by?: unknown }).by;
     const by = typeof own === 'string' && own.trim() !== '' ? own : 'rules';
-    if (d.asked) byId.set(d.asked.id, by);
-    else byQuestion.set(d.question, by);
+    if (d.asked) {
+      byId.set(d.asked.id, by);
+      const day = got(d.asked, 'lapses') ?? got(d, 'lapses');
+      if (!lapsesOf.has(d.asked.id) && realDay(day) !== null) lapsesOf.set(d.asked.id, day);
+      noteOf.set(d.asked.id, got(d.asked, 'note') ?? got(d, 'note'));
+    } else byQuestion.set(d.question, by);
   }
   const out: Drafted[] = suggestionsOf(reading).map((s) => {
     const id = idOf(s.href);
     const by = id === null ? byQuestion.get(s.question) : (filedBy.get(id) ?? byId.get(id));
-    return { ...s, by: by ?? 'rules' };
+    /* WHAT WAITS SAYS ITS DAY; WHAT WAS CLOSED SAYS WHY, only where the record took it back with one of its two notes. */
+    const waits = s.state === 'waiting' && id !== null ? waitsOf(lapsesOf.get(id), now) : null;
+    const taken = s.state === 'answered' && id !== null ? takenOf(noteOf.get(id), now) : null;
+    return { ...s, by: by ?? 'rules', waits, taken };
   });
   const listed = new Set(out.map((s) => s.href));
   for (const w of reading.waiting) {
     const href = decideHref(w.id);
-    if (!listed.has(href)) out.push({ question: w.question, state: 'waiting', href, said: slashWords.waiting, by: filedBy.get(w.id) ?? null });
+    if (!listed.has(href)) out.push({ question: w.question, state: 'waiting', href, said: slashWords.waiting, by: filedBy.get(w.id) ?? null, waits: waitsOf(lapsesOf.get(w.id), now), taken: null });
   }
   const rank = { waiting: 0, new: 1, answered: 2 } as const;
   return out.sort((a, b) => rank[a.state] - rank[b.state]);

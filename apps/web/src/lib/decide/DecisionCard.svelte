@@ -538,6 +538,9 @@
           >{/if}{#if compact && card.band}<span class="queue-cost" data-cost={card.cost} hidden>{card.band}</span>{/if}
       </h3>
       {#if !compact && card.later}<p class="qa-later" dir="auto">{card.later}</p>{/if}
+      <!-- HOW LONG IT WAITS (ENG-B14): under why, in the side, where whoever asked wrote one; here, under the question,
+           where nobody did. -->
+      {#if !compact && !card.why && card.lapses}<p class="dc-lapses" dir="auto">{card.lapses}</p>{/if}
       {#if card.merge && !compact}
         <MergeCard merge={card.merge} {answerable} holding={busy ? '' : null} titleOf={(key) => card.ways.find((w) => w.key === key)?.label} onpress={pressMerge} />
       {:else if oneTap}
@@ -659,6 +662,7 @@
           <div class="dc-part dc-part-why" role="group" aria-labelledby="{uid}-why-h">
             <h4 class="dc-h" id="{uid}-why-h">{cardWords.why}</h4>
             <p class="queue-why" dir="auto">{card.why}</p>
+            {#if card.lapses}<p class="dc-lapses" dir="auto">{card.lapses}</p>{/if}
           </div>
         {/if}
         <!-- WHAT IT CHANGES: what accepting the lead does, the money it writes, what changes from what to what, and the
@@ -955,6 +959,13 @@
   /* HOW MANY MORE CHANGES WAIT ON THE QUESTION'S PAGE: the quiet ink of a field's name, under the last line. */
   .dc-more {
     color: var(--dim);
+  }
+
+  /* THE DAY IT IS TAKEN BACK, under why: quiet, and at the body's size, since a person reads it whole. */
+  .dc-lapses {
+    color: var(--dim);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
   }
 
   .dc-what::first-letter {

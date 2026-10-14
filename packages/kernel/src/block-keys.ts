@@ -49,7 +49,8 @@ const GENERAL = [
  * on one surface, and a `cards` block's `fold` is how many cards each of its `group`s shows before the rest fold; a
  * `cards` or a `table` block's `group` is a link, a choice or the state of its list, a heading each value; a
  * `feed`'s `group` is `day`, a heading each day, and its `fold` is `run`, one line a run (`feedSaysFault`); `tiles` draws a `queue` as tiles; `who` draws a `heat` as a line a person, columns `day | who`; `register` is the list a `capture` adds to and an `inputs` block
- * edits; `row` is a `diff`'s row and an `inputs` block's.
+ * edits; `row` is a `diff`'s row and an `inputs` block's; `axis` is where a `forecast`'s value axis starts, `fit` or
+ * `zero` (`forecastAxisFault`).
  *
  * LEFT GENERAL ON PURPOSE: `opening`, `from` and `horizon` are read by whatever kind sits over `forecast.runway`, and a
  * `table` over it is written in the app's own tests; `cells` turns any block into figures; `target`, `inherit`,
@@ -90,6 +91,7 @@ export const KEY_KINDS: Readonly<Record<string, readonly string[]>> = {
   sell: ['forecast'],
   horizons: ['forecast'],
   headline: ['forecast'],
+  axis: ['forecast'],
   versions: ['diff'],
   field: ['diff'],
   row: ['diff', 'inputs'],
@@ -140,7 +142,7 @@ export const ANSWER_KEYS: readonly string[] = [
   'scope_marks', 'feed', 'seen', 'history', 'values', 'said', 'bars', 'measures', 'latest', 'past', 'changes', 'working_now',
   'quiet', 'lateness', 'late_name', 'sells', 'fx',
   'fills', 'rings', 'queue', 'nexts', 'trends', 'done_now', 'next', 'open', 'types', 'home',
-  'short_now', 'window', 'files', 'lanes', 'wholeRead',
+  'short_now', 'window', 'files', 'lanes', 'wholeRead', 'read_as',
 ];
 
 /**
@@ -213,6 +215,28 @@ export function feedSaysFault(block: Readonly<Record<string, unknown>>, who: str
   if (block.fold !== undefined && block.fold !== FEED_FOLD)
     return { fix: `${who}'s fold is ${JSON.stringify(block.fold)}; ${FEED_SAYS}.`, at: 'fold', allowed: [FEED_FOLD] };
   return null;
+}
+
+/**
+ * Where a `forecast`'s value axis may start: `fit`, from a round step under the lowest balance, which is what a forecast
+ * draws when it says nothing; or `zero`, from nought whatever the walk does.
+ */
+export const FORECAST_AXES = ['fit', 'zero'] as const;
+export type ForecastAxis = (typeof FORECAST_AXES)[number];
+
+/**
+ * Why a `forecast`'s `axis` cannot be drawn, or `null`. `who` is what the sentence calls the block.
+ *
+ * ONE OF TWO WORDS, and anything else is refused rather than drawn fitted, so `axis: wide` does not install as if it had
+ * been heard. The install and the read both ask here, as they ask `feedSaysFault`.
+ */
+export function forecastAxisFault(block: Readonly<Record<string, unknown>>, who: string): { fix: string; at: string; allowed: string[] } | null {
+  if (block.axis === undefined || (FORECAST_AXES as readonly unknown[]).includes(block.axis)) return null;
+  return {
+    fix: `${who}'s axis is ${JSON.stringify(block.axis)}; a forecast's axis is fit, to start just under its lowest balance, or zero, to always start at nought.`,
+    at: 'axis',
+    allowed: [...FORECAST_AXES],
+  };
 }
 
 /** The sentence for a key this kind does not read, naming the kinds that do. */

@@ -2690,25 +2690,38 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     /* ASKED: anything Slash filed, in any state, and anything anybody filed that is still open. A CHOICE TOO (`options`),
        which the nightly walk files: left out, a "Which project?" answered No was filed again the next night, and one
        waiting took no slot of the cap. */
-    const asked = new Map<string, { id: string; status: string }>();
+    const asked = new Map<string, { id: string; status: string; lapses?: string; note?: string }>();
     /* `by` IS WHO DRAFTED IT, as `slashFiling` kept it: `rules`, a model's name, or `null` for a question filed before the
        record kept that (migration 21), which says neither rather than guess. */
-    const waiting: { id: string; question: string; by: string | null }[] = [];
-    for (const row of sql.all<{ id: string; body: string; status: string; opened_by: string; drafted_by: string | null }>(
-      "SELECT id, body, status, opened_by, drafted_by FROM suggestion WHERE body_kind IN ('pack', 'settings', 'arrange', 'rowset', 'change', 'options') AND (opened_by = ? OR status = 'open') ORDER BY opened_at",
+    const waiting: { id: string; question: string; by: string | null; lapses?: string }[] = [];
+    /* THE LINE THE KERNEL WROTE WHEN IT TOOK ONE BACK (`govern.ts` `takeBack`), so the Slash page can say why it closed. */
+    const takenNote = (id: string): string | undefined =>
+      sql.one<{ note: string | null }>(
+        "SELECT note FROM event WHERE target = ? AND kind = 'resolve' AND to_v = 'withdrawn' ORDER BY ts DESC, id DESC LIMIT 1",
+        `suggestion:${id}`,
+      )?.note ?? undefined;
+    for (const row of sql.all<{ id: string; body: string; status: string; resolved_as: string | null; opened_by: string; drafted_by: string | null }>(
+      "SELECT id, body, status, resolved_as, opened_by, drafted_by FROM suggestion WHERE body_kind IN ('pack', 'settings', 'arrange', 'rowset', 'change', 'options') AND (opened_by = ? OR status = 'open') ORDER BY opened_at",
       SLASH,
     )) {
+      /* THE DAY IT WAITS UNTIL AND, ONCE TAKEN BACK, WHY (ENG-B14), for the Slash page's lines. */
+      let lapses: string | undefined;
       try {
         const body = JSON.parse(row.body) as Record<string, unknown>;
-        asked.set(stableKey(body), { id: row.id, status: row.status });
+        lapses = typeof body.lapses === 'string' ? body.lapses : undefined;
+        /* A TAKE-BACK IS STATUS `resolved` AS `withdrawn` (`takeBack`), never a status of its own. */
+        const note = row.resolved_as === 'withdrawn' ? takenNote(row.id) : undefined;
+        const said = { id: row.id, status: row.status, ...(lapses ? { lapses } : {}), ...(note ? { note } : {}) };
+        asked.set(stableKey(body), said);
         /* AND A PAGE SLASH ASKED FOR BY ITS PEN SIGNATURE (offer-pen-50, `keyed`): its why holds a count that changes, so
            by its body alone a page told No was asked again. */
         const list = row.opened_by === SLASH ? pageAskedFor(body) : null;
-        if (list !== null) asked.set(signatureOf('page', list), { id: row.id, status: row.status });
+        if (list !== null) asked.set(signatureOf('page', list), said);
       } catch {
         /* a body that will not parse asks nothing */
       }
-      if (row.opened_by === SLASH && row.status === 'open') waiting.push({ id: row.id, question: kernel.question(row.id) ?? row.id, by: row.drafted_by });
+      if (row.opened_by === SLASH && row.status === 'open')
+        waiting.push({ id: row.id, question: kernel.question(row.id) ?? row.id, by: row.drafted_by, ...(lapses ? { lapses } : {}) });
     }
     const shown = ctx === undefined || !partial ? waiting : waiting.filter((w) => {
       const row = kernel.governanceRow('suggestion', w.id);

@@ -76,7 +76,8 @@ export function causeOf(kind: string, body: Record<string, unknown>, question?: 
     return `options#${hash(canon(asked))}`;
   }
   if (kind === 'pattern' || kind === 'settings' || kind === 'arrange') {
-    const { cause: _c, egress: _e, approve: _a, ...asked } = body;
+    /* AN OFFER'S STRENGTH AND ITS DAY ARE NOT THE ASK (ENG-B14): the same offer re-filed with a new day joins the open one. */
+    const { cause: _c, egress: _e, approve: _a, rank: _r, lapses: _l, ...asked } = body;
     return `${kind}#${hash(canon(asked))}`;
   }
   return null;

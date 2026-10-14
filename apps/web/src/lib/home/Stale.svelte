@@ -11,13 +11,19 @@
   NOTHING HERE IS A CALL. The record says how an agent clears each line; none of that is read by `stale.ts`, so none
   can be drawn.
 
-  NOTHING IS DRAWN FOR NOTHING: not a heading, not an empty state. Six kinds are listed and the rest are counted.
+  AND WHAT THE LESSONS SAY, under the record's lines: a skill whose lessons its text does not take in yet, a link to
+  the skill, and a lesson two projects learned, with "Keep it once". That press puts the question to the person and
+  opens Decide; while it waits it cannot be pressed again, and a refusal is said under its line in plain words.
+
+  NOTHING IS DRAWN FOR NOTHING: not a heading, not an empty state. Six lines are listed and the rest are counted.
 
   QUIET: no red and no accent. Stale is not late, and nothing here waits on a day. The count is a pill, said aloud by
   the sentence beside it, so the pill itself is kept from a screen reader. A link is 44 tall under a thumb.
 -->
 <script lang="ts">
+  import { goto } from '$app/navigation';
   import { at } from '$lib/at.ts';
+  import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
   import { staleLine, staleShown, type StaleRow } from './stale.ts';
@@ -26,10 +32,30 @@
 
   const words = {
     more: (n: number) => (n === 1 ? 'And one more of another kind.' : `And ${String(n)} more of other kinds.`),
+    keep: 'Keep it once',
   } as const;
 
   const line = $derived(staleLine(rows));
   const list = $derived(staleShown(rows));
+
+  /* THE LINE WHOSE PRESS IS ON ITS WAY, what each refusal said, and the presses a host cannot answer at all. */
+  let waiting = $state<string | null>(null);
+  let refused = $state.raw<Readonly<Record<string, string>>>({});
+  let gone = $state.raw<ReadonlySet<string>>(new Set());
+
+  async function keep(row: StaleRow): Promise<void> {
+    if (!row.keep || waiting !== null) return;
+    waiting = row.key;
+    refused = Object.fromEntries(Object.entries(refused).filter(([key]) => key !== row.key));
+    const out = await row.keep();
+    waiting = null;
+    if (out.ok) {
+      void goto(at(out.href));
+      return;
+    }
+    refused = { ...refused, [row.key]: out.said };
+    if (out.gone) gone = new Set([...gone, row.key]);
+  }
 </script>
 
 {#if line}
@@ -47,6 +73,16 @@
               <span class="s-count" aria-hidden="true">{row.count}</span>
               <span class="s-go" aria-hidden="true"><Icon name="chevron" size="s" /></span>
             </a>
+          {:else if row.keep}
+            <div class="s-line s-pair" data-stale-kind="twice">
+              <span class="s-text" dir="auto">{row.said}</span>
+              {#if !gone.has(row.key)}
+                <Button weight="quiet" size="sm" disabled={waiting !== null} aria-busy={waiting === row.key} onclick={() => void keep(row)}>
+                  {words.keep}
+                </Button>
+              {/if}
+            </div>
+            {#if refused[row.key]}<p class="s-no" role="status">{refused[row.key]}</p>{/if}
           {:else}
             <p class="s-line" data-stale-kind={row.key}>
               <span class="s-text" dir="auto">{row.said}</span>
@@ -149,6 +185,15 @@
     flex: none;
     place-items: center;
     color: var(--dim);
+  }
+
+  /* A REFUSAL, under the line it answers, in the tile's quiet ink: it is not late and needs no red. */
+  .s-no {
+    margin: 0;
+    padding: 0 var(--sp-3) var(--sp-2);
+    color: var(--ink2, var(--dim));
+    font-size: var(--t-sm);
+    line-height: 20px;
   }
 
   .s-more {

@@ -5,8 +5,10 @@
   paths and the words; `forecast` in `src/html.ts` is this file's twin.
 
   THE KNOBS AND THE SCRUB EXIST ONLY WHERE THE HOST ASKS FOR THEM (`opts.scenario`). They live in
-  this component's memory and never in the address, and without them the drawing is the walk the
-  host made, which is exactly what `toHTML` draws, so the parity tests hold the two equal.
+  this component's memory and never in the address or the browser's storage, so a page left and come back to draws
+  the host's walk again (HD.241: they reset on each visit; a group goes with its last walk, `forecast-group.svelte.ts`).
+  Without them the drawing is the walk the host made, which is exactly what `toHTML` draws, so the parity tests hold
+  the two equal. The scrub follows a thumb as it follows a mouse, and the page still scrolls under a vertical swipe.
 
   A KNOB WITH NOTHING TO MOVE IS NOT DRAWN: drift with no converted step, What counts with nothing to
   count, the sell day with no holdings figure in a walk's own money, and Show in with no rate into another
@@ -26,6 +28,8 @@
   import { day } from '../src/format.ts';
   import {
     FORECAST_ADJUST,
+    FORECAST_AXIS_BREAK,
+    FORECAST_AXIS_BREAK_STYLE,
     FORECAST_BALANCE,
     FORECAST_CLOSE,
     FORECAST_COUNT,
@@ -245,6 +249,12 @@
     (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
     track(e);
   };
+  /* A THUMB LIFTED LEAVES THE DAY IT READ, because the thumb was over the line while it moved and the reading is what it
+     came for; a mouse that leaves takes the reading with it. A page scroll that takes the touch (`touch-action: pan-y`,
+     so an upward swipe on the chart still scrolls) cancels it, and the readout goes. */
+  const leave = (e: PointerEvent) => {
+    if (e.pointerType === 'mouse') scrub = null;
+  };
 
   /* ── Adjust: a disclosure over the knobs, under the chart at every width ── */
 
@@ -320,7 +330,7 @@
     class="forecast-plot"
     onpointerdown={grab}
     onpointermove={track}
-    onpointerleave={() => (scrub = null)}
+    onpointerleave={leave}
     onpointercancel={() => (scrub = null)}
   >
     <svg class="forecast-chart" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label={p.sentence}>
@@ -336,15 +346,20 @@
       <path class="forecast-low" d={p.low} vector-effect="non-scaling-stroke"></path>
       <path class="forecast-now" {...FORECAST_PAINT.now} d={p.now.d} vector-effect="non-scaling-stroke"></path>
       {#if p.cross}<path class="forecast-cross" d={p.cross.d} vector-effect="non-scaling-stroke"></path>{/if}
+      <!-- THE DAY BEING READ, a hairline down the chart, so a thumb sees which point the readout names. -->
+      {#if readout}<path class="forecast-scrub" {...FORECAST_PAINT.rule} d="M{Number(readout.at) * 1000} 0V100" vector-effect="non-scaling-stroke"></path>{/if}
     </svg>
     <!-- TODAY'S BALANCE BESIDE TODAY'S DOT, where the line starts, hidden like the axis: the chart's name says it. -->
     <!-- A CROSSING NEAR TODAY SETS THE TWO LABELS APART: the balance under its dot, the flag's day after its rule. -->
     <span class="forecast-now-label num" data-near-flag={p.cross?.near ? '' : undefined} style="--at:{p.now.at};--y:{p.now.y}" aria-hidden="true"
       >{p.now.label}</span
     >
-    <!-- THE VALUE AXIS, its round steps down one side, zero among them; hidden, because the chart's name says the walk. -->
+    <!-- THE VALUE AXIS, its round steps down one side, zero among them; hidden, because the chart's name says the walk.
+         Where zero is off it, its end nearest zero carries a break beside the real amount, and the name says where it starts. -->
     <ol class="forecast-axis" aria-hidden="true">
-      {#each p.axis as a}<li class="forecast-axis-tick" data-zero={a.zero ? '' : undefined} style="--at:{a.at}">{a.label}</li>{/each}
+      {#each p.axis as a}<li class="forecast-axis-tick" data-zero={a.zero ? '' : undefined} data-cut={a.cut ? '' : undefined} style="--at:{a.at}"
+          >{#if a.cut}<span class="forecast-axis-break" style={FORECAST_AXIS_BREAK_STYLE}>{FORECAST_AXIS_BREAK}</span>{/if}{a.label}</li
+        >{/each}
     </ol>
     {#if p.cross}<span class="forecast-pin" data-side={p.cross.near ? 'end' : undefined} style="--at:{p.cross.at}" aria-hidden="true">{TONES.warn.glyph} {p.cross.day}</span>{/if}
     {#if readout}
@@ -578,3 +593,63 @@
     {/if}
   {/if}
 </div>
+
+<!--
+  WHAT THE CHART SHEET (`packages/skin/blocks-charts.css`) LEAVES TO THE COMPONENT: the readout as a thumb reads it in a
+  narrow tile, and the controls a thumb presses. The sheet sets the rest.
+
+  GLOBAL, UNDER `.forecast`, and not scoped: a scoped rule puts the component's own class on every element it names,
+  and the parity tests hold this drawing equal to `toHTML`'s, tag for tag and class for class. The rules ride the
+  component's own stylesheet, so they arrive with the first forecast drawn and add nothing to what every screen loads.
+-->
+<style>
+  /* THE PLOT IS ITS OWN MEASURE, so the readout is laid out for the tile it sits in and not for the window: a forecast
+     in a narrow column of a wide page is a phone's width too. */
+  :global(.forecast .forecast-plot) {
+    container: forecast-plot / inline-size;
+  }
+
+  /* ONE FLAT TILE, as every block is (DIRECTION 39): no glass behind the readout and no shadow under it. */
+  :global(.forecast .forecast-readout) {
+    background: var(--well);
+    backdrop-filter: none;
+    box-shadow: none;
+  }
+
+  /* SAFARI'S SPELLING, as the sheet writes it beside the standard one. */
+  @supports (-webkit-backdrop-filter: none) {
+    :global(.forecast .forecast-readout) {
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+  }
+
+  /* NARROW, THE READOUT IS A BAND ACROSS THE TOP OF THE CHART, the day at its start and the balance at its end, so it
+     never runs past the tile's edge and is never under the thumb that moves it. Beside the day it floated, and from
+     the middle of a 390 chart it ran out of the tile. */
+  @container forecast-plot (max-width: 600px) {
+    :global(.forecast .forecast-readout),
+    :global(.forecast .forecast-readout[data-flip]) {
+      inset-inline: 0;
+      grid-template-columns: 1fr auto;
+      align-items: baseline;
+      max-inline-size: none;
+      margin-inline-start: 0;
+      translate: none;
+    }
+
+    :global(.forecast .forecast-readout-move) {
+      grid-column: 1 / -1;
+    }
+  }
+
+  /* EVERY CONTROL UNDER THE CHART TAKES A THUMB. The sheet sizes the chips, the tools, the sliders and Reset; these are
+     the rest a thumb presses. */
+  @media (pointer: coarse) {
+    :global(.forecast .forecast-segs .segment),
+    :global(.forecast .forecast-date),
+    :global(.forecast .forecast-toggle) {
+      min-block-size: var(--tap);
+    }
+  }
+</style>
