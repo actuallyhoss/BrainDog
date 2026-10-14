@@ -2,7 +2,7 @@
  * The card the record composes (AGT-B07), held to its shape and its size.
  *
  * LINE ONE, THEN THE SLOTS IN ONE ORDER, EACH LEFT OUT WHEN IT HAS NOTHING: who and where, then `Next`, `Signs`,
- * `Waiting`, `Learned` and `More`, with the same-tree line before them and the older-command line after them only when
+ * `Waiting`, `Decided`, `Learned` and `More`, with the same-tree line before them and the older-command line after them only when
  * each is true. At most three things a slot, about 120 words and never more than 150. A step is checked before it is
  * acted on when it is a day old or another run left it; questions that read the same are one; names print as written;
  * control characters never reach the terminal. No Who slot.
@@ -16,7 +16,7 @@ import type { Brief, Context, LiveBrief } from '../src/index.ts';
 
 const NOW = Date.UTC(2026, 9, 9, 9);
 const HOUR = 3_600;
-const ORDER = ['Also', 'Next', 'Signs', 'Waiting', 'Learned', 'More', 'Update'] as const;
+const ORDER = ['Also', 'Next', 'Signs', 'Waiting', 'Decided', 'Learned', 'More', 'Update'] as const;
 
 /** A context with nothing in it, and what a case adds. */
 const ctx = (over: Partial<Context> = {}): Context => ({
@@ -150,6 +150,13 @@ test('THE TWO NEWEST LEARNINGS ARE SAID, and the rest are a count in More beside
   assert.equal(slots.get('Learned'), 'Lesson 9 is what a session would otherwise get wrong. · Lesson 4 is what a session would otherwise get wrong.');
   assert.equal(slots.get('More'), '3 learnings · 2 keys by name · call context');
   assert.doesNotMatch(draw(ctx({ session: run, registers: [keys] })), /Deploy key/u, 'a key was listed by name');
+});
+
+test('WHAT WAS DECIDED HERE IS ONE LINE after Waiting, the newest three, so the session asks none of it again (AGT-B09)', () => {
+  const decided = ['Decided 12 Oct: Ship the beta first', 'Decided 9 Oct: Yes: Keep the old price', 'Decided 2 Oct: No: Move the launch', 'Decided 1 Oct: Weekly'];
+  const slots = shaped(draw(ctx({ session: run, decided })));
+  assert.equal(slots.get('Decided'), '12 Oct: Ship the beta first · 9 Oct: Yes: Keep the old price · 2 Oct: No: Move the launch');
+  assert.equal(shaped(draw(ctx({ session: run }))).has('Decided'), false, 'a context with nothing decided drew the line');
 });
 
 test('ANOTHER RUN WORKING IN THIS TREE is one line before Next with the sentence word for word, and the caller is never one', () => {

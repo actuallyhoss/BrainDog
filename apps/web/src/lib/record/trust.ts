@@ -16,6 +16,10 @@
  *
  * ONLY THE OWNER IS ANSWERED. Anyone the record refuses, and a host built before the call, reads as `null`, and nothing
  * is drawn: there is no ladder of theirs to show.
+ *
+ * AND THE OWNER TAKES A RUNG BACK HERE: a kind an agent does on its own carries "Ask again" (`trustTakeBack`, "undo"
+ * D37.167), which puts it back to asking. Under the lines, two more say what no rung reaches: what the agent was not
+ * lifted on, and the floor the ladder never lifts at all.
  */
 
 import type { TrustStanding } from '@braindog/client';
@@ -24,10 +28,17 @@ export const words = {
   title: 'What each agent may do on its own',
   empty: 'No agent is connected yet, so nothing is done without you.',
   backMark: 'Put back',
+  askAgain: 'Ask again',
+  asksFirst: 'Asks first: everything else this agent does.',
+  alwaysAsks: 'Always asks: amounts of money, keys, sharing, and deleting.',
 } as const;
 
-/** One sentence of the ladder. `back` marks a kind taken back to asking, with `why` as the record worded it. */
-export type TrustLine = { key: string; text: string; back: boolean; why: string | null };
+/**
+ * One sentence of the ladder. `back` marks a kind taken back to asking, with `why` as the record worded it. `take` is
+ * what "Ask again" sends for a kind the agent does on its own, the agent and the kind as the record said them, and
+ * `null` where it already asks.
+ */
+export type TrustLine = { key: string; text: string; back: boolean; why: string | null; take: { agent: string; kind: string } | null };
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -69,12 +80,13 @@ export function trustLines(standing: TrustStanding, now: number): TrustLine[] {
     /* The day sits between commas, so the sentence reads on past it. */
     const who = twice ? `${a.agent}, connected ${dayOf(a.connected!, now)},` : a.agent;
     if (a.kinds.length === 0) {
-      out.push({ key: `${i}`, text: `${who} asks before every change`, back: false, why: null });
+      out.push({ key: `${i}`, text: `${who} asks before every change`, back: false, why: null, take: null });
       return;
     }
     a.kinds.forEach((k, j) => {
       const back = k.rung === 'ask' && k.dropped !== null;
-      out.push({ key: `${i}:${j}`, text: kindSaid(who, k, now), back, why: back ? (k.dropped?.why ?? null) : null });
+      const take = k.rung === 'ask' ? null : { agent: a.agent, kind: k.kind };
+      out.push({ key: `${i}:${j}`, text: kindSaid(who, k, now), back, why: back ? (k.dropped?.why ?? null) : null, take });
     });
   });
   return out;
@@ -116,4 +128,29 @@ export async function readTrust(client: TrustClient): Promise<TrustStanding | nu
       kinds: a.kinds.map((k) => ({ kind: k.kind, rung: k.rung, since: k.since, lifted: k.lifted === true, dropped: k.dropped && typeof k.dropped.at === 'string' ? { at: k.dropped.at, why: typeof k.dropped.why === 'string' ? k.dropped.why : null } : null })),
     })),
   };
+}
+
+/** The client's `call`, and nothing else of it, so a test hands in one function. */
+export type TakeBackClient = { call: (name: string, args: Record<string, unknown>) => Promise<unknown> };
+
+/** What a press of "Ask again" came to: done, or the record's sentence for why not. */
+export type TakeBackOut = { ok: true } | { ok: false; fix: string };
+
+const NOT_DONE = 'That could not be done just now. Nothing was changed.';
+
+/**
+ * Put one kind back to asking, by the agent and the kind as the record said them. The typed client has no line for
+ * `trustTakeBack` yet, so it goes by name through `call`, as the record's other new doors do.
+ */
+export async function takeBack(client: TakeBackClient, take: { agent: string; kind: string }): Promise<TakeBackOut> {
+  let out: unknown;
+  try {
+    out = await client.call('trustTakeBack', { agent: take.agent, kind: take.kind });
+  } catch {
+    return { ok: false, fix: NOT_DONE };
+  }
+  const answer = out as { ok?: unknown; refusal?: { fix?: unknown } } | null;
+  if (typeof answer === 'object' && answer !== null && answer.ok === true) return { ok: true };
+  const fix = answer?.refusal?.fix;
+  return { ok: false, fix: typeof fix === 'string' && fix.trim() !== '' ? fix : NOT_DONE };
 }

@@ -31,7 +31,7 @@ const due = (n: number, day: string, title: string, amount: number, direction: '
   seq: n,
   fields: { list: 'obligations', row: `obligations#${n}`, title, day, amount: { amount, currency: 'GBP' }, direction },
 });
-const rows = [due(1, past, 'Encore payment', 120_000, 'in'), due(2, today, 'Studio rent', 90_000, 'out'), due(3, soon, 'Hosting', 2_000, 'out')];
+const rows = [due(1, past, 'Orchardline payment', 120_000, 'in'), due(2, today, 'Studio rent', 90_000, 'out'), due(3, soon, 'Hosting', 2_000, 'out')];
 
 /** A block as business 1.7.1 declares its Due this week: description, signed amount, and the day last. */
 const business = {
@@ -62,7 +62,7 @@ test('A DUE THIS WEEK TABLE SAYS A DAY GONE IS LATE, in Today\'s words and with 
   assert.equal(now!.tone, undefined, 'a row due today is not late yet');
   assert.equal(later!.tone, undefined);
   /* THE REST OF THE ROW IS AS IT WAS: the title, the signed amount, and the door to the row. */
-  assert.equal(gone!.cells[0], 'Encore payment');
+  assert.equal(gone!.cells[0], 'Orchardline payment');
   assert.match(String(gone!.cells[1]), /^\+/u);
   assert.match(String(now!.cells[1]), /^−/u);
   assert.equal(gone!.href, '/r/obligations/1');

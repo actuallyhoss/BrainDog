@@ -52,6 +52,9 @@ async function growing(ageDays = 20) {
     clock.set(T0 + day * DAY);
     value(await api.create({ register: 'tasks', fields: { what: `Step on day ${day}` } }, OWNER));
   }
+  /* AND THE FIRST STEP EDITED BY HAND ON DAY 5: the owner's own use on five days, so Slash advises it (HD.410). */
+  clock.set(T0 + 5 * DAY);
+  value(api.kernel.update('tasks', 'tasks#1', { what: 'Step on day 0, checked' }, { actor: 'p_owner', version: 1 }));
   clock.set(T0 + ageDays * DAY);
   return { sql, clock, api };
 }

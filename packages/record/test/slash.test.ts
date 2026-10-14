@@ -13,6 +13,7 @@ import { normaliseUseCase, useCasePack } from '@braindog/declare';
 
 import { createRecordApi, type CallContext, type CatalogueEntry, type SlashModel, type SlashModelInput } from '../src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
+import { COMPANIES, PROJECTS } from '../../../fixtures/names.ts';
 
 const DAY = 86_400_000;
 const NOW = Date.UTC(2026, 8, 17, 12);
@@ -89,7 +90,14 @@ async function record(options: { model?: SlashModel; catalogue?: CatalogueEntry[
     value(await api.decide({ id: asked.id, decide: { option: 'accept', reason: 'yes' } }, owner));
   };
   const day = (n: number) => clock.set(NOW - n * DAY);
-  return { api, sql, clock, install, day };
+  /** The owner's own use: one row they write to `register` on each of `days` ago, the use Slash counts (`youngSaid`). */
+  const uses = (register: string, days: readonly number[]) => {
+    for (const n of days) {
+      day(n);
+      value(api.kernel.create(register, { what: `Kept on day ${n}` }, { actor: 'p_owner' }));
+    }
+  };
+  return { api, sql, clock, install, day, uses };
 }
 
 type Reading = {
@@ -101,7 +109,10 @@ type Reading = {
 };
 type Filed = { by: string; filed: { id: string; question: string; by: string }[]; skipped: { question: string; why: string }[]; dropped: string[] };
 
-/** A record four months old: Work used by an agent, a Logbook filled by hand with no page, Notes left alone. */
+/**
+ * A record four months old: Work used by an agent, a Logbook filled by hand with no page, Notes left alone. The owner
+ * uses it on seven days, more than the five a record needs before Slash advises it (`youngSaid`).
+ */
 async function used(options: { model?: SlashModel; catalogue?: CatalogueEntry[] } = {}) {
   const r = await record(options);
   /* THE PEN TURNED OFF, so Slash's growing-list page is Slash's to ask: with the pen on, the pen holds Logbook's page
@@ -114,6 +125,7 @@ async function used(options: { model?: SlashModel; catalogue?: CatalogueEntry[] 
     value(await r.api.page({ slug: 'diary' }, owner));
     value(await r.api.list({ register: 'tasks' }, owner));
     value(await r.api.list({ register: 'logbook' }, owner));
+    value(r.api.kernel.create('logbook', { what: `Entry ${n}` }, { actor: 'p_owner' }));
   }
   for (const n of [20, 12, 5]) {
     r.day(n);
@@ -198,32 +210,71 @@ test('SLASH FILES ITS PROPOSALS THROUGH THE SAME DOOR, and only the owner accept
   sql.close();
 });
 
-test('A RECORD MADE TODAY STARTED TODAY, not "0 days old"', async () => {
+test('A RECORD MADE TODAY IS WAITED ON FROM TODAY, not "0 days old"', async () => {
   const { api, sql, install } = await record();
   await install({ install: 'log' });
   value(api.kernel.create('logbook', { what: 'First entry' }, { actor: 'p_owner' }));
   const seen = value<Reading>(await api.slash({}, owner));
-  assert.equal(seen.quiet, 'This BrainDog started today. Slash waits for two weeks of use before it suggests changes.');
+  assert.equal(seen.quiet, 'Slash waits for two weeks of your own use. You started using BrainDog today.');
   sql.close();
 });
 
-test('A RECORD BROUGHT IN WITH ITS PAST IS AS OLD AS THE OLDEST DAY ITS ROWS HOLD, not the day they were written', async () => {
-  /* A RECORD THE SEED WROTE, OR ONE BROUGHT IN, WRITES EVERY ROW ON THE DAY IT ARRIVES: months of payments read "This
-     BrainDog started today". A day ahead is a plan and not a past, and an example's day is a pack's invention. */
-  const { api, sql, clock } = await record();
-  value(
-    await api.kernel.install([
-      { id: 'register.payments', kind: 'register', body: { id: 'payments', name: 'Payments', title: 'what', fields: [{ id: 'what', type: 'text', required: true }, { id: 'on', type: 'day' }] } as never },
-    ]),
-  );
-  const shift = (days: number) => new Date(clock.now() + days * DAY).toISOString().slice(0, 10);
-  value(api.kernel.create('payments', { what: 'Ahead', on: shift(400) }, { actor: 'p_owner' }));
-  value(api.kernel.create('payments', { what: 'Invented', on: shift(-900), tags: ['example'] }, { actor: 'p_owner' }));
+/** Payments, a list with a day, as an import brings one in. */
+const PAYMENTS = {
+  id: 'register.payments',
+  kind: 'register',
+  body: { id: 'payments', name: 'Payments', title: 'what', fields: [{ id: 'what', type: 'text', required: true }, { id: 'on', type: 'day' }] },
+} as never;
+
+test("A RECORD BROUGHT IN WITH ITS PAST IS AS YOUNG AS ITS OWNER'S USE, not the oldest day its rows hold", async () => {
+  /* HD.410, "a fortnight of use is not a habit": a year of rows an import wrote is somebody's past, not how this owner
+     uses this record, so Slash reads no habit into it until the owner has two weeks and five days of their own. This
+     reverses the test it replaces, which called such a record as old as its oldest row. */
+  const { api, sql, clock, uses } = await record();
+  value(await api.kernel.install([PAYMENTS]));
+  const lastYear = (i: number) => new Date(clock.now() - (400 - i) * DAY).toISOString().slice(0, 10);
+  for (let i = 0; i < 200; i++)
+    value(api.kernel.create('payments', { what: `${COMPANIES[i % COMPANIES.length]} ${i + 1}`, on: lastYear(i) }, { actor: 'ingest:payments-file' }));
+  uses('payments', [120, 119]);
+
   const young = value<Reading>(await api.slash({}, owner));
-  assert.match(String(young.quiet), /^This BrainDog started today\./u, 'a day ahead or an example’s day made the record old');
-  value(api.kernel.create('payments', { what: 'Rent in March', on: shift(-40) }, { actor: 'p_owner' }));
+  assert.equal(young.quiet, 'Slash waits for two weeks of your own use. You have used BrainDog on 2 days since you started yesterday.');
+  assert.deepEqual(young.drafts, [], 'a record two days into its use was advised from its import');
+  assert.deepEqual(value<Filed>(await api.slashPropose({}, owner)).filed, []);
+
+  /* TWO WEEKS IN AND FIVE DAYS OF USE, IT IS ADVISED. */
+  uses('payments', [115, 110, 106]);
+  const old = value<Reading>(await api.slash({}, owner));
+  assert.equal(old.quiet, null, 'fourteen days and five days of use is still called young');
+  sql.close();
+});
+
+test('TWO WEEKS ARE NOT ENOUGH ON THEIR OWN: Slash waits for use on five different days, and says so', async () => {
+  const { api, sql, install, day, uses } = await record();
+  await install({ install: 'log' });
+  uses('logbook', [100, 90]);
+  day(80);
   const seen = value<Reading>(await api.slash({}, owner));
-  assert.equal(seen.quiet, null, 'a record holding forty days of its own is still called young');
+  assert.equal(seen.quiet, 'Slash waits for your own use on 5 different days. You have used BrainDog on 3 days.');
+  assert.deepEqual(seen.drafts, []);
+  uses('logbook', [70, 60]);
+  assert.equal(value<Reading>(await api.slash({}, owner)).quiet, null, 'five days of use over seven weeks is still called young');
+  sql.close();
+});
+
+test("AN AGENT'S WRITES ARE NEVER A PERSON'S USE: an agent, an import and the system on thirty days leave the record young", async () => {
+  const { api, sql, clock, day } = await record();
+  value(await api.kernel.install([PAYMENTS]));
+  for (let n = 60; n > 30; n--) {
+    day(n);
+    for (const actor of ['agent:claude', 'ingest:payments-file', 'system'])
+      value(api.kernel.create('payments', { what: `${PROJECTS[n % PROJECTS.length]} on day ${n}`, on: new Date(clock.now()).toISOString().slice(0, 10) }, { actor }));
+  }
+  day(0);
+  const seen = value<Reading>(await api.slash({}, owner));
+  assert.equal(seen.quiet, 'Slash waits for two weeks of your own use. Nobody has added or changed anything here by hand yet.');
+  assert.deepEqual(seen.drafts, []);
+  assert.deepEqual(value<Filed>(await api.slashPropose({}, owner)).filed, []);
   sql.close();
 });
 
@@ -235,7 +286,7 @@ test('A YOUNG RECORD IS WATCHED, NOT ADVISED', async () => {
     for (let i = 0; i < 3; i++) value(api.kernel.create('logbook', { what: `Entry ${n}.${i}` }, { actor: 'p_owner' }));
   }
   const seen = value<Reading>(await api.slash({}, owner));
-  assert.equal(seen.quiet, 'This BrainDog is 7 days old. Slash waits for two weeks of use before it suggests changes.');
+  assert.equal(seen.quiet, 'Slash waits for two weeks of your own use. You have used BrainDog on 4 days since you started 7 days ago.');
   assert.ok(seen.noticed.some((n) => n.kind === 'grows' && n.subject === 'logbook'));
   assert.deepEqual(seen.drafts, []);
   assert.deepEqual(value<Filed>(await api.slashPropose({}, owner)).filed, []);
@@ -406,7 +457,7 @@ type Toned = Reading & { daily: { on: boolean; last: string | null } };
 const settingsOf = async (api: Awaited<ReturnType<typeof record>>['api'], id: string) => value<{ values: Record<string, unknown> }>(await api.packConfig({ id }, owner)).values;
 
 test('THE WORDS FOLLOW USE: a page the owner keeps opening lends its list its name, and a label only the use case declares', async () => {
-  const { api, sql, install, day } = await record({ catalogue: TEAM_CATALOGUE });
+  const { api, sql, install, day, uses } = await record({ catalogue: TEAM_CATALOGUE });
   await install({ usecase: 'team', why: ['A team.'] }, 'arrange');
   /* THE OWNER'S OWN PAGE over Tickets, called Issues, and a list with no label declared that is shown the same way. */
   await install({ install: 'log' });
@@ -425,6 +476,7 @@ test('THE WORDS FOLLOW USE: a page the owner keeps opening lends its list its na
     value(await api.page({ slug: 'issues' }, owner));
     value(await api.page({ slug: 'captains-log' }, owner));
   }
+  uses('tickets', [20, 11, 6, 2, 1]);
   day(0);
 
   const seen = value<Toned>(await api.slash({}, owner));
@@ -479,13 +531,14 @@ const CREW = (() => {
 const CREW_CATALOGUE: CatalogueEntry[] = [...CATALOGUE, entry('usecase-crew', 'Crew', useCasePack(CREW)!, 'usecase')];
 
 test('A LIST RENAMED IS RENAMED IN ALL THREE WORDS: its name, one of it, and the line saying what it holds', async () => {
-  const { api, sql, install, day } = await record({ catalogue: CREW_CATALOGUE });
+  const { api, sql, install, day, uses } = await record({ catalogue: CREW_CATALOGUE });
   await install({ usecase: 'crew', why: ['A crew.'] }, 'arrange');
   await install({ why: ['My pages.'], pages: [{ id: 'page.issues', body: page('issues', 'Issues', 'tickets', 'Crew') }] }, 'arrange');
   for (const n of [20, 20, 11, 6, 2, 1]) {
     day(n);
     value(await api.page({ slug: 'issues' }, owner));
   }
+  uses('tickets', [20, 11, 6, 2, 1]);
   day(0);
 
   const seen = value<Toned>(await api.slash({}, owner));
@@ -548,12 +601,13 @@ test('HOME SAYS WHO DID THE WORK: agents doing most of it are named, and a quart
 });
 
 test('THE SKILLS A USE CASE NAMES are offered to the agents once each, as rows only the owner accepting writes', async () => {
-  const { api, sql, install, day } = await record({ catalogue: TEAM_CATALOGUE });
+  const { api, sql, install, day, uses } = await record({ catalogue: TEAM_CATALOGUE });
   await install({ usecase: 'team', why: ['A team.'] }, 'arrange');
   let seen = value<Toned>(await api.slash({}, owner));
   assert.ok(!seen.drafts.some((d) => d.body_kind === 'rowset'), 'skills were offered to a record that keeps none');
 
   await install({ install: 'agents' });
+  uses('tickets', [20, 11, 6, 2]);
   day(0);
   seen = value<Toned>(await api.slash({}, owner));
   assert.equal(seen.noticed.find((x) => x.kind === 'skills')?.text, 'Team names skills for agents that you do not have in Skills yet: task-triage and standup-digest.');

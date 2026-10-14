@@ -132,6 +132,17 @@ const fakeMeter = (cap: number) => {
 };
 
 /**
+ * THE OWNER'S OWN USE ON FIVE DAYS, so Slash advises a record past its fortnight (HD.410): the first task edited by hand
+ * on four more days, and left as it was.
+ */
+function usedOnFiveDays(api: Awaited<ReturnType<typeof createRecordApi>>, clock: ReturnType<typeof fixedClock>): void {
+  for (const [i, day] of [3, 5, 7, 9].entries()) {
+    clock.set(T0 + day * DAY);
+    value(api.kernel.update('tasks', 'tasks#1', { what: i % 2 === 0 ? 'Sample the fit.' : 'Sample the fit' }, { actor: 'p_owner', version: i + 1 }));
+  }
+}
+
+/**
  * A record with one open task and one done, `ageDays` old. With `growing`, five more tasks written on three separate days in
  * the last month, so the rules draft "Give Tasks a page of its own?" and there is something a description must not file.
  */
@@ -147,6 +158,8 @@ async function record(model: SlashModel, ageDays: number, slashMeter?: SlashMete
       clock.set(T0 + day * DAY);
       value(await api.create({ register: 'tasks', fields: { what: `Later step ${i}`, state: 'open' } }, OWNER));
     }
+  /* PAST ITS FORTNIGHT, THE OWNER'S OWN USE ON FIVE DAYS, so Slash advises it (HD.410). */
+  if (ageDays >= 14) usedOnFiveDays(api, clock);
   clock.set(T0 + ageDays * DAY);
   return { sql, clock, api };
 }
@@ -569,6 +582,7 @@ async function injected(model: SlashModel) {
   assert.ok((await api.kernel.install([TASKS, PAYROLL, HOME])).ok);
   value(await api.create({ register: 'tasks', fields: { what: 'Sample the fit', state: 'open' } }, OWNER));
   value(await api.create({ register: 'payroll', fields: { who: 'Sam', salary: 99000 } }, OWNER));
+  usedOnFiveDays(api, clock);
   clock.set(T0 + 20 * DAY);
   return { sql, clock, api };
 }

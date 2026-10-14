@@ -313,13 +313,8 @@ test('THE MONEY PAGE READS WHOLE ON A RECORD, and every walk on it starts from C
   const cash = k.metric(k.metricDecl('cash-now')!);
   assert.ok(cash.ok && cash.value.value !== null);
   const walks = money.blocks.filter((b) => b.source === 'forecast.runway');
-  assert.equal(walks.length, 2, 'the bridge and the forecast');
+  assert.deepEqual(walks.map((b) => b.kind), ['forecast']);
   for (const walk of walks) assert.equal(walk.walk?.from, cash.value.value, `${walk.kind} does not start from Cash now`);
-
-  /* THE BRIDGE LOOKS THIRTY DAYS AHEAD AND THE FORECAST A YEAR, over the same legs. */
-  const bridge = walks.find((b) => b.kind === 'bridge')!;
-  const last = bridge.walk!.steps.at(-1)!.day;
-  assert.ok(last <= '2026-10-03', `the bridge walked to ${last}`);
 
   /* A REPEATING ROW IS SPENT EVERY TIME IT COMES ROUND: the rent appears in each month of the forecast's walk. */
   const forecast = walks.find((b) => b.kind === 'forecast')!;

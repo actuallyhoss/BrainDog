@@ -29,6 +29,8 @@ import { SWEPT_NOTE, SWEPT_STEP_NOTE } from './schedule.ts';
 import { SESSION } from './session.ts';
 /* `tidy-keys.ts` IMPORTS ONLY THIS FILE'S TYPES, so the finder it lends adds no load ring. */
 import { keysUnopened } from './tidy-keys.ts';
+/* `tidy-same.ts` LIKEWISE, and it reads `same.ts`, which this file's importers already load through the write path. */
+import { rowsSame } from './tidy-same.ts';
 
 const DAY_MS = 86_400_000;
 
@@ -42,8 +44,21 @@ export const OLD_QUESTION_MS = 14 * DAY_MS;
 /** What a finder would ask: the question as the person reads it, and one sentence for what "Do it" does. */
 export type TidyAsk = { question: string; does: string };
 
-/** What a finder answers. `stale`: how many now. `did`: how many the record cleared in the last day. */
-export type Found = { stale: number; did: number; ask: TidyAsk | null };
+/** One place a finder's things are, as a person reads it: its line, how many, and the address that shows only them. */
+export type FoundAt = { said: string; count: number; href: string };
+
+/**
+ * What a finder answers. `stale`: how many now. `did`: how many the record cleared in the last day. A finder may also
+ * say its count in a sentence of its own (`said`, "3 things are here twice") and where they are, a place each (`at`),
+ * which a reader draws in place of its name and number. Neither is kept in `tidy_line`, and neither asks anything.
+ */
+export type Found = {
+  stale: number;
+  did: number;
+  ask: TidyAsk | null;
+  said?: string | undefined;
+  at?: readonly FoundAt[] | undefined;
+};
 
 /** `name` is what the finder counts, in plain words, as its figure is called: "Ended runs that wrote nothing". */
 export type Finder = { id: string; name?: string | undefined; find(sql: Sql, nowMs: number): Found };
@@ -240,8 +255,9 @@ const faultsOpen: Finder = {
   find: (sql) => ({ stale: openFaults(sql).length, did: 0, ask: null }),
 };
 
-/* AND THE SEALED KEYS NOBODY OPENS (AGT-D17), counted only: its own file says why it asks nothing. */
-for (const finder of [runsStopped, runsEmpty, stepsOld, questionsOld, questionsMoot, faultsOpen, keysUnopened]) registerFinder(finder);
+/* AND THE SEALED KEYS NOBODY OPENS (AGT-D17), and the things held twice in a list that says what makes two one
+   (`rows-same`, C13's clashes): both counted only, and each file says why it asks nothing. */
+for (const finder of [runsStopped, runsEmpty, stepsOld, questionsOld, questionsMoot, faultsOpen, keysUnopened, rowsSame]) registerFinder(finder);
 
 /** What a finder found, or `null` when it threw: one finder that cannot count never stops the others being counted. */
 function counted(finder: Finder, sql: Sql, nowMs: number): Found | null {

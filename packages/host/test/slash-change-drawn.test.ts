@@ -46,6 +46,11 @@ async function record(model?: SlashModel) {
   const api = await createRecordApi({ sql, clock, ...(model === undefined ? {} : { slashModel: model }) });
   assert.ok((await api.kernel.install([rates()])).ok);
   assert.ok(api.kernel.create('rates', { what: 'Gold, by hand', price: 2400 }, { actor: 'p_owner' }).ok);
+  /* THE OWNER'S OWN USE ON FIVE DAYS, so Slash advises a record past its fortnight (HD.410). */
+  for (const [i, day] of [25, 20, 15, 10].entries()) {
+    clock.set(NOW - day * DAY);
+    assert.ok(api.kernel.update('rates', 'rates#1', { what: i % 2 === 0 ? 'Gold, by hand.' : 'Gold, by hand' }, { actor: 'p_owner', version: i + 1 }).ok);
+  }
   clock.set(NOW);
   const live = () => {
     const decl = api.kernel.declarations().find((d) => d.id === 'register.rates')!;

@@ -232,3 +232,95 @@ test('TWO GRANTS OF ONE NAME ARE TOLD APART: the later one carries a number, and
   );
   sql.close();
 });
+
+/* ── the owner's "Ask again" (`trustTakeBack`) ─────────────────────────── */
+
+/** A browser session of the owner's, the only caller an ADMIN method answers. */
+const inBrowser: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' }, credentialed: true };
+
+const refusalOf = (r: unknown): { code: string; fix: string } => {
+  const x = r as { ok: boolean; refusal?: { code: string; fix: string } };
+  assert.equal(x.ok, false, 'refused');
+  return x.refusal!;
+};
+
+test('ASK AGAIN PUTS A LIFTED KIND BACK TO ASKING with the owner\'s why, and nothing else moves', async () => {
+  const { api, sql, clock } = await record();
+  const arrived = lift(sql, 'tasks:move:done');
+  lift(sql, 'tasks:edit');
+  sql.exec("INSERT INTO ladder (agent, kind, rung, accepted_unchanged, since) VALUES ('t_cursor', 'tasks:add', 'quiet', 0, ?)", arrived);
+  const before = value<Standing>(await api.trust(undefined, owner));
+
+  clock.at = NOW + HOUR;
+  const at = new Date(clock.at).toISOString();
+  const answer = value<Standing>(await api.trustTakeBack({ agent: 'claude code', kind: 'Mark tasks done' }, inBrowser));
+  assert.deepEqual(answer.agents.map((a) => a.agent), ['Claude Code'], 'it answers the agent it put back, by its name');
+  assert.deepEqual(answer.agents[0]!.kinds, [
+    { kind: 'change tasks', rung: 'tell', since: arrived, lifted: true, dropped: null },
+    { kind: 'mark tasks done', rung: 'ask', since: at, lifted: false, dropped: { at, why: 'You put it back to asking.' } },
+  ]);
+  const after = value<Standing>(await api.trust(undefined, owner));
+  assert.deepEqual(after.agents[1], before.agents[1], 'another agent is left as it stood');
+  assert.doesNotMatch(JSON.stringify(answer), /t_claude|tasks:/u, 'no grant id and no kind key in the answer');
+
+  /* PRESSING TWICE CHANGES NOTHING: a kind already asking keeps its day. */
+  clock.at = NOW + 2 * HOUR;
+  const count = () => sql.one<{ n: number }>('SELECT (SELECT COUNT(*) FROM event) + (SELECT COUNT(*) FROM pref) AS n')!.n;
+  const held = count();
+  const again = value<Standing>(await api.trustTakeBack({ agent: 'Claude Code', kind: 'mark tasks done' }, inBrowser));
+  assert.deepEqual(again.agents[0]!.kinds, answer.agents[0]!.kinds);
+  assert.equal(count(), held, 'nothing was written');
+
+  /* NO KIND NAMED IS EVERY KIND IT WAS LIFTED ON, and the one already asking keeps its day. */
+  const all = value<Standing>(await api.trustTakeBack({ agent: 'Claude Code' }, inBrowser));
+  const later = new Date(clock.at).toISOString();
+  assert.deepEqual(all.agents[0]!.kinds, [
+    { kind: 'change tasks', rung: 'ask', since: later, lifted: false, dropped: { at: later, why: 'You put it back to asking.' } },
+    { kind: 'mark tasks done', rung: 'ask', since: at, lifted: false, dropped: { at, why: 'You put it back to asking.' } },
+  ]);
+  assert.deepEqual(value<Standing>(await api.trust(undefined, owner)).agents[1], before.agents[1], 'and the other agent still stands where it did');
+  sql.close();
+});
+
+test('ASK AGAIN IS A PERSON\'S PRESS: a token is refused, and so is a colleague, and nothing moves', async () => {
+  const { api, sql } = await record();
+  lift(sql, 'tasks:edit');
+  const rungs = () => sql.all('SELECT agent, kind, rung, since, dropped_at FROM ladder ORDER BY agent, kind');
+  const was = rungs();
+  const token = refusalOf(await api.trustTakeBack({ agent: 'Claude Code', kind: 'change tasks' }, agent()));
+  assert.equal(token.code, 'NEEDS_BROWSER_SESSION', 'an agent never sets a rung, its own or another\'s');
+  assert.match(token.fix, /from the app/u);
+  const colleague = refusalOf(await api.trustTakeBack({ agent: 'Claude Code' }, { principal: { kind: 'person', id: 'p_2', level: 'decide' }, credentialed: true }));
+  assert.equal(colleague.code, 'LEVEL_REQUIRED');
+  assert.equal(refusalOf(await api.trustTakeBack({ agent: 'Claude Code' }, { ...inBrowser, registers: ['tasks'] })).code, 'FORBIDDEN', 'an owner held to some lists');
+  assert.deepEqual(rungs(), was);
+  sql.close();
+});
+
+test('ASK AGAIN NAMES WHAT IT DID NOT FIND, and takes only an agent and a kind', async () => {
+  const { api, sql } = await record();
+  lift(sql, 'tasks:edit');
+  const was = sql.all('SELECT * FROM ladder');
+  const none = refusalOf(await api.trustTakeBack({ agent: 'Windsurf' }, inBrowser));
+  assert.deepEqual([none.code, none.fix], ['VALUE_MALFORMED', 'No agent connected to this record is called Windsurf. Nothing was changed.']);
+  assert.equal(refusalOf(await api.trustTakeBack({ agent: 'Claude Code', kind: 'add projects' }, inBrowser)).code, 'VALUE_MALFORMED');
+  assert.equal(refusalOf(await api.trustTakeBack({ agent: 'An old script' }, inBrowser)).code, 'VALUE_MALFORMED', 'a revoked grant stands nowhere');
+  assert.equal(refusalOf(await api.trustTakeBack({}, inBrowser)).code, 'REQUIRED_MISSING');
+  assert.equal(refusalOf(await api.trustTakeBack({ agent: 'Claude Code', rung: 'ask' } as never, inBrowser)).code, 'FIELD_UNKNOWN');
+  assert.equal(refusalOf(await api.trustTakeBack({ agent: 'Claude Code', kind: 3 }, inBrowser)).code, 'VALUE_MALFORMED');
+  assert.doesNotMatch(none.fix, /—|t_claude/u, 'the sentence names the agent as a person typed it');
+  assert.deepEqual(sql.all('SELECT * FROM ladder'), was);
+  sql.close();
+});
+
+test('THE OFFER USES HIS WORDS: Do and tell, then Keep asking', async () => {
+  const { api, sql } = await record();
+  for (let i = 0; i < 10; i += 1) {
+    value<Asked>(await api.create({ register: 'tasks', fields: { name: `Task ${i}` } }, agent()));
+    value(await api.decide({ id: open(sql).find((q) => q.body_kind === 'rowset')!.id, decide: { option: 'accept', reason: 'fine' } }, owner));
+  }
+  const offer = sql.one<{ body: string }>("SELECT body FROM suggestion WHERE opened_by = 'rule:ladder' AND status = 'open'")!;
+  const labels = (JSON.parse(offer.body) as { options: { label: string }[] }).options.map((o) => o.label);
+  assert.deepEqual(labels, ['Do and tell', 'Keep asking']);
+  sql.close();
+});

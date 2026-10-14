@@ -15,6 +15,7 @@
  * does not exist, so `owed` is handed in empty and every `owed` reads 0 until it does.
  */
 
+import { slashBrake } from '@braindog/kernel';
 import type { Result } from '@braindog/ports';
 
 import type { CallContext } from '../index.ts';
@@ -45,7 +46,7 @@ export function methods(deps: RecordDeps) {
       if (read === undefined) return { ok: true, value: null };
       const now = clock.now();
       const { calls, mentions, questions } = await read(new Date(now - MONTH_DAYS * DAY).toISOString());
-      return { ok: true, value: engineReadings({ now, calls, owed: [], mentions, questions }) };
+      return { ok: true, value: engineReadings({ now, calls, owed: [], mentions, questions, braked: slashBrake(deps.sql) }) };
     },
   };
 }

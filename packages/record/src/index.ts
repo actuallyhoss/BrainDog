@@ -210,7 +210,7 @@ import { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, 
 import type { Directory } from './directory.ts';
 import { methods, type RecordDeps as MethodDeps } from './methods/index.ts';
 import { staleCount, staleFor as staleLines } from './methods/stale.ts';
-import { learnedOrder, learnedSorted } from './methods/learnings.ts';
+import { learnedOrder, learnedSorted, replacedIn, replacesField } from './methods/learnings.ts';
 import { briefFactsFor } from './methods/briefing.ts';
 import { briefTick } from './brief-write.ts';
 import type { EngineHealthRead } from './methods/engine.ts';
@@ -222,7 +222,8 @@ import { landRetype } from './methods/retype.ts';
 import { rerank } from './rerank.ts';
 import { aboutOf, ladder, type Caller, type Gate } from './ladder.ts';
 import { OLDER, card as cardOf } from './card.ts';
-import { BRIEF_ROWS, capRegister, peopleHere, projectWaiting, rulesOf, type Placed } from './context-caps.ts';
+import { BRIEF_ROWS, capRegister, DECIDED, decidedHere, peopleHere, projectWaiting, rulesOf, type Decision, type Placed } from './context-caps.ts';
+import { choiceOf } from './decided.ts';
 import { alsoHere, nextLines, runName, sameTree, type AlsoHere, type LastHere, type LeftStep, type TreeRun } from './same-tree.ts';
 import { byWhoOf, passesOf, passFolder, passKept, type ByWho, type UpdatePass } from './update-pass.ts';
 import { docValues } from './row-values.ts';
@@ -241,7 +242,7 @@ export type { PenItem } from './emergent.ts';
 /* THE ENGINE'S READINGS, THE ARITHMETIC ALONE (engine-readings-59): what was asked, answered, kept and refused, the
    mentions not attached and the open questions by cause, from rows a caller hands in. No method reads them yet. */
 export type { EngineLedger, EngineLedgerRead } from './methods/engine-readings.ts';
-export { engineReadings, OTHER as READINGS_OTHER, UNSAID as READINGS_UNSAID, type EngineReadings, type AskReading, type LedgerCall, type OwedRead, type ReadingsOf } from './engine-readings.ts';
+export { engineReadings, OTHER as READINGS_OTHER, UNSAID as READINGS_UNSAID, type EngineReadings, type Braked, type AskReading, type LedgerCall, type OwedRead, type ReadingsOf } from './engine-readings.ts';
 export { PREVIEW_DECLARATIONS_MOST, PREVIEW_SAMPLE_ROWS_A_LIST, PREVIEW_SAMPLE_ROWS_MOST, type ChangePreviewed, type PreviewChangeArgs, type PreviewedPage } from './preview-change.ts';
 export { SAMPLE_ROWS_MOST, SLASH_REPAIRS_MOST, type DescribedDraft, type SlashDecl, type SlashDrafted, type SlashPreview, type SlashPreviewedPage, type SlashPreviewer, type SlashRows } from './slash.ts';
 export { SKILL_DRAFTS_A_DAY, skillBearings, skillDraftOf, type SkillBearing, type SkillDraftInput } from './slash.ts';
@@ -1507,6 +1508,11 @@ export type Context = {
   waiting: { id: string; question: string }[];
   /** How many of every open question the caller may see are this project's: a row it is about is placed here, or the run that asked was. */
   waiting_here?: number;
+  /**
+   * The last three questions a person decided for this project, newest first, each as "Decided 2 Oct: <the choice>"
+   * (`decidedHere`, AGT-B09), so an agent opening a session here is told what was already answered and asks it no more.
+   */
+  decided?: string[];
   /** Up to three learnings of kind `rule`, this project's first, read from every learning and not only the five sent, and how many more. */
   rules?: { rows: Brief[]; more: number };
   /**
@@ -6012,17 +6018,6 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const placedWaiting = (ctx: CallContext): ({ id: string; question: string } & Placed)[] => {
     const rows = kernel.openSuggestions();
     if (!rows.ok) return [];
-    const placeOf = (ref: unknown): string | null => {
-      if (typeof ref !== 'string' || ref === '') return null;
-      const row = kernel.get(ref);
-      if (!row) return null;
-      const decl = kernel.register(row.register);
-      if (decl?.scopes !== undefined) return kernel.nameOf(row.id);
-      if (row.register === SESSION) return text(row.fields.project);
-      const f = decl?.fields.find((x) => x.scope !== undefined && !x.retired);
-      const v = f === undefined ? undefined : row.fields[f.id];
-      return typeof v === 'string' && v !== '' ? kernel.nameOf(v) : null;
-    };
     return rows.value
       .filter((row) => !holds(ctx, row))
       .flatMap((row) => {
@@ -6030,10 +6025,69 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         if (id === null) return [];
         const raw = row.body;
         const body = (typeof raw === 'string' ? (() => { try { return JSON.parse(raw) as unknown; } catch { return null; } })() : raw) as Record<string, unknown> | null;
-        const named = [body?.about, body?.at, body?.target, ...(Array.isArray(body?.rows) ? (body.rows as unknown[]).map((r) => (r !== null && typeof r === 'object' ? (r as { at?: unknown }).at : undefined)) : [])];
-        const projects = [...new Set(named.map(placeOf).filter((p): p is string => p !== null))];
-        return [{ id, question: kernel.question(String(row.id)) ?? '', project: placeOf(row.opened_by), projects }];
+        return [{ id, question: kernel.question(String(row.id)) ?? '', ...placedBy(row.opened_by, body) }];
       });
+  };
+
+  /** The project a run, a project row, or a row with a scope field is placed in, by its handle, or `null`. */
+  const placeOf = (ref: unknown): string | null => {
+    if (typeof ref !== 'string' || ref === '') return null;
+    const row = kernel.get(ref);
+    if (!row) return null;
+    const decl = kernel.register(row.register);
+    if (decl?.scopes !== undefined) return kernel.nameOf(row.id);
+    if (row.register === SESSION) return text(row.fields.project);
+    const f = decl?.fields.find((x) => x.scope !== undefined && !x.retired);
+    const v = f === undefined ? undefined : row.fields[f.id];
+    return typeof v === 'string' && v !== '' ? kernel.nameOf(v) : null;
+  };
+
+  /** Where a question stands (`Placed`): the run that asked it, and the rows its body names (`about`, `at`, `target`, `rows[].at`). */
+  const placedBy = (openedBy: unknown, body: Record<string, unknown> | null): Placed => {
+    const named = [body?.about, body?.at, body?.target, ...(Array.isArray(body?.rows) ? (body.rows as unknown[]).map((r) => (r !== null && typeof r === 'object' ? (r as { at?: unknown }).at : undefined)) : [])];
+    return { project: placeOf(openedBy), projects: [...new Set(named.map(placeOf).filter((p): p is string => p !== null))] };
+  };
+
+  /** The most closed questions `placedDecided` reads, newest first, before it places them. */
+  const DECIDED_READ = 200;
+
+  /**
+   * The questions a person decided, newest first, each with what was chosen (`choiceOf`) and placed as `placedWaiting`
+   * places an open one, so `decidedHere` says this project's last three (AGT-B09). Held as `waitingFor` holds them.
+   *
+   * A PERSON'S ANSWER ONLY, as the kernel remembers one (`remembered` in `govern.ts`): the newest close of each question,
+   * and not one a rule made when its run ended, nor Slash's, nor the asker taking back its own. ONE BOUND QUERY: the
+   * ways of closing go as one JSON list, so nothing here grows the bound values with the record.
+   */
+  const placedDecided = (ctx: CallContext): Decision[] => {
+    const rows = sql.all<{ id: string; body_kind: string; body: string | null; opened_by: string; opened_at: string; resolved_as: string | null; asked: string | null; ts: string; decided: string | null }>(
+      `SELECT s.id AS id, s.body_kind AS body_kind, s.body AS body, s.opened_by AS opened_by, s.opened_at AS opened_at, s.resolved_as AS resolved_as,
+              (SELECT coalesce(q.to_v, q.note) FROM event q WHERE q.kind = 'suggest' AND q.target = r.target ORDER BY q.rowid LIMIT 1) AS asked,
+              r.ts AS ts,
+              (SELECT d.to_v FROM event d WHERE r.batch IS NOT NULL AND d.batch = r.batch AND d.kind = 'decide' ORDER BY d.rowid DESC LIMIT 1) AS decided
+         FROM suggestion s
+         JOIN event r ON r.rowid = (SELECT max(e.rowid) FROM event e WHERE e.target = 'suggestion:' || s.id AND e.kind = 'resolve')
+        WHERE s.status <> 'open' AND s.resolved_as IN (SELECT value FROM json_each(?))
+          AND r.actor NOT LIKE 'rule:%' AND r.actor <> ? AND r.actor <> s.opened_by
+        ORDER BY r.ts DESC, r.rowid DESC
+        LIMIT ?`,
+      JSON.stringify(['addressed', 'wont-fix', 'incorrect']),
+      SLASH,
+      DECIDED_READ,
+    );
+    const parsed = (raw: string | null): unknown => {
+      try {
+        return raw === null ? null : (JSON.parse(raw) as unknown);
+      } catch {
+        return null;
+      }
+    };
+    return rows.flatMap((row) => {
+      const body = parsed(row.body) as Record<string, unknown> | null;
+      if (holds(ctx, { ...row, body })) return [];
+      const choice = choiceOf(row.asked ?? '', { resolved_as: row.resolved_as, body, decided: parsed(row.decided) as { answer?: unknown; rows?: unknown } | null });
+      return choice === null ? [] : [{ choice, decided_at: row.ts, ...placedBy(row.opened_by, body) }];
+    });
   };
 
   /**
@@ -7660,10 +7714,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const fades = decl.fields.some((field) => field.id === FADES && field.type === 'day' && !field.retired);
       const got = kernel.inScope(id, home?.id ?? null, { limit: SCOPE_READ, open: true });
       if (!got.ok) continue;
+      /* WHAT A LEARNING THAT STANDS REPLACES IS NOT HANDED (`replacedIn`), exactly as the `learnings` read leaves it out. */
+      const replaced = fades ? replacedIn([...got.value.rows, ...got.value.inherited], replacesField(id, decl.fields as never)) : new Set<string>();
       const fresh = (rows: Entry[]): Entry[] => {
         if (!fades) return rows;
-        const kept = rows.filter((row) => String(row.fields[FADES] ?? row.created_at.slice(0, 10)) >= cutoff);
-        faded += rows.length - kept.length;
+        const standing = rows.filter((row) => !replaced.has(row.id));
+        const kept = standing.filter((row) => String(row.fields[FADES] ?? row.created_at.slice(0, 10)) >= cutoff);
+        faded += standing.length - kept.length;
         return kept;
       };
       /* WHAT FADES IS HANDED IN THE ORDER `learnings` READS IT (`learnedSorted`): the kind the list declares first, then
@@ -7756,6 +7813,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       next_lines,
       waiting: asked.waiting.map(({ id, question }) => ({ id, question })),
       waiting_here: asked.here,
+      /* WHAT HE ALREADY ANSWERED HERE (AGT-B09), so nobody asks him again. */
+      decided: decidedHere(placedDecided(ctx), project?.spoken ?? null, DECIDED, kernel.identity()?.tz ?? 'UTC'),
       registers,
       rules: rulesOf(learned, project?.spoken ?? null),
       /* IN TOUCH LATEST FIRST, and the kernel's newest-changed order among people with the same day or none: five in the
@@ -7791,7 +7850,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * the first call, so `context` counts what went stale through the same guards the read `stale` answers through.
    */
   let methodsHanded: MethodDeps | null = null;
-  const methodDeps = (): MethodDeps => (methodsHanded ??= { kernel, sql, guard, scoped, readable, sightOf, admin, vault, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), ...(deps.engineLedger === undefined ? {} : { engineLedger: deps.engineLedger }), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom, createDoor: (ctx, register, fields) => { const stop = mergeShaped(ctx, register, fields, null) ?? keyHeld(ctx, register, fields, null); return stop ? { refusal: stop } : { fields: huedOf(register, fields) }; }, withheld: drawnWithheld });
+  const methodDeps = (): MethodDeps => (methodsHanded ??= { kernel, sql, guard, scoped, readable, sightOf, admin, vault, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), ...(deps.engineLedger === undefined ? {} : { engineLedger: deps.engineLedger }), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom, untrusted: (ctx, where) => { const reader = callerOf(ctx); if (reader !== null) trust.markUntrusted(reader, where); }, createDoor: (ctx, register, fields) => { const stop = mergeShaped(ctx, register, fields, null) ?? keyHeld(ctx, register, fields, null); return stop ? { refusal: stop } : { fields: huedOf(register, fields) }; }, withheld: drawnWithheld });
 
   /**
    * The stale count `context` carries: the lines the read `stale` would answer this caller at this moment, added up

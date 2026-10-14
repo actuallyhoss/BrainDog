@@ -52,7 +52,15 @@ export type Proposed = {
   change?: Row;
   /** A `pattern`'s address in the builder, with its samples and its rule, for "Open in the builder". */
   builder?: string;
+  /**
+   * A `pattern`'s ingest and the arrivals it was drawn from, so the screen can read each one as the rule would
+   * (`pattern-reads.ts`) and a yes is a yes to something seen. Only an ingest carries it, as only an ingest opens the builder.
+   */
+  pattern?: PatternAsked;
 };
+
+/** What a pattern question is read with: the ingest it holds, bare or declared, and its samples' ids. */
+export type PatternAsked = { ingest: Row; samples: string[] };
 
 const isRow = (v: unknown): v is Row => typeof v === 'object' && v !== null && !Array.isArray(v);
 const text = (v: unknown): string => (typeof v === 'string' ? v : typeof v === 'number' ? String(v) : '');
@@ -264,7 +272,12 @@ export function proposedOf(kind: string, body: Row): Proposed | null {
     const samples = Array.isArray(body.samples) ? body.samples.filter((s): s is string => typeof s === 'string') : [];
     const opens = isRow(held) && (held.kind === undefined || held.kind === 'ingest');
     return rule
-      ? { appears: [rule], samples: Array.isArray(body.samples) ? body.samples.length : null, ...(opens ? { builder: builderPath(samples, held) } : {}) }
+      ? {
+          appears: [rule],
+          samples: Array.isArray(body.samples) ? body.samples.length : null,
+          ...(opens ? { builder: builderPath(samples, held) } : {}),
+          ...(opens && isRow(held) && samples.length ? { pattern: { ingest: held, samples } } : {}),
+        }
       : null;
   }
   if (kind !== 'change') return null;

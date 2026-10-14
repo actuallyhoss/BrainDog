@@ -51,7 +51,39 @@ export type Change =
 export type Take = { title: string; why: string | null };
 export type Takes = { said: Take[]; closed: number };
 
-export type Updated = { at: string; title: string; changes: Change[]; takes?: Takes };
+/**
+ * `why` IS THE ROW'S OWN REASON, from the question's `why` (a scope question's "used by 3 runs in Kiln."), with the
+ * title the record led it with cut, since the title is drawn beside it. A row the question gives no reason has none.
+ */
+export type Updated = { at: string; title: string; changes: Change[]; takes?: Takes; why?: string };
+
+/** In the queue's card only the first row's reason is drawn, and the rest are this count. */
+export const moreReasons = (n: number): string => (n === 1 ? 'and one more reason' : `and ${String(n)} more reasons`);
+
+type Reason = { text: string; at: string };
+
+/**
+ * THE REASON A QUESTION FILED BESIDE ONE ROW: the ones whose `at` is the row's `at` as the proposal names it, else the
+ * row's internal id, else (a spoken name no other row of the proposal claims) the number it ends in. Joined when the
+ * record filed two, as a joined question may. The leading "<title>: " is cut; the full stop stays.
+ */
+function reasonFor(why: readonly Reason[] | undefined, at: string, row: Row, ats: ReadonlySet<string>, title: string): string | undefined {
+  if (!why || why.length === 0) return undefined;
+  const mine = (w: Reason): boolean =>
+    w.at === at ||
+    (row.id !== undefined && w.at === row.id) ||
+    (!ats.has(w.at) && !ROW_ID.test(w.at) && !ROW_ID.test(at) && row.seq !== null && row.seq === Number(/#(\d+)$/u.exec(w.at)?.[1]) && sameList(w.at, at));
+  const lead = `${title}: `;
+  const said = why
+    .filter(mine)
+    .map((w) => w.text.trim())
+    .map((t) => (t.startsWith(lead) && t.length > lead.length ? t.slice(lead.length).trimStart() : t))
+    .filter((t) => t !== '');
+  return said.length > 0 ? said.join(' ') : undefined;
+}
+
+/** Whether two spoken names are of one list (`keys#4`, `keys#12`), so a number is never matched across lists. */
+const sameList = (a: string, b: string): boolean => a.replace(/#\d+$/u, '') === b.replace(/#\d+$/u, '');
 
 type Field = { id: string; type: string; label?: string; to?: string; of?: string; scope?: unknown; retired?: boolean; required?: boolean };
 type Decl = { title?: string; fields: readonly Field[] };
@@ -153,13 +185,14 @@ function taken(target: Decl, pool: readonly Row[], before: unknown, after: unkno
  * field whose value would not move, draw nothing.
  */
 export function updatesOf(
-  body: { register: string; rows: readonly Record<string, unknown>[] } | undefined,
+  body: { register: string; rows: readonly Record<string, unknown>[]; why?: readonly Reason[] } | undefined,
   registers: Readonly<Record<string, Decl | undefined>>,
   rows: Readonly<Record<string, readonly Row[] | undefined>>,
   show: (register: string, field: string, value: unknown) => string | null,
 ): Updated[] {
   if (!body) return [];
   const out: Updated[] = [];
+  const ats = new Set(body.rows.flatMap((r) => (typeof r.at === 'string' ? [r.at] : [])));
   for (const r of body.rows) {
     if (typeof r.at !== 'string' || typeof r.patch !== 'object' || r.patch === null) continue;
     /* A ROW MAY NAME ITS OWN LIST, when a fold moves a link another list holds, and is read in that list. */
@@ -200,7 +233,15 @@ export function updatesOf(
     const why = changes.some((c) => c.long) && takes.said.length + takes.closed > 0;
     const title = decl?.title ? row.fields[decl.title] : undefined;
     /* NEVER THE HANDLE (`projects#1`) IN ITS PLACE: a row with no title is said as one. */
-    out.push({ at: r.at, title: typeof title === 'string' && title !== '' ? title : words.untitled, changes: why ? changes.filter((c) => !told.has(c.field)) : changes, ...(why ? { takes } : {}) });
+    const named = typeof title === 'string' && title !== '' ? title : words.untitled;
+    const reason = reasonFor(body.why, r.at, row, ats, typeof title === 'string' ? title.trim() : named);
+    out.push({
+      at: r.at,
+      title: named,
+      changes: why ? changes.filter((c) => !told.has(c.field)) : changes,
+      ...(why ? { takes } : {}),
+      ...(reason !== undefined ? { why: reason } : {}),
+    });
   }
   return out;
 }

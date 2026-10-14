@@ -34,6 +34,29 @@ test('the press asks the record once and opens the question it answers on Decide
   assert.deepEqual(out, { ok: true, href: `/decide/${encodeURIComponent('01JQ ASK/1')}` });
 });
 
+test('the picked are passed through by their numbers, so only what they are here twice with is asked about', async () => {
+  const calls: unknown[][] = [];
+  const call = async (name: string, args: Record<string, unknown>): Promise<Called> => {
+    calls.push([name, args]);
+    return { ok: true, value: { question: '01JQ PICKED' } };
+  };
+  const out = await foldAsk(call, 'skills', [3, 7]);
+  assert.deepEqual(calls, [['askFoldTwice', { register: 'skills', rows: [3, 7] }]]);
+  assert.deepEqual(out, { ok: true, href: `/decide/${encodeURIComponent('01JQ PICKED')}` });
+  /* None of them held twice is the record's sentence, and the bar keeps its button. */
+  const refusal = { code: 'VALUE_MALFORMED', fix: 'None of the skills picked is here twice, so nothing was asked.' };
+  assert.deepEqual(await foldAsk(async () => ({ ok: false, refusal }), 'skills', [4, 5]), { ok: false, said: refusal.fix, gone: false });
+});
+
+test('the bar folds the picked of a `same:` list through this file, with the shared button and the fold icon', () => {
+  const bar = readFileSync(new URL('./parts/BulkBar.svelte', import.meta.url), 'utf8');
+  assert.match(bar, /import \{ foldAsk, sameOf \} from '\.\.\/twice-fold\.ts'/);
+  assert.match(bar, /sameOf\(decl\) !== null/, 'the button is not on a list that says what makes two the same');
+  assert.match(bar, /foldAsk\(\(name, args\) => createClient\(\{ base: apiBase\(\) \}\)\.call\(name, args\), id, picked\.map\(\(r\) => r\.seq\)\)/);
+  assert.match(bar, /goto\(at\(asked\.href\)\)/, 'the press does not open the question on Decide');
+  assert.match(bar, /<Button weight="quiet" disabled=\{folding\} onclick=\{\(\) => void fold\(\)\}>\s*<Icon name="link" size="s" \/>\{words\.foldMany\}/);
+});
+
 test("a refusal is handed back in the record's own words, and the button stays", async () => {
   const refusal = { code: 'FORBIDDEN', fix: 'Only a person can fold these. Ask the owner.' };
   const out = await foldAsk(async () => ({ ok: false, refusal }), 'skills');

@@ -16,9 +16,13 @@ export const HISTORY: Record<string, unknown>[] = [
      what goes out in a month beside the chart under, which draws the same month among its twelve; a person read
      monthly spending three times. What each category takes is on the categories' own list. */
   {
-    /* MONTH BY MONTH: what moved in and out in the twelve months to now, read from `transactions`, and what is due in
+    /* MONTH BY MONTH: what moved in and out in the six months to now, read from `transactions`, and what is due in
        the three after, with what was left each month as a line. The current month is so far, and the months ahead
-       are what is due once plus what repeats at its monthly share, in every one of them. */
+       are what is due once plus what repeats at its monthly share, in every one of them.
+
+       SIX BACK, SINCE REC-B23 (the Money board: "six months back and three ahead"), where it read twelve: half a year
+       is what a person plans the next three months by, and nine bars read as one picture where fifteen read as a
+       ledger ("i dont want a very 'busy' looking ui"). A book's page draws its own twelve (`book.ts`). */
     kind: 'series',
     heading: 'In and out, by month',
     icon: 'chart-column',
@@ -27,7 +31,7 @@ export const HISTORY: Record<string, unknown>[] = [
       { metric: 'in-by-month', then: 'in-due-by-month', each: 'every-month-in', label: 'Money in' },
       { metric: 'out-by-month', then: 'out-due-by-month', each: 'every-month-out', label: 'Money out', dir: 'out' },
     ],
-    back: 12,
+    back: 6,
     ahead: 3,
     net: true,
     when: { metric: 'out-by-month', gt: 0 },

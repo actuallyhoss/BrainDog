@@ -7,7 +7,8 @@
  * purpose: `bridgeRows` in `blocks.ts` carries the measurements, both of what the renderer does when
  * the minus is taken off and of why a tile stating an amount must not have one. Since money-core
  * 3.0.0 the tile is `Going out, 30 days`, read from the bridge's own walk, so the pair is one sum; since 3.3.0 the
- * page draws only the bridge, and the figure is read directly.
+ * page draws only the bridge, and the figure is read directly. Since 3.17.0 Money draws no bridge at all, so the bridge
+ * below is one made over the legs Cash ahead walks, which a book's page still draws.
  *
  * WHAT THIS FILE ADDS IS THE PAIR, because a sign that is right on its own terms in two places can
  * still drift into two answers, which is what 491e7e05 measured on these very blocks. So the two
@@ -38,7 +39,7 @@ import { bridgePlan, moveOf, signedOf, type Row } from 'braindog-render';
 import { openRecord, type Declaration } from '@braindog/kernel';
 import './fixtures/fill.ts';
 import { REGISTERS } from './api.ts';
-import { metric, page } from './fixtures/readers.ts';
+import { metric, pages, readBlock } from './fixtures/readers.ts';
 import { blockOf as liveBlockOf } from './page-live.ts';
 import { draw, sectionWell, toSegments } from './blocks.ts';
 import { copy } from '../copy.ts';
@@ -47,17 +48,22 @@ import { copy } from '../copy.ts';
 const drawnRows = (block: Parameters<typeof toSegments>[0]): Row[] =>
   toSegments(block).flatMap((seg) => ('rows' in seg ? seg.rows : []));
 
-const blockOf = (slug: string, kind: string, source?: string) => {
-  const block = page(slug)?.blocks.find((b) => b.kind === kind && (source === undefined || b.source === source));
-  assert.ok(block, `/p/${slug} draws no ${kind}, so this test is about a block that is gone`);
-  return block;
-};
-
 /** A figure as a reader sees it, sign and all: `signedOf` reads `GBP −42,741.00` back as a number. */
 const figure = (row: Row | undefined): number => signedOf(row?.cells[1] ?? '');
 
+/**
+ * THE BRIDGE MONEY DREW UNTIL money-core 3.17.0, MADE FOR THE TEST: Coming and going opens on the calendar since
+ * REC-B23, and a book's page, which still draws one, has no book in the sample. Its legs are the ones Cash ahead walks
+ * on the Money page, read off that page's own declaration, over the thirty days `leaving-30d` and `arriving-30d` walk.
+ */
+const moneyBridge = () => {
+  const ahead = pages()['money']?.blocks.find((b) => b.kind === 'forecast' && b.source === 'forecast.runway') as { from?: unknown } | undefined;
+  assert.ok(ahead?.from, '/p/money draws no Cash ahead, so this test has no legs to walk');
+  return readBlock({ kind: 'bridge', span: 12, source: 'forecast.runway', opening: { metric: 'cash-now' }, from: ahead.from, horizon: 30 } as never);
+};
+
 test('THE BRIDGE’S OUT ROW AND THE `Going out, 30 days` TILE ARE ONE MONEY IN TWO READINGS, and neither may take the other’s sign', () => {
-  const bridge = blockOf('money', 'bridge', 'forecast.runway');
+  const bridge = moneyBridge();
   const rows = drawnRows(bridge);
   assert.deepEqual(
     rows.map((r) => r.cells[0]),

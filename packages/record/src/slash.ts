@@ -21,7 +21,7 @@
  * evidence where presence is being recorded (a page nobody opens counts only on a record where other pages are opened).
  */
 
-import { pageSpokenFor, signatureOf } from './emergent.ts';
+import { PEN_USE_DAYS, PEN_YOUNG_DAYS, pageSpokenFor, signatureOf, usedOf, youngOf, type Used } from './emergent.ts';
 import { GROWS, NAMED_PAGE, recommend, type DrawnPage } from './design-agent.ts';
 import type { FigureTest, Grows } from './arrange.ts';
 import { subjectOf } from './automations.ts';
@@ -40,8 +40,8 @@ const DAY_MS = 86_400_000;
 const AGENTS = { writes: 10, days: 3 };
 /** Ninety days of silence, from the same rule of three `observe.ts` uses for a dormant declaration. */
 const QUIET_DAYS = 90;
-/** A record younger than this is watched and not advised: a fortnight of use is not a habit (`observe.ts` governors). */
-const YOUNG_DAYS = 14;
+/** A record used for fewer days than this is watched and not advised: a fortnight of use is not a habit (ENG-B17). */
+const YOUNG_DAYS = PEN_YOUNG_DAYS;
 /** Another use case's lists take this many times the speaking one's new rows, and at least `VOICE.rows`, before the voice is questioned. */
 const VOICE = { ratio: 3, rows: 10 };
 /** A page opened this many times, on this many separate days, in thirty days names what it shows in the person's own word. */
@@ -207,6 +207,12 @@ export type Usage = {
    * record brought in today holding a payment from March is months old, and its log is not. Absent, `ageDays` is.
    */
   loggedDays?: number;
+  /**
+   * A person's own use: the first time a person wrote to the record and the different days one did (`usedOf`), never
+   * an agent's, an import's or the system's. The young rule reads it, so a record brought in with a year of rows is as
+   * young as its owner's use (HD.410). Absent, as on a reading made by hand, `firstWrite` and `ageDays` are.
+   */
+  used?: Used;
   /** Whether pages being opened and lists being read are recorded at all here, in ninety days (two subjects on three days). */
   listening: { pages: boolean; lists: boolean };
   lists: ListUse[];
@@ -548,6 +554,7 @@ export function readUsage(
     firstWrite,
     ageDays,
     loggedDays,
+    used: usedOf(sql),
     listening: { pages: alive('page.render'), lists: alive('register.read') },
     lists,
     pages,
@@ -1112,17 +1119,40 @@ function noticeWhole(usage: Usage, offered: readonly Offered[]): { noticed: Noti
 
   /* A YOUNG RECORD IS WATCHED, NOT ADVISED. What was noticed is still said; nothing is proposed yet, BUT THE SKILLS AN
      ADD-ON SHIPS, which are the add-on's own and no advice about how the record is used, so a record with agents on is
-     offered them the first night. */
-  if (usage.firstWrite === null || usage.ageDays < YOUNG_DAYS)
-    return {
-      noticed,
-      drafts: keyed(shipped),
-      quiet:
-        usage.firstWrite === null
-          ? 'Nothing has been added yet, so there is nothing to go on.'
-          : `${usage.ageDays < 1 ? 'This BrainDog started today' : usage.ageDays === 1 ? 'This BrainDog started yesterday' : `This BrainDog is ${plural(usage.ageDays, 'day')} old`}. Slash waits for two weeks of use before it suggests changes.`,
-    };
+     offered them the first night. Young is read from a person's own use (`youngSaid`), never the oldest row. */
+  const young = youngSaid(usage);
+  if (young !== null) return { noticed, drafts: keyed(shipped), quiet: young };
   return { noticed, drafts: keyed(drafts), quiet: null };
+}
+
+/**
+ * What the Slash page says while the record is too young to be advised, or `null` once it is not. FROM A PERSON'S OWN
+ * USE (HD.410: "a fortnight of use is not a habit"): fewer than two weeks since a person first wrote to it, or writes
+ * on fewer than five different days, and the sentence says which. A record brought in today with a year of rows has
+ * none, and an agent's writes are never a person's. A reading made by hand without `used` is judged by its age.
+ */
+export function youngSaid(usage: Pick<Usage, 'at' | 'firstWrite' | 'ageDays' | 'used'>): string | null {
+  const byAge = (): string | null => {
+    if (usage.firstWrite === null) return 'Nothing has been added yet, so there is nothing to go on.';
+    if (usage.ageDays >= YOUNG_DAYS) return null;
+    const age = usage.ageDays < 1 ? 'This BrainDog started today' : usage.ageDays === 1 ? 'This BrainDog started yesterday' : `This BrainDog is ${plural(usage.ageDays, 'day')} old`;
+    return `${age}. Slash waits for two weeks of use before it suggests changes.`;
+  };
+  const { used } = usage;
+  if (used === undefined) return byAge();
+  const nowMs = Date.parse(usage.at);
+  const which = youngOf(used, nowMs);
+  /* A record whose oldest row is younger than two weeks has no older use either; a reading that says so is believed. */
+  if (which === null) return byAge();
+  if (which === 'none')
+    return usage.firstWrite === null
+      ? 'Nothing has been added yet, so there is nothing to go on.'
+      : 'Slash waits for two weeks of your own use. Nobody has added or changed anything here by hand yet.';
+  if (which === 'days')
+    return `Slash waits for your own use on ${PEN_USE_DAYS} different days. You have used BrainDog on ${plural(used.days, 'day')}.`;
+  const age = Math.max(0, Math.floor((nowMs - Date.parse(used.first!)) / DAY_MS));
+  const when = age < 1 ? 'today' : age === 1 ? 'yesterday' : `${plural(age, 'day')} ago`;
+  return `Slash waits for two weeks of your own use. ${used.days <= 1 ? `You started using BrainDog ${when}.` : `You have used BrainDog on ${plural(used.days, 'day')} since you started ${when}.`}`;
 }
 
 /**

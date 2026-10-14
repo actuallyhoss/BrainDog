@@ -254,4 +254,5 @@ export type ModelJobInference = {
    */
   resolve?: ModelJobUnderstand['resolve'];
   mentions?: ModelJobUnderstand['mentions'];
+  about?: ModelJobUnderstand['about'];
 };

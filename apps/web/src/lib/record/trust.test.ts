@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import type { TrustStanding } from '@braindog/client';
-import { readTrust, trustLines, words } from './trust.ts';
+import { readTrust, takeBack, trustLines, words } from './trust.ts';
 
 /* Noon UTC, so the day reads the same in any zone a test runs in. */
 const NOW = Date.parse('2026-10-13T12:00:00Z');
@@ -87,4 +87,48 @@ test('the owner is answered, and no agent connected reads as an empty ladder', a
   assert.deepEqual(await readTrust({ trust: async () => ({ ok: true as const, value }) }), value);
   assert.deepEqual(trustLines({ agents: [] }, NOW), []);
   assert.match(words.empty, /^[^.]+\.$/u);
+});
+
+test('the owner\'s way down and what never climbs, in his words', () => {
+  assert.equal(words.askAgain, 'Ask again');
+  assert.equal(words.asksFirst, 'Asks first: everything else this agent does.');
+  assert.equal(words.alwaysAsks, 'Always asks: amounts of money, keys, sharing, and deleting.');
+});
+
+test('a kind done on its own carries Ask again with the agent and kind as the record said them, and one that asks carries none', () => {
+  const lines = trustLines(
+    {
+      agents: [
+        agent('Claude Code', [kind('add tasks', 'quiet', '2026-10-03'), kind('change projects', 'ask', '2026-10-01'), kind('tag tasks', 'tell', '2026-10-04')], '2026-09-20'),
+        agent('Claude Code 2', [kind('add tasks', 'tell', '2026-10-06')], '2026-10-06'),
+        agent('Codex', []),
+      ],
+    },
+    NOW,
+  );
+  assert.deepEqual(
+    lines.map((l) => l.take),
+    [
+      { agent: 'Claude Code', kind: 'add tasks' },
+      null,
+      { agent: 'Claude Code', kind: 'tag tasks' },
+      /* THE NAME THE RECORD GAVE, never the line's own "connected 6 Oct", which is for a person to read. */
+      { agent: 'Claude Code 2', kind: 'add tasks' },
+      null,
+    ],
+  );
+});
+
+test('Ask again sends the agent and the kind to trustTakeBack, and says the record\'s sentence when it is refused', async () => {
+  const heard: [string, Record<string, unknown>][] = [];
+  const done = await takeBack({ call: async (name, args) => (heard.push([name, args]), { ok: true, value: { agents: [] } }) }, { agent: 'Cursor', kind: 'add tasks' });
+  assert.deepEqual(done, { ok: true });
+  assert.deepEqual(heard, [['trustTakeBack', { agent: 'Cursor', kind: 'add tasks' }]]);
+
+  const fix = 'Open this from the app; a token cannot put an agent back to asking.';
+  assert.deepEqual(await takeBack({ call: async () => ({ ok: false, refusal: { code: 'NEEDS_BROWSER_SESSION', fix } }) }, { agent: 'Cursor', kind: 'add tasks' }), { ok: false, fix });
+  const lost = await takeBack({ call: async () => { throw new Error('offline'); } }, { agent: 'Cursor', kind: 'add tasks' });
+  assert.equal(lost.ok, false);
+  assert.match(lost.ok ? '' : lost.fix, /Nothing was changed\.$/u, 'a press that never landed says nothing moved');
+  assert.doesNotMatch(lost.ok ? '' : lost.fix, /—/u);
 });

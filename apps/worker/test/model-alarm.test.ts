@@ -134,6 +134,14 @@ async function pressing(t: TestContext) {
     (await (await c.ask(`/api/${method}`, { method: 'POST', cookie, body: JSON.stringify(body) })).json()) as { ok: boolean };
   assert.ok((await post('setDeclaration', { body: { register: 'notes', name: 'notes', title: 'what', fields: [{ id: 'what', type: 'text', required: true }] } }, early)).ok);
   assert.ok((await post('create', { register: 'notes', fields: { what: PROMPT } }, early)).ok);
+  /* THE OWNER'S OWN USE ON FIVE DAYS, so Slash asks its model of a record past its fortnight (HD.410). */
+  for (const day of [3, 5, 7, 9]) {
+    t.mock.timers.setTime(T0 + day * DAY);
+    const kept = await post('create', { register: 'notes', fields: { what: `Kept on day ${day}` } }, await c.signIn(OWNER));
+    assert.ok(kept.ok, JSON.stringify(kept));
+    /* AND THE YOUNG RECORD'S LOOK THAT WRITE WOKE IS LET FINISH, or it would read the clock moved on below. */
+    await c.settle();
+  }
   t.mock.timers.setTime(T0 + 20 * DAY);
   const cookie = await c.signIn(OWNER);
   return { ai, sent, kv, press: () => post('slashPropose', {}, cookie) };

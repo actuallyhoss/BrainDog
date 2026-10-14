@@ -14,6 +14,10 @@
  * write would learn which agents the owner connected and how far each is trusted, which is the owner's own business
  * and nobody else's to change. So the caller is the owner in person, or a grant the owner made for themselves, held to
  * no part of the record. Everyone else is refused in one sentence, as `signs` refuses a caller held to part of it.
+ *
+ * AND ONE WRITE, THE OWNER'S PRESS: `trustTakeBack` puts an agent back to asking on a kind it was lifted on, or on all
+ * of them ("undo", D37.167). ADMIN, as `slashReads` is: a person in a browser, never a token, since an agent that could
+ * set its own rung, or another's, would be trusted by nobody. It names the agent and the kind as `trust` said them.
  */
 
 import type { Result } from '@braindog/ports';
@@ -25,7 +29,7 @@ import type { RecordDeps } from './index.ts';
 export type { Standing };
 
 export function methods(deps: RecordDeps) {
-  const { kernel, sql, scoped, no, clock } = deps;
+  const { kernel, sql, scoped, admin, no, clock } = deps;
   const read = ladder({ sql, kernel, now: () => clock.now() });
 
   /**
@@ -53,6 +57,31 @@ export function methods(deps: RecordDeps) {
           : no('FORBIDDEN', 'Where agents stand is for the owner of this record to read, so nothing was read.', { at: 'principal' });
       }
       return { ok: true, value: read.standing(deps.validFrom?.()) };
+    },
+
+    /**
+     * Put an agent back to asking: `{ agent, kind }` on that kind, `{ agent }` on every kind it was lifted on. Answers
+     * where that agent stands after, as `trust` says it. ADMIN, the owner in a browser over the whole record.
+     */
+    async trustTakeBack(args: { agent?: unknown; kind?: unknown } | undefined, ctx: CallContext): Promise<Result<Standing>> {
+      const stop = admin(ctx, 'put an agent back to asking');
+      if (stop) return { ok: false, refusal: stop };
+      if (part(ctx)) return no('FORBIDDEN', 'Where agents stand is about the whole record, and this caller is held to part of it.', { at: 'principal' });
+      const said = (args ?? {}) as Record<string, unknown>;
+      const extra = Object.keys(said).find((k) => k !== 'agent' && k !== 'kind');
+      if (extra !== undefined) return { ok: false, refusal: { code: 'FIELD_UNKNOWN', fix: `${extra} is not something this call takes. It takes agent and kind.`, at: extra, allowed: ['agent', 'kind'] } };
+      if (typeof said.agent !== 'string' || said.agent.trim() === '') return no('REQUIRED_MISSING', 'Say which agent, by the name Settings shows for it.', { at: 'agent' });
+      if (said.kind !== undefined && said.kind !== null && (typeof said.kind !== 'string' || said.kind.trim() === '')) {
+        return no('VALUE_MALFORMED', 'kind is a kind of change as Settings says it, such as "add tasks", or left out for every kind.', { at: 'kind' });
+      }
+      const kind = typeof said.kind === 'string' ? said.kind : null;
+      const out = read.takeBack(said.agent, kind, deps.validFrom?.());
+      if ('unknown' in out) {
+        return out.unknown === 'agent'
+          ? no('VALUE_MALFORMED', `No agent connected to this record is called ${said.agent.trim()}. Nothing was changed.`, { at: 'agent' })
+          : no('VALUE_MALFORMED', `${said.agent.trim()} has no kind of change called ${kind?.trim()}. Nothing was changed.`, { at: 'kind' });
+      }
+      return { ok: true, value: { agents: [out.agent] } };
     },
   };
 }

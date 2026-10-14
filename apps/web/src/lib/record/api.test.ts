@@ -961,9 +961,12 @@ const rowsOfBlock = (block: BlockResult) =>
   toSegments(block).flatMap((seg) => ('rows' in seg ? (seg.rows as { cells: string[] }[]) : []));
 
 test('THE BRIDGE ADDS UP BY CONSTRUCTION: cash now, what comes in, what goes out, and where it lands', () => {
-  /* BY ITS KIND: the bridge sits under Coming and going with no heading of its own since money-core 3.13.0. */
-  const block = page('money')?.blocks.find((b) => b.kind === 'bridge');
-  assert.ok(block?.walk, 'the bridge has no walk');
+  /* A BRIDGE MADE FOR THE TEST, SINCE money-core 3.17.0: Coming and going opens on the calendar (REC-B23), and the
+     sample holds no book whose page still draws one. It walks the legs Cash ahead walks on the Money page, over thirty days. */
+  const ahead = pages()['money']?.blocks.find((b) => b.kind === 'forecast' && b.source === 'forecast.runway') as { from?: unknown } | undefined;
+  assert.ok(ahead?.from, '/p/money draws no Cash ahead, so this test has no legs to walk');
+  const block = readBlock({ kind: 'bridge', span: 12, source: 'forecast.runway', opening: { metric: 'cash-now' }, from: ahead.from, horizon: 30 } as never);
+  assert.ok(block.walk, 'the bridge has no walk');
   const rows = rowsOfBlock(block);
   assert.equal(rows.length, 4);
   const figure = (cell: string | undefined) => magnitudeOf(cell ?? '') * 100;

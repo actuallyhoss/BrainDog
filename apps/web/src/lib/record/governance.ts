@@ -29,8 +29,16 @@ import type { MergeCluster, Question } from './schema.ts';
  * A `rowset` body, as `propose` files it (`packages/kernel/src/govern.ts`): a row with `at` updates that row at the
  * version it was read at, and a row without one creates. It is here and not beside the sample's rowsets, because a
  * shipped reader may not import the fixture to name a type.
+ *
+ * `why` IS EACH ROW'S REASON, as the record files a scope question's (`packages/record/src/methods/stale.ts`
+ * `proposeScopes`): `{ text: '<title>: <reasons>.', at: '<the row's name>' }`, so the question says why each row moves.
  */
-export type RowsetBody = { register: string; rows: readonly Record<string, unknown>[] };
+export type Reason = { text: string; at: string };
+export type RowsetBody = { register: string; rows: readonly Record<string, unknown>[]; why?: readonly Reason[] };
+
+/** A reason the record filed beside a row: a sentence and the row it cites. A bare sentence or a half one is not one. */
+const isReason = (v: unknown): v is Reason =>
+  isRow(v) && typeof v.text === 'string' && v.text.trim() !== '' && typeof v.at === 'string' && v.at !== '';
 
 /** The list one update row is in: its own `register` where it names one (a fold moving a link another list holds), else the question's. */
 const listOf = (body: { register: string }, row: Record<string, unknown>): string =>
@@ -322,8 +330,10 @@ export const aboutOf = (row: Row): About => ({
 
 export function rowsetOf(row: Row): RowsetBody | undefined {
   if (row.body_kind !== 'rowset' || !isRow(row.body)) return undefined;
-  const { register, rows } = row.body;
-  return typeof register === 'string' && Array.isArray(rows) ? { register, rows: rows.filter(isRow) } : undefined;
+  const { register, rows, why } = row.body;
+  if (typeof register !== 'string' || !Array.isArray(rows)) return undefined;
+  const said = Array.isArray(why) ? why.filter(isReason).map((w) => ({ text: w.text, at: w.at })) : [];
+  return { register, rows: rows.filter(isRow), ...(said.length > 0 ? { why: said } : {}) };
 }
 
 /**

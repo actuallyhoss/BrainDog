@@ -16,7 +16,7 @@ import { no, type Refusal, type Result, type Sql } from '@braindog/ports';
 import type { Entry } from '@braindog/kernel';
 
 import { createRecordApi, type CallContext } from '../src/index.ts';
-import { foldQuestion, methods, writesOf, type Clash, type SameReaders } from '../src/methods/held-twice.ts';
+import { foldCause, foldQuestion, methods, writesOf, type Clash, type SameReaders } from '../src/methods/held-twice.ts';
 import type { RecordDeps } from '../src/methods/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
@@ -307,4 +307,126 @@ test('THE QUESTION SAYS THE LIST BY ITS OWN NAME AND KEEPS BY ITS keep, and the 
   assert.deepEqual(writesOf(gone, 'x'), [w]);
   assert.deepEqual(writesOf({ writes: [{ register: 'skills', id: 'a', version: 2, patch: { deleted_at: 'x' } }] }, 'y'), [{ ...w, version: 2 }]);
   assert.deepEqual(writesOf([{ key: 'k', keep: 'b', others: ['a'], writes: gone }, { nothing: true }], 'x'), [w]);
+});
+
+/* ── the picked: "Fold into one" on the bar, for the ones he picked (AGT-D04) ─────────────────────────────────── */
+
+/** Every door these walk through: the stand-in always, and the record's own when its kernel has the readers. */
+const doors = (r: Awaited<ReturnType<typeof studio>>): [string, Door][] => [['stand-in', standIn(r)], ...(KERNEL_HAS ? [['own', realDoor(r.api)] as [string, Door]] : [])];
+const causeOf = (sql: Sql, id: string) => sql.one<{ cause: string }>('SELECT cause FROM suggestion WHERE id = ?', id)?.cause;
+
+test('TWO PICKED OF THREE PAIRS FOLD JUST THEIR PAIRS: one question, signed by the person, and one Undo', async () => {
+  for (const which of ['stand-in', 'own']) {
+    const r = await studio();
+    const door = doors(r).find(([n]) => n === which)?.[1];
+    if (door === undefined) continue;
+    const { api, sql, first, later, release, review } = r;
+    /* Writing is picked by the one kept, Ponytail by the one held again, each by its number in the list. */
+    const asked = value<Asked>(await door.askFoldTwice({ register: 'skills', rows: [first[1]!.seq!, later[0]!.seq!] }, owner));
+    const open = questions(sql);
+    assert.equal(open.length, 1, which);
+    assert.equal(open[0]!.opened_by, 'p_1', 'the question is the asker\'s');
+    assert.equal(api.kernel.question(asked.question), '2 skills are here twice. Keep the oldest of each?', which);
+    assert.match(causeOf(sql, asked.question)!, /^tidy#same#skills#/u);
+    const rows = (JSON.parse(open[0]!.body) as { rows: { patch: Record<string, unknown> }[] }).rows;
+    assert.equal(rows.filter((w) => w.patch.deleted_at !== undefined).length, 2, which);
+    /* Release comes after the Writing held again, and moves; Review comes after the Deploy held again, left alone. */
+    assert.deepEqual(rows.filter((w) => w.patch.after !== undefined).map((w) => w.patch.after), [first[1]!.id], which);
+
+    value(await api.decide({ id: asked.question, decide: { option: 'accept', reason: 'Fold them.' } } as never, owner));
+    const after = liveIds(sql);
+    assert.ok(!after.has(later[0]!.id) && !after.has(later[1]!.id), `${which}: a picked pair is still here twice`);
+    assert.ok(after.has(later[2]!.id), `${which}: the pair nobody picked was folded`);
+    assert.equal(afterOf(api, release.id), first[1]!.id);
+    assert.equal(afterOf(api, review.id), later[2]!.id);
+    assert.deepEqual(value<Twice>(await door.heldTwice({ register: 'skills' }, owner)), { seqs: seqs([first[2]!, later[2]!]) });
+
+    const decision = sql.one<{ id: string }>('SELECT id FROM decision ORDER BY rowid DESC LIMIT 1')!.id;
+    const plan = value<{ hash: string }>(await api.undo({ decision, dry: true }, owner));
+    value(await api.undo({ decision, hash: plan.hash }, owner));
+    for (const k of [...first, ...later]) assert.ok(liveIds(sql).has(k.id), `${which}: ${String(k.fields.name)} did not come back`);
+    assert.equal(afterOf(api, release.id), later[1]!.id);
+    sql.close();
+  }
+});
+
+test('BOTH OF ONE PAIR PICKED FOLD THAT PAIR ALONE, by handle or by id, and the same pick again answers the same question', async () => {
+  const r = await studio();
+  const door = standIn(r);
+  const asked = value<Asked>(await door.askFoldTwice({ register: 'skills', rows: [`skills#${String(r.first[0]!.seq)}`, r.later[0]!.id] }, owner));
+  assert.equal(r.api.kernel.question(asked.question), 'One skill is here twice. Keep the oldest?');
+  const rows = (JSON.parse(questions(r.sql)[0]!.body) as { rows: { at: string; patch: Record<string, unknown> }[] }).rows;
+  assert.deepEqual(rows.map((w) => Object.keys(w.patch)), [['deleted_at']], 'only the Ponytail held again is folded');
+  /* The one kept alone is the same pick: the same question, and nothing filed twice. */
+  assert.deepEqual(value<Asked>(await door.askFoldTwice({ register: 'skills', rows: [r.first[0]!.seq!] }, owner)), asked);
+  /* Another pair picked is its own question. */
+  const other = value<Asked>(await door.askFoldTwice({ register: 'skills', rows: [r.later[2]!.seq!, r.first[2]!.seq!] }, owner));
+  assert.notEqual(other.question, asked.question);
+  assert.equal(questions(r.sql).length, 2);
+  r.sql.close();
+});
+
+test('A PICKED SKILL HELD ONCE IS REFUSED AT rows, in a plain sentence, and a pick that is not a list is too', async () => {
+  const r = await studio();
+  const door = standIn(r);
+  const once = await door.askFoldTwice({ register: 'skills', rows: [r.review.seq!, r.release.seq!] }, owner);
+  assert.equal(refusal(once).code, 'VALUE_MALFORMED');
+  assert.equal(refusal(once).at, 'rows');
+  assert.equal(refusal(once).fix, 'None of the skills picked is here twice, so nothing was asked. Pick the ones the list shows as here twice.');
+  for (const rows of [[], 'skills#2', [{}], ['a b'], [0], [1.5]]) {
+    const out = await door.askFoldTwice({ register: 'skills', rows }, owner);
+    assert.equal(refusal(out).code, 'VALUE_MALFORMED', JSON.stringify(rows));
+    assert.equal(refusal(out).at, 'rows', JSON.stringify(rows));
+  }
+  /* A token is refused before the pick is read, as the whole list's press is. */
+  assert.equal(refusal(await realDoor(r.api).askFoldTwice({ register: 'skills', rows: [r.later[0]!.seq!] }, agent)).code, 'NEEDS_BROWSER_SESSION');
+  for (const out of [once]) assert.doesNotMatch(refusal(out).fix, /—|\brows?\b|[0-9A-HJKMNP-TV-Z]{26}/u);
+  assert.equal(questions(r.sql).length, 0);
+  r.sql.close();
+});
+
+test('A FOLD OF THE WHOLE LIST ALREADY WAITING IS JOINED, NEVER DOUBLED, and every pair picked is the whole list\'s fold', async () => {
+  const r = await studio();
+  const door = standIn(r);
+  const whole = value<Asked>(await door.askFoldTwice({ register: 'skills' }, owner));
+  assert.equal(causeOf(r.sql, whole.question), 'tidy#same#skills');
+  assert.deepEqual(value<Asked>(await door.askFoldTwice({ register: 'skills', rows: [r.later[1]!.seq!] }, owner)), whole);
+  assert.deepEqual(value<Asked>(await door.askFoldTwice({ register: 'skills', rows: [r.first[0]!.seq!, r.first[1]!.seq!, r.first[2]!.seq!] }, owner)), whole);
+  assert.equal(questions(r.sql).length, 1);
+  r.sql.close();
+});
+
+test('A SKILL LEFT HELD TWICE THAT LINKS TO ONE FOLDED AWAY HAS ITS LINK MOVED, so nothing points at a skill gone', async () => {
+  const r = await studio();
+  /* The Deploy held again comes after the Ponytail held again; only Ponytail is picked. */
+  value(r.api.kernel.update('skills', r.later[2]!.id, { after: r.later[0]!.id } as never, { actor: 'p_1' }));
+  const asked = value<Asked>(await standIn(r).askFoldTwice({ register: 'skills', rows: [r.later[0]!.seq!] }, owner));
+  value(await r.api.decide({ id: asked.question, decide: { option: 'accept', reason: 'Fold them.' } } as never, owner));
+  assert.ok(liveIds(r.sql).has(r.later[2]!.id), 'the Deploy pair was folded');
+  assert.equal(afterOf(r.api, r.later[2]!.id), r.first[0]!.id, 'it still points at the Ponytail folded away');
+  r.sql.close();
+});
+
+test('A GRANT NARROWED TO ONE PAIR MAY FOLD THAT PAIR, and is refused a pair it cannot see all of', async () => {
+  const r = await studio();
+  const narrowed = { principal: { kind: 'person', id: 'p_4', level: 'write' }, wheres: { skills: { field: 'name', is: 'Ponytail' } } } as unknown as CallContext;
+  const out = await standIn(r).askFoldTwice({ register: 'skills', rows: [r.first[0]!.seq!] }, narrowed);
+  /* Only "Ponytail" is seen, not "ponytail": the pair is not all theirs to see, so nothing is filed and nothing named. */
+  assert.equal(refusal(out).code, 'FORBIDDEN');
+  assert.doesNotMatch(refusal(out).fix, /Writing|Deploy/u);
+  assert.equal(questions(r.sql).length, 0);
+  r.sql.close();
+});
+
+test('THE CAUSE OF A PICKED FOLD NAMES THE ONES KEPT, sorted, and the whole list\'s is as it was', () => {
+  assert.equal(foldCause('skills'), 'tidy#same#skills');
+  assert.equal(foldCause('skills', []), 'tidy#same#skills');
+  assert.equal(foldCause('skills', ['b', 'a']), 'tidy#same#skills#a.b');
+  assert.equal(foldCause('skills', ['a', 'b']), foldCause('skills', ['b', 'a']));
+  /* A pick too long to spell is a fingerprint of the same rows, within what a cause may be, and another pick is not it. */
+  const many = Array.from({ length: 30 }, (_, i) => `01M4WT7MM03PB3SX3Z8XV263${String(i).padStart(2, '0')}`);
+  const long = foldCause('skills', many);
+  assert.ok(long.length <= 200 && /^tidy#same#skills#30\.[0-9a-f]{16}$/u.test(long), long);
+  assert.equal(foldCause('skills', [...many].reverse()), long);
+  assert.notEqual(foldCause('skills', many.slice(1)), long);
 });

@@ -409,11 +409,11 @@ test('AN INSTALMENT IS A DATED AMOUNT AND THE WALK HAD NEVER READ ONE, so the ba
     'the walk without the leg ends better off than the record does, which is the direction a runway must never be wrong in',
   );
 
-  /* THE THIRTY-DAY BRIDGE IS THIS WALK OVER A SHORTER HORIZON. A leg added to one and not the other
-     is two answers about the same thirty days, one block apart on one screen. */
-  const bridge = (PAGES.money!.blocks as readonly { kind?: string; from?: unknown }[]).find((b) => b.kind === 'bridge');
-  assert.ok(bridge, 'the money page draws a thirty-day bridge');
-  assert.equal(bridge.from, from, 'the bridge and the walk are handed the ONE array, not two copies a deepEqual holds level');
+  /* THE THIRTY-DAY FIGURES ARE THIS WALK OVER A SHORTER HORIZON. A leg added to one and not the other is two answers
+     about the same thirty days. The bridge that walked them on the page went in REC-B23; the figures a use case's page
+     draws still read the walk, so they are held to it here. */
+  for (const id of ['arriving-30d', 'leaving-30d'])
+    assert.equal((METRICS[id] as { legs?: unknown }).legs, from, `${id} and the walk are handed the ONE array, not two copies a deepEqual holds level`);
 });
 
 /**
@@ -424,7 +424,7 @@ test('AN INSTALMENT IS A DATED AMOUNT AND THE WALK HAD NEVER READ ONE, so the ba
  * money-core 3.0.0 the tiles are figures over the walk itself (`source: forecast.runway`, `legs:` the page's own
  * `CASH_LEGS`), so they may wear the walk's words, and this holds them to the bridge to the penny.
  */
-test('THE TILES AND THE BRIDGE ON `/p/money` ADD UP THE SAME MOVEMENTS, so no two of them answer one question twice', async () => {
+test('THE THIRTY-DAY FIGURES AND THE WALK OF THIRTY DAYS ADD UP THE SAME MOVEMENTS, so no two of them answer one question twice', async () => {
   const k = await seeded();
 
   /* THE FIGURES AND NOT THE TILES, SINCE money-core 3.3.0: the Money page says the thirty days once, as the bridge, and
@@ -440,15 +440,21 @@ test('THE TILES AND THE BRIDGE ON `/p/money` ADD UP THE SAME MOVEMENTS, so no tw
   for (const b of MONEY_PAGES.money!.blocks as { kind: string; cells?: { metric: string }[] }[])
     for (const c of b.cells ?? []) assert.ok(!line.includes(`{{${c.metric}}}`), `a tile beside the line says ${c.metric} again`);
 
-  const bridge = blockOf(k, 'money', 'bridge');
-  const steps = bridge.walk?.steps;
-  assert.ok(steps && steps.length > 0, 'the bridge draws its walk');
+  /* THE WALK OF THE NEXT THIRTY DAYS, SINCE REC-B23 OFF THE PAGE: Cash ahead's own legs from Cash now over thirty days,
+     which is what the bridge walked, so the two figures are still held to the walk to the penny. */
+  const opening = reading(k, 'cash-now');
+  assert.ok(opening !== null);
+  const walked = k.runway(opening, cashWalk().from, 30);
+  assert.ok(walked.ok, sayOf(walked));
+  assert.deepEqual(walked.value.refusals, [], 'a walk that refuses is money missing from the answer');
+  const steps = walked.value.steps;
+  assert.ok(steps.length > 0, 'nothing is dated in the next thirty days');
   const sum = (of: (s: { source: string; delta: number }) => boolean) => steps.filter(of).reduce((n, s) => n + s.delta, 0);
 
   /* WHAT REPEATS IS IN THE WALK NOW, from `recurring`, beside the bills and the parts of a plan. */
   assert.ok(steps.some((s) => s.source === 'recurring'), 'nothing that repeats moves in the next thirty days');
-  assert.equal(arriving.value, sum((s) => s.delta > 0), 'Coming in is the money in of the bridge');
-  assert.equal(leaving.value, -sum((s) => s.delta < 0), 'Going out is the money out of the bridge');
+  assert.equal(arriving.value, sum((s) => s.delta > 0), 'Coming in is the money in of the thirty-day walk');
+  assert.equal(leaving.value, -sum((s) => s.delta < 0), 'Going out is the money out of the thirty-day walk');
 });
 
 /**
@@ -718,9 +724,8 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
     /* WHAT COMES IN AND GOES OUT IS OPEN, ONE TILE, SINCE money-core 3.11.0, and what already happened is folded under
        History. One view of the month is kept of three (3.4.0). */
     'Coming and going',
-    /* THE NEXT THIRTY DAYS, WITH NO HEADING OF ITS OWN SINCE money-core 3.13.0: it is the first thing in the tile, so
-       the tile opened on two headings, one over the other. */
-    undefined,
+    /* NO WALK OF THE NEXT THIRTY DAYS, SINCE REC-B23: it was Cash ahead's arithmetic again, so the calendar of them
+       opens the tile. */
     'Due in the next 30 days',
     'Instalments',
     /* WHERE THE MONEY WENT, SINCE money-wire-70 (REC-B19 jobs 3 and 4): this month against last by category, then
@@ -730,6 +735,8 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
     /* THE MONTHS BEHIND, OPEN UNDER COMING AND GOING: the folded History heading stood over this one chart and went
        to make room, and Being chased went with it. */
     'In and out, by month',
+    /* WHAT REPEATS, SINCE REC-B23: in and out every month, after the chart whose months ahead it is. */
+    'Every month',
   ]);
   /* WHAT STANDS BESIDE THE WALK, AND WHAT IS FOLDED. */
   const blocks = page.blocks as { heading?: string; area?: string; fold?: boolean; box?: boolean }[];
@@ -737,10 +744,10 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
   assert.deepEqual(blocks.filter((b) => b.area === 'rail').map((b) => b.heading), ['Runs out', 'Accounts', 'Waiting on you']);
   assert.deepEqual(blocks.filter((b) => b.fold === true).map((b) => b.heading), [], 'a folded heading over one chart is back');
   assert.deepEqual(blocks.filter((b) => b.box === true).map((b) => b.heading), ['Heads up', 'Coming and going']);
-  /* ONE HEADING OVER COMING AND GOING, SINCE money-core 3.13.0: the block straight under the boxed heading is the walk
-     of the next thirty days, and it wears neither a heading nor a glyph of its own. */
-  const under = (page.blocks as { kind: string; heading?: string; icon?: string; horizon?: number }[])[blocks.findIndex((b) => b.heading === 'Coming and going') + 1]!;
-  assert.deepEqual([under.kind, under.horizon, under.heading, under.icon], ['bridge', 30, undefined, undefined]);
+  /* UNDER COMING AND GOING, SINCE REC-B23, THE CALENDAR AND NO WALK: the walk of thirty days is off the page
+     (`money-page.test.ts` holds it there). */
+  const under = (page.blocks as { kind: string; heading?: string }[])[blocks.findIndex((b) => b.heading === 'Coming and going') + 1]!;
+  assert.deepEqual([under.kind, under.heading], ['calendar', 'Due in the next 30 days']);
   /* NO LAW ON A PAGE EVERYBODY DRAWS: the late notes say what is late in words any record's owner reads. */
   assert.ok(!JSON.stringify(page).includes('Statutory'), 'a note speaks for one country');
 
@@ -750,10 +757,7 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
   for (const b of (out.value as { blocks: readonly DrawnBlock[] }).blocks) assert.deepEqual(b.refusals, [], `${String(b.heading)} is refused`);
   assert.ok(!k.page('ledger').ok, 'the Ledger page is still on the record');
 
-  /* THE CASH WALK OFFERS FIVE YEARS AND TO THE END AGAIN, SINCE money-core 3.10.0, AND COUNTING IS ONE CONTROL. */
-  const ahead = (page.blocks as { heading?: string; horizons?: unknown; knobs?: unknown }[]).find((b) => b.heading === 'Cash ahead')!;
-  assert.deepEqual(ahead.horizons, [90, 180, 365, 730, 1825, 'last']);
-  assert.ok(!(ahead.knobs as string[]).includes('leave'), '`leave` is a second control over the streams `count` moves');
+  /* THE CASH WALK'S LENGTHS AND CONTROLS ARE HELD IN `money-page.test.ts`, with the page's other blocks. */
 
   /* AND IT LEAVES ITS OWN SENTENCE TO THE PAGE, while the line over it is drawn (money-core 3.6.0). */
   const drawn = (out.value as { blocks: readonly DrawnBlock[] }).blocks as readonly (DrawnBlock & {
@@ -1035,7 +1039,10 @@ test('HEADS UP IS NOT DRAWN WHEN NOTHING UNDER IT IS TRUE, on a record with an a
   assert.ok(out.ok, sayOf(out));
   const blocks = (out.value as { blocks: readonly { heading?: string; drawn?: boolean }[] }).blocks;
   assert.equal(blocks.find((b) => b.heading === 'Heads up')?.drawn, false, 'an empty Heads up box is drawn');
-  assert.notEqual(blocks.find((b) => b.heading === 'Coming and going')?.drawn, false, 'the fold after it is hidden with it');
+  /* AND COMING AND GOING IS SHUT TOO, SINCE REC-B23: the walk of thirty days was the one block in it drawn on every record
+     with an account, and with it off the page nothing here falls due, repeats or moved. `money-page.test.ts` draws the
+     box once something repeats. */
+  assert.equal(blocks.find((b) => b.heading === 'Coming and going')?.drawn, false, 'an empty Coming and going box is drawn');
 });
 
 /**

@@ -62,6 +62,10 @@ import { HEADLINE_MOST, PAGE_TILES_FIRST, SAMPLE_ROWS_MOST } from '@braindog/rec
 import type { SlashAsk } from './slash-answers.ts';
 import { BACKGROUND_JOBS_MONTH, backgroundSpent } from './model-jobs.ts';
 import { SLASH_MENTIONS_INSTRUCTIONS, SLASH_RESOLVE_INSTRUCTIONS, type MentionsInput, type ResolveInput, type UnderstandModel } from './understand.ts';
+import { SLASH_ABOUT_ASK, type AboutShown } from './about.ts';
+
+/* THE ABOUT ASK, for the Worker's included model to send the same words (`apps/worker/src/slash.ts`). */
+export { SLASH_ABOUT_ASK };
 import { turnedAway } from './slash-turned-away.ts';
 export { turnedAway, TURNED_AWAY_SQL } from './slash-turned-away.ts';
 
@@ -489,6 +493,7 @@ export function endpointModel(options: EndpointModelOptions): SlashUnderstanding
     skill: (input: SkillDraftInput): Promise<unknown> => ask(SLASH_SKILL_INSTRUCTIONS, input),
     resolve: (input: ResolveInput): Promise<unknown> => ask(SLASH_RESOLVE_INSTRUCTIONS, input),
     mentions: (input: MentionsInput): Promise<unknown> => ask(SLASH_MENTIONS_INSTRUCTIONS, input),
+    about: (input: AboutShown): Promise<unknown> => ask(SLASH_ABOUT_ASK, input),
   };
 }
 
@@ -722,6 +727,7 @@ export function anthropicModel(options: EndpointModelOptions): SlashUnderstandin
     skill: (input: SkillDraftInput): Promise<unknown> => ask(SLASH_SKILL_INSTRUCTIONS, input),
     resolve: (input: ResolveInput): Promise<unknown> => ask(SLASH_RESOLVE_INSTRUCTIONS, input),
     mentions: (input: MentionsInput): Promise<unknown> => ask(SLASH_MENTIONS_INSTRUCTIONS, input),
+    about: (input: AboutShown): Promise<unknown> => ask(SLASH_ABOUT_ASK, input),
   };
 }
 

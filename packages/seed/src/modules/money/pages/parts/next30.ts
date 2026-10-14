@@ -1,4 +1,8 @@
-/** Coming and going: the next thirty days, as arithmetic and as a calendar. */
+/**
+ * Coming and going: the next thirty days, as a calendar. The walk of them as arithmetic stays here, but Money places
+ * only the heading and the calendar since REC-B23 (money-every-month-92, `money.ts` filters the bridge off): it said
+ * again what Cash ahead says.
+ */
 
 import { CASH_LEGS } from '../../legs.ts';
 import { DUE_30D } from '../shared.ts';
@@ -29,7 +33,10 @@ export const NEXT_30: Record<string, unknown>[] = [
        NO HEADING OF ITS OWN, SINCE money-core 3.13.0 (the second design review's fix 8). It is the first thing under
        Coming and going, so the tile opened on two headings, each with its glyph, one straight over the other. The
        walk says what it is in its own rows, Coming in, Going out and In 30 days, under the one heading that names
-       them. */
+       them.
+
+       NOT PLACED ON MONEY SINCE REC-B23 (money-every-month-92): `money.ts` filters it off, and the calendar opens
+       Coming and going. */
     kind: 'bridge',
     span: 12,
     source: 'forecast.runway',

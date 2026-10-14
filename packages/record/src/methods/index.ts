@@ -60,6 +60,7 @@ import { methods as stale } from './stale.ts';
 import { methods as learnings } from './learnings.ts';
 import { methods as textFaults } from './text-faults.ts';
 import { methods as learned } from './learned.ts';
+import { methods as inboxHints } from './inbox-hints.ts';
 /* END METHODS */
 
 /**
@@ -93,6 +94,11 @@ export type RecordDeps = {
   /** The Directory when this host keeps it beside the record, and `null` on a host whose Directory is elsewhere. */
   directory: Directory | null;
   clock: Clock;
+  /**
+   * Marks the caller's key as having read words anybody could have written (`trust.markUntrusted`), as the Inbox read
+   * marks its reader, so the ladder keeps such a run asking. `where` is said to the person. Absent, nothing is marked.
+   */
+  untrusted?: (ctx: CallContext, where: string) => void;
   /**
    * Slash's described path (`slashDrafted` in `index.ts`), which `slash-draft.ts` answers `slashDraft` with, because the
    * model, the reading of use and Slash's ledger are the record's and a method file is handed none of them. Absent,
@@ -179,6 +185,7 @@ export function methods(deps: RecordDeps) {
     ...learnings(deps),
     ...textFaults(deps),
     ...learned(deps),
+    ...inboxHints(deps),
     /* END METHODS */
   };
 }

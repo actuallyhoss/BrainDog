@@ -73,6 +73,11 @@ async function press(model: SlashModel) {
   const api = await createRecordApi({ sql, clock, slashModel: model, slashMeter: m.meter });
   assert.ok((await api.kernel.install([TASKS])).ok);
   value(await api.create({ register: 'tasks', fields: { what: 'Invoice Acme', state: 'open' } }, OWNER));
+  /* THE OWNER'S OWN USE ON FIVE DAYS, so Slash advises a record past its fortnight (HD.410). */
+  for (const [i, day] of [3, 5, 7, 9].entries()) {
+    clock.set(T0 + day * DAY);
+    value(api.kernel.update('tasks', 'tasks#1', { what: i % 2 === 0 ? 'Invoice Acme.' : 'Invoice Acme' }, { actor: 'p_owner', version: i + 1 }));
+  }
   clock.set(T0 + 20 * DAY);
   const out = value<Filed>(await api.slashPropose({}, OWNER));
   sql.close();

@@ -239,7 +239,7 @@ test('A CALLER THE LEARNINGS ARE CLOSED TO IS REFUSED IN THE RECORD\'S OWN SENTE
   value(await api.kernel.install([{ id: 'register.tasks', kind: 'register', body: { id: 'tasks', name: 'Tasks', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] } }] as never));
   const bare: Made = { api, sql, clock, portage: '' };
   assert.equal(api.kernel.registers().has('learnings'), false);
-  for (const ctx of [owner, inPortage, shut]) assert.deepEqual(value<Learnings>(await learnings(bare, ctx)), { rows: [], truncated: false, faded: 0 });
+  for (const ctx of [owner, inPortage, shut]) assert.deepEqual(value<Learnings>(await learnings(bare, ctx)), { rows: [], truncated: false, faded: 0, replaced: 0 });
 });
 
 test('A CALLER LET INTO SOME OF THE LEARNINGS reads those and no others, and the ones kept from it are not counted as faded', async () => {

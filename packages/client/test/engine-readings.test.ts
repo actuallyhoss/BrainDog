@@ -41,6 +41,7 @@ test('A READ, a GET of engineReadings with nothing in the query, and the answer 
       },
     ],
     understanding: { unattached: 5, open_by_cause: { unsaid: 2, ambiguous: 1 } },
+    braked: null,
   };
   const { sent, client } = answering({ ok: true, value: readings });
   const out = await client.engineReadings();

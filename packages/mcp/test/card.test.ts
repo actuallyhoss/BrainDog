@@ -28,7 +28,7 @@ import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 import { tokenBudget } from './tokens.ts';
 
 const NOW = Date.UTC(2026, 8, 22, 9);
-const LABELS = ['Also', 'Next', 'Signs', 'Waiting', 'Learned', 'More', 'Update'] as const;
+const LABELS = ['Also', 'Next', 'Signs', 'Waiting', 'Decided', 'Learned', 'More', 'Update'] as const;
 const HOUR = 3_600;
 
 /** The card's lines after the header, as `[label, body]`, each held to the column the labels make. */
@@ -207,6 +207,25 @@ test('ON A RECORD LIKE THE OWNER\'S, context is a card and a few lines, under 1,
   assert.match(slots.get('More') ?? '', /^\d+ stale, read braindog:stale · \d+\+? learnings · \d+\+? keys by name\b/u);
   assert.doesNotMatch(text, /Deploy key \d+/u, 'a key that applies everywhere was listed by name');
   assert.doesNotMatch(text, /tool-\d+/u, 'a tool was listed as work');
+  sql.close();
+});
+
+test('A QUESTION THE OWNER DECIDED IN THE PROJECT IS ON THE CARD AS DECIDED, so the next session asks none of it again (AGT-B09)', async () => {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  await installSeed(api.kernel);
+  const mcp = tools(api);
+  const options = [{ id: 'renew', label: 'Renew the domain', because: 'Old PDFs point at it.' }, { id: 'lapse', label: 'Let it lapse', because: 'It costs every year.' }];
+  const asked = await mcp.call('propose', { question: 'Let kilnfonts.example lapse?', body_kind: 'options', body: { options } }, agent);
+  assert.ok(asked.ok, JSON.stringify(asked));
+  const id = (asked.value as { id: string }).id;
+  const decided = await api.decide({ id, decide: { option: 'renew', reason: 'The PDFs.' } }, { principal: { kind: 'person', id: 'p_seed', level: 'owner' } });
+  assert.ok(decided.ok, JSON.stringify(decided));
+
+  const reply = (await handle({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'context', arguments: {} } }, api, { ...agent })) as Reply;
+  assert.ok('result' in reply);
+  const { card: said } = (reply.result as { structuredContent: { card: string } }).structuredContent;
+  assert.match(shaped(said).get('Decided') ?? '', /^\d{1,2} \p{L}+: Renew the domain$/u, said);
   sql.close();
 });
 

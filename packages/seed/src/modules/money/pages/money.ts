@@ -6,6 +6,7 @@ import { ADD_ACCOUNT } from './parts/add-account.ts';
 import { BUDGET } from './parts/budget.ts';
 import { BY_BOOK } from './parts/by-book.ts';
 import { CROSS_CHECK } from './parts/cross-check.ts';
+import { EVERY_MONTH } from './parts/every-month.ts';
 import { FORECAST } from './parts/forecast.ts';
 import { HEADLINE_LASTS } from './parts/headline.ts';
 import { HEADS_UP } from './parts/heads-up.ts';
@@ -94,6 +95,15 @@ import { SPENDING } from './parts/spending.ts';
  * record, whose invoices still say since when on their own list. THE LINE A PASSED BUDGET WRITES IS DECLARED AND NOT
  * PLACED: no page writes a note once an entry yet, so it would take a block and draw nothing. It comes in when the
  * page reader learns it, and it needs one more block given up then.
+ *
+ * WHAT REPEATS EVERY MONTH, AND SIX MONTHS BEHIND (REC-B23 jobs 5 to 7; "a finance application on steroids... neatly
+ * visualized", "i dont want a very 'busy' looking ui"). The walk of the next thirty days under Coming and going went:
+ * it was Cash ahead's arithmetic again over a shorter horizon, one tile above it, and the thirty days are still the
+ * calendar's and Cash ahead's own. Its block went to Every month (`parts/every-month.ts`), what comes in and goes out
+ * every month at its monthly share, after the chart whose months ahead it is, so the page is twenty-four still and
+ * the same five tiles before the fold. THE COSTS BY CATEGORY ARE DECLARED AND NOT PLACED: the page had one block to
+ * give, and the two figures are the answer. And the chart reads six months back where it read twelve
+ * (`parts/history.ts`), with three ahead, as the Money board draws it.
  */
 export const MONEY_PAGE: SeedPage = {
   page: 'money',
@@ -119,12 +129,15 @@ export const MONEY_PAGE: SeedPage = {
     ...LEDGER,
     /* Every line of it but the one on categories marked the other way, given up for the line above. */
     ...HEADS_UP.filter((b) => (b.when as { metric?: string } | undefined)?.metric !== 'categories-against-direction'),
-    ...NEXT_30,
+    /* The heading and the calendar, and not the walk of thirty days (see above). */
+    ...NEXT_30.filter((b) => b.kind !== 'bridge'),
     ...INSTALMENTS,
     ...SPENDING,
     /* The tile, and not yet the line under it (see above). */
     ...BUDGET.filter((b) => b.kind === 'progress'),
     /* The chart, and no folded heading over it alone. */
     ...HISTORY.filter((b) => b.kind !== 'section'),
+    /* What repeats, as two figures, and not yet by category (see above). */
+    ...EVERY_MONTH.filter((b) => b.kind === 'stat'),
   ],
 };

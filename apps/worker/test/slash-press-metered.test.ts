@@ -74,6 +74,15 @@ test('A PRESS ON THE WORKER WRITES A LEDGER ROW AND IS REFUSED PAST THE OPERATOR
   assert.ok(declared.ok, JSON.stringify(declared));
   const made = await post('create', { register: 'tasks', fields: { what: 'Invoice Acme', state: 'open' } }, early);
   assert.ok(made.ok, JSON.stringify(made));
+  /* THE OWNER'S OWN USE ON FIVE DAYS, so Slash asks its model of a record past its fortnight (HD.410): the first row
+     edited by hand on four more days, and left as it was. */
+  for (const [i, day] of [3, 5, 7, 9].entries()) {
+    t.mock.timers.setTime(T0 + day * DAY);
+    const kept = await post('update', { register: 'tasks', seq: 1, patch: { what: i % 2 === 0 ? 'Invoice Acme.' : 'Invoice Acme' } }, await c.signIn(OWNER));
+    assert.ok(kept.ok, JSON.stringify(kept));
+    /* AND THE YOUNG RECORD'S LOOK THAT WRITE WOKE IS LET FINISH, or it would read the clock moved on below. */
+    await c.settle();
+  }
 
   /* AND THE CLOCK PAST SLASH'S FIRST FORTNIGHT, with a fresh sign-in, because a press is an owner's write. */
   t.mock.timers.setTime(T0 + 20 * DAY);

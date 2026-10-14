@@ -131,7 +131,8 @@ export type MetricDecl = {
    * source reads `metric_point`, the line a figure's nights kept, and this build reads one thing of it: with
    * `value: { count: 'missing' }`, how many days of the window hold no point (`readSeriesGaps`).
    * An `events.<list>` source reads the history for who made each entry of a list: with `value: { count: 'made' }`, how
-   * many were made in the window, in parts by who made them (`readMade`).
+   * many were made in the window, in parts by who made them (`readMade`); with `value: { count: 'changed', field }`, how
+   * many had that field changed in it, and by `bucket` with `group_by: 'at'`, in each week of it (`readChanged`).
    */
   source: string;
   /**
@@ -1341,11 +1342,28 @@ export function evaluateMetric(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
      who and by nothing else, because the entries' own fields are `register.<list>`'s to ask about. */
   if (decl.source.startsWith('events.')) {
     const list = decl.source.slice('events.'.length);
-    const value = decl.value as { count?: unknown };
-    if (keysOf(decl.value).join() !== 'count' || value.count !== 'made')
-      at('SOURCE_UNKNOWN', `${decl.source} is read only as { count: made }, how many of the list's entries were made in its window`, 'source');
+    const value = decl.value as { count?: unknown; field?: unknown };
+    /* OR HOW MANY HAD ONE FIELD CHANGED (AGT-C17 job c), "skills changing" beside learnings arriving: `{ count: changed,
+       field: rev }` over `events.skills` is the skills that took a new version. Read in its own reader (`readChanged`). */
+    const changed = keysOf(decl.value).sort().join() === 'count,field' && value.count === 'changed';
+    if (!changed && (keysOf(decl.value).join() !== 'count' || value.count !== 'made'))
+      at('SOURCE_UNKNOWN', `${decl.source} is read only as { count: made }, how many of the list's entries were made in its window, or { count: changed, field: <a field> }, how many had that field changed`, 'source');
     if (list === '') at('SOURCE_UNKNOWN', 'events. names no list: write events.<list>', 'source');
     else if (!ctx.schemaOf(list) || (ctx.reads !== undefined && !ctx.reads(list))) at('REGISTER_UNKNOWN', `there is no list called ${list}`, 'source');
+    if (changed) {
+      const schema = list === '' ? undefined : ctx.schemaOf(list);
+      const field = value.field;
+      if (schema && (typeof field !== 'string' || !Object.hasOwn(schema.fields, field)))
+        at('FIELD_UNKNOWN', `${list} has no field called ${String(field)} to count the changes of`, 'value');
+      if (decl.where !== undefined) at('DECLARATION_INVALID', `${decl.source} counts every change of ${String(field)} in its window: leave where out`, 'where');
+      if (decl.bucket === undefined && decl.group_by !== undefined)
+        at('DECLARATION_INVALID', `${decl.source} is cut only by the day of each change: leave group_by out, or write group_by: at with a bucket`, 'group_by');
+      if (decl.bucket !== undefined && !isBucket(decl.bucket)) at('DECLARATION_INVALID', `${String(decl.bucket)} is not a bucket`, 'bucket');
+      else if (decl.bucket !== undefined && decl.group_by !== 'at')
+        at('DECLARATION_INVALID', `${decl.source} is cut by the day of each change: write group_by: at beside the bucket`, 'group_by');
+      if (refusals.length) return { ok: false, refusal: refusals[0]! };
+      return readChanged(sql, decl, ctx, shift!, list, field as string);
+    }
     if (decl.bucket !== undefined) at('DECLARATION_INVALID', `${decl.source} is one count over its window, with no line through time: leave bucket out`, 'bucket');
     else if (decl.group_by !== undefined && decl.group_by !== 'by')
       at('DECLARATION_INVALID', `${decl.source} is read in parts by who made each entry, and by nothing else: leave group_by out, or write by`, 'group_by');
@@ -3498,6 +3516,74 @@ function readMade(sql: Sql, decl: MetricDecl, ctx: EvalContext, shift: number, l
   const why = `${typeof name === 'string' && name.trim() !== '' ? name.trim() : idWords(list)} entries made ${days === 1 ? 'today' : `in the last ${days} days`}`;
   const more = Math.max(0, groups.length - GROUP_CAP);
   return ok({ value, unit: null, rows: value, held, delta: null, why, met, refusals: [], groups: groups.slice(0, GROUP_CAP), ...(more > 0 ? { more } : {}) });
+}
+
+/**
+ * A figure over `events.<list>` as `{ count: 'changed', field }`: how many of the list's entries had that field changed
+ * in the window, and with a `bucket`, in each bucket of it (AGT-C17 job c, "skills changing", by week).
+ *
+ * THE WINDOW IS `readMade`'S, whole days ending today in the record's zone. A BUCKET IS CUT BY THE DAY OF THE CHANGE as
+ * the history wrote it, the way a figure over a list cuts `created_at` (`groupsOf`), so the learnings that arrived and
+ * the skills that changed in one week of one chart are cut at the same edge.
+ *
+ * AN ENTRY COUNTS ONCE IN EACH PART, however many times it changed there: a skill that took two versions in a week is
+ * one skill that changed that week, so "2 skills changed" says what it counts. An edit of any other field, a change to
+ * an entry deleted since, and the entry's making are not counted. A state field changes by a `state` line, any other by
+ * an `edit`, and both are read.
+ *
+ * ONE BOUND QUERY: the history by its index on the time, inside the window, joined to the list's live entries.
+ */
+function readChanged(sql: Sql, decl: MetricDecl, ctx: EvalContext, shift: number, list: string, field: string): Result<Reading> {
+  const days = Math.max(1, Math.round(shift / DAY));
+  const today = new Date(clockOf(ctx)).toISOString().slice(0, 10);
+  const first = new Date(Date.parse(`${today}T12:00:00Z`) - (days - 1) * DAY).toISOString().slice(0, 10);
+  const starts = (day: string): string => (ctx.tz === undefined ? `${day}T00:00:00.000Z` : dayStartsAt(day, ctx.tz));
+  const lines = sql.all<{ d: string; t: string }>(
+    `SELECT DISTINCT substr(e.ts, 1, 10) AS d, e.target AS t
+       FROM event e JOIN entry r ON r.id = substr(e.target, 7)
+      WHERE e.ts >= ? AND e.ts < ? AND e.kind IN ('edit', 'state') AND e.field = ? AND substr(e.target, 1, 6) = 'entry:'
+        AND r.register = ? AND r.deleted_at IS NULL`,
+    starts(first),
+    starts(dayAfter(today)),
+    field,
+    list,
+  );
+  const value = new Set(lines.map((l) => l.t)).size;
+  const t = decl.target as { lte?: unknown; gte?: unknown } | undefined;
+  const met = typeof t?.lte === 'number' ? value <= t.lte : typeof t?.gte === 'number' ? value >= t.gte : null;
+  const body = sql.one<{ name: unknown; fields: unknown }>(
+    "SELECT json_extract(body, '$.name') AS name, json_extract(body, '$.fields') AS fields FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0",
+    `register.${list}`,
+  );
+  const named = typeof body?.name === 'string' && body.name.trim() !== '' ? body.name.trim() : idWords(list);
+  const label = (() => {
+    try {
+      const held = (JSON.parse(String(body?.fields ?? '[]')) as { id?: unknown; label?: unknown }[]).find((f) => f?.id === field)?.label;
+      return typeof held === 'string' && held.trim() !== '' ? held.trim().toLowerCase() : idWords(field).toLowerCase();
+    } catch {
+      return idWords(field).toLowerCase();
+    }
+  })();
+  const why = `${named} whose ${label} changed ${days === 1 ? 'today' : `in the last ${days} days`}`;
+  const whole = { value, unit: null, rows: value, held: value, delta: null, why, met, refusals: [] };
+  if (decl.bucket === undefined) return ok(whole);
+
+  /* EVERY BUCKET FROM THE FIRST CHANGE TO THE ONE THE CLOCK IS IN, one nothing changed in `empty`: a gap, never a zero. */
+  const bucket = decl.bucket;
+  const current = bucketOf(new Date(clockOf(ctx)).toISOString(), bucket)!;
+  const each = new Map<string, Set<string>>();
+  for (const l of lines) {
+    const key = bucketOf(String(l.d), bucket);
+    if (key !== null) each.set(key, (each.get(key) ?? new Set<string>()).add(l.t));
+  }
+  const keys = [...each.keys()].sort();
+  if (keys.length === 0) return ok({ ...whole, groups: [], current, more: 0 });
+  const run = bucketRun(keys[0]!, keys.at(-1)! > current ? keys.at(-1)! : current, bucket, GROUP_CAP);
+  const groups: Group[] = run.keys.map((key) => {
+    const n = each.get(key)?.size ?? 0;
+    return { key, value: n === 0 ? null : n, rows: n, state: bucketState(key, n, current, key === run.keys[0] && run.more === 0) };
+  });
+  return ok({ ...whole, groups, current, more: run.more });
 }
 
 export function snapshot(

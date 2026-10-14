@@ -12,6 +12,9 @@
 
   A HOST WITHOUT `previewChange` asks for each page alone (`drawnOf`, the record's `previewPage`), and a host
   without that either draws the lines and nothing more, which is what this screen drew before either.
+
+  A PATTERN DRAWS ITS MESSAGES under its rule (`PatternReads.svelte`, loaded only then): who each is from and what the
+  rule would take out of it, and how many more like them wait, so a yes is a yes to something seen.
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
@@ -121,6 +124,12 @@
     <li class="appear">{@render drawing(tried)}</li>
   {/each}
 </ul>
+<!-- A PATTERN'S MESSAGES, AS ITS RULE READS THEM, under the rule. Imported only for a pattern, so no other question loads it. -->
+{#if proposed.pattern}
+  {#await import('./PatternReads.svelte') then loaded}
+    <loaded.default pattern={proposed.pattern} />
+  {/await}
+{/if}
 <!-- A CHANGE THE RECORD WOULD NOT INSTALL IS SAID ONCE, in its sentence, under the lines that still say what it holds. -->
 {#if rehearsed?.from === 'refused'}<p class="appear-note">{rehearsed.fix}</p>{/if}
 {#if proposed.samples !== null}<p class="appear-note">{copy.proposalSamples(proposed.samples)}</p>{/if}

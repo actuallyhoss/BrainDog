@@ -7,8 +7,7 @@
  * failure that taught each, and Faded with its count. Reached from What the brain learned on the Agents page, and with
  * no place of its own in the rail.
  *
- * WHAT IT DOES NOT HOLD YET: skill versions by week, and a skill's before and after. Both read the record's log, and no
- * figure an add-on may declare reads the log by week (AGT-C17 job c).
+ * WHAT IT DOES NOT HOLD YET: a skill's before and after. It reads the record's log.
  */
 
 import { test } from 'node:test';
@@ -89,13 +88,13 @@ test('IT OPENS ON ONE LINE SAID FROM FIGURES, and a clause at nought is left out
   assert.deepEqual([PAGE.blocks[0]!.kind, PAGE.blocks[0]!.lead], ['note', true]);
   /* TWO NOTES ON ONE FIGURE, so exactly one draws, as the Agents page's line does. */
   assert.deepEqual(leads.map((b) => b.when), [{ metric: 'learnings-arrived', gt: 0 }, { metric: 'learnings-arrived', is: 0 }]);
-  assert.equal(leads[0]!.body, '{{learnings-arrived}} learning(s) arrived this month, {{learnings-faded}} faded');
-  assert.equal(leads[1]!.body, 'No learning arrived this month, {{learnings-faded}} faded');
+  assert.equal(leads[0]!.body, '{{learnings-arrived}} learning(s) arrived this month, {{skills-changed}} skill(s) changed, {{learnings-faded}} faded');
+  assert.equal(leads[1]!.body, 'No learning arrived this month, {{skills-changed}} skill(s) changed, {{learnings-faded}} faded');
   /* THE WRITER SPLITS A LINE AT ITS COMMAS and drops a clause whose every figure is nought (`leadOf` in the web's
      `record/metrics.ts`), so each figure is alone in its clause. */
   for (const lead of leads) {
     const clauses = String(lead.body).split(/,\s+/u);
-    assert.equal(clauses.length, 2);
+    assert.equal(clauses.length, 3);
     assert.equal(clauses.filter((c) => c.includes('{{learnings-faded}}')).length, 1);
     for (const c of clauses) assert.ok((c.match(/\{\{/gu) ?? []).length <= 1, `two figures share a clause: ${c}`);
   }
@@ -104,8 +103,8 @@ test('IT OPENS ON ONE LINE SAID FROM FIGURES, and a clause at nought is left out
 test('THE BLOCKS: a chart by week drawn only from three points, What changed newest first with the failure, and Faded with its count', () => {
   const by = (key: string): Declared => PAGE.blocks.find((b) => b.key === key)!;
   const chart = by('by-week');
-  assert.deepEqual([chart.kind, chart.heading], ['series', 'Learnings that arrived, by week']);
-  assert.deepEqual(chart.series, [{ metric: 'learnings-by-week', label: 'Learnings' }]);
+  assert.deepEqual([chart.kind, chart.heading], ['series', 'Learnings that arrived and skills that changed, by week']);
+  assert.deepEqual(chart.series, [{ metric: 'learnings-by-week', label: 'Learnings' }, { metric: 'skills-changed-by-week', label: 'Skills changed' }]);
   assert.equal(chart.back, 24, 'the chart reaches back six months');
   /* THREE POINTS: drawn only while a learning arrived two weeks ago or more, so its week, the one after and this one
      are three bars at least. A chart of one bar says nothing a number does not. */
@@ -180,7 +179,7 @@ test('SIX LEARNINGS OVER FOUR WEEKS, ONE NOT CONFIRMED IN A HUNDRED DAYS: the ch
   assert.notEqual(chart.drawn, false);
   assert.equal(chart.bars?.bucket, 'week');
   assert.equal(chart.bars?.keys.length, 4, chart.bars?.keys.join(', '));
-  assert.deepEqual(chart.bars?.values, [[2, 1, 1, 2]]);
+  assert.deepEqual(chart.bars?.values, [[2, 1, 1, 2], [null, null, null, null]]);
 
   /* WHAT CHANGED, the newest first, each with the failure that taught it. */
   const changed = keyed(blocks, 'changed');

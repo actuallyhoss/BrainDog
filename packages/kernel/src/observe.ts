@@ -680,3 +680,97 @@ const brakeNote = (deps: AnalyseDeps, said: string): void => {
     said,
   );
 };
+
+/* ── whether Slash may file another question at all (ENG-B17) ──────────────────────────────────────────────────────── */
+
+/** The brake as it stands: on or off, the share of the window he took up, and how many answers it was worked out from. */
+export type Brake = { on: boolean; share: number; of: number };
+
+/** Whether Slash may file another question, and when it may not, the one sentence that says why. */
+export type MayPropose = { may: true } | { may: false; why: string; share?: number; of?: number };
+
+/** The window the brake reads: Slash's last twenty answered questions (24 §4.7, the scored brake's own twenty). */
+const BRAKE_OF = 20;
+/** The most of Slash's answers read to walk the brake's history. A night files a handful, so this is years of them. */
+const ANSWERS_READ = 500;
+/** The floor: a fortnight since a person first used the record, and use on five separate days (HD.410). */
+const FLOOR = { days: 14, used: 5 };
+
+/**
+ * The brake over Slash's answered questions, oldest first, `true` where he took it up (`addressed`).
+ *
+ * THE HISTORY IS THE STATE. The scored-prediction brake keeps its state in a note signed `system`; this one writes
+ * nothing, so it walks every window of twenty in order with the same two thresholds: on below `STOP`, off again only at
+ * `GO`. A share of 0.65 is braked after a fall from 0.7 and free after a climb from 0.5, which is the hysteresis, and
+ * no row can disagree with it because there is no row. Under twenty answers it never brakes: too few to say.
+ */
+export function brakeOf(answers: readonly boolean[]): Brake {
+  const took = (from: number, to: number): number => answers.slice(from, to).filter(Boolean).length;
+  if (answers.length < BRAKE_OF) return { on: false, share: answers.length === 0 ? 0 : took(0, answers.length) / answers.length, of: answers.length };
+  let on = false;
+  let share = 0;
+  for (let end = BRAKE_OF; end <= answers.length; end++) {
+    share = took(end - BRAKE_OF, end) / BRAKE_OF;
+    if (share < STOP) on = true;
+    else if (on && share >= GO) on = false;
+  }
+  return { on, share, of: BRAKE_OF };
+}
+
+/**
+ * The brake on this record: Slash's answered questions in the order he answered them.
+ *
+ * HIS ANSWER, NEVER THE RECORD'S. Answered is resolved as `addressed`, `wont-fix` or `incorrect`; one withdrawn, moot,
+ * asked again or still deferred was never put to him and decided, so it is in no window.
+ */
+export function slashBrake(sql: Sql): Brake {
+  const rows = sql.all<{ r: string }>(
+    `SELECT s.resolved_as AS r FROM suggestion s
+     WHERE s.opened_by = 'slash' AND s.status = 'resolved' AND s.resolved_as IN ('addressed', 'wont-fix', 'incorrect')
+     ORDER BY (SELECT max(e.rowid) FROM event e WHERE e.target = 'suggestion:' || s.id AND e.kind = 'resolve') DESC, s.rowid DESC
+     LIMIT ?`,
+    ANSWERS_READ,
+  );
+  return brakeOf(rows.reverse().map((row) => row.r === 'addressed'));
+}
+
+const plural = (n: number, one: string): string => `${n} ${one}${n === 1 ? '' : 's'}`;
+
+/**
+ * Whether Slash may file another question now: the floor, the brake, then one arrangement offer a week.
+ *
+ * ONE GOVERNOR FOR EVERY QUESTION SLASH WOULD FILE. `governors` above holds the weekly analyser; this holds the daily
+ * look and anything else Slash files. THE FLOOR IS A PERSON'S OWN USE (HD.410, "a fortnight of use is not a habit"):
+ * events whose actor is a person (`p_`), never an agent, an import's run or `system`, so a record brought in with a
+ * year of rows is as young as its owner's use. The brake is `slashBrake`. `arrangement` asks for an arrangement offer,
+ * of which Slash files one a week. READS ONLY: nothing is written, so asking twice answers the same.
+ */
+export function mayPropose(sql: Sql, nowMs: number, opts: { arrangement?: boolean } = {}): MayPropose {
+  const used = sql.one<{ first: string | null; days: number }>(
+    `SELECT min(ts) AS first, count(DISTINCT substr(ts, 1, 10)) AS days FROM event
+     WHERE actor LIKE 'p\\_%' ESCAPE '\\' AND ts <= ?`,
+    instant(nowMs),
+  );
+  const first = used?.first ? Date.parse(used.first) : NaN;
+  const days = Number(used?.days ?? 0);
+  if (!Number.isFinite(first)) return { may: false, why: 'Slash waits until you have used BrainDog for two weeks, and you have not used it yet.' };
+  const since = Math.floor((nowMs - first) / DAY_MS);
+  if (since < FLOOR.days)
+    return { may: false, why: `Slash waits until you have used BrainDog for two weeks, and you began ${since === 0 ? 'today' : `${plural(since, 'day')} ago`}.` };
+  if (days < FLOOR.used) return { may: false, why: `Slash waits until you have used BrainDog on five days, and you have used it on ${plural(days, 'day')}.` };
+
+  const brake = slashBrake(sql);
+  if (brake.on) {
+    const down = brake.of - Math.round(brake.share * brake.of);
+    return { may: false, why: `You turned down ${down} of the last ${brake.of}, so Slash waits.`, share: brake.share, of: brake.of };
+  }
+
+  if (opts.arrangement) {
+    const lately = sql.one<{ x: number }>(
+      "SELECT 1 AS x FROM suggestion WHERE opened_by = 'slash' AND body_kind = 'arrange' AND opened_at >= ? LIMIT 1",
+      instant(nowMs - WEEK_MS),
+    );
+    if (lately) return { may: false, why: 'Slash offered a new arrangement this week, and it offers one a week.' };
+  }
+  return { may: true };
+}

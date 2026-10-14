@@ -25,8 +25,9 @@
  *
  * THE WEEK OFFER IS THE ONE DRAWN FROM USE (`weeksOffered`): a list with a day, four or more of its entries falling in
  * this week, read on three different weeks, and no page that groups it by week, is offered a page of its week. It is
- * never made in a record's first `PEN_YOUNG_DAYS` days (ENG-B17: "a fortnight of use is not a habit"), counted from the
- * day the record was made and never from the oldest day its entries say, so an import does not make a record old.
+ * never made before `PEN_YOUNG_DAYS` days since a person first used the record (ENG-B17: "a fortnight of use is not a
+ * habit"), counted from a person's own writes (`usedOf`) and never from the oldest day its entries say, so an import,
+ * an agent or the night's sweep does not make a record old. Its own reads on three different weeks are the days of use.
  *
  * ONE OFFER A LIST, IN ONE PLACE, THE BEST FEW AT ONCE (USE-B03). `penRanked` keeps one offer a list and drops a list Slash
  * already asked a page for on Decide; `penFor` shows its first `PEN_SHOWN`, and beside them the offer of any list the
@@ -696,6 +697,8 @@ function shapesOffered(deps: PenDeps, room: number): PenItem[] {
 
 /** The days a record is watched and offered nothing drawn from use: a fortnight of use is not a habit (ENG-B17). */
 export const PEN_YOUNG_DAYS = 14;
+/** The different days a person wrote on before a record is no longer young, however long ago they began (ENG-B17). */
+export const PEN_USE_DAYS = 5;
 /** The entries a list holds in this week before its week is worth a page of its own. */
 export const PEN_WEEK_FEWEST = 4;
 /** The different weeks a list is read on before reading it by the week is a habit. */
@@ -734,16 +737,34 @@ const weekOf = (field: string, today: string, unfinished: Json | null = null): J
   };
 };
 
+/** How a person has used the record: the first time one wrote to it, and the different days anyone did, by the clock. */
+export type Used = { first: string | null; days: number };
+
 /**
- * When the record began: the day it was made, else the first line its log wrote, or `null` when it holds neither. Never
- * the oldest day an entry says about itself, which an import of last year's orders would make a year ago.
+ * A PERSON'S OWN USE, READ FROM THE LOG: the events whose actor is a person (`p_`, `personOf` in the kernel), never an
+ * agent's run, an import's run, an ingest, a rule, Slash or `system`. A record brought in today holding a year of rows
+ * was written by its import, so it has no use until somebody uses it; an import of a whole record keeps its people's
+ * own events, which are their use. One query over the actor index, the range `p_` up to the next character.
  */
-function bornOf(sql: Sql): number | null {
-  const at =
-    sql.one<{ ts: string }>('SELECT created_at AS ts FROM record WHERE singleton = 1')?.ts ??
-    sql.one<{ ts: string }>('SELECT ts FROM event ORDER BY rowid LIMIT 1')?.ts;
-  const ms = typeof at === 'string' ? Date.parse(at) : Number.NaN;
-  return Number.isFinite(ms) ? ms : null;
+export function usedOf(sql: Sql): Used {
+  const r = sql.one<{ first: string | null; days: number }>(
+    'SELECT min(ts) AS first, count(DISTINCT substr(ts, 1, 10)) AS days FROM event WHERE actor >= ? AND actor < ?',
+    'p_',
+    'p`',
+  );
+  const first = typeof r?.first === 'string' && Number.isFinite(Date.parse(r.first)) ? r.first : null;
+  return { first, days: first === null ? 0 : Number(r?.days ?? 0) };
+}
+
+/**
+ * Whether a record is still too young to read habits into: no person has used it, the first did fewer than
+ * `PEN_YOUNG_DAYS` days ago, or on fewer than `PEN_USE_DAYS` different days. `'weeks'` and `'days'` say which, so a
+ * page can say it in plain words; `null` is old enough.
+ */
+export function youngOf(used: Used, nowMs: number): 'none' | 'weeks' | 'days' | null {
+  if (used.first === null) return 'none';
+  if (nowMs - Date.parse(used.first) < PEN_YOUNG_DAYS * DAY_MS) return 'weeks';
+  return used.days < PEN_USE_DAYS ? 'days' : null;
 }
 
 /** The different weeks since `since` that `list` was read on, by itself or through a page that draws it. */
@@ -951,15 +972,15 @@ export const weekSaid = (n: number, name: string, one: string | undefined, due: 
  * The page holds the list's own figures, what falls this week, what is owed when the day is a due day and an unfinished
  * entry's sum is left empty, and what is running low beside it. Its why says what was seen, in the list's own words.
  *
- * NEVER IN THE RECORD'S FIRST `PEN_YOUNG_DAYS` DAYS, never once its `week:<list>` is dismissed, and never when `boot`
+ * NEVER BEFORE `PEN_YOUNG_DAYS` DAYS SINCE A PERSON FIRST USED THE RECORD (`usedOf`), never once its `week:<list>` is dismissed, and never when `boot`
  * has the pen off, since `penFor` is then not asked at all. The cheap questions are asked first: the age once, then for
  * each list its dismissal, its count and its pages, and only then its week and its reads.
  */
 function weeksOffered(deps: PenDeps): PenItem[] {
   const { kernel, reads, pages, dismissed, use, labels } = deps;
   if (!use) return [];
-  const born = bornOf(use.sql);
-  if (born === null || use.nowMs - born < PEN_YOUNG_DAYS * DAY_MS) return [];
+  const first = usedOf(use.sql).first;
+  if (first === null || use.nowMs - Date.parse(first) < PEN_YOUNG_DAYS * DAY_MS) return [];
 
   const declared = kernel.declarations();
   const held = heldPages(declared);

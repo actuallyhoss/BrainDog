@@ -104,6 +104,11 @@ async function record(model: SlashModel, slashMeter?: SlashMeter) {
   assert.ok((await api.kernel.install([TASKS, DONE_STEPS, DESK, PLAIN])).ok);
   value(await api.create({ register: 'tasks', fields: { what: 'Sample the fit', state: 'open' } }, OWNER));
   value(await api.create({ register: 'tasks', fields: { what: 'Cut the pattern', state: 'done' } }, OWNER));
+  /* THE OWNER'S OWN USE ON FIVE DAYS, so Slash advises a record past its fortnight (HD.410). */
+  for (const [i, day] of [3, 5, 7, 9].entries()) {
+    clock.set(T0 + day * DAY);
+    value(api.kernel.update('tasks', 'tasks#1', { what: i % 2 === 0 ? 'Sample the fit.' : 'Sample the fit' }, { actor: 'p_owner', version: i + 1 }));
+  }
   clock.set(T0 + 20 * DAY);
   return { sql, clock, api };
 }

@@ -16,7 +16,7 @@
  *
  * A PAYMENT TAKEN BACK UNPAYS. Handed a payment that is void or pending, `settle` marks nothing paid, and a bill that
  * payment names is counted again from its other payments: open, or part paid with what is left, and no day. A bill a
- * person marked paid by hand, which holds no "Paid so far", is left as it is.
+ * person marked paid by hand, which holds no "Paid so far", is left as it is. A payment deleted is `unsettle.js`'s.
  *
  * TWO CURRENCIES ARE NEVER ADDED OR COMPARED. A payment in another currency than the thing it pays changes nothing and
  * says so, as does money going the other way, and a thing already paid, cancelled or ended.
@@ -199,8 +199,10 @@ export default async function run(ctx) {
     return null;
   }
   const [paymentRow, itemRow] = [await ctx.record.get(paymentAt), await ctx.record.get(itemAt)];
+  /* A PAYMENT DELETED BEFORE THIS RUN READ IT marks nothing paid, and its bill is counted again by `script.unsettle`
+     (`unsettle.js`), which its delete starts. */
   if (!paymentRow) {
-    ctx.log('The payment is no longer in the record, so nothing was marked paid.');
+    ctx.log('The payment was deleted, so nothing was marked paid.');
     return null;
   }
   if (!itemRow) {

@@ -18,6 +18,7 @@ import { LEARN_CATEGORY_SCRIPT } from './scripts/learn-category.js';
 import matchRun, { MATCH_PAYMENT_SCRIPT, matchPayment } from './scripts/match-payment.js';
 import { PLANS_FROM_NAMES_SCRIPT } from './scripts/plans-from-names.js';
 import settleRun, { SETTLE_SCRIPT, settle } from './scripts/settle.js';
+import { UNSETTLE_RULE, UNSETTLE_SCRIPT } from './scripts/unsettle.js';
 
 /**
  * WHICH FILING RULES MAY FILE AN ENTRY, as `link.to.where` over `filing_rules`, filled from the entry being filed: the
@@ -364,6 +365,9 @@ export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
     steps: [{ script: { id: 'settle', as: 'settling', input: { payment: '{{trigger.entry}}', item: '{{trigger.row.settles}}' } } }],
   },
   SETTLE_SCRIPT,
+  /* A DELETED PAYMENT REOPENS WHAT IT PAID (unsettle-92): `payment-unsettles` recounts the bill without it. */
+  UNSETTLE_RULE,
+  UNSETTLE_SCRIPT,
   /**
    * A PAYMENT THAT NAMES NOTHING FINDS WHAT IT PAID (REC-B11 step 3, match-payment-78): a cleared Ledger entry with
    * nothing in "Settles" starts `script.match_payment`, which looks among the open bills, instalments and repeating

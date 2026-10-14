@@ -44,6 +44,7 @@ import { ROUTES as stale } from './stale.ts';
 import { ROUTES as learnings } from './learnings.ts';
 import { ROUTES as textFaults } from './text-faults.ts';
 import { ROUTES as learned } from './learned.ts';
+import { ROUTES as inboxHints } from './inbox-hints.ts';
 /* END ROUTES */
 
 export const EXTRA_ROUTES: readonly Route[] = [
@@ -79,5 +80,6 @@ export const EXTRA_ROUTES: readonly Route[] = [
   ...learnings,
   ...textFaults,
   ...learned,
+  ...inboxHints,
   /* END ROUTES */
 ];

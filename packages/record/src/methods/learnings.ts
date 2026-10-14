@@ -17,6 +17,13 @@
  * confirmed nor made in the last ninety days has faded: it is left out and counted in `faded`, exactly as `context`
  * counts it, so the two never disagree about which learnings a run is still held to.
  *
+ * ONE ANOTHER REPLACES IS NOT A ROW EITHER (AGT-C14 job b, as a read). A learning names the one it replaces in the field
+ * that points at its own list (`replacesField`), and nothing moved the old one, so it was handed beside the lesson that
+ * replaced it. `replacedIn` says which a standing learning replaces, down a chain and never round a loop, and those are
+ * left out and counted in `replaced`. Nothing is written: the old row keeps its state and is still on the list for a
+ * person, and taking the new one back or deleting it hands the old one again. Moving the old row to `superseded` in
+ * the same write is the scope's, and his to rule.
+ *
  * THE LIST IS FOUND BY WHAT IT DECLARES, never by a name: a list whose rows fade is one with a `confirmed_on` day, and
  * that says where its rows apply. A record with no such list is answered no rows and no refusal. A caller that list is
  * closed to is refused in the sentence `list` would say.
@@ -52,8 +59,11 @@ export type Learned = {
   made: string;
 };
 
-/** What `learnings` answers: the rows in order, whether more stand than were answered, and how many have faded. */
-export type Learnings = { rows: Learned[]; truncated: boolean; faded: number };
+/**
+ * What `learnings` answers: the rows in order, whether more stand than were answered, how many have faded, and how many
+ * were left out because a learning that stands replaces them.
+ */
+export type Learnings = { rows: Learned[]; truncated: boolean; faded: number; replaced: number };
 
 /** How many learnings one answer holds when nothing else is asked for, in all and not for each place. */
 export const LEARNED_SHOWN = 40;
@@ -66,7 +76,7 @@ const READ_MOST = 200;
 const FADES = 'confirmed_on';
 export const LEARNED_FADE_MS = 90 * 86_400_000;
 
-type Field = { id: string; type?: string; retired?: boolean; scope?: unknown; values?: readonly string[] };
+type Field = { id: string; type?: string; to?: string; retired?: boolean; scope?: unknown; values?: readonly string[] };
 
 const text = (value: unknown): string | null => (typeof value === 'string' && value !== '' ? value : null);
 /** The number in a spoken id, `12` of `LN12`, which is the order two learnings of one day were made in. */
@@ -93,12 +103,50 @@ export const learnedOrder = (kinds: readonly string[]) => {
 };
 
 /**
+ * The field a learning names the one it replaces in: a ref to its own list, by what the list declares and never by a
+ * name. `null` when the list declares none, and then nothing is ever replaced.
+ */
+export const replacesField = (list: string, fields: readonly Field[]): string | null =>
+  fields.find((f) => f.type === 'ref' && f.to === list && !f.retired)?.id ?? null;
+
+/**
+ * The ids the learnings that stand replace, from `rows`, which are the rows that stand: read open (nothing replaced,
+ * taken back or deleted), so a replacement taken back or deleted replaces nothing and hands the old one back.
+ *
+ * DOWN A CHAIN: C replaces B replaces A, and A and B are both out. The walk starts at each row no other row in `rows`
+ * names, which is a lesson nothing has replaced, and follows what it names until a row is not in `rows`.
+ *
+ * NEVER ROUND A LOOP. A walk stops at an id it has put out already, and a row that names itself names nothing. Two
+ * that name each other and nothing else have no start, so neither is out: nobody can say which of them holds.
+ */
+export function replacedIn(rows: readonly Entry[], field: string | null | undefined): Set<string> {
+  const out = new Set<string>();
+  if (!field) return out;
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  const named = (row: Entry): string | null => {
+    const v = row.fields[field];
+    return typeof v === 'string' && v !== '' && v !== row.id ? v : null;
+  };
+  const isNamed = new Set(rows.map(named).filter((id): id is string => id !== null));
+  for (const head of rows) {
+    if (isNamed.has(head.id)) continue;
+    let at = named(head);
+    while (at !== null && at !== head.id && !out.has(at)) {
+      out.add(at);
+      const next = byId.get(at);
+      at = next === undefined ? null : named(next);
+    }
+  }
+  return out;
+}
+
+/**
  * The learnings one caller is handed at one moment. `null` is a record with no list whose rows fade. The caller's
  * right to read that list is the method's to ask first; the rows a narrowed grant leaves out are left out here.
  */
 export function learnedFor(deps: RecordDeps, ctx: CallContext, nowMs: number, limit: number = LEARNED_SHOWN): Learnings {
   const { kernel, readable } = deps;
-  const none: Learnings = { rows: [], truncated: false, faded: 0 };
+  const none: Learnings = { rows: [], truncated: false, faded: 0, replaced: 0 };
   const list = fadingList(deps);
   if (list === null) return none;
   const { id, decl } = list;
@@ -129,10 +177,20 @@ export function learnedFor(deps: RecordDeps, ctx: CallContext, nowMs: number, li
     return found.ok && found.value.rows.length > 0;
   };
 
+  const here = got.value.rows.filter(admitted);
+  const wide = got.value.inherited.filter(admitted);
+  /* WHAT A LEARNING THAT STANDS REPLACES is left out, judged across both places and among the rows this caller reads.
+     One that has faded still replaces: it says the old one stopped being true, whether or not it is handed itself. */
+  const out = replacedIn([...here, ...wide], replacesField(id, decl.fields as readonly Field[]));
   const cutoff = new Date(nowMs - LEARNED_FADE_MS).toISOString().slice(0, 10);
   let faded = 0;
+  let replaced = 0;
   const said = (rows: readonly Entry[], where: Learned['where']): Learned[] =>
-    rows.filter(admitted).flatMap((row) => {
+    rows.flatMap((row) => {
+      if (out.has(row.id)) {
+        replaced += 1;
+        return [];
+      }
       const made = row.created_at.slice(0, 10);
       const confirmed = text(row.fields[FADES]);
       if ((confirmed ?? made) < cutoff) {
@@ -152,10 +210,10 @@ export function learnedFor(deps: RecordDeps, ctx: CallContext, nowMs: number, li
         },
       ];
     });
-  const standing = [...said(got.value.rows, 'here'), ...said(got.value.inherited, 'everywhere')].sort(learnedOrder(kindsOf(decl.fields as readonly Field[])));
+  const standing = [...said(here, 'here'), ...said(wide, 'everywhere')].sort(learnedOrder(kindsOf(decl.fields as readonly Field[])));
   /* A place that filled the read may hold more than were read, so the answer says there may be more. */
   const full = Math.max(got.value.rows.length, got.value.inherited.length) >= READ_MOST;
-  return { rows: standing.slice(0, limit), truncated: standing.length > limit || full, faded };
+  return { rows: standing.slice(0, limit), truncated: standing.length > limit || full, faded, replaced };
 }
 
 /**
@@ -264,9 +322,10 @@ export function methods(deps: RecordDeps) {
 
   return {
     /**
-     * `{ limit? }`: the learnings that still stand where the caller is, as `{ rows, truncated, faded }`, the kind the
-     * list declares first before the next, the project's before everywhere, newest first. `LEARNED_SHOWN` in all unless
-     * `limit` asks for another count. READ+, refused where the list is closed to the caller, and it changes nothing.
+     * `{ limit? }`: the learnings that still stand where the caller is, as `{ rows, truncated, faded, replaced }`, the
+     * kind the list declares first before the next, the project's before everywhere, newest first. `LEARNED_SHOWN` in
+     * all unless `limit` asks for another count. One a standing learning replaces is left out and counted in
+     * `replaced`. READ+, refused where the list is closed to the caller, and it changes nothing.
      */
     async learnings(args: { limit?: unknown } | undefined, ctx: CallContext): Promise<Result<Learnings>> {
       const stop = scoped(ctx, 'read');

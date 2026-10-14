@@ -13,7 +13,8 @@ import assert from 'node:assert/strict';
 import type { Declaration } from '@braindog/kernel';
 
 import { createRecordApi, type Boot, type CallContext, type PenItem } from '../src/index.ts';
-import { PEN_DISMISSED_MOST, PEN_MOST, PEN_SHOWN, penRanked } from '../src/emergent.ts';
+import { PEN_DISMISSED_MOST, PEN_MOST, PEN_SHOWN, PEN_USE_DAYS, PEN_YOUNG_DAYS, penRanked, usedOf, youngOf } from '../src/emergent.ts';
+import { COMPANIES, PROJECTS } from '../../../fixtures/names.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 import { NOW, installSeed } from '../../seed/src/index.ts';
 
@@ -268,5 +269,40 @@ test('ONE OFFER A LIST: a list two pages draw without a calendar is offered one 
   assert.equal(forParts.length, 1, `Parts was offered twice: ${JSON.stringify(pen.map((i) => i.id))}`);
   assert.equal(forParts[0]!.id, 'block:stores:calendar:parts', 'the first page in the record was not the one offered the calendar');
   assert.equal(forParts[0]!.why, 'Parts puts a day on its entries in Bought, and Stores has no calendar of them.');
+  sql.close();
+});
+
+test("A RECORD IS AS OLD AS ITS PEOPLE'S OWN USE: an import, an agent and the system never make it older (HD.410)", async () => {
+  const sql = openSqlite();
+  const clock = fixedClock(Date.parse('2026-09-01T09:00:00Z'));
+  const api = await createRecordApi({ sql, clock });
+  value(await api.kernel.install([PARTS]));
+  const DAY = 86_400_000;
+  const start = clock.now();
+
+  /* A YEAR OF ROWS WRITTEN BY AN IMPORT AND AN AGENT IS NOBODY'S USE: the week offer's clock has not started. */
+  for (let i = 0; i < 200; i++)
+    value(api.kernel.create('parts', { name: `${PROJECTS[i % PROJECTS.length]} part ${i + 1}` }, { actor: i % 2 === 0 ? 'ingest:parts-file' : 'agent:claude' }));
+  value(api.kernel.create('parts', { name: 'Written by the night' }, { actor: 'system' }));
+  assert.deepEqual(usedOf(sql), { first: null, days: 0 });
+  assert.equal(youngOf(usedOf(sql), start + 400 * DAY), 'none');
+
+  /* A PERSON WRITING IS USE, counted once a day, and young until two weeks and five days of it. */
+  for (const d of [0, 0, 3, 9]) {
+    clock.set(start + d * DAY);
+    value(api.kernel.create('parts', { name: `${COMPANIES[d % COMPANIES.length]} order on day ${d}` }, { actor: owner.principal.id }));
+  }
+  const used = usedOf(sql);
+  assert.equal(used.days, 3);
+  assert.equal(Date.parse(used.first!), start);
+  assert.equal(youngOf(used, start + 10 * DAY), 'weeks');
+  assert.equal(youngOf(used, start + PEN_YOUNG_DAYS * DAY), 'days', 'three days of use was called a habit');
+  clock.set(start + 12 * DAY);
+  value(api.kernel.create('parts', { name: 'Kept on day twelve' }, { actor: 'p_2' }));
+  clock.set(start + 13 * DAY);
+  value(api.kernel.create('parts', { name: 'Kept on day thirteen' }, { actor: owner.principal.id }));
+  assert.equal(usedOf(sql).days, PEN_USE_DAYS);
+  assert.equal(youngOf(usedOf(sql), start + 13 * DAY), 'weeks');
+  assert.equal(youngOf(usedOf(sql), start + PEN_YOUNG_DAYS * DAY), null);
   sql.close();
 });

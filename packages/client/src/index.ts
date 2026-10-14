@@ -1164,6 +1164,7 @@ export type AskReading = {
 export type EngineReadings = {
   asks: AskReading[];
   understanding: { unattached: number; open_by_cause: Record<string, number> };
+  braked: { on: boolean; share: number; of: number } | null;
 };
 
 /**
@@ -1780,7 +1781,7 @@ export function createClient(options: ClientOptions) {
      * Put one question on Decide that folds everything `register` holds twice into one of each, by what the list says
      * makes two of its rows the same, with one Undo. A person's press: a token is refused.
      */
-    askFoldTwice: (args: { register: string }) => call<Answer<'askFoldTwice'>>('askFoldTwice', args as Record<string, unknown>),
+    askFoldTwice: (args: { register: string; rows?: readonly (number | string)[] }) => call<Answer<'askFoldTwice'>>('askFoldTwice', args as Record<string, unknown>),
     /**
      * Which people of `register` may be on the record twice, as `{ seqs }`, so a list can be narrowed to them. `null`
      * when that list is not where the record keeps people. It reads and changes nothing. READ+.
@@ -1914,6 +1915,8 @@ export function createClient(options: ClientOptions) {
     doorHealth: () => call<AnswerOr<'doorHealth', DoorHealth>>('doorHealth'),
     /** How far each connected agent is trusted with each kind of change, by name (ENG-A12). It writes nothing. */
     trust: () => call<AnswerOr<'trust', TrustStanding>>('trust'),
+    /** Put an agent back to asking on one kind it does on its own, or on every such kind with none named (ENG-A12). An owner's in a browser. */
+    trustTakeBack: (args: { agent: string; kind?: string }) => call<TrustStanding>('trustTakeBack', args),
     changeEmail: (email: string) => accountDoor<Record<string, never>>('email', { email }),
     confirmEmail: (token: string) => accountDoor<{ email: string; unreached: number }>('email/confirm', { token }),
 

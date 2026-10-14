@@ -196,3 +196,79 @@ test('the words over what a change takes in are plain, with no dash a person wou
   assert.equal(words.takes, 'Why: what was learned');
   for (const w of Object.values(words)) assert.doesNotMatch(String(w), /—|–/u);
 });
+
+/* A scope question, as `proposeScopes` files one: each row moves to a project, and `why` says why, led by its title. */
+const keys = {
+  title: 'label',
+  fields: [
+    { id: 'label', type: 'text' },
+    { id: 'project', type: 'ref', to: 'projects', label: 'Where it applies', scope: { inherit: false } },
+  ],
+};
+const runs = { title: 'name', fields: [{ id: 'name', type: 'text' }, { id: 'project', type: 'ref', to: 'projects', label: 'Where it applies', scope: { inherit: false } }] };
+const scoped = {
+  keys: [
+    { id: '01J0000000000000000000KEY4', seq: 4, version: 2, fields: { label: 'Deploy token', project: null } },
+    { seq: 5, version: 1, fields: { label: 'Mail key', project: null } },
+  ],
+  runs: [{ seq: 2, version: 1, fields: { name: 'Nightly build', project: null } }],
+};
+
+test('EACH ROW OF A SCOPE QUESTION SAYS WHY IT MOVES: its own reason, with the title it was led by cut', async () => {
+  /* ONE OF `fixtures/names.ts`'s invented projects, written here: a file under `src/` may not reach out of `apps/web`
+     by a relative path (`graph`, 31 §3 layer 3). */
+  const PROJECTS = ['Lanternfish'] as const;
+  const out = updatesOf(
+    {
+      register: 'keys',
+      rows: [
+        { at: 'keys#4', version: 2, patch: { project: 'projects#1' } },
+        { at: 'keys#5', version: 1, patch: { project: 'projects#2' } },
+        { at: 'runs#2', version: 1, register: 'runs', patch: { project: 'projects#1' } },
+      ],
+      why: [
+        { text: `Deploy token: used by 3 runs in ${PROJECTS[0]}.`, at: 'keys#4' },
+        { text: `Nightly build: started from ${PROJECTS[0]} twice.`, at: 'runs#2' },
+      ],
+    },
+    { keys, runs },
+    scoped,
+    () => null,
+  );
+  assert.deepEqual(
+    out.map((u) => [u.at, u.title, u.why]),
+    [
+      ['keys#4', 'Deploy token', `used by 3 runs in ${PROJECTS[0]}.`],
+      ['keys#5', 'Mail key', undefined],
+      ['runs#2', 'Nightly build', `started from ${PROJECTS[0]} twice.`],
+    ],
+  );
+  assert.equal(Object.hasOwn(out[1]!, 'why'), false, 'a row with no reason draws none');
+});
+
+test('a reason is matched to its row by the row’s internal id or its number, never across lists, and one not led by the title is kept whole', () => {
+  const out = updatesOf(
+    {
+      register: 'keys',
+      rows: [
+        { at: '01J0000000000000000000KEY4', version: 2, patch: { project: 'projects#1' } },
+        { at: 'keys#5', version: 1, patch: { project: 'projects#2' } },
+      ],
+      why: [
+        { text: 'Deploy token: named in two notes.', at: '01J0000000000000000000KEY4' },
+        { text: 'Seen in one project only.', at: 'keys#05' },
+        { text: 'Mail key: a run of another list.', at: 'runs#5' },
+      ],
+    },
+    { keys, runs },
+    scoped,
+    () => null,
+  );
+  assert.deepEqual(out.map((u) => u.why), ['named in two notes.', 'Seen in one project only.']);
+});
+
+test('the words for the reasons the queue’s card leaves out count them plainly', async () => {
+  const { moreReasons } = await import('./changes.ts');
+  assert.equal(moreReasons(1), 'and one more reason');
+  assert.equal(moreReasons(51), 'and 51 more reasons');
+});

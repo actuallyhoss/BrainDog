@@ -23,6 +23,7 @@ import { keptLists, modulesFor, useCase, useCaseDocument } from '../src/usecases
 import { carriedDocument, dayOf, moduleDocument } from '../src/usecases/install.ts';
 import { peopleBefore3 } from './people-before-3.ts';
 import { CHASING } from '../src/modules/money/pages/parts/chasing.ts';
+import { NEXT_30 } from '../src/modules/money/pages/parts/next30.ts';
 
 type Body = Record<string, unknown>;
 const TODAY = dayOf(NOW);
@@ -718,6 +719,11 @@ const withoutBatch78 = (doc: Body): Body => {
   const book = withPage(money, 'money-book', (now) => now.filter((b) => !(b.kind === 'note' && (b.when as Body | undefined)?.metric === 'book-lasts-until:{{name}}')));
   return { ...book, declarations: (book.declarations as Body[]).filter((d) => d.script !== 'match_payment' && d.rule !== 'payment-matches' && d.rule !== 'instalment-settles' && d.script !== 'file_back' && d.script !== 'learn_category' && d.rule !== 'rule-files-back' && d.rule !== 'category-teaches' && d.rule !== 'category-taught') };
 };
+/** AND BATCH 92'S, folded into the same unreleased step and undone first (money-every-month-92, REC-B23 jobs 5 to 7): the walk of the next thirty days stands under Coming and going again, Every month goes, and the chart reads twelve months back. And a deleted payment no longer reopens its bill (unsettle-92): `payment-unsettles` and its script go. */
+const withoutBatch92 = (doc: Body): Body => {
+  const money = withPage(doc, 'money', (now) => now.filter((b) => b.heading !== 'Every month').flatMap((b) => (b.heading === 'Coming and going' ? [b, NEXT_30.find((x) => x.kind === 'bridge') as Body] : [b])).map((b) => (b.heading === 'In and out, by month' ? { ...b, back: 12 } : b)));
+  return { ...money, declarations: (money.declarations as Body[]).filter((d) => d.script !== 'unsettle' && d.rule !== 'payment-unsettles') };
+};
 /** Batch 63's four figures of this month's spending against last (spend-figures-63), new in the unreleased money-core 3.17.0. */
 const SPEND_VS_LAST: ReadonlySet<string> = new Set(['spent-last-month', 'spent-by-category-last-month', 'spent-by-category-to-date-last-month', 'spent-vs-last-month']);
 const LATEST: Record<string, { version: string; released: string; undo: (doc: Body) => Body }> = {
@@ -726,7 +732,7 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
     version: '3.13.0',
     released: '2e09983b40aba73e',
     undo: (raw) => {
-      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(withoutPlanLeads(withoutBatch73(withoutBatch74(withoutBatch75(withoutBatch76(withoutBatch77(withoutBatch78(raw))))))))))))))))));
+      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(withoutPlanLeads(withoutBatch73(withoutBatch74(withoutBatch75(withoutBatch76(withoutBatch77(withoutBatch78(withoutBatch92(raw)))))))))))))))))));
       return {
       ...doc,
       /* AND THE SCRIPT THAT MARKS A BILL PAID, WITH THE RULE THAT STARTS IT (settle-rule-60), both newer than 3.13.0. */
@@ -953,7 +959,8 @@ test('THE SECOND DESIGN REVIEW’S PAGE FIXES GO IN ON THEIR OWN over the versio
   /* THE BOARD AND THE WALK OF THIRTY DAYS WEAR NO HEADING. */
   assert.deepEqual(blocks('work-board').filter((b) => b.kind === 'board').map((b) => [b.heading, b.icon]), [[undefined, undefined]]);
   const money = blocks('money');
-  assert.deepEqual([money[money.findIndex((b) => b.heading === 'Coming and going') + 1]!.kind, money.find((b) => b.kind === 'bridge')!.heading], ['bridge', undefined]);
+  /* AND SINCE REC-B23 NO WALK OF THIRTY DAYS AT ALL: the calendar opens Coming and going. */
+  assert.deepEqual([money[money.findIndex((b) => b.heading === 'Coming and going') + 1]!.kind, money.some((b) => b.kind === 'bridge')], ['calendar', false]);
   /* PEOPLE DRAWS NO DOTS, AND SINCE 3.2.0 NO LIST OVER ITS CARDS EITHER, and keeps the figures the chart and the list drew on. */
   const people = blocks('people');
   assert.ok(!people.some((b) => b.kind === 'heat'), 'the twelve weeks of dots are still on People');

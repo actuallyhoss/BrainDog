@@ -102,8 +102,96 @@ export function foldQuestion(decl: { name?: unknown; one?: unknown } | undefined
     : `${n} ${many.toLowerCase()} are here twice. Keep ${kept}${each}?`;
 }
 
-/** The cause his press files the fold under, so one list holds at most one open fold. */
-export const foldCause = (register: string): string => `tidy#same#${register}`;
+/**
+ * The cause his press files the fold under, so one list holds at most one open fold of the whole of it. A fold of some
+ * groups only is filed under the list and the rows kept of those groups, sorted, so a press for other groups is its own
+ * question and a press for the same ones again answers the one waiting. A cause is at most 200 characters, so a pick
+ * too long to spell is filed under a fingerprint of the same sorted rows instead, two runs of 32-bit FNV-1a.
+ */
+export function foldCause(register: string, keeps?: readonly string[]): string {
+  const whole = `tidy#same#${register}`;
+  if (keeps === undefined || keeps.length === 0) return whole;
+  const sorted = [...keeps].sort().join('.');
+  if (whole.length + 1 + sorted.length <= CAUSE_MOST) return `${whole}#${sorted}`;
+  let a = 0x811c9dc5;
+  let b = 0x050c5d1f;
+  for (let i = 0; i < sorted.length; i++) {
+    const c = sorted.charCodeAt(i);
+    a = Math.imul(a ^ c, 0x01000193) >>> 0;
+    b = Math.imul(b ^ c, 0x01000193) >>> 0;
+  }
+  return `${whole}#${String(keeps.length)}.${a.toString(16).padStart(8, '0')}${b.toString(16).padStart(8, '0')}`;
+}
+
+/** The longest cause the record files a question under. */
+const CAUSE_MOST = 200;
+
+/** A field of a list that links to the list itself, as the kernel's plan reads one (`same.ts` `linksInto`). */
+type LinkField = { id: string; type?: unknown; of?: unknown; to?: unknown; retired?: unknown; derived?: unknown };
+
+/** The fields of `decl` that link into `register`: a ref, or a list of refs, live and typed in. */
+export const linksIn = (decl: unknown, register: string): string[] =>
+  ((decl as { fields?: unknown } | undefined)?.fields as LinkField[] | undefined ?? [])
+    .filter((f) => f !== null && typeof f === 'object' && f.retired !== true && f.derived !== true && f.to === register && (f.type === 'ref' || (f.type === 'list' && f.of === 'ref')))
+    .map((f) => f.id);
+
+/**
+ * THE WRITES THAT FOLD SOME GROUPS ONLY, out of the plan for the whole list (AGT-D04): he picked two skills that are
+ * one, and only their group is folded. Read from the writes, never from which group carries them, because the plan
+ * writes a row pointing into two groups once, under the first group that names it.
+ *
+ * Each row folded away is kept only for a group picked. Each link moved is kept only for the links it moves into a
+ * group picked, recomputed from the row as it is now (`fieldsOf`), so a link into a group left alone stays as it was.
+ * And a row the plan would have folded away, left alone now, has its own links into a group picked moved too
+ * (`links`, the list's fields that link to it), since the plan never writes the links of a row it folds. Links first,
+ * so no write folds away a row another still points at.
+ */
+export function pickedWrites(
+  writes: readonly FoldWrite[],
+  groups: readonly Clash[],
+  picked: readonly Clash[],
+  register: string,
+  links: readonly string[],
+  fieldsOf: (id: string) => Readonly<Record<string, unknown>> | undefined,
+): FoldWrite[] {
+  const into = new Map<string, string>();
+  for (const g of picked) for (const o of g.others) into.set(o, g.keep);
+  const away = new Set(groups.flatMap((g) => g.others));
+  const moved = (v: unknown): unknown => {
+    if (typeof v === 'string') return into.get(v);
+    if (!Array.isArray(v) || !v.some((x) => typeof x === 'string' && into.has(x))) return undefined;
+    return [...new Set(v.map((x) => (typeof x === 'string' ? (into.get(x) ?? x) : x)).filter((x): x is string => typeof x === 'string'))];
+  };
+  const patchOf = (held: Readonly<Record<string, unknown>>, fields: Iterable<string>): Record<string, unknown> | null => {
+    const patch: Record<string, unknown> = {};
+    for (const f of fields) {
+      const to = moved(held[f]);
+      if (to !== undefined) patch[f] = to;
+    }
+    return Object.keys(patch).length > 0 ? patch : null;
+  };
+
+  const linked: FoldWrite[] = [];
+  const folds: FoldWrite[] = [];
+  for (const w of writes) {
+    if (away.has(w.at)) {
+      if (into.has(w.at)) folds.push(w);
+      continue;
+    }
+    const patch = patchOf(fieldsOf(w.at) ?? {}, Object.keys(w.patch));
+    if (patch !== null) linked.push({ ...w, patch });
+  }
+  for (const id of away) {
+    if (into.has(id)) continue;
+    const held = fieldsOf(id);
+    const patch = held === undefined ? null : patchOf(held, links);
+    if (patch !== null) linked.push({ register, at: id, patch });
+  }
+  return [...linked, ...folds];
+}
+
+/** At most how many picked a press names, so one call never reads the whole record a row at a time. */
+const PICK_MOST = 1000;
 
 /** The sentence a token's press is refused in: folding is a person's own press, as putting a list back is. */
 const PERSONS = 'Folding what is here twice changes many things at once, and only a person decides that, signed in. Open the list in the app.';
@@ -178,12 +266,16 @@ export function methods(deps: RecordDeps, readers?: SameReaders) {
     },
 
     /**
-     * `{ register }`: one question on Decide that folds everything the list holds twice, "3 skills are here twice. Keep
-     * the oldest of each?", signed by the person who pressed. Accepting it writes the kernel's plan in one batch, so one
-     * Undo brings every row back. Answers `{ question }`, and the one already waiting when it is pressed again. DATA, a
-     * person's only, and nothing is folded until the question is answered.
+     * `{ register, rows? }`: one question on Decide that folds everything the list holds twice, "3 skills are here twice.
+     * Keep the oldest of each?", signed by the person who pressed. Accepting it writes the kernel's plan in one batch, so
+     * one Undo brings every row back. Answers `{ question }`, and the one already waiting when it is pressed again. DATA,
+     * a person's only, and nothing is folded until the question is answered.
+     *
+     * WITH `rows`, THE ONES HE PICKED (each by its number in the list, its handle or its id), only the groups holding one
+     * of them are asked about and folded. None of them held twice is refused at `rows`. A fold of the whole list already
+     * waiting holds them, so it is the one answered, never a second question over the same things.
      */
-    async askFoldTwice(args: { register?: unknown } | undefined, ctx: CallContext): Promise<Result<FoldAsked>> {
+    async askFoldTwice(args: { register?: unknown; rows?: unknown } | undefined, ctx: CallContext): Promise<Result<FoldAsked>> {
       const stop = guard(ctx, 'write', typeof args?.register === 'string' ? args.register : undefined);
       if (stop) return { ok: false, refusal: stop };
       const listed = listOf(args);
@@ -197,11 +289,37 @@ export function methods(deps: RecordDeps, readers?: SameReaders) {
         return no('VALUE_MALFORMED', `${name} does not say what makes two of them the same, so nothing in it is folded as one.`, { at: 'register' });
       if (same.sameClashes === undefined || same.sameFoldPlan === undefined)
         return no('NOT_IN_THIS_BUILD', `This BrainDog cannot fold what is here twice in ${name} yet. It arrives with the next update.`);
+      const many = String(name).toLowerCase();
+      const asked = args?.rows;
+      const handle = (r: unknown): boolean =>
+        (typeof r === 'number' && Number.isInteger(r) && r > 0) || (typeof r === 'string' && r !== '' && r.length <= 80 && !/\s/u.test(r));
+      if (asked !== undefined && (!Array.isArray(asked) || asked.length === 0 || asked.length > PICK_MOST || !asked.every(handle)))
+        return no('VALUE_MALFORMED', `Say which ${many} to fold: rows is a list of the ones picked, each by its number in the list.`, { at: 'rows' });
 
-      const groups = groupsOf(register);
-      if (groups.length === 0) return no('ALREADY_KNOWN', `Nothing in ${name} is here twice, so nothing was asked.`, { at: 'register' });
-      /* A FOLD IS OF THE WHOLE LIST, so somebody whose grant leaves out a row of it is not the one to ask for it: the rows
-         they cannot read are never named, and nothing is filed. */
+      const all = groupsOf(register);
+      if (all.length === 0) return no('ALREADY_KNOWN', `Nothing in ${name} is here twice, so nothing was asked.`, { at: 'register' });
+      /* THE GROUPS HE PICKED FROM: each one picked read as the record names it, and a group kept when its kept row or
+         one of its others is among them. Something gone, or of another list, is simply not among them. */
+      let groups = all;
+      if (Array.isArray(asked)) {
+        const ids = new Set<string>();
+        for (const r of asked as (string | number)[]) {
+          const row = kernel.get(typeof r === 'number' || /^\d+$/u.test(r) ? `${register}#${String(r)}` : r);
+          if (row !== null && row.register === register) ids.add(row.id);
+        }
+        groups = all.filter((g) => [g.keep, ...g.others].some((id) => ids.has(id)));
+        if (groups.length === 0)
+          return no('VALUE_MALFORMED', `None of the ${many} picked is here twice, so nothing was asked. Pick the ones the list shows as here twice.`, { at: 'rows' });
+      }
+      const some = groups.length < all.length;
+      /* A FOLD OF THE WHOLE LIST ALREADY WAITING HOLDS THESE TOO, so it is the question answered, never a second one
+         asking to fold the same things. */
+      if (some) {
+        const waiting = sql.one<{ id: string }>("SELECT id FROM suggestion WHERE cause = ? AND status = 'open' LIMIT 1", foldCause(register));
+        if (waiting) return tail({ ok: true as const, value: { question: waiting.id } });
+      }
+      /* A FOLD IS OF EVERY ROW IT NAMES, so somebody whose grant leaves out one of them is not the one to ask for it: the
+         rows they cannot read are never named, and nothing is filed. */
       const admitted = admittedBy(ctx, register);
       const unseen = groups.some((g) => [g.keep, ...g.others].some((id) => {
         const seq = seqOf(id, register);
@@ -210,7 +328,8 @@ export function methods(deps: RecordDeps, readers?: SameReaders) {
       if (unseen)
         return no('FORBIDDEN', `Some of what is here twice in ${name} is outside what you can see, so folding it is for somebody who sees all of ${name}.`, { at: 'register' });
 
-      const writes = writesOf(same.sameFoldPlan(register), new Date(clock.now()).toISOString());
+      const planned = writesOf(same.sameFoldPlan(register), new Date(clock.now()).toISOString());
+      const writes = some ? pickedWrites(planned, all, groups, register, linksIn(decl, register), (id) => kernel.get(id)?.fields) : planned;
       /* A LINK HELD IN ANOTHER LIST MOVES IN THE SAME QUESTION: its row names its own list (`register`), and whoever
          pressed must be one who may write there too, since accepting writes it as the fold's own change. */
       for (const there of new Set(writes.filter((w) => w.register !== register).map((w) => w.register))) {
@@ -240,7 +359,7 @@ export function methods(deps: RecordDeps, readers?: SameReaders) {
           question: foldQuestion(decl as { name?: unknown; one?: unknown }, rule, groups.length),
           body_kind: 'rowset',
           body: { register, rows: [...rows.values()] },
-          cause: foldCause(register),
+          cause: foldCause(register, some ? groups.map((g) => g.keep) : undefined),
           again: 'You asked again from the list.',
         },
         { actor: ctx.principal.id },

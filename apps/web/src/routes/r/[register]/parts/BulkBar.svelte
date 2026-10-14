@@ -23,7 +23,9 @@
   say where they apply (a key, a tool, a skill, a learning): one sheet of places, one press, every one picked moved,
   one sentence and one Undo (`scope-move.ts` `moveMany`). Keys going to Everywhere are asked about first, as one key is
   on its own page. "Fold into one" is on the bar of the list that keeps people, for two to twelve picked: it asks on
-  Decide whether they are the same one and opens that question, and folds nobody itself.
+  Decide whether they are the same one and opens that question, and folds nobody itself. On a list that says what makes
+  two of its things the same (a skill, a key, a learning), it is there for two or more picked: one question folds just
+  the ones picked with what they are here twice with, and Decide's answer has one Undo.
 -->
 <script lang="ts">
   import { copy } from '$lib/copy.ts';
@@ -40,6 +42,7 @@
   import Sheet from '$lib/ui/Sheet.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
+  import { foldAsk, sameOf } from '../twice-fold.ts';
 
   let {
     count,
@@ -121,15 +124,34 @@
     say(out, movedSaid(out, to));
   }
 
-  /* ── FOLD INTO ONE ── the list that keeps people (`meets:`), and as many as one question asks about. */
+  /* ── FOLD INTO ONE ── the list that keeps people (`meets:`), and as many as one question asks about; or a list that
+     says what makes two of its things the same (`same:`), where the picked are folded with what they are here twice
+     with, in one question (`foldAsk`). A host with no such fold takes the button away. */
   const FOLD_MOST = 12;
-  const canFold = $derived(picked !== undefined && decl?.meets !== undefined && picked.length >= 2 && picked.length <= FOLD_MOST);
+  const sameList = $derived(sameOf(decl) !== null);
+  let foldGone = $state<string | null>(null);
+  const canFold = $derived(
+    picked !== undefined &&
+      picked.length >= 2 &&
+      (decl?.meets !== undefined ? picked.length <= FOLD_MOST : sameList && foldGone !== decl?.id),
+  );
   let folding = $state(false);
 
   async function fold() {
     const id = decl?.id;
     if (folding || !id || !picked || !canFold) return;
     folding = true;
+    if (sameList) {
+      const asked = await foldAsk((name, args) => createClient({ base: apiBase() }).call(name, args), id, picked.map((r) => r.seq));
+      folding = false;
+      if (!asked.ok) {
+        toasts.push(asked.said, { intent: 'warn' });
+        if (asked.gone) foldGone = id;
+        return;
+      }
+      void goto(at(asked.href));
+      return;
+    }
     const out = await createClient({ base: apiBase() }).sameOne({ register: id, rows: picked.map((r) => `${id}#${r.seq}`) });
     folding = false;
     if (!out.ok) {

@@ -4,7 +4,8 @@
  * `engineHealth` says whether the model answers. This says what the engine did with the answers: for each purpose, how
  * many asks reached a model in the last day, week and month, and of the last day's how many were answered, how many
  * answers were kept and how many asks were refused; what still waits for a read and since when; and the newest failure.
- * Then the understanding: mentions that point at nothing, and the open questions by the kind of their cause.
+ * Then the understanding: mentions that point at nothing, and the open questions by the kind of their cause. Then the
+ * brake on Slash's questions (ENG-B17), echoed from the kernel's reading with the share it was worked out from.
  *
  * PURE. The caller reads the ledger, the queue of what is owed, the mentions and the open questions, and hands them in
  * with the time. Nothing here opens a store or reads a clock, so the counts are held by a test over a ledger it writes.
@@ -51,7 +52,16 @@ export type ReadingsOf = {
   owed: readonly OwedRead[];
   mentions: readonly MentionSeen[];
   questions: readonly OpenQuestion[];
+  /**
+   * The brake on Slash's questions, as the kernel's `slashBrake` reads it (ENG-B17): on or off, the share of his last
+   * answers he took up, and how many it was worked out from. Absent where the caller read none, and the reading says
+   * `null` then, never a brake that is off: an unread brake and a free one are not the same answer.
+   */
+  braked?: Braked | null | undefined;
 };
+
+/** Whether Slash's questions are braked, with the share and the count it was worked out from. */
+export type Braked = { on: boolean; share: number; of: number };
 
 export type AskReading = {
   purpose: string;
@@ -73,6 +83,8 @@ export type AskReading = {
 export type EngineReadings = {
   asks: AskReading[];
   understanding: { unattached: number; open_by_cause: Record<string, number> };
+  /** The brake on Slash's questions, or `null` where it was not read. */
+  braked: Braked | null;
 };
 
 /** Where a purpose or a cause that is not a plain word is counted. */
@@ -108,6 +120,16 @@ const said = (c: LedgerCall): 'answered' | 'failed' | 'budget' | 'silent' => {
 };
 
 const byName = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+
+/**
+ * The brake as handed in, held to its shape: a share outside 0..1 or a count that is not a whole number is no reading,
+ * so `null`, the same as one never read. Echoed, never worked out here: the kernel owns the arithmetic.
+ */
+const brakedOf = (b: Braked | null | undefined): Braked | null => {
+  if (b === null || b === undefined || typeof b.on !== 'boolean') return null;
+  if (!Number.isFinite(b.share) || b.share < 0 || b.share > 1 || !Number.isInteger(b.of) || b.of < 0) return null;
+  return { on: b.on, share: b.share, of: b.of };
+};
 
 /** Count the ledger, the queue, the mentions and the open questions handed in, as they stand at `of.now`. */
 export function engineReadings(of: ReadingsOf): EngineReadings {
@@ -174,5 +196,6 @@ export function engineReadings(of: ReadingsOf): EngineReadings {
       unattached: of.mentions.reduce((n, m) => n + (m.attached ? 0 : 1), 0),
       open_by_cause: Object.fromEntries([...causes.entries()].sort((a, b) => byName(a[0], b[0]))),
     },
+    braked: brakedOf(of.braked),
   };
 }

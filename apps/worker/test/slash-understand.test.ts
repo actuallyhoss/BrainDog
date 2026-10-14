@@ -12,6 +12,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { SLASH_MENTIONS_INSTRUCTIONS, SLASH_RESOLVE_INSTRUCTIONS, UNDERSTAND_ASK } from '@braindog/host/understand';
+import { SLASH_ABOUT_ASK } from '@braindog/host/slash';
+import { askAbout, type AboutJob } from '../../../packages/host/src/about.ts';
+
+import { COMPANIES, PEOPLE } from '../../../fixtures/names.ts';
 
 import { openSqlite } from '../../../packages/kernel/test/sqlite.ts';
 import { workerModelJobs } from '../src/slash-jobs.ts';
@@ -97,4 +101,43 @@ test("HIS OWN MONTH OF ASKS SPENT DOES NOT STOP IT: understanding is the backgro
 
 test('NO MODEL IS NO READING: a Worker with nothing to ask offers no jobs at all', () => {
   assert.equal(workerModelJobs({}, noGrants, { sql: openSqlite(), clock }), undefined);
+});
+
+/* ONE JOB OF THE ABOUT READ: a note that names a person and the company she is at, both handed as candidates. */
+const PRIYA = PEOPLE[3]!.name;
+const SALTMARSH = COMPANIES[1];
+const ABOUT_JOB: AboutJob = {
+  items: [{ n: 1, kind: 'note', where: 'a note', text: `${PRIYA} sent the signed order from ${SALTMARSH}.`, trusted: true }],
+  candidates: [
+    { h: 'h1', kind: 'person', name: PRIYA, also: [], seen: [], how: 'name' },
+    { h: 'h2', kind: 'org', name: SALTMARSH, also: [], seen: [], how: 'key' },
+  ],
+};
+
+test('THE INCLUDED MODEL IS ASKED WHO A THING IS ABOUT, with the about ask, as one background row under UNDERSTAND_ASK', async () => {
+  const answer = { about: [{ n: 1, kind: 'person', name: PRIYA, is: 'h1', sentence: `${PRIYA} sent the signed order from ${SALTMARSH}.`, role: 'buyer', with: [] }] };
+  const ai = fakeAi([JSON.stringify(answer)]);
+  const sql = openSqlite();
+  const jobs = workerModelJobs({ AI: ai.AI, AI_GATEWAY: 'braindog', SLASH_INCLUDED: 'yes' }, noGrants, { sql, clock });
+  assert.ok(jobs?.about, 'a Worker with a model could not be asked who a thing is about');
+
+  const asked = await askAbout(jobs.about, ABOUT_JOB);
+  assert.equal(asked.by, 'model');
+  assert.deepEqual(asked.kept.attach.map((a) => [a.h, a.name, a.role]), [['h1', PRIYA, 'buyer']]);
+  assert.deepEqual(ai.runs.map((r) => r.system), [SLASH_ABOUT_ASK]);
+  const rows = sql.all<{ question: string; status: string }>('SELECT question, status FROM slash_call').map((r) => ({ ...r }));
+  assert.deepEqual(rows, [{ question: UNDERSTAND_ASK, status: 'ok' }]);
+});
+
+test('AT AN OPERATOR CEILING OF 0 THE ABOUT ASK IS NEVER SENT, and the rules keep the key hit alone', async () => {
+  const ai = fakeAi(['{"about":[]}']);
+  const jobs = workerModelJobs(
+    { AI: ai.AI, AI_GATEWAY: 'braindog', SLASH_INCLUDED: 'yes', SLASH_INCLUDED_MONTH_NEURONS: '0' },
+    noGrants,
+    { sql: openSqlite(), clock },
+  );
+  const asked = await askAbout(jobs?.about, ABOUT_JOB);
+  assert.equal(asked.by, 'rules');
+  assert.deepEqual(asked.kept.attach.map((a) => a.h), ['h2']);
+  assert.equal(ai.runs.length, 0);
 });

@@ -37,6 +37,7 @@
  */
 
 import {
+  SLASH_ABOUT_ASK,
   SLASH_BRIEF_INSTRUCTIONS,
   SLASH_HEADLINE_INSTRUCTIONS,
   SLASH_INSTRUCTIONS,
@@ -156,6 +157,17 @@ const CARDS: JsonSchema = { type: 'object', properties: { cards: { type: 'array'
    is checked by `@braindog/host/understand` (`settleResolve`, `mentionsKept`), which keeps only what it handed out. */
 const VERDICTS: JsonSchema = { type: 'object', properties: { verdicts: { type: 'object' } }, required: ['verdicts'] };
 const MENTIONS: JsonSchema = { type: 'object', properties: { mentions: { type: 'array', items: { type: 'object' } } }, required: ['mentions'] };
+/* Who and what a job of things is about: the names, and for an arrival its triage and the quotes of its fields. Each is
+   checked by `@braindog/host`'s `aboutKept`, which keeps only the handles it handed and the text's own words. */
+const ABOUT: JsonSchema = {
+  type: 'object',
+  properties: {
+    about: { type: 'array', items: { type: 'object' } },
+    triage: { type: 'array', items: { type: 'object' } },
+    fields: { type: 'array', items: { type: 'object' } },
+  },
+  required: ['about'],
+};
 
 /**
  * One call to a model that did not answer, for the operator (ENG-A01): what `index.ts` writes as an `op: 'model'` line
@@ -350,6 +362,8 @@ export function includedModel(env: SlashEnv, onFail?: OnModelFail): WorkerSlashM
     brief: (input) => ask(SLASH_BRIEF_INSTRUCTIONS, input, CARDS),
     resolve: (input) => ask(SLASH_RESOLVE_INSTRUCTIONS, input, VERDICTS),
     mentions: (input) => ask(SLASH_MENTIONS_INSTRUCTIONS, input, MENTIONS),
+    /* WHO AND WHAT A THING IS ABOUT, the same background ask under the same worst-ask bound. */
+    about: (input) => ask(SLASH_ABOUT_ASK, input, ABOUT),
   };
 }
 
@@ -424,6 +438,7 @@ const ownTold = (model: WorkerSlashModel, key: { provider: string; model: string
     draft: wrap(model.draft.bind(model)),
     resolve: wrap(model.resolve.bind(model)),
     mentions: wrap(model.mentions.bind(model)),
+    ...(model.about ? { about: wrap(model.about.bind(model)) } : {}),
     ...(model.form ? { form: wrap(model.form.bind(model)) } : {}),
     ...(model.skill ? { skill: wrap(model.skill.bind(model)) } : {}),
     ...(model.headline ? { headline: wrap(model.headline.bind(model)) } : {}),
@@ -497,6 +512,13 @@ export function workerSlashModel(env: SlashEnv, api: () => Pick<RecordApi, 'kern
     /* WHO IS WHO, the model-jobs pass's two asks, through the same choice: the doubtful pairs and the night's notes. */
     resolve: async (input) => chosen().resolve(input),
     mentions: async (input) => chosen().mentions(input),
+    /* WHO AND WHAT A THING IS ABOUT, through the same choice: a model that reads none is never sent, and the rules keep
+       the key hits alone. */
+    about: async (input) => {
+      const model = chosen();
+      if (model.about === undefined) throw new NotSent('The model Slash answers with here reads nothing for who it is about.');
+      return model.about(input);
+    },
   };
 }
 

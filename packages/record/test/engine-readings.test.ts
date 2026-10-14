@@ -35,7 +35,7 @@ const of = (over: Partial<ReadingsOf> = {}): ReadingsOf => ({ now: NOW, calls: [
 const ask = (r: ReturnType<typeof engineReadings>, purpose: string) => r.asks.find((a) => a.purpose === purpose);
 
 test('an empty ledger reads as nothing asked and nothing open', () => {
-  assert.deepEqual(engineReadings(of()), { asks: [], understanding: { unattached: 0, open_by_cause: {} } });
+  assert.deepEqual(engineReadings(of()), { asks: [], understanding: { unattached: 0, open_by_cause: {} }, braked: null });
 });
 
 test('asked is counted by purpose over the last day, week and month', () => {
@@ -185,4 +185,19 @@ test('the reader changes nothing it was handed', () => {
   const calls = Object.freeze([Object.freeze(call('look', HOUR))]);
   const owed = Object.freeze([Object.freeze({ purpose: 'look', at: ago(HOUR) })]);
   assert.doesNotThrow(() => engineReadings(of({ calls, owed })));
+});
+
+/* THE BRAKE ON SLASH'S QUESTIONS (ENG-B17): echoed with the share it was worked out from, and `null` where it was not read,
+   never a brake that is off. */
+test('the brake reads true or false with its share, and null where none was handed in', () => {
+  assert.deepEqual(engineReadings(of({ braked: { on: true, share: 0.55, of: 20 } })).braked, { on: true, share: 0.55, of: 20 });
+  assert.deepEqual(engineReadings(of({ braked: { on: false, share: 0.7, of: 20 } })).braked, { on: false, share: 0.7, of: 20 });
+  assert.equal(engineReadings(of()).braked, null);
+  assert.equal(engineReadings(of({ braked: null })).braked, null);
+});
+
+test('a brake out of its shape is no reading: a share past one or a count that is not whole reads null', () => {
+  assert.equal(engineReadings(of({ braked: { on: true, share: 1.5, of: 20 } })).braked, null);
+  assert.equal(engineReadings(of({ braked: { on: false, share: 0.5, of: 2.5 } })).braked, null);
+  assert.equal(engineReadings(of({ braked: { on: false, share: Number.NaN, of: 20 } })).braked, null);
 });

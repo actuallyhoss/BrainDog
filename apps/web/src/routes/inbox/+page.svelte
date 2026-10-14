@@ -151,6 +151,28 @@
 
   let open = $state<string | null>(null);
 
+  /**
+   * WHAT EACH WAITING ARRIVAL IS, the record's line under its title ("Payment, EGP 420, Quietcart", "From Mara Okafor").
+   * Asked once the rows are drawn, in one call for the newest not yet asked, and never waited on: a row draws its title
+   * at once and the line joins it. A host that does not answer draws no line, and is not asked again.
+   */
+  let hintLines = $state.raw<ReadonlyMap<string, string>>(new Map());
+  const hintsAsked = new Set<string>();
+  let hintsOff = false;
+  function askHints(items: readonly InboxItem[]) {
+    if (hintsOff) return;
+    const ids = items.map((i) => i.id).filter((id) => !hintsAsked.has(id)).slice(0, 50 /* `HINTS_MOST` */);
+    if (ids.length === 0) return;
+    for (const id of ids) hintsAsked.add(id);
+    void import('./hints.ts')
+      .then((m) => m.linesFor(apiBase(), ids))
+      .then((read) => {
+        if (read === null) hintsOff = true;
+        else if (read.size > 0) hintLines = new Map([...hintLines, ...read]);
+      })
+      .catch(() => (hintsOff = true));
+  }
+
   $effect(() => {
     /* UNTRACKED, ALL OF IT. The effect read `route.data.live`, so the `invalidateAll` after every filing re-ran the
        read and put the open row and the cursor back on the first arrival. And it reads the pending count it writes.
@@ -166,6 +188,7 @@
           live = { items: out.items, cursor: out.cursor };
           open = out.items[0]?.id ?? null;
           ok = true;
+          askHints(out.items);
         } else if (out.from === 'unrouted') {
           unrouted = true;
           ok = true;
@@ -339,6 +362,7 @@
     shapes = read;
     live = { items: out.items, cursor: out.cursor };
     if (open !== null && !out.items.some((i) => i.id === open)) open = null;
+    askHints(out.items);
   }
 
   /**
@@ -358,6 +382,7 @@
       if (out.from === 'live') {
         shapes = new Map([...shapes, ...read]);
         live = { items: [...had.items, ...out.items], cursor: out.cursor };
+        askHints(out.items);
       } else if (out.from === 'refused') olderFix = out.fix;
     } finally {
       older = false;
@@ -925,6 +950,7 @@
                 >
                   <span class="line-main">
                     <span class="line-title">{item.subject}</span>
+                    {#if hintLines.get(item.id)}<span class="hint">{hintLines.get(item.id)}</span>{/if}
                     <span class="line-detail"><span class="from">{item.from}</span>{#if open !== item.id && item.body}<span class="gist">{firstWords(item.body)}</span>{/if}</span>
                   </span>
                   <span class="line-when">{since(item.arrived, clock)}</span>
@@ -1432,6 +1458,16 @@
   .gist::before {
     content: '·';
     margin-inline: var(--sp-2);
+  }
+
+  /* WHAT THE RECORD READ IT AS, under the subject: muted, at the body's size, one line. */
+  .hint {
+    overflow: hidden;
+    color: var(--dim);
+    font-size: var(--t-base);
+    line-height: 20px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   /* THE BODY SITS UNDER THE SUBJECT, on the ground: space opens it, not a slab. */

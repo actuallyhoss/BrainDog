@@ -205,7 +205,7 @@ test('TWO CREATES WITH ONE op_id OVER /api ARE ONE TASK, and the second answers 
 });
 
 /**
- * The agent's key climbed to "Let it, and tell me" for adding tasks, as a person climbs it: ten tasks it asked to add,
+ * The agent's key climbed to "Do and tell" for adding tasks, as a person climbs it: ten tasks it asked to add,
  * each accepted as it was, then a yes to the offer the tenth brings. Before that every create it sends is a question.
  */
 async function climbed(r: { owner: Client; bearer: string }): Promise<void> {

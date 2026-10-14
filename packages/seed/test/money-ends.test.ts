@@ -43,8 +43,6 @@ const MONEY_CORE_2_3_0 = JSON.parse(readFileSync(new URL('./fixtures/money-core-
 const OWNER = { actor: 'p_1' };
 
 /** The steps of the row called `what` in the walk a block on `/p/money` draws, as `day delta`. */
-/* BY ITS HEADING, OR BY ITS KIND WHERE IT WEARS NONE: the walk of the next thirty days is the first thing under Coming
-   and going and has had no heading of its own since money-core 3.13.0, so it is asked for as `bridge`. */
 function walked(k: Kernel, heading: string, what: string): string[] {
   const out = k.page('money');
   assert.ok(out.ok, sayOf(out));
@@ -93,10 +91,8 @@ test('money-core declares `ends` on Money as a day, and names it on the repeatin
     .map((b) => ({ ...b, heading: b.heading ?? b.kind }));
   assert.deepEqual(
     legs.map((b) => [b.heading, b.from!.find((l) => l.register === 'recurring')?.ends]),
-    [
-      ['Cash ahead', 'ends'],
-      ['bridge', 'ends'],
-    ],
+    /* THE WALK OF THIRTY DAYS IS OFF THE PAGE SINCE REC-B23 (money-every-month-92), so Cash ahead is the one walk. */
+    [['Cash ahead', 'ends']],
   );
   /* A BILL IS WALKED ONCE, AND ONE THAT SAYS IT REPEATS NOT AT ALL, so the obligations leg has no end to stop on. */
   for (const b of legs) {
@@ -116,7 +112,6 @@ test('a monthly line ending on 10 November walks 10 September, October and Novem
   assert.ok(made.ok, sayOf(made));
   /* THE END IS INCLUSIVE, because an imported end day is the last payday: see `Leg.ends`. */
   assert.deepEqual(walked(k, 'Cash ahead', HOSTING.what), ['2026-09-10 -4500', '2026-10-10 -4500', '2026-11-10 -4500']);
-  assert.deepEqual(walked(k, 'bridge', HOSTING.what), ['2026-09-10 -4500']);
 
   /* A BILL THAT SAYS IT REPEATS IS KEPT AND NOT WALKED, end or none: its money moves on the line in `recurring`. */
   value(k.create('obligations', { ...HOSTING_BILL, ends: '2026-11-10' }, OWNER));

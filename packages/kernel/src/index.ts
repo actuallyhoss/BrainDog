@@ -560,7 +560,7 @@ export type { ArrangePart, Arranging, Decision, Decided, Filed, Proposal, Rememb
 /* `exponentOf` IS EXPORTED SO THE RECORD'S CURRENCY TABLE IS NOT A SECOND EXPONENT READER. It is
    `Intl`, cached per code; a table built from a copy of it could disagree with the reading. */
 export { CHANNELS as INGEST_CHANNELS, CONFIDENCES, PROPOSE_AT, arrive, day as ingestDay, exponentOf, extract as extractField, fileAsSecond, patternReport, resolve as extractOutcome, senderOf, shapeOf, tailCause } from './ingest.ts';
-export { SIGNALS, WINDOWS, analyse, findingsFrom, observe } from './observe.ts';
+export { SIGNALS, WINDOWS, analyse, brakeOf, findingsFrom, mayPropose, observe, slashBrake } from './observe.ts';
 /* WHAT A CARD SAYS OF AN AMOUNT AND OF WHERE A RUN STANDS (ENG-B12): the kernel's own two readings, so the briefing writes neither again. */
 export { moneyText } from './ingest.ts';
 /* THE SHAPES OWED A PATTERN (ENG-B07): which arrivals wait on a draft, and the cause their one question is filed under. */
@@ -598,7 +598,7 @@ export type {
  * A PACK UPDATE THAT ADDS TWO ACTIONS IS ONE QUESTION, not two. `install` takes a bundle wherever it takes a declaration.
  */
 export type DeclarationBundle = { declarations: Declaration[] };
-export type { Analysis, Counted, Finding, Observation, Signal } from './observe.ts';
+export type { Analysis, Brake, Counted, Finding, MayPropose, Observation, Signal } from './observe.ts';
 export type { Answered, Arrival, Arrived, Confidence, DoorLine, Extracted, Extractor, FieldOutcome, IngestDecl, IngestDeps, NumberReaders, PatternLine, PatternReport, Sender } from './ingest.ts';
 export type { CycleLine, ForecastDeps, Horizon, Leg, Runway, Step } from './forecast.ts';
 export type { DryRun, Fired, LinkTo, RuleAction, RuleDecl, RulesDeps, RulesOutcome } from './rules.ts';
@@ -4755,6 +4755,53 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   }
 
   /**
+   * TELLING THE PERSON AN AGENT ASKED THEM SOMETHING (AGT-C19). A run's new question, the first of its cause, is an
+   * active notice; one that cannot wait (`soon`, AGT-C08, read by the queue's own `WAIT_SQL`) is time-sensitive, pushed
+   * once for its cause. Before this a question an agent filed reached nobody until Decide was opened.
+   *
+   * THROUGH `notify` AND NOTHING BESIDE IT, so the record's quiet hours hold it and an active push is one an hour and
+   * says how many wait. OFF UNLESS THE RECORD ALREADY PUSHES: where no owner turned a phone on (`ownersPushSubs`) it
+   * writes and sends nothing, not even the note. And it never mails (`owners` is handed empty, so a time-sensitive one
+   * is the push alone): one question is one notice, on the one channel the owner chose. A person's own question and the
+   * record's tell nobody: whoever asked already knows. The line names the agent's project or the agent, never a handle.
+   * The notice is about the question (`suggestion:<id>`, as a key's is `grant:<id>`) and not signed by the run, which
+   * wrote no note: a run's history and its undo keep only what it did.
+   *
+   * IT TELLS AND NOTHING MORE: it asks, files and decides nothing, and a notice that cannot be queued never fails the
+   * question it is about.
+   */
+  function tellAsked(suggestion: string): void {
+    try {
+      const q = sql.one<{ opened_by: string | null; cause: string | null; wait: string | null }>(
+        `SELECT opened_by, cause, ${WAIT_SQL} AS wait FROM suggestion WHERE id = ?`,
+        ...waitParams(clock.now()),
+        suggestion,
+      );
+      const by = q?.opened_by;
+      if (!q || typeof by !== 'string' || !isRunName(by) || ownersPushSubs(sql).length === 0) return;
+      const run = bySeq(SESSION, Number(by.slice((registers.get(SESSION)?.seq_prefix ?? 'S').length)), true);
+      const project = run ? projectNamed(run.fields.project) : null;
+      const hints = run
+        ? {
+            ...(typeof run.fields.agent === 'string' ? { agent: run.fields.agent } : {}),
+            ...(typeof run.fields.client === 'string' ? { client: run.fields.client } : {}),
+          }
+        : {};
+      const app = runAgentOf(hints).name;
+      const who = project ? `${project}'s agent` : app === 'Agent' ? 'An agent' : app;
+      notify({ ...interruptDeps(), owners: () => [] }, {
+        actor: `suggestion:${suggestion}`,
+        say: `${who} asks you something`,
+        level: q.wait === 'soon' ? 'time-sensitive' : 'active',
+        cause: `asked.${q.cause ?? suggestion}`,
+        url: `/decide/${suggestion}`,
+      });
+    } catch {
+      /* A NOTICE IS NEVER WORTH A QUESTION. Whatever it wrote before it threw stays; the question is filed either way. */
+    }
+  }
+
+  /**
    * Whether a line of the log is the record keeping its own books, which a feed of what changed leaves out and the log
    * keeps whole: a run's history, `history` and `recentHistory` with `everything` still read every one of them.
    *
@@ -6833,7 +6880,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     sql,
     /* THE ONE ROUTER. A rule that declares `urgent` shows in the install diff as "interrupts you",
        and until now that diff was the only reader of the key — 09 §4 is what it should have meant. */
-    interrupt: (said) => notify(interruptDeps(), { ...said, urgent: true }),
+    interrupt: (said) => notify(interruptDeps(), { ...said, level: 'time-sensitive' }),
     /* AND THE ONE ACTION THAT REACHES FORWARD IN TIME. `ON CONFLICT (kind, key) DO UPDATE` so a rule
        that fires twice on one row moves the date rather than arming a second reminder — the same
        idempotence `once_per` gives the firing, applied to what the firing arms. */
@@ -7159,7 +7206,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     nowMs: clock.now(),
     mint,
     enqueue: (payload) => enqueue(sql, mint, clock.now(), 'pull.fetch', payload),
-    notify: (said) => void notify(interruptDeps(), { ...said, urgent: true }),
+    notify: (said) => void notify(interruptDeps(), { ...said, level: 'time-sensitive' }),
     ack: (args) => ack(sql, ackDeps(), args),
     lookup: actionDecl,
     arrive: (decl, body, sha256) =>
@@ -7318,7 +7365,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     /* AND AN AUTOMATION'S QUESTION TO SLASH, answered into its run in the ack's transaction. */
     answerRun: (a) => void answerStep(flowDeps(), a),
     /* AND A PAGED CONNECTOR WHOSE KEY WAS REFUSED, told through the one router (`finishPull`, `pull.ts`). */
-    notify: (said) => void notify(interruptDeps(), { ...said, urgent: true }),
+    notify: (said) => void notify(interruptDeps(), { ...said, level: 'time-sensitive' }),
   });
 
   /** The same, plus who is asking and which record this is — the two halves of a `grant.read` row. */
@@ -7330,7 +7377,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     /* THE ONE ROUTER, HANDED IN. 09 §4's rate limit, 09 §3's split between what a push carries and
        what an email does, and the `note` event, are all one function — and a credential expiring is
        one of the three things 09 §5 makes urgent by default. */
-    interrupt: (said) => notify(interruptDeps(), { ...said, urgent: true }),
+    interrupt: (said) => notify(interruptDeps(), { ...said, level: 'time-sensitive' }),
   });
 
   async function tail(scheduler: Scheduler): Promise<void> {
@@ -9188,7 +9235,11 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         const { title, ...asked } = p;
         const out = openSuggestion(governDeps(), () => signedBy(typeof w === 'string' ? { actor: w } : w), asked, drafted);
         /* A JOINING RUN IS NOT TITLED after somebody else's question. */
-        if (out.ok && !out.value.joined && out.value.answered === undefined) nameRunBy(out.value.id, typeof w === 'string' ? { actor: w } : w, typeof title === 'string' ? title : undefined);
+        if (out.ok && !out.value.joined && out.value.answered === undefined) {
+          nameRunBy(out.value.id, typeof w === 'string' ? { actor: w } : w, typeof title === 'string' ? title : undefined);
+          /* AND A RUN'S NEW QUESTION TELLS THE PERSON, once (`tellAsked`). Joined or answered from memory, nothing new was asked. */
+          tellAsked(out.value.id);
+        }
         return out;
       }),
 

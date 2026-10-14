@@ -10,8 +10,9 @@
  *
  * LINE ONE SAYS WHO AND WHERE: the run, the app on the machine as a person names it, the project, the branch. Then the
  * line about another run working in the same tree, only when it is true. Then the slots in this order, each left out
- * when it has nothing true to say: `Next`, `Signs`, `Waiting`, `Learned`, `More`. At most three things a slot. No Who
- * slot: the people of a project are a call away, and the card is for what a session would otherwise get wrong.
+ * when it has nothing true to say: `Next`, `Signs`, `Waiting`, `Decided`, `Learned`, `More`. At most three things a
+ * slot. No Who slot: the people of a project are a call away, and the card is for what a session would otherwise get
+ * wrong.
  *
  * ABOUT 120 WORDS, NEVER MORE THAN 150. Past 120 it cuts what `More` names, then the second learning, then the third
  * question, then the runs named after the first on the same-tree line. Past 150 it keeps cutting, in the order of what
@@ -398,6 +399,13 @@ function waitingSlot(c: Context, at: CardAt): Slot | null {
   };
 }
 
+/** What a person already decided here (Context.decided, AGT-B09), so the session asks none of it again. */
+function decidedSlot(c: Context): Slot | null {
+  const lines = (c.decided ?? []).slice(0, PER_SLOT);
+  if (lines.length === 0) return null;
+  return { label: 'Decided', lead: '', items: lines.map((l) => l.replace(/^Decided /u, '')), tail: none, least: 1 };
+}
+
 /** The skills a standing learning bears on (its `topic` is the skill's name) that the skill's `because` does not carry. */
 function bearing(c: Context): { skill: string; learnings: number } | null {
   const byTopic = new Map<string, string[]>();
@@ -532,7 +540,7 @@ function olderSlot(at: CardAt, now: number): Slot | null {
 /* ── the card ──────────────────────────────────────────────────────────── */
 
 /** What is cut past 120 words, in this order, each down to the number beside it: the brief's order. */
-const AIM_CUTS: [string, number][] = [['More', 0], ['Learned', 1], ['Waiting', 2], ['Also', 1]];
+const AIM_CUTS: [string, number][] = [['More', 0], ['Learned', 1], ['Decided', 1], ['Waiting', 2], ['Also', 1]];
 /** What is cut past 150 as well, after those. `More` at -1 is the line itself. */
 const MOST_CUTS: [string, number][] = [['Waiting', 1], ['Learned', 0], ['Signs', 1], ['Next', 1], ['More', -1]];
 
@@ -559,7 +567,7 @@ function cutOnce(slots: Slot[], rules: [string, number][]): boolean {
 }
 
 /** The lines that lose words first in the last resort: none of them is line one, the same-tree warning, Next or Update. */
-const SOFT = new Set(['Signs', 'Waiting', 'Learned', 'More']);
+const SOFT = new Set(['Signs', 'Waiting', 'Decided', 'Learned', 'More']);
 const labelOf = (line: string): string => line.slice(0, LABEL).trim();
 
 /**
@@ -597,7 +605,7 @@ export function card(c: Context, at: CardAt, now: number): Card {
   const head = firstLine(c, at, own);
   const next = nextSlot(c, at, own);
   const nextLine = next.slot === null ? null : lineOfSlot(next.slot);
-  const slots = [alsoSlot(c, own), next.slot, signsSlot(c), waitingSlot(c, at), ...learnedAndMore(c, at, next.handedLeft), olderSlot(at, now)].filter((s): s is Slot => s !== null);
+  const slots = [alsoSlot(c, own), next.slot, signsSlot(c), waitingSlot(c, at), decidedSlot(c), ...learnedAndMore(c, at, next.handedLeft), olderSlot(at, now)].filter((s): s is Slot => s !== null);
   const size = () => wordCount(render(head, slots).join('\n'));
   while (size() > CARD_AIM && cutOnce(slots, AIM_CUTS));
   while (size() > CARD_MOST && cutOnce(slots, [...AIM_CUTS, ...MOST_CUTS]));

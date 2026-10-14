@@ -84,6 +84,11 @@ async function record() {
   make('deals', { what: 'Kiln retainer', with: [bo.id, ada.id] });
   /* EXAMPLES NAMING CY name nobody, so they do not lift him over the line. */
   for (const what of ['Sample one', 'Sample two', 'Sample three']) make('tasks', { what, who: cy.id, tags: ['example'] });
+  /* FIVE DAYS OF THE OWNER'S OWN USE, so Slash advises the record (HD.410). */
+  for (const d of [50, 40, 30, 20]) {
+    clock.set(NOW - d * DAY);
+    make('tasks', { what: `Kept on day ${d}` });
+  }
   clock.set(NOW);
   return { sql, k, clock };
 }

@@ -73,9 +73,16 @@ const ABSENT = new Set(['ROUTE_UNKNOWN', 'NOT_IN_THIS_BUILD']);
  * `call` IS THE CLIENT'S OWN, handed in so this is driven without a record. A second press answers the question already
  * waiting, so pressing twice opens one question. A refusal is handed back in the record's own words; nothing here to
  * fold, which the record says by answering no question, is said plainly and opens nothing.
+ *
+ * `rows`, THE ONES PICKED ON THE LIST by their numbers, folds only what they are here twice with (the bar's "Fold into
+ * one"). Absent, the press is the whole list's, as the button over the list is.
  */
-export async function foldAsk(call: (name: string, args: Record<string, unknown>) => Promise<Called>, register: string): Promise<Folded> {
-  const out = await call('askFoldTwice', { register });
+export async function foldAsk(
+  call: (name: string, args: Record<string, unknown>) => Promise<Called>,
+  register: string,
+  rows?: readonly number[],
+): Promise<Folded> {
+  const out = await call('askFoldTwice', rows === undefined ? { register } : { register, rows: [...rows] });
   if (!out.ok) {
     const code = out.refusal?.code ?? '';
     if (ABSENT.has(code)) return { ok: false, said: 'This BrainDog cannot fold these yet.', gone: true };

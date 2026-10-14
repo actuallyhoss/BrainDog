@@ -21,6 +21,10 @@
   that taught it). A skill's next version was a long diff over a line of handles, and the press was taken without the
   reason. One you cannot open is a count. In the queue (`compact`) only the first line of each is drawn, so the answer
   buttons stay near the title; the gate draws both.
+
+  EACH ROW SAYS WHY IT MOVES (`why` in `changes.ts`): the reason the question filed beside it, after its chips, muted.
+  A scope question moving fifty keys was fifty chips and not one reason. In the queue only the first row's is drawn,
+  with "and N more reasons".
 -->
 <script lang="ts">
   /* `Diff` is drawn here outside a declared page, so its kind's sheet comes with it (`kinds/diff.css`). */
@@ -30,7 +34,7 @@
   import { apiBase } from '$lib/at.ts';
   import { placeNamed, placesIn, words as scopeWords, type Place, type Scope } from '$lib/record/scope-move.ts';
   import ScopeChip from '$lib/ui/ScopeChip.svelte';
-  import { closedSaid, words, type Updated } from './changes.ts';
+  import { closedSaid, moreReasons, words, type Updated } from './changes.ts';
 
   let { updates, compact = false }: { updates: readonly Updated[]; compact?: boolean } = $props();
 
@@ -46,6 +50,10 @@
 
   /* Two of these are on one screen (the queue's card and its tile), so a heading's id is this drawing's own. */
   const uid = $props.id();
+
+  /* IN THE QUEUE, ONE REASON: the first row's, and how many more there are, so the answer buttons stay near the title. */
+  const firstWhy = $derived(updates.findIndex((u) => u.why !== undefined));
+  const moreWhy = $derived(firstWhy < 0 ? 0 : updates.filter((u) => u.why !== undefined).length - 1);
 
   /** One side of a move, as its chip: the project it names, or `null` for everywhere. */
   const sideOf = (to: string, said: string | null): Scope | null =>
@@ -107,6 +115,11 @@
           </p>
         {/if}
       {/each}
+      {#if u.why && (!compact || i === firstWhy)}
+        <p class="row-why">
+          {u.why}{#if compact && moreWhy > 0}<span class="row-why-more">{' '}{moreReasons(moreWhy)}</span>{/if}
+        </p>
+      {/if}
     </li>
   {/each}
 </ul>
@@ -173,8 +186,20 @@
   }
 
   .take-why,
-  .take-closed {
+  .take-closed,
+  .row-why {
     color: var(--ink2);
+  }
+
+  /* THE ROW'S OWN REASON, after its chips: the question's words for why this one moves, in the tile's text. */
+  .row-why {
+    margin: 0;
+    font-size: var(--t-ui);
+    overflow-wrap: anywhere;
+  }
+
+  .row-why-more {
+    color: var(--dim);
   }
 
   .change-field {

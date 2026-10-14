@@ -59,14 +59,14 @@ test('THE PACK IS A LEGAL PACK, with the manifest the plan gives it', async () =
 /* THE VERSION SHIPPED IS THE VERSION SAID (agents-pack-49): the changelog's newest agents entry is the manifest's, so
    the add-on's page never draws a version with no notes, and its notes name what the page gained and no word a person
    should not read. */
-test('THE NEWEST CHANGE NOTE IS 1.13.0, and it names the new page, where it opens from and what it does not hold yet', () => {
+test('THE NEWEST CHANGE NOTE IS 1.13.0, and it names the new page, where it opens from and the skills that changed', () => {
   const newest = MODULE_CHANGES.agents[0]!;
   assert.equal(newest.version, '1.13.0');
   assert.equal(newest.version, AGENTS_PACK.manifest.version);
   assert.match(newest.notes, /How the brain changed/);
   assert.match(newest.notes, /What the brain learned/);
   assert.match(newest.notes, /Faded/);
-  assert.match(newest.notes, /Skill versions are not on it yet/);
+  assert.match(newest.notes, /how many skills changed/);
   assert.ok(newest.notes.length <= 500, 'a change note is at most 500 characters');
   assert.ok(!/\brows?\b|—|\(s\)|\bsessions?\b|handoff/iu.test(newest.notes), 'the note says "row", "session", "handoff", an em dash or "(s)"');
 });
@@ -114,6 +114,8 @@ const PROVIDES = [
   'metric.runs-unplaced',
   'metric.skill-learnings',
   'metric.skills-active',
+  'metric.skills-changed',
+  'metric.skills-changed-by-week',
   'metric.tools-by-week',
   'metric.tools-unseen',
   'page.agents',
@@ -627,11 +629,12 @@ const FIGURES_11: Record<string, unknown> = {
 };
 
 /**
- * WHAT 1.13.0 PUT IN (AGT-C17 job b): the page How the brain changed, the two figures it is said and drawn on, and the
- * line under What the brain learned that opens it. Taken out again here, so the marks 1.12.0 and the versions under it
- * were cut with are still read off what the add-on declares today.
+ * WHAT 1.13.0 PUT IN (AGT-C17 jobs b and c): the page How the brain changed, the four figures it is said and drawn on
+ * (the learnings that arrived, and the skills that changed over the record's log), and the line under What the brain
+ * learned that opens it, and Needs a look's line of what is here twice (AGT-C18, `stale-rows-same`). Taken out again
+ * here, so the marks 1.12.0 and the versions under it were cut with are still read off what the add-on declares today.
  */
-const FIGURES_13 = ['learnings-arrived', 'learnings-charted'];
+const FIGURES_13 = ['learnings-arrived', 'learnings-charted', 'skills-changed', 'skills-changed-by-week'];
 
 /**
  * AND WHAT 1.13.0 PUT IN THE LISTS (AGT-C13 e, AGT-D15 1, AGT-B09 4): `same:` on all four, the kind `rule` with its
@@ -656,7 +659,7 @@ const listsBefore13 = (lists: Record<string, Record<string, unknown>>): Record<s
 const before13 = (declarations: Record<string, unknown>[]): Record<string, unknown>[] =>
   declarations
     .filter((d) => d.page !== 'brain' && !FIGURES_13.includes(String(d.metric)))
-    .map((d) => (d.page === 'agents' ? { ...d, blocks: (d.blocks as { key?: string }[]).filter((b) => b.key !== 'brain-link') } : listBefore13(d)));
+    .map((d) => (d.page === 'agents' ? { ...d, blocks: (d.blocks as { key?: string; when?: { metric?: string } }[]).filter((b) => b.key !== 'brain-link' && b.when?.metric !== 'stale-rows-same') } : listBefore13(d)));
 
 test('1.12.0 TAKES NOTHING AWAY: with Working, Today, Earlier and their two figures put back, the add-on declares what 1.11.0 did, to the letter', () => {
   type Block = { kind: string; heading?: string };
@@ -699,10 +702,10 @@ test('1.12.0 TAKES NOTHING AWAY: with Working, Today, Earlier and their two figu
   assert.equal(mark(rest), 'e3c40dd0030b3e3c', 'the page is named, placed or held to other lists');
   assert.equal(mark(Object.entries(AGENTS_PAGES).filter(([slug]) => slug !== 'agents' && slug !== 'brain')), 'c0ba8121ad6e909f', 'a skill’s page or a run’s is changed');
   assert.equal(mark(listsBefore13(AGENTS_REGISTERS)), 'dd24d88e551ccf5d', 'a list or a field is changed');
-  /* WITHOUT 1.13.0'S TWO, which came last of the figures this add-on writes itself and before the door's. */
+  /* WITHOUT 1.13.0'S FOUR, which came last of the figures this add-on writes itself and before the door's. */
   const figures12 = Object.fromEntries(Object.entries(AGENTS_MODULE.AGENTS_METRICS).filter(([id]) => !FIGURES_13.includes(id)));
   assert.equal(mark({ ...figures12, ...FIGURES_11 }), 'f59d74ab2bdc01ce', 'a figure went or is changed');
-  assert.equal(Object.keys(AGENTS_MODULE.AGENTS_METRICS).length, 23, 'a figure went or came');
+  assert.equal(Object.keys(AGENTS_MODULE.AGENTS_METRICS).length, 25, 'a figure went or came');
   /* `runs-left-next` STAYS DECLARED, for an agent that reads it, though no block draws on it. */
   assert.ok(AGENTS_MODULE.AGENTS_METRICS['runs-left-next']);
   assert.equal(JSON.stringify(AGENTS_PAGES.agents!.blocks).includes('runs-left-next'), false, 'the page still counts steps its own way');
@@ -747,13 +750,58 @@ test('EARLIER IS FOLDED UNDER ITS OWN HEADING, which counts the runs, and Left f
    AND 1.12.0'S OWN MARK BESIDE IT, read with what 1.13.0 put in taken out (`before13`): the page, its two figures and
    the line that opens it, and in the lists `same:`, the kind `rule` and the four-part test. So 1.13.0 added those and
    moved nothing 1.12.0 declared. The mark was set again for the lists' part (it was c5d81d3045627de5 with the page
-   alone), since 1.13.0 is not released. */
+   alone), since 1.13.0 is not released, and again for the skills that changed beside the learnings (AGT-C17 job c:
+   two figures over the record's log, a second series on the chart and a clause in the line; it was 7c0c9cb8f919f32f),
+   and again for Needs a look's line of what is here twice (tidy-rows-same-92, AGT-C18; it was 421923fd971c9103). */
 test('AGENTS 1.13.0 DECLARES WHAT IT DID WHEN IT WAS CUT, and 1.12.0 under it is as it was', () => {
   const doc = agentsPackDocument() as { version: string; declarations: Record<string, unknown>[] };
   assert.equal(doc.version, '1.13.0', 'a new version takes a mark of its own beside this one');
-  assert.equal(mark(doc.declarations), '7c0c9cb8f919f32f', 'the Agents add-on changed what it declares with no new version');
+  assert.equal(mark(doc.declarations), '7bc8400d00577416', 'the Agents add-on changed what it declares with no new version');
   assert.equal(mark(before13(doc.declarations)), '42ceb4a21591e2e8', 'something 1.12.0 declared is changed beside what 1.13.0 put in');
-  assert.equal(doc.declarations.length - before13(doc.declarations).length, 3, '1.13.0 put in a page and two figures');
+  assert.equal(doc.declarations.length - before13(doc.declarations).length, 5, '1.13.0 put in a page and four figures');
+});
+
+/* THE SKILLS THAT CHANGED, SINCE 1.13.0 (AGT-C17 job c): two figures over the record's log, each skill that took a
+   version counted once, said in the line of How the brain changed as a clause of its own and drawn as the chart's
+   second series, on the learnings' weeks. A version is taken only by an accepted proposal, so that is how this takes one. */
+test('A SKILL THAT TOOK A VERSION IS COUNTED IN THE LINE AND DRAWN BESIDE THE LEARNINGS, BY WEEK', async () => {
+  const figures = AGENTS_MODULE.AGENTS_METRICS;
+  const CHANGED = { source: 'events.skills', value: { count: 'changed', field: 'rev' }, format: 'int', target: { gte: 0 }, compare: 'none' };
+  assert.deepEqual(figures['skills-changed'], { metric: 'skills-changed', name: 'Skills that changed, last 30 days', ...CHANGED, window: '30d' });
+  assert.deepEqual(figures['skills-changed-by-week'], {
+    metric: 'skills-changed-by-week',
+    name: 'Skills that changed, by week',
+    ...CHANGED,
+    window: '182d',
+    group_by: 'at',
+    bucket: 'week',
+  });
+  type Block = { key?: string; body?: string; series?: { metric: string; label?: string }[] };
+  const page = AGENTS_PAGES.brain!.blocks as Block[];
+  assert.deepEqual(page.find((b) => b.key === 'by-week')!.series, [
+    { metric: 'learnings-by-week', label: 'Learnings' },
+    { metric: 'skills-changed-by-week', label: 'Skills changed' },
+  ]);
+  /* A CLAUSE OF ITS OWN IN BOTH LINES, so the writer leaves it out at nought (`leadOf`). */
+  for (const key of ['line', 'line-quiet'])
+    assert.ok(String(page.find((b) => b.key === key)!.body).split(/,\s+/u).includes('{{skills-changed}} skill(s) changed'), `${key} does not say the skills`);
+
+  const { k, sql } = await seeded();
+  assert.equal(reading(k, 'skills-changed'), 0, 'a seeded skill took no version');
+  const skill = value<{ rows: { id: string; version: number; fields: Record<string, unknown> }[] }>(k.list({ register: 'skills', limit: 1 })).rows[0]!;
+  const rev = Number(skill.fields.rev);
+  const asked = value<{ id: string }>(
+    k.propose({ question: 'Take the new version?', body_kind: 'rowset', body: { register: 'skills', rows: [{ at: skill.id, version: skill.version, patch: { body: '# Reviewed again', rev: rev + 1 } }] } } as never, 'agent:claude'),
+  );
+  value(k.decide(asked.id, { decide: { option: 'accept', reason: 'it reads right' } } as never, 'p_seed'));
+  assert.equal(k.get(skill.id)?.fields.rev, rev + 1, 'the accepted proposal did not take the version');
+  assert.equal(reading(k, 'skills-changed'), 1);
+  const weeks = k.metric(k.metricDecl('skills-changed-by-week')!);
+  assert.ok(weeks.ok, JSON.stringify(weeks));
+  assert.deepEqual(weeks.value.groups?.map((g) => [g.key, g.value]), [[weeks.value.current, 1]]);
+  /* AND THE PAGE STILL READS, every block without a refusal. */
+  for (const b of opened(k, 'brain')) assert.deepEqual(b.refusals, [], `${(b as { key?: string }).key}: ${JSON.stringify(b.refusals)}`);
+  sql.close();
 });
 
 test('A SKILL IN USE HAS A PAGE: its trigger, then its versions; a retired one has none', async () => {
@@ -928,8 +976,13 @@ test('NEEDS A LOOK HOLDS THE KEYS AND TOOLS TO PUT RIGHT, each line drawn only w
   const box = declared.findIndex((b) => b.kind === 'section' && b.heading === 'Needs a look');
   assert.ok(box > 0 && declared[box]!.box === true, 'Needs a look is not a boxed section');
   assert.ok(box > declared.findIndex((b) => b.kind === 'cards' && b.heading === 'Today'), 'Needs a look is above the runs of today');
-  /* THE FOUR OF 1.10.0, then the stale line 1.11.0 put under them (its own test is below). */
-  const BOX = [...NOTES, 'gone-stale'];
+  /* THE FOUR OF 1.10.0, then the stale line 1.11.0 put under them (its own test is below), then 1.13.0's line of what
+     is here twice, with the way to fold it on each list that says what makes two of its rows one. */
+  const BOX = [...NOTES, 'gone-stale', 'stale-rows-same'];
+  assert.deepEqual(
+    [...String(noteOn(declared as Drawn[], 'stale-rows-same')?.body).matchAll(/\]\(([^)]+)\)/gu)].map((m) => m[1]),
+    ['/r/skills?twice=1', '/r/tools?twice=1', '/r/credentials?twice=1', '/r/learnings?twice=1'],
+  );
   assert.deepEqual(declared.slice(box + 1, box + 1 + BOX.length).map((b) => b.when?.metric), BOX, 'the lines are not in the box, or not in order');
   const closer = declared[box + 1 + BOX.length]!;
   assert.deepEqual([closer.kind, closer.heading, closer.fold], ['section', 'Earlier', true], 'nothing closes the box, so it swallows what follows');

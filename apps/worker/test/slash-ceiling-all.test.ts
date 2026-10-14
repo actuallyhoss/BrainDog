@@ -105,6 +105,15 @@ async function recordOver(t: TestContext, neurons: string, lists: number, guide 
     const made = await post('create', { register: `list_${i}`, fields: { what: `row ${i}` } }, early);
     assert.ok(made.ok, JSON.stringify(made));
   }
+  /* THE OWNER'S OWN USE ON FIVE DAYS, so Slash asks its model of a record past its fortnight (HD.410): the first row
+     edited by hand on four more days, and left as it was. */
+  for (const [i, day] of [3, 5, 7, 9].entries()) {
+    t.mock.timers.setTime(T0 + day * DAY);
+    const kept = await post('update', { register: 'list_0', seq: 1, patch: { what: i % 2 === 0 ? 'row 0.' : 'row 0' } }, await c.signIn(OWNER));
+    assert.ok(kept.ok, JSON.stringify(kept));
+    /* AND THE YOUNG RECORD'S LOOK THAT WRITE WOKE IS LET FINISH, or it would read the clock moved on below. */
+    await c.settle();
+  }
   t.mock.timers.setTime(T0 + 20 * DAY);
   const cookie = await c.signIn(OWNER);
   return { ai, c, cookie, post: (method: string, body: object) => post(method, body, cookie) };

@@ -46,6 +46,7 @@ import {
 import { codeOf, fixOf, type Result, type Sql } from '@braindog/ports';
 
 import { neverSent } from './infer.ts';
+import type { AboutShown } from './about.ts';
 import type { ModelJobMeter } from './model-jobs.ts';
 
 /** The understanding share of the background allowance: `infer.resolve` and the notes pass together, a month. */
@@ -159,6 +160,8 @@ export type Mention = { note: string; name: string; type: 'person' | 'org' | 'pu
 export type ModelJobUnderstand = {
   resolve?: ((input: ResolveInput) => Promise<Result<unknown>>) | undefined;
   mentions?: ((input: MentionsInput) => Promise<Result<unknown>>) | undefined;
+  /** Who and what one job of things is about (`about.ts`), read by `askAbout`. Absent, the rules keep key hits only. */
+  about?: ((input: AboutShown) => Promise<Result<unknown>>) | undefined;
 };
 
 /** The host's Slash store, where the verdicts and the notes pass's marks are kept beside the ledger. */
@@ -1200,8 +1203,15 @@ export type UnderstandLedger = {
   background(kind: 'understand', payload?: unknown): Promise<{ ok: true; value: Held } | { ok: false; refusal: { code: string; fix: string } }>;
 };
 
-/** The two asks a host's `SlashModel` answers, as `endpointModel` and `anthropicModel` build them. */
-export type UnderstandModel = { resolve(input: ResolveInput): Promise<unknown>; mentions(input: MentionsInput): Promise<unknown> };
+/**
+ * The asks a host's `SlashModel` answers, as `endpointModel` and `anthropicModel` build them. `about` is optional on the
+ * type so a host's own model that cannot be asked it still is one; every adapter the hosts build answers it.
+ */
+export type UnderstandModel = {
+  resolve(input: ResolveInput): Promise<unknown>;
+  mentions(input: MentionsInput): Promise<unknown>;
+  about?: ((input: AboutShown) => Promise<unknown>) | undefined;
+};
 
 /** Bytes over three, as the record's meter counts an ask it holds no usage for (`slash-ask.ts`). */
 const tokens = (v: unknown): number => Math.ceil((JSON.stringify(v) ?? '').length / 3);
@@ -1214,7 +1224,11 @@ const tokens = (v: unknown): number => Math.ceil((JSON.stringify(v) ?? '').lengt
 export function understandingOver(
   model: UnderstandModel,
   ledger: UnderstandLedger,
-): { resolve: NonNullable<ModelJobUnderstand['resolve']>; mentions: NonNullable<ModelJobUnderstand['mentions']> } {
+): {
+  resolve: NonNullable<ModelJobUnderstand['resolve']>;
+  mentions: NonNullable<ModelJobUnderstand['mentions']>;
+  about?: NonNullable<ModelJobUnderstand['about']>;
+} {
   const held = async <I>(ask: (input: I) => Promise<unknown>, input: I): Promise<Result<unknown>> => {
     const hold = await ledger.background('understand', input);
     if (!hold.ok) return { ok: false, refusal: { code: hold.refusal.code, fix: hold.refusal.fix } };
@@ -1243,5 +1257,7 @@ export function understandingOver(
   return {
     resolve: (input) => held((i: ResolveInput) => model.resolve(i), input),
     mentions: (input) => held((i: MentionsInput) => model.mentions(i), input),
+    /* THE ABOUT ASK UNDER THE SAME HOLD, so it is counted in the understanding share and an outage costs nothing. */
+    ...(model.about ? { about: (input: AboutShown) => held((i: AboutShown) => model.about!(i), input) } : {}),
   };
 }

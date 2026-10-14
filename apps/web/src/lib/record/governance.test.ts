@@ -530,3 +530,25 @@ test('an update row that names its own list is read in that list, and the card d
     ['skills#3', 'Release', ['Because']],
   ]);
 });
+
+test('A ROWSET KEEPS THE REASON FILED BESIDE EACH ROW, and a reason that is not a sentence and a row is dropped', async () => {
+  const { rowsetOf } = await import('./governance.ts');
+  /* ONE OF `fixtures/names.ts`'s invented projects, written here: a file under `src/` may not reach out of `apps/web`
+     by a relative path (`graph`, 31 §3 layer 3). */
+  const PROJECTS = ['Lanternfish'] as const;
+  const body = {
+    register: 'keys',
+    rows: [{ at: 'keys#4', version: 2, patch: { project: 'projects#1' } }],
+    why: [
+      { text: `Deploy token: used by 3 runs in ${PROJECTS[0]}.`, at: 'keys#4' },
+      { text: 'No row to say it of.' },
+      { text: '', at: 'keys#5' },
+      'A bare sentence.',
+      { text: 'A number for a row.', at: 7 },
+    ],
+  };
+  const got = rowsetOf({ body_kind: 'rowset', body });
+  assert.deepEqual(got?.why, [{ text: `Deploy token: used by 3 runs in ${PROJECTS[0]}.`, at: 'keys#4' }]);
+  assert.equal(rowsetOf({ body_kind: 'rowset', body: { register: 'keys', rows: [] } })?.why, undefined, 'none filed, none kept');
+  assert.equal(rowsetOf({ body_kind: 'rowset', body: { ...body, why: 'not a list' } })?.why, undefined);
+});

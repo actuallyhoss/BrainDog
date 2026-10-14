@@ -211,6 +211,9 @@ const WEEKLY = { value: { count: 'id' }, group_by: 'created_at', bucket: 'week',
 /** A count of rows now, with no good or bad number, as the weekly figures are. */
 const COUNT = { value: { count: 'id' }, format: 'int', target: { gte: 0 }, window: '30d', compare: 'none' } as const;
 
+/** A count of the skills that took a new version, SINCE 1.13.0, over the log: each figure gives its own window. */
+const CHANGED = { value: { count: 'changed', field: 'rev' }, format: 'int', target: { gte: 0 }, compare: 'none' } as const;
+
 /** A count of rows that should be none, SINCE 1.10.0: each one is something to put right, so above nought misses. */
 const FIX = { ...COUNT, target: { lte: 0 } } as const;
 
@@ -397,10 +400,14 @@ export const AGENTS_METRICS: Record<string, SeedMetric> = {
      reaches back arrived two weeks ago or more: the chart trims the weeks before its first learning (`barsOf` in
      `packages/kernel/src/series.ts`), so one learning that old makes three weeks of bars at least, and with none the
      chart would be one bar or two and is not drawn. A count each, with no good or bad number.
-     HOW MANY SKILL VERSIONS WERE TAKEN IS NOT HERE: a version is a line of the record's log, and a figure an add-on
-     declares reads a list (AGT-C17 job c). */
+     AND SINCE 1.13.0 TOO (AGT-C17 job c), THE SKILLS THAT CHANGED: a skill takes a new version by its `rev`, which only
+     the owner's press moves (`by: 'decide'`), and every move is a line of the record's log. So these read the log over
+     `events.skills`, `{ count: changed, field: rev }`: how many skills took a version in thirty days, for the line, and
+     in each week of six months, for the chart's second series. A skill that took two in one week is one that changed. */
   'learnings-arrived': { metric: 'learnings-arrived', name: 'Learnings that arrived, last 30 days', source: 'register.learnings', where: 'created_at after -30d', ...COUNT },
   'learnings-charted': { metric: 'learnings-charted', name: 'Learnings from two weeks ago or more, last six months', source: 'register.learnings', where: 'created_at after -182d, created_at before -14d', ...COUNT },
+  'skills-changed': { metric: 'skills-changed', name: 'Skills that changed, last 30 days', source: 'events.skills', ...CHANGED, window: '30d' },
+  'skills-changed-by-week': { metric: 'skills-changed-by-week', name: 'Skills that changed, by week', source: 'events.skills', ...CHANGED, window: '182d', group_by: 'at', bucket: 'week' },
   ...DOOR_METRICS,
 };
 
@@ -587,6 +594,10 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
          seven days (`tidied-week`), so the line says both what waits and that something is clearing it. Drawn only
          while anything is stale; a record that cannot read the figure yet draws nothing, as for any `when:`. */
       { kind: 'note', tone: 'warn', span: 12, when: { metric: 'gone-stale', gt: 0 }, body: 'Things gone stale: {{gone-stale}}. Tidied this week: {{tidied-week}}.' },
+      /* WHAT IS HERE TWICE, SINCE 1.13.0 (AGT-C18, the kernel's `rows-same`): every row past the one kept in each group
+         a list's `same:` folds, with the way to each of this pack's lists that says what makes two of its rows one. A
+         line inside Needs a look, so it adds no tile. */
+      { kind: 'note', tone: 'warn', span: 12, when: { metric: 'stale-rows-same', gt: 0 }, body: 'Things here twice: {{stale-rows-same}}. Fold them on [Skills](/r/skills?twice=1), [Tools](/r/tools?twice=1), [Keys](/r/credentials?twice=1) or [Learnings](/r/learnings?twice=1).' },
       /* EVERY RUN LAST HEARD FROM BEFORE TODAY, FOLDED SHUT SINCE 1.11.0. Left for the next run made seven tiles before
          the fold and a page shows six (`test/calm-pages.test.ts`), so one gave way, and it is this one: what a stopped
          run left is said above now, by the steps themselves, so the runs of other days are looked up and not read each
@@ -727,24 +738,45 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
 
      EVERY BLOCK HAS A KEY OF ITS OWN, so a person's look that moves or hides one holds when a heading is reworded.
 
-     WHAT IT DOES NOT DRAW YET, and says nowhere that it does: the skill versions taken, by week and in the line, and a
-     skill's text before and after. Both read the record's log, which no figure an add-on declares reads by week
-     (AGT-C17 job c). A skill's own page draws its versions meanwhile. */
+     AND THE SKILLS THAT CHANGED BESIDE THEM (AGT-C17 job c), read off the record's log (`skills-changed`): "2 skill(s)
+     changed" is a clause of its own in the line, so it is left out at nought, and the chart draws the weeks skills
+     took a version in as its second series, on the learnings' weeks. The chart is still drawn on the learnings' three
+     weeks alone, since a `when:` holds every leaf it names and a chart of skills alone would need a figure of its own.
+
+     WHAT IT DOES NOT DRAW YET, and says nowhere that it does: a skill's text before and after. A skill's own page draws
+     its versions, each against the one before. */
   brain: {
     page: 'brain',
     title: 'How the brain changed',
     icon: 'learning',
     requires: ['register.learnings'],
     blocks: [
-      { kind: 'note', key: 'line', lead: true, span: 12, when: { metric: 'learnings-arrived', gt: 0 }, body: '{{learnings-arrived}} learning(s) arrived this month, {{learnings-faded}} faded' },
-      { kind: 'note', key: 'line-quiet', lead: true, span: 12, when: { metric: 'learnings-arrived', is: 0 }, body: 'No learning arrived this month, {{learnings-faded}} faded' },
+      {
+        kind: 'note',
+        key: 'line',
+        lead: true,
+        span: 12,
+        when: { metric: 'learnings-arrived', gt: 0 },
+        body: '{{learnings-arrived}} learning(s) arrived this month, {{skills-changed}} skill(s) changed, {{learnings-faded}} faded',
+      },
+      {
+        kind: 'note',
+        key: 'line-quiet',
+        lead: true,
+        span: 12,
+        when: { metric: 'learnings-arrived', is: 0 },
+        body: 'No learning arrived this month, {{skills-changed}} skill(s) changed, {{learnings-faded}} faded',
+      },
       {
         kind: 'series',
         key: 'by-week',
-        heading: 'Learnings that arrived, by week',
+        heading: 'Learnings that arrived and skills that changed, by week',
         icon: 'chart-column',
         span: 12,
-        series: [{ metric: 'learnings-by-week', label: 'Learnings' }],
+        series: [
+          { metric: 'learnings-by-week', label: 'Learnings' },
+          { metric: 'skills-changed-by-week', label: 'Skills changed' },
+        ],
         back: 24,
         when: { metric: 'learnings-charted', gt: 0 },
       },
@@ -854,10 +886,12 @@ export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, Se
      1.11.0 drew it.
      1.13.0 ONLY ADDS, SO IT IS MINOR (AGT-C17 job b): `page.brain`, How the brain changed, with no place in the rail; the
      line under What the brain learned on the agents home that opens it; and the figures `learnings-arrived` and
-     `learnings-charted` it is said and drawn on. `learnings-faded` reads the rule it read, now written once. No list,
+     `learnings-charted` it is said and drawn on, with `skills-changed` and `skills-changed-by-week` over the record's
+     log for the skills that took a version (AGT-C17 job c). `learnings-faded` reads the rule it read, now written once. No list,
      field or figure goes, and every block 1.12.0 drew is as it was. Learnings, skills, keys and tools each say what
      makes two of them one (`same:`, AGT-C13), a learning's kind gains `rule`, and the learnings' own words say when to
-     record one (AGT-D15); no row changes. */
+     record one (AGT-D15); no row changes. Needs a look gains a sixth line, over the record's `stale-rows-same`, with the
+     way to fold what is here twice on each of those four lists (AGT-C18). */
   manifest: { id: 'agents', version: '1.13.0', requires: ['register.things'] },
   registers: AGENTS_REGISTERS,
   pages: AGENTS_PAGES,

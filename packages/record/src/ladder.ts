@@ -9,7 +9,8 @@
  *   - a write at Do and tell or Do quietly is written, and counts as one more change kept
  *   - a learning added where its run is, or confirmed, is written at any rung, and counts towards none (`learnt`)
  *   - after `OFFER_AFTER` kept within `OFFER_DAYS`, with none undone, the owner is asked once whether it may climb
- *   - an undo, `DECLINES_DROP` declines in a row, an anomaly or a change of app takes it back to Ask.
+ *   - an undo, `DECLINES_DROP` declines in a row, an anomaly or a change of app takes it back to Ask
+ *   - and so does the owner's own press, "Ask again", on a kind it was lifted on (`takeBack`).
  *
  * ONLY A GRANT THE RECORD HOLDS CLIMBS. A token principal is made by a host from the `token` row `verifyToken` read, so
  * every agent in production has one; a principal with no row is a host's own construction for a call of its own, and
@@ -62,6 +63,7 @@ const DROP_SAID = {
   declined: `${DECLINES_DROP} changes like this in a row were declined.`,
   burst: `It made more than ${ANOMALY_WRITES} changes in two minutes.`,
   app: 'It began writing from another app.',
+  owner: 'You put it back to asking.',
 } as const;
 export type DropWhy = keyof typeof DROP_SAID;
 
@@ -88,6 +90,12 @@ export type Standing = { agents: { agent: string; connected: string | null; kind
 const ORDER: readonly Rung[] = ['ask', 'tell', 'quiet'];
 const above = (r: Rung): Rung | null => ORDER[ORDER.indexOf(r) + 1] ?? null;
 const lower = (a: Rung, b: Rung): Rung => (ORDER.indexOf(a) <= ORDER.indexOf(b) ? a : b);
+
+/** One agent of `standing` as the ladder holds it: its grant (or Slash), and each kind's key and the rung its row holds. */
+type Listed = { id: string; agent: string; connected: string | null; kinds: (StandingKind & { key: string; held: Rung })[] };
+
+/** One agent as a person reads it, with the grant and the keys set aside. */
+const plain = (a: Listed): Standing['agents'][number] => ({ agent: a.agent, connected: a.connected, kinds: a.kinds.map(({ key: _key, held: _held, ...k }) => k) });
 
 /** What the ladder needs of the record. */
 export type LadderDeps = { sql: Sql; kernel: Kernel; now: () => number };
@@ -282,7 +290,7 @@ export function ladder(deps: LadderDeps) {
 
   /**
    * Take an agent back to Ask on these kinds, or on every kind when `kinds` is `null`, and forget what it was kept for,
-   * so climbing again starts from nothing. `why` is which of the four it was, kept for `standing` to say.
+   * so climbing again starts from nothing. `why` is which of the five it was, kept for `standing` to say.
    *
    * AND AN OFFER STILL WAITING FOR ONE OF THEM IS WITHDRAWN (research-audit-20 M2). "You kept them all" stopped being true
    * the moment one was undone, declined a third time or written in a burst, and a yes to it would have set the rung the
@@ -373,7 +381,7 @@ export function ladder(deps: LadderDeps) {
           options: [
             {
               id: 'yes',
-              label: next === 'tell' ? 'Let it, and tell me' : 'Let it, quietly',
+              label: next === 'tell' ? 'Do and tell' : 'Do quietly',
               because: next === 'tell' ? `It will ${doing} on its own and say so. Every change keeps its Undo.` : `It will ${doing} on its own without a line each time. Every change keeps its Undo.`,
             },
             { id: 'no', label: 'Keep asking', because: next === 'tell' ? `It asks before it does this, as now.` : `It keeps telling you each time, as now.` },
@@ -437,14 +445,19 @@ export function ladder(deps: LadderDeps) {
    * `why` IS WHAT `drop` WAS TOLD, and for an undo, which tells it nothing, the undo found in `undone` at that moment.
    * A drop from before the reason was kept answers `null`.
    */
-  const standing = (validFrom?: string): Standing => {
+  const standing = (validFrom?: string): Standing => ({
+    agents: listed(validFrom).map(plain),
+  });
+
+  /** `standing` with what a person never reads kept beside it: each agent's grant (or Slash) and each kind's key. */
+  const listed = (validFrom?: string): Listed[] => {
     const at = iso();
     const arrived = sql.one<{ applied_at: string }>('SELECT applied_at FROM migration WHERE version = ?', LADDER_ARRIVED)?.applied_at;
     const from = arrived === undefined ? Number.NaN : Date.parse(arrived);
     const listName = (id: string): string => kernel.register(id)?.name ?? id;
 
-    const kindsOf = (agent: string, scope: Scope | null): StandingKind[] => {
-      const out: StandingKind[] = [];
+    const kindsOf = (agent: string, scope: Scope | null): Listed['kinds'] => {
+      const out: Listed['kinds'] = [];
       const rows = sql.all<{ kind: string; rung: string; since: string; dropped_at: string | null }>('SELECT kind, rung, since, dropped_at FROM ladder WHERE agent = ?', agent);
       for (const r of rows) {
         const cut = r.kind.indexOf(':');
@@ -459,12 +472,14 @@ export function ladder(deps: LadderDeps) {
           since: r.since,
           lifted: r.dropped_at === null && r.rung === 'tell' && since >= from && since <= from + LIFT_WINDOW_MS,
           dropped: r.dropped_at === null ? null : { at: r.dropped_at, why: whyDropped(agent, r.kind, r.dropped_at) },
+          key: r.kind,
+          held,
         });
       }
       return out.sort((a, b) => (a.kind < b.kind ? -1 : a.kind > b.kind ? 1 : 0));
     };
 
-    const agents: Standing['agents'] = sql
+    const agents: Listed[] = sql
       .all<{ id: string; scope: string; label: string | null; created_at: string }>(
         `SELECT id, scope, label, created_at FROM token
          WHERE scope <> 'read' AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > ?)
@@ -473,7 +488,7 @@ export function ladder(deps: LadderDeps) {
         at,
       )
       .filter((t) => !endedByCutOff(validFrom, t.created_at))
-      .map((t) => ({ agent: (t.label ?? '').trim() || 'Your agent', connected: t.created_at, kinds: kindsOf(t.id, t.scope as Scope) }));
+      .map((t) => ({ id: t.id, agent: (t.label ?? '').trim() || 'Your agent', connected: t.created_at, kinds: kindsOf(t.id, t.scope as Scope) }));
     const slash = kindsOf(SLASH, null);
     /* SLASH'S NAME IS TAKEN FIRST, listed or not, so a grant's name does not move the day Slash earns a rung. A number
        another grant already has for its own name is passed over. */
@@ -494,8 +509,8 @@ export function ladder(deps: LadderDeps) {
       said.add(fold(name));
       a.agent = name;
     }
-    if (slash.length > 0) agents.push({ agent: 'Slash', connected: null, kinds: slash });
-    return { agents };
+    if (slash.length > 0) agents.push({ id: SLASH, agent: 'Slash', connected: null, kinds: slash });
+    return agents;
   };
 
   /** Why one kind was taken back at `at`, as a sentence, or `null` when nothing kept says (see `standing`). */
@@ -512,7 +527,31 @@ export function ladder(deps: LadderDeps) {
     return undone ? DROP_SAID.undone : null;
   };
 
-  return { standing, grantOf, untrusted, markUntrusted, gate, rungFor, noteFault, kept, declined, drop, anomaly, clientChanged, answered, agentOfActor };
+  /**
+   * The owner's own "Ask again" (ENG-A12, "undo" D37.167): an agent back to asking on one kind, said in the words
+   * `standing` says it in, or on every kind it was lifted on when `kind` is `null`. It is `drop` with `owner` for why,
+   * so `standing` says "You put it back to asking." and an offer waiting on that kind is withdrawn.
+   *
+   * BY NAME AND WORDS, AS A PERSON READ THEM, never a grant's id or a kind's key: the agent is the name `standing` gave
+   * it (a second grant of one name with its number), compared as a person reads it, whatever its case or spacing.
+   *
+   * NOTHING ELSE MOVES. A kind already asking keeps its day and its count, so pressing twice changes nothing, and every
+   * other agent and kind is left as it stood. Answers the agent as `standing` says it after, or which name was unknown.
+   */
+  const takeBack = (agentName: string, kind: string | null, validFrom?: string): { agent: Standing['agents'][number] } | { unknown: 'agent' | 'kind' } => {
+    const fold = (said: string): string => said.trim().replace(/\s+/gu, ' ').toLowerCase();
+    const found = listed(validFrom).find((a) => fold(a.agent) === fold(agentName));
+    if (found === undefined) return { unknown: 'agent' };
+    const named = kind === null ? found.kinds : found.kinds.filter((k) => fold(k.kind) === fold(kind));
+    if (kind !== null && named.length === 0) return { unknown: 'kind' };
+    const lifted = named.filter((k) => k.held !== 'ask').map((k) => k.key);
+    if (lifted.length === 0) return { agent: plain(found) };
+    drop(found.id, lifted, 'owner');
+    const after = listed(validFrom).find((a) => a.id === found.id);
+    return { agent: plain(after ?? found) };
+  };
+
+  return { standing, takeBack, grantOf, untrusted, markUntrusted, gate, rungFor, noteFault, kept, declined, drop, anomaly, clientChanged, answered, agentOfActor };
 }
 
 /** The floors as a person reads them, each the start of a sentence. */

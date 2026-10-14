@@ -72,6 +72,11 @@ async function record() {
     const thing = make('things', { name, state });
     for (let i = 0; i < NAMED_PAGE.linked; i++) make('tasks', { what: `${name} step ${i + 1}`, thing: thing.id });
   }
+  /* FIVE DAYS OF THE OWNER'S OWN USE, so Slash advises the record (HD.410). */
+  for (const d of [50, 40, 30, 20]) {
+    clock.set(NOW - d * DAY);
+    make('tasks', { what: `Kept on day ${d}` });
+  }
   clock.set(NOW);
   return { sql, k, clock };
 }

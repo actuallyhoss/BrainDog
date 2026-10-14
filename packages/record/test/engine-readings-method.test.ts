@@ -35,11 +35,16 @@ const LEDGER: EngineLedger = {
   questions: [{ cause: 'understand.fold#3' }, { cause: 'understand.fold#9' }, { cause: null }],
 };
 
+/** The brake over a record Slash never asked anything on (`slashBrake`, ENG-B17): too few answers to brake. */
+const UNBRAKED = { on: false, share: 0, of: 0 };
+
 /** The method file over a guard that lets `who` through and turns everybody else away, as `scoped` does. */
 const over = (engineLedger?: (since: string) => Promise<EngineLedger>, who: CallContext = OWNER) =>
   methods({
     scoped: (ctx: CallContext) => (ctx === who ? null : { code: 'FORBIDDEN', fix: 'Ask the owner for read access.' }),
     clock: fixedClock(T0),
+    /* A STORE WITH NO ANSWER OF SLASH'S IN IT, which is all the brake reads. */
+    sql: { all: () => [] },
     ...(engineLedger === undefined ? {} : { engineLedger }),
   } as unknown as RecordDeps);
 
@@ -47,7 +52,7 @@ test("THE ARITHMETIC'S ANSWER FOR THE LAST 30 DAYS, with nothing owed, and the h
   const asked: string[] = [];
   const m = over(async (since) => (asked.push(since), LEDGER), READER);
   const out = await m.engineReadings(undefined, READER);
-  assert.deepEqual(out, { ok: true, value: engineReadings({ now: T0, ...LEDGER, owed: [] }) });
+  assert.deepEqual(out, { ok: true, value: engineReadings({ now: T0, ...LEDGER, owed: [], braked: UNBRAKED }) });
   assert.deepEqual(asked, [ago(30 * DAY)]);
   assert.ok(out.ok && out.value !== null);
   /* Said in figures too, so a reader that answered nothing would not pass by agreeing with itself. */
@@ -83,5 +88,5 @@ test("ON A REAL RECORD the host's ledger is handed through", async (t) => {
   /* `index.ts` hands `engineLedger` to the method files once its line lands (this unit's blocked change). Until then the
      record answers `null`, which this case says rather than passing quietly. */
   if (out.ok && out.value === null) return t.todo('record index.ts does not hand engineLedger to methods(...) yet');
-  assert.deepEqual(out, { ok: true, value: engineReadings({ now: T0, ...LEDGER, owed: [] }) });
+  assert.deepEqual(out, { ok: true, value: engineReadings({ now: T0, ...LEDGER, owed: [], braked: UNBRAKED }) });
 });

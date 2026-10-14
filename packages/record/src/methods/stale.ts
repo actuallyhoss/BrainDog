@@ -303,6 +303,11 @@ export function staleFor(deps: RecordDeps, ctx: CallContext, nowMs: number, list
         const found = finder.find(sql, nowMs);
         if (found.stale <= 0) continue;
         const asked = shown.find((q) => q.cause === causeOfFinder(finder.id));
+        /* A FINDER THAT SAYS WHERE ITS THINGS ARE (`at`, AGT-C18's rows-same) is a line a place, each with its own address. */
+        if (asked === undefined && found.at !== undefined && found.at.length > 0) {
+          for (const place of found.at) lines.push({ kind: finder.id, said: place.said, count: place.count, clear: `See them, and the one press that folds them, at ${place.href}` });
+          continue;
+        }
         lines.push({
           kind: finder.id,
           said: `${finder.name ?? finder.id.replace(/-/gu, ' ')}: ${found.stale}`,

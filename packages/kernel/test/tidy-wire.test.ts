@@ -65,6 +65,7 @@ test('a record never swept holds no line, and the first sweep keeps one a finder
       ['keys-unopened', 0, 0],
       ['questions-moot', 0, 0],
       ['questions-old', 0, 0],
+      ['rows-same', 0, 0],
       ['runs-empty', 0, 0],
       ['runs-stopped', 0, 0],
       ['steps-old', 0, 0],
@@ -123,7 +124,7 @@ test('a finder that throws: the sweep still finishes, the other finders keep the
   const lines = kept(sql);
   assert.equal(lines.find((l) => l.finder === 'wire-broken'), undefined);
   assert.equal(lines.find((l) => l.finder === 'steps-old')?.did, 1);
-  assert.equal(lines.length, 7);
+  assert.equal(lines.length, 8);
   /* THE BOOKS WERE KEPT: the step the sweep is for was closed, in the same call. */
   assert.equal(sql.one<{ state: string }>("SELECT state FROM entry WHERE register = 'session' AND json_extract(fields, '$.next') = 'Ship it'")?.state, 'done');
   assert.doesNotThrow(() => k.purge());

@@ -118,6 +118,8 @@ export async function cloud(extra: Record<string, unknown> = {}) {
   const storages = new Map<string, RecordStorage>();
   const objects = new Map<string, Obj>();
   const log: string[] = [];
+  /* WHAT A RECORD HANDED `ctx.waitUntil` (the daily look beside a request), kept so a test can let it finish (`settle`). */
+  const waits: Promise<unknown>[] = [];
   const open = (id: string): Obj => {
     const storage = storages.get(id) ?? recordStorage();
     storages.set(id, storage);
@@ -125,7 +127,7 @@ export async function cloud(extra: Record<string, unknown> = {}) {
       storage,
       id: { toString: () => id },
       blockConcurrencyWhile: (f: () => unknown) => f(),
-      waitUntil: () => {},
+      waitUntil: (p: unknown) => void waits.push(Promise.resolve(p).catch(() => {})),
       abort: (reason?: string) => {
         log.push(`abort ${id}`);
         objects.set(id, open(id));
@@ -198,5 +200,10 @@ export async function cloud(extra: Record<string, unknown> = {}) {
   const events = (id: string, kind: string): number =>
     Number((storages.get(id)?.sql.exec('SELECT count(*) AS n FROM event WHERE kind = ?', kind as never).toArray()[0] as { n: number } | undefined)?.n ?? 0);
 
-  return { bundle, env, blobs, directory, dirStorage, storages, objects, log, open, provision, signIn, ask, events, record: (id: string) => (env['RECORD'] as { get: (id: string) => Obj }).get(id) };
+  /** Every `waitUntil` a record was handed so far, finished, so a mocked clock moved next is not read by work still under way. */
+  const settle = async (): Promise<void> => {
+    while (waits.length > 0) await Promise.all(waits.splice(0));
+  };
+
+  return { bundle, env, blobs, directory, dirStorage, storages, objects, log, open, provision, signIn, ask, events, settle, record: (id: string) => (env['RECORD'] as { get: (id: string) => Obj }).get(id) };
 }

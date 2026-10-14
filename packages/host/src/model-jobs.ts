@@ -13,8 +13,8 @@
  *   - a draft with `examples` (the ingest's third unmatched arrival of one shape, `packages/kernel/src/ingest.ts`) reads
  *     those arrivals from the inbox and asks for a pattern, acked as `{ question, body_kind: 'pattern', body }`;
  *   - a draft with `signal: 'ingest.unmatched'` is the same, its samples found by the shape its `subject` names;
- *   - any other `signal` (`search.empty`, `write.refused`, `query.scan`, dormant) is acked with no model call as a
- *     two-way `options` question carrying the finding's own sentence, so every finding reaches Decide at no cost.
+ *   - any other `signal` (`search.empty`, `write.refused`, `query.scan`, dormant) is settled done with no model call,
+ *     its sentence kept as a reading, and files no question (ENG-B17): a finding that changes nothing is not asked.
  * A digest's prose is acked as `{ text }`, and `''` sends the digest as figures. An embedding is acked as
  * `{ model, dims, vectors }`, one vector for each text the hourly sweep queued, which the kernel writes to `entry_vec`.
  * A doubtful pair is acked as `{ verdicts: [{ hash, same, confidence }] }`, from the cache first (`understand.ts`).
@@ -479,26 +479,15 @@ async function samplesOfShape(api: ModelJobsApi, shape: string): Promise<Result<
 }
 
 /**
- * A finding no model is asked about, as the two-way question the gate files (`packages/kernel/src/govern.ts`, `options`).
+ * A finding no model is asked about, as the one line the pass logs (ENG-B17).
  *
- * THE QUESTION IS THE FINDING'S OWN SENTENCE, which the analyser wrote to be read (`packages/kernel/src/observe.ts`), so the
- * person on Decide reads what was noticed and chooses, and a real change can be drafted from `look` later.
+ * KEPT AS A READING, NEVER FILED AS A QUESTION. It used to be a "Look into it / Not now" question signed by Slash whose
+ * two answers changed nothing on the record, so every week asked him to choose between two ways of doing nothing. The
+ * finding's own sentence is what the analyser wrote to be read (`packages/kernel/src/observe.ts`), and it stays noticed
+ * there; what Slash offers is a real change or nothing.
  */
-function findingQuestion(p: Record<string, unknown>): Settled {
-  const why = typeof p.why === 'string' && p.why.trim() !== '' ? p.why : `The record noticed ${String(p.signal)} on ${String(p.subject ?? 'something')}.`;
-  return {
-    state: 'done',
-    result: {
-      question: why,
-      body_kind: 'options',
-      body: {
-        options: [
-          { id: 'look', label: 'Look into it', because: why },
-          { id: 'later', label: 'Not now', because: 'Nothing on the record changes, and the finding stays noticed.' },
-        ],
-      },
-    },
-  };
+function findingReading(p: Record<string, unknown>): string {
+  return typeof p.why === 'string' && p.why.trim() !== '' ? p.why : `The record noticed ${String(p.signal)} on ${String(p.subject ?? 'something')}.`;
 }
 
 /**
@@ -519,8 +508,10 @@ async function settleDraft(api: ModelJobsApi, inference: ModelJobInference, job:
   if (Array.isArray(p.examples) && p.examples.every((id) => typeof id === 'string' && id !== ''))
     samples = await slashSamplesOf(api, p.examples as string[], RECORD_CTX);
   else if (p.signal === 'ingest.unmatched' && typeof p.subject === 'string') samples = await samplesOfShape(api, p.subject);
-  else if (typeof p.signal === 'string') return findingQuestion(p);
-  else return { state: 'done' };
+  else if (typeof p.signal === 'string') {
+    log(`model job ${job.id}: noticed, and nothing to ask: ${findingReading(p)}`);
+    return { state: 'done' };
+  } else return { state: 'done' };
 
   /* AN ARRIVAL GONE SINCE THE DRAFT WAS QUEUED (filed, erased) LEAVES NOTHING TO DRAFT FROM, and asking again finds it
      gone again: done with nothing filed, and the line says why. */
