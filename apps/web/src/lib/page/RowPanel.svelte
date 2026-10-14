@@ -158,6 +158,9 @@
     loaded = '';
     confirming = false;
     host.dirty = false;
+    /* A PANEL THAT CLOSED ITSELF (its close, Escape) TELLS THE HOST, so whoever follows the open row (a list's address)
+       hears it. Closing a closed host says nothing twice. */
+    host.close();
     if (!r) return;
     const el = document.querySelector<HTMLElement>(`[data-row="${CSS.escape(keyOf(r))}"]`);
     el?.focus({ preventScroll: true });

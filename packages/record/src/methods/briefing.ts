@@ -14,8 +14,16 @@
  * cards know and nothing here gathers yet.
  *
  * WORKED OUT AT THE READ AND KEPT IN NO TABLE, so any record answers it today from what it holds, and `basis` says what
- * it was worked out from. The lines are the rules' own sentences (`by: 'rule'`): the model's half, its instructions and
- * the write at 08:00 and 17:00, is a later job, and when it lands this read hands the same facts to it.
+ * it was worked out from. With nothing kept the lines are the rules' own sentences (`by: 'rule'`).
+ *
+ * A MODEL'S CARDS ARE ANSWERED THE MOMENT ONE IS KEPT, AND ONLY WHILE THEY ARE STILL TRUE. The write (`../brief-write.ts`,
+ * at 08:00, at 17:00 and when the basis moves) keeps what a model answered as one pref of the model's own holder, with
+ * the basis it was written from. This read asks no model and writes nothing: it gathers the caller's own facts, and the
+ * kept answer stands only when its basis is the basis of those facts (`keptBrief`). So a bill paid a minute ago is said
+ * by the rules at once and never by a stale card, and somebody who reads less than the facts were gathered for has a
+ * basis of their own and is answered the rules' cards, never lines written about what they were not shown. A kept card
+ * is still held to the facts handed over here (`briefOf`): its holes are filled from the record's own figures and a
+ * handle this caller was not handed is left out. When the rules speak in a model's place, `said` is the sentence why.
  *
  * EVERY FACT IS HELD TO THE CALLER BEFORE IT IS A FACT. A list closed to them gives no row, a narrowed grant gives the
  * rows it admits (the read goes through the grant's own rule), a question is one `sightOf` shows them and is called
@@ -26,9 +34,10 @@
  */
 
 import type { Result } from '@braindog/ports';
-import { localDays, openHandoffs, readableZone, sessionDeclaration, spoken, whereFor } from '@braindog/kernel';
+import { SLASH, localDays, openHandoffs, readableZone, sessionDeclaration, spoken, whereFor } from '@braindog/kernel';
 import type { Entry, HandoffPlace, Json } from '@braindog/kernel';
 
+import { BRIEF_KEPT, keptBrief } from '../brief-write.ts';
 import { BRIEF_RANK, briefFrom, type Brief, type BriefFact } from '../briefing.ts';
 import { hashOf } from '../headlines.ts';
 import type { CallContext } from '../index.ts';
@@ -36,8 +45,11 @@ import { scrubbed } from '../scrub.ts';
 import { exceptionsFor } from './exceptions.ts';
 import type { RecordDeps } from './index.ts';
 
-/** What `briefing` answers: the cards, when they were worked out, and the hash of the facts they were worked out from. */
-export type Briefing = Brief;
+/**
+ * What `briefing` answers: the cards, when they were worked out, the hash of the facts they were worked out from, and
+ * `said`: the sentence why the rules wrote them where a model would have, or `null`.
+ */
+export type Briefing = Brief & { said: string | null };
 
 /** The list runs are kept in, read out of the kernel's own declaration so there is one copy of its name. */
 const SESSION = (sessionDeclaration().body as unknown as { id: string }).id;
@@ -66,8 +78,13 @@ const handle = (kind: string, n: number): string => `${kind}-${String(n + 1).pad
  */
 const within = (at: number, of: number): number => (of <= 0 ? 0 : (0.4 * (of - at)) / of);
 
-export function methods(deps: RecordDeps) {
-  const { kernel, sql, scoped, readable, sightOf, clock } = deps;
+/**
+ * Everything worth saying on this record now that this caller may read, as facts: what is late and what falls due, what
+ * is asked, what runs left, and what stopped, in that order. The read below and the write that asks a model both call
+ * it, so the two are worked out from the same facts and one basis. It guards nothing itself: each caller has its own.
+ */
+export function briefFactsFor(deps: RecordDeps, ctx: CallContext, nowMs: number): BriefFact[] {
+  const { kernel, sql, readable, sightOf } = deps;
 
   /**
    * What is late and what falls due inside `BRIEF_DUE_DAYS`, across every list the caller may read: a row a day
@@ -213,25 +230,35 @@ export function methods(deps: RecordDeps) {
     });
   };
 
+  return [
+    ...dated(ctx, nowMs),
+    ...asked(ctx),
+    ...steps(ctx, nowMs),
+    /* AND WHAT STOPPED (`exceptionsFor`, ENG-B13), already held to the lists this caller reads whole. */
+    ...(exceptionsFor(deps, ctx, nowMs) ?? []).map((e, n, all): BriefFact => ({ h: handle('exception', n), kind: 'exception', title: e.subject, figures: { when: e.since }, row: e.row?.id ?? '', cause: e.cause, rank: BRIEF_RANK.exception + within(n, all.length) })),
+  ];
+}
+
+export function methods(deps: RecordDeps) {
+  const { kernel, scoped, clock } = deps;
+
   return {
     /**
-     * `{}`: what matters on this record now, as `{ cards, at, basis }`. Each card is one line a person reads, the row
-     * it opens and who wrote the line (`rule` until a model writes it). No card when nothing is pressing. READ+, held
-     * to what the caller may read, and it changes nothing.
+     * `{}`: what matters on this record now, as `{ cards, at, basis, said }`. Each card is one line a person reads, the
+     * row it opens and who wrote the line: `slash` when a model's kept answer still stands for this caller's own facts,
+     * else `rule`. `said` is why the rules wrote it when a model would have, or `null`. No card when nothing is
+     * pressing. READ+, held to what the caller may read, and it changes nothing.
      */
     async briefing(_args: unknown, ctx: CallContext): Promise<Result<Briefing>> {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false, refusal: stop };
       const nowMs = clock.now();
-      const facts = [
-        ...dated(ctx, nowMs),
-        ...asked(ctx),
-        ...steps(ctx, nowMs),
-        /* AND WHAT STOPPED (`exceptionsFor`, ENG-B13), already held to the lists this caller reads whole. */
-        ...(exceptionsFor(deps, ctx, nowMs) ?? []).map((e, n, all): BriefFact => ({ h: handle('exception', n), kind: 'exception', title: e.subject, figures: { when: e.since }, row: e.row?.id ?? '', cause: e.cause, rank: BRIEF_RANK.exception + within(n, all.length) })),
-      ];
-      /* NO MODEL IS ASKED HERE YET, so the rules say the cards (`briefFrom` with no answer: `briefCandidates`, then `rulesBrief`). */
-      return { ok: true, value: briefFrom(null, facts, new Date(nowMs).toISOString()) };
+      const facts = briefFactsFor(deps, ctx, nowMs);
+      /* NO MODEL IS ASKED HERE. What one answered at the last write is read out of the model's own prefs, and it stands
+         only for the basis it was written from: a moved basis, or another caller's, is answered by the rules. */
+      const kept = keptBrief(kernel.prefsOf(SLASH)[BRIEF_KEPT], facts);
+      const brief = briefFrom(kept === null ? null : { cards: kept.cards }, facts, new Date(nowMs).toISOString(), kept?.said ?? null);
+      return { ok: true, value: { ...brief, said: brief.said ?? null } };
     },
   };
 }

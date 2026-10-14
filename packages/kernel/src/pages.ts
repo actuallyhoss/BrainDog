@@ -33,6 +33,7 @@ import { sourceModule } from './sources/index.ts';
 import { ACTIONS_BLOCKING } from './sources/actions-blocking.ts';
 import { FEED_BY } from './sources/activity.ts';
 import { RUNS_ON_LISTS } from './sources/runs-on.ts';
+import { DOING_SAID, withSaid } from './sources/sessions-working.ts';
 import { fileLists } from './kinds/gallery.ts';
 import { panelFault, roadmapFault, shortFault } from './kinds/words.ts';
 import { BODY_KINDS, type Shows } from './govern.ts';
@@ -48,7 +49,7 @@ import { withAdds, type PageAddition } from './page-adds.ts';
 import { barsOf, type Bars, type SeriesLine } from './series.ts';
 import { isBucket } from './buckets.ts';
 import { isQuiet, presenceOf, WORKING_MS } from './presence.ts';
-import { SESSION_PREFIX, agentOf } from './session.ts';
+import { SESSION_PREFIX, agentOf, recordNamed } from './session.ts';
 import { quietSign, type VitalSign } from './signs.ts';
 import { nextSteps, stepsPercent, tallySteps, type StepsDecl } from './steps.ts';
 import { COSTS, type Cost, type Wait } from './weigh.ts';
@@ -1091,6 +1092,9 @@ export type WholeRead = {
 
 /** The register `sessions.live` and `sessions.working` read, whose fields their columns name. */
 const SESSION = 'session';
+
+/** The field of a run that says which project it is placed in, by that project's spoken name (`projectsOf`). */
+const PLACED = 'project';
 
 /** How many versions a `diff` shows: `42 §4.5` bounds `versions` at 2 to 10. */
 const VERSIONS = { least: 2, most: 10 } as const;
@@ -2273,7 +2277,12 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
      ask are checked before any query, so a block that cannot say which project draws nothing rather
      than every row of the register. */
   const inherit = block.inherit === true;
-  const scoped = (block.columns ?? []).filter((c) => c.as === 'scope');
+  /* THE LIST OF RUNS SAYS WHERE A RUN APPLIES IN ITS OWN WAY (AGT-C12): a run is placed in a project by that project's
+     spoken name, which `projectsOf` reads as the two run sources read it, and no `scope:` field says so. So over that
+     list `as: scope` is taken on the run's project and answered below, and it is not a scope this block inherits by. */
+  const runs = register === SESSION;
+  const placedIn = runs ? (block.columns ?? []).filter((c) => c.as === 'scope' && c.field === PLACED) : [];
+  const scoped = (block.columns ?? []).filter((c) => c.as === 'scope' && !placedIn.includes(c));
   if ((inherit && (!deps.scopeOf || !deps.inScope)) || (scoped.length && !deps.scopeOf))
     return {
       ...base,
@@ -2379,7 +2388,9 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
     .filter((c) => !(block.kind === 'cards' && (c.as === 'next' || c.metric !== undefined)))
     /* A COLUMN'S SECOND FIELD (`or:`) IS CHECKED AS ITS FIRST IS, or the fallback would be a blank nobody looks into. */
     .flatMap((c) => (c.or === undefined ? [c.field] : [c.field, c.or]))
-    .filter((f) => f !== 'seq' && f !== CHANGED && !Object.hasOwn(schema.fields, f));
+    /* WHAT A RUN SAID IT IS DOING IS A COLUMN OF THE LIST OF RUNS AND NO FIELD OF IT (`withSaid`), here as on the two
+       run sources, so a card over the runs that stopped says the sentence a card over the working ones says. */
+    .filter((f) => f !== 'seq' && f !== CHANGED && !(runs && f === DOING_SAID) && !Object.hasOwn(schema.fields, f));
   /* A CARD'S NEXT STEP IS A FIELD OF THE STEPS LIST, not of the list the cards are over, so it is checked there. */
   const nextFault = nextColumnFault(deps, block, register);
   if (nextFault) return { ...base, refusals: also(nextFault) };
@@ -2506,10 +2517,14 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
   /* A BAR OR A SPLIT ADDS UP ITS ROWS WHERE IT IS DRAWN, so the home currency and the rates travel beside them, and the
      rows are converted or split by currency with the same arithmetic a figure uses (`fx.ts`). */
   const held = block.kind === 'bar' || block.kind === 'split' ? deps.ctx.fx?.() : undefined;
+  /* A RUN'S PROJECT BY ITS NAME, AND WHAT IT SAID IT IS DOING, read only for a block that asks for either: the same two
+     answers `sessions.live` gives, so a run reads the same on a card whichever of the three lists it. */
+  const runSaid = runs && (block.columns ?? []).some((c) => c.field === DOING_SAID);
+  const placed = placedIn.length > 0 || runSaid ? projectsOf(deps, rows) : null;
   return {
     ...base,
     ...spent,
-    rows,
+    rows: placed && runSaid ? withSaid(deps, block, rows, placed.scopes, SOURCE_KIT) : rows,
     ...(wholeRead ? { wholeRead } : {}),
     ...(held && (held.home !== null || held.rates.length > 0) ? { fx: { home: held.home, rates: [...held.rates] } } : {}),
     ...changesOf(deps, register, rows, asksChanged),
@@ -2519,6 +2534,7 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
     ...(short ? { open: listed.value.matched } : {}),
     ...(inherit ? { inherited: listed.value.inherited ?? 0 } : {}),
     ...(scope ? scopesOf(deps, rows, scope) : {}),
+    ...(placed && placedIn.length > 0 ? placed : {}),
     ...ringsOf(deps, block, register, rows),
     ...nextsOf(deps, block, register, rows),
     ...trendsOf(deps, block, rows),
@@ -4113,7 +4129,11 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
     const runs = block.source === 'sessions.live' || block.source === 'sessions.working';
     if (runs || block.working === true || block.source === HANDOFFS_OPEN) named.add(SESSION);
     /* A LIVE RUN IS NAMED BY ITS PROJECT'S TITLE (`projectsOf`), a row of the list that declares `scopes:`. */
-    const projects = runs || block.source === HANDOFFS_OPEN ? beside?.projects?.() : null;
+    /* AND SO IS A RUN READ OFF THE LIST ITSELF, where a card asks for its project or for what it said it is doing: both
+       read the projects' titles (`projectsOf`, `withSaid`). */
+    const listedRuns =
+      block.source === `register.${SESSION}` && (block.columns ?? []).some((c) => c?.field === DOING_SAID || (c?.as === 'scope' && c?.field === PLACED));
+    const projects = runs || listedRuns || block.source === HANDOFFS_OPEN ? beside?.projects?.() : null;
     if (projects) named.add(projects);
     /* A CARD'S NEXT STEP AND ITS RING READ EVERY LIST OF STEPS UNDER THE CARDS, all of them, because `ringsOf` tallies
        each and `stepsHolding` refuses a field none of them has with every one's name and fields in `allowed`. */
@@ -4905,6 +4925,7 @@ const SOURCE_KIT = {
   agentOf,
   isQuiet,
   projectsOf,
+  recordNamed,
   markOf,
   typesOf,
   quietSign,

@@ -63,6 +63,21 @@ test('the template draws from the helper, each part once and keyed, so a read la
   assert.ok(order.every((at) => at > 0), 'a part is missing from the template');
 });
 
+test("THE PAGE'S OWN SENTENCE STAYS UNDER THE HEAD: the reader draws the briefing under it, and Home only where no reader does", () => {
+  /* Handed to the reader only while it draws the blocks and there is a card, so no empty row opens the board. */
+  assert.match(home, /<PageView [^>]*opens=\{paged && brief && brief\.cards\.length > 0 \? briefed : undefined\}/u);
+  assert.match(home, /\{#if !paged\}\{@render briefed\(\)\}\{\/if\}/u, 'the briefing is drawn twice, or not at all without a reader');
+  assert.match(home, /const paged = \$derived\(reader && drawn\?\.from === 'live'\);/u);
+  const body = readFileSync(new URL('../page/PageBody.svelte', import.meta.url), 'utf8');
+  /* Under the headline when the headline is what a reader meets first, else over the first block: never both. */
+  assert.match(body, /const opensAt = \$derived\(opens && !arranging && headline && reading\[0\] === headline \? headline\.at : -1\);/u);
+  assert.equal(body.split('{@render opens()}').length - 1, 2);
+  assert.match(body, /\{#if opens && opensAt === at\}/u);
+  assert.match(body, /\{#if opens && opensAt < 0\}/u);
+  /* And who wrote it goes with the cards. */
+  assert.match(home, /<brief\.Part cards=\{brief\.cards\} foot=\{brief\.foot\} \/>/u);
+});
+
 test('neither read comes with the screen: each is fetched when asked for, parts and all', () => {
   for (const name of ['briefing', 'Briefing', 'matched', 'Matched']) {
     assert.doesNotMatch(home, new RegExp(`^\\s*import (?!type\\b)[^;]*from '[^']*/${name}(\\.svelte|\\.ts)';$`, 'mu'), `${name} is imported with the screen`);

@@ -207,19 +207,24 @@ function ledger() {
 
 const MONTH = new Date(Date.UTC(2026, 9, 1)).toISOString();
 
-test(`UNDERSTANDING SPENDS ITS OWN ${UNDERSTAND_ASKS_MONTH} AND NO MORE, counted inside the work's month and never the headlines'`, async () => {
+test("UNDERSTANDING SPENDS ITS OWN SHARE OF THE ONE POOL AND NO MORE, counted inside the work's month and never the headlines' floor", async () => {
   const { sql, meter: record } = ledger();
   const understanding = understandingOver({ resolve: async () => ({ verdicts: {} }), mentions: async () => ({ mentions: [] }) }, record);
-  for (let i = 0; i < UNDERSTAND_ASKS_MONTH; i++) assert.ok((await understanding.resolve({ pairs: [] })).ok);
+  /* THE MOST IT MAY SPEND IS THE MONTH LESS EVERYBODY ELSE'S FLOORS (`budget-plan.ts`), 340 of 600: no wall of ten. */
+  const most = backgroundMeter(sql).understand!.cap;
+  assert.equal(most, BACKGROUND_JOBS_MONTH - 260);
+  for (let i = 0; i < most; i++) assert.ok((await understanding.resolve({ pairs: [] })).ok);
   const refused = await understanding.mentions({ notes: [] });
   assert.ok(!refused.ok);
   assert.equal('refusal' in refused && refused.refusal.code, 'SLASH_BUDGET_SPENT');
 
   const work = backgroundMeter(sql);
-  assert.equal(work.understand?.cap, UNDERSTAND_ASKS_MONTH);
-  assert.equal(work.understand?.spent(MONTH), UNDERSTAND_ASKS_MONTH);
-  assert.equal(work.spent(MONTH), UNDERSTAND_ASKS_MONTH);
-  assert.equal(backgroundMeter(sql, BACKGROUND_JOBS_MONTH, 'headline').spent(MONTH), 0);
+  assert.equal(work.understand?.cap, most);
+  assert.equal(work.understand?.spent(MONTH), most);
+  assert.equal(work.spent(MONTH), most);
+  /* THE HEADLINES STILL HAVE THEIR FLOOR, all of it. */
+  const headline = backgroundMeter(sql, BACKGROUND_JOBS_MONTH, 'headline');
+  assert.equal(headline.cap - headline.spent(MONTH), 100);
   /* AND A SKILL DRAFT STILL HAS THE REST OF THE WORK'S MONTH. */
   const skill = await record.background('skill');
   assert.ok(skill.ok);

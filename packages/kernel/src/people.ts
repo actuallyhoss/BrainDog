@@ -16,7 +16,7 @@
  *      its dots, dashes, underscores and the number on its end (`rohan.meduri`, `rohanmeduri` and `rohanmeduri24` are
  *      one handle). The same organisation or domain alone is never enough: two colleagues share both (M4). The older
  *      row is kept, the record's own person always, and the newer folded into it, carrying every field the kept row
- *      lacks (H2).
+ *      lacks (H2). A fold he undid is never made again (`foldUndone`): the meeting writes on the one it was about.
  *   4. ONE QUESTION PER CLUSTER for the doubtful rest, worded in names and the evidence for each (M4), never in ids.
  *      Asked once: a pair the owner said no to, or a merge he undid, is never asked about again. A later meeting of
  *      somebody the question names keeps it current (`reask`), and one who may be the same person joins it rather than
@@ -881,8 +881,11 @@ function byOrgName(sql: Sql, orgs: DeclaredList<OrgFields>, name: string): Row |
 
 /* ── what is asked about organisations ───────────────────────────────── */
 
-/** A list as a question about it names its rows: by its register, and the field a fold points at the row kept. */
-type Keyed = { register: string; fields: { merged_into?: string | undefined } };
+/**
+ * A list as a question about it names its rows: by its register, and the field a fold points at the row kept. And as a
+ * merge reads it: the parts its rows keep their keys in.
+ */
+type Keyed = { register: string; fields: { merged_into?: string | undefined; email?: string | undefined; domain?: string | undefined; handles?: string | undefined; keys?: string | undefined } };
 
 /** An organisation's own name, as a sentence says it. */
 const orgNameOf = (deps: Pick<PeopleDeps, 'titleOf'>, orgs: DeclaredList<OrgFields>, row: Row): string =>
@@ -1537,6 +1540,7 @@ function settle(deps: PeopleDeps, list: DeclaredList<MeetsFields>, person: Row, 
         vouched(deps, list, o) &&
         kindsMeet(deps, list, now, o, folds, person.id) &&
         !(deps.moneyAt?.(now.id) && deps.moneyAt?.(o.id)) &&
+        /* NOR A PAIR HE ANSWERED, NOR ONE WHOSE FOLD HE UNDID (`foldUndone`): the meeting stays on its own row. */
         !refused(deps, list, now, o, false),
     );
     if (other === undefined) break;
@@ -2118,17 +2122,86 @@ function refused(deps: Pick<PeopleDeps, 'sql' | 'nameOf'>, list: Keyed, a: Row, 
     }
   });
   if (asked) return true;
-  /* AN UNDONE MERGE IS A `merged_into` THAT WENT FROM ONE OF THE PAIR BACK TO NOTHING. */
-  return deps.sql.one<{ n: number }>(
+  return foldUndone(deps, list, a, b);
+}
+
+/**
+ * Whether these two were folded into one and he took it back: the one reader of an undone fold, for the strong rules,
+ * the bands and every question (`refused`). An Undo is a no, so the pair is never folded again and never asked about.
+ *
+ * READ FROM THE LOG'S OWN LINES, with no mark kept anywhere else. Three ways the log says it:
+ *   - the merge field of one went from the other back to nothing (`undoMerge` puts it back so);
+ *   - it was set to the other and put back later, whatever it held between: a second fold in the same batch moves the
+ *     first one's pointer on, so the line that puts it back names the row the chain ended in, not this one;
+ *   - the batch that set it is in `undone`, whichever undo wrote it there.
+ *
+ * AND SOMEBODY MET AGAIN IN THE PLACE OF ONE STILL FOLDED AWAY IS THAT SAME PERSON. An undo that took back what the
+ * kept row was carried and left the folded row gone frees its address, and the next commit or mail by that address
+ * makes a new row for it. That row answers to a key the folded one holds, so the undone fold is its own too.
+ */
+function foldUndone(deps: Pick<PeopleDeps, 'sql'>, list: Keyed, a: Row, b: Row): boolean {
+  const merged = list.fields.merged_into;
+  if (merged === undefined || a.id === b.id) return false;
+  const [ta, tb] = [`entry:${a.id}`, `entry:${b.id}`];
+  const back = deps.sql.one<{ n: number }>(
     `SELECT 1 AS n FROM event WHERE kind = 'edit' AND field = ? AND to_v IS NULL
        AND ((target = ? AND instr(from_v, ?) > 0) OR (target = ? AND instr(from_v, ?) > 0)) LIMIT 1`,
     merged,
-    `entry:${a.id}`,
+    ta,
     b.id,
-    `entry:${b.id}`,
+    tb,
     a.id,
-  ) !== undefined;
+  );
+  if (back !== undefined) return true;
+  const set = deps.sql.one<{ n: number }>(
+    `SELECT 1 AS n FROM event s WHERE s.kind = 'edit' AND s.field = ? AND s.to_v IS NOT NULL
+       AND ((s.target = ? AND instr(s.to_v, ?) > 0) OR (s.target = ? AND instr(s.to_v, ?) > 0))
+       AND (EXISTS (SELECT 1 FROM event p WHERE p.target = s.target AND p.kind = 'edit' AND p.field = s.field AND p.to_v IS NULL AND p.rowid > s.rowid)
+         OR EXISTS (SELECT 1 FROM undone u WHERE u.batch = s.batch OR u.batch = s.id)) LIMIT 1`,
+    merged,
+    ta,
+    b.id,
+    tb,
+    a.id,
+  );
+  if (set !== undefined) return true;
+  /* THE FOLDS TAKEN BACK THAT POINTED AT ONE OF THE PAIR, read from `undone` by its batch (a fold with no batch is
+     kept there under its own line's id). Few on any record, so the keys are compared here. */
+  const pointed = `SELECT e.target AS target, e.to_v AS into_v FROM undone u JOIN event e ON e.{on} = u.batch
+     WHERE e.kind = 'edit' AND e.field = ? AND e.to_v IS NOT NULL AND (instr(e.to_v, ?) > 0 OR instr(e.to_v, ?) > 0)`;
+  const taken = deps.sql.all<{ target: string; into_v: string }>(
+    `${pointed.replace('{on}', 'batch')} UNION ${pointed.replace('{on}', 'id')}`,
+    merged,
+    a.id,
+    b.id,
+    merged,
+    a.id,
+    b.id,
+  );
+  if (taken.length === 0) return false;
+  const [ka, kb] = [new Set(keysAt(list, a)), new Set(keysAt(list, b))];
+  return taken.some(({ target, into_v }) => {
+    const id = target.replace(/^entry:/, '');
+    if (id === a.id || id === b.id) return false;
+    const gone = deps.sql.one<RawRow>('SELECT id, seq, version, fields, deleted_at FROM entry WHERE register = ? AND id = ? AND deleted_at IS NOT NULL', list.register, id);
+    if (gone === undefined) return false;
+    /* THE ONE OF THE PAIR IT WAS NOT FOLDED INTO is the one that may stand where it stood. */
+    const other = into_v.includes(a.id) ? kb : ka;
+    return keysAt(list, withDeleted(gone)).some((k) => other.has(k));
+  });
 }
+
+/** Every key a row of either list answers to, by whichever of the parts its list names. */
+const keysAt = (list: Keyed, row: Row): string[] => {
+  const at = list.fields;
+  const many = (field: string | undefined): string[] => (field === undefined ? [] : listOf(row.fields[field]));
+  return keysOf({
+    email: at.email === undefined ? undefined : textOf(row.fields[at.email]),
+    domain: at.domain === undefined ? undefined : textOf(row.fields[at.domain]),
+    handles: many(at.handles),
+    keys: many(at.keys),
+  });
+};
 
 /* ── held twice, asked with no model ─────────────────────────────────── */
 

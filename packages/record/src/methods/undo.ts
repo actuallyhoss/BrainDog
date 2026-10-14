@@ -23,11 +23,18 @@
  * kernel's `undoBackfill`, which unplaces a run, unlinks a payment and removes an organisation nothing else links to,
  * none of which the general undo reads. Its plan is said here in the same names and with the same hash a press needs,
  * so a row's byline and Undo on a walk's line work as on any other change.
+ *
+ * AND A MATCH THE RECORD MADE IS PUT BACK AS A MERGE IS PUT BACK (ENG-B04). A batch the kernel says is a fold (`isFold`)
+ * is planned by `foldPlan` and put back by `undoMerge`, whole: the general undo read it line by line and gave back the
+ * one carried key. The look, the hash and the answer are the same, so the tile that lists matches presses this.
+ * `isFold` IS ASKED FIRST, since `foldPlan` answers a plan for a batch that holds a decision too, and that one goes back
+ * by its decision. THE PRESS ANSWERS THE WRITE DOOR'S REFUSAL WHEN THERE IS ONE, said in names, because the plan is read
+ * from the log and cannot foresee it. And the batch such an undo wrote is not undone from here (`unfolded`).
  */
 
 import type { Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
-import { BACKFILL_ACTOR, sessionDeclaration, ulids, type UndoApplied, type UndoPlan, type UndoRow, type UndoScope, type UndoSkip, type UndoStep } from '@braindog/kernel';
+import { BACKFILL_ACTOR, ladderAgentOf, sessionDeclaration, ulids, type UndoApplied, type UndoPlan, type UndoRow, type UndoScope, type UndoSkip, type UndoStep } from '@braindog/kernel';
 
 import { ladder } from '../ladder.ts';
 import { isHandle, spokenOf } from '../question-handles.ts';
@@ -98,6 +105,15 @@ export function methods(deps: RecordDeps) {
     if (args.dry !== undefined && typeof args.dry !== 'boolean') return no('VALUE_MALFORMED', 'dry is true to see what would be put back, and false or left out to put it back.', { at: 'dry' });
     const opts = { reads: (register: string) => readable(ctx, register) === null };
     const walk = 'batch' in scope && walked(scope.batch) ? scope.batch : null;
+    /* A MATCH THE RECORD MADE GOES BACK AS A MERGE GOES BACK, before anything of the general undo is asked: that one
+       reads the batch line by line, and a fold is put back whole or not at all. */
+    if (walk === null && 'batch' in scope && kernel.isFold(scope.batch)) return foldUndo(scope.batch, args, ctx, row);
+    /* AND A MATCH PUT BACK IS NOT MATCHED AGAIN FROM HERE. The batch a fold's undo wrote is not a fold, so the general
+       undo would read it line by line: it deletes the one who came back and folds nobody, with no link moved and no key
+       carried, which is a person lost and not a match. Refused, the look and the press alike, until the kernel can
+       fold the two again by that batch. */
+    if (walk === null && 'batch' in scope && unfolded(scope.batch))
+      return no('NOT_IN_THIS_BUILD', 'That change put a match back, and it cannot be undone from here. If the two are one person after all, merge them from the list they are in.', { at: 'batch' });
     /* ONE ROW OF THE CHANGE WHEN `row` NAMES ONE, the kernel's undo and the walk's alike, so Undo on one line of a
        change that touched many puts back that line's row and leaves the rest (`scope.row`, `onlyRow` in the kernel). */
     if (walk === null) scope = row === undefined ? scope : { ...scope, row };
@@ -138,6 +154,91 @@ export function methods(deps: RecordDeps) {
     if (!out.ok) return out;
     const { undone: _marks, ...answer } = out.value;
     return tail({ ok: true, value: answer });
+  };
+
+  /* ── a match the record made ─────────────────────────────────────── */
+
+  /** The kind a fold is on the ladder: an agent whose fold was put back asks before it folds again. */
+  const FOLD_KIND = 'fold';
+
+  /** Whether `batch` is the one a fold's undo wrote: `undone` names it as what put a fold back. */
+  const unfolded = (batch: string): boolean => sql.all<{ batch: string }>('SELECT batch FROM undone WHERE by_batch = ?', batch).some((u) => kernel.isFold(u.batch));
+
+  /**
+   * The write door's refusal of a put back, said to a person. The door names a row by its handle (`people#3 already has
+   * that email`), so the handle becomes the row's name, and an id it cannot name becomes "somebody else".
+   */
+  const doorWords = (fix: string): string =>
+    fix
+      .trim()
+      .replace(/[.\s]+$/u, '')
+      .replace(/\b([a-z][a-z0-9_]*)#(\d+)\b/gu, (_, register: string, seq: string) => {
+        const row = kernel.get({ register, seq: Number(seq) });
+        const title = row ? kernel.titleOfRow(row.id) : null;
+        return title !== null && title.trim() !== '' ? title : 'somebody else';
+      })
+      .replace(/\b[0-9A-HJKMNP-TV-Z]{26}\b/gu, 'somebody else');
+
+  /** One batch read for the first time, or again: `foldPlan` answers nothing for a batch that folded nobody. */
+  const foldLook = (batch: string): UndoPlan | null => {
+    const plan = kernel.foldPlan(batch);
+    if (plan === null) return null;
+    /* PUT BACK BEFORE, AND NOTHING OF IT LEFT TO DO, is said as any undo says it. One an earlier undo put back in part
+       still lists what is left, and that is what a press does. */
+    if (!plan.already || plan.steps.length > 0) return { ...plan, already: false };
+    return { ...plan, say: 'This was put back already.', lines: [], steps: [], skipped: [] };
+  };
+
+  /**
+   * The look and the press for a fold the strong rules or the bands made (`kernel.isFold`): what `matched` lists and a
+   * screen draws Undo on.
+   *
+   * BY `undoMerge`, NEVER LINE BY LINE. The general undo reads each line of the batch on its own, so it gave back the
+   * one carried key and left the rest with "Leaves ... as it is"; the kernel's own inverse brings the one folded back
+   * with their keys, empties what the one kept was carried, and points every link that moved back.
+   *
+   * THE SAME TWO CALLS AND THE SAME ANSWER AS ANY UNDO, so no screen changes: a plan in names with a hash, and applying
+   * needs that hash against the plan read again. One of the two cannot be named: there is no half of a match to undo.
+   *
+   * THE LADDER DROPS INSIDE THE UNDO'S TRANSACTION, as for the general undo: whoever made the fold, when it is an agent,
+   * is back at Ask on folding. The mark in `undone` is `undoMerge`'s own, which is how a second look knows it was taken back.
+   */
+  const foldUndo = (batch: string, args: { dry?: unknown; hash?: unknown }, ctx: CallContext, row?: UndoRow): Result<UndoPlan | Undone> | Promise<Result<Undone>> => {
+    if (row !== undefined) return no('VALUE_MALFORMED', 'A match is put back whole, so both come back together. Undo it without naming one of them.', { at: 'row' });
+    const plan = foldLook(batch);
+    if (plan === null) return no('ROW_UNKNOWN', 'There is no match under that change, so there is nothing of it to undo.', { at: 'batch' });
+    if (args.dry === true) return ok(plan);
+    if (!said(args.hash))
+      return no('REQUIRED_MISSING', 'Undo shows what it will put back before it does. Ask with dry first, then send the hash it answers.', { at: 'hash' });
+    const broken = kernel.refused();
+    if (broken) return { ok: false, refusal: broken };
+    if (plan.hash !== args.hash) return no('PLAN_STALE', 'Something changed since this undo was shown. Look at it again, then put it back.', { at: 'hash' });
+    if (plan.already) return ok({ batch, put: 0, say: 'Nothing was put back: it was undone already.', lines: [], skipped: [] });
+    const by = actorOf(ctx);
+    const out = kernel.transaction((): Result<Undone> => {
+      const before = sql.one<{ n: number | null }>('SELECT max(rowid) AS n FROM event')?.n ?? 0;
+      const maker = sql.one<{ actor: string | null }>('SELECT actor FROM event WHERE batch = ? OR (batch IS NULL AND id = ?) ORDER BY rowid LIMIT 1', batch, batch)?.actor ?? null;
+      const put = kernel.undoMerge(batch, { actor: by });
+      /* THE PLAN IS READ FROM THE LOG AND CANNOT FORESEE THE WRITE DOOR (somebody else took the address the one coming
+         back held, say). `undoMerge` puts nothing back when any write of it is refused, so the door's own refusal is
+         answered, its code kept and its sentence said in names, and the press never says done on the plan's word. */
+      if (!put.ok) {
+        if (!('refusal' in put)) return put;
+        return { ok: false, refusal: { ...put.refusal, fix: `This match was not put back, and nothing changed: ${doorWords(put.refusal.fix)}. Change that first, then undo it again.` } };
+      }
+      /* The undo's own batch, the one its first line was written under. It is answered as any undo answers its own, and
+         is not itself undone from here (`unfolded`). */
+      const wrote = sql.one<{ batch: string | null; id: string }>('SELECT batch, id FROM event WHERE rowid > ? ORDER BY rowid LIMIT 1', before);
+      const own = wrote === undefined ? batch : (wrote.batch ?? wrote.id);
+      const agent = maker === null ? null : ladderAgentOf(sql, maker);
+      /* `undoMerge` keeps its own mark in `undone` as it puts the fold back, so nothing is written there from here. */
+      if (wrote !== undefined && agent !== null) trust.drop(agent, [FOLD_KIND], 'undone');
+      const n = wrote === undefined ? 0 : plan.steps.length;
+      /* The plan's own sentence, said as done: "Puts back 2 ..., leaves 1 as it is" is "Put back 2 .... Left 1 as it is." */
+      const done = `${plan.say.replace(/^Puts /u, 'Put ').replace(/, leaves /u, '. Left ').replace(/\.$/u, '')}.`;
+      return ok({ batch: own, put: n, say: n === 0 ? 'Nothing was put back: it was changed since.' : done, lines: n === 0 ? [] : plan.steps.map((s) => s.line), skipped: plan.skipped });
+    });
+    return out.ok ? tail(out) : out;
   };
 
   /**

@@ -10,8 +10,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { SLASH_HEADLINE_INSTRUCTIONS } from '@braindog/host/slash';
-import type { HeadlineInput, RecordApi } from '@braindog/record';
+import { SLASH_BRIEF_INSTRUCTIONS, SLASH_HEADLINE_INSTRUCTIONS } from '@braindog/host/slash';
+import type { BriefInput, HeadlineInput, RecordApi } from '@braindog/record';
 
 import { openSqlite } from '../../../packages/kernel/test/sqlite.ts';
 import type { KeyStore } from '../src/keys.ts';
@@ -25,12 +25,12 @@ const INPUT: HeadlineInput = {
 const LINES = '{"lines":{"bake":"Three loaves are still to bake, the rye first."}}';
 
 /** The endpoint, answering every ask with the lines, and what each ask told it. */
-const endpoint = () => {
+const endpoint = (answer: string = LINES) => {
   const told: { url: string; system: string; user: unknown }[] = [];
   const send = async (url: URL, init: RequestInit) => {
     const body = JSON.parse(String(init.body)) as { messages: { content: string }[] };
     told.push({ url: String(url), system: body.messages[0]!.content, user: JSON.parse(body.messages[1]!.content) });
-    return new Response(JSON.stringify({ choices: [{ message: { content: LINES } }] }), { status: 200 });
+    return new Response(JSON.stringify({ choices: [{ message: { content: answer } }] }), { status: 200 });
   };
   return { told, send };
 };
@@ -75,6 +75,48 @@ test('A KEY HE CHOSE THAT IS GONE SENDS NOTHING, and the endpoint is not asked i
     (e: unknown) => e as { sent?: unknown; message: string },
   );
   assert.equal(thrown?.sent, false, 'a headline on a gone key was not marked as never sent');
+  assert.match(thrown?.message ?? '', /no longer a key in the vault/u);
+  assert.deepEqual(wire.told, []);
+  store.close();
+});
+
+/* ── the briefing, through the same choice ─────────────────────────────────────────────────────────────────────────────
+   THE WRAP LEFT `brief` OFF AS IT ONCE LEFT `headline` OFF, so a self-host that could open his key was never asked for
+   Today's cards and the rules' cards stood with nothing said. The endpoint is the same test double. */
+
+const FACTS: BriefInput = {
+  today: '2026-10-02',
+  most: 3,
+  facts: [{ h: 'obligations#1', kind: 'due', title: 'Pay the miller', figures: { amount: '120' } }],
+};
+const CARDS = '{"cards":[{"h":"obligations#1","line":"The miller is owed 120 today."}]}';
+
+test('THE ENDPOINT WRITES THE BRIEFING, told the briefing rules and handed the facts', async () => {
+  const wire = endpoint(CARDS);
+  const model = slashModelFor({ url: ENDPOINT, send: wire.send }, api, undefined);
+  assert.deepEqual(await model!.brief!(FACTS), JSON.parse(CARDS));
+  assert.deepEqual(wire.told, [{ url: ENDPOINT, system: SLASH_BRIEF_INSTRUCTIONS, user: FACTS }]);
+});
+
+test('WITH HIS KEY STORE OPEN, THE MODEL THE RECORD IS HANDED STILL WRITES THE BRIEFING, on the endpoint while no key is chosen', async () => {
+  const wire = endpoint(CARDS);
+  const store = slashStore('a');
+  const model = slashModelFor({ url: ENDPOINT, send: wire.send }, api, keys, () => store);
+  assert.ok(model?.brief, 'the model handed to the record writes no briefing, so the rules cards stand with nothing asked');
+  assert.deepEqual(await model.brief(FACTS), JSON.parse(CARDS));
+  assert.deepEqual(wire.told, [{ url: ENDPOINT, system: SLASH_BRIEF_INSTRUCTIONS, user: FACTS }]);
+  store.close();
+});
+
+test('A BRIEFING ON A KEY HE CHOSE THAT IS GONE SENDS NOTHING, and the endpoint is not asked in its place', async () => {
+  const wire = endpoint(CARDS);
+  const store = slashStore('b');
+  const model = slashModelFor({ url: ENDPOINT, send: wire.send }, api, keys, () => store);
+  const thrown = await model!.brief!(FACTS).then(
+    () => null,
+    (e: unknown) => e as { sent?: unknown; message: string },
+  );
+  assert.equal(thrown?.sent, false, 'a briefing on a gone key was not marked as never sent');
   assert.match(thrown?.message ?? '', /no longer a key in the vault/u);
   assert.deepEqual(wire.told, []);
   store.close();

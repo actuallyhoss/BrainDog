@@ -88,6 +88,7 @@
     select = false,
     whole = false,
     offer,
+    opens,
   }: {
     /** The page's address, which arranging writes against and a missing page names. */
     slug: string;
@@ -113,6 +114,11 @@
      * board. Not drawn over the page's source, which is the declaration and nothing else.
      */
     offer?: Snippet | undefined;
+    /**
+     * What a home draws where its board opens (Today's briefing), handed to the body, which puts it under the page's
+     * own sentence where the page opens on one (`PageBody`'s `opens`). Read only by a `home`.
+     */
+    opens?: Snippet | undefined;
   } = $props();
 
   /* A PAGE IS THE RECORD'S BLOCKS AND NOTHING ELSE; a record that does not answer is its refusal, drawn below. */
@@ -645,6 +651,7 @@
       pick={select && !arranging ? picked : null}
       arrangement={kept ? arrangement : null}
       {onwalk}
+      opens={opens ?? null}
     />
   </div>
   {#if select && !arranging}<BatchBar {picked} />{/if}

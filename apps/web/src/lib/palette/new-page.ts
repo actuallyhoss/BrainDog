@@ -84,6 +84,14 @@ export const rowTitle = (p: Paging): string => (p.title === '' ? label(p.suggest
 /** Where a page lives. */
 export const pageHref = (slug: string): string => `/p/${slug}`;
 
+/**
+ * Where a page just made opens: its address, asking for "Describe it" to be open already (ENG-B11), so one sentence
+ * builds it. The page's own menu reads the mark and takes it out of the address (`page/change-open.ts`), and where
+ * Slash has no model there it opens the page as it is. SPELLED HERE, since the palette is in the layout every screen
+ * waits for; `change-open.test.ts` holds it to that file's reading.
+ */
+export const describedHref = (slug: string): string => `${pageHref(slug)}?describe=1`;
+
 /** What a press answered: the page and the sentence that says so, with its way back when there is one; or a sentence. */
 export type Made =
   | { ok: true; slug: string; as: 'made' | 'suggested'; said: string; back?: (() => Promise<{ ok: true; said: string } | { ok: false; fix: string }>) | undefined }
@@ -104,10 +112,11 @@ export type Desk = {
 };
 
 /**
- * THE ROW, PRESSED: the page asked for once, opened, and one receipt that can take it back.
+ * THE ROW, PRESSED: the page asked for once, opened on its describe field, and one receipt that can take it back.
  *
  * THE SHELL IS READ BEFORE THE PAGE OPENS, so the rail lists the page by the time it is on screen. UNDO RETIRES THE
- * PAGE, says so, and leaves it when the reader is still there, because what is left at that address is nothing.
+ * PAGE, says so, and leaves it when the reader is still there, because what is left at that address is nothing. It
+ * leaves the page's plain address, which is where the reader is once the page has read the mark.
  *
  * A SUGGESTION OPENS NOTHING AND OFFERS NO UNDO. There is no page until the owner accepts it on Decide, which the
  * receipt says, and a question once asked is the owner's to answer.
@@ -125,7 +134,7 @@ export async function pressed(p: Paging, desk: Desk): Promise<void> {
   if (out.as === 'suggested') return void desk.toast(out.said, { intent: 'good' });
   const href = pageHref(out.slug);
   const back = out.back;
-  await desk.go(href);
+  await desk.go(describedHref(out.slug));
   desk.toast(out.said, {
     intent: 'good',
     ...(back

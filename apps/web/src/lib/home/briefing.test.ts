@@ -3,12 +3,15 @@
  */
 
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-import { BRIEFING_MOST, briefingRows, readBriefing } from './briefing.ts';
+import { BRIEFING_MOST, briefingRead, briefingRows, footOf, readBriefing, readBriefingSaid } from './briefing.ts';
 
 const card = (h: string, line: unknown, row: unknown, by: unknown = 'rule') => ({ h, line, row, cause: null, by });
 const answer = (cards: unknown[]) => ({ ok: true as const, value: { cards, at: '2026-10-14T08:00:00.000Z', basis: 'b1' } });
+/** The answer with the record's own sentence on why the rules wrote it, and with no such key where `said` is left out. */
+const saying = (cards: unknown[], said?: unknown) => ({ ok: true as const, value: { ...answer(cards).value, ...(said === undefined ? {} : { said }) } });
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 
 test('A CARD IS ITS LINE, WHERE ITS OWN THING OPENS, AND WHO WROTE IT', () => {
@@ -84,4 +87,82 @@ test('THE READ NEVER FAILS THE SCREEN: a host without the call, a refusal and a 
   assert.deepEqual(await readBriefing('http://record.test', absent), none);
   assert.deepEqual(await readBriefing('http://record.test', async () => json(403, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'No.' } })), none);
   assert.deepEqual(await readBriefing('http://record.test', async () => Promise.reject(new Error('offline'))), none);
+});
+
+test('THE WHOLE READ IS THE CARDS, WHO WROTE THEM AND WHAT THE RECORD SAID: Slash where any card is Slash\'s', () => {
+  const both = [card('a', 'One.', 'tasks#1', 'slash'), card('b', 'Two.', 'tasks#2')];
+  assert.deepEqual(briefingRead(saying(both, 'Slash ran out of its budget for today.')), {
+    rows: briefingRows(answer(both)),
+    written: 'slash',
+    said: 'Slash ran out of its budget for today.',
+  });
+  assert.equal(briefingRead(saying([card('a', 'One.', 'tasks#1'), card('b', 'Two.', 'tasks#2')], null)).written, 'rule');
+  assert.equal(briefingRead(saying([card('a', 'One.', 'tasks#1', 'slash')])).written, 'slash');
+  /* The rows reader stays, and reads the same cards. */
+  assert.deepEqual(briefingRead(saying(both)).rows, briefingRows(saying(both)));
+});
+
+test('AN OLDER HOST SAYS NOTHING: no `said`, an empty one and one that is no sentence all read as null', () => {
+  const cards = [card('a', 'One.', 'tasks#1')];
+  for (const said of [undefined, null, '', '   ', 7, {}, ['x']]) assert.equal(briefingRead(saying(cards, said)).said, null);
+  assert.equal(briefingRead(saying(cards, '  Slash is switched off.  ')).said, 'Slash is switched off.');
+  for (const odd of [null, undefined, 'x', {}, { ok: true, value: null }, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'No.' } }])
+    assert.deepEqual(briefingRead(odd), { rows: [], written: 'rule', said: null });
+});
+
+test('THE FOOT SAYS WHY THE RULES WROTE IT, once, and nothing where Slash wrote it or nothing was said', () => {
+  const rule = [card('a', 'One.', 'tasks#1'), card('b', 'Two.', 'tasks#2')];
+  const slash = [card('a', 'One.', 'tasks#1', 'slash'), card('b', 'Two.', 'tasks#2', 'slash')];
+  const why = 'Slash ran out of its budget for today.';
+  assert.equal(footOf(briefingRead(saying(rule, why))), `Written by the rules: ${why}`);
+  /* ITS FULL STOP IS KEPT ONCE: one is added where the record left it off, and three are one. */
+  assert.equal(footOf(briefingRead(saying(rule, 'Slash is switched off'))), 'Written by the rules: Slash is switched off.');
+  assert.equal(footOf(briefingRead(saying(rule, 'Slash is switched off...'))), 'Written by the rules: Slash is switched off.');
+  /* EVERY CARD IS SLASH'S: nothing to explain, whatever was said. */
+  assert.equal(footOf(briefingRead(saying(slash, why))), null);
+  /* A RECORD WITH NO MODEL is not told so on every visit, and an older host says nothing at all. */
+  assert.equal(footOf(briefingRead(saying(rule, null))), null);
+  assert.equal(footOf(briefingRead(saying(rule))), null);
+  /* NO CARDS IS NO BRIEFING, so there is nothing for a foot to stand under. */
+  assert.equal(footOf(briefingRead(saying([], why))), null);
+  /* SOME OF EACH says so, and never claims the rules wrote Slash's lines. */
+  assert.equal(footOf(briefingRead(saying([slash[0], rule[1]], why))), `Partly written by the rules: ${why}`);
+});
+
+test('THE FOOT IS A SENTENCE AND NEVER AN ADDRESS OR A LONG DASH, since its words came down the wire', () => {
+  const rule = [card('a', 'One.', 'tasks#1')];
+  const foot = footOf(briefingRead(saying(rule, `No model answered \u2014 the budget is spent.\nTry again${' later'.repeat(80)}`)));
+  assert.ok(foot !== null);
+  assert.doesNotMatch(foot, /[\u2014\u2013\n]/u);
+  assert.ok(foot.length <= 'Written by the rules: '.length + 200, 'the foot runs on');
+});
+
+test('THE READ WITH WHAT WAS SAID NEVER FAILS THE SCREEN EITHER', async () => {
+  const none = { ok: true, value: { rows: [], written: 'rule', said: null } };
+  assert.deepEqual(await readBriefingSaid('http://record.test', async () => Promise.reject(new Error('offline'))), none);
+  assert.deepEqual(await readBriefingSaid('http://record.test', async () => json(403, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'No.' } })), none);
+  const cards = [card('a', 'One.', 'tasks#1')];
+  const out = await readBriefingSaid('http://record.test', async () => json(200, saying(cards, 'Slash is switched off.')));
+  assert.equal(footOf(out.value), 'Written by the rules: Slash is switched off.');
+});
+
+test('THE TILE HAS THE HEAD EVERY TILE ON TODAY HAS: its glyph in a well, then its name', () => {
+  const tile = readFileSync(new URL('./Briefing.svelte', import.meta.url), 'utf8');
+  assert.match(tile, /<Tile icon="[a-z-]+" title=\{words\.title\}/u, 'the tile names no glyph');
+  assert.doesNotMatch(tile, /<Section\b/u, 'a section draws a name and no glyph');
+});
+
+test('THE TILE DRAWS THE FOOT AS PLAIN TEXT UNDER THE CARDS: 15px, no pill, no icon, no colour of its own', () => {
+  const tile = readFileSync(new URL('./Briefing.svelte', import.meta.url), 'utf8');
+  /* ONE MORE PROP, null until a screen passes it, so a screen that does not draws what it drew. */
+  assert.match(tile, /foot = null/u);
+  assert.match(tile, /foot\?: string \| null/u);
+  const list = tile.indexOf('</ul>');
+  const drawn = tile.indexOf('{#if foot}<p class="b-foot" data-briefing-foot dir="auto">{foot}</p>{/if}');
+  assert.ok(list > 0 && drawn > list && drawn < tile.indexOf('</Tile>'), 'the foot is not under the cards, inside the tile');
+  const rule = /\.b-foot \{([^}]*)\}/u.exec(tile)?.[1] ?? '';
+  assert.match(rule, /font-size: var\(--t-row\);/u, 'the foot is not 15px');
+  assert.match(rule, /color: var\(--dim\);/u);
+  assert.match(rule, /overflow-wrap: anywhere;/u, 'a long sentence would push the tile wide at 390');
+  assert.doesNotMatch(rule, /background|border|radius|var\(--(red|accent|late)/u, 'the foot is a pill or has a colour of its own');
 });

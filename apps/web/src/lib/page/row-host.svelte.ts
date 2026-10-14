@@ -2,7 +2,8 @@
  * THE PAGE'S HOLD ON ONE ROW AT A TIME: the row open in the docked panel, the row whose menu is open, and every row
  * touched from this page in the last ten minutes (Just changed), with the writes that change them. `PageView` makes one
  * for a page at its own address; the panel, the menu and the strip read it, and the body's keys and the renderer's
- * `onopen` and `onmenu` call it.
+ * `onopen` and `onmenu` call it. A list screen makes one over its own rows with `listHost`, at the foot of this file,
+ * and the row it has open is the address's `?row=`.
  *
  * WORK'S VERBS, OVER ANY LIST A BLOCK DRAWS. Each write is Work's: drawn at once in Just changed, sent in turn behind the
  * row's previous write, said with an Undo for six seconds (`lib/data/optimistic.ts`), and the page read again so the
@@ -59,6 +60,11 @@ export type HostDeps = {
   who?: () => { me: string | null; names: ReadonlyMap<string, string> };
   /** Where what the reader has seen is kept. Absent, the browser's storage; `null`, nowhere. */
   store?: Store | null;
+  /**
+   * Told the row the panel is on each time that changes, and `null` once it is on none: how a list keeps the open row
+   * in its address (`listHost`). Absent, as on a page, nobody is told.
+   */
+  shown?: (row: RowAt | null) => void;
 };
 
 export class RowHost {
@@ -92,6 +98,8 @@ export class RowHost {
   #queues = new Map<string, Promise<unknown>>();
   #deps: HostDeps;
   #on = '';
+  /** The row `shown` was last told, by its key, so it is told a change once. */
+  #told: string | null = null;
   /** What the reader has seen on this page (`byline.ts`): when they last left it, and each row they opened. */
   #seen = $state.raw<Seen>({ page: 0, rows: {} });
   /** The rows whose byline Undo is on its way, so a second press does not send it twice. */
@@ -129,6 +137,8 @@ export class RowHost {
     this.changesOpen = false;
     this.menuOpen = false;
     this.asked = null;
+    /* NOBODY IS TOLD: the address is the next page's own by now, and what it holds is that page's to open. */
+    this.#told = null;
     this.touched = new Map(kept.get(slug) ?? []);
     /* AND READ AGAINST NOW, or a page come back to after a while would show what aged out until the next tick. */
     this.clock = Date.now();
@@ -328,7 +338,10 @@ export class RowHost {
         const to: RowAt = { register: row.register, seq: again.entry.seq };
         if (on === this.#on) {
           this.#land(keyOf(to), again.entry);
-          if (this.opened && keyOf(this.opened) === keyOf(row)) this.opened = to;
+          if (this.opened && keyOf(this.opened) === keyOf(row)) {
+            this.opened = to;
+            this.#tell();
+          }
         }
         return again.entry;
       }
@@ -384,12 +397,23 @@ export class RowHost {
     this.changesOpen = false;
     this.panelOpen = true;
     this.seeRow(row);
+    this.#tell();
     return true;
   }
 
   close() {
     this.panelOpen = false;
     this.changesOpen = false;
+    this.#tell();
+  }
+
+  /** Says which row the panel is on now to whoever asked to be told (`shown`), once for each change. */
+  #tell() {
+    const row = this.panelOpen ? this.opened : null;
+    const key = row ? keyOf(row) : null;
+    if (key === this.#told) return;
+    this.#told = key;
+    this.#deps.shown?.(row);
   }
 
   /** Opens the week's changes in the docked panel, in place of a row. */
@@ -397,6 +421,7 @@ export class RowHost {
     this.menuOpen = false;
     this.panelOpen = false;
     this.changesOpen = true;
+    this.#tell();
   }
 
   /** THE PANEL FOLLOWS THE CURSOR as j and k walk the page, unless something in it is typed and not saved yet. */
@@ -509,7 +534,10 @@ export class RowHost {
   remove(row: RowAt): boolean {
     const e = this.entry(row);
     if (!e || !this.writable(row)) return false;
-    if (this.opened && keyOf(this.opened) === keyOf(row)) this.panelOpen = false;
+    if (this.opened && keyOf(this.opened) === keyOf(row)) {
+      this.panelOpen = false;
+      this.#tell();
+    }
     const title = titleOf(e, this.shapeOf(row.register));
     void this.#run(this.#removal(row, words.said.deleted(title)));
     return true;
@@ -589,6 +617,158 @@ export class RowHost {
   /** The panel's Save: every field it changed, in one write, with one Undo. */
   save(row: RowAt, patch: Fields, title: string) {
     this.panelOpen = false;
+    this.#tell();
     this.write(row, patch, words.marks.edited, words.said.edited(title));
   }
+}
+
+/* ── a list's host ──────────────────────────────────────────────────────────
+   A LIST SCREEN OPENS THE SAME PANEL A PAGE DOES. It hands the host what it draws (its rows, in the order they are
+   drawn) and its address, and the row the panel is on is the address's `?row=`: a link to it opens it, Back closes it,
+   and nothing else in the address is touched. */
+
+/** What a list screen hands `listHost`: the host's own needs, with the list and the address in place of a page. */
+export type ListDeps = Omit<HostDeps, 'slug' | 'blocks' | 'shown'> & {
+  /** The list's id. */
+  register: () => string;
+  /** The list's rows as drawn now, filtered and in order, which next and previous walk. */
+  rows: () => readonly Entry[];
+  /** The screen's address: read whole, and written whole with only `row` changed. */
+  address: { read: () => URL; write: (to: URL) => void };
+};
+
+/**
+ * What a walk answers: the panel `moved`; it is at the list's `end`; it holds something typed and not saved
+ * (`unsaved`), which the screen says; or no panel is open to move (`closed`).
+ */
+export type Walked = 'moved' | 'end' | 'unsaved' | 'closed';
+
+/** The address's own name for the open row. */
+const ROW = 'row';
+
+export class ListHost {
+  /** The host `RowPanel` and `RowVerbMenu` are handed. */
+  readonly host: RowHost;
+  #deps: ListDeps;
+  /** What the address said when it was last read here: a number, none, or never read. */
+  #read: number | null | undefined = undefined;
+
+  constructor(deps: ListDeps) {
+    this.#deps = deps;
+    this.host = new RowHost({
+      ...deps,
+      slug: () => this.#slug(),
+      blocks: () => [{ register: deps.register(), entries: deps.rows() }],
+      shown: (row) => this.#write(row ? row.seq : null),
+    });
+    this.sync();
+  }
+
+  /** Just changed is kept by this, and no page is called it: a page's own name has no colon. */
+  #slug(): string {
+    return `list:${this.#deps.register()}`;
+  }
+
+  #at(seq: number): RowAt {
+    return { register: this.#deps.register(), seq };
+  }
+
+  /** The row the address names, or `null` where it names none. */
+  #named(): number | null {
+    const said = this.#deps.address.read().searchParams.get(ROW);
+    return said !== null && /^\d+$/u.test(said) ? Number(said) : null;
+  }
+
+  /** Puts the open row in the address, or takes it out, leaving every other part as it was. Nothing is written twice. */
+  #write(seq: number | null) {
+    const to = new URL(this.#deps.address.read());
+    const was = to.searchParams.get(ROW);
+    if (was === (seq === null ? null : String(seq))) return;
+    if (seq === null) to.searchParams.delete(ROW);
+    else to.searchParams.set(ROW, String(seq));
+    this.#deps.address.write(to);
+  }
+
+  /** The number of the row the panel is on, or `null` while it is on none. */
+  get opened(): number | null {
+    const h = this.host;
+    return h.panelOpen && h.opened?.register === this.#deps.register() ? h.opened.seq : null;
+  }
+
+  /** Opens the row in the panel and names it in the address. A row the list does not draw does not open. */
+  open(seq: number, type = false): boolean {
+    return this.host.open(this.#at(seq), type);
+  }
+
+  close() {
+    this.host.close();
+  }
+
+  /**
+   * THE LIST'S OWN CURSOR MOVED TO `seq` (`j`, `k`, a press): an open panel goes with it, unless something typed in it
+   * is not saved, and a closed one stays closed.
+   */
+  follow(seq: number): Walked {
+    const on = this.opened;
+    if (on === null) return 'closed';
+    if (on === seq) return 'moved';
+    if (this.host.dirty) return 'unsaved';
+    return this.open(seq) ? 'moved' : 'end';
+  }
+
+  /** The row drawn after the open one. */
+  next(): Walked {
+    return this.#step(1);
+  }
+
+  /** The row drawn before the open one. */
+  previous(): Walked {
+    return this.#step(-1);
+  }
+
+  #step(by: 1 | -1): Walked {
+    const on = this.opened;
+    if (on === null) return 'closed';
+    if (this.host.dirty) return 'unsaved';
+    const rows = this.#deps.rows();
+    const to = rows[rows.findIndex((e) => e.seq === on) + by];
+    /* A ROW THAT LEFT THE LIST HAS NO NEIGHBOUR TO WALK TO: `findIndex` answers -1, and stepping back from it is no row. */
+    if (!to || !rows.some((e) => e.seq === on)) return 'end';
+    return this.open(to.seq) ? 'moved' : 'end';
+  }
+
+  /**
+   * THE LIST OR THE ADDRESS CHANGED, and the panel is brought in step. The screen calls it from one effect that reads
+   * both, and once more costs nothing.
+   *   - Another list is on the screen: the host starts again for it, as it does for another page.
+   *   - The open row left the list (deleted, filtered out): the panel closes and the address lets go of it.
+   *   - The address moved since it was last read (a link, Back): the panel goes to the row it names, or closes where it
+   *     names none. An address that has not moved is never acted on, so one written a moment late (`goto`) is not read
+   *     as the reader going back. Something typed and not saved keeps the panel, and the address is put back on it.
+   *   - The address names a row the list has not read yet: it is kept, and opened by the call after the read.
+   */
+  sync() {
+    const h = this.host;
+    h.forPage(this.#slug());
+    const on = this.opened;
+    if (on !== null && !this.#deps.rows().some((e) => e.seq === on)) h.close();
+    const named = this.#named();
+    if (named === this.#read) return;
+    const now = this.opened;
+    if (named === now) {
+      this.#read = named;
+    } else if (now !== null && h.dirty) {
+      this.#write(now);
+    } else if (named === null) {
+      this.#read = null;
+      h.close();
+    } else if (this.open(named)) {
+      this.#read = named;
+    }
+  }
+}
+
+/** The panel's host for a list screen: `host` goes to `RowPanel`, and the rest is the screen's to call. */
+export function listHost(deps: ListDeps): ListHost {
+  return new ListHost(deps);
 }

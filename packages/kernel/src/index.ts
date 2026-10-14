@@ -261,6 +261,7 @@ import { beatRun, workingRuns } from './presence.ts';
 import { agentOf as ladderAgentOf, keysOfStamp, kindOfEvent, kindsOfProposal, madeByIn, personOf, recordReader, shapeIn, tokenOfRun } from './change-kind.ts';
 import { undoApply as applyUndo, undoPlan as planUndo, undoStaged as stageUndo, type UndoApplied, type UndoDeclared, type UndoOptions, type UndoPlan, type UndoScope } from './undo.ts';
 import { understandBackfill, undoBackfill, type BackfillDeps, type BackfillOptions, type Backfilled } from './backfill.ts';
+import { foldPlan as planFold, isFold as foldMade, type FoldDeps, type FoldPlan } from './undo-fold.ts';
 import {
   FINISHED,
   KERNEL_WRITTEN,
@@ -492,6 +493,8 @@ export {
 } from './change-kind.ts';
 /* UNDO ON THE SERVER (`undo.ts`) and THE WALK OVER WHAT THE RECORD ALREADY HOLDS (`backfill.ts`), each also a kernel
    method below (`undoPlan`, `undoApply`, `backfill`, `undoBackfill`), which hands them the record's own parts. */
+/* WHAT PUTTING A MATCH BACK WOULD DO (`undo-fold.ts`), each also a kernel method below (`foldPlan`, `isFold`). */
+export { foldPlan, isFold, type FoldDeps, type FoldList, type FoldPlan, type FoldRow } from './undo-fold.ts';
 export { undoApply, undoPlan, undoStaged, type UndoApplied, type UndoDeclared, type UndoDo, type UndoneMark, type UndoOptions, type UndoParts, type UndoPlan, type UndoRow, type UndoScope, type UndoSkip, type UndoStage, type UndoStep } from './undo.ts';
 export {
   BACKFILL_ACTOR, BACKFILL_LIMIT, BACKFILL_SOURCE, PAYEE_SEEN, organisationsHolding, tidy as tidyPayee, understandBackfill, undoBackfill,
@@ -5720,6 +5723,20 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     return ok({ restored: undone });
   }
 
+  /** The record's own readers, as `undo-fold.ts` takes them. */
+  function foldDeps(): FoldDeps {
+    return {
+      sql,
+      byId,
+      titleOf: titleOfRow,
+      list: (register) => registers.get(register),
+      mergeField: (register) => {
+        const list = keyedOf(register);
+        return list === undefined ? undefined : mergeFieldOf(list);
+      },
+    };
+  }
+
   function reproject(entry: Entry): void {
     const decl = registers.get(entry.register);
     if (!decl || decl.series) return;
@@ -9281,6 +9298,18 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       if (barred) return barred;
       return attempt(sql, transaction, () => undoMerge(ref, { actor: w.actor }));
     },
+
+    /**
+     * Whether `batch` is a fold the record made by itself (`undo-fold.ts`): it folded a row and holds no decision. Such a
+     * batch is put back by `undoMerge`; one somebody said yes to is put back by undoing the decision.
+     */
+    isFold: (batch: string): boolean => foldMade(foldDeps(), batch),
+
+    /**
+     * What `undoMerge(batch)` would do, in names, with the fingerprint to hand back, and nothing written. `null` when
+     * the batch folded nobody. Read from the batch's own lines, never by running the undo.
+     */
+    foldPlan: (batch: string): FoldPlan | null => planFold(foldDeps(), batch),
 
     /** Every identity key again, from the rows: what an import runs, and a repair. */
     rebuildKeys: (): number => transaction(() => rebuildKeys(sql, instant(clock.now()))),

@@ -56,11 +56,23 @@ export type BriefFact = {
 /** One card of a briefing: the fact it is about, its line as it is read, the row it opens, and who wrote the line. */
 export type BriefCard = { h: string; line: string; row: string; cause: string | null; by: 'slash' | 'rule' };
 
-/** A briefing as the read answers it: its cards, when it was written, and the hash of the facts it was written from. */
-export type Brief = { cards: BriefCard[]; at: string; basis: string };
+/**
+ * A briefing as the read answers it: its cards, when it was written, and the hash of the facts it was written from.
+ * `said` is there once a model was asked: `null` when its cards stand, else the sentence saying why the rules wrote this.
+ */
+export type Brief = { cards: BriefCard[]; at: string; basis: string; said?: string | null };
 
 /** What the model answers: the cards it picked, in its order, each one line with holes. */
 export type BriefAnswer = { cards: { h: string; line: string }[] };
+
+/**
+ * What a model is handed to write a briefing from: the day, how many cards it may write, and the facts by handle and
+ * name. A fact's row, cause and rank stay here: the model picks and words, and the record knows what a card opens.
+ */
+export type BriefInput = { today: string; most: number; facts: { h: string; kind: BriefKind; title: string; figures: Record<string, string> }[] };
+
+/** The model a briefing is asked of. A host with no `brief` writes none, and the rules say the cards. It answers a `BriefAnswer`, checked here. */
+export type BriefModel = { brief?(input: BriefInput): Promise<unknown> };
 
 const kindAt = (kind: BriefKind): number => BRIEF_KINDS.indexOf(kind);
 
@@ -103,6 +115,11 @@ export function briefCandidates(facts: readonly BriefFact[]): BriefFact[] {
 export function briefBasis(facts: readonly BriefFact[]): string {
   const said = briefCandidates(facts).map((f) => [f.kind, f.title, Object.keys(f.figures).sort().map((k) => [k, f.figures[k]]), f.row, f.cause]);
   return hashOf(JSON.stringify(said));
+}
+
+/** The one ask a briefing is: the facts as `briefCandidates` hands them, each by its handle, kind, name and figures. */
+export function briefInput(facts: readonly BriefFact[], today: string): BriefInput {
+  return { today, most: BRIEF_CARDS_MOST, facts: briefCandidates(facts).map((f) => ({ h: f.h, kind: f.kind, title: f.title, figures: { ...f.figures } })) };
 }
 
 /** A figure a sentence may say, or `undefined` when the fact holds none by that name. */
@@ -256,9 +273,10 @@ export function rulesBrief(facts: readonly BriefFact[]): BriefCard[] {
 /**
  * The whole briefing from what was gathered and what a model answered (`null` when none was asked): the model's cards
  * where at least one passes, else the rules', written `at` an instant and kept with the basis it was written from.
+ * `said` is handed once a model was asked (`brief-write.ts`) and goes out as it came; not handed, it is absent.
  */
-export function briefFrom(answer: unknown, facts: readonly BriefFact[], at: string): Brief {
+export function briefFrom(answer: unknown, facts: readonly BriefFact[], at: string, said?: string | null): Brief {
   const handed = briefCandidates(facts);
-  const said = answer === null || answer === undefined ? [] : briefOf(answer, handed);
-  return { cards: said.length > 0 ? said : rulesBrief(handed), at, basis: briefBasis(handed) };
+  const cards = answer === null || answer === undefined ? [] : briefOf(answer, handed);
+  return { cards: cards.length > 0 ? cards : rulesBrief(handed), at, basis: briefBasis(handed), ...(said === undefined ? {} : { said }) };
 }

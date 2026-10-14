@@ -504,10 +504,12 @@ export type Stale = Answer<'stale'>;
  * `briefing`: what matters today as cards, in the record's order, seven at most. `h` is the card's handle, `line` its
  * one sentence, `row` the thing it opens as a record says one (`tasks#12`) or `null`, `cause` what several questions
  * share, and `by` whether the model wrote the line or the rules did. `at` is when it was written and `basis` what it
- * was written from. Written out here because the record's own type is not yet named from `@braindog/host/types`.
+ * was written from. `said` is the sentence why the rules wrote the cards where a model would have: `null` when a
+ * model's cards stand or nothing was kept, and absent from a host older than the field. Written out here because the
+ * record's own type is not yet named from `@braindog/host/types`.
  */
 export type BriefingCard = { h: string; line: string; row: string | null; cause: string | null; by: 'slash' | 'rule' };
-export type Briefing = { cards: BriefingCard[]; at: string; basis: string };
+export type Briefing = { cards: BriefingCard[]; at: string; basis: string; said?: string | null };
 
 /** `packs`: one pack, on or off. `version` is `null` for a pack the seed owns by its bodies. See `PackState` in `@braindog/kernel`. */
 export type PackState = { id: string; version: string | null; disabled_at: string | null; registers: string[] };
@@ -1722,8 +1724,9 @@ export function createClient(options: ClientOptions) {
      */
     heldTwice: (args: { register: string }) => call<HeldTwice>('heldTwice', args as Record<string, unknown>),
     /**
-     * What matters today, as cards a screen draws above everything else: `{ cards, at, basis }`. It reads and changes
-     * nothing, and a caller is handed no card from a list they may not read. READ+.
+     * What matters today, as cards a screen draws above everything else: `{ cards, at, basis, said }`, `said` being why
+     * the rules wrote them where a model would have, or `null`. It reads and changes nothing, and a caller is handed no
+     * card from a list they may not read. READ+.
      */
     briefing: () => call<Briefing>('briefing', {}),
     /**

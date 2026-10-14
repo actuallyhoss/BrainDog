@@ -209,6 +209,8 @@ import { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, 
 import type { Directory } from './directory.ts';
 import { methods, type RecordDeps as MethodDeps } from './methods/index.ts';
 import { staleCount, staleFor as staleLines } from './methods/stale.ts';
+import { briefFactsFor } from './methods/briefing.ts';
+import { briefTick } from './brief-write.ts';
 import type { EngineHealthRead } from './methods/engine.ts';
 import { quietSign } from './methods/signs.ts';
 import { methods as jobMethods } from './jobs.ts';
@@ -275,7 +277,9 @@ export {
 } from './headlines.ts';
 /* THE BRIEFING'S CARDS (ENG-B12, `briefing.ts`): the facts a briefing is written from, the check a model's cards pass,
    and the rules' own cards. The read is `briefing` in `methods/briefing.ts`. */
-export { BRIEF_CARDS_MOST, BRIEF_FACTS_MOST, BRIEF_KINDS, BRIEF_LINE_MOST, BRIEF_RANK, BRIEF_RULES_MOST, briefBasis, briefCandidates, briefFault, briefFrom, briefOf, rulesBrief, type Brief as Briefing, type BriefAnswer, type BriefCard, type BriefFact, type BriefKind } from './briefing.ts';
+export { BRIEF_CARDS_MOST, BRIEF_FACTS_MOST, BRIEF_KINDS, BRIEF_LINE_MOST, BRIEF_RANK, BRIEF_RULES_MOST, briefBasis, briefCandidates, briefFault, briefFrom, briefInput, briefOf, rulesBrief, type Brief as Briefing, type BriefAnswer, type BriefCard, type BriefFact, type BriefInput, type BriefKind, type BriefModel } from './briefing.ts';
+/* AND THE MODEL'S HALF (`brief-write.ts`): when it is asked, and the one answer kept. The tick is `slashBrief` below. */
+export { BRIEF_ASKED, BRIEF_ASKS_DAY, BRIEF_HOURS, BRIEF_KEPT, BRIEF_NO_ANSWER, briefSlot, briefTick, keptBrief, type BriefAsk, type BriefAsked, type KeptBrief } from './brief-write.ts';
 /* THE ONE RECOMMENDER AND THE ONE QUEUE OF WHAT THE RECORD OFFERS TO ARRANGE (ENG-B14, `design-agent.ts`), under one name
    because its own are short words (`Offer`, `Queue`, `recommend`). Nothing in the record calls it yet. */
 export * as designAgent from './design-agent.ts';
@@ -4317,6 +4321,38 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     headlinesLooked = clock.now();
     if (askedOn(kernel.prefsOf(SLASH)[HEADLINES_ASKED], today).asks >= HEADLINE_ASKS_DAY) return;
     await slashHeadlines(today, true);
+  };
+
+  /**
+   * THE BRIEFING, WRITTEN BY A MODEL (ENG-B12, `brief-write.ts`): the one place a model is asked for it. The facts are
+   * gathered as somebody who reads the whole record does, which is how its owner reads `briefing`, so what is kept
+   * stands for the owner's own basis and for nobody who reads less (`keptBrief`). `briefTick` asks once a part of the
+   * day in the record's own zone and again when the facts move, and keeps the answer in Slash's own prefs.
+   *
+   * THE ASK IS THE HEADLINES' SHARE OF THE BACKGROUND MONTH (`slashAsked`), never one of the person's own. A model that
+   * writes no briefing is asked nothing and nothing is kept, so the rules' cards stand and nothing is said about it.
+   *
+   * AT MOST ONCE EVERY `HEADLINE_LOOK_MS` ON A LATER TICK OF THE DAY (`again`), since the Worker ticks after every
+   * request and the gathering reads every list that keeps a date. Kept in memory, so a restart looks once more, which
+   * costs a read and never an ask: the ask is bounded by `BRIEF_ASKS_DAY`.
+   */
+  let briefLooked = Number.NEGATIVE_INFINITY;
+  const slashBrief = async (nowMs: number, again = false): Promise<string[]> => {
+    const model = deps.slashModel;
+    if (typeof model?.brief !== 'function') return [];
+    if (again && nowMs - briefLooked < HEADLINE_LOOK_MS) return [];
+    briefLooked = nowMs;
+    const brief = model.brief.bind(model);
+    const facts = briefFactsFor(methodDeps(), { principal: { kind: 'system', id: SLASH } }, nowMs);
+    const out = await briefTick({
+      facts,
+      now: nowMs,
+      zone: kernel.identity()?.tz ?? 'UTC',
+      read: (key) => kernel.prefsOf(SLASH)[key],
+      write: (key, value) => kernel.setPref(SLASH, key, value as never),
+      ask: (input) => slashAsked('headline', input, (i) => brief(i)),
+    });
+    return out.dropped === null ? [] : [out.dropped];
   };
 
   /**
@@ -8694,6 +8730,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (state.last === today) {
         /* THE DAY'S LOOK IS DONE, BUT A PAGE WHOSE FIGURES MOVED SINCE MAY BE ASKED ABOUT ONCE MORE (`slashHeadlinesAgain`). */
         await slashHeadlinesAgain(today).catch(() => {});
+        /* AND THE BRIEFING, when a new part of his day began or what it was written from moved (`slashBrief`). */
+        await slashBrief(clock.now(), true).catch(() => {});
         return { ran: false, why: 'today' };
       }
       kernel.setPref(SLASH, SLASH_LAST, today);
@@ -8714,6 +8752,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       out.dropped.push(...understood.dropped);
       /* AND THE HEADLINES LAST, which file nothing on Decide and only write Slash's own prefs. */
       out.dropped.push(...(await slashHeadlines(today)).dropped);
+      /* THEN THE BRIEFING, after everything the look filed, so it is written from the questions that now wait. A briefing
+         that fails never costs the day its look: the rules' cards stand. */
+      out.dropped.push(...(await slashBrief(clock.now()).catch(() => [] as string[])));
       if (out.filed.length > 0 && scheduler) await kernel.tail(scheduler);
       return { ran: true, ...out };
     },

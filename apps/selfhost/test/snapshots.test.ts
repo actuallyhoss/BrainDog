@@ -11,6 +11,7 @@ import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { TIDY_LINE_DDL } from '../../../packages/kernel/src/tidy.ts';
 import { start } from '../src/server.ts';
 
 const OBLIGATIONS = {
@@ -81,6 +82,47 @@ test('A SNAPSHOT IS A SQLITE FILE BESIDE THE RECORD, downloadable, and putting i
 
     /* And going back is itself undoable, from the copy taken just before. */
     assert.equal((await s.call('restore', { bookmark: kept })).status, 200);
+    assert.deepEqual((await titles(s.call)).sort(), ['After the copy', 'Before the copy']);
+  } finally {
+    await s.running.close();
+    rmSync(s.dir, { recursive: true, force: true });
+  }
+});
+
+test('A TABLE THE COPY DOES NOT HOLD ENDS EMPTY: a copy taken before the hourly pass made tidy_line restores, and the rest is as the copy had it', async () => {
+  const s = await server();
+  try {
+    const sql = s.running.sql;
+    const has = (schema: string) => sql.one<{ n: number }>(`SELECT count(*) AS n FROM ${schema}.sqlite_master WHERE type = 'table' AND name = 'tidy_line'`)?.n;
+    /* The record before its first hourly pass: the table is made by the pass and by no migration. */
+    sql.exec('DROP TABLE IF EXISTS tidy_line');
+    assert.equal((await s.call('create', { register: 'obligations', fields: { what: 'Before the copy' } })).status, 200);
+    const took = await s.call('snapshot', {});
+    assert.equal(took.status, 200, JSON.stringify(took.body));
+    const snap = (took.body.value as { id: string }).id;
+
+    /* The pass runs, as the kernel makes its table, and writes a line; a row is written too. */
+    sql.exec(TIDY_LINE_DDL);
+    sql.exec("INSERT INTO tidy_line (finder, day, stale, did, low, at) VALUES ('stale-obligations', '2026-09-16', 4, 1, 3, '2026-09-16T12:00:00.000Z')");
+    assert.equal((await s.call('create', { register: 'obligations', fields: { what: 'After the copy' } })).status, 200);
+
+    /* The copy really does not hold the table, which is the case that answered 422 `no such table: snap.tidy_line`. */
+    sql.exec('ATTACH DATABASE ? AS held', join(s.dir, 'snapshots', `${snap}.brain`));
+    try {
+      assert.equal(has('held'), 0, 'the copy holds the table, so this test proves nothing');
+    } finally {
+      sql.exec('DETACH DATABASE held');
+    }
+
+    const back = await s.call('restore', { bookmark: snap });
+    assert.equal(back.status, 200, JSON.stringify(back.body));
+    assert.equal(has('main'), 1, 'the restore dropped a table the record made');
+    assert.equal(sql.one<{ n: number }>('SELECT count(*) AS n FROM tidy_line')?.n, 0, 'rows written after the copy outlived the restore');
+    assert.deepEqual(await titles(s.call), ['Before the copy'], 'the rest of the record is not as the copy had it');
+
+    /* And the copy kept just before the restore holds the table, so going forward again brings the line back. */
+    assert.equal((await s.call('restore', { bookmark: (back.body.value as { kept: string }).kept })).status, 200);
+    assert.equal(sql.one<{ n: number }>('SELECT count(*) AS n FROM tidy_line')?.n, 1);
     assert.deepEqual((await titles(s.call)).sort(), ['After the copy', 'Before the copy']);
   } finally {
     await s.running.close();

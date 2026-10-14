@@ -795,9 +795,11 @@ export function slashRecordMeter(deps: SlashLedgerDeps): SlashRecordMeter {
      * engine counted every `pattern` row as his, and on the included model each of these took one of his 80 while this
      * comment said it did not.
      *
-     * EACH FROM ITS OWN SHARE (`HEADLINE_ASKS_MONTH`): a headline ask is written with purpose `headline` and
-     * held to the headlines' share, and the look and a skill draft to the rest, which the model-jobs pass spends too. So a
-     * month of drafts and digests cannot leave the pages without their line, nor the headlines the digests without prose.
+     * EACH FROM ITS OWN SHARE OF ONE POOL (the plan's, `budget-plan.ts`): a headline ask is written with purpose
+     * `headline` and held to the headlines' share, and the look and a skill draft to the rest, which the model-jobs pass
+     * spends too. Each share may always spend its floor, and past it what is left once the floors nobody has used are set
+     * aside. So a month of drafts and digests cannot leave the pages without their line, nor the headlines the digests
+     * without prose.
      * `ask` is optional because a record a release behind calls `background()` for its skill drafts alone.
      *
      * AND ONLY WHILE HE LETS IT READ: all four are behind his one switch, asked first (`mayThink`).
@@ -818,10 +820,13 @@ export function slashRecordMeter(deps: SlashLedgerDeps): SlashRecordMeter {
       const engine = await deps.engine();
       if (engine === undefined) return { ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'Slash has no ledger on this host to count the draft in.' } };
       const status = engine.status() as { tier?: unknown; model?: unknown } | undefined;
-      const meter = backgroundMeter(deps.sql, BACKGROUND_JOBS_MONTH, ask === 'headline' ? 'headline' : 'work');
+      const work = backgroundMeter(deps.sql, BACKGROUND_JOBS_MONTH, ask === 'headline' ? 'headline' : 'work');
+      /* THE LOOK AND A SKILL DRAFT ARE HELD TO THE REST, as the model-jobs pass is: the work less the floor understanding
+         has not used yet, so neither spends through this door what reading who is who is still owed. */
+      const meter = ask === 'look' || ask === 'skill' ? (work.rest ?? work) : work;
       const since = monthStart(deps.clock.now());
-      /* UNDERSTANDING IS HELD TO ITS OWN TEN AND TO THE WORK'S MONTH IT IS COUNTED IN, both. */
-      const understanding = ask === 'understand' ? meter.understand : undefined;
+      /* UNDERSTANDING IS HELD TO ITS OWN SHARE AND TO THE WORK'S MONTH IT IS COUNTED IN, both. */
+      const understanding = ask === 'understand' ? work.understand : undefined;
       if (meter.spent(since) >= meter.cap || (understanding !== undefined && understanding.spent(since) >= understanding.cap)) {
         /* THE ASK TURNED AWAY LEAVES ITS ROW (`slash-turned-away.ts`, model-sign-49). */
         turnedAway(deps.sql, new Date(deps.clock.now()).toISOString(), 'pattern', typeof status?.tier === 'string' ? status.tier : 'a');

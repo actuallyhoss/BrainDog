@@ -29,6 +29,7 @@ import type { Json, Kernel, Tried } from '@braindog/kernel';
 import { coerce, slugify } from '@braindog/kernel';
 import { MODULE_WORDS, labelSetting, voiceSetting } from '@braindog/declare';
 import { KINDS, isKind } from 'braindog-render';
+import type { BriefInput } from './briefing.ts';
 import type { HeadlineInput } from './headlines.ts';
 import { clean } from './scrub.ts';
 
@@ -1202,6 +1203,12 @@ export interface SlashModel {
    * line (`compose-look.ts` checks the rest), and passes `@braindog/host`'s `SLASH_HEADLINE_INSTRUCTIONS`.
    */
   headline?(input: HeadlineInput): Promise<unknown>;
+  /**
+   * The day's briefing as cards (ENG-B12, `briefing.ts`): `{ cards: [{ h, line }] }` over the facts handed in, by their
+   * handles. OPTIONAL: a model that writes none is asked nothing and the rules' cards stand (`brief-write.ts`). A host
+   * passes `@braindog/host`'s `SLASH_BRIEF_INSTRUCTIONS`.
+   */
+  brief?(input: BriefInput): Promise<unknown>;
 }
 
 export type SlashModelInput = {

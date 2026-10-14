@@ -14,7 +14,8 @@ import { calmFaults, type CallContext } from '@braindog/record';
 
 import { anthropicModel, endpointModel, SLASH_HEADLINE_INSTRUCTIONS, SLASH_INSTRUCTIONS } from '../src/slash.ts';
 import { slashRecordMeter } from '../src/slash-ask.ts';
-import { backgroundMeter, BACKGROUND_JOBS_MONTH, HEADLINE_ASK, HEADLINE_ASKS_MONTH } from '../src/model-jobs.ts';
+import { floorsOf } from '../src/budget-plan.ts';
+import { backgroundMeter, BACKGROUND_JOBS_MONTH, HEADLINE_ASK } from '../src/model-jobs.ts';
 import { createSlash } from '../../slash/src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
@@ -116,9 +117,13 @@ function ledger() {
 
 const since = new Date(Date.UTC(2026, 9, 1)).toISOString();
 
-test(`HEADLINES SPEND THEIR OWN SHARE: ${HEADLINE_ASKS_MONTH} a month are held and the next is refused, while a skill draft still is not`, async () => {
+test('HEADLINES SPEND THEIR OWN SHARE OF THE ONE POOL: all of the month but the floors of the others, then the next is refused, while a skill draft still is not', async () => {
   const { sql, meter } = ledger();
-  for (let i = 0; i < HEADLINE_ASKS_MONTH; i++) {
+  /* THE MOST THE HEADLINES MAY SPEND IS THE MONTH LESS EVERYBODY ELSE'S FLOORS (`budget-plan.ts`), 340 of 600, and no
+     wall of thirty stops them before it. */
+  const most = backgroundMeter(sql, BACKGROUND_JOBS_MONTH, 'headline').cap;
+  assert.equal(most, BACKGROUND_JOBS_MONTH - 260);
+  for (let i = 0; i < most; i++) {
     const held = await meter.background('headline');
     assert.ok(held.ok, `headline ask ${i + 1} was refused`);
     held.value.settle({ usage: { in: 300, out: 40 } });
@@ -130,24 +135,33 @@ test(`HEADLINES SPEND THEIR OWN SHARE: ${HEADLINE_ASKS_MONTH} a month are held a
     assert.match(refused.refusal.fix, /headlines are spent until 2026-11-01, so each page keeps its own line/u);
   }
   const rows = sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM slash_call WHERE kind = 'pattern' AND question = ?", HEADLINE_ASK)?.n;
-  assert.equal(rows, HEADLINE_ASKS_MONTH, 'a refused ask wrote a row');
+  assert.equal(rows, most, 'a refused ask wrote a row');
 
-  /* THE OTHER SHARE IS UNTOUCHED: the skill draft and the model-jobs pass see none of the headlines. */
-  assert.equal(backgroundMeter(sql).spent(since), 0);
-  assert.equal(backgroundMeter(sql, BACKGROUND_JOBS_MONTH, 'headline').spent(since), HEADLINE_ASKS_MONTH);
+  /* THE OTHERS' FLOORS ARE UNTOUCHED: the skill draft and the model-jobs pass still have what the plan keeps for them,
+     the 260 the headlines could not spend. A meter's `spent` reads what was left over as spent, so what a share may
+     spend now is its cap less that. */
+  const left = (): number => {
+    const work = backgroundMeter(sql);
+    return work.cap - work.spent(since);
+  };
+  assert.equal(left(), 260);
+  assert.equal(backgroundMeter(sql, BACKGROUND_JOBS_MONTH, 'headline').spent(since), most);
   const skill = await meter.background();
   assert.ok(skill.ok, 'a skill draft was refused by the headlines');
   skill.value.settle({ usage: { in: 500, out: 200 } });
-  assert.equal(backgroundMeter(sql).spent(since), 1);
+  assert.equal(left(), 259);
   sql.close();
 });
 
 test('SKILL DRAFTS AND THE MODEL-JOBS PASS cannot spend the headlines: with the rest of the month gone, a headline is still held', async () => {
   const { sql, meter } = ledger();
   const work = backgroundMeter(sql);
-  assert.equal(work.cap, BACKGROUND_JOBS_MONTH - HEADLINE_ASKS_MONTH);
+  assert.equal(work.cap, BACKGROUND_JOBS_MONTH - floorsOf(BACKGROUND_JOBS_MONTH).headline);
+  /* A SKILL DRAFT AND THE PASS ARE HELD TO THE REST: the work less the floor reading who is who has not used. */
+  const rest = work.rest!;
+  assert.equal(rest.cap, work.cap - floorsOf(BACKGROUND_JOBS_MONTH).understand);
   /* A month of digests and skill drafts, as the pass and the look settle them. */
-  for (let i = 0; i < work.cap - 1; i++)
+  for (let i = 0; i < rest.cap - 1; i++)
     sql.exec(
       `INSERT INTO slash_call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, code, question, purpose, spends)
        VALUES (?, ?, 'prose', 'a', 'glm-5.3-flash', 10, 10, 0, 0, 'ok', NULL, NULL, 'look', 'background')`,
@@ -165,7 +179,15 @@ test('SKILL DRAFTS AND THE MODEL-JOBS PASS cannot spend the headlines: with the 
   assert.ok(headline.ok, 'the skill drafts and digests ate the headlines');
   /* A CALL NEVER SENT IS RELEASED, and costs the share nothing. */
   headline.value.release();
-  assert.equal(backgroundMeter(sql, BACKGROUND_JOBS_MONTH, 'headline').spent(since), 0);
+  /* WHAT THE HEADLINES MAY STILL SPEND IS THEIR FLOOR, all of it: the work took what was left over and none of theirs. */
+  const theirs = backgroundMeter(sql, BACKGROUND_JOBS_MONTH, 'headline');
+  assert.equal(theirs.cap - theirs.spent(since), floorsOf(BACKGROUND_JOBS_MONTH).headline);
+  assert.equal(sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM slash_call WHERE purpose = 'headline'")?.n, 0);
+  /* AND READING WHO IS WHO STILL HAS ITS OWN: a look or a skill draft through this door spent none of it. */
+  assert.equal(work.understand!.cap - work.understand!.spent(since), floorsOf(BACKGROUND_JOBS_MONTH).understand);
+  const who = await meter.background('understand');
+  assert.ok(who.ok, 'the skill drafts and digests ate what reading who is who was owed');
+  who.value.release();
   sql.close();
 });
 
@@ -181,11 +203,13 @@ test("THE DAILY LOOK'S OWN DRAFT is written as a look and spends the work share,
   sql.close();
 });
 
-test('A SMALLER ALLOWANCE IS SPLIT IN PROPORTION, so neither share is left with nothing', () => {
+test('A SMALLER ALLOWANCE IS SHARED IN PROPORTION, so neither share is left with nothing', () => {
   const sql = openSqlite();
   const work = backgroundMeter(sql, 10);
   const headline = backgroundMeter(sql, 10, 'headline');
   assert.ok(work.cap > 0 && headline.cap > 0);
-  assert.equal(work.cap + headline.cap, 10);
+  /* EACH IS THE MONTH LESS THE OTHERS' FLOORS, so the two overlap in what is nobody's and no longer add up to the cap. */
+  assert.equal(work.cap, 8);
+  assert.equal(headline.cap, 5);
   sql.close();
 });

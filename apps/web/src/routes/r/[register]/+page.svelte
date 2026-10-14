@@ -93,7 +93,9 @@
   import ViewSwitch from './parts/ViewSwitch.svelte';
   import ListTable from './parts/ListTable.svelte';
   import ListRowMenu from './parts/ListRowMenu.svelte';
-  import RowPeek from './parts/RowPeek.svelte';
+  import { listHost, type Walked } from '$lib/page/row-host.svelte.ts';
+  import RowPanel from '$lib/page/RowPanel.svelte';
+  import RowVerbMenu from '$lib/page/RowVerbMenu.svelte';
   import DisplayMenu from './parts/DisplayMenu.svelte';
   import FieldAdd from './parts/FieldAdd.svelte';
   import ListEditor from '$lib/ui/ListEditor.svelte';
@@ -1724,37 +1726,87 @@
     if (focus.col > last) focus = { ...focus, col: Math.max(0, last) };
   });
   /**
-   * THE PEEKED ROW IS IN THE URL, and the comment above used to say it was not.
+   * THE OPEN ROW IS IN THE ADDRESS (`?row=7`), and the panel it opens in is the one every declared page opens
+   * (`RowPanel`, through `listHost` in `lib/page/row-host.svelte.ts`): every field the list declares, saved in one
+   * write with one Undo. The peek that stood here drew the fields and could change none.
    *
-   * `19 §5`'s table puts *open drawers* in component state and this file read the peek as one of
-   * those. It is not: `19 §2` names it in its own row — "Entry peek | `/r/obligations?row=7` — a
-   * 480px drawer, list still visible, for triage" — and `§5` gives *Focused row* the same
-   * `?row=7`, with the note that deep-linking a paged list needs a stable key and never an index.
-   *
-   * WHAT IT COST WAS TWO THINGS A PERSON DOES CONSTANTLY. Copying the URL out of a peek sent a
-   * colleague the whole list rather than the row being discussed, and Back — the gesture every
-   * person on earth uses to close a thing that opened over what they were reading — left the
-   * register entirely.
-   *
-   * THE KEY IS `seq`, WHICH IS THE STABLE ONE. `focus.row` is an index into whatever is on screen
-   * and moves when a filter does; `#7` is `#7` under every sort this list has.
+   * WHY THE ADDRESS. Copying it out of an open row sends a colleague the row being discussed and not the whole list,
+   * and Back, the gesture every person uses to close a thing that opened over what they were reading, closes the panel
+   * and stays on the list. The key is the row's number, which is the same under every sort and filter this list has;
+   * `focus.row` is an index into whatever is on screen. A sort or a chip changes the address through `setParam`, which
+   * starts from the address as it is, so the open row is carried along; a row the new answer no longer holds closes the
+   * panel, and the host takes it out of the address.
    */
-  /* A ROW'S NUMBER IS ONE OR MORE, which is what the record hands out. This read `said !== 0` for as
-     long as `pending` minted NEGATIVE numbers for rows typed against the sample, so `?row=-1` could
-     open the drawer on one; `pending` went with the sample, and a
-     negative number in an address now names no row anywhere. */
-  const peeked = $derived.by(() => {
-    const said = Number(page.url.searchParams.get('row'));
-    return Number.isInteger(said) && said > 0 ? said : null;
+  const host = listHost({
+    register: () => id,
+    /* THE ROWS AS DRAWN: the order on screen, with what was edited here over them. */
+    rows: () => result.entries,
+    address: {
+      read: () => page.url,
+      /* OPENING AND CLOSING ARE STEPS BACK CAN UNDO; walking from one open row to the next is not one a step each. */
+      write: (to) =>
+        void goto(at(`${to.pathname}${to.search}${to.hash}`), {
+          replaceState: page.url.searchParams.has('row') && to.searchParams.has('row'),
+          noScroll: true,
+          keepFocus: true,
+        }),
+    },
+    base: () => apiBase(),
+    now: () => now,
+    reread: () => rereadRows(),
+    toasts,
+    may: (register) => may(shell, 'write', register),
+    who: () => ({ me: shell.me?.person ?? null, names: new Map(Object.entries(shell.names ?? {})) }),
   });
 
-  const peek = (seq: number | null) =>
-    setParam((p) => {
-      if (seq === null) p.delete('row');
-      else p.set('row', String(seq));
-    });
+  /* THE PANEL IS KEPT IN STEP WITH THE LIST AND THE ADDRESS (`sync`): a row that left the list closes it, a link or Back
+     moves it, and a row the address names is opened once the list has read it.
 
-  const peekedEntry = $derived(peeked === null ? undefined : rowAt(peeked));
+     AND A PANEL THAT CLOSED ITSELF (its own close, Escape) IS CLOSED ON THE HOST TOO, which is what takes the row out of
+     the address: the panel only sets its own open, and `?row=7` would otherwise outlive the panel it named. Closing a
+     closed host writes nothing. */
+  $effect(() => {
+    void result.entries;
+    void page.url.href;
+    const shut = host.opened === null;
+    untrack(() => {
+      if (shut) host.close();
+      host.sync();
+    });
+  });
+
+  /**
+   * A WRITE FROM THE PANEL READS THE LIST'S ROWS AGAIN, in place (`recheck`), so the changed day shows at once. A list
+   * walked past its first page is only marked stale by that, so there the rows the host holds newer are put where they
+   * stand.
+   */
+  async function rereadRows() {
+    await recheck();
+    if (pages.length <= 1) return;
+    for (const e of pages.flat()) {
+      const got = host.host.entry({ register: id, seq: e.seq });
+      if (got && got.version > e.version) landRow(got);
+    }
+  }
+
+  /** Said when a key would move the panel off a row that holds something typed and not saved. */
+  const UNSAVED = copy.rowUnsaved;
+
+  /** Whether the panel holds something typed for another row than `seq`, said when it does: nothing typed is thrown away. */
+  function keeps(seq: number): boolean {
+    const typed = host.host.dirty && host.opened !== null && host.opened !== seq;
+    if (typed) toasts.push(UNSAVED, { intent: 'warn' });
+    return typed;
+  }
+
+  /** After `j` or `k` walked the open row: the list's own cursor goes with the panel, or the reader is told why not. */
+  function walked(out: Walked) {
+    if (out === 'unsaved') return void toasts.push(UNSAVED, { intent: 'warn' });
+    const at = result.entries.findIndex((e) => e.seq === host.opened);
+    if (out !== 'moved' || at < 0) return;
+    focus = { ...focus, row: at };
+    carry();
+  }
 
   /** Only INDEXED fields are offered, in declaration order, at most eight (`filterableOf`). */
   const filterable = $derived(filterableOf(decl?.fields ?? []));
@@ -1984,12 +2036,19 @@
 
     if (e.key === 'j' || e.key === 'ArrowDown') {
       e.preventDefault();
-      focus = { ...focus, row: Math.min(focus.row + 1, rows.length - 1) };
-      carry();
+      /* WHILE A ROW IS OPEN THE WALK IS THE PANEL'S, and the cursor goes with it (`walked`). */
+      if (host.opened !== null) walked(host.next());
+      else {
+        focus = { ...focus, row: Math.min(focus.row + 1, rows.length - 1) };
+        carry();
+      }
     } else if (e.key === 'k' || e.key === 'ArrowUp') {
       e.preventDefault();
-      focus = { ...focus, row: Math.max(focus.row - 1, 0) };
-      carry();
+      if (host.opened !== null) walked(host.previous());
+      else {
+        focus = { ...focus, row: Math.max(focus.row - 1, 0) };
+        carry();
+      }
     } else if (e.key === 'ArrowRight') {
       e.preventDefault();
       focus = { ...focus, col: Math.min(focus.col + 1, columns.length - 1) };
@@ -1998,7 +2057,8 @@
       focus = { ...focus, col: Math.max(focus.col - 1, 0) };
     } else if (e.key === 'p') {
       e.preventDefault();
-      peek(result.entries[focus.row]?.seq ?? null);
+      const seq = result.entries[focus.row]?.seq;
+      if (seq !== undefined && !keeps(seq)) host.open(seq);
     } else if (e.key === 'Enter') {
       /* ENTER ON A CONTROL IS THAT CONTROL'S. It pressed Display, opened a filter menu or chose a
          value in it, and then took the page to the cursor's row as well, so the choice was made on a
@@ -2488,7 +2548,7 @@
   <!-- THE SENTENCE, cut round the phrase that needs him, which `PageHead` draws in red (`data-needs`). -->
   {#snippet readingSaid()}{reading?.before}{#if reading?.needs}<span data-needs>{reading.needs}</span>{/if}{reading?.after}{/snippet}
 
-  <!-- THE SCREEN NARROWS BESIDE THE DOCKED PEEK, AND NEVER GOES UNDER IT. `--dock-w` is what an open docked
+  <!-- THE SCREEN NARROWS BESIDE THE DOCKED PANEL, AND NEVER GOES UNDER IT. `--dock-w` is what an open docked
        panel takes from the window's end edge, and nothing otherwise; the head's and the list's own gutter already
        stand inside it, so what is added is the rest. -->
   <div class="list-screen">
@@ -2750,8 +2810,10 @@
     </div>
   {/snippet}
 
-  <!-- Peek: the docked panel, with the list still visible beside it, for triage. `?row=7` is which row. -->
-  <RowPeek register={id} seq={peeked} entry={peekedEntry} title={decl.title} {now} names={result.names ?? undefined} {peek} />
+  <!-- The open row: the docked panel every declared page opens, with the list still visible beside it, and the menu
+       its More opens. `?row=7` is which row. -->
+  <RowPanel host={host.host} />
+  <RowVerbMenu host={host.host} reread={rereadRows} />
 
   <!-- Put this filter on a page as a block. `⌥B`, and it was a toast until now.
 
@@ -2802,7 +2864,7 @@
     {saidInLine}
     onclose={() => (menuAt = null)}
     {setRowState}
-    {peek}
+    peek={(seq) => void (keeps(seq) || host.open(seq))}
     {toggleSelect}
     {copyId}
     {copyLink}
@@ -2830,7 +2892,7 @@
   /* EVERY OTHER RULE THIS SCREEN DRAWS IS IN THE PART THAT DRAWS ITS MARKUP (`parts/`), because a
      `<style>` block styles only what its own file writes. What is left here is the page's frame. */
 
-  /* THE ROOM THE DOCKED PEEK TAKES, less the gutter the head and the list already keep at their end, so the list's
+  /* THE ROOM THE DOCKED PANEL TAKES, less the gutter the head and the list already keep at their end, so the list's
      edge stands 12 from the panel. It moves with the panel's own slide, over `--d-panel` on the sheet curve. */
   .list-screen {
     padding-inline-end: max(0px, calc(var(--dock-w) - var(--gutter)));

@@ -8,9 +8,12 @@
  * IT NEVER FAILS THE SCREEN. A record with no such call, a reader it refuses, a record that keeps nobody and a line
  * that dropped all answer nobody, and nobody draws nothing: Home stands as it did before.
  *
- * THE BATCH IS A HANDLE BESIDE THE WORDS, never in them. `undoOf` says what the record's undo would be sent for one
- * match. NOTHING PRESSES IT YET: the record's undo does not give two back from a match today (it leaves the matched
- * one as it is and the next meeting matches the pair again), so the tile lists and draws no Undo until it can.
+ * THE BATCH IS A HANDLE BESIDE THE WORDS, never in them. `undoOf` says what the record's undo is sent for one match.
+ *
+ * UNDO IS THE RECORD'S OWN, READ BEFORE IT IS PRESSED. `undoMatch` asks the plan dry and says it in names ("Puts back
+ * Teodor Vance and T. Vance as two people."); `putBack` sends that plan back by its hash. A RECORD THAT CANNOT GIVE TWO
+ * BACK FROM A MATCH DRAWS NO UNDO: its plan names nobody coming back (it leaves the matched one as it is, and the next
+ * meeting would match the pair again), so `undoMatch` answers `null` for it and the tile only lists.
  *
  * A ROUTE-ONLY MODULE, like `briefing.ts`: the client carries the route table as a value, so this is imported lazily
  * from the screen that draws it and never from anything every screen loads.
@@ -18,8 +21,9 @@
 
 import { createClient } from '@braindog/client';
 
+import { copy } from '../copy.ts';
 import type { Fetch } from '../record/boot-live.ts';
-import type { UndoScope } from '../record/undo-write.ts';
+import { undoApply, undoPlan, type UndoPlan, type UndoScope } from '../record/undo-write.ts';
 
 /** How many matches the tile lists when it is opened. The rest are counted in one line under them. */
 export const MATCHED_SHOWN = 5;
@@ -32,9 +36,10 @@ const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
  * One match as it is drawn. `when` is the instant the record made it, or `null` where it sent none a clock can read;
- * `batch` is the handle the record's undo takes, `''` where it sent none, and is never drawn.
+ * `batch` is the handle the record's undo takes, `''` where it sent none, and is never drawn. `into` is the name of the
+ * one the others were matched to, which Undo says first among who comes back.
  */
-export type MatchedRow = { key: string; line: string; evidence: string; when: string | null; batch: string };
+export type MatchedRow = { key: string; line: string; evidence: string; when: string | null; batch: string; into: string };
 
 const COUNTS = ['Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'] as const;
 
@@ -88,6 +93,7 @@ export function matchedRows(answer: unknown): MatchedRow[] {
       evidence: typeof m.evidence === 'string' ? m.evidence.trim() : '',
       when: typeof m.at === 'string' && Number.isFinite(Date.parse(m.at)) ? m.at : null,
       batch,
+      into,
     });
   }
   return rows;
@@ -127,5 +133,132 @@ export async function readMatched(base: string, io?: Fetch): Promise<{ ok: true;
     return { ok: true, value: matchedRows(await createClient({ base, ...(io ? { fetch: io } : {}) }).matched()) };
   } catch {
     return { ok: true, value: [] };
+  }
+}
+
+/* ── Undo: the plan, then Put back ───────────────────────────────────────── */
+
+/** The word the record's plan puts on a step that brings back somebody a match had put away ("Bring T. Vance back"). */
+const GIVEN_BACK = 'restore';
+
+/** The head of its one sentence for a match put back ("Puts back 2 people"), and how many it says come apart. */
+const SAYS_BACK = /^Puts back (\d+) people\b/u;
+
+/** What Undo needs of a match: its batch, and the name of the one the others were matched to where it is known. */
+export type MatchHandle = { batch: string; into?: string };
+
+/**
+ * Who a plan gives back, by name and once each, and how many the record says come apart; `null` for a plan that gives
+ * nobody back.
+ *
+ * ONE PERSON IS ONE HANDLE, never one name: two called the same are two. THE ONE WHO WAS KEPT COMES BACK TOO, as
+ * themselves alone: the plan names them by a step that takes off what the match added, or only counts them, and
+ * `into` is who that is. Any other step is something that pointed at one of them going home (a task, a note), and is
+ * never named as a person.
+ */
+function givenBack(plan: UndoPlan, into = ''): { names: string[]; said: number | null } | null {
+  const marked = plan.steps.filter((s) => s.do === GIVEN_BACK);
+  const says = SAYS_BACK.exec(plan.say);
+  if (marked.length === 0 && says === null) return null;
+  const said = says === null ? null : Number(says[1]);
+  const seen = new Set<string>();
+  const names: string[] = [];
+  for (const [i, step] of (marked.length > 0 ? marked : plan.steps).entries()) {
+    const handle = step.row ?? `at:${String(i)}`;
+    if (step.title === '' || seen.has(handle)) continue;
+    seen.add(handle);
+    names.push(step.title);
+  }
+  /* THE KEPT ONE IS ON THE LIST THE OTHERS COME BACK TO, so something else that happens to share the name is not them. */
+  const lists = new Set(marked.map((m) => m.list ?? m.at?.register ?? null));
+  const step = plan.steps.some((s) => s.do !== GIVEN_BACK && same(s.title, into) && lists.has(s.list ?? s.at?.register ?? null));
+  const kept = marked.length > 0 && into !== '' && (step || (said !== null && said > names.length));
+  if (kept) names.unshift(into);
+  return { names, said };
+}
+
+/** "Ada Lovelace as two people", "Ann, Bo and Cy as three people", "T. Vance as a person of their own". */
+function asPeople(names: readonly string[]): string {
+  const n = names.length;
+  if (n === 1) return `${names[0]!} as a person of their own`;
+  const count = (COUNTS[n - 2] ?? String(n)).toLowerCase();
+  return `${names.every((name) => same(name, names[0]!)) ? names[0]! : listed(names)} as ${count} people`;
+}
+
+/** Who comes back, when every one the record counts can be named; `null` where its own sentence is the true one. */
+function named(plan: UndoPlan, into?: string): string | null {
+  const back = givenBack(plan, into);
+  if (back === null || back.names.length === 0) return null;
+  return back.said !== null && back.said !== back.names.length ? null : asPeople(back.names);
+}
+
+/**
+ * The plan in one sentence a person can agree to: who comes back, and as how many. `null` for a plan that gives nobody
+ * back, which is a record that cannot split a match and so draws no Undo.
+ *
+ * THE RECORD'S OWN SENTENCE WHERE THE NAMES ARE NOT ALL OF IT: a change that held more than this one match is said by
+ * its count. WHAT THE PLAN LEAVES IS SAID AFTER, one by the record's reason and more by their number.
+ */
+export function planSaid(plan: UndoPlan, into?: string): string | null {
+  if (givenBack(plan, into) === null) return null;
+  const who = named(plan, into);
+  const head = who === null ? `${plan.say.replace(/\.$/u, '')}.` : `Puts back ${who}.`;
+  if (who === null || plan.skipped.length === 0) return head;
+  const one = plan.skipped.length === 1 ? plan.skipped[0]!.line : '';
+  return `${head} ${one !== '' ? `${one.replace(/\.$/u, '')}.` : `Leaves ${String(plan.skipped.length)} as they are.`}`;
+}
+
+/** The same once it is done, for the toast: "Put back Teodor Vance and T. Vance as two people." `null` where it names nobody. */
+export function backSaid(plan: UndoPlan, into?: string): string | null {
+  const who = named(plan, into);
+  return who === null ? null : `Put back ${who}.`;
+}
+
+/** What Undo on one match would do, read and not done: the plan, and `say`, its one sentence in names. */
+export type MatchPlan = { from: 'plan'; say: string; plan: UndoPlan };
+
+/**
+ * What Put back answered. `undone` carries the sentence the toast says. `again` is a plan that moved between the read
+ * and the press: nothing was put back, and the tile reads the plan again. `refused` is the record's own sentence.
+ */
+export type MatchBack = { from: 'undone'; said: string } | { from: 'again' } | { from: 'refused'; fix: string };
+
+/**
+ * Ask the record what Undo on this match would put back, changing nothing.
+ *
+ * `null` IS NO BUTTON, whichever it is: a match with no batch, a record with no undo, a reader it refuses (only the
+ * owner puts a change back), a dead line, and a record whose plan gives nobody back. A person is never shown an Undo
+ * that would not give them two people.
+ */
+export async function undoMatch(base: string, row: MatchHandle, io?: Fetch): Promise<MatchPlan | null> {
+  const scope = undoOf(row);
+  if (scope === null) return null;
+  try {
+    const out = await undoPlan(base, scope, io);
+    if (out.from !== 'plan') return null;
+    const say = planSaid(out.plan, row.into);
+    return say === null ? null : { from: 'plan', say, plan: out.plan };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Put back the plan that was read, by its hash.
+ *
+ * WHO CAME BACK IS SAID IN NAMES WHEN ALL OF IT WENT BACK. Where the record left something, or had nothing left to put
+ * back, the sentence is the record's count and its own reason, never a claim that two people are back.
+ */
+export async function putBack(base: string, row: MatchHandle, plan: UndoPlan, io?: Fetch): Promise<MatchBack> {
+  const scope = undoOf(row);
+  if (scope === null) return { from: 'refused', fix: copy.recordNotReached };
+  try {
+    const out = await undoApply(base, scope, plan, io);
+    if (out.from === 'conflict') return { from: 'again' };
+    if (out.from !== 'undone') return { from: 'refused', fix: out.fix };
+    const whole = out.put > 0 && out.skipped.length === 0 ? backSaid(plan, row.into) : null;
+    return { from: 'undone', said: whole ?? out.said };
+  } catch {
+    return { from: 'refused', fix: copy.recordNotReached };
   }
 }

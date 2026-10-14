@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { COMMANDS, admits, commands } from './admit.ts';
-import { FILL, maker, paging, pressed, rowTitle, whoOf, words, type Desk, type Made } from './new-page.ts';
+import { FILL, describedHref, maker, pageHref, paging, pressed, rowTitle, whoOf, words, type Desk, type Made } from './new-page.ts';
 import { pageWords } from '../record/page-new.ts';
 import type { Fetch } from '../record/row-live.ts';
 
@@ -120,7 +120,9 @@ test('A PRESS MAKES THE PAGE ONCE, OPENS IT, AND SHOWS ONE TOAST WITH UNDO', asy
   const at = desk(async () => made);
   await pressed({ title: 'Wedding', suggest: false }, at.desk);
   /* The shell is read before the page opens, so the rail lists it when it is on screen. */
-  assert.deepEqual(at.did, ['make Wedding', 'refresh', 'go /p/wedding', 'toast']);
+  /* AND IT OPENS ON "DESCRIBE IT" (ENG-B11): the address carries the mark the page's own menu reads. */
+  assert.equal(describedHref('wedding'), '/p/wedding?describe=1');
+  assert.deepEqual(at.did, ['make Wedding', 'refresh', `go ${describedHref('wedding')}`, 'toast']);
   assert.equal(at.toasts.length, 1);
   assert.equal(at.toasts[0]!.text, 'Wedding is ready.');
   assert.equal(typeof at.toasts[0]!.undo, 'function', 'the receipt offers no way back');
@@ -128,6 +130,8 @@ test('A PRESS MAKES THE PAGE ONCE, OPENS IT, AND SHOWS ONE TOAST WITH UNDO', asy
   /* UNDO takes the page away, leaves its address, reads the shell again and says so, once. */
   at.toasts[0]!.undo!();
   await settled();
+  /* THE PLAIN ADDRESS, since the mark is gone from the address bar by then and `leave` compares where the reader is. */
+  assert.equal(pageHref('wedding'), '/p/wedding');
   assert.deepEqual(at.did.slice(4), ['leave /p/wedding', 'refresh', 'toast']);
   assert.deepEqual(at.toasts[1], { text: 'Wedding was taken back out.', intent: undefined, undo: undefined });
 });
@@ -146,6 +150,13 @@ test('a suggestion opens nothing and offers no undo: there is no page until Deci
   await pressed({ title: 'Wedding', suggest: true }, at.desk);
   assert.deepEqual(at.did, ['make Wedding', 'refresh', 'toast']);
   assert.deepEqual(at.toasts, [{ text: 'Wedding is waiting on Decide.', intent: 'good', undo: undefined }]);
+});
+
+test('a made page with no way back still opens on Describe it, with a receipt and no Undo', async () => {
+  const at = desk(async () => ({ ok: true, slug: 'wedding-2', as: 'made', said: 'Wedding is ready.' }));
+  await pressed({ title: 'Wedding', suggest: false }, at.desk);
+  assert.deepEqual(at.did, ['make Wedding', 'refresh', 'go /p/wedding-2?describe=1', 'toast']);
+  assert.deepEqual(at.toasts, [{ text: 'Wedding is ready.', intent: 'good', undo: undefined }]);
 });
 
 test('a refusal is one warning in the record\'s words, and a press that could not load says the calm sentence', async () => {

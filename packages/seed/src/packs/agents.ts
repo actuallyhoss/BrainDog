@@ -213,16 +213,33 @@ const DOOR_METRICS: Record<string, SeedMetric & { sign: string }> = {
  */
 
 /**
- * THE RUNS THAT STOPPED TODAY, SINCE 1.6.0: idle or handed off, and last heard from today. With the kernel's working runs
- * and `RUNS_EARLIER` it cuts the live runs (`sessions.live`, every run not done or abandoned) so each sits under one
- * heading: a run active and heard from inside fifteen minutes is working, one that stopped today is Today, and anything
- * last heard from before today is Earlier, the run the end hook never closed among them. An active run quiet since
- * earlier today is under none of the three, and Today's lanes still draw it.
+ * THE RUNS UNDER THREE HEADINGS, SINCE 1.6.0, each run under one: a run active and heard from inside fifteen minutes
+ * is working (the kernel's), one that stopped today is Today (`RUNS_TODAY`), and anything last heard from before today
+ * is Earlier (`RUNS_EARLIER`), the run the end hook never closed among them. An active run quiet since earlier today is
+ * under none of the three, and Today's lanes still draw it.
  */
-export const RUNS_TODAY = 'state is idle or handoff, last_seen is today';
 
-/** THE RUNS LAST HEARD FROM BEFORE TODAY, SINCE 1.6.0, whatever they say they are doing (`RUNS_TODAY` says why). */
-export const RUNS_EARLIER = 'last_seen before today';
+/**
+ * A RUN OF ITS OWN THAT DID SOMETHING, SINCE 1.12.0: not a helper, whose work is its parent's and is counted on the
+ * parent's card, and not a run that signed no write. `is not 0` and never "above nought", which the grammar cannot
+ * say: so a run whose writes the record has not counted yet (`wrote` missing, migration 28's steps not there) is kept,
+ * as the record's own tidy keeps it (`runs-empty` in `packages/kernel/src/tidy.ts`: nought, never missing).
+ */
+const RAN = 'parent is empty, wrote is not 0';
+
+/**
+ * THE RUNS THAT ENDED OR STOPPED TODAY. FROM 1.6.0 TO 1.11.0 only idle or handed off, read among the runs not finished
+ * (`sessions.live`), so a run that ended properly, as done, was on no part of the page it should be listed on. SINCE
+ * 1.12.0 every run of the list last heard from today that is not active, the finished ones too, less the helpers and
+ * the runs that wrote nothing (`RAN`). NOT ACTIVE, because a run active and heard from inside fifteen minutes is a
+ * Working card and would be drawn twice; one active and quiet since earlier today is under neither, and Today's lanes
+ * still draw it (the grammar counts in days, so no clause can say fifteen minutes).
+ */
+export const RUNS_TODAY = `state is not active, last_seen is today, ${RAN}`;
+
+/** THE RUNS LAST HEARD FROM BEFORE TODAY, whatever they say they are doing; SINCE 1.12.0 the finished ones too, less
+ *  the helpers and the runs that wrote nothing. The run the end hook never closed is among them, as it was. */
+export const RUNS_EARLIER = `last_seen before today, ${RAN}`;
 
 /**
  * WHAT AN AGENT'S RUN ASKED, SINCE 1.6.0: an open question opened by a run (its spoken id, `S12`) or by an agent's key
@@ -238,17 +255,26 @@ const ASKED_BY_A_RUN = {
 };
 
 /**
- * WHAT A STOPPED RUN'S CARD SAYS, Today's and Earlier's: what it was doing, which agent, the project it was placed in,
- * the next step it left, and when it was last heard from. The next step is a fact and not the title, as it was under
- * Where they left off, because a run that left none is still a run somebody looks for by what it did.
+ * WHAT AN ENDED RUN'S CARD SAYS, Today's and Earlier's, SINCE 1.12.0: which agent, what it said it was doing, the
+ * project it was placed in, and when it was last heard from.
+ * Until then it was titled by `doing`, which on a run nobody named is the record's own "Claude Code in BrainDog", the
+ * same on every card, and which an agent may fill with file paths; and it carried the run's next step, which Left for
+ * the next run says since 1.11.0, once, and only while nobody has taken it.
+ *
+ * THE SENTENCE AND THE PROJECT, AS ON A WORKING CARD. What a run said it is doing is `doing_said`, a column the record
+ * works out and no field of the list; it answers it over the list of runs as it does over the runs working and the
+ * runs not finished, and a run's project by its name (`as: scope`), never its id. So a card reads the same under
+ * Working, Today and Earlier, and a run that said nothing, or whose name is the record's own, has no sentence.
  */
-const STOPPED_COLUMNS = [
-  { field: 'doing', as: 'title' },
-  { field: 'agent', as: 'who' },
+const ENDED_COLUMNS = [
+  { field: 'agent', as: 'title' },
+  { field: 'doing_said', as: 'reply' },
   { field: 'project', label: 'Project', as: 'scope' },
-  { field: 'next', label: 'Next', as: 'fact' },
   { field: 'last_seen', as: 'when' },
 ];
+
+/** The latest first: the list of runs comes in no order of its own, as the run sources do. */
+const LATEST_FIRST = [{ field: 'last_seen', dir: 'desc' }];
 
 export const AGENTS_METRICS: Record<string, SeedMetric> = {
   'learnings-by-week': { metric: 'learnings-by-week', name: 'Learnings added, by week', source: 'register.learnings', where: 'created_at after -182d', ...WEEKLY },
@@ -289,12 +315,13 @@ export const AGENTS_METRICS: Record<string, SeedMetric> = {
      own clause, and the line reads the record's built-in `runs-working`, the runs the Working cards draw. */
   'runs-left-next': { metric: 'runs-left-next', name: 'Runs that left a next step', source: 'register.session', where: 'state is idle or handoff, next is set', ...COUNT },
   /* THE TWO GROUPS OF STOPPED RUNS, SINCE 1.6.0, each over its cards' own clause, so a heading is drawn only over runs.
-     Earlier counts only the runs still open, as `sessions.live` lists them, so a figure and its cards agree. */
+     THE SAME RUNS AS THE CARDS SINCE 1.12.0, to the letter: both read the list of runs by the one clause, the finished
+     runs counted too, where Earlier's figure had to say again which runs `sessions.live` lists. */
   'runs-today': { metric: 'runs-today', name: 'Runs that stopped today', source: 'register.session', where: RUNS_TODAY, ...COUNT },
   /* EVERY RUN HEARD FROM TODAY, SINCE 1.8.0, whatever it says it is doing, a finished one included: what Today's lanes
      are drawn on, over the list they read. */
   'runs-heard-today': { metric: 'runs-heard-today', name: 'Runs heard from today', source: 'register.session', where: 'last_seen is today', ...COUNT },
-  'runs-earlier': { metric: 'runs-earlier', name: 'Runs last heard from before today', source: 'register.session', where: `state is active or idle or handoff, ${RUNS_EARLIER}`, ...COUNT },
+  'runs-earlier': { metric: 'runs-earlier', name: 'Runs last heard from before today', source: 'register.session', where: RUNS_EARLIER, ...COUNT },
   'learnings-active': { metric: 'learnings-active', name: 'Learnings in use', source: 'register.learnings', where: 'state is active', ...COUNT },
   'skills-active': { metric: 'skills-active', name: 'Skills in use', source: 'register.skills', where: 'state is active', ...COUNT },
   /* ONE SKILL'S LESSONS, `{{it}}` filled from the skill page's own `{{name}}`, the clauses of the tile drawn on it. */
@@ -356,6 +383,9 @@ export const AGENTS_METRICS: Record<string, SeedMetric> = {
  *
  * WHAT WAS LEFT, AND EARLIER FOLDED, SINCE 1.11.0: Left for the next run sits under Working, the steps nobody has taken,
  * and Earlier keeps its place as the last of the groups but under a fold of its own, below Needs a look.
+ *
+ * WHOSE CARD AND WHAT IT SAID, AND THE FINISHED RUNS LISTED, SINCE 1.12.0: a card is titled by the agent, and Today and
+ * Earlier read the list of runs, so a run that ended properly is on the page.
  *
  * NO PEOPLE ON THEM. "People met lately" would make the page require `register.people`, and then a
  * record without People could not take this pack. The people an agent meets are on the People page.
@@ -424,7 +454,14 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
          minutes, a helper folded under the run that started it. The end hook leaves a run idle and a handoff waits for
          a pickup, and neither is working. The source takes no `where:` and no `order:`, so no page can count working its
          own way again. The project is a scope chip, read off the run's placed project. WORKING AND NOT "Working now"
-         SINCE 1.6.0, one word among the group headings. */
+         SINCE 1.6.0, one word among the group headings.
+
+         THE AGENT IS THE TITLE AND WHAT IT SAID IS UNDER IT, SINCE 1.12.0 (AGT-C12). The title was `doing`, and on the
+         owner's record four cards read "Claude Code in BrainDog", the name the record gives a run nobody named, and a
+         fifth printed file paths. `doing_said` is the record's own column on a run: what the agent said it is doing,
+         and nothing when the name is the record's or reads as a path, a host or a handle. NO NEXT STEP: a working
+         run's step is its own note, and a step left is said under Left for the next run. How many helpers a run has
+         comes with the answer, for the host to say. */
       {
         kind: 'cards',
         heading: 'Working',
@@ -432,10 +469,9 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         span: 12,
         source: 'sessions.working',
         columns: [
-          { field: 'doing', as: 'title' },
-          { field: 'agent', as: 'who' },
+          { field: 'agent', as: 'title' },
+          { field: 'doing_said', as: 'reply' },
           { field: 'project', label: 'Project', as: 'scope' },
-          { field: 'next', label: 'Next', as: 'fact' },
           { field: 'last_seen', as: 'when' },
         ],
         limit: 12,
@@ -463,15 +499,18 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         limit: 6,
         when: { metric: 'handoffs-open', gt: 0 },
       },
-      /* THE RUNS THAT STOPPED TODAY, SINCE 1.6.0, and with them where each left off: what the next session starts from. */
+      /* THE RUNS THAT ENDED OR STOPPED TODAY, SINCE 1.6.0. OVER THE LIST OF RUNS SINCE 1.12.0 (`RUNS_TODAY`), so a run
+         that finished today is here, and a helper or a run that wrote nothing is not; the latest first. Where each
+         left off is Left for the next run's to say, above. */
       {
         kind: 'cards',
         heading: 'Today',
         icon: 'flag',
         span: 12,
-        source: 'sessions.live',
+        source: 'register.session',
         where: RUNS_TODAY,
-        columns: STOPPED_COLUMNS,
+        columns: ENDED_COLUMNS,
+        order: LATEST_FIRST,
         limit: 8,
         when: { metric: 'runs-today', gt: 0 },
       },
@@ -512,6 +551,9 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
          fold's says what they are. The latest first, six drawn and the rest counted under them, as before. A section
          whose `when:` says no hides what it holds, so a record with no such run draws neither.
 
+         OVER THE LIST OF RUNS SINCE 1.12.0, as Today is: the heading counts the finished runs too, and neither counts a
+         helper or a run that wrote nothing.
+
          IT IS ALSO WHAT CLOSES Needs a look above it: a boxed section holds the blocks after it up to the next one.
 
          THE TWO TILES HEADED Today WERE NOT MADE ONE. Only a boxed section draws two blocks on one surface, and it
@@ -523,7 +565,7 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         icon: 'history',
         span: 12,
         fold: true,
-        source: 'sessions.live',
+        source: 'register.session',
         where: RUNS_EARLIER,
         limit: 1,
         when: { metric: 'runs-earlier', gt: 0 },
@@ -531,9 +573,10 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
       {
         kind: 'cards',
         span: 12,
-        source: 'sessions.live',
+        source: 'register.session',
         where: RUNS_EARLIER,
-        columns: STOPPED_COLUMNS,
+        columns: ENDED_COLUMNS,
+        order: LATEST_FIRST,
         limit: 6,
         when: { metric: 'runs-earlier', gt: 0 },
       },
@@ -679,8 +722,14 @@ export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, Se
      where it read `runs-left-next`. That figure stays declared, read by no block. Needs a look gains a fifth line, over
      the record's `gone-stale` and `tidied-week` (AGT-C18). Earlier goes under a fold of its own below Needs a look,
      with its count on the heading, so the page still shows six tiles before its fold. No list, field or figure goes,
-     and every other block 1.10.0 drew is as it was. */
-  manifest: { id: 'agents', version: '1.11.0', requires: ['register.things'] },
+     and every other block 1.10.0 drew is as it was.
+     1.12.0 TAKES NOTHING AWAY, SO IT IS MINOR (AGT-C12 job c): a Working card is titled by the agent, with what it said
+     it is doing under that or nothing (the record's `doing_said`), and carries no next step. Today and Earlier read
+     the list of runs where they read the runs not finished, so a run that ended is listed, and a helper or a run that
+     wrote nothing is not; `runs-today` and `runs-earlier` count the same runs by the same clauses. Their cards are
+     the agent, what it said, its project and when. No list, field or figure goes, the page has the blocks it had, and every other block is as
+     1.11.0 drew it. */
+  manifest: { id: 'agents', version: '1.12.0', requires: ['register.things'] },
   registers: AGENTS_REGISTERS,
   pages: AGENTS_PAGES,
   metrics: AGENTS_METRICS,

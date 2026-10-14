@@ -240,7 +240,9 @@
           toasts.push(pageWords.undone(title));
         }),
     });
-    await goto(at(home), { invalidateAll: true });
+    /* THE NEW PAGE OPENS ON "Describe it" (`?describe=1`, which `ChangePage` reads and takes out of the address), as
+       the palette's New page does. `home` stays the plain address: it is what Undo compares and leaves. */
+    await goto(at(`${home}?describe=1`), { invalidateAll: true });
   }
 
   /** The narrow rail's flyout: the name of the row under the pointer or the focus, since the row shows only its glyph. */

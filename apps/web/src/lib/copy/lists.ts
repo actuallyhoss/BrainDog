@@ -250,8 +250,11 @@ export const lists = {
   saveAsView: 'Save as a view',
   editRow: 'Edit',
   /* `Preview` AND IT WAS `Peek`. It is printed as a keyboard hint on every list, `p peek`, which is
-     a word the product invented for a thing every other product calls a preview. */
+     a word the product invented for a thing every other product calls a preview. It opens the panel a
+     row is read and changed in (`page/RowPanel.svelte`). */
   peek: 'Preview',
+  /** Said when a key would move that panel off something typed and not saved. */
+  rowUnsaved: 'Save what you typed, or close the panel, before you move on.',
   openRow: 'Open',
   copyId: 'Copy number',
   copyLink: 'Copy link',

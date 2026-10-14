@@ -6,7 +6,13 @@
   A line Slash wrote says so, in the word the page menu uses for what Slash arranged; a line the rules wrote says
   nothing, since that is the record speaking for itself.
 
+  WHY THE RULES WROTE IT IS ONE QUIET LINE UNDER THE CARDS (`footOf`), where the record said why: plain words at the
+  size of a line, no pill, no mark and no colour of its own. A screen that passes no foot draws none.
+
   NOTHING IS DRAWN FOR NO CARDS: not a heading, not an empty state. Today reads as it did before there was a briefing.
+
+  THE TILE'S HEAD IS EVERY TILE'S (`ui/Tile.svelte`): the glyph in its well, then the name. It stood on Today as the one
+  tile with no glyph, over tiles that all have one.
 
   A SENTENCE WRAPS, where a row's title is cut with an ellipsis: a card is one sentence of up to 140 characters and the
   whole of it is the point. Each link is 44 tall under a thumb.
@@ -14,10 +20,10 @@
 <script lang="ts">
   import { at } from '$lib/at.ts';
   import Icon from '$lib/ui/Icon.svelte';
-  import Section from '$lib/ui/Section.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
   import type { BriefingRow } from './briefing.ts';
 
-  let { cards }: { cards: readonly BriefingRow[] } = $props();
+  let { cards, foot = null }: { cards: readonly BriefingRow[]; foot?: string | null } = $props();
 
   const words = {
     title: 'Briefing',
@@ -28,7 +34,9 @@
 </script>
 
 {#if cards.length > 0}
-  <Section title={words.title}>
+  <Tile icon="doc" title={words.title} data-briefing-tile>
+    <!-- ONE CHILD OF THE TILE, so the foot stands close under the cards and not a tile's gap away. -->
+    <div class="b-body">
     <ul class="brief" data-briefing>
       {#each cards as card (card.key)}
         <li>
@@ -47,10 +55,16 @@
         </li>
       {/each}
     </ul>
-  </Section>
+    {#if foot}<p class="b-foot" data-briefing-foot dir="auto">{foot}</p>{/if}
+    </div>
+  </Tile>
 {/if}
 
 <style>
+  .b-body {
+    min-inline-size: 0;
+  }
+
   .brief {
     display: flex;
     flex-direction: column;
@@ -104,6 +118,16 @@
     flex: none;
     place-items: center;
     color: var(--dim);
+  }
+
+  /* THE FOOT, under the last card and in line with the cards' own words: 15px, and it wraps at any width. */
+  .b-foot {
+    margin: 0;
+    padding: var(--sp-2) var(--sp-2) 0;
+    color: var(--dim);
+    font-size: var(--t-row);
+    line-height: 22px;
+    overflow-wrap: anywhere;
   }
 
   /* UNDER A THUMB A LINK IS 44 (13 §7): the pointer and not the width, as every row is. */

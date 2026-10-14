@@ -2,7 +2,8 @@
  * The briefing on Today: what matters today, as lines a person can press (`Briefing.svelte`).
  *
  * THROUGH THE RECORD'S OWN `briefing` AND NOTHING ELSE. The record picks the cards, orders them and writes each line;
- * this file only turns a card into what a screen draws: its sentence, where its own thing opens, and who wrote it.
+ * this file only turns a card into what a screen draws: its sentence, where its own thing opens, and who wrote it,
+ * and the record's one sentence on why the rules wrote the briefing where they did (`footOf`).
  *
  * IT NEVER FAILS THE SCREEN. A record with no such call, a reader it refuses and a line that dropped all answer no
  * cards, and no cards draws nothing: Today stands as it did before there was a briefing.
@@ -79,11 +80,68 @@ export function briefingRows(answer: unknown): BriefingRow[] {
   return rows;
 }
 
+/**
+ * The whole read: the cards, who wrote them, and what the record said about that.
+ *
+ * `written` IS SLASH WHERE ANY CARD IS SLASH'S, and the rules otherwise, which is also what no cards reads as. `said` IS
+ * THE RECORD'S OWN SENTENCE on why the rules wrote it, and `null` where it said nothing: a host built before the key
+ * sends none, and that is nothing said.
+ */
+export type BriefingRead = { rows: BriefingRow[]; written: 'slash' | 'rule'; said: string | null };
+
+/** How long a sentence under the cards may run. The record keeps its own far shorter; this is the screen's ceiling. */
+const SAID_MOST = 200;
+
+/**
+ * The record's sentence as one line of plain words: its breaks and runs of spaces closed up, a long dash read as the
+ * comma it stands for, and cut at a word where it runs on. It came down the wire, so it is read as strictly as a line.
+ */
+function sentence(said: unknown): string | null {
+  if (typeof said !== 'string') return null;
+  const flat = said.replace(/\s*[\u2012-\u2015]\s*/gu, ', ').replace(/\s+/gu, ' ').trim();
+  if (flat === '') return null;
+  if (flat.length <= SAID_MOST) return flat;
+  const cut = flat.slice(0, SAID_MOST);
+  const word = cut.lastIndexOf(' ');
+  return (word > 0 ? cut.slice(0, word) : cut).trimEnd();
+}
+
+/** The record's answer as the whole read. The cards are `briefingRows`' own, so the two readers never disagree. */
+export function briefingRead(answer: unknown): BriefingRead {
+  const rows = briefingRows(answer);
+  const a = answer as { ok?: unknown; value?: { said?: unknown } | null } | null | undefined;
+  return { rows, written: rows.some((r) => r.by === 'slash') ? 'slash' : 'rule', said: a?.ok === true ? sentence(a.value?.said) : null };
+}
+
+/**
+ * The one quiet line under the cards, or `null` for none: why the rules wrote the briefing, in the record's sentence.
+ *
+ * NOTHING WHERE EVERY CARD IS SLASH'S, since each says so itself. NOTHING WHERE NOTHING WAS SAID: a record with no
+ * model is not told so on every visit. NOTHING UNDER NO CARDS. Its full stop is kept once.
+ */
+export function footOf(read: BriefingRead): string | null {
+  if (read.rows.length === 0 || read.said === null || read.rows.every((r) => r.by === 'slash')) return null;
+  const why = read.said.replace(/[.\s]+$/u, '');
+  if (why === '') return null;
+  return `${read.written === 'slash' ? 'Partly written by the rules' : 'Written by the rules'}: ${why}.`;
+}
+
+const client = (base: string, io?: Fetch) => createClient({ base, ...(io ? { fetch: io } : {}) });
+
 /** The briefing for the record at `base`. Always an answer, and an empty one where there is nothing to draw. */
 export async function readBriefing(base: string, io?: Fetch): Promise<{ ok: true; value: BriefingRow[] }> {
   try {
-    return { ok: true, value: briefingRows(await createClient({ base, ...(io ? { fetch: io } : {}) }).briefing()) };
+    return { ok: true, value: briefingRows(await client(base, io).briefing()) };
   } catch {
     return { ok: true, value: [] };
+  }
+}
+
+/** The same read with what the record said beside the cards. Always an answer, as `readBriefing` is. */
+export async function readBriefingSaid(base: string, io?: Fetch): Promise<{ ok: true; value: BriefingRead }> {
+  try {
+    return { ok: true, value: briefingRead(await client(base, io).briefing()) };
+  } catch {
+    return { ok: true, value: briefingRead(null) };
   }
 }

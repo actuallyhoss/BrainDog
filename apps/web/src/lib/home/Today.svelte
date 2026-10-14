@@ -139,14 +139,19 @@
   /* THE BRIEFING, a read of its own beside the screen's: what matters today, as the record wrote it (`briefing.ts`).
      It never holds the screen back and never fails it, because it answers no cards for a record with no briefing, and
      no cards draws nothing. */
-  const briefing = read<BriefingRow[]>(
+  const briefing = read<{ rows: BriefingRow[]; foot: string | null }>(
     () => (data.refused ? null : apiBase()),
     () =>
       import('./briefing.ts')
-        .then((m) => m.readBriefing(apiBase()))
-        .catch(() => ({ ok: true as const, value: [] })),
+        .then(async (m) => {
+          const out = await m.readBriefingSaid(apiBase());
+          return { ok: true as const, value: { rows: out.value.rows, foot: m.footOf(out.value) } };
+        })
+        .catch(() => ({ ok: true as const, value: { rows: [], foot: null } })),
   );
-  const brief = $derived(briefing.value ?? []);
+  const brief = $derived(briefing.value?.rows ?? []);
+  /** Who wrote it, where the rules did and the record said why (`footOf`); nothing from an older host. */
+  const briefFoot = $derived(briefing.value?.foot ?? null);
 
   const takesTasks = $derived(data.lists.some((l) => l.id === TASKS) && may(data, 'append', TASKS));
   const mayWrite = $derived(data.lists.some((l) => l.id === TASKS) && may(data, 'write', TASKS));
@@ -592,7 +597,7 @@
           {/if}
 
           <!-- WHAT MATTERS TODAY, first, and nothing where the record wrote no briefing. -->
-          <Briefing cards={brief} />
+          <Briefing cards={brief} foot={briefFoot} />
 
           <!-- WHAT NEEDS YOU, and nothing when nothing does: the sentence above has already said so. -->
           {#if needing > 0}

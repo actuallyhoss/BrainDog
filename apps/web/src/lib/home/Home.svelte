@@ -425,7 +425,7 @@
    */
   type BriefingPart = typeof import('./Briefing.svelte').default;
   type MatchedPart = typeof import('./Matched.svelte').default;
-  let brief = $state.raw<{ cards: readonly BriefingRow[]; Part: BriefingPart } | null>(null);
+  let brief = $state.raw<{ cards: readonly BriefingRow[]; foot: string | null; Part: BriefingPart } | null>(null);
   let matched = $state.raw<{ rows: readonly MatchedRow[]; Part: MatchedPart } | null>(null);
   $effect(() => {
     if (data.refused) return;
@@ -436,8 +436,8 @@
        fine whatever came back: neither read refuses the screen. */
     const at = untrack(opened);
     const briefing = Promise.all([import('./briefing.ts'), import('./Briefing.svelte')]).then(async ([m, part]) => {
-      const out = await m.readBriefing(base);
-      if (here) brief = { cards: out.value, Part: part.default };
+      const out = await m.readBriefingSaid(base);
+      if (here) brief = { cards: out.value.rows, foot: m.footOf(out.value), Part: part.default };
     });
     const matches = Promise.all([import('./matched.ts'), import('./Matched.svelte')]).then(async ([m, part]) => {
       const out = await m.readMatched(base);
@@ -451,6 +451,14 @@
 
   /* NOTHING TO DRAW AT ALL: the line says so, and nothing under it. A host that cannot draw Today's body is calm too. */
   const calm = $derived((shaped !== null && !drawsAny(shaped.blocks)) || (settled && got === null));
+
+  /* WHETHER THE PAGE'S READER IS DRAWN, and whether it is drawing the page's blocks (`paged`) and not its bars.
+     THE BRIEFING IS DRAWN BY THE READER WHEN IT IS: a page that opens on a sentence of its own (a `note lead` that fills
+     figures, the cash line) keeps that sentence straight under the head's line, and the briefing follows it as the first
+     tile. Drawn over the page it stood between the head and the page's sentence, which then read as a line lost between
+     two tiles. Where no reader draws the blocks, the briefing is drawn here, first, as it was. */
+  const reader = $derived((drawn !== null && (!calm || Boolean(shaped?.capture))) || !settled);
+  const paged = $derived(reader && drawn?.from === 'live');
 
   /* A RECORD WITH NO LISTS AT ALL goes to the prompt (`+layout.ts`); this is what is left if it is reached anyway. */
   const empty = $derived(data.index.registers.length === 0 && data.lists.length === 0 && data.open === 0);
@@ -533,6 +541,11 @@
   {/if}
 {/snippet}
 
+<!-- WHAT MATTERS TODAY, with who wrote it, drawn once: by the page's reader, or here where none draws the blocks. -->
+{#snippet briefed()}
+  {#if brief}<brief.Part cards={brief.cards} foot={brief.foot} />{/if}
+{/snippet}
+
 <div class="page">
   {#if data.refused}
     <!--
@@ -555,12 +568,13 @@
   {:else}
     <!--
       TOP TO BOTTOM AS `homeReads` SAYS: the briefing, the page, who was matched. Keyed by the part, so a read that
-      lands after the page is put over or under it and the page drawn is the page that stays.
+      lands after the page is put over or under it and the page drawn is the page that stays. The briefing is the first
+      tile either way: handed to the page's reader where one draws the blocks (`paged`), under the page's own sentence.
     -->
     {#each homeReads(brief?.cards.length ?? 0, matched?.rows.length ?? 0) as part (part)}
       {#if part === 'briefing'}
         <!-- WHAT MATTERS TODAY, first, and nothing where the record wrote no briefing. -->
-        {#if brief}<brief.Part cards={brief.cards} />{/if}
+        {#if !paged}{@render briefed()}{/if}
       {:else if part === 'matched'}
         <!-- WHO THE RECORD MATCHED ON ITS OWN, the board's last line, and nothing where it matched nobody. -->
         {#if matched}<matched.Part rows={matched.rows} />{/if}
@@ -595,9 +609,9 @@
         {/if}
 
         <!-- A CALM PAGE WITH A LINE IN ITS HEAD STILL DRAWS ITS READER, which holds the writes the line adds through. -->
-        {#if (drawn !== null && (!calm || shaped?.capture)) || !settled}
+        {#if reader}
           <div class="body">
-            <PageView bind:this={view} {slug} got={drawn} mode="home" {reread} />
+            <PageView bind:this={view} {slug} got={drawn} mode="home" {reread} opens={paged && brief && brief.cards.length > 0 ? briefed : undefined} />
           </div>
         {/if}
 

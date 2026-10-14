@@ -9,6 +9,7 @@ import { evaluate } from '@braindog/where';
 
 import type { BlockResult, PageBlock, PageDeps, SourceKit } from '../pages.ts';
 import type { Also, Source } from './index.ts';
+import { DOING_SAID, saidRefusal, withSaid } from './sessions-working.ts';
 
 /**
  * The runs that are not finished, as rows of `session`, the most recently seen first.
@@ -24,12 +25,14 @@ function liveBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: Al
   if (!schema) return { ...base, refusals: also({ code: 'SOURCE_UNKNOWN', fix: 'This record keeps no runs.', at: 'source' }) };
   if (block.order?.length)
     return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: 'sessions.live comes the most recently seen first, so it takes no order:.', at: 'order' }) };
-  const unknown = (block.columns ?? []).map((c) => c.field).filter((f) => f !== 'seq' && !Object.hasOwn(schema.fields, f));
+  const unknown = (block.columns ?? []).map((c) => c.field).filter((f) => f !== 'seq' && f !== DOING_SAID && !Object.hasOwn(schema.fields, f));
   if (unknown.length)
     return {
       ...base,
       refusals: also({ code: 'FIELD_UNKNOWN', fix: `${SESSION} has no field called ${unknown.join(', ')}.`, at: 'columns', allowed: Object.keys(schema.fields) }),
     };
+  const unread = saidRefusal(block, kit);
+  if (unread) return { ...base, refusals: also(unread) };
   const said = predicateOf(block.where, schema, deps.ctx);
   if (said.bad.length) return { ...base, refusals: also(...said.bad) };
   const kept = deps.sessionsLive().filter((r) => evaluate(said.predicate, r.fields, schema));
@@ -38,7 +41,10 @@ function liveBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: Al
   /* AND WHICH OF THEM HAVE GONE QUIET, read here so a page and the rail agree on the one clock: open is not working, and
      four runs reading "Working now" that nobody had heard from in hours was the board the owner saw. Open and not working
      (`isQuiet` over `presenceOf`): a run that left a step is never quiet, even one carried in with no `last_seen`. */
-  return { ...base, rows, matched: kept.length, ...projectsOf(deps, rows), quiet: rows.map((r) => isQuiet(r, deps.ctx.nowMs)) };
+  const placed = projectsOf(deps, rows);
+  /* AND WHAT EACH SAID IT IS DOING, for a block that names `doing_said` (`withSaid`): a row more in the answer, and
+     nothing a `where:` can ask about, because it is no field of the list. */
+  return { ...base, rows: withSaid(deps, block, rows, placed.scopes, kit), matched: kept.length, ...placed, quiet: rows.map((r) => isQuiet(r, deps.ctx.nowMs)) };
 }
 
 export const sessionsLive: Source = { read: liveBlock };

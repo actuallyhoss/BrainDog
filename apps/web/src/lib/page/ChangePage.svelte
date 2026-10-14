@@ -35,6 +35,7 @@
   import { apiBase } from '$lib/at.ts';
   import type { LiveLook } from '$lib/record/page-live.ts';
   import AskPage from './AskPage.svelte';
+  import { describeAsked, opensDescribe, withoutDescribe } from './change-open.ts';
   import { bodyOf, historyOf, isPinned, keptHere, lookPage, offerKey, pinBody, retireLook, writeLook } from './look.ts';
   import { words as pageWords } from './words.ts';
 
@@ -78,6 +79,19 @@
   /* ONLY AN OWNER MAY ASK SLASH TO DRAFT, as the record's `slashDraft` holds, so a member is not offered a press that
      is always refused. A reader of the sample has no person, and is shown it, since the sheet says why nothing drafts. */
   const mayChange = $derived(change && page.data.me?.owner !== false);
+
+  /* A PAGE JUST MADE OPENS ON ITS DESCRIBE FIELD (ENG-B11): the palette opens it at `?describe=1`, and this reads the
+     mark once. The sheet opens when this reader may change the page and the host has a model; with none the page opens
+     as it always did. Either way the mark leaves the address, replaced and not pushed, so Back and a reload do not open
+     the sheet again. `answered` is the address already dealt with, so nothing here runs twice while the address turns. */
+  let answered = '';
+  $effect(() => {
+    if (!describeAsked(page.url) || answered === page.url.href) return;
+    answered = page.url.href;
+    if (opensDescribe({ asked: true, mayChange, model })) open = true;
+    /* THROUGH `at()`, which hands back an address already under the app as it is (`at-sites.test.ts`). */
+    void goto(at(withoutDescribe(page.url)), { replaceState: true, noScroll: true, keepFocus: true });
+  });
 
   /* EDIT LAYOUT FROM 900px, the width the arranging mode is drawn for. Read as the menu is drawn, so a window narrowed
      with the menu shut offers it no more. */

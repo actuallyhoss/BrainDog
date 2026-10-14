@@ -37,6 +37,7 @@
  */
 
 import {
+  SLASH_BRIEF_INSTRUCTIONS,
   SLASH_HEADLINE_INSTRUCTIONS,
   SLASH_INSTRUCTIONS,
   SLASH_KEY_GONE,
@@ -52,6 +53,7 @@ import {
   slashRecord,
   slashSamplesOf,
   turnedAway,
+  type SlashBriefModel,
   type SlashHostDeps,
   type SlashInference,
 } from '@braindog/host/slash';
@@ -147,6 +149,9 @@ const DRAFTS: JsonSchema = { type: 'object', properties: { drafts: { type: 'arra
 const PLAN: JsonSchema = { type: 'object', properties: { plan: { type: 'object' } }, required: ['plan'] };
 /* The page headlines: one line a page, keyed by the page's id. Each line is checked by the record (`headlineFault`). */
 const LINES: JsonSchema = { type: 'object', properties: { lines: { type: 'object' } }, required: ['lines'] };
+/* The briefing: the cards Today opens on, each a handle it was handed and one line. Each card is checked by the record
+   (`briefFault`), which keeps only the handles it handed out. */
+const CARDS: JsonSchema = { type: 'object', properties: { cards: { type: 'array', items: { type: 'object' } } }, required: ['cards'] };
 /* Who is who: a number for each doubtful pair, keyed by the pair's handle, and the names read in the night's notes. Each
    is checked by `@braindog/host/understand` (`settleResolve`, `mentionsKept`), which keeps only what it handed out. */
 const VERDICTS: JsonSchema = { type: 'object', properties: { verdicts: { type: 'object' } }, required: ['verdicts'] };
@@ -298,8 +303,13 @@ export function includedInference(
   };
 }
 
-/** The record's model on this Worker: its press, first plan and headlines, and the two asks of who is who. */
-export type WorkerSlashModel = SlashModel & UnderstandModel;
+/**
+ * The record's model on this Worker: its press, first plan and headlines, the two asks of who is who, and the briefing.
+ *
+ * `brief` IS OPTIONAL ON THE TYPE AS `headline` IS, because the owner's own model is whatever the host's adapter for his
+ * provider can write. Both models this file builds have it.
+ */
+export type WorkerSlashModel = SlashModel & UnderstandModel & Partial<SlashBriefModel>;
 
 /**
  * The record's own Slash over the included model: `endpointModel`'s draft, first plan and page headlines, the same
@@ -336,6 +346,8 @@ export function includedModel(env: SlashEnv, onFail?: OnModelFail): WorkerSlashM
     draft: (input) => ask(SLASH_INSTRUCTIONS, input, DRAFTS),
     form: (input) => ask(SLASH_PLAN_INSTRUCTIONS, input, PLAN),
     headline: (input) => ask(SLASH_HEADLINE_INSTRUCTIONS, input, LINES),
+    /* THE BRIEFING, held to the same worst ask as the rest: a background ask, and never one of his. */
+    brief: (input) => ask(SLASH_BRIEF_INSTRUCTIONS, input, CARDS),
     resolve: (input) => ask(SLASH_RESOLVE_INSTRUCTIONS, input, VERDICTS),
     mentions: (input) => ask(SLASH_MENTIONS_INSTRUCTIONS, input, MENTIONS),
   };
@@ -415,6 +427,7 @@ const ownTold = (model: WorkerSlashModel, key: { provider: string; model: string
     ...(model.form ? { form: wrap(model.form.bind(model)) } : {}),
     ...(model.skill ? { skill: wrap(model.skill.bind(model)) } : {}),
     ...(model.headline ? { headline: wrap(model.headline.bind(model)) } : {}),
+    ...(model.brief ? { brief: wrap(model.brief.bind(model)) } : {}),
   };
 };
 
@@ -473,6 +486,13 @@ export function workerSlashModel(env: SlashEnv, api: () => Pick<RecordApi, 'kern
       const model = chosen();
       if (model.headline === undefined) throw new NotSent('The model Slash answers with here writes no headlines.');
       return model.headline(input);
+    },
+    /* THE BRIEFING, Today's cards, through the same choice: a model that writes none is never sent, and the rules
+       write the cards as they did. */
+    brief: async (input) => {
+      const model = chosen();
+      if (model.brief === undefined) throw new NotSent('The model Slash answers with here writes no briefing.');
+      return model.brief(input);
     },
     /* WHO IS WHO, the model-jobs pass's two asks, through the same choice: the doubtful pairs and the night's notes. */
     resolve: async (input) => chosen().resolve(input),

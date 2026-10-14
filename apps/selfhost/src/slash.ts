@@ -124,6 +124,12 @@ export function slashModelFor(
       if (model.headline === undefined) throw Object.assign(new Error('The model Slash answers with here writes no headlines.'), { sent: false });
       return model.headline(input);
     },
+    /* AND THE BRIEFING, so a self-host on his own key is asked for Today's cards as the other adapters are. */
+    brief: async (input) => {
+      const model = chosen();
+      if (model.brief === undefined) throw Object.assign(new Error('The model Slash answers with here writes no briefing.'), { sent: false });
+      return model.brief(input);
+    },
   };
 }
 

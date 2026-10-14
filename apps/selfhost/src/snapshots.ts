@@ -243,12 +243,17 @@ export function fileSnapshots(sql: Sql, file: string, now: () => number): FileSn
           /* READ BEFORE THE TABLES ARE EMPTIED, in the same transaction, so nothing ends a credential between the read
              and the copy and is then lost. */
           const ended = CARRIED.filter((c) => tables.includes(c.table)).map((c) => ({ c, rows: sql.all<Record<string, Param>>(c.read) }));
+          /* A TABLE THE COPY DOES NOT HOLD ENDS EMPTY. The migrations agree, so such a table is one the record made for
+             itself after the copy was taken (`tidy_line`, made by the hourly pass on first use). The copy held nothing
+             of it, so the restored record holds nothing of it: the live rows are not kept, and the copy is not refused. */
+          const held = new Set(sql.all<{ name: string }>("SELECT name FROM snap.sqlite_master WHERE type = 'table'").map((t) => t.name));
           for (const name of tables) {
             const cols = sql
               .all<{ name: string }>(`SELECT name FROM pragma_table_info('${name}', 'main')`)
               .map((c) => `"${c.name}"`)
               .join(', ');
             sql.exec(`DELETE FROM main."${name}"`);
+            if (!held.has(name)) continue;
             sql.exec(`INSERT INTO main."${name}" (${cols}) SELECT ${cols} FROM snap."${name}"`);
           }
           for (const { c, rows } of ended) for (const row of rows) sql.exec(c.write, ...c.columns.map((col) => row[col] ?? null), row.id ?? null);

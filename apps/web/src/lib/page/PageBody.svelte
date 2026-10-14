@@ -65,6 +65,7 @@
     whole = false,
     captured = -1,
     under = null,
+    opens = null,
   }: {
     /**
      * `page` is `/p/<slug>`, with its block keys. `home` is a home's body: its blocks that hold nothing are not drawn, a
@@ -114,6 +115,11 @@
     captured?: number;
     /** What the header hands back to sit under the headline: that same line on a phone, where the name's row has no room for it. */
     under?: Snippet | null;
+    /**
+     * What the screen draws where the board opens (Today's briefing): straight under the page's own sentence where the
+     * page opens on one, so that sentence stays under the screen's head, and before the first block otherwise.
+     */
+    opens?: Snippet | null;
   } = $props();
 
   const arranging = $derived(arrangement?.editing ?? false);
@@ -313,6 +319,11 @@
    * `repeatsFirst`, DIRECTION §39): the line said again what the first card asked, straight under it.
    */
   /* THE FIRST CARD, NOT THE FIRST BLOCK: the line a task is typed into and a heading are not what the eye reads first. */
+  /* WHERE WHAT THE SCREEN OPENS THE BOARD WITH IS DRAWN (`opens`): under the headline when the headline is the first
+     thing a reader meets, by its index in `laid`, and `-1` for the top of the page. The top while arranging, where the
+     blocks are a list being moved and nothing stands between two of them. */
+  const opensAt = $derived(opens && !arranging && headline && reading[0] === headline ? headline.at : -1);
+
   const firstTile = $derived(reading.find((x) => x !== headline && !OPENERS.has(x.block.kind))?.block ?? null);
   const next = $derived(nextSaid && !repeatsFirst(look, firstTile) && !askedAside(look?.next?.row) ? nextSaid : null);
 
@@ -1024,6 +1035,8 @@
     </div>
     <!-- UNDER THE HEADLINE: the one next action the look names, wherever the headline is drawn. -->
     {#if next && !arranging && headline?.at === at}<NextStep {next} host={mode === 'page' ? host : null} />{/if}
+    <!-- AND WHAT THE SCREEN OPENS THE BOARD WITH, a row of its own under the page's sentence and over the first tile. -->
+    {#if opens && opensAt === at}<div class="page-strip" data-opens>{@render opens()}</div>{/if}
     {#if lifted?.at === at}
       <!-- THEN the line the page opens on, on a phone, under its sentence and never between the name and the sentence;
            then what narrows the page, as part of its header, then what was just done on it, before what it holds. -->
@@ -1090,6 +1103,7 @@
        tile instead, or the head would sit over it. -->
   <!-- A PAGE WITH NO HEADLINE STILL OPENS ON THE LOOK'S NEXT ACTION, before what narrows it. -->
   {#if next && !headline && !arranging}<NextStep {next} host={mode === 'page' ? host : null} />{/if}
+  {#if opens && opensAt < 0}<div class="page-strip" data-opens>{@render opens()}</div>{/if}
   {#if under && !lifted}<div class="page-strip">{@render under()}</div>{/if}
   {#if strip && !lifted}<div class="page-strip">{@render strip()}</div>{/if}
   {#if host && mode === 'page' && !arranging && !lifted}<JustChanged {host} />{/if}
