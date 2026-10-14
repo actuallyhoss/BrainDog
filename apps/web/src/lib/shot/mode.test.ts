@@ -12,7 +12,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { applyShot, shared, SHOT_KEY, SHOT_MARK, titleIn, type Page } from './mode.ts';
+import { applyShot, shared, SHOT_MARK, titleIn, type Page } from './mode.ts';
 import { customise, type Here } from '../palette/customise.ts';
 
 /** The words a developer typed. Everything else on the page below is a record's. */
@@ -157,10 +157,6 @@ test("the tab keeps only the page's own name and the product's", () => {
   assert.equal(titleIn('Orla Penhallow · Money · BrainDog', OWN), 'Money · BrainDog');
   assert.equal(titleIn('Lease renewal · Pinecrest Lettings · BrainDog', OWN), 'BrainDog');
   assert.equal(titleIn('BrainDog', OWN), 'BrainDog');
-});
-
-test('the key is S, with Shift and the platform modifier', () => {
-  assert.equal(SHOT_KEY, 'S');
 });
 
 /* ── the palette's row ──────────────────────────────────────────────────── */

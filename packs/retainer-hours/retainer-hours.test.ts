@@ -8,7 +8,7 @@
  * retainer's hours used of the hours it bought this month, how much of what was worked was billed, and what the
  * retainers bring in a month. The answers are worked out here by hand from the same rows and held equal.
  *
- * RED FIRST, MEASURED: with no `agency.pack.json` this file failed at its first read, ENOENT. The first test asserts the
+ * RED FIRST, MEASURED: with no `retainer-hours.pack.json` this file failed at its first read, ENOENT. The first test asserts the
  * record does not already keep retainers, so a list somebody else declared would fail it rather than pass it.
  *
  * Every name here is invented.
@@ -44,7 +44,7 @@ type Drawn = { kind: string; heading?: string; rows?: { id: string; fields: Body
 type Page = { slug: string; title: string; blocks: Drawn[] };
 
 /** The file as it ships, read fresh each time so no test can hand the next one a copy it changed. */
-const PACK_FILE = new URL('./agency.pack.json', import.meta.url);
+const PACK_FILE = new URL('./retainer-hours.pack.json', import.meta.url);
 const file = (): Body & { declarations: Body[] } => JSON.parse(readFileSync(PACK_FILE, 'utf8')) as never;
 
 /** Projects' own list, which a timesheet may point at once the record keeps it. */
@@ -59,8 +59,8 @@ async function put(api: Api, doc: unknown): Promise<Diff> {
   return diff;
 }
 
-/** A fresh record, with People unless `people` is false, Projects when `projects` says so, and this add-on when `agency` does. */
-async function record(opts: { people?: boolean; projects?: boolean; agency?: boolean } = {}): Promise<{ api: Api; sql: NodeSql; diff: Diff | null }> {
+/** A fresh record, with People unless `people` is false, Projects when `projects` says so, and this add-on when `hours` does. */
+async function record(opts: { people?: boolean; projects?: boolean; hours?: boolean } = {}): Promise<{ api: Api; sql: NodeSql; diff: Diff | null }> {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
   said(
@@ -77,7 +77,7 @@ async function record(opts: { people?: boolean; projects?: boolean; agency?: boo
   /* PEOPLE AS THE RECORD WOULD BE GIVEN IT, its own two lists and Projects only when the record keeps Projects. */
   const holds = [...(opts.projects ? [PROJECTS] : []), 'people', 'organisations'];
   if (opts.people !== false) await put(api, firstPartyDocument('people', { holds, seeds: [] }));
-  const diff = opts.agency === false ? null : await put(api, file());
+  const diff = opts.hours === false ? null : await put(api, file());
   return { api, sql, diff };
 }
 
@@ -135,16 +135,16 @@ const pageOf = async (api: Api, slug: string): Promise<Page> => said<Page>(await
 /* ── The tests ─────────────────────────────────────────────────────────────────────────────────── */
 
 test('BEFORE THE ADD-ON: a record with People keeps no retainer and no timesheet', async () => {
-  const { api, sql } = await record({ agency: false });
+  const { api, sql } = await record({ hours: false });
   for (const list of ['client_retainers', 'timesheets']) assert.equal(api.kernel.register(list), undefined, `${list} is already on the record`);
   const ids = api.kernel.declarations().map((d) => d.id);
   for (const id of ['page.clients', 'page.timesheets-week', 'page.retainer', 'metric.billed-share-month']) assert.ok(!ids.includes(id), `${id} is already on the record`);
   sql.close();
 });
 
-test('THE FILE IS agency 1.0.0 ON PEOPLE, data only: two lists, three pages, nine figures, no script and no example rows', () => {
+test('THE FILE IS retainer-hours 1.0.0 ON PEOPLE, data only: two lists, three pages, nine figures, no script and no example rows', () => {
   const doc = file() as Body & { requires: { packs: unknown }; declarations: Body[] };
-  assert.deepEqual([doc.pack, doc.version, doc.author, doc.license], ['agency', '1.0.0', 'BrainDog', 'MIT']);
+  assert.deepEqual([doc.pack, doc.version, doc.author, doc.license], ['retainer-hours', '1.0.0', 'BrainDog', 'MIT']);
   assert.deepEqual(doc.requires.packs, { people: '>=3.3.0 <4.0.0' });
   assert.equal(doc.seeds, undefined, 'no example rows');
   const kinds = (k: string) => doc.declarations.filter((d) => k in d).map((d) => d[k]);
@@ -257,7 +257,7 @@ test('THE PROJECT LINK WAITS on a record without Projects, and is there to fill 
 });
 
 test('WITHOUT PEOPLE the add-on is refused before anything is written, with a sentence that says to install People first', async () => {
-  const { api, sql } = await record({ people: false, agency: false });
+  const { api, sql } = await record({ people: false, hours: false });
   const plan = await planOf(api, file());
   assert.equal(plan.ok, false);
   assert.equal(plan.refusal?.code, 'REGISTER_UNRESOLVED');

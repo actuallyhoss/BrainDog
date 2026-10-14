@@ -137,12 +137,17 @@ export function kindBody(d: KindDraft): JobBody {
   };
 }
 
-/** The field on the form a kernel refusal is about: `args[0].label` is the prompt's slots, `job` is the title. */
+/**
+ * WHERE A BODY KEY'S SENTENCE IS DRAWN, when that is not the form field of the same name: `job` is made from the
+ * title, `args` from the prompt's slots, and the tools are said under the commands, the last of the three lines that
+ * fill them. Keyed by the body's own keys, so the form speaks only of its own fields.
+ */
+const DRAWN_AT: Partial<Record<keyof JobBody, keyof KindDraft>> = { job: 'title', args: 'prompt', tools: 'commands' };
+
+/** The field on the form a kernel refusal is about: `args[0].label` is the prompt's slots, `tools[2]` the commands. */
 function fieldOf(at: string): string {
   const head = at.split(/[.[]/u)[0] ?? at;
-  if (head === 'job') return 'title';
-  if (head === 'args') return 'prompt';
-  return head;
+  return DRAWN_AT[head as keyof JobBody] ?? head;
 }
 
 /**

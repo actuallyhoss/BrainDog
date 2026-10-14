@@ -20,6 +20,7 @@ import {
   fileKind,
   kindBody,
   kindFault,
+  kindFaultAt,
   kindId,
   kindProposal,
   slotsOf,
@@ -67,6 +68,16 @@ test('only the two permissions are offered, and a skipped one is refused in the 
   assert.equal(kernel.at, 'permission');
   assert.equal(kindFault(skipped), kernel.fix.split('job.tidy-the-lantern-notes').join(words.thisKind));
   assert.match(kindFault(skipped) ?? '', /^This kind would skip the run's permissions/u);
+});
+
+test("a refusal is drawn under the form's own field: no tools under the commands, a slot's label under the prompt", () => {
+  const none = draft({ tools: [], commands: '' });
+  assert.equal(checked(none)?.at, 'tools');
+  assert.equal(kindFaultAt(none)?.at, 'commands');
+  const long = draft({ args: [{ id: 'repo_name', label: 'x'.repeat(41), max: 64 }] });
+  assert.equal(checked(long)?.at, 'args[0].label');
+  assert.equal(kindFaultAt(long)?.at, 'prompt');
+  assert.equal(kindFaultAt(draft({ permission: 'bypassPermissions' as never }))?.at, 'permission');
 });
 
 test('accept edits sets writes, which the kernel requires', () => {

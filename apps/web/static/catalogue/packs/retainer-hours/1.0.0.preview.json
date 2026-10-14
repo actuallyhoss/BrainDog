@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "made_at": "2026-10-14T09:19:39.229Z",
+  "made_at": "2026-10-14T12:32:03.420Z",
   "pages": [
     {
       "blocks": [
@@ -131,13 +131,13 @@
         "order": 10,
         "section": "Clients"
       },
-      "pack": "agency",
+      "pack": "retainer-hours",
       "page": "clients",
       "requires": [
         "register.client_retainers"
       ],
       "title": "Clients",
-      "read_at": "2026-10-14T09:19:39.229Z",
+      "read_at": "2026-10-14T12:32:03.420Z",
       "zone": "UTC",
       "look": {
         "look": "clients",
@@ -259,13 +259,13 @@
         "order": 20,
         "section": "Clients"
       },
-      "pack": "agency",
+      "pack": "retainer-hours",
       "page": "timesheets-week",
       "requires": [
         "register.timesheets"
       ],
       "title": "Timesheets",
-      "read_at": "2026-10-14T09:19:39.229Z",
+      "read_at": "2026-10-14T12:32:03.420Z",
       "zone": "UTC",
       "look": {
         "look": "timesheets-week",

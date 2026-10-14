@@ -8,7 +8,7 @@
  * and this file imports the two heavy parts only inside `applyShot`: the own words (`virtual:own-words`, about 39 KB) and
  * the plate's sheet (`@braindog/skin/kinds/shot.css`). So a screen with the mode off carries none of it.
  *
- * ONE SESSION A TAB. The layout turns it on from the person's `look.shot`, and the palette, the key and Settings turn
+ * ONE SESSION A TAB. The layout turns it on from the person's `look.shot`, and the palette and Settings turn
  * it on and off as they are pressed, so a second `on` hands back the stop already running and an `off` ends it whoever
  * started it. A stop that is no longer the running one does nothing.
  *
@@ -20,9 +20,6 @@
 
 import { here } from '../at.ts';
 import { plate, watch } from './plate.ts';
-
-/** The key, with Shift and the platform's modifier: `⌘⇧S`, or `Ctrl+Shift+S`. */
-export const SHOT_KEY = 'S';
 
 /** The mark on `<html>` while the mode is on. */
 export const SHOT_MARK = 'data-shot';

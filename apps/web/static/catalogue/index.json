@@ -4,57 +4,6 @@
   "entries": [
     {
       "kind": "pack",
-      "id": "agency",
-      "title": "Agency",
-      "summary": "Retainers and timesheets for a small agency: each client's hours used this month against the hours it bought, what was billed of what was worked, and what the retainers bring in a month.",
-      "author": "BrainDog",
-      "license": "MIT",
-      "audience": "addon",
-      "latest": "1.0.0",
-      "versions": [
-        {
-          "version": "1.0.0",
-          "checksum": "0c2c0cc5f877ab6b072f8c561cd7a8d8918b6af13b478848061265b718953632",
-          "bytes": 11778,
-          "published_at": "2026-10-14T09:19:39.229Z",
-          "bump": null,
-          "reach": {
-            "modules": [
-              "people"
-            ],
-            "lists": [
-              "Retainers",
-              "Timesheets"
-            ],
-            "pages": [
-              "Clients",
-              "Timesheets",
-              "{{name}}"
-            ],
-            "rules": [],
-            "examples": 0,
-            "skills": [],
-            "calls_out": [],
-            "waits": [
-              "things"
-            ]
-          },
-          "notes": "The first version.",
-          "preview": true
-        }
-      ],
-      "categories": [
-        "modules",
-        "made-by-braindog"
-      ],
-      "publisher": {
-        "kind": "braindog",
-        "id": "braindog",
-        "name": "BrainDog"
-      }
-    },
-    {
-      "kind": "pack",
       "id": "agent-notes",
       "title": "Agent notes",
       "summary": "Two short notes a day, at 08:00 and 17:00 your time, of what your agents ask you, what they did and what is stuck. Nothing when there is nothing to say, and never by mail.",
@@ -2090,6 +2039,57 @@
             "skills": [],
             "calls_out": []
           }
+        }
+      ],
+      "categories": [
+        "modules",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      }
+    },
+    {
+      "kind": "pack",
+      "id": "retainer-hours",
+      "title": "Agency",
+      "summary": "Retainers and timesheets for a small agency: each client's hours used this month against the hours it bought, what was billed of what was worked, and what the retainers bring in a month.",
+      "author": "BrainDog",
+      "license": "MIT",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "fcdc838297f0f018ff9dbe2002d37272eb8f243f5b0fb950dc682c29c0a2c4cd",
+          "bytes": 11826,
+          "published_at": "2026-10-14T12:32:03.420Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "people"
+            ],
+            "lists": [
+              "Retainers",
+              "Timesheets"
+            ],
+            "pages": [
+              "Clients",
+              "Timesheets",
+              "{{name}}"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": [],
+            "waits": [
+              "things"
+            ]
+          },
+          "notes": "The first version.",
+          "preview": true
         }
       ],
       "categories": [

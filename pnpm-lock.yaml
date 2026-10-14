@@ -394,8 +394,6 @@ importers:
         specifier: workspace:*
         version: link:../ports
 
-  packs/agency: {}
-
   packs/agent-notes: {}
 
   packs/bank-hsbc-eg: {}
@@ -439,6 +437,8 @@ importers:
   packs/rates-poll: {}
 
   packs/reading-list: {}
+
+  packs/retainer-hours: {}
 
   packs/roadmap: {}
 

@@ -31,7 +31,7 @@
   const forced = $derived(draft.permission === 'acceptEdits');
 
   /** The fields that carry a help line a sentence can be drawn in. */
-  const SHOWN = ['title', 'prompt', 'repo', 'tools', 'turns', 'permission', 'writes'];
+  const SHOWN = ['title', 'prompt', 'repo', 'commands', 'turns', 'permission', 'writes'];
 
   const toggle = (list: readonly string[], one: string): string[] => (list.includes(one) ? list.filter((t) => t !== one) : [...list, one]);
 
@@ -129,8 +129,8 @@
 
       <div class="item">
         <label class="label" for="kind-commands">{words.commands}</label>
-        <textarea id="kind-commands" class="lines code" rows="3" spellcheck="false" autocapitalize="off" aria-describedby="kind-commands-help" data-wrong={faultAt('tools') ? '' : undefined} bind:value={draft.commands}></textarea>
-        {@render help('kind-commands-help', 'tools', words.commandsHelp)}
+        <textarea id="kind-commands" class="lines code" rows="3" spellcheck="false" autocapitalize="off" aria-describedby="kind-commands-help" data-wrong={faultAt('commands') ? '' : undefined} bind:value={draft.commands}></textarea>
+        {@render help('kind-commands-help', 'commands', words.commandsHelp)}
       </div>
 
       <div class="item">

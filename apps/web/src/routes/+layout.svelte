@@ -703,12 +703,6 @@
         });
       return;
     }
-    /* `⌘⇧S`: screenshot mode on or off (`lib/shot/mode.ts`'s `SHOT_KEY`), pressed as the palette's row presses it. */
-    if (mod && e.shiftKey && !e.altKey && e.key.toUpperCase() === 'S') {
-      e.preventDefault();
-      void import('$lib/palette/customise-apply.ts').then((m) => m.shot(!m.shotNow()));
-      return;
-    }
     if (typing()) return;
 
     /* AND THE SWITCH. Every chord above this line still works with character keys off; nothing below

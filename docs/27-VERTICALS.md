@@ -167,7 +167,7 @@ this product and wrong for a calendar — which is exactly what §7's restated c
 ## 9 · Three strangers' Mondays
 
 Three add-ons were written as files only, for jobs nobody here runs: a landlord (`packs/landlord`), a wedding
-photographer (`packs/photographer`) and a small agency (`packs/agency`). Each was asked its owner's Monday questions,
+photographer (`packs/photographer`) and a small agency (`packs/retainer-hours`). Each was asked its owner's Monday questions,
 and each README keeps the ones the grammar could not say under "What it cannot answer yet". They are gathered here,
 each with what was missing.
 

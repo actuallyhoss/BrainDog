@@ -1,5 +1,5 @@
 {
-  "pack": "agency",
+  "pack": "retainer-hours",
   "version": "1.0.0",
   "title": "Agency",
   "summary": "Retainers and timesheets for a small agency: each client's hours used this month against the hours it bought, what was billed of what was worked, and what the retainers bring in a month.",
@@ -19,7 +19,7 @@
       "mobile": [ "name", "fee", "hours_bought" ],
       "state": "state",
       "done": [ "ended" ],
-      "pack": "agency",
+      "pack": "retainer-hours",
       "fields": [
         { "id": "name", "label": "Retainer", "type": "text", "required": true, "search": true },
         { "id": "org", "label": "Client", "type": "ref", "to": "organisations", "required": true, "index": true },
@@ -46,7 +46,7 @@
       "holds": "who worked on which retainer, on what day, for how many hours, and whether the hours are billed",
       "title": "what",
       "mobile": [ "what", "who", "hours" ],
-      "pack": "agency",
+      "pack": "retainer-hours",
       "fields": [
         { "id": "what", "label": "What was done", "type": "text", "required": true, "search": true },
         { "id": "who", "label": "Person", "type": "ref", "to": "people", "required": true, "index": true },
@@ -79,7 +79,7 @@
       "nav": { "section": "Clients", "order": 10 },
       "icon": "handshake",
       "requires": [ "register.client_retainers" ],
-      "pack": "agency",
+      "pack": "retainer-hours",
       "blocks": [
         {
           "kind": "note",
@@ -135,7 +135,7 @@
       "nav": { "section": "Clients", "order": 20 },
       "icon": "clock",
       "requires": [ "register.timesheets" ],
-      "pack": "agency",
+      "pack": "retainer-hours",
       "blocks": [
         {
           "kind": "note",
@@ -179,7 +179,7 @@
       "for": { "register": "client_retainers" },
       "icon": "handshake",
       "requires": [ "register.client_retainers", "register.timesheets" ],
-      "pack": "agency",
+      "pack": "retainer-hours",
       "blocks": [
         {
           "kind": "note",
