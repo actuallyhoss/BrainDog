@@ -80,7 +80,7 @@ test('(1) ONE BACKGROUND ASK ON THE INCLUDED MODEL LEAVES HIS COUNT WHERE IT WAS
     assert.equal(background(), 1);
     assert.deepEqual(rows().map((r) => [r.kind, r.purpose, r.spends]), [
       ['read', 'ask', 'person'],
-      ['pattern', 'look', 'background'],
+      ['pattern', 'pattern', 'background'],
     ]);
 
     /* AND THE REST OF THE RECORD'S OWN WORK: two sentences above a digest, and an ask a host wrote for the headlines. */
@@ -93,7 +93,7 @@ test('(1) ONE BACKGROUND ASK ON THE INCLUDED MODEL LEAVES HIS COUNT WHERE IT WAS
     );
     assert.equal(his(), 1);
     assert.deepEqual(rows().map((r) => [r.kind, r.purpose, r.spends]).slice(2), [
-      ['prose', 'look', 'background'],
+      ['prose', 'prose', 'background'],
       ['pattern', 'headline', 'background'],
     ]);
     assert.equal(background(), 3);
@@ -137,8 +137,8 @@ test('(3) A FAILED ATTEMPT MOVES NEITHER COUNT: a model that could not be reache
     assert.deepEqual(rows().map((r) => [r.kind, r.purpose, r.code, r.spends]), [
       ['read', 'ask', 'UNREACHABLE', 'none'],
       ['read', 'automation', 'UNREACHABLE', 'none'],
-      ['pattern', 'look', 'UNREACHABLE', 'none'],
-      ['prose', 'look', 'UNREACHABLE', 'none'],
+      ['pattern', 'pattern', 'UNREACHABLE', 'none'],
+      ['prose', 'prose', 'UNREACHABLE', 'none'],
     ]);
     assert.equal(his(), 0);
     assert.equal(background(), 0);

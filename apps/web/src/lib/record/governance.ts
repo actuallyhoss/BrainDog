@@ -45,8 +45,11 @@ export type Governor = {
   call(name: string, args?: Record<string, unknown>): Promise<Wire<unknown>>;
 };
 
-/** A register's declaration, with only the keys a diff reads. */
-export type Decl = { title?: string; fields: readonly { id: string; type: string; label?: string; labels?: Readonly<Record<string, string>> }[] };
+/** A register's declaration, with only the keys a diff reads: a list of refs says what it holds (`of`) and of which list (`to`). */
+export type Decl = {
+  title?: string;
+  fields: readonly { id: string; type: string; label?: string; labels?: Readonly<Record<string, string>>; of?: string; to?: string; required?: boolean }[];
+};
 
 /** A row a proposal would update, as `get` answers it. */
 export type Held = { id?: string; register?: string; seq: number | null; version: number; fields: Record<string, unknown> };
@@ -353,6 +356,11 @@ const isHeld = (v: unknown): v is Held =>
  * EACH DECLARATION IS RELABELLED WITH THE RECORD'S LABELS, by the holder `data/record.ts`'s `schema` draws a list with.
  * Both Decide screens hand this the raw `@braindog/client`, whose `schema` knows no labels, so a `plainOf` that read
  * a field's labels still found none there and the diff said Registrar where the row reads Agency.
+ *
+ * AND THE ROWS A PATCH ADDS TO A LIST OF REFS, with the declaration of the list they are in, so a change that rewrites a
+ * text and takes in what was learned can say each one by its title (`updatesOf`'s `takes`). Read by field type alone,
+ * never by a list's name; a ref the row already holds is not read again, and one the record will not give is left out,
+ * which the card counts as one the reader cannot open.
  */
 export async function heldBy(client: Governor, bodies: readonly RowsetBody[]): Promise<Rows> {
   const registers: Record<string, Decl> = {};
@@ -366,7 +374,25 @@ export async function heldBy(client: Governor, bodies: readonly RowsetBody[]): P
       if (typeof r.at !== 'string' || r.at === '') continue;
       const seq = /^(?:[a-z_]+#|[A-Z]+)(\d+)$/u.exec(r.at)?.[1];
       const got = seq === undefined ? await client.call('get', { spoken: r.at }) : await client.get(body.register, Number(seq));
-      if (got.ok && isHeld(got.value) && (got.value.register ?? body.register) === body.register) (rows[body.register] ??= []).push(got.value);
+      const was = got.ok && isHeld(got.value) && (got.value.register ?? body.register) === body.register ? got.value : undefined;
+      if (was) (rows[body.register] ??= []).push(was);
+      for (const [field, after] of Object.entries(isRow(r.patch) ? r.patch : {})) {
+        const f = registers[body.register]?.fields.find((x) => x.id === field);
+        if (f?.type !== 'list' || f.of !== 'ref' || typeof f.to !== 'string' || !Array.isArray(after)) continue;
+        const to = f.to;
+        if (!(to in registers)) {
+          const decl = await client.schema(to);
+          if (decl.ok && isDecl(decl.value)) registers[to] = relabel({ ...decl.value, id: to }, labels());
+        }
+        const before = was?.fields[field];
+        const had = new Set(Array.isArray(before) ? before.map(String) : []);
+        for (const ref of after) {
+          if (typeof ref !== 'string' || ref === '' || had.has(ref)) continue;
+          const one = await client.call('get', { spoken: ref });
+          const row = one.ok && isHeld(one.value) ? one.value : undefined;
+          if (row && (row.register ?? to) === to && !(rows[to] ?? []).some((e) => e.id === row.id && e.seq === row.seq)) (rows[to] ??= []).push(row);
+        }
+      }
     }
   }
   return { registers, rows };

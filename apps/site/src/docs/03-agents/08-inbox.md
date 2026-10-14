@@ -35,6 +35,23 @@ all | Every state
 
 An arrival that could not be checked (a webhook without its right token or signature, or mail that failed its checks) is still stored, so you can see it, but no rule ever files it.
 
+Reading the inbox needs a token its owner gave the inbox reach. The owner mints one with braindog token create --inbox.
+
+## Every state at once, and one arrival whole
+
+The `inbox` read takes two more arguments, each asked alone:
+
+```code | text
+inbox {"digest": true}
+inbox {"id": "<id>"}
+```
+
+`digest: true` answers every state in one read: `counts`, how many arrivals are in each of the six states, and `states`, the newest 100 of each. A body is cut to 180 characters, and a line whose body was longer says `cut: true`.
+
+`id` answers one arrival whole, with its full body. An id that is no arrival in this inbox is refused with a sentence that says so.
+
+Neither goes with `state`, `cursor`, `limit` or `repeats`, or with the other: the record refuses the extra key by name.
+
 ## Filing and setting aside
 
 ```code | text

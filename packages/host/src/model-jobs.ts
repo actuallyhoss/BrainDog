@@ -37,7 +37,7 @@ import { shapeOf, type Kernel, type OutboxKind, type OutboxRow } from '@braindog
 import { codeOf, fixOf, type Result, type Scheduler, type Sql } from '@braindog/ports';
 import type { CallContext, RecordApi } from '@braindog/record';
 
-import { BUDGET_ORDER, leftOf, mostOf, type BudgetPurpose } from './budget-plan.ts';
+import { BUDGET_ORDER, leftOf, mostOf, type BudgetPurpose, type BudgetSpent } from './budget-plan.ts';
 import type { EngineHealthRead } from './engine-health.ts';
 import { mayThink, neverSent, type NeverSent, type Reads } from './infer.ts';
 import type { DraftSample, ModelJobInference } from './slash-answers.ts';
@@ -78,7 +78,13 @@ export const HEADLINE_ASK = "Slash's page headlines";
  * store version 3), restated because this package never imports that one. Every row this host writes carries both,
  * and every count here reads them.
  */
-export type AskPurpose = 'headline' | 'understand' | 'look' | 'ask' | 'automation' | 'plan';
+export type AskPurpose = 'headline' | 'understand' | 'look' | 'skill' | 'prose' | 'pattern' | 'embed' | 'ask' | 'automation' | 'plan';
+
+/**
+ * The purposes of the work that write rows of their own, each with a meter of its own (`ModelJobMeter.of`): the daily
+ * look, a digest's prose, a pattern draft, a skill draft and an embedding.
+ */
+export type WorkPurpose = Exclude<BudgetPurpose, 'headline' | 'understand' | 'compose'>;
 export type AskSpends = 'person' | 'background' | 'none';
 
 /** The kernel's job for a doubtful pair (`loop/contract-17.md`), migration 23's kind in `OUTBOX_KINDS`. */
@@ -149,6 +155,13 @@ export type ModelJobMeter = {
    * whole meter, as they were before the plan.
    */
   rest?: ModelJobMeter | undefined;
+  /**
+   * ONE PURPOSE OF THE WORK AS A METER OF ITS OWN: its floor always, and past it what the plan leaves, so the prose is
+   * never leased out of the pattern's floor nor a skill draft out of the look's. `leased` is what a pass has leased
+   * and not settled yet, by purpose, counted as spent so two leases of one pass never take the same ask left over.
+   * ABSENT, as a meter a host built by hand is, every purpose is held to `rest`, as before each had its own.
+   */
+  of?: ((purpose: WorkPurpose, leased?: BudgetSpent) => ModelJobMeter) | undefined;
 };
 
 export type ModelJobsDeps = {
@@ -211,11 +224,12 @@ const warn = (line: string): void => console.error(line);
  *
  * ONE POOL WITH A FLOOR EACH, AND `share` SAYS WHOSE PART OF IT IS METERED (`budget-plan.ts`, ENG-A10). `headline` is the
  * page headlines and `understand` is reading who is who, each a purpose of its own. `work`, the default and what the
- * model-jobs pass and a skill draft are held to, is everything but the headlines, understanding among it as it always
- * was counted, and it carries understanding's meter and the meter of all the rest (`REST`). None of the three is a wall
- * any more: each may always spend its floor, and past it whatever is left once the floors nobody has used yet are set
- * aside, so thirty nights of headlines no longer stop the thirty-first while the month has room, and a month of drafts
- * still leaves the headlines theirs.
+ * model-jobs pass is held to, is everything but the headlines, understanding among it as it always was counted, and it
+ * carries understanding's meter, the meter of all the rest together (`REST`), and a meter for each purpose of the rest
+ * alone (`of`), which is what a job of the pass, the look and a skill draft are each held to. None of them is a wall:
+ * each may always spend its floor, and past it whatever is left once the floors nobody has used yet are set aside, so
+ * thirty nights of headlines no longer stop the thirty-first while the month has room, a month of drafts still leaves
+ * the headlines theirs, and a month of daily looks still leaves a digest its prose.
  *
  * `cap` IS THE MOST THE SHARE COULD EVER SPEND, the month less everybody else's floors, and `spent` is the share's own
  * rows, read as more when the others have spent into what was left over, so `cap - spent` is what the share may spend
@@ -228,29 +242,46 @@ const warn = (line: string): void => console.error(line);
  */
 export function backgroundMeter(sql: Pick<Sql, 'one'>, cap = BACKGROUND_JOBS_MONTH, share: 'work' | 'headline' | 'understand' = 'work'): ModelJobMeter {
   return share === 'work'
-    ? { ...shareMeter(sql, cap, ['understand', ...REST]), understand: shareMeter(sql, cap, ['understand']), rest: shareMeter(sql, cap, REST) }
+    ? {
+        ...shareMeter(sql, cap, ['understand', ...REST]),
+        understand: shareMeter(sql, cap, ['understand']),
+        rest: shareMeter(sql, cap, REST),
+        of: (purpose, leased) => shareMeter(sql, cap, [purpose], leased),
+      }
     : shareMeter(sql, cap, [share]);
 }
 
 /**
- * Everything the ledger writes that is neither a headline nor understanding, as ONE pool of the plan. A digest's prose,
- * a pattern and an embedding are all written with purpose `look` (`packages/slash/src/jobs.ts` `WORK`), and so is a
- * skill draft (`slash-ask.ts`), so the floors of `prose`, `pattern`, `compose` and `skill` would be set aside for rows
- * nobody ever writes. Pooled, the work spends them. When each row names its own purpose this list is what shrinks.
+ * Everything the ledger writes that is neither a headline nor understanding: the purposes the `rest` meter adds up. A
+ * LIST AND NO LONGER A POOL. It was one pool while a digest's prose, a pattern, an embedding and a skill draft were all
+ * written with purpose `look`: their floors would have been set aside for rows nobody wrote, so they were added into
+ * one floor, and the busiest of the six spent all of it. Each of those rows names its own purpose now
+ * (`packages/slash/src/jobs.ts`, `slash-ask.ts` `BACKGROUND_PURPOSE`), so each floor holds alone.
  */
 const REST: readonly BudgetPurpose[] = BUDGET_ORDER.filter((p) => p !== 'headline' && p !== 'understand');
 
-/** One share of the pool as a meter: the purposes in `mine`, counted and held by the plan. */
-function shareMeter(sql: Pick<Sql, 'one'>, cap: number, mine: readonly BudgetPurpose[]): ModelJobMeter {
-  const most = mostOf(mine, cap, [REST]);
+/**
+ * The purposes whose rows still cannot be told apart, each list one pool of the plan with one floor (`leftOf`). ONE IS
+ * LEFT: no row is written with purpose `compose`, and what composes outside a page's headline is the daily look, so the
+ * two share the look's rows and the look spends both floors. When a row names `compose` this list is empty.
+ */
+const SHARED: readonly (readonly BudgetPurpose[])[] = [['compose', 'look']];
+
+/**
+ * One share of the plan as a meter: the purposes in `mine`, counted and held by the plan. `leased` is added to what the
+ * ledger says each purpose spent (`ModelJobMeter.of`).
+ */
+function shareMeter(sql: Pick<Sql, 'one'>, cap: number, mine: readonly BudgetPurpose[], leased?: BudgetSpent): ModelJobMeter {
+  const most = mostOf(mine, cap, SHARED);
   return {
     cap: most,
     spent(since) {
       const by = backgroundSpentBy(sql, since);
       /* A COUNT NOBODY CAN READ IS READ AS SPENT, so it never lets a call through. */
       if (by === null) return most;
+      if (leased !== undefined) for (const p of BUDGET_ORDER) by[p] += Math.max(0, Math.floor(leased[p] ?? 0));
       const own = mine.reduce((n, p) => n + (by[p] ?? 0), 0);
-      return Math.max(own, most - leftOf(mine, by, cap, [REST]));
+      return Math.max(own, most - leftOf(mine, by, cap, SHARED));
     },
   };
 }
@@ -648,13 +679,37 @@ export async function serveModelJobs(api: ModelJobsApi, deps: ModelJobsDeps): Pr
      `rest`, built by hand, holds them to the whole month as before. */
   const rest = meter.rest ?? meter;
   const restLeft = rest === meter ? left : Math.min(left, rest.cap - rest.spent(month));
-  const drafting = Math.min(n, restLeft);
-  const asked = drafting > 0 ? api.kernel.leaseOutbox(['infer.draft', 'infer.prose'], drafting) : [];
+  /* AND EACH JOB IS LEASED FROM ITS OWN PURPOSE'S MONTH (`ModelJobMeter.of`): the prose from the prose's, a draft from
+     the pattern's, so a night of one never takes the other's floor. What this pass has leased already is counted as
+     spent, because a job is a call not settled yet and two purposes may not both take the last ask left over. */
+  const leased: BudgetSpent = {};
+  const ownLeft = (purpose: WorkPurpose): number => {
+    const own = meter.of?.(purpose, leased);
+    return own === undefined ? restLeft : Math.min(restLeft, own.cap - own.spent(month));
+  };
+  let asked: OutboxRow[];
+  if (meter.of === undefined) {
+    /* A METER BUILT BY HAND HAS ONE MONTH FOR BOTH, and the queue decides which comes first, as it always did. */
+    const drafting = Math.min(n, restLeft);
+    asked = drafting > 0 ? api.kernel.leaseOutbox(['infer.draft', 'infer.prose'], drafting) : [];
+  } else {
+    /* THE PROSE FIRST, as the plan's order has it (`BUDGET_ORDER`): a digest goes out today, a pattern can wait a night. */
+    const prosing = Math.min(n, ownLeft('prose'));
+    const prose = prosing > 0 ? api.kernel.leaseOutbox(['infer.prose'], prosing) : [];
+    leased.prose = prose.length;
+    const drafting = Math.min(Math.min(n, restLeft) - prose.length, ownLeft('pattern'));
+    const drafts = drafting > 0 ? api.kernel.leaseOutbox(['infer.draft'], drafting) : [];
+    leased.pattern = drafts.length;
+    asked = [...prose, ...drafts];
+  }
   /* A PAIR IS ONE ASK AT MOST AND OFTEN NONE (the cache), and it is leased no further than understanding's month has left. */
   const understandLeft = meter.understand ? meter.understand.cap - meter.understand.spent(month) : 0;
   const judging = Math.min(n - asked.length, understandLeft);
   const judged = inference.resolve && judging > 0 ? api.kernel.leaseOutbox([RESOLVE], judging) : [];
-  const room = Math.min(n, restLeft - Math.ceil(rest.cap * EMBED_KEPT_SHARE)) - asked.length - judged.length;
+  leased.understand = judged.length;
+  /* AN EMBEDDING HAS NO FLOOR, so its own month is what is left over once every floor nobody has used is set aside. */
+  const spare = Math.min(n, restLeft - Math.ceil(rest.cap * EMBED_KEPT_SHARE)) - asked.length - judged.length;
+  const room = meter.of === undefined ? spare : Math.min(spare, ownLeft('embed'));
   const jobs = [...asked, ...judged, ...(inference.embed && room > 0 ? api.kernel.leaseOutbox(['infer.embed'], room) : [])];
   let acked = 0;
 

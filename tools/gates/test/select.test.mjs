@@ -41,7 +41,7 @@ const MET_BY_A_BUILD = { 'web-build': true, builds: true, host: false, proof: fa
 
 /** A gate's declared needs, read from its file the way the runner reads a script's. */
 function needsOf(name) {
-  const file = name === 'theme' ? join(root, 'packages/skin/scripts/theme.mjs') : join(gates, `${name}.mjs`);
+  const file = name === 'theme' ? join(root, 'packages/skin/scripts/theme.mjs') : name === 'row-drawer' ? join(gates, 'walks', 'row-drawer.walk.mjs') : join(gates, `${name}.mjs`);
   if (!existsSync(file)) return [];
   const m = /^export const needs = \[([^\]]*)\];$/mu.exec(readFileSync(file, 'utf8'));
   return m === null ? [] : [...m[1].matchAll(/'([a-z-]+)'/gu)].map((n) => n[1]);

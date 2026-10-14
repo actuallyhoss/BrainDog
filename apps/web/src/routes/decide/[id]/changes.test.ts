@@ -101,3 +101,98 @@ test('THE SAMPLE DIFFS DRAW NO RAW TOKEN', () => {
     }
   }
 });
+
+/* WHAT A CHANGE TAKES IN. The lists are named for nothing the product has, so the reading is by field types alone: a
+   list of refs on the changed row, and on the list it points at, the title and the first other text a row must have. */
+const guides = {
+  manuals: {
+    title: 'name',
+    fields: [
+      { id: 'name', type: 'text' },
+      { id: 'body', type: 'document', label: 'Text' },
+      { id: 'rev', type: 'int', label: 'Version' },
+      { id: 'drawn_from', type: 'list', of: 'ref', to: 'findings', label: 'Drawn from' },
+    ],
+  },
+  findings: {
+    title: 'said',
+    fields: [
+      { id: 'said', type: 'text', required: true },
+      { id: 'note', type: 'text' },
+      { id: 'taught_by', type: 'text', required: true },
+    ],
+  },
+};
+const OLD = '01HZX0000000000000000000A1';
+const held = {
+  manuals: [{ id: '01HZX0000000000000000000M3', seq: 3, version: 4, fields: { name: 'deploy', body: 'Ship it.\nWatch it.', rev: 3, drawn_from: [OLD] } }],
+  findings: [
+    { id: OLD, seq: 4, version: 1, fields: { said: 'Tail the logs after a deploy', taught_by: 'An error sat unseen for a day because nobody looked.' } },
+    { id: '01HZX0000000000000000000A2', seq: 12, version: 1, fields: { said: 'Run the migration before the deploy', taught_by: 'The site answered 500 for ten minutes while the table was missing.' } },
+    { id: '01HZX0000000000000000000A3', seq: 13, version: 1, fields: { said: 'Say the version in the commit', taught_by: '' } },
+  ],
+};
+const next = (drawn_from: unknown, more: Record<string, unknown> = { body: 'Migrate first.\nShip it.\nWatch it.', rev: 4 }) =>
+  updatesOf({ register: 'manuals', rows: [{ at: 'manuals#3', version: 4, patch: { ...more, drawn_from } }] }, guides, held, show);
+
+test('a change to a long text that adds refs says what it takes in, by the rows’ own words and in the order added', () => {
+  const [u] = next([OLD, 'FD13', 'findings#12']);
+  assert.ok(u?.takes);
+  assert.deepEqual(u.takes, {
+    said: [
+      { title: 'Say the version in the commit', why: null },
+      { title: 'Run the migration before the deploy', why: 'The site answered 500 for ten minutes while the table was missing.' },
+    ],
+    closed: 0,
+  });
+  /* The diff and the version are still there, and the list of refs is not drawn a second time as handles. */
+  assert.deepEqual(u.changes.map((c) => c.field), ['body', 'rev']);
+});
+
+test('a ref the reader cannot open is counted, never named', async () => {
+  const { closedSaid } = await import('./changes.ts');
+  const [u] = next([OLD, 'FD12', 'FD77', 'FD78']);
+  assert.equal(u?.takes?.said.length, 1);
+  assert.equal(u?.takes?.closed, 2);
+  assert.equal(closedSaid(1, 1), 'One more you cannot open');
+  assert.equal(closedSaid(2, 1), '2 more you cannot open');
+  assert.equal(closedSaid(1, 0), 'One you cannot open');
+  assert.equal(closedSaid(3, 0), '3 you cannot open');
+});
+
+test('no added ref answers no takes, and a ref taken away keeps its own line', () => {
+  assert.equal(next([OLD])[0]?.takes, undefined);
+  assert.equal(next(undefined)[0]?.takes, undefined);
+  /* The same row said by its handle is not an addition. */
+  assert.equal(next(['FD4'])[0]?.takes, undefined);
+  const [swap] = next(['FD12']);
+  assert.equal(swap?.takes?.said.length, 1);
+  assert.ok(swap?.changes.some((c) => c.field === 'drawn_from'), 'a ref taken away is still said');
+});
+
+test('refs added with no long text beside them are a plain change, and so are refs to a list nobody handed', () => {
+  const [plain] = next([OLD, 'FD12'], { rev: 4 });
+  assert.equal(plain?.takes, undefined);
+  assert.ok(plain?.changes.some((c) => c.field === 'drawn_from'));
+  const [blind] = updatesOf(
+    { register: 'manuals', rows: [{ at: 'manuals#3', version: 4, patch: { body: 'New.\nText.', drawn_from: [OLD, 'FD12'] } }] },
+    { manuals: guides.manuals },
+    { manuals: held.manuals },
+    show,
+  );
+  assert.equal(blind?.takes, undefined);
+  assert.ok(blind?.changes.some((c) => c.field === 'drawn_from'));
+});
+
+test('nothing in what a change takes in holds an id or a handle', () => {
+  const [u] = next([OLD, 'FD13', 'findings#12', 'FD77', '01HZX0000000000000000000ZZ']);
+  const said = JSON.stringify(u?.takes);
+  assert.doesNotMatch(said, /[0-9A-HJKMNP-TV-Z]{26}/u);
+  assert.doesNotMatch(said, /\b[A-Z]{1,4}\d+\b|#\d+|findings|manuals/u);
+});
+
+test('the words over what a change takes in are plain, with no dash a person would read as a pause', async () => {
+  const { words } = await import('./changes.ts');
+  assert.equal(words.takes, 'Why: what was learned');
+  for (const w of Object.values(words)) assert.doesNotMatch(String(w), /—|–/u);
+});

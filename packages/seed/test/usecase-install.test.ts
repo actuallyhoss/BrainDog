@@ -195,9 +195,10 @@ test("A USE CASE'S HOME OPENS, every block readable, with its headings in the re
 test('TEAM BOARD AND THE GUIDE OPEN ON THEIR OWN HOME, and the guide on its six milestones', async () => {
   const team = await made('team');
   const board = value<{ blocks: Drawn[] }>(team.k.page(homePageOf('team'))).blocks;
-  /* THE LINE FIRST AND HOW THE CYCLE IS GOING FOLDED UNDER THE REST, SINCE TEAM 2.10.0. */
+  /* THE LINE FIRST AND HOW THE CYCLE IS GOING FOLDED UNDER THE REST, SINCE TEAM 2.10.0. And Gone quiet under the line,
+     inside 2.21.0 (batch 88), declared here and drawn only while something is quiet. */
   assert.deepEqual(board.map((b) => b.heading), [
-    undefined, 'Agents suggest', 'In flight', 'Blocked', 'Due this week', 'Bring the team in', 'How the cycle is going', 'This cycle', 'Open tickets, each morning',
+    undefined, 'Gone quiet', 'Agents suggest', 'In flight', 'Blocked', 'Due this week', 'Bring the team in', 'How the cycle is going', 'This cycle', 'Open tickets, each morning',
   ]);
   for (const b of board) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
   const under = (heading: string) => board.find((b) => b.heading === heading)!;

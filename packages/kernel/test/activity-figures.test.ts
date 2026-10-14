@@ -362,3 +362,32 @@ test('through the record itself, over writes the record made: the figure counts 
   assert.equal(hours.value.groups!.filter((g) => (g.value ?? 0) > 0).length, 1);
   sql.close();
 });
+
+test('a bar or a split over a figure of the log draws its parts, though the figure is cut by `activity:` and groups by no word', async () => {
+  const { sql, k } = await record();
+  const page = {
+    id: 'page.busy',
+    kind: 'page',
+    body: {
+      page: 'busy',
+      title: 'Busy',
+      blocks: [
+        { kind: 'split', heading: 'Who worked', source: 'metric.activity-by-who' },
+        { kind: 'bar', heading: 'What changed', source: 'metric.activity-by-kind' },
+        { kind: 'bar', heading: 'Busy hours', source: 'metric.activity-by-hour' },
+      ],
+    },
+  };
+  const made = await k.install([page as never]);
+  assert.ok(made.ok, JSON.stringify(made));
+  type Drawn = { heading?: string; refusals?: { code: string; fix: string }[]; readings?: { metric: string; reading: Reading | null }[] };
+  const out = k.page('busy') as { ok: boolean; value: { blocks: Drawn[] } };
+  assert.ok(out.ok, JSON.stringify(out));
+  const [who, kinds, hours] = out.value.blocks;
+  for (const b of [who!, kinds!, hours!]) assert.deepEqual(b.refusals ?? [], [], b.heading);
+  /* THE SAME PARTS THE FIGURE ANSWERS READ ALONE, so a tile and an agent's read never say two counts. */
+  assert.deepEqual(parts(who!.readings![0]!.reading!), parts(read(sql, 'activity-by-who')));
+  assert.deepEqual(parts(kinds!.readings![0]!.reading!), parts(read(sql, 'activity-by-kind')));
+  assert.equal(hours!.readings![0]!.reading!.groups!.length, 24);
+  sql.close();
+});

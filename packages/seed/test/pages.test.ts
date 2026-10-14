@@ -18,6 +18,7 @@ import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 
 import { openRecord, type Kernel } from '@braindog/kernel';
+import { BUILT_IN_FIGURES } from '../../kernel/src/built-in-figures.ts';
 import { parseWhere, type Schema } from '@braindog/where';
 import type { Param, Row, Sql } from '@braindog/ports';
 import { sayOf } from '@braindog/ports';
@@ -135,9 +136,9 @@ test('EVERY BLOCK NAMES A SOURCE THE RECORD HAS', async () => {
     for (const block of blocksOf(page as Record<string, unknown>)) {
       if (!block.source) continue;
       if (COMPUTED.has(block.source)) continue;
-      /* A BAR OR A SPLIT MAY READ A FIGURE, which the record has when it is declared. */
+      /* A BAR OR A SPLIT MAY READ A FIGURE, which the record has when it is declared or when the kernel builds it in. */
       if (block.source.startsWith('metric.')) {
-        if (!k.declarations().some((d) => d.id === block.source)) missing.push(`${slug}: ${block.source}`);
+        if (!Object.hasOwn(BUILT_IN_FIGURES, block.source.slice('metric.'.length)) && !k.declarations().some((d) => d.id === block.source)) missing.push(`${slug}: ${block.source}`);
         continue;
       }
       const register = block.source.startsWith('register.') ? block.source.slice('register.'.length) : null;

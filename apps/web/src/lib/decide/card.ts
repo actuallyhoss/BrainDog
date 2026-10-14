@@ -47,6 +47,8 @@ export const cardWords = {
   slash: (person: string, verb: string) => `Slash suggested · ${person} ${verb}`,
   accepted: 'accepted',
   declined: 'declined',
+  /** Whoever took an accepted suggestion back, as the history says it. */
+  undid: 'undid',
   chose: (option: string) => `chose ${option}`,
   /** Beside the line while the answer waits out its six seconds. */
   undo: 'Undo',

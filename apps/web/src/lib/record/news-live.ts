@@ -21,7 +21,7 @@ import { copy } from '../copy.ts';
 import { NO_ROW_SAID, unsaidFigure, type Metric } from './api.ts';
 import { actorFor, forget, type Fetch } from './boot-live.ts';
 import { METRICS } from './declared.ts';
-import { noteOf } from './history-live.ts';
+import { noteOf, settlingOf } from './history-live.ts';
 import { beyondOf, format, fxNote, hrefFor, offTarget, partsText, targetLine } from './metrics.ts';
 import { moneyInText } from './money.ts';
 import { runByIn } from './names.ts';
@@ -169,6 +169,8 @@ export async function readLog(base: string, me: string | null, io?: Fetch, befor
        counted what she was not shown, and her newest line's rowid was what the footer called "version 4,192". 0 is what
        "names no event" already means (`markRead`'s `upTo: 0`), and `/audit` draws no version for it. */
     const at = e.rowid ?? 0;
+    /* HOW THE LINE SETTLED A SUGGESTION, kept so Activity can say who suggested beside who settled (`settledOf`). */
+    const settling = settlingOf(e);
     return {
       seq: at,
       at: e.ts,
@@ -179,6 +181,7 @@ export async function readLog(base: string, me: string | null, io?: Fetch, befor
       note: moneyInText(e.note ?? (e.register !== null ? noteOf(e.register, e) : '')),
       version: at,
       ...(e.pass === undefined ? {} : { pass: e.pass, steps: (e.steps ?? []).flatMap((s) => toLine(s) ?? []) }),
+      ...(settling === null ? {} : { settling }),
     };
   };
   for (const e of out.value.events) {

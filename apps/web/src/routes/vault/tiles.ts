@@ -36,6 +36,13 @@ export const words = {
   elsewhere: 'Not sealed here',
   /* The toolbar's add, on a phone, where it is a circle with no words of its own. */
   addKey: 'Add a key',
+  /* The one button on a key with no value, where a sealed key has Reveal. */
+  sealValue: 'Seal a value',
+  /* Where a key came from, as its row says it, in the row's menu. */
+  cameFrom: 'Came from',
+  cameFromSaid: (where: string) => `Came from ${where}`,
+  /* Over the keys, only when the read stopped before the record ran out of them. */
+  moreKeys: (n: number) => `The first ${n === 1 ? 'key is' : `${n} keys are`} listed. This record holds more.`,
 } as const;
 
 /** How many bars the tile draws; the rest of the keys are the list under it. */
@@ -121,6 +128,39 @@ export function readingOf(ranked: readonly KeyRow[], lastBy: ReadonlyMap<string,
 /** A key's state as a word, and whether a value is sealed on this record behind it. */
 export const stateOf = (k: KeyRow): { word: string; sealed: boolean } =>
   k.sealed ? { word: words.sealedHere, sealed: true } : { word: k.grant ? words.retired : words.elsewhere, sealed: false };
+
+/**
+ * WHAT A SEALED KEY IS, UNOPENED: the hint the record stored when it sealed it ("a 40-character value"), or `null`.
+ *
+ * ONLY FOR A VALUE THAT IS THERE. A key with no value, or one taken out of service, has nothing to hint at, and a seal
+ * older than the hint carries none: nothing is written here from the size alone, because the sentence is the record's.
+ */
+export const hintOf = (k: KeyRow): string | null => {
+  const hint = k.sealed ? (k.hint?.trim() ?? '') : '';
+  return hint === '' ? null : hint;
+};
+
+/**
+ * THE ONE BUTTON AT THE END OF A KEY'S ROW: Reveal where a value is sealed behind a grant, "Seal a value" where the
+ * row holds none, which opens the sheet Replace opens and seals onto that same row.
+ *
+ * `null` for a row that is sealed and names no grant to open: there is a value, and no door to it from here.
+ */
+export const rowAction = (k: KeyRow): { act: 'reveal' } | { act: 'seal'; word: string } | null =>
+  k.sealed ? (k.grant ? { act: 'reveal' } : null) : { act: 'seal', word: words.sealValue };
+
+/**
+ * WHERE EACH KEY CAME FROM, by the key's row id, for the rows that say so. Read from the rows the index was built
+ * from, so a key whose row says nothing has no line, and none is guessed from its name or what it opens.
+ */
+export function cameFromOf(rows: readonly { id: string; fields: Record<string, unknown> }[]): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const r of rows) {
+    const where = typeof r.fields.origin === 'string' ? r.fields.origin.trim() : '';
+    if (where !== '') out.set(r.id, where);
+  }
+  return out;
+}
 
 /** A key's row page, `credentials#3` to `/r/credentials/3`, or `null` for a row read without its number. */
 export const rowPath = (k: KeyRow): string | null => {

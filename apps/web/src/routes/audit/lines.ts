@@ -26,12 +26,15 @@ import { useCaseName } from '@braindog/seed/usecases/names';
 import { firstPartyModule as moduleOf } from '@braindog/seed/packs/modules';
 
 import { copy } from '../../lib/copy.ts';
+import { cardWords } from '../../lib/decide/card.ts';
+import { settledSaid, type SettledWords, type Settling } from '../../lib/record/history-live.ts';
 import { PAGES } from '../../lib/record/held.ts';
 import { moneyInText } from '../../lib/record/money.ts';
 import { actor, humanize, listName, type ActorKind } from '../../lib/record/names.ts';
 import type { AuditEvent, EventKind } from '../../lib/record/schema.ts';
 import { runOf } from '../../lib/ui/face.ts';
 import { listed } from '../../lib/viz/shared.ts';
+import { byLine } from '../slash/lines.ts';
 
 const count = (n: number): string => n.toLocaleString('en');
 
@@ -389,6 +392,40 @@ export function thingOf(target: string, title: string | null, nameOf: (list: str
     return { text: usecase ? copy.feedUseCase(useCaseName(usecase)) : copy.feedPack(moduleOf(pack)?.name ?? humanize(pack)), href: null, list: null };
   }
   return said === null ? null : { text: said, href: null, list: null };
+}
+
+/* ── who suggested and who settled ─────────────────────────────────────── */
+
+/**
+ * THE WORDS A SETTLED SUGGESTION IS SAID IN, each from where it is already said and none typed here: the answered
+ * card's (`cardWords`), and the Slash page's for who drafted it (`byLine`), Slash's own rules or the model it names.
+ */
+export const settledWords: SettledWords = {
+  slash: cardWords.slash,
+  accepted: cardWords.accepted,
+  declined: cardWords.declined,
+  chose: cardWords.chose,
+  undid: cardWords.undid,
+  drafted: byLine,
+};
+
+/**
+ * WHO SUGGESTED AND WHO SETTLED, for a line that settled a suggestion of Slash's: "Slash suggested · Mara accepted",
+ * then who drafted it where the record says. The line read "Decided" under one name, so a suggestion of Slash's that
+ * somebody accepted read as a decision that person came to alone.
+ *
+ * ONE SENTENCE WITH A ROW'S HISTORY, made by the function that makes it there (`settledSaid`), so the two cannot drift.
+ * `settling` is how the line settled it, as `settlingOf` reads a line of the log. `null` for a line that settled
+ * nothing, for a person's own or an agent's suggestion, and where the record does not say who suggested: each of those
+ * reads as it did. The reader is said as the screen says them.
+ */
+export function settledOf(
+  e: { settling?: Settling | null },
+  me: string | null = null,
+  names: ReadonlyMap<string, string> = new Map(),
+): string | null {
+  const s = e.settling ?? null;
+  return s === null ? null : settledSaid(s, actor(s.by, me, names).name, settledWords);
 }
 
 /* ── bursts ────────────────────────────────────────────────────────────── */

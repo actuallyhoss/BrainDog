@@ -70,6 +70,7 @@ import {
   readCatalogue,
   readCatalogueFile,
 } from '../../packages/declare/src/catalogue.ts';
+import { MODULES } from '../../packages/declare/src/usecase.ts';
 import { makePreview } from './previews.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -126,6 +127,10 @@ for (const folder of readdirSync(packsDir, { withFileTypes: true }).filter((d) =
   } catch {
     fail(`${where}/${folder}.pack.json is not JSON.`);
   }
+  /* A MODULE'S OWN FILE WAITS FOR THE MODULE TO GO (SHL-A13). While the build still compiles the module in, its id is
+     one BrainDog keeps for itself and the door refuses a file that takes it, so the file is passed over here and
+     neither published nor previewed. The day the id leaves `MODULES` it is published like any other pack. */
+  if (MODULES.includes(doc.pack)) continue;
   packs.set(doc.pack, { where, doc });
   const listed = index.entries.find((e) => e.kind === 'pack' && e.id === doc.pack)?.versions.find((v) => v.version === doc.version);
   if (listed && listed.checksum === (await fileChecksum(text))) continue;

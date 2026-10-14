@@ -307,6 +307,8 @@ test('THE STEP MOVES ONLY THE BACKGROUND WORK OFF HIS COUNT, and says how much: 
       [
         ['headline', { purpose: 'headline', spends: 'background' }],
         ['who', { purpose: 'understand', spends: 'background' }],
+        /* STILL `look`, ALL FIVE, THOUGH A JOB WRITTEN TODAY SAYS `pattern`, `prose` OR `embed` (`job-purposes.test.ts`):
+           the step is a released one and reads a row once, and an older row has no purpose on it to be told apart by. */
         ['drafted', { purpose: 'look', spends: 'background' }],
         ['skill', { purpose: 'look', spends: 'background' }],
         ['prose', { purpose: 'look', spends: 'background' }],

@@ -66,7 +66,7 @@
   import QuantityBox from '$lib/ui/QuantityBox.svelte';
   import JsonBox from '$lib/ui/JsonBox.svelte';
   import { ownsRecord, type Me } from '../../../settings/levels.ts';
-  import { readHistory, readNames, type Told } from '$lib/record/history-live.ts';
+  import { readHistory, readNames, type Say, type SettledWords, type Told } from '$lib/record/history-live.ts';
   import { rowReader, type Docs, type Got, type RowReader } from '$lib/record/row-live.ts';
   import { resolverOf, shownOf } from '$lib/record/row-values.ts';
   import { rowWriter, type RowWriter } from '$lib/record/rows-write.ts';
@@ -201,7 +201,7 @@
        after it. */
     const [r, h, l] = await Promise.all([
       reader.read(register, n),
-      readHistory(apiBase(), register, n),
+      sayOf().then((say) => readHistory(apiBase(), register, n, undefined, say)),
       links.read(register, n),
     ]);
     const current = askedFor === key;
@@ -341,7 +341,7 @@
   async function refreshHistory(register: string, n: number) {
     const key = `${register}#${n}`;
     const at = opened();
-    const h = await readHistory(apiBase(), register, n);
+    const h = await readHistory(apiBase(), register, n, undefined, await sayOf());
     const current = askedFor === key;
     closed(!current || h.from !== 'refused', at);
     if (current) told = h;
@@ -523,7 +523,25 @@
   function askNames() {
     if (!live || namesAsked) return;
     namesAsked = true;
-    void readNames(apiBase()).then((m) => (people = m));
+    void readNames(apiBase()).then((m) => {
+      people = m;
+      /* A LINE THAT SAYS WHO SETTLED A SUGGESTION WAS WORDED BEFORE THE NAMES CAME, so it is read once more with them. */
+      if (history.some((e) => e.settled !== undefined) && Number.isInteger(seq) && seq >= 1) void refreshHistory(id, seq);
+    });
+  }
+
+  /**
+   * WHO READS, THE NAMES, AND THE CARD'S OWN WORDS, for a line an answered suggestion of Slash's made: "Slash suggested ·
+   * Mara accepted" (`settledSaid`), the sentence Activity says. The words are the answered card's and the Slash page's,
+   * fetched when a row's history is first read and never held by the entry.
+   */
+  let settledWords: SettledWords | null = null;
+  async function sayOf(): Promise<Say> {
+    if (settledWords === null) {
+      const [{ cardWords }, { byLine }] = await Promise.all([import('$lib/decide/card.ts'), import('../../../slash/lines.ts')]);
+      settledWords = { slash: cardWords.slash, accepted: cardWords.accepted, declined: cardWords.declined, chose: cardWords.chose, undid: cardWords.undid, drafted: byLine };
+    }
+    return { me: me || null, names: people, words: settledWords };
   }
   $effect(() => {
     if (history.some((e) => /^p_/u.test(e.by) && e.by !== me)) untrack(askNames);

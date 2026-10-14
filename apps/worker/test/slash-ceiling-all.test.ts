@@ -222,7 +222,7 @@ test("A SKILL DRAFT IS A BACKGROUND ASK TOO: held under the ceiling, turned away
   assert.ok(held?.ok, JSON.stringify(held));
   held.value.settle({ usage: { in: 100, out: 10 } });
   const rows = sql.all<{ question: string; purpose: string; spends: string }>('SELECT question, purpose, spends FROM slash_call').map((r) => ({ ...r }));
-  assert.deepEqual(rows, [{ question: "Slash's skill draft", purpose: 'look', spends: 'background' }]);
+  assert.deepEqual(rows, [{ question: "Slash's skill draft", purpose: 'skill', spends: 'background' }]);
 
   const none = workerSlashMeter({ ...INCLUDED, SLASH_INCLUDED_MONTH_NEURONS: '0' }, noGrants, { sql: openSqlite(), clock });
   const turned = await none.background?.('skill');

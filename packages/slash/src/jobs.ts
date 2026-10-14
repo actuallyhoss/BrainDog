@@ -7,9 +7,15 @@
  * the host's model-job pass acks the job with it and the kernel files it in the ack's transaction, through the one gate
  * (`packages/kernel/src/outbox.ts`, the `infer.draft` branch), so a draft is never filed twice. `digestProse` answers an
  * `infer.prose` job. Neither job is one of the owner's asks, AND THE ROW SAYS SO: each is written `spends: 'background'`
- * (`WORK`), which `asksUsed` passes over and the host's background meter counts. Until store version 3 a job's
- * `pattern` row was counted with his asks by its kind, so on the included model the record's own drafts spent his 80.
- * A press at the raw inbox is his, and `proposePattern` says that (`PRESSED`).
+ * (`DRAFTED`, `PROSED`, `EMBEDDED`), which `asksUsed` passes over and the host's background meter counts. Until store
+ * version 3 a job's `pattern` row was counted with his asks by its kind, so on the included model the record's own
+ * drafts spent his 80. A press at the raw inbox is his, and `proposePattern` says that (`PRESSED`).
+ *
+ * AND WHAT IT BOUGHT (ENG-A10): a draft is written `pattern`, a digest's sentences `prose`, an embedding `embed`. All
+ * three were `look` until then, the daily look's own purpose, so a month's thinking read as one line and the plan's
+ * floor for each (`packages/host/src/budget-plan.ts`) had no rows of its own to count. The rows already written keep
+ * what they say: nothing here rereads the ledger, and the step to store version 3 (`FILL_2`, `call.ts`) still reads an
+ * older build's rows as `look`, having nothing on them to tell one job from another.
  *
  * WHAT A PATTERN IS FOR. Messages keep arriving that no declared pattern parses, and they are the same
  * message every time: one sender, one subject, one amount in one place. A person can write the
@@ -68,9 +74,12 @@ type Drafting = {
 
 /**
  * What each call here is on the ledger, said once and handed to every row it settles (`call.ts`, `Charge`): the
- * record's own work spends the background allowance, and a press at the raw inbox is one of his asks.
+ * record's own work spends the background allowance, each job under its own purpose, and a press at the raw inbox is
+ * one of his asks.
  */
-const WORK = { purpose: 'look', spends: 'background' } as const;
+const DRAFTED = { purpose: 'pattern', spends: 'background' } as const;
+const PROSED = { purpose: 'prose', spends: 'background' } as const;
+const EMBEDDED = { purpose: 'embed', spends: 'background' } as const;
 const PRESSED = { purpose: 'ask', spends: 'person' } as const;
 
 /** What a pattern read, for the fold and the ledger: how many messages, and never what they said. */
@@ -255,7 +264,7 @@ export const patterns = (
     /* THE RECORD'S OWN JOB, SO NOBODY'S CONTEXT: the index is read as `slash`, which is how the kernel files what this
        drafts, and the row is settled `ok` with nothing in `filed`, because the filing is the ack's and happens after. */
     async draftPattern(samples) {
-      const drafted = await drafting(samples, SLASH_CTX, WORK);
+      const drafted = await drafting(samples, SLASH_CTX, DRAFTED);
       if (!drafted.ok) return drafted;
       drafted.value.account('ok');
       return ok(drafted.value.draft);
@@ -447,7 +456,8 @@ const proseAsked = (name: string, id: string, text: string): string => {
  * and never loses one. A call the host says it never sent (`sent: false`) will not be sent on a retry either, so that
  * digest goes as figures at once, and no row is written for a call that was not made.
  *
- * THE ROW IS `prose`, WHICH NO COUNT OF THE OWNER'S ASKS READS (`asksUsed` counts `read` and `propose`). It carries no
+ * THE ROW IS `prose`, BY KIND AND BY PURPOSE, WHICH NO COUNT OF THE OWNER'S ASKS READS (`asksUsed` counts the rows
+ * that say `spends = 'person'`, and this one says `background`). It carries no
  * question and no read: what the digest said stays in the digest.
  */
 async function prose(core: Core, fallback: Inference, digest: unknown): Promise<Result<{ text: string }>> {
@@ -464,7 +474,7 @@ async function prose(core: Core, fallback: Inference, digest: unknown): Promise<
   const content = proseAsked(name, id, text);
   const estimate = tokens(PROSE.system) + tokens(content);
   const account = (status: CallStatus, model: string, usage: { in: number; out: number }, code?: string): void =>
-    core.account({ id: callId, kind: 'prose', tier: s.tier, model, usage, ms: core.clock.now() - t0, status, code, ...WORK });
+    core.account({ id: callId, kind: 'prose', tier: s.tier, model, usage, ms: core.clock.now() - t0, status, code, ...PROSED });
 
   let reply: InferenceReply;
   try {
@@ -534,7 +544,7 @@ async function embedOf(core: Core, fallback: Inference, texts: readonly string[]
   const callId = core.mint();
   const t0 = core.clock.now();
   const account = (status: CallStatus, model: string, usage: { in: number; out: number }, code?: string): void =>
-    core.account({ id: callId, kind: 'embed', tier: s.tier, model, usage, ms: core.clock.now() - t0, status, code, ...WORK });
+    core.account({ id: callId, kind: 'embed', tier: s.tier, model, usage, ms: core.clock.now() - t0, status, code, ...EMBEDDED });
 
   if (fallback.embed === undefined) {
     account('error', '-', { in: 0, out: 0 }, 'NOT_IN_THIS_BUILD');

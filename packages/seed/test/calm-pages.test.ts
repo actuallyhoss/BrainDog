@@ -45,7 +45,7 @@ const OVER: Record<string, number> = { 'money-book': 1 };
 
 test('THE SWEEP READS EVERY DECLARED PAGE, so a page left out is not a page passed', () => {
   assert.ok(pages.length >= 25, `only ${pages.length} pages were read`);
-  for (const slug of ['money', 'portfolio', 'project', 'work', 'estate', 'agents', 'personal/home-personal', 'founder/home-founder', 'team/home-team', 'guide/guide', 'student/home-student', 'business/home-business'])
+  for (const slug of ['money', 'portfolio', 'project', 'work', 'estate', 'agents', 'calendar', 'activity', 'personal/home-personal', 'founder/home-founder', 'team/home-team', 'guide/guide', 'student/home-student', 'business/home-business'])
     assert.ok(pages.some(([s]) => s === slug), `${slug} is not swept`);
 });
 

@@ -458,3 +458,36 @@ test('a suggestion that carries the record’s merge carries it onto its questio
   assert.equal(questionOf({ ...row, merge: half }, 'Are these one person?', 1).merge, undefined, 'a candidate the card cannot read drops the whole cluster');
   assert.equal(questionOf({ ...row, merge: { ...merge, candidates: [merge.candidates[0]] } }, '', 1).merge, undefined, 'one name is no merge');
 });
+
+/* A SKILL'S CHANGE SAYS WHAT WAS LEARNED: the rows a patch adds to a list of refs are read with their own declaration,
+   so the card names each by its title and the failure behind it, and never by `LN12`. */
+test('a proposal that rewrites a text and adds refs reads the rows it adds, and the card says them by their own words', async () => {
+  const asked: string[] = [];
+  const schemas: Record<string, unknown> = {
+    skills: { title: 'name', fields: [{ id: 'name', type: 'text', required: true }, { id: 'body', type: 'document' }, { id: 'because', type: 'list', of: 'ref', to: 'learnings' }] },
+    learnings: { title: 'lesson', fields: [{ id: 'lesson', type: 'text', required: true }, { id: 'failure', type: 'text', required: true }] },
+  };
+  const held: Record<string, unknown> = {
+    LN7: { id: 'r_ln7', register: 'learnings', seq: 7, version: 1, fields: { lesson: 'Rehearse a migration first.', failure: 'A release stopped half way.' } },
+    LN12: { id: 'r_ln12', register: 'learnings', seq: 12, version: 1, fields: { lesson: 'Name the file a check read.', failure: 'A green check had read nothing.' } },
+    'things#3': { id: 'r_t3', register: 'things', seq: 3, version: 1, fields: { name: 'Elsewhere' } },
+  };
+  const c = client({
+    schema: async (register) => (schemas[register] ? { ok: true, value: schemas[register] } : refused('REGISTER_UNKNOWN', 'No such list.')),
+    get: async () => ({ ok: true, value: { id: 'r_sk2', register: 'skills', seq: 2, version: 4, fields: { name: 'Release', body: 'Ship it.\n\nThen watch.', because: ['LN7'] } } }),
+    call: async (name, args) => {
+      const spoken = String((args as { spoken?: unknown } | undefined)?.spoken ?? '');
+      asked.push(`${name}:${spoken}`);
+      return held[spoken] ? { ok: true, value: held[spoken] } : refused('NOT_FOUND', 'No such row.');
+    },
+  });
+  const body = { register: 'skills', rows: [{ op: 'update', at: 'skills#2', patch: { body: 'Rehearse, then ship it.\n\nThen watch.', because: ['LN7', 'LN12', 'LN99', 'things#3'] } }] };
+  const { heldBy } = await import('./governance.ts');
+  const read = await heldBy(c, [body]);
+  assert.deepEqual(asked, ['get:LN12', 'get:LN99', 'get:things#3'], 'a ref the row already holds is not read again');
+  assert.deepEqual(read.rows.learnings?.map((r) => r.seq), [12], 'a row of another list is not put among the learnings');
+  assert.equal(read.registers.learnings?.fields.find((f) => f.id === 'failure')?.required, true, 'the declaration keeps what the card reads');
+  const [u] = updatesOf(body, read.registers, read.rows, plainOf(read.registers));
+  assert.equal(u?.takes?.said[0]?.title, 'Name the file a check read.');
+  assert.equal(u?.takes?.said[0]?.why, 'A green check had read nothing.');
+});

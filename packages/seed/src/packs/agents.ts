@@ -172,8 +172,9 @@ export const AGENTS_REGISTERS: Record<string, SeedRegister> = {
  * `packages/kernel/src/series.ts`), and each figure reads a little further, so the oldest week on a chart is whole: a
  * week cut by the figure's own window would be drawn short and read as a quiet week.
  *
- * NO PAGE OF THIS PACK DRAWS THEM SINCE 1.5.0, when Growth left the agents home with the rest of its inventory. They stay
- * declared: a person's own page can chart them, and an agent can read them.
+ * NO PAGE OF THIS PACK DREW THEM FROM 1.5.0, when Growth left the agents home with the rest of its inventory, TO 1.13.0,
+ * when How the brain changed took the learnings' weeks for its chart. The keys' and the tools' stay declared and drawn
+ * by no page of this pack: a person's own page can chart them, and an agent can read them.
  *
  * A COUNT HAS NO GOOD OR BAD NUMBER, so each target is only that it is a count, as Work's weekly figures are.
  */
@@ -276,33 +277,38 @@ const ENDED_COLUMNS = [
 /** The latest first: the list of runs comes in no order of its own, as the run sources do. */
 const LATEST_FIRST = [{ field: 'last_seen', dir: 'desc' }];
 
+/**
+ * THE LEARNINGS THAT HAVE FADED, BY THE RECORD'S OWN RULE: active, and neither confirmed nor written in the last ninety
+ * days (`FADES` and `FADE_MS` in `packages/record/src/index.ts`, which leaves them out of `context`). A learning never
+ * confirmed is judged by the day it was written.
+ *
+ * A TREE AND NOT A SENTENCE, because the rule is an `and` around an `or`, and a sentence may join its clauses with
+ * commas or with `, or` but not both (`packages/where/src/sentence.ts`).
+ *
+ * ONE TREE SINCE 1.13.0, read by the figure and by Faded on How the brain changed, so the heading's count, the cards
+ * under it and the page's line cannot count three ways.
+ */
+const FADED = {
+  all: [
+    { field: 'state', is: 'active' },
+    {
+      any: [
+        { field: 'confirmed_on', before: '-90d' },
+        { all: [{ field: 'confirmed_on', empty: true }, { field: 'created_at', before: '-90d' }] },
+      ],
+    },
+  ],
+};
+
 export const AGENTS_METRICS: Record<string, SeedMetric> = {
   'learnings-by-week': { metric: 'learnings-by-week', name: 'Learnings added, by week', source: 'register.learnings', where: 'created_at after -182d', ...WEEKLY },
   'keys-by-week': { metric: 'keys-by-week', name: 'Keys added, by week', source: 'register.credentials', where: 'created_at after -182d', ...WEEKLY },
   'tools-by-week': { metric: 'tools-by-week', name: 'Tools added, by week', source: 'register.tools', where: 'created_at after -182d', ...WEEKLY },
-  /**
-   * THE LEARNINGS THAT HAVE FADED, BY THE RECORD'S OWN RULE: active, and neither confirmed nor written in the last ninety
-   * days (`FADES` and `FADE_MS` in `packages/record/src/index.ts`, which leaves them out of `context`). A row never
-   * confirmed is judged by the day it was written.
-   *
-   * A TREE AND NOT A SENTENCE, because the rule is an `and` around an `or`, and a sentence may join its clauses with
-   * commas or with `, or` but not both (`packages/where/src/sentence.ts`).
-   */
   'learnings-faded': {
     metric: 'learnings-faded',
     name: 'Faded learnings',
     source: 'register.learnings',
-    where: {
-      all: [
-        { field: 'state', is: 'active' },
-        {
-          any: [
-            { field: 'confirmed_on', before: '-90d' },
-            { all: [{ field: 'confirmed_on', empty: true }, { field: 'created_at', before: '-90d' }] },
-          ],
-        },
-      ],
-    },
+    where: FADED,
     value: { count: 'id' },
     format: 'int',
     target: { gte: 0 },
@@ -358,11 +364,21 @@ export const AGENTS_METRICS: Record<string, SeedMetric> = {
   /* THE RUNS OF THE LAST TWO WEEKS PLACED IN NO PROJECT, SINCE 1.10.0. A run outside every project is allowed, so it has
      no verdict: it is the number to read beside the count of runs. */
   'runs-unplaced': { metric: 'runs-unplaced', name: 'Runs in no project, last two weeks', source: 'register.session', where: 'last_seen after -14d, project is empty', ...COUNT },
+  /* WHAT HOW THE BRAIN CHANGED IS SAID AND DRAWN ON, SINCE 1.13.0 (AGT-C17 job b). How many learnings arrived in thirty
+     days, by the day the record wrote each, which is the line's "this month". And how many of the six months the chart
+     reaches back arrived two weeks ago or more: the chart trims the weeks before its first learning (`barsOf` in
+     `packages/kernel/src/series.ts`), so one learning that old makes three weeks of bars at least, and with none the
+     chart would be one bar or two and is not drawn. A count each, with no good or bad number.
+     HOW MANY SKILL VERSIONS WERE TAKEN IS NOT HERE: a version is a line of the record's log, and a figure an add-on
+     declares reads a list (AGT-C17 job c). */
+  'learnings-arrived': { metric: 'learnings-arrived', name: 'Learnings that arrived, last 30 days', source: 'register.learnings', where: 'created_at after -30d', ...COUNT },
+  'learnings-charted': { metric: 'learnings-charted', name: 'Learnings from two weeks ago or more, last six months', source: 'register.learnings', where: 'created_at after -182d, created_at before -14d', ...COUNT },
   ...DOOR_METRICS,
 };
 
 /**
- * The pack's pages: the agents home at `/p/agents`, a page per skill with its versions, and a page per run.
+ * The pack's pages: the agents home at `/p/agents`, How the brain changed at `/p/brain`, a page per skill with its
+ * versions, and a page per run.
  *
  * THE HOME IS THE RUNS, SINCE 1.5.0 (DIRECTION §37, "Stop the harm"): who is working now, where the stopped runs left
  * off, and what they added to the brain, in that order. Until 1.3.0 it was a grid of cards per list, each of the same
@@ -589,6 +605,10 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         span: 12,
         fold: true,
       },
+      /* THE WAY TO How the brain changed, SINCE 1.13.0 (AGT-C17 job b): the page has no place of its own in the rail, so
+         this line is how a person reaches it, first under the heading and over what the runs added. No `when:`, so it
+         is there on a quiet record too, which also keeps the heading drawn while the log under it is empty. */
+      { kind: 'note', key: 'brain-link', span: 12, body: '[How the brain changed](/p/brain)' },
       /* WHAT THE AGENTS ADDED AND CHANGED IN WHAT THE BRAIN HOLDS, one group per run, from the record's own log. An
          `agents` block and not a `feed`, because a feed groups by the kind of actor and would put every run under one
          head; this groups by who, and `first:` folds each run's rest into one line with its count, so a busy run
@@ -660,6 +680,81 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
       },
     ],
   },
+  /* HOW THE BRAIN CHANGED, SINCE 1.13.0 (AGT-C17 job b; "the brain's growth over time: learnings arriving and skills
+     changing, with before and after", "easily visually displayed on the web ui"). Batches 85 to 87 made agents capture
+     learnings, confirm them and be told when a skill is behind, and no screen showed any of it moving.
+
+     NO `nav:`, so it takes no place in the rail: the scope put it under Agents there, and the rail is the owner's to
+     grow. What the brain learned on the agents home opens it.
+
+     THREE TILES UNDER ONE LINE, each drawn only over something. The line says what arrived in thirty days and what
+     has faded, two notes on the one figure so exactly one draws, and each figure alone between commas, so the writer
+     leaves out a clause at nought. The chart is the weeks learnings arrived in, six months back, and only once there
+     are three weeks to draw (`learnings-charted`). What changed is the learnings themselves, the newest first, each
+     with the failure that taught it, and the one it replaced when it replaced one. Faded is the learnings agents are
+     no longer told, counted on its heading by the same rule its figure counts by.
+
+     A CARD OPENS ITS LEARNING, where it is confirmed or retired: a block declares no button, so Still true and Retire
+     are not on the card.
+
+     EVERY BLOCK HAS A KEY OF ITS OWN, so a person's look that moves or hides one holds when a heading is reworded.
+
+     WHAT IT DOES NOT DRAW YET, and says nowhere that it does: the skill versions taken, by week and in the line, and a
+     skill's text before and after. Both read the record's log, which no figure an add-on declares reads by week
+     (AGT-C17 job c). A skill's own page draws its versions meanwhile. */
+  brain: {
+    page: 'brain',
+    title: 'How the brain changed',
+    icon: 'learning',
+    requires: ['register.learnings'],
+    blocks: [
+      { kind: 'note', key: 'line', lead: true, span: 12, when: { metric: 'learnings-arrived', gt: 0 }, body: '{{learnings-arrived}} learning(s) arrived this month, {{learnings-faded}} faded' },
+      { kind: 'note', key: 'line-quiet', lead: true, span: 12, when: { metric: 'learnings-arrived', is: 0 }, body: 'No learning arrived this month, {{learnings-faded}} faded' },
+      {
+        kind: 'series',
+        key: 'by-week',
+        heading: 'Learnings that arrived, by week',
+        icon: 'chart-column',
+        span: 12,
+        series: [{ metric: 'learnings-by-week', label: 'Learnings' }],
+        back: 24,
+        when: { metric: 'learnings-charted', gt: 0 },
+      },
+      {
+        kind: 'cards',
+        key: 'changed',
+        heading: 'What changed',
+        icon: 'history',
+        span: 12,
+        source: 'register.learnings',
+        columns: [
+          { field: 'lesson', as: 'title' },
+          { field: 'because', as: 'reply' },
+          { field: 'topic', label: 'Bears on', as: 'fact' },
+          { field: 'supersedes', label: 'Replaces', as: 'fact' },
+          { field: 'confirmed_on', label: 'Last confirmed', as: 'when' },
+        ],
+        order: [{ field: 'created_at', dir: 'desc' }],
+        limit: 12,
+      },
+      { kind: 'section', key: 'faded', heading: 'Faded', icon: 'clock', span: 12, source: 'register.learnings', where: FADED, limit: 1, when: { metric: 'learnings-faded', gt: 0 } },
+      {
+        kind: 'cards',
+        key: 'faded-learnings',
+        span: 12,
+        source: 'register.learnings',
+        where: FADED,
+        columns: [
+          { field: 'lesson', as: 'title' },
+          { field: 'because', as: 'reply' },
+          { field: 'confirmed_on', label: 'Last confirmed', as: 'when' },
+        ],
+        order: [{ field: 'created_at', dir: 'asc' }],
+        limit: 12,
+        when: { metric: 'learnings-faded', gt: 0 },
+      },
+    ],
+  },
   /* A RUN'S OWN PAGE, SINCE 1.7.0 (DIRECTION §37, "the run docked beside"): one per row of the kernel's list of runs,
      named by what it was doing. What it did and Undo this run are the host's (`panel: run`, `RunPanel.svelte`), drawn
      under the one section, by the run's handle and never its id. No `nav:`, so the runs never grow the rail: a run's
@@ -728,8 +823,12 @@ export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, Se
      the list of runs where they read the runs not finished, so a run that ended is listed, and a helper or a run that
      wrote nothing is not; `runs-today` and `runs-earlier` count the same runs by the same clauses. Their cards are
      the agent, what it said, its project and when. No list, field or figure goes, the page has the blocks it had, and every other block is as
-     1.11.0 drew it. */
-  manifest: { id: 'agents', version: '1.12.0', requires: ['register.things'] },
+     1.11.0 drew it.
+     1.13.0 ONLY ADDS, SO IT IS MINOR (AGT-C17 job b): `page.brain`, How the brain changed, with no place in the rail; the
+     line under What the brain learned on the agents home that opens it; and the figures `learnings-arrived` and
+     `learnings-charted` it is said and drawn on. `learnings-faded` reads the rule it read, now written once. No list,
+     field or figure goes, and every block 1.12.0 drew is as it was. */
+  manifest: { id: 'agents', version: '1.13.0', requires: ['register.things'] },
   registers: AGENTS_REGISTERS,
   pages: AGENTS_PAGES,
   metrics: AGENTS_METRICS,

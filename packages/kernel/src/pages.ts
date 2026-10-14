@@ -25,7 +25,7 @@ import type { ActionRow } from './actions.ts';
 import type { Exception } from './exceptions.ts';
 import { ANSWER_KEYS, BLOCK_READS, FILTER_TYPES, blockKeyOf, feedSaysFault, keyedBlocks, kindsReading, wrongKindKey } from './block-keys.ts';
 import { applyLook, composeLook, lookOf, mergeLook, type LookBody } from './compose.ts';
-import { HANDOFFS_OPEN, builtInFigure, type OpenStep } from './built-in-figures.ts';
+import { HANDOFFS_OPEN, RECORD_ACTIVITY, builtInFigure, type OpenStep } from './built-in-figures.ts';
 import type { ActionBlocking } from './signs-actions.ts';
 import { KEEP, markDrawn, type Why } from './drawn.ts';
 import { kindModule } from './kinds/index.ts';
@@ -3372,7 +3372,9 @@ function metricBlock(deps: PageDeps, block: PageBlock, id: string, base: BlockRe
   const named = deps.metric(name);
   if (!named) return { ...base, refusals: also({ code: 'METRIC_UNKNOWN', fix: `There is no metric called ${name}.`, at: 'source' }) };
   const decl = colon < 0 ? named : (fill(named, null, id.slice(colon + 1)) as MetricDecl);
-  if (typeof decl.group_by !== 'string' || decl.bucket !== undefined)
+  /* A FIGURE OF THE LOG IS CUT BY `activity:` (who, kind or hour) AND CARRIES NO `group_by`, yet its reading is parts
+     of a whole all the same, so it is let through beside a figure grouped by a word. */
+  if ((typeof decl.group_by !== 'string' && decl.source !== RECORD_ACTIVITY) || decl.bucket !== undefined)
     return {
       ...base,
       refusals: also({ code: 'DECLARATION_INVALID', fix: `A ${block.kind} over a figure draws its parts, so ${name} groups by a word, and a date cut into buckets is a series.`, at: 'source' }),

@@ -22,7 +22,9 @@
   the switch still opens the thing, and the switch is 44 under a thumb (`controls.css`).
 -->
 <script lang="ts">
+  import { goto } from '$app/navigation';
   import { at } from '$lib/at.ts';
+  import { ownPress } from '$lib/record/actions.ts';
   import IconWell from '$lib/ui/IconWell.svelte';
   import type { HubRow } from './hub.ts';
 
@@ -81,7 +83,15 @@
         <div class="row line line-tall">{@render body(r, false)}</div>
       {/if}
       {#if r.fix}
-        <a class="fix tap" href={at(r.fix.path)}>{r.fix.label}</a>
+        <a
+          class="fix tap"
+          href={at(r.fix.path)}
+          onclick={(e) => {
+            const f = r.fix;
+            if (!f?.state || !ownPress(e)) return;
+            e.preventDefault();
+            void goto(at(f.path), { state: f.state });
+          }}>{r.fix.label}</a>
       {/if}
     </li>
   {/each}

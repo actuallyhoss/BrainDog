@@ -1268,6 +1268,38 @@ export type HistoryPage = { events: EventLine[]; cursor: Cursor | null; byWho: B
  */
 export type InboxPage = { arrivals: InboxLine[]; cursor: number | null; counts: Record<InboxState, number>; ruledThisWeek: number };
 
+/** How many of each state a digest sends at most, and how many characters of each body. */
+export const INBOX_DIGEST_MOST = 100;
+export const INBOX_DIGEST_BODY = 180;
+
+/** An arrival on a digest: its line with the body's first `INBOX_DIGEST_BODY` characters, and `cut` only when there were more. */
+export type InboxDigestLine = InboxLine & { cut?: true };
+
+/**
+ * `inbox({ digest: true })`: how many arrivals are in each of the six states, and each state's newest
+ * `INBOX_DIGEST_MOST`, newest first, so one answer says the whole inbox and a busy one cannot outgrow it. A state that
+ * holds more says so by its count, and is paged with `state`; a body that was cut is read whole with `id`.
+ */
+export type InboxDigest = { counts: Record<InboxState, number>; states: Record<InboxState, InboxDigestLine[]> };
+
+/** What `inbox` takes: the paged read's four, or `digest` alone, or `id` alone. */
+export type InboxArgs = { state?: string; cursor?: number; limit?: number; repeats?: boolean; digest?: boolean; id?: string };
+
+/** What `inbox` answers for what it was asked: a digest, one arrival whole, or a page. */
+export type InboxAnswer<A> = A extends { digest: true } ? InboxDigest : A extends { id: string } ? InboxLine : InboxPage;
+
+/** What a token without the `inbox` reach is told, with the one command that gives it. */
+const INBOX_NO_REACH = 'Reading the inbox needs a token its owner gave the inbox reach. The owner mints one with braindog token create --inbox.';
+
+/** A body's first `INBOX_DIGEST_BODY` characters, counted as characters and never cut through the middle of one. */
+const digestLine = (line: InboxLine): InboxDigestLine => {
+  const body = line.body;
+  if (body === null || body.length <= INBOX_DIGEST_BODY) return line;
+  /* Twice the cut and one more is every code unit the first 181 characters can take, so a long mail is not spread whole. */
+  const head = Array.from(body.slice(0, INBOX_DIGEST_BODY * 2 + 1));
+  return head.length <= INBOX_DIGEST_BODY ? line : { ...line, body: head.slice(0, INBOX_DIGEST_BODY).join(''), cut: true };
+};
+
 /** The week the Inbox counts a rule's filings over: seven days back from the record's clock. */
 const INBOX_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -5343,8 +5375,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     if (row.body_kind === 'options' && row.opened_by === SLASH) return !readsEveryList(ctx);
     const body = row.body as Record<string, unknown> | undefined;
     /* A QUESTION FILLED FROM AN ARRIVAL THAT WROTE NO ROW IS HELD AS THE INBOX IS, to the owner reading the whole record
-       (`ruleAsked`). */
-    if (row.body_kind === 'options' && ruleAsked(row)?.inbox === true) return allows(ctx, 'owner', listName) !== null || !wholeRecord(ctx);
+       (`ruleAsked`) AND TO A TOKEN THE OWNER GAVE THE `inbox` REACH, the one rule `inbox` itself asks. It was the owner's
+       alone, so an agent sent to settle the arrivals read each one and none of what was asked about it. It reads the
+       question and answers none: `decide` asks `decide`, which no token reaches. */
+    if (row.body_kind === 'options' && ruleAsked(row)?.inbox === true)
+      return (allows(ctx, 'owner', listName) !== null && !inboxReached(ctx)) || !wholeRecord(ctx);
     /* EVERY BODY THAT NAMES A REGISTER, not only a `rowset`. A `pattern` carries a whole ingest
        declaration with `writes.register` on it and a `change` carries a `declaration_id`; both name
        a register and both used to pass unfiltered while the one that carries ROWS was filtered. An `options` question a
@@ -12136,22 +12171,77 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * skipped is the one place a skip that is too wide shows. `counts` names all six states on every page, so a caller
      * learns how much sits in each before asking for any. The arguments are read after the owner's check, so a caller
      * who is refused is not told which keys the inbox takes.
+     *
+     * `digest: true` IS THE WHOLE INBOX IN ONE ANSWER (`InboxDigest`): a count of all six states and the newest hundred
+     * of each, each body cut to 180 characters and marked `cut` when it was longer. An agent's first read was the two
+     * waiting states with every body whole, so a busy inbox of long mails passed the limit of the answer it was read
+     * in and the agent stopped at the counts. `id` IS ONE ARRIVAL, WHOLE, which is where a cut body is read to its
+     * end. Each is asked alone, and neither lets in anybody a page refuses.
      */
-    async inbox(
+    async inbox<const A extends InboxArgs | undefined>(
       /* `state` IS A STRING because it arrives from the wire, as an MCP address segment or a JSON body, and is checked below. */
-      args: { state?: string; cursor?: number; limit?: number; repeats?: boolean } | undefined,
+      args: A,
       ctx: CallContext,
-    ): Promise<Result<InboxPage>> {
+    ): Promise<Result<InboxAnswer<A>>> {
+      /* ONE ANSWER OF THREE, typed by what was asked (`InboxAnswer`), so a caller of the paged read is still handed a page. */
+      const answer = (value: InboxPage | InboxDigest | InboxLine) => ok(value) as Result<InboxAnswer<A>>;
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false, refusal: stop };
       /* ONE RULE FOR THE REACH, `inboxReached`, which `boot`'s inbox count asks too, so the count and this door agree. */
       const granted = inboxReached(ctx);
       const owner = granted ? null : allows(ctx, 'owner', listName);
-      if (owner) return { ok: false, refusal: { ...owner, code: 'FORBIDDEN' } };
+      /* A TOKEN IS TOLD THE REACH AND THE COMMAND THAT GIVES IT. `allows` answers every token "no token reaches it",
+         which stopped being true of this one read the day the reach was made, and sent an agent's owner looking for a
+         person to sign in when one flag on the token was all it lacked. A person keeps the sentence about their level. */
+      if (owner) return ctx.principal.kind === 'token' ? no('FORBIDDEN', INBOX_NO_REACH, { at: 'principal' }) : { ok: false, refusal: { ...owner, code: 'FORBIDDEN' } };
       if (!wholeRecord(ctx))
         return no('FORBIDDEN', 'The inbox belongs to the whole record, and this caller is held to part of it.', { at: 'principal' });
-      const extra = stray((args ?? {}) as Record<string, unknown>, ['state', 'cursor', 'limit', 'repeats']);
+      const given = (args ?? {}) as Record<string, unknown>;
+      const extra = stray(given, ['state', 'cursor', 'limit', 'repeats', 'digest', 'id']);
       if (extra) return { ok: false, refusal: extra };
+      /* `true` OR ITS WORD IS NOT ASKED HERE: a digest is asked for by a JSON body or by the door's own address, never a query string. */
+      const digest: unknown = given.digest;
+      if (digest !== undefined && typeof digest !== 'boolean')
+        return no('VALUE_MALFORMED', 'digest is true, for every state in one answer, or left out.', { at: 'digest' });
+      /* `digest` AND `id` EACH STAND ALONE. Each is a read of its own shape, so an argument of the paged read beside one
+         would be dropped without a word, and a caller who sent `state` with `digest` would read all six as the one. */
+      const alone = digest === true ? 'digest' : given.id !== undefined ? 'id' : null;
+      if (alone !== null) {
+        const beside = ['id', 'state', 'cursor', 'limit', 'repeats'].find((k) => k !== alone && given[k] !== undefined);
+        if (beside !== undefined)
+          return no(
+            'VALUE_MALFORMED',
+            alone === 'digest'
+              ? `digest answers every state at once, the newest ${INBOX_DIGEST_MOST} of each, and takes nothing beside it. Leave out ${beside}, or leave out digest to read ${beside === 'id' ? 'that one arrival' : 'one state a page at a time'}.`
+              : `id answers that one arrival whole, and takes nothing beside it. Leave out ${beside}, or leave out id to read a page.`,
+            { at: beside },
+          );
+      }
+      if (alone === 'id') {
+        const id = given.id;
+        if (typeof id !== 'string') return no('VALUE_MALFORMED', 'An id is the id of one arrival, as the inbox gives it on each line.', { at: 'id' });
+        if (id === '') return no('REQUIRED_MISSING', 'Which arrival? Name it by its id.', { at: 'id' });
+        /* THE KERNEL'S OWN LINE, so one arrival reads as it does on a page: found by the place it was stored at, in the
+           state it is in now. An erased one is in none of the six, and is answered as no arrival at all. */
+        const at = sql.one<{ rowid: number; state: string }>('SELECT rowid, state FROM inbox_raw WHERE id = ?', id);
+        const line =
+          at && (INBOX_STATES as readonly string[]).includes(at.state)
+            ? kernel.inboxBefore(Number(at.rowid) + 1, 1, [at.state as InboxState]).find((l) => l.id === id)
+            : undefined;
+        if (line === undefined) return no('OUT_OF_BOUNDS', 'There is no arrival with that id in this inbox.', { at: 'id' });
+        const reader = callerOf(ctx);
+        if (reader !== null) trust.markUntrusted(reader, 'the inbox');
+        return answer(line);
+      }
+      if (alone === 'digest') {
+        const states = Object.fromEntries(
+          INBOX_STATES.map((s) => [s, kernel.inboxBefore(null, INBOX_DIGEST_MOST, [s]).map(digestLine)]),
+        ) as Record<InboxState, InboxDigestLine[]>;
+        /* A CUT BODY IS STILL TEXT ANYBODY COULD HAVE WRITTEN, so a digest marks its reader as a page does. */
+        const reader = INBOX_STATES.every((s) => states[s].length === 0) ? null : callerOf(ctx);
+        if (reader !== null) trust.markUntrusted(reader, 'the inbox');
+        return answer({ counts: kernel.inboxCounts(), states });
+      }
       /* `repeats: true` PAGES THROUGH THE SECOND COPIES ALONE (audit-35 #3): a skipped arrival ingest marked as repeating a
          row, each carrying that row's id as `repeats`, so "It is a second one" is offered by the mark and a page of rule
          skips can no longer hide a real second charge. */
@@ -12179,7 +12269,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* WHAT ARRIVED IS TEXT ANYBODY COULD HAVE WRITTEN, so an agent that reads it asks for the rest of its run (`ladder.ts`). */
       const reader = arrivals.length === 0 ? null : callerOf(ctx);
       if (reader !== null) trust.markUntrusted(reader, 'the inbox');
-      return ok({
+      return answer({
         arrivals,
         cursor: lines.length > limit ? (arrivals.at(-1)?.rowid ?? null) : null,
         counts: kernel.inboxCounts(),

@@ -25,6 +25,7 @@
 import { bytes as fmtBytes, since } from 'braindog-render';
 
 import { copy } from '../copy.ts';
+import type { RECONNECT_STATE, ReconnectState } from './vault.ts';
 
 /* ── the shapes ─────────────────────────────────────────────────────────── */
 
@@ -288,16 +289,37 @@ export function often(every: string): string {
 export type Tone = 'warn' | undefined;
 
 /** What one row says about where it stands, whether it offers Resume, and whether it points at usage. */
-/** `reconnect` is where the key an action was paused on is put right, when that is why it paused. */
-export type Said = { line: string; tone: Tone; resume: boolean; usage: boolean; reconnect?: { href: string; label: string } };
+/** The navigation state "Reconnect key" travels with: the Vault reads the key's name and the action to resume from it. */
+export type ReconnectNav = Record<typeof RECONNECT_STATE, ReconnectState>;
 
 /**
- * The Vault, opened on the key a paused action needs, with the action to resume once the key is in.
- *
- * A LABEL AND AN ACTION'S NAME IN THE ADDRESS, and never a value: the value is typed into the sheet the Vault opens.
+ * `reconnect` is where the key an action was paused on is put right, when that is why it paused: the address to open,
+ * the button's word, and the state to open it with.
  */
-export const reconnectHref = (key: string, ingest: string): string =>
-  `/vault?${new URLSearchParams({ reconnect: key, then: ingest }).toString()}`;
+export type Said = { line: string; tone: Tone; resume: boolean; usage: boolean; reconnect?: { href: string; label: string; state: ReconnectNav } };
+
+/**
+ * The Vault, where a paused action's key is put right.
+ *
+ * NOTHING AFTER THE PATH. An address is kept in the browser's history and goes wherever a link is pasted, and a key's
+ * name is not for either, so what the Vault should open travels in the navigation's state (`reconnectState`). After a
+ * reload the state is gone and the plain Vault shows, which is right.
+ */
+export const reconnectHref = (): string => '/vault';
+
+/* THE VAULT'S OWN KEY, HELD EQUAL BY THE COMPILER AND NOT IMPORTED AS A VALUE: the app's frame reads this file, and the
+   Vault's reads are not for every screen to load. A different word in `vault.ts` fails the typecheck on this line. */
+const RECONNECT_KEY: typeof RECONNECT_STATE = 'vaultReconnect';
+
+/** What the Vault opens on: the key by the name its declaration gives it, and the action to resume once it is in. */
+export const reconnectState = (key: string, ingest: string): ReconnectNav => ({ [RECONNECT_KEY]: { key, then: ingest } });
+
+/**
+ * Whether a press on the link is this tab's to follow with state. A middle press or one with a modifier opens a tab or
+ * a window, which the browser does from the address alone, and that opens the plain Vault.
+ */
+export const ownPress = (e: Pick<MouseEvent, 'button' | 'metaKey' | 'ctrlKey' | 'shiftKey' | 'altKey' | 'defaultPrevented'>): boolean =>
+  e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey && !e.defaultPrevented;
 
 /**
  * One action's state, in one sentence.
@@ -316,7 +338,7 @@ export function stateOf(row: ActionRow, now: number): Said {
        there and meters nothing, so `last` is empty or an older run. Nothing else pauses an action without a paused run. */
     const missing = !refused && Boolean(row.key) && (last?.outcome !== 'paused' || last.status === null);
     const why = refused ? words.refusedKey(host, row.key!) : missing ? words.missingKey(row.key!) : words.paused;
-    const reconnect = refused || missing ? { href: reconnectHref(row.key!, row.ingest), label: refused ? words.reconnect : words.addTheKey } : undefined;
+    const reconnect = refused || missing ? { href: reconnectHref(), label: refused ? words.reconnect : words.addTheKey, state: reconnectState(row.key!, row.ingest) } : undefined;
     return { line: why, tone: 'warn', resume: true, usage: false, ...(reconnect ? { reconnect } : {}) };
   }
   if (!last) return { line: words.never(next), tone: undefined, resume: false, usage: false };

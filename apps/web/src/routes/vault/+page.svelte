@@ -32,14 +32,15 @@
 <script lang="ts">
   import { apiBase, at, signInFirst } from '$lib/at.ts';
   import { onDestroy, onMount } from 'svelte';
+  import { page } from '$app/state';
   import { createClient } from '@braindog/client';
   import { since, relative, TONES } from 'braindog-render';
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import { CODE_DIGITS, type Answer, type DeviceRow } from '$lib/record/device.ts';
   import {
-    answerLine, approve, asks, daysFor, holders, keysOf, lastUsers, lockOf, namesOf, reconnectOf, reprove, revoke, runPath, scopeName,
-    wantsPassphrase, withPassphrase, words,
+    answerLine, approve, asks, daysFor, holders, keysOf, lastUsers, lockOf, namesOf, readAll, reconnectFrom, reconnectOf, reprove, revoke, runPath,
+    scopeName, wantsPassphrase, withPassphrase, words, RECONNECT_STATE,
     type GrantState, type KeyRow, type Lock, type ProjectMark, type UsedByRun,
   } from '$lib/record/vault.ts';
   import { words as actionWords } from '$lib/record/actions.ts';
@@ -61,7 +62,7 @@
   import Menu from '$lib/ui/Menu.svelte';
   import PassField from './PassField.svelte';
   import Passphrase from './Passphrase.svelte';
-  import { opensOf, rowPath, sentenceOf, stateOf, words as tileWords } from './tiles.ts';
+  import { cameFromOf, hintOf, opensOf, rowAction, rowPath, sentenceOf, stateOf, words as tileWords } from './tiles.ts';
 
   /**
    * Whether the record has answered yet. THERE IS NO THIRD STATE: this screen drew the sample's grants and keys,
@@ -71,6 +72,10 @@
   let from = $state<'reading' | 'live'>('reading');
   let machines = $state<DeviceRow[]>([]);
   let keys = $state<KeyRow[]>([]);
+  /** Where each key came from, by its row id, for the rows that say so (`cameFromOf`). */
+  let cameFrom = $state<ReadonlyMap<string, string>>(new Map());
+  /** Whether the record holds keys past the ones read: a page refused part way, or a read that met its ceiling. */
+  let moreKeys = $state(false);
   /** The run that opened each key last, by the key's row id, from `usedBy`. A key missing here says only its counts. */
   let lastBy = $state<ReadonlyMap<string, UsedByRun>>(new Map());
   let names: ReadonlyMap<string, string> & { marks?: ReadonlyMap<string, ProjectMark> } = $state(new Map());
@@ -137,6 +142,17 @@
     return line.charAt(0).toUpperCase() + line.slice(1);
   };
 
+  /** One row of a list as this screen reads it. */
+  type Row = { id: string; seq: number | null; fields: Record<string, unknown>; state: string | null };
+  /** How many rows one page asks for; `readAll` asks for pages until the record says there are no more. */
+  const PAGE = 200;
+  /** Every row of one of the record's lists, a page at a time, with the refusal that stopped it where one did. */
+  const everyRow = (register: string) =>
+    readAll(async (cursor: string | null) => {
+      const out = await client!.list({ register, limit: PAGE, ...(cursor === null ? {} : { cursor }) });
+      return out.ok ? { ok: true as const, value: { rows: out.value.rows as Row[], cursor: out.value.cursor } } : out;
+    });
+
   onMount(() => {
     void read(async () => {
       client = createClient({ base: apiBase() });
@@ -157,18 +173,18 @@
       devices = saidOf(listed);
       if (listed.ok) machines = listed.value;
       /* A record without the agents pack has no Keys register, and it says so rather than answering an empty index. */
-      const [projects, credentials, grants] = await Promise.all([
-        client.list({ register: 'things', limit: 200 }),
-        client.list({ register: 'credentials', limit: 200 }),
-        client.listGrants(),
-      ]);
-      type Row = { id: string; seq: number | null; fields: Record<string, unknown>; state: string | null };
-      index = saidOf(credentials);
+      /* EVERY PAGE OF BOTH LISTS (`readAll`), so a record with more than 200 keys lists every one of them. */
+      const [projects, credentials, grants] = await Promise.all([everyRow('things'), everyRow('credentials'), client.listGrants()]);
+      /* A REFUSAL IS THE SECTION'S ANSWER ONLY WHERE NOTHING WAS READ. A page refused part way leaves real keys, which
+         are drawn, with one line under them saying more stand. */
+      index = credentials.refused !== null && credentials.rows.length === 0 ? saidOf(credentials.refused) : { kind: 'held' };
       counted = saidOf(grants);
       /* A RECORD WITH NO PROJECTS LIST NAMES NO PROJECT, and the chips say "A project" where a scope
          points at one this screen cannot name, which is this screen saying where the record said nothing. */
-      names = projects.ok ? namesOf(projects.value.rows as Row[]) : new Map();
-      keys = credentials.ok ? keysOf(credentials.value.rows as Row[], grants.ok ? (grants.value as GrantState[]) : [], names) : [];
+      names = projects.rows.length > 0 ? namesOf(projects.rows) : new Map();
+      keys = keysOf(credentials.rows, grants.ok ? (grants.value as GrantState[]) : [], names);
+      cameFrom = cameFromOf(credentials.rows);
+      moreKeys = credentials.more && credentials.rows.length > 0;
       forConnectors = connectorGrants(grants.ok ? grants.value : []);
       void whoOpened();
       from = 'live';
@@ -290,9 +306,13 @@
   /** The index, read again from the record rather than patched here, so the line a person reads is the record. */
   async function reread() {
     if (!client) return;
-    const [credentials, grants] = await Promise.all([client.list({ register: 'credentials', limit: 200 }), client.listGrants()]);
-    type Row = { id: string; seq: number | null; fields: Record<string, unknown>; state: string | null };
-    if (credentials.ok) keys = keysOf(credentials.value.rows as Row[], grants.ok ? (grants.value as GrantState[]) : [], names);
+    const [credentials, grants] = await Promise.all([everyRow('credentials'), client.listGrants()]);
+    /* A read refused before its first key leaves the keys as they were drawn, as one refused page always did. */
+    if (credentials.refused === null || credentials.rows.length > 0) {
+      keys = keysOf(credentials.rows, grants.ok ? (grants.value as GrantState[]) : [], names);
+      cameFrom = cameFromOf(credentials.rows);
+      moreKeys = credentials.more;
+    }
     if (grants.ok) forConnectors = connectorGrants(grants.value);
     void whoOpened();
   }
@@ -395,7 +415,10 @@
    */
   let resumeAfter: string | null = null;
   function reconnect() {
-    const asked = reconnectOf(new URL(location.href).searchParams, keys);
+    /* THE NAVIGATION'S STATE FIRST, which is how "Reconnect key" arrives with nothing after `/vault`; the address
+       second, for a link made before that. A reload drops the state, and the plain Vault shows. */
+    const carried = (page.state as Record<string, unknown>)[RECONNECT_STATE] ?? (history.state as Record<string, unknown> | null)?.[RECONNECT_STATE];
+    const asked = reconnectFrom(carried, keys) ?? reconnectOf(new URL(location.href).searchParams, keys);
     if (!asked) return;
     resumeAfter = asked.then;
     if (asked.mode === 'replace') return openReplace(asked.row);
@@ -667,14 +690,23 @@
     {/if}
     <!-- A COUNT THE RECORD WOULD NOT GIVE IS SAID ONCE, in the record's own words, and never drawn as "never opened". -->
     {#if uncounted}<p class="said">{uncounted}</p>{/if}
+    <!-- KEYS THE RECORD HOLDS PAST THE ONES READ ARE SAID, so a list that stopped short never reads as all of them. -->
+    {#if moreKeys}<p class="said">{tileWords.moreKeys(keys.length)}</p>{/if}
     <ul class="ledger ledger-lead whos keys">
       {#each keys as k (k.id)}
         <!--
           ONE ROW ANATOMY: the key's well, its name (a link to its row), and under it where it applies, what it
           opens and whether a value is sealed here; how often it was opened at the end; Reveal and the "…" menu on hover.
           Replace and Revoke stay in the key's own menu (design 2.14): neither is what a person comes to the vault to do most.
+
+          A SEALED KEY SAYS WHAT IT IS, UNOPENED, after what it opens: the hint the host wrote when it sealed it. A KEY WITH
+          NO VALUE HAS "Seal a value" WHERE A SEALED ONE HAS REVEAL, which opens the sheet Replace opens and seals onto
+          this same row. Where the key came from, when its row says, is the first line of its menu.
         -->
         {@const state = stateOf(k)}
+        {@const hint = hintOf(k)}
+        {@const action = rowAction(k)}
+        {@const origin = cameFrom.get(k.id)}
         {@const href = rowPath(k)}
         {@const u = lastBy.get(k.id)}
         <li class="who key" data-selected={shown && shown.id === k.id ? '' : undefined}>
@@ -685,6 +717,7 @@
               <span class="line-detail key-meta">
                 <ScopeChip scope={k.scope} />
                 {#if k.opens}<span class="key-opens">{k.opens}</span>{/if}
+                {#if hint}<span class="key-hint">{hint}</span>{/if}
                 <span class="state" data-sealed={state.sealed ? '' : undefined}><span class="dot" aria-hidden="true"></span>{state.word}</span>
               </span>
             </span>
@@ -702,16 +735,19 @@
             </span>
             {#if acts}
               <span class="line-verbs who-do">
-                {#if k.grant && k.sealed}
+                {#if action?.act === 'reveal'}
                   <!-- ONLY WHERE THERE IS SOMETHING SEALED TO OPEN: an index row points at no grant. -->
                   <Button size="sm" disabled={revealing === k.id} onclick={() => void revealKey(k)}>
                     {revealing === k.id ? words.revealing : words.reveal}
                   </Button>
+                {:else if action?.act === 'seal'}
+                  <Button size="sm" onclick={() => openReplace(k)}>{action.word}</Button>
                 {/if}
                 <Menu label={moreFor(k.label)} align="end">
                   {#snippet trigger()}
                     <span class="more-trigger"><Icon name="more" size="s" /><span class="vh">{moreFor(k.label)}</span></span>
                   {/snippet}
+                  {#if origin}<p class="mi-note">{tileWords.cameFromSaid(origin)}</p>{/if}
                   <button type="button" class="mi" role="menuitem" onclick={() => openReplace(k)}>{words.replace}</button>
                   {#if k.grant && k.sealed}
                     <button type="button" class="mi" role="menuitem" data-tone="bad" onclick={() => void retireKey(k)}>{copy.revokeKey}</button>
@@ -959,6 +995,12 @@
     white-space: nowrap;
   }
 
+  /* WHAT A SEALED KEY IS, UNOPENED: quieter than what it opens, and whole, since it is the short one of the two. */
+  .key-hint {
+    color: var(--dim);
+    white-space: nowrap;
+  }
+
   .sep {
     color: var(--dim);
   }
@@ -1072,6 +1114,16 @@
   .mi:hover,
   .mi:focus-visible {
     background: var(--hover-wash);
+  }
+
+  /* A SENTENCE IN A MENU, not a row: nothing happens when it is pressed. Where the key came from, wrapped, never cut. */
+  .mi-note {
+    max-inline-size: 280px;
+    margin: 0;
+    padding: var(--sp-2) var(--sp-3);
+    color: var(--dim);
+    font-size: var(--t-sm);
+    overflow-wrap: anywhere;
   }
 
   /* A DESTRUCTIVE VERB IS ITS WORDS IN INK: red is for what needs him, and a menu item never does. */

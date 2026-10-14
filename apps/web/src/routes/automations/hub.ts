@@ -472,8 +472,8 @@ export type HubRow = {
   dot: 'bad' | 'warn' | 'off' | null;
   /** Where the row opens, or `null` for a row with no screen of its own. */
   path: string | null;
-  /** A link under the row that does what its sentence asks, like adding a missing key. */
-  fix?: { path: string; label: string } | undefined;
+  /** A link under the row that does what its sentence asks, like adding a missing key, and the state its navigation carries, when what it opens must not be in the address. */
+  fix?: { path: string; label: string; state?: Record<string, unknown> | undefined } | undefined;
   /** The glyph in the row's 32px well: what starts it, how it reaches out, or what kind of thing ran. */
   icon?: IconName | undefined;
   /** The right-hand column: an automation's next turn, or the time a run started. */

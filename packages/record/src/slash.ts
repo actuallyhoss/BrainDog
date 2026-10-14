@@ -22,6 +22,7 @@
  */
 
 import { pageSpokenFor, signatureOf } from './emergent.ts';
+import { GROWS, NAMED_PAGE, recommend, type DrawnPage } from './design-agent.ts';
 import type { FigureTest, Grows } from './arrange.ts';
 import { subjectOf } from './automations.ts';
 import type { Refusal, Result, Sql } from '@braindog/ports';
@@ -35,8 +36,6 @@ import { clean } from './scrub.ts';
 
 const DAY_MS = 86_400_000;
 
-/** A list gains this many rows, on this many separate days, in thirty days before it is said to grow. */
-const GROWS = { rows: 5, days: 3 };
 /** Agents write this many times, on this many separate days, in thirty days before Slash says they work here. */
 const AGENTS = { writes: 10, days: 3 };
 /** Ninety days of silence, from the same rule of three `observe.ts` uses for a dormant declaration. */
@@ -55,9 +54,11 @@ const LABEL_MOST = 40;
 const HOLDS_MOST = 280;
 /**
  * A person, an organisation or a project earns a page of its own once it is met this often or this many things here name
- * it (DIRECTION §38): five dated `met` lines, or three rows in other lists pointing at it.
+ * it (DIRECTION §38): so many dated `met` lines, or so many rows in other lists pointing at it. THE COUNTS ARE THE
+ * RECOMMENDER'S OWN (`design-agent.ts` `NAMED_PAGE`), kept under the name the reading has always said them by, and a list
+ * is said to grow by its `GROWS`: one place weighs an arrangement, so no count is written twice.
  */
-export const ENTITY_PAGE = { met: 5, linked: 3 };
+export const ENTITY_PAGE = NAMED_PAGE;
 /** At most this many of those are drafted in one look, the strongest first, so Decide is not a column of names. */
 const ENTITY_DRAFTS_MOST = 2;
 /** At most this many entities are carried in the reading, which the model is handed whole. */
@@ -157,6 +158,11 @@ export type PageUse = {
   opens90: number;
   lastOpened: string | null;
   declaredAt: string;
+  /**
+   * The entry a template made this page for. Absent on a page somebody wrote. With `registers`, the lists it reads, this
+   * is what "has a page" is read from (`design-agent.ts` `namedHasPage`, `listHasPage`).
+   */
+  row?: { list: string; seq: number };
 };
 
 /** One of the speaking use case's words: a voice line or a label, as declared and as it reads now. */
@@ -205,6 +211,13 @@ export type Usage = {
   listening: { pages: boolean; lists: boolean };
   lists: ListUse[];
   pages: PageUse[];
+  /**
+   * The pages a template made for the people, organisations and projects in `entities`, each carrying its `row`. KEPT
+   * APART FROM `pages`, which every other rule judges as pages of the record (opened or not, quiet or not): a page per
+   * entry is opened under its own address and is nobody's to retire. Only those of `entities` are read, so a template
+   * over a thousand people adds at most `ENTITIES_READ_MOST` here.
+   */
+  made?: PageUse[];
   agents: AgentUse[];
   packs: PackUse[];
   /** The use case this record speaks in now, or `null` for the house voice. */
@@ -502,6 +515,34 @@ export function readUsage(
 
   const entities = entitiesOf(sql, kernel, roles, reads, (id) => lists.find((l) => l.id === id)?.name ?? kernel.register(id)?.name ?? id);
 
+  /* THE PAGES AS DRAWN FOR THEM. A page a template made for a row is that row's page, whatever the template is titled, and
+     the declarations above cannot say which rows a template's `where` took: the kernel's own expansion can. Asked only
+     when somebody crossed the line, and kept only for those who did. */
+  const made: PageUse[] = [];
+  if (entities.length > 0) {
+    const crossed = new Set(entities.map((e) => `${e.list}#${e.seq}`));
+    for (const p of kernel.pages()) {
+      if (p.about === null || p.about.seq === null || !crossed.has(`${p.about.register}#${p.about.seq}`)) continue;
+      const template = declared.find((d) => d.kind === 'page' && d.id.slice(d.id.indexOf('.') + 1) === p.template);
+      /* ITS TITLE IS A TEMPLATE FILLED FROM THE ROW, and the reading goes to a model whole: one that says an address, a
+         link or a key is not carried (`scrub.ts`), and the page stands under its address alone. */
+      const titled = typeof p.title === 'string' && p.title.trim() !== '' && clean(p.title);
+      made.push({
+        slug: p.slug,
+        title: titled ? String(p.title) : p.slug,
+        titled,
+        pack: template?.pack ?? null,
+        registers: p.registers.filter(reads),
+        opens30: opens30.get(p.slug)?.n ?? 0,
+        openDays30: opens30.get(p.slug)?.days ?? 0,
+        opens90: opens90.get(p.slug)?.n ?? 0,
+        lastOpened: opens90.get(p.slug)?.last ?? null,
+        declaredAt: template?.created_at ?? '',
+        row: { list: p.about.register, seq: p.about.seq },
+      });
+    }
+  }
+
   return {
     at: instantOf(nowMs),
     firstWrite,
@@ -510,6 +551,7 @@ export function readUsage(
     listening: { pages: alive('page.render'), lists: alive('register.read') },
     lists,
     pages,
+    ...(made.length > 0 ? { made } : {}),
     agents: [...agents.entries()]
       .map(([actor, a]) => ({ actor, writes30: a.writes30, days30: a.days.size, lists: [...a.lists.entries()].sort((x, y) => y[1] - x[1]).map(([id]) => id) }))
       .sort((a, b) => b.writes30 - a.writes30),
@@ -708,6 +750,19 @@ const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n =
 const joinNames = (names: readonly string[]): string =>
   names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
 
+/**
+ * The reading's pages as the recommender reads them (`design-agent.ts` `DrawnPage`): those somebody wrote and those a
+ * template made for somebody in the reading, each with the lists it reads and, where it has one, its row.
+ */
+const drawnOf = (usage: Usage): DrawnPage[] =>
+  [...usage.pages, ...(usage.made ?? [])].map((p) => ({ slug: p.slug, title: p.title, lists: p.registers, ...(p.row === undefined ? {} : { row: p.row }) }));
+
+/** The reading's own moment, for the recommender, which is told the time and never asks it. */
+const readAt = (usage: Usage): number => {
+  const ms = Date.parse(usage.at);
+  return Number.isFinite(ms) ? ms : 0;
+};
+
 /** A slug no page holds, for a page over `list`. */
 function freeSlug(list: string, pages: readonly PageUse[]): string {
   const taken = new Set(pages.map((p) => p.slug));
@@ -763,12 +818,16 @@ function noticeWhole(usage: Usage, offered: readonly Offered[]): { noticed: Noti
   const listName = (id: string): string => usage.lists.find((l) => l.id === id)?.name ?? id;
   const packTitle = (id: string): string => offered.find((o) => o.id === id)?.title ?? usage.packs.find((p) => p.id === id)?.title ?? id;
 
-  /* WHAT GROWS, most first. */
+  /* WHAT GROWS, most first. WHICH OF THEM IS OFFERED A PAGE IS THE RECOMMENDER'S ANSWER (`recommend`): it holds the
+     counts and reads "no page draws it whole" off the pages as drawn, so this rule and the pen cannot disagree. */
+  const pageOffered = new Set(
+    recommend({ nowMs: readAt(usage), pages: drawnOf(usage), lists: usage.lists.map((l) => ({ id: l.id, name: l.name, rows: l.rows, added30: l.added30, addedDays30: l.addedDays30 })) }).map((o) => o.key),
+  );
   const growing = usage.lists.filter((l) => l.added30 >= GROWS.rows && l.addedDays30 >= GROWS.days).sort((a, b) => b.added30 - a.added30);
   for (const l of growing) {
     noticed.push({ kind: 'grows', subject: l.id, text: `${l.name} grew by ${l.added30} in the last thirty days, on ${l.addedDays30} separate days.` });
     /* A LIST THAT GROWS AND NO PAGE SHOWS gets a page of its own, filed beside its pack's pages in the rail. */
-    if (!usage.pages.some((p) => p.registers.includes(l.id)) && !pageSpokenFor(l.id, penHeld, penGone)) {
+    if (pageOffered.has(`page:${l.id}`) && !pageSpokenFor(l.id, penHeld, penGone)) {
       const slug = freeSlug(l.id, usage.pages);
       const section = usage.pages.find((p) => p.pack !== null && p.pack === l.pack)?.title ?? l.name;
       drafts.push({
@@ -1089,17 +1148,25 @@ const THEM: Readonly<Record<EntityUse['kind'], { them: string; own: string; has:
  * drafted. And it goes to the model as one of the rules' drafts on the look, as every rule draft does, so a model may
  * improve it, through `fromModel` and `prepare` like anything it answers.
  *
- * A PAGE IS NOT DRAFTED TWICE FOR ONE NAME: a page somebody wrote with that title, or at that address, is its page.
+ * A PAGE IS NOT DRAFTED FOR A THING THAT HAS ONE, AND THE RECOMMENDER SAYS WHICH HAVE (`design-agent.ts` `recommend`,
+ * `namedHasPage`): a page a template made for its row, a page somebody wrote with that title, or one at that address. This
+ * rule read titles and addresses for itself and so missed the first, and two projects with a page were each offered one.
+ * What it keeps of its own is whether the address a draft would take is free, which is another question.
  */
 export function entityDrafts(usage: Usage): SlashDraft[] {
   const out: SlashDraft[] = [];
-  const titles = new Set(usage.pages.map((p) => p.title.trim().toLowerCase()));
-  const slugs = new Set(usage.pages.map((p) => p.slug));
-  for (const e of usage.entities ?? []) {
+  const entities = usage.entities ?? [];
+  const drawn = drawnOf(usage);
+  const offered = new Set(
+    recommend({ nowMs: readAt(usage), pages: drawn, named: entities.map((e) => ({ list: e.list, listName: e.listName, seq: e.seq, name: e.name, met: e.met, linked: e.linked })) }).map((o) => o.key),
+  );
+  /* THE ADDRESSES SPOKEN FOR: every page drawn, and each page drafted in this look. */
+  const taken = new Set(drawn.map((p) => p.slug));
+  for (const e of entities) {
     if (out.length >= ENTITY_DRAFTS_MOST) break;
-    if (!sayable(e.name) || titles.has(e.name.toLowerCase()) || e.lead === null || !/^[a-z][a-z0-9_]*$/u.test(e.list)) continue;
+    if (!sayable(e.name) || !offered.has(`page:${e.list}#${e.seq}`) || e.lead === null || !/^[a-z][a-z0-9_]*$/u.test(e.list)) continue;
     const base = slugify(e.name);
-    if (base === '' || slugs.has(base)) continue;
+    if (base === '' || taken.has(base)) continue;
     const { them, own, has } = THEM[e.kind];
     const lead = `${e.lead.label.charAt(0).toUpperCase()}${e.lead.label.slice(1)}: {{${e.list}#${e.seq}.${e.lead.field}}}`;
     const links = e.links.filter((l) => usage.lists.some((x) => x.id === l.list)).slice(0, ENTITY_LINKS_MOST);
@@ -1133,7 +1200,7 @@ export function entityDrafts(usage: Usage): SlashDraft[] {
       ...(e.linked >= ENTITY_PAGE.linked ? [`${plural(e.linked, 'thing')} here ${e.linked === 1 ? 'names' : 'name'} ${them}`] : []),
     ];
     const why = `${opening(joinNames(said))}, and ${has} no page yet.`;
-    slugs.add(base);
+    taken.add(base);
     out.push({
       key: '',
       question: `Give ${e.name} a page of ${own}? ${why}`,

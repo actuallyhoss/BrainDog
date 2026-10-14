@@ -168,9 +168,11 @@ test('SKILL DRAFTS AND THE MODEL-JOBS PASS cannot spend the headlines: with the 
       `prose-${i}`,
       new Date(T0 - 1000 * i).toISOString(),
     );
-  const last = await meter.background('skill');
-  assert.ok(last.ok);
-  last.value.settle({ usage: { in: 10, out: 10 } });
+  for (let i = 0; i < floorsOf(BACKGROUND_JOBS_MONTH).skill; i++) {
+    const last = await meter.background('skill');
+    assert.ok(last.ok);
+    last.value.settle({ usage: { in: 10, out: 10 } });
+  }
   const spent = await meter.background('skill');
   assert.equal(spent.ok, false);
   if (!spent.ok) assert.match(spent.refusal.fix, /background Slash asks are spent until 2026-11-01/u);

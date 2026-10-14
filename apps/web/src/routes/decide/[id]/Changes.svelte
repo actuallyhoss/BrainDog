@@ -15,6 +15,12 @@
   mark and name or the globe, and never the two row ids the proposal carries. The projects are read once a list for
   the tab (`scope-move.ts` `placesIn`); until they arrive, and for a project this reader cannot see, a side reads
   "A project".
+
+  WHAT A CHANGE TAKES IN IS SAID BEFORE ITS DIFF (`takes` in `changes.ts`): under "Why: what was learned", each row
+  the change adds to a list of refs by its own words, and under it what stands behind it (for a learning, the failure
+  that taught it). A skill's next version was a long diff over a line of handles, and the press was taken without the
+  reason. One you cannot open is a count. In the queue (`compact`) only the first line of each is drawn, so the answer
+  buttons stay near the title; the gate draws both.
 -->
 <script lang="ts">
   /* `Diff` is drawn here outside a declared page, so its kind's sheet comes with it (`kinds/diff.css`). */
@@ -24,7 +30,7 @@
   import { apiBase } from '$lib/at.ts';
   import { placeNamed, placesIn, words as scopeWords, type Place, type Scope } from '$lib/record/scope-move.ts';
   import ScopeChip from '$lib/ui/ScopeChip.svelte';
-  import { words, type Updated } from './changes.ts';
+  import { closedSaid, words, type Updated } from './changes.ts';
 
   let { updates, compact = false }: { updates: readonly Updated[]; compact?: boolean } = $props();
 
@@ -38,17 +44,36 @@
       });
   });
 
+  /* Two of these are on one screen (the queue's card and its tile), so a heading's id is this drawing's own. */
+  const uid = $props.id();
+
   /** One side of a move, as its chip: the project it names, or `null` for everywhere. */
   const sideOf = (to: string, said: string | null): Scope | null =>
     said === null ? null : (placeNamed(places[to] ?? null, said) ?? { spoken: said, name: scopeWords.someProject, mark: null, hue: null });
 </script>
 
 <ul class="changes">
-  {#each updates as u (u.at)}
+  {#each updates as u, i (u.at)}
     <li class="change">
       <p class="change-row">
         <span class="change-title">{u.title}</span>
       </p>
+      {#if u.takes}
+        <div class="takes">
+          <p class="change-label" id="takes-{uid}-{i}">{words.takes}</p>
+          <ul class="takes-list" aria-labelledby="takes-{uid}-{i}">
+            {#each u.takes.said as t, n (n)}
+              <li class="take">
+                <span class="take-title">{t.title}</span>
+                {#if t.why && !compact}<span class="take-why">{t.why}</span>{/if}
+              </li>
+            {/each}
+            {#if u.takes.closed > 0}
+              <li class="take take-closed">{closedSaid(u.takes.closed, u.takes.said.length)}</li>
+            {/if}
+          </ul>
+        </div>
+      {/if}
       {#each u.changes as c (c.field)}
         {#if c.long && compact}
           <details class="change-fold">
@@ -117,6 +142,40 @@
     font-weight: 500;
   }
 
+  /* WHY, BEFORE WHAT: a short list in the tile's own text, with no box, rule or chip round it. */
+  .takes {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    min-inline-size: 0;
+    margin-block-end: var(--sp-2);
+  }
+
+  .takes-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .take {
+    display: flex;
+    flex-direction: column;
+    min-inline-size: 0;
+    font-size: var(--t-ui);
+    overflow-wrap: anywhere;
+  }
+
+  .take-title {
+    color: var(--ink);
+  }
+
+  .take-why,
+  .take-closed {
+    color: var(--ink2);
+  }
 
   .change-field {
     display: flex;

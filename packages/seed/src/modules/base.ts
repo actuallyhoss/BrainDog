@@ -242,6 +242,40 @@ export type SeedRule = { rule: string; pack?: string; register: string; when: st
  */
 export const CALENDAR_SOURCE = 'deadlines';
 
+/**
+ * Activity: everything written to the record, a day at a time, with who did it beside it (PGS-C24 job 7).
+ *
+ * ONE FEED OVER THE RECORD'S OWN LOG. `source: activity` reads every change whoever made it, so the page names no list and
+ * leans on no register. `group: day` is a heading each day in the record's own zone, `fold: run` is one line for each
+ * run's work with how many more it wrote, and `since: seen` marks what is new since the reader last looked. Fifty lines,
+ * the most a feed reads at once; older ones wait for a feed's `more:`, which no build reads yet.
+ *
+ * THE SIDE COLUMN IS THE LOG AS THREE FIGURES (`activity-by-who`, `activity-by-kind`, `activity-by-hour`, the kernel's
+ * own over the last thirty days), each tile headed by its figure's name, so a tile and the figure an agent reads are
+ * never called two things. Who worked is a `split`, three parts of one whole; the other two are bars. Under them, what
+ * an agent asked: the fifth part the hand-built screen lacked.
+ *
+ * IT OPENS ON ITS LINE, AS EVERY PAGE DOES (DIRECTION §39, held by `calm-pages.test.ts`), in plain words and with no
+ * figure: nothing counts what a reader has not seen yet, nor the agents' share of it, and a sentence is not given a
+ * number the record cannot read.
+ *
+ * EVERY BLOCK HAS A `key:`, so a tile moved in Edit layout, or by an agent's proposal, is found again when the page's
+ * next version lands.
+ *
+ * NOT ON THE RAIL, so no `nav:`: the rail is the seven places (DIRECTION §39) and is the person's to change. IN PEOPLE,
+ * for Calendar's reason above.
+ */
+
+/**
+ * What an agent asked: an open question opened by a run (its spoken id, `S12`) or by an agent's key with no run to sign
+ * it (`agent:claude`). THE AGENTS PAGE'S OWN TEST, WRITTEN AGAIN (`ASKED_BY_A_RUN` in `packs/agents.ts`, which imports
+ * this file and so cannot be imported here); `base-activity.test.ts` holds the two equal. A tree and not a sentence,
+ * because a spoken id is an s and a first digit, one to nine, and the grammar has no pattern for that.
+ */
+export const ASKED_BY_AN_AGENT = {
+  any: [{ field: 'who', starts: 'agent:' }, ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => ({ field: 'who', starts: `s${n}` }))],
+};
+
 export const BASE_PAGES: Record<string, SeedPage> = {
   calendar: {
     page: 'calendar',
@@ -259,6 +293,35 @@ export const BASE_PAGES: Record<string, SeedPage> = {
         back: 0,
         ahead: 2,
         empty: 'Nothing is due in these three months.',
+      },
+    ],
+  },
+  activity: {
+    page: 'activity',
+    title: 'Activity',
+    icon: 'activity',
+    pack: 'people',
+    layout: { rail: 4 },
+    blocks: [
+      { kind: 'note', lead: true, key: 'line', span: 12, body: 'Everything that changed, a day at a time, newest first.' },
+      { kind: 'feed', key: 'feed', span: 12, source: 'activity', group: 'day', fold: 'run', since: 'seen', first: 50, empty: 'Nothing has changed yet.' },
+      { kind: 'split', key: 'who-worked', heading: 'Who worked', icon: 'people', span: 12, area: 'rail', source: 'metric.activity-by-who' },
+      { kind: 'bar', key: 'what-changed', heading: 'What changed', icon: 'activity', span: 12, area: 'rail', source: 'metric.activity-by-kind' },
+      { kind: 'bar', key: 'busy-hours', heading: 'Busy hours', icon: 'clock', span: 12, area: 'rail', source: 'metric.activity-by-hour' },
+      {
+        /* ANSWERED WHERE THEY ARE SHOWN, three at most and the rest in Decide. ONLY WHILE SOMETHING IS ASKED
+           (`questions-open`, the record's own count of what is open): with none of them an agent's, the queue has
+           nothing in it and is not drawn. */
+        kind: 'queue',
+        key: 'agents-asked',
+        heading: 'Agents asked',
+        icon: 'ask',
+        span: 12,
+        area: 'rail',
+        source: 'governance.open',
+        where: ASKED_BY_AN_AGENT,
+        limit: 3,
+        when: { metric: 'questions-open', gt: 0 },
       },
     ],
   },

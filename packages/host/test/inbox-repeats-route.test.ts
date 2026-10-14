@@ -68,3 +68,35 @@ test('A POST SAYS THE SAME, and a repeats that is not true or false is refused a
   assert.equal(bad.body.refusal?.at, 'repeats');
   sql.close();
 });
+
+/* ── digest and id, by either verb (inbox-digest-88) ─────────────────────────────────────────────────────────────── */
+
+type Whole = { ok: boolean; value?: { counts?: Record<string, number>; states?: Record<string, Line[]>; id?: string; arrivals?: Line[] }; refusal?: { code: string; at?: string } };
+
+test('the route table names digest as a structured argument and id as text, and says both in its one line', () => {
+  const route = ROUTES.find((r) => r.name === 'inbox');
+  assert.deepEqual([route?.takes?.digest, route?.takes?.id], ['json', 'text']);
+  assert.match(route?.what ?? '', /With digest it answers every state at once, the newest 100 of each with the body cut to 180 characters, and with id one arrival whole\./u);
+});
+
+test('A GET FOR THE DIGEST REACHES THE RECORD AS true, not as the four letters, and a GET for one id answers that arrival', async () => {
+  const { call, sql, again } = await host();
+  const out = (await call('inbox?digest=true')) as { status: number; body: Whole };
+  assert.equal(out.status, 200, JSON.stringify(out.body));
+  assert.equal(out.body.value?.counts?.skipped, 5);
+  assert.ok(out.body.value?.states?.skipped?.some((a) => a.id === again), 'the second charge is not in the digest');
+  assert.equal(out.body.value?.arrivals, undefined, 'a digest was answered as a page');
+  const posted = (await call('inbox', { digest: true })) as { status: number; body: Whole };
+  assert.deepEqual(posted.body.value?.counts, out.body.value?.counts);
+
+  const one = (await call(`inbox?id=${encodeURIComponent(again)}`)) as { status: number; body: Whole };
+  assert.equal(one.status, 200, JSON.stringify(one.body));
+  assert.equal(one.body.value?.id, again);
+
+  /* EACH GOES ALONE, in the record's own refusal, and a digest that is not true or false is refused at the argument. */
+  const beside = await call('inbox?digest=true&state=skipped');
+  assert.deepEqual([beside.body.refusal?.code, beside.body.refusal?.at], ['VALUE_MALFORMED', 'state']);
+  const bad = await call('inbox?digest=1');
+  assert.equal(bad.body.refusal?.at, 'digest');
+  sql.close();
+});

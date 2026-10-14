@@ -13,13 +13,13 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { HELD, collect, declarationsOf, fold, heldIn, hitsIn, judge, kernelWords, namesIn, namesOfDocument, namesOfSource, read, unnamed } from '../core-names.mjs';
+import { HELD, collect, declarationsOf, fold, heldIn, hitsIn, judge, kernelWords, namesIn, namesOfDocument, namesOfSource, read, seedAddOns, unnamed } from '../core-names.mjs';
 import { EXEMPT, HELD as WORDS_HELD, PUBLIC_WORDS, WORDS, uncomment, wordsWith } from '../shell-words.mjs';
 
 const gates = join(import.meta.dirname, '..');
@@ -162,6 +162,60 @@ test('the field pass leaves out five letters or fewer and an id two add-ons decl
   assert.equal(files, 2);
   assert.deepEqual([...names.values()].filter((n) => n.kind === 'field').map((n) => n.name), ['matures_on']);
   assert.ok(!names.has('amount') && !names.has('label'));
+});
+
+/* A FILE BESIDE ITS MODULE. The same file, read with the seed's module standing and with it gone. */
+test("an add-on's file beside the seed module it replaces says its id and no more, and is read whole the day the module goes", () => {
+  const dir = mkdtempSync(join(tmpdir(), 'core-names-beside-'));
+  const put = (path, text) => {
+    mkdirSync(join(dir, path, '..'), { recursive: true });
+    writeFileSync(join(dir, path), text);
+  };
+  const pack = (id) => ({
+    pack: id,
+    requires: { packs: { ledgerbook: '^1.0.0' } },
+    declarations: [{ register: `${id}_rows`, fields: [{ id: `${id}_keeper` }] }, { metric: `${id}-held` }],
+  });
+  const said = () => [...collect(dir).names.values()].map((n) => `${n.kind} ${n.name}`).sort();
+  const whole = (id) => [`add-on ${id}`, `field ${id}_keeper`, `figure ${id}-held`, `list ${id}_rows`];
+  try {
+    put('packs/orchard/orchard.pack.json', JSON.stringify(pack('orchard')));
+    put('packs/cellar/cellar.pack.json', JSON.stringify(pack('cellar')));
+    put('packages/seed/src/modules/orchard.ts', "export const ORCHARD = [{ id: 'orchard_rows', pack: 'orchard', fields: [{ id: 'orchard_keeper' }] }];\n");
+    /* A comment, a type and a test name no add-on, and neither does the same key outside the seed's two folders. */
+    put('packages/seed/src/modules/base.ts', "/* pack: 'cellar' */\nexport type Module = { pack: string };\n");
+    put('packages/seed/src/modules/cellar.test.ts', "export const T = { pack: 'cellar' };\n");
+    put('packages/seed/src/index.ts', "export const SEED = { pack: 'cellar' };\n");
+    put('packages/kernel/src/modules/cellar.ts', "export const C = { pack: 'cellar' };\n");
+    assert.deepEqual([...seedAddOns(dir)], ['orchard']);
+    /* With the module standing: its id and what it asks for. The neighbour, which the seed never held, is read whole. */
+    assert.deepEqual(said(), ['add-on ledgerbook', 'add-on orchard', ...whole('cellar')].sort());
+    assert.equal(collect(dir).files, 2, 'the file is still counted as read');
+    /* A module in a folder holds its add-on back as a single file does. */
+    rmSync(join(dir, 'packages/seed/src/modules/orchard.ts'));
+    put('packages/seed/src/modules/orchard/lists/rows.ts', "export const ROWS = { id: 'orchard_rows', pack: 'orchard' };\n");
+    assert.deepEqual([...seedAddOns(dir)], ['orchard']);
+    /* The module goes, and nothing here changes: the same file now makes every name it declares. */
+    rmSync(join(dir, 'packages/seed/src/modules/orchard'), { recursive: true });
+    assert.deepEqual([...seedAddOns(dir)], []);
+    assert.deepEqual(said(), ['add-on ledgerbook', ...whole('orchard'), ...whole('cellar')].sort());
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('this tree: every pack file the seed also holds makes the names it made before it was written, and the seed is read, not listed', () => {
+  const seeded = seedAddOns(repo);
+  const beside = [...seeded].filter((id) => existsSync(join(repo, 'packs', id, `${id}.pack.json`)));
+  for (const id of beside) {
+    const doc = JSON.parse(readFileSync(join(repo, 'packs', id, `${id}.pack.json`), 'utf8'));
+    const own = [...reading.names.values()].filter((n) => n.by.has(id) && n.by.size === 1);
+    assert.deepEqual(own.filter((n) => n.kind !== 'add-on'), [], `${id} is still in the seed, and its file made a name of its own`);
+    /* It is not read as empty either: the file holds lists, and reading it whole would make them names. */
+    assert.ok(namesOfDocument(doc, id).some((f) => f.kind === 'list'), `${id}'s file declares a list`);
+  }
+  /* Nothing under packs/ that the seed does not hold is passed over. */
+  assert.ok(!seeded.has('dates') && [...reading.names.values()].some((n) => n.by.has('dates') && n.kind !== 'add-on'), 'dates');
 });
 
 for (const [tree, place] of [

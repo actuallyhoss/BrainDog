@@ -795,11 +795,12 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
   /* AND PEOPLE 3.3.0'S HEALTH PAGE, the record's vital signs, comes off first. */
   /* AND PEOPLE 3.4.0'S NOTE OF WHO MAY BE HELD TWICE comes off the People page with it (people-held-twice-69). */
   /* AND PEOPLE 3.4.0'S CALENDAR PAGE, added while it is unreleased (calendar-page-82). */
+  /* AND PEOPLE 3.4.0'S ACTIVITY PAGE, added while it is still unreleased (activity-page-88). */
   people: {
     version: '3.1.0',
     released: '36328d2fcaeb58f3',
     undo: (raw) =>
-      withPage({ ...raw, declarations: (raw.declarations as Body[]).filter((d) => d.page !== 'health' && d.page !== 'calendar') }, 'people', (now) =>
+      withPage({ ...raw, declarations: (raw.declarations as Body[]).filter((d) => d.page !== 'health' && d.page !== 'calendar' && d.page !== 'activity') }, 'people', (now) =>
         now.flatMap((b) =>
           (b.when as Body | undefined)?.metric === 'held-twice'
             ? []
@@ -1024,6 +1025,8 @@ const DUE_NO_NEAR_EDGE = 'state is open or part, due before +8d';
  * lasts the year" (founder-lasts-74).
  */
 const lookBefore = (doc: Body, id: string): Body => {
+  /* A TEAM'S HOME DRAWS GONE QUIET inside the unreleased 2.21.0 (founder-home-quiet-88, batch 88): it comes off. */
+  if (id === 'team') return withPage(doc, 'home-team', (now) => now.filter((b) => b.source !== 'exceptions'));
   if (id !== 'founder') return doc;
   const config = doc.config as Record<string, Body> | undefined;
   return {
@@ -1046,6 +1049,7 @@ const lookBefore = (doc: Body, id: string): Body => {
           title: 'Overview',
           blocks: (d.blocks as Body[]).flatMap((b) => {
             if (b.heading === 'Late') return [];
+            if (b.source === 'exceptions' || (b.kind === 'section' && b.heading === 'Agents at work')) return [];
             if (b.kind === 'note' && typeof b.body === 'string' && b.body.endsWith('it lasts the year.')) return [];
             if (b.kind === 'note' && typeof b.body === 'string' && b.body.includes('{{runway-days}}')) return [{ ...b, when: { metric: 'books-held', lt: 2 } }];
             if (b.heading === 'Due this week') return [{ ...b, where: DUE_NO_NEAR_EDGE }];

@@ -240,7 +240,10 @@ export default function guards(
   const bodies = new Map();
   const homes = new Map();
   for (const { file, text } of surfaces) {
-    const starts = [...text.matchAll(/^ {4}(?:async )?([a-zA-Z]+)\((.*)$/gm)].map((m) => ({
+    /* A METHOD MAY TAKE TYPE PARAMETERS, `inbox<const A extends InboxArgs | undefined>(`, and it is still that
+       method: the list between the name and its `(` is read past, so its body is its own and not the tail of the
+       method above it. */
+    const starts = [...text.matchAll(/^ {4}(?:async )?([a-zA-Z]+)(?:<[^()\n]*>)?\((.*)$/gm)].map((m) => ({
       name: m[1],
       at: m.index,
       /* A LINE ENDING IN `;` IS A CALL AT FOUR SPACES (a helper's body can hold one), NOT A METHOD, so it

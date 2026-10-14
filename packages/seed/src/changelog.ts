@@ -75,7 +75,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     },
   ],
   people: [
-    { version: '3.4.0', notes: 'People says when somebody may be on your record twice, with a link that opens the list at those people. Calendar is a new page: this month and the next two, with everything that has a day it is due, from every list.' },
+    { version: '3.4.0', notes: 'People says when somebody may be on your record twice, with a link that opens the list at those people. Calendar is a new page: this month and the next two, with everything that has a day it is due, from every list. Activity is a page of its own: everything that changed, a day at a time, with one line for each run, and who worked, what changed, the busy hours and what an agent asked beside it.' },
     { version: '3.3.0', notes: 'Health is a page of its own: each check this record runs on itself, by name, with what it last found. Anything that needs a look comes first, said in words and marked, and a check with nothing to go on yet says Not read yet. Under the first line it says how many checks have not been read yet.' },
     {
       version: '3.2.0',
@@ -255,6 +255,11 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     { version: '1.6.0', notes: 'Work\'s own page lists tasks as checklists cut so that each task sits under exactly one: Today, This week, Waiting on you, With an agent, After this week, Later and No due day.' },
   ],
   agents: [
+    {
+      version: '1.13.0',
+      notes:
+        'Agents has a new page, How the brain changed, opened from What the brain learned. It says how many learnings arrived this month and how many have faded, draws the learnings that arrived week by week once there are three weeks to draw, and lists what changed, newest first, each with the failure that taught it. Faded lists the learnings nobody confirmed in ninety days, with how many there are. Skill versions are not on it yet.',
+    },
     {
       version: '1.12.0',
       notes:

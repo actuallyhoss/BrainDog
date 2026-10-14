@@ -1,0 +1,209 @@
+/**
+ * HOW THE BRAIN CHANGED (AGT-C17 job b), the Agents add-on's page since 1.13.0: "the brain's growth over time: learnings
+ * arriving and skills changing, with before and after", "easily visually displayed on the web ui". Batches 85 to 87
+ * made agents capture learnings, confirm them and be told when a skill is behind; this is the page that shows it.
+ *
+ * WHAT IT HOLDS: one line said from figures, a chart by week of the learnings that arrived, What changed with the
+ * failure that taught each, and Faded with its count. Reached from What the brain learned on the Agents page, and with
+ * no place of its own in the rail.
+ *
+ * WHAT IT DOES NOT HOLD YET: skill versions by week, and a skill's before and after. Both read the record's log, and no
+ * figure an add-on may declare reads the log by week (AGT-C17 job c).
+ */
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+import { normalise, type Pack } from '@braindog/declare';
+import { openRecord, type Kernel } from '@braindog/kernel';
+import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.ts';
+
+import { AGENTS_PACK, AGENTS_PAGES, NOW, agentsPackDocument, day, declarations, installAgentsPack } from '../src/index.ts';
+import { AGENTS_METRICS } from '../src/packs/agents.ts';
+
+const value = <T>(r: unknown): T => {
+  const x = r as { ok: boolean; value: T; refusal?: { code: string; fix: string; at?: string } };
+  assert.ok(x.ok, x.ok ? '' : `${x.refusal?.code} at ${x.refusal?.at}: ${x.refusal?.fix}`);
+  return x.value;
+};
+
+/** A record with Things and the add-on and nothing else: what a person who just switched it on holds. */
+async function fresh(): Promise<{ k: Kernel; sql: NodeSql }> {
+  const sql = openSqlite();
+  const k = await openRecord(sql, fixedClock(NOW));
+  value(await k.install(declarations().filter((d) => d.id === 'register.things')));
+  value(await installAgentsPack(k));
+  return { k, sql };
+}
+
+type When = { metric?: string; gt?: number; is?: number };
+type Declared = { kind: string; key?: string; heading?: string; icon?: string; lead?: boolean; fold?: boolean; body?: string; when?: When; source?: string; where?: unknown; order?: unknown; limit?: number; back?: number; series?: { metric: string; label?: string }[]; columns?: { field: string; as?: string; label?: string }[] };
+type Drawn = Declared & { drawn?: boolean; rows: { fields: Record<string, unknown> }[]; matched: number; refusals: unknown[]; bars?: { bucket: string; keys: string[]; values: (number | null)[][] } };
+
+const PAGE = AGENTS_PAGES.brain as unknown as { page: string; title: string; nav?: unknown; for?: unknown; icon?: string; requires: string[]; blocks: Declared[] };
+const opened = (k: Kernel): Drawn[] => value<{ blocks: Drawn[] }>(k.page('brain')).blocks;
+const keyed = (blocks: Drawn[], key: string): Drawn => {
+  const found = blocks.find((b) => b.key === key);
+  assert.ok(found, `no block keyed ${key}`);
+  return found;
+};
+const reading = (k: Kernel, id: string): number | null => {
+  const decl = k.metricDecl(id);
+  assert.ok(decl, `${id} is not declared on the record`);
+  return value<{ value: number | null }>(k.metric(decl)).value;
+};
+
+const DAY_MS = 86_400_000;
+const AS = { actor: 'p_seed' };
+
+test('THE PAGE IS DECLARED: How the brain changed, with no place in the rail, and every block has a key', async () => {
+  assert.ok(PAGE, 'the add-on holds no page `brain`');
+  assert.equal(PAGE.title, 'How the brain changed');
+  assert.equal(PAGE.nav, undefined, 'the page takes a place of its own in the rail');
+  assert.equal(PAGE.for, undefined, 'it is one page, not one a learning');
+  assert.deepEqual(PAGE.requires, ['register.learnings']);
+  const keys = PAGE.blocks.map((b) => b.key);
+  for (const [i, b] of PAGE.blocks.entries()) assert.match(String(b.key), /^[a-z][a-z0-9-]*$/u, `block ${i}, a ${b.kind}, has no key`);
+  assert.equal(new Set(keys).size, keys.length, `a key is used twice: ${keys.join(', ')}`);
+  for (const b of PAGE.blocks) assert.doesNotMatch(`${b.heading ?? ''} ${b.body ?? ''}`, /—|\brows?\b|\bentit|list item|\bLN\d|#\d/iu, `${b.key} reads as the machine`);
+  /* THE ADD-ON SAYS IT PROVIDES THE PAGE AND ITS TWO FIGURES. */
+  const pack = value<Pack>(await normalise(agentsPackDocument()));
+  for (const id of ['page.brain', 'metric.learnings-arrived', 'metric.learnings-charted']) assert.ok(pack.manifest.provides.includes(id), `${id} is not provided`);
+  assert.equal(AGENTS_PACK.manifest.version, '1.13.0');
+});
+
+test('THE AGENTS PAGE LINKS TO IT FROM What the brain learned', () => {
+  const blocks = AGENTS_PAGES.agents!.blocks as Declared[];
+  const at = blocks.findIndex((b) => b.kind === 'section' && b.heading === 'What the brain learned');
+  assert.ok(at > 0, 'What the brain learned is gone');
+  const link = blocks.slice(at + 1).find((b) => b.kind === 'note' && String(b.body).includes('(/p/brain)'));
+  assert.ok(link, 'nothing under What the brain learned opens the page');
+  assert.equal(link.body, '[How the brain changed](/p/brain)');
+  assert.equal(link.key, 'brain-link');
+  assert.equal(link.when, undefined, 'the link is drawn only some of the time');
+  assert.ok(!blocks.slice(at + 1).some((b) => b.kind === 'section'), 'a section parts the link from What the brain learned');
+});
+
+test('IT OPENS ON ONE LINE SAID FROM FIGURES, and a clause at nought is left out', () => {
+  const leads = PAGE.blocks.filter((b) => b.lead);
+  assert.deepEqual([PAGE.blocks[0]!.kind, PAGE.blocks[0]!.lead], ['note', true]);
+  /* TWO NOTES ON ONE FIGURE, so exactly one draws, as the Agents page's line does. */
+  assert.deepEqual(leads.map((b) => b.when), [{ metric: 'learnings-arrived', gt: 0 }, { metric: 'learnings-arrived', is: 0 }]);
+  assert.equal(leads[0]!.body, '{{learnings-arrived}} learning(s) arrived this month, {{learnings-faded}} faded');
+  assert.equal(leads[1]!.body, 'No learning arrived this month, {{learnings-faded}} faded');
+  /* THE WRITER SPLITS A LINE AT ITS COMMAS and drops a clause whose every figure is nought (`leadOf` in the web's
+     `record/metrics.ts`), so each figure is alone in its clause. */
+  for (const lead of leads) {
+    const clauses = String(lead.body).split(/,\s+/u);
+    assert.equal(clauses.length, 2);
+    assert.equal(clauses.filter((c) => c.includes('{{learnings-faded}}')).length, 1);
+    for (const c of clauses) assert.ok((c.match(/\{\{/gu) ?? []).length <= 1, `two figures share a clause: ${c}`);
+  }
+});
+
+test('THE BLOCKS: a chart by week drawn only from three points, What changed newest first with the failure, and Faded with its count', () => {
+  const by = (key: string): Declared => PAGE.blocks.find((b) => b.key === key)!;
+  const chart = by('by-week');
+  assert.deepEqual([chart.kind, chart.heading], ['series', 'Learnings that arrived, by week']);
+  assert.deepEqual(chart.series, [{ metric: 'learnings-by-week', label: 'Learnings' }]);
+  assert.equal(chart.back, 24, 'the chart reaches back six months');
+  /* THREE POINTS: drawn only while a learning arrived two weeks ago or more, so its week, the one after and this one
+     are three bars at least. A chart of one bar says nothing a number does not. */
+  assert.deepEqual(chart.when, { metric: 'learnings-charted', gt: 0 });
+  assert.equal(AGENTS_METRICS['learnings-charted']!.where, 'created_at after -182d, created_at before -14d');
+
+  const changed = by('changed');
+  assert.deepEqual([changed.kind, changed.heading, changed.source], ['cards', 'What changed', 'register.learnings']);
+  assert.deepEqual(changed.order, [{ field: 'created_at', dir: 'desc' }]);
+  assert.deepEqual(changed.columns!.slice(0, 2), [{ field: 'lesson', as: 'title' }, { field: 'because', as: 'reply' }]);
+  assert.ok(changed.columns!.some((c) => c.field === 'supersedes'), 'a learning that replaced another does not say which');
+
+  const faded = by('faded');
+  assert.deepEqual([faded.kind, faded.heading, faded.source], ['section', 'Faded', 'register.learnings']);
+  assert.deepEqual(faded.where, AGENTS_METRICS['learnings-faded']!.where, 'Faded and its figure count different learnings');
+  assert.deepEqual(faded.when, { metric: 'learnings-faded', gt: 0 });
+  const cards = by('faded-learnings');
+  assert.deepEqual([cards.kind, cards.heading], ['cards', undefined]);
+  assert.deepEqual(cards.where, faded.where);
+  assert.deepEqual(cards.when, faded.when);
+  assert.equal(PAGE.blocks.indexOf(cards), PAGE.blocks.indexOf(faded) + 1);
+});
+
+test('ON A FRESH RECORD IT INSTALLS CLEAN, and draws its line and no empty chart or Faded', async () => {
+  const { k, sql } = await fresh();
+  const page = k.pages().find((p) => p.slug === 'brain');
+  assert.ok(page, k.pages().map((p) => p.slug).join(', '));
+  assert.equal(page.title, 'How the brain changed');
+  const blocks = opened(k);
+  for (const b of blocks) assert.deepEqual(b.refusals, [], `${b.key}: ${JSON.stringify(b.refusals)}`);
+  assert.deepEqual(blocks.map((b) => b.key), PAGE.blocks.map((b) => b.key), 'a block answers under another key');
+  assert.deepEqual([reading(k, 'learnings-arrived'), reading(k, 'learnings-faded'), reading(k, 'learnings-charted')], [0, 0, 0]);
+  assert.deepEqual([keyed(blocks, 'line').drawn, keyed(blocks, 'line-quiet').drawn], [false, undefined], 'the quiet line is not the one drawn');
+  for (const key of ['by-week', 'changed', 'faded', 'faded-learnings']) assert.equal(keyed(blocks, key).drawn, false, `${key} is drawn over nothing`);
+  /* AND THE AGENTS PAGE STILL READS, its link among its blocks. */
+  const agents = value<{ blocks: Drawn[] }>(k.page('agents')).blocks;
+  assert.deepEqual(agents.find((b) => b.key === 'brain-link')?.refusals, []);
+  sql.close();
+});
+
+test('SIX LEARNINGS OVER FOUR WEEKS, ONE NOT CONFIRMED IN A HUNDRED DAYS: the chart answers the weeks, and one has faded', async () => {
+  const { k, sql } = await fresh();
+  /* Days back from the record's today, a Thursday: two this week, one in each of the two before, two in the fourth. */
+  const BACK = [1, 2, 9, 16, 22, 23];
+  const made: string[] = [];
+  for (const [i, back] of BACK.entries()) {
+    const row = value<{ id: string }>(
+      k.create(
+        'learnings',
+        {
+          lesson: `Lesson ${i + 1}: check the thing before it ships.`,
+          because: `Failure ${i + 1}: it shipped unchecked and a morning went on putting it right.`,
+          kind: 'method',
+          ...(i === 5 ? { confirmed_on: day(-100) } : {}),
+        },
+        AS,
+      ),
+    );
+    sql.exec('UPDATE entry SET created_at = ? WHERE id = ?', new Date(NOW - back * DAY_MS).toISOString(), row.id);
+    made.push(row.id);
+  }
+  assert.equal(reading(k, 'learnings-arrived'), 6);
+  assert.equal(reading(k, 'learnings-faded'), 1);
+  assert.ok((reading(k, 'learnings-charted') ?? 0) > 0);
+
+  const blocks = opened(k);
+  for (const b of blocks) assert.deepEqual(b.refusals, [], `${b.key}: ${JSON.stringify(b.refusals)}`);
+  assert.deepEqual([keyed(blocks, 'line').drawn, keyed(blocks, 'line-quiet').drawn], [undefined, false]);
+
+  /* THE CHART'S WEEKS: four of them, the oldest first, since a week before the first learning is trimmed. */
+  const chart = keyed(blocks, 'by-week');
+  assert.notEqual(chart.drawn, false);
+  assert.equal(chart.bars?.bucket, 'week');
+  assert.equal(chart.bars?.keys.length, 4, chart.bars?.keys.join(', '));
+  assert.deepEqual(chart.bars?.values, [[2, 1, 1, 2]]);
+
+  /* WHAT CHANGED, the newest first, each with the failure that taught it. */
+  const changed = keyed(blocks, 'changed');
+  assert.equal(changed.matched, 6);
+  assert.deepEqual(changed.rows.map((r) => r.fields.lesson), [1, 2, 3, 4, 5, 6].map((n) => `Lesson ${n}: check the thing before it ships.`));
+  assert.match(String(changed.rows[0]!.fields.because), /^Failure 1: /u);
+
+  /* FADED: the one, counted on the heading and drawn under it. */
+  assert.equal(keyed(blocks, 'faded').matched, 1);
+  const faded = keyed(blocks, 'faded-learnings');
+  assert.deepEqual(faded.rows.map((r) => r.fields.lesson), ['Lesson 6: check the thing before it ships.']);
+  sql.close();
+});
+
+test('A CHART OF FEWER THAN THREE WEEKS IS NOT DRAWN: learnings of this week and last say it in the line alone', async () => {
+  const { k, sql } = await fresh();
+  for (const back of [1, 8]) {
+    const row = value<{ id: string }>(k.create('learnings', { lesson: `Lesson from ${back} days back, kept.`, because: 'It went wrong once and took a morning to put right.', kind: 'fact' }, AS));
+    sql.exec('UPDATE entry SET created_at = ? WHERE id = ?', new Date(NOW - back * DAY_MS).toISOString(), row.id);
+  }
+  const blocks = opened(k);
+  assert.equal(reading(k, 'learnings-arrived'), 2);
+  assert.equal(keyed(blocks, 'by-week').drawn, false, 'two points were drawn as a chart');
+  assert.equal(keyed(blocks, 'changed').matched, 2);
+  sql.close();
+});

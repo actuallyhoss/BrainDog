@@ -52,6 +52,9 @@
 
   const rowOf = (r: ActionRow): HubRow => {
     const said = stateOf(r, now);
+    /* THE LINK THAT PUTS A KEY RIGHT CARRIES WHAT THE VAULT SHOULD OPEN ON AS `state`, for the row list to navigate
+       with: the address itself is the plain Vault, with no key's name in it. */
+    const mend = said.reconnect && { path: said.reconnect.href, label: said.reconnect.label, state: said.reconnect.state };
     return {
       key: r.ingest,
       /* ITS ID IN WORDS, NEVER THE ID. An action declares no title, and a slug in a list of named automations one
@@ -64,7 +67,7 @@
       dot: said.tone === 'warn' ? 'warn' : null,
       path: null,
       icon: channelIcon(r.channel),
-      ...(said.reconnect ? { fix: { path: said.reconnect.href, label: said.reconnect.label } } : {}),
+      ...(mend ? { fix: mend } : {}),
     };
   };
 

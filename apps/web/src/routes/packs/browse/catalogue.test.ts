@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { exportUseCase } from '@braindog/declare';
+import { exportUseCase, MODULES } from '@braindog/declare';
 import { emptyCatalogue, newAuthorKey, publishTo, type AuthorKey, type CatalogueEntry, type CatalogueIndex, type CatalogueVersion } from '@braindog/declare/catalogue';
 
 import {
@@ -378,6 +378,9 @@ test('the catalogue this app ships lists every pack in packs/, at its version, b
   assert.ok(packs.some((p) => p.folder === 'project-brief'), 'packs/project-brief is gone, so this test proves nothing');
   for (const { folder, text } of packs) {
     const { pack, version } = JSON.parse(text) as { pack: string; version: string };
+    /* A MODULE'S OWN FILE WAITS FOR THE MODULE TO GO (SHL-A13): the catalogue tool passes it over until then, and it is
+       published when the module is taken out, so it is not looked for here. */
+    if ((MODULES as readonly string[]).includes(pack)) continue;
     const entry: CatalogueEntry | undefined = index.value.entries.find((e) => e.kind === 'pack' && e.id === pack);
     assert.ok(entry, `packs/${folder} (${pack}) is not in the shipped catalogue, which lists ${index.value.entries.map((e) => e.id).join(', ')}. Run node tools/catalogue/from-packs.mjs.`);
     const listed: CatalogueVersion | undefined = entry.versions.find((v) => v.version === version);

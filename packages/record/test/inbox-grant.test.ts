@@ -101,7 +101,7 @@ test('THE REACH OPENS THE INBOX TO NOBODY ELSE: a scoped token, a demoted owner,
   sql.close();
 });
 
-test('THE REACH READS AND DOES NOT TRIAGE: filing and archiving stay a person in a browser', async () => {
+test("THE TWO OLDER VERBS STAY A PERSON'S: fileArrival and archiveArrival refuse a token with the reach, which files through triage", async () => {
   const { api, sql, ids } = await record();
   /* `NEEDS_BROWSER_SESSION`, WHICH IS `admin`'S ANSWER TO EVERY TOKEN. This asserted `FORBIDDEN` first and was wrong:
      the refusal is the one a token of any scope gets from any ADMIN method, which is the point, since the reach was

@@ -98,7 +98,7 @@ test('(1) ASK, HEADLINE, LOOK AND UNDERSTAND COME BACK LABELLED, each row under 
   }
 });
 
-test("(2) THE ENGINE'S OWN ROWS SAY THEIRS: his question is `ask`, a rule's is `automation`, the record's draft is `look`", async () => {
+test("(2) THE ENGINE'S OWN ROWS SAY THEIRS: his question is `ask`, a rule's is `automation`, the record's draft is `pattern`", async () => {
   const { sql, inference, slash } = build();
   try {
     inference.say(PREDICATE);
@@ -112,7 +112,7 @@ test("(2) THE ENGINE'S OWN ROWS SAY THEIRS: his question is `ask`, a rule's is `
     assert.deepEqual(listed(slash).map((a) => [a.kind, a.purpose]), [
       ['read', 'ask'],
       ['read', 'automation'],
-      ['pattern', 'look'],
+      ['pattern', 'pattern'],
     ]);
   } finally {
     sql.close();

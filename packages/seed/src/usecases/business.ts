@@ -59,7 +59,9 @@ export const BUSINESS = {
      with Shop beside it. The use case a sentence proposes changed, so a minor step.
      1.7.1: its Home is titled Today, where it said Overview under a rail item that says Today (this use case's voice
      names no word for Home, so the rail says the house's). One word on a page that is already there, so a patch step.
-     1.7.0 is live. */
+     1.7.0 is live. Still unreleased (commit 63423720 holds 1.7.0), it takes batch 88's block with no version of its
+     own: Home draws Gone quiet, what stopped reporting, straight under What you have (founder-home-quiet-88), a sixth
+     tile on a page held to six. A block added, nothing taken away. */
   version: '1.7.1',
   title: 'Small business',
   summary: 'Money in and out, the hosting and subscriptions you run on, the people involved and the work.',
@@ -99,6 +101,22 @@ export const BUSINESS = {
           /* THE PAGE'S ONE LINE, SINCE 1.4.0, said from the one figure every record has whatever it installs. */
           { kind: 'note', lead: true, span: 12, body: '{{questions-open}} question(s) need your call' },
           { kind: 'stat', lead: true, heading: 'What you have', icon: 'wallet', span: 12, source: 'figures.home' },
+          {
+            /* WHAT STOPPED REPORTING, STRAIGHT UNDER WHAT THERE IS, INSIDE 1.7.1 (batch 88): the table a founder's Home
+               draws since 2.6.0 and the browser draws on the Today it builds, word for word, over the record's own read
+               of what went quiet. No `when:` and no `empty:`: the record leaves it out while nothing is quiet. */
+            kind: 'table',
+            heading: 'Gone quiet',
+            icon: 'history',
+            span: 12,
+            source: 'exceptions',
+            columns: [
+              { field: 'subject', label: 'What' },
+              { field: 'since', label: 'Last seen' },
+              { field: 'was', label: 'Before' },
+            ],
+            limit: 6,
+          },
           {
             /* EVERY LIST THAT HOLDS A DUE DAY, overdue first and then by day: an invoice, a bill, a renewal and a task
                are one week, and the amount carries its own sign. */

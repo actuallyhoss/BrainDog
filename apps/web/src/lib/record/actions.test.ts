@@ -27,7 +27,9 @@ import {
   readUsage,
   stateOf,
   usageFromLedger,
+  ownPress,
   reconnectHref,
+  reconnectState,
   weeksOf,
   whatOf,
   words,
@@ -36,6 +38,7 @@ import {
   type Fetch,
 } from './actions.ts';
 import { signInFor } from './packs.ts';
+import { RECONNECT_STATE } from './vault.ts';
 import { copy } from '../copy.ts';
 
 const NOW_MS = Date.parse('2026-09-15T12:00:00.000Z');
@@ -83,19 +86,39 @@ test('how often is said in words, and a spelling it does not know is printed as 
   assert.equal(often('fortnightly'), 'fortnightly');
 });
 
+test('A PRESS THAT STAYS IN THIS TAB is the only one followed with state; a new tab or window is the browser\'s own', () => {
+  const press = { button: 0, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, defaultPrevented: false };
+  assert.equal(ownPress(press), true);
+  for (const other of [{ button: 1 }, { metaKey: true }, { ctrlKey: true }, { shiftKey: true }, { altKey: true }, { defaultPrevented: true }]) {
+    assert.equal(ownPress({ ...press, ...other }), false, JSON.stringify(other));
+  }
+});
+
 test('A PAUSED ACTION SAYS WHY in one calm sentence, in warn and never in red, and offers Resume', () => {
   const refused = stateOf(row({ state: 'paused', last: { at: '2026-09-15T06:11:00.000Z', outcome: 'paused', status: 401, note: '' } }), NOW_MS);
   assert.equal(refused.tone, 'warn');
   assert.equal(refused.resume, true);
   assert.match(refused.line, /api\.stripe\.com did not accept the key "Stripe read"/);
 
-  assert.deepEqual(refused.reconnect, { href: reconnectHref('Stripe read', 'stripe-balance'), label: 'Reconnect key' });
-  const asked = new URL(refused.reconnect?.href ?? '', 'https://x.example');
-  assert.deepEqual([asked.pathname, asked.searchParams.get('reconnect'), asked.searchParams.get('then')], ['/vault', 'Stripe read', 'stripe-balance']);
+  /* THE ADDRESS IS THE VAULT AND NOTHING MORE. The key's name and the action to resume ride in the navigation's state,
+     under the key the Vault reads, so neither lands in the browser's history or in a link that is passed on. */
+  assert.equal(reconnectHref(), '/vault');
+  assert.deepEqual(refused.reconnect, {
+    href: '/vault',
+    label: 'Reconnect key',
+    state: { [RECONNECT_STATE]: { key: 'Stripe read', then: 'stripe-balance' } },
+  });
+  assert.deepEqual(reconnectState('Stripe read', 'stripe-balance'), refused.reconnect?.state);
+  for (const said of [refused.reconnect?.href ?? '', refused.reconnect?.label ?? '']) {
+    assert.ok(!said.includes('?'), `"${said}" carries a query`);
+    assert.ok(!/stripe/iu.test(said), `"${said}" names the key or the action`);
+  }
 
   const gone = stateOf(row({ state: 'paused', last: { at: '2026-09-15T06:11:00.000Z', outcome: 'paused', status: null, note: '' } }), NOW_MS);
   assert.match(gone.line, /not in the vault/);
   assert.equal(gone.reconnect?.label, 'Add the key');
+  assert.equal(gone.reconnect?.href, '/vault');
+  assert.deepEqual(gone.reconnect?.state[RECONNECT_STATE], { key: 'Stripe read', then: 'stripe-balance' });
 
   /* THE KERNEL PAUSES A ROW WHOSE KEY IS NOT IN THE VAULT AT FIRE TIME, before any run, so there is no paused run to read. */
   for (const last of [null, { at: '2026-09-14T06:11:00.000Z', outcome: 'ok' as const, status: 200, note: '' }]) {

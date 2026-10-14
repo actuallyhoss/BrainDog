@@ -242,6 +242,11 @@ const GATES = [
      checks the gate it lands on, presses the count and checks it reaches Decide. Its own ephemeral
      port, for the reason `passkey` has one. */
   ['queue', call(join(here, 'queue.mjs'))],
+  /* AND THE PANEL BESIDE A LIST, PRESSED (PGS-C04's guard). Every list opens the one editing panel and each seam of it
+     was tested from the source; nothing had pressed `p`, Save, Undo, `j` or Escape on one. On a fresh record with ten
+     tasks it does, at the desk width and at 390 where the panel is a bottom sheet, and reads the list, the toast and the address.
+     A walk, so it lives in `walks/`; its own ephemeral port, for the reason `passkey` has one. */
+  ['row-drawer', call(join(here, 'walks', 'row-drawer.walk.mjs'))],
   /* WHAT A SETTLED SCREEN PRINTS (PRF-B04 job 7): every address the gates' record gives, drawn once at 390 on the record's
      clock, red on a raw id, a raw time, a key, a value that never arrived or a page error. Its own ephemeral port, for
      the reason passkey has one. */

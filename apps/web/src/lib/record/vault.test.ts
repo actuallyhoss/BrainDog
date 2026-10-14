@@ -9,13 +9,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import type { DeviceRow } from '@braindog/client';
+import type { Client, DeviceRow } from '@braindog/client';
 
 import { copy } from '../copy.ts';
 import * as vault from './vault.ts';
 import {
   GLOBAL, VAULT_ALL_DAYS, VAULT_DAYS, answerLine, approve, asks, daysFor, holders, keysOf, namesOf, packSaid, planOf, reprove, revoke,
-  reconnectOf, scopeName, words,
+  READ_ALL_PAGES, RECONNECT_STATE, readAll, reconnectFrom, reconnectOf, scopeName, words,
+  type GrantState, type KeyRow, type ReconnectState,
 } from './vault.ts';
 
 const row = (over: Partial<DeviceRow>): DeviceRow => ({
@@ -192,6 +193,100 @@ test('NOTHING A PERSON READS CARRIES A VALUE, A CODE OR A HANDLE', () => {
   assert.doesNotMatch(words.noKeysHow, /keys get/);
 });
 
+test('A SEALED ROW SAYS WHAT IT IS UNOPENED: its size and its hint, from the grant or from what a briefing already knew', () => {
+  const rows = [
+    { id: 'c1', fields: { label: 'A joined', opens: 'o', value: 'g1' } },
+    { id: 'c2', fields: { label: 'B briefed', opens: 'o', value: { sealed: true, opened: 1, last_opened: null, bytes: 12, hint: 'a 12-character value' } } },
+  ];
+  const keys = keysOf(rows, [{ id: 'g1', opened: 0, last_opened: null, revoked_at: null, bytes: 40, hint: 'a 40-character value' }], new Map());
+  assert.deepEqual(keys.map((k) => [k.bytes, k.hint]), [[40, 'a 40-character value'], [12, 'a 12-character value']]);
+});
+
+test('A ROW WITH NO VALUE, AN OLDER SEAL OR A REVOKED ONE CARRIES NEITHER, and a fact that is not one is not drawn', () => {
+  const rows = [
+    { id: 'c1', fields: { label: 'A none', opens: 'o', where: '1Password' } },
+    { id: 'c2', fields: { label: 'B older', opens: 'o', value: 'g_old' } },
+    { id: 'c3', fields: { label: 'C nulls', opens: 'o', value: 'g_null' } },
+    { id: 'c4', fields: { label: 'D revoked', opens: 'o', value: 'g_gone' } },
+    { id: 'c5', fields: { label: 'E briefed', opens: 'o', value: { sealed: true, opened: 0, last_opened: null } } },
+    { id: 'c6', fields: { label: 'F unsealed', opens: 'o', value: { sealed: false, opened: 0, last_opened: null, bytes: 9, hint: 'a 9-character value' } } },
+    { id: 'c7', fields: { label: 'G odd', opens: 'o', value: 'g_odd' } },
+  ];
+  const grants = [
+    { id: 'g_old', opened: 2, last_opened: null, revoked_at: null },
+    { id: 'g_null', opened: 2, last_opened: null, revoked_at: null, bytes: null, hint: null },
+    { id: 'g_gone', opened: 2, last_opened: null, revoked_at: '2026-09-01', bytes: 40, hint: 'a 40-character value' },
+    { id: 'g_odd', opened: 0, last_opened: null, revoked_at: null, bytes: -1, hint: '   ' },
+  ] as GrantState[];
+  const keys = keysOf(rows, grants, new Map());
+  assert.equal(keys.length, 7);
+  for (const k of keys) {
+    assert.equal('bytes' in k, false, `${k.label} carries no size`);
+    assert.equal('hint' in k, false, `${k.label} carries no hint`);
+  }
+  /* A HINT LONGER THAN THE RECORD LETS ONE BE IS NOT A HINT (`packages/kernel/src/vault.ts`, sixty characters), and the size beside it still is. */
+  const [long] = keysOf([rows[1]!], [{ id: 'g_old', opened: 0, last_opened: null, revoked_at: null, bytes: 61, hint: 'x'.repeat(61) }], new Map());
+  assert.equal(long?.bytes, 61);
+  assert.equal('hint' in (long ?? {}), false);
+});
+
+/* ── every page of a list ── */
+
+const page = (from: number, n: number, cursor: string | null) =>
+  ({ ok: true as const, value: { rows: Array.from({ length: n }, (_, i) => ({ id: `k${from + i}` })), matched: 405, cursor } });
+
+test('EVERY KEY IS READ, A PAGE AT A TIME: 200, 200 and 5 answer 405 in order, each page asked with the cursor before it', async () => {
+  const asked: (string | null)[] = [];
+  const pages = [page(0, 200, 'c1'), page(200, 200, 'c2'), page(400, 5, null)];
+  const all = await readAll(async (cursor) => (asked.push(cursor), pages[asked.length - 1]!));
+  assert.deepEqual(asked, [null, 'c1', 'c2']);
+  assert.equal(all.rows.length, 405);
+  assert.deepEqual(all.rows.map((r) => r.id), Array.from({ length: 405 }, (_, i) => `k${i}`));
+  assert.equal(all.refused, null);
+  assert.equal(all.more, false);
+});
+
+test('a refused page answers what was read with the refusal, and asks for nothing after it', async () => {
+  const refused = { ok: false as const, refusal: { code: 'FORBIDDEN', fix: 'Sign in again.' } };
+  let calls = 0;
+  const all = await readAll(async (cursor) => (calls++, cursor === null ? page(0, 200, 'c1') : refused));
+  assert.equal(calls, 2);
+  assert.equal(all.rows.length, 200);
+  assert.equal(all.refused, refused);
+  assert.equal(all.more, true, 'a page was owed, so what was read is not all of it');
+  const first = await readAll(async () => refused);
+  assert.deepEqual(first, { rows: [], refused, more: true });
+});
+
+test('THE READ STOPS AT A CEILING IT STATES, and at a cursor that comes round again, and says more stand', async () => {
+  assert.equal(READ_ALL_PAGES, 50);
+  let calls = 0;
+  const endless = await readAll(async () => page(calls++, 1, `c${calls}`));
+  assert.equal(calls, READ_ALL_PAGES);
+  assert.equal(endless.rows.length, READ_ALL_PAGES);
+  assert.deepEqual({ refused: endless.refused, more: endless.more }, { refused: null, more: true });
+  calls = 0;
+  const three = await readAll(async () => page(calls++, 1, `c${calls}`), 3);
+  assert.deepEqual([calls, three.rows.length, three.more], [3, 3, true]);
+  calls = 0;
+  const round = await readAll(async () => page(calls++, 2, 'same'));
+  assert.deepEqual([calls, round.rows.length, round.more], [2, 4, true], 'the same cursor twice is a read that would never end');
+  const none = await readAll(async () => ({ ok: true as const, value: { rows: [{ id: 'only' }] } }));
+  assert.deepEqual(none, { rows: [{ id: 'only' }], refused: null, more: false }, 'an answer with no cursor is the last page');
+});
+
+test('the read is the client’s own `list`, a page of 200 at a time, and a refusal comes back as the client said it', async () => {
+  const sent: unknown[] = [];
+  const list = (async (args: { register: string; limit?: number; cursor?: string | null }) => {
+    sent.push(args);
+    return args.cursor ? { ok: false, refusal: { code: 'FORBIDDEN', fix: 'Sign in again.' } } : { ok: true, value: { rows: [{ id: 'k0' }], matched: 2, cursor: 'c1' } };
+  }) as unknown as Client['list'];
+  const all = await readAll((cursor) => list({ register: 'credentials', limit: 200, cursor }));
+  assert.deepEqual(sent, [{ register: 'credentials', limit: 200, cursor: null }, { register: 'credentials', limit: 200, cursor: 'c1' }]);
+  assert.deepEqual(all.rows, [{ id: 'k0' }]);
+  assert.equal(all.refused && 'refusal' in all.refused ? all.refused.refusal.code : null, 'FORBIDDEN');
+});
+
 /* ── the pack offered on connect ── */
 
 test('a plan from the record reads in the Packs screen words, and keeps its hash', () => {
@@ -258,4 +353,24 @@ test('RECONNECT OPENS THE KEY A PAUSED ACTION NAMED: its row to replace, or Add 
   assert.deepEqual(reconnectOf(asked('/vault?reconnect=GitHub%20deploy'), [row]), { mode: 'add', label: 'GitHub deploy', then: null });
   assert.equal(reconnectOf(asked('/vault'), [row]), null);
   assert.equal(reconnectOf(asked('/vault?reconnect=%20&then=x'), [row]), null);
+});
+
+test('RECONNECT FROM THE NAVIGATION STATE answers what the address answered, and nothing in the address is read', () => {
+  const row: KeyRow = { id: 'cred_1', spoken: 'credentials#1', label: 'Stripe read', opens: 'api.stripe.com', project: null, scope: null, sealed: true, opened: 3, lastOpened: null, grant: 'g_1' };
+  const asked = (href: string) => new URL(href, 'https://x.example').searchParams;
+  assert.equal(RECONNECT_STATE, 'vaultReconnect');
+  const pairs: [ReconnectState, string][] = [
+    [{ key: 'stripe READ', then: 'stripe-balance' }, '/vault?reconnect=stripe%20READ&then=stripe-balance'],
+    [{ key: 'GitHub deploy', then: null }, '/vault?reconnect=GitHub%20deploy'],
+    [{ key: '  Stripe read ', then: '  ' }, '/vault?reconnect=%20%20Stripe%20read%20&then=%20%20'],
+  ];
+  for (const [state, href] of pairs) assert.deepEqual(reconnectFrom(state, [row]), reconnectOf(asked(href), [row]));
+  assert.deepEqual(reconnectFrom({ key: 'stripe READ', then: 'stripe-balance' }, [row]), { mode: 'replace', row, then: 'stripe-balance' });
+  assert.deepEqual(reconnectFrom({ key: 'GitHub deploy', then: null }, [row]), { mode: 'add', label: 'GitHub deploy', then: null });
+  /* THE WHOLE OF A PAGE'S STATE IS NOT IT: the caller hands `page.state[RECONNECT_STATE]`, and anything else is no ask. */
+  const not: unknown[] = [
+    null, undefined, 'Stripe read', 7, [], ['Stripe read', null], {}, { key: '', then: null }, { key: '  ', then: 'x' }, { key: 5, then: null },
+    { key: 'Stripe read' }, { key: 'Stripe read', then: 5 }, { key: 'Stripe read', then: undefined }, { [RECONNECT_STATE]: { key: 'Stripe read', then: null } },
+  ];
+  for (const state of not) assert.equal(reconnectFrom(state, [row]), null, JSON.stringify(state) ?? 'undefined');
 });

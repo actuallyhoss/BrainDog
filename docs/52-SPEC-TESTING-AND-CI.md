@@ -125,7 +125,7 @@ The fewest that hold. One gate per file; a shared `lib.mjs`; one budgets file; o
 ```
 tools/
 ├── gates/
-│   ├── run.mjs                 the runner: an ordered array; 22 gates called, 7 spawned, the answer read (§5.1)
+│   ├── run.mjs                 the runner: an ordered array; 51 gates called, 5 spawned, the answer read (§5.1)
 │   ├── self-test.mjs           runs each grep gate against tools/gates/negative/<gate> (§9)
 │   ├── lib.mjs                 budgets() · budget() · keyPaths() · skipDir · MAY_REFUSE · readiness()
 │   ├── record.mjs              NOT a gate: the self-host in memory with the seed installed, served on
@@ -138,8 +138,9 @@ tools/
 │   ├── event-kinds.mjs  router-groups.mjs  guards.mjs         closed-lists.mjs slash-actor.mjs
 │   ├── refusals.mjs     refusal-fixtures.mjs  flags.mjs        em-dash.mjs
 │   ├── no-declarations-in-kernel.mjs    css-rules.mjs         colour-grep.mjs  dead-copy.mjs
-│   └── bundle.mjs       prefs.mjs       keys.mjs              layout.mjs       a11y.mjs
+│   ├── bundle.mjs       prefs.mjs       keys.mjs              layout.mjs       a11y.mjs
 │                        passkey.mjs     queue.mjs             deploy-parity.mjs
+│   └── walks/row-drawer.walk.mjs        `row-drawer`, a registered gate that is a walk and not a file beside the rest
 └── release.mjs                 `pnpm release` (§5.6)
 
 packages/skin/scripts/theme.mjs         `theme`, a registered gate that is not a file in tools/gates
@@ -229,6 +230,7 @@ rather than this table's.
 | `a11y` | axe-core over every route of five build roots (`apps/web/build`, the three variant builds, `apps/site/build`), both schemes, two widths | no unnamed control, no heading level skipped, no `aria-*` that names nothing, no contrast under the floor. It declares no `needs` on purpose: each root is skipped by name, so a tree with only the site built still gets a real audit | — |
 | `passkey` | a real browser against a real record, on its own ephemeral port | the ceremony end to end: arrive signed out, come in by the server key, add a passkey, sign out, come back in with it | `web-build` |
 | `queue` | `/p/agents` in a real browser, on its own ephemeral port | pressing an option lands on its gate, highlighted and unchosen; pressing the count of what is left lands on Decide | `web-build` |
+| `row-drawer` | a list on a fresh record with ten tasks, in a real browser on its own ephemeral port, at the desk width and at 390 (`walks/row-drawer.walk.mjs`) | a row opens in its panel with `p`, a change is saved and shows in the list, the toast and the address, Undo takes it back, `j` walks to the next row and Escape closes | `web-build` |
 | `deploy-parity` | `DEPLOY_HOST`; `apps/web/build/`; `BRAINDOG_BUILD` | SHA-256 of the live `/app/` and `/app/_app/version.json` equal the build's (`/` and `/_app/version.json` before push A of the one-domain move); `/.well-known/braindog-build` carries this run's `app` tuple. The one gate that measures something outside this repository | `host` `web-build` |
 
 ## 4 · Data structures
@@ -400,7 +402,9 @@ with `if (import.meta.main)`, which is also how `self-test` spawns it against a 
 
 The twenty-two called: `nul-bytes` `graph` `secret-grep` `event-kinds` `router-groups` `guards` `closed-lists`
 `refusals` `refusal-fixtures` `flags` `css-rules` `colour-grep` `dead-copy` `em-dash` `bundle` `prefs` `keys`
-`layout` `a11y` `passkey` `queue` `deploy-parity`. The seven spawned, and why:
+`layout` `a11y` `passkey` `queue` `deploy-parity`. That was the count on 22 September: `run.mjs` now calls fifty-one of its
+fifty-six entries, `row-drawer` (`walks/row-drawer.walk.mjs`) among them, and spawns five, `typecheck` `self-test`
+`stack` `words-guide` `theme`. The seven spawned then, and why:
 
 | Gate | Why it is spawned |
 |---|---|
@@ -723,8 +727,8 @@ sixteen plus `vault-screen`; 50 owns the spec files, this spec owns their place 
 | Property | `node --test` + fast-check | `packages/where/test` · `packages/render/test` | 1,000 predicate runs + 1,000 fuzz strings + every seed | ≤ 20 s | `ci.yml` |
 | Conformance | `node --test` (Node); Vitest (DO) | `packages/ports/src/conformance` | thirty-two cases, equal `ran` per host | ≤ 10 s Node; ≤ 4 min DO | `ci.yml` |
 | Fixtures | `node --test` | `fixtures/` · `kernel/test` · `declare/test` · `record/test` | 9 materialisations (`five-thousand` ≤ 10 s, 40 §7); 119 refusal fixtures, two of the nine `via` runners built; round-trip; determinism | ≤ 40 s | `ci.yml` |
-| Gates | `node tools/gates/run.mjs` | `tools/gates` | 27 scripts + 59 negative fixtures (§3) | ≤ 5 min | `gates.yml` |
-| Browser | Playwright 1.62.1, imported by six gates | `tools/gates` | no spec files; the browser work is `layout` `a11y` `keys` `prefs` `passkey` `queue` (§3) | nineteen minutes, which is a comment in `run.mjs` and the only figure that exists: nothing times a gate. That comment says *the two browser gates*, and was written when there were two, so the number survives it and the count does not | `gates.yml` |
+| Gates | `node tools/gates/run.mjs` | `tools/gates` | 56 gates in `run.mjs` + 59 negative fixtures (§3) | ≤ 5 min | `gates.yml` |
+| Browser | Playwright 1.62.1, imported by ten gates | `tools/gates` | no spec files; the browser work is `layout` `a11y` `keys` `prefs` `passkey` `queue` `printed` `rule-sheet` `signin-live` `row-drawer` (§3) | nineteen minutes, which is a comment in `run.mjs` and the only figure that exists: nothing times a gate. That comment says *the two browser gates*, and was written when there were two, so the number survives it and the count does not | `gates.yml` |
 | Durable Object | Vitest 4.1.11 + plugin 1.1.2 | `apps/worker/test` | twenty-eight files (§3), and neither `conformance.test.ts` nor `boot-probe.test.ts` is one of them: `ls apps/worker/test/` names neither, so this row asked for two files that have never existed | ≤ 4 min | `ci.yml` (phase 5) |
 | Deploy | `deploy-parity` | `tools/gates` | 3 fetches, ≤ 6 attempts | ≤ 2 min | `deploy.yml` |
 

@@ -233,6 +233,32 @@ const NUMBERS_THIS_WEEK: Record<string, unknown>[] = [
 ];
 
 /**
+ * WHAT WENT QUIET (ENG-B13), SINCE 2.6.0: the things this record was taking and has stopped taking, one line each, with
+ * what a person calls it, the day it was last there and what it was before ("Written to on 5 of 14 days"). The browser
+ * draws this tile on the Today it builds for a record with no Home of its own (`quietTile` in
+ * `apps/web/src/lib/home/default-home.ts`), and a founder's record has its own, so numbers that stopped a fortnight
+ * ago were said on no page read in the morning. THE SAME BLOCK, WORD FOR WORD, so the two say one thing.
+ *
+ * NO `where:` AND NO `order:`: every kind is shown, and the longest quiet first is the read's own order, which refuses
+ * one written over it. NO `empty:` AND NO `when:` EITHER. On a day nothing is quiet the record leaves the block out by
+ * itself, a heading over nothing, and no figure counts what went quiet for a `when:` to read. IT NAMES NO LIST, so the
+ * names in it are the record's.
+ */
+const GONE_QUIET: Record<string, unknown> = {
+  kind: 'table',
+  heading: 'Gone quiet',
+  icon: 'history',
+  span: 12,
+  source: 'exceptions',
+  columns: [
+    { field: 'subject', label: 'What' },
+    { field: 'since', label: 'Last seen' },
+    { field: 'was', label: 'Before' },
+  ],
+  limit: 6,
+};
+
+/**
  * A SERVICE LAPSING WITHIN THIRTY DAYS, EITHER SIDE OF TODAY, SINCE 1.16.0: one whose renewal passed in the last month
  * and can still be saved, or that lapses in the next. `state is lapsing` alone listed every domain somebody chose to
  * let go, renewing in a year's time, on the page read every morning. The Services page still counts them all.
@@ -373,7 +399,14 @@ export const FOUNDER = {
      a bill nobody can say is covered. A `when:` now takes two tests and reads the walk reaching its last day
      (`beyond`), so Home's line of what there is ends "it lasts the year" on exactly that record, with one book, and the
      line with the days stands everywhere else (`packages/seed/test/founder-runway-words.test.ts` holds the three
-     records it must stay silent on). A block added and a condition narrowed on the one before it, nothing taken away. */
+     records it must stay silent on). A block added and a condition narrowed on the one before it, nothing taken away.
+
+     AND HOME SAYS WHAT STOPPED REPORTING (ENG-B13, batch 88). Gone quiet, the table the browser draws on the Today it
+     builds, is declared on `page.home-founder` straight under what the money is, over the record's own read of what went
+     quiet, six lines at most and not drawn while nothing is. A record with its own Home never drew the browser's. It
+     is a seventh tile on a page held to six, so Working now is folded shut under Agents at work, beneath the line that
+     says how many agents work. Two blocks added, nothing taken away, and no list or figure asked for, so it stays
+     inside the unreleased 2.6.0. */
   version: '2.6.0',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
@@ -508,6 +541,9 @@ export const FOUNDER = {
         requires: ['register.datapoints', 'register.accounts', 'register.obligations', 'register.services', 'register.books'],
         blocks: [
           ...WHAT_YOU_HAVE,
+          /* WHAT STOPPED REPORTING, STRAIGHT UNDER WHAT THE MONEY IS, SINCE 2.6.0 (`GONE_QUIET`): a figure read this
+             morning may be a fortnight old, and this is the line that says which. Not drawn while nothing is quiet. */
+          GONE_QUIET,
           {
             /* THE ONE WAY IN FOR A BANK OR A PAYMENTS FEED, ONLY WHILE NO ACCOUNT COUNTS AS CASH, SINCE 1.16.0: it was
                drawn on a record holding thirteen accounts and its bank's own add-on. Browse is searched for "money"
@@ -557,6 +593,17 @@ export const FOUNDER = {
             span: 12,
             when: { metric: 'runs-working', gt: 0 },
             body: '{{runs-working}} agent(s) are working now.',
+          },
+          {
+            /* WHICH AGENTS, FOLDED SHUT, SINCE 2.6.0 (batch 88). Gone quiet is a seventh tile on a page that stood at six
+               (`test/calm-pages.test.ts`), and this is the one that gave way: the line above already says how many are
+               at work, and the rail and the Agents page say which. Gone with its table while no agent works. */
+            kind: 'section',
+            heading: 'Agents at work',
+            icon: 'session',
+            span: 12,
+            fold: true,
+            when: { metric: 'runs-working', gt: 0 },
           },
           {
             /* AND WHICH, the record's working runs since 2.4.0 (`sessions.working`), a helper folded under its run. It

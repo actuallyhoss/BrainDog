@@ -629,7 +629,9 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   held-twice-shown, and then how many too many ("N people may be on this record twice, M too many")
  *   (people-twice-note-82). And Calendar is a new page, `page.calendar` (calendar-page-82): this month and the next
  *   two, with everything that has a day it is due, from every list; one calendar over the computed deadlines, off
- *   the rail. A page added, nothing taken away.
+ *   the rail. A page added, nothing taken away. And batch 88's Activity, `page.activity` (activity-page-88): everything
+ *   that changed, a day at a time with one line a run, and beside it who worked, what changed, the busy hours and
+ *   what an agent asked, off the rail. A page added, nothing taken away.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
   portfolio: '1.17.0',

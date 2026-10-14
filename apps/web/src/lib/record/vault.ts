@@ -288,12 +288,40 @@ export type KeyRow = {
   lastOpened: string | null;
   /** The grant `revokeGrant` names, where this row points at one. An index row points at none. */
   grant: string | null;
+  /** How long the sealed value is, in bytes. Absent on a row with no value sealed here and on a seal older than the fact. */
+  bytes?: number;
+  /** What the sealed value is, unopened ("a 40-character value"), as the host wrote it when it sealed. Absent as `bytes` is. */
+  hint?: string;
 };
 
-/** `listGrants`, with only the keys read here. */
-export type GrantState = { id: string; opened: number; last_opened: string | null; revoked_at: string | null };
+/** `listGrants`, with only the keys read here. `bytes` and `hint` are absent from a host older than them and null on an older seal. */
+export type GrantState = {
+  id: string;
+  opened: number;
+  last_opened: string | null;
+  revoked_at: string | null;
+  bytes?: number | null;
+  hint?: string | null;
+};
 
-type KnownState = { sealed: boolean; opened: number; last_opened: string | null };
+type KnownState = { sealed: boolean; opened: number; last_opened: string | null; bytes?: unknown; hint?: unknown };
+
+/** The longest hint the record keeps (`packages/kernel/src/vault.ts`, `bindGrant`): past it a hint could be the value. */
+export const HINT_MOST = 60;
+
+/**
+ * The two facts of a sealed value a row may say unopened, each only when it is one.
+ *
+ * NEITHER IS TAKEN ON TRUST. They come over the wire as whatever the host answered, so a size that is no whole number
+ * and a hint that is empty or longer than the record lets one be are left off, and the row reads as it did before.
+ */
+function unopened(from: { bytes?: unknown; hint?: unknown }): { bytes?: number; hint?: string } {
+  const out: { bytes?: number; hint?: string } = {};
+  if (typeof from.bytes === 'number' && Number.isInteger(from.bytes) && from.bytes >= 0) out.bytes = from.bytes;
+  const hint = typeof from.hint === 'string' ? from.hint.trim() : '';
+  if (hint !== '' && hint.length <= HINT_MOST) out.hint = hint;
+  return out;
+}
 
 const isKnown = (v: unknown): v is KnownState =>
   typeof v === 'object' && v !== null && typeof (v as KnownState).sealed === 'boolean' && typeof (v as KnownState).opened === 'number';
@@ -305,6 +333,10 @@ const isKnown = (v: unknown): v is KnownState =>
  * THE SECRET FIELD IS READ TWO WAYS. A row from `list` holds the grant's id there, joined to `listGrants`
  * for the counts; a row from `context` holds what is known already. A row pointing at no grant is an
  * index row: the key is kept somewhere the row names, not here.
+ *
+ * A SEALED ROW ALSO SAYS WHAT IT IS, UNOPENED: `bytes` and `hint`, which the host stores when it seals and the record
+ * hands a browser with the grant. Only a row whose value is sealed here carries them, so a revoked grant's row, whose
+ * bytes are gone, does not go on describing them.
  */
 export function keysOf(
   rows: readonly { id: string; seq?: number | null; fields: Record<string, unknown>; state?: string | null }[],
@@ -325,6 +357,7 @@ export function keysOf(
       const scope: Scope | null = projectId
         ? { spoken: mark ? `things#${mark.seq}` : projectId, name: project ?? words.someProject, mark: mark?.mark ?? null, hue: mark?.hue ?? null }
         : null;
+      const sealed = known ? known.sealed : grant ? grant.revoked_at === null : typeof value === 'string';
       return {
         id: r.id,
         spoken: typeof r.seq === 'number' ? `${KEYS_REGISTER}#${r.seq}` : null,
@@ -333,9 +366,10 @@ export function keysOf(
         opens: String(r.fields.opens ?? ''),
         project,
         scope,
-        sealed: known ? known.sealed : grant ? grant.revoked_at === null : typeof value === 'string',
+        sealed,
         opened: known?.opened ?? grant?.opened ?? 0,
         lastOpened: known?.last_opened ?? grant?.last_opened ?? null,
+        ...(sealed ? unopened(known ?? grant ?? {}) : {}),
       };
     })
     .sort((a, b) => a.label.localeCompare(b.label));
@@ -343,6 +377,52 @@ export function keysOf(
 
 /** The list the Keys index reads, which `usedBy` names a key's row in. */
 export const KEYS_REGISTER = 'credentials';
+
+/* ── every page of a list ─────────────────────────────────────────────── */
+
+/**
+ * The most pages `readAll` asks for: at the 200 rows a page the Vault reads, ten thousand keys. It is a stop for a host
+ * that never answers a last page, not a size anybody is expected to reach, and a read that meets it says `more`.
+ */
+export const READ_ALL_PAGES = 50;
+
+/** One page as `list` answers it, with only what is read here. A page with no `cursor` is the last one. */
+export type PageOf<T> = { rows: readonly T[]; cursor?: string | null };
+
+/** What `readAll` answers: the rows of every page read, in order; the refusal that stopped it, or null; and whether rows stand past these. */
+export type AllRead<T, F> = { rows: T[]; refused: F | null; more: boolean };
+
+/**
+ * A list read page by page until the record says it is done, so a screen that reads it shows every row and not the first 200.
+ *
+ * `read` IS HANDED THE CURSOR OF THE PAGE BEFORE, null for the first, and answers what `client.list` answers. The caller
+ * closes over the list and the page's size, so this knows neither.
+ *
+ * A REFUSED PAGE KEEPS WHAT WAS READ. The rows before it are real, so they are answered beside the refusal, as it came,
+ * for the screen to say in its own words. `more` is true then, since a page was owed.
+ *
+ * IT STOPS BY ITSELF TWICE OVER: at `most` pages, and at a cursor it has been handed before, which is a host going
+ * round. Both answer `more`, and neither is a refusal, because nothing was refused.
+ */
+export async function readAll<T, F extends { ok: false }>(
+  read: (cursor: string | null) => Promise<{ ok: true; value: PageOf<T> } | F>,
+  most: number = READ_ALL_PAGES,
+): Promise<AllRead<T, F>> {
+  const rows: T[] = [];
+  const seen = new Set<string>();
+  let cursor: string | null = null;
+  for (let asked = 0; asked < most; asked++) {
+    const out = await read(cursor);
+    if (!out.ok) return { rows, refused: out, more: true };
+    rows.push(...out.value.rows);
+    const next = out.value.cursor;
+    if (typeof next !== 'string' || next === '') return { rows, refused: null, more: false };
+    if (seen.has(next)) return { rows, refused: null, more: true };
+    seen.add(next);
+    cursor = next;
+  }
+  return { rows, refused: null, more: true };
+}
 
 /** One run among a key's or a tool's newest uses, as `usedBy` answers it (`@braindog/record` `UsedByRun`). */
 export type UsedByRun = { run: string; agent: string | null; machine: string | null; at: string; count: number };
@@ -478,6 +558,32 @@ export function reconnectOf(params: URLSearchParams, keys: readonly KeyRow[]): R
   const label = params.get('reconnect')?.trim() ?? '';
   if (label === '') return null;
   const then = params.get('then')?.trim() || null;
+  const row = keys.find((k) => k.label.trim().toLowerCase() === label.toLowerCase());
+  return row ? { mode: 'replace', row, then } : { mode: 'add', label, then };
+}
+
+/** Where a navigation to `/vault` carries a `ReconnectState`: `goto('/vault', { state: { [RECONNECT_STATE]: ... } })`, read back from the page's state. */
+export const RECONNECT_STATE = 'vaultReconnect';
+
+/**
+ * What "Reconnect key" hands the Vault in the navigation's state, never in the address: the key's name as the paused
+ * action says it, and the action to resume, or null for none. A reload drops it, and the plain Vault shows.
+ */
+export type ReconnectState = { key: string; then: string | null };
+
+/**
+ * `reconnectOf`, asked with the navigation's state: the same sheet for the same key, with nothing after `/vault`.
+ *
+ * `state` IS WHAT THE PAGE HOLDS UNDER `RECONNECT_STATE`, whatever that is. A history entry is written by more than this
+ * app, so anything that is not a name and an action or null answers null, as an address asking for nothing does.
+ */
+export function reconnectFrom(state: unknown, keys: readonly KeyRow[]): Reconnect | null {
+  if (typeof state !== 'object' || state === null || Array.isArray(state)) return null;
+  const { key, then: after } = state as { key?: unknown; then?: unknown };
+  if (typeof key !== 'string' || (typeof after !== 'string' && after !== null)) return null;
+  const label = key.trim();
+  if (label === '') return null;
+  const then = after?.trim() || null;
   const row = keys.find((k) => k.label.trim().toLowerCase() === label.toLowerCase());
   return row ? { mode: 'replace', row, then } : { mode: 'add', label, then };
 }

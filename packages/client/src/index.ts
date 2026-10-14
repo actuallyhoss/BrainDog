@@ -243,6 +243,17 @@ export type EventLine = {
   pass?: { said: string; updated: number; asked: number; steps: number; at: string };
   /** Every line that pass wrote, newest first. */
   steps?: EventLine[];
+  /**
+   * On a line that settled a suggestion, or a row's event an accepted suggestion wrote: who suggested it, who drafted it
+   * (`rules` or the model's name), the chosen option's own words on a `decide`, who settled it, and `undone` on the
+   * event that took it back. Absent from a host that does not say them, which today is every host: the record's log
+   * read does not send them yet.
+   */
+  suggested_by?: string | null;
+  drafted_by?: string | null;
+  answer_label?: string | null;
+  settled_by?: string | null;
+  undone?: boolean | null;
 };
 
 /** Who wrote the lines a read answers: the record is BrainDog itself, never an agent or a person. */
@@ -302,6 +313,27 @@ export type InboxPage = {
   counts?: Record<InboxState, number>;
   ruledThisWeek?: number;
 };
+
+/** An arrival on a digest: its line with the body's first 180 characters, and `cut` only when there were more. */
+export type InboxDigestLine = InboxLine & { cut?: true };
+
+/**
+ * `inbox({ digest: true })`: how many arrivals are in each of the six states, and each state's newest hundred, newest
+ * first. A state that holds more says so by its count and is paged with `state`; a cut body is read whole with `id`.
+ */
+export type InboxDigest = { counts: Record<InboxState, number>; states: Record<InboxState, InboxDigestLine[]> };
+
+/**
+ * What `inbox` takes: the paged read's four, or `digest` alone, or `id` alone. The record refuses state, cursor, limit
+ * or repeats beside either, and each beside the other.
+ */
+export type InboxArgs =
+  | { state?: InboxState | 'all'; cursor?: number; limit?: number; repeats?: boolean; digest?: never; id?: never }
+  | { digest: true }
+  | { id: string };
+
+/** What `inbox` answers for what it was asked: a digest, one arrival whole, or a page. */
+export type InboxAnswer<A> = A extends { digest: true } ? InboxDigest : A extends { id: string } ? InboxLine : InboxPage;
 
 /**
  * One figure as `figures` lists it: never its reading, which `metric` answers. `format` is how the declaration says to
@@ -1448,8 +1480,11 @@ export function createClient(options: ClientOptions) {
      * archived, `all` every state. An owner's read, or a token's with the `inbox` reach; `cursor` is the one the page
      * above answered with. `repeats: true` pages through the arrivals set aside as repeats alone, so a page of skipped
      * balance alerts cannot push a real second charge out of sight.
+     *
+     * `{ digest: true }` answers every state at once (`InboxDigest`) and `{ id }` one arrival whole (`InboxLine`). Each
+     * goes alone. An older host refuses either with the keys it takes.
      */
-    inbox: (args: { state?: InboxState | 'all'; cursor?: number; limit?: number; repeats?: boolean } = {}) => call<InboxPage>('inbox', args as Record<string, unknown>),
+    inbox: <const A extends InboxArgs = Record<never, never>>(args?: A) => call<InboxAnswer<A>>('inbox', (args ?? {}) as Record<string, unknown>),
     /**
      * Settle one arrival: file it on a list with the fields it should carry (`register`), archive it (`ignore`), or put a
      * filed or archived one back in the inbox (`back`, with the filed row's `version`). Exactly one of the three. DATA.

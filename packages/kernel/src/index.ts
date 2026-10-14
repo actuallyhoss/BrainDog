@@ -484,6 +484,7 @@ export { anchorDayOf, cycleAfter, restDaysOf } from './forecast.ts';
 export { SERIES_AHEAD, SERIES_BACK, SERIES_LINES, barsOf } from './series.ts';
 export { SETUP_KIND, setupCollapser, type FeedLine } from './feed.ts';
 export type { Bars, SeriesLine } from './series.ts';
+export { LIST_PAGE_COLUMNS, LIST_PAGE_ROWS, listPage, type ListPage, type ListPageBlock, type ListPageColumn, type ListPageFilter, type ListPageSaid, type ListPageShape, type ListPageField } from './default-pages.ts';
 /* An arrangement's parts (govern-parts-43), by their ids and needs; `partsOf` is fx.ts's name here, so it goes out as arrangePartsOf. */
 export { ARRANGING, BODY_KINDS, GOVERNANCE, LADDER_RULE, OPEN_ARRANGEMENTS, PACK_VERBS, ladderFault, partsOf as arrangePartsOf, pressedOnly, rememberedLine, uniteArrangements } from './govern.ts';
 /* THE LADDER OF TRUST'S NAMES (`change-kind.ts`): what kind of change a write or a question is, and which rung an agent

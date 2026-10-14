@@ -11,6 +11,10 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import type { AuditEvent, EventKind } from '../../lib/record/schema.ts';
+import { answeredLine, cardWords } from '../../lib/decide/card.ts';
+import { settledBy, settlingOf, type Suggested } from '../../lib/record/history-live.ts';
+import { actor } from '../../lib/record/names.ts';
+import { byLine } from '../slash/lines.ts';
 import {
   historyWords,
   awaySaid,
@@ -37,6 +41,8 @@ import {
   reaches,
   RUN_FOLD_MIN,
   runFolds,
+  settledOf,
+  settledWords,
   tallyOf,
   tallySaid,
   thingOf,
@@ -433,4 +439,46 @@ test('THE AWAY LINE IS NOT DRAWN AFTER A STAMP: what was read is said as nothing
   const after = seenAfter();
   assert.equal(awaySaid(after.actors, 'p_1', NO_NAMES, after.capped, after.byWho), historyWords.nothingNew);
   assert.equal(readMarkOf(9, after.actors.length), null, 'a page already stamped stamped again');
+});
+
+/* ── who suggested and who settled (ENG-B16) ───────────────────────────── */
+
+test('A SUGGESTION OF SLASH’S THAT SOMEBODY SETTLED SAYS BOTH NAMES, in the answered card’s own words', () => {
+  const mara = 'p_01M2PAZ28BN3FTKQB266DVT4HX';
+  const names = new Map([[mara, 'Mara']]);
+  const line = (kind: string, to: unknown, more: Suggested = { suggested_by: 'slash' }) => ({
+    settling: settlingOf({ actor: mara, kind, to, ...more }),
+  });
+  const yes = line('decide', JSON.stringify({ question: 'Mark the four paid invoices done?', answer: 'accept' }));
+  assert.equal(settledOf(yes, null, names), 'Slash suggested · Mara accepted');
+  /* THE SENTENCE THE ANSWERED CARD SAYS, and the one a row's history says of the same line. */
+  assert.equal(settledOf(yes, null, names), answeredLine({ slash: true }, { key: 'accept', label: 'Accept', recommended: true }, 'Mara', 'now'));
+  assert.equal(settledOf(yes, null, names), settledBy({ actor: mara, kind: 'decide', to: { answer: 'accept' }, suggested_by: 'slash' }, { me: null, names, words: cardWords }));
+  assert.equal(settledOf(line('resolve', 'wont-fix'), null, names), 'Slash suggested · Mara declined');
+  assert.equal(settledOf(line('decide', { answer: 'keep-both' }, { suggested_by: 'slash', answer_label: 'Keep both' }), null, names), 'Slash suggested · Mara chose Keep both');
+  assert.equal(settledOf(line('resolve', 'undone'), null, names), 'Slash suggested · Mara undid');
+  /* THE READER IS YOU, as every line of this screen says them. */
+  assert.equal(settledOf(yes, mara, names), `Slash suggested · ${actor(mara, mara).name} accepted`);
+  /* WHO DRAFTED IT, in the Slash page's words, and nobody where the record names nobody. */
+  const drafted = (by: string) => line('decide', { answer: 'accept' }, { suggested_by: 'slash', drafted_by: by });
+  assert.equal(settledOf(drafted('rules'), null, names), `Slash suggested · Mara accepted · ${byLine('rules')}`);
+  assert.equal(settledOf(drafted('Haiku'), null, names), `Slash suggested · Mara accepted · ${byLine('Haiku')}`);
+  for (const s of [settledOf(yes, null, names), settledOf(drafted('rules'), null, names)]) assert.doesNotMatch(s!, /—/u);
+});
+
+test('A DECISION ON A PERSON’S OWN OR AN AGENT’S SUGGESTION READS AS IT DID, and so does every line that settled nothing', () => {
+  const mara = 'p_01M2PAZ28BN3FTKQB266DVT4HX';
+  const yes = (more: Suggested) => ({ settling: settlingOf({ actor: mara, kind: 'decide', to: { answer: 'accept' }, ...more }) });
+  assert.equal(settledOf(yes({ suggested_by: mara })), null);
+  assert.equal(settledOf(yes({ suggested_by: 'agent:claude' })), null);
+  assert.equal(settledOf(yes({})), null, 'the log does not say who suggested yet, so nothing is claimed');
+  assert.equal(settledOf({}), null, 'a line the log sent as it does today');
+  assert.equal(settledOf({ settling: settlingOf({ actor: mara, kind: 'resolve', to: 'addressed', suggested_by: 'slash' }) }), null, 'the close beside a yes is not said twice');
+  /* THE WORDS ARE THE CARD'S OWN, held here by reference and typed nowhere in this file. */
+  assert.equal(settledWords.slash, cardWords.slash);
+  assert.equal(settledWords.accepted, cardWords.accepted);
+  assert.equal(settledWords.declined, cardWords.declined);
+  assert.equal(settledWords.chose, cardWords.chose);
+  const src = readFileSync(fileURLToPath(new URL('./lines.ts', import.meta.url)), 'utf8');
+  assert.doesNotMatch(src, /`Slash suggested|'accepted'|'declined'/u);
 });

@@ -104,7 +104,9 @@ export const TEAM = {
      2.21.0: the project page it embeds lists a project's own tools alone under Tools and servers (`kind is tool, scope
      is project`, sketchpad-60), where it listed everybody's. Batch 60 wrote this into 2.20.0, which commit 63423720
      had already deployed, so it is a version of its own. One `where` narrowed on a block that is there, nothing added
-     or taken away, so a minor step. 2.20.0 IS LIVE. */
+     or taken away, so a minor step. 2.20.0 IS LIVE. Still unreleased (commit 63423720 holds 2.20.0), it takes batch
+     88's block with no version of its own: Home draws Gone quiet, what stopped reporting, straight under its line
+     (founder-home-quiet-88), a sixth tile on a page held to six. A block added, nothing taken away. */
   version: '2.21.0',
   title: 'Team board',
   summary: 'Tickets with an owner and a status, the cycle each is in, and the work your agents took on.',
@@ -258,6 +260,22 @@ export const TEAM = {
             lead: true,
             span: 12,
             body: '{{open-tasks}} open ticket(s), {{tickets-blocked}} blocked, {{questions-open}} suggestion(s) from agents',
+          },
+          {
+            /* WHAT STOPPED REPORTING, STRAIGHT UNDER THE LINE, INSIDE 2.21.0 (batch 88): the table a founder's Home draws
+               since 2.6.0 and the browser draws on the Today it builds, word for word, over the record's own read of
+               what went quiet. No `when:` and no `empty:`: the record leaves it out while nothing is quiet. */
+            kind: 'table',
+            heading: 'Gone quiet',
+            icon: 'history',
+            span: 12,
+            source: 'exceptions',
+            columns: [
+              { field: 'subject', label: 'What' },
+              { field: 'since', label: 'Last seen' },
+              { field: 'was', label: 'Before' },
+            ],
+            limit: 6,
           },
           {
             /* FIRST, BECAUSE AN AGENTIC TASK LIST IS ONE WHERE THE AGENTS PROPOSE: a ticket to open, a priority to

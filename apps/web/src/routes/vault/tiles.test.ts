@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import type { KeyRow, UsedByRun } from '../../lib/record/vault.ts';
-import { BARS, clip, opensOf, readingOf, rowPath, sentenceOf, stateOf, words } from './tiles.ts';
+import { BARS, cameFromOf, clip, hintOf, opensOf, readingOf, rowAction, rowPath, sentenceOf, stateOf, words } from './tiles.ts';
 
 const NOW = Date.parse('2026-09-30T12:00:00Z');
 
@@ -102,4 +102,47 @@ test('A LONG NAME IS CLIPPED FOR ITS BAR, and a key row links to its row page by
   assert.equal(clip('Registrar'), 'Registrar');
   assert.equal(rowPath(key({ spoken: 'credentials#3' })), '/r/credentials/3');
   assert.equal(rowPath(key({ spoken: null })), null);
+});
+
+test('A SEALED KEY SAYS ITS HINT UNOPENED, and a key with no value, an older seal or one out of service says none', () => {
+  assert.equal(hintOf(key({ bytes: 40, hint: 'a 40-character value' })), 'a 40-character value');
+  assert.equal(hintOf(key({})), null, 'a seal older than the hint has none, and none is made up from nothing');
+  assert.equal(hintOf(key({ bytes: 40 })), null, 'a size alone is not a sentence this screen writes');
+  assert.equal(hintOf(key({ hint: '   ' })), null);
+  assert.equal(hintOf(key({ sealed: false, grant: null, hint: 'a 40-character value' })), null, 'no value, so nothing to hint at');
+  assert.equal(hintOf(key({ sealed: false, grant: 'g', hint: 'a 40-character value' })), null);
+});
+
+test('THE ROW HAS ONE BUTTON: Reveal where a value is sealed, "Seal a value" where there is none', () => {
+  assert.equal(words.sealValue, 'Seal a value');
+  assert.deepEqual(rowAction(KEYS[0]!), { act: 'reveal' });
+  assert.deepEqual(rowAction(KEYS[3]!), { act: 'seal', word: 'Seal a value' }, 'kept somewhere else: one press seals it onto this row');
+  assert.deepEqual(rowAction(key({ sealed: false, grant: 'g' })), { act: 'seal', word: 'Seal a value' }, 'out of service: the same row takes a new value');
+  /* A row a briefing already knew is sealed and names no grant to open, so it has neither: there is a value, and no door to it here. */
+  assert.equal(rowAction(key({ sealed: true, grant: null })), null);
+});
+
+test('A KEY SAYS WHERE IT CAME FROM when its row does, by the row and never by a guess', () => {
+  assert.equal(words.cameFrom, 'Came from');
+  const from = cameFromOf([
+    { id: 'a', fields: { label: 'A', origin: '  the registrar, at sign-up ' } },
+    { id: 'b', fields: { label: 'B', origin: '' } },
+    { id: 'c', fields: { label: 'C' } },
+    { id: 'd', fields: { label: 'D', origin: 7 } },
+  ]);
+  assert.deepEqual([...from], [['a', 'the registrar, at sign-up']]);
+  assert.equal(words.cameFromSaid('the registrar, at sign-up'), 'Came from the registrar, at sign-up');
+  assert.equal(cameFromOf([]).size, 0);
+});
+
+test('EVERY KEY IS COUNTED, however many: 405 handed is 405 said, not the first page of them', () => {
+  const many = Array.from({ length: 405 }, (_, i) => key({ id: `k${i}`, label: `Key ${i}`, opened: 1, ...(i < 90 ? { sealed: false, grant: null } : {}) }));
+  const s = sentenceOf({ keys: many, listed: true, counts: true, asking: 0, seesMachines: true });
+  assert.equal(s?.text, '405 keys, 315 sealed here, opened 315 times.');
+  assert.equal(sentenceOf({ keys: many.slice(90), listed: true, counts: false, asking: 0, seesMachines: false })?.text, '315 keys sealed.');
+});
+
+test('MORE KEYS THAN WERE READ IS SAID, and a read that got them all says nothing', () => {
+  assert.equal(words.moreKeys(405), 'The first 405 keys are listed. This record holds more.');
+  assert.ok(!words.moreKeys(1).includes('—'));
 });

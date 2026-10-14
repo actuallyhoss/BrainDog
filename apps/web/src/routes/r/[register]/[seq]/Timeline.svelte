@@ -193,7 +193,7 @@
           {@const w = who(m.event.by)}
           <li class="event">
             <Face name={w.name} kind={w.kind} run={runOf(m.event.by)} size="s" />
-            <p class="event-line"><span class="by">{w.name}</span> {m.event.note}</p>
+            <p class="event-line"><span class="by">{m.event.settled ?? w.name}</span> {m.event.note}</p>
             <time class="when" datetime={m.event.at}>{since(m.event.at, now)}</time>
           </li>
         {:else if m.thread.comment.resolved}

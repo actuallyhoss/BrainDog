@@ -100,7 +100,7 @@ test('A CLEAN PAYLOAD IS HELD AS IT ALWAYS WAS, and so is an ask that hands none
   assert.deepEqual(rows(), [
     { purpose: 'look', spends: 'background', code: null },
     { purpose: 'headline', spends: 'background', code: null },
-    { purpose: 'look', spends: 'background', code: null },
+    { purpose: 'skill', spends: 'background', code: null },
   ]);
 });
 

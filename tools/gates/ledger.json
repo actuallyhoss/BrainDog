@@ -346,6 +346,13 @@
         { "at": 1, "on": "2026-10-09", "why": "The skip's exit code 3, written once in the gate as every gate that skips writes it. It falls when the runner exports the code." }
       ]
     },
+    "tools/gates/walks/row-drawer.walk.mjs": {
+      "owes": "proof",
+      "file": "tools/gates/walks/row-drawer.walk.mjs",
+      "lines": [
+        { "at": 1, "on": "2026-10-14", "why": "The skip's exit code 3, written once in the gate as every gate that skips writes it. It falls when the runner exports the code." }
+      ]
+    },
     "tools/gates/public-clean.mjs": {
       "owes": "proof",
       "file": "tools/gates/public-clean.mjs",

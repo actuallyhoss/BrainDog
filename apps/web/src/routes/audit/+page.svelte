@@ -90,6 +90,7 @@
     passOf,
     reaches,
     runFolds,
+    settledOf,
     tallyOf,
     tallySaid,
     thingOf,
@@ -649,6 +650,7 @@
   {@const by = actorSaid(e.by, me, names, e.run_by ?? null)}
   <!-- ONE PASS OF BRAINDOG'S OWN UPDATE (`passOf`) says the record's sentence as its whole line, and names nothing of its own. -->
   {@const pass = passOf(e)}
+  {@const settled = pass === null ? settledOf(e, me, names) : null}
   {@const declared = pass === null && e.kind === 'declare' ? declaredOf(e.target, e.note) : null}
   {@const thing = pass !== null ? null : (t.many ?? (declared === null && e.target ? thingFor(e.target) : null))}
   {@const note = declared === null && pass === null ? t.note : ''}
@@ -680,7 +682,7 @@
           <!-- AN AGENT'S LINE WEARS ITS RUN: the run's hue, and a door to the run's handoff. -->
           <span class="who"><Face name={by.name} you={by.you} kind={by.kind} run={runOf(e.by)} size="s" /></span>
           <span class="detail-text"
-            >{by.name}{#if note}<span class="note" title={note}>{' · '}{note}</span>{/if}{#if thing?.list}<span class="where-inline"
+            >{settled ?? by.name}{#if note}<span class="note" title={note}>{' · '}{note}</span>{/if}{#if thing?.list}<span class="where-inline"
                 >{' · '}{thing.list}</span
               >{/if}</span
           >

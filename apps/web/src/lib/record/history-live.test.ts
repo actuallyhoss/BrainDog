@@ -11,7 +11,9 @@ import { readFileSync } from 'node:fs';
 import './fixtures/fill.ts';
 import { display, REGISTERS, whoDid } from './api.ts';
 import * as history from './history-live.ts';
-import { noteOf, readHistory, readNames, type Fetch } from './history-live.ts';
+import { linesOf, noteOf, readHistory, readNames, settledBy, settlingOf, type Event, type Fetch, type Suggested } from './history-live.ts';
+import { answeredLine, cardWords } from '../decide/card.ts';
+import { copy } from '../copy.ts';
 
 const BASE = 'http://record.test';
 
@@ -147,4 +149,77 @@ test('A MEMBER WHO MAY READ PEOPLE IS TOLD THE NAMES BY boot, and members, which
   assert.deepEqual([...names], [['p_01M2PAZ28BN3FTKQB266DVT4HX', 'Ada Lovelace']]);
   assert.deepEqual(asked, ['/api/boot']);
   forget();
+});
+
+/* ── who suggested and who settled (ENG-B16) ───────────────────────────── */
+
+const MARA = 'p_01M2PAZ28BN3FTKQB266DVT4HX';
+const NAMES = new Map([[MARA, 'Mara']]);
+const SAY = { me: null, names: NAMES, words: cardWords };
+const decided = (answer: string, more: Record<string, unknown> = {}): Event & Suggested => ({
+  ts: '2026-10-01T09:00:00.000Z',
+  actor: MARA,
+  kind: 'decide',
+  to: JSON.stringify({ question: 'Mark the four paid invoices done?', answer }),
+  suggested_by: 'slash',
+  ...more,
+});
+
+test('A SUGGESTION OF SLASH’S THAT A PERSON SETTLED SAYS BOTH NAMES, in the words the Decide card says', () => {
+  assert.equal(settledBy(decided('accept'), SAY), 'Slash suggested · Mara accepted');
+  /* THE SAME SENTENCE THE ANSWERED CARD SAYS, made by the card's own function. */
+  assert.equal(settledBy(decided('accept'), SAY), answeredLine({ slash: true }, { key: 'accept', label: 'Accept', recommended: true }, 'Mara', 'now'));
+  assert.equal(settledBy(decided('reject'), SAY), 'Slash suggested · Mara declined');
+  assert.equal(settledBy(decided('keep-both', { answer_label: 'Keep both' }), SAY), 'Slash suggested · Mara chose Keep both');
+  assert.equal(settledBy(decided('keep-both'), SAY), 'Slash suggested · Mara chose keep both', 'an option the record sent no words for is its key in words');
+  /* THE RECORD MAY SEND `to` READ ALREADY, and an agent's proposal Slash drafted is Slash's too, as on the card. */
+  assert.equal(settledBy({ ...decided('accept'), to: { question: 'q', answer: 'accept' } }, SAY), 'Slash suggested · Mara accepted');
+  assert.equal(settledBy(decided('accept', { suggested_by: 'agent:claude', drafted_by: 'slash:model' }), SAY), 'Slash suggested · Mara accepted');
+});
+
+test('NO IS SAID AS DECLINED AND AN UNDO SAYS WHO UNDID, each off the line the record writes for it', () => {
+  const closed = (to: string, actor = MARA): Event & Suggested => ({ ts: '2026-10-01T09:00:00.000Z', actor, kind: 'resolve', to, suggested_by: 'slash' });
+  assert.equal(settledBy(closed('wont-fix'), SAY), 'Slash suggested · Mara declined');
+  assert.equal(settledBy(closed('incorrect'), SAY), 'Slash suggested · Mara declined');
+  assert.equal(settledBy(closed('undone'), SAY), 'Slash suggested · Mara undid');
+  assert.equal(settledBy({ ...closed('reopened'), kind: 'suggest' }, SAY), 'Slash suggested · Mara undid', 'a whole undo reopens the question');
+  /* THE CLOSE WRITTEN BESIDE AN ACCEPT is the same press as the `decide` line, which says it; it is not said twice. */
+  assert.equal(settledBy(closed('addressed'), SAY), null);
+  /* NOBODY SETTLED THESE: the asker took it back, and BrainDog reopened what would not install. */
+  assert.equal(settledBy(closed('withdrawn', 'slash'), SAY), null);
+  assert.equal(settledBy({ ...closed('reopened', 'system'), kind: 'suggest' }, SAY), null);
+});
+
+test('A PERSON’S OWN PROPOSAL, AN AGENT’S, AND ONE THE RECORD NAMES NO SUGGESTER FOR READ AS THEY DID', () => {
+  assert.equal(settledBy(decided('accept', { suggested_by: MARA }), SAY), null);
+  assert.equal(settledBy(decided('accept', { suggested_by: 'agent:claude' }), SAY), null);
+  assert.equal(settledBy(decided('accept', { suggested_by: 'rule:renewal' }), SAY), null);
+  const { suggested_by: _, ...bare } = decided('accept');
+  assert.equal(settledBy(bare, SAY), null, 'the read does not say who suggested yet, so nothing is claimed');
+  assert.equal(settlingOf(bare)?.how, 'accepted', 'what the line itself says is still read');
+  assert.equal(settledBy({ actor: MARA, kind: 'edit', to: 'done' }, SAY), null);
+});
+
+test('THE READER IS SAID AS THE SCREEN SAYS THEM, and who drafted it follows where the caller has words for it', () => {
+  assert.equal(settledBy(decided('accept'), { ...SAY, me: MARA }), `Slash suggested · ${copy.feedYou} accepted`);
+  const drafted = (by: string | null): string | null => (by === 'rules' ? 'From how you use BrainDog' : by ? `Drafted by ${by}` : null);
+  const say = { ...SAY, words: { ...cardWords, drafted } };
+  assert.equal(settledBy(decided('accept', { drafted_by: 'rules' }), say), 'Slash suggested · Mara accepted · From how you use BrainDog');
+  assert.equal(settledBy(decided('accept', { drafted_by: 'Haiku' }), say), 'Slash suggested · Mara accepted · Drafted by Haiku');
+  assert.equal(settledBy(decided('accept'), say), 'Slash suggested · Mara accepted', 'nobody is claimed where the record names nobody');
+  for (const s of [settledBy(decided('accept', { drafted_by: 'rules' }), say), settledBy(decided('reject'), SAY)]) assert.doesNotMatch(s!, /—/u);
+});
+
+test('A ROW’S HISTORY SAYS IT ON THE CHANGE AN ACCEPTED SUGGESTION MADE, by who pressed and not the rule that signed', () => {
+  const events: (Event & Suggested)[] = [
+    { ts: '2026-10-01T09:00:00.000Z', actor: 'S42', kind: 'create', field: null, from: null, to: null, note: null },
+    { ts: '2026-10-02T09:00:00.000Z', actor: 'rule:tidy', kind: 'note', note: 'Marked done', suggested_by: 'slash', settled_by: MARA },
+    { ts: '2026-10-03T09:00:00.000Z', actor: MARA, kind: 'note', note: 'Put back', suggested_by: 'slash', undone: true },
+  ];
+  /* WITH NOTHING TO SAY IT WITH, every line is exactly the line it was. */
+  assert.deepEqual(linesOf('services', events)[1], { by: 'rule.tidy', note: 'Marked done', at: '2026-10-02T09:00:00.000Z' });
+  const lines = linesOf('services', events, SAY);
+  assert.deepEqual(lines[0], { by: MARA, note: 'Put back', at: '2026-10-03T09:00:00.000Z', settled: 'Slash suggested · Mara undid' });
+  assert.deepEqual(lines[1], { by: 'rule.tidy', note: 'Marked done', at: '2026-10-02T09:00:00.000Z', settled: 'Slash suggested · Mara accepted' });
+  assert.deepEqual(lines[2], { by: 'S42', note: 'created', at: '2026-10-01T09:00:00.000Z' });
 });

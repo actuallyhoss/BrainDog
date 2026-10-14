@@ -19,12 +19,17 @@ import { display, labelOf } from './api.ts';
 import { REGISTERS } from './held.ts';
 import { readBoot } from './boot-live.ts';
 import { moneyInText } from './money.ts';
-import { listName } from './names.ts';
+import { actor as actorSaid, listName } from './names.ts';
+import type { cardWords } from '../decide/card.ts';
 
 export type Fetch = NonNullable<ClientOptions['fetch']>;
 
-/** One line of a row's history: who, what, and when, newest first. */
-export type Line = { by: string; note: string; at: string };
+/**
+ * One line of a row's history: who, what, and when, newest first. `settled` is who suggested the change and who settled
+ * it ("Slash suggested · Mara accepted"), on a line an answered suggestion of Slash's made, where `linesOf` was handed
+ * the names to say it with.
+ */
+export type Line = { by: string; note: string; at: string; settled?: string };
 
 /** `now` is the clock `since` reads against: the reader's, since every line is the record's. */
 export type Told = { from: 'live'; lines: Line[]; now: number } | { from: 'refused'; fix: string };
@@ -104,6 +109,117 @@ export function declaredOf(target: string | null | undefined, note: string | nul
   return null;
 }
 
+/* ── who suggested and who settled ─────────────────────────────────────── */
+
+/**
+ * WHAT A LINE MAY CARRY OF THE SUGGESTION BEHIND IT, beside its own keys. The record's history read and its log send
+ * none of these yet, so each is read where it is sent and nothing is claimed where it is not.
+ *
+ * `suggested_by` is who filed the suggestion and `drafted_by` who drafted it, Slash's rules (`rules`) or the model the
+ * record names, as the record keeps both on the suggestion. `answer_label` is the chosen option in its own words.
+ * On a change to somebody's things that an accepted suggestion made, `settled_by` is who pressed (the line is signed by
+ * the rule that let it land) and `undone` marks the change that took it back.
+ */
+export type Suggested = {
+  suggested_by?: string | null;
+  drafted_by?: string | null;
+  answer_label?: string | null;
+  settled_by?: string | null;
+  undone?: boolean | null;
+};
+
+/** How a suggestion was settled, read off one line: what was done, by whom, and whose suggestion it was. */
+export type Settling = {
+  how: 'accepted' | 'declined' | 'chose' | 'undid';
+  /** The option chosen, in words, when `how` is `chose`. */
+  option?: string;
+  by: string;
+  suggested_by: string | null;
+  drafted_by: string | null;
+};
+
+/**
+ * THE CARD'S WORDS, handed in by whoever draws the line and never copied here: this file is read by screens that draw
+ * no card, so it imports the card's type and none of its code. `drafted` says who drafted it, where the caller has words
+ * for that.
+ */
+export type SettledWords = Pick<typeof cardWords, 'slash' | 'accepted' | 'declined' | 'chose' | 'undid'> & {
+  drafted?: (by: string) => string | null;
+};
+
+/** Who reads the line and the names the record gave its people, with the card's words to say it in. */
+export type Say = { me: string | null; names: ReadonlyMap<string, string>; words: SettledWords };
+
+/** A string the record sent, trimmed, or `null` for anything else and for an empty one. */
+const text = (v: unknown): string | null => (typeof v === 'string' && v.trim() !== '' ? v.trim() : null);
+
+/** The option a `decide` line names: its `to` is `{ question, answer }`, as the record wrote it or already read. */
+function answerOf(to: unknown): string | null {
+  let held = to;
+  if (typeof held === 'string') {
+    try {
+      held = JSON.parse(held);
+    } catch {
+      return null;
+    }
+  }
+  return typeof held === 'object' && held !== null ? text((held as { answer?: unknown }).answer) : null;
+}
+
+/**
+ * How one line settled a suggestion, or `null` for a line that settled none.
+ *
+ * READ OFF THE LINES THE RECORD WRITES FOR EACH PRESS. A yes is a `decide` line naming the option; a no is a `resolve`
+ * line closed as `wont-fix` or `incorrect`; an undo is a `resolve` closed as `undone`, or a `suggest` that reopened the
+ * question, signed by whoever undid it. The `resolve` written beside a yes (`addressed`) is the same press as its
+ * `decide` line and is left to it, and nobody settled a question its asker took back or BrainDog reopened.
+ *
+ * A CHANGE TO SOMEBODY'S THINGS IS ONE ONLY WHERE THE RECORD SAYS A SUGGESTION MADE IT (`suggested_by`): it landed, so
+ * it was accepted, unless the line is the one that took it back.
+ */
+export function settlingOf(e: Pick<Event, 'actor' | 'kind' | 'to'> & Suggested): Settling | null {
+  const whose = { suggested_by: text(e.suggested_by), drafted_by: text(e.drafted_by) };
+  const by = text(e.settled_by) ?? e.actor;
+  const label = text(e.answer_label);
+  if (e.kind === 'decide') {
+    const answer = answerOf(e.to);
+    if (answer === null) return null;
+    if (answer === 'reject') return { how: 'declined', by, ...whose };
+    if (answer === 'accept') return { how: 'accepted', by, ...whose };
+    return { how: 'chose', option: label ?? answer.replace(/[_-]+/gu, ' '), by, ...whose };
+  }
+  if (e.kind === 'resolve') {
+    if (e.to === 'wont-fix' || e.to === 'incorrect') return { how: 'declined', by, ...whose };
+    return e.to === 'undone' ? { how: 'undid', by, ...whose } : null;
+  }
+  if (e.kind === 'suggest') return e.to === 'reopened' && e.actor !== 'system' ? { how: 'undid', by, ...whose } : null;
+  if (whose.suggested_by === null) return null;
+  if (e.undone === true) return { how: 'undid', by, ...whose };
+  return label === null ? { how: 'accepted', by, ...whose } : { how: 'chose', option: label, by, ...whose };
+}
+
+/** Whether Slash filed it or drafted it for whoever did, as the card reads it (`bySlash` in `lib/decide/card.ts`). */
+const SLASHS = /^slash\b/u;
+
+/**
+ * THE ONE SENTENCE, for Activity and for a row's history: "Slash suggested · Mara accepted", in the card's own words,
+ * with who drafted it after where the caller can say that. `null` for anybody else's suggestion, a person's own or an
+ * agent's, and for one the record names no suggester for, which all read as they did.
+ */
+export function settledSaid(s: Settling, person: string, words: SettledWords): string | null {
+  const drafter = s.drafted_by !== null && SLASHS.test(s.drafted_by);
+  if (s.suggested_by !== 'slash' && !drafter) return null;
+  const verb = s.how === 'accepted' ? words.accepted : s.how === 'declined' ? words.declined : s.how === 'undid' ? words.undid : words.chose(s.option ?? '');
+  const drafted = s.drafted_by === null || drafter ? null : (words.drafted?.(s.drafted_by) ?? null);
+  return drafted === null ? words.slash(person, verb) : `${words.slash(person, verb)} · ${drafted}`;
+}
+
+/** The same for a line as the record sent it: whoever settled it by the name the screen says them, the reader as You. */
+export function settledBy(e: Pick<Event, 'actor' | 'kind' | 'to'> & Suggested, say: Say): string | null {
+  const s = settlingOf(e);
+  return s === null ? null : settledSaid(s, actorSaid(s.by, say.me, say.names).name, say.words);
+}
+
 /* A RULE IS `rule:<id>` ON THE RECORD AND `rule.<id>` IN THE SAMPLE, and `actorOf` words the second. */
 const actor = (a: string): string => a.replace(/^rule:/u, 'rule.');
 
@@ -113,8 +229,13 @@ const actor = (a: string): string => a.replace(/^rule:/u, 'rule.');
  * `moneyInText` HERE AND NOT IN `noteOf`, because `news-live.ts` words its lines with `noteOf` and hands the whole
  * sentence through `moneyInText` itself; one pass over one sentence, wherever it is made.
  */
-export const linesOf = (register: string, events: readonly Event[]): Line[] =>
-  events.map((e) => ({ by: actor(e.actor), note: moneyInText(noteOf(register, e)), at: e.ts })).reverse();
+export const linesOf = (register: string, events: readonly (Event & Suggested)[], say?: Say): Line[] =>
+  events
+    .map((e) => {
+      const settled = say === undefined ? null : settledBy(e, say);
+      return { by: actor(e.actor), note: moneyInText(noteOf(register, e)), at: e.ts, ...(settled === null ? {} : { settled }) };
+    })
+    .reverse();
 
 /**
  * The names of the people on this record, by id, for saying who did what. `boot` sends them to the owner and to a member
@@ -140,12 +261,15 @@ export async function readNames(base: string, io?: Fetch): Promise<ReadonlyMap<s
  *
  * A ROW WITH NO NUMBER THE RECORD COULD HOLD (a pending one) ASKS NOTHING, and its answer is the true one: the record
  * holds no events for it. It was `sample` with no lines, a word that now names nothing.
+ *
+ * `say` IS THE READER, THE NAMES AND THE CARD'S WORDS, and with it a line an answered suggestion of Slash's made carries
+ * who suggested and who settled (`settled`). Without it every line is the line it was.
  */
-export async function readHistory(base: string, register: string, seq: number, io?: Fetch): Promise<Told> {
+export async function readHistory(base: string, register: string, seq: number, io?: Fetch, say?: Say): Promise<Told> {
   if (!Number.isInteger(seq) || seq < 1) return { from: 'live', lines: [], now: Date.now() };
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });
   const out = await client.history(register, seq);
-  if (out.ok) return { from: 'live', lines: linesOf(register, out.value as Event[]), now: Date.now() };
+  if (out.ok) return { from: 'live', lines: linesOf(register, out.value as (Event & Suggested)[], say), now: Date.now() };
   return { from: 'refused', fix: 'refusal' in out ? out.refusal.fix : 'The row changed while it was being read.' };
 }
 

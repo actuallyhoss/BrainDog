@@ -35,7 +35,7 @@ test('A CARD SHOWS THE RAIL, THE LISTS AND HOME FROM THE DECLARATIONS, AND THE V
   assert.deepEqual(business, {
     rail: [],
     lists: [],
-    home: [{ text: 'What you have' }, { text: 'Due this week' }, { text: 'Needs your call' }, { text: 'Working now' }, { text: 'What changed' }],
+    home: [{ text: 'What you have' }, { text: 'Gone quiet' }, { text: 'Due this week' }, { text: 'Needs your call' }, { text: 'Working now' }, { text: 'What changed' }],
     spine: {},
   });
 });

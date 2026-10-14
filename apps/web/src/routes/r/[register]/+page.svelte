@@ -23,7 +23,7 @@
   import { said } from '$lib/voice.svelte.ts';
   import * as clipboard from '$lib/clipboard.ts';
   import * as pref from '$lib/pref.ts';
-  import { covered, silenced, typing as isTyping } from '$lib/a11y/keys.svelte.ts';
+  import { covered, overlays, silenced, typing as isTyping } from '$lib/a11y/keys.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { chipsOf, columnsFor, currencyFor, display, DOM_CAP, heldTwiceOn, iconFor, isRows, joinOf, labelOf, toRows, TWICE, twiceOf, twiceWords, type Filter, whereOf } from '$lib/record/api.ts';
   import { createClient } from '@braindog/client';
@@ -104,6 +104,7 @@
   import { ownsRecord, type Me } from '../../settings/levels.ts';
   import { may } from '$lib/record/may.ts';
   import { reachWords, writeWords } from './reach.ts';
+  import { wantsDeclared } from './declared.ts';
   import { liveOverlay, run, UNDO_MS, type Sent } from '$lib/data/optimistic.svelte.ts';
   import { ARRIVED_MS } from '$lib/data/optimistic.ts';
   import OfferCard from '$lib/design/OfferCard.svelte';
@@ -128,6 +129,13 @@
   let declared = $state<{ register: string; decl: RegisterDecl } | null>(null);
   let refusal = $state<Refusal | null>(null);
   const decl = $derived(declared?.register === id ? declared.decl : undefined);
+
+  /**
+   * WHETHER THIS VISIT DRAWS THE LIST AS A PAGE THE RECORD COMPOSES (PGS-A23, `DeclaredList.svelte`), which the address
+   * asks for by one key and nothing on this screen links to until his yes on the list board. While it does, nothing
+   * below is drawn, and this screen's keys and its panel's host stand down: its rows are not on screen to act on.
+   */
+  const composed = $derived(wantsDeclared(page.url));
 
   /**
    * THE RECORD'S INSTANT, which every tone and date band on this screen is measured from. It is the
@@ -1768,6 +1776,7 @@
   $effect(() => {
     void result.entries;
     void page.url.href;
+    if (composed) return;
     const shut = host.opened === null;
     untrack(() => {
       if (shut) host.close();
@@ -1959,10 +1968,14 @@
   }
 
   function onkeydown(e: KeyboardEvent) {
+    if (composed) return;
     /* AND NOT WHILE SOMETHING IS OPEN OVER THE PAGE. See `covered`: this handler is one of six on
        the routes under the shell, and none of them read the overlay depth, so a sheet made of
-       buttons left the page behind it holding its own keyboard. */
-    if (covered()) return;
+       buttons left the page behind it holding its own keyboard.
+
+       BUT `j` AND `k` STILL WALK WHILE THE ONLY THING OPEN IS THIS LIST'S OWN PANEL AS A SHEET, which it is below
+       1,280: walking the open row is what the two keys are for, and a field being typed in still stops them below. */
+    if (covered() && !(host.opened !== null && overlays.depth === 1 && ['j', 'k'].includes(e.key))) return;
     /* THE ONE TEST FOR WHETHER SOMEBODY IS TYPING, rather than a narrower copy of it. This read
        INPUT and TEXTAREA only, so a bare key fired over an open select and inside a contenteditable
        block, both of which `keys.svelte.ts` has always covered.
@@ -2505,7 +2518,12 @@
 
 <svelte:window {onkeydown} />
 
-{#if refusal && refusal.code !== 'REGISTER_UNKNOWN'}
+{#if composed}
+  <!-- THE LIST AS A PAGE THE RECORD COMPOSES, fetched when the address asks for it and never otherwise. -->
+  {#await import('./DeclaredList.svelte') then loaded}
+    <loaded.default register={id} {decl} count={booted?.registers.find((r) => r.id === id)?.count ?? null} refused={refusal?.fix ?? null} />
+  {/await}
+{:else if refusal && refusal.code !== 'REGISTER_UNKNOWN'}
   <!-- THE RECORD SAID NO, AND ITS SENTENCE IS THE BODY, verbatim (`13 §6`). What the record wrote
        is the most specific thing anybody can say about why this list is not here, and a sentence
        rewritten here would be a guess about it. -->

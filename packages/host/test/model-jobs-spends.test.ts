@@ -132,7 +132,8 @@ test('EVERY ROW THE RECORD HOLDS SAYS WHAT IT WAS FOR AND WHOSE MONTH IT SPENT, 
   assert.deepEqual(counts(), { his: 2, work: 3, headlines: 1, understand: 1 });
   assert.deepEqual(
     sql.all<{ purpose: string; spends: string }>('SELECT purpose, spends FROM slash_call ORDER BY rowid').map((r) => `${r.purpose} ${r.spends}`),
-    ['ask person', 'plan person', 'look background', 'look background', 'headline background', 'understand background'],
+    /* A SKILL DRAFT SAYS `skill`, its own purpose with its own floor (`budget-floors-alone.test.ts`), and no longer `look`. */
+    ['ask person', 'plan person', 'skill background', 'look background', 'headline background', 'understand background'],
   );
   /* A HOLD IN FLIGHT IS COUNTED WHERE IT WILL SETTLE, and one let go is counted nowhere. */
   const flying = await meter.background('headline');

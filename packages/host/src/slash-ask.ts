@@ -688,12 +688,12 @@ const BACKGROUND_ASK: Record<SlashBackgroundAsk, string> = {
 };
 
 /**
- * The purpose a background ask's row is written with, which is what the meters count by (`backgroundSpent`). A skill
- * draft is written as `look`: the ledger names six purposes and a skill draft is the look's own work, drafted from what
- * the look found.
+ * The purpose a background ask's row is written with, which is what the meters count by (`backgroundSpentBy`). EACH ITS
+ * OWN. A skill draft was written as `look` once, and so it spent the look's month and the look spent its floor; it is
+ * `skill` now, a purpose the plan gives a floor of its own (`budget-plan.ts`).
  */
 const BACKGROUND_PURPOSE: Record<SlashBackgroundAsk, AskPurpose> = {
-  skill: 'look',
+  skill: 'skill',
   look: 'look',
   headline: 'headline',
   understand: 'understand',
@@ -796,10 +796,10 @@ export function slashRecordMeter(deps: SlashLedgerDeps): SlashRecordMeter {
      * comment said it did not.
      *
      * EACH FROM ITS OWN SHARE OF ONE POOL (the plan's, `budget-plan.ts`): a headline ask is written with purpose
-     * `headline` and held to the headlines' share, and the look and a skill draft to the rest, which the model-jobs pass
-     * spends too. Each share may always spend its floor, and past it what is left once the floors nobody has used are set
-     * aside. So a month of drafts and digests cannot leave the pages without their line, nor the headlines the digests
-     * without prose.
+     * `headline` and held to the headlines' share, the look with `look` to the look's, and a skill draft with `skill`
+     * to the skill drafts'. Each share may always spend its floor, and past it what is left once the floors nobody has
+     * used are set aside. So a month of drafts and digests cannot leave the pages without their line, nor the headlines
+     * the digests without prose, nor a month of daily looks a skill without its draft.
      * `ask` is optional because a record a release behind calls `background()` for its skill drafts alone.
      *
      * AND ONLY WHILE HE LETS IT READ: all four are behind his one switch, asked first (`mayThink`).
@@ -821,9 +821,10 @@ export function slashRecordMeter(deps: SlashLedgerDeps): SlashRecordMeter {
       if (engine === undefined) return { ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'Slash has no ledger on this host to count the draft in.' } };
       const status = engine.status() as { tier?: unknown; model?: unknown } | undefined;
       const work = backgroundMeter(deps.sql, BACKGROUND_JOBS_MONTH, ask === 'headline' ? 'headline' : 'work');
-      /* THE LOOK AND A SKILL DRAFT ARE HELD TO THE REST, as the model-jobs pass is: the work less the floor understanding
-         has not used yet, so neither spends through this door what reading who is who is still owed. */
-      const meter = ask === 'look' || ask === 'skill' ? (work.rest ?? work) : work;
+      /* THE LOOK AND A SKILL DRAFT ARE EACH HELD TO THEIR OWN PURPOSE'S MONTH, as each job of the model-jobs pass is: its
+         floor, and past it what is left once every floor nobody has used is set aside, so neither spends through this
+         door what the other, a digest's prose, a pattern or reading who is who is still owed. */
+      const meter = ask === 'look' || ask === 'skill' ? (work.of?.(ask) ?? work.rest ?? work) : work;
       const since = monthStart(deps.clock.now());
       /* UNDERSTANDING IS HELD TO ITS OWN SHARE AND TO THE WORK'S MONTH IT IS COUNTED IN, both. */
       const understanding = ask === 'understand' ? work.understand : undefined;

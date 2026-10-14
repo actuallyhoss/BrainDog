@@ -1,0 +1,11 @@
+{
+  "name": "@braindog/pack-estate",
+  "version": "2.3.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test estate.test.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}

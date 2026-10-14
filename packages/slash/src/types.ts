@@ -233,11 +233,13 @@ export const BACKGROUND_ASKS_MONTH = 600;
  *
  * `ask` is a person's own question or press. `automation` is a rule of his asking at one of its steps. `plan` is the
  * first plan a new record is offered. `headline` is the page headlines, `understand` the reading of who is who, and
- * `look` every other piece of background work: the daily look, a skill or pattern draft, digest prose, an embedding.
+ * `look` the daily look.
  *
- * `compose`, `skill`, `pattern`, `prose`, `embed` and `probe` are the host router's own names for that background work
- * one by one (`packages/host/src/infer.ts`, host-infer-54), and `probe` is the operator's test of a model, which spends
- * nobody's allowance. The ledger's purpose column takes any of them.
+ * `compose`, `skill`, `pattern`, `prose`, `embed` and `probe` are the host router's own names for the other background
+ * work one by one (`packages/host/src/infer.ts`, host-infer-54). The engine's own jobs write `pattern`, `prose` and
+ * `embed` (`jobs.ts`), the host writes a skill draft as `skill` (`packages/host/src/slash-ask.ts`), nothing writes
+ * `compose` yet, and `probe` is the operator's test of a model, which spends nobody's allowance. The ledger's purpose
+ * column takes any of them.
  */
 export type Purpose = 'ask' | 'automation' | 'plan' | 'headline' | 'understand' | 'look' | 'compose' | 'skill' | 'pattern' | 'prose' | 'embed' | 'probe';
 

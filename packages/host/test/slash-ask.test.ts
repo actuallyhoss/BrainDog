@@ -698,7 +698,7 @@ test("A BACKGROUND ASK LEAVES HIS COUNT WHERE IT WAS, and his own press moves it
   assert.equal(used(), 2);
   assert.deepEqual(
     sql.all<{ purpose: string; spends: string }>('SELECT purpose, spends FROM slash_call ORDER BY rowid').map((r) => `${r.purpose} ${r.spends}`),
-    ['headline background', 'look background', 'look background', 'understand background', 'ask person', 'plan person'],
+    ['headline background', 'look background', 'skill background', 'understand background', 'ask person', 'plan person'],
   );
   sql.close();
 });
