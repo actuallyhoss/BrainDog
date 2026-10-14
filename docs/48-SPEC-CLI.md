@@ -694,7 +694,7 @@ stream, no signature. It reads what an agent reads.
 
 **What it writes** (`mirrorFiles(lists, rowsOf, day)`, a map from path to text):
 
-5. `README.md`: `Written on <day>.`, then one line per list in id order, `- [<name>](<id>/README.md): <count>`, or
+5. `README.md`: `Written on <day>.`, then one line per list in id order, a link named `<name>` to `<id>/README.md` and then `: <count>`, or
    the not-read line.
 6. `<list>/README.md`: the list's name, `<name> holds <count>.`, and its fields in declared order with the kind of
    value each takes in words (`a link to People`, `money`, `a day`).

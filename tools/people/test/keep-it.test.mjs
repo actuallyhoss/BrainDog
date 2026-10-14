@@ -137,7 +137,9 @@ for (const [path, step] of [
   ['/account/billing/checkout', /free record/u],
 ]) {
   test('A DOOR THAT NEVER ANSWERS IS RED BY ITS STEP: ' + path, { timeout: 10_000 }, async () => {
-    const r = await keepIt(MARIAM, { wrap: never(path), limit: 600 });
+    /* FOUR SECONDS, NOT 0.6: the limit covers the whole walk, and starting the hosted service alone outlived 0.6 s on
+       CI's runner (14 October), so the walk stopped before the door it was there to wait on. */
+    const r = await keepIt(MARIAM, { wrap: never(path), limit: 4_000 });
     assert.equal(r.pass, false);
     assert.match(r.saw, /the walk stopped at/u);
     assert.match(r.saw, step);
