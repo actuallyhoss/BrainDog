@@ -7,7 +7,22 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { REGISTERS } from './held.ts';
-import { moveMany, movedSaid, movable, scopeFieldOf, words, type MoveClient, type MoveRow, type Place } from './scope-move.ts';
+import {
+  afterMove,
+  choiceOf,
+  moveMany,
+  movedSaid,
+  movable,
+  movesIn,
+  opensMove,
+  scopeFieldOf,
+  scopeOf,
+  words,
+  type MoveClient,
+  type MoveRow,
+  type Place,
+} from './scope-move.ts';
+import type { Names } from './remote.ts';
 
 REGISTERS['projects'] = { id: 'projects', name: 'Projects', one: 'project', title: 'name', seq_prefix: 'P', fields: [{ id: 'name', type: 'text' }] } as never;
 REGISTERS['keys'] = {
@@ -29,6 +44,16 @@ REGISTERS['skills'] = {
   fields: [
     { id: 'label', type: 'text' },
     { id: 'project', type: 'ref', to: 'projects', scope: 'project' },
+  ],
+} as never;
+REGISTERS['learnings'] = {
+  id: 'learnings',
+  name: 'Learnings',
+  one: 'learning',
+  title: 'label',
+  fields: [
+    { id: 'label', type: 'text' },
+    { id: 'projects', type: 'refs', to: 'projects', scope: 'project' },
   ],
 } as never;
 REGISTERS['notes'] = { id: 'notes', name: 'Notes', one: 'note', title: 'label', fields: [{ id: 'label', type: 'text' }] } as never;
@@ -188,4 +213,66 @@ test('a list whose things name no place is moved nowhere', async () => {
   if (out.ask) return;
   assert.equal(sent.length, 0);
   assert.equal(out.failed, 1);
+});
+
+/* ── ONE PRESS, WHEREVER THE CHIP IS ───────────────────────────────────────────────────────────────────────────────
+   The row's page, a list's table and its cards open one sheet (`[seq]/ScopeMove.svelte`); what each decides is here. */
+
+const names = Object.assign(new Map([['projects#1', 'Kiln']]), { marks: new Map() }) as Names;
+
+test('the chip says where each row applies, by name, and what a press on it does', () => {
+  const kilnSaid = scopeOf('skills', { project: 1 }, names);
+  assert.equal(kilnSaid?.name, 'Kiln');
+  assert.equal(kilnSaid?.spoken, 'P1');
+  assert.equal(words.moveLabel(kilnSaid?.name ?? words.everywhere), 'Where it applies: Kiln. Move it');
+  assert.equal(scopeOf('skills', { project: null }, names), null);
+  assert.equal(words.moveLabel(words.everywhere), 'Where it applies: Everywhere. Move it');
+  /* A PROJECT THIS TAB COULD NOT NAME IS STILL A PROJECT, and never its number. */
+  assert.equal(scopeOf('skills', { project: 9 }, names)?.name, words.someProject);
+  assert.equal(scopeOf('notes', { label: 'x' }, names), undefined);
+});
+
+test('a key going to Everywhere asks first, and every other press moves or closes', () => {
+  const atKiln = scopeOf('keys', { project: 1 }, names) ?? null;
+  assert.equal(choiceOf('keys', atKiln, null), 'ask');
+  assert.equal(choiceOf('skills', atKiln, null), 'move');
+  assert.equal(choiceOf('keys', atKiln, marsh), 'move');
+  assert.equal(choiceOf('keys', null, kiln), 'move');
+  /* WHERE IT IS ALREADY, THE PRESS CLOSES THE SHEET AND WRITES NOTHING, Everywhere included. */
+  assert.equal(choiceOf('keys', atKiln, kiln), 'here');
+  assert.equal(choiceOf('keys', null, null), 'here');
+});
+
+test('a row on a list of several projects keeps its chip and cannot move', () => {
+  assert.equal(movesIn('learnings', true), false);
+  assert.equal(scopeOf('learnings', { projects: [1, 9] }, names)?.name, 'Kiln, A project');
+  assert.equal(movesIn('keys', true), true);
+  assert.equal(movesIn('skills', true), true);
+  /* A READER WHO MAY NOT WRITE THE LIST, AND A LIST WHOSE ROWS NAME NO PLACE, get the words and no press. */
+  assert.equal(movesIn('keys', false), false);
+  assert.equal(movesIn('notes', true), false);
+});
+
+test('Enter and Space open the move from a grid cell, and a key with a modifier is the list’s', () => {
+  assert.equal(opensMove({ key: 'Enter' }), true);
+  assert.equal(opensMove({ key: ' ' }), true);
+  assert.equal(opensMove({ key: 'e' }), false);
+  assert.equal(opensMove({ key: 'Escape' }), false);
+  assert.equal(opensMove({ key: 'Enter', metaKey: true }), false);
+  assert.equal(opensMove({ key: ' ', ctrlKey: true }), false);
+});
+
+test('a move that landed stands in for the row until the list reads it again', () => {
+  const was = scopeOf('skills', { project: 1 }, names);
+  const landed = { seq: 4, version: 8, to: marsh };
+  /* BEFORE THE READ: the chip says Marsh, and the next move goes against the version the move answered. */
+  assert.deepEqual(afterMove({ seq: 4, version: 7 }, was, landed), { version: 8, scope: marsh });
+  /* THE READ ARRIVED, OR THE ROW CHANGED SOMEWHERE ELSE SINCE: the row as read wins. */
+  assert.deepEqual(afterMove({ seq: 4, version: 8 }, was, landed), { version: 8, scope: was });
+  assert.deepEqual(afterMove({ seq: 4, version: 11 }, was, landed), { version: 11, scope: was });
+  /* ANOTHER ROW, OR NO MOVE AT ALL, is the row as read. */
+  assert.deepEqual(afterMove({ seq: 5, version: 2 }, was, landed), { version: 2, scope: was });
+  assert.deepEqual(afterMove({ seq: 4, version: 7 }, was, undefined), { version: 7, scope: was });
+  /* A MOVE TO EVERYWHERE IS SAID AS EVERYWHERE, not as the place it left. */
+  assert.deepEqual(afterMove({ seq: 4, version: 7 }, was, { ...landed, to: null }), { version: 8, scope: null });
 });

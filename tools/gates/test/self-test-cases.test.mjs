@@ -98,3 +98,25 @@ test('no port key is left in budgets.json for a gate that asks the system for on
   const b = JSON.parse(readFileSync(join(gates, 'budgets.json'), 'utf8'));
   for (const section of ['keys', 'prefs', 'layout', 'a11y']) assert.equal(b[section]?.port, undefined, `${section}.port`);
 });
+
+test('the row drawer has a planted fault: a browser negative in its neighbours\' words, spawned where the walk lives', async () => {
+  const { BROWSER } = await import('../self-test.mjs');
+  const c = BROWSER.find((b) => b.gate === 'row-drawer');
+  assert.ok(c, 'no row-drawer case in BROWSER');
+  assert.ok(REGISTERED.has('row-drawer'), 'run.mjs registers row-drawer');
+  assert.equal(c.seed, 'row-drawer');
+  for (const k of ['blind', 'red']) assert.ok(typeof c[k] === 'string' && c[k].trim(), `${k} is a sentence`);
+  for (const n of [c.names].flat()) assert.ok(typeof n === 'string' && n.trim(), 'each name is a sentence');
+  for (const b of BROWSER) {
+    /* EVERY CASE IS THE SAME FIVE KEYS, and `file` only for a gate that is not `<gate>.mjs` beside self-test. */
+    const keys = Object.keys(b).filter((k) => k !== 'file').sort();
+    assert.deepEqual(keys, ['blind', 'gate', 'names', 'red', 'seed'], b.gate);
+    const at = join(gates, b.file ?? `${b.gate}.mjs`);
+    assert.ok(readFileSync(at, 'utf8').includes('BRAINDOG_GATE_SEED'), `${b.gate}'s file reads no seed`);
+    for (const v of [b.blind, b.red, ...[b.names].flat()]) assert.doesNotMatch(v, /[—–]/u);
+  }
+  /* AND THE NAMES ARE THE WALK'S OWN SENTENCES, so the negative cannot drift from what the judge and the drive print. */
+  const walk = readFileSync(join(gates, c.file), 'utf8');
+  for (const n of [c.names].flat()) assert.ok(walk.includes(n), `the walk never says "${n}"`);
+  assert.ok(!GAPS.has('row-drawer'));
+});

@@ -66,16 +66,16 @@ const value = <T>(r: unknown): T => {
 type Drawn = { heading?: string; rows: Entry[]; matched?: number; inherited?: number; refusals?: unknown[] };
 
 /**
- * The record: Kiln with a key, a tool and a skill of its own, Portage with a tool of its own, Tamsin with nothing of its
+ * The record: Kiln with a key, a tool and a skill of its own, Portage with a tool of its own, Oxbow with nothing of its
  * own, and three tools, two skills and a key for everywhere. Six runs: two of Claude Code, and one each of Codex, Cursor, Gemini and an older Codex.
  */
 async function record() {
   const clock = fixedClock(NOW - 200 * DAY);
   const k: Kernel = await openRecord(openSqlite(), clock);
-  value(await k.install([...LISTS, pageAbout('kiln', 'things#1'), pageAbout('portage', 'things#2'), pageAbout('tamsin', 'things#3')]));
+  value(await k.install([...LISTS, pageAbout('kiln', 'things#1'), pageAbout('portage', 'things#2'), pageAbout('oxbow', 'things#3')]));
   value(k.create('things', { name: 'Kiln' }, OWNER));
   value(k.create('things', { name: 'Portage' }, OWNER));
-  value(k.create('things', { name: 'Tamsin' }, OWNER));
+  value(k.create('things', { name: 'Oxbow' }, OWNER));
   const tool = (name: string, project?: string): string => value<Entry>(k.create('tools', { name, ...(project ? { project } : {}) }, OWNER)).id;
   const tools = { kiln: tool('kiln-mcp', 'things#1'), portage: tool('portage-cli', 'things#2'), github: tool('github'), search: tool('search'), idle: tool('weather') };
   value(k.create('credentials', { label: 'Kiln deploy key', opens: 'Deploys Kiln', project: 'things#1' }, OWNER));
@@ -158,7 +158,7 @@ test('A RUN OLDER THAN NINETY DAYS IS NOT COUNTED, and a thing nobody used says 
 
 test('NAMES, NEVER RUN IDS: no agents line on any page holds a run handle', async () => {
   const { k } = await record();
-  for (const slug of ['kiln', 'portage', 'tamsin'])
+  for (const slug of ['kiln', 'portage', 'oxbow'])
     for (const r of page(k, slug).All!.rows) {
       const said = r.fields.used_agents;
       assert.ok(said === null || (typeof said === 'string' && !/\bS[0-9]+\b/u.test(said)), `${slug}: ${String(said)}`);
@@ -180,7 +180,7 @@ test('INHERITED IS EVERY ROW KEPT THAT APPLIES EVERYWHERE, counted before the bl
 
 test('A PROJECT WITH NOTHING OF ITS OWN ANSWERS ONLY WHAT APPLIES EVERYWHERE, every row of it quiet', async () => {
   const { k } = await record();
-  const blocks = page(k, 'tamsin');
+  const blocks = page(k, 'oxbow');
   assert.deepEqual(blocks.All!.rows.map((r) => r.fields.name), GLOBAL);
   for (const r of blocks.All!.rows) assert.deepEqual([r.fields.scope, r.fields.quiet], ['global', 'global'], String(r.fields.name));
   assert.deepEqual([blocks.All!.inherited, blocks.All!.matched], [6, 6]);

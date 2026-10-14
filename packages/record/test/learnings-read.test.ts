@@ -265,11 +265,16 @@ test('context HANDS WHAT WAS LEARNED IN THE SAME ORDER, so the twenty a place it
   /* A method written first and never touched again, then twenty-two facts: by the day last changed it would be cut. */
   await learn(r, NOW - 30 * DAY, 'Run the proof before the release.', 'method', false);
   for (let i = 0; i < 22; i++) await learn(r, NOW - 20 * DAY + i * MIN, `Fact number ${String(i)} of the order test.`, 'fact', false);
-  const told = value<{ registers: { id: string; inherited: { lesson?: unknown }[] }[] }>(await r.api.context({}, owner));
-  const handed = (told.registers.find((g) => g.id === 'learnings')?.inherited ?? []).map((row) => row.lesson);
-  assert.equal(handed.length, 20);
-  assert.equal(handed[0], 'Run the proof before the release.');
-  assert.equal(handed[1], 'Fact number 21 of the order test.', 'and the newest fact after it');
-  assert.deepEqual(handed, lessons(value<Learnings>(await learnings(r, owner, { limit: 20 }))));
+  /* FIVE IN THE BRIEF ANSWER AND TWENTY IN THE FULL ONE (AGT-B09), each the ones the read leads with. */
+  for (const [format, n] of [['brief', 5], ['full', 20]] as const) {
+    const told = value<{ registers: { id: string; inherited: { lesson?: unknown }[] }[] }>(
+      await r.api.context({}, format === 'full' ? ({ ...owner, session: { ...(owner as { session?: object }).session, format } } as typeof owner) : owner),
+    );
+    const handed = (told.registers.find((g) => g.id === 'learnings')?.inherited ?? []).map((row) => row.lesson);
+    assert.equal(handed.length, n);
+    assert.equal(handed[0], 'Run the proof before the release.');
+    assert.equal(handed[1], 'Fact number 21 of the order test.', 'and the newest fact after it');
+    assert.deepEqual(handed, lessons(value<Learnings>(await learnings(r, owner, { limit: n }))));
+  }
   r.sql.close();
 });

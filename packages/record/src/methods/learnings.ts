@@ -25,6 +25,11 @@
  * `here` or `everywhere`: the project is the one the caller stands in, which it already knows, and no handle of it.
  *
  * IT READS AND WRITES NOTHING ELSE. No run is opened by asking and nothing is confirmed by being read.
+ *
+ * ONE LESSON LEARNED TWICE (AGT-D15 jobs 2 and 3). `learningsTwice` (READ+) says which lessons two projects learned
+ * on their own, by the rule in `../learning-promote.ts`, and `promoteLearnings` (DATA, a person's only) puts each to
+ * Decide as one question. It is asked when a person asks and never by the night: a matcher may show, and only a press
+ * asks. Here and not in the kernel, so no kernel export and no table line was needed.
  */
 
 import type { Result } from '@braindog/ports';
@@ -33,6 +38,7 @@ import type { Entry } from '@braindog/kernel';
 
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
+import { PROMOTED_WHY, promotionQuestion, promotionsFor, type Lesson, type Promotion } from '../learning-promote.ts';
 
 /** One learning as a session reads it. `made` and `confirmed_on` are days; `where` is never a project's handle. */
 export type Learned = {
@@ -179,8 +185,82 @@ function fadingList(deps: RecordDeps) {
   return null;
 }
 
+/* ── one lesson learned twice (AGT-D15 jobs 2 and 3) ─────────────────────────────────────────────────────────────── */
+
+/** One side of a lesson learned twice, as a person reads it: the learning by its spoken id, its words, its project's name. */
+export type TwiceSide = { spoken: string; lesson: string; project: string };
+/** One lesson learned twice: the older and the newer, the topic they share, and the question it would be put as. */
+export type Twice = { older: TwiceSide; newer: TwiceSide; topic: string; question: string; parts: readonly string[] };
+/** What `learningsTwice` answers: the pairs, older first, and whether more stand than were answered. */
+export type LearnedTwice = { pairs: Twice[]; truncated: boolean };
+/**
+ * What `promoteLearnings` answers: each question this press filed, by its words (`opened` false when it joined one
+ * already waiting), and how many such questions wait on Decide now.
+ */
+export type Promoted = { asked: { said: string; opened: boolean }[]; open: number };
+
+/** The most pairs one `learningsTwice` answers, and the most of these questions open on Decide at once. */
+export const TWICE_SHOWN = 20;
+export const TWICE_OPEN_MOST = 5;
+/** The most learnings read to find pairs in, the most one kernel read hands. */
+const TWICE_READ = 500;
+/** What every such question is filed under, then the two rows' ids, so one pair is asked once and a no is kept. */
+const TWICE_CAUSE = 'learned-twice#';
+
+type Pair = { promotion: Promotion; rows: [Entry, Entry]; said: Twice };
+type Listed = NonNullable<ReturnType<typeof fadingList>>;
+
+/**
+ * Every lesson learned twice that this caller may read, older first, each with its question. `null` is a record with
+ * no list whose rows fade. Both rows must be ones the caller's grant admits; a project the caller may not read is
+ * called "One project" and "another project", never by an id.
+ */
+function twiceFor(deps: RecordDeps, ctx: CallContext): { list: Listed; pairs: Pair[] } | null {
+  const { kernel, readable } = deps;
+  const list = fadingList(deps);
+  if (list === null) return null;
+  const { id, decl } = list;
+  const place = (decl.fields as readonly Field[]).find((f) => f.scope !== undefined && !f.retired);
+  /* A LEARNING THAT STANDS is one in the state its list starts a row in, which the list declares (`active`). */
+  const standing = decl.fields.find((f) => f.id === decl.state)?.default;
+  if (place === undefined || typeof standing !== 'string') return { list, pairs: [] };
+  const got = kernel.list({ register: id, where: { field: decl.state!, is: standing }, limit: TWICE_READ }, whereFor(ctx.wheres, id));
+  if (!got.ok) return { list, pairs: [] };
+  const byId = new Map(got.value.rows.map((row) => [row.id, row]));
+  const lessons: Lesson[] = got.value.rows.map((row) => ({
+    id: row.id,
+    lesson: text(row.fields[decl.title]) ?? '',
+    topic: text(row.fields.topic),
+    active: row.state === standing,
+    made: row.created_at,
+    because: text(row.fields.because),
+  }));
+  const projectOf = (l: Lesson): string | null => text(byId.get(l.id)?.fields[place.id]);
+  const pairs = promotionsFor(lessons, projectOf).map((promotion): Pair => {
+    const nameOf = (project: string): string => {
+      const row = kernel.get(project);
+      const title = row && readable(ctx, row.register) === null ? kernel.titleOfRow(project) : null;
+      return title ?? (project === promotion.olderProject ? 'One project' : 'another project');
+    };
+    const asked = promotionQuestion(promotion, nameOf);
+    const side = (l: Lesson, project: string): TwiceSide => ({ spoken: kernel.nameOf(l.id), lesson: l.lesson, project: nameOf(project) });
+    return {
+      promotion,
+      rows: [byId.get(promotion.older.id)!, byId.get(promotion.newer.id)!],
+      said: {
+        older: side(promotion.older, promotion.olderProject),
+        newer: side(promotion.newer, promotion.newerProject),
+        topic: promotion.older.topic ?? '',
+        question: asked.question,
+        parts: asked.parts,
+      },
+    };
+  });
+  return { list, pairs };
+}
+
 export function methods(deps: RecordDeps) {
-  const { scoped, readable, clock, no } = deps;
+  const { kernel, scoped, readable, clock, no } = deps;
 
   return {
     /**
@@ -198,6 +278,78 @@ export function methods(deps: RecordDeps) {
       const closed = list === null ? null : readable(ctx, list.id);
       if (closed) return { ok: false, refusal: closed };
       return { ok: true, value: learnedFor(deps, ctx, clock.now(), limit) };
+    },
+
+    /**
+     * `{}`: each lesson two projects learned on their own, as `{ pairs, truncated }`, older first, at most
+     * `TWICE_SHOWN`, each with the question it would be put as. READ+, held to the rows the caller may read, and it
+     * changes and asks nothing.
+     */
+    async learningsTwice(_args: unknown, ctx: CallContext): Promise<Result<LearnedTwice>> {
+      const stop = scoped(ctx, 'read');
+      if (stop) return { ok: false, refusal: stop };
+      const list = fadingList(deps);
+      const closed = list === null ? null : readable(ctx, list.id);
+      if (closed) return { ok: false, refusal: closed };
+      const pairs = twiceFor(deps, ctx)?.pairs ?? [];
+      return { ok: true, value: { pairs: pairs.slice(0, TWICE_SHOWN).map((p) => p.said), truncated: pairs.length > TWICE_SHOWN } };
+    },
+
+    /**
+     * `{}`: one question on Decide for each lesson learned twice, "Kiln and Crumb.gg learned the same thing. Keep it
+     * once, for everywhere?", the four parts of the test under it, signed by the person who pressed. DATA, a person's
+     * only: no agent widens a learning, and no night asks this by itself. At most `TWICE_OPEN_MOST` wait at once; a
+     * pair asked already, or one he said no to, is never asked again. Accepting one is a rowset Decide writes in one
+     * batch, so one Undo takes it back: the older row's project is cleared, and the newer row is marked replaced with
+     * the reason `PROMOTED_WHY`. Answers `{ asked, open }`, `asked` each question filed by its words.
+     */
+    async promoteLearnings(_args: unknown, ctx: CallContext): Promise<Result<Promoted>> {
+      const list = fadingList(deps);
+      const stop = deps.guard(ctx, 'propose', list?.id);
+      if (stop) return { ok: false, refusal: stop };
+      if (ctx.principal.kind !== 'person')
+        return no('NEEDS_BROWSER_SESSION', 'Only a person keeps a lesson once for everywhere. Open BrainDog and ask from there.', { at: 'principal' });
+      const found = twiceFor(deps, ctx);
+      const openNow = (): number =>
+        Number(deps.sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM suggestion WHERE status = 'open' AND substr(cause, 1, ?) = ?", TWICE_CAUSE.length, TWICE_CAUSE)?.n ?? 0);
+      if (found === null || found.pairs.length === 0) return { ok: true, value: { asked: [], open: openNow() } };
+      const { decl } = found.list;
+      const state = decl.fields.find((f) => f.id === decl.state);
+      const place = (decl.fields as readonly Field[]).find((f) => f.scope !== undefined && !f.retired)!;
+
+      const asked: Promoted['asked'] = [];
+      for (const { promotion, rows, said } of found.pairs) {
+        if (openNow() >= TWICE_OPEN_MOST) break;
+        const cause = `${TWICE_CAUSE}${promotion.older.id}#${promotion.newer.id}`;
+        /* ASKED ONCE, AND A NO IS KEPT: any question under this cause, open or answered, means this pair was asked. */
+        if (deps.sql.one('SELECT 1 AS y FROM suggestion WHERE cause = ?', cause) != null) continue;
+        /* THE NEWER ROW IS REPLACED, the first finished state its list lets a standing row move to, and with the
+           reason the move requires, both as the list declares them. */
+        const from = rows[1].state ?? '';
+        const move = state?.transitions?.[from];
+        const to = decl.done?.find((d) => move?.to.includes(d));
+        const reason = move?.requires?.[0];
+        if (to === undefined || decl.state === undefined) return no('NOT_IN_THIS_BUILD', 'This record cannot mark a learning replaced, so a lesson learned twice is not asked about.');
+        const filed = kernel.propose(
+          {
+            question: said.question,
+            body_kind: 'rowset',
+            body: {
+              register: found.list.id,
+              rows: [
+                { at: said.older.spoken, version: rows[0].version, patch: { [place.id]: null } },
+                { at: said.newer.spoken, version: rows[1].version, patch: { [decl.state]: to, ...(reason ? { [reason]: PROMOTED_WHY } : {}) } },
+              ],
+              context: said.parts.join('\n'),
+            },
+            cause,
+          },
+          ctx.principal.id,
+        );
+        if (!filed.ok) return deps.tail(filed as Result<never>);
+        if (filed.value.answered === undefined) asked.push({ said: said.question, opened: filed.value.joined === undefined });
+      }
+      return deps.tail({ ok: true as const, value: { asked, open: openNow() } });
     },
   };
 }

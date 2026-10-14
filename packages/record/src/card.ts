@@ -26,6 +26,7 @@
  * Typed on `Context` alone, by a type-only import, so the record's `briefing()` can call it without a cycle.
  */
 
+import { RULE, rulesOf, type Rules } from './context-caps.ts';
 import type { Brief, Context } from './index.ts';
 
 /** About this many words. Past it, the first cuts are made. */
@@ -78,6 +79,8 @@ export type CardAt = {
   waiting?: number | null | undefined;
   /** Things the caller adds to More, such as what the start hook's skills sync did. */
   more?: string[] | undefined;
+  /** The Home page the record declares, by its title, which More names with the read that opens it. */
+  home?: string | null | undefined;
   /**
    * A row by its handle or its id, as its name, when the caller may read it; `null` otherwise. A question's words may
    * hold a bare id or a handle whose row the context did not send, and those print as the row's name, never as an id.
@@ -434,31 +437,73 @@ export function learnedFirst(a: Brief, z: Brief): number {
   return fact(a) - fact(z) || far(a) - far(z) || (on === zon ? 0 : on > zon ? -1 : 1);
 }
 
+/** The most of a rule the card says: a rule is a line a session keeps in mind, not a paragraph. */
+const RULE_CHARS = 60;
+
 /**
- * Learned and More: the two lessons still standing that matter most (`learnedFirst`), then what is there on demand,
- * three at most. More leads with how many things went stale where the session stands (AGT-C18) and the read that names
- * them, said only for a whole number above zero: the count is the one thing in More a session can act on at once.
+ * How many rows a list has where the session stands: what `context` counted when it capped the list (`capRegister`'s
+ * `here` and `everywhere`), else the rows it sent, with a `+` when it said there were more.
+ */
+function countedOf(c: Context, id: string): { n: number; plus: string } {
+  const r = register(c, id) as (Context['registers'][number] & { here?: unknown; everywhere?: unknown }) | undefined;
+  const whole = (n: unknown): n is number => typeof n === 'number' && Number.isInteger(n) && n >= 0;
+  if (r && whole(r.here) && whole(r.everywhere)) return { n: r.here + r.everywhere, plus: '' };
+  return { n: rowsOf(c, id).length, plus: r?.truncated ? '+' : '' };
+}
+
+/**
+ * The rules the card leads Learned with: the ones `context` read from every learning (`rulesOf`, so a rule older than
+ * the newest lessons is still here), else the ones among the learnings it sent.
+ */
+function rulesFor(c: Context): Rules<Brief> {
+  const sent = (c as Context & { rules?: unknown }).rules as Partial<Rules<Brief>> | undefined;
+  if (sent && Array.isArray(sent.rows)) return { rows: sent.rows, more: typeof sent.more === 'number' && sent.more > 0 ? sent.more : 0 };
+  return rulesOf(rowsOf(c, 'learnings'), c.project?.spoken ?? null);
+}
+
+/**
+ * Learned and More. Learned leads with the record's own rules (AGT-B09), each cut at sixty characters, "and 2 more
+ * rules" when there are more, then the lessons still standing that matter most (`learnedFirst`), three things at most.
+ * More is what is there on demand, three at most, by count, then the Home page and the call: it names no key and no
+ * skill. It leads with how many things went stale where the session stands (AGT-C18) and the read that names them,
+ * said only for a whole number above zero: the count is the one thing in More a session can act on at once.
  */
 function learnedAndMore(c: Context, at: CardAt, handedLeft: number): Slot[] {
+  const rules = rulesFor(c);
+  const ruled = rules.rows.map((row) => words(plainly(wordsOf(row, 'lesson'), c, true, at), RULE_CHARS)).filter(Boolean);
+  const isRule = new Set(rules.rows.map((row) => row.spoken));
   const lessons = rowsOf(c, 'learnings').filter((row) => row.state === null || row.state === 'active').sort(learnedFirst);
-  const learned = lessons.map((row) => words(plainly(wordsOf(row, 'lesson'), c, true, at), 120)).filter(Boolean).slice(0, LEARNED);
+  const learned = lessons
+    .filter((row) => row.kind !== RULE && !isRule.has(row.spoken))
+    .map((row) => words(plainly(wordsOf(row, 'lesson'), c, true, at), 120))
+    .filter(Boolean)
+    .slice(0, Math.max(0, Math.min(LEARNED, PER_SLOT - ruled.length)));
   const more: string[] = [];
   if (typeof c.stale === 'number' && Number.isInteger(c.stale) && c.stale > 0) more.push(`${String(c.stale)} stale, read ${STALE_READ}`);
   const tried = c.handoff?.tried.length ?? 0;
   if (tried > 0) more.push(count(tried, 'dead end'));
   if (handedLeft > 0) more.push(`${String(handedLeft)} more handed to you`);
   const grow = bearing(c);
-  if (grow) more.push(`${count(grow.learnings, 'learning')} for skill ${grow.skill}`);
-  const plus = (id: string) => (register(c, id)?.truncated ? '+' : '');
-  if (lessons.length > learned.length) more.push(`${String(lessons.length)}${plus('learnings')} learnings`);
-  const keys = rowsOf(c, 'credentials').length;
-  if (keys > 0) more.push(`${String(keys)}${plus('credentials')} ${keys === 1 && !plus('credentials') ? 'key' : 'keys'} by name`);
-  const skills = rowsOf(c, 'skills').length;
-  if (skills > 0) more.push(`${String(skills)}${plus('skills')} ${skills === 1 && !plus('skills') ? 'skill' : 'skills'}`);
+  if (grow) more.push(`${count(grow.learnings, 'learning')} for a skill`);
+  /* COUNTED BY `context` WHEN IT CAPPED THE LIST, and otherwise the standing lessons it sent, never one that was superseded. */
+  const learnt = countedOf(c, 'learnings');
+  const lessonsIn = learnt.n > rowsOf(c, 'learnings').length ? learnt.n : lessons.length;
+  if (lessonsIn > learned.length + ruled.length) more.push(`${String(lessonsIn)}${learnt.plus} learnings`);
+  const keys = countedOf(c, 'credentials');
+  if (keys.n > 0) more.push(`${String(keys.n)}${keys.plus} ${keys.n === 1 && !keys.plus ? 'key' : 'keys'} by name`);
+  const skills = countedOf(c, 'skills');
+  if (skills.n > 0) more.push(`${String(skills.n)}${skills.plus} ${skills.n === 1 && !skills.plus ? 'skill' : 'skills'}`);
   more.push(...(at.more ?? []).map((m) => words(m, 60)).filter(Boolean));
+  const home = at.home ? words(at.home, 40) : '';
+  /* "AND 2 MORE RULES" IS COUNTED FROM WHAT THE CUT LEFT: the lessons go first, so a rule cut is still said to be there. */
+  const rulesLeft = (shown: number): string => {
+    const left = rules.more + ruled.length - Math.min(shown, ruled.length);
+    return left > 0 ? ` · and ${count(left, 'more rule', 'more rules')}` : '';
+  };
+  const items = [...ruled, ...learned];
   return [
-    ...(learned.length > 0 ? [{ label: 'Learned', lead: '', items: learned, tail: none, least: 0 }] : []),
-    { label: 'More', lead: '', items: more.slice(0, PER_SLOT), tail: (shown: number) => `${shown > 0 ? ' · ' : ''}call context`, least: 0 },
+    ...(items.length > 0 ? [{ label: 'Learned', lead: '', items, tail: rulesLeft, least: 0 }] : []),
+    { label: 'More', lead: '', items: more.slice(0, PER_SLOT), tail: (shown: number) => `${shown > 0 ? ' · ' : ''}${home ? `Home page ${home}, read braindog:page/home · ` : ''}call context`, least: 0 },
   ];
 }
 

@@ -66,7 +66,8 @@ async function fixture(): Promise<Fixture> {
   const onKiln = await make('tasks', { what: 'Work on Kiln', thing: 'things#1' });
   const base = { lesson: 'A ref is sent back as it came.', because: 'Measured while writing this file.', kind: 'fact' };
   const first = await make('learnings', base);
-  const second = await make('learnings', { ...base, supersedes: first.spoken });
+  /* IN ITS OWN WORDS: two learnings saying the same lesson are one (`same:` on learnings), and the second is refused. */
+  const second = await make('learnings', { ...base, lesson: 'A ref is sent back as it came, every time.', supersedes: first.spoken });
   return { api, doomed, onDoomed, onKiln, first, second };
 }
 
@@ -243,6 +244,9 @@ async function roundTrip(fx: Fixture, mcp: Mcp, rows: Answered[], deleted: Set<s
             wrong.push(`${at}: ${JSON.stringify(said)}, and a new ref to a deleted row is refused at its field, saying so`);
           continue;
         }
+        /* A COPY MADE ON A LIST THAT SAYS WHAT MAKES TWO OF ITS ROWS THE SAME (`same:`, AGT-C13) IS THAT ROW AGAIN, refused
+           ALREADY_KNOWN with the call that changes the one held, so its refs go back through the other doors only. */
+        if (s.how === 'create' && !said.ok && said.refusal?.code === 'ALREADY_KNOWN' && fx.api.kernel.register(a.register)?.same !== undefined) continue;
         /* A ROWSET THAT CHANGES NOTHING IS NOT FILED (`ALREADY_KNOWN`): the row already holds exactly what was sent, which
            is the round trip this file asks for, so its refs are read as they are and must still be as they were. */
         const same = s.place === 'in place' && !said.ok && said.refusal?.code === 'ALREADY_KNOWN';

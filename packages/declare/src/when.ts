@@ -41,6 +41,10 @@ export function holdsIn(when: unknown): string[] | null {
   return Array.isArray(when.holds) ? when.holds.filter((n): n is string => typeof n === 'string') : [];
 }
 
+/** The ids of a list's fields, in the order it says them. */
+const fieldIds = (body: unknown): string[] =>
+  isBody(body) && Array.isArray(body.fields) ? body.fields.flatMap((f) => (isBody(f) && typeof f.id === 'string' ? [f.id] : [])) : [];
+
 /** What one list makes held: its id, and each role it declares or plays by its name. */
 function namesOf(list: string, body: Body): string[] {
   const out = [list];
@@ -100,17 +104,41 @@ function sifted(kind: DeclKind, body: Body, at: string, decide: Decide, out: Wai
     });
   };
   if (kind === 'register') {
+    const had = fieldIds(body);
     sift(body, 'fields', at);
+    const lost = new Set(had.filter((f) => !fieldIds(body).includes(f)));
+    if (lost.size > 0) {
+      /* A ROLE'S PART OVER A FIELD THAT WAITS GOES WITH THE FIELD, since the kernel refuses a role naming a field the list
+         does not have (people-pack-file-90). */
+      for (const key of Object.keys(ROLES)) {
+        const part = body[key];
+        if (isBody(part)) body[key] = Object.fromEntries(Object.entries(part).filter(([k, v]) => k === 'when' || !lost.has(String(v))));
+      }
+      /* AND SO DOES THE PART OF `hand` THAT NAMES IT, which the kernel refuses too: Work's hand.person waits with the
+         field it names (work-pack-file-90). `mobile` keeps it, as the seed's own modules do, since the short view of a
+         field that is not there draws nothing and the kernel does not refuse it. */
+      if (isBody(body.hand)) body.hand = Object.fromEntries(Object.entries(body.hand).filter(([k, v]) => k === 'taken' || !lost.has(String(v))));
+    }
     for (const key of ['pairs', ...Object.keys(ROLES)]) {
       const part = body[key];
       if (isBody(part) && !keep(part, `${at}.${key}`)) delete body[key];
     }
   }
-  if (kind === 'page')
+  if (kind === 'page') {
+    /* A READER FILTER MAY WAIT, as a block may (work-pack-file-90). */
+    sift(body, 'filters', at);
+    const all = Array.isArray(body.blocks) ? [...body.blocks] : [];
     sift(body, 'blocks', at, (block, where) => {
       sift(block, 'columns', where);
       sift(block, 'legs', where);
     });
+    /* A LIST ONLY WAITING BLOCKS READ LEAVES THE PAGE'S REQUIRES WITH THEM, since the kernel refuses a page requiring a
+       list the record does not hold (people-pack-file-90). */
+    if (Array.isArray(body.requires)) {
+      const reads = (bs: unknown[], r: unknown) => bs.some((b) => isBody(b) && b.source === r);
+      body.requires = body.requires.filter((r) => !reads(all, r) || reads(body.blocks as unknown[], r));
+    }
+  }
   if (kind === 'metric') sift(body, 'legs', at);
   return body;
 }
@@ -139,8 +167,6 @@ function settled(pack: Pack, decide: Decide): { pack: Pack; waiting: Waiting[] }
   });
   /* A LIST THAT WAITS TAKES ITS EXAMPLE ROWS WITH IT, which would otherwise be written into a list that is not there, and
      a field that waits takes its value out of each example, which would otherwise be refused as a field the list lacks. */
-  const fieldIds = (body: unknown): string[] =>
-    isBody(body) && Array.isArray(body.fields) ? body.fields.flatMap((f) => (isBody(f) && typeof f.id === 'string' ? [f.id] : [])) : [];
   const cut = new Map<string, Set<string>>();
   for (const d of declarations) {
     const was = pack.declarations.find((p) => p.id === d.id);

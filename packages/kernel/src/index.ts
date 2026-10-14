@@ -252,7 +252,8 @@ import {
 import { slashMayWrite } from './slash.ts';
 import { answeredOnly, askOwnRows, askSame, fileVerdicts, joinOrganisation, meet as meetPerson, resolveJob, type MeetArgs, type Met, type PeopleDeps } from './people.ts';
 import { meetsRole, orgRole, ratesRole, type MeetsFields, type OrgFields } from './roles.ts';
-import { entityLists, foldChain, foldEnd, foldedCarry, holderOf, keyedLists, mergeFieldOf, rebuildKeys, rekey, rowKeys, type KeyedList } from './entities.ts';
+import { foldChain, foldEnd, foldedCarry, holderOf, keyLists, keyedLists, mergeFieldOf, rebuildKeys, rekey, rowKeys, type KeyedList } from './entities.ts';
+import { clashes, foldPlan as sameFoldPlan, sameDoor, type FoldGroup, type SameGroup } from './same.ts';
 import { builtInFigure, openSteps, readOpenQuestions } from './built-in-figures.ts';
 import { openExceptions } from './exceptions.ts';
 import { finders, tidyHour } from './tidy.ts';
@@ -518,11 +519,15 @@ export type { MeetsFields, OrgFields, RatesFields } from './roles.ts';
 export { ratesRole } from './roles.ts';
 /* THE IDENTITY KEYS (`identity-keys.ts`), for every door that reads who something is about: one normaliser, so a key
    the CLI harvests from a commit and one the record holds are the same string. */
-export { KEY_KINDS, PUBLIC_MAIL, WEAK_KINDS, bankKey, githubOfAddress, isMachineIdentity, isOrganisationAddress, isPublicMail, isWeakKey, keyFrom, keyOf, keyOfAny, keysOf, kindOfKey, nameWords, parseFrom, payeeName, registrable, valueOfKey } from './identity-keys.ts';
-export type { IdentitySaid, KeyInput, KeyKind } from './identity-keys.ts';
-export { claimed, entityLists, nameKey, noteMention, projectList, settledBy } from './entities.ts';
+export { KEY_KINDS, PUBLIC_MAIL, WEAK_KINDS, bankKey, githubOfAddress, isMachineIdentity, isOrganisationAddress, isPublicMail, isWeakKey, keyFrom, keyOf, keyOfAny, keysOf, kindOfKey, nameWords, parseFrom, payeeName, registrable, sameFold, valueOfKey } from './identity-keys.ts';
+export type { IdentitySaid, KeyInput, KeyKind, SameFold } from './identity-keys.ts';
+export { claimed, entityLists, keyLists, nameKey, noteMention, projectList, sameLists, settledBy } from './entities.ts';
 /* `Claimed` is the scheduler's name here already (`schedule.ts`), so the keys' one goes out as `KeyClaimed`. */
-export type { Claimed as KeyClaimed, EntityList, ProjectList } from './entities.ts';
+export type { Claimed as KeyClaimed, EntityList, KeyList, ProjectList, SameList, SameRule } from './entities.ts';
+/* WHAT MAKES TWO ROWS THE SAME (AGT-C13): the groups here twice, and the writes that fold them, for a person's press.
+   `foldPlan` is already the name of what undoing a match would do (`undo-fold.ts`), so this one goes out as `sameFoldPlan`. */
+export { clashes, foldPlan as sameFoldPlan, sameListOf, sameRuleOf } from './same.ts';
+export type { FoldGroup, FoldWrite, SameDecl, SameGroup } from './same.ts';
 export { isMarkGlyph, isUnknownMark } from './marks.ts';
 export { CEILING, CLIENT_KINDS, SCOPES, ceilingOf, DEFAULT_DAYS as TOKEN_DAYS } from './token.ts';
 export { cutOffReadable, endedByCutOff, isBuild } from './token.ts';
@@ -836,6 +841,8 @@ export type RegisterDecl = {
    * this does not.
    */
   once?: readonly string[];
+  /** What makes two of its rows the same thing (`declare.ts`'s `sameFault`): read by `same.ts` and `entities.ts`. */
+  same?: { fields: readonly string[]; within?: string; fold: 'text' | 'exact'; keep?: 'oldest' | 'latest' | 'sealed' };
 };
 
 export type Entry = {
@@ -4080,6 +4087,20 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const foldField = keyedHere === undefined ? undefined : mergeFieldOf(keyedHere);
       const door_ = mergeDoor(register, current, merged, patch, touched, keyedHere, foldField, door, w.reads);
       if (door_) return { ok: false, refusal: door_ };
+      /* ── a second row saying what a first says, on a list declaring `same:` (`same.ts`, AGT-C13) ──
+         Refused for every write, a rule's, a flow's or an ingest's too, as a second person is; an accepted rowset is the
+         owner's own word and the record's merge is its own, so both pass, and an import never comes this way. */
+      if (decl.same !== undefined && !door.decided && !door.merge) {
+        const twice = sameDoor(sql, decl, {
+          current,
+          merged,
+          sent: patch,
+          touched,
+          today: dayIn(clock.now(), recordIdentity(sql)?.tz),
+          named: w.reads !== undefined && w.reads(register),
+        });
+        if (twice) return { ok: false, refusal: twice };
+      }
       if (current && foldField !== undefined && touched.includes(foldField)) {
         const into = merged[foldField];
         if (typeof into === 'string' && into !== current.id && into !== current.fields[foldField]) {
@@ -5438,9 +5459,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * The source is who wrote it; `meet` says where it came from once the write is back (`sourceKeys`).
    */
   function rekeyEntry(before: Entry | null, after: Entry, w: WriteContext): void {
-    /* EVERY LIST THAT HOLDS KEYS, a project's among them (entity-keys-59): `keyedOf` is the merge door's, people and
-       organisations alone, and the door must not see the project list. */
-    const list = entityLists(registers.values()).find((l) => l.register === after.register);
+    /* EVERY LIST THAT HOLDS KEYS, a project's among them (entity-keys-59) and a list declaring `same:` (AGT-C13):
+       `keyedOf` is the merge door's, people and organisations alone, and the door must not see the others. */
+    const list = keyLists(registers.values()).find((l) => l.register === after.register);
     if (list) rekey(sql, list, before, after, w.actor, instant(clock.now()));
   }
 
@@ -9319,6 +9340,25 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      */
     foldPlan: (batch: string): FoldPlan | null => planFold(foldDeps(), batch),
 
+    /**
+     * The rows of `register` here twice, by what its `same:` says makes two of them one (`same.ts`, AGT-C13): each group's
+     * key, the row its `keep` keeps and the others, by row id. Empty for a list that declares no `same:`. Reads only.
+     */
+    sameClashes: (register: string): SameGroup[] => {
+      const decl = registers.get(register);
+      return decl === undefined ? [] : clashes(sql, decl);
+    },
+
+    /**
+     * For every group of `sameClashes`, the writes that would fold it: every link of every list moved to the row kept,
+     * then each other finished with "Folded into <title>", or deleted on a list with no finished state. Writes nothing:
+     * a person's press files it as one question, and the owner's accept writes it.
+     */
+    sameFoldPlan: (register: string): FoldGroup[] => {
+      const decl = registers.get(register);
+      return decl === undefined ? [] : sameFoldPlan(sql, decl, registers.values());
+    },
+
     /** Every identity key again, from the rows: what an import runs, and a repair. */
     rebuildKeys: (): number => transaction(() => rebuildKeys(sql, instant(clock.now()))),
 
@@ -10699,7 +10739,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     undoApply: (scope: UndoScope, hash: string, actor: string, opts: UndoOptions = {}, declared?: UndoDeclared): Result<UndoApplied> => {
       const barred = schemaRefusal(state);
       if (barred) return barred;
-      return applyUndo(parts, scope, hash, actor, opts, declared);
+      /* A MOVE ONLY A DECISION MAKES, put back by undoing that decision, goes through a decision's door (AGT-D15). */
+      return applyUndo({ ...parts, decidedWrite: (register, ref, patch, w) => write(register, ref, patch, w, { decided: true }) }, scope, hash, actor, opts, declared);
     },
 
     /**

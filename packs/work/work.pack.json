@@ -1,0 +1,747 @@
+{
+  "pack": "work",
+  "version": "1.19.0",
+  "title": "Work",
+  "summary": "Tasks, the threads of work they belong to, and how each thread is going.",
+  "changes": "A thread has six states and the moves between them, and a day it aims for. A follow-up takes its parent's project, thread and owner, each one it left empty, and its agent when that agent made it. The Board opens with the line to add work. Which project a task or a thread is for waits until Projects is there, and who owns a task until People is.",
+  "author": "BrainDog",
+  "license": "MIT",
+  "requires": { "format": 1, "primitives": 1, "packs": {} },
+  "words": {
+    "tracks": { "name": "Threads", "one": "thread" },
+    "updates": { "name": "Updates", "one": "update" },
+    "tasks": { "name": "Tasks", "one": "task" }
+  },
+  "declarations": [
+    {
+      "register": "tracks",
+      "icon": "rows",
+      "name": "Threads",
+      "one": "thread",
+      "holds": "the lines of work you are in the middle of, and what each one is waiting on",
+      "title": "name",
+      "mobile": [ "name", "thing", "state" ],
+      "state": "state",
+      "done": [ "done", "dropped" ],
+      "pack": "work",
+      "fields": [
+        { "id": "name", "type": "text", "required": true, "search": true },
+        {
+          "id": "state",
+          "label": "Status",
+          "type": "enum",
+          "values": [ "idea", "planned", "open", "holding", "done", "dropped" ],
+          "labels": {
+            "idea": "Idea",
+            "planned": "Planned",
+            "open": "Open",
+            "holding": "Holding",
+            "done": "Done",
+            "dropped": "Dropped"
+          },
+          "transitions": {
+            "idea": { "to": [ "planned", "open", "dropped" ] },
+            "planned": { "to": [ "idea", "open", "holding", "dropped" ] },
+            "open": { "to": [ "holding", "done", "dropped" ] },
+            "holding": { "to": [ "planned", "open", "done", "dropped" ] },
+            "done": { "to": [ "open" ] },
+            "dropped": { "to": [ "idea", "open" ] }
+          },
+          "index": true,
+          "required": true
+        },
+        {
+          "id": "thing",
+          "label": "Project",
+          "type": "ref",
+          "to": "things",
+          "index": true,
+          "when": { "holds": [ "things" ] }
+        },
+        { "id": "opened", "type": "day", "index": true },
+        { "id": "target", "label": "Aiming for", "type": "day", "index": true, "deadline": true, "remind": [ "0d" ] },
+        { "id": "note", "type": "document" },
+        { "id": "tags", "type": "list", "of": "text" }
+      ]
+    },
+    {
+      "register": "updates",
+      "icon": "doc",
+      "name": "Updates",
+      "one": "update",
+      "holds": "what was true about a thread on a date, who said so, and how it was going",
+      "title": "body",
+      "mobile": [ "body", "health", "at" ],
+      "pack": "work",
+      "fields": [
+        { "id": "body", "label": "Update", "type": "document", "required": true, "search": true },
+        {
+          "id": "health",
+          "type": "enum",
+          "values": [ "on_track", "at_risk", "off_track" ],
+          "index": true,
+          "required": true
+        },
+        { "id": "track", "label": "Thread", "type": "ref", "to": "tracks", "index": true, "required": true },
+        { "id": "by", "type": "text", "index": true, "required": true },
+        { "id": "at", "label": "When", "type": "instant", "index": true, "required": true },
+        { "id": "supersedes", "label": "Replaces", "type": "ref", "to": "updates" },
+        { "id": "tags", "type": "list", "of": "text" }
+      ]
+    },
+    {
+      "register": "tasks",
+      "icon": "task",
+      "name": "Tasks",
+      "one": "task",
+      "holds": "work with a state and a date, who holds it, and which agent took it, so nothing is carried in your head",
+      "title": "what",
+      "mobile": [ "what", "thing", "state" ],
+      "state": "state",
+      "done": [ "done", "dropped" ],
+      "finished": "done_on",
+      "hand": { "person": "owner", "agent": "agent", "taken": "doing" },
+      "pack": "work",
+      "fields": [
+        { "id": "what", "label": "Description", "type": "text", "required": true, "search": true },
+        {
+          "id": "state",
+          "label": "Status",
+          "type": "enum",
+          "values": [ "backlog", "open", "doing", "review", "blocked", "done", "dropped" ],
+          "labels": { "backlog": "Later", "review": "To check" },
+          "default": "open",
+          "index": true,
+          "required": true
+        },
+        {
+          "id": "priority",
+          "label": "Priority",
+          "type": "enum",
+          "values": [ "urgent", "high", "normal", "low" ],
+          "labels": { "urgent": "Urgent", "high": "High", "normal": "Normal", "low": "Low" }
+        },
+        { "id": "why", "label": "Why this tier", "type": "text" },
+        {
+          "id": "owner",
+          "label": "Owner",
+          "type": "ref",
+          "to": "people",
+          "index": true,
+          "when": { "holds": [ "people" ] }
+        },
+        { "id": "agent", "label": "Agent", "type": "text", "index": true },
+        { "id": "parent", "label": "Part of", "type": "ref", "to": "tasks", "index": true },
+        { "id": "done_on", "label": "Done on", "type": "day", "index": true },
+        {
+          "id": "thing",
+          "label": "Project",
+          "type": "ref",
+          "to": "things",
+          "index": true,
+          "scope": {},
+          "when": { "holds": [ "things" ] }
+        },
+        { "id": "by", "label": "Due", "type": "day", "index": true, "deadline": true, "remind": [ "0d" ] },
+        { "id": "track", "label": "Thread", "type": "ref", "to": "tracks", "index": true },
+        { "id": "effort", "type": "duration", "unit": "d" },
+        { "id": "note", "type": "document" },
+        { "id": "tags", "type": "list", "of": "text" }
+      ]
+    },
+    {
+      "page": "work",
+      "title": "Work",
+      "nav": { "section": "Work", "order": 10 },
+      "icon": "task",
+      "requires": [ "register.tasks" ],
+      "pack": "work",
+      "filters": [
+        { "field": "thing", "control": "chips", "when": { "holds": [ "things" ] } }
+      ],
+      "blocks": [
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": { "metric": "open-tasks", "is": 0 },
+          "body": "Nothing is open right now"
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": { "metric": "tasks-late-yours", "gt": 0 },
+          "body": "{{tasks-late-yours}} late, {{tasks-waiting}} waiting on you"
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": { "metric": "tasks-late-yours", "is": 0 },
+          "body": "Nothing is late, {{tasks-waiting}} waiting on you"
+        },
+        { "kind": "capture", "heading": "What needs doing?", "icon": "plus", "span": 12, "register": "tasks" },
+        {
+          "kind": "todo",
+          "heading": "Late",
+          "icon": "alert",
+          "span": 12,
+          "source": "register.tasks",
+          "where": "state is open or doing, agent is empty, by before today",
+          "columns": [ { "field": "what" }, { "field": "by" } ],
+          "order": [ { "field": "priority", "dir": "asc" }, { "field": "by", "dir": "asc" } ],
+          "limit": 12,
+          "when": { "metric": "tasks-late-yours", "gt": 0 }
+        },
+        {
+          "kind": "stat",
+          "heading": "At a glance",
+          "icon": "gauge",
+          "span": 12,
+          "when": { "metric": "open-tasks", "gt": 0 },
+          "cells": [
+            { "metric": "open-tasks", "label": "Open" },
+            { "metric": "tasks-due-7d", "label": "Due this week" },
+            {
+              "metric": "tasks-done-7d",
+              "label": "Done this week",
+              "trend": "7d",
+              "note": "{{tasks-done-7d-agents}} of them by an agent"
+            }
+          ]
+        },
+        {
+          "kind": "todo",
+          "heading": "This week",
+          "icon": "calendar-days",
+          "span": 4,
+          "source": "register.tasks",
+          "where": "state is open or doing, agent is empty, by after yesterday, by before +8d",
+          "columns": [ { "field": "what" }, { "field": "by" } ],
+          "order": [ { "field": "by", "dir": "asc" }, { "field": "priority", "dir": "asc" } ],
+          "limit": 12,
+          "when": { "metric": "tasks-this-week-yours", "gt": 0 }
+        },
+        {
+          "kind": "todo",
+          "heading": "With an agent",
+          "icon": "session",
+          "span": 4,
+          "source": "register.tasks",
+          "where": "state is open or doing, agent is set",
+          "columns": [ { "field": "what" }, { "field": "agent" } ],
+          "order": [ { "field": "by", "dir": "asc" } ],
+          "limit": 8,
+          "working": true,
+          "when": { "metric": "tasks-with-agents", "gt": 0 }
+        },
+        {
+          "kind": "todo",
+          "heading": "Waiting on you",
+          "icon": "hourglass",
+          "span": 4,
+          "source": "register.tasks",
+          "where": "state is review or blocked",
+          "columns": [ { "field": "what" }, { "field": "note" }, { "field": "by" }, { "field": "changed" } ],
+          "order": [ { "field": "by", "dir": "asc" } ],
+          "limit": 8,
+          "when": { "metric": "tasks-waiting", "gt": 0 }
+        },
+        {
+          "kind": "section",
+          "heading": "Not this week",
+          "icon": "archive",
+          "span": 12,
+          "fold": true,
+          "when": { "metric": "tasks-not-this-week", "gt": 0 }
+        },
+        {
+          "kind": "todo",
+          "heading": "After this week",
+          "icon": "calendar-days",
+          "span": 12,
+          "source": "register.tasks",
+          "where": "state is open or doing, agent is empty, by after +7d",
+          "columns": [ { "field": "what" }, { "field": "by" } ],
+          "order": [ { "field": "by", "dir": "asc" } ],
+          "limit": 8,
+          "when": { "metric": "tasks-after-week-yours", "gt": 0 }
+        },
+        {
+          "kind": "todo",
+          "heading": "No due day",
+          "icon": "circle-dashed",
+          "span": 12,
+          "source": "register.tasks",
+          "where": "state is open or doing, agent is empty, by is empty",
+          "columns": [ { "field": "what" }, { "field": "thing", "when": { "holds": [ "things" ] } } ],
+          "order": [ { "field": "by", "dir": "asc" } ],
+          "limit": 8,
+          "when": { "metric": "tasks-undated-yours", "gt": 0 }
+        },
+        {
+          "kind": "todo",
+          "heading": "Later",
+          "icon": "archive",
+          "span": 12,
+          "source": "register.tasks",
+          "where": "state is backlog",
+          "columns": [ { "field": "what" }, { "field": "thing", "when": { "holds": [ "things" ] } } ],
+          "order": [ { "field": "by", "dir": "asc" } ],
+          "limit": 8,
+          "when": { "metric": "tasks-later", "gt": 0 }
+        },
+        {
+          "kind": "section",
+          "heading": "Done lately",
+          "icon": "check",
+          "span": 12,
+          "fold": true,
+          "when": { "metric": "tasks-done-7d", "gt": 0 }
+        },
+        {
+          "kind": "todo",
+          "heading": "Done recently",
+          "icon": "circle-check",
+          "span": 12,
+          "source": "register.tasks",
+          "where": "state is done, done_on after -8d",
+          "columns": [ { "field": "what" }, { "field": "done_on" }, { "field": "agent" } ],
+          "order": [ { "field": "done_on", "dir": "desc" } ],
+          "limit": 8,
+          "when": { "metric": "tasks-done-7d", "gt": 0 }
+        }
+      ]
+    },
+    {
+      "page": "work-board",
+      "title": "Board",
+      "nav": { "section": "Work", "order": 20 },
+      "icon": "board",
+      "requires": [ "register.tasks" ],
+      "pack": "work",
+      "blocks": [
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": { "metric": "open-tasks", "is": 0 },
+          "body": "Nothing is open right now"
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "body": "{{open-tasks}} open task(s), {{tasks-waiting}} to check or blocked, {{tasks-with-agents}} with an agent"
+        },
+        { "kind": "capture", "heading": "What needs doing?", "icon": "plus", "span": 12, "register": "tasks" },
+        {
+          "kind": "board",
+          "span": 12,
+          "columns": [
+            { "field": "state" },
+            { "field": "what" },
+            { "field": "by" },
+            { "field": "owner", "when": { "holds": [ "people" ] } }
+          ],
+          "source": "register.tasks",
+          "where": "state is not dropped",
+          "order": [ { "field": "priority", "dir": "asc" }, { "field": "by", "dir": "asc" } ],
+          "working": true
+        },
+        {
+          "kind": "table",
+          "heading": "Everything open",
+          "icon": "rows",
+          "span": 12,
+          "source": "register.tasks",
+          "where": "state is not backlog or done or dropped",
+          "columns": [
+            { "field": "what", "width": "minmax(20ch,1fr)" },
+            { "field": "thing", "label": "Project", "width": "minmax(10ch,16ch)", "when": { "holds": [ "things" ] } },
+            { "field": "owner", "label": "Owner", "width": "minmax(8ch,14ch)", "when": { "holds": [ "people" ] } },
+            { "field": "agent", "label": "Agent", "width": "10ch" },
+            { "field": "state", "label": "Status", "width": "12ch" },
+            { "field": "by", "label": "Due", "width": "13ch", "align": "end" }
+          ],
+          "order": [ { "field": "by", "dir": "asc" } ],
+          "when": { "metric": "open-tasks", "gt": 0 },
+          "limit": 50
+        }
+      ]
+    },
+    {
+      "metric": "project-open",
+      "name": "Open",
+      "source": "register.tasks",
+      "where": "thing is {{it}}, state is not backlog or done or dropped",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "lte": 5 },
+      "window": "30d",
+      "compare": "none",
+      "when": { "holds": [ "things" ] }
+    },
+    {
+      "metric": "project-due-soon",
+      "name": "Due soon",
+      "source": "register.tasks",
+      "where": "thing is {{it}}, state is not backlog or done or dropped, by after yesterday, by before +8d",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none",
+      "when": { "holds": [ "things" ] }
+    },
+    {
+      "metric": "project-in-review",
+      "name": "In review",
+      "source": "register.tasks",
+      "where": "thing is {{it}}, state is review",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "lte": 0 },
+      "window": "30d",
+      "compare": "none",
+      "when": { "holds": [ "things" ] }
+    },
+    {
+      "metric": "project-held-up",
+      "name": "Handed back or blocked",
+      "source": "register.tasks",
+      "where": "thing is {{it}}, state is review or blocked",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "lte": 0 },
+      "window": "30d",
+      "compare": "none",
+      "when": { "holds": [ "things" ] }
+    },
+    {
+      "metric": "project-moved-7d",
+      "name": "Changed this week",
+      "source": "register.tasks",
+      "where": "thing is {{it}}, updated_at after -8d",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none",
+      "when": { "holds": [ "things" ] }
+    },
+    {
+      "metric": "project-last-worked",
+      "name": "Last worked",
+      "source": "register.tasks",
+      "where": "thing is {{it}}",
+      "value": { "age": "updated_at" },
+      "format": "days",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none",
+      "when": { "holds": [ "things" ] }
+    },
+    {
+      "metric": "project-done-7d",
+      "name": "Done this week",
+      "source": "register.tasks",
+      "where": "thing is {{it}}, state is done, done_on after -8d",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none",
+      "when": { "holds": [ "things" ] }
+    },
+    {
+      "metric": "project-dated",
+      "name": "Planned with a day",
+      "source": "register.tasks",
+      "where": "thing is {{it}}, by is set, state is not done or dropped",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none",
+      "when": { "holds": [ "things" ] }
+    },
+    {
+      "metric": "open-tasks",
+      "name": "Open",
+      "source": "register.tasks",
+      "where": "state is not backlog or done or dropped",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none",
+      "snapshot": { "grain": "day", "into": "series.open-tasks" }
+    },
+    {
+      "metric": "tasks-later",
+      "name": "Kept for later",
+      "source": "register.tasks",
+      "where": "state is backlog",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "tasks-due-7d",
+      "name": "Due in 7 days",
+      "source": "register.tasks",
+      "where": "state is not done or dropped, by after yesterday, by before +8d",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "tasks-overdue",
+      "name": "Past their date",
+      "source": "register.tasks",
+      "where": "state is not done or dropped, by before today",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "lte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "tasks-late-yours",
+      "name": "Yours, late",
+      "source": "register.tasks",
+      "where": "state is open or doing, agent is empty, by before today",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "lte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "tasks-today-yours",
+      "name": "Yours, due today",
+      "source": "register.tasks",
+      "where": "state is open or doing, agent is empty, by is today",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "tasks-week-yours",
+      "name": "Yours, due this week",
+      "source": "register.tasks",
+      "where": "state is open or doing, agent is empty, by after today, by before +8d",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "tasks-this-week-yours",
+      "name": "Yours, due today or this week",
+      "source": "register.tasks",
+      "where": "state is open or doing, agent is empty, by after yesterday, by before +8d",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "tasks-after-week-yours",
+      "name": "Yours, after this week",
+      "source": "register.tasks",
+      "where": "state is open or doing, agent is empty, by after +7d",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "tasks-undated-yours",
+      "name": "Yours, with no due day",
+      "source": "register.tasks",
+      "where": "state is open or doing, agent is empty, by is empty",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "tasks-not-this-week",
+      "name": "Not this week",
+      "source": "register.tasks",
+      "where": {
+        "any": [
+          {
+            "all": [
+              { "field": "state", "in": [ "open", "doing" ] },
+              { "field": "agent", "empty": true },
+              { "any": [ { "field": "by", "after": "+7d" }, { "field": "by", "empty": true } ] }
+            ]
+          },
+          { "field": "state", "is": "backlog" }
+        ]
+      },
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "tasks-waiting",
+      "name": "Waiting on you",
+      "source": "register.tasks",
+      "where": "state is review or blocked",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "lte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "tasks-with-agents",
+      "name": "With an agent",
+      "source": "register.tasks",
+      "where": "state is open or doing, agent is set",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "tasks-done-7d",
+      "name": "Done in 7 days",
+      "source": "register.tasks",
+      "where": "state is done, done_on after -8d",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none",
+      "snapshot": { "grain": "day", "into": "series.tasks-done-7d" }
+    },
+    {
+      "metric": "tasks-done-7d-agents",
+      "name": "Done in 7 days by an agent",
+      "source": "register.tasks",
+      "where": "state is done, done_on after -8d, agent is set",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "tasks-done-by-week",
+      "name": "Done, by week",
+      "source": "register.tasks",
+      "where": "state is done, done_on after -63d",
+      "value": { "count": "id" },
+      "group_by": "done_on",
+      "bucket": "week",
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "project-done-by-week",
+      "name": "Done, by week",
+      "source": "register.tasks",
+      "where": "thing is {{it}}, state is done, done_on after -63d",
+      "value": { "count": "id" },
+      "group_by": "done_on",
+      "bucket": "week",
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none",
+      "when": { "holds": [ "things" ] }
+    },
+    {
+      "metric": "tasks-due-by-week",
+      "name": "Due, by week",
+      "source": "register.tasks",
+      "where": "state is not done or dropped, by after yesterday, by before +29d",
+      "value": { "count": "id" },
+      "group_by": "by",
+      "bucket": "week",
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "rule": "close_follow_ups",
+      "pack": "work",
+      "on": { "written": { "register": "tasks", "op": [ "update" ], "fields": [ "state" ] } },
+      "when": "state is done",
+      "steps": [ { "script": { "id": "close_follow_ups", "as": "closing" } } ]
+    },
+    {
+      "rule": "start_with_parent",
+      "pack": "work",
+      "on": { "written": { "register": "tasks", "op": [ "create" ] } },
+      "when": "parent is set",
+      "steps": [ { "script": { "id": "start_with_parent", "as": "placing" } } ]
+    },
+    {
+      "script": "close_follow_ups",
+      "title": "Close the follow-ups of a finished task",
+      "pack": "work",
+      "runs": { "rule": true },
+      "egress": [],
+      "keys": [],
+      "reads": [ "tasks" ],
+      "writes": [ "tasks" ],
+      "source": "export default async function run(ctx) {\n  const parent = await ctx.record.get(ctx.input.id);\n  if (!parent || parent.fields.state !== 'done') return;\n  const steps = await ctx.record.list('tasks', { all: [{ field: 'parent', is: parent.id }, { field: 'state', in: ['open', 'doing', 'blocked'] }] });\n  const line = 'Closed with ' + parent.fields.what + ' (tasks#' + parent.seq + ').';\n  for (const step of steps) {\n    const note = typeof step.fields.note === 'string' && step.fields.note.trim() !== '' ? step.fields.note + '\\n\\n' + line : line;\n    ctx.update('tasks#' + step.seq, { state: 'done', note }, step.version);\n  }\n}"
+    },
+    {
+      "script": "start_with_parent",
+      "title": "Start a follow-up where its parent is",
+      "pack": "work",
+      "runs": { "rule": true },
+      "egress": [],
+      "keys": [],
+      "reads": [ "tasks" ],
+      "writes": [ "tasks" ],
+      "source": "export default async function run(ctx) {\n  const task = await ctx.record.get(ctx.input.id);\n  if (!task || !task.fields.parent) return;\n  const parent = await ctx.record.get(task.fields.parent);\n  if (!parent) return;\n  const patch = {};\n  for (const field of ['thing', 'track', 'owner'])\n    if (!task.fields[field] && parent.fields[field]) patch[field] = parent.fields[field];\n  const name = (v) => (typeof v === 'string' ? v.trim().toLowerCase() : '');\n  const by = ctx.input.made_by;\n  const maker = by !== null && typeof by === 'object' ? name(by.agent) : '';\n  if (!task.fields.agent && maker !== '' && maker !== 'other' && maker === name(parent.fields.agent)) patch.agent = parent.fields.agent;\n  if (Object.keys(patch).length > 0) ctx.update('tasks#' + task.seq, patch, task.version);\n}"
+    }
+  ],
+  "seeds": [
+    {
+      "register": "tracks",
+      "fields": {
+        "name": "Variable axis QA",
+        "state": "open",
+        "opened": { "day": "-38" },
+        "note": "Nine instances, three signed off. The rest need the mastering pass first."
+      }
+    },
+    {
+      "register": "tasks",
+      "fields": {
+        "what": "Chase Halden on 2026-041",
+        "state": "review",
+        "agent": "cursor",
+        "by": { "day": "+1" },
+        "effort": 17280,
+        "note": "Cursor drafted the chaser. Read it before it goes."
+      }
+    }
+  ]
+}

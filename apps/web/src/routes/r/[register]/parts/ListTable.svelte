@@ -22,7 +22,11 @@
   import { display, DOM_CAP, homeCurrency, identityOf, labelOf } from '$lib/record/api.ts';
   import { currencyTypedIn } from '$lib/ui/money-typed.ts';
   import { isFile, isJson, isQuantity, unitOf, unitsOf } from '$lib/record/field-draft.ts';
-  import { scopeFieldOf, scopeOf } from '$lib/record/scope-move.ts';
+  import { page } from '$app/state';
+  import { may } from '$lib/record/may.ts';
+  import type { Shell } from '$lib/record/boot-live.ts';
+  import { afterMove, movesIn, opensMove, scopeFieldOf, scopeOf, words as scopeWords, type Landed } from '$lib/record/scope-move.ts';
+  import ScopeMove from '../[seq]/ScopeMove.svelte';
   import type { Names } from '$lib/record/remote.ts';
   import type { Entry, FieldDecl, RegisterDecl } from '$lib/record/schema.ts';
   import IdentityMark from '$lib/ui/IdentityMark.svelte';
@@ -153,6 +157,48 @@
     const entry = rowAt(Number(row.key.split('#')[1]));
     const due = entry ? dueOf(decl, entry, now) : null;
     return due?.late ? due.text : null;
+  };
+
+  /**
+   * WHERE A ROW APPLIES MOVES FROM ITS CELL, as it moves from the row's own page: one press on the chip opens the
+   * projects, one more moves the row, and its history reads "Moved to Kiln" under the name of whoever pressed. It was a
+   * screen away. A list whose rows name several projects, or a reader who may not write it, keeps the chip as words.
+   *
+   * ONE SHEET FOR THE WHOLE TABLE, beside it and not in a cell (`ScopeMove`'s `compact`): the chip in each cell opens it
+   * for its own row. Until the list reads the row again, the cell says where the move put it (`afterMove`).
+   */
+  const moves = $derived.by(() => {
+    const shell = page.data as unknown as Partial<Shell>;
+    return shell.me !== undefined && movesIn(register, may(shell as Shell, 'write', register));
+  });
+  let mover = $state<ReturnType<typeof ScopeMove>>();
+  let landed = $state<Record<number, Landed>>({});
+  const placeOf = (seq: number) => {
+    const e = rowAt(seq);
+    return e ? afterMove(e, scopeOf(register, e.fields, names), landed[seq]).scope : undefined;
+  };
+  const titleOf = (seq: number): string => display(register, decl.title, rowAt(seq)?.fields[decl.title]) ?? copy.thisRow;
+  function moveFrom(seq: number, from: HTMLElement | null) {
+    const e = rowAt(seq);
+    if (e) mover?.openFor(e, titleOf(seq), from);
+  }
+
+  /**
+   * THE CHIP IS NOT A TAB STOP OF ITS OWN, like every control in a row: a grid has one, and the keyboard reaches the
+   * cell. So Enter and Space on the cell that holds the chip open the move rather than the row, in the capture phase,
+   * before the cell's own Enter (`Table`) and the list's keys hear them. Every other cell keeps Enter for the row.
+   */
+  const cellOpens = (seq: number) => (node: HTMLElement) => {
+    const cell = node.closest<HTMLElement>('[role="gridcell"]');
+    if (!cell) return;
+    const keys = (e: KeyboardEvent) => {
+      if (e.target !== cell || !opensMove(e)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      moveFrom(seq, cell);
+    };
+    cell.addEventListener('keydown', keys, true);
+    return () => cell.removeEventListener('keydown', keys, true);
   };
 </script>
 
@@ -426,8 +472,25 @@
           </span>
         {/if}
       {:else if column.field === scopeFieldOf(register)?.id && scopeOf(register, rowAt(seq)?.fields ?? {}, names) !== undefined}
-        <!-- WHERE THE ROW APPLIES, AS A CHIP: the project's mark and name, or the globe and "Everywhere", where an empty cell drew nothing. -->
-        <ScopeChip scope={scopeOf(register, rowAt(seq)?.fields ?? {}, names) ?? null} />
+        <!-- WHERE THE ROW APPLIES, AS A CHIP: the project's mark and name, or the globe and "Everywhere", where an empty
+             cell drew nothing. Where the row can move, the chip is the press that moves it, and the press does not open
+             the row. `tabindex="-1"` as every control in a row is; its cell's Enter and Space reach it (`cellOpens`). -->
+        {@const place = placeOf(seq) ?? null}
+        {#if moves}
+          <button
+            type="button"
+            class="scope-at tap"
+            tabindex="-1"
+            aria-label={scopeWords.moveLabel(place?.name ?? scopeWords.everywhere)}
+            onclick={(e) => {
+              e.stopPropagation();
+              moveFrom(seq, e.currentTarget);
+            }}
+            {@attach cellOpens(seq)}><ScopeChip scope={place} /><span class="scope-at-open"><Icon name="chevronDown" size="s" /></span></button
+          >
+        {:else}
+          <ScopeChip scope={place} />
+        {/if}
       {:else if ident}
         <IdentityMark identity={ident} />
       {:else if value === null}
@@ -469,6 +532,12 @@
     {/snippet}
   </Table>
 </div>
+
+{#if moves}
+  <ScopeMove bind:this={mover} {register} {names} live={moves} compact onmoved={(got) => {
+      if (got) landed = { ...landed, [got.seq]: got };
+    }} />
+{/if}
 
 <style>
   /* Sentence case is the stylesheet's, on the first letter, so the word stays the one the record
@@ -613,6 +682,44 @@
 
   .table-slot :global(.td .scope-chip .thing-glyph) {
     margin-inline-end: 0;
+  }
+
+  /* WHERE THE CHIP MOVES THE ROW IT IS A BUTTON, a rectangle at the control's radius round the same words, with the
+     chevron that says a press opens something. Its wash shows under a mouse only, and its edge is held out by its own
+     padding so the words stay on the column's edge. 28px tall, inside the 44px `.tap` grows under a thumb. */
+  .scope-at {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    min-inline-size: 0;
+    max-inline-size: calc(100% + 2 * var(--sp-1));
+    min-block-size: var(--ctl-h-sm);
+    margin-inline: calc(-1 * var(--sp-1));
+    padding-inline: var(--sp-1);
+    background: none;
+    border: 0;
+    border-radius: var(--r-ctl);
+    color: var(--ink);
+    font: inherit;
+    line-height: var(--lh-tight);
+    vertical-align: middle;
+    cursor: pointer;
+  }
+
+  .scope-at-open {
+    display: inline-flex;
+    flex: none;
+    color: var(--dim);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .scope-at:hover {
+      background: var(--hover-wash);
+    }
+
+    .scope-at:hover .scope-at-open {
+      color: var(--ink);
+    }
   }
 
   /* THE HEADS ARE QUIET: the meta size in the second ink, one hairline under them, and nothing else. */

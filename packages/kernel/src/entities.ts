@@ -26,12 +26,17 @@
  * lists a place holds it, and `holderOf('domain:…')` still answers the organisation and nothing else. `claimed` reads
  * them back, and `settledBy` says whether what was found decides: one project by a place or a site, never by a name.
  *
+ * A LIST CAN SAY WHAT MAKES TWO OF ITS ROWS ONE (AGT-C13). A list declaring `same:` holds one key a row, built from
+ * the text fields its rule names, folded as it says, within one value of its scope or a link: `same:<list>:<where>:
+ * <what>`. Kept as a person's are, one live row per key and the first keeps it, so a second skill saying what the first
+ * says is known to be the same row (`keyLists`, `sameLists`). These are not entities: `entityLists` never answers one.
+ *
  * NOTHING HERE WRITES A ROW. It reads rows and writes the two derived tables; who becomes whom is `people.ts`'s.
  */
 
 import type { Sql } from '@braindog/ports';
 
-import { isWeakKey, keysOf, nameWords } from './identity-keys.ts';
+import { isWeakKey, keysOf, nameWords, sameFold, type SameFold } from './identity-keys.ts';
 import { meetsRole, orgRole, type MeetsFields, type OrgFields, type Role, type RoleList } from './roles.ts';
 import { isFolderPlace } from './scope.ts';
 
@@ -62,8 +67,8 @@ export type ProjectList = { register: string; role: 'project'; fields: ProjectFi
 /** Any list whose rows are entities with keys: a person's, an organisation's, a project's. */
 export type EntityList = KeyedList | ProjectList;
 
-/** A list as `entityLists` reads it: a role's list, and what makes one the list of projects. */
-export type EntityDecl = RoleList & { title?: unknown; scopes?: unknown };
+/** A list as `entityLists` reads it: a role's list, what makes one the list of projects, and what makes two rows one. */
+export type EntityDecl = RoleList & { title?: unknown; scopes?: unknown; same?: unknown };
 
 const fieldNamed = (list: EntityDecl, id: unknown, types?: readonly string[]): string | undefined => {
   if (typeof id !== 'string') return undefined;
@@ -103,6 +108,74 @@ export function entityLists(lists: Iterable<EntityDecl>): EntityList[] {
   return out;
 }
 
+/** What a list's `same:` says makes two of its rows one, as `declare.ts`'s `sameFault` let it install. */
+export type SameRule = { fields: readonly string[]; within?: string; fold: SameFold; keep: 'oldest' | 'latest' | 'sealed' };
+
+/** A list declaring `same:`: its rows hold one key each, the thing they say, and the first live row to say it keeps it. */
+export type SameList = { register: string; role: 'same'; fields: Readonly<Record<string, never>>; same: SameRule };
+
+/** Every list whose rows carry keys: the entities of `entityLists`, and the lists that declare `same:`. */
+export type KeyList = EntityList | SameList;
+
+const KEEPS = ['oldest', 'latest', 'sealed'] as const;
+
+/**
+ * The lists declaring `same:` (AGT-C13), each with its rule read whole and `keep` filled in as `oldest`.
+ *
+ * KEPT APART FROM `entityLists`, which `about.ts` and `resolve.ts` read as the people, organisations and projects a
+ * mention can be: a skill is not somebody met. And a list already playing a role is that and not also this, so a row's
+ * keys are kept one way; `declare.ts` refuses the two together at install, and a body written past it is read here as
+ * its role. A rule naming a field the list no longer has is no rule, so no row answers to half a key.
+ */
+export function sameLists(lists: Iterable<EntityDecl>): SameList[] {
+  const out: SameList[] = [];
+  for (const list of lists) {
+    const same = list.same as Partial<Record<keyof SameRule, unknown>> | undefined;
+    if (same === null || typeof same !== 'object' || Array.isArray(same)) continue;
+    if (list.meets !== undefined || list.org !== undefined || list.scopes !== undefined) continue;
+    const named = Array.isArray(same.fields) ? same.fields : [];
+    const fields = named.map((id) => fieldNamed(list, id, ['text']));
+    if (fields.length === 0 || fields.some((f) => f === undefined)) continue;
+    if (same.fold !== 'text' && same.fold !== 'exact') continue;
+    const within = fieldNamed(list, same.within);
+    if (same.within !== undefined && within === undefined) continue;
+    const keep = (KEEPS as readonly unknown[]).includes(same.keep) ? (same.keep as SameRule['keep']) : 'oldest';
+    out.push({ register: list.id, role: 'same', fields: {}, same: { fields: fields as string[], ...(within === undefined ? {} : { within }), fold: same.fold, keep } });
+  }
+  return out;
+}
+
+/** Every list whose rows carry keys, entities first, so a list that is both is kept as the entity it is. */
+export function keyLists(lists: Iterable<EntityDecl>): KeyList[] {
+  const all = [...lists];
+  const out: KeyList[] = entityLists(all);
+  for (const list of sameLists(all)) if (!out.some((l) => l.register === list.register)) out.push(list);
+  return out;
+}
+
+/** What parts the folded fields of a `same:` key: the record separator, which no folded text keeps (`sameKey`). */
+const PARTS = '\u001e';
+
+/**
+ * A `same:` row's one key: `same:<list>:<where>:<what>`. Where is the value of the rule's `within`, a list of them in
+ * order, or `*` for a row that applies everywhere; what is the rule's fields, each folded, in the rule's order. NOTHING
+ * when a field it names is empty, since an empty name is the same as every other empty name and says nothing.
+ */
+function sameKey(list: SameList, fields: Readonly<Record<string, unknown>>): string[] {
+  const rule = list.same;
+  const parts: string[] = [];
+  for (const id of rule.fields) {
+    const said = textOf(fields[id]);
+    const folded = said === undefined ? '' : sameFold(said, rule.fold);
+    /* A TEXT HOLDING EITHER SEPARATOR could spell another row's key, or a project's claim (`SHARED`), so it holds none. */
+    if (folded === '' || folded.includes(PARTS) || folded.includes('\u001f')) return [];
+    parts.push(folded);
+  }
+  const at = rule.within === undefined ? undefined : fields[rule.within];
+  const where = textOf(at)?.trim() ?? (textsOf(at).length > 0 ? [...new Set(textsOf(at).map((w) => w.trim()))].sort().join(',') : '*');
+  return [`same:${list.register}:${where}:${parts.join(PARTS)}`];
+}
+
 const listOf = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
 const textOf = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() !== '' ? v : undefined);
 
@@ -120,8 +193,11 @@ const bareName = (place: string): boolean => !/[\\/:]/u.test(place.trim().replac
  * A PROJECT'S PLACES ARE READ AS `scope.ts` READS THEM (`candidateOf`): a folder listed among the repositories is a
  * folder. A BARE REPOSITORY NAME IS A NAME, weak like the project's own: `portage` is every fork's and every other
  * checkout's name too, so it proposes the project and a whole remote decides.
+ *
+ * A LIST DECLARING `same:` answers its one key, the thing the row says (`sameKey`), and nothing when it says nothing.
  */
-export function rowKeys(list: EntityList, fields: Readonly<Record<string, unknown>>): string[] {
+export function rowKeys(list: KeyList, fields: Readonly<Record<string, unknown>>): string[] {
+  if (list.role === 'same') return sameKey(list, fields);
   const at = list.fields as Partial<Record<string, string>>;
   const read = (part: string): unknown => (at[part] === undefined ? undefined : fields[at[part]!]);
   if (list.role === 'project') {
@@ -141,7 +217,7 @@ export function rowKeys(list: EntityList, fields: Readonly<Record<string, unknow
 }
 
 /** The field a list says a row was folded into, or `undefined`. A project is never folded. */
-export const mergeFieldOf = (list: EntityList): string | undefined => (list.fields as { merged_into?: string }).merged_into;
+export const mergeFieldOf = (list: KeyList): string | undefined => (list.fields as { merged_into?: string }).merged_into;
 
 /** A row as `rekey` reads it. */
 export type KeyedRow = { id: string; register: string; fields: Readonly<Record<string, unknown>>; deleted_at: string | null };
@@ -259,8 +335,11 @@ export const settledBy = (found: readonly Claimed[]): string | null => {
  *   - Unfolded (its `merged_into` cleared): the keys its own fields carry come back from any row along the chain it
  *     was folded into, since a later merge may have moved them on.
  *   - Live: the keys it lost go, and the ones it gained are claimed.
+ *
+ * A `same:` ROW IS KEPT AS A PERSON'S IS, and is never folded (its list names no `merged_into`): the first live row to
+ * say a thing holds its key, a row saying it second holds nothing, and a deleted row frees what it held.
  */
-export function rekey(sql: Pick<Sql, 'one' | 'all' | 'exec'>, list: EntityList, before: KeyedRow | null, after: KeyedRow, source: string, at: string): void {
+export function rekey(sql: Pick<Sql, 'one' | 'all' | 'exec'>, list: KeyList, before: KeyedRow | null, after: KeyedRow, source: string, at: string): void {
   if (list.role === 'project') return rekeyShared(sql, list, after, source, at);
   const field = mergeFieldOf(list);
   const into = field === undefined ? undefined : textOf(after.fields[field]);
@@ -298,11 +377,12 @@ export function rekey(sql: Pick<Sql, 'one' | 'all' | 'exec'>, list: EntityList, 
  *
  * THE LISTS ARE READ FROM THE LIVE DECLARATIONS, not from a kernel's cache, because the migration runs before there is
  * one. Live rows claim first, oldest first, so the row a person made first keeps a key two rows carry; then each folded
- * row's keys go to the end of its chain of `merged_into`, where nobody holds them.
+ * row's keys go to the end of its chain of `merged_into`, where nobody holds them. A list declaring `same:` is read the
+ * same way, and the oldest live row of two that say one thing holds its key.
  */
 export function rebuildKeys(sql: Pick<Sql, 'one' | 'all' | 'exec'>, at: string): number {
   if (!sql.one("SELECT 1 AS n FROM sqlite_master WHERE type = 'table' AND name = 'entity_key'")) return 0;
-  const lists = entityLists(
+  const lists = keyLists(
     sql
       .all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'register' AND superseded_at IS NULL AND retired = 0")
       .flatMap(({ body }) => {

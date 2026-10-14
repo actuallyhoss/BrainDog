@@ -17,7 +17,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { budget } from '../lib.mjs';
-import { NEW_DAY_TASK, OPENED, STEPS, TASKS, WALKED, WIDTHS, formOf, judge, needs } from '../walks/row-drawer.walk.mjs';
+import { NEW_DAY_TASK, OPENED, PLANT, STEPS, TASKS, WALKED, WIDTHS, formOf, handed, judge, needs, planted, seeded, walkedTrue } from '../walks/row-drawer.walk.mjs';
 
 const gates = join(import.meta.dirname, '..');
 
@@ -136,6 +136,65 @@ test('the form is read from where the panel sits, never from a width written dow
   /* A sheet that floats in the middle of a phone is neither. */
   assert.equal(formOf({ form: 'sheet', left: 40, top: 100, width: 310, height: 400 }, phone), 'neither');
   assert.equal(formOf(null, phone), null);
+});
+
+/* ── the planted fault (`self-test`'s `row-drawer` case) ── */
+
+test('the seed is read from BRAINDOG_GATE_SEED alone, by its own name, among others joined by commas', () => {
+  const was = process.env.BRAINDOG_GATE_SEED;
+  try {
+    delete process.env.BRAINDOG_GATE_SEED;
+    assert.equal(seeded(), false, 'no variable, no seed');
+    process.env.BRAINDOG_GATE_SEED = 'row-drawer';
+    assert.equal(seeded(), true, 'the variable is where it is read from');
+    process.env.BRAINDOG_GATE_SEED = 'a11y-contrast, row-drawer';
+    assert.equal(seeded(), true, 'one of several, as a11y reads them');
+  } finally {
+    if (was === undefined) delete process.env.BRAINDOG_GATE_SEED;
+    else process.env.BRAINDOG_GATE_SEED = was;
+  }
+  for (const other of [undefined, '', 'queue', 'keys,prefs', 'row-drawers', 'row', 'drawer'])
+    assert.equal(seeded(other), false, `${JSON.stringify(other)} is not this walk's seed`);
+  assert.equal(seeded(' row-drawer '), true);
+});
+
+test('the planted reading turns a green walk red, in the words self-test names, at both widths', () => {
+  for (const width of WIDTHS) {
+    const seen = good(width);
+    assert.ok(walkedTrue(seen), 'the good walk saw j work, so the planted reading replaces a true one');
+    const findings = judge(planted(seen));
+    assert.ok(findings.some((f) => f.includes('j did not move the panel to the fourth task')), findings.join(' | '));
+    assert.ok(findings.some((f) => f.includes(`after j the address holds row=${OPENED}, not row=${WALKED}`)), findings.join(' | '));
+    /* ONE FAULT: every finding is about `j`, and nothing else the walk read was changed. */
+    assert.ok(findings.every((f) => /after j|^\d+: j /u.test(f)), findings.join(' | '));
+    const { walked: _w, ...rest } = planted(seen);
+    const { walked: _v, ...was } = seen;
+    assert.deepEqual(rest, was);
+    assert.deepEqual(seen, good(width), 'what the walk read is not changed in place');
+  }
+  assert.doesNotMatch(PLANT, /[—–]/u);
+});
+
+test('with no seed the judge says what it said before; a walk whose j was broken anyway is not the seed\'s red', () => {
+  const was = process.env.BRAINDOG_GATE_SEED;
+  delete process.env.BRAINDOG_GATE_SEED;
+  try {
+    for (const width of WIDTHS) {
+      const seen = good(width);
+      assert.equal(handed(seen), seen, 'an unseeded run hands the judge what it read, itself');
+      assert.deepEqual(judge(handed(seen)), []);
+      assert.notEqual(handed(seen, true), seen);
+    }
+    for (const [, path, value] of BROKEN) {
+      const seen = without(DESK, path, value);
+      assert.equal(handed(seen, false), seen);
+      assert.deepEqual(judge(handed(seen)), judge(seen));
+    }
+  } finally {
+    if (was !== undefined) process.env.BRAINDOG_GATE_SEED = was;
+  }
+  assert.equal(walkedTrue(without(DESK, 'walked.task', THIRD)), false);
+  assert.equal(walkedTrue(without(DESK, 'walked.row', null)), false);
 });
 
 test('the runner holds an entry row-drawer, beside queue, in the run a web build meets', () => {

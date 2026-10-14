@@ -135,7 +135,7 @@ function kindOf(decl: Decl | undefined): Kind {
   return 'kept';
 }
 
-type Group = { id: string; name: string; kind: Kind; decl: Decl | undefined; rows: Record<string, unknown>[]; inherited: Record<string, unknown>[]; truncated: boolean };
+type Group = { id: string; name: string; kind: Kind; decl: Decl | undefined; rows: Record<string, unknown>[]; inherited: Record<string, unknown>[]; truncated: boolean; everywhere: number | null };
 
 /** Newest first, by the number in the handle. */
 const newest = (rows: readonly Record<string, unknown>[]): Record<string, unknown>[] => [...rows].sort((a, z) => seqOf(z.spoken) - seqOf(a.spoken));
@@ -268,13 +268,16 @@ export function briefed(b: Briefing): { value: Record<string, unknown>; text: st
       rows: Array.isArray(r.rows) ? r.rows.filter(isObject) : [],
       inherited: Array.isArray(r.inherited) ? r.inherited.filter(isObject) : [],
       truncated: r.truncated === true,
+      /* THE RECORD'S OWN COUNT OF WHAT APPLIES EVERYWHERE when it sends one (`capRegister`, AGT-B09): it sends five rows
+         a list, so the rows it sent are not how many there are. */
+      everywhere: typeof r.everywhere === 'number' && Number.isInteger(r.everywhere) && r.everywhere >= 0 ? r.everywhere : null,
     };
   });
   const registers = groups.map((g) => {
     /* A KEPT LIST IS ITS COUNT AND THE ROWS OF THIS PROJECT, never the ones that apply everywhere: the owner's 166 keys
        and 36 skills were the same rows in every session's briefing, and a key is asked for by name when it is needed. */
     if (g.kind === 'kept') {
-      const everywhere = g.inherited.length;
+      const everywhere = Math.max(g.everywhere ?? 0, g.inherited.length);
       return {
         id: g.id,
         name: g.name,

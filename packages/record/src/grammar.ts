@@ -157,6 +157,7 @@ const REGISTER = {
     hand: '{person?: <ref field>, agent?: <text field>, taken?: <state value>}: who holds a row, a person by a ref field and an agent by the text field it signs with, and the state a row moves to when an agent takes it. Either may be left out, but not both',
     once: 'the fields an add-on plants and never changes after, by id: [name]. Its own update leaves each as the row holds it; a person still edits them',
     order: '{field, dir?: asc|desc}: the order a read with none of its own comes back in, by a number, day, time or text field of this list',
+    same: "{fields: [<text field>], within?: <scope or ref field>, fold: text|exact, keep?: oldest|latest|sealed}: what makes two rows one thing, such as two skills of one name in one project. text reads 'Ponytail (copy)' and 'ponytail.md' as 'ponytail'; exact reads them as written",
   },
   field: {
     id: 'lower-case letters, digits and single underscores; never id, seq, register, created_at, updated_at, deleted_at, version, spoken or title, and never starting with _ (required)',

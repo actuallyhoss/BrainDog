@@ -1768,6 +1768,11 @@ export function createClient(options: ClientOptions) {
      */
     sameOne: (args: { register: string; rows: readonly string[] }) => call<SameOne>('sameOne', args as Record<string, unknown>),
     /**
+     * Put one question on Decide that folds everything `register` holds twice into one of each, by what the list says
+     * makes two of its rows the same, with one Undo. A person's press: a token is refused.
+     */
+    askFoldTwice: (args: { register: string }) => call<Answer<'askFoldTwice'>>('askFoldTwice', args as Record<string, unknown>),
+    /**
      * Which people of `register` may be on the record twice, as `{ seqs }`, so a list can be narrowed to them. `null`
      * when that list is not where the record keeps people. It reads and changes nothing. READ+.
      */

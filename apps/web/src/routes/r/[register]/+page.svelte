@@ -51,6 +51,7 @@
   import { capturedFields, holdInPlace, inverseOf, rowWriter, type Held, type RowWriter, type Wrote } from '$lib/record/rows-write.ts';
   import { draftOf, editable, patchOf, unchanged, wrongValue } from '$lib/record/field-draft.ts';
   import { spentPutBacks, type Change } from './put-back.ts';
+  import { foldAsk, sameOf, thingWords, twiceLine } from './twice-fold.ts';
   import {
     arrivedAt,
     chipOn,
@@ -174,6 +175,34 @@
   /** Something narrows the list: a chip, or the word. The search box is asked beside it where it matters. */
   const narrowed = $derived(filters.length > 0 || twice !== null);
   const clearTwice = () => setParam((p) => p.delete(TWICE));
+  /* AND A LIST OF THINGS THAT SAYS WHAT MAKES TWO OF THEM THE SAME (`same:`, `twice-fold.ts`): its own words, never the
+     people's, and how many the record names, asked beside the list while the word is off (`twiceMany`). The line says
+     so and links to the word; under the word, one button files the question that folds them, which Decide asks. A host
+     that cannot answer draws none of it. */
+  const thing = $derived(sameOf(decl));
+  const thingSaid = $derived(thing && decl ? thingWords(decl, thing.keep) : null);
+  let twiceMany = $state<{ register: string; n: number } | null>(null);
+  const twiceSaid = $derived(!twiceAsked && twiceMany?.register === id ? twiceLine(decl, twiceMany.n) : null);
+  const twiceHref = $derived.by(() => {
+    const p = new URLSearchParams(page.url.searchParams);
+    p.set(TWICE, '1');
+    return `?${p}`;
+  });
+  let folding = $state(false);
+  /** The list whose host has no fold, so the button goes rather than answering every press with the same refusal. */
+  let foldGone = $state<string | null>(null);
+  async function fold(): Promise<void> {
+    if (folding || !thing) return;
+    folding = true;
+    const out = await foldAsk((name, args) => createClient({ base: apiBase() }).call(name, args), id);
+    folding = false;
+    if (!out.ok) {
+      toasts.push(out.said, { intent: 'warn' });
+      if (out.gone) foldGone = id;
+      return;
+    }
+    void goto(at(out.href));
+  }
   /* A VIEW KEEPS CHIPS, A SEARCH AND AN ORDER, AND HAS NO WORD FOR THE PEOPLE HELD TWICE. Saved from this list it would
      open on everyone the chips let through, under a title that never said so. So nothing is saved while the word narrows
      the list, and this says why, naming the button that leads out (`twiceWords.unsaved`). */
@@ -594,24 +623,32 @@
          list declares). The answer narrows the list, its counts and every later page of it. A refusal is drawn as one:
          everyone, under a line saying these are the people held twice, is the one wrong answer nobody could see. */
       let rows: Filter | null = null;
-      if (wantsTwice && heldTwiceOn(page.url.searchParams, s.value)) {
+      const held = () => {
         const client = createClient({ base: apiBase() });
-        const who = await rowsHeldTwice((name, args) => client.call(name, args), register);
+        return rowsHeldTwice((name, args) => client.call(name, args), register);
+      };
+      if (wantsTwice && heldTwiceOn(page.url.searchParams, s.value)) {
+        const who = await held();
         if (asked !== said) return true;
         if (!who.ok) return refuse(who.refusal);
         rows = who.value;
       }
+      /* HOW MANY THINGS ARE HERE TWICE, for the line over a list that says `same:` while the word is off. Asked beside
+         the page, and a refusal is nought: the line is a pointer, and a host that cannot answer draws none. */
+      const thingsTwice = sameOf(s.value) === null ? null : rows ? Promise.resolve(rows.values.length) : held().then((h) => (h.ok ? h.value.values.length : 0), () => 0);
       const chips = rows ? [...typed, rows] : typed;
       const size = b.value.registers.find((r) => r.id === register)?.count ?? 0;
       const bar = size >= ENOUGH_TO_SIFT || text !== '' || chips.length > 0;
-      const [answer, facets] = await Promise.all([
+      const [answer, facets, many] = await Promise.all([
         src.page(register, { filters: chips, q: text, sort: order, join: joined }, null),
         bar ? countAll(register, s.value, chips, text, joined) : Promise.resolve<Tally>({ counts: new Map(), withheld: null }),
+        thingsTwice,
       ]);
       if (asked !== said) return true;
       if (!answer.ok) return refuse(answer.refusal);
       declared = { register, decl: s.value };
       twiceHeld = rows ? { register, rows } : null;
+      twiceMany = many === null ? null : { register, n: many };
       pages = [answer.value.entries];
       named = answer.value.names;
       cursor = answer.value.cursor;
@@ -2342,7 +2379,7 @@
     if (!decl || saving) return;
     /* THE WORD FIRST: "filter or search first" would be the wrong advice, since a chip beside the word saves no more. */
     if (twice) {
-      toasts.push(twiceWords.unsaved, { intent: 'warn' });
+      toasts.push(thingSaid?.unsaved ?? twiceWords.unsaved, { intent: 'warn' });
       return;
     }
     if (filters.length === 0 && q === '') {
@@ -2643,8 +2680,22 @@
            takes the word out of the address and leaves the chips, the search and the order as they are. -->
       {#if twice}
         <p class="held-twice" data-held-twice role="status">
-          <span>{twiceWords.showing}</span>
-          <Button data-held-twice-clear onclick={clearTwice}>{twiceWords.clear}</Button>
+          <span>{thingSaid?.showing ?? twiceWords.showing}</span>
+          <span class="held-acts">
+            <!-- THE ONE PRESS THAT FOLDS THEM, on a list of things that says `same:`: it files the question and opens it
+                 on Decide, where the fold is the answer and one Undo brings every one back. Not for people, whose fold
+                 is chosen two at a time from the picked bar. -->
+            {#if thingSaid && twice.values.length > 0 && foldGone !== id}
+              <Button weight="primary" data-held-twice-fold disabled={folding} onclick={() => void fold()}>{thingSaid.keep}</Button>
+            {/if}
+            <Button data-held-twice-clear onclick={clearTwice}>{thingSaid?.clear ?? twiceWords.clear}</Button>
+          </span>
+        </p>
+      {:else if twiceSaid}
+        <!-- HOW MANY ARE HERE TWICE, on a list of things that says what makes two the same, and the link that shows them. -->
+        <p class="held-twice" data-held-twice-count role="status">
+          <span>{twiceSaid}</span>
+          <Button data-held-twice-show href={twiceHref}>Show them</Button>
         </p>
       {/if}
       <div class="list-tools" data-uncounted={unsaid ? '' : undefined}>
@@ -2694,7 +2745,7 @@
 
       {#if rows.length === 0 && twice && filters.length === 0 && q === '' && result.total > 0}
         <!-- NOBODY IS HELD TWICE, said as that and not as a search that found nothing. -->
-        <p class="held-none" data-held-twice-none>{twiceWords.none}</p>
+        <p class="held-none" data-held-twice-none>{thingSaid?.none ?? twiceWords.none}</p>
       {:else if rows.length === 0}
         <ListEmpty kind={emptyKind} register={id} {decl} size={result.total} {q} {filters} {searched} />
       {:else if picked.length > 0}
@@ -3053,6 +3104,13 @@
     color: var(--ink);
     font-size: var(--fs-body);
     line-height: 1.4;
+  }
+
+  /* THE LINE'S BUTTONS, kept together at its end and wrapping as one under the sentence on a phone. */
+  .held-acts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
   }
 
   /* NOBODY IS HELD TWICE: one plain sentence where the people would be. */

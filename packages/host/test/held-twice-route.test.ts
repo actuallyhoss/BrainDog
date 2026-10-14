@@ -47,7 +47,7 @@ const withHeldTwice = (api: object, said: unknown, heard: unknown[] = []) =>
   );
 
 test('HELD TWICE IS ONE READ+ READ, written once in its file, taking the list, with a plain sentence', () => {
-  assert.deepEqual(OWN.map((r) => [r.name, r.group, r.writes]), [['heldTwice', 'READ+', false]]);
+  assert.deepEqual(OWN.map((r) => [r.name, r.group, r.writes]), [['heldTwice', 'READ+', false], ['askFoldTwice', 'DATA', true]]);
   assert.deepEqual(OWN[0]!.takes, { register: 'text' });
   const what = OWN[0]!.what;
   assert.match(what, /changes nothing/u);

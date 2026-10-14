@@ -2948,7 +2948,10 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     const turn: Turn = { text: text && !full, titles: new Map() };
     const stray = strayIn(name, sent);
     if (stray !== null) return said(stray, full ? JSON.stringify(stray.refusal) : refusalBrief(stray.refusal as Record<string, unknown>));
-    const done = await tool(sent, ctx, turn);
+    /* EXCEPT THAT A FULL context ASKS THE RECORD FOR THE FULL ANSWER TOO, twenty rows of each list where the brief one
+       sends five (AGT-B09): as a hint on the session, which is where the record reads it, never as an argument. */
+    const asked = name === 'context' && full ? ({ ...ctx, session: { ...((ctx as { session?: object }).session ?? {}), format: 'full' } } as typeof ctx) : ctx;
+    const done = await tool(sent, asked, turn);
     let result = done.result;
     if (refused(result)) {
       /* THE LIST'S TITLE FIRST: `name` is otherwise handed the field spelled most like it, which is rarely the title. */

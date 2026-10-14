@@ -176,7 +176,8 @@ test('CONTEXT OVER THE SEED: the run, Kiln, the last handoff, who is live, what 
     ),
   );
 
-  value(await api.create({ register: 'learnings', fields: { lesson: 'Export the variable font last.', project } }, owner));
+  /* A METHOD, so it is among the five the brief answer leads with (kind first, as `learnings` reads them, AGT-B09). */
+  value(await api.create({ register: 'learnings', fields: { lesson: 'Export the variable font last.', kind: 'method', project } }, owner));
   value(await api.create({ register: 'learnings', fields: { lesson: 'Proof on paper before the web.', confirmed_on: '2026-01-02' } }, owner));
   const person = value<{ rows: Entry[] }>(await api.list({ register: 'people', limit: 1 }, owner)).rows[0] ?? assert.fail('the seed has no people');
   value(await api.update({ register: 'people', seq: person.seq!, patch: { projects: [project] } }, owner));

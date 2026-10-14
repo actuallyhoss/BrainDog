@@ -196,3 +196,49 @@ test('THE CATALOGUE SAYS WHAT A FILE WAITS FOR, and refuses a part that waits in
     assert.match(refused.refusal.fix, /is required and waits for people/u);
   }
 });
+
+test('THE CUTS A FILE CANNOT WRITE: a role and hand lose a field that waits, and a page its requires', async () => {
+  const PROJECTS = { holds: ['projects'] };
+  const doc = {
+    ...DOC,
+    seeds: [],
+    declarations: [
+      {
+        register: 'contacts',
+        name: 'Contacts',
+        title: 'name',
+        fields: [{ id: 'name', type: 'text', required: true }, { id: 'email', type: 'text', when: PEOPLE }, { id: 'owner', type: 'ref', to: 'people', when: PEOPLE }],
+        mobile: ['name', 'email'],
+        hand: { person: 'owner' },
+        meets: { name: 'name', email: 'email' },
+      },
+      {
+        page: 'contacts',
+        title: 'Contacts',
+        requires: ['register.contacts', 'register.projects'],
+        filters: [{ field: 'name', when: PROJECTS }],
+        blocks: [
+          { kind: 'table', source: 'register.contacts', columns: [{ field: 'name' }] },
+          { kind: 'table', source: 'register.projects', when: PROJECTS, columns: [{ field: 'name' }] },
+        ],
+      },
+    ],
+  };
+  const pack = await packOf(doc);
+  const without = resolveWhen(pack, new Set()).pack;
+  const list = bodyOf(without, 'register.contacts')!;
+  assert.deepEqual(list.meets, { name: 'name' }, 'the role keeps only the fields that are there');
+  assert.deepEqual(list.mobile, ['name', 'email'], 'the short view keeps it, as the seed modules do');
+  assert.deepEqual(list.hand, {});
+  const page = bodyOf(without, 'page.contacts')!;
+  assert.deepEqual(page.requires, ['register.contacts'], 'a list only a waiting block read is no longer required');
+  assert.deepEqual(page.filters, []);
+  /* HELD, NOTHING IS CUT, and settleWhen gives the same body from the plan's waiting. */
+  const held = resolveWhen(pack, new Set(['people', 'projects']));
+  assert.deepEqual(held.waiting, []);
+  assert.deepEqual(bodyOf(held.pack, 'register.contacts')!.meets, { name: 'name', email: 'email' });
+  assert.deepEqual(bodyOf(held.pack, 'page.contacts')!.requires, ['register.contacts', 'register.projects']);
+  const plan = resolveWhen(pack, new Set());
+  assert.deepEqual(bodyOf(settleWhen(pack, plan.waiting), 'register.contacts'), list);
+  assert.deepEqual(bodyOf(settleWhen(pack, plan.waiting), 'page.contacts'), page);
+});

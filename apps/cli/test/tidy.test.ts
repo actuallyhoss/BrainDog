@@ -1,6 +1,6 @@
 /**
- * `braindog tidy [--json]`: what went stale on the record and the call that clears each, read in one GET and said a
- * line a kind, and the record's refusal said plainly when it cannot read them yet.
+ * `braindog tidy [--json]`: what went stale on the record and the call that clears each, read in GETs and said a line a
+ * kind, and the record's refusal said plainly when it cannot read them yet. What `--ask` files is `tidy-ask.test.ts`'s.
  *
  * THE HOST IS A STUB ON node:http, as in `signs.test.ts`, because apps never import apps. What is under test is the
  * command: the one read it sends, that it names no run, and what it prints.
@@ -78,14 +78,25 @@ test('THE ANSWER IS READ AS THE RECORD GIVES IT: a missing part read as nothing,
   assert.deepEqual(tidyLines(readStale({})), ['Nothing is stale.']);
 });
 
+/**
+ * What every host here says to the two newer reads: it has no such route, as a record older than them does. The client
+ * refuses them in the same words before sending while its route table has no row for them, so the command prints the
+ * same either way. Their answers are `tidy-ask.test.ts`'s.
+ */
+const OLDER_BOTH = 'This BrainDog cannot say yet what looks like it belongs to a project, or which lessons were learned twice. It will once it is updated.';
+
+type Answer = { value?: unknown; refusal?: { code: string; fix: string }; status?: number };
+
 /** A host whose `stale` answers `value`, or refuses with `refusal`, keeping every request it was sent. */
-async function host(t: { after: (fn: () => Promise<void>) => void }, answer: { value?: unknown; refusal?: { code: string; fix: string }; status?: number }) {
+async function host(t: { after: (fn: () => Promise<void>) => void }, stale: Answer) {
   const seen: { method: string; verb: string | undefined; query: string; headers: IncomingHttpHeaders }[] = [];
   const server = createServer((req, res) => {
     req.resume();
     req.on('end', () => {
       const url = new URL(req.url ?? '/', 'http://stub');
-      seen.push({ method: url.pathname.replace(/^\/api\//, ''), verb: req.method, query: url.search, headers: req.headers });
+      const method = url.pathname.replace(/^\/api\//, '');
+      seen.push({ method, verb: req.method, query: url.search, headers: req.headers });
+      const answer: Answer = method === 'stale' || stale.refusal ? stale : { refusal: { code: 'ROUTE_UNKNOWN', fix: `There is no method called ${method}.` }, status: 404 };
       res.writeHead(answer.status ?? (answer.refusal ? 403 : 200), { 'content-type': 'application/json' });
       res.end(JSON.stringify(answer.refusal ? { ok: false, refusal: answer.refusal } : { ok: true, value: answer.value }));
     });
@@ -120,35 +131,40 @@ function io(base: string): AgentIo & { lines: string[]; said: string[]; answered
   };
 }
 
-test('BRAINDOG TIDY IS ONE READ: a GET of stale and nothing else, naming no run, and the record’s answer handed on untouched', async (t) => {
+test('BRAINDOG TIDY WITHOUT --ask ONLY READS: GETs of stale and the two newer reads, naming no run, and the record’s answer handed on untouched', async (t) => {
   const h = await host(t, { value: STALE });
   const one = io(h.base);
   assert.equal(await tidyCommand([], one), 0, one.said.join('\n'));
-  assert.deepEqual(h.seen.map((s) => [s.method, s.verb, s.query]), [['stale', 'GET', '']]);
+  /* STALE ONCE AND FIRST, AND NOTHING BUT GETS: the newer reads reach the host once their route rows land. */
+  assert.deepEqual(h.seen[0] && [h.seen[0].method, h.seen[0].verb, h.seen[0].query], ['stale', 'GET', '']);
+  assert.equal(h.seen.filter((s) => s.method === 'stale').length, 1);
+  for (const s of h.seen) assert.equal(s.verb, 'GET', `${s.method} was sent as a ${String(s.verb)}`);
+  assert.ok(h.seen.every((s) => ['stale', 'scopeProposals', 'learningsTwice'].includes(s.method)));
   assert.equal(h.seen[0]!.headers.authorization, 'Bearer rec_01TESTTESTTESTTESTTESTTEST.tidy');
   /* THE COMMAND'S BUILD RIDES EVERY CALL (AGT-B01) and names no run, so it is the one `x-braindog-` header a read carries. */
-  for (const name of Object.keys(h.seen[0]!.headers)) assert.doesNotMatch(name, /^x-braindog-(?!cli$)/u, `${name} names a run`);
-  assert.deepEqual(one.answered, [{ value: STALE }]);
-  assert.deepEqual(one.lines, LINES);
+  for (const s of h.seen) for (const name of Object.keys(s.headers)) assert.doesNotMatch(name, /^x-braindog-(?!cli$)/u, `${name} names a run`);
+  assert.deepEqual(one.answered, [{ value: { stale: STALE } }]);
+  assert.deepEqual(one.lines, [...LINES, '', OLDER_BOTH]);
   assert.deepEqual(one.said, []);
 
-  /* It takes nothing but the host: it files nothing and answers nothing, so there is nothing to apply. */
+  /* It takes the host and --ask and nothing else, so there is nothing to apply. */
+  const before = h.seen.length;
   for (const flag of ['--apply', '--fix', 'now']) {
     const two = io(h.base);
     assert.equal(await tidyCommand([flag], two), 1);
-    assert.match(two.said[0]!, /^braindog tidy takes/u);
+    assert.match(two.said[0]!, /^braindog tidy takes \[--ask\], \[--json\] and \[--host <host>\]/u);
     assert.deepEqual(two.lines, []);
   }
-  assert.equal(h.seen.length, 1);
+  assert.equal(h.seen.length, before, 'an unknown flag sends nothing');
 });
 
 test('WITH NOTHING STALE IT SAYS SO AND EXITS 0, and what the record says is scrubbed for the terminal', async (t) => {
   const calm = await host(t, { value: { lines: [], count: 0 } });
   const one = io(calm.base);
   assert.equal(await tidyCommand([], one), 0);
-  assert.deepEqual(one.lines, ['Nothing is stale.']);
+  assert.deepEqual(one.lines, ['Nothing is stale.', '', OLDER_BOTH]);
   assert.deepEqual(one.said, []);
-  assert.deepEqual(one.answered, [{ value: { lines: [], count: 0 } }]);
+  assert.deepEqual(one.answered, [{ value: { stale: { lines: [], count: 0 } } }]);
 
   /* A sentence holding an escape cannot move the cursor or recolour the terminal. */
   const loud = await host(t, { value: { lines: [{ kind: 'steps', said: '1 step was left: \u001b[31mred\u001b[0m\u0007', count: 1, clear: 'handoff\u001b[2J' }], count: 1 } });
@@ -156,7 +172,7 @@ test('WITH NOTHING STALE IT SAYS SO AND EXITS 0, and what the record says is scr
   assert.equal(await tidyCommand([], two), 0);
   // eslint-disable-next-line no-control-regex
   for (const line of two.lines) assert.doesNotMatch(line, /[\u0000-\u0008\u000b-\u001f\u007f]/u, `${JSON.stringify(line)} carries a control character`);
-  assert.equal(two.lines.at(-1), '1 thing is stale.');
+  assert.deepEqual(two.lines.slice(-3), ['1 thing is stale.', '', OLDER_BOTH]);
 });
 
 test('BRAINDOG TIDY SAYS PLAINLY why the record would not read: an older BrainDog exits 0 with one sentence, a refusal prints its fix', async (t) => {
@@ -200,22 +216,25 @@ test('BRAINDOG TIDY, AS A PERSON RUNS IT: the word is wired, --json prints one d
   const h = await host(t, { value: STALE });
   const plain = await run(h.base, ['tidy']);
   assert.equal(plain.code, 0, plain.stderr);
-  assert.equal(plain.stdout, `${LINES.join('\n')}\n`);
+  assert.equal(plain.stdout, `${[...LINES, '', OLDER_BOTH].join('\n')}\n`);
 
   const asked = await run(h.base, ['tidy', '--json']);
   assert.equal(asked.code, 0, asked.stderr);
-  /* BYTE FOR BYTE: the document's value is the record's answer, its keys in the record's order and nothing added. */
+  /* BYTE FOR BYTE: the document's value holds the record's answer under its call's name, its keys in the record's order and nothing added. */
   const doc = JSON.parse(asked.stdout) as { ok: boolean; value: unknown };
   assert.equal(doc.ok, true);
-  assert.equal(JSON.stringify(doc.value), JSON.stringify(STALE));
-  assert.deepEqual(h.seen.map((s) => [s.method, s.verb]), [['stale', 'GET'], ['stale', 'GET']]);
+  assert.equal(JSON.stringify(doc.value), JSON.stringify({ stale: STALE }));
+  assert.deepEqual(h.seen.filter((s) => s.method === 'stale').map((s) => [s.method, s.verb]), [['stale', 'GET'], ['stale', 'GET']]);
+  for (const s of h.seen) assert.equal(s.verb, 'GET');
+  const sent = h.seen.length;
   for (const s of h.seen) for (const name of Object.keys(s.headers)) assert.doesNotMatch(name, /^x-braindog-(?!cli$)/u, `${name} names a run`);
 
   const wrong = await run(h.base, ['tidy', '--apply']);
   assert.equal(wrong.code, 1);
   assert.match(wrong.stderr, /^braindog tidy takes/u);
-  assert.equal(h.seen.length, 2, 'an unknown flag sends nothing');
+  assert.equal(h.seen.length, sent, 'an unknown flag sends nothing');
 
   const help = await run(h.base, ['help']);
-  assert.match(help.stdout, /^braindog tidy \[--json\] \[--host <host>\]$/mu);
+  /* `--ask` joins this line when main.ts names it (blocked for batch 89's file), so either form passes. */
+  assert.match(help.stdout, /^braindog tidy (\[--ask\] )?\[--json\] \[--host <host>\]$/mu);
 });

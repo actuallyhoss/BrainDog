@@ -32,6 +32,10 @@ import type { MergeCluster, Question } from './schema.ts';
  */
 export type RowsetBody = { register: string; rows: readonly Record<string, unknown>[] };
 
+/** The list one update row is in: its own `register` where it names one (a fold moving a link another list holds), else the question's. */
+const listOf = (body: { register: string }, row: Record<string, unknown>): string =>
+  typeof row.register === 'string' && row.register !== '' ? row.register : body.register;
+
 type Refusal = { code: string; fix: string };
 type Wire<T> = { ok: true; value: T } | { ok: false; refusal: Refusal } | { ok: false; conflict: unknown };
 type Row = Record<string, unknown>;
@@ -361,6 +365,9 @@ const isHeld = (v: unknown): v is Held =>
  * text and takes in what was learned can say each one by its title (`updatesOf`'s `takes`). Read by field type alone,
  * never by a list's name; a ref the row already holds is not read again, and one the record will not give is left out,
  * which the card counts as one the reader cannot open.
+ *
+ * A ROW MAY NAME ITS OWN LIST (`register`), when a fold moves a link another list holds: that row is read, and its
+ * declaration asked, in the list it names, and every other row in the question's.
  */
 export async function heldBy(client: Governor, bodies: readonly RowsetBody[]): Promise<Rows> {
   const registers: Record<string, Decl> = {};
@@ -372,12 +379,17 @@ export async function heldBy(client: Governor, bodies: readonly RowsetBody[]): P
     }
     for (const r of body.rows) {
       if (typeof r.at !== 'string' || r.at === '') continue;
+      const list = listOf(body, r);
+      if (!(list in registers)) {
+        const decl = await client.schema(list);
+        if (decl.ok && isDecl(decl.value)) registers[list] = relabel({ ...decl.value, id: list }, labels());
+      }
       const seq = /^(?:[a-z_]+#|[A-Z]+)(\d+)$/u.exec(r.at)?.[1];
-      const got = seq === undefined ? await client.call('get', { spoken: r.at }) : await client.get(body.register, Number(seq));
-      const was = got.ok && isHeld(got.value) && (got.value.register ?? body.register) === body.register ? got.value : undefined;
-      if (was) (rows[body.register] ??= []).push(was);
+      const got = seq === undefined ? await client.call('get', { spoken: r.at }) : await client.get(list, Number(seq));
+      const was = got.ok && isHeld(got.value) && (got.value.register ?? list) === list ? got.value : undefined;
+      if (was) (rows[list] ??= []).push(was);
       for (const [field, after] of Object.entries(isRow(r.patch) ? r.patch : {})) {
-        const f = registers[body.register]?.fields.find((x) => x.id === field);
+        const f = registers[list]?.fields.find((x) => x.id === field);
         if (f?.type !== 'list' || f.of !== 'ref' || typeof f.to !== 'string' || !Array.isArray(after)) continue;
         const to = f.to;
         if (!(to in registers)) {

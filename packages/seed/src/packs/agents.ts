@@ -15,7 +15,16 @@ import type { SeedMetric } from '../modules/base.ts';
 
 export type PackManifest = { id: string; version: string; requires: readonly string[] };
 
-export const AGENTS_REGISTERS: Record<string, SeedRegister> = {
+/**
+ * WHAT MAKES TWO ROWS OF A LIST ONE THING, SINCE 1.13.0 (AGT-C13, with the half of AGT-D03 that declares it on tools
+ * and keys): the fields that say it, the scope field they are compared within, and how they are folded first. `text`
+ * folds case, accents, spaces, a last word in brackets and a file ending; `exact` only trims. `keep` says which of two
+ * alike stays, and `sealed` keeps the one holding a sealed value whatever its age. The kernel reads it
+ * (`packages/kernel/src/declare.ts`); this add-on only says it, as data every record gets.
+ */
+type Same = { fields: readonly string[]; within?: string; fold: 'text' | 'exact'; keep?: 'oldest' | 'latest' | 'sealed' };
+
+export const AGENTS_REGISTERS: Record<string, SeedRegister & { same?: Same }> = {
   learnings: {
     id: 'learnings',
     name: 'Learnings',
@@ -23,10 +32,17 @@ export const AGENTS_REGISTERS: Record<string, SeedRegister> = {
     icon: 'learning',
     pack: 'agents',
     seq_prefix: 'LN',
-    holds: 'what an agent found out the hard way, with the failure that taught it',
+    /* THE FOUR-PART TEST IN ONE LINE, SINCE 1.13.0 (AGT-D15 job 1): an agent reads a list's own words with its shape, and
+       the test was in one document and in nothing an agent reads. No full stop, because a page says "Learnings holds"
+       and this, and ends it. */
+    holds:
+      'what an agent found out the hard way, with the failure that taught it. Record one only when it changes what a session does, holds beyond this one case, a session without it would get something wrong, and it has no other home',
     title: 'lesson',
     state: 'state',
     done: ['superseded', 'reverted'],
+    /* ONE LESSON IS ONE LEARNING WITHIN A PROJECT, folded as text, so a second agent saying it again in other case or
+       spacing is the same lesson. */
+    same: { fields: ['lesson'], within: 'project', fold: 'text' },
     /* `topic` IS ON THE SHORT FORM SINCE 1.3.0, so `context` hands an agent the skill a lesson bears on (`brief()` in
        `packages/record/src/index.ts` projects the title and these), which is what tells a run a skill may need its next
        version.
@@ -41,7 +57,9 @@ export const AGENTS_REGISTERS: Record<string, SeedRegister> = {
       /* The failure that taught it. Required, because a lesson with no failure behind it cannot be
          checked when it stops being true. */
       { id: 'because', label: 'Because', type: 'text', required: true, min: 24, max: 600, search: true },
-      { id: 'kind', label: 'Kind', type: 'enum', values: ['method', 'fact'], required: true, index: true },
+      /* `rule` SINCE 1.13.0 (AGT-B09 job 4): what a person writes for every session to be handed first, such as "divide
+         estimates by 4". An added value, so no row changes. */
+      { id: 'kind', label: 'Kind', type: 'enum', values: ['method', 'fact', 'rule'], labels: { rule: 'Rule' }, required: true, index: true },
       { id: 'project', label: 'Where it applies', type: 'ref', to: 'things', index: true, scope: { widen: 'person' } },
       /* A SKILL'S NAME WHEN THE LESSON BEARS ON ONE, and a plain topic otherwise. The id stays `topic`, because ids are
          for ever; the label says what an agent should write in it. */
@@ -75,6 +93,9 @@ export const AGENTS_REGISTERS: Record<string, SeedRegister> = {
     title: 'name',
     state: 'state',
     done: ['retired'],
+    /* ONE NAME IS ONE SKILL WITHIN A PROJECT, as it is written, because the name is the folder the skill is written to
+       and two folders differ by a letter's case. */
+    same: { fields: ['name'], within: 'project', fold: 'exact' },
     /* `because` IS ON THE SHORT FORM SINCE 1.3.0, so `context` says which learnings a skill already carries, by their
        spoken ids, and a lesson bearing on it that is not among them is the one to propose into its next version.
 
@@ -109,6 +130,9 @@ export const AGENTS_REGISTERS: Record<string, SeedRegister> = {
     title: 'label',
     state: 'state',
     done: ['retired'],
+    /* ONE NAME IS ONE KEY WITHIN A PROJECT, and of two alike the one holding the sealed value stays: an import's index
+       row is often the older and the vault's the newer, so keeping the oldest would lose the key. */
+    same: { fields: ['label'], within: 'project', fold: 'text', keep: 'sealed' },
     mobile: ['label', 'opens', 'project'],
     fields: [
       { id: 'label', label: 'Name', type: 'text', required: true, max: 120, search: true },
@@ -140,6 +164,10 @@ export const AGENTS_REGISTERS: Record<string, SeedRegister> = {
     title: 'name',
     state: 'state',
     done: ['retired'],
+    /* ONE PROGRAM IS ONE TOOL, said by its name within a project and folded as text. NOT BY `command`, the one text field
+       that says what runs: it is `npx` or `uvx` for most servers, with the program in `args`, a list a key cannot be
+       read from, and an `http` tool has none. So two rows of one program are found by the name they share, folded. */
+    same: { fields: ['name'], within: 'project', fold: 'text' },
     mobile: ['name', 'kind', 'project'],
     fields: [
       { id: 'name', label: 'Name', type: 'text', required: true, max: 64, index: true, search: true },
@@ -827,7 +855,9 @@ export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, Se
      1.13.0 ONLY ADDS, SO IT IS MINOR (AGT-C17 job b): `page.brain`, How the brain changed, with no place in the rail; the
      line under What the brain learned on the agents home that opens it; and the figures `learnings-arrived` and
      `learnings-charted` it is said and drawn on. `learnings-faded` reads the rule it read, now written once. No list,
-     field or figure goes, and every block 1.12.0 drew is as it was. */
+     field or figure goes, and every block 1.12.0 drew is as it was. Learnings, skills, keys and tools each say what
+     makes two of them one (`same:`, AGT-C13), a learning's kind gains `rule`, and the learnings' own words say when to
+     record one (AGT-D15); no row changes. */
   manifest: { id: 'agents', version: '1.13.0', requires: ['register.things'] },
   registers: AGENTS_REGISTERS,
   pages: AGENTS_PAGES,

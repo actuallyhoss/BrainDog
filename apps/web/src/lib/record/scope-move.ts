@@ -138,6 +138,51 @@ export function widens(register: string, from: Scope | null, to: Place | null): 
   return from !== null && to === null && (REGISTERS[register]?.fields.some((f) => f.type === 'secret' && !f.retired) ?? false);
 }
 
+/* ── ONE PRESS, WHEREVER THE CHIP IS ─────────────────────────────────────────────────────────────────────────────────
+   The row's own page, a list's table and its cards open the same sheet (`[seq]/ScopeMove.svelte`), and what they decide
+   about a press is decided here once, so the three cannot come apart. */
+
+/**
+ * What a press on a place in the sheet does: `here` where the row applies there already, which closes the sheet and
+ * writes nothing; `ask` where it would open a key to every project (`widens`); `move` for every other place.
+ */
+export function choiceOf(register: string, from: Scope | null, to: Place | null): 'here' | 'ask' | 'move' {
+  if (to === null ? from === null : from?.spoken === to.spoken) return 'here';
+  return widens(register, from, to) ? 'ask' : 'move';
+}
+
+/**
+ * Whether a row's chip on this list is the move: the reader may write the list, and its rows apply to one project. A
+ * list whose rows name several projects keeps the chip without the move, as the row's page does (`movable`).
+ */
+export const movesIn = (register: string, writes: boolean): boolean => writes && movable(scopeFieldOf(register));
+
+/**
+ * The keys that open the move from a grid's cell, where the chip is not a tab stop of its own: Enter and Space, with
+ * no modifier, since a modifier is the list's.
+ */
+export const opensMove = (e: { key: string; ctrlKey?: boolean; metaKey?: boolean; altKey?: boolean }): boolean =>
+  (e.key === 'Enter' || e.key === ' ') && !e.ctrlKey && !e.metaKey && !e.altKey;
+
+/** A move that landed: the row, the version the write answered, and where it went. */
+export type Landed = { seq: number; version: number; to: Place | null };
+
+/**
+ * The version the next write on a row goes against, and where its chip says it applies.
+ *
+ * A LIST READS ITS ROWS AGAIN ON THE SHELL'S NEXT POLL, NOT ON THE PRESS, so until it has, the row it holds is the row
+ * from before the move: the chip would name the old project and a second move would be refused as written over. The
+ * move's own answer stands in until a read at least as new arrives, and a row changed somewhere else since wins.
+ */
+export function afterMove(
+  row: { seq: number; version: number },
+  scope: Scope | null | undefined,
+  landed: Landed | null | undefined,
+): { version: number; scope: Scope | null | undefined } {
+  if (!landed || landed.seq !== row.seq || row.version >= landed.version) return { version: row.version, scope };
+  return { version: landed.version, scope: landed.to };
+}
+
 /** A project as the menu offers it, from a row of its list as `list` answers it. */
 function placeOf(to: string, row: RecordRow): Place | null {
   if (row.seq === null) return null;

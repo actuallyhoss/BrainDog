@@ -244,8 +244,9 @@ const notRun = [];
 
 /**
  * The negatives that cannot be a fixture tree, because the thing under test is a real browser over
- * a real build. Three gates run that way, each run again with one violation seeded, and `layout`
- * and `a11y` walk their `RULES` below (`WALKED`).
+ * a real build. Four gates run that way, each run again with one violation seeded, and `layout`
+ * and `a11y` walk their `RULES` below (`WALKED`). A gate that is not `<gate>.mjs` in this directory
+ * says where it is in `file`, from here.
  *
  * THREE OUTCOMES, NOT TWO, AND THE THIRD IS THE ONE THAT COST AN EVENING. This was written as
  * `if (r.status === 0 || !said.includes(names))`, so a gate that went red for something else
@@ -259,7 +260,7 @@ const notRun = [];
  * width and scheme; its findings are at the bottom. The fixture gates print theirs first, which is
  * why that branch slices the other end.
  */
-const BROWSER = [
+export const BROWSER = [
   /**
    * `prefs`: `BRAINDOG_GATE_SEED=prefs` pins `--row-h`, `--t-ui` and `--text` to constants, which
    * is precisely what the build shipped for the life of the Text control, and the gate must notice
@@ -297,6 +298,20 @@ const BROWSER = [
     blind: 'PASSED a queue with the cheapest question first. The ranking could be reversed and nothing would say.',
     red: 'red on a queue ranked backwards',
   },
+  /**
+   * `row-drawer`: `BRAINDOG_GATE_SEED=row-drawer` hands the walk's judge the panel read after `j` as still on the third
+   * task, planted in what the walk read and never in the app, and the judge must say `j` did not move it. The walk lives
+   * in `walks/`, so `file` says where to spawn it. The second sentence is the walk's own, printed only when the planted
+   * reading replaced one that saw `j` work, so a run whose `j` is broken anyway cannot pass for this negative.
+   */
+  {
+    gate: 'row-drawer',
+    file: join('walks', 'row-drawer.walk.mjs'),
+    seed: 'row-drawer',
+    names: ['j did not move the panel to the fourth task', 'planted over a reading that had it on the fourth'],
+    blind: 'PASSED a panel that never moved on j. The list drawer could stop walking and nothing would say.',
+    red: 'red on a panel that stays put on j',
+  },
 ];
 
 /* A STALE BUILD IS AN ABSENT ONE, and this asked only whether `apps/web/build` existed until
@@ -317,7 +332,7 @@ const tail = (lines) =>
     .map((l) => `      ${l.trim()}`)
     .join('\n');
 
-function seededBrowser({ gate, seed, names, blind, red }) {
+function seededBrowser({ gate, file, seed, names, blind, red }) {
   /* SKIPPED WHEN THE BUILD CANNOT BE MEASURED, like the gate itself, AND WRITTEN DOWN. This returned
      without touching either counter, so the five browser negatives could every one of them be
      skipped and the only trace was five lines above a summary that still read like a full pass. */
@@ -326,7 +341,7 @@ function seededBrowser({ gate, seed, names, blind, red }) {
     notRun.push(gate);
     return;
   }
-  const r = spawnSync(process.execPath, [join(here, `${gate}.mjs`)], {
+  const r = spawnSync(process.execPath, [join(here, file ?? `${gate}.mjs`)], {
     cwd: join(here, '..', '..'),
     encoding: 'utf8',
     env: { ...process.env, BRAINDOG_GATE_SEED: seed },

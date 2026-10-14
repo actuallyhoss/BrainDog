@@ -56,7 +56,10 @@
   import { dirOf, display, identityFor, labelOf, toneOf } from '$lib/record/api.ts';
   import { REGISTERS } from '$lib/record/held.ts';
   import { agentKey, agentName, handFor } from '$lib/record/hand.ts';
-  import { scopeFieldOf, scopeOf, type Scope } from '$lib/record/scope-move.ts';
+  import { page } from '$app/state';
+  import { may } from '$lib/record/may.ts';
+  import type { Shell } from '$lib/record/boot-live.ts';
+  import { afterMove, movesIn, scopeFieldOf, scopeOf, type Landed, type Scope } from '$lib/record/scope-move.ts';
   import { isMoney, type Entry } from '$lib/record/schema.ts';
   import type { Names } from '$lib/record/remote.ts';
   import Face from './Face.svelte';
@@ -113,6 +116,34 @@
       .catch(() => undefined);
   });
   const to = $derived(href ?? ((e: Entry) => `/r/${register}/${e.seq}`));
+
+  /**
+   * WHERE A ROW APPLIES MOVES FROM ITS CARD, as from the table and the row's own page: one press on the chip opens the
+   * projects and one more moves the row. Only where the reader may write the list and its rows apply to one project; a
+   * list of several, or a reader who may only look, keeps the chip as words in the card's second line.
+   *
+   * THE CHIP LEAVES THE LINK FOR IT, since a button inside a link is neither, and sits at the card's end. The one sheet
+   * every card opens (`ScopeMove`'s `compact`) is loaded the first time a list that moves is drawn, so the saved view
+   * and Decide, whose cards are often a list that cannot, pay nothing for it.
+   */
+  const moves = $derived.by(() => {
+    const shell = page.data as unknown as Partial<Shell>;
+    return shell.me !== undefined && movesIn(register, may(shell as Shell, 'write', register));
+  });
+  type Mover = typeof import('../../routes/r/[register]/[seq]/ScopeMove.svelte').default;
+  let MoveSheet = $state<Mover>();
+  let mover = $state<ReturnType<Mover>>();
+  let landed = $state<Record<number, Landed>>({});
+  $effect(() => {
+    if (!moves || MoveSheet) return;
+    void import('../../routes/r/[register]/[seq]/ScopeMove.svelte').then((m) => (MoveSheet = m.default)).catch(() => undefined);
+  });
+  /* THE CHIP IS THE PRESS ONCE THE SHEET IS HERE, and words until then, so a press never lands on nothing. */
+  const pressable = $derived(moves && MoveSheet !== undefined);
+  function moveFrom(e: Entry, title: string) {
+    const from = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null;
+    mover?.openFor(e, title, from);
+  }
 
   /**
    * THE ROW'S HOLDER, AFTER A HAND: a person by their People row's own name, read as any other ref field is
@@ -259,7 +290,7 @@
     const word = tone && typeof due === 'string' ? dueSaid(due, tone) : state ? saidOf(e, state) || null : null;
     const date = done ? (decl?.finished ? daySaid(e.fields[decl.finished]) : null) : daySaid(due);
     const text = detailFields.find((f) => saidOf(e, f) !== '');
-    const place: Scope | null | undefined = scoped === undefined ? undefined : scopeOf(register, e.fields, names);
+    const place: Scope | null | undefined = scoped === undefined ? undefined : afterMove(e, scopeOf(register, e.fields, names), landed[e.seq]).scope;
     const chip = place !== undefined && (decl?.mobile.includes(scoped ?? '') === true || text === undefined);
     /* THE PROJECT'S NAME, where nothing else fills the detail and the project is not already the chip. */
     const thing = !chip && text === undefined ? (markFor(e)?.name ?? null) : null;
@@ -321,9 +352,11 @@
             {/if}
             {#if line.word}<span class="card-word" data-late={line.tone ? '' : undefined}>{line.word}</span>{/if}
             {#if line.date}{#if line.word}<span aria-hidden="true">{' · '}</span>{/if}<span class="card-date">{line.date}</span>{/if}
-            {#if line.chip}
+            {#if line.chip && pressable}
+              <!-- The chip is the move, drawn after the link (below); line two keeps its word and its date. -->
+            {:else if line.chip}
               <!-- WHERE THE ROW APPLIES, AS THE DETAIL: a pill needs no separator before it, so it takes
-                   the gap the line's words keep instead. A card is a link, so the chip is words and never a control. -->
+                   the gap the line's words keep instead. Inside the link the chip is words and never a control. -->
               <ScopeChip scope={line.place ?? null} />
             {:else if line.detail}
               {@const f = line.detail}
@@ -343,6 +376,11 @@
             </span>
           {/if}
         </a>
+        <!-- WHERE THE ROW APPLIES, AS THE PRESS THAT MOVES IT: outside the link, at the card's end before its verbs, the
+             pill the row's own page draws, a 44px target under a thumb. -->
+        {#if line.chip && pressable}
+          <span class="card-move"><ScopeChip scope={line.place ?? null} onmove={() => moveFrom(e, title ?? copy.thisRow)} /></span>
+        {/if}
         <!-- OUTSIDE THE ANCHOR, because a button inside a link is neither. The card stays the whole
              tap target for opening the row and this sits beside it. -->
         {#if action}{@render action(e)}{/if}
@@ -350,6 +388,19 @@
       </li>
     {/each}
   </ul>
+{/if}
+
+{#if moves && MoveSheet}
+  <MoveSheet
+    bind:this={mover}
+    {register}
+    {names}
+    live={moves}
+    compact
+    onmoved={(got) => {
+      if (got) landed = { ...landed, [got.seq]: got };
+    }}
+  />
 {/if}
 
 <style>
@@ -584,6 +635,16 @@
 
     .card-b > :global(.scope-chip:not(:first-child)) {
       margin-inline-start: var(--sp-2);
+    }
+
+    /* THE CHIP THAT MOVES THE ROW, at the card's end and the middle of its two lines, as wide as its words up to
+       twelve characters of a name (`ScopeChip`) and never more than half the card, so the title keeps its line. */
+    .card-move {
+      display: flex;
+      flex: none;
+      align-items: center;
+      max-inline-size: 50%;
+      padding-inline: var(--sp-2) var(--sp-1);
     }
 
     /* Sentence case in the stylesheet, so the text stays the record's own word for search and for a

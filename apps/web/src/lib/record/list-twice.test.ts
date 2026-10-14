@@ -96,6 +96,49 @@ test('another list declaring no role still ignores the word, whatever it holds',
   }
 });
 
+/* A LIST OF THINGS THAT SAYS WHAT MAKES TWO OF ITS ROWS THE SAME (`same:`): skills, tools, keys, learnings. The record
+   names its rows held twice in the same answer, so the word narrows it too, by the declaration and never by its name. */
+const SKILLS = { ...REGISTERS.skills!, same: { fields: ['name'], within: 'project', fold: 'exact' } } as RegisterDecl;
+
+test('a list that declares same: narrows under the word, under any name', () => {
+  for (const id of ['skills', 'tools', 'credentials', 'learnings', 'anything']) {
+    const said = { ...SKILLS, id } as RegisterDecl;
+    assert.equal(heldTwiceOn(params(`/r/${id}?twice=1`), said), true, id);
+    assert.equal(heldTwiceOn(params(`/r/${id}?sort=name&twice=1`), said), true, id);
+    for (const href of [`/r/${id}`, `/r/${id}?twice=0`, `/r/${id}?f=twice:in:1`]) assert.equal(heldTwiceOn(params(href), said), false, href);
+  }
+  /* The same fields saying no `same:` are the list as it always opened. */
+  const { same: _none, ...plain } = SKILLS as RegisterDecl & { same?: unknown };
+  assert.equal(heldTwiceOn(params('/r/skills?twice=1'), plain as RegisterDecl), false);
+  assert.equal(heldTwiceOn(params('/r/skills?twice=1'), { ...SKILLS, same: null } as unknown as RegisterDecl), false);
+});
+
+test("the Agents add-on's own lists say same:, and narrow as they stand", () => {
+  for (const id of ['skills', 'tools', 'credentials', 'learnings']) {
+    const own = REGISTERS[id];
+    assert.ok(own, `the sample no longer has ${id}`);
+    assert.ok((own as { same?: unknown }).same, `${id} no longer says what makes two of its rows the same`);
+    assert.equal(heldTwiceOn(params(`/r/${id}?twice=1`), own), true, id);
+  }
+});
+
+test('a list of things is asked once by its own name, and its answer becomes the filter', async () => {
+  const calls: unknown[][] = [];
+  const out = await rowsHeldTwice(async (name, args) => {
+    calls.push([name, args]);
+    return { ok: true as const, value: { seqs: [2, 5, 7, 11] } };
+  }, 'skills');
+  assert.deepEqual(calls, [['heldTwice', { register: 'skills' }]]);
+  assert.deepEqual(out, { ok: true, value: rowsFilter([2, 5, 7, 11]) });
+  /* And the same tree over the numbers, whatever list it narrows. */
+  assert.deepEqual(whereFor('skills', [rowsFilter([2, 5])], '', new Map()), { field: 'seq', in: [2, 5] });
+});
+
+test('the people words are unchanged beside a list of things', () => {
+  assert.equal(twiceWords.clear, 'Show everyone');
+  assert.equal(twiceWords.unsaved, 'A view cannot keep the people who may be on this record twice. Choose Show everyone first.');
+});
+
 test('a list that declares the role narrows under any name', () => {
   for (const id of ['people', 'contacts', 'clients']) {
     const said = { ...PEOPLE, id } as RegisterDecl;
@@ -183,7 +226,7 @@ test('the list screen reads the word, asks once, and draws the line with its way
   /* The word leaves the address and nothing else does. */
   assert.match(route, /p\.delete\(TWICE\)/);
   /* A view has no word for it, so nothing is saved while it narrows the list, and Save view is not drawn beside a chip. */
-  assert.match(route, /if \(twice\) \{\s*toasts\.push\(twiceWords\.unsaved/, 'a view is saved without the word');
+  assert.match(route, /if \(twice\) \{\s*toasts\.push\(thingSaid\?\.unsaved \?\? twiceWords\.unsaved/, 'a view is saved without the word');
   assert.match(route, /savable=\{twice === null\}/, 'Save view is drawn while the word narrows the list');
   assert.ok(twiceWords.unsaved.includes(twiceWords.clear), 'the sentence names a button the line does not have');
 });

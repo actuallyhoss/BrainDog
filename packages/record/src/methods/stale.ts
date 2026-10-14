@@ -26,15 +26,34 @@
  *
  * IT READS AND WRITES NOTHING. No question is filed by asking: where a finder has one to put, the call it names is
  * `propose`, so the choice still goes to the person and nothing is asked by the record itself.
+ *
+ * BESIDE IT, THE TIDY OF WHERE THINGS APPLY (AGT-D04): `scopeProposals` reads, and `proposeScopes` is the one write in
+ * this file, a person's press that files questions and moves nothing. Both are further down.
  */
 
 import type { Result } from '@braindog/ports';
-import { causeOfFinder, finders, openHandoffs, sessionDeclaration, tokenOfRun, whereFor } from '@braindog/kernel';
-import type { Finder, HandoffPlace, Json, OpenHandoff } from '@braindog/kernel';
+import { BODY_KINDS, causeOfFinder, finders, openHandoffs, sessionDeclaration, tokenOfRun, whereFor } from '@braindog/kernel';
+import type { BodyKind, Entry, Finder, HandoffPlace, Json, OpenHandoff } from '@braindog/kernel';
 
 import type { CallContext } from '../index.ts';
 import { skillBearings } from '../slash.ts';
 import { scrubbed } from '../scrub.ts';
+import {
+  proposalLine,
+  proposalsFor,
+  strandedAnswers,
+  strandedFor,
+  strandedLine,
+  USED_WITHIN_DAYS,
+  type ScopeEvidence,
+  type ScopeListName,
+  type ScopeMade,
+  type ScopeNamer,
+  type ScopeProject,
+  type ScopeProposal,
+  type ScopeRow,
+  type ScopeUse,
+} from '../scope-propose.ts';
 import type { RecordDeps } from './index.ts';
 
 /** One kind of stale thing as a person or an agent reads it. `clear` is the one call that clears it, in words. */
@@ -308,8 +327,334 @@ export function staleFor(deps: RecordDeps, ctx: CallContext, nowMs: number, list
 /** How many things are stale for one caller: the lines' counts added up, the one number `context` carries. */
 export const staleCount = (lines: readonly StaleLine[]): number => lines.reduce((n, l) => n + l.count, 0);
 
+/* ---------------------------------------------------------------------------------------------------------------------
+ * WHERE WHAT HAS NO SCOPE BELONGS (AGT-D04 jobs 2 and 3): `scopeProposals` (READ+) says it a list, and `proposeScopes`
+ * (DATA) puts it on Decide as one question a list, so a person answers once and not once a row. The votes are
+ * `scope-propose.ts`'s, pure; what is here gathers what they read, with reads the record already makes, under the
+ * caller's own grant, and files what they answer.
+ *
+ * NOTHING ASKS BY ITSELF. No clock and no night calls `proposeScopes`: a person presses for it (the Vault's note, or
+ * `braindog tidy --ask`), and the question is signed by her. A token is refused, since an agent proposes one move with
+ * `propose` and never the whole record's.
+ *
+ * EVERY LIST WITH A SCOPE FIELD, BY WHAT IT DECLARES. Keys, tools and skills are not named here: a list is in when one of
+ * its fields says where its rows apply (`scope:`), and the projects are the one list that declares `scopes:`.
+ * ------------------------------------------------------------------------------------------------------------------- */
+
+/** One row of a list's proposal as it is read: the row by its handle and name, the project by name, and why. */
+export type ScopeAskRow = { at: string; title: string; project: string; reasons: string[] };
+
+/** One list's proposal: the list by its handle and name, how many rows, the question it is asked in, and the rows. */
+export type ScopeAsk = {
+  list: string;
+  name: string;
+  count: number;
+  line: string;
+  rows: ScopeAskRow[];
+  truncated: boolean;
+  /** How many of its rows are placed in a finished project, and the sentence that says so ('' at nought). */
+  stranded: number;
+  strandedLine: string;
+};
+
+/** What `scopeProposals` answers. */
+export type ScopeAsks = { lists: ScopeAsk[] };
+
+/** One question `proposeScopes` filed or found waiting: its handle, its words, how many rows, and whether it is new. */
+export type ScopeAsked = { list: string; name: string; question: string; said: string; rows: number; opened: boolean };
+
+/** What `proposeScopes` answers. */
+export type ScopesAsked = { asked: ScopeAsked[] };
+
+/** The most rows one question holds, which is the most a rowset carries (`MAX_ROWS` in govern). */
+export const SCOPE_ASK_MOST = 200;
+/** The most rows one list is read for, a page of the kernel's at a time. */
+const SCOPE_READ_MOST = 5_000;
+const SCOPE_PAGE = 500;
+/** The most uses of one row walked for its runs, as `usedBy` walks them. */
+const SCOPE_USES_WALK = 5_000;
+
+/** The causes the two questions are filed under, a list each, so the same ask is asked once. */
+export const scopeCause = (list: string): string => `scope-move:${list}`;
+export const strandedCause = (list: string): string => `scope-stranded:${list}`;
+
+/** A run's name as `usedBy` reads one: the prefix and then digits, with anything a `GLOB` reads as a pattern in brackets. */
+const RUN = sessionDeclaration().body as unknown as { id: string; seq_prefix: string };
+const RUN_GLOB = `${RUN.seq_prefix.replace(/[*?[\]]/g, (c) => `[${c}]`)}[1-9]*`;
+const RUN_NAME = new RegExp(`^${RUN.seq_prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[1-9][0-9]*$`, 'u');
+
+type Decl = NonNullable<ReturnType<RecordDeps['kernel']['register']>>;
+type Field = Decl['fields'][number];
+
+/** The field of a list that says where its rows apply, as the kernel's `scopeFieldOf` finds it. */
+const scopeFieldIn = (decl: Decl): Field | undefined => decl.fields.find((f) => f.scope !== undefined && f.retired !== true);
+
+/** Whether a row is in one of its list's finished states. */
+const finishedIn = (decl: Decl, row: Entry): boolean =>
+  decl.state !== undefined && (decl.done ?? []).length > 0 && (decl.done ?? []).includes(String(row.fields[decl.state] ?? row.state ?? ''));
+
+/** A list as a sentence names its rows, from its own declaration: "Keys", and "key" (its `one`, or its name less an s). */
+const namesOf = (decl: Decl): ScopeListName => {
+  const { one, many } = wordsOf(decl);
+  return { name: decl.name, one: one ?? (many.endsWith('s') ? many.slice(0, -1) : many) };
+};
+
+/** A row's title as a person reads it, or the list's word for one when it has none. */
+const titleOf = (decl: Decl, row: Entry): string => {
+  const t = row.fields[decl.title];
+  return typeof t === 'string' && t.trim() !== '' ? (scrubbed(t.trim()) ?? namesOf(decl).one) : namesOf(decl).one;
+};
+
+/** One list as the two methods work on it: its declaration and scope field, its rows by id, and what the votes said. */
+type Gathered = {
+  list: string;
+  decl: Decl;
+  field: Field;
+  rows: Map<string, Entry>;
+  proposals: ScopeProposal[];
+  stranded: ScopeRow[];
+};
+
+/** Text made comparable, as `scope-propose.ts` compares it: lower case, one space. */
+const plainText = (s: string): string => s.toLowerCase().replace(/\s+/g, ' ').trim();
+
+/**
+ * Every list with a scope field the caller reads, with what the votes propose for it, or `null` when the record keeps
+ * no projects she may read. `only` holds it to one list. `declinedOf` is each list's `'row:project'` pairs he said no to.
+ *
+ * READ UNDER HER OWN GRANT, every list: a list closed to her is not read and not named, and a narrowed grant reads only
+ * the rows it admits. The runs are evidence only for a caller who may read them, since a vote counts them.
+ */
+function scopeGather(deps: RecordDeps, ctx: CallContext, nowMs: number, only: string | null, declinedOf: (list: string, field: Field) => Set<string>): { lists: Gathered[]; projects: Map<string, ScopeProject> } | null {
+  const { kernel, sql, readable } = deps;
+  const homes = [...kernel.registers()].filter(([, d]) => d.scopes !== undefined);
+  if (homes.length !== 1) return null;
+  const [home, homeDecl] = homes[0]!;
+  if (readable(ctx, home) !== null) return null;
+
+  /** Every live row of one list she may read, a page at a time. */
+  const rowsOf = (list: string): Entry[] => {
+    const out: Entry[] = [];
+    let cursor: string | null = null;
+    do {
+      const got = kernel.list({ register: list, limit: SCOPE_PAGE, ...(cursor === null ? {} : { cursor }) }, whereFor(ctx.wheres, list));
+      if (!got.ok) break;
+      out.push(...got.value.rows);
+      cursor = got.value.cursor;
+    } while (cursor !== null && out.length < SCOPE_READ_MOST);
+    return out;
+  };
+
+  const texts = (fields: Record<string, Json>, key: string | undefined): string[] => {
+    const held = key === undefined ? undefined : fields[key];
+    return Array.isArray(held) ? held.filter((x): x is string => typeof x === 'string' && x.trim() !== '') : [];
+  };
+  const projects = new Map<string, ScopeProject>();
+  for (const p of rowsOf(home))
+    projects.set(p.id, {
+      id: p.id,
+      name: titleOf(homeDecl, p),
+      repos: texts(p.fields, homeDecl.scopes?.repos),
+      folders: texts(p.fields, homeDecl.scopes?.folders),
+      finished: finishedIn(homeDecl, p),
+    });
+
+  /* THE LISTS, each with its rows read once: the namers are read across all of them. */
+  const scoped: { list: string; decl: Decl; field: Field; rows: Entry[] }[] = [];
+  for (const [list, decl] of kernel.registers()) {
+    const field = scopeFieldIn(decl);
+    if (field === undefined || field.type !== 'ref' || field.to !== home || readable(ctx, list) !== null) continue;
+    scoped.push({ list, decl, field, rows: rowsOf(list) });
+  }
+
+  /* A RUN AND WHERE IT WAS, read once a run: its project by id, and the app it ran in. */
+  const runsRead = readable(ctx, SESSION) === null;
+  const runs = new Map<string, { project: string | null; by: string | null }>();
+  const runOf = (name: string): { project: string | null; by: string | null } => {
+    const held = runs.get(name);
+    if (held) return held;
+    const seq = Number(name.slice(RUN.seq_prefix.length));
+    const row = sql.one<{ fields: string }>('SELECT fields FROM entry WHERE register = ? AND seq = ? AND deleted_at IS NULL', SESSION, seq);
+    const f = row ? (JSON.parse(row.fields) as Record<string, Json>) : {};
+    const spoken = typeof f.project === 'string' && f.project !== '' ? f.project : null;
+    const at = spoken === null ? null : (kernel.get(spoken)?.id ?? null);
+    const app = typeof f.client === 'string' && f.client.trim() !== '' ? f.client.trim() : null;
+    const out = { project: at, by: app };
+    runs.set(name, out);
+    return out;
+  };
+  const since = new Date(nowMs - USED_WITHIN_DAYS * DAY_MS).toISOString();
+  /** The runs that used one row since the window opened: a write to it, or an open of a value it seals. */
+  const usesOf = (row: Entry, decl: Decl): ScopeUse[] => {
+    const targets = [`entry:${row.id}`];
+    for (const f of decl.fields) if (f.type === 'secret' && typeof row.fields[f.id] === 'string' && row.fields[f.id] !== '') targets.push(`grant:${String(row.fields[f.id])}`);
+    const out: ScopeUse[] = [];
+    for (const target of targets)
+      for (const u of sql.all<{ actor: string; at: string }>(
+        `SELECT actor, MAX(ts) AS at FROM (SELECT actor, ts FROM event WHERE target = ? AND kind IN ('edit', 'grant.read') AND ts >= ? ORDER BY ts DESC LIMIT ?)
+          WHERE actor GLOB ? AND substr(actor, ?) NOT GLOB '*[^0-9]*' GROUP BY actor`,
+        target, since, SCOPE_USES_WALK, RUN_GLOB, RUN.seq_prefix.length + 1,
+      ))
+        out.push({ row: row.id, run: u.actor, project: runOf(u.actor).project, at: u.at });
+    return out;
+  };
+  /** The run that added one row, when a run did. */
+  const madeOf = (row: Entry): ScopeMade | null => {
+    const by = sql.one<{ actor: string }>("SELECT actor FROM event WHERE target = ? AND kind = 'create' ORDER BY rowid LIMIT 1", `entry:${row.id}`)?.actor;
+    if (by === undefined || !RUN_NAME.test(by)) return null;
+    const run = runOf(by);
+    return { row: row.id, project: run.project, ...(run.by === null ? {} : { by: run.by }) };
+  };
+
+  /* WHO NAMES WHOM: a row of a scoped list that holds another's id in a link, or its title in a list of words (a tool's
+     "Keys it needs" holding a key's name). A name two rows share names neither, since it cannot say which. */
+  const byTitle = new Map<string, string[]>();
+  for (const s of scoped)
+    for (const row of s.rows) {
+      const key = plainText(titleOf(s.decl, row));
+      byTitle.set(key, [...(byTitle.get(key) ?? []), row.id]);
+    }
+  const known = new Set(scoped.flatMap((s) => s.rows.map((r) => r.id)));
+  const namers: ScopeNamer[] = [];
+  for (const s of scoped)
+    for (const row of s.rows) {
+      if (finishedIn(s.decl, row)) continue;
+      const placed = row.fields[s.field.id];
+      const project = typeof placed === 'string' && placed !== '' ? placed : null;
+      const named = new Set<string>();
+      for (const f of s.decl.fields) {
+        if (f.id === s.field.id || f.retired === true) continue;
+        const held = row.fields[f.id];
+        const items = Array.isArray(held) ? held : [held];
+        if (f.type === 'ref' || (f.type === 'list' && f.of === 'ref'))
+          for (const v of items) if (typeof v === 'string' && known.has(v)) named.add(v);
+        if (f.type === 'list' && f.of === 'text')
+          for (const v of items) {
+            const ids = typeof v === 'string' ? byTitle.get(plainText(v)) : undefined;
+            if (ids?.length === 1) named.add(ids[0]!);
+          }
+      }
+      named.delete(row.id);
+      for (const target of named) namers.push({ row: target, by: titleOf(s.decl, row), project });
+    }
+
+  const lists: Gathered[] = [];
+  for (const s of scoped) {
+    if (only !== null && s.list !== only) continue;
+    const rows: ScopeRow[] = s.rows.map((row) => {
+      const placed = row.fields[s.field.id];
+      const words = s.decl.fields
+        .filter((f) => f.type === 'text' && f.id !== s.decl.title && f.retired !== true && typeof row.fields[f.id] === 'string')
+        .map((f) => ({ label: f.label ?? f.id, text: String(row.fields[f.id]) }));
+      return { id: row.id, list: s.list, name: titleOf(s.decl, row), project: typeof placed === 'string' && placed !== '' ? placed : null, texts: words, retired: finishedIn(s.decl, row) };
+    });
+    const open = rows.filter((r) => r.project === null && r.retired !== true);
+    const evidence: ScopeEvidence = {
+      since,
+      uses: runsRead ? open.flatMap((r) => usesOf(s.rows.find((x) => x.id === r.id)!, s.decl)) : [],
+      namers: namers.filter((n) => open.some((r) => r.id === n.row)),
+      made: runsRead ? open.flatMap((r) => madeOf(s.rows.find((x) => x.id === r.id)!) ?? []) : [],
+    };
+    lists.push({
+      list: s.list,
+      decl: s.decl,
+      field: s.field,
+      rows: new Map(s.rows.map((r) => [r.id, r])),
+      proposals: proposalsFor(rows, evidence, [...projects.values()], declinedOf(s.list, s.field)),
+      stranded: strandedFor(rows, [...projects.values()]),
+    });
+  }
+  return { lists, projects };
+}
+
+/**
+ * The `'row:project'` pairs he said no to on a question of this list's cause: every row of one he declined, and the rows
+ * he left out when he took some of one. A row his yes moved and an Undo put back is not among them: he said yes.
+ */
+function declinedIn(deps: RecordDeps, list: string, field: Field): Set<string> {
+  const { sql, kernel } = deps;
+  const out = new Set<string>();
+  const closed = sql.all<{ id: string; body: string; resolved_as: string | null }>(
+    "SELECT id, body, resolved_as FROM suggestion WHERE cause = ? AND status <> 'open' ORDER BY opened_at, rowid",
+    scopeCause(list),
+  );
+  for (const q of closed) {
+    let body: { rows?: unknown } | null = null;
+    try {
+      body = JSON.parse(q.body) as { rows?: unknown };
+    } catch {
+      continue;
+    }
+    const asked = (Array.isArray(body?.rows) ? body.rows : []).flatMap((r) => {
+      const at = (r as { at?: unknown }).at;
+      const to = (r as { patch?: Record<string, unknown> }).patch?.[field.id];
+      const row = typeof at === 'string' ? kernel.get(at) : null;
+      return row && typeof to === 'string' ? [{ row: row.id, to }] : [];
+    });
+    const resolved = sql.one<{ batch: string | null }>("SELECT batch FROM event WHERE kind = 'resolve' AND target = ? ORDER BY rowid DESC LIMIT 1", `suggestion:${q.id}`);
+    const answer = resolved?.batch
+      ? sql.one<{ answer: string }>(
+          "SELECT d.answer AS answer FROM event e JOIN decision d ON e.target = 'decision:' || d.id WHERE e.kind = 'decide' AND e.batch = ? ORDER BY e.rowid DESC LIMIT 1",
+          resolved.batch,
+        )?.answer
+      : undefined;
+    const no = q.resolved_as === 'wont-fix' || q.resolved_as === 'incorrect' || answer === 'reject';
+    for (const a of asked) {
+      const taken = !no && resolved?.batch != null && sql.one('SELECT 1 AS y FROM event WHERE batch = ? AND target = ? LIMIT 1', resolved.batch, `entry:${a.row}`) != null;
+      if (!taken && (no || answer !== undefined)) out.add(`${a.row}:${a.to}`);
+    }
+  }
+  return out;
+}
+
+/**
+ * The kernel's kind for a question of answers to choose from, read off its own list rather than spelled here. The type
+ * holds it to the kind whose body carries `options`, so a list reordered in the kernel is a compile error and not a
+ * question of the wrong kind.
+ */
+const CHOOSE: Extract<BodyKind, keyof { options: unknown }> = BODY_KINDS[0];
+
+/**
+ * The question for one list's things left in a finished project: three answers, two of which write. "Retire them" sets
+ * each to the list's retired state (or its last finished one), "Keep them for every project" clears where they apply,
+ * which widens them and so is only ever his answer, and "Leave them" writes nothing. A list with no finished state has
+ * no "Retire them", and is asked the other two.
+ */
+function strandedAsk(nameOf: (id: string) => string, g: Gathered, left: readonly ScopeRow[], names: ScopeListName) {
+  const [retire, keep, leave] = strandedAnswers(left.length);
+  const them = left.length === 1 ? 'it' : 'them';
+  const done = g.decl.done ?? [];
+  const retired = g.decl.state === undefined ? undefined : (done.find((v) => /retir/iu.test(v)) ?? done[done.length - 1]);
+  const at = (r: ScopeRow) => ({ at: nameOf(r.id), version: g.rows.get(r.id)!.version });
+  const options = [
+    ...(retired === undefined || g.decl.state === undefined
+      ? []
+      : [{ id: 'retire', label: retire, because: `Nothing live works in the project ${them === 'it' ? 'it is' : 'they are'} in any more.`, patches: left.map((r) => ({ ...at(r), patch: { [g.decl.state!]: retired } })) }]),
+    { id: 'every', label: keep, because: `${them === 'it' ? 'It is' : 'They are'} still needed, so every project's sessions are handed ${them}.`, patches: left.map((r) => ({ ...at(r), patch: { [g.field.id]: null } })) },
+    { id: 'leave', label: leave, because: `Nothing changes, and ${them === 'it' ? 'it stays' : 'they stay'} with the finished project.` },
+  ];
+  const line = strandedLine(left.length, names);
+  return { question: `${line} What should happen to ${them}?`, body_kind: CHOOSE, body: { options }, cause: strandedCause(g.list) };
+}
+
+/** The sentence a list she cannot read, or one with no scope field, is refused in: the same for both, naming neither. */
+const NO_SUCH_LIST = 'No list you can read by that name says where its things apply. Leave register out to read every one.';
+
+/** The sentence anybody but a person signed in is refused in: an agent proposes one move with `propose`. */
+const PERSON_ONLY = 'Open this from the app; only a person puts the moves of every list to Decide. An agent proposes one move with propose.';
+
 export function methods(deps: RecordDeps) {
-  const { scoped, clock } = deps;
+  const { scoped, guard, clock, kernel, sql, no, tail } = deps;
+
+  /** The one list asked for, or `null` for every one, or a refusal when it is not a list she reads with a scope field. */
+  const onlyOf = (args: { register?: unknown } | undefined, ctx: CallContext): Result<string | null> => {
+    const r = args?.register;
+    if (r === undefined || r === null) return { ok: true, value: null };
+    const decl = typeof r === 'string' ? kernel.register(r) : undefined;
+    if (typeof r !== 'string' || decl === undefined || scopeFieldIn(decl) === undefined || deps.readable(ctx, r) !== null)
+      return no('REGISTER_UNKNOWN', NO_SUCH_LIST, { at: 'register' });
+    return { ok: true, value: r };
+  };
 
   return {
     /**
@@ -321,6 +666,85 @@ export function methods(deps: RecordDeps) {
       if (stop) return { ok: false, refusal: stop };
       const lines = staleFor(deps, ctx, clock.now());
       return { ok: true, value: { lines, count: staleCount(lines) } };
+    },
+
+    /**
+     * `{ register? }`: where the things of each list with no scope belong, as `{ lists }`, each list
+     * `{ list, name, count, line, rows, truncated, stranded, strandedLine }`, its rows `{ at, title, project, reasons }`,
+     * at most 200. READ+, held to the lists the caller may read, and it changes nothing.
+     */
+    async scopeProposals(args: { register?: unknown } | undefined, ctx: CallContext): Promise<Result<ScopeAsks>> {
+      const stop = scoped(ctx, 'read');
+      if (stop) return { ok: false, refusal: stop };
+      const only = onlyOf(args, ctx);
+      if (!only.ok) return only as Result<never>;
+      const found = scopeGather(deps, ctx, clock.now(), only.value, (list, field) => declinedIn(deps, list, field));
+      if (found === null) return { ok: true, value: { lists: [] } };
+      const lists = found.lists.map((g): ScopeAsk => {
+        const names = namesOf(g.decl);
+        return {
+          list: g.list,
+          name: g.decl.name,
+          count: g.proposals.length,
+          line: proposalLine(g.proposals.length, names),
+          rows: g.proposals.slice(0, SCOPE_ASK_MOST).map((p) => ({
+            at: kernel.nameOf(p.row),
+            title: titleOf(g.decl, g.rows.get(p.row)!),
+            project: found.projects.get(p.project)?.name ?? '',
+            reasons: p.reasons,
+          })),
+          truncated: g.proposals.length > SCOPE_ASK_MOST,
+          stranded: g.stranded.length,
+          strandedLine: strandedLine(g.stranded.length, names),
+        };
+      });
+      return { ok: true, value: { lists } };
+    },
+
+    /**
+     * `{ register? }`: put each list's moves to Decide as one question, signed by the caller, and its things left in a
+     * finished project as one question of three answers. Answers `{ asked }`, one a question filed or found waiting.
+     * DATA, a person's press only, and nothing moves until she answers.
+     */
+    async proposeScopes(args: { register?: unknown } | undefined, ctx: CallContext): Promise<Result<ScopesAsked>> {
+      if (ctx.principal.kind !== 'person') return { ok: false, refusal: { code: 'NEEDS_BROWSER_SESSION', fix: PERSON_ONLY, at: 'principal' } };
+      const stop = guard(ctx, 'propose');
+      if (stop) return { ok: false, refusal: stop };
+      const only = onlyOf(args, ctx);
+      if (!only.ok) return only as Result<never>;
+      const found = scopeGather(deps, ctx, clock.now(), only.value, (list, field) => declinedIn(deps, list, field));
+      const asked: ScopeAsked[] = [];
+      const by = ctx.principal.id;
+      /** What one filing answered, as a line of `asked`, or nothing when he answered this already and nothing new is in it. */
+      const heard = (g: Gathered, out: ReturnType<typeof kernel.propose>, said: string, rows: number): Result<null> => {
+        if (!out.ok) return out as Result<never>;
+        if (out.value.answered !== undefined) return { ok: true, value: null };
+        const held = out.value.joined === true ? sql.one<{ body: string }>('SELECT body FROM suggestion WHERE id = ?', out.value.id) : null;
+        const count = held ? ((JSON.parse(held.body) as { rows?: unknown[]; options?: { patches?: unknown[] }[] }).rows?.length ?? rows) : rows;
+        asked.push({ list: g.list, name: g.decl.name, question: out.value.id, said: kernel.question(out.value.id) ?? said, rows: count, opened: out.value.joined !== true });
+        return { ok: true, value: null };
+      };
+      for (const g of found?.lists ?? []) {
+        if (guard(ctx, 'propose', g.list) !== null) continue;
+        const names = namesOf(g.decl);
+        const moves = g.proposals.slice(0, SCOPE_ASK_MOST);
+        if (moves.length > 0) {
+          const said = proposalLine(moves.length, names);
+          const body = {
+            register: g.list,
+            rows: moves.map((p) => ({ at: kernel.nameOf(p.row), version: g.rows.get(p.row)!.version, patch: { [g.field.id]: p.project } })),
+            why: moves.map((p) => ({ text: `${titleOf(g.decl, g.rows.get(p.row)!)}: ${p.reasons.join('. ')}.`, at: kernel.nameOf(p.row) })),
+          };
+          const done = heard(g, kernel.propose({ question: said, body_kind: 'rowset', body, cause: scopeCause(g.list) }, by), said, moves.length);
+          if (!done.ok) return done as Result<never>;
+        }
+        const left = g.stranded.slice(0, SCOPE_ASK_MOST);
+        if (left.length > 0) {
+          const done = heard(g, kernel.propose(strandedAsk(kernel.nameOf, g, left, names), by), strandedLine(left.length, names), left.length);
+          if (!done.ok) return done as Result<never>;
+        }
+      }
+      return tail({ ok: true as const, value: { asked } });
     },
   };
 }

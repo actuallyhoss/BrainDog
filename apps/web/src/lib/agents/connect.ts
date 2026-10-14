@@ -141,15 +141,15 @@ export function heardOf(rows: readonly unknown[], keys: readonly KeyHeard[] = []
     const f = (row as { fields?: unknown }).fields;
     if (typeof f !== 'object' || f === null) continue;
     const fields = f as Record<string, unknown>;
-    const at = text(fields.last_seen);
-    if (at === null || !Number.isFinite(Date.parse(at))) continue;
+    const seen = text(fields.last_seen);
+    if (seen === null || !Number.isFinite(Date.parse(seen))) continue;
     const scripted = made !== null && text(fields.token_id) === made;
     const tile = scripted ? 'script' : tileOfRun(fields);
     /* THE APP BY THE NAME IT GAVE, else the way in's own title, and never an id: `runByName` reads only a name. */
     const said = runByName({ agent: '', client: text(fields.client), parent: null });
     const own = CONNECT_TILES.find((t) => t.id === tile);
     const app = said !== nameWords.agent ? said : tile === 'other' || tile === 'script' || !own ? nameWords.agent : own.title;
-    out.push({ tile, app, machine: machineOf(fields.host), at });
+    out.push({ tile, app, machine: machineOf(fields.host), at: seen });
   }
   const key = made === null ? undefined : keys.find((k) => k.id === made);
   if (key?.last_used_at && Number.isFinite(Date.parse(key.last_used_at))) {

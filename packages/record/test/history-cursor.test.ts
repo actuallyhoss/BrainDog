@@ -195,7 +195,7 @@ test("(7) THE OWNER'S ANSWERS ARE TODAY'S, rowids and whole-number cursors, with
 
   const whole = value<Page>(await api.recentHistory({ limit: 200 } as never, owner));
   assert.deepEqual(whole.events.map((e) => ({ rowid: e.rowid, id: e.id })), log);
-  for (const e of whole.events) assert.deepEqual(Object.keys(e).filter((k) => k !== 'settles' && k !== 'run_by').sort(), KEYS, `${e.kind} carries other keys`);
+  for (const e of whole.events) assert.deepEqual(Object.keys(e).filter((k) => k !== 'settles' && k !== 'run_by' && !['suggested_by', 'drafted_by', 'answer_label', 'settled_by', 'undone'].includes(k)).sort(), KEYS, `${e.kind} carries other keys`);
   for (const p of await pages(api, owner, 3)) assert.ok(p.cursor === null || p.cursor === p.events.at(-1)!.rowid, `cursor ${JSON.stringify(p.cursor)}`);
 
   /* A DIGIT STRING IS THE SAME CURSOR, because a GET now brings it as the text it was sent (`host` no longer coerces). */

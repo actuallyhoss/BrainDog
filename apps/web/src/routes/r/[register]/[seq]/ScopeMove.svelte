@@ -12,13 +12,32 @@
 
   A ROW ON A LIST WHOSE ROWS SAY NOTHING ABOUT WHERE THEY APPLY DRAWS NOTHING HERE, and a list whose rows name several
   projects draws the chip without the move, since "Everywhere" is not a list of projects.
+
+  ON A LIST IT IS `compact`, AND IT IS THE ONE SHEET FOR EVERY ROW. A list's table and its cards draw each row's chip at
+  their own size and call `openFor` with the row pressed; this draws no chip and the same sheet the row's page opens.
+  One sheet and not one a row, because a `Sheet` always draws its dialog and its head, which was ten nodes a row against
+  the list's 2,000, and a dialog inside a table's cell inherits the cell's line height, which is the row's.
 -->
 <script lang="ts">
   import { apiBase } from '$lib/at.ts';
   import { labelOf } from '$lib/record/api.ts';
   import type { Names } from '$lib/record/remote.ts';
   import type { Entry } from '$lib/record/schema.ts';
-  import { movable, moveScope, placesIn, scopeFieldOf, scopeOf, widens, words, type Place } from '$lib/record/scope-move.ts';
+  import {
+    afterMove,
+    choiceOf,
+    movable,
+    moveScope,
+    movesIn,
+    placesIn,
+    scopeFieldOf,
+    scopeOf,
+    widens,
+    words,
+    type Landed,
+    type Place,
+    type Scope,
+  } from '$lib/record/scope-move.ts';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import ScopeChip from '$lib/ui/ScopeChip.svelte';
@@ -32,24 +51,37 @@
     names,
     live,
     title,
+    compact = false,
     onmoved,
   }: {
     register: string;
-    /** The row as the page holds it, whose `version` a move is written against. */
-    row: Entry;
+    /** The row as the page holds it, whose `version` a move is written against. A list's is the row `openFor` names. */
+    row?: Entry | undefined;
     /** The record's names and marks for the rows this one points at. */
     names: Names | undefined;
-    /** Whether the row is the record's, which is the only row a move can be written to. */
+    /** Whether the row is the record's and the reader may write its list, which is the only row a move can be written to. */
     live: boolean;
-    /** The row's title, for the sentence a conflict says. */
-    title: string;
-    /** Called once a move has landed, so the page reads the row and its history again. */
-    onmoved: () => void;
+    /** The row's title, for the sentence a conflict says and under the sheet's title. */
+    title?: string | undefined;
+    /** On a list's table or cards: no chip of its own, and the one sheet every row's chip opens with `openFor`. */
+    compact?: boolean;
+    /** Called once a move has landed with what landed, or with `null` when the row changed somewhere else first. */
+    onmoved?: ((landed: Landed | null) => void) | undefined;
   } = $props();
 
+  /* THE ROW A LIST'S CHIP OPENED THE SHEET FOR, its title, and what to give the focus back to once the sheet closes. */
+  let held = $state.raw<{ row: Entry; title: string; from: HTMLElement | null } | null>(null);
+  const target = $derived(compact ? held?.row : row);
+  const named = $derived((compact ? held?.title : title) ?? '');
+
+  /* THE MOVES THAT LANDED, by row, each standing in for its row until the page has read it again (`afterMove`): on a
+     list, two rows moved one after the other are both said where they went. */
+  let landed = $state<Record<number, Landed>>({});
+
   const field = $derived(scopeFieldOf(register));
-  const scope = $derived(scopeOf(register, row.fields, names));
-  const canMove = $derived(live && movable(field));
+  const now = $derived(target ? afterMove(target, scopeOf(register, target.fields, names), landed[target.seq]) : undefined);
+  const scope = $derived(now?.scope);
+  const canMove = $derived(movesIn(register, live));
 
   let open = $state(false);
   /* `undefined` while the projects are being read, `null` when the record would not list them. */
@@ -61,54 +93,79 @@
 
   function openMove() {
     const to = field?.to;
-    if (!canMove || !to) return;
+    if (!canMove || !to || !target) return;
     asking = false;
     open = true;
     places = undefined;
     void placesIn(apiBase(), to).then((got) => (places = got));
   }
 
+  /**
+   * A list's chip, pressed: the sheet opens for that row. `from` is the chip, or the cell that holds it, which takes the
+   * focus back when the sheet closes, so Escape lands where the press began.
+   */
+  export function openFor(r: Entry, t: string, from: HTMLElement | null = null) {
+    if (moving) return;
+    held = { row: r, title: t, from };
+    openMove();
+  }
+
   /** A press on a place: the row's own place closes the list, a key opened to every project asks first. */
   function choose(to: Place | null) {
     if (moving) return;
-    if ((to === null && scope === null) || (to !== null && scope?.spoken === to.spoken)) {
-      open = false;
-      return;
-    }
-    if (widens(register, scope ?? null, to)) {
-      asking = true;
-      return;
-    }
-    void moveTo(to);
+    const choice = choiceOf(register, scope ?? null, to);
+    if (choice === 'here') open = false;
+    else if (choice === 'ask') asking = true;
+    else moveTo(to);
   }
 
-  async function moveTo(to: Place | null) {
+  function moveTo(to: Place | null) {
+    const r = target;
+    if (!r || !now) return;
+    void write({ row: r, version: now.version, from: scope ?? null, name: named }, to);
+  }
+
+  /* THE ROW IS CARRIED, NOT READ AGAIN, so an Undo pressed after the sheet was opened for another row of the list still
+     moves the row it undoes, against the version its own move answered. */
+  async function write(at: { row: Entry; version: number; from: Scope | null; name: string }, to: Place | null) {
     const f = field;
     if (moving || !live || !movable(f)) return;
-    const from = scope ?? null;
     /* THE WAY BACK IS THE PLACE IT WAS IN, found among the places the menu read. It is offered only where going back
        asks nothing: a way back that would open a key to every project is a move to be made with its question. */
+    const from = at.from;
     const back = from === null ? null : places?.find((p) => p.spoken === from.spoken);
     moving = true;
-    const out = await moveScope(apiBase(), { register, seq: row.seq, version: row.version, field: f.id, to, name: title });
+    const out = await moveScope(apiBase(), { register, seq: at.row.seq, version: at.version, field: f.id, to, name: at.name });
     moving = false;
     open = false;
     asking = false;
     if (!out.ok) {
       toasts.push(out.fix, { intent: 'warn' });
       /* A ROW CHANGED SOMEWHERE ELSE FIRST IS READ AGAIN, so what the chip says is what the record holds. */
-      if (out.stale) onmoved();
+      if (out.stale) onmoved?.(null);
       return;
     }
-    toasts.push(words.movedTo(to?.name ?? words.everywhere), back !== undefined && !widens(register, to, back) ? { undo: () => void moveTo(back) } : {});
-    onmoved();
+    const done: Landed = { seq: at.row.seq, version: out.version, to };
+    landed = { ...landed, [done.seq]: done };
+    toasts.push(
+      words.movedTo(to?.name ?? words.everywhere),
+      back !== undefined && !widens(register, to, back) ? { undo: () => void write({ row: at.row, version: out.version, from: to, name: at.name }, back) } : {},
+    );
+    onmoved?.(done);
+  }
+
+  /* ON A LIST, THE FOCUS GOES BACK TO THE CHIP THAT OPENED THE SHEET, or its cell, if it is still on the screen. */
+  function closed() {
+    asking = false;
+    const from = compact ? held?.from : null;
+    if (from?.isConnected && document.activeElement !== from) from.focus();
   }
 
   const isHere = (p: Place | null): boolean => (p === null ? scope === null : scope?.spoken === p.spoken);
 </script>
 
 {#snippet confirm()}
-  <Button weight="primary" disabled={moving} onclick={() => void moveTo(null)}>{words.widenGo}</Button>
+  <Button weight="primary" disabled={moving} onclick={() => moveTo(null)}>{words.widenGo}</Button>
 {/snippet}
 
 {#snippet place(p: Place | null)}
@@ -120,12 +177,12 @@
   </li>
 {/snippet}
 
-{#if scope !== undefined}
+{#if !compact && scope !== undefined}
   <ScopeChip {scope} size="m" onmove={canMove ? openMove : undefined} />
 {/if}
 
 {#if canMove && field}
-  <Sheet bind:open title={labelOf(field)} subtitle={title} footer={asking ? confirm : undefined} onclose={() => (asking = false)}>
+  <Sheet bind:open title={labelOf(field)} subtitle={named} footer={asking ? confirm : undefined} onclose={closed}>
     {#if asking}
       <p class="scope-ask">{words.widenKey}</p>
     {:else if places === undefined}

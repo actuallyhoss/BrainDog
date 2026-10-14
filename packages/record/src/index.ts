@@ -204,12 +204,13 @@ import {
 import { RUNS_PAGE_MOST } from './automations.ts';
 import { historyCursors, type HistoryCursors } from './history-cursor.ts';
 import { handleOf, isHandle, spokenOf } from './question-handles.ts';
+import { withSettling } from './settling.ts';
 import { dropPushSub, readPushSub, savePushSub } from './push.ts';
 import { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, REPORT_ROWS_PER_MINUTE, REPORT_WINDOW_MS, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
 import type { Directory } from './directory.ts';
 import { methods, type RecordDeps as MethodDeps } from './methods/index.ts';
 import { staleCount, staleFor as staleLines } from './methods/stale.ts';
-import { learnedSorted } from './methods/learnings.ts';
+import { learnedOrder, learnedSorted } from './methods/learnings.ts';
 import { briefFactsFor } from './methods/briefing.ts';
 import { briefTick } from './brief-write.ts';
 import type { EngineHealthRead } from './methods/engine.ts';
@@ -221,6 +222,7 @@ import { landRetype } from './methods/retype.ts';
 import { rerank } from './rerank.ts';
 import { aboutOf, ladder, type Caller, type Gate } from './ladder.ts';
 import { OLDER, card as cardOf } from './card.ts';
+import { BRIEF_ROWS, capRegister, peopleHere, projectWaiting, rulesOf, type Placed } from './context-caps.ts';
 import { alsoHere, nextLines, runName, sameTree, type AlsoHere, type LastHere, type LeftStep, type TreeRun } from './same-tree.ts';
 import { byWhoOf, passesOf, passFolder, passKept, type ByWho, type UpdatePass } from './update-pass.ts';
 import { docValues } from './row-values.ts';
@@ -728,9 +730,14 @@ const CLIENT_ID = /^[A-Za-z0-9._:-]{1,128}$/;
 
 /* ── what `context` shows ──────────────────────────────────────────────── */
 
-/** A register's rows `context` shows from the project, and again from everywhere, newest first. */
-const SHOWN = 20;
-/** The people linked to the project, most recently in touch first. */
+/**
+ * The rows of a list `context` reads from the project, and again from everywhere, before it cuts them to what it sends
+ * (`capRegister`): the most the kernel's `inScope` reads, so the rows most recently used are chosen from all of them.
+ */
+const SCOPE_READ = 200;
+/** Later than any time a row was used, for a row handed to the agent asking, which leads the rows `context` keeps. */
+const IN_USE_NOW = '9999-12-31T23:59:59.999Z';
+/** The people linked to the project in the full answer, most recently in touch first; the brief one names five. */
 const MET = 10;
 /** The people linked to the project read to choose those `MET` from, by when they were last in touch. */
 const LINKED = 50;
@@ -1238,7 +1245,7 @@ export type EventLine = Omit<LogLine, 'rowid'> & {
    */
   pass?: import('./update-pass.ts').PassSaid;
   steps?: EventLine[];
-};
+} & Partial<import('./settling.ts').Settled>;
 
 /**
  * Where a page of the log stops, or what a read mark reaches: the event's rowid for a caller who reads the whole record,
@@ -1496,10 +1503,18 @@ export type Context = {
    * a working run took, or "Nothing was handed over" with the last run here. Empty on a place no run ended in before.
    */
   next_lines?: string[];
-  /** Open suggestions, newest first, each with the question a person answers. */
+  /** Open suggestions, this project's first and then newest first, each with the question a person answers. */
   waiting: { id: string; question: string }[];
-  /** Every register with a scope field the caller may read: the project's open rows, then the global ones nearer-wins leaves. */
-  registers: { id: string; name: string; rows: Brief[]; inherited: Brief[]; truncated: boolean }[];
+  /** How many of every open question the caller may see are this project's: a row it is about is placed here, or the run that asked was. */
+  waiting_here?: number;
+  /** Up to three learnings of kind `rule`, this project's first, read from every learning and not only the five sent, and how many more. */
+  rules?: { rows: Brief[]; more: number };
+  /**
+   * Every register with a scope field the caller may read: the project's open rows, then the global ones nearer-wins
+   * leaves, five in all unless `format: 'full'` asked for twenty of each (`capRegister`, AGT-B09). `here` and
+   * `everywhere` count every open row of each, `more` how many this answer leaves out, and `rest` the call that lists them.
+   */
+  registers: { id: string; name: string; rows: Brief[]; inherited: Brief[]; truncated: boolean; here?: number; everywhere?: number; more?: number; rest?: string | null }[];
   /** The people linked to this project, most recently in touch first, each with their role and organisation. */
   people: PersonBrief[];
   /** How many people other than the record's own are linked here, sent only when there are more than `people` holds. */
@@ -5990,6 +6005,38 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
+   * The open questions `context` sends, each placed as `context-caps.ts` reads a question (`Placed`, AGT-B09): the
+   * project of the run that asked it, and the projects of the rows it is about, by their handles, so this project's
+   * questions lead and are counted. Held as `waitingFor` holds them; the places are never sent.
+   */
+  const placedWaiting = (ctx: CallContext): ({ id: string; question: string } & Placed)[] => {
+    const rows = kernel.openSuggestions();
+    if (!rows.ok) return [];
+    const placeOf = (ref: unknown): string | null => {
+      if (typeof ref !== 'string' || ref === '') return null;
+      const row = kernel.get(ref);
+      if (!row) return null;
+      const decl = kernel.register(row.register);
+      if (decl?.scopes !== undefined) return kernel.nameOf(row.id);
+      if (row.register === SESSION) return text(row.fields.project);
+      const f = decl?.fields.find((x) => x.scope !== undefined && !x.retired);
+      const v = f === undefined ? undefined : row.fields[f.id];
+      return typeof v === 'string' && v !== '' ? kernel.nameOf(v) : null;
+    };
+    return rows.value
+      .filter((row) => !holds(ctx, row))
+      .flatMap((row) => {
+        const id = nameOf(ctx, 'suggestion', String(row.id));
+        if (id === null) return [];
+        const raw = row.body;
+        const body = (typeof raw === 'string' ? (() => { try { return JSON.parse(raw) as unknown; } catch { return null; } })() : raw) as Record<string, unknown> | null;
+        const named = [body?.about, body?.at, body?.target, ...(Array.isArray(body?.rows) ? (body.rows as unknown[]).map((r) => (r !== null && typeof r === 'object' ? (r as { at?: unknown }).at : undefined)) : [])];
+        const projects = [...new Set(named.map(placeOf).filter((p): p is string => p !== null))];
+        return [{ id, question: kernel.question(String(row.id)) ?? '', project: placeOf(row.opened_by), projects }];
+      });
+  };
+
+  /**
    * A suggestion with its question, which is its `suggest` event rather than a column.
    *
    * WITHOUT IT A QUEUE IS A LIST OF BODIES NOBODY CAN READ: `governance` answered each open suggestion
@@ -6990,7 +7037,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const { lines, next } = walk(ctx, null, cursor ?? kernel.unreadFrom(reader), NEWS + 1, true, skip, true);
     const events = lines.slice(0, NEWS);
     return {
-      events: events.map((line) => shown(ctx, line)),
+      /* AND WHO SUGGESTED, DRAFTED AND SETTLED, read once for the page (`settling.ts`). */
+      events: withSettling(sql, events).map((line) => shown(ctx, line)),
       upTo: events[0] ? pointAt(ctx, events[0]) : null,
       sinceCapped: next !== null || lines.length > NEWS,
       byWho: byWhoOf(events, reader),
@@ -7410,6 +7458,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
+   * The title of the Home page the record declares, the one `braindog:page/home` reads, for the card's More line: the
+   * one use case home or the page called home that the caller may open, and `null` when there is none or several, since
+   * which of several is read there is the arrangement's to say.
+   */
+  const homeTitle = (ctx: CallContext): string | null => {
+    const seen = kernel.pages().filter((p) => seesPage(ctx, p));
+    const homes = seen.filter((p) => /^home-[a-z0-9][a-z0-9-]*$/u.test(p.slug));
+    const one = homes.length === 1 ? homes[0] : homes.length === 0 ? seen.find((p) => p.slug === 'home') : undefined;
+    return one?.title ?? null;
+  };
+
+  /**
    * THE CONTEXT WITH ITS CARD (`card.ts`, AGT-B07), so the start hook, `context` and `braindog context` print one text
    * made here by one set of rules, whatever build of the command sits on the machine. `build` says which command called
    * (its `x-braindog-cli` on this call, else what its key last said) and whether it is older than the oldest the door
@@ -7433,6 +7493,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         min_cli: build?.min_cli ?? null,
         decider: deciderOf(ctx),
         waiting: questionsFor(ctx),
+        home: homeTitle(ctx),
         /* A ROW A QUESTION NAMES BY ID OR BY A HANDLE THE CONTEXT DID NOT SEND, by its name, as governance says it, and
            only when the caller may read its list. */
         named: (s) => {
@@ -7457,6 +7518,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    */
   const briefing = (ctx: CallContext): Context => {
     const hints = ctx.session ?? {};
+    /* HOW MUCH IS SENT (AGT-B09): five rows a list unless the caller asked for the full answer, twenty of each. */
+    const format = (hints as { format?: unknown }).format === 'full' ? 'full' : 'brief';
     const token = ctx.principal.kind === 'token';
     const run = ctx.principal.kind === 'token' ? kernel.findRun(hints, ctx.principal.id) : null;
     const place = hints.remote || hints.repo || hints.cwd ? hints : run ? { remote: text(run.fields.remote) ?? undefined, repo: text(run.fields.repo) ?? undefined, cwd: text(run.fields.cwd) ?? undefined } : {};
@@ -7540,6 +7603,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        scope links a row to projects, as people are linked, is who is here rather than what applies. */
     const cutoff = new Date(clock.now() - FADE_MS).toISOString().slice(0, 10);
     const registers: Context['registers'] = [];
+    const me = (text(run?.fields.agent) ?? hints.agent ?? '').trim().toLowerCase().replace(/^agent:/u, '');
+    /* EVERY LEARNING READ, before any is cut, so a rule older than the newest lessons still reaches the card (`rulesOf`). */
+    const learned: Brief[] = [];
     const met: PersonBrief[] = [];
     /* EVERYBODY LINKED HERE BUT THE RECORD'S OWN PERSON, counted in full: the read below stops at `LINKED`. */
     let everyone = 0;
@@ -7592,7 +7658,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         continue;
       }
       const fades = decl.fields.some((field) => field.id === FADES && field.type === 'day' && !field.retired);
-      const got = kernel.inScope(id, home?.id ?? null, { limit: fades ? 200 : SHOWN + 1, open: true });
+      const got = kernel.inScope(id, home?.id ?? null, { limit: SCOPE_READ, open: true });
       if (!got.ok) continue;
       const fresh = (rows: Entry[]): Entry[] => {
         if (!fades) return rows;
@@ -7606,13 +7672,63 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const rows = placed(fresh(got.value.rows), 'here');
       const inherited = placed(fresh(got.value.inherited), 'everywhere');
       if (fades && rows.length + inherited.length > 0) fading = true;
+      /* A READ THAT CAME BACK FULL IS COUNTED BY THE STORE, open rows here and those that apply everywhere, so "40 keys"
+         is every key and not the two hundred read. */
+      const at = `'$.${f.id}'`;
+      const done = decl.done ?? [];
+      const openOnly = done.length ? ` AND coalesce(state, '') NOT IN (SELECT value FROM json_each(?))` : '';
+      const countWhere = (where: string, ...params: string[]): number =>
+        sql.one<{ n: number }>(`SELECT count(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL AND ${where}${openOnly}`, id, ...params, ...(done.length ? [JSON.stringify(done)] : []))?.n ?? 0;
+      const counted = {
+        ...(home && got.value.rows.length >= SCOPE_READ
+          ? { here: countWhere(f.type === 'list' ? `EXISTS (SELECT 1 FROM json_each(fields, ${at}) WHERE value = ?)` : `json_extract(fields, ${at}) = ?`, home.id) }
+          : {}),
+        ...(got.value.inherited.length >= SCOPE_READ ? { everywhere: countWhere(`json_extract(fields, ${at}) IS NULL`) } : {}),
+      };
+      /* MOST RECENTLY USED FIRST: changed, or a key opened, whichever is newest. WHAT FADES KEEPS THE ORDER `learnings`
+         READS IT IN (`learnedSorted` above, the kind first), so the five sent are the five that read leads with. */
+      const secrets = decl.fields.filter((field) => field.type === 'secret' && !field.retired).map((field) => field.id);
+      /* A ROW HANDED TO THIS AGENT IS IN USE NOW (`hand.agent`), so it leads and the card's Next finds it whatever the cut. */
+      const handField = decl.hand?.agent;
+      const handedHere = (row: Entry): boolean => {
+        const v = handField === undefined ? undefined : row.fields[handField];
+        return me !== '' && typeof v === 'string' && v.trim().toLowerCase().replace(/^agent:/u, '') === me;
+      };
+      const used = (row: Entry): (string | null)[] => [
+        handedHere(row) ? IN_USE_NOW : null,
+        row.updated_at,
+        ...secrets.map((k) => (typeof row.fields[k] === 'string' ? kernel.keyState(row.fields[k] as string).last_opened : null)),
+      ];
+      /* THE BRIEF FIVE OF WHAT FADES ARE THE FIVE THE learnings READ LEADS WITH, across here and everywhere (`learnedOrder`:
+         the kind first, then here before everywhere), so a method that applies everywhere is not cut by this project's
+         facts. The counts are still of every row. */
+      const lead = ((): { rows: Entry[]; inherited: Entry[] } => {
+        if (!fades || format === 'full') return { rows, inherited };
+        const kinds = decl.fields.find((field) => field.id === 'kind' && field.type === 'enum' && !field.retired)?.values ?? [];
+        const order = learnedOrder(kinds);
+        const placeOf = (row: Entry, where: 'here' | 'everywhere') => ({ row, at: { kind: text(row.fields.kind), where, made: row.created_at.slice(0, 10), spoken: kernel.nameOf(row.id) } });
+        const first = [...rows.map((row) => placeOf(row, 'here')), ...inherited.map((row) => placeOf(row, 'everywhere'))].sort((a, b) => order(a.at, b.at)).slice(0, BRIEF_ROWS);
+        const kept = new Set(first.map((p) => p.row.id));
+        return { rows: rows.filter((row) => kept.has(row.id)), inherited: inherited.filter((row) => kept.has(row.id)) };
+      })();
+      const capped = capRegister(lead.rows, lead.inherited, {
+        register: id,
+        format,
+        ...(fades ? {} : { used }),
+        counted: fades ? { here: Math.max(rows.length, counted.here ?? 0), everywhere: Math.max(inherited.length, counted.everywhere ?? 0) } : counted,
+      });
       registers.push({
         id,
         name: decl.name,
-        rows: rows.slice(0, SHOWN).map((row) => brief(decl, f.id, row, 'project')),
-        inherited: inherited.slice(0, SHOWN).map((row) => brief(decl, f.id, row, 'global')),
-        truncated: rows.length > SHOWN || inherited.length > SHOWN || (fades && Math.max(got.value.rows.length, got.value.inherited.length) >= 200),
+        rows: capped.rows.map((row) => brief(decl, f.id, row, 'project')),
+        inherited: capped.inherited.map((row) => brief(decl, f.id, row, 'global')),
+        truncated: capped.truncated || (fades && Math.max(got.value.rows.length, got.value.inherited.length) >= SCOPE_READ),
+        here: capped.here,
+        everywhere: capped.everywhere,
+        more: capped.more,
+        rest: capped.rest,
       });
+      if (fades) learned.push(...rows.map((row) => brief(decl, f.id, row, 'project')), ...inherited.map((row) => brief(decl, f.id, row, 'global')));
     }
 
     /* THE MANNERS EVERY CLIENT IS TOLD, whatever it was built with (AGT-C05): say what you are doing once you know it,
@@ -7626,6 +7742,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             ? 'When a learning shown here held, set its confirmed_on to today with update, and call handoff before you stop.'
             : 'Work from what is open here, say what you are doing once you know it, and call handoff with the one next step before you stop.';
 
+    /* THIS PROJECT'S QUESTIONS FIRST (AGT-B09), and how many of them there are. */
+    const asked = projectWaiting(placedWaiting(ctx), project?.spoken ?? null, ASKED);
+    const people = peopleHere(met, format === 'full' ? MET : 5, everyone);
+
     const told: Context = {
       session: run ? { spoken: `${PREFIX}${String(run.seq)}`, state: run.state } : null,
       project,
@@ -7634,15 +7754,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       live: { same_repo: others.filter((r) => r.same_repo).map(liveBrief), elsewhere: others.filter((r) => !r.same_repo).map(liveBrief) },
       also_here,
       next_lines,
-      waiting: waitingFor(ctx).slice(0, ASKED).map(({ id, question }) => ({ id, question })),
+      waiting: asked.waiting.map(({ id, question }) => ({ id, question })),
+      waiting_here: asked.here,
       registers,
-      /* IN TOUCH LATEST FIRST, and the kernel's newest-changed order among people with the same day or none. */
-      people: met
-        .map((person, i) => [person, i] as const)
-        .sort(([a, i], [b, j]) => (b.in_touch ?? '').localeCompare(a.in_touch ?? '') || i - j)
-        .map(([person]) => person)
-        .slice(0, MET),
-      ...(met.length > MET ? { people_total: everyone } : {}),
+      rules: rulesOf(learned, project?.spoken ?? null),
+      /* IN TOUCH LATEST FIRST, and the kernel's newest-changed order among people with the same day or none: five in the
+         brief answer, as many as before in the full one. */
+      people: people.people,
+      ...(people.total > people.people.length ? { people_total: people.total } : {}),
       self: selfOf(ctx),
       organisations: orgs === null ? [] : organisationsOf(orgs, orgLinked, orgNamed),
       faded,
@@ -12051,12 +12170,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       return ok({ ...out.value, credential: kernel.nameOf(row.id), label: typeof row.fields.label === 'string' ? row.fields.label : label });
     },
 
-    /** A row's history: the writes that made it, each with who and when. */
+    /**
+     * A row's history: the writes that made it, each with who and when, and on a write an accepted suggestion made, who
+     * suggested, drafted and settled it (`settling.ts`).
+     */
     async history(args: { register: string; seq: number }, ctx: CallContext) {
       const stop = guard(ctx, 'read', args.register);
       if (stop) return { ok: false, refusal: stop } as Result<never>;
       const row = kernel.get({ register: args.register, seq: args.seq });
-      return ok(row && rowAdmitted(ctx, args.register, row.seq) ? kernel.history(row.id) : []);
+      return ok(row && rowAdmitted(ctx, args.register, row.seq) ? withSettling(sql, kernel.history(row.id)) : []);
     },
 
     /**
@@ -12149,7 +12271,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       let below: Cursor | null = null;
       if (lines.length > limit) below = last ? pointAt(ctx, last) : null;
       else if (next !== null) below = holdsRowids(ctx) ? next : await cursors.seal(next);
-      return ok({ events: events.map((line) => shown(ctx, line)), cursor: below, byWho: byWhoOf(events, readerOf(ctx)) });
+      return ok({ events: withSettling(sql, events).map((line) => shown(ctx, line)), cursor: below, byWho: byWhoOf(events, readerOf(ctx)) });
     },
 
     /**

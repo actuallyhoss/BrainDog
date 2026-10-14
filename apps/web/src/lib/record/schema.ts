@@ -185,6 +185,7 @@ export type RegisterDecl = {
    */
   meets?: Readonly<Record<string, string>>;
   org?: Readonly<Record<string, string>>;
+  same?: { fields: readonly string[]; within?: string; fold: 'text' | 'exact'; keep?: 'oldest' | 'latest' | 'sealed' };
   /** The kernel's scope roles, as declared and read by the kernel alone. */
   scopes?: unknown;
 };

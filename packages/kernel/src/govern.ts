@@ -2294,8 +2294,11 @@ function applyPatches(deps: GovernDeps, raw: unknown, actor: string, batch: stri
   return ok(wrote);
 }
 
-/** The keys a `rowset` row that updates carries, and nothing beside them. */
-const UPDATE_KEYS = ['at', 'version', 'patch'];
+/**
+ * The keys a `rowset` row that updates carries, and nothing beside them. `register` is a live list the row is in when it
+ * is not the rowset's own, so one question can fold a list and move the links another list holds to it (AGT-C13).
+ */
+const UPDATE_KEYS = ['at', 'version', 'patch', 'register'];
 
 /**
  * The rows of a `rowset` that update: `{ at, version, patch }`, where a row without `at` creates.
@@ -2309,9 +2312,12 @@ function checkUpdates(deps: GovernDeps, register: string, rows: readonly Record<
   for (const [i, r] of rows.entries()) {
     if (!('at' in r)) continue;
     const where = `body.rows[${i}]`;
-    const row = typeof r.at === 'string' ? deps.row(register, r.at) : null;
+    if (r.register !== undefined && (typeof r.register !== 'string' || !deps.hasRegister(r.register)))
+      return { code: 'REGISTER_UNKNOWN', fix: `There is no list called ${String(r.register)}. Leave register off for a row of ${register}.`, at: `${where}.register` };
+    const list = typeof r.register === 'string' ? r.register : register;
+    const row = typeof r.at === 'string' ? deps.row(list, r.at) : null;
     if (!row || row.deleted)
-      return { code: 'VALUE_MALFORMED', fix: `${String(r.at)} is not a live row of ${register}.`, at: `${where}.at` };
+      return { code: 'VALUE_MALFORMED', fix: `${String(r.at)} is not a live row of ${list}.`, at: `${where}.at` };
     /* ONE UPDATE PER ROW. A second would be compared against the version the first leaves, so it
        could never apply, and the proposal would be one nobody can accept. */
     if (named.has(row.id))
@@ -2330,7 +2336,7 @@ function checkUpdates(deps: GovernDeps, register: string, rows: readonly Record<
       return { code: 'VALUE_MALFORMED', fix: 'An update carries a patch: the fields it changes, with their new values.', at: `${where}.patch` };
     const extra = Object.keys(r).find((key) => !UPDATE_KEYS.includes(key));
     if (extra !== undefined)
-      return { code: 'FIELD_UNKNOWN', fix: 'A row that updates carries at, version and patch, and nothing beside them.', at: `${where}.${extra}` };
+      return { code: 'FIELD_UNKNOWN', fix: 'A row that updates carries at, version and patch, and register when it is in another list, and nothing beside them.', at: `${where}.${extra}` };
   }
   return null;
 }
@@ -2349,16 +2355,18 @@ function applyUpdate(
   actor: string,
   batch: string,
 ): Result<{ id: string; version: number }> {
-  const row = deps.row(register, String(r.at));
-  if (!row) return no('VALUE_MALFORMED', `${String(r.at)} is no longer a row of ${register}.`, { at: 'body.rows' });
+  /* THE ROW'S OWN LIST WHEN IT NAMES ONE, checked live when it was filed (`checkUpdates`). */
+  const list = typeof r.register === 'string' ? r.register : register;
+  const row = deps.row(list, String(r.at));
+  if (!row) return no('VALUE_MALFORMED', `${String(r.at)} is no longer a row of ${list}.`, { at: 'body.rows' });
   const { deleted_at, ...fields } = r.patch as Record<string, unknown>;
   let version = Number(r.version);
   if (Object.keys(fields).length > 0) {
-    const made = deps.write(register, fields, actor, batch, { id: row.id, version });
+    const made = deps.write(list, fields, actor, batch, { id: row.id, version });
     if (!made.ok || deleted_at === undefined) return made;
     version = made.value.version;
   }
-  return deps.write(register, { deleted_at }, actor, batch, { id: row.id, version });
+  return deps.write(list, { deleted_at }, actor, batch, { id: row.id, version });
 }
 
 /**

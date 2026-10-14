@@ -132,7 +132,10 @@ export type UndoApplied = {
 };
 
 /** What the undo writes through: the record's own write path, inside its own transaction. */
-export type UndoParts = Pick<KernelParts, 'sql' | 'clock' | 'mint' | 'transaction' | 'write'>;
+export type UndoParts = Pick<KernelParts, 'sql' | 'clock' | 'mint' | 'transaction' | 'write'> & {
+  /** The write path through the door an accepted decision's writes use, for a move undoing that decision puts back. */
+  decidedWrite?: KernelParts['write'];
+};
 
 /** Narrows what a person's plan may show: a list she cannot read is left out without a word. */
 export type UndoOptions = { reads?: (register: string) => boolean };
@@ -433,6 +436,8 @@ type Work = {
   patch: Patch;
   /** The record's own fields it puts back, which no patch may name: a run's `project`. */
   stamp?: Record<string, Json>;
+  /** A move back out of a state only a decision leaves, under an undo of that decision: written as a decision's is. */
+  decided?: true;
   steps: UndoStep[];
   /** The lines whose change this puts back, for the kinds the ladder is told. */
   from: Line[];
@@ -607,6 +612,19 @@ function worked(sql: Sql, scope: UndoScope, opts: UndoOptions): Result<Worked> {
       from: placing,
     };
   };
+
+  /* WHAT THIS UNDO BRINGS BACK, worked out before any row is: a link back to one of them is not a link to a row
+     deleted since, since the restore is written first (`rank`). One Undo of a fold puts each link back on the one it
+     named (AGT-C13). The same tests as the loop's own restore below. */
+  const restoredHere = new Set<string>();
+  for (const [id, evs] of byRow) {
+    const row = rows.get(id);
+    if (!row || row.deleted_at === null || row.register === SESSION || !lists(row.register)) continue;
+    if (opts.reads && !opts.reads(row.register)) continue;
+    if (evs.some((e) => e.kind === 'create')) continue;
+    const gone = evs.filter((e) => e.kind === 'delete' || e.kind === 'restore');
+    if (gone.length > 0 && gone[0]!.kind === 'delete' && gone[gone.length - 1]!.kind === 'delete') restoredHere.add(id);
+  }
 
   for (const [id, evs] of byRow) {
     const row = rows.get(id);
@@ -797,16 +815,19 @@ function worked(sql: Sql, scope: UndoScope, opts: UndoOptions): Result<Worked> {
           skip(id, title, `${decl.name} does not let it move from ${spoken(held, f, nameOfRow)} back to ${spoken(from, f, nameOfRow)}`);
           continue;
         }
-        if (way?.by === 'decide') {
+        /* UNDOING THE DECISION THAT MADE IT IS DECIDING (AGT-D15): the person taking a decision back moves it back too,
+           through the door a decision's own writes use (`decidedWrite`). Any other undo leaves it to a decision. */
+        if (way?.by === 'decide' && !('decision' in scope)) {
           skip(id, title, `moving it from ${spoken(held, f, nameOfRow)} needs a decision`);
           continue;
         }
+        if (way?.by === 'decide') w.decided = true;
       }
       /* A LINK BACK TO A ROW DELETED SINCE would be refused by the write; the plan says so first. */
       if ((f.type === 'ref' || f.of === 'ref') && from !== null) {
         const ids = (Array.isArray(from) ? from : [from]).filter((x): x is string => typeof x === 'string');
         const there = rowsOf(sql, ids);
-        const lost = ids.find((x) => there.get(x)?.deleted_at !== null);
+        const lost = ids.find((x) => there.get(x)?.deleted_at !== null && !restoredHere.has(x));
         if (lost !== undefined) {
           skip(id, title, `${there.get(lost) ? named(titleOf(there.get(lost)!, lists(there.get(lost)!.register))) : 'what it pointed at'} has been deleted since`);
           continue;
@@ -1198,7 +1219,8 @@ export function undoApply(parts: UndoParts, scope: UndoScope, hash: string, acto
           version = versionOf(one.id);
         }
         if (Object.keys(one.patch).length > 0 || one.stamp !== undefined) {
-          const set = parts.write(one.register, one.id, one.patch, { ...w, version, ...(one.stamp === undefined ? {} : { stamp: one.stamp }) });
+          const writes = one.decided === true ? (parts.decidedWrite ?? parts.write) : parts.write;
+          const set = writes(one.register, one.id, one.patch, { ...w, version, ...(one.stamp === undefined ? {} : { stamp: one.stamp }) });
           if (!set.ok) return set as Result<never>;
           version = versionOf(one.id);
         }

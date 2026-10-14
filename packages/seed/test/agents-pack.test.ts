@@ -632,10 +632,31 @@ const FIGURES_11: Record<string, unknown> = {
  * were cut with are still read off what the add-on declares today.
  */
 const FIGURES_13 = ['learnings-arrived', 'learnings-charted'];
+
+/**
+ * AND WHAT 1.13.0 PUT IN THE LISTS (AGT-C13 e, AGT-D15 1, AGT-B09 4): `same:` on all four, the kind `rule` with its
+ * label, and the four-part test after what learnings hold. Taken out the same way, each key back where it stood.
+ */
+const HOLDS_12 = 'what an agent found out the hard way, with the failure that taught it';
+const listBefore13 = <T extends Record<string, unknown>>(list: T): T => {
+  const { same: _same, ...rest } = list as Record<string, unknown>;
+  if (_same === undefined) return list;
+  const fields = (rest.fields as Record<string, unknown>[]).map((f) => {
+    if (rest.holds !== undefined && list.title === 'lesson' && f.id === 'kind') {
+      const { labels: _labels, ...kind } = f;
+      return { ...kind, values: ['method', 'fact'] };
+    }
+    return f;
+  });
+  return { ...rest, ...(list.title === 'lesson' ? { holds: HOLDS_12 } : {}), fields } as unknown as T;
+};
+const listsBefore13 = (lists: Record<string, Record<string, unknown>>): Record<string, Record<string, unknown>> =>
+  Object.fromEntries(Object.entries(lists).map(([id, list]) => [id, listBefore13(list)]));
+
 const before13 = (declarations: Record<string, unknown>[]): Record<string, unknown>[] =>
   declarations
     .filter((d) => d.page !== 'brain' && !FIGURES_13.includes(String(d.metric)))
-    .map((d) => (d.page === 'agents' ? { ...d, blocks: (d.blocks as { key?: string }[]).filter((b) => b.key !== 'brain-link') } : d));
+    .map((d) => (d.page === 'agents' ? { ...d, blocks: (d.blocks as { key?: string }[]).filter((b) => b.key !== 'brain-link') } : listBefore13(d)));
 
 test('1.12.0 TAKES NOTHING AWAY: with Working, Today, Earlier and their two figures put back, the add-on declares what 1.11.0 did, to the letter', () => {
   type Block = { kind: string; heading?: string };
@@ -677,7 +698,7 @@ test('1.12.0 TAKES NOTHING AWAY: with Working, Today, Earlier and their two figu
   assert.equal(mark(kept), '7f805aacdb423834', 'a block 1.10.0 drew is changed');
   assert.equal(mark(rest), 'e3c40dd0030b3e3c', 'the page is named, placed or held to other lists');
   assert.equal(mark(Object.entries(AGENTS_PAGES).filter(([slug]) => slug !== 'agents' && slug !== 'brain')), 'c0ba8121ad6e909f', 'a skill’s page or a run’s is changed');
-  assert.equal(mark(AGENTS_REGISTERS), 'dd24d88e551ccf5d', 'a list or a field is changed');
+  assert.equal(mark(listsBefore13(AGENTS_REGISTERS)), 'dd24d88e551ccf5d', 'a list or a field is changed');
   /* WITHOUT 1.13.0'S TWO, which came last of the figures this add-on writes itself and before the door's. */
   const figures12 = Object.fromEntries(Object.entries(AGENTS_MODULE.AGENTS_METRICS).filter(([id]) => !FIGURES_13.includes(id)));
   assert.equal(mark({ ...figures12, ...FIGURES_11 }), 'f59d74ab2bdc01ce', 'a figure went or is changed');
@@ -724,11 +745,13 @@ test('EARLIER IS FOLDED UNDER ITS OWN HEADING, which counts the runs, and Left f
    released sets the mark again and says what moved; one after it is 1.14.0 with a mark of its own.
 
    AND 1.12.0'S OWN MARK BESIDE IT, read with what 1.13.0 put in taken out (`before13`): the page, its two figures and
-   the line that opens it. So 1.13.0 added those and moved nothing 1.12.0 declared. */
+   the line that opens it, and in the lists `same:`, the kind `rule` and the four-part test. So 1.13.0 added those and
+   moved nothing 1.12.0 declared. The mark was set again for the lists' part (it was c5d81d3045627de5 with the page
+   alone), since 1.13.0 is not released. */
 test('AGENTS 1.13.0 DECLARES WHAT IT DID WHEN IT WAS CUT, and 1.12.0 under it is as it was', () => {
   const doc = agentsPackDocument() as { version: string; declarations: Record<string, unknown>[] };
   assert.equal(doc.version, '1.13.0', 'a new version takes a mark of its own beside this one');
-  assert.equal(mark(doc.declarations), 'c5d81d3045627de5', 'the Agents add-on changed what it declares with no new version');
+  assert.equal(mark(doc.declarations), '7c0c9cb8f919f32f', 'the Agents add-on changed what it declares with no new version');
   assert.equal(mark(before13(doc.declarations)), '42ceb4a21591e2e8', 'something 1.12.0 declared is changed beside what 1.13.0 put in');
   assert.equal(doc.declarations.length - before13(doc.declarations).length, 3, '1.13.0 put in a page and two figures');
 });

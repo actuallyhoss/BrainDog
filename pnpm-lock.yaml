@@ -418,6 +418,8 @@ importers:
 
   packs/pad: {}
 
+  packs/people: {}
+
   packs/portfolio-bands: {}
 
   packs/project-brief: {}
@@ -437,6 +439,8 @@ importers:
   packs/task-tiers: {}
 
   packs/week-in-money: {}
+
+  packs/work: {}
 
   packs/worked-numbers: {}
 

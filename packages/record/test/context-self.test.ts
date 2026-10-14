@@ -78,10 +78,10 @@ async function record(others: number) {
 test("THE RECORD'S OWN PERSON IS MARKED self, AND context SAYS THE KEYS THEY ARE KNOWN BY", async () => {
   const { api, sql } = await record(2);
   const here = value<Context>(await api.context(undefined, agent()));
+  /* THE RECORD'S OWN PERSON IS NOT SOMEBODY MET HERE (`peopleHere`, AGT-B09): named by the keys below, never in people. */
   assert.deepEqual(
     here.people.map((p) => [p.name, p.self]),
     [
-      ['Mara', true],
       ['Person 2', false],
       ['Person 1', false],
     ],
@@ -103,15 +103,20 @@ test('A CALLER WHO DOES NOT READ PEOPLE IS TOLD NO KEYS', async () => {
 test('MORE PEOPLE HERE THAN ARE NAMED ARE COUNTED, without the record’s own person', async () => {
   const { api, sql } = await record(12);
   const here = value<Context>(await api.context(undefined, agent()));
-  assert.equal(here.people.length, 10);
+  /* FIVE IN THE BRIEF ANSWER, ten in the full one (AGT-B09). */
+  assert.equal(here.people.length, 5);
   assert.equal(here.people_total, 12);
+  const full = agent();
+  const all = value<Context>(await api.context(undefined, { ...full, session: { ...full.session, format: 'full' } } as CallContext));
+  assert.equal(all.people.length, 10);
+  assert.equal(all.people_total, 12);
   sql.close();
 });
 
 test('PAST THE FIFTY READ TO CHOOSE FROM, EVERYBODY HERE IS STILL COUNTED', async () => {
   const { api, sql } = await record(60);
   const here = value<Context>(await api.context(undefined, agent()));
-  assert.equal(here.people.length, 10);
+  assert.equal(here.people.length, 5);
   assert.equal(here.people_total, 60);
   sql.close();
 });

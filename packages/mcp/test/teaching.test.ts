@@ -192,7 +192,8 @@ test("a learning's refs are named by prefix as its rows are, and the prefixed id
   const base = { lesson: 'A ref comes back as a spoken id.', because: 'Measured on the seed while writing the tests.', kind: 'fact' };
   const first = valueOf<Shaped>(await mcp.call('create', { register: 'learnings', fields: base }, agent));
   assert.match(first.spoken, /^LN\d+$/);
-  const second = valueOf<Shaped>(await mcp.call('create', { register: 'learnings', fields: { ...base, supersedes: first.spoken } }, agent));
+  /* IN ITS OWN WORDS: two learnings saying the same lesson are one (`same:` on learnings), and the second is refused. */
+  const second = valueOf<Shaped>(await mcp.call('create', { register: 'learnings', fields: { ...base, lesson: 'A ref comes back as a spoken id, every time.', supersedes: first.spoken } }, agent));
   assert.equal(second.fields!.supersedes, first.spoken);
   assert.equal(second.fields!.project, 'things#1');
   const back = await mcp.call('update', { spoken: second.spoken, patch: second.fields, version: second.version }, agent);

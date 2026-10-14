@@ -491,3 +491,42 @@ test('a proposal that rewrites a text and adds refs reads the rows it adds, and 
   assert.equal(u?.takes?.said[0]?.title, 'Name the file a check read.');
   assert.equal(u?.takes?.said[0]?.why, 'A green check had read nothing.');
 });
+
+/* A FOLD THAT MOVES A LINK ANOTHER LIST HOLDS files that row with its own `register`: it is read in that list, with that
+   list's declaration, and never looked up by its number among the question's rows. */
+test('an update row that names its own list is read in that list, and the card draws it there', async () => {
+  const schemas: Record<string, unknown> = {
+    learnings: { title: 'lesson', fields: [{ id: 'lesson', type: 'text', required: true }, { id: 'state', type: 'text' }] },
+    skills: { title: 'name', fields: [{ id: 'name', type: 'text', required: true }, { id: 'because', type: 'text', label: 'Because' }] },
+  };
+  const rowsOf: Record<string, Record<number, unknown>> = {
+    learnings: { 3: { id: 'r_ln3', register: 'learnings', seq: 3, version: 2, fields: { lesson: 'Rehearse first.', state: 'kept' } } },
+    skills: { 3: { id: 'r_sk3', register: 'skills', seq: 3, version: 5, fields: { name: 'Release', because: 'learnings#3' } } },
+  };
+  const got: string[] = [];
+  const c = client({
+    schema: async (register) => (schemas[register] ? { ok: true, value: schemas[register] } : refused('REGISTER_UNKNOWN', 'No such list.')),
+    get: async (register, seq) => {
+      got.push(`${register}#${String(seq)}`);
+      const row = rowsOf[register]?.[seq];
+      return row ? { ok: true, value: row } : refused('NOT_FOUND', 'No such row.');
+    },
+  });
+  const body = {
+    register: 'learnings',
+    rows: [
+      { at: 'learnings#3', version: 2, patch: { state: 'folded' } },
+      { at: 'skills#3', version: 5, register: 'skills', patch: { because: 'learnings#1' } },
+    ],
+  };
+  const { heldBy } = await import('./governance.ts');
+  const read = await heldBy(c, [body]);
+  assert.deepEqual(got, ['learnings#3', 'skills#3']);
+  assert.deepEqual(read.rows.skills?.map((r) => r.seq), [3]);
+  assert.deepEqual(read.rows.learnings?.map((r) => r.seq), [3], 'the skill is not put among the learnings');
+  const out = updatesOf(body, read.registers, read.rows, plainOf(read.registers));
+  assert.deepEqual(out.map((u) => [u.at, u.title, u.changes.map((ch) => ch.label)]), [
+    ['learnings#3', 'Rehearse first.', ['State']],
+    ['skills#3', 'Release', ['Because']],
+  ]);
+});

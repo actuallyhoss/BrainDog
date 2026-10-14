@@ -258,7 +258,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     {
       version: '1.13.0',
       notes:
-        'Agents has a new page, How the brain changed, opened from What the brain learned. It says how many learnings arrived this month and how many have faded, draws the learnings that arrived week by week once there are three weeks to draw, and lists what changed, newest first, each with the failure that taught it. Faded lists the learnings nobody confirmed in ninety days, with how many there are. Skill versions are not on it yet.',
+        'Agents has a new page, How the brain changed, opened from What the brain learned. It says how many learnings arrived this month and how many have faded, draws the learnings that arrived week by week once there are three weeks to draw, and lists what changed, newest first, each with the failure that taught it. Faded lists the learnings nobody confirmed in ninety days, with how many there are. Skill versions are not on it yet. A learning can be a rule, and a skill, tool or key added twice is one.',
     },
     {
       version: '1.12.0',

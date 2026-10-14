@@ -1126,6 +1126,8 @@ export function holdingParts(kind: DeclKind, body: Part): { at: string; part: Pa
     each('fields', body, '');
     for (const key of ['pairs', ...HOLDS_ROLES]) if (isPart(body[key])) out.push({ at: key, part: body[key] as Part });
   }
+  /* A PAGE'S READER FILTER MAY WAIT, as Work's filter by project waits for Projects (work-pack-file-90). */
+  if (kind === 'page') each('filters', body, '');
   if (kind === 'page' && Array.isArray(body.blocks))
     body.blocks.forEach((block, i) => {
       if (!isPart(block)) return;
@@ -4282,6 +4284,9 @@ function createFault(
  *             The app's "Hand to" reads it, and nothing in the kernel names the list that declares it.
  *   `once`    the fields an add-on plants and never patches: its own later write (`WriteContext.pack`) leaves them as
  *             a row holds them, and a person's edit is not narrowed (the write path in `index.ts`, SHL-A09).
+ *   `same`    `{ fields, within?, fold, keep? }`: what makes two of its rows the same thing, its text `fields` folded by
+ *             `fold` (`text` or `exact`) within one value of `within`, its scope or a link; `keep` is which of two is
+ *             kept, `oldest` unless it says `latest` or `sealed` (`sameFault` below, `entities.ts`'s `rowKeys`, AGT-C13).
  *
  * `rates` AND `meets` ARE NOT IN `42 §4.4` YET, and `declare.test.ts` lists what the code admits that the document does
  * not publish. They landed in a change that did not include the document or that test.
@@ -4300,6 +4305,7 @@ const REGISTER_KEYS = [
   'owner_only',
   'hand',
   'once',
+  'same',
 ] as const;
 
 /**
@@ -4330,6 +4336,65 @@ const REPEAT_READ = ['freq', 'interval', 'count', 'until', 'workday'] as const;
  * (`LINKS` in `packages/seed/src/packs/first-party.ts`), and a list that hands only to agents is still handed.
  */
 const HAND_PARTS = ['person', 'agent', 'taken'] as const;
+
+/** The parts of a list's `same:`, the two ways it compares a text (`identity-keys.ts`'s `sameFold`), and which row stays. */
+const SAME_PARTS = ['fields', 'within', 'fold', 'keep'] as const;
+const SAME_FOLDS = ['text', 'exact'] as const;
+const SAME_KEEPS = ['oldest', 'latest', 'sealed'] as const;
+/** The list keys that already say when two rows are one: people and organisations by their keys, projects by places. */
+const KEEPS_OWN_KEYS = ['meets', 'org', 'scopes'] as const;
+
+/**
+ * Why a list's `same:` would key its rows by what they cannot hold, or `null` when it can be read (AGT-C13).
+ *
+ * EVERY PART IS CHECKED HERE, AT INSTALL, because a key built from a field a row does not have is no key at all: every
+ * row would answer to nothing, and the duplicates it was declared against would stay. `within` is where two rows must
+ * both be to be one, so it is the list's scope or a link, never a text. `sealed` keeps the row holding a sealed value,
+ * so a list with nothing to seal a value in cannot ask for it.
+ */
+function sameFault(id: string, body: Readonly<Record<string, unknown>>, fields: readonly (FieldLike & { scope?: unknown })[], same: unknown): Refusal | null {
+  const shape = 'as { fields: [name], within: project, fold: text }: the text fields two rows share, where, and how they are compared';
+  if (!isPart(same) || Object.keys(same).some((k) => !(SAME_PARTS as readonly string[]).includes(k)))
+    return bad('DECLARATION_INVALID', `${id} says what makes two of its rows the same. Say it ${shape}.`, 'same', SAME_PARTS);
+  const role = KEEPS_OWN_KEYS.find((k) => body[k] !== undefined);
+  if (role !== undefined)
+    return bad('DECLARATION_INVALID', `${id} declares ${role}:, which already says when two of its rows are one, so same: would be read by nothing. Take it out.`, 'same');
+  const live = fields.filter((f) => f.retired !== true);
+  const texts = live.filter((f) => f.type === 'text').map((f) => f.id);
+  const named = same.fields;
+  if (!Array.isArray(named) || named.length === 0 || named.some((n) => typeof n !== 'string'))
+    return bad('DECLARATION_INVALID', `${id}'s same names the fields two rows share as a list of its text fields, such as [name].`, 'same.fields', texts);
+  for (const [i, name] of (named as string[]).entries()) {
+    const field = fields.find((f) => f.id === name);
+    if (field === undefined) return bad('FIELD_UNKNOWN', `${id}'s same names ${name}, and ${id} has no such field.`, `same.fields[${i}]`, texts);
+    if (field.retired === true)
+      return bad('DECLARATION_INVALID', `${id}'s same names ${name}, which is retired, so no row writes it. Name a live text field.`, `same.fields[${i}]`, texts);
+    if (field.type !== 'text')
+      return bad('DECLARATION_INVALID', `${id}'s same names ${name}, which is a ${field.type}, and two rows are the same by their text fields.`, `same.fields[${i}]`, texts);
+    if ((named as string[]).indexOf(name) !== i)
+      return bad('DECLARATION_INVALID', `${id}'s same names ${name} twice. Name each field once.`, `same.fields[${i}]`, texts);
+  }
+  const wheres = live.filter((f) => f.scope !== undefined || f.type === 'ref').map((f) => f.id);
+  if (same.within !== undefined && (typeof same.within !== 'string' || !wheres.includes(same.within)))
+    return bad(
+      'DECLARATION_INVALID',
+      `${id}'s same is within ${JSON.stringify(same.within)}, and that is ${id}'s scope or one of its links, such as project, or left out.`,
+      'same.within',
+      wheres,
+    );
+  if (!(SAME_FOLDS as readonly unknown[]).includes(same.fold))
+    return bad('ENUM_VALUE_UNKNOWN', `${id}'s same compares by text or exact, and ${JSON.stringify(same.fold ?? null)} is neither.`, 'same.fold', SAME_FOLDS);
+  if (same.keep !== undefined && !(SAME_KEEPS as readonly unknown[]).includes(same.keep))
+    return bad(
+      'ENUM_VALUE_UNKNOWN',
+      `${id}'s same keeps the oldest, the latest or the sealed one of two rows, and ${JSON.stringify(same.keep)} is none of them.`,
+      'same.keep',
+      SAME_KEEPS,
+    );
+  if (same.keep === 'sealed' && !live.some((f) => sealedAs(f) !== null))
+    return bad('DECLARATION_INVALID', `${id}'s same keeps the sealed one of two rows, and ${id} has no secret or file field to seal a value in.`, 'same.keep', ['oldest', 'latest']);
+  return null;
+}
 
 /** Why a list's `once:` names what an add-on cannot plant, or `null` when it is a list of this list's own written fields. */
 function onceFault(id: string, fields: readonly (FieldLike & { derived?: boolean })[], once: unknown): Refusal | null {
@@ -5677,6 +5742,13 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
      field is refused on every write, so neither is a field an add-on could plant once. */
   if (decl.body.once !== undefined) {
     const fault = onceFault(id, fields as unknown as (FieldLike & { derived?: boolean })[], decl.body.once);
+    if (fault) return fault;
+  }
+
+  /* `same:` NAMES LIVE TEXT FIELDS OF THIS LIST, AND A SCOPE OR A LINK TO BE WITHIN, or the key `entities.ts` builds
+     from it is built from nothing and every duplicate it was declared against answers to no key. */
+  if (decl.body.same !== undefined) {
+    const fault = sameFault(id, decl.body as Record<string, unknown>, fields as unknown as (FieldLike & { scope?: unknown })[], decl.body.same);
     if (fault) return fault;
   }
 

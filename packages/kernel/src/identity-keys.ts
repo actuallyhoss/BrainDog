@@ -600,6 +600,37 @@ export const nameWords = (name: string): string =>
     .replace(/\s+/g, ' ')
     .trim();
 
+/** How a list's `same:` says two texts are one: `exact` as written, `text` as a person would read them. */
+export type SameFold = 'text' | 'exact';
+
+/** A last word in brackets, `(copy)` or `[old]`, with the space before it. */
+const LAST_BRACKETED = /\s*(?:\([^()[\]]*\)|\[[^()[\]]*\])$/u;
+/** A file's ending, `.md` or `.json`: a dot and up to five letters or digits, one a letter, at the very end. */
+const FILE_ENDING = /(?<=\S)\.(?=[\p{L}\p{N}]{0,4}\p{L})[\p{L}\p{N}]{1,5}$/u;
+
+/**
+ * A text as a list's `same:` compares it (`entities.ts`'s `rowKeys`). `exact` trims and nothing more, so `Ponytail` and
+ * `ponytail` stay two. `text` lower-cases, takes the accents off, makes every run of space one, and drops a last word
+ * in brackets and a file ending, so `ponytail (copy)`, `ponytail.md` and `Ponytail` are one. A text that would be left
+ * empty by the drop keeps what it dropped: `(draft)` alone is a name.
+ *
+ * NARROW ON PURPOSE, as the identity keys are: punctuation inside the text and every word but a bracketed last one
+ * stay, so two lessons that differ by one word are two.
+ */
+export function sameFold(text: string, fold: SameFold): string {
+  const said = text.trim();
+  if (fold === 'exact') return said;
+  const drop = (s: string, end: RegExp): string => {
+    const cut = s.replace(end, '').trimEnd();
+    return cut === '' ? s : cut;
+  };
+  /* ONE ENDING AND ONE BRACKET, in either order: `ponytail (copy).md` and `ponytail.md (copy)`, never `a.b.c` to `a`. */
+  const ended = drop(said, FILE_ENDING);
+  const bare = drop(ended, LAST_BRACKETED);
+  const cut = bare !== ended && ended === said ? drop(bare, FILE_ENDING) : bare;
+  return cut.normalize('NFKD').replace(/\p{M}/gu, '').normalize('NFC').toLowerCase().replace(/\s+/gu, ' ').trim();
+}
+
 /** A name as its weak key, or `null` when nothing in it is a letter or a digit. */
 function nameKeyOf(raw: string): string | null {
   const words = nameWords(raw);

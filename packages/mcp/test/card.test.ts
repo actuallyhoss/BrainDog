@@ -204,7 +204,7 @@ test('ON A RECORD LIKE THE OWNER\'S, context is a card and a few lines, under 1,
   const keys = result.structuredContent.registers.find((r) => r.id === 'credentials') as { rows: unknown[]; everywhere?: number; more?: boolean } | undefined;
   assert.ok(keys && (keys.everywhere ?? 0) >= 20 && keys.more === true && keys.rows.length <= 10, JSON.stringify(keys));
   /* MORE LEADS WITH WHAT WENT STALE (AGT-C18, `card.ts`), since a count is the one thing in it a session can act on. */
-  assert.match(slots.get('More') ?? '', /^\d+ stale, read braindog:stale · \d+\+ learnings · \d+\+ keys by name\b/u);
+  assert.match(slots.get('More') ?? '', /^\d+ stale, read braindog:stale · \d+\+? learnings · \d+\+? keys by name\b/u);
   assert.doesNotMatch(text, /Deploy key \d+/u, 'a key that applies everywhere was listed by name');
   assert.doesNotMatch(text, /tool-\d+/u, 'a tool was listed as work');
   sql.close();

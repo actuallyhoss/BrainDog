@@ -884,9 +884,12 @@ export const twiceOf = (params: URLSearchParams): boolean => params.get(TWICE) =
  * answered who they are and this never asked. One declaration cannot say whether ANOTHER list has taken the role since,
  * and it need not: the record answers nobody for a list that is not where it keeps people (`heldTwice`), so the worst
  * this can do is say nobody is held twice, never show everyone as if they were.
+ *
+ * AND ANY LIST THAT SAYS WHAT MAKES TWO OF ITS ROWS THE SAME (`same:`), skills, tools, keys or learnings, whose rows the
+ * record names in the same answer. Its words are its own (`twice-fold.ts` beside the list route), never these people's.
  */
 export const heldTwiceOn = (params: URLSearchParams, decl: RegisterDecl | undefined): boolean =>
-  twiceOf(params) && decl !== undefined && ((decl as { meets?: unknown }).meets !== undefined || decl.id === PEOPLE);
+  twiceOf(params) && decl !== undefined && ((decl as { meets?: unknown }).meets !== undefined || decl.id === PEOPLE || decl.same != null);
 
 /**
  * The numbers the record answered, as a filter the list is asked with. It rides beside the chips and is never one: no

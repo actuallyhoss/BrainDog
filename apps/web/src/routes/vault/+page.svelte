@@ -63,6 +63,8 @@
   import PassField from './PassField.svelte';
   import Passphrase from './Passphrase.svelte';
   import { cameFromOf, hintOf, opensOf, rowAction, rowPath, sentenceOf, stateOf, words as tileWords } from './tiles.ts';
+  /* TYPES ONLY: the note's code and its component are a dynamic import (`scopeNote`), never in this screen's own chunk. */
+  import type { Call, ScopeProposal } from './scope-note.ts';
 
   /**
    * Whether the record has answered yet. THERE IS NO THIRD STATE: this screen drew the sample's grants and keys,
@@ -188,6 +190,7 @@
       forConnectors = connectorGrants(grants.ok ? grants.value : []);
       void whoOpened();
       from = 'live';
+      void scopeNote();
       /* THE PASSPHRASE IS ASKED ABOUT ONLY FOR A PERSON WHO MAY ACT HERE: its two methods are the vault gate's, as the
          machines read is, so anyone that read refused would be refused this too, and it would say nothing new. */
       if (mayAct(devices)) void probe();
@@ -200,6 +203,27 @@
 
   /* WHAT A KEY'S "…" MENU IS CALLED TO A SCREEN READER, by the key's name, as a flow card's menu is (`flow.ts`). */
   const moreFor = (label: string) => `More for: ${label}`;
+
+  /* ── keys that look like they belong to a project ── */
+
+  /**
+   * THE ONE LINE IN THE KEYS TILE, AND ITS BUTTON (`scope-note.ts`, `ScopeNote.svelte`), both loaded by a dynamic import
+   * only once the screen has drawn its reads, so the Vault's first paint and what every screen loads do not grow by
+   * them. Asked only where the index was read and holds keys; nothing comes back on a refusal or at nought.
+   */
+  let scope = $state.raw<{ Note: typeof import('./ScopeNote.svelte').default; found: ScopeProposal; call: Call } | null>(null);
+  async function scopeNote() {
+    const c = client;
+    if (!c || index.kind !== 'held' || keys.length === 0) return;
+    try {
+      const [note, view] = await Promise.all([import('./scope-note.ts'), import('./ScopeNote.svelte')]);
+      const call: Call = (name, args) => c.call(name, args);
+      const found = await note.readScopeNote(call);
+      if (found) scope = { Note: view.default, found, call };
+    } catch {
+      /* A chunk that would not load is a note not drawn, never a screen refused. */
+    }
+  }
 
   /* ── the passphrase ── */
 
@@ -692,6 +716,9 @@
     {#if uncounted}<p class="said">{uncounted}</p>{/if}
     <!-- KEYS THE RECORD HOLDS PAST THE ONES READ ARE SAID, so a list that stopped short never reads as all of them. -->
     {#if moreKeys}<p class="said">{tileWords.moreKeys(keys.length)}</p>{/if}
+    <!-- KEYS THAT LOOK LIKE THEY BELONG TO A PROJECT: one line and one button that puts the move on Decide. Loaded after
+         the screen drew; nothing here at nought or on a refusal. -->
+    {#if scope}<scope.Note found={scope.found} call={scope.call} />{/if}
     <ul class="ledger ledger-lead whos keys">
       {#each keys as k (k.id)}
         <!--

@@ -159,11 +159,13 @@ export function updatesOf(
   show: (register: string, field: string, value: unknown) => string | null,
 ): Updated[] {
   if (!body) return [];
-  const decl = registers[body.register];
-  const held = rows[body.register] ?? [];
   const out: Updated[] = [];
   for (const r of body.rows) {
     if (typeof r.at !== 'string' || typeof r.patch !== 'object' || r.patch === null) continue;
+    /* A ROW MAY NAME ITS OWN LIST, when a fold moves a link another list holds, and is read in that list. */
+    const list = typeof r.register === 'string' && r.register !== '' ? r.register : body.register;
+    const decl = registers[list];
+    const held = rows[list] ?? [];
     const at = r.at;
     const seq = Number(/(\d+)$/u.exec(at)?.[1]);
     const row = held.find((e) => e.id === at) ?? (ROW_ID.test(at) ? undefined : held.find((e) => e.seq === seq));
@@ -189,7 +191,7 @@ export function updatesOf(
           ? { field, label, long: false, before: null, after: null, scope: { to: f.to, before: placeSaid(before), after: placeSaid(after) } }
           : isLong(f?.type ?? 'text', before, after)
             ? { field, label, long: true, block: diffBlock(text(before), text(after)) }
-            : { field, label, long: false, before: dated(show(body.register, field, before)), after: dated(show(body.register, field, after)) },
+            : { field, label, long: false, before: dated(show(list, field, before)), after: dated(show(list, field, after)) },
       );
     }
     if (changes.length === 0) continue;

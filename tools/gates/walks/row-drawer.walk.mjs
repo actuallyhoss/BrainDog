@@ -24,6 +24,10 @@
  * (`test/row-drawer-walk.test.mjs`): each promise taken away is red in the words of what was missing. The drive below
  * them only presses and reads, and hands what it read to `judge`.
  *
+ * AND A PLANTED FAULT (`BRAINDOG_GATE_SEED=row-drawer`, `seeded` and `planted` below). `self-test` runs the walk again
+ * with the panel read after `j` as still on the third task, and the walk must go red on it, so a walk that passes while
+ * looking at nothing is a red line in `self-test` and not a green one here.
+ *
  * NO BUILD, NO RUN. It says it walked nothing and returns 3, which `run.mjs` counts as a skip and never as a pass.
  * ITS OWN EPHEMERAL PORT (`server.listen(0)`), for the reason `queue.mjs` gives: a fixed port is one a second run finds
  * taken. Every handle it opens is given back in one `finally`, however it leaves.
@@ -176,6 +180,36 @@ export function judge(seen) {
 
   return out;
 }
+
+/**
+ * THE WALK'S OWN PROOF THAT IT LOOKS AT ANYTHING (`self-test`, as `queue`, `keys` and `prefs` have theirs). True when
+ * `BRAINDOG_GATE_SEED` names `row-drawer`, alone or among others joined by commas, as `seedsOf` reads it in `a11y.mjs`.
+ * Another gate's seed is not this walk's and plants nothing here.
+ *
+ * READ FROM THE VARIABLE AND NOTHING ELSE: no argument, no file, so a run nobody seeded cannot be a seeded one.
+ */
+export function seeded(value = process.env.BRAINDOG_GATE_SEED) {
+  return (value ?? '').split(',').some((s) => s.trim() === 'row-drawer');
+}
+
+/** The planted fault, in the words the seeded run says it planted. */
+export const PLANT = 'the panel read after j as still on the third task';
+
+/**
+ * WHAT A SEEDED WALK HANDS `judge`: what it read, with the reading after `j` put back on the third task, as a panel
+ * that never moved would read. PLANTED IN WHAT THE WALK READ AND NEVER IN THE APP: the page is pressed exactly as a real
+ * run presses it, and only this copy differs, so a judge that stopped looking at `j` would pass it and `self-test` would
+ * say so. Everything else in `seen` is handed on unchanged.
+ */
+export function planted(seen) {
+  return { ...seen, walked: { row: String(OPENED), task: seen.third } };
+}
+
+/** What the drive hands `judge`: the planted reading in a seeded run, and in any other run what it read, itself. */
+export const handed = (seen, on = seeded()) => (on ? planted(seen) : seen);
+
+/** Whether the walk read `j` working, so the planted reading replaced a true one and the seeded red is the seed's. */
+export const walkedTrue = (seen) => seen.walked?.task === seen.fourth && seen.walked?.row === String(WALKED);
 
 /* ── the drive ────────────────────────────────────────────────────────────── */
 
@@ -414,6 +448,8 @@ export default async function rowDrawer(root = join(import.meta.dirname, '..', '
 
   /** Every way this run fell short, in the order it happened. Collected, never thrown on the first. */
   const findings = [];
+  /** Read once, at the start, so every width of one run is seeded or none is. */
+  const SEEDED = seeded();
 
   let record = null;
   let server = null;
@@ -453,7 +489,10 @@ export default async function rowDrawer(root = join(import.meta.dirname, '..', '
       } finally {
         await opened?.context.close().catch(() => {});
       }
-      findings.push(...judge(seen));
+      /* A SEEDED RUN JUDGES THE PLANTED READING, and says whether it was planted over a walk that saw `j` work: without
+         that line a run whose `j` was broken anyway would be red in the seed's words for a reason that is not the seed. */
+      if (SEEDED && walkedTrue(seen)) console.log(`  row-drawer: seeded at ${width}: ${PLANT}, planted over a reading that had it on the fourth.`);
+      findings.push(...judge(handed(seen, SEEDED)));
     }
 
     const blind = ready.nothingDrawn();
