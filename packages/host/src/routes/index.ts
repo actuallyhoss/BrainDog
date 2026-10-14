@@ -43,6 +43,7 @@ import { ROUTES as matched } from './matched.ts';
 import { ROUTES as stale } from './stale.ts';
 import { ROUTES as learnings } from './learnings.ts';
 import { ROUTES as textFaults } from './text-faults.ts';
+import { ROUTES as learned } from './learned.ts';
 /* END ROUTES */
 
 export const EXTRA_ROUTES: readonly Route[] = [
@@ -77,5 +78,6 @@ export const EXTRA_ROUTES: readonly Route[] = [
   ...stale,
   ...learnings,
   ...textFaults,
+  ...learned,
   /* END ROUTES */
 ];

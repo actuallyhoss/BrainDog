@@ -59,6 +59,7 @@ import { methods as matched } from './matched.ts';
 import { methods as stale } from './stale.ts';
 import { methods as learnings } from './learnings.ts';
 import { methods as textFaults } from './text-faults.ts';
+import { methods as learned } from './learned.ts';
 /* END METHODS */
 
 /**
@@ -177,6 +178,7 @@ export function methods(deps: RecordDeps) {
     ...stale(deps),
     ...learnings(deps),
     ...textFaults(deps),
+    ...learned(deps),
     /* END METHODS */
   };
 }

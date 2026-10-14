@@ -19,11 +19,14 @@
  * PURE, AND NODE LOADS IT: no import at all.
  */
 
-/** The panels the host draws: a project's scheduled actions, the key a row's numbers are sent with, and a run's changes. */
-export type Panel = 'actions' | 'reporting' | 'run';
+/**
+ * The panels the host draws: a project's scheduled actions, the key a row's numbers are sent with, a run's changes,
+ * and where the record saw the row the page is about (`Seen.svelte`, the `about` read's places).
+ */
+export type Panel = 'actions' | 'reporting' | 'run' | 'seen';
 
 /* A `Set`, so a `panel:` of `constructor` names nothing. */
-const PANELS: ReadonlySet<string> = new Set<Panel>(['actions', 'reporting', 'run']);
+const PANELS: ReadonlySet<string> = new Set<Panel>(['actions', 'reporting', 'run', 'seen']);
 
 /** The panel `block` asks for, or `null`. Only a section carries one. */
 export function panelOf(block: { kind: string; heading?: string | undefined }): Panel | null {

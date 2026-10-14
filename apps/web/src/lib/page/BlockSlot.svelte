@@ -545,7 +545,11 @@
      `panel: reporting`. The actions panel drew the key as well, so a founder's project page, which names both, drew
      the key twice. Not while arranging, since a list that fetches is not a block to move, and not on an inert page,
      since the key's panel makes one. -->
-{#if panel && param && writes && !arranging}
+<!-- WHERE IT WAS SEEN (`panel: seen`) ONLY READS, so it is drawn for any page drawn for a row, one that does not write
+     as well, and never while arranging. IT IS LOADED BY `import()`, so neither it nor its styles reach the entry chunk. -->
+{#if panel === 'seen' && param && !arranging}
+  {#await import('./panels/Seen.svelte') then { default: Seen }}<Seen register={param.register} seq={param.seq} {now} />{/await}
+{:else if panel && panel !== 'seen' && param && writes && !arranging}
   <!-- BY THE ROW, `things#1`, and not by its title: the record resolves each action's project to its row. -->
   {#if panel === 'actions'}<Actions project={{ spoken: `${param.register}#${param.seq}`, title: param.title }} />
   {:else if panel === 'run'}

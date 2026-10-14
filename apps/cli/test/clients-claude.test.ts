@@ -78,8 +78,8 @@ function filesUnder(dir: string): { file: string; text: string }[] {
 
 /* ── the table ─────────────────────────────────────────────────────────── */
 
-test('THE TABLE holds Claude Code first, by its id, as the client tools write takes when none is named, then Codex and Cursor', () => {
-  assert.deepEqual(CLIENTS.map((c) => [c.id, c.title]), [['claude', 'Claude Code'], ['codex', 'Codex'], ['cursor', 'Cursor']]);
+test('THE TABLE holds Claude Code first, by its id, as the client tools write takes when none is named, then Codex, Cursor, Claude Desktop and VS Code', () => {
+  assert.deepEqual(CLIENTS.map((c) => [c.id, c.title]), [['claude', 'Claude Code'], ['codex', 'Codex'], ['cursor', 'Cursor'], ['claude-desktop', 'Claude Desktop'], ['vscode', 'VS Code']]);
   assert.equal(DEFAULT_CLIENT, 'claude');
   assert.equal(clientOf('claude'), CLIENTS[0]);
   assert.equal(clientOf('nobody'), undefined);

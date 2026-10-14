@@ -80,6 +80,7 @@ export function signedOutSurface(fix: string): McpSurface<Ctx> {
     inbox: no,
     inboxPatterns: no,
     figures: no,
+    offered: no,
     triage: no,
     tryAutomation: no,
     previewChange: no,

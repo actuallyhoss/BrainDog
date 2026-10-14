@@ -155,6 +155,12 @@ function byHand(k: Kernel, decl: SeedMetric): { value: number | null; unit: stri
     const today = new Date(NOW).toISOString().slice(0, 10);
     return { value: newest === undefined ? null : Math.max(0, Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${newest}T00:00:00Z`)) / 86_400_000)), unit: null };
   }
+  /* HOW MANY DIFFERENT VALUES A FIELD HOLDS, an empty one not among them (money-core 3.17.0's `rules-filing`): what
+     `count(DISTINCT ...)` answers, nought over no rows. */
+  if ('distinct' in v) {
+    const field = v.distinct as string;
+    return { value: new Set(rows.flatMap((e) => (e.fields[field] === undefined || e.fields[field] === null ? [] : [JSON.stringify(e.fields[field])]))).size, unit: null };
+  }
   if ('count' in v) {
     const field = v.count as string;
     return { value: field === 'id' ? rows.length : rows.filter((e) => e.fields[field] !== undefined).length, unit: null };

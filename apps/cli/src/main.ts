@@ -32,7 +32,7 @@ import { automations, scripts } from './automations.ts';
 import { behindLine } from './behind.ts';
 import { serveBridge } from './bridge.ts';
 import { exportFile, importFile } from './brainfile.ts';
-import { HOOK_MS, heldHere, hookEnd, hookStart, parentOf, unreachable } from './hooks.ts';
+import { HOOK_MS, heldHere, hookBudget, hookEnd, hookStart, parentOf, unreachable } from './hooks.ts';
 import { hookBeat } from './beat.ts';
 import { budgetOf, clientFor, hostsPath, target, type Target } from './http.ts';
 import { byHand, handRun, installProfiles, profilesOf, readReplace, replaceByHand, shellOf, type Replace } from './install.ts';
@@ -51,6 +51,7 @@ import { context } from './context.ts';
 import { doctor } from './doctor.ts';
 import { session } from './session.ts';
 import { skills } from './skills.ts';
+import { afterHello, startFromServer } from './session-start.ts';
 import { signedOutFix, signedOutSurface } from './signed-out.ts';
 import { serveStdio } from './stdio.ts';
 import { surfaceOver } from './surface.ts';
@@ -365,9 +366,16 @@ async function mcp(args: string[]): Promise<void> {
      headers, read per request, so a deploy reaches an open session. `--local` keeps the server this command composes
      for seven nights after the bridge ships, and then goes. A sign-in that ends mid-session is the bridge's to say. */
   if (values.local !== true) {
-    await serveBridge({ input: process.stdin, output: process.stdout, say: (l) => process.stderr.write(`${l}\n`) }, to, async (client) =>
-      sessionHeaders(await where, agent, heldHere(process.env, cwd, to.key, Date.now(), server), { env: process.env, client, parent: parentOf(process.env, to.key) }),
-    );
+    const say = (l: string) => void process.stderr.write(`${l}\n`);
+    let said: ClientInfo = {};
+    const hints = async (client: ClientInfo) => {
+      said = client;
+      return sessionHeaders(await where, agent, heldHere(process.env, cwd, to.key, Date.now(), server), { env: process.env, client, parent: parentOf(process.env, to.key) });
+    };
+    /* THE START WORK, ONCE THE FIRST `initialize` IS ANSWERED (`session-start.ts`): for an app with no start hook, once a
+       day for this machine, folder and app, in the background and inside the hook's budget, its lines on stderr. */
+    const output = afterHello(process.stdout, () => void startFromServer({ io: { env: process.env }, to, where, agent, headers: () => hints(said), ms: hookBudget(process.env), say }));
+    await serveBridge({ input: process.stdin, output, say }, to, hints);
     process.exitCode = 0;
     setTimeout(() => process.exit(0), 1_000).unref();
     return;

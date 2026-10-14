@@ -418,6 +418,36 @@ type ControlledStep = { of?: string; from?: string };
 type ForecastSell = { label: string; value: number };
 
 /**
+ * The `spent` and `known` rows of a walk whose everyday spending was measured, or none.
+ *
+ * `spent | 3 | 2026-07..2026-09 | £2,400.00`: what went out in an average month of the months counted, in the walk's own
+ * money, which the spend control reaches by. The third cell names the first and last month counted, which the renderer's
+ * line for everyday spending says; a renderer that does not read it ignores it. Written only when a month was counted,
+ * something went out, and the measure gave no reason it moved nothing.
+ *
+ * `known | 2026-10-31 |  |`: the last day a step the record holds falls on. AN EVERYDAY STEP IS MEASURED, NOT KNOWN, so the
+ * line is solid to the last dated movement and dashed after it. Written only when the walk holds everyday steps: without
+ * them every step is known, and the renderer's own reading of the last step is already right. With none dated it is today.
+ *
+ * ONLY THE MEASURE IN THE WALK'S OWN CURRENCY, and never on one walk of a group: each walk of a group is a currency the
+ * record could not add up, and an average in one money is not a reach for a slider in another.
+ */
+function measuredRows(block: BlockResult, today: string, said: (minor: number) => string): string[] {
+  const walk = block.walk;
+  if (!walk || !walk.currency || block.walkGroup) return [];
+  const e = walk.everyday?.find((m) => m.currency === walk.currency);
+  if (!e) return [];
+  const rows: string[] = [];
+  if (!e.why && e.months.length > 0 && e.spent > 0) rows.push(`spent | ${e.months.length} | ${e.months[0]}..${e.months[e.months.length - 1]} | ${said(e.spent)}`);
+  const measured = (s: { kind?: string }): boolean => s.kind === 'everyday';
+  if (walk.steps.some(measured)) {
+    const known = walk.steps.reduce((most, s) => (!measured(s) && s.day > most ? s.day : most), today);
+    rows.push(`known | ${known} |  | `);
+  }
+  return rows;
+}
+
+/**
  * A forecast as the dialect writes it: the opening, the balance remembered before today, every movement
  * of the walk, the horizon, the knobs a reader may move, how late money comes in, and how near a crossing is said.
  *
@@ -447,6 +477,8 @@ function forecastRows(block: BlockResult): string[] {
     /* WHAT THE SELL CONTROL MAY COUNT AS SOLD, in the walk's own money. The renderer leaves out a figure in any other,
        so a holding the host could not convert is not offered rather than added as the wrong amount. */
     ...((block as BlockResult & { sells?: readonly ForecastSell[] }).sells ?? []).map((s) => `sell |  | ${escapeCell(s.label)} | ${said(s.value)}`),
+    /* WHAT AN ORDINARY MONTH COSTS AND THE LAST DAY THE RECORD KNOWS, when its everyday spending was measured. */
+    ...measuredRows(block, today, said),
     `horizon | ${typeof walk.horizon === 'number' ? walk.horizon : typeof block.horizon === 'number' ? block.horizon : 180} |  | `,
     /* HOW FAR THE RECORD WALKED PAST THE LENGTH IT OPENS ON, so the length control offers up to it and not only up to
        the opening length (`packages/render/src/forecast.ts` `horizonChoices`). */

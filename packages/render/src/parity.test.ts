@@ -23,7 +23,7 @@ import type { Component } from 'svelte';
 import { parse, type Block as BlockSegment } from './parse.ts';
 import { toHTML } from './html.ts';
 import { UNNAMED } from './inline.ts';
-import { forecastFigure, forecastModel, forecastPerMonth, inCurrency, largest } from './forecast.ts';
+import { forecastFigure, forecastModel, forecastPerMonth, inCurrency, largest, spendRange } from './forecast.ts';
 import { writeAmount } from './money.ts';
 import { BRIDGE_MIXED } from './bridge.ts';
 
@@ -93,6 +93,10 @@ const page = (src: string): BlockSegment => {
   assert.equal(seg?.type, 'block', `the fixture did not parse as a block: ${src}`);
   return seg as BlockSegment;
 };
+
+/** A walk the record measured everyday spending for: the `spent` row with its months, and four weeks of shares. */
+const EVERYDAY =
+  '```forecast\nopening | 2026-10-14 | Cash now | EGP 200,000.00\nhome | EGP |  | \nspent | 3 | 2026-07..2026-09 | EGP 41,200.00\nstep | 2026-10-21 | Everyday spending | EGP −9,507.69\nstep | 2026-10-28 | Everyday spending | EGP −9,507.69\nstep | 2026-11-01 | Rent | EGP −20,000.00\nstep | 2026-11-04 | Everyday spending | EGP −9,507.69\nstep | 2026-11-11 | Everyday spending | EGP −9,507.69\nhorizon | 30 |  | \nknobs | spend |  | \n```';
 
 const SHAPES: Record<string, string> = {
   'agents working now':
@@ -221,6 +225,9 @@ const SHAPES: Record<string, string> = {
   'a forecast whose page headline says when it runs out':
     '```forecast\nopening | 2026-09-03 | Cash now | £1,000.00\nstep | 2026-10-30 | Rent | −£2,000.00\nhorizon | 90 |  | \nheadline | under |  | \n```',
   'a forecast that stays above zero, with no past': '```forecast\nopening | 2026-09-17 | Cash now | USD 1,000.00\nstep | 2026-09-18 | Rent | USD −100.00\nhorizon | 30 |  | \n```',
+  /* EVERYDAY SPENDING AS THE RECORD WALKS IT, a week's share every seventh day beside what it measured: one line of
+     Every movement in both renderers, never a row a week. */
+  'a forecast that spends every day, measured over three months': EVERYDAY,
   'a forecast with no opening row': '```forecast\nstep | 2026-09-18 | Rent | −£100.00\n```',
   /* A WALK OF TWO YEARS THAT OPENS ON THREE MONTHS, as Money's Cash ahead is: a lease and a bonus move only past it. */
   'a forecast that walks past the length it opens on':
@@ -352,6 +359,33 @@ test('WHAT COUNTS OFFERS WHAT THE CHART SHOWS: every switch is a movement both r
     assert.ok(!table(html).includes(past), `${past} moves past the three months on screen`);
     assert.ok(!chips.some(([label]) => label === past), `${past} is offered over a chart that does not reach it`);
   }
+});
+
+test('EVERYDAY SPENDING IS ONE LINE IN BOTH RENDERERS, and the control moves what was measured from no change', () => {
+  const block = page(EVERYDAY);
+  const Knobbed = Block as unknown as Component<{ block: BlockSegment; opts: { scenario: boolean } }>;
+  const knobs = tree(render(Knobbed, { props: { block, opts: { scenario: true } } }).body);
+  const html = tree(toHTML([block]));
+  const table = (t: string): string => decode(/<table class="forecast-table">[\s\S]*?<\/table>/u.exec(t)?.[0] ?? '').replaceAll('\u00a0', ' ');
+  /* `tree` writes an empty attribute bare. */
+  const line = '<tr data-everyday><td colspan="4">Everyday spending, measured from Jul to Sep: EGP 41,200 a month</td></tr>';
+  for (const [name, t] of [['toHTML', html], ['the Svelte drawer', knobs]] as const) {
+    assert.equal(table(t).split(line).length, 2, `${name} says the line once`);
+    assert.doesNotMatch(table(t), /<td>Everyday spending<\/td>/u, `${name} lists no row a week`);
+    assert.match(table(t), /<td>Rent<\/td>/u, `${name} still lists the bill`);
+  }
+  assert.equal(table(knobs), table(html), 'the two renderers list the same movements');
+  /* THE CONTROL IS THE SVELTE DRAWER'S ALONE, and is the range `spendRange` offers, opening on no change. */
+  const model = forecastModel(EVERYDAY.split('\n').slice(1, -1).map((l) => l.split('|').map((c) => c.trim())))!;
+  const range = spendRange(model);
+  assert.equal(range.min, -range.max);
+  assert.ok(knobs.includes(`<span class="forecast-knob-name">Spend more or less each month</span>`), 'named for what it moves');
+  const slider = /<input class="forecast-range" type="range"[^>]*>/u.exec(knobs.split('Spend more or less each month')[1] ?? '')?.[0] ?? '';
+  assert.match(slider, new RegExp(`min="${range.min}"`, 'u'));
+  assert.match(slider, new RegExp(`max="${range.max}"`, 'u'));
+  assert.match(slider, /value="0"/u, 'opening on no change');
+  assert.ok(knobs.includes('>No change<'), 'and says so');
+  assert.doesNotMatch(knobs, /Spending the record doesn&#39;t know|Spending the record doesn't know/u);
 });
 
 /** The cells of a forecast's table, in order: what moved and the balance after it. */

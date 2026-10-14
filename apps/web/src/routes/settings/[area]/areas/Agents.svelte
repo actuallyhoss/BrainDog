@@ -37,6 +37,7 @@
   import { AGENTS_PACK, agentsPackDocument } from '@braindog/seed/packs';
   /* Imported here and nowhere in the layout, so the client stays out of the entry chunk. */
   import { createClient } from '@braindog/client';
+  import { listenFor } from '$lib/agents/listen.ts';
   import { TONES, relative, since } from 'braindog-render';
   import { isQuiet } from '@braindog/kernel';
   import { liveOf, type RunLive } from '$lib/ui/face.ts';
@@ -297,16 +298,9 @@
     sheetOpen = true;
   }
 
-  /* WHAT THE SHEET'S LIVE ROW ASKS every two seconds: the newest runs, and the keys once a key was made in it. A read that
-     fails is no answer, and the row keeps what it last said. */
-  const LISTEN_RUNS = 20;
-  async function listen(keys: boolean) {
-    const c = clientOf();
-    const runs = await c.list({ register: 'session', limit: LISTEN_RUNS, order: [{ field: 'last_seen', dir: 'desc' }] });
-    if (!runs.ok) return null;
-    const tokens = keys ? await c.listTokens() : null;
-    return { rows: runs.value.rows, keys: tokens?.ok ? (tokens.value as TokenRow[]) : [] };
-  }
+  /* WHAT THE SHEET'S LIVE ROW ASKS every two seconds (`lib/agents/listen.ts`), which Today's first step asks too, over
+     this screen's own client, made when first asked. */
+  const listen = (keys: boolean) => listenFor(clientOf())(keys);
 
   /* THE LIST IS READ AGAIN WHEN THE SHEET CLOSES, so what connected while it was open is in it. */
   let sheetWas = false;

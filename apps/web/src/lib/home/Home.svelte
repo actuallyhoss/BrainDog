@@ -23,7 +23,8 @@
   what went stale under it; and who the record matched as the board's last line. Each is asked for beside the page and
   never by its read, each is fetched with its own part when it is asked for, and each draws nothing for a record that
   answers none (`homeReads`). Under them all, the board's last tile: what the record found wrong in its own pages and
-  notes (`TextFaults.svelte`), fetched the same way and drawn only when it found something.
+  notes (`TextFaults.svelte`), fetched the same way and drawn only when it found something. After it, last of all,
+  what the answers taught (`Learned.svelte`), the same way.
 -->
 <script module lang="ts">
   /** What Today draws, top to bottom. */
@@ -436,11 +437,15 @@
   type StalePart = typeof import('./Stale.svelte').default;
   type FaultsPart = typeof import('./TextFaults.svelte').default;
   type FaultsFound = import('./text-faults.ts').TextFaults;
+  type LearnedPart = typeof import('./Learned.svelte').default;
+  type LearnedFound = import('./learned.ts').Learned;
   let brief = $state.raw<{ cards: readonly BriefingRow[]; foot: string | null; Part: BriefingPart } | null>(null);
   let matched = $state.raw<{ rows: readonly MatchedRow[]; Part: MatchedPart } | null>(null);
   let stale = $state.raw<{ rows: readonly StaleRow[]; Part: StalePart } | null>(null);
   /* WHAT THE RECORD FOUND WRONG IN ITS OWN PAGES AND NOTES, kept only when there is something: nought draws nothing. */
   let faults = $state.raw<{ found: FaultsFound; Part: FaultsPart } | null>(null);
+  /* WHAT THE ANSWERS TAUGHT, kept only when there is something: nought draws nothing. */
+  let learned = $state.raw<{ found: LearnedFound; Part: LearnedPart } | null>(null);
   $effect(() => {
     if (data.refused) return;
     void moving.version;
@@ -465,6 +470,11 @@
     void Promise.all([import('./text-faults.ts'), import('./TextFaults.svelte')]).then(async ([m, part]) => {
       const found = await m.loadTextFaults(base);
       if (here) faults = found && found.count > 0 ? { found, Part: part.default } : null;
+    }, () => undefined);
+    /* AND AFTER IT, WHAT THE ANSWERS TAUGHT, out of the bracket the same way. */
+    void Promise.all([import('./learned.ts'), import('./Learned.svelte')]).then(async ([m, part]) => {
+      const found = await m.loadLearned(base);
+      if (here) learned = found && found.rows.length > 0 ? { found, Part: part.default } : null;
     }, () => undefined);
     void Promise.allSettled([briefing, matches, stales]).then(() => closed(true, at));
     return () => {
@@ -651,6 +661,8 @@
       nothing at nought.
     -->
     {#if faults}<faults.Part found={faults.found} lists={data.lists} />{/if}
+    <!-- WHAT THE ANSWERS TAUGHT, the board's very last tile: what the record will not ask again. Nothing at nought. -->
+    {#if learned}<learned.Part found={learned.found} />{/if}
   {/if}
 </div>
 

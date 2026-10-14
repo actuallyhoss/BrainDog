@@ -74,3 +74,70 @@ export function organisationOf(rows: readonly { seq: number | null; fields: Reco
   const naming = rows.filter((r) => r.seq !== null && Array.isArray(r.fields.projects) && r.fields.projects.includes(projectId));
   return naming.length === 1 ? `organisations#${naming[0]!.seq}` : null;
 }
+
+/**
+ * WHETHER SETTING UP FOLDS AWAY TO ONE LINE. On a lived row the first screen is the row's own tiles, and the key, the
+ * line and the poll form are a press away: a row that holds a live key, that any reading names, or that was made
+ * before today is lived. Only a row made today that holds nothing opens on setup, since sending numbers is the next
+ * thing to do there. A row whose made day is not known is taken as lived. Days are `YYYY-MM-DD` in the reader's zone.
+ */
+export function setupFolded(at: { keys: number; readings: number; madeDay: string | null; today: string }): boolean {
+  if (at.keys > 0 || at.readings > 0) return true;
+  return at.madeDay === null || at.madeDay < at.today;
+}
+
+/** The day an instant falls on in the reader's zone, as `YYYY-MM-DD`, or `null` when it is not a time. */
+export function dayOf(when: string | number | Date | null | undefined): string | null {
+  if (when === null || when === undefined || when === '') return null;
+  const d = new Date(when);
+  if (Number.isNaN(d.getTime())) return null;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** What the fold's button says, shut and open. */
+export const FOLD_WORDS = { show: 'Show how to send numbers', hide: 'Hide' } as const;
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const DAY_MS = 86_400_000;
+
+/** `9 Oct`, with the year when it is not this one. */
+function dated(d: Date, now: Date): string {
+  const day = `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+  return d.getFullYear() === now.getFullYear() ? day : `${day} ${d.getFullYear()}`;
+}
+
+/** How long ago, by the reader's calendar: today, yesterday, 2 days ago, and a date after four weeks. */
+function ago(d: Date, now: Date): string {
+  const days = Math.round((Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) - Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())) / DAY_MS);
+  if (days <= 0) return 'today';
+  if (days === 1) return 'yesterday';
+  return days < 28 ? `${days} days ago` : `on ${dated(d, now)}`;
+}
+
+const timeOf = (when: string | null | undefined): Date | null => {
+  if (!when) return null;
+  const d = new Date(when);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+
+/**
+ * THE ONE LINE SETUP FOLDS TO, in names and counts and never an id: a key that has sent says when it last did, else the
+ * readings say how many arrived and when the last did, else a key not used yet says so, else nothing is sent here yet.
+ */
+export function foldedLine(
+  at: { keys: number; lastUsed: string | null; readings: number; lastReading: string | null },
+  now: Date | number = Date.now(),
+): string {
+  const today = new Date(now);
+  const used = timeOf(at.lastUsed);
+  const keys = at.keys === 1 ? '1 key' : `${at.keys} keys`;
+  if (at.keys > 0 && used) return `Numbers arrive here with ${keys}, last used ${ago(used, today)}.`;
+  if (at.readings > 0) {
+    const last = timeOf(at.lastReading);
+    if (at.readings === 1) return last ? `1 number arrived here, on ${dated(last, today)}.` : '1 number arrived here.';
+    return last ? `${at.readings} numbers arrived here, the last on ${dated(last, today)}.` : `${at.readings} numbers arrived here.`;
+  }
+  if (at.keys === 1) return 'A key is ready here and has not been used yet.';
+  if (at.keys > 1) return `${keys} are ready here and none has been used yet.`;
+  return 'No numbers are sent here yet.';
+}

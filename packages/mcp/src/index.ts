@@ -257,6 +257,16 @@ export type McpSurface<C> = {
    */
   figures?(ctx: C): Answer<{ id: string; name?: string; param?: boolean }[]>;
   /**
+   * Everything this caller may read, in one read: `{ fixed, lists, pages, figures, skills }` (the record's `offered`,
+   * READ+, AGT-B04). A fixed address is decided by the check its own reader asks, never by running it, and a skill is its
+   * name and when to use it. It backs `resources/list`, which with it reads no resource and draws no page: on a record
+   * of 54 pages the old way took 8 seconds at every session start.
+   *
+   * OPTIONAL, for a host older than the route, which `apps/cli/src/surface.ts` probes for. Without it, or when it
+   * refuses, `resources/list` reads each address and draws each page as it always has.
+   */
+  offered?(ctx: C): Answer;
+  /**
    * What the record's walk over what it already holds would link next and ask on Decide, in names, with nothing changed
    * (the record's `understandPlan`, READ+, DIRECTION §38). It backs the `braindog:understand` resource. Optional for the command line's
    * reason above: both HTTP hosts hand `serveMcp` the whole record, and a surface without it answers `NOT_IN_THIS_BUILD`.
@@ -1156,6 +1166,66 @@ const FIXED: readonly Resource[] = [
   resource('grammar/script', 'What a script declaration may contain, what its ctx can reach, its limits, and two that install.'),
   resource('grammar/automations', 'What an automation may say: its triggers, its steps, its limits, what does not run yet, and two that install.'),
 ];
+
+/**
+ * The fixed addresses the record's `offered` decides, as `FIXED_ADDRESSES` in `packages/record/src/methods/offered.ts`
+ * names them (`test/resources-offered.test.ts` holds the two lists together). An address of `FIXED` above that is not
+ * here is read before it is listed, as it always was: who may read it is still the record's to say, and it draws no page.
+ */
+export const OFFERED_DECIDES: ReadonlySet<string> = new Set([
+  'whoami', 'boot', 'context', 'understand', 'handoffs', 'sessions/live', 'digest/today', 'decisions', 'inbox', 'inbox/patterns',
+  'actions', 'automations', 'arrangement', 'grammar/page', 'grammar/register', 'grammar/metric', 'grammar/proposals',
+  'grammar/ingest', 'grammar/kinds', 'grammar/script', 'grammar/automations',
+]);
+
+/**
+ * The surface method each decided address is read through, where it is one a host may not have. WHAT A HOST CANNOT
+ * SERVE IS THE DOOR'S TO DROP (`offered.ts`): the record says who may read an address, and an address whose method
+ * this surface lacks is answered `NOT_IN_THIS_BUILD` by `read`, so it is not listed, as it is not today.
+ */
+const SERVED_BY: Readonly<Record<string, keyof McpSurface<unknown>>> = {
+  context: 'context',
+  understand: 'understandPlan',
+  handoffs: 'previewPage',
+  'sessions/live': 'sessionsLive',
+  inbox: 'inbox',
+  'inbox/patterns': 'inboxPatterns',
+  actions: 'actions',
+  automations: 'automations',
+  arrangement: 'arrangement',
+  'grammar/page': 'arrangement',
+  'grammar/register': 'arrangement',
+  'grammar/metric': 'arrangement',
+  'grammar/proposals': 'arrangement',
+  'grammar/ingest': 'arrangement',
+  'grammar/kinds': 'arrangement',
+};
+
+/** What `offered` answered, held to its shape, because over the command line it came off the wire. `null` is no answer to use. */
+type OfferedNow = {
+  fixed: Set<string>;
+  lists: { id: string; name: string }[];
+  pages: { slug: string; title: string }[];
+  figures: { id: string; name: string; param: boolean }[];
+  skills: { name: string; when: string | null }[];
+};
+function offeredNow(value: unknown): OfferedNow | null {
+  if (!isObject(value)) return null;
+  const { fixed, lists, pages, figures, skills } = value;
+  if (![fixed, lists, pages, figures, skills].every(Array.isArray)) return null;
+  const text = (x: unknown): x is string => typeof x === 'string';
+  return {
+    fixed: new Set((fixed as unknown[]).filter(text)),
+    lists: (lists as unknown[]).flatMap((l) => (isObject(l) && text(l.id) && text(l.name) ? [{ id: l.id, name: l.name }] : [])),
+    pages: (pages as unknown[]).flatMap((p) => (isObject(p) && text(p.slug) && text(p.title) ? [{ slug: p.slug, title: p.title }] : [])),
+    figures: (figures as unknown[]).flatMap((f) =>
+      isObject(f) && text(f.id) ? [{ id: f.id, name: text(f.name) ? f.name : '', param: f.param === true }] : [],
+    ),
+    skills: (skills as unknown[]).flatMap((s) =>
+      isObject(s) && text(s.name) ? [{ name: s.name, when: text(s.when) && s.when !== '' ? s.when : null }] : [],
+    ),
+  };
+}
 
 /** The addresses a client fills in itself. A template is a grammar, so it names nothing a caller cannot see. */
 export const TEMPLATES = [
@@ -3368,8 +3438,51 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
    * So the list is never ahead of the record: each fixed resource and each figure is read first, a
    * page is withheld when every block on it was withheld, and a register comes from `boot`, which
    * lists only what the caller may read.
+   *
+   * ONE READ WHEN THE HOST ANSWERS `offered` (AGT-B04). The record says in one read what each reader would let this
+   * caller see, so nothing is run to find out: no fixed address it decides is read, no page is drawn, no figure read.
+   * The order and the words are today's, so a client sees the same list sooner. A host without it, or one that refuses
+   * it, is listed the way below, exactly as before.
    */
   const resources = async (ctx: C): Promise<Resource[]> => {
+    const said = surface.offered ? await surface.offered(ctx) : null;
+    const now = said?.ok ? offeredNow(said.value) : null;
+    return now ? resourcesOffered(now, ctx) : resourcesRead(ctx);
+  };
+
+  /**
+   * The list from `offered`'s answer. A fixed address it decides is listed when it names it and this surface has the
+   * method that serves it; one it does not decide is read first, as before, a few at once. A page, figure or skill is
+   * listed under today's address and words, and the name tests are today's, so nothing listed is a name `read` refuses.
+   */
+  const resourcesOffered = async (now: OfferedNow, ctx: C): Promise<Resource[]> => {
+    const served = (address: string): boolean => {
+      const method = SERVED_BY[address];
+      return method === undefined || surface[method] !== undefined;
+    };
+    const fixed = await pooled(FIXED, async (r) => {
+      if (OFFERED_DECIDES.has(r.name)) return now.fixed.has(r.name) && served(r.name) ? r : null;
+      return (await read(r.uri, ctx, false)).ok ? r : null;
+    });
+    const out: Resource[] = fixed.filter((r) => r !== null);
+    for (const list of now.lists)
+      if (NAMED.test(list.id)) out.push(resource(`schema/${list.id}`, `What ${list.name} holds: its fields, their types, and what each may take.`));
+    for (const page of now.pages)
+      if (NAMED.test(page.slug)) out.push(resource(`page/${page.slug}`, `${page.title}, with every block run: rows and figures, never markup.`));
+    for (const f of now.figures)
+      if (!f.param && NAMED.test(f.id))
+        out.push(resource(`metric/${f.id}`, `${f.name ? `${f.name}: the` : 'The'} figure ${f.id}, with its target and how it compares.`));
+    const named = new Set<string>();
+    for (const skill of now.skills) {
+      if (!SKILL.test(skill.name) || named.has(skill.name)) continue;
+      named.add(skill.name);
+      out.push(resource(`skill/${skill.name}`, skill.when !== null ? `When to use it: ${skill.when}` : `The text of the skill ${skill.name}.`));
+    }
+    return out;
+  };
+
+  /** The list as it was before `offered`: each fixed address read, each page drawn, each figure and skill asked. */
+  const resourcesRead = async (ctx: C): Promise<Resource[]> => {
     const out: Resource[] = [];
     const offered = await pooled(FIXED, async (r) => ((await read(r.uri, ctx, false)).ok ? r : null));
     out.push(...offered.filter((r) => r !== null));

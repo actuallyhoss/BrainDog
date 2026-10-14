@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { bindable, bindingOf, curlLine, keyFor, organisationOf } from './reporting.ts';
+import { FOLD_WORDS, bindable, bindingOf, curlLine, dayOf, foldedLine, keyFor, organisationOf, setupFolded } from './reporting.ts';
 
 const DATAPOINTS = [
   { id: 'name', type: 'text' },
@@ -56,4 +56,48 @@ test('the line is one line, with the key or a placeholder, and the body in singl
   assert.equal(line, `curl -X POST https://brain.example/api/report -H "Authorization: Bearer <report key>" -H "Content-Type: application/json" -d '{"name":"Sign-ups","value":12}'`);
   assert.doesNotMatch(line, /\n/u);
   assert.match(curlLine('http://127.0.0.1:5931', 'rec_x.fake-secret', '<report key>'), /Bearer rec_x\.fake-secret/u);
+});
+
+test('setup folds on a lived row and stays open only on a row made today that holds nothing', () => {
+  const today = '2026-10-14';
+  assert.equal(setupFolded({ keys: 1, readings: 0, madeDay: today, today }), true, 'a live key');
+  assert.equal(setupFolded({ keys: 0, readings: 3, madeDay: today, today }), true, 'a reading names it');
+  assert.equal(setupFolded({ keys: 0, readings: 0, madeDay: '2026-10-13', today }), true, 'made yesterday');
+  assert.equal(setupFolded({ keys: 0, readings: 0, madeDay: null, today }), true, 'a made day not known is lived');
+  assert.equal(setupFolded({ keys: 0, readings: 0, madeDay: today, today }), false, 'made today with nothing: setting up is next');
+  assert.equal(dayOf(new Date(2026, 9, 9, 23, 30)), '2026-10-09', 'the reader\'s own day');
+  assert.equal(dayOf('not a time'), null);
+  assert.equal(dayOf(null), null);
+});
+
+test('the folded line says what arrives here at one and at many, in words and never an id', () => {
+  const now = new Date(2026, 9, 14, 12);
+  const at = (d: number, h = 9) => new Date(2026, 9, d, h).toISOString();
+  const lines = [
+    foldedLine({ keys: 1, lastUsed: at(12), readings: 0, lastReading: null }, now),
+    foldedLine({ keys: 2, lastUsed: at(13), readings: 5, lastReading: at(13) }, now),
+    foldedLine({ keys: 1, lastUsed: at(14), readings: 0, lastReading: null }, now),
+    foldedLine({ keys: 0, lastUsed: null, readings: 3, lastReading: at(9) }, now),
+    foldedLine({ keys: 0, lastUsed: null, readings: 1, lastReading: at(9) }, now),
+    foldedLine({ keys: 1, lastUsed: null, readings: 0, lastReading: null }, now),
+    foldedLine({ keys: 3, lastUsed: null, readings: 0, lastReading: null }, now),
+    foldedLine({ keys: 0, lastUsed: null, readings: 0, lastReading: null }, now),
+  ];
+  assert.deepEqual(lines, [
+    'Numbers arrive here with 1 key, last used 2 days ago.',
+    'Numbers arrive here with 2 keys, last used yesterday.',
+    'Numbers arrive here with 1 key, last used today.',
+    '3 numbers arrived here, the last on 9 Oct.',
+    '1 number arrived here, on 9 Oct.',
+    'A key is ready here and has not been used yet.',
+    '3 keys are ready here and none has been used yet.',
+    'No numbers are sent here yet.',
+  ]);
+  assert.equal(foldedLine({ keys: 0, lastUsed: null, readings: 2, lastReading: new Date(2025, 11, 30).toISOString() }, now), '2 numbers arrived here, the last on 30 Dec 2025.');
+  assert.equal(foldedLine({ keys: 1, lastUsed: new Date(2026, 7, 1).toISOString(), readings: 0, lastReading: null }, now), 'Numbers arrive here with 1 key, last used on 1 Aug.');
+  for (const line of [...lines, FOLD_WORDS.show, FOLD_WORDS.hide]) {
+    assert.doesNotMatch(line, /#\d|[0-9A-HJKMNP-TV-Z]{26}|\u2014|\//u, `no id, path or em dash in "${line}"`);
+  }
+  assert.equal(FOLD_WORDS.show, 'Show how to send numbers');
+  assert.equal(FOLD_WORDS.hide, 'Hide');
 });

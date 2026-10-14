@@ -10,10 +10,25 @@
   ITS WORDS ARE ITS OWN, in `say` below and not in `copy.ts`, as `first-run.ts` keeps the first run's: this is read by
   one screen, for a few days, and the entry chunk every screen waits for does not carry it. What each step would find is
   the first run's own sentence, said from the lists this record keeps.
+
+  CONNECT OPENS THE CONNECT SHEET HERE (AGT-A07, "offered by the first run"): the one command and the live row that says
+  when the agent has called, so the first agent is connected without leaving Today. The sheet is a chunk of its own,
+  loaded with `import()` on the first press as Settings, Agents loads it, so Home carries none of it. Its `listen` is the
+  one Settings hands it (`agents/listen.ts`). The step is still a link to Settings, Agents: a press with a modifier, a
+  sheet that cannot load, and a reader who is not the record's owner (who may not make keys, `ownsRecord`, the rule
+  Agents.svelte holds as `anOwner`) all go there.
 -->
 <script lang="ts">
+  import { goto } from '$app/navigation';
+  import { page } from '$app/state';
+  import { apiBase, at } from '$lib/at.ts';
   import { write } from '$lib/pref.ts';
+  import type { Shell } from '$lib/record/boot-live.ts';
+  import type { ConnectLines } from '$lib/record/device.ts';
+  import type { Listened } from '$lib/agents/listen.ts';
   import type { MadeStep } from '$lib/start/made.ts';
+  import { createClient } from '@braindog/client';
+  import { ownsRecord } from '../../routes/settings/levels.ts';
   import Button from '$lib/ui/Button.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
   import Tile from '$lib/ui/Tile.svelte';
@@ -72,6 +87,46 @@
     hidden = true;
     onhide?.();
   }
+
+  /* THE SHEET IS THE OWNER'S, as on Settings, Agents: a key made in it is an owner's to make. */
+  const shell = $derived(page.data as unknown as Partial<Shell>);
+  const mayConnect = $derived(shell.me !== undefined && ownsRecord(shell.me));
+
+  /* LOADED ON THE FIRST PRESS: the sheet, the record's lines and the live row's ask, all at once and kept. */
+  type Connect = {
+    Sheet: typeof import('$lib/agents/ConnectSheet.svelte').default;
+    lines: ConnectLines;
+    listen: (keys: boolean) => Promise<Listened | null>;
+  };
+  let connect = $state<Connect | null>(null);
+  let sheetOpen = $state(false);
+  let loading = $state(false);
+
+  async function load(): Promise<Connect | null> {
+    const [sheet, device, listen] = await Promise.all([
+      import('$lib/agents/ConnectSheet.svelte'),
+      import('$lib/record/device.ts'),
+      import('$lib/agents/listen.ts'),
+    ]).catch(() => [null, null, null] as const);
+    if (sheet === null || device === null || listen === null) return null;
+    /* THE BARE HOST, as Settings' lines carry it; the setup line names this record when there is one. */
+    const slug = shell.live === true ? (shell.index?.slug ?? null) : null;
+    return { Sheet: sheet.default, lines: device.connectLines(page.url.origin, slug), listen: listen.listenFor(createClient({ base: apiBase() })) };
+  }
+
+  /* A PRESS WITH A MODIFIER OPENS THE LINK where the person asked for it; a sheet that cannot load goes there too. */
+  async function openSheet(e: MouseEvent, href: string) {
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    if (loading) return;
+    if (connect === null) {
+      loading = true;
+      connect = await load();
+      loading = false;
+      if (connect === null) return void goto(at(href));
+    }
+    sheetOpen = true;
+  }
 </script>
 
 {#if !hidden && lines.length > 0}
@@ -87,11 +142,19 @@
             <span class="want-more-name">{line.name}</span>
             <span class="want-more-does">{line.does}</span>
           </span>
-          <Button size="sm" href={line.href}>{line.go}</Button>
+          {#if line.key === 'agent' && mayConnect}
+            <Button size="sm" href={line.href} aria-busy={loading || undefined} onclick={(e) => void openSheet(e, line.href)}>{line.go}</Button>
+          {:else}
+            <Button size="sm" href={line.href}>{line.go}</Button>
+          {/if}
         </li>
       {/each}
     </ul>
   </Tile>
+{/if}
+
+{#if connect}
+  <connect.Sheet bind:open={sheetOpen} lines={connect.lines} listen={connect.listen} />
 {/if}
 
 <style>

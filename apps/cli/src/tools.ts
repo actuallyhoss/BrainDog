@@ -28,6 +28,13 @@
  * NOTHING DEAD OR FOREIGN IS WRITTEN (AGT-A07 build 4). A tool whose program is neither on this machine's path nor a
  * file here, or which starts from another system's path (a drive letter off Windows, another system's home folder),
  * is left out with one line naming it, so a new machine is never handed what only ran on another one.
+ *
+ * WHAT CLAUDE CODE IS CONNECTED TO BEYOND ITS FILES IS AN INTEGRATION (AGT-D10 job 6). When the scan is handed
+ * `connected` (`braindog tools scan` hands it `claude mcp list`, by `clients/connected.ts`), each entry whose name or
+ * address no config file read here holds (a connector added in the claude.ai app, a server a plugin registered) goes
+ * the same way a server does, as `kind: 'integration'`: its address when one was printed, no transport, no command, and
+ * no key read or written. The start hook hands none, since the list connects to every server and takes ten seconds.
+ * Nothing is taken from the names of tools.
  */
 
 import { hostname } from 'node:os';
@@ -38,6 +45,7 @@ import type { Brief, Client, Context } from '@braindog/client';
 
 import { hostsPath, readHosts } from './http.ts';
 import { CLIENTS, clientOf, DEFAULT_CLIENT, foreignPath, onPath, runClaude, type ClaudeRunner, type Env as ClientEnv } from './clients/index.ts';
+import { connectedOf, runClaudeList, type ConnectedList, type ListRunner } from './clients/connected.ts';
 import { HEADER_NAME, keys } from './keys.ts';
 import { asking, causeOf, connect, fixOf, isObject, joinedSaid, QUESTION, readLock, samePath, sha256, spokenOf, Stopped, thisMachine, valueOf, writeLock, type AgentIo } from './skills.ts';
 
@@ -90,12 +98,16 @@ const TOOL_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 
 type Entry = { name: string; header: boolean; secret: boolean; given: string | null };
 
-/** One server as a config describes it. `given` is held only until the server is recorded. */
+/**
+ * One server as a config describes it, or one integration as its client lists it, which has no transport, no command
+ * and no entries. `given` is held only until the server is recorded.
+ */
 type Found = {
+  kind: 'mcp' | 'integration';
   name: string;
   scope: 'project' | 'global';
   source: string;
-  transport: 'stdio' | 'http';
+  transport: 'stdio' | 'http' | null;
   command: string | null;
   args: string[];
   endpoint: string | null;
@@ -133,7 +145,7 @@ function serversOf(servers: unknown, scope: Found['scope'], source: string, line
       const secret = text !== null && (KEY_NAMED.test(key) || (header && AUTH_HEADER.test(key)) || looksLikeKey(text));
       entries.push({ name: key, header, secret, given: secret ? text : null });
     }
-    out.push({ name, scope, source, transport, command, args, endpoint, entries });
+    out.push({ kind: 'mcp', name, scope, source, transport, command, args, endpoint, entries });
   }
   return out;
 }
@@ -253,7 +265,34 @@ export type ToolScan = {
    * kept by name for want of a vault grant is said once for that host, and again only once a grant has been kept.
    */
   once?: { host: string; hosts: string } | undefined;
+  /** What the client says it is connected to beyond its files, read after them. None asked when not given. */
+  connected?: (() => Promise<ConnectedList>) | undefined;
 };
+
+/** Where an integration was found, as its row's origin and its lines name it. */
+const CONNECTED_SOURCE = "Claude Code's connections";
+
+/** How a found tool is named in a line: a server with the file it came from, an integration by its name. */
+const toolSaid = (f: Found): string => (f.kind === 'integration' ? `Integration ${f.name}` : `Tool ${f.name} in ${f.source}`);
+
+/**
+ * The integrations among what the client listed: each entry whose name (as a person reads it or as printed) and whose
+ * address no server read from a file holds. An address that looks like it holds a key is left out, and said.
+ */
+function integrationsOf(list: ConnectedList, found: Map<string, Found>, lines: string[]): Found[] {
+  const names = new Set([...found.values()].map((f) => f.name.toLowerCase()));
+  const addresses = new Set([...found.values()].flatMap((f) => (f.endpoint === null ? [] : [addressOf(f.endpoint)])));
+  const out: Found[] = [];
+  for (const c of list.entries) {
+    if (names.has(c.name.toLowerCase()) || names.has(c.listed.toLowerCase())) continue;
+    if (c.address !== null && addresses.has(addressOf(c.address))) continue;
+    const keyed = c.address !== null && looksLikeKey(c.address);
+    if (keyed) lines.push(`Integration ${c.name} has an address that looks like it holds a key, so it is kept without its address.`);
+    names.add(c.name.toLowerCase());
+    out.push({ kind: 'integration', name: c.name, scope: 'global', source: CONNECTED_SOURCE, transport: null, command: null, args: [], endpoint: keyed ? null : c.address, entries: [] });
+  }
+  return out;
+}
 
 /** Whether the hosts file keeps an unexpired vault grant for this host. */
 function grantHeld(hosts: string, host: string, now: number): boolean {
@@ -316,6 +355,12 @@ export async function scanTools(s: ToolScan): Promise<string[]> {
       if (set.fault !== null) lines.push(set.fault);
       else keep(serversOf(set.servers, set.scope, set.source, lines));
     }
+  /* After every file, so an entry a file holds is that file's server and never an integration besides. */
+  if (s.connected !== undefined) {
+    const list = await s.connected();
+    lines.push(...list.lines);
+    keep(integrationsOf(list, found, lines));
+  }
 
   const project = s.context.project;
   const listed = [...reg.rows, ...reg.inherited];
@@ -414,11 +459,11 @@ export async function scanTools(s: ToolScan): Promise<string[]> {
       /* By name first, then by how it starts. A tool already asked about is not looked for again: its answer is a
          row of its own name. */
       const waits = f.scope === 'global' && project !== null && !reg.truncated && lock.asked[key] === shape;
-      const row = listed.find((r) => r.scope === f.scope && r.name === f.name) ?? (waits ? undefined : await startsAs(f, key, start));
+      const row = listed.find((r) => r.scope === f.scope && r.name === f.name) ?? (waits || (f.kind === 'integration' && f.endpoint === null) ? undefined : await startsAs(f, key, start));
 
       if (row === undefined) {
         if (reg.truncated) {
-          lines.push(`Tool ${f.name} in ${f.source} was not recorded, because the record lists more tools than one context shows.`);
+          lines.push(`${toolSaid(f)} was not recorded, because the record lists more tools than one context shows.`);
           continue;
         }
         if (f.scope === 'global' && project !== null) {
@@ -431,12 +476,12 @@ export async function scanTools(s: ToolScan): Promise<string[]> {
         }
         const n = await needsFor(f, [], allow);
         if (s.dryRun) {
-          lines.push(`Tool ${f.name} in ${f.source} would be recorded${keysSaid(n)}.`);
+          lines.push(`${toolSaid(f)} would be recorded${keysSaid(n)}.`);
           continue;
         }
         const out = await s.client.create({ register: 'tools', fields: fieldsOf(f, n.needs, machine, now) });
         const spoken = spokenOf(valueOf(out));
-        lines.push(spoken === null ? `Tool ${f.name} in ${f.source} was not recorded: ${fixOf(out)}` : `Tool ${f.name} in ${f.source} was recorded${keysSaid(n)}.`);
+        lines.push(spoken === null ? `${toolSaid(f)} was not recorded: ${fixOf(out)}` : `${toolSaid(f)} was recorded${keysSaid(n)}.`);
         continue;
       }
 
@@ -447,8 +492,10 @@ export async function scanTools(s: ToolScan): Promise<string[]> {
       const was = startOf(fields);
 
       /* THE SAME START IS THE SAME TOOL, AND NOTHING IS ASKED: the change would leave the row as it is. A name it needs
-         here that the row lacks is added, and nothing the row names is taken away, since another machine may need it. */
-      if (startKey(was) === start) {
+         here that the row lacks is added, and nothing the row names is taken away, since another machine may need it.
+         AN INTEGRATION IS THE SAME while its address is, or when none was printed this time. */
+      const same = f.kind === 'integration' ? f.endpoint === null || (was.endpoint !== null && addressOf(was.endpoint) === addressOf(f.endpoint)) : startKey(was) === start;
+      if (same) {
         const patch: Record<string, unknown> = {};
         const hosts = strings(fields.hosts);
         if (!hosts.includes(machine)) patch.hosts = [...hosts, machine];
@@ -470,17 +517,17 @@ export async function scanTools(s: ToolScan): Promise<string[]> {
       if (lock.asked[key] === shape) continue;
       const n = await needsFor(f, prior, allow);
       if (s.dryRun) {
-        lines.push(`Tool ${f.name} in ${f.source} differs from the one in the record, which would be left as it is and the change proposed${keysSaid(n)}.`);
+        lines.push(`${toolSaid(f)} differs from the one in the record, which would be left as it is and the change proposed${keysSaid(n)}.`);
         continue;
       }
-      const patch = { transport: f.transport, command: f.command, args: f.args, endpoint: f.endpoint, needs: n.needs };
+      const patch = f.kind === 'integration' ? { endpoint: f.endpoint } : { transport: f.transport, command: f.command, args: f.args, endpoint: f.endpoint, needs: n.needs };
       /* THE OWNER'S QUESTION IN WORDS, 80 CHARACTERS AT MOST. It read "Change tools#8 to how fly-copperleaf is set up
          in ~/.claude.json on Maras-MacBook-Pro.local?", then "Update the fly-copperleaf tool to match this Mac?", which
          still named a machine and not what would change. The id, the path and the network name are the details, beside
          how it starts in the record (`was`) and how it starts here (`now`).
          ASKED ONCE FOR EVERY MACHINE (AGT-C07): the cause is the row and the start asked for, so a second machine with
          the same config joins the question already open. */
-      const question = asking('Change how ', f.name, ' starts?');
+      const question = f.kind === 'integration' ? asking('Change the address of ', f.name, '?') : asking('Change how ', f.name, ' starts?');
       const out = await s.client.call<{ id: string; joined?: true; said?: string }>('propose', {
         question,
         body_kind: 'rowset',
@@ -493,15 +540,15 @@ export async function scanTools(s: ToolScan): Promise<string[]> {
       });
       const made = valueOf(out);
       if (made === null || typeof made.id !== 'string') {
-        lines.push(`Tool ${f.name} in ${f.source} differs from the one in the record, and the change was not proposed: ${fixOf(out)}`);
+        lines.push(`${toolSaid(f)} differs from the one in the record, and the change was not proposed: ${fixOf(out)}`);
         continue;
       }
       lock.asked[key] = shape;
       const joined = joinedSaid(made);
       lines.push(
         joined === null
-          ? `Tool ${f.name} in ${f.source} differs from the one in the record, so that was left as it is${keysSaid(n)}, and the change was asked on Decide: ${question}`
-          : `Tool ${f.name} in ${f.source} differs from the one in the record, so that was left as it is${keysSaid(n)}, and the change is asked on Decide already. ${joined}`,
+          ? `${toolSaid(f)} differs from the one in the record, so that was left as it is${keysSaid(n)}, and the change was asked on Decide: ${question}`
+          : `${toolSaid(f)} differs from the one in the record, so that was left as it is${keysSaid(n)}, and the change is asked on Decide already. ${joined}`,
       );
     }
     if (everywhere.length > 0) lines.push(await askEverywhere(s.client, everywhere, lock, machine, s.dryRun));
@@ -522,8 +569,20 @@ export async function scanTools(s: ToolScan): Promise<string[]> {
   return lines;
 }
 
-/** A row's fields for a server: how it starts, the keys it needs by name, and where it was seen. */
+/**
+ * A row's fields for a server: how it starts, the keys it needs by name, and where it was seen. An integration's are
+ * its name, its address when one was printed, and where it was seen: it has no transport, no command and no keys.
+ */
 function fieldsOf(f: Found, needs: string[], machine: string, now: number): Record<string, unknown> {
+  if (f.kind === 'integration')
+    return {
+      name: f.name,
+      kind: 'integration',
+      ...(f.endpoint === null ? {} : { endpoint: f.endpoint }),
+      hosts: [machine],
+      seen: new Date(now).toISOString(),
+      origin: `${f.source} on ${machine}`.slice(0, 280),
+    };
   return {
     name: f.name,
     kind: 'mcp',
@@ -547,7 +606,7 @@ async function askEverywhere(client: Client, asks: { f: Found; key: string; shap
   const names = asks.map((a) => a.f.name).join(', ');
   if (dryRun)
     return one
-      ? `Tool ${one.name} in ${one.source} would be proposed as a tool everywhere, with its keys by name only.`
+      ? `${toolSaid(one)} would be proposed as a tool everywhere, with its keys by name only.`
       : `${String(asks.length)} tools in ${sources} (${names}) would be proposed together as tools everywhere, with their keys by name only.`;
   /* IN WORDS, 80 CHARACTERS AT MOST, with where they were found kept in the details. Decide offers the rows one by one,
      so the question no longer says it can. */
@@ -559,10 +618,10 @@ async function askEverywhere(client: Client, asks: { f: Found; key: string; shap
   });
   const made = valueOf(out);
   if (made === null || typeof made.id !== 'string')
-    return one ? `Tool ${one.name} in ${one.source} was not proposed: ${fixOf(out)}` : `${String(asks.length)} tools in ${sources} were not proposed: ${fixOf(out)}`;
+    return one ? `${toolSaid(one)} was not proposed: ${fixOf(out)}` : `${String(asks.length)} tools in ${sources} were not proposed: ${fixOf(out)}`;
   for (const a of asks) lock.asked[a.key] = a.shape;
   return one
-    ? `Tool ${one.name} in ${one.source} applies everywhere and this run is in a project, so its keys were not deposited and recording it was asked on Decide: ${question}`
+    ? `${toolSaid(one)} applies everywhere and this run is in a project, so its keys were not deposited and recording it was asked on Decide: ${question}`
     : `${String(asks.length)} tools in ${sources} apply everywhere and this run is in a project, so their keys were not deposited and recording them was asked on Decide in one question: ${question}`;
 }
 
@@ -775,7 +834,7 @@ const USAGE_SCAN = 'braindog tools scan takes --host and --dry-run, and nothing 
 const USAGE_WRITE = 'braindog tools write takes --scope user or --scope project, --host and --dry-run, and nothing else.';
 
 /** `braindog tools scan|write`, and the exit code. */
-export async function tools(args: string[], io: AgentIo & { cli: string; claude?: ClaudeRunner }): Promise<number> {
+export async function tools(args: string[], io: AgentIo & { cli: string; claude?: ClaudeRunner; list?: ListRunner }): Promise<number> {
   const [verb, ...rest] = args;
   if (verb !== 'scan' && verb !== 'write') {
     io.say('braindog tools takes scan or write.');
@@ -811,7 +870,12 @@ export async function tools(args: string[], io: AgentIo & { cli: string; claude?
   const base = { client: at.client, context: at.context, top: at.top, cwd: io.cwd, home: io.home, dryRun };
   const lines =
     verb === 'scan'
-      ? await scanTools({ ...base, deposit: depositor({ file: hostsPath(io.env), env: io.env, host: at.to.key, headers: await io.headers(at.to.key) }) })
+      ? await scanTools({
+          ...base,
+          deposit: depositor({ file: hostsPath(io.env), env: io.env, host: at.to.key, headers: await io.headers(at.to.key) }),
+          /* By hand, so the ten seconds the list takes are waited for. */
+          connected: () => connectedOf(io.list ?? runClaudeList, io.cwd),
+        })
       : await writeTools({ ...base, scope: scope ?? null, cli: io.cli, claude: io.claude ?? runClaude, env: io.env });
   for (const line of lines) io.out(line);
   if (lines.length === 0) io.out(verb === 'scan' ? 'Every server found is recorded as it is.' : 'Every tool is written as the record has it.');

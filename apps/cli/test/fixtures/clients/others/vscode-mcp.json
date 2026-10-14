@@ -1,0 +1,26 @@
+{
+	"servers": {
+		"io.github.github/github-mcp-server": {
+			"type": "http",
+			"url": "https://api.example.com/mcp/",
+			"gallery": "https://gallery.example.com",
+			"version": "1.0.0"
+		},
+		"memory": {
+			"type": "stdio",
+			"command": "npx",
+			"args": ["-y", "@modelcontextprotocol/server-memory"],
+			"env": {
+				"API_KEY": "${input:api-key}"
+			}
+		}
+	},
+	"inputs": [
+		{
+			"type": "promptString",
+			"id": "api-key",
+			"description": "API key",
+			"password": true
+		}
+	]
+}

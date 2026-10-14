@@ -12,7 +12,9 @@ import type { SeedRule } from '../base.ts';
 import { OBLIGATIONS_REGISTER } from './lists/obligations.ts';
 import { BOOK_FROM_ACCOUNT_SCRIPT } from './scripts/book-from-account.js';
 import { CLOSE_ACCOUNT_SCRIPT } from './scripts/close-account.js';
+import { FILE_BACK_SCRIPT } from './scripts/file-back.js';
 import { LAST_DAY_SCRIPT } from './scripts/last-day.js';
+import { LEARN_CATEGORY_SCRIPT } from './scripts/learn-category.js';
 import matchRun, { MATCH_PAYMENT_SCRIPT, matchPayment } from './scripts/match-payment.js';
 import { PLANS_FROM_NAMES_SCRIPT } from './scripts/plans-from-names.js';
 import settleRun, { SETTLE_SCRIPT, settle } from './scripts/settle.js';
@@ -464,6 +466,54 @@ export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
     steps: [{ script: { id: 'plans_from_names', as: 'linking', input: {} } }],
   },
   PLANS_FROM_NAMES_SCRIPT,
+  /**
+   * A NEW OR CHANGED FILING RULE FILES WHAT IT MATCHES (REC-B10 step 5, since money-core 3.17.0): a rule made, or one
+   * whose text, way of matching, what it reads, way, category, account or status changed, starts `script.file_back`,
+   * which files the Ledger entries of the last 400 days with no category that the rule fits, by the category rule's own
+   * ladder, as one change with one Undo (`scripts/file-back.js`). Until this a rule filed only what arrived after it.
+   * `when: state is on`, so a rule switched off files nothing, and one switched on again files back. Not on `rank` or
+   * `note`, which change nothing it matches. NO `input`: the script is handed the rule's list and number.
+   */
+  {
+    rule: 'rule-files-back',
+    name: 'File what a filing rule matches',
+    pack: 'money-core',
+    on: { written: { register: 'filing_rules', op: ['create', 'update'], fields: ['match', 'match_by', 'reads', 'direction', 'category', 'account', 'state'] } },
+    when: 'state is on',
+    steps: [{ script: { id: 'file_back', as: 'filing', input: {} } }],
+  },
+  FILE_BACK_SCRIPT,
+  /**
+   * A CATEGORY SET BY HAND ASKS ONCE WHETHER THE PAYEE ALWAYS GOES THERE (REC-B10 step 6): "File every Talabat under
+   * Outing from now on? 14 more like it have no category." (`scripts/learn-category.js`). Yes is `category-taught`,
+   * which runs the script again with the answer, and the script makes the rule; making it starts `rule-files-back`.
+   * "Only this one" starts nothing, and the question's cause, one a payee, is what stops it being asked again.
+   * A PERSON'S EDIT AND NOTHING ELSE, AS FAR AS A TRIGGER CAN SAY. `op: update` leaves out a bank's or an import's new
+   * entry. `filed_by is empty` leaves out every write a rule or a script makes of a category, since each writes the rule
+   * that filed it too, and that is also what keeps a file-back of 500 entries from starting 500 runs here. A rule's own
+   * write starts no rule at all. The bank's text is what the rule Yes makes will match, so an entry without it is not
+   * asked about, and nor is a move between two of a person's own accounts.
+   * NEVER ON A CLOCK AND NEVER AT NIGHT: only the write of a category starts it, and the question is signed by the
+   * script, never by `system`.
+   */
+  {
+    rule: 'category-teaches',
+    name: 'Offer a filing rule from a category set by hand',
+    pack: 'money-core',
+    on: { written: { register: 'transactions', op: ['update'], fields: ['category'] } },
+    when: 'category is set, filed_by is empty, counterparty_text is set, transfer is false',
+    steps: [{ script: { id: 'learn_category', as: 'asking', input: {} } }],
+  },
+  /* YES TO THAT QUESTION MAKES THE RULE: the question is about its entry (`transactions#N`), so the run is on that
+     entry, and the script reads the payee, the way and the category from it again at the press. */
+  {
+    rule: 'category-taught',
+    name: 'Make the filing rule a person said yes to',
+    pack: 'money-core',
+    on: { decided: { about: 'script.learn_category', option: 'Yes' } },
+    steps: [{ script: { id: 'learn_category', as: 'making', input: { answer: '{{trigger.option}}' } } }],
+  },
+  LEARN_CATEGORY_SCRIPT,
 ];
 
 /**

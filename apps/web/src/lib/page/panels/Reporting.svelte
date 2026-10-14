@@ -10,6 +10,11 @@
   places the live feed add-on can land a reading (`pollBindsTo`). A poll calls out and costs
   money, so nothing is fetched until the owner approves the address and the interval once, on Decide.
 
+  ON A LIVED ROW IT FOLDS TO ONE LINE (`setupFolded`, `foldedLine`): a row with a live key, a reading that names it, or
+  made before today draws what arrives here in one sentence and a button that opens the whole of this in place, so the
+  page opens on its own tiles. Only a row made today that holds nothing opens on setup. Open or shut is decided once a
+  visit and never saved, and a key just made opens it and keeps it open while it is shown.
+
   THE KEYS ARE READ AGAIN when the reader comes back to the tab and every half minute while it is in view, so a key
   the project has just used stops saying it never was.
 
@@ -27,7 +32,19 @@
   import Button from '$lib/ui/Button.svelte';
   import PollForm from './PollForm.svelte';
   import { pollBindsTo } from '$lib/record/poll-form.ts';
-  import { READINGS, bindable, bindingOf, curlLine, keyFor, organisationOf, type Binding } from '$lib/record/reporting.ts';
+  import {
+    FOLD_WORDS,
+    READINGS,
+    bindable,
+    bindingOf,
+    curlLine,
+    dayOf,
+    foldedLine,
+    keyFor,
+    organisationOf,
+    setupFolded,
+    type Binding,
+  } from '$lib/record/reporting.ts';
 
   let { register, seq, title }: { register: string; seq: number; title: string } = $props();
 
@@ -42,9 +59,18 @@
   let origin = $state('');
   /** The organisation that lists this project, which its readings name too, or null. */
   let listedBy = $state<string | null>(null);
+  /** How many readings name this row, and the newest one's time. */
+  let readings = $state(0);
+  let lastReading = $state<string | null>(null);
+  /** Whether the whole of setup is drawn, or only the one line it folds to. Per visit, never saved. */
+  let open = $state(false);
 
   const spoken = $derived(`${register}#${seq}`);
   const line = $derived(curlLine(origin, minted, copy.reportPlaceholder));
+  const bodyId = $derived(`report-${register}-${seq}`);
+  /** The newest time any of this row's keys was used, or null. */
+  const lastUsed = $derived(keys.reduce<string | null>((a, k) => (k.last_used_at && (!a || k.last_used_at > a) ? k.last_used_at : a), null));
+  const folded = $derived(foldedLine({ keys: keys.length, lastUsed, readings, lastReading }));
 
   async function load() {
     origin = location.origin;
@@ -57,17 +83,26 @@
       return;
     }
     field = bound.field;
+    /* THE ROW ITSELF, for the day it was made (whether setup folds) and, on a project, its id. */
+    const row = await client.get(register, seq);
+    const made = row.ok ? (row.value as { created_at?: unknown } | null)?.created_at : null;
     /* A PROJECT AN ORGANISATION LISTS reports for that organisation too, so its numbers are on the organisation's page. */
     let organisation: string | null = null;
     if (register === 'things' && bound.field !== 'organisation') {
-      const row = await client.get(register, seq);
       const orgs = await client.list({ register: 'organisations', limit: 200 });
-      const id = row.ok ? (row.value as { id?: unknown }).id : null;
+      const id = row.ok ? (row.value as { id?: unknown } | null)?.id : null;
       if (typeof id === 'string' && orgs.ok) organisation = organisationOf(orgs.value.rows as never, id);
     }
     listedBy = bound.links.includes('organisation') ? organisation : null;
     binding = bindingOf(bound.field, spoken, { source: bound.source, organisation, links: bound.links });
+    /* HOW MANY READINGS NAME THIS ROW, and when the newest is dated: one row read, and its count. */
+    const read = await client.list({ register: READINGS, where: { field: bound.field, is: spoken }, order: [{ field: 'at', dir: 'desc' }], limit: 1 });
+    readings = read.ok ? read.value.matched : 0;
+    const newest = read.ok ? (read.value.rows[0] as { fields?: { at?: unknown } } | undefined)?.fields?.at : null;
+    lastReading = typeof newest === 'string' ? newest : null;
     await list(client);
+    /* OPEN OR SHUT IS DECIDED ONCE A VISIT, here, and never saved: a key read again later does not fold it under the reader. */
+    open = !setupFolded({ keys: keys.length, readings, madeDay: dayOf(typeof made === 'string' ? made : null), today: dayOf(Date.now())! });
     from = 'ready';
   }
 
@@ -111,6 +146,7 @@
       return;
     }
     minted = out.value.bearer;
+    open = true;
     await list();
   }
 
@@ -130,43 +166,54 @@
 
 {#if from === 'ready'}
   <section class="report" aria-label={copy.reportHeading}>
-    <p class="report-why">{copy.reportWhy(title)}</p>
-
-    {#if minted}
-      {@const key = minted}
-      <div class="report-once" role="status">
-        <p class="report-label">{copy.tokenOnce}</p>
-        <p class="report-code">{key}</p>
-        <div class="report-do">
-          <Button weight="primary" onclick={() => void clipboard.put(key, copy.tokenCopied)}>{copy.copyToken}</Button>
-          <Button weight="bare" onclick={() => (minted = null)}>{copy.connectDone}</Button>
-        </div>
-      </div>
-    {/if}
-
-    <p class="report-label">{copy.reportLine}</p>
-    <p class="report-code">{line}</p>
-    <div class="report-do">
-      <Button weight="quiet" onclick={() => void clipboard.put(line, copy.lineCopied)}>{copy.copyLine}</Button>
-      {#if !cannot && !minted}
-        <Button weight="quiet" disabled={busy} onclick={() => void make()}>{copy.reportMake}</Button>
+    <!-- SETUP FOLDS TO ONE LINE on a lived row (`setupFolded`), so the page's own tiles hold the first screen. The
+         button opens today's whole panel in place; a key just made keeps it open while it is shown once. -->
+    <div class="report-fold">
+      <p class="report-folded">{folded}</p>
+      {#if !minted}
+        <Button weight="quiet" aria-expanded={open} aria-controls={bodyId} onclick={() => (open = !open)}>{open ? FOLD_WORDS.hide : FOLD_WORDS.show}</Button>
       {/if}
     </div>
-    {#if cannot}<p class="report-said" role="status">{cannot}</p>{/if}
 
-    {#if keys.length}
-      <ul class="report-keys" aria-label={copy.reportKeys}>
-        {#each keys as key (key.id)}
-          <li class="report-key">
-            <span class="report-key-name">{key.name ?? title}</span>
-            <span class="report-key-when">{key.last_used_at ? copy.usedWhen(since(key.last_used_at)) : copy.neverUsed}</span>
-            <Button weight="bare" disabled={busy} aria-label="{copy.revokeKey} {key.name ?? title}" onclick={() => void revoke(key)}>{copy.revokeKey}</Button>
-          </li>
-        {/each}
-      </ul>
-    {/if}
+    <div class="report-body" id={bodyId} hidden={!open}>
+      <p class="report-why">{copy.reportWhy(title)}</p>
 
-    {#if pollBindsTo(register, field)}<PollForm {register} {seq} {title} organisation={listedBy} />{/if}
+      {#if minted}
+        {@const key = minted}
+        <div class="report-once" role="status">
+          <p class="report-label">{copy.tokenOnce}</p>
+          <p class="report-code">{key}</p>
+          <div class="report-do">
+            <Button weight="primary" onclick={() => void clipboard.put(key, copy.tokenCopied)}>{copy.copyToken}</Button>
+            <Button weight="bare" onclick={() => (minted = null)}>{copy.connectDone}</Button>
+          </div>
+        </div>
+      {/if}
+
+      <p class="report-label">{copy.reportLine}</p>
+      <p class="report-code">{line}</p>
+      <div class="report-do">
+        <Button weight="quiet" onclick={() => void clipboard.put(line, copy.lineCopied)}>{copy.copyLine}</Button>
+        {#if !cannot && !minted}
+          <Button weight="quiet" disabled={busy} onclick={() => void make()}>{copy.reportMake}</Button>
+        {/if}
+      </div>
+      {#if cannot}<p class="report-said" role="status">{cannot}</p>{/if}
+
+      {#if keys.length}
+        <ul class="report-keys" aria-label={copy.reportKeys}>
+          {#each keys as key (key.id)}
+            <li class="report-key">
+              <span class="report-key-name">{key.name ?? title}</span>
+              <span class="report-key-when">{key.last_used_at ? copy.usedWhen(since(key.last_used_at)) : copy.neverUsed}</span>
+              <Button weight="bare" disabled={busy} aria-label="{copy.revokeKey} {key.name ?? title}" onclick={() => void revoke(key)}>{copy.revokeKey}</Button>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+
+      {#if pollBindsTo(register, field)}<PollForm {register} {seq} {title} organisation={listedBy} />{/if}
+    </div>
   </section>
 {/if}
 
@@ -176,6 +223,27 @@
     gap: var(--sp-2);
     max-inline-size: var(--measure);
     margin-block-start: var(--sp-3);
+  }
+
+  .report-fold {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2) var(--sp-3);
+  }
+
+  .report-folded {
+    flex: 1 1 16rem;
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-base);
+    text-wrap: pretty;
+  }
+
+  /* THE PANEL ITSELF, today's whole of it, drawn only while open; `hidden` keeps the poll form's half-typed fields. */
+  .report-body:not([hidden]) {
+    display: grid;
+    gap: var(--sp-2);
   }
 
   .report-why {

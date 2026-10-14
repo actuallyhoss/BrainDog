@@ -96,8 +96,8 @@ function standsIn(hay: string, needle: string): boolean {
 }
 
 /**
- * A repository as the `said` vote looks for it: its owner and name (`sam/bake`), whatever address it was listed by
- * (`https://github.com/sam/bake.git`, `git@github.com:sam/bake`). `null` for one with no owner, which would be found
+ * A repository as the `said` vote looks for it: its owner and name (`sam/bakery`), whatever address it was listed by
+ * (`https://github.com/sam/bakery.git`, `git@github.com:sam/bakery`). `null` for one with no owner, which would be found
  * in any sentence holding the bare word.
  */
 function repoOf(listed: string): string | null {

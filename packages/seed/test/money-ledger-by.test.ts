@@ -136,7 +136,7 @@ test('THE WRITTEN LINE COUNTS THE DAY, from the two figures over who made the en
   const said = (LEDGER[0] as { body?: unknown }).body;
   assert.equal(typeof said, 'string', 'the Ledger tile has no written line');
   const text = String(said);
-  for (const id of Object.keys(FILING_FIGURES)) assert.ok(text.includes(`{{${id}}}`), `the line does not read ${id}, which is drawn nowhere else`);
+  for (const id of ['filed-for-you-30d', 'filed-today']) assert.ok(text.includes(`{{${id}}}`), `the line does not read ${id}, which is drawn nowhere else`);
   /* A LINE A PERSON READS: no dash, and none of the words that name the record's own parts. */
   assert.doesNotMatch(text, /[—–]/u);
   assert.doesNotMatch(text, /\b(rows?|entity|entities|list items?)\b/iu);

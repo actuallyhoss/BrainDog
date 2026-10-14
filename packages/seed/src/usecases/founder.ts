@@ -259,6 +259,14 @@ const GONE_QUIET: Record<string, unknown> = {
 };
 
 /**
+ * WHERE IT WAS SEEN (ENG-B03), SINCE 2.6.0: the notes, runs and rows that name the project, the person or the
+ * organisation a page is for, newest first, which the record's `about` read answers and the app draws under this heading
+ * (`panel: seen`). LAST ON EACH PAGE, holding only its panel, so nothing before the fold moves. The same block on the
+ * three, so a person renaming the heading on one keeps what it draws.
+ */
+const WHERE_SEEN: Record<string, unknown> = { kind: 'section', heading: 'Where it was seen', icon: 'history', span: 12, panel: 'seen' };
+
+/**
  * A SERVICE LAPSING WITHIN THIRTY DAYS, EITHER SIDE OF TODAY, SINCE 1.16.0: one whose renewal passed in the last month
  * and can still be saved, or that lapses in the next. `state is lapsing` alone listed every domain somebody chose to
  * let go, renewing in a year's time, on the page read every morning. The Services page still counts them all.
@@ -406,7 +414,12 @@ export const FOUNDER = {
      quiet, six lines at most and not drawn while nothing is. A record with its own Home never drew the browser's. It
      is a seventh tile on a page held to six, so Working now is folded shut under Agents at work, beneath the line that
      says how many agents work. Two blocks added, nothing taken away, and no list or figure asked for, so it stays
-     inside the unreleased 2.6.0. */
+     inside the unreleased 2.6.0.
+
+     AND EACH PAGE SAYS WHERE ITS THING WAS SEEN (ENG-B03, batch 91). A project's page, and People's pages for an
+     organisation and a person, end with "Where it was seen", a section naming `panel: seen`, under which the app draws
+     the notes, runs and rows that name it, newest first, from the record's `about` read. Three blocks added, nothing
+     taken away, so still inside the unreleased 2.6.0. */
   version: '2.6.0',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
@@ -728,13 +741,18 @@ export const FOUNDER = {
         /* THE NUMBERS AND WHERE THEY ARE SENT BEFORE THE TEMPLATE'S MORE ABOUT TILE, SINCE founder 2.1.0: a box holds
            every block after it up to the next section, so under it the numbers would be a part of that tile and not the
            project's own figures, and the key would sit under the tile, a screen away from the numbers it sends. */
-        blocks: beforeMore(
-          withNumbersThisWeek(projectTemplate(HOLDS).blocks as Record<string, unknown>[]),
-          numbers('thing is {{name}}'),
-          /* IN THE MAIN COLUMN UNDER THE PROJECT'S NUMBERS, and the one place on the page the key is drawn: More about
-             the project draws the scheduled actions alone (`BlockSlot.svelte`). */
-          { kind: 'section', heading: 'Send numbers here', icon: 'observe', span: 12, panel: 'reporting' },
-        ),
+        blocks: [
+          ...beforeMore(
+            withNumbersThisWeek(projectTemplate(HOLDS).blocks as Record<string, unknown>[]),
+            numbers('thing is {{name}}'),
+            /* IN THE MAIN COLUMN UNDER THE PROJECT'S NUMBERS, and the one place on the page the key is drawn: More about
+               the project draws the scheduled actions alone (`BlockSlot.svelte`). */
+            { kind: 'section', heading: 'Send numbers here', icon: 'observe', span: 12, panel: 'reporting' },
+          ),
+          /* AFTER THE MORE ABOUT TILE, SINCE 2.6.0 (`WHERE_SEEN`): a section ends the box before it, so the tile keeps
+             what it held. */
+          WHERE_SEEN,
+        ],
       },
     ],
     seeds: [{ register: 'datapoints', fields: { name: 'Monthly recurring revenue', value: 4200, unit: 'GBP', source: 'example', at: '-1d' } }],
@@ -786,6 +804,11 @@ export const FOUNDER = {
       /* A SERVICE'S NUMBERS, ON RENEWALS, SINCE 2.6.0 (REC-C12): Estate's page, and this pack's list, so the block is
          laid from here and said beside the page (`SERVICE_NUMBERS`). After the others, so they keep their places. */
       SERVICE_NUMBERS,
+      /* WHERE AN ORGANISATION AND A PERSON WERE SEEN, SINCE 2.6.0 (`WHERE_SEEN`). After Notes, the last of People's own
+         blocks on both pages, so each page ends with it as a project's does, and goes last anyway where somebody took
+         Notes away (`page-adds.ts`). Last here, so the additions before keep their numbers. */
+      { page: 'page.relation', after: 'Notes', block: WHERE_SEEN },
+      { page: 'page.someone', after: 'Notes', block: WHERE_SEEN },
     ],
   },
 };

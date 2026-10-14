@@ -105,7 +105,7 @@ export async function surfaceOver(clientFor: (ctx: Ctx) => Client): Promise<McpS
   const allowed = refused(probe) ? (probe.refusal as { allowed?: unknown }).allowed : undefined;
   const routed = new Set(Array.isArray(allowed) ? allowed : []);
 
-  const later: Pick<McpSurface<Ctx>, (typeof LATER)[number] | 'actions' | 'figures'> = {};
+  const later: Pick<McpSurface<Ctx>, (typeof LATER)[number] | 'actions' | 'figures' | 'offered'> = {};
   for (const name of LATER) if (routed.has(name)) later[name] = (args: object, ctx: Ctx) => ask<unknown>(ctx, name, args);
   /* `actions` TAKES NO ARGUMENTS, so it is written out rather than folded into the loop above: the surface declares it
      as `(ctx)` alone, and giving it the loop's `(args, ctx)` shape is a compile error, not a harmless widening. */
@@ -114,6 +114,10 @@ export async function surfaceOver(clientFor: (ctx: Ctx) => Client): Promise<McpS
      Without it `record_index` names only the figures a page draws; the probe keeps it off until
      the client's table carries the name, so no call goes out for a route that is not there. */
   if (routed.has('figures')) later.figures = (ctx: Ctx) => ask<{ id: string; name?: string }[]>(ctx, 'figures');
+  /* AND `offered`, WHICH IS WHY A STDIO SESSION'S LIST OF RESOURCES IS ONE ROUND TRIP (AGT-B04): without it the door
+     reads every fixed address and draws every page to learn what to list, a round trip each over this transport. A host
+     that answers it with a refusal is listed the old way, so a host older than the route costs nothing but the time. */
+  if (routed.has('offered')) later.offered = (ctx: Ctx) => ask<unknown>(ctx, 'offered');
 
   return {
     boot: (ctx) => ask(ctx, 'boot'),

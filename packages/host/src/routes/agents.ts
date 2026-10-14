@@ -9,6 +9,10 @@
  * one write, and the record picks the state. `beat` IS ONE TOO, in the same group for the same caller, though it changes
  * no version and writes no history: a session saying it is still working moves its run's clock in place (AGT-C03).
  *
+ * `offered` IS THE AGENT DOOR'S LIST OF RESOURCES IN ONE READ (AGT-B04, `packages/record/src/methods/offered.ts`): what
+ * an agent may read, decided by the check each address's own reader asks and never by running the read, so a session
+ * starting on a large record lists its resources without drawing a page. It writes nothing.
+ *
  * THE JOB ROWS ARE HERE, and their methods are in
  * `packages/record/src/jobs.ts`, not beside `triage`. `docs/30-BLUEPRINT.md` §5 has named every one of them since tier C
  * was written; a record without them answers each `NOT_IN_THIS_BUILD` through `handlersFor`, never a 500.
@@ -19,6 +23,7 @@ import type { Route } from '../index.ts';
 export const ROUTES: readonly Route[] = [
   { name: 'usedBy', group: 'READ+', writes: false, what: 'Which runs used one key or one tool, the one that used it last first, each with its agent, its machine, when and how often.',
     takes: { spoken: 'text' } },
+  { name: 'offered', group: 'READ+', writes: false, what: 'Everything you may read here, in one read: the fixed addresses, the lists, the pages, the figures, and the skills by name with when to use each. It changes nothing.' },
   { name: 'end', group: 'DATA', writes: true, what: 'Say this agent’s session closed. Its run ends as done, or waits for the next session when it left a fresh next step. An agent only.' },
   { name: 'beat', group: 'DATA', writes: true, what: 'Say this agent is still working between writes, so its run reads as working. Nothing is added to its history. An agent only.' },
   { name: 'triage', group: 'DATA', writes: true, what: 'File one arrival from the inbox as a row, set it aside, or put a filed or archived one back.' },

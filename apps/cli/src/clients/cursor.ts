@@ -30,9 +30,9 @@ import type { Applied, Client, Env, Plan, ServerSet, Want } from './index.ts';
 /* ── where a JSON value is in its text ────────────────────────────────── */
 
 type Member = { key: string; start: number; valueStart: number; valueEnd: number };
-type Obj = { open: number; close: number; members: Member[] };
+export type Obj = { open: number; close: number; members: Member[] };
 
-const skipWs = (text: string, i: number): number => {
+export const skipWs = (text: string, i: number): number => {
   while (i < text.length && ' \t\r\n'.includes(text[i]!)) i++;
   return i;
 };
@@ -65,7 +65,7 @@ function skipValue(text: string, i: number): number {
 }
 
 /** The object whose `{` is at `at`: where it closes, and where each member's key and value are. */
-function objectAt(text: string, at: number): Obj {
+export function objectAt(text: string, at: number): Obj {
   const members: Member[] = [];
   let i = skipWs(text, at + 1);
   if (text[i] === '}') return { open: at, close: i, members };
@@ -84,7 +84,7 @@ function objectAt(text: string, at: number): Obj {
 }
 
 /** The spaces or tabs that start the line holding `pos`. */
-const indentOf = (text: string, pos: number): string => /^[ \t]*/.exec(text.slice(text.lastIndexOf('\n', pos - 1) + 1))![0];
+export const indentOf = (text: string, pos: number): string => /^[ \t]*/.exec(text.slice(text.lastIndexOf('\n', pos - 1) + 1))![0];
 
 /** A value as the file would print it: the file's own indent unit, every line after the first under `indent`. */
 const render = (value: unknown, indent: string, unit: string): string => JSON.stringify(value, null, unit).replaceAll('\n', `\n${indent}`);

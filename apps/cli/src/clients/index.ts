@@ -3,9 +3,9 @@
  * machine, where it keeps its servers for a person and for a repository, how to read them, and how to write the
  * record's tools into them. `tools.ts` and `setup.ts` go through the table and know no app's files of their own.
  *
- * CLAUDE CODE, CODEX AND CURSOR FOR NOW. The others (VS Code, Claude Desktop, Windsurf, `others.ts`, still to come)
- * join as one file each beside `claude.ts`, once their paths and formats are read from a real install and their own
- * documents, never guessed.
+ * CLAUDE CODE, CODEX, CURSOR, CLAUDE DESKTOP AND VS CODE, in that order. The last two are `others.ts`, their paths and
+ * formats read from a real install and their own documents. Windsurf is not in: the address of its own document now
+ * opens another app's page, so its path is not settled, and it is never guessed (`others.ts`'s header says so).
  *
  * IMPORT THIS FILE, NEVER A CLIENT'S OWN. A client module calls the machine helpers below, and this file builds the
  * table from the client modules, so each imports the other. Entered here, each client is evaluated first and calls
@@ -19,10 +19,12 @@ import { join, resolve } from 'node:path';
 import { claude } from './claude.ts';
 import { codex } from './codex.ts';
 import { cursor } from './cursor.ts';
+import { claudeDesktop, vscode } from './others.ts';
 
 export { claude, runClaude, type ClaudeRunner } from './claude.ts';
 export { codex } from './codex.ts';
 export { cursor } from './cursor.ts';
+export { claudeDesktop, vscode } from './others.ts';
 
 export type Env = Record<string, string | undefined>;
 
@@ -67,7 +69,7 @@ export type Client = {
 };
 
 /** The table. */
-export const CLIENTS: readonly Client[] = [claude, codex, cursor];
+export const CLIENTS: readonly Client[] = [claude, codex, cursor, claudeDesktop, vscode];
 
 /** The client whose entries `braindog tools write` writes when none is named. */
 export const DEFAULT_CLIENT = claude.id;

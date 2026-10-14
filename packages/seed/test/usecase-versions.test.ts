@@ -1470,9 +1470,9 @@ const DECLARED: Record<string, Version> = {
       setting.voice_pen_waits setting.voice_right_now setting.voice_since_away setting.voice_working_now
       adds.page.relation.1 adds.page.relation.2 adds.page.relation.3 hands.register.organisations.people
       metric.project-numbers-7d metric.projects-earning-silent adds.page.portfolio.4
-      adds.page.estate.5 metric.service-numbers
+      adds.page.estate.5 metric.service-numbers adds.page.relation.6 adds.page.someone.7
     `,
-    declares: '6bb5b7dec0fe3e2b',
+    declares: 'bd926c3bbb84b916',
     history: [
       "`setting.voice_home` and the title of `page.home-founder` say Today where both said Overview; `due-this-week` and Due this week start today; `late-money` is added with a Late table ahead of the week, oldest first; Lapsing loses its Cost column -> 1a6e6f8b5a7311cc",
       "Folded into the unreleased 2.6.0 (sketchpad-60; integrate 60): `page.project`'s Tools and servers reads the project's own tools alone (`kind is tool, scope is project`), so a project with none of its own draws no card where it listed everybody's -> 11f22bd8f6e3f8d2",
@@ -1485,6 +1485,7 @@ const DECLARED: Record<string, Version> = {
       "Inside the unreleased 2.6.0 (project-runs-tile-87, AGT-C12 job d and AGT-D12 job 2; integrate 87; commit 63423720 holds 2.5.0): `page.project`'s Agents reads a run of its own that wrote something (`parent is empty, wrote is not 0`), titled by the agent with `doing_said` under it; Keys, Tools and servers and Skills sit under a boxed section Runs on, a third of the tile each where each was a half, with And from everywhere under them (`kind is not action, scope is global`, five); Money by month is the tile's width where it was a half, so no row is left with a hole over the new heading; no id added or taken away -> 86861bc4c9e643e6",
       "Inside the unreleased 2.6.0 (founder-home-quiet-88, ENG-B13 'Seen'; batch 88; commit 63423720 holds 2.5.0, and the task asked for 2.7.0, which this file's own rule refuses for a version never released): `page.home-founder` draws Gone quiet, a table over the source `exceptions` with What, Last seen and Before, six lines at most, straight under what the money is and not drawn while nothing is quiet; it was a seventh tile, so Working now is folded shut under a section Agents at work, held to `runs-working` as its table is; two blocks added, no id added or taken away -> 48875c311c09ba01",
       "Inside the unreleased 2.6.0 (runs-on-section-89, AGT-D12 job 2; batch 89; commit 63423720 holds 2.5.0): `page.project`'s Keys, Tools and servers and Skills draw six rows each where they drew three, and Keys, Tools and servers and And from everywhere name who used each by `used_agents`, labelled Used by, where Keys and Tools named `used_by` and And from everywhere `used_agent`, each labelled Last used by; no id added or taken away -> 6bb5b7dec0fe3e2b",
+      "Inside the unreleased 2.6.0 (seen-section-91, ENG-B03 'Seen: the about answer'; batch 91; commit 63423720 holds 2.5.0): `page.project` ends with a section Where it was seen naming `panel: seen`, after its More about tile, and the same section is laid on People's pages for an organisation and a person after Notes, the last block of their own (`adds.page.relation.6`, `adds.page.someone.7`), last among the additions so those before keep their numbers; three blocks added, nothing taken away -> bd926c3bbb84b916",
     ],
   },
   'team@2.19.0': {

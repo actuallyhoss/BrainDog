@@ -216,12 +216,21 @@ test('a roadmap over a list that names no columns is refused, naming the three i
   sql.close();
 });
 
-test('A SECTION MAY NAME THE RUN PANEL, drawn on a run’s own page, and any other word is refused naming the three', async () => {
+test('A SECTION MAY NAME THE RUN PANEL, drawn on a run’s own page, and any other word is refused naming the four', async () => {
   const { panelFault, PANELS } = await import('./words.ts');
-  assert.deepEqual([...PANELS], ['actions', 'reporting', 'run']);
+  assert.deepEqual([...PANELS], ['actions', 'reporting', 'run', 'seen']);
   assert.equal(panelFault('run', true), null);
   const odd = panelFault('runs', true);
   assert.equal(odd?.at, 'panel');
-  assert.match(odd?.fix ?? '', /actions, reporting, run/);
+  assert.match(odd?.fix ?? '', /actions, reporting, run, seen/);
   assert.equal(panelFault('run', false)?.at, 'panel', 'a page about no row has no run to draw');
+});
+
+test('A SECTION MAY NAME THE SEEN PANEL on a page per row, and on a page about no row it is refused', async () => {
+  const { panelFault } = await import('./words.ts');
+  assert.equal(panelFault('seen', true), null);
+  assert.equal(panelFault('seen', null), null, 'a block read on its own cannot say');
+  const astray = panelFault('seen', false);
+  assert.equal(astray?.code, 'DECLARATION_INVALID');
+  assert.match(astray?.fix ?? '', /panel: seen draws a part of one row's page/u);
 });

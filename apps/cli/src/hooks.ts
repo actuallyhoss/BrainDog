@@ -12,7 +12,6 @@
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 
 import type { Client, Context } from '@braindog/client';
@@ -22,8 +21,8 @@ import { briefing, cardOf, nextLine, words, type Moved, type Where } from './bri
 import { budgetOf, clientFor, hostsPath, readHosts, sameHost, target, type Target } from './http.ts';
 import { authoredIn, childHeads, commitsBy, joinedAt, listedBy, localRepo, LOG_FORMAT, meeter, meetingOf, MIN_COMMITS, ownerOf, readLayout, type Layout, type MeetCall, type Meeting, type Owner, type Reader } from './people.ts';
 import { cliBuild, git, hostSessionOf, positionOf, sessionHeaders, type Parent, type Position } from './position.ts';
-import { syncSkills, type AgentIo } from './skills.ts';
-import { depositor, scanTools } from './tools.ts';
+import type { AgentIo } from './skills.ts';
+import { startWork } from './session-start.ts';
 
 type Env = Record<string, string | undefined>;
 
@@ -558,60 +557,8 @@ export async function hookStart(io: Io): Promise<void> {
   }
 }
 
-/** Each of the sync and the scan gets at most this long, inside what is left of the hook's budget. */
-export const START_WORK_MS = 3_000;
-
-/**
- * Skills sync, then tools scan, at a session's start, and what each did as one item of the card's More.
- *
- * A COUNT AND NOT THE LINES. What the two did is housekeeping: files written, a row recorded, an edit proposed, which
- * the owner meets on Decide and `braindog skills sync` and `braindog tools scan` say in full. Their lines carried file
- * paths and ids, and are not what an agent starts from.
- *
- * NOTHING AT ALL WHEN THE RECORD HAS NEITHER REGISTER: no request, no file read. Each runs on its own client and
- * deadline, and a failure is one fixed item, because an error could quote anything.
- */
-async function startWork(io: Io, to: Target, at: Position, context: Context, run: { spoken: string; client_id?: string }, until: number): Promise<string[]> {
-  const wants = (id: string) => context.registers.some((r) => r.id === id);
-  if (!wants('skills') && !wants('tools')) return [];
-  const home = io.home ?? homedir();
-  const found = await git(at.cwd, 'rev-parse', '--show-toplevel');
-  const top = found === null ? null : resolve(found);
-  const headers = sessionHeaders(at, 'claude', run, { env: io.env });
-  const said: string[] = [];
-  const step = async (label: string, work: (client: Client, signal: AbortSignal, ms: number) => Promise<string[]>) => {
-    const left = until - Date.now() - 250;
-    if (left <= 0) return;
-    const ms = Math.min(START_WORK_MS, left);
-    const signal = AbortSignal.timeout(ms);
-    try {
-      const lines = await work(clientFor(to, async () => headers, signal), signal, ms);
-      if (lines.length > 0) said.push(`${label}: ${String(lines.length)} change${lines.length === 1 ? '' : 's'}`);
-    } catch {
-      said.push(`${label} skipped`);
-    }
-  };
-  if (wants('skills'))
-    /* The list read stops at half the step's time, on the hook's clock, so what was read is still acted on inside it. */
-    await step('skills sync', (client, _signal, ms) =>
-      syncSkills({ client, context, home, configDir: io.env.CLAUDE_CONFIG_DIR || join(home, '.claude'), top, dryRun: false, until: Date.now() + ms / 2 }),
-    );
-  if (wants('tools'))
-    await step('tools scan', (client, signal) =>
-      scanTools({
-        client,
-        context,
-        top,
-        cwd: at.cwd,
-        home,
-        dryRun: false,
-        deposit: depositor({ file: hostsPath(io.env), env: io.env, host: to.key, headers, signal }),
-        /* The no-grant sentence once, not at every start. */
-        once: { host: to.key, hosts: hostsPath(io.env) },
-      }),
-    );
-  return said;
-}
+/* The start work itself (`startWork`) lives in `session-start.ts`, so the MCP server can do it too for an app with no hook. */
+export { START_WORK_MS } from './session-start.ts';
 
 /* ── the people met in this session's commits ──────────────────────────── */
 

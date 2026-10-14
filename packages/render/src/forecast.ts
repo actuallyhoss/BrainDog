@@ -37,6 +37,8 @@ import { readAmount, writeAmount, type AmountSetting } from './money.ts';
 const at = (n: number): string => String(Math.round(n * 100) / 100);
 const DAY_MS = 86_400_000;
 const ISO = /^\d{4}-\d{2}-\d{2}$/u;
+/** A calendar month as the host writes one, `2026-07`. */
+const MONTH = /^(\d{4})-(0[1-9]|1[0-2])$/u;
 const MONTH_DAYS = 30.4375;
 const YEAR_DAYS = MONTH_DAYS * 12;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -124,6 +126,12 @@ export type ForecastModel = {
    */
   spent: number | null;
   /**
+   * The calendar months `spent` was measured over, from the `spent` row's third cell (`2026-07..2026-09`), or `null`
+   * when there is no `spent` row or the cell does not hold two months in order. The one line of everyday spending says
+   * them (`forecastEveryday`).
+   */
+  measured: { from: string; to: string } | null;
+  /**
    * The last day the walk is drawn from what the record knows, from a `known | 2026-12-31 |  |` row, or `null` when the
    * host sent none and the walk's last dated movement is it. The line is solid to it and dashed beyond.
    */
@@ -191,11 +199,22 @@ export type Scenario = {
 const ms = (day: string): number => Date.parse(`${day}T12:00:00Z`);
 export const addDays = (day: string, n: number): string => new Date(ms(day) + n * DAY_MS).toISOString().slice(0, 10);
 export const daysBetween = (from: string, to: string): number => Math.round((ms(to) - ms(from)) / DAY_MS);
-/** `12 Nov`, the way a sentence over a chart says a day. */
-export const shortDay = (day: string): string => {
+/**
+ * `12 Nov`, the way a sentence over a chart says a day, and `12 Nov 2027` when `today` is given and the day is in
+ * another year: a walk of a year said "Stays above zero to 14 Oct", which reads as this October, a year early.
+ */
+export const shortDay = (day: string, today?: string): string => {
   if (!ISO.test(day)) return day;
   const d = new Date(ms(day));
-  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
+  const year = today !== undefined && ISO.test(today) && today.slice(0, 4) !== day.slice(0, 4) ? ` ${day.slice(0, 4)}` : '';
+  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}${year}`;
+};
+
+/** `Jul`, a calendar month as a person says it, and `Nov 2025` when `today` is in another year. */
+export const shortMonth = (month: string, today: string): string => {
+  const m = MONTH.exec(month);
+  if (!m) return month;
+  return `${MONTHS[Number(m[2]) - 1]}${m[1] === today.slice(0, 4) ? '' : ` ${m[1]}`}`;
 };
 
 /** A whole number written in a cell, at least `least`, or `null`. */
@@ -239,6 +258,7 @@ export function forecastModel(rows: readonly (readonly string[])[]): ForecastMod
     shows: showsOf(rows),
     home,
     spent: spentOf(rows.find((r) => r[0]?.trim() === 'spent'), opening[3]!),
+    measured: measuredOf(rows.find((r) => r[0]?.trim() === 'spent'), opening[3]!),
     known: knownOf(rows.find((r) => r[0]?.trim() === 'known'), today),
     headline: rows.some((r) => r[0]?.trim() === 'headline' && r[1]?.trim() === 'under'),
   };
@@ -266,6 +286,18 @@ function spentOf(row: readonly string[] | undefined, opening: string): number | 
   const cell = row?.[3]?.trim() ?? '';
   const v = Math.abs(signedOf(cell));
   return cell && Number.isFinite(v) && v > 0 && unitOf(cell) === unitOf(opening) ? v : null;
+}
+
+/**
+ * A `spent | 3 | 2026-07..2026-09 | £2,400.00` row's months, or `null`.
+ *
+ * ONLY BESIDE A FIGURE THIS WALK READS: months with no amount the walk can use would say how something unsaid was
+ * measured. Two months out of order, or a cell in any other shape, say nothing rather than a wrong span.
+ */
+function measuredOf(row: readonly string[] | undefined, opening: string): ForecastModel['measured'] {
+  const [from = '', to = '', ...more] = (row?.[2] ?? '').trim().split('..');
+  if (more.length || !MONTH.test(from) || !MONTH.test(to) || from > to || spentOf(row, opening) === null) return null;
+  return { from, to };
 }
 
 /**
@@ -632,8 +664,12 @@ const SPEND_STOPS = 50;
 /** The months of going out the spend slider's reach is measured over. */
 const SPEND_MONTHS = 3;
 
-/** The spend slider's reach and its step, both in the walk's own money. */
-export type SpendRange = { max: number; step: number };
+/**
+ * The spend slider: its two ends and its step, all in the walk's own money, what it is called and the note under it,
+ * and the amount it is measured against, `null` where the record measured nothing and the slider adds what it does
+ * not know.
+ */
+export type SpendRange = { min: number; max: number; step: number; name: string; note: string; measured: number | null };
 
 /**
  * The spend slider: from nothing to twice what goes out in an average month, in steps that are round in the money
@@ -648,13 +684,57 @@ export type SpendRange = { max: number; step: number };
  * A WALK WITH NOTHING GOING OUT reaches a sixth of its opening balance, twice a twelfth, the same measure of a month;
  * and a walk with neither has only the smallest stops.
  */
-export function spendRange(model: ForecastModel): SpendRange {
+export function spendRange(model: ForecastModel, key = ''): SpendRange {
   const until = addDays(model.today, Math.round(SPEND_MONTHS * MONTH_DAYS));
   const ahead = model.steps.reduce((n, s) => (s.delta < 0 && s.day <= until ? n - s.delta : n), 0) / SPEND_MONTHS;
   const month = model.spent ?? (ahead > 0 ? ahead : Math.abs(model.opening) / 12);
-  if (!(month > 0)) return { max: SPEND_STOPS, step: 1 };
+  const unknown = { min: 0, name: key ? forecastSpendIn(key) : FORECAST_SPEND, note: FORECAST_SPEND_NOTE, measured: null };
+  if (!(month > 0)) return { ...unknown, max: SPEND_STOPS, step: 1 };
   const step = roundStep((2 * month) / SPEND_STOPS);
-  return { max: Math.max(step, Math.ceil((2 * month) / step) * step), step };
+  if (model.spent === null) return { ...unknown, max: Math.max(step, Math.ceil((2 * month) / step) * step), step };
+  /* SPENDING THE RECORD MEASURED IS MOVED UP OR DOWN FROM WHERE IT IS, so the slider runs from spending none of it to
+     spending it twice, opening on no change. Each end is a whole number of steps, so no change is a stop, and never past
+     the measured amount: below it the walk would be paid for spending less than nothing. */
+  const reach = Math.max(step, Math.floor(model.spent / step) * step);
+  return { min: -reach, max: reach, step, name: key ? forecastMeasuredIn(key) : FORECAST_SPEND_MEASURED, note: everydaySaid(model, model.spent), measured: model.spent };
+}
+
+/**
+ * What the spend slider reads at `value`, its amount already written as `figure` without a sign: `E£2,000 a month` where
+ * it adds spending the record does not know, and where it moves what was measured, `No change`, `E£2,000 more a month`
+ * or `E£2,000 less a month`.
+ */
+export const spendSaid = (range: SpendRange, value: number, figure: string): string =>
+  range.measured === null ? forecastPerMonth(figure) : value === 0 ? FORECAST_SPEND_SAME : value > 0 ? forecastSpendMore(figure) : forecastSpendLess(figure);
+
+/** Whether a step is a week's share of everyday spending, as the record's walk names those steps. */
+export const isEveryday = (s: { label: string }): boolean => s.label === FORECAST_EVERYDAY;
+
+/** The movements "Every movement" lists one by one: every step but the weekly shares of everyday spending. */
+export const listedSteps = <T extends { label: string }>(steps: readonly T[]): T[] => steps.filter((s) => !isEveryday(s));
+
+/**
+ * The one line "Every movement" holds for everyday spending, `Everyday spending, measured from Jul to Sep: E£41,200 a
+ * month`, or `''` when the walk on screen moves none.
+ *
+ * ONE LINE, NOT A ROW A WEEK. The record walks a week's share of everyday spending every seventh day, so a year's walk
+ * listed fifty-two lines of the same amount between the bills a person reads the list for. The monthly amount is the
+ * one the record measured (`spent`); a walk that came without it is said from its own weekly shares.
+ */
+export function forecastEveryday(model: ForecastModel, shown: Scenario): string {
+  if (!shown.steps.some(isEveryday)) return '';
+  const weeks = model.steps.filter(isEveryday);
+  /* A MONTH SAID FROM WEEKS IS SAID IN WHOLE UNITS, because a week's share was rounded to the cent and twelve over
+     fifty-two of it comes back a cent or two short of the month it was cut from. */
+  const monthly = model.spent ?? Math.round((-weeks.reduce((n, s) => n + s.delta, 0) / weeks.length) * (52 / 12));
+  return everydaySaid(model, monthly);
+}
+
+/** The everyday line's words for a monthly amount, the months it was measured over said when the host sent them. */
+function everydaySaid(model: ForecastModel, monthly: number): string {
+  const m = model.measured;
+  const over = !m ? '' : m.from === m.to ? `, measured in ${shortMonth(m.from, model.today)}` : `, measured from ${shortMonth(m.from, model.today)} to ${shortMonth(m.to, model.today)}`;
+  return `${FORECAST_EVERYDAY}${over}: ${forecastPerMonth(forecastFigure(model, Math.abs(monthly), 'read'))}`;
 }
 
 /** The round number at or above `n`, 1, 2 or 5 times a power of ten, and never less than one of the money's units. */
@@ -764,7 +844,8 @@ export function against(base: Scenario, shown: Scenario, moved: boolean): string
     return n < 0 ? forecastSooner(-n) : forecastLater(n);
   }
   if (base.crossed) return FORECAST_NO_LONGER;
-  if (shown.crossed) return forecastNow(shortDay(shown.crossed.day));
+  /* THE WALK'S FIRST DAY IS TODAY, so a crossing in another year says its year. */
+  if (shown.crossed) return forecastNow(shortDay(shown.crossed.day, base.days[0]?.day));
   return FORECAST_STILL;
 }
 
@@ -1016,16 +1097,16 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
     ticks.unshift({ at: '0', label: yearly ? start.slice(0, 4) : tickLabel(start, every), edge: true });
 
   const c = shown.crossed;
-  const said = c ? forecastUnder(shortDay(c.day)) : forecastAbove(shortDay(end));
+  const said = c ? forecastUnder(shortDay(c.day, model.today)) : forecastAbove(shortDay(end, model.today));
   const nowAt = daysBetween(start, model.today) / span;
   const figure = (v: number) => forecastFigure(model, v);
   /* `--at` IS A SHARE, as every chart's ticks read it, and `y` answers in the box's hundred units. */
   const axis = levels.map((v) => ({ at: String(Math.round(Number(y(v)) * 100) / 10_000), label: forecastFigure(model, v, 'axis'), zero: v === 0 }));
   const sentence = [
     `${model.label || FORECAST_BALANCE} ${figure(model.opening)} ${FORECAST_TODAY}`,
-    model.past.length ? forecastRecorded(shortDay(model.past[0]!.day), figure(model.past[0]!.value)) : '',
+    model.past.length ? forecastRecorded(shortDay(model.past[0]!.day, model.today), figure(model.past[0]!.value)) : '',
     said,
-    forecastLowest(figure(shown.lowest.balance), shortDay(shown.lowest.day)),
+    forecastLowest(figure(shown.lowest.balance), shortDay(shown.lowest.day, model.today)),
   ]
     .filter(Boolean)
     .join('. ');
@@ -1116,6 +1197,12 @@ export const FORECAST_HORIZON = 'Horizon';
 export const FORECAST_LATE = 'Money in arrives late by';
 export const FORECAST_SPEND = "Spending the record doesn't know";
 export const FORECAST_SPEND_NOTE = "the record only knows bills you've entered";
+/** The record's own name for a week's share of everyday spending, which its walk gives every such step. */
+export const FORECAST_EVERYDAY = 'Everyday spending';
+export const FORECAST_SPEND_MEASURED = 'Spend more or less each month';
+export const FORECAST_SPEND_SAME = 'No change';
+export const forecastSpendMore = (figure: string): string => `${figure} more a month`;
+export const forecastSpendLess = (figure: string): string => `${figure} less a month`;
 export const FORECAST_GROW_OUT = 'Spending grows by';
 export const FORECAST_GROW_IN = 'Money in grows by';
 export const FORECAST_COUNT = 'What counts';
@@ -1164,6 +1251,8 @@ export const forecastDays = (n: number): string => `${n} ${n === 1 ? 'day' : 'da
 export const forecastPerMonth = (figure: string): string => `${figure} a month`;
 /** Spending the record does not know in one currency of a walk drawn once per currency, the currency by its name. */
 export const forecastSpendIn = (key: string): string => `${FORECAST_SPEND}, in ${/^[A-Z]{3}$/u.test(key) ? currencyName(key) : key}`;
+/** Measured spending moved in one currency of a walk drawn once per currency, the currency by its name. */
+export const forecastMeasuredIn = (key: string): string => `${FORECAST_SPEND_MEASURED}, in ${/^[A-Z]{3}$/u.test(key) ? currencyName(key) : key}`;
 export const forecastRecorded = (day: string, figure: string): string => `recorded from ${day}, when it was ${figure}`;
 export const forecastUnderIn = (n: number): string => (n <= 0 ? 'Cash goes under today' : `Cash goes under in ${n} ${n === 1 ? 'day' : 'days'}`);
 export const forecastAverage = (n: number): string => (n <= 0 ? 'on average so far: on time' : `on average so far: ${n} ${n === 1 ? 'day' : 'days'}`);

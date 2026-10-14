@@ -1,0 +1,207 @@
+/**
+ * The page Filing rules and its figures (REC-B10 job 10), one test an effect.
+ *
+ * ON A RECORD HOLDING MONEY AS ITS PACK DOCUMENT SAYS IT, as `money-filing.test.ts` measures the list: the three packs
+ * installed with no example entries, rules and entries written as a person writes them, the record's own step filing
+ * each entry, and the page read as the app reads it (`k.page`). So a figure whose sentence the record refuses, or a block
+ * the page checker refuses, fails here and not on a screen. The page's words go through the record's own copy check
+ * (`lintAnswer`), which finds an id, a time or an em dash a person would read.
+ *
+ * RED FIRST: with no `pages/rules.ts` the file does not load.
+ */
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+import { install, normalise, plan, type Host, type Installed, type Pack } from '@braindog/declare';
+import { openRecord, type Entry, type Kernel, type PageResult } from '@braindog/kernel';
+import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
+import { lintAnswer } from '../../record/src/page-lint.ts';
+
+import { NOW, day, firstPartyDocument } from '../src/index.ts';
+import { FILING_FIGURES } from '../src/modules/money/figures/filing.ts';
+import { MONEY_PAGES } from '../src/modules/money/pages/index.ts';
+import { MONEY_RULES_PAGE } from '../src/modules/money/pages/rules.ts';
+
+type Result<T> = { ok: boolean; value: T; refusal?: { code: string; fix: string; at?: string } };
+type Group = { key: string; label?: string; value: number | null };
+type Reading = { value: number | null; groups?: Group[] };
+type Block = {
+  kind: string;
+  heading?: string;
+  body?: string;
+  lead?: boolean;
+  drawn?: boolean;
+  rows?: Entry[];
+  readings?: { metric: string; reading: Reading | null }[];
+  values?: Record<string, unknown>;
+  unnamed?: string[];
+  refusals?: unknown[];
+};
+
+const OWNER = { actor: 'p_1' };
+const value = <T>(r: unknown): T => {
+  const x = r as Result<T>;
+  assert.ok(x.ok, x.ok ? '' : `${x.refusal?.code} at ${x.refusal?.at}: ${x.refusal?.fix}`);
+  return x.value;
+};
+const hostFor = (k: Kernel): Host => ({
+  count: (register) => k.count(register),
+  stage: (batch) => k.stageInstall(batch as never),
+  transaction: (fn) => k.transaction(fn),
+  reload: () => k.reload(),
+  retire: (ids) => k.retire(ids),
+  seed: (register, fields) => k.create(register, { ...fields, tags: ['example'] }, { actor: 'p_seed', cascade: false }) as never,
+  remember: (row) => k.rememberPack(row),
+  forget: (id) => k.forgetPack(id),
+  claimed: (pack) => k.packClaims(pack),
+});
+
+type Fresh = { k: Kernel; clock: ReturnType<typeof fixedClock>; outing: Entry; food: Entry; card: Entry };
+
+/** A fresh record holding Money as its document says it, two categories for money out and one account in pounds. */
+async function fresh(): Promise<Fresh> {
+  const clock = fixedClock(NOW);
+  const k = await openRecord(openSqlite(), clock);
+  for (const id of ['portfolio', 'people', 'money-core']) {
+    const pack = value<Pack>(await normalise(firstPartyDocument(id, { seeds: [] }), { kind: 'local' }));
+    const state: Installed = { format: 1, primitives: 1, record_version: k.version(), packs: k.packs(), declarations: k.declarations() as Installed['declarations'], rows: k.census() };
+    const diff = await plan(pack, state);
+    value(await install(pack, diff, hostFor(k), diff.planHash));
+  }
+  const outing = value<Entry>(k.create('categories', { name: 'Outing', direction: 'out', state: 'live' }, OWNER));
+  const food = value<Entry>(k.create('categories', { name: 'Food', direction: 'out', state: 'live' }, OWNER));
+  const card = value<Entry>(k.create('accounts', { name: 'Card', kind: 'bank', balance: { amount: 100_000, currency: 'GBP' }, as_of: day(-1) }, OWNER));
+  return { k, clock, outing, food, card };
+}
+
+const rule = (k: Kernel, fields: Record<string, unknown>): Entry => value<Entry>(k.create('filing_rules', fields, OWNER));
+/** One cleared payment with no category, left for the record's step to file. */
+const paid = (k: Kernel, card: Entry, bank: string, n: number): Entry =>
+  value<Entry>(k.create('transactions', { on: day(-2), direction: 'out', amount: { amount: 1_250, currency: 'GBP' }, account: card.id, state: 'cleared', what: `Card purchase ${n}`, counterparty_text: bank }, OWNER));
+
+/** The page as the app reads it, found by its title and never by an address typed here. */
+function pageOf(k: Kernel): { page: PageResult; blocks: Block[] } {
+  const listed = k.pages() as unknown as { slug: string; title: string }[];
+  const found = listed.find((p) => p.title === 'Filing rules');
+  assert.ok(found, 'Money has a page called Filing rules');
+  const page = value<PageResult>(k.page(found.slug));
+  const blocks = page.blocks as unknown as Block[];
+  for (const b of blocks) assert.deepEqual(b.refusals ?? [], [], `${b.heading ?? b.kind} is read`);
+  /* ITS WORDS ARE CLEAN: no id, no time, no em dash where a person reads them. */
+  assert.deepEqual(lintAnswer(page, null), [], 'the page says nothing the copy check finds');
+  return { page, blocks };
+}
+const drawn = (blocks: Block[]): Block[] => blocks.filter((b) => b.drawn !== false);
+function leadOf(blocks: Block[]): Block {
+  const lead = drawn(blocks).filter((b) => b.lead === true);
+  assert.equal(lead.length, 1, 'one block leads');
+  assert.deepEqual(lead[0]!.unnamed ?? [], [], 'every figure the sentence asks for is one the record has');
+  return lead[0]!;
+}
+/** A figure read through the kernel as a page reads it. */
+const figure = (k: Kernel, id: string): Reading => value<Reading>(k.metric(FILING_FIGURES[id] as never));
+
+test('the page is under Money, after a plan, needs the two lists, and is last of Money pages', () => {
+  assert.equal(MONEY_RULES_PAGE.page, 'money-rules');
+  assert.equal(MONEY_RULES_PAGE.title, 'Filing rules');
+  assert.equal(MONEY_RULES_PAGE.pack, 'money-core');
+  assert.deepEqual(MONEY_RULES_PAGE.nav, { section: 'Money', order: 40 });
+  assert.equal(MONEY_RULES_PAGE.for, undefined, 'one page for the record, not one a rule');
+  const requires = MONEY_RULES_PAGE.requires as string[];
+  assert.ok(requires.includes('register.filing_rules'));
+  assert.ok(requires.includes('register.transactions'));
+  assert.equal(Object.keys(MONEY_PAGES).at(-1), 'money-rules');
+});
+
+test('every figure of the page is a count, unjudged, and named to money-core', () => {
+  for (const id of ['rule-filed', 'filed-by-rule-30d', 'rules-filing-30d', 'rules-filing']) {
+    const f = FILING_FIGURES[id]!;
+    assert.ok(f, `${id} is declared`);
+    assert.equal(f.pack, 'money-core');
+    assert.equal(f.source, 'register.transactions');
+    assert.deepEqual(f.target, { gte: 0 }, `${id} is judged by nothing`);
+    const v = f.value as Record<string, unknown>;
+    assert.ok('count' in v || 'distinct' in v, `${id} adds no money`);
+  }
+  assert.equal(FILING_FIGURES['rule-filed']!.group_by, 'filed_by');
+  assert.equal(FILING_FIGURES['filed-by-rule-30d']!.group_by, 'filed_by');
+});
+
+test('THE PAGE SHOWS SIX TILES OR FEWER: a lead is the line, and one of three is drawn', () => {
+  const blocks = MONEY_RULES_PAGE.blocks as Block[];
+  assert.ok(blocks.filter((b) => !b.lead).length <= 6);
+  assert.deepEqual([blocks[0]!.kind, blocks[0]!.lead], ['note', true], 'the page opens on its line');
+  for (const b of blocks) assert.doesNotMatch(`${b.heading ?? ''} ${b.body ?? ''}`, /—/u, 'no em dash');
+});
+
+test('ON A FRESH RECORD WITH TWO RULES AND FIVE FILED ENTRIES, the figures read 5 by their parts and the page draws both rules', async () => {
+  const { k, outing, food, card } = await fresh();
+  const talabat = rule(k, { match: 'Talabat', match_by: 'starts', direction: 'out', category: food.id });
+  const cinema = rule(k, { match: 'VOX', match_by: 'contains', direction: 'out', category: outing.id });
+  [1, 2, 3].forEach((n) => paid(k, card, 'TALABAT CAIRO', n));
+  [4, 5].forEach((n) => paid(k, card, 'MAF VOX CINEMAS', n));
+  /* AND ONE NO RULE FITS, which no part counts. */
+  paid(k, card, 'FENWICK CLOUD', 6);
+
+  const all = figure(k, 'rule-filed');
+  assert.equal(all.value, 5);
+  const parts = Object.fromEntries((all.groups ?? []).map((g) => [g.key, g.value]));
+  assert.deepEqual(parts, { [talabat.id]: 3, [cinema.id]: 2 });
+  /* EACH PART IS CALLED BY ITS RULE'S OWN TEXT, never its id. */
+  assert.deepEqual((all.groups ?? []).map((g) => g.label).sort(), ['Talabat', 'VOX']);
+  assert.equal(figure(k, 'filed-by-rule-30d').value, 5);
+  assert.equal(figure(k, 'rules-filing-30d').value, 2);
+
+  const { blocks } = pageOf(k);
+  const lead = leadOf(blocks);
+  assert.match(lead.body!, /rule\(s\) filed/u);
+  assert.equal(lead.values?.['rules-filing-30d'], 2);
+  assert.equal(lead.values?.['filed-by-rule-30d'], 5);
+
+  /* THE TABLE OF RULES HOLDS BOTH, and the bars count each by its name. */
+  const rules = drawn(blocks).find((b) => b.heading === 'Rules')!;
+  assert.deepEqual(rules.rows!.map((r) => r.fields.match).sort(), ['Talabat', 'VOX']);
+  const bars = drawn(blocks).find((b) => b.heading === 'Entries each rule filed');
+  assert.ok(bars, 'two rules that filed draw their bars');
+  const drawnParts = bars.readings![0]!.reading!.groups!.map((g) => [g.label, g.value]);
+  assert.deepEqual(drawnParts, [['Talabat', 3], ['VOX', 2]], 'the most first');
+  /* AND WHAT THEY FILED LATELY, each entry beside the rule that filed it. */
+  const lately = drawn(blocks).find((b) => b.heading === 'Filed lately')!;
+  assert.equal(lately.rows!.length, 5);
+  assert.ok(lately.rows!.every((r) => r.fields.filed_by === talabat.id || r.fields.filed_by === cinema.id));
+});
+
+test('A RULE SWITCHED OFF KEEPS ITS COUNT, and one rule that filed draws no bar of one part', async () => {
+  const { k, food, card } = await fresh();
+  const talabat = rule(k, { match: 'Talabat', match_by: 'starts', direction: 'out', category: food.id });
+  [1, 2].forEach((n) => paid(k, card, 'TALABAT CAIRO', n));
+  value(k.update('filing_rules', talabat.id, { state: 'off' }, OWNER));
+  assert.equal(figure(k, 'rule-filed').value, 2);
+  const { blocks } = pageOf(k);
+  assert.equal(leadOf(blocks).values?.['filed-by-rule-30d'], 2);
+  assert.equal(drawn(blocks).find((b) => b.heading === 'Entries each rule filed'), undefined);
+  assert.equal(drawn(blocks).find((b) => b.heading === 'Rules')!.rows![0]!.fields.state, 'off');
+});
+
+test('RULES THAT FILED BEFORE AND NOTHING LATELY SAY SO IN WORDS, never "0 rules filed 0"', async () => {
+  const { k, clock, food, card } = await fresh();
+  rule(k, { match: 'Talabat', match_by: 'starts', direction: 'out', category: food.id });
+  [1, 2, 3].forEach((n) => paid(k, card, 'TALABAT CAIRO', n));
+  /* FORTY DAYS ON: the three were made before the window, and still filed by the rule. */
+  clock.advance(40 * 86_400_000);
+  assert.equal(figure(k, 'filed-by-rule-30d').value, 0);
+  const lead = leadOf(pageOf(k).blocks);
+  assert.match(lead.body!, /^No rule has filed anything in the last 30 days\./u);
+  assert.deepEqual([lead.values?.['rules-filing'], lead.values?.['rule-filed']], [1, 3]);
+});
+
+test('WITH NO RULE, THE LEAD READS THE NOUGHT SENTENCE and nothing else counts', async () => {
+  const { k } = await fresh();
+  assert.equal(figure(k, 'rule-filed').value, 0);
+  const { blocks } = pageOf(k);
+  assert.equal(leadOf(blocks).body, 'No rule has filed anything yet. Set a category on an entry and the record offers one.');
+  assert.equal(drawn(blocks).find((b) => b.heading === 'Entries each rule filed'), undefined);
+  assert.equal(drawn(blocks).find((b) => b.heading === 'Filed lately'), undefined);
+  assert.ok(drawn(blocks).length <= 7, 'six tiles or fewer beside the line');
+});

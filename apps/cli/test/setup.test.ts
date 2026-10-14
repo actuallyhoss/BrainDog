@@ -20,6 +20,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { CLIENTS, type Client } from '../src/clients/index.ts';
+import { claudeDesktopFolder, vscodeUserFolder } from '../src/clients/others.ts';
 import { hostKey } from '../src/http.ts';
 import { HOOK_STATUS, keepCopy } from '../src/install.ts';
 import { profilesFile, setup, type ProfileRunner, type SetupIo } from '../src/setup.ts';
@@ -350,7 +351,7 @@ test('an app not on this machine is one line and is left alone; --only names the
 
   const wrong = home2(true);
   assert.equal(await setup([host, '--only', 'nope'], wrong.io), 1);
-  assert.equal(wrong.out[0], '! braindog setup --only takes claude, codex, cursor, fakeapp, and not nope.');
+  assert.equal(wrong.out[0], '! braindog setup --only takes claude, codex, cursor, claude-desktop, vscode, fakeapp, and not nope.');
 });
 
 test('with Codex and Cursor in the table, a home holding both gets the server in each, and a second run changes nothing', async () => {
@@ -370,6 +371,39 @@ test('with Codex and Cursor in the table, a home holding both gets the server in
   m.out.length = 0;
   assert.equal(await setup([host, '--yes'], m.io), 0, m.out.join('\n'));
   for (const title of ['Codex', 'Cursor']) assert.ok(m.out.includes(`3. MCP server, ${title}: braindog is already registered, running this command.`), m.out.join('\n'));
+  assert.equal(m.out.at(-1), `Nothing changed: this machine was already set up from ${hostKey(host)}.`);
+  assert.deepEqual(snapshot(m.home), settled, 'the second run wrote');
+});
+
+test('with Claude Desktop and VS Code on the machine, each gets the server in its own file, and a second run changes nothing', async () => {
+  /* WHERE THEIR DOCUMENTS PUT THEM ON THIS PLATFORM; Claude Desktop has no path on Linux, so there it is VS Code alone. */
+  const host = await stubRecord();
+  const m = home2(false);
+  const desktop = claudeDesktopFolder(m.home);
+  const code = vscodeUserFolder(m.home);
+  if (desktop !== null) {
+    mkdirSync(desktop, { recursive: true });
+    writeFileSync(join(desktop, 'claude_desktop_config.json'), '{\n  "preferences": {\n    "sidebarMode": "chat"\n  }\n}');
+  }
+  mkdirSync(code, { recursive: true });
+  const titles = [...(desktop !== null ? ['Claude Desktop'] : []), 'VS Code'];
+  assert.equal(await setup([host, '--yes'], m.io), 0, m.out.join('\n'));
+  for (const title of titles) assert.ok(m.out.includes(`3. MCP server, ${title}: braindog is registered, running this command.`), m.out.join('\n'));
+  const vs = JSON.parse(readFileSync(join(code, 'mcp.json'), 'utf8')) as { servers: Record<string, { args: string[] }> };
+  assert.deepEqual(vs.servers.braindog!.args.slice(-3), ['mcp', '--agent', 'other']);
+  if (desktop !== null) {
+    const cd = JSON.parse(readFileSync(join(desktop, 'claude_desktop_config.json'), 'utf8')) as { preferences: unknown; mcpServers: Record<string, unknown> };
+    /* STEP 4 WRITES THE RECORD'S TOOLS INTO IT TOO, as into every app setup reaches. */
+    assert.deepEqual(Object.keys(cd.mcpServers).sort(), ['braindog', 'mail', 'search']);
+    assert.deepEqual(cd.preferences, { sidebarMode: 'chat' });
+    assert.ok(existsSync(join(desktop, 'claude_desktop_config.json.pre-braindog')));
+  }
+  for (const [file, body] of Object.entries(snapshot(m.home))) assert.deepEqual(tokensIn(body), [], `${file} holds a token shape`);
+
+  const settled = snapshot(m.home);
+  m.out.length = 0;
+  assert.equal(await setup([host, '--yes'], m.io), 0, m.out.join('\n'));
+  for (const title of titles) assert.ok(m.out.includes(`3. MCP server, ${title}: braindog is already registered, running this command.`), m.out.join('\n'));
   assert.equal(m.out.at(-1), `Nothing changed: this machine was already set up from ${hostKey(host)}.`);
   assert.deepEqual(snapshot(m.home), settled, 'the second run wrote');
 });

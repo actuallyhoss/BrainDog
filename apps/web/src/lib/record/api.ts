@@ -1540,7 +1540,7 @@ export type FeedRow = {
 };
 
 /** One step of a cash walk, as this build's walk and the record's both send it. */
-export type WalkStep = { day: string; label: string; delta: number; balance: number; source: string; href?: string; spoken?: string };
+export type WalkStep = { day: string; label: string; delta: number; balance: number; source: string; href?: string; spoken?: string; kind?: 'everyday' };
 
 /** A cash walk, with only the keys the table reads. The record's `crossed` arrives as a copy of a step, not the step. */
 export type Walk = {
@@ -1556,6 +1556,8 @@ export type Walk = {
   reach?: number | undefined;
   /** On a walk drawn once per currency: what this walk may count as sold, in its own currency. */
   sells?: readonly { label: string; value: number }[] | undefined;
+  /** What the everyday leg measured, once per currency (the kernel's `Runway.everyday`): `why` set when it moved nothing. */
+  everyday?: readonly { currency: string | null; months: readonly string[]; spent: number; planned: number; monthly: number; why?: string }[];
 };
 
 /** Where a step's row opens: this build's `href`, or the record's `register#seq` as that row's address. */

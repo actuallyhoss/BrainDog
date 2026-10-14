@@ -44,8 +44,6 @@
     FORECAST_RESET,
     FORECAST_SELL_NOTE,
     FORECAST_SHOW_IN,
-    FORECAST_SPEND,
-    FORECAST_SPEND_NOTE,
     FORECAST_WHAT,
     FORECAST_WHEN,
     addDays,
@@ -59,11 +57,10 @@
     forecastDriftNote,
     forecastMore,
     forecastModel,
-    forecastPerMonth,
     forecastPerYear,
     forecastPlan,
     forecastRateOf,
-    forecastSpendIn,
+    forecastEveryday,
     horizonChoices,
     forecastFigure,
     inCurrency,
@@ -73,6 +70,8 @@
     readoutAt,
     scenario,
     spendRange,
+    spendSaid,
+    listedSteps,
     underNote,
     type Counted,
     type ForecastModel,
@@ -196,7 +195,7 @@
   $effect(() => {
     if (!group || !model) return;
     const mine = countsOf(model, held.horizon ?? model.horizon);
-    const member: Member = { money: { currency: model.currency, home: model.home, template: model.template }, heavy: [...mine.in, ...mine.out], pairs: pairsOf(model), sells: model.sells.map((x) => x.label), counts: mine, range: spendRange(model) };
+    const member: Member = { money: { currency: model.currency, home: model.home, template: model.template }, heavy: [...mine.in, ...mine.out], pairs: pairsOf(model), sells: model.sells.map((x) => x.label), counts: mine, range: spendRange(model, key) };
     group.members[key] = member;
   });
 
@@ -383,7 +382,13 @@
           <td class="num"></td>
           <td class="num">{m.template}</td>
         </tr>
-        {#each s.steps as step}
+        <!-- EVERYDAY SPENDING IS ONE LINE, not a row a week (`forecastEveryday`), as toHTML draws it. -->
+        {#if forecastEveryday(m, s)}
+          <tr data-everyday="">
+            <td colspan="4">{forecastEveryday(m, s)}</td>
+          </tr>
+        {/if}
+        {#each listedSteps(s.steps) as step}
           <tr>
             <th scope="row">{day(step.day)}</th>
             <td>{step.label}</td>
@@ -440,10 +445,10 @@
     {#if m.knobs.includes('spend')}
       {#each spends as [k, money, range] (k)}
         <label class="forecast-knob">
-          <span class="forecast-knob-name">{k ? forecastSpendIn(k) : FORECAST_SPEND}</span>
-          <input class="forecast-range" type="range" min="0" max={range.max} step={range.step} value={spendOf(k) * rate} oninput={(e) => setSpend(k, e)} />
-          <span class="forecast-knob-value num">{forecastPerMonth(forecastFigure(money, spendOf(k) * rate, 'read'))}</span>
-          <span class="forecast-knob-note">{FORECAST_SPEND_NOTE}</span>
+          <span class="forecast-knob-name">{range.name}</span>
+          <input class="forecast-range" type="range" min={range.min} max={range.max} step={range.step} value={spendOf(k) * rate} oninput={(e) => setSpend(k, e)} />
+          <span class="forecast-knob-value num">{spendSaid(range, spendOf(k) * rate, forecastFigure(money, Math.abs(spendOf(k) * rate), 'read'))}</span>
+          <span class="forecast-knob-note">{range.note}</span>
         </label>
       {/each}
     {/if}

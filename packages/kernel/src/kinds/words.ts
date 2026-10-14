@@ -19,12 +19,13 @@ export type Raw = Readonly<Record<string, unknown>>;
 /**
  * The host panels a `section` may name with `panel:`, drawn by the host for the page's row under the section's
  * heading: what the row's work runs on and is scheduled to do, where its numbers are sent, and, on a run's own page,
- * what that run did (`run`, drawn only when the page is for a run).
+ * what that run did (`run`, drawn only when the page is for a run), and where the row was seen (`seen`, the notes, runs
+ * and rows that name it, newest first, from the record's `about` read).
  *
  * A KEY AND NOT TWO KINDS, because the renderer cannot draw either: each is the host's own screen, placed by the page.
  * The web still reads the two English headings a page carried before this key, and nothing new relies on them.
  */
-export const PANELS = ['actions', 'reporting', 'run'] as const;
+export const PANELS = ['actions', 'reporting', 'run', 'seen'] as const;
 
 /** The most bytes a path's short view is named in, which is the width of the switch it is drawn on. */
 export const SHORT_LABEL_BYTES = 24;

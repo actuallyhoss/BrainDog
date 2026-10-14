@@ -19,6 +19,7 @@ import { join } from 'node:path';
 import { hostKey, hostsPath, saveHosts } from '../src/http.ts';
 import { connect, thisMachine, type AgentIo } from '../src/skills.ts';
 import { depositor, looksLikeKey, renderEntry, scanTools, tools, writeTools, type ClaudeRunner } from '../src/tools.ts';
+import { connectedOf, type ListRunner } from '../src/clients/connected.ts';
 
 const TOKEN = ['rec_01TESTTESTTESTTESTTESTTEST', 'stub-bearer-for-tests-only-7b3c'].join('.');
 const SCOPE = '01JZ8QK3F7R2M9V4XN6TCB5HAE';
@@ -115,6 +116,9 @@ async function stubRecord(t: After, o: { project?: boolean; register?: boolean }
 
 type Call = { args: string[]; cwd: string };
 
+/** A stand-in for `claude mcp list` that prints this, and never runs Claude Code. */
+const listing = (out: string): ListRunner => async () => ({ code: 0, out });
+
 /* `login: false` IS A MACHINE HOLDING NO LOGIN AT ALL, since `keys put` deposits with the login when there is no vault
    grant, so the name-only path is now the one with neither. The stub reads no bearer. */
 async function setup(t: After, o: { project?: boolean; grant?: boolean; register?: boolean; login?: boolean } = {}) {
@@ -136,7 +140,7 @@ async function setup(t: After, o: { project?: boolean; grant?: boolean; register
     if (typeof got === 'number') throw new Error(`connect ended with ${String(got)}`);
     return got;
   };
-  const scan = async (s: { dryRun?: boolean; once?: boolean } = {}) => {
+  const scan = async (s: { dryRun?: boolean; once?: boolean; connected?: string } = {}) => {
     const c = await at();
     const said = await scanTools({
       client: c.client,
@@ -149,6 +153,7 @@ async function setup(t: After, o: { project?: boolean; grant?: boolean; register
       machine: 'test-machine',
       now: () => NOW,
       ...(s.once === true ? { once: { host: c.to.key, hosts: hostsPath(env) } } : {}),
+      ...(s.connected === undefined ? {} : { connected: () => connectedOf(listing(s.connected!), top) }),
     });
     lines.push(...said);
     return said;
@@ -600,7 +605,96 @@ test('braindog tools scan --dry-run over the command prints the lines and says i
   const h = await setup(t, { project: true, grant: true });
   const token = fakeValue();
   h.mcp({ 'kiln-deploy': { command: 'npx', env: { KILN_API_TOKEN: token } } });
-  assert.equal(await tools(['scan', '--dry-run'], { ...h.io, cli: CLI }), 0);
+  assert.equal(await tools(['scan', '--dry-run'], { ...h.io, cli: CLI, list: listing('') }), 0);
   assert.equal(h.out.at(-1), 'That was a dry run, so nothing was deposited, written, sent or proposed.');
   nowhere(h, [token]);
+});
+
+/* ── integrations: what Claude Code lists and no file holds ────────────── */
+
+const LIST = [
+  'Checking MCP server health…',
+  '',
+  'claude.ai Linear: https://mcp.linear.example/mcp - ✔ Connected',
+  'lantern: https://mcp.lantern.example (HTTP) - ✔ Connected',
+  'claude.ai Lantern Cloud: https://MCP.lantern.example/ - ✔ Connected',
+  '',
+].join('\n');
+
+test('an integration Claude Code lists and no file holds is recorded once, with its address and no start or keys', async (t) => {
+  const h = await setup(t);
+  writeFileSync(h.claudeJson, JSON.stringify({ mcpServers: { lantern: { type: 'http', url: 'https://mcp.lantern.example' } } }));
+  const said = await h.scan({ connected: LIST });
+  assert.ok(said.includes('Integration Linear was recorded.'), said.join('\n'));
+  assert.deepEqual(
+    h.rows.map((r) => [r.fields.name, r.fields.kind]),
+    [
+      ['lantern', 'mcp'],
+      ['Linear', 'integration'],
+    ],
+    'the file holds lantern, by name and by address, so it is one row and no integration besides',
+  );
+  const linear = h.rows.find((r) => r.fields.name === 'Linear')!;
+  assert.deepEqual(linear.fields, {
+    name: 'Linear',
+    kind: 'integration',
+    endpoint: 'https://mcp.linear.example/mcp',
+    hosts: ['test-machine'],
+    seen: new Date(NOW).toISOString(),
+    origin: "Claude Code's connections on test-machine",
+  });
+  assert.equal(h.of('vault/deposit').length, 0, 'no key is read or written for an integration');
+
+  /* Listed again the same day: the same row, nothing written. */
+  const creates = h.of('create').length;
+  const again = await h.scan({ connected: LIST });
+  assert.equal(h.of('create').length, creates);
+  assert.equal(h.of('update').length, 0);
+  assert.ok(!again.some((l) => l.startsWith('Integration ')), again.join('\n'));
+});
+
+test('an integration seen again on another day or machine is touched, never added twice', async (t) => {
+  const h = await setup(t);
+  const row = h.add({ name: 'Linear', kind: 'integration', endpoint: 'https://mcp.linear.example/mcp/', hosts: ['other-machine'], seen: '2026-08-01T00:00:00.000Z' });
+  await h.scan({ connected: 'claude.ai Linear: https://mcp.linear.example/mcp - ✔ Connected\n' });
+  assert.equal(h.rows.length, 1);
+  assert.deepEqual(row.fields.hosts, ['other-machine', 'test-machine']);
+  assert.equal(row.fields.seen, new Date(NOW).toISOString());
+  /* Under another name, by its address: still that row. */
+  row.fields.seen = '2026-08-01T00:00:00.000Z';
+  await h.scan({ connected: 'claude.ai Linear Work: https://mcp.linear.example/mcp - ✔ Connected\n' });
+  assert.equal(h.rows.length, 1);
+  assert.equal(row.fields.seen, new Date(NOW).toISOString());
+});
+
+test('a dry run says what it would record and writes nothing', async (t) => {
+  const h = await setup(t);
+  const said = await h.scan({ dryRun: true, connected: LIST });
+  assert.ok(said.includes('Integration Linear would be recorded.'), said.join('\n'));
+  assert.equal(h.of('create').length + h.of('update').length + h.of('propose').length, 0);
+  assert.equal(existsSync(h.lockFile), false);
+});
+
+test('a run in a project asks before an integration for everywhere, as it does for a server', async (t) => {
+  const h = await setup(t, { project: true });
+  const said = await h.scan({ connected: 'claude.ai Linear: https://mcp.linear.example/mcp - ✔ Connected\n' });
+  assert.equal(h.of('create').length, 0);
+  const [asked] = h.of('propose');
+  assert.equal((asked?.args.body as { rows: Record<string, unknown>[] }).rows[0]?.kind, 'integration');
+  assert.ok(said.some((l) => l.startsWith('Integration Linear applies everywhere')), said.join('\n'));
+});
+
+test('an address that looks like it holds a key is left out, and Claude Code absent records nothing', async (t) => {
+  const h = await setup(t);
+  const key = keyShaped();
+  const said = await h.scan({ connected: `claude.ai Quill: https://mcp.quill.example/mcp?token=${key} - ✔ Connected\n` });
+  assert.deepEqual(h.rows.map((r) => r.fields), [{ name: 'Quill', kind: 'integration', hosts: ['test-machine'], seen: new Date(NOW).toISOString(), origin: "Claude Code's connections on test-machine" }]);
+  assert.ok(said.includes('Integration Quill has an address that looks like it holds a key, so it is kept without its address.'));
+  nowhere(h, [key]);
+
+  const c = await connect(undefined, h.io);
+  if (typeof c === 'number') throw new Error('no connection');
+  const absent = await scanTools({ client: c.client, context: c.context, top: h.top, cwd: h.top, home: h.home, dryRun: false, deposit: null, machine: 'test-machine', now: () => NOW, connected: () => connectedOf(async () => ({ code: 'absent', out: '' }), h.top) });
+  assert.deepEqual(absent, ['Claude Code was not found, so what it is connected to was not read.']);
+  assert.equal(h.rows.length, 1);
 });

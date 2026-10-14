@@ -577,6 +577,8 @@ export type RecordSurface = {
   page(args: never, ctx: never): Promise<Result<unknown>>;
   metric(args: never, ctx: never): Promise<Result<unknown>>;
   figures(ctx: never): Promise<Result<unknown>>;
+  /** OPTIONAL as `scriptTry` is: the agent door's list of resources in one read (AGT-B04). */
+  offered?(ctx: never): Promise<Result<unknown>>;
   listGrants(ctx: never): Promise<Result<unknown>>;
   revokeGrant(args: never, ctx: never): Promise<Result<unknown>>;
   dryRun(args: never, ctx: never): Promise<Result<unknown>>;
@@ -701,6 +703,7 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     page: (a, ctx) => api.page(a as never, ctx as never),
     metric: (a, ctx) => api.metric(a as never, ctx as never),
     figures: (_a, ctx) => api.figures(ctx as never),
+    offered: (_a, ctx) => api.offered ? api.offered(ctx as never) : Promise.resolve({ ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog cannot answer offered yet, so nothing was read or written.' } }),
     listGrants: (_a, ctx) => api.listGrants(ctx as never),
     revokeGrant: (a, ctx) => api.revokeGrant(a as never, ctx as never),
     dryRun: (a, ctx) => api.dryRun(a as never, ctx as never),
@@ -804,7 +807,7 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
      when it is called; a record that has not got it answers `NOT_IN_THIS_BUILD`, as `scriptTry` does above, rather than a
      500 from calling a function that is not there. The name comes from the table, never from a caller. */
   for (const route of EXTRA_ROUTES)
-    handlers[route.name] = async (a, ctx) => {
+    handlers[route.name] ??= async (a, ctx) => {
       const method = (api as unknown as Record<string, unknown>)[route.name];
       return typeof method === 'function'
         ? (method as Handler).call(api, a, ctx)

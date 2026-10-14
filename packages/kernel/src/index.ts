@@ -6001,6 +6001,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       ...(deps.scopeOf ? { scopeOf: deps.scopeOf } : {}),
       ...(deps.lists ? { lists: deps.lists } : {}),
       ...(deps.metrics ? { metrics: deps.metrics } : {}),
+      ...(deps.packOf ? { packOf: deps.packOf } : {}),
       projects: () => [...registers.values()].find((r) => r.scopes !== undefined)?.id ?? null,
     };
   };
@@ -6342,6 +6343,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         .all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'metric' AND superseded_at IS NULL AND retired = 0 ORDER BY id")
         .map((r) => liveTarget(sql, JSON.parse(r.body) as MetricDecl, ctx));
     },
+    packOf: (id) => sql.one<{ pack: string | null }>("SELECT coalesce(pack_id, json_extract(body, '$.pack')) AS pack FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0", id)?.pack ?? null,
     inScope: (register, project, opts) => inScope(register, project, opts),
     stepsOf: (register) =>
       [...registers.values()].flatMap((r) => {

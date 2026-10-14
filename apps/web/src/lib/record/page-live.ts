@@ -23,6 +23,7 @@ import { COSTS, isBucket, isQuiet, type Bars, type FxRead, type MeasureSeries, t
 import { MISSING, UNNAMED, integer, money, quantity, since, day as fmtDay, type Resolve } from 'braindog-render';
 
 import { copy } from '../copy.ts';
+import { lateSaid } from '../home/today-tiles.ts';
 import { ratesPreset } from './action-draft.ts';
 import { live as actionsOf, type ActionRow, type Outcome } from './actions.ts';
 import {
@@ -946,6 +947,8 @@ function walkOf(v: unknown): Walk | null {
     ...(typeof v.horizon === 'number' ? { horizon: v.horizon } : {}),
     /* AND HOW FAR IT WALKED PAST THAT, which the length control offers up to (`reach` rows, `blocks.ts`). */
     ...(typeof v.reach === 'number' && Number.isInteger(v.reach) && v.reach > 0 ? { reach: v.reach } : {}),
+    /* WHAT THE EVERYDAY LEG MEASURED (kernel's `Runway.everyday`), which `forecastRows` writes as `spent` and `known`. */
+    ...(Array.isArray(v.everyday) ? { everyday: v.everyday } : {}),
   };
 }
 
@@ -1580,15 +1583,24 @@ export function blockOf(
      names no real list, so `registerOf` answers null for it and the common path below sent every such block back
      as one this build cannot draw. Entries carry the raw fields (`homeBlocks` reads `entries[n].fields.day` to
      split Overdue), and rows are said by hand: `toRows`'s `display()` only knows a field's type through a declared
-     register, which this one can never be. */
+     register, which this one can never be.
+     A DAY ALREADY GONE SAYS HOW LATE IT IS, in the words Today's Late uses (`lateSaid`), and the row carries the bad
+     tone, which the page draws with its glyph, so it is never told by colour alone. The record reads what is late first,
+     so a "Due this week" that any page declares listed a payment five days past under this week as a bare day. Today is
+     the reader's own day at `now`, as Home works it out for its Late (`default-home.ts` `howLate`), which writes the same
+     words again. */
   if (b.source === 'deadlines') {
     const spoken = /^([a-z][a-z0-9_]*)#([1-9][0-9]*)$/u;
+    const wall = new Date(now);
+    const today = `${wall.getFullYear()}-${String(wall.getMonth() + 1).padStart(2, '0')}-${String(wall.getDate()).padStart(2, '0')}`;
     const entries = got.map((r) => entryOf('deadlines', r, refs));
     const rows: LiveBlock['rows'] = got.map((r) => {
       const at = typeof r.fields.row === 'string' ? spoken.exec(r.fields.row) : null;
+      const due = typeof r.fields.day === 'string' && /^\d{4}-\d{2}-\d{2}/u.test(r.fields.day) ? r.fields.day.slice(0, 10) : null;
+      const late = due !== null && due < today;
       const cells = (b.columns ?? []).map((c) => {
         const v = r.fields[c.field];
-        if (c.field === 'day') return typeof v === 'string' ? fmtDay(v) : null;
+        if (c.field === 'day') return late ? lateSaid(due, today) : typeof v === 'string' ? fmtDay(v) : null;
         if (c.field === 'amount') {
           if (!isObject(v) || typeof v.amount !== 'number' || typeof v.currency !== 'string') return null;
           const said = money(v.amount, v.currency);
@@ -1597,7 +1609,12 @@ export function blockOf(
         }
         return typeof v === 'string' ? v : v === null || v === undefined ? null : String(v);
       });
-      return { key: typeof r.fields.row === 'string' ? r.fields.row : String(r.id), cells, ...(at ? { href: `/r/${at[1]}/${at[2]}` } : {}) };
+      return {
+        key: typeof r.fields.row === 'string' ? r.fields.row : String(r.id),
+        cells,
+        ...(late ? { tone: 'bad' as const } : {}),
+        ...(at ? { href: `/r/${at[1]}/${at[2]}` } : {}),
+      };
     });
     return { ...shell, register: 'deadlines', entries, matched: entries, rows, shown: entries.length, total: matched };
   }

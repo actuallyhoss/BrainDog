@@ -256,8 +256,8 @@ export type PageBlock = {
    */
   about?: string;
   /**
-   * A `section`'s on a page per row: the host panel drawn for that row under the section's heading, `actions` or
-   * `reporting` (`kinds/words.ts` `PANELS`). The record checks the word and hands it back; the panel is the host's.
+   * A `section`'s on a page per row: the host panel drawn for that row under the section's heading, `actions`,
+   * `reporting`, `run` or `seen` (`kinds/words.ts` `PANELS`). The record checks the word and hands it back; the panel is the host's.
    */
   panel?: string;
   /**
@@ -872,6 +872,12 @@ export type PageDeps = {
   /** Every live metric declaration, which `figures.home` and a forecast's sell knob choose from by what each declares. */
   metrics?: () => readonly MetricDecl[];
   /**
+   * The installed module or add-on a declaration came with, by the declaration's id (`metric.open-tasks`), or `null` for
+   * one nobody's pack brought: what `<module>.<figure>` asks (PGS-B13). Absent, a declaration's own `pack:` says, and a
+   * figure that names none is its list's, as a first-party pack places it.
+   */
+  packOf?: (id: string) => string | null;
+  /**
    * The blocks installed packs add to the page whose declaration id is `page` (`additionsOf` in `page-adds.ts`), which
    * `readPage` lays among the page's own. Absent, a page draws its own blocks and nothing else.
    */
@@ -948,6 +954,8 @@ export type ListsBeside = {
   lists?: () => readonly ListShape[];
   /** Every live metric, as `PageDeps.metrics` answers, so the home figures and the sell knob name the lists behind theirs. */
   metrics?: () => readonly MetricDecl[];
+  /** The module a declaration came with, as `PageDeps.packOf` answers, so `<module>.<figure>` names its figure's lists. */
+  packOf?: (id: string) => string | null;
 };
 
 /** The source a block names for one project's actions in its way (REC-C09), which that source holds. */
@@ -4352,13 +4360,30 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
     for (const path of pathsOf(block, (id) => (metric?.(id) ?? builtInFigure(id)) !== null, true)) {
       const said = pathOf(path);
       if (!said) continue;
-      if ('metric' in said) addFigure(said.metric);
-      else if ('own' in said) continue;
-      else if ('change' in said || 'rowsOf' in said) {
+      if ('metric' in said) {
+        addFigure(said.metric);
+        continue;
+      }
+      if ('own' in said) continue;
+      /* `<module>.<figure>` NAMES THE LISTS ITS FIGURE READS, read over the declarations `beside` hands, and its first word
+         is a list only when the record has a list of that name. */
+      const two = twoOf(said);
+      const owned = two && beside ? moduleFigure(beside, two.head, two.tail) : null;
+      if (owned) addFigure(owned.metric);
+      const isList = (id: string): boolean => LIST_ID.test(id) && (owned === null || (beside?.lists?.() ?? []).some((l) => l.id === id));
+      if ('change' in said || 'rowsOf' in said) {
         const head = 'change' in said ? said.change : said.rowsOf;
-        if (metric?.(head) ?? builtInFigure(head)) addFigure(head);
-        else if (LIST_ID.test(head)) named.add(head);
-      } else named.add(said.register);
+        const isFigure = (metric?.(head) ?? builtInFigure(head)) !== null;
+        if (isFigure) addFigure(head);
+        /* A LIST OF THAT NAME IS NAMED TOO when the record has one, since a state it holds is read first (`twoOf`). */
+        if (isList(head) && (!isFigure || (beside?.lists?.() ?? []).some((l) => l.id === head))) named.add(head);
+      } else if ('then' in said) {
+        /* A NESTED PATH READS ITS ROW'S LIST AND THE LIST ITS LINK POINTS AT, so a reader held from Projects is held from
+           `{{tasks#1.project.name}}` as she is from the project itself. */
+        named.add(said.register);
+        const to = pointsAt?.(said.register, said.field);
+        if (to) named.add(to);
+      } else if (isList(said.register)) named.add(said.register);
     }
   }
   return [...named];
@@ -4446,15 +4471,16 @@ export function pathsOf(block: PageBlock, figure?: (id: string) => boolean, unfi
 }
 
 /**
- * What a path names, in `05 §7.1`'s grammar outside a template: a metric, a row's field by spoken id,
- * a register's count, or how many of a register's rows are in one state. Nothing else is read:
- * `portfolio.revenue` is a state count of a list with no such state, and so answers nothing, and a path
- * that names none of these is `null` rather than a guess.
+ * What a path names, in `05 §7.1`'s grammar outside a template: a metric, a row's field by spoken id, one step through
+ * that field, a register's count, how many of a register's rows are in one state, or a module's figure. Nothing else is
+ * read, and a path that names none of these is `null` rather than a guess.
  *
- * `<list>.<value>` IS A COUNT OF THE ROWS IN THAT STATE (`tasks.open`), where the value is one of the
- * list's `state` enum. `count` is the whole list's, so a state called `count` is read as the whole
- * count; every other word is a state, answered only when the list's state enum holds it (`valueAt`).
- * The list is named either way (`registersOf`), because a count of a list's rows is about that list.
+ * THE SHAPE ONLY. Which of several readings two words get is the record's to say, in the one order `twoOf` writes down,
+ * so this answers the form the words take and `valueAt` and `namedAt` walk the order over it.
+ *
+ * `<list>#<n>.<field>.<part>` IS ONE STEP INTO A FIELD (PGS-B13): a field of the row a link points at, a money's
+ * `amount` or `currency`, or how many a list field holds (`count`). A fourth part is nothing, so a path never walks
+ * from row to row to row.
  */
 function pathOf(
   path: string,
@@ -4464,6 +4490,7 @@ function pathOf(
   | { change: string }
   | { rowsOf: string; part: RowPart; field?: string }
   | { register: string; seq: number; field: string }
+  | { register: string; seq: number; field: string; then: string }
   | { register: string; count: true }
   | { register: string; state: string }
   | { own: string; count?: true }
@@ -4478,6 +4505,11 @@ function pathOf(
   if (parts.length === 1 && ownField(path)) return { own: path };
   if (parts.length === 2 && parts[1] === 'count' && ownField(parts[0]) && own![parts[0]!]!.type === 'list') return { own: parts[0]!, count: true };
   if (parts.length === 1) return /^[a-z][a-z0-9_-]*$/.test(path) ? { metric: path } : null;
+  if (parts.length === 3) {
+    const row = /^([a-z][a-z0-9_]*)#([1-9][0-9]*)$/.exec(parts[0]!);
+    const [, field, then] = parts as [string, string, string];
+    return row && /^[a-z][a-z0-9_]*$/.test(then) ? { register: row[1]!, seq: Number(row[2]), field, then } : null;
+  }
   if (parts.length !== 2) return null;
   const [head, tail] = parts as [string, string];
   /* `<figure>.first_<field>` IS A FIELD OF THE FIRST ROW A FIGURE COUNTS, the row `.first` names, so a sentence can say
@@ -4485,14 +4517,15 @@ function pathOf(
   const firstOf = /^first_([a-z][a-z0-9_]*)$/.exec(tail);
   if (firstOf && /^[a-z][a-z0-9_-]*$/.test(head)) return { rowsOf: head, part: 'first', field: firstOf[1]! };
   /* `<figure>.change` IS HOW FAR A FIGURE MOVED (`changeOf`). A list called `tasks` with a state called `change` would
-     say the same words, so the record decides between the two by whether a figure of that name is declared. */
+     say the same words, and `twoOf`'s order decides between the two. */
   if (tail === 'change' && /^[a-z][a-z0-9_-]*$/.test(head)) return { change: head };
   /* `<figure>.first`, `.names`, `.more` AND `.since` ARE THE ROWS A FIGURE COUNTS (`rowsValue`), decided between a figure
      and a list's state of that name exactly as `.change` is. */
   if ((ROW_PARTS as readonly string[]).includes(tail) && /^[a-z][a-z0-9_-]*$/.test(head)) return { rowsOf: head, part: tail as RowPart };
   const row = /^([a-z][a-z0-9_]*)#([1-9][0-9]*)$/.exec(head);
   if (row) return { register: row[1]!, seq: Number(row[2]), field: tail };
-  if (!/^[a-z][a-z0-9_]*$/.test(head)) return null;
+  /* A MODULE'S ID MAY HOLD A DASH where a list's may not, so `money-core.cash-now` is two words to ask the order about. */
+  if (!/^[a-z][a-z0-9_-]*$/.test(head)) return null;
   if (tail === 'count') return { register: head, count: true };
   return /^[A-Za-z][A-Za-z0-9_-]*$/.test(tail) ? { register: head, state: tail } : null;
 }
@@ -4524,64 +4557,186 @@ function valueAt(deps: PageDeps, path: string, how?: { fx?: FxRead }): Json | un
     if (parsed.count) return Array.isArray(held) ? held.length : 0;
     return FIGURES.has(spec.type) ? figure(held) : undefined;
   }
-  /* A FIGURE'S CHANGE WHEN A FIGURE HAS THE NAME, and otherwise the count of a list's rows in a state called `change`,
-     which is what these words read as before a figure could be asked how far it moved. */
-  if ('change' in parsed) {
-    const decl = deps.metric(parsed.change);
+  if ('then' in parsed) return stepValue(deps, parsed);
+  const two = twoOf(parsed);
+  if (two) return twoValue(deps, parsed, two, how);
+  if ('metric' in parsed) {
+    const named = deps.metric(parsed.metric);
+    /* The declaration with its parameter filled, as a figure cell reads `project-owed:Kiln`. */
+    const decl = named && parsed.param !== undefined ? (fill(named, null, parsed.param) as MetricDecl) : named;
+    return decl ? figureValue(deps, decl, how) : undefined;
+  }
+  if (!('seq' in parsed)) return undefined;
+  const schema = deps.schemaOf(parsed.register);
+  if (!schema) return undefined;
+  const decl = Object.hasOwn(schema.fields, parsed.field) ? schema.fields[parsed.field] : undefined;
+  if (!decl || !FIGURES.has(decl.type)) return undefined;
+  const row = rowAt(deps, parsed.register, parsed.seq);
+  return row && Object.hasOwn(row.fields, parsed.field) ? figure(row.fields[parsed.field]) : undefined;
+}
+
+/** A row by its spoken id's number, `tasks#3`, or `null` when the list holds none. */
+function rowAt(deps: PageDeps, register: string, seq: number): Entry | null {
+  const listed = deps.list({ register, where: { field: 'seq', is: seq }, limit: 1 });
+  return (listed.ok ? listed.value.rows[0] : undefined) ?? null;
+}
+
+/** One figure's reading as a sentence says it: a number, an amount, its amounts in several currencies, or a day. */
+function figureValue(deps: PageDeps, decl: MetricDecl, how?: { fx?: FxRead }): Json | undefined {
+  const read = deps.read(decl);
+  if (!read.ok) return undefined;
+  /* A FIGURE IN SEVERAL CURRENCIES IS EACH OF ITS AMOUNTS, which the host writes one after another. */
+  if (read.value.parts) return read.value.parts.map((p) => ({ amount: p.amount, currency: p.currency }));
+  if (read.value.value === null) return undefined;
+  /* A FIGURE THAT IS A DAY (the latest `due`) is held as whole days since 1970, and a sentence says the day: the ISO day
+     goes out, which a host writes as it writes any other day. */
+  if (decl.format === 'day') return new Date(read.value.value * 86_400_000).toISOString().slice(0, 10);
+  /* AND HOW ONE AMOUNT WAS CONVERTED, for a caller that asks (`values_fx`): only where a rate was used. */
+  if (how && read.value.fx?.asOf) how.fx = read.value.fx;
+  return read.value.unit ? { amount: read.value.value, currency: read.value.unit } : read.value.value;
+}
+
+/* ── the order for two words, and one step further ───────────────────────── */
+
+type PathSaid = NonNullable<ReturnType<typeof pathOf>>;
+
+/**
+ * The two words of a path the order below decides, `tasks` and `open`, or `null` for a path of another form.
+ *
+ * THE ORDER FOR TWO WORDS, written down here once and kept (PGS-B13, `05 §7.1`). A path two rules could read is read by
+ * the first that answers, and never guessed:
+ *
+ * 1. A list and `count`, or a state its list's state field holds: `tasks.count`, `tasks.open`.
+ * 2. A figure and `change`, `first`, `names`, `more`, `since` or `first_<field>`: `cash-now.change`.
+ * 3. An installed module or add-on and a figure it declares (`moduleFigure`): `work.open-tasks`, read over the whole
+ *    record on any page.
+ * 4. Then a list's state, which past the first rule answers nothing: a state its list does not hold is not a count of
+ *    nought, which would read as true.
+ *
+ * `valueAt` reads by it, `namedAt` says whether anything answers by it, and `registersOf` names every list a reading by
+ * it could reach, so a block is held from a reader by whichever rule answers.
+ */
+function twoOf(said: PathSaid): { head: string; tail: string } | null {
+  if ('change' in said) return { head: said.change, tail: 'change' };
+  if ('rowsOf' in said) return { head: said.rowsOf, tail: said.field === undefined ? said.part : `first_${said.field}` };
+  if ('count' in said && 'register' in said) return { head: said.register, tail: 'count' };
+  if ('state' in said) return { head: said.register, tail: said.state };
+  return null;
+}
+
+/** One path of two words, read by `twoOf`'s order. */
+function twoValue(deps: PageDeps, said: PathSaid, two: { head: string; tail: string }, how?: { fx?: FxRead }): Json | undefined {
+  /* 1. A LIST'S COUNT, OR THE COUNT OF ITS ROWS IN A STATE IT HOLDS, asked of the list by the field it mirrors its state
+     onto, as the whole count is. */
+  const schema = LIST_ID.test(two.head) ? deps.schemaOf(two.head) : null;
+  if (schema && 'count' in said) {
+    const listed = deps.list({ register: two.head, limit: 1 });
+    return listed.ok ? listed.value.matched : undefined;
+  }
+  if (schema && stateNamed(deps, two.head, two.tail)) {
+    const listed = deps.list({ register: two.head, where: { field: schema.state!, is: two.tail }, limit: 1 });
+    return listed.ok ? listed.value.matched : undefined;
+  }
+  /* 2. A FIGURE'S PART, when a figure has the name: how far it moved, or the rows it counts. */
+  if ('change' in said) {
+    const decl = deps.metric(said.change);
     if (decl) return changeOf(deps, decl);
   }
-  if ('rowsOf' in parsed) {
-    const decl = deps.metric(parsed.rowsOf);
-    if (decl) return rowsValue(deps, decl, parsed.part, parsed.field);
+  if ('rowsOf' in said) {
+    const decl = deps.metric(said.rowsOf);
+    if (decl) return rowsValue(deps, decl, said.part, said.field);
   }
-  const said =
-    'change' in parsed
-      ? LIST_ID.test(parsed.change)
-        ? { register: parsed.change, state: 'change' }
-        : null
-      : 'rowsOf' in parsed
-        ? LIST_ID.test(parsed.rowsOf)
-          ? { register: parsed.rowsOf, state: parsed.field === undefined ? parsed.part : `first_${parsed.field}` }
-          : null
-        : parsed;
-  if (!said) return undefined;
-  if ('metric' in said) {
-    const named = deps.metric(said.metric);
-    /* The declaration with its parameter filled, as a figure cell reads `project-owed:Kiln`. */
-    const decl = named && said.param !== undefined ? (fill(named, null, said.param) as MetricDecl) : named;
-    const read = decl ? deps.read(decl) : null;
-    if (!read?.ok) return undefined;
-    /* A FIGURE IN SEVERAL CURRENCIES IS EACH OF ITS AMOUNTS, which the host writes one after another. */
-    if (read.value.parts) return read.value.parts.map((p) => ({ amount: p.amount, currency: p.currency }));
-    if (read.value.value === null) return undefined;
-    /* A FIGURE THAT IS A DAY (the latest `due`) is held as whole days since 1970, and a sentence says the day: the
-       ISO day goes out, which a host writes as it writes any other day. */
-    if (decl?.format === 'day') return new Date(read.value.value * 86_400_000).toISOString().slice(0, 10);
-    /* AND HOW ONE AMOUNT WAS CONVERTED, for a caller that asks (`values_fx`): only where a rate was used. */
-    if (how && read.value.fx?.asOf) how.fx = read.value.fx;
-    return read.value.unit ? { amount: read.value.value, currency: read.value.unit } : read.value.value;
+  /* 3. A MODULE'S FIGURE, over the whole record, and only to a reader of every list behind it. */
+  const owned = moduleFigure(deps, two.head, two.tail);
+  if (owned) return mayRead(deps, owned) ? figureValue(deps, owned, how) : undefined;
+  /* 4. A list's state it does not hold: nothing. */
+  return undefined;
+}
+
+/** What a declaration reads of the modules a record has installed: `PageDeps` and `ListsBeside` both hand these. */
+type ModuleReads = { lists?: () => readonly ListShape[]; metrics?: () => readonly MetricDecl[]; packOf?: (id: string) => string | null };
+
+/** The pack a declaration's own body names, `pack:`, or `null`. */
+const packSaid = (body: unknown): string | null => {
+  const p = body !== null && typeof body === 'object' ? (body as { pack?: unknown }).pack : undefined;
+  return typeof p === 'string' && p !== '' ? p : null;
+};
+
+/**
+ * The module or add-on a figure came with: the host's word for it (`packOf`), else the figure's own `pack:`, else the
+ * module of the list it counts, which is where a first-party pack places a figure that names none.
+ */
+function moduleOf(src: ModuleReads, decl: MetricDecl, lists: readonly ListShape[]): string | null {
+  const said = src.packOf?.(`metric.${decl.metric}`) ?? packSaid(decl);
+  if (said) return said;
+  if (typeof decl.source !== 'string' || !decl.source.startsWith('register.')) return null;
+  const list = decl.source.slice('register.'.length);
+  return src.packOf?.(`register.${list}`) ?? packSaid(lists.find((l) => l.id === list));
+}
+
+/**
+ * `<module>.<figure>`: the figure an installed module or add-on declares under that word, or `null`.
+ *
+ * A MODULE IS INSTALLED WHEN IT HAS A FIGURE ON THE RECORD, so a module that was turned off, whose declarations are
+ * retired, answers nothing. Among its figures the word is, in this order: the figure's id (`work.open-tasks`); its id
+ * with the module's own word before it (`<module>-<word>`); or the one figure that is the plain total of a field of
+ * that name (`{ sum: <word> }`), which is how `{{portfolio.revenue}}` reads what the projects say they earn. Two figures
+ * totalling the same field answer nothing, as does a figure that waits for a parameter, since neither is one figure.
+ */
+function moduleFigure(src: ModuleReads, module: string, word: string): MetricDecl | null {
+  if (!src.metrics || !/^[a-z][a-z0-9_-]*$/.test(module)) return null;
+  const lists = src.lists?.() ?? [];
+  const figures = src.metrics().filter((d) => moduleOf(src, d, lists) === module);
+  const by = (id: string) => figures.find((d) => d.metric === id) ?? null;
+  const totals = figures.filter((d) => {
+    const v = d.value as unknown;
+    return v !== null && typeof v === 'object' && Object.keys(v).length === 1 && (v as { sum?: unknown }).sum === word && !JSON.stringify(d).includes('{{');
+  });
+  return by(word) ?? by(`${module}-${word}`) ?? (totals.length === 1 ? totals[0]! : null);
+}
+
+/**
+ * `<list>#<n>.<field>.<part>`: one step into a row's field (PGS-B13), or nothing.
+ *
+ * - A LINK'S ROW: `tasks#1.project.name` is the name of the project the task points at, a field that list declares and
+ *   a reader may be shown, and only to a reader of both lists. One step: a link on the far row is not followed.
+ * - A MONEY'S `amount` (minor units) or `currency`, so a sentence can say the two apart.
+ * - A LIST FIELD'S `count`, how many it holds, nought when it holds none.
+ * - A long field is still nothing, as it is a step nearer (`05 §7.1` rule 2), and so is any other part.
+ */
+function stepValue(deps: PageDeps, said: { register: string; seq: number; field: string; then: string }): Json | undefined {
+  const spec = stepSpec(deps, said);
+  const reads = deps.ctx.reads;
+  if (!spec || (reads !== undefined && !reads(said.register))) return undefined;
+  const row = rowAt(deps, said.register, said.seq);
+  if (!row) return undefined;
+  const held = Object.hasOwn(row.fields, said.field) ? row.fields[said.field] : undefined;
+  if (spec.type === 'list') return Array.isArray(held) ? held.length : 0;
+  if (spec.type === 'money') {
+    const m = figure(held);
+    return m !== null && typeof m === 'object' && !Array.isArray(m) ? m[said.then] : undefined;
   }
+  const to = spec.to!;
+  if (typeof held !== 'string' || held === '' || (reads !== undefined && !reads(to))) return undefined;
+  const far = deps.list({ register: to, where: { field: 'id', is: held }, limit: 1 });
+  const hit = far.ok ? far.value.rows[0] : undefined;
+  return hit && Object.hasOwn(hit.fields, said.then) ? figure(hit.fields[said.then]) : undefined;
+}
+
+/**
+ * The field a step is taken through, when the step is one the record reads: a link and a field of the list it points
+ * at that a reader may be shown, a money and `amount` or `currency`, or a list field and `count`. `null` otherwise.
+ */
+function stepSpec(deps: PageDeps, said: { register: string; field: string; then: string }): { type: string; to?: string | undefined } | null {
   const schema = deps.schemaOf(said.register);
-  if (!schema) return undefined;
-  if ('count' in said) {
-    const listed = deps.list({ register: said.register, limit: 1 });
-    return listed.ok ? listed.value.matched : undefined;
-  }
-  /* A STATE'S COUNT IS ASKED OF THE LIST, as the whole count is, by the field the list mirrors its state onto, and only
-     for a value that field's enum holds: `tasks.opne` is nothing rather than a count of nought, which would read as
-     true. */
-  if ('state' in said) {
-    const field = schema.state;
-    const spec = field !== undefined && Object.hasOwn(schema.fields, field) ? schema.fields[field] : undefined;
-    if (field === undefined || spec?.type !== 'enum' || !(spec.values ?? []).includes(said.state)) return undefined;
-    const listed = deps.list({ register: said.register, where: { field, is: said.state }, limit: 1 });
-    return listed.ok ? listed.value.matched : undefined;
-  }
-  const decl = Object.hasOwn(schema.fields, said.field) ? schema.fields[said.field] : undefined;
-  if (!decl || !FIGURES.has(decl.type)) return undefined;
-  const listed = deps.list({ register: said.register, where: { field: 'seq', is: said.seq }, limit: 1 });
-  const row = listed.ok ? listed.value.rows[0] : undefined;
-  return row && Object.hasOwn(row.fields, said.field) ? figure(row.fields[said.field]) : undefined;
+  const spec = schema && Object.hasOwn(schema.fields, said.field) ? schema.fields[said.field] : undefined;
+  if (!spec) return null;
+  if (spec.type === 'money') return said.then === 'amount' || said.then === 'currency' ? spec : null;
+  if (spec.type === 'list') return said.then === 'count' ? spec : null;
+  if (spec.type !== 'ref' || typeof spec.to !== 'string' || spec.to === '') return null;
+  const far = deps.schemaOf(spec.to);
+  const part = far && Object.hasOwn(far.fields, said.then) ? far.fields[said.then] : undefined;
+  return part && FIGURES.has(part.type) ? spec : null;
 }
 
 /** What a sentence may say about the rows a figure counts: the first one's name, a few names, how many besides, and since when. */
@@ -4784,20 +4939,33 @@ function namedAt(deps: PageDeps, path: string): boolean {
   if (!parsed) return false;
   if ('own' in parsed) return true;
   if ('metric' in parsed) return figureNamed(deps, parsed.metric);
-  if ('change' in parsed) return figureNamed(deps, parsed.change) || stateNamed(deps, parsed.change, 'change');
-  if ('rowsOf' in parsed) {
-    if (parsed.field === undefined) return figureNamed(deps, parsed.rowsOf) || stateNamed(deps, parsed.rowsOf, parsed.part);
-    /* `first_<field>` NAMES A FIELD THE FIGURE'S LIST DECLARES, so `first_ownd` is the author's typo and not a dash. */
-    const decl = deps.metric(parsed.rowsOf);
-    const schema = decl?.source.startsWith('register.') ? deps.schemaOf(decl.source.slice('register.'.length)) : null;
-    return (schema !== null && Object.hasOwn(schema.fields, parsed.field)) || stateNamed(deps, parsed.rowsOf, `first_${parsed.field}`);
+  /* ONE STEP NAMES SOMETHING WHEN THE STEP IS ONE THE RECORD READS and the row is there: `tasks#1.project.nmae` is the
+     author's typo, and a link through a list the caller may not open is named and draws its dash. */
+  if ('then' in parsed) return stepSpec(deps, parsed) !== null && rowThere(deps, parsed.register, parsed.seq);
+  const two = twoOf(parsed);
+  if (two) {
+    /* BY THE SAME ORDER `valueAt` READS BY, so a path one rule names is never drawn as words nobody knows. */
+    if ('count' in parsed && LIST_ID.test(two.head) && deps.schemaOf(two.head)) return true;
+    if (stateNamed(deps, two.head, two.tail)) return true;
+    if ('change' in parsed && figureNamed(deps, parsed.change)) return true;
+    if ('rowsOf' in parsed && figureNamed(deps, parsed.rowsOf)) {
+      if (parsed.field === undefined) return true;
+      /* `first_<field>` NAMES A FIELD THE FIGURE'S LIST DECLARES, so `first_ownd` is the author's typo and not a dash. */
+      const decl = deps.metric(parsed.rowsOf);
+      const schema = decl?.source.startsWith('register.') ? deps.schemaOf(decl.source.slice('register.'.length)) : null;
+      if (schema !== null && Object.hasOwn(schema.fields, parsed.field)) return true;
+    }
+    return moduleFigure(deps, two.head, two.tail) !== null;
   }
-  if ('state' in parsed) return stateNamed(deps, parsed.register, parsed.state);
+  if (!('seq' in parsed)) return false;
   const schema = deps.schemaOf(parsed.register);
-  if (!schema) return false;
-  if ('count' in parsed) return true;
-  if (!Object.hasOwn(schema.fields, parsed.field)) return false;
-  const listed = deps.list({ register: parsed.register, where: { field: 'seq', is: parsed.seq }, limit: 1 });
+  if (!schema || !Object.hasOwn(schema.fields, parsed.field)) return false;
+  return rowThere(deps, parsed.register, parsed.seq);
+}
+
+/** Whether a row is there, and a read the caller may not make answers that it is, so its dash is drawn as before. */
+function rowThere(deps: PageDeps, register: string, seq: number): boolean {
+  const listed = deps.list({ register, where: { field: 'seq', is: seq }, limit: 1 });
   return !listed.ok || listed.value.rows.length > 0;
 }
 

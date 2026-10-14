@@ -465,10 +465,11 @@ const withoutCrossCheck = (doc: Body): Body => ({
  */
 const NOT_CLOSED = ', state is not closed';
 const open = (b: Body): Body => (typeof b.where === 'string' && b.where.includes(NOT_CLOSED) ? { ...b, where: b.where.replace(NOT_CLOSED, '') } : b);
+const RULE_FILED_91: ReadonlySet<string> = new Set(['rule-filed', 'filed-by-rule-30d', 'rules-filing-30d', 'rules-filing']);
 const withoutFiling = (doc: Body): Body => ({
   ...doc,
   declarations: (doc.declarations as Body[])
-    .filter((d) => d.register !== 'filing_rules')
+    .filter((d) => d.register !== 'filing_rules' && d.page !== 'money-rules' && !RULE_FILED_91.has(String(d.metric)))
     .map((d) => {
       if (d.register === 'transactions' && Array.isArray(d.fields)) return { ...d, fields: (d.fields as Body[]).filter((f) => f.id !== 'filed_by') };
       if (d.register === 'categories' && Array.isArray(d.fields))
@@ -715,7 +716,7 @@ const withoutBatch78 = (doc: Body): Body => {
   };
   const money = withPage(doc, 'money', (now) => now.flatMap(lasts));
   const book = withPage(money, 'money-book', (now) => now.filter((b) => !(b.kind === 'note' && (b.when as Body | undefined)?.metric === 'book-lasts-until:{{name}}')));
-  return { ...book, declarations: (book.declarations as Body[]).filter((d) => d.script !== 'match_payment' && d.rule !== 'payment-matches' && d.rule !== 'instalment-settles') };
+  return { ...book, declarations: (book.declarations as Body[]).filter((d) => d.script !== 'match_payment' && d.rule !== 'payment-matches' && d.rule !== 'instalment-settles' && d.script !== 'file_back' && d.script !== 'learn_category' && d.rule !== 'rule-files-back' && d.rule !== 'category-teaches' && d.rule !== 'category-taught') };
 };
 /** Batch 63's four figures of this month's spending against last (spend-figures-63), new in the unreleased money-core 3.17.0. */
 const SPEND_VS_LAST: ReadonlySet<string> = new Set(['spent-last-month', 'spent-by-category-last-month', 'spent-by-category-to-date-last-month', 'spent-vs-last-month']);
@@ -998,6 +999,7 @@ const projectBefore = (doc: Body, id: string): Body =>
          Agents read every run placed in the project, titled by what it was doing. */
       /* AND UNTIL BATCH 89 (runs-on-section-89) the three drew three rows each and named who by the run, `used_by`, Last used by. */
       const runsOn89 = (x: Body): Body => ({ ...x, limit: 3, columns: (x.columns as Body[]).map((c) => (c.as === 'who' ? { field: 'used_by', label: 'Last used by', as: 'who' } : c)) });
+      if (b.kind === 'section' && b.panel === 'seen') return [];
       if (b.kind === 'section' && b.heading === 'Runs on') return [];
       if (b.heading === 'And from everywhere') return [];
       if (b.heading === 'Money by month') return [{ ...b, span: 6 }];
@@ -1109,7 +1111,7 @@ const numbersBefore = (doc: Body, id: string): Body =>
     ? doc
     : {
         ...doc,
-        ...(Array.isArray(doc.adds) ? { adds: (doc.adds as Body[]).filter((a) => (a.block as Body | undefined)?.key !== 'earning-silent' && (a.block as Body | undefined)?.heading !== 'Server and provider numbers') } : {}),
+        ...(Array.isArray(doc.adds) ? { adds: (doc.adds as Body[]).filter((a) => (a.block as Body | undefined)?.key !== 'earning-silent' && (a.block as Body | undefined)?.heading !== 'Server and provider numbers' && (a.block as Body | undefined)?.panel !== 'seen') } : {}),
         declarations: (doc.declarations as Body[]).filter((d) => d.metric !== 'project-numbers-7d' && d.metric !== 'projects-earning-silent' && d.metric !== 'service-numbers').map((d) =>
           typeof d.metric === 'string' && d.metric.startsWith('datapoints-') && typeof d.where === 'string'
             ? d.where === 'at before tomorrow'

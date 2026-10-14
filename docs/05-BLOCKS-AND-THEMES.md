@@ -317,9 +317,21 @@ In the skill, not in the schema — a schema that teaches is a schema nobody rea
 | a row by spoken id, then a field | `{{tasks#125.state}}` — **the register is required**, because every register has a `#1`. *An earlier draft also wrote `{{shop.revenue.monthly}}`; `shop` is a row's title, not its id, and a bare row id is not a path* |
 | a **count**, never the contents | `{{blockers.count}}` — `register.count` |
 | the rows in one state, counted | `{{tasks.open}}` — `register.<state value>` |
-| the whole record | `{{portfolio.revenue}}` — a metric with `source: *` |
+| one step into a row's field | `{{tasks#1.project.name}}` · `{{tasks#1.cost.amount}}` · `{{tasks#1.tags.count}}`: a field of the row a link points at, a money's `amount` or `currency`, a list field's `count`. One step and no further: a link on the far row is not followed, and a fourth part names nothing |
+| the whole record, by module | `{{portfolio.revenue}}`: `<module>.<figure>`: an installed module or add-on, then a figure it declares |
+| a figure's part | `{{cash-now.change}}` · `{{tasks-late-yours.first}}`: `change`, `first`, `names`, `more`, `since`, `first_<field>` |
 
-Six forms, resolved in that order. **Lexically**, a path is `segment ('.' segment)*`; a segment is
+Eight forms. **One order for two words**, written down once and kept: (1) a list and `count`, or a state its list
+holds; (2) a figure and `change`, `first`, `names`, `more`, `since` or `first_<field>`; (3) a module and a figure it
+declares; (4) then a list's state, which past (1) answers nothing. A path two rules could read is read by the first
+that answers, never guessed, and a path no rule answers still names nothing. A module's figure is found by its id
+(`{{work.open-tasks}}`), by its id after the module's own word (`portfolio.live` for `portfolio-live`), or as the one
+figure of that module that totals a field of that name (`portfolio.revenue` is what the projects say they earn); two
+such totals, or a figure that waits for a parameter, answer nothing. A step through a link reads the far row only for
+a reader of both lists. *Amended October 14th 2026 (PGS-B13). The newest reading of a measure, `<measure>.<period>`,
+is not a form yet.*
+
+**Lexically**, a path is `segment ('.' segment)*`; a segment is
 `[A-Za-z][A-Za-z0-9_-]*` or `register#digits`. Anything after `{{` that is not a path, or one of the
 eight typed kinds of §7.2 followed by `:`, renders as the author's text, marked unresolved.
 

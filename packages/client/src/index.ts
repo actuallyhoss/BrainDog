@@ -349,6 +349,13 @@ export type InboxAnswer<A> = A extends { digest: true } ? InboxDigest : A extend
 export type FigureEntry = { id: string; name: string; format: string | null; list: string | null; pack: string | null; param: boolean };
 
 /**
+ * `offered`: everything the caller may read, in one read, as `{ fixed, lists, pages, figures, skills }`. `fixed` is the
+ * addresses with no parameter, each decided by the check its own reader asks; a skill is its name and when to use it,
+ * never its text. See `Offered` in `packages/record/src/methods/offered.ts`.
+ */
+export type Offered = Answer<'offered'>;
+
+/**
  * One row as `context` shows it: its spoken id, version, scope, state, and its register's mobile fields.
  * A key's secret field is `{ sealed, opened, last_opened, last_by }`, never a value.
  */
@@ -1554,6 +1561,8 @@ export function createClient(options: ClientOptions) {
     metric: (metric: string) => call<unknown>('metric', { metric }),
     /** Every figure the caller may read, whichever pack declared it and whether or not a page draws it. */
     figures: () => call<FigureEntry[]>('figures'),
+    /** What the caller may read, in one read: the fixed addresses, lists, pages, figures and skills by name. READ+. */
+    offered: () => call<Offered>('offered', {}),
     packs: () => call<PackState[]>('packs'),
     /* ADMIN, SO A BROWSER SESSION. Nothing cascades: `alsoDisable` names what a `PACK_REQUIRED` listed. */
     disablePack: (args: { id: string; alsoDisable?: string[] }) => call<PackToggle>('disablePack', args as Record<string, unknown>),

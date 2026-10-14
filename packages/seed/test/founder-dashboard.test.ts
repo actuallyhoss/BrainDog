@@ -103,7 +103,7 @@ test('THE DASHBOARD AND AN ORGANISATION PAGE read every block, and the numbers a
      projects. NOT ITS MONEY YET: People is installed before Money, so its copy leaves out a block over a list the
      record does not hold yet (`placed` in `packs/first-party.ts`), until People is next updated. */
   const own = value<{ blocks: Drawn[] }>(k.page(harbour.slug)).blocks;
-  assert.deepEqual(own.map((b) => b.heading), [undefined, 'People', 'Numbers, 30 days', 'Latest numbers', 'Send numbers here', 'Projects', 'Seen in', 'Notes']);
+  assert.deepEqual(own.map((b) => b.heading), [undefined, 'People', 'Numbers, 30 days', 'Latest numbers', 'Send numbers here', 'Projects', 'Seen in', 'Notes', 'Where it was seen']);
   for (const b of own) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
   assert.equal(own[0]!.rows?.length, 1, 'its card reads its own row');
   assert.equal(own[2]!.matched, 40, 'only its own numbers, the example one left out');
@@ -214,6 +214,7 @@ test('A FOUNDER’S PROJECT HAS A PAGE, with Estate since founder 1.4.0: what is
     'Tools and servers',
     'Skills',
     'And from everywhere',
+    'Where it was seen',
   ]);
   for (const b of blocks) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
   assert.deepEqual((blocks.find((b) => b.heading === 'At a glance') as unknown as { cells: { label: string }[] }).cells.map((c) => c.label), ['Open', 'Still to come in', 'Costs a year', 'Done this week'], 'with Estate present, what it costs a year takes the place the task figures held');

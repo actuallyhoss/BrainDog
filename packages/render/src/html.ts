@@ -45,7 +45,7 @@ import { SERIES_NET, SERIES_NONE, seriesPlan, type SeriesPlan } from './series.t
 import { LINES_AGAINST, LINES_NONE, LINES_NUMBERS, linesOnly, linesPlan } from './lines.ts';
 import { PROGRESS_NONE, PROGRESS_OF, PROGRESS_TOTAL, progressPlan, progressRangeSaid, progressSentence, progressSpentSaid, rangePlan, rangeSentence } from './progress.ts';
 import { AMOUNT_SPACE, writeFigure, type AmountSetting, type WrittenAmount } from './money.ts';
-import { FORECAST_BALANCE, FORECAST_MOVE, FORECAST_NONE, FORECAST_NUMBERS, FORECAST_PAINT, FORECAST_WHAT, FORECAST_WHEN, baseKnobs, forecastFigure, forecastModel, forecastPlan, scenario, underNote } from './forecast.ts';
+import { FORECAST_BALANCE, FORECAST_MOVE, FORECAST_NONE, FORECAST_NUMBERS, FORECAST_PAINT, FORECAST_WHAT, FORECAST_WHEN, baseKnobs, forecastEveryday, forecastFigure, forecastModel, forecastPlan, listedSteps, scenario, underNote } from './forecast.ts';
 import { DIFF_GLYPHS, DIFF_WORDS, diffFolded, diffPlan, type DiffLine } from './diff.ts';
 import { ROADMAP_LEGEND, ROADMAP_NONE, ROADMAP_TODAY, roadmapAxis, roadmapFlip, roadmapLegend, roadmapLines, roadmapPlan, roadmapRow, roadmapSentence, roadmapShare, roadmapSkipped, roadmapToday } from './roadmap.ts';
 import { RING_NONE, RING_OF, RING_PAINT, RING_STEP_OPACITY, ringPlan } from './ring.ts';
@@ -1640,11 +1640,13 @@ function forecast(b: Block, o: RenderOptions): string {
   const ticks = `<ol class="forecast-ticks" aria-hidden="true">${plan.ticks
     .map((t) => `<li class="forecast-tick"${t.edge ? ' data-edge=""' : ''} style="--at:${t.at}">${escape(t.label)}</li>`)
     .join('')}</ol>`;
+  /* EVERYDAY SPENDING IS ONE LINE, not a row a week (`forecastEveryday`), and the bills are listed around it. */
+  const everyday = forecastEveryday(model, shown);
   const row = (when: string, what: string, move: string, balance: string) =>
     `<tr><th scope="row">${escape(when)}</th><td>${escape(what)}</td><td class="num">${escape(move)}</td><td class="num">${escape(balance)}</td></tr>`;
   const numbers = `<details class="forecast-numbers"><summary class="forecast-toggle">${escape(FORECAST_NUMBERS)}</summary><table class="forecast-table"><thead><tr>${[FORECAST_WHEN, FORECAST_WHAT, FORECAST_MOVE, FORECAST_BALANCE]
     .map((h) => `<th scope="col">${escape(h)}</th>`)
-    .join('')}</tr></thead><tbody>${row(day(model.today), model.label, '', model.template)}${shown.steps
+    .join('')}</tr></thead><tbody>${row(day(model.today), model.label, '', model.template)}${everyday ? `<tr data-everyday=""><td colspan="4">${escape(everyday)}</td></tr>` : ''}${listedSteps(shown.steps)
     .map((s) => row(day(s.day), s.label, forecastFigure(model, s.delta), forecastFigure(model, s.balance)))
     .join('')}</tbody></table></details>`;
   const note = underNote(model, shown);

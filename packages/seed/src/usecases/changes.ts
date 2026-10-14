@@ -27,7 +27,7 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
   founder: [
     {
       version: '2.6.0',
-      notes: "Home is called Today and says the money lasts the year when nothing due runs it out. It says what stopped reporting and folds Working now under Agents at work. What is late has its own table above Due this week. Lapsing has no Cost column. A number can name its service. Numbers dated after today are left out. A project page has a card per agent run that changed something, and six of its keys, tools and skills under Runs on, with which agents used each. Its money on its way is Still to come in.",
+      notes: "Home is called Today. It says the money lasts the year if nothing due ends it, and what stopped reporting. Working now folds under Agents at work. Late has a table above Due this week. Lapsing drops Cost. A number can name its service; one dated after today is left out. A project page has a card per agent run that wrote something, six keys, tools and skills under Runs on with who used each, and money due in as Still to come in. A project, person or organisation page ends with where it was seen.",
     },
     {
       version: '2.5.0',
