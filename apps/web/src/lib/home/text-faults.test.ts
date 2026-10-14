@@ -9,7 +9,20 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 import { PAGES, TITLES, learnPages } from '../record/held.ts';
-import { FAULTS_SHOWN, faultLine, faultRows, knownOf, loadTextFaults, more, placeOf, readTextFaults, textFaultsOf, type Known } from './text-faults.ts';
+import {
+  FAULTS_SHOWN,
+  TEXT_FAULTS_KEPT_MS,
+  faultLine,
+  faultRows,
+  knownOf,
+  loadTextFaults,
+  more,
+  placeOf,
+  readTextFaults,
+  textFaultsOf,
+  textFaultsOnce,
+  type Known,
+} from './text-faults.ts';
 
 const ULID = '01J9Z3K4M5N6P7Q8R9S0T1V2W3';
 const NOTE = {
@@ -171,6 +184,35 @@ test('THROUGH THE CLIENT: a host without the read draws nothing, and a host with
   }
 });
 
+test('THE WALK IS ASKED ONCE FOR THE TAB: a second ask while it is out, or inside the keeping time, is the same read', async () => {
+  let asked = 0;
+  const io = async () => {
+    asked += 1;
+    return json(200, answer([NOTE]));
+  };
+  const base = 'http://kept.test/app/acme';
+  const first = textFaultsOnce(base, io, 1_000);
+  /* WHILE IT IS OUT, and after it landed, the same read: the record is not asked to walk its words twice. */
+  assert.equal(textFaultsOnce(base, io, 2_000), first);
+  const got = await first;
+  assert.equal(textFaultsOnce(base, io, 1_000 + TEXT_FAULTS_KEPT_MS - 1), first);
+  assert.ok(asked <= 1, `asked ${String(asked)} times`);
+  /* ANOTHER RECORD IS ITS OWN, and past the keeping time the record is asked again. */
+  assert.notEqual(textFaultsOnce('http://kept.test/app/other', io, 2_000), first);
+  const later = textFaultsOnce(base, io, 1_000 + TEXT_FAULTS_KEPT_MS);
+  assert.notEqual(later, first);
+  assert.deepEqual(await later, got);
+});
+
+test('NONE IS NOT KEPT: a host that refused is asked again at the next visit', async () => {
+  const base = 'http://refused.test/app/acme';
+  const refused = async () => json(403, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'No.' } });
+  const first = textFaultsOnce(base, refused, 1_000);
+  assert.equal(await first, null);
+  await Promise.resolve();
+  assert.notEqual(textFaultsOnce(base, refused, 2_000), first);
+});
+
 const bare = (text: string): string => text.replaceAll(/<!--[\s\S]*?-->/gu, '').replaceAll(/\/\*[\s\S]*?\*\//gu, '');
 const home = bare(readFileSync(new URL('./Home.svelte', import.meta.url), 'utf8'));
 
@@ -180,12 +222,22 @@ test('HOME REACHES THE TILE BY A DYNAMIC IMPORT ONLY, and draws it once, after t
   }
   assert.match(home, /import\('\.\/text-faults\.ts'\)/u);
   assert.match(home, /import\('\.\/TextFaults\.svelte'\)/u);
-  assert.match(home, /const found = await m\.loadTextFaults\(base\);\s*if \(here\) faults = found && found\.count > 0 \? \{ found, Part: part\.default \} : null;/u);
+  assert.match(home, /const found = await m\.textFaultsOnce\(base\);\s*if \(here\) faults = found && found\.count > 0 \? \{ found, Part: part\.default \} : null;/u);
   assert.equal(home.split('<faults.Part').length - 1, 1, 'the tile is drawn once');
   assert.match(home, /\{#if faults\}<faults\.Part found=\{faults\.found\} lists=\{data\.lists\} \/>\{\/if\}/u);
   /* AFTER THE BOARD'S READS: past the each that draws the briefing, the page, what went stale and who was matched. */
   assert.ok(home.indexOf('<faults.Part') > home.indexOf('<stale.Part'));
   assert.ok(home.indexOf('<faults.Part') > home.indexOf('{/each}', home.indexOf('<matched.Part')));
+});
+
+test('THE BOARD\'S LAST TILES ARE ASKED ONCE THE PAGE HAS ANSWERED, never beside the page read or in the bracket', () => {
+  const effects = home.split('$effect(').slice(1);
+  const late = effects.filter((e) => e.includes('textFaultsOnce(base)'));
+  assert.equal(late.length, 1, 'one effect asks for the walk');
+  assert.match(late[0]!, /^\(\) => \{\s*if \(data\.refused \|\| !settled\) return;/u);
+  for (const tile of ['loadLearned(base)', 'loadNamedTwice(base)']) assert.ok(late[0]!.includes(tile), `${tile} waits for the page too`);
+  assert.doesNotMatch(late[0]!.slice(0, late[0]!.indexOf('return () =>')), /opened|closed\(/u);
+  assert.doesNotMatch(home, /loadTextFaults\(/u);
 });
 
 test('THE TILE IS FLAT, NAMES ITS MARK BESIDE ITS WORDS, AND IS 44 UNDER A THUMB', () => {

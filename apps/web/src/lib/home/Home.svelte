@@ -470,9 +470,27 @@
       const out = await m.readStale(base);
       if (here) stale = { rows: out.value, Part: part.default };
     });
-    /* THE BOARD'S LAST TILE, so it is out of the screen's bracket: landing late, it moves nothing drawn over it. */
+    void Promise.allSettled([briefing, matches, stales]).then(() => closed(true, at));
+    return () => {
+      here = false;
+    };
+  });
+
+  /**
+   * THE BOARD'S LAST TILES WAIT FOR THE PAGE. They are out of the screen's bracket, and landing late they move nothing
+   * drawn over them, but each is a call the record answers in turn: asked beside the page read they went ahead of it, and
+   * what the record found wrong in its words (`textFaults`) walks every page and note, 11 to 16 seconds on a lived-in
+   * record, so the page under the briefing stayed bars for as long as the walk ran. So they are asked once the page has
+   * answered (`settled`), and the walk is asked once for the tab and not each time the record moves (`textFaultsOnce`).
+   */
+  $effect(() => {
+    if (data.refused || !settled) return;
+    void moving.version;
+    const base = apiBase();
+    let here = true;
+    /* THE BOARD'S LAST TILE: what the record found wrong in its own pages and notes. */
     void Promise.all([import('./text-faults.ts'), import('./TextFaults.svelte')]).then(async ([m, part]) => {
-      const found = await m.loadTextFaults(base);
+      const found = await m.textFaultsOnce(base);
       if (here) faults = found && found.count > 0 ? { found, Part: part.default } : null;
     }, () => undefined);
     /* AND AFTER IT, WHAT THE ANSWERS TAUGHT, out of the bracket the same way. */
@@ -485,7 +503,6 @@
       const found = await m.loadNamedTwice(base);
       if (here) named = found && found.lines.length > 0 ? { found, Part: part.default } : null;
     }, () => undefined);
-    void Promise.allSettled([briefing, matches, stales]).then(() => closed(true, at));
     return () => {
       here = false;
     };

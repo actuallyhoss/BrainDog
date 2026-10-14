@@ -167,6 +167,36 @@ export async function loadTextFaults(base: string, io?: Fetch): Promise<TextFaul
   }
 }
 
+/** How long a tab keeps what the record found before it asks the record to walk its words again. */
+export const TEXT_FAULTS_KEPT_MS = 10 * 60_000;
+
+/* WHAT EACH RECORD FOUND, AS THIS TAB LAST ASKED IT, by the record's address: the answer, or the read still out. */
+const heldFaults = new Map<string, { at: number; found: Promise<TextFaults | null> }>();
+
+/**
+ * What the record at `base` found, asked at most once in `TEXT_FAULTS_KEPT_MS` for the tab, and never a second time while
+ * a read is out.
+ *
+ * THE WALK HOLDS THE RECORD. `textFaults` reads every page and note the reader may open, and the record answers one call
+ * at a time: on a record of a few thousand rows it took 11 to 16 seconds, and the version poll, the page read and the
+ * briefing asked beside it all waited behind it. Home asked it again each time the record moved, so on a record an agent
+ * writes to every few seconds a walk was always out and the page under Today's briefing stayed bars. Asked once and kept,
+ * the record moving redraws nothing here; the tile is the board's last and says what a walk found, not what changed since.
+ *
+ * NONE IS NOT KEPT: a host that dropped the line, or refused, is asked again at the next visit rather than held silent.
+ */
+export function textFaultsOnce(base: string, io?: Fetch, now: number = Date.now()): Promise<TextFaults | null> {
+  const kept = heldFaults.get(base);
+  if (kept && now - kept.at < TEXT_FAULTS_KEPT_MS) return kept.found;
+  const found = loadTextFaults(base, io);
+  const mine = { at: now, found };
+  heldFaults.set(base, mine);
+  void found.then((f) => {
+    if (f === null && heldFaults.get(base) === mine) heldFaults.delete(base);
+  });
+  return found;
+}
+
 /** The first six faults to list, each by its place's own name with the fix and where it opens. None at nought. */
 export function faultRows(found: TextFaults | null, known: Known = NOTHING_KNOWN): FaultRow[] {
   if (!found || found.count <= 0) return [];
