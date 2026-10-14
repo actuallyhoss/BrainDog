@@ -76,6 +76,13 @@ export const SLASH_TIMEOUT_MS = 30_000;
 const ANSWER_BYTES = 64_000;
 
 /**
+ * At most this much of an embedding answer is read, which is no proposal's size: the kernel queues a hundred rows to one
+ * job (`EMBED_ROWS_MOST`), and a hundred vectors of 4,096 numbers written as JSON decimals run to about ten million
+ * characters. Under `ANSWER_BYTES` every batch a real embedding model answers was a throw after the model ran.
+ */
+const EMBED_ANSWER_BYTES = 12_000_000;
+
+/**
  * The most tokens one side of one call is billed, whatever the provider's body says (`counted`).
  *
  * A MILLION, WHICH IS SEVENTY TIMES THE LARGEST CALL THE PACKAGE MAKES: its `propose` template caps the prompt at 12,000
@@ -288,6 +295,16 @@ export type EndpointModelOptions = {
    * with its `anthropic-version` beside it. Left out, the bearer.
    */
   auth?: 'bearer' | 'anthropic' | undefined;
+  /**
+   * The embedding model the endpoint expects, such as `nomic-embed-text`. ABSENT, `endpointInference` has no `embed` and
+   * the record's `infer.embed` waits for a host that has one, which is the product working.
+   */
+  embedModel?: string | undefined;
+  /**
+   * The embeddings address, where it is not the chat address's sibling: left out, `/chat/completions` becomes
+   * `/embeddings`, or `/embeddings` follows a trailing `/v1` (`embedAddress`).
+   */
+  embedUrl?: string | undefined;
 };
 
 /**
@@ -421,7 +438,7 @@ const usageIn = (text: string): { in: number; out: number } | undefined => {
  * that is not `ok` is a `SlashRefusedError`, settled under `-` and not asked again. Everything after a 200, and the
  * timeout, is a `SlashAnsweredError`, carrying `model`, the name the body was sent with.
  */
-const post = async (url: URL, options: EndpointModelOptions, body: unknown, model?: string): Promise<string> => {
+const post = async (url: URL, options: EndpointModelOptions, body: unknown, model?: string, most = ANSWER_BYTES): Promise<string> => {
   const headers: Record<string, string> = { 'content-type': 'application/json', accept: 'application/json' };
   const key = options.key ? await options.key() : null;
   /* THE KEY IN THE ONE HEADER ITS PROVIDER READS, and in no other place. */
@@ -464,7 +481,7 @@ const post = async (url: URL, options: EndpointModelOptions, body: unknown, mode
   } catch {
     throw signal.aborted ? timedOut() : new SlashAnsweredError('The Slash endpoint broke off its answer.', undefined, model);
   }
-  if (text.length > ANSWER_BYTES) throw new SlashAnsweredError('The Slash endpoint answered more than Slash reads.', usageIn(text), model);
+  if (text.length > most) throw new SlashAnsweredError('The Slash endpoint answered more than Slash reads.', usageIn(text), model);
   return text;
 };
 
@@ -535,8 +552,13 @@ export type SlashInferenceCall = {
  */
 export type SlashInferenceReply = { text: string; usage: { in: number; out: number }; model?: string };
 
+/** One call's embeddings, the package's `Embedding` written out for the same reason: int8 vectors of one width, in order. */
+export type SlashEmbedding = { model: string; dims: number; vectors: Int8Array[]; usage: { in: number; out: number } };
+
 export interface SlashInference {
   complete(call: SlashInferenceCall): Promise<SlashInferenceReply>;
+  /** OPTIONAL, as the package's is: a host with no embedding model leaves it out and `embedTexts` refuses in words. */
+  embed?(texts: readonly string[]): Promise<SlashEmbedding>;
 }
 
 /**
@@ -604,7 +626,9 @@ const counted = (value: unknown): number =>
  */
 export function endpointInference(options: EndpointModelOptions): SlashInference {
   const url = endpointUrl(options.url);
+  const embed = embeddingsOver(url, options);
   return {
+    ...(embed ? { embed } : {}),
     complete: async (call: SlashInferenceCall): Promise<SlashInferenceReply> => {
       const model = modelSent(call.model, options.model);
       const text = await post(
@@ -640,6 +664,82 @@ export function endpointInference(options: EndpointModelOptions): SlashInference
         model,
       };
     },
+  };
+}
+
+/* ── embeddings, over the same endpoint where it serves them ─────────────────── */
+
+/**
+ * The embeddings address: `embedUrl` where the host named one, else the chat address's sibling, else none.
+ *
+ * THE SIBLING IS THE OPENAI SHAPE MOST LOCAL SERVERS COPY: `/v1/chat/completions` beside `/v1/embeddings`. An address that
+ * ends in neither `/chat/completions` nor `/v1` is somebody's own route, and guessing a path under it would post a batch
+ * of his rows somewhere nobody said serves them, so it is no `embed` at all.
+ */
+const embedAddress = (chat: URL, named?: string): URL | undefined => {
+  if (named !== undefined) return endpointUrl(named);
+  const path = chat.pathname.replace(/\/+$/u, '');
+  const at = new URL(chat.href);
+  if (path.endsWith('/chat/completions')) at.pathname = `${path.slice(0, -'/chat/completions'.length)}/embeddings`;
+  else if (path.endsWith('/v1')) at.pathname = `${path}/embeddings`;
+  else return undefined;
+  return at;
+};
+
+/**
+ * `clamp(round(x × 127), −127, 127)` after the vector is made unit length, as the Worker quantises (`51 §5.11` step 4).
+ *
+ * UNIT LENGTH FIRST, because Workers AI's model answers normalised vectors and a local server may not: a vector of
+ * length forty would clamp to ±127 in nearly every place and match everything alike. A vector of zeros stays zeros.
+ */
+const unitInt8 = (row: readonly number[]): Int8Array => {
+  const norm = Math.sqrt(row.reduce((n, x) => n + x * x, 0));
+  const out = new Int8Array(row.length);
+  for (const [at, x] of row.entries()) out[at] = Math.max(-127, Math.min(127, Math.round((norm > 0 ? x / norm : 0) * 127)));
+  return out;
+};
+
+/**
+ * `embed` over an OpenAI-style `/embeddings`, or `undefined` where the host named no embedding model or no address can be
+ * had. The same `post` as a completion, so the key is asked for on each call, sits in one header and nowhere else, and a
+ * status answers the same marks.
+ *
+ * EVERY CHECK THE WORKER'S ANSWER PASSES (`apps/worker/src/inference.ts`): the kernel writes `entry_vec` by position, so a
+ * short count, a vector that is not all finite numbers, or two widths in one batch would file a vector on the wrong row
+ * or one that matches nothing. Each is a `SlashAnsweredError`, because the model ran and may have billed.
+ */
+function embeddingsOver(chat: URL, options: EndpointModelOptions): SlashInference['embed'] {
+  const model = options.embedModel;
+  if (model === undefined) return undefined;
+  const url = embedAddress(chat, options.embedUrl);
+  if (url === undefined) return undefined;
+  return async (texts: readonly string[]): Promise<SlashEmbedding> => {
+    /* NOTHING TO EMBED IS NOT A CALL, the Worker's rule. */
+    if (texts.length === 0) return { model, dims: 0, vectors: [], usage: { in: 0, out: 0 } };
+    const text = await post(url, options, { model, input: [...texts] }, model, EMBED_ANSWER_BYTES);
+    let parsed: { data?: unknown; usage?: { prompt_tokens?: unknown } } | null;
+    try {
+      parsed = JSON.parse(text) as typeof parsed;
+    } catch {
+      throw new SlashAnsweredError('The Slash endpoint answered its embeddings with a body that is not JSON.', undefined, model);
+    }
+    const usage = { in: counted(parsed?.usage?.prompt_tokens), out: 0 };
+    const wrong = (why: string): SlashAnsweredError => new SlashAnsweredError(`The Slash endpoint answered ${why}, so no embedding was kept.`, usage, model);
+    const data = parsed?.data;
+    if (!Array.isArray(data) || data.length !== texts.length) throw wrong(`${Array.isArray(data) ? data.length : 'no'} vectors for ${texts.length} texts`);
+    /* IN `index` ORDER, which the answer may not be written in; a position where an item says none. */
+    const rows: (readonly number[] | undefined)[] = new Array(texts.length);
+    for (const [i, item] of data.entries()) {
+      const at = (item as { index?: unknown } | null)?.index ?? i;
+      const vector = (item as { embedding?: unknown } | null)?.embedding;
+      if (typeof at !== 'number' || !Number.isInteger(at) || at < 0 || at >= texts.length || rows[at] !== undefined) throw wrong('its vectors out of order');
+      if (!Array.isArray(vector) || vector.length === 0 || !vector.every((x) => typeof x === 'number' && Number.isFinite(x)))
+        throw wrong('a vector that is not a list of numbers');
+      rows[at] = vector as number[];
+    }
+    const dims = rows[0]!.length;
+    if (rows.some((row) => row!.length !== dims)) throw wrong('vectors of two widths');
+    return { model, dims, vectors: rows.map((row) => unitInt8(row!)), usage };
   };
 }
 
@@ -759,6 +859,10 @@ export type SlashHostConfig = {
   model?: string | undefined;
   /** An operator's key, which only a self-host has. Absent, the endpoint is called with no key. */
   key?: string | undefined;
+  /** `SLASH_EMBED_MODEL`: the endpoint's embedding model. Absent, this host embeds nothing. */
+  embedModel?: string | undefined;
+  /** `SLASH_EMBED_ENDPOINT`: the embeddings address, where it is not the chat address's sibling. */
+  embedUrl?: string | undefined;
 };
 
 export type SlashHostDeps = {
@@ -791,7 +895,10 @@ export function slashFromEnv(env: Readonly<Record<string, unknown>>, options: { 
   const url = text(env.SLASH_ENDPOINT);
   if (!url) return undefined;
   const key = options.operatorKey === false || typeof env.SLASH_KEY !== 'string' || env.SLASH_KEY === '' ? undefined : env.SLASH_KEY;
-  return { url, model: text(env.SLASH_MODEL), key };
+  /* AND AN EMBEDDING MODEL ONLY WHERE ONE IS NAMED, so a self-host that set none sends no row of his to be embedded. */
+  const embedModel = text(env.SLASH_EMBED_MODEL);
+  const embedUrl = text(env.SLASH_EMBED_ENDPOINT);
+  return { url, model: text(env.SLASH_MODEL), key, ...(embedModel ? { embedModel } : {}), ...(embedUrl ? { embedUrl } : {}) };
 }
 
 /**
@@ -811,6 +918,8 @@ function endpointOptionsOf(config: SlashHostConfig | undefined, deps: SlashHostD
   return {
     url: config.url,
     model: config.model,
+    embedModel: config.embedModel,
+    embedUrl: config.embedUrl,
     key: async () => {
       if (operator === undefined && deps.keyRequired)
         throw new SlashKeyClosedError('This host has no key for its Slash endpoint, so nothing was sent.');

@@ -78,7 +78,7 @@ import {
 import { pagedRunner } from '@braindog/host/connector';
 import { replayUsage } from '@braindog/host/actions';
 import { serveAsks } from '@braindog/host/slash-answers';
-import { backgroundMeter, serveModelJobs } from '@braindog/host/model-jobs';
+import { backgroundMeter, queryVector, serveModelJobs } from '@braindog/host/model-jobs';
 import { grantNamed, holdingScript } from '@braindog/host/script';
 import { askerOf, scriptTrial, trialSandbox } from '@braindog/host/script-try';
 import { runInQuickJs } from '@braindog/script/quickjs';
@@ -1385,9 +1385,10 @@ export async function start(options: {
      `test/slash-answers.test.ts`, a deliverer handed every kind was handed the question. Only `serveAsks` in `poll` leases
      it, and only where there is a model to ask. */
   /* AND A MODEL JOB IS NOT A DELIVERER'S WHERE `serveModelJobs` SERVES IT, for the same reason: acked `done` with no
-     result, a draft files nothing and a digest goes without its prose. With no model the list is left as it was given. */
+     result, a draft files nothing and a digest goes without its prose. With no model the list is left as it was given. An `infer.embed` too, where the
+     endpoint embeds: acked `done` with no vectors, the row would never be indexed. */
   const delivers: readonly OutboxKind[] = (options.delivers ?? []).filter(
-    (k) => k !== 'infer.ask' && (!options.actions || k !== 'pull.fetch') && (!modelJobs || (k !== 'infer.draft' && k !== 'infer.prose' && k !== 'infer.resolve')),
+    (k) => k !== 'infer.ask' && (!options.actions || k !== 'pull.fetch') && (!modelJobs || (k !== 'infer.draft' && k !== 'infer.prose' && k !== 'infer.resolve')) && (!modelJobs?.embed || k !== 'infer.embed'),
   );
 
   /**
@@ -1692,6 +1693,9 @@ export async function start(options: {
     /* SLASH'S MODEL, when this host points at one; the record files what it drafts through the proposal door or not at all. */
     slashModel,
     slashMeter,
+    /* A SEARCH'S OWN WORDS AS A VECTOR (ENG-B18), only where the endpoint embeds, his switch for Slash reading is on and the
+       month's background allowance has room; never on the ask ceiling. Absent where nothing embeds, and search is by words. */
+    meaning: queryVector({ embed: modelJobs?.embed, meter: jobsMeter, now: () => clock.now(), reads: () => api.kernel.prefsOf('slash')['slash.reads'] !== false }),
     engineHealth,
     engineLedger,
     /* NEWER VERSIONS IN THIS HOST'S CATALOGUE AND THE KENNEL, for Slash to ask about on Decide, and the whole of both for

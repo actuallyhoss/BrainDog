@@ -18,6 +18,7 @@ import { createRecordApi } from '@braindog/record';
 import type { Proposal } from '@braindog/slash';
 
 import { fixedClock, openSqlite } from '../../../packages/kernel/test/sqlite.ts';
+import { EMBED_MODEL } from '../src/inference.ts';
 import { slashLook, workerSlashDoor, workerSlashEngine, workerSlashModel } from '../src/slash.ts';
 
 const FAKE_KEK = '0'.repeat(64);
@@ -419,8 +420,14 @@ const objectStorage = () => {
 
 /** Workers AI's `run`, answering the pass-1 draft `slash-demo.test.ts` answers with, and counting every run. */
 let aiRuns = 0;
+/* THE ASK'S OWN SEARCH MAY EMBED ITS WORDS ONCE (ENG-B18), on the background allowance: counted apart, so `aiRuns` is Slash's model. */
+let aiEmbeds = 0;
 const countedAi = {
-  run: async () => {
+  run: async (model: string) => {
+    if (model === EMBED_MODEL) {
+      aiEmbeds++;
+      return { data: [] };
+    }
     aiRuns++;
     const content = '{"registers":[],"where":null,"q":"open"}';
     return { choices: [{ message: { role: 'assistant', content }, finish_reason: 'stop' }], usage: { prompt_tokens: 1, completion_tokens: 1 } };
@@ -468,17 +475,18 @@ const ask = (headers: Record<string, string>) =>
 
 /** The model, answered here and counted, so a test can say that nothing was spent as well as what came back. Every call
     to it, and any `fetch` the Worker makes beside it, is one call. */
-const withModel = async (run: () => Promise<Response>): Promise<{ status: number; body: Record<string, unknown>; calls: number }> => {
+const withModel = async (run: () => Promise<Response>): Promise<{ status: number; body: Record<string, unknown>; calls: number; embeds: number }> => {
   const real = globalThis.fetch;
   let calls = 0;
   const from = aiRuns;
+  const embedsFrom = aiEmbeds;
   globalThis.fetch = (async () => {
     calls++;
     return new Response('{}', { status: 502 });
   }) as typeof fetch;
   try {
     const out = await run();
-    return { status: out.status, body: (await out.json()) as Record<string, unknown>, calls: calls + aiRuns - from };
+    return { status: out.status, body: (await out.json()) as Record<string, unknown>, calls: calls + aiRuns - from, embeds: aiEmbeds - embedsFrom };
   } finally {
     globalThis.fetch = real;
   }
@@ -491,7 +499,7 @@ test("A TOKEN THE RECORD KNOWS, WITH THE APP'S ORIGIN WRITTEN BY HAND, IS REFUSE
   const refusal = out.body['refusal'] as { code: string; at: string };
   assert.equal(refusal.code, 'NEEDS_BROWSER_SESSION');
   assert.equal(refusal.at, 'principal');
-  assert.equal(out.calls, 0, 'the model was called for a token');
+  assert.equal(out.calls + out.embeds, 0, 'the model was called for a token');
   /* THE BEARER WAS RESOLVED, SO THE TOKEN IS ONE THE RECORD KNOWS, and the ask itself never reached the object. */
   assert.deepEqual(forwarded, [], 'the router forwarded a token to the ask and left the refusal to the object');
 });
@@ -504,7 +512,7 @@ test('AND THE OBJECT REFUSES A TOKEN CONTEXT ITSELF, for a router that forwards 
   const refused = await withModel(() => object.fetch(ask({ 'x-braindog-ctx': JSON.stringify(ctx) })));
   assert.equal(refused.status, 403, `a token context was answered ${refused.status}: ${JSON.stringify(refused.body)}`);
   assert.equal((refused.body['refusal'] as { code: string }).code, 'NEEDS_BROWSER_SESSION');
-  assert.equal(refused.calls, 0, 'the model was called for a token');
+  assert.equal(refused.calls + refused.embeds, 0, 'the model was called for a token');
 
   /* A PERSON STILL GETS THROUGH, or the refusal above would be a door shut on everybody, and the fold ends on the vault. */
   const asked = await withModel(() => object.fetch(ask({ 'x-braindog-ctx': JSON.stringify(owner) })));

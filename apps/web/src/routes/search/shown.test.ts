@@ -19,7 +19,8 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { sentenceOf, shownState, topOf, whereSaid } from './shown.ts';
+import { BY_MEANING } from '../../lib/record/search-live.ts';
+import { byMeaningOf, meaningLine, sentenceOf, shownState, topOf, whereSaid } from './shown.ts';
 
 const page = readFileSync(fileURLToPath(new URL('./+page.svelte', import.meta.url)), 'utf8');
 const answered = (total: number) => ({ from: 'live' as const, value: { hits: [], total, groups: [] } });
@@ -77,4 +78,34 @@ test('the reading under the bars says how many the top list holds, or which list
   assert.equal(whereSaid({ total: 3, groups: [g('Tasks', 1), g('People', 1), g('Pages', 1)] }), 'Tasks, People and Pages hold 1 each, of 3.');
   assert.equal(whereSaid({ total: 4, groups: [g('Tasks', 1), g('People', 3)] }), '3 of 4 are in People.');
   assert.equal(whereSaid({ total: 3, groups: [g('Tasks', 1), g('People', 2)] }).startsWith('2 of 3 are'), true);
+});
+
+/* ── the quiet line about meaning ──────────────────────────────────────── */
+
+test('hits found by meaning are counted in one line, one and many', () => {
+  assert.equal(meaningLine('vehicle cover', { total: 4, byMeaning: 1 }, 'fused'), '1 of these share no word with “vehicle cover”: Slash found them by meaning.');
+  assert.equal(meaningLine(' vehicle cover ', { total: 4, byMeaning: 2 }, 'fused'), '2 of these share no word with “vehicle cover”: Slash found them by meaning.');
+  assert.equal(meaningLine('kiln', { total: 3, byMeaning: 0 }, 'fused'), null, 'every hit shares a word, so there is nothing to say');
+});
+
+test('nothing found says why it was searched by words only, and only when the record said why', () => {
+  const none = { total: 0, byMeaning: 0 };
+  assert.equal(meaningLine('kiln', none, 'off'), 'Searched by its words only: Slash reading on its own is off. Turn it on in Settings, under Agents.');
+  assert.equal(meaningLine('kiln', none, 'spent'), "Searched by its words only: this month's searches by meaning are used.");
+  assert.equal(meaningLine('kiln', none, 'failed'), 'Searched by its words only: the model did not answer this time.');
+  for (const quiet of ['none', 'words', undefined] as const) assert.equal(meaningLine('kiln', none, quiet), null, `${quiet} says nothing`);
+  assert.equal(meaningLine('', { total: 0, byMeaning: 0 }, 'off'), null, 'an empty query is no search at all');
+  assert.equal(meaningLine('  ', { total: 2, byMeaning: 2 }, 'fused'), null);
+});
+
+test('the hits by meaning are the ones whose line says so', () => {
+  const hit = (detail: string) => ({ title: 'Marlow kiln', detail, href: '/r/tasks/1', kind: 'Tasks', icon: 'rows' as const });
+  assert.equal(byMeaningOf({ hits: [hit(BY_MEANING), hit(''), hit(BY_MEANING)] as never }), 2);
+  assert.equal(byMeaningOf({ hits: [] }), 0);
+});
+
+test('the screen draws the line under the sentence and under the empty state', () => {
+  assert.match(page, /meaningLine\(q, \{ total: found\.total, byMeaning: byMeaningOf\(found\) \}/u);
+  assert.match(page, /below=\{shown === 'hits' && meaningSaid \? meaningBelow : undefined\}/u);
+  assert.match(page, /<\/Empty>\s*\{#if meaningSaid\}<p class="reading">\{meaningSaid\}<\/p>\{\/if\}/u);
 });

@@ -45,7 +45,8 @@ import {
 import { slashAskDoor, type SlashAskDoor, type SlashRecordMeter } from '@braindog/host';
 import type { ModelJobInference, SlashAnswer } from '@braindog/host/slash-answers';
 import { understandingOver } from '@braindog/host/understand';
-import { no, type Clock, type Refusal, type Sql } from '@braindog/ports';
+import type { ModelJobEmbed, ModelJobEmbeddings } from '@braindog/host/model-jobs';
+import { no, ok, type Clock, type Refusal, type Result, type Sql } from '@braindog/ports';
 import type { CallContext, RecordApi, SlashModel } from '@braindog/record';
 import type { Slash } from '@braindog/slash';
 
@@ -58,7 +59,7 @@ export type SlashConfig = SlashHostConfig & {
   send?: ((input: URL, init: RequestInit) => Promise<Response>) | undefined;
 };
 
-/** `SLASH_ENDPOINT`, `SLASH_MODEL`, `SLASH_KEY`, or nothing. */
+/** `SLASH_ENDPOINT`, `SLASH_MODEL`, `SLASH_KEY`, `SLASH_EMBED_MODEL`, `SLASH_EMBED_ENDPOINT`, or nothing. */
 export const slashFromEnv = (env: Record<string, string | undefined>): SlashConfig | undefined => fromEnv(env);
 
 /**
@@ -247,8 +248,9 @@ export function slashAnswersFor(
  * What answers the record's model jobs on this host, or nothing: `serveModelJobs`'s `deps.inference` for the tick, the
  * twin of the Worker's `workerModelJobs` (`apps/worker/src/slash-jobs.ts`).
  *
- * TWO JOBS, AND BOTH ARE SLASH'S: an `infer.draft` is a pattern for messages nothing
- * parsed, drafted by `draftPattern`, and an `infer.prose` is the two sentences above a digest, written by `digestProse`.
+ * THREE JOBS, ALL SLASH'S: an `infer.draft` is a pattern for messages nothing parsed, drafted by `draftPattern`, an
+ * `infer.prose` is the two sentences above a digest, written by `digestProse`, and an `infer.embed` is a hundred rows'
+ * vectors, by `embedTexts`, only where `SLASH_EMBED_MODEL` names a model.
  * The pass that leases, meters and acks them is `@braindog/host`'s; this is only the engine it is handed.
  *
  * `undefined` EXACTLY WHERE `slashAnswersFor` IS, AND DECIDED WITHOUT AN `await`, so the tick can tell a host with
@@ -263,7 +265,7 @@ export function slashModelJobs(
   store: KeyStore | undefined,
   deps: SlashEngineDeps,
   meter: SlashRecordMeter,
-): ModelJobInference | undefined {
+): (ModelJobInference & ModelJobEmbed) | undefined {
   if (!config || slashInferenceOf(config, wireOf(config, api, store)) === undefined) return undefined;
   /* AND WHO IS WHO, over the record's own model on the same endpoint: the doubtful pairs of `infer.resolve` and the
      night's notes, each held in `meter`'s background ledger under `UNDERSTAND_ASK` (`@braindog/host/understand`). */
@@ -281,6 +283,17 @@ export function slashModelJobs(
   return {
     draft: async (samples) => (await engine()).draftPattern(samples),
     prose: async (digest) => (await engine()).digestProse(digest),
+    /* AND THE INDEX, WHERE THE ENDPOINT EMBEDS (`SLASH_EMBED_MODEL`): one `slash_call` row of kind `embed` a call,
+       through the engine's `embedTexts`, so `backgroundMeter` counts it inside the month and its half-kept rule as on
+       the Cloud. A refusal goes back as it came, for the pass to read. Absent, `infer.embed` waits for a host that has it. */
+    ...(config.embedModel
+      ? {
+          embed: async (texts: readonly string[]): Promise<Result<ModelJobEmbeddings>> => {
+            const out = await (await engine()).embedTexts(texts);
+            return out.ok ? ok({ model: out.value.model, dims: out.value.dims, vectors: out.value.vectors }) : out;
+          },
+        }
+      : {}),
     ...(model ? understandingOver(model, meter) : {}),
   };
 }

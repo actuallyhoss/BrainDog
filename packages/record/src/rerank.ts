@@ -16,8 +16,8 @@ import type { Sql } from '@braindog/ports';
 /** How many of the best word matches the query's vector is the mean of. */
 const SEEDS = 3;
 
-/** Reciprocal-rank fusion's constant, the one `45 §read` names. */
-const RRF_K = 60;
+/** Reciprocal-rank fusion's constant, the one `45 §read` names. `near.ts` fuses by it too. */
+export const RRF_K = 60;
 
 /** How many ids one `IN (…)` names, as `45 §read` chunks them. */
 const CHUNK = 64;
@@ -25,13 +25,14 @@ const CHUNK = 64;
 type Vec = { model: string; vec: Int8Array };
 
 /** A blob as the adapter hands it back: an `ArrayBuffer` in a Durable Object, a `Uint8Array` under `node:sqlite`. */
-function int8Of(blob: unknown): Int8Array | null {
+export function int8Of(blob: unknown): Int8Array | null {
   if (blob instanceof ArrayBuffer) return new Int8Array(blob);
   if (ArrayBuffer.isView(blob)) return new Int8Array(blob.buffer, blob.byteOffset, blob.byteLength);
   return null;
 }
 
-function cosine(a: Float64Array, b: Int8Array): number {
+/** How alike two vectors of one width are, from -1 to 1, and 0 when either is all zeros. */
+export function cosine(a: ArrayLike<number>, b: ArrayLike<number>): number {
   let dot = 0;
   let aa = 0;
   let bb = 0;
@@ -90,4 +91,36 @@ export function rerank<T extends { id: string }>(sql: Pick<Sql, 'all'>, hits: re
     out[slot] = hits[(fused[i] as { at: number }).at] as T;
   });
   return out;
+}
+
+/**
+ * The word hits and the rows nearest the query's own vector (`near.ts`), fused into one order by reciprocal rank.
+ *
+ * Each list scores a row `1 / (RRF_K + place)`, places counted from 1, and a row's score is the sum over the lists it is
+ * in. A ROW IN BOTH IS ANSWERED ONCE, as its word hit: the words found it, so it carries no `by`. A row only the meaning
+ * found is `{ id, rank: 0, by: 'meaning' }`, a rank the words never gave (theirs are bm25's, below zero), so a reader of
+ * the answer can mark it. Ties keep the words' order, and a near-only row ties after every word hit, in the near order.
+ */
+export function fuse<T extends { id: string; rank: number }>(
+  words: readonly T[],
+  near: readonly { id: string }[],
+): (T | { id: string; rank: number; by: 'meaning' })[] {
+  const nearAt = new Map<string, number>();
+  near.forEach((n, i) => {
+    if (!nearAt.has(n.id)) nearAt.set(n.id, i);
+  });
+  const wordIds = new Set(words.map((w) => w.id));
+  const score = (wordAt: number | undefined, at: number | undefined) =>
+    (wordAt === undefined ? 0 : 1 / (RRF_K + wordAt + 1)) + (at === undefined ? 0 : 1 / (RRF_K + at + 1));
+
+  const all: { hit: T | { id: string; rank: number; by: 'meaning' }; score: number; tie: number }[] = words.map((w, i) => ({
+    hit: w,
+    score: score(i, nearAt.get(w.id)),
+    tie: i,
+  }));
+  for (const [id, at] of nearAt) {
+    if (wordIds.has(id)) continue;
+    all.push({ hit: { id, rank: 0, by: 'meaning' }, score: score(undefined, at), tie: words.length + at });
+  }
+  return all.sort((a, b) => b.score - a.score || a.tie - b.tie).map((x) => x.hit);
 }

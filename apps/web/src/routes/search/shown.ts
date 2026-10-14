@@ -32,7 +32,8 @@
  * the previous query does not: those two arms wait instead.
  */
 
-import type { Found } from '../../lib/record/search-live.ts';
+import type { SearchResult } from '../../lib/record/api.ts';
+import { BY_MEANING, type Found, type Meaning } from '../../lib/record/search-live.ts';
 
 /**
  * The five arms of the page, named.
@@ -113,4 +114,28 @@ export function whereSaid(found: { total: number; groups: readonly Matched[] }):
   }
   const n = top.total.toLocaleString('en');
   return `${n} of ${found.total.toLocaleString('en')} ${top.total === 1 ? 'is' : 'are'} in ${top.kind}.`;
+}
+
+/** How many of an answer's hits the record found by meaning, and not by any word typed. */
+export function byMeaningOf(result: Pick<SearchResult, 'hits'>): number {
+  return result.hits.filter((h) => h.detail === BY_MEANING).length;
+}
+
+/**
+ * THE ONE QUIET LINE ABOUT MEANING: how many of the hits share no word with the query, or, when nothing was found, why
+ * the record searched by its words alone. `null` when there is nothing to say, which is every record that does not
+ * send how it searched, a host with no search by meaning (`none`), and a search by words that found nothing (`words`).
+ *
+ * SO A RECORD THAT HOLDS NOTHING CAN BE TOLD FROM ONE WHOSE SEARCH BY MEANING IS OFF. "Nothing matches" was all a
+ * person learned either way. The place named is where `SlashReads.svelte` is mounted: Settings, the Agents area.
+ */
+export function meaningLine(q: string, found: { total: number; byMeaning: number }, meaning: Meaning | undefined): string | null {
+  const said = q.trim();
+  if (said === '') return null;
+  if (found.byMeaning > 0) return `${found.byMeaning.toLocaleString('en')} of these share no word with “${said}”: Slash found them by meaning.`;
+  if (found.total > 0) return null;
+  if (meaning === 'off') return 'Searched by its words only: Slash reading on its own is off. Turn it on in Settings, under Agents.';
+  if (meaning === 'spent') return "Searched by its words only: this month's searches by meaning are used.";
+  if (meaning === 'failed') return 'Searched by its words only: the model did not answer this time.';
+  return null;
 }

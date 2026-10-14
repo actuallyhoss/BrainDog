@@ -20,6 +20,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { bundled, objectStorage } from './bundled-worker.ts';
+import { EMBED_MODEL } from '../src/inference.ts';
 
 const HOST = 'app.example.test';
 const REC = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
@@ -53,8 +54,14 @@ test('A DEPLOYMENT THAT STILL SETS DEMO_RECORD OPENS NOTHING: a GET with no cred
 const fakeAi = () => {
   const ai = {
     calls: 0,
+    /* THE ASK'S OWN SEARCH MAY EMBED ITS WORDS ONCE (ENG-B18), on the background allowance: counted apart, so `calls` is Slash's model. */
+    embeds: 0,
     AI: {
-      run: async () => {
+      run: async (model: string) => {
+        if (model === EMBED_MODEL) {
+          ai.embeds++;
+          return { data: [] };
+        }
         ai.calls++;
         const content = '{"registers":[],"where":null,"q":"open"}';
         return { choices: [{ message: { role: 'assistant', content }, finish_reason: 'stop' }], usage: { prompt_tokens: 1, completion_tokens: 1 } };
@@ -83,11 +90,11 @@ const ask = (ctx: object) =>
   });
 
 /** One ask at the object, with the model's calls counted, so a refusal is seen to have spent nothing. */
-const asked = async (ctx: object): Promise<{ status: number; body: { refusal?: { code: string; at?: string } }; calls: number }> => {
+const asked = async (ctx: object): Promise<{ status: number; body: { refusal?: { code: string; at?: string } }; calls: number; embeds: number }> => {
   const ai = fakeAi();
   const object = await hostedRecord(ai);
   const out = await object.fetch(ask(ctx));
-  return { status: out.status, body: (await out.json()) as { refusal?: { code: string; at?: string } }, calls: ai.calls };
+  return { status: out.status, body: (await out.json()) as { refusal?: { code: string; at?: string } }, calls: ai.calls, embeds: ai.embeds };
 };
 
 test('A PERSON CONTEXT THAT SAYS IT IS NOT CREDENTIALED IS REFUSED AT THE OBJECT, and the model is not called', async () => {
@@ -95,13 +102,13 @@ test('A PERSON CONTEXT THAT SAYS IT IS NOT CREDENTIALED IS REFUSED AT THE OBJECT
   assert.equal(out.status, 403, `an uncredentialed person asked Slash and was answered ${out.status}: ${JSON.stringify(out.body)}`);
   assert.equal(out.body.refusal?.code, 'NEEDS_BROWSER_SESSION');
   assert.equal(out.body.refusal?.at, 'principal');
-  assert.equal(out.calls, 0, 'the model was called for somebody who never signed in');
+  assert.equal(out.calls + out.embeds, 0, 'the model was called for somebody who never signed in');
 });
 
 test('A PERSON CONTEXT THAT DOES NOT SAY IT IS CREDENTIALED is refused the same way', async () => {
   const out = await asked({ principal: { kind: 'person', id: 'p_owner', level: 'owner' } });
   assert.equal(out.status, 403, JSON.stringify(out.body));
-  assert.equal(out.calls, 0);
+  assert.equal(out.calls + out.embeds, 0);
 });
 
 test('A SIGNED-IN PERSON STILL GETS THROUGH, or the lock would be a door shut on everybody', async () => {

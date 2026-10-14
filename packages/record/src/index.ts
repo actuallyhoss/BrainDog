@@ -219,7 +219,7 @@ import { methods as jobMethods } from './jobs.ts';
 import { PEN_DISMISSED_MOST, penFor, penRanked, signatureOf, type PenItem } from './emergent.ts';
 import { methods as previewChangeMethods } from './methods/preview-change.ts';
 import { landRetype } from './methods/retype.ts';
-import { rerank } from './rerank.ts';
+import { byMeaning } from './near.ts';
 import { aboutOf, ladder, type Caller, type Gate } from './ladder.ts';
 import { OLDER, card as cardOf } from './card.ts';
 import { BRIEF_ROWS, capRegister, DECIDED, decidedHere, peopleHere, projectWaiting, rulesOf, type Decision, type Placed } from './context-caps.ts';
@@ -1798,6 +1798,8 @@ export type RecordDeps = {
    * `NOT_IN_THIS_BUILD` rather than guessing.
    */
   directory?: Directory | undefined;
+  /** How this host turns a search into a vector (ENG-B18, `near.ts`), or nothing where it cannot. */
+  meaning?: import('./near.ts').Meaning | undefined;
 };
 
 /** What `invite` says when the host never said it can take invitations. */
@@ -1990,7 +1992,7 @@ export async function createRecordApi(deps: RecordDeps) {
   return { ...api(kernel, deps, cursors), kernel };
 }
 
-function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress' | 'slashModel' | 'slashMeter' | 'engineHealth' | 'engineLedger' | 'catalogueOffers' | 'catalogueShelf' | 'tryScript' | 'answersSlash' | 'directory' | 'validFrom'>, cursors: HistoryCursors) {
+function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress' | 'slashModel' | 'slashMeter' | 'engineHealth' | 'engineLedger' | 'catalogueOffers' | 'catalogueShelf' | 'tryScript' | 'answersSlash' | 'directory' | 'validFrom' | 'meaning'>, cursors: HistoryCursors) {
   const { sql, clock, scheduler, build, snapshots, destroy, invitations } = deps;
   /* THE LADDER OF TRUST, the record's half (`ladder.ts`): what an agent's write does at the rung it stands on. */
   const trust = ladder({ sql, kernel, now: () => clock.now() });
@@ -12563,24 +12565,27 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         ...(registers.length === every.length ? {} : { registers }),
         ...(args.limit === undefined ? {} : { limit: args.limit }),
       });
-      /* THE WORDS' ORDER, SHUFFLED BY MEANING WHERE THE ROWS HAVE VECTORS (`rerank.ts`), and left exactly as it was
-         where they have none. Before the reach below, which only drops hits and so keeps the order it is given. */
-      const shown = rerank(sql, found.hits).flatMap((hit) => {
+      /* THE WORDS' ORDER, SHUFFLED BY MEANING WHERE THE ROWS HAVE VECTORS (`rerank.ts`), and where the words found fewer
+         than five, the rows nearest the query's own meaning fused in (`near.ts`), each marked `by: 'meaning'`. Before the
+         reach below, which only drops hits and so keeps the order it is given. */
+      const searched = await byMeaning(sql, deps.meaning, String(args.q ?? ''), found.hits, registers.length === every.length ? {} : { registers });
+      const shown = searched.hits.flatMap((hit) => {
         const row = kernel.get(hit.id);
-        return row && rowAdmitted(ctx, row.register, row.seq) ? [{ row, rank: hit.rank }] : [];
+        return row && rowAdmitted(ctx, row.register, row.seq) ? [{ row, rank: hit.rank, ...('by' in hit ? { by: hit.by } : {}) }] : [];
       });
       /* A TITLE IS THE ROW'S OWN WORDS, so an agent handed one from outside the record is marked as `get` marks it. */
       readFrom(ctx, ok({ rows: shown.map((h) => h.row) }));
       return ok({
-        hits: shown.map(({ row, rank }) => {
+        hits: shown.map(({ row, rank, by }) => {
           const title = kernel.register(row.register)?.title;
-          return { register: row.register, seq: row.seq, title: title ? String(row.fields[title] ?? '') : '', rank };
+          return { register: row.register, seq: row.seq, title: title ? String(row.fields[title] ?? '') : '', rank, ...(by ? { by } : {}) };
         }),
         /* THE TOTAL IS NOT NARROWED THE SAME WAY: `fts.searchMatched` counts every live row of a register
            this caller may read, and a caller whose grant is further narrowed by a `where` sees a figure over the
            whole register beside a page that is already narrowed. The hits above never name a row outside the
            `where`; the count naming how many there might be is the known gap left here. */
         matched: found.matched,
+        meaning: searched.meaning,
         comments,
       });
     },

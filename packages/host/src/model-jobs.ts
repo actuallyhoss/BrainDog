@@ -683,6 +683,11 @@ export async function serveModelJobs(api: ModelJobsApi, deps: ModelJobsDeps): Pr
     /* A METER BUILT BY HAND HAS ONE MONTH FOR BOTH, and the queue decides which comes first, as it always did. */
     const drafting = Math.min(n, restLeft);
     asked = drafting > 0 ? api.kernel.leaseOutbox(['infer.draft', 'infer.prose'], drafting) : [];
+    /* COUNTED AS LEASED all the same, so the embeddings' room below sets them aside as it always did. */
+    for (const job of asked) {
+      const p = job.kind === 'infer.prose' ? 'prose' : 'pattern';
+      leased[p] = (leased[p] ?? 0) + 1;
+    }
   } else {
     /* THE PROSE FIRST, as the plan's order has it (`BUDGET_ORDER`): a digest goes out today, a pattern can wait a night. */
     const prosing = Math.min(n, ownLeft('prose'));
@@ -699,8 +704,7 @@ export async function serveModelJobs(api: ModelJobsApi, deps: ModelJobsDeps): Pr
   const judged = inference.resolve && judging > 0 ? api.kernel.leaseOutbox([RESOLVE], judging) : [];
   leased.understand = judged.length;
   /* AN EMBEDDING HAS NO FLOOR, so its own month is what is left over once every floor nobody has used is set aside. */
-  const spare = Math.min(n, restLeft - Math.ceil(rest.cap * EMBED_KEPT_SHARE)) - asked.length - judged.length;
-  const room = meter.of === undefined ? spare : Math.min(spare, ownLeft('embed'));
+  const room = Math.min(n - asked.length - judged.length, embedRoom(meter, now, leased));
   const jobs = [...asked, ...judged, ...(inference.embed && room > 0 ? api.kernel.leaseOutbox(['infer.embed'], room) : [])];
   let acked = 0;
 
@@ -731,4 +735,103 @@ export async function serveModelJobs(api: ModelJobsApi, deps: ModelJobsDeps): Pr
     }
   }
   return jobs.length >= MODEL_JOBS_PER_PASS;
+}
+
+/**
+ * How many embedding calls the month has room for now: what the rest of the month has left once `EMBED_KEPT_SHARE` of it
+ * is set aside for the prose and the pattern drafts, less what a pass has `leased` and not settled, and no more than the
+ * embeddings' own month (`ModelJobMeter.of`). The pass leases `infer.embed` no further than this, and a search turns its
+ * words into a vector only while it is above nought (`queryVector`), so the half-month rule holds for both.
+ */
+export function embedRoom(meter: ModelJobMeter, now: number, leased: BudgetSpent = {}): number {
+  const month = monthOf(now, 0);
+  const left = meter.cap - meter.spent(month);
+  const rest = meter.rest ?? meter;
+  const restLeft = rest === meter ? left : Math.min(left, rest.cap - rest.spent(month));
+  const taken = BUDGET_ORDER.reduce((n, p) => n + Math.max(0, Math.floor(leased[p] ?? 0)), 0);
+  const spare = restLeft - Math.ceil(rest.cap * EMBED_KEPT_SHARE) - taken;
+  const own = meter.of?.('embed', leased);
+  return own === undefined ? spare : Math.min(spare, own.cap - own.spent(month));
+}
+
+/* ── A search's words as a vector (ENG-B18) ───────────────────────────────────────────────────── */
+
+/**
+ * What a search by meaning is handed for its query: the vector, or why there is none. `off` is his switch, `spent` is
+ * the month's room, `failed` is everything else, and the search is by words for all three. The same shape as
+ * `MeaningAnswer` in `packages/record/src/near.ts`, written out here because this package imports no record source.
+ */
+export type QueryMeaning = { ok: true; vector: { model: string; dims: number; vec: Int8Array } } | { ok: false; why: 'off' | 'spent' | 'failed' };
+
+/** How long a query's vector is kept: a day, so a search asked again today costs no call. */
+export const QUERY_KEPT_MS = 86_400_000;
+/** How many queries are kept at most; the oldest goes past this. */
+export const QUERY_KEPT_MOST = 256;
+/** The longest query sent, in characters after folding. Longer is not a search and is never sent. */
+export const QUERY_CHARS_MOST = 500;
+
+/** A query as it is kept and sent: spaces trimmed and collapsed, lower case, so the same words are one call. */
+const foldQuery = (q: string): string => q.trim().replace(/\s+/gu, ' ').toLowerCase();
+
+/**
+ * The record's one guarded path from a search's words to a vector, or `undefined` where the host cannot embed.
+ *
+ * IN THIS ORDER, AND EACH STEP SENDS NOTHING WHEN IT SAYS NO: the query is folded, and empty or past `QUERY_CHARS_MOST`
+ * is `failed`; his switch (`mayThink('embed')`, ENG-A09) off, or not readable, is `off`, even for a query kept from
+ * before; a query asked within the day is answered from memory with no call and no ledger row; no room in the month (`embedRoom`) is `spent`; then one
+ * call of one text, and one vector of the width it states is `ok` and is kept. The call goes through the host's
+ * engine, which writes its ledger row, so `backgroundMeter` and the vital signs count it as an embedding.
+ *
+ * THE LOG NEVER HOLDS HIS WORDS: a refusal's fix or a thrown message, and a message that echoes the query is replaced.
+ */
+export function queryVector(deps: { embed: ModelJobEmbed['embed'] | undefined; meter: ModelJobMeter; now: () => number; reads?: Reads; log?: (line: string) => void }): ((q: string) => Promise<QueryMeaning>) | undefined {
+  const { embed, meter } = deps;
+  if (embed === undefined) return undefined;
+  const log = deps.log ?? warn;
+  const kept = new Map<string, { at: number; vector: { model: string; dims: number; vec: Int8Array } }>();
+  const failed: QueryMeaning = { ok: false, why: 'failed' };
+  /* HIS SWITCH IS SAID ONCE while it stays off, as the pass says it, and again after he turns it back on and off. */
+  let saidOff = false;
+  const unsaid = (line: string, q: string): string => (line.toLowerCase().includes(q) ? 'A search by meaning was not answered, so it was by words.' : line);
+  return async (raw) => {
+    const q = foldQuery(raw);
+    if (q === '' || q.length > QUERY_CHARS_MOST) return failed;
+    /* HIS SWITCH BEFORE THE KEPT VECTORS, so a query kept while it was on is not answered by meaning once it is off. */
+    const may = await mayThink('embed', deps.reads);
+    if (!may.ok) {
+      if (!saidOff) log(`${fixOf(may)} The search was by words.`);
+      saidOff = true;
+      return { ok: false, why: 'off' };
+    }
+    saidOff = false;
+    const now = deps.now();
+    const hit = kept.get(q);
+    if (hit !== undefined) {
+      if (now - hit.at <= QUERY_KEPT_MS) return { ok: true, vector: hit.vector };
+      kept.delete(q);
+    }
+    if (embedRoom(meter, now) <= 0) return { ok: false, why: 'spent' };
+    let got: Result<ModelJobEmbeddings>;
+    try {
+      got = await embed([q]);
+    } catch (e) {
+      log(unsaid(said(e), q));
+      return failed;
+    }
+    if (!got.ok) {
+      log(unsaid(fixOf(got), q));
+      return failed;
+    }
+    const { model, dims, vectors } = got.value;
+    const vec = vectors[0];
+    if (vectors.length !== 1 || vec === undefined || dims <= 0 || vec.length !== dims) return failed;
+    const vector = { model, dims, vec };
+    kept.set(q, { at: now, vector });
+    while (kept.size > QUERY_KEPT_MOST) {
+      const oldest = kept.keys().next().value;
+      if (oldest === undefined) break;
+      kept.delete(oldest);
+    }
+    return { ok: true, vector };
+  };
 }

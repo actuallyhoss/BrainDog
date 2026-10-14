@@ -1,8 +1,9 @@
 /**
  * What answers the record's model jobs on this Worker: `serveModelJobs`'s `deps.inference`, over Slash's own engine.
  *
- * TWO JOBS ON THE ENGINE, AND BOTH ARE SLASH'S. An `infer.draft` is a pattern for messages nothing
- * parsed, drafted by `draftPattern`; an `infer.prose` is the two sentences above a digest, written by `digestProse`. An
+ * THREE JOBS ON THE ENGINE, AND ALL ARE SLASH'S. An `infer.draft` is a pattern for messages nothing
+ * parsed, drafted by `draftPattern`; an `infer.prose` is the two sentences above a digest, written by `digestProse`; an
+ * `infer.embed` is the index's vectors, made by `embedTexts`, and a search's own words go the same way (`workerMeaning`). An
  * `infer.resolve` and the nightly notes go to the record's own model through `understandingOver`. The
  * pass that leases them, meters them on the background allowance and acks them is `@braindog/host/model-jobs`, and the
  * alarm calls it; this file is only the engine it is handed.
@@ -21,13 +22,14 @@
  * calls that before a job is leased.
  */
 
-import type { ModelJobEmbed } from '@braindog/host/model-jobs';
+import { backgroundMeter, queryVector, type ModelJobEmbed, type ModelJobEmbeddings } from '@braindog/host/model-jobs';
+import type { Reads } from '@braindog/host/infer';
 import type { ModelJobInference } from '@braindog/host/slash-answers';
 import { understandingOver } from '@braindog/host/understand';
+import { ok, type Result, type Sql } from '@braindog/ports';
 import type { RecordApi } from '@braindog/record';
 import type { Slash } from '@braindog/slash';
 
-import { aiInference } from './inference.ts';
 import { workerUnderstandLedger } from './slash-meter.ts';
 import { workerSlashEngine, workerSlashModel, type SlashEngineDeps, type SlashEnv } from './slash.ts';
 
@@ -47,13 +49,30 @@ export function workerModelJobs(env: SlashEnv, api: () => RecordApi, deps: Slash
   return {
     draft: async (samples) => (await engine()).draftPattern(samples),
     prose: async (digest) => (await engine()).digestProse(digest),
-    /* WORKERS AI, NOT THE SLASH ENGINE ABOVE: `embed` is `aiInference`'s own, over the `AI` binding
-       this Worker holds platform-wide, so it is offered whenever that binding exists and never gated on a record's
-       own Slash setup. Absent, `infer.embed` is never leased (`@braindog/host/model-jobs`'s `ModelJobEmbed`). */
-    embed: env.AI ? async (texts: readonly string[]) => aiInference(env).embed(texts) : undefined,
+    /* THROUGH THE ENGINE, OVER THE `AI` BINDING (ENG-B18): the engine's own model embeds with `aiInference`'s `embed`
+       wherever that binding is bound (`slash.ts` `embedOver`), and `embedTexts` writes each call's `slash_call` row, so
+       the month's embed count, the half-month rule and the vital signs read what was sent. It skipped the engine once,
+       and the count read 0 whatever went out. Offered whenever the binding exists; absent, `infer.embed` is never
+       leased (`@braindog/host/model-jobs`'s `ModelJobEmbed`). */
+    embed: env.AI
+      ? async (texts: readonly string[]): Promise<Result<ModelJobEmbeddings>> => {
+          const got = await (await engine()).embedTexts(texts);
+          return got.ok ? ok({ model: got.value.model, dims: got.value.dims, vectors: got.value.vectors }) : got;
+        }
+      : undefined,
     /* AND WHO IS WHO, over the record's own model and not the engine: the doubtful pairs of `infer.resolve` and the
        night's notes, each held in this object's ledger under `UNDERSTAND_ASK`, in the understanding share and under the
        operator's ceiling (`slash-meter.ts`). */
     ...understandingOver(model, workerUnderstandLedger(env, api, deps)),
   };
+}
+
+/**
+ * A search's words as a vector on this Worker (ENG-B18), for the record's search by meaning: `queryVector` over the
+ * engine's `embed` above and the background allowance this Durable Object's ledger counts (`backgroundMeter`), so a query
+ * is one `slash_call` row of kind `embed`, asked only while his switch is on (`reads`) and the month has room past its
+ * kept half, and kept a day. `now` is the Durable Object's clock, the wall's by default. `undefined` where the Worker cannot embed, and the search is by words.
+ */
+export function workerMeaning(jobs: ModelJobEmbed | undefined, sql: Sql, reads: Reads, now: () => number = () => Date.now()): ReturnType<typeof queryVector> {
+  return queryVector({ embed: jobs?.embed, meter: backgroundMeter(sql), now, reads });
 }

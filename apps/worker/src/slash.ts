@@ -274,6 +274,7 @@ export function includedInference(
   /* SCHEMA BREAKS IN A ROW, over every call this adapter makes: an answer that keeps its schema starts it over. */
   let streak = 0;
   return {
+    ...embedOver(env),
     complete: async (call) => {
       let last: unknown;
       let ran = false;
@@ -312,6 +313,27 @@ export function includedInference(
       streak = 0;
       told(onFail, { model: call.model, provider, why: phraseOf(fix), raw, sent: true, whose: 'operator', streak: 0 });
       throw new Reached(fix, call.model, phraseOf(fix), raw);
+    },
+  };
+}
+
+/**
+ * The engine's embedding call, over `aiInference`'s own `embed` on the `AI` binding, wherever that binding is bound: on
+ * the included engine and on the one for his own key alike, since the binding is the Worker's and not his model's. So
+ * every embedding on the Cloud goes through `embedTexts` (`packages/slash/src/jobs.ts`), which writes its `slash_call` row
+ * of kind `embed`, and `backgroundMeter`, the half-month rule and the vital signs count it.
+ *
+ * A REFUSAL IS THROWN AS ITS FIX, MARKED NOT REACHED (`NotSent`), so the package settles the row under `-` and spends
+ * nobody's month on a call no vector came back from. No binding, no `embed`, and the package refuses in words.
+ */
+function embedOver(env: SlashEnv): Pick<SlashInference, 'embed'> {
+  if (env.AI === undefined) return {};
+  return {
+    embed: async (texts) => {
+      const got = await aiInference(env).embed(texts);
+      if (got.ok) return { model: got.value.model, dims: got.value.dims, vectors: got.value.vectors, usage: { in: got.value.usage.in, out: got.value.usage.out } };
+      const fix = 'refusal' in got ? got.refusal.fix : 'The embedding model did not answer.';
+      throw new NotSent(fix, phraseOf(fix));
     },
   };
 }
@@ -576,7 +598,7 @@ export const CLOUD_TIERS = ['a', 'b'] as const;
  */
 export async function workerSlashEngine(env: SlashEnv, api: () => RecordApi, deps: SlashEngineDeps): Promise<Slash | undefined> {
   const included = includedInference(env, undefined, deps.onFail);
-  const inference = included ?? (isBound(env.KEK) ? ownOnly : undefined);
+  const inference = included ?? (isBound(env.KEK) ? { ...ownOnly, ...embedOver(env) } : undefined);
   if (inference === undefined) return undefined;
   const slash = await import('@braindog/slash');
   /* ONLY TIER `a` IS PRICED IN NEURONS, the package's default: those calls are Workers AI on the operator's account, and
@@ -818,12 +840,15 @@ const HIS = `(spends = 'person' OR (spends = 'none' AND purpose IN (${HIS_PURPOS
 /** The SQL test for a `slash_call` row that is a person's own or his automations', for `slashDays` to count by the same rule. */
 export const HIS_CALL = HIS;
 
+/* AND NEVER AN EMBEDDING, in any of the three counts, as `slash-meter.ts` leaves `kind = 'embed'` out of its own: the
+   index's calls are the background allowance's, held there by the half-month rule (`@braindog/host/model-jobs`
+   `embedRoom`), and an hour of them would otherwise eat the asks the operator's ceiling keeps for everything else. */
 const callsMade = (deps: { sql: Sql; clock: Clock }): number =>
-  deps.sql.one<{ n: number }>(`SELECT COUNT(*) AS n FROM slash_call WHERE model <> '-' AND tier <> 'b' AND ${HIS} AND ts >= ?`, monthOf(deps.clock.now(), 0))?.n ?? 0;
+  deps.sql.one<{ n: number }>(`SELECT COUNT(*) AS n FROM slash_call WHERE model <> '-' AND tier <> 'b' AND kind <> 'embed' AND ${HIS} AND ts >= ?`, monthOf(deps.clock.now(), 0))?.n ?? 0;
 
 /* THE BACKGROUND'S OWN CALLS ON THE INCLUDED MODEL THIS MONTH, held and settled, as `callsMade` counts his: every call that is not his. */
 const backgroundMade = (deps: { sql: Sql; clock: Clock }): number =>
-  deps.sql.one<{ n: number }>(`SELECT COUNT(*) AS n FROM slash_call WHERE model <> '-' AND tier <> 'b' AND NOT ${HIS} AND ts >= ?`, monthOf(deps.clock.now(), 0))?.n ?? 0;
+  deps.sql.one<{ n: number }>(`SELECT COUNT(*) AS n FROM slash_call WHERE model <> '-' AND tier <> 'b' AND kind <> 'embed' AND NOT ${HIS} AND ts >= ?`, monthOf(deps.clock.now(), 0))?.n ?? 0;
 
 /**
  * THE JOINT SPEND: this month's neurons on the included model, his calls and the background's together, with the next
@@ -842,7 +867,7 @@ const backgroundMade = (deps: { sql: Sql; clock: Clock }): number =>
  */
 const jointSpent = (deps: { sql: Sql; clock: Clock }, worst: number): number =>
   deps.sql.one<{ n: number | null }>(
-    `SELECT SUM(CASE WHEN code = 'SLASH_PENDING' OR tier <> 'a' THEN ? ELSE neurons END) AS n FROM slash_call WHERE model <> '-' AND tier <> 'b' AND ts >= ?`,
+    `SELECT SUM(CASE WHEN code = 'SLASH_PENDING' OR tier <> 'a' THEN ? ELSE neurons END) AS n FROM slash_call WHERE model <> '-' AND tier <> 'b' AND kind <> 'embed' AND ts >= ?`,
     worst,
     monthOf(deps.clock.now(), 0),
   )?.n ?? 0;

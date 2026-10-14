@@ -62,7 +62,7 @@ import { fileModelSign } from '@braindog/host/sign-model';
 import { slashLook, workerSlashAnswers, workerSlashDoor, workerSlashModel, type ModelFail } from './slash.ts';
 import { PLAN_AGENTS, planAgents, slashErasing, slashPlanMoved } from './slash.ts';
 import { slashReplay, workerSlashMeter } from './slash-meter.ts';
-import { workerModelJobs } from './slash-jobs.ts';
+import { workerMeaning, workerModelJobs } from './slash-jobs.ts';
 import { workerCatalogueOffers, workerCatalogueShelf } from './catalogue.ts';
 import { kennelVitals, serveKennel, servesKennel, writeCounts } from './kennel.ts';
 /* MAIL ON THE CLOUD: Email Routing's messages into the same door as a forwarder's post. */
@@ -834,6 +834,9 @@ export class Record$ extends DurableObject<Env> {
            are, under the owner's `ask_cap` and the operator's ceiling alike (`slash-meter.ts`). Without it the record asks
            `slashModel` unmetered: 5 presses and the daily look were 6 binding calls under a ceiling of three, and no row. */
         slashMeter: workerSlashMeter(this.env, () => api, { sql, clock: { now: () => Date.now() } }),
+        /* A SEARCH'S OWN WORDS AS A VECTOR (ENG-B18), only while his switch for Slash reading is on and the month's background
+           allowance has room, and never on the ask ceiling (`workerMeaning`). Absent where this Worker cannot embed. */
+        meaning: workerMeaning(this.#jobs, sql, () => api.kernel.prefsOf('slash')['slash.reads'] !== false),
         /* AND WHETHER THAT MODEL ANSWERS, for a read token, the command line and the daily vital sign (`engineHealth`). */
         engineHealth,
         /* AND WHAT IT WAS ASKED AND ANSWERED THIS MONTH, with what the record still does not understand (`engineReadings`). */

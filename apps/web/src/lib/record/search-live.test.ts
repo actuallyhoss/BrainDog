@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs';
 
 import './fixtures/fill.ts';
 import { iconFor, REGISTERS } from './api.ts';
-import { groupsOf, othersOf, searcher, type Fetch } from './search-live.ts';
+import { answered, BY_MEANING, groupsOf, othersOf, searcher, type Fetch } from './search-live.ts';
 
 const BASE = 'http://record.test';
 
@@ -233,4 +233,51 @@ test('SEARCH REACHES EVERY OPEN QUESTION AND EVERY DECISION, past boot’s twent
   assert.deepEqual(out.value.groups[0]?.hits.map((h) => h.href), ['/decide/SG56', '/decide/D570']);
   const decisionPages = sent.filter((u) => new URL(u).searchParams.get('register') === 'decision').length;
   assert.equal(decisionPages, 3, 'decisions are read a page of two hundred at a time');
+});
+
+/* ── search by meaning ─────────────────────────────────────────────────── */
+
+const byWords = { register: 'obligations', seq: 1, title: 'Renew the van policy with Marlow' };
+const byMeaning = { register: 'obligations', seq: 9, title: 'Kestrel motor insurance', by: 'meaning' as const };
+
+test('A HIT FOUND BY MEANING SAYS SO IN ITS LINE, and its list counts the words’ matches plus it', async () => {
+  const { io } = host(() => json(200, { ok: true, value: { hits: [byWords, byMeaning], matched: { obligations: 7 }, meaning: 'fused' } }));
+  const out = await searcher(BASE, io).find('vehicle cover');
+  assert.equal(out.from, 'live');
+  if (out.from !== 'live') return;
+  assert.equal(out.meaning, 'fused');
+  assert.deepEqual(
+    out.value.groups[0]!.hits.map((h) => [h.title, h.detail]),
+    [
+      ['Renew the van policy with Marlow', ''],
+      ['Kestrel motor insurance', BY_MEANING],
+    ],
+  );
+  assert.equal(BY_MEANING, 'Close in meaning, no word in common');
+  assert.equal(out.value.groups[0]!.total, 8, '`matched` counts word matches only');
+  assert.equal(out.value.total, 8);
+});
+
+test('an answer that says nothing of meaning is grouped exactly as before', async () => {
+  const { io } = host(() => json(200, { ok: true, value: { hits: [byWords, { ...byWords, seq: 2 }], matched: { obligations: 7 } } }));
+  const out = await searcher(BASE, io).find('marlow');
+  assert.equal(out.from, 'live');
+  if (out.from !== 'live') return;
+  assert.equal('meaning' in out, false);
+  assert.deepEqual(out.value, groupsOf('marlow', [byWords, { ...byWords, seq: 2 }], undefined, { obligations: 7 }));
+  assert.equal(out.value.groups[0]!.total, 7);
+  assert.ok(out.value.hits.every((h) => h.detail === ''));
+});
+
+test('a word for how it searched that this build does not know is read as nothing', () => {
+  assert.equal('meaning' in answered({ hits: [], matched: {}, meaning: 'nonsense' }), false);
+  assert.equal('meaning' in answered({ hits: [], matched: {}, meaning: 7 }), false);
+  assert.equal('meaning' in answered([byWords]), false, 'the bare array of an older record');
+  for (const m of ['fused', 'words', 'none', 'off', 'spent', 'failed']) assert.equal(answered({ hits: [], matched: {}, meaning: m }).meaning, m);
+});
+
+test('a list only meaning reached counts what arrived', () => {
+  const out = groupsOf('vehicle cover', [byMeaning], undefined, {});
+  assert.equal(out.groups[0]!.total, 1);
+  assert.equal(out.hits[0]!.detail, BY_MEANING);
 });

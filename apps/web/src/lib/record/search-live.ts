@@ -29,10 +29,25 @@ import { learn } from './remote.ts';
 
 export type Fetch = NonNullable<ClientOptions['fetch']>;
 
-export type Found = { from: 'live'; value: SearchResult } | { from: 'refused'; fix: string };
+/**
+ * HOW THE RECORD SEARCHED, as it says beside its hits: `fused` is its words and its meaning together, `words` is its
+ * words alone with nothing asked of a model, `none` is a host that offers no search by meaning, and the last three are
+ * why a hosted record searched by its words when it could have asked: reading is off, the month's allowance is used,
+ * or the model did not answer. A record built before search by meaning sends none of them, and draws what it drew.
+ */
+export type Meaning = 'fused' | 'words' | 'none' | 'off' | 'spent' | 'failed';
+const MEANINGS: readonly unknown[] = ['fused', 'words', 'none', 'off', 'spent', 'failed'] satisfies readonly Meaning[];
 
-/** One hit as the record's `search` sends it, and only the keys read here. */
-type Hit = { register: string; seq: number; title: string };
+export type Found = { from: 'live'; value: SearchResult; meaning?: Meaning } | { from: 'refused'; fix: string };
+
+/**
+ * A ROW FOUND BY MEANING SAYS SO IN ITS OWN LINE, because it holds none of the words typed and a person reading the
+ * list would otherwise take it for a mistake. `shown.ts` counts the hits that carry it.
+ */
+export const BY_MEANING = 'Close in meaning, no word in common';
+
+/** One hit as the record's `search` sends it, and only the keys read here. `by` is there only for a hit no word found. */
+type Hit = { register: string; seq: number; title: string; by?: 'meaning' };
 
 /**
  * What the record answered, in either of the two shapes it can answer in.
@@ -55,7 +70,7 @@ type Hit = { register: string; seq: number; title: string };
  * separately deployed things that drift apart between updates. This module already reads `boot` and
  * `governance` this way. A number is the one kind of answer where guessing costs a wrong screen.
  */
-type Answer = { hits: readonly Hit[]; matched: Readonly<Record<string, number>> | null };
+type Answer = { hits: readonly Hit[]; matched: Readonly<Record<string, number>> | null; meaning?: Meaning };
 
 /** What the record holds besides rows that a search reaches: its pages and its questions. */
 export type Others = {
@@ -85,7 +100,8 @@ function said(q: string, text: string, id?: string): boolean {
  * best hit arrived, then the pages.
  *
  * The record says the register, the number and the title, and nothing else. So a live row has no
- * state beside it and no reason it matched.
+ * state beside it and no reason it matched, unless no word matched it: then its line says it was
+ * found by meaning (`BY_MEANING`).
  *
  * A GROUP'S `total` IS HOW MANY MATCHED AND NOT HOW MANY ARRIVED, which is what `SearchResult` has
  * always documented it as ("how many rows matched across every list, what the caller is not
@@ -106,7 +122,7 @@ export function groupsOf(
     const group = byRegister.get(h.register) ?? [];
     group.push({
       title: h.title,
-      detail: '',
+      detail: h.by === 'meaning' ? BY_MEANING : '',
       href: `/r/${h.register}/${h.seq}`,
       kind: decl?.name ?? h.register,
       icon: iconFor(decl?.icon, 'rows'),
@@ -131,13 +147,16 @@ export function groupsOf(
 
   const groups: { kind: string; total: number; hits: SearchHit[]; href: string | null }[] = [];
   if (questions.length) groups.push({ kind: copy.decide, total: questions.length, hits: questions, href: null });
-  for (const [register, g] of byRegister)
+  /* `matched` COUNTS WORD MATCHES ONLY, so a list's total is its word count plus the hits it gained by meaning. */
+  for (const [register, g] of byRegister) {
+    const words = matched?.[register];
     groups.push({
       kind: g[0]?.kind ?? register,
-      total: matched?.[register] ?? g.length,
+      total: words === undefined ? g.length : words + g.filter((h) => h.detail === BY_MEANING).length,
       hits: g,
       href: `/r/${register}?q=${encodeURIComponent(q.trim())}`,
     });
+  }
   if (pages.length) groups.push({ kind: copy.pages, total: pages.length, hits: pages, href: null });
 
   /* THE WHOLE IS THE SUM OF THE GROUPS, so the count over the heading and the counts down the page
@@ -193,7 +212,10 @@ export function answered(value: unknown): Answer {
   const said = isObject(value.matched) ? value.matched : {};
   const matched: Record<string, number> = {};
   for (const [register, n] of Object.entries(said)) if (typeof n === 'number' && Number.isFinite(n)) matched[register] = n;
-  return { hits: value.hits as Hit[], matched };
+  /* HOW IT SEARCHED, ONLY WHEN IT IS ONE OF THE SIX WORDS: anything else is a record this build does not know, and
+     saying nothing is what a record that sent nothing gets. */
+  const meaning = MEANINGS.includes(value.meaning) ? (value.meaning as Meaning) : undefined;
+  return { hits: value.hits as Hit[], matched, ...(meaning ? { meaning } : {}) };
 }
 
 export type Searcher = { find(q: string): Promise<Found> };
@@ -218,7 +240,8 @@ export function searcher(base: string, io?: Fetch): Searcher {
         );
         /* A LIST THIS BUILD DOES NOT SHIP IS NAMED BY THE RECORD, so a course is grouped under Courses and not its id. */
         await Promise.all([...new Set(answer.hits.map((h) => h.register))].map((r) => learn(client.schema, r, asked)));
-        return { from: 'live', value: groupsOf(q, answer.hits, await others, answer.matched) };
+        const value = groupsOf(q, answer.hits, await others, answer.matched);
+        return { from: 'live', value, ...(answer.meaning ? { meaning: answer.meaning } : {}) };
       }
       return { from: 'refused', fix: 'refusal' in out ? out.refusal.fix : 'The record changed while it was being read.' };
     },

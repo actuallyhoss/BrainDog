@@ -38,7 +38,7 @@
   import type { SearchResult } from '$lib/record/api.ts';
   import { searcher, type Found, type Searcher } from '$lib/record/search-live.ts';
   import { shownState } from './shown.ts';
-  import { sentenceOf, topOf, whereSaid } from './shown.ts';
+  import { byMeaningOf, meaningLine, sentenceOf, topOf, whereSaid } from './shown.ts';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
@@ -152,6 +152,13 @@
   /* THE SENTENCE AND THE TILE ARE THE ANSWER'S, and only once the answer on screen has hits: a verdict or a wait says
      nothing about where anything matched. `top` is the list with strictly the most, and no list on a tie. */
   const sentence = $derived(shown === 'hits' ? (sentenceOf(q, found) ?? undefined) : undefined);
+  /* AND ONE QUIET LINE ABOUT MEANING, for an answer the screen is drawing: how many of the hits share no word with
+     the query, or why nothing was searched by meaning. A record that does not say how it searched says nothing here. */
+  const meaningSaid = $derived(
+    shown === 'hits' || shown === 'none'
+      ? meaningLine(q, { total: found.total, byMeaning: byMeaningOf(found) }, answer?.from === 'live' ? answer.meaning : undefined)
+      : null,
+  );
   const top = $derived(topOf(found.groups));
   const bars = $derived(found.groups.map((g) => ({ label: g.kind, value: g.total, tone: g === top ? 'ink' : undefined })));
 
@@ -218,7 +225,10 @@
 
 <svelte:head><title>{titleOf(q || copy.search)}</title></svelte:head>
 
-<PageHead icon="search" title={copy.search} count={q ? found.total : undefined} {sentence} />
+{#snippet meaningBelow()}<p class="reading">{meaningSaid}</p>{/snippet}
+
+<!-- UNDER THE TITLE SENTENCE when there are hits; under the empty state, below, when there are none. -->
+<PageHead icon="search" title={copy.search} count={q ? found.total : undefined} {sentence} below={shown === 'hits' && meaningSaid ? meaningBelow : undefined} />
 
 <div class="page">
   <!-- THE FIELD ACROSS THE BOARD, first under the sentence: 48 tall on the tile's own fill, as wide as the tiles under
@@ -325,6 +335,7 @@
         <Button weight="bare" href="/audit">{copy.searchInHistory}</Button>
       {/snippet}
     </Empty>
+    {#if meaningSaid}<p class="reading">{meaningSaid}</p>{/if}
   {:else}
     <div class="results" data-split={found.groups.length >= 2 ? '' : undefined}>
       <!-- WHERE IT MATCHED, ONLY WHEN THERE IS A WHERE: a single list is its own heading already. The list holding
@@ -547,7 +558,7 @@
     }
   }
 
-  /* THE ONE LINE THAT READS THE CHART, under it. */
+  /* THE ONE LINE THAT READS THE CHART, under it, and the quiet line about meaning in the same voice. */
   .reading {
     margin: 0;
     color: var(--ink2);
