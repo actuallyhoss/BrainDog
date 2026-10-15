@@ -415,6 +415,15 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
     return rows.find((r) => r.record === record) ?? null;
   };
 
+  /**
+   * The Stripe customer this person already pays as, from their rows, or `undefined` for none yet.
+   *
+   * NEVER A GIFT'S, whose row has no customer (`''`): taken as the payer, the first row being a gift sent Stripe an empty
+   * customer and every payment page answered "Stripe could not be reached" (`billing-rehearsal.test.ts`, "FIX (gift
+   * customer)").
+   */
+  const payingAs = (rows: readonly BillingRow[]): string | undefined => rows.find((r) => r.customer !== '')?.customer;
+
   /** The open records this person owns, from the Directory's usage ledger, as of today. */
   const ownedOpen = async (person: string): Promise<Result<AccountUsage['records']>> => {
     const today = new Date(deps.clock()).toISOString().slice(0, 10);
@@ -673,7 +682,7 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
         if (free === undefined || free.slug === null || (row === null && (await deps.billing({ op: 'of', record: free.record })) !== null))
           return no('OUT_OF_BOUNDS', 'There is no record of yours to pay for by that id.', { at: 'record' });
         const paying = row === null ? await deps.billing({ op: 'for', person: who.person }) : [row];
-        customer = paying[0]?.customer ?? (await customerFor(stripe, who.person, who.email));
+        customer = payingAs(paying) ?? (await customerFor(stripe, who.person, who.email));
         metadata = { person: who.person, record: free.record, plan: plan.value };
         back = `${origin.value}/app/${free.slug}/settings/billing`;
       } else {
@@ -689,7 +698,7 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
       if (!asked.ok) return asked;
       const { slug, name, tz } = asked.value;
       const paying = await deps.billing({ op: 'for', person: who.person });
-      customer = paying[0]?.customer ?? (await customerFor(stripe, who.person, who.email));
+      customer = payingAs(paying) ?? (await customerFor(stripe, who.person, who.email));
       metadata = { person: who.person, email: who.email, slug, tz, plan: plan.value, ...(name !== null ? { name } : {}) };
       back = `${origin.value}/app/signup`;
     }
@@ -1132,6 +1141,43 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
   };
 
   return { billing, checkout, portal, webhook };
+}
+
+/* ── a record deleted while it is paid for ───────────────────────────────── */
+
+/**
+ * A record being deleted stops being paid for: the subscription its row pays by is ended now, and the row lets go of
+ * it. Answers `none` when there is nothing to end (no row, a gift, a record back on Free), `ended` (one Stripe had
+ * already cancelled among them, `endSubscription`), or `failed` with a line. A LAPSED ROW IS ENDED TOO: a subscription
+ * Stripe gave up on can sit `unpaid`, and a card put on it later would pay for a record that is gone.
+ *
+ * FOUND BY THE REHEARSAL (`billing-rehearsal.test.ts`, "FIX (deleted while paid)"): nothing on the delete path asked
+ * Stripe anything, so an owner who deleted a record on Cloud went on being charged for it every month. Ended at once and
+ * not at the period's end, because there is nothing left to use. The row lets go of the subscription before Stripe's
+ * `customer.subscription.deleted` arrives, so that event finds no row and moves nothing on a record that is gone.
+ *
+ * NEVER A STOP. A deletion the owner asked for goes on whatever this answers, and `failed` is an `op: 'billing'` line at
+ * `error` naming the record, so the operator ends the subscription from Stripe's dashboard.
+ */
+export async function endForDeleted(env: BillingEnv, deps: Pick<BillingDeps, 'billing' | 'stripe'>, record: string): Promise<'none' | 'ended' | 'failed'> {
+  const row = await deps.billing({ op: 'of', record });
+  if (row === null || isGift(row) || row.subscription === null) return 'none';
+  const key = billingKey(env);
+  if (!key.ok) {
+    op({ op: 'billing', did: 'end', ok: false, why: 'key', rec: record }, 'error');
+    return 'failed';
+  }
+  const ended = await endSubscription(deps.stripe(key.value), row.subscription);
+  if (ended !== true) {
+    op({ op: 'billing', did: 'end', ok: false, why: 'deleted', rec: record, status: ended.status, code: ended.code }, 'error');
+    return 'failed';
+  }
+  const out = await deps.billing({ op: 'set', row: { record, subscription: null, price: null, period_end: null } });
+  /* ONE LINE A DELETION: Stripe ended it either way, so this answers `ended`, and a row that would not let go says so
+     at `error` rather than beside a line that says all went well. */
+  if (!out.ok) op({ op: 'billing', did: 'end', ok: false, why: 'row', rec: record, code: refused(out) ? out.refusal.code : 'refused' }, 'error');
+  else op({ op: 'billing', did: 'end', ok: true, rec: record });
+  return 'ended';
 }
 
 /* ── the response and the body ───────────────────────────────────────────── */

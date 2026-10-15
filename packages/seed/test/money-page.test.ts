@@ -130,7 +130,7 @@ test('THE COSTS BY CATEGORY STAND STRAIGHT AFTER EVERY MONTH, the file\'s own ba
 test('NO QUESTION IS ASKED ON MONEY: the questions are answered in Decide, and the side column holds no queue', () => {
   assert.deepEqual(BLOCKS.filter((b) => b.kind === 'queue').map((b) => b.heading), [], 'Money places a queue again');
   assert.equal(at('Waiting on you'), -1, 'Waiting on you is on Money again');
-  assert.deepEqual(BLOCKS.filter((b) => b.area === 'rail').map((b) => b.heading), ['Runs out', 'Accounts']);
+  assert.deepEqual(BLOCKS.filter((b) => b.area === 'rail').map((b) => b.heading), ['Lasts', 'Accounts']);
 });
 
 test('THE CHART READS SIX MONTHS BACK AND THREE AHEAD, and Cash ahead keeps its lengths and controls', () => {
@@ -139,7 +139,7 @@ test('THE CHART READS SIX MONTHS BACK AND THREE AHEAD, and Cash ahead keeps its 
 
   /* MOVED HERE FROM `money.test.ts`: the cash walk offers five years and to the end, and counting is one control. */
   const ahead = BLOCKS[at('Cash ahead')]!;
-  assert.deepEqual(ahead.horizons, [90, 180, 365, 730, 1825, 'last']);
+  assert.deepEqual(ahead.horizons, [70, 90, 180, 365, 730, 1825, 'last']);
   assert.ok(!ahead.knobs!.includes('leave'), '`leave` is a second control over the streams `count` moves');
 });
 

@@ -16,6 +16,7 @@
 import type { Clock, Refusal, Sql, no } from '@braindog/ports';
 import type { Result } from '@braindog/ports';
 import type { Kernel } from '@braindog/kernel';
+import { nudgeAction } from '@braindog/kernel';
 
 import type { Directory } from '../directory.ts';
 import type { CallContext, Need, Understanding } from '../index.ts';
@@ -42,6 +43,7 @@ import { methods as faults } from './faults.ts';
 import { methods as withdraw } from './withdraw.ts';
 import { methods as door } from './door.ts';
 import { methods as engine } from './engine.ts';
+import { methods as engineProbe } from './engine-probe.ts';
 import { methods as engineReadings } from './engine-readings.ts';
 import { methods as pagesCensus } from './pages-census.ts';
 import { methods as pageVersions } from './page-versions.ts';
@@ -68,7 +70,12 @@ import { methods as namedTwiceMethods } from './named-twice.ts';
 import { methods as exportPack } from './export-pack.ts';
 import { methods as deviceRenameMethods } from './device-rename.ts';
 import { methods as packsRemovedMethods } from './packs-removed.ts';
+import { methods as deciderMethods } from './decider.ts';
 import { methods as flowGrammarMethods } from './flow-grammar.ts';
+import { methods as huesMethods } from './hues.ts';
+import { methods as pushTestMethods } from './push-test.ts';
+import { methods as doorSwitchMethods } from './door-switch.ts';
+import { methods as actionRun } from './action-run.ts';
 /* END METHODS */
 
 /**
@@ -136,6 +143,8 @@ export type RecordDeps = {
   host?: 'cloud' | 'self-host';
   /** Whether Slash's model answers (host `engine-health.ts`). Absent, `engineHealth` answers `null`. */
   engineHealth?: (() => Promise<import('./engine.ts').EngineHealthRead>) | undefined;
+  /** The host's probe of the answer route's models (host `engine-probe.ts`). Absent, `engineProbe` is refused `NOT_IN_THIS_BUILD`. */
+  engineProbe?: (() => Promise<import('./engine-probe.ts').EngineProbe>) | undefined;
   /** Slash's ledger, the mentions and the open questions since an instant (host). Absent, `engineReadings` answers `null`. */
   engineLedger?: import('./engine-readings.ts').EngineLedgerRead | undefined;
   /** The host's own build and MIN_CLI (AGT-A02), which doorHealth answers and reads behind against. Absent, both are null. */
@@ -179,6 +188,7 @@ export function methods(deps: RecordDeps) {
     ...withdraw(deps),
     ...door(deps),
     ...engine(deps),
+    ...engineProbe(deps),
     ...engineReadings(deps),
     ...pagesCensus(deps),
     ...pageVersions(deps),
@@ -205,7 +215,12 @@ export function methods(deps: RecordDeps) {
     ...exportPack(deps),
     ...deviceRenameMethods(deps),
     ...packsRemovedMethods(deps),
+    ...deciderMethods(deps),
     ...flowGrammarMethods(deps),
+    ...huesMethods(deps),
+    ...pushTestMethods(deps),
+    ...doorSwitchMethods(deps),
+    ...actionRun({ ...deps, nudgeAction }),
     /* END METHODS */
   };
 }

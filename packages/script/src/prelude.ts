@@ -82,6 +82,9 @@ export const PRELUDE = `(function (host) {
         host.log(words(parts));
       },
       ...(typeof host.fold === 'function' ? { fold: (text) => host.fold(String(text)).then(parse) } : {}),
+      ...(typeof host.cycle === 'function'
+        ? { cycle: (day, line) => host.cycle(String(day), stringify(line === undefined ? null : line)).then(parse) }
+        : {}),
       record: freeze({
         list: (register, where, options) =>
           host

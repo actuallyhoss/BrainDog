@@ -906,6 +906,8 @@
   <div class="page" data-plain={sided ? undefined : ''}>
     <!-- HOW FAR AN ACCEPTED ARRANGEMENT GOT LEADS, because it is the news and the reason the options came back. -->
     {#if part && !settled}<Applied partial={part} />{/if}
+    <!-- WHO DECIDES THIS ONE, and for the owner the way to name them: its own chunk, read only on an open question. -->
+    {#if !settled}{#await import('./Decider.svelte') then m}<m.default {question} owner={me.owner} me={me.person} />{/await}{/if}
 
     <!-- ONE TILE, READ LIKE A FORM (DIRECTION §39): who asked and when, why, the answers as choices, Decide and Not now,
          then what accepting does as a plain part of the same tile, and the comments under it all. A settled question

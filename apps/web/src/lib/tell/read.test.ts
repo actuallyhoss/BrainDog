@@ -79,7 +79,7 @@ test('the Nadia sentence on a fresh shop record is a client, an order from her a
     settled: TODAY,
     party: { $row: 0 },
   });
-  assert.equal(paid!.said, 'EGP 900.00 in, by InstaPay');
+  assert.equal(paid!.said, 'EGP\u00a0900.00 in, by InstaPay');
   assert.equal(paid!.detail, 'into Bills and invoices, marked paid');
   /* Nothing is missing, so one press adds all three. */
   assert.deepEqual(paid!.missing, []);
@@ -95,7 +95,7 @@ test('a record that holds an account keeps the payment on its Ledger, filed to t
   assert.equal(paid.fields.state, 'cleared');
   assert.equal(paid.fields.account, 'accounts#1');
   assert.equal(paid.fields.what, 'Payment from Nadia, by InstaPay');
-  assert.equal(paid.said, 'EGP 900.00 in, by InstaPay');
+  assert.equal(paid.said, 'EGP\u00a0900.00 in, by InstaPay');
   assert.equal(paid.detail, 'into Ledger, marked paid');
   assert.deepEqual(paid.missing, []);
 });
@@ -117,7 +117,7 @@ test('with no account and no Bills and invoices, the Ledger entry says the accou
 test('on a fresh record, money the reader paid is a paid item owed by her, and two currencies stay two items', () => {
   const [wax] = tellRead('I paid 200 for wax', fresh).rows;
   assert.deepEqual(wax!.fields, { what: 'Wax', amount: { amount: 20000, currency: 'EGP' }, state: 'paid', direction: 'owed_by_me', due: TODAY, settled: TODAY });
-  assert.equal(wax!.said, 'EGP 200.00 out');
+  assert.equal(wax!.said, 'EGP\u00a0200.00 out');
   assert.deepEqual(wax!.missing, []);
   const two = tellRead('Nadia wants 3 jars, paid 500, paid US$40', fresh).rows.filter((r) => r.register === 'obligations');
   assert.deepEqual(two.map((r) => r.fields.amount), [{ amount: 50000, currency: 'EGP' }, { amount: 4000, currency: 'USD' }]);
@@ -154,7 +154,7 @@ test('an amount with a currency word keeps it, and one with none takes the recor
   assert.deepEqual(euros!.fields.amount, { amount: 5000, currency: 'EUR' });
   const code = tellRead('Omar paid USD 1,200.50 by card', shop).rows.find((r) => r.register === 'transactions');
   assert.deepEqual(code!.fields.amount, { amount: 120050, currency: 'USD' });
-  assert.equal(code!.said, 'USD 1,200.50 in, by card');
+  assert.equal(code!.said, '$1,200.50\u00a0USD in, by card');
   const pounds = tellRead('Omar paid 300 pounds', shop).rows.find((r) => r.register === 'transactions');
   assert.deepEqual(pounds!.fields.amount, { amount: 30000, currency: 'EGP' });
 });
@@ -171,7 +171,7 @@ test('money the reader paid goes out, for what they said', () => {
   assert.equal(rows.length, 1);
   assert.equal(rows[0]!.fields.direction, 'out');
   assert.equal(rows[0]!.fields.what, 'Wax');
-  assert.equal(rows[0]!.said, 'EGP 200.00 out');
+  assert.equal(rows[0]!.said, 'EGP\u00a0200.00 out');
 });
 
 test('a pasted message is from the person who sent it', () => {

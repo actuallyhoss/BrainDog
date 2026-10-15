@@ -214,6 +214,7 @@ import { methods, type RecordDeps as MethodDeps } from './methods/index.ts';
 import { staleCount, staleFor as staleLines } from './methods/stale.ts';
 import { learnedOrder, learnedSorted, replacedIn, replacesField } from './methods/learnings.ts';
 import { briefFactsFor } from './methods/briefing.ts';
+import { doorFacts, doorIsOff, turnedAway as doorTurnedAway, type DoorFacts } from './methods/door-switch.ts';
 import { briefTick } from './brief-write.ts';
 import type { EngineHealthRead } from './methods/engine.ts';
 import { quietSign } from './methods/signs.ts';
@@ -313,11 +314,12 @@ type HeldAsk = Backfilled['held'][number];
  * exactly what GitHub sends, so the door has one HMAC check and not two. `tolerance` is in seconds, the unit
  * `verifyStripe` takes.
  */
-export type IngestVerification =
+export type IngestVerification = (
   | { kind: 'none' }
   | { kind: 'path'; sha256: string }
   | { kind: 'hmac_sha256'; header: string; key: Uint8Array }
-  | { kind: 'stripe'; header: string; secret: string; tolerance: number };
+  | { kind: 'stripe'; header: string; secret: string; tolerance: number }
+) & { off?: true };
 
 /**
  * Opens the vault key a door's `verify:` names, or answers `null`: the host's `OpenKey`, which the record may not
@@ -1792,6 +1794,8 @@ export type RecordDeps = {
    * `engineHealth` answers. Absent, `engineHealth` answers `null`.
    */
   engineHealth?: (() => Promise<EngineHealthRead>) | undefined;
+  /** The host's probe of the answer route's models (host `engine-probe.ts`). Absent, `engineProbe` is refused `NOT_IN_THIS_BUILD`. */
+  engineProbe?: (() => Promise<import('./methods/engine-probe.ts').EngineProbe>) | undefined;
   /**
    * Slash's ledger, the mentions and the open questions since an instant, read by the host and counted by
    * `engineReadings` (`./methods/engine-readings.ts`). Absent, `engineReadings` answers `null`.
@@ -2016,7 +2020,7 @@ export async function createRecordApi(deps: RecordDeps) {
   return { ...api(kernel, deps, cursors), kernel };
 }
 
-function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress' | 'slashModel' | 'slashMeter' | 'engineHealth' | 'engineLedger' | 'catalogueOffers' | 'catalogueShelf' | 'tryScript' | 'trialsToday' | 'shares' | 'answersSlash' | 'directory' | 'validFrom' | 'meaning'>, cursors: HistoryCursors) {
+function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress' | 'slashModel' | 'slashMeter' | 'engineHealth' | 'engineProbe' | 'engineLedger' | 'catalogueOffers' | 'catalogueShelf' | 'tryScript' | 'trialsToday' | 'shares' | 'answersSlash' | 'directory' | 'validFrom' | 'meaning'>, cursors: HistoryCursors) {
   const { sql, clock, scheduler, build, snapshots, destroy, invitations } = deps;
   /* THE LADDER OF TRUST, the record's half (`ladder.ts`): what an agent's write does at the rung it stands on. */
   const trust = ladder({ sql, kernel, now: () => clock.now() });
@@ -7922,7 +7926,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * the first call, so `context` counts what went stale through the same guards the read `stale` answers through.
    */
   let methodsHanded: MethodDeps | null = null;
-  const methodDeps = (): MethodDeps => (methodsHanded ??= { kernel, sql, guard, scoped, readable, sightOf, admin, vault, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), ...(deps.engineLedger === undefined ? {} : { engineLedger: deps.engineLedger }), ...(deps.shares === undefined ? {} : { shares: deps.shares }), ...(deps.catalogue === undefined ? {} : { catalogue: deps.catalogue }), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom, untrusted: (ctx, where) => { const reader = callerOf(ctx); if (reader !== null) trust.markUntrusted(reader, where); }, createDoor: (ctx, register, fields) => { const stop = mergeShaped(ctx, register, fields, null) ?? keyHeld(ctx, register, fields, null); return stop ? { refusal: stop } : { fields: huedOf(register, fields) }; }, withheld: drawnWithheld });
+  const methodDeps = (): MethodDeps => (methodsHanded ??= { kernel, sql, guard, scoped, readable, sightOf, admin, vault, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), ...(deps.engineProbe === undefined ? {} : { engineProbe: deps.engineProbe }), ...(deps.engineLedger === undefined ? {} : { engineLedger: deps.engineLedger }), ...(deps.shares === undefined ? {} : { shares: deps.shares }), ...(deps.catalogue === undefined ? {} : { catalogue: deps.catalogue }), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom, untrusted: (ctx, where) => { const reader = callerOf(ctx); if (reader !== null) trust.markUntrusted(reader, where); }, createDoor: (ctx, register, fields) => { const stop = mergeShaped(ctx, register, fields, null) ?? keyHeld(ctx, register, fields, null); return stop ? { refusal: stop } : { fields: huedOf(register, fields) }; }, withheld: drawnWithheld });
 
   /**
    * The stale count `context` carries: the lines the read `stale` would answer this caller at this moment, added up
@@ -10552,6 +10556,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const run = target && args.decide !== undefined ? ruleAsked(target) : null;
       const answering = run ? answersNot(ctx, run) : null;
       if (answering) return { ok: false as const, refusal: answering };
+      /* A QUESTION HANDED TO SOMEBODY IS HERS OR AN OWNER'S TO ANSWER (USE-A13); put off is anybody's. */
+      const handed = args.defer === undefined ? kernel.deciderFault(String(args.id), actorOf(ctx), ctx.principal.kind === 'person' && ctx.principal.level === 'owner') : null;
+      if (handed !== null) return no('FORBIDDEN', handed, { at: 'id' });
       /* NO VERDICT IS A MISSING ANSWER, NOT A BAD ONE. With none of the three it fell through to the
          resolve branch and was refused "undefined is not a way to resolve one". */
       if (args.decide === undefined && args.defer === undefined && args.resolved_as === undefined)
@@ -11953,12 +11960,19 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * label, or a key that does not open are all `none`: the arrival is stored `untriaged` and matches nothing, which
      * is how a wrong path token is answered, and never a 404 that would make a sender give up on the URL.
      */
+    /** An arrival turned away at a door switched off, counted for the doors screen. INTERNAL, not in `ROUTES`. */
+    doorTurnedAway(args: { ingest: string }): void {
+      if (typeof args?.ingest === 'string' && args.ingest !== '') doorTurnedAway(sql, args.ingest, clock.now());
+    },
+
     async ingestVerify(args: { ingest: string }, open?: OpenDoorKey): Promise<IngestVerification | null> {
       const held = typeof args?.ingest === 'string' ? heldDigest(args.ingest) : undefined;
       const row = kernel.declarations().find((d) => d.kind === 'ingest' && d.id === `ingest.${args.ingest}`);
       if (!row) return null;
       const decl = JSON.parse(row.body) as { channel?: unknown; verify?: { kind?: unknown; header?: unknown; key?: unknown; tolerance?: unknown } };
       if (decl.channel !== 'webhook') return null;
+      /* A DOOR SWITCHED OFF (`door-switch.ts`) is answered off before any key is opened, so the host turns it away. */
+      if (doorIsOff(sql, args.ingest) !== null) return { kind: 'none', off: true };
       const v = decl.verify;
       if (v?.kind === 'hmac_sha256' || v?.kind === 'stripe' || v?.kind === 'github') {
         const grant = open === undefined || typeof v.key !== 'string' ? undefined : grantChosen(kernel.grants(), v.key);
@@ -12070,10 +12084,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * AN OWNER'S, IN A BROWSER, for `ingestMint`'s reason: a door is where rows come in at `exact` with nobody looking,
      * and which of them are open is the owner's to see before it is anybody's to use.
      */
-    async doors(ctx: CallContext): Promise<Result<{ id: string; description: string; verify: string; held: boolean; register: string }[]>> {
+    async doors(ctx: CallContext): Promise<Result<({ id: string; description: string; verify: string; held: boolean; register: string } & DoorFacts)[]>> {
       const stop = admin(ctx);
       if (stop) return { ok: false as const, refusal: stop };
-      const out: { id: string; description: string; verify: string; held: boolean; register: string }[] = [];
+      const out: ({ id: string; description: string; verify: string; held: boolean; register: string } & DoorFacts)[] = [];
       for (const row of kernel.declarations()) {
         if (row.kind !== 'ingest') continue;
         const decl = JSON.parse(row.body) as { channel?: unknown; description?: unknown; verify?: { kind?: unknown }; writes?: { register?: unknown } };
@@ -12091,6 +12105,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           verify: typeof decl.verify?.kind === 'string' ? decl.verify.kind : 'none',
           held: heldDigest(id) !== undefined,
           register,
+          ...doorFacts(sql, id, clock.now()),
         });
       }
       return ok(out);

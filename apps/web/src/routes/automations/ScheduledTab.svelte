@@ -6,13 +6,17 @@
   is next and when. A paused action has no turns to draw; it leads the list, in its own group, because it is the one
   that needs a look.
 
-  READ ONLY, AS THE PAGE BLOCK IS. Resuming a paused action belongs to "Runs on" on its project's page, and a key the
-  action is missing is added in the Vault, so a row whose sentence asks for a key carries the link that adds it and
-  nothing else. New opens the scheduled-action sheet through the address (`?new=action`), as any page may.
+  ONE PRESS, AND NOTHING ELSE CHANGES HERE. Resuming a paused action belongs to "Runs on" on its project's page, and a
+  key the action is missing is added in the Vault, so a row whose sentence asks for a key carries the link that adds it.
+  An action on its clock carries Run now under it (`run-now.ts`): the record moves its next turn to now, and the line
+  under the button says what the record answered, a wait included. A paused one carries none, because its own sentence
+  already says it will not run and where it is resumed. New opens the scheduled-action sheet through the address
+  (`?new=action`), as any page may.
 -->
 <script lang="ts">
   import { apiBase } from '$lib/at.ts';
   import { untrack } from 'svelte';
+  import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Section from '$lib/ui/Section.svelte';
   import Tile from '$lib/ui/Tile.svelte';
@@ -22,6 +26,7 @@
   import { humanize } from '$lib/record/names.ts';
   import HubRows from './HubRows.svelte';
   import { channelIcon, hubWords as w, nextReading, nextWeek, type HubRow } from './hub.ts';
+  import { runNow, runNowSaid, runWords } from './run-now.ts';
 
   let from = $state<'reading' | 'ready' | 'absent' | 'refused'>('reading');
   let rows = $state<ActionRow[]>([]);
@@ -72,7 +77,22 @@
   };
 
   const paused = $derived(rows.filter((r) => r.state === 'paused').map(rowOf));
-  const clocked = $derived(rows.filter((r) => r.state !== 'paused').map(rowOf));
+  const clocked = $derived(rows.filter((r) => r.state !== 'paused').map((r) => ({ row: rowOf(r), ingest: r.ingest })));
+
+  /* ONE PRESS OUT AT A TIME FOR EACH ACTION, and its button waits while it is. The line it leaves stays under the
+     row until the next press, so a second press reads the wait in place of the first line. */
+  let pressing = $state<Record<string, true>>({});
+  let pressed = $state<Record<string, string>>({});
+
+  async function press(ingest: string) {
+    if (pressing[ingest]) return;
+    pressing = { ...pressing, [ingest]: true };
+    const out = await runNow(apiBase(), ingest);
+    pressed = { ...pressed, [ingest]: runNowSaid(out, Date.now()).line };
+    const rest = { ...pressing };
+    delete rest[ingest];
+    pressing = rest;
+  }
   const week = $derived(nextWeek(rows, now));
 </script>
 
@@ -97,7 +117,19 @@
   {/if}
   {#if clocked.length > 0}
     <Section title={w.onClock} count={clocked.length}>
-      <HubRows rows={clocked} />
+      <ul class="clocked">
+        {#each clocked as c (c.ingest)}
+          <li>
+            <HubRows rows={[c.row]} />
+            <div class="press">
+              <Button size="sm" disabled={pressing[c.ingest] === true} aria-label={runWords.aria(c.row.name)} onclick={() => void press(c.ingest)}>{runWords.press}</Button>
+              <!-- THE STATUS IS THERE BEFORE ITS LINE, so a screen reader hears the line arrive: a live region drawn
+                   with its words in it is often read as nothing. -->
+              <p class="pressed" role="status">{pressed[c.ingest] ?? ''}</p>
+            </div>
+          </li>
+        {/each}
+      </ul>
     </Section>
   {/if}
 {/if}
@@ -105,6 +137,34 @@
 <style>
   /* THE ONE LINE UNDER THE CHART that says what it means, at body size in ink. */
   .reading {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--t-base);
+    line-height: 20px;
+  }
+
+  /* EACH ACTION ON ITS CLOCK IS ITS OWN ROW AND ITS PRESS UNDER IT, with the ledger's hairline between two of them,
+     so the list reads as the one list it was before the button. */
+  .clocked {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .clocked > li + li {
+    border-block-start: 1px solid var(--rule);
+  }
+
+  /* THE PRESS LINES UP WITH THE ROW'S WORDS, NOT ITS WELL, as the row's own link to the Vault does. */
+  .press {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2) var(--sp-3);
+    margin: 0 0 var(--sp-2) calc(var(--well-l) + var(--sp-3));
+  }
+
+  .pressed {
     margin: 0;
     color: var(--ink);
     font-size: var(--t-base);

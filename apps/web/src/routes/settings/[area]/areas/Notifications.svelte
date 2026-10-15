@@ -3,7 +3,9 @@
   the record's quiet hours, and whether this device is rung.
 -->
 <script lang="ts">
-  import { apiBase } from '$lib/at.ts';
+  import { BASE, apiBase } from '$lib/at.ts';
+  import { sendTest, testWords } from '$lib/ui/push.ts';
+  import type { Call } from '$lib/ui/webhook-doors.ts';
   import { copy } from '$lib/copy.ts';
   import { read } from '$lib/data/read.svelte.ts';
   import { wrote } from '$lib/record/settings-write.ts';
@@ -151,6 +153,32 @@
     switched = was;
     muteRefusal = out && 'refusal' in out ? out.refusal.fix : copy.recordNotReached;
   }
+
+  /* SEND A TEST (REC-A15): a person proves their phone rings, on their own press, so a dead subscription is found now
+     and not when a real notice never arrives. The record rings every device of theirs and says how many; a press
+     inside a minute is its `RATE_LIMITED`, whose `fix` already says when the next may go.
+
+     DRAWN ONLY WHILE THIS DEVICE IS RUNG, as `PushToggle` reads it from the registration that already exists, never
+     one made by opening the screen: the toggle hands up every turn (`onchange`). */
+  let rung = $state(false);
+  let testing = $state(false);
+  let tested = $state('');
+  let testBad = $state(false);
+
+  /* THE TOGGLE SAYS WHEN IT TURNS, so the test appears the moment the switch is on and goes, with its line, when off. */
+  const turned = (v: boolean) => {
+    rung = v;
+    if (!v) tested = '';
+  };
+
+  async function test() {
+    if (testing) return;
+    testing = true;
+    const out = await sendTest(clientOf().call as unknown as Call);
+    tested = out.kind === 'sent' || out.kind === 'denied' || out.kind === 'failed' ? out.line : 'fix' in out ? out.fix : '';
+    testBad = out.kind !== 'sent';
+    testing = false;
+  }
 </script>
 
 <!--
@@ -248,8 +276,21 @@
   {/if}
 </Section>
 <!-- THE ONE CONTROL ON THIS SCREEN THAT IS ABOUT THE DEVICE, NOT THE RECORD. It says whether this browser is rung when
-     something interrupts. It draws nothing until the host hands it a key, so on a host without one it is not here. -->
-<PushToggle host={props.shell.host} />
+     something interrupts. It draws nothing until the host hands it a key, so on a host without one it is not here.
+     THE TILE IS THIS WRAPPER, so the toggle's section lies flat inside it and the test sits under the switch in the same
+     tile; a wrapper the toggle drew nothing into is not drawn. -->
+<div class="push tile">
+  <div class="push-switch"><PushToggle host={props.shell.host} onchange={turned} /></div>
+  {#if rung}
+    <div class="push-test">
+      <Button weight="quiet" disabled={testing} onclick={() => void test()}>{testing ? testWords.pressing : testWords.send}</Button>
+    </div>
+  {/if}
+  <!-- Always in the document: a live region inserted with its first sentence is not reliably announced. -->
+  <p class="said" role="status">
+    {#if rung && tested}{#if testBad}<span role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span> {/if}{tested}{/if}
+  </p>
+</div>
 
 <style>
   /* THE QUIET HOURS, AS ONE ROW: the well, the sentence with its two pickers inside it, and the switch at the row's end
@@ -299,6 +340,37 @@
     min-inline-size: 9ch;
     min-block-size: var(--ctl-h);
     font-variant-numeric: tabular-nums;
+  }
+
+  /* THE DEVICE'S TILE, the one `Section` draws, so the toggle inside it lies flat (`Section`'s own rule for a tile). */
+  .push {
+    min-inline-size: 0;
+    padding: var(--tile-pad);
+    background: var(--tile);
+    border-radius: var(--tile-r);
+  }
+
+  .push:not(:has(section)) {
+    display: none;
+  }
+
+  .push-test {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    margin-block-start: var(--sp-2);
+  }
+
+  .said {
+    margin: var(--sp-2) 0 0;
+    max-inline-size: var(--measure);
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    line-height: var(--lh-body);
+  }
+
+  .said:empty {
+    margin: 0;
   }
 
   /* WHAT FOLLOWS THE ROW STARTS WHERE ITS SENTENCE STARTS. */

@@ -633,10 +633,10 @@ test('AN AGENT PROPOSES ITS ACTIONS AS ONE CHANGE: every host, how often, the ke
     'CALLS OUT hooks.example.test · every 15m · grant "hook key"',
     `ping runs for the project studio and sends the key "hook key".`,
     'CALLS OUT hooks.example.test · when a rule runs it, at most 100 a day · grant "hook key" · sends invoices.what, invoices.party',
-    /* AND WHAT A KEY REACHES, ONCE AT THE END. `§2.7` says every key counts as global until scope
-       on credentials is built and that the approval says so in words. Under every keyed line it
-       would be the same sentence three times; here it is the record's own fact, said once. */
-    'Keys are not kept per project yet, so any action in this record can send any key it names.',
+    /* AND WHO CAN OPEN THE KEY, ONCE AT THE END: a scheduled action opens it with nobody present.
+       Under every keyed line it would be the same sentence three times; here it is the record's own
+       fact, said once. */
+    'A scheduled action opens this key with nobody present, so the server that runs it can open it too.',
   ]);
   /* NOTHING IS ARMED BY ASKING. */
   assert.ok(!row(sql, 'call', 'ping'));
@@ -661,7 +661,7 @@ test('AN AGENT PROPOSES ITS ACTIONS AS ONE CHANGE: every host, how often, the ke
   assert.ok(narrower.ok, fixOf(narrower));
   assert.deepEqual(bodyOf<{ approve: string[] }>(sql, (narrower.value as { id: string }).id).approve, [
     'CALLS OUT hooks.example.test · when a rule runs it, at most 100 a day · grant "hook key" · sends invoices.what',
-    'Keys are not kept per project yet, so any action in this record can send any key it names.',
+    'A scheduled action opens this key with nobody present, so the server that runs it can open it too.',
   ]);
 });
 

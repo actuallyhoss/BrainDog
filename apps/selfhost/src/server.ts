@@ -19,7 +19,7 @@ import { env } from 'node:process';
 
 import {
   grantAad, grantKey, openSealed,
-  engineHealthRead, engineLedgerRead, handlersFor, hintsOf, mentionsAttached, httpStatus, serveApi, serveIngest, serveKeys, serveSlash, serveVault, servesKeys, servesSlash, servesVault, sessionOf, slashRecordMeter, withSession,
+  engineHealthRead, engineLedgerRead, engineProbeOf, probeWireOf, handlersFor, hintsOf, mentionsAttached, httpStatus, serveApi, serveIngest, serveKeys, serveSlash, serveVault, servesKeys, servesSlash, servesVault, sessionOf, slashRecordMeter, withSession,
   type Handler, type IngestDoor, type KeysDoor, type SlashAskDoor, type VaultDoor,
 } from '@braindog/host';
 import {
@@ -84,7 +84,7 @@ import { askerOf, scriptTrial, trialSandbox } from '@braindog/host/script-try';
 import { runInQuickJs } from '@braindog/script/quickjs';
 import { outboundHeld, scriptSandbox } from './script.ts';
 import { httpFor } from './http.ts';
-import { slashAnswersFor, slashDoor, slashEngineFor, slashFromEnv, slashModelFor, slashModelJobs, type SlashConfig } from './slash.ts';
+import { selfhostFacts, selfhostProbeWire, slashAnswersFor, slashDoor, slashEngineFor, slashFromEnv, slashModelFor, slashModelJobs, type SlashConfig } from './slash.ts';
 import { unwrap, type KeyStore } from './keys.ts';
 import { shellOf } from './shell.ts';
 import { signerFor } from './sign.ts';
@@ -932,7 +932,7 @@ function arrivalDoor(api: Api, spend: (key: string) => number | null, inbound: (
       const here = api.kernel.identity()?.id;
       if (here === undefined || ask.rec !== here) return null;
       const v = await api.ingestVerify({ ingest: ask.ingest });
-      return v?.kind === 'path' ? v : null;
+      return v?.kind === 'path' || v?.off === true ? v : null;
     },
     /* THE RECORD TAKES THE BYTES, THE FLAG AND THE INGEST, AND NOTHING ELSE OF THE URL. `rec` is this
        process's one record and is no fact about the payload. The ingest was once dropped here too,
@@ -949,6 +949,10 @@ function arrivalDoor(api: Api, spend: (key: string) => number | null, inbound: (
         ...(arrival.ingest === undefined ? {} : { ingest: arrival.ingest }),
       }),
     limit: async (ask) => spend(`${ask.channel}:${ask.key}`),
+    /* A DOOR SWITCHED OFF ANSWERS 410 AND STORES NOTHING (SHL-C13); the record counts the arrival it turned away. */
+    turnedAway: async (ask) => {
+      if (ask.ingest !== undefined) api.doorTurnedAway({ ingest: ask.ingest });
+    },
     ...(inbound === null
       ? {}
       : {
@@ -1353,6 +1357,21 @@ export async function start(options: {
     load: () => import('@braindog/slash'),
     grants: () => api.kernel.grants(),
   });
+  /* AND THE PROBE (ENG-A08), as the Worker hands it: each candidate of this host's route asked on the adapter its asks
+     use, settling in the same Slash SQLite, the package loaded on the press only, held to his switch for Slash reading. */
+  const probeWire = selfhostProbeWire(slashConfig, () => api, options.keys);
+  const engineProbe = engineProbeOf({
+    facts: () => selfhostFacts(slashConfig),
+    clock,
+    ledger: async () => {
+      const s = await import('@braindog/slash');
+      s.openLedger(slashSql, { now: clock.now() });
+      const c = s.ledgerCore(slashSql, clock, { complete: () => Promise.reject(new Error('unused')), embed: () => Promise.reject(new Error('unused')) });
+      return { reserve: c.reserve, account: c.account, release: c.release, last: () => [] };
+    },
+    complete: probeWireOf(probeWire),
+    reads: () => api.kernel.prefsOf('slash')['slash.reads'] !== false,
+  });
   /* AND WHAT THAT LEDGER HOLDS, for the record's `engineReadings` (ENG-B01), as the Worker hands it: the same Slash
      SQLite, so the calls it counts are the ones the health above was read from, beside the questions still open, each
      by its cause. Handed whether or not a model is set, since the open questions are the record's own. The mentions are
@@ -1708,6 +1727,7 @@ export async function start(options: {
        month's background allowance has room; never on the ask ceiling. Absent where nothing embeds, and search is by words. */
     meaning: queryVector({ embed: modelJobs?.embed, meter: jobsMeter, now: () => clock.now(), reads: () => api.kernel.prefsOf('slash')['slash.reads'] !== false }),
     engineHealth,
+    engineProbe,
     engineLedger,
     /* NEWER VERSIONS IN THIS HOST'S CATALOGUE AND THE KENNEL, for Slash to ask about on Decide, and the whole of both for
        the arranger: the folder first, then the public Kennel (`kennel.ts` `kennelReader`), so an add-on published only

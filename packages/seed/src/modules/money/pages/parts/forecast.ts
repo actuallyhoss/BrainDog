@@ -33,9 +33,16 @@ export const FORECAST: Record<string, unknown>[] = [
        FIVE YEARS AND TO THE END AGAIN SINCE money-core 3.10.0, because the record now walks two years at most unasked
        (`WALK_UNASKED` in `packages/kernel/src/pages.ts`) and walks further only when a reader picks a longer length,
        which the page asks for (`RenderOptions.walk`). So a load still walks two years, and a plan that runs past them
-       can be read to its end (research audit 16, H1). */
-    horizon: 90,
-    horizons: [90, 180, 365, 730, 1825, 'last'],
+       can be read to its end (research audit 16, H1).
+       TEN WEEKS FIRST, SINCE THE UNRELEASED money-core 3.17.0 (REC-B08): the span a person acts on, the next few pay
+       days and the bills before them, with three months and every longer length still one press away. The walk is
+       unchanged, two years unasked, so opening shorter costs nothing and takes nothing off the knob. */
+    horizon: 70,
+    horizons: [70, 90, 180, 365, 730, 1825, 'last'],
+    /* THE VALUE AXIS FITS THE WALK (REC-B08), starting just under its lowest balance, so ten weeks of a balance far
+       above nought still shows which way it moves. `fit` is what saying nothing draws today; said here so a change of
+       the renderer's default does not flatten Money's chart. */
+    axis: 'fit',
     /* COUNTING A PLAN OR A STREAM IN OR OUT IS ONE CONTROL, `count`, and `leave` is folded into it: two controls over
        the same streams with opposite meanings was one question asked two ways. Drift draws a slider only for a pair
        some step was converted through, so a record in one currency sees none. `sell` offers what a pack declares

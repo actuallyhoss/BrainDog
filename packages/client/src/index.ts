@@ -256,6 +256,9 @@ export type EventLine = {
   answer_label?: string | null;
   settled_by?: string | null;
   undone?: boolean | null;
+  /** Who had answered the question an undo took back (rule:ladder when Slash's rung let it land), and who kept a change that landed alone. */
+  answered_by?: string | null;
+  kept_by?: string | null;
 };
 
 /** Who wrote the lines a read answers: the record is BrainDog itself, never an agent or a person. */
@@ -650,6 +653,8 @@ export type ActionRow = {
 
 /** `resumeAction`: the action that runs again now. */
 export type ActionResumed = { ingest: string; kind: 'pull' | 'call' | 'poll' };
+/** `actionRun`: the action whose next run is due now. */
+export type ActionRan = { ingest: string; due_at: string };
 
 /** `resumeScript`: the script that runs again now. */
 export type ScriptResumed = { script: string };
@@ -1140,6 +1145,8 @@ export type Heard = { kind: HeardKind; n?: number | undefined; ms?: number | und
  * WRITTEN HERE UNTIL THE RECORD NAMES IT, as `AnswerOr` reads it: the record's own declaration wins once it exists.
  */
 export type EngineState = 'answering' | 'not_answering' | 'never_asked' | 'off' | 'key_closed';
+/** `engineProbe`'s answer: each model Slash would use, whether it answered and how fast, or why not. */
+export type EngineProbed = { candidates: { model: string; served: boolean; strict: boolean; ms: number; why?: string }[]; said: string; next: string };
 export type EngineHealth = {
   health: { state: EngineState; last_ok: string | null; since: string | null; answeredBy?: { model: string; at: string }; lastWords?: string; doubleShare?: number; doubleOf?: { twice: number; asks: number }; spent?: { person: number; background: number } };
   said: { text: string; whose: 'ours' | 'yours' | null };
@@ -1587,6 +1594,8 @@ export function createClient(options: ClientOptions) {
     revokeDevice: (args: { handle: string }) => call<DeviceRow>('revokeDevice', args as Record<string, unknown>),
     /** Rename one machine by its handle (`id`): its sign-in and its key read the new name. */
     renameDevice: (args: { id: string; label: string }) => call<DeviceRow>('renameDevice', args as Record<string, unknown>),
+    /** Switch one webhook door off or on: off answers every arrival 410 and stores nothing, and on again is the same door. ADMIN. */
+    doorSwitch: (args: { ingest: string; on: boolean }) => call<unknown>('doorSwitch', args as Record<string, unknown>),
     listGrants: () => call<unknown[]>('listGrants'),
     /* VAULT, SO A BROWSER SESSION AND A SIGN-IN IN THE LAST FIFTEEN MINUTES. The bytes go and the row stays. */
     revokeGrant: (args: { id: string }) => call<null>('revokeGrant', args as Record<string, unknown>),
@@ -1662,6 +1671,8 @@ export function createClient(options: ClientOptions) {
      */
     suspendMember: (args: { person: string; suspended: boolean }) =>
       call<Answer<'suspendMember'>>('suspendMember', args as Record<string, unknown>),
+    /** Hand one open question to the person who decides it, or take it back with `to` left out. ADMIN. The wire name is `setDecider`. */
+    handQuestion: (args: { id: string; to?: string | null }) => call<{ id: string; decider: string | null }>('setDecider', args as Record<string, unknown>),
     /** `reach` opens something beyond the scope, and only an owner's whole-record token uses it: `['inbox']` reads the money inbox. */
     createToken: (args: { scope: TokenRow['scope']; label?: string; days?: number; reach?: TokenReach[] }) =>
       call<MintedToken>('createToken', args as Record<string, unknown>),
@@ -1747,6 +1758,8 @@ export function createClient(options: ClientOptions) {
      */
     setPref: <K extends keyof Prefs>(key: K, value: NonNullable<Prefs[K]> | null) =>
       call<{ key: K; value: NonNullable<Prefs[K]> | null }>('setPref', { key, value }),
+    /** One test notification to each of the reader's own devices, once a minute: how many it went to and the record's line. */
+    pushTest: () => call<{ devices: number; line: string }>('pushTest'),
     /**
      * This browser asks to be told, with what `PushSubscription.toJSON()` gave, passed as it is: the record takes that
      * shape, `expirationTime` included, so nothing between the browser and the record reshapes a key.
@@ -1806,6 +1819,10 @@ export function createClient(options: ClientOptions) {
      * when that list is not where the record keeps people. It reads and changes nothing. READ+.
      */
     heldTwice: (args: { register: string }) => call<HeldTwice>('heldTwice', args as Record<string, unknown>),
+    /** How many things in each list that names an accent have no colour of their own, with up to five names each: { lists, total }. list asks of one. It reads and changes nothing. READ+. */
+    huesWanted: (args: { list?: string } = {}) => call<Answer<'huesWanted'>>('huesWanted', args as Record<string, unknown>),
+    /** Give everything in list with no colour of its own a hue, once, in one batch: { list, gave, names, batch }, the batch for undo({ batch }), null when nothing wanted one. A person's press: a token is refused. DATA. */
+    giveHues: (args: { list: string }) => call<Answer<'giveHues'>>('giveHues', args as Record<string, unknown>),
     /**
      * What matters today, as cards a screen draws above everything else: `{ cards, at, basis, said }`, `said` being why
      * the rules wrote them where a model would have, or `null`. It reads and changes nothing, and a caller is handed no
@@ -1843,6 +1860,7 @@ export function createClient(options: ClientOptions) {
        thing that starts a paused action again. */
     actions: () => call<ActionRow[]>('actions'),
     resumeAction: (ingest: string) => call<ActionResumed>('resumeAction', { ingest }),
+    actionRun: (ingest: string) => call<ActionRan>('actionRun', { ingest }),
     /** A script paused by three refused runs in a row, started again now. ADMIN, and the only thing that restarts one. */
     resumeScript: (script: string) => call<ScriptResumed>('resumeScript', { script }),
     /** Every installed script with its last run and its refused runs in a row. READ+, held to the lists each touches. */
@@ -1929,6 +1947,8 @@ export function createClient(options: ClientOptions) {
     engineReadings: () => call<AnswerOr<'engineReadings', EngineReadings | null>>('engineReadings'),
     /** The one switch for Slash's background reading: with nothing, the state as it stands. An owner's in a browser. */
     slashReads: (on?: boolean) => call<SlashReads>('slashReads', on === undefined ? {} : { on }),
+    /** Ask each model Slash would use whether it answers now: which answered and how fast, or why not. One every ten minutes. ADMIN. */
+    engineProbe: () => call<EngineProbed>('engineProbe', {}),
     /* THE DOOR'S HEALTH (AGT-A02). ADMIN, so a browser session at owner: every connection, its app, build and last tool
        call, and the seven signs. It takes nothing and changes nothing. */
     doorHealth: () => call<AnswerOr<'doorHealth', DoorHealth>>('doorHealth'),

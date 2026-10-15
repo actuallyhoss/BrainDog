@@ -109,7 +109,8 @@ test('WHAT GOOD LOOKS LIKE IS WHAT A PERSON SAYS, not an inequality', () => {
   assert.equal(targetLine({ format: 'money.GBP', target: { lte: 2_000_050 } } as MetricDecl), 'Limit GBP 20,000.50');
   assert.equal(targetLine({ format: 'money.GBP', target: { lte: 0 } } as MetricDecl), 'None expected');
   assert.equal(targetLine({ format: 'int', target: { gte: 3 } } as MetricDecl), 'At least 3');
-  assert.equal(targetLine({ format: 'money.GBP', target: { gte: 0 } } as MetricDecl), 'Keep above GBP 0');
+  /* NOTHING IS UNDER NOTHING: a floor of zero says no line, on money as on a count. */
+  assert.equal(targetLine({ format: 'money.GBP', target: { gte: 0 } } as MetricDecl), '');
   for (const said of [under, targetLine({ format: 'int', target: { gte: 3 } } as MetricDecl)])
     assert.ok(!/[≤≥]/.test(said), `a glyph nobody types: ${said}`);
 });

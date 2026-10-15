@@ -2,6 +2,21 @@
   "pages": {
     "Counts on Rule sheet": "/p/rule-sheet"
   },
+  "example": {
+    "Counts on Rule sheet": {
+      "list": "things",
+      "fields": {
+        "name": "Rule sheet",
+        "lane": "parked",
+        "next": "Glaze the second batch",
+        "domains": [
+          "kiln.example",
+          "glaze.example"
+        ],
+        "aim": "2026-12-01"
+      }
+    }
+  },
   "rules": [
     {
       "rule": "Values: a figure named in text is read from the record",
@@ -117,6 +132,24 @@
       "page": "Values",
       "selector": ".typed[data-form=\"money\"]",
       "text": "JPY 900,719,925,474,099,312"
+    },
+    {
+      "rule": "Values: a day is counted from the reader's own today, so late in Greenwich's evening it is still a day off there",
+      "page": "Values",
+      "block": "A day in two zones",
+      "zone": "UTC",
+      "at": "2026-10-14T22:30:00Z",
+      "selector": ".typed[data-form=\"day\"]",
+      "text": "15 Oct 2026 · in 1d"
+    },
+    {
+      "rule": "Values: at the same moment in Cairo, east of Greenwich, the same day is already today",
+      "page": "Values",
+      "block": "A day in two zones",
+      "zone": "Africa/Cairo",
+      "at": "2026-10-14T22:30:00Z",
+      "selector": ".typed[data-form=\"day\"]",
+      "text": "15 Oct 2026 · today"
     },
     {
       "rule": "Values: a quantity is a number with its unit",
@@ -328,6 +361,41 @@
       "page": "Counts on Rule sheet",
       "selector": ".ring-label",
       "text": "Tasks done here"
+    },
+    {
+      "rule": "Own values: a project's own text field is read on its own page",
+      "page": "Counts on Rule sheet",
+      "block": "Its own values",
+      "selector": ".document p",
+      "text": "Its next step: Glaze the second batch."
+    },
+    {
+      "rule": "Own values: a count of a project's own list is read, never its contents",
+      "page": "Counts on Rule sheet",
+      "block": "Its own values",
+      "selector": ".document p",
+      "text": "a count and never the domains: 2."
+    },
+    {
+      "rule": "Own values: a list the project holds nothing in counts nought",
+      "page": "Counts on Rule sheet",
+      "block": "Its own values",
+      "selector": ".document p",
+      "text": "How many repositories: 0."
+    },
+    {
+      "rule": "Own values: a day field of the project is read as a day",
+      "page": "Counts on Rule sheet",
+      "block": "Its own values",
+      "selector": ".document .typed[data-form=\"day\"]",
+      "text": "1 Dec 2026"
+    },
+    {
+      "rule": "Own values: no field of the project draws as a hole or as a word nobody knows",
+      "page": "Counts on Rule sheet",
+      "block": "Its own values",
+      "selector": ".document :is(.hole, .unresolved)",
+      "count": 0
     },
     {
       "rule": "Layout: a side rail whose only block is held back is not drawn",

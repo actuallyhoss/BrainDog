@@ -20,7 +20,7 @@
 import type { Refusal, Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
 import { conflictFault, installFault, installOrder, keptQuestion, labelsOf, laterVersion, packIdOf, plan, plannedState, readShared, install, labelSetting, stagedBatch, uninstall, unresolvedFault, SPEAKS, VOICE_KEYS, speakingPack, voiceOf as voiceIn, voiceSetting, voiceWrites, type Diff, type Host, type Installed, type InstallOptions, type Pack, type VoiceKey } from '@braindog/declare';
-import { KEYS_REACH_ALL, approvalLines, configReads, configValue, egressChanged, egressOf, personNameOf, ulids, type ConfigDecl, type Declaration, type Json, type Kernel, type PlannedRecord } from '@braindog/kernel';
+import { KEY_OPENED_UNATTENDED, KEY_OPENED_UNATTENDED_PASSPHRASE, approvalLines, configReads, configValue, egressChanged, egressOf, personNameOf, ulids, type ConfigDecl, type Declaration, type Json, type Kernel, type PlannedRecord } from '@braindog/kernel';
 import type { FormSpec, NextSpec } from './slash.ts';
 import { normaliseChecked } from './theme-check.ts';
 import { retireMarks, takersFor } from './arrange-retires.ts';
@@ -448,7 +448,8 @@ export function arrangeUnion(open: Record<string, unknown>, next: Record<string,
   set('plan', once([...maps(open.plan), ...maps(next.plan)], (s) => `${String(s.pack)}${s.replan === true ? ' again' : ''}`));
   /* THE LINE EVERY KEY SHARES STAYS LAST, where `approvalLines` puts it. */
   const lines = [...new Set([...list(open.approve), ...list(next.approve)].filter((l): l is string => typeof l === 'string'))];
-  set('approve', [...lines.filter((l) => l !== KEYS_REACH_ALL), ...lines.filter((l) => l === KEYS_REACH_ALL)]);
+  const last = (l: string) => l === KEY_OPENED_UNATTENDED || l === KEY_OPENED_UNATTENDED_PASSPHRASE;
+  set('approve', [...lines.filter((l) => !last(l)), ...lines.filter(last)]);
   /* A PAGE OR A DECLARATION BOTH SEND IS THE NEXT ONE'S, in the open one's place. */
   const later = (key: string) => {
     const mine = maps(open[key]);

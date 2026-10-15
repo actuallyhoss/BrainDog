@@ -144,7 +144,12 @@ export function methods(deps: RecordDeps) {
     try {
       out = kernel.transaction(() => {
         const applied = kernel.undoApply(scope, args.hash as string, actorOf(ctx), opts, declared.value);
-        if (applied.ok) for (const mark of applied.value.undone) if (mark.agent !== null) trust.drop(mark.agent, mark.kinds, 'undone');
+        if (applied.ok)
+          for (const mark of applied.value.undone) {
+            /* A QUESTION THE LADDER LANDED (Slash's attach) is signed by the ladder, so who asked is read from the question. */
+            const by = mark.agent !== null ? { agent: mark.agent, kinds: mark.kinds } : trust.landed(mark.batch);
+            if (by !== null) trust.drop(by.agent, by.kinds, 'undone');
+          }
         return applied;
       });
     } finally {

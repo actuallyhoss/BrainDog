@@ -153,7 +153,7 @@ const READ_BY: Readonly<Record<string, readonly string[]>> = (() => {
 export const ANSWER_KEYS: readonly string[] = [
   'drawn', 'rows', 'matched', 'readings', 'walk', 'walks', 'walkFx', 'refusals', 'inherited', 'scopes',
   'scope_marks', 'feed', 'seen', 'history', 'values', 'said', 'bars', 'measures', 'latest', 'past', 'changes', 'working_now',
-  'quiet', 'lateness', 'late_name', 'sells', 'fx',
+  'quiet', 'presence', 'facts', 'lateness', 'late_name', 'sells', 'fx',
   'fills', 'rings', 'queue', 'nexts', 'trends', 'done_now', 'next', 'open', 'types', 'home',
   'short_now', 'window', 'files', 'lanes', 'wholeRead', 'read_as', 'says_at',
 ];

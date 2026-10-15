@@ -136,6 +136,7 @@ export type Ports = { permission(): Promise<string>; manager(): Promise<Manager>
 export type Said =
   | { kind: 'on' }
   | { kind: 'off' }
+  | { kind: 'sent'; line: string }
   | { kind: 'denied'; line: string }
   | { kind: 'failed'; line: string }
   | { kind: 'signin'; fix: string }
@@ -232,4 +233,41 @@ function refusedAs(out: Refused): Said {
   if (code === 'UNREACHABLE') return { kind: 'refused', fix: copy.pushNotSent };
   if (code === 'UNAUTHORIZED' || code === 'NEEDS_BROWSER_SESSION') return { kind: 'signin', fix };
   return { kind: 'refused', fix };
+}
+
+/**
+ * The words the test press says, here and not in `copy.ts` while that file is other work's. Plain, and naming only
+ * the person's own devices: nothing of the record is in a test push, so nothing of it is in what the press says.
+ */
+export const testWords = {
+  send: 'Send a test notification',
+  pressing: 'Sending the test',
+  sent: (devices: number): string => `Sent to ${devices} ${devices === 1 ? 'device' : 'devices'}. It should arrive within a minute.`,
+  /* THE PRESS IS DRAWN ONLY WHILE THIS DEVICE IS ON, so none on the record is the dead subscription the test is for. */
+  none: 'Nothing was sent: the record holds no device of yours. Turn notifications off and on again here.',
+  noRoute: 'This record cannot send a test yet, so nothing was sent.',
+  notReached: 'The record was not reached, so nothing was sent. Try again once you are online.',
+} as const;
+
+/**
+ * Ring each of this person's own devices once (`pushTest`, REC-A15), and say how many.
+ *
+ * THE COUNT IS THE RECORD'S, worded here. A press inside a minute is the record's `RATE_LIMITED`, and its `fix` already
+ * says when the next may go, so it is said as it came. Through `call` until the client names `pushTest` itself.
+ */
+export async function sendTest(call: Call): Promise<Said> {
+  try {
+    const out = await call('pushTest');
+    /* NOT `refusedAs`'s two sentences, which say nothing was turned on: a test press turns nothing on. */
+    if (!out.ok && 'refusal' in out && out.refusal.code === 'ROUTE_UNKNOWN') return { kind: 'refused', fix: testWords.noRoute };
+    if (!out.ok && (!('refusal' in out) || out.refusal.code === 'UNREACHABLE')) return { kind: 'refused', fix: testWords.notReached };
+    if (!out.ok) return refusedAs(out);
+    /* THE RECORD'S OWN SENTENCE WHEN IT SENT ONE, these words for a record that answered the count alone. */
+    const value = out.value as { devices?: unknown; line?: unknown } | null;
+    if (typeof value?.devices !== 'number') return { kind: 'refused', fix: testWords.notReached };
+    if (value.devices === 0) return { kind: 'failed', line: testWords.none };
+    return { kind: 'sent', line: typeof value.line === 'string' && value.line !== '' ? value.line : testWords.sent(value.devices) };
+  } catch {
+    return { kind: 'refused', fix: testWords.notReached };
+  }
 }

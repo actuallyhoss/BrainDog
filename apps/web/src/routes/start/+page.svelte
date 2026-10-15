@@ -832,6 +832,9 @@
           </div>
         {/if}
       </div>
+    {:else if page.url.searchParams.get('agent') === '1'}
+      <!-- SET UP FROM HIS OWN AGENT: the agent proposes, the page draws it, and Make it mine is pressed here. Its own chunk. -->
+      {#await import('./FromAgent.svelte') then { default: FromAgent }}<FromAgent />{/await}
     {:else}
       {#if alreadyMade}
         <section class="again" aria-labelledby="again-h">

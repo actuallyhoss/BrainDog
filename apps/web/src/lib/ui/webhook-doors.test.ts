@@ -21,7 +21,7 @@ import { fileURLToPath } from 'node:url';
 
 import type { Fetch } from '../record/boot-live.ts';
 import { copy } from '../copy.ts';
-import { asksFirst, callerAt, doorUrl, doorsOf, listDoors, mintDoor, saidOf, type Call } from './webhook-doors.ts';
+import { asksFirst, callerAt, doorUrl, doorsOf, lastLine, listDoors, mintDoor, offLine, saidOf, switchDoor, switchLabel, type Call, type Door } from './webhook-doors.ts';
 
 const BASE = 'https://app.brain.dog';
 const REC = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
@@ -54,6 +54,9 @@ function caller(answers: Record<string, unknown>): { call: Call; asked: [string,
   return { call, asked };
 }
 
+/** A row from a host whose `doors` predates the switch: no `on`, so no switch is drawn. */
+const UNSWITCHED = { on: null, offSince: null, lastArrival: null, arrivals: 0, turnedAway: 0 };
+
 const TWO = [
   { id: 'stripe-events', description: 'Payments reported by the card processor', verify: { kind: 'path' }, held: false, register: 'payments' },
   { id: 'build-results', description: 'Results posted by the build server', verify: { kind: 'path' }, held: true, register: 'builds' },
@@ -66,8 +69,8 @@ test('TWO DECLARED DOORS ARE TWO ROWS, each read from the record and named by it
   assert.deepEqual(listed, {
     kind: 'doors',
     doors: [
-      { id: 'stripe-events', name: 'Payments reported by the card processor', register: 'payments', mintable: true, held: false },
-      { id: 'build-results', name: 'Results posted by the build server', register: 'builds', mintable: true, held: true },
+      { id: 'stripe-events', name: 'Payments reported by the card processor', register: 'payments', mintable: true, held: false, ...UNSWITCHED },
+      { id: 'build-results', name: 'Results posted by the build server', register: 'builds', mintable: true, held: true, ...UNSWITCHED },
     ],
   });
 });
@@ -136,7 +139,7 @@ test('A DOOR CHECKED SOME OTHER WAY HAS NO MINT, because `ingestMint` could only
 
 test('A DOOR WITH NO DESCRIPTION IS NAMED BY ITS ID, and a row with no id is left out', () => {
   const listed = doorsOf({ ok: true, value: [{ id: 'bare', verify: { kind: 'path' } }, { description: 'Nameless' }, null, 'text'] });
-  assert.deepEqual(listed, { kind: 'doors', doors: [{ id: 'bare', name: 'bare', register: null, mintable: true, held: false }] });
+  assert.deepEqual(listed, { kind: 'doors', doors: [{ id: 'bare', name: 'bare', register: null, mintable: true, held: false, ...UNSWITCHED }] });
 });
 
 test('NONE DECLARED IS AN EMPTY LIST, which the screen draws as its empty state and not as a bank', () => {
@@ -204,4 +207,57 @@ test('NO USE CASE IS SPELLED IN THE SCREEN OR ITS WORDS', () => {
   for (const [name, source] of sources)
     assert.doesNotMatch(source, /bank|iphone|shortcut|bank-from-out-sms|\bsms\b/iu, `${name} names a use case`);
   assert.equal(Object.keys(copy).some((k) => k.startsWith('shortcut')), false, 'a shortcut* key is left in copy');
+});
+
+/* ── on and off (SHL-C13) ─────────────────────────────────────────────── */
+
+const NOW = Date.UTC(2026, 9, 15, 12);
+
+test('A DOOR THAT IS OFF SAYS SINCE WHEN AND HOW MANY WERE TURNED AWAY, in one line', () => {
+  const listed = doorsOf({
+    ok: true,
+    value: [
+      { id: 'kiln-sensor', description: 'Readings posted by the kiln', verify: { kind: 'path' }, held: true, register: 'firings', on: false, offSince: '2026-10-03T08:00:00.000Z', lastArrival: '2026-10-02T21:10:00.000Z', arrivals: 0, turnedAway: 12 },
+    ],
+  });
+  assert.equal(listed.kind, 'doors');
+  const door = (listed as { doors: Door[] }).doors[0]!;
+  assert.equal(door.on, false);
+  assert.equal(offLine(door, NOW, 'UTC'), 'Off since 3 October. 12 turned away.');
+  assert.equal(offLine({ ...door, turnedAway: 1 }, NOW, 'UTC'), 'Off since 3 October. 1 turned away.');
+  assert.equal(offLine({ ...door, turnedAway: 0 }, NOW, 'UTC'), 'Off since 3 October. Nothing turned away.');
+  assert.equal(lastLine(door, NOW, 'UTC'), 'Last arrival 2 October, none in the last 7 days.');
+  /* A DAY FROM ANOTHER YEAR CARRIES ITS YEAR. */
+  assert.equal(offLine({ ...door, offSince: '2025-12-30T08:00:00.000Z' }, NOW, 'UTC'), 'Off since 30 December 2025. 12 turned away.');
+});
+
+test('A DOOR THAT IS ON HAS NO OFF LINE, and its last arrival and its week are said', () => {
+  const listed = doorsOf({
+    ok: true,
+    value: [{ id: 'garden-gate', description: 'Visitors at the garden gate', verify: { kind: 'path' }, held: true, register: 'visits', on: true, offSince: null, lastArrival: '2026-10-14T17:45:00.000Z', arrivals: 9, turnedAway: 0 }],
+  });
+  const door = (listed as { doors: Door[] }).doors[0]!;
+  assert.equal(door.on, true);
+  assert.equal(offLine(door, NOW, 'UTC'), null);
+  assert.equal(lastLine(door, NOW, 'UTC'), 'Last arrival 14 October, 9 in the last 7 days.');
+  assert.equal(lastLine({ ...door, lastArrival: null, arrivals: 0 }, NOW, 'UTC'), 'Nothing has arrived yet.');
+  assert.equal(switchLabel(door), 'Visitors at the garden gate takes arrivals');
+  assert.equal(switchLabel({ name: 'Visitors at the garden gate.' }), 'Visitors at the garden gate takes arrivals');
+});
+
+test('THE SWITCH SENDS ONE doorSwitch FOR ITS OWN DOOR, and the answer is laid over the row', async () => {
+  const { call, asked } = caller({ doorSwitch: { ok: true, value: { ingest: 'kiln-sensor', on: false, offSince: '2026-10-15T12:00:00.000Z', lastArrival: null, arrivals: 0, turnedAway: 0 } } });
+  const out = await switchDoor(call, 'kiln-sensor', false);
+  assert.deepEqual(asked, [['doorSwitch', { ingest: 'kiln-sensor', on: false }]]);
+  assert.equal(out.kind, 'switched');
+  assert.deepEqual(out.kind === 'switched' ? out.facts : null, { on: false, offSince: '2026-10-15T12:00:00.000Z', lastArrival: null, arrivals: 0, turnedAway: 0 });
+});
+
+test('A SWITCH THE HOST LACKS, OR A STALE SIGN-IN, IS A SENTENCE and changes no row', async () => {
+  const missing = await switchDoor(caller({ doorSwitch: { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'There is no method called doorSwitch.' } } }).call, 'kiln-sensor', false);
+  assert.equal(missing.kind, 'refused');
+  assert.doesNotMatch(missing.kind === 'refused' ? missing.fix : '', /doorSwitch/u);
+  const fix = 'Sign in again to switch this door back on. It is still off.';
+  const stale = await switchDoor(caller({ doorSwitch: { ok: false, refusal: { code: 'NEEDS_BROWSER_SESSION', fix } } }).call, 'kiln-sensor', true);
+  assert.deepEqual(stale, { kind: 'signin', fix });
 });

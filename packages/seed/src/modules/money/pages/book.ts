@@ -58,14 +58,17 @@ export const bookPage = (declared: (figure: string) => boolean): SeedPage => ({
       source: 'forecast.runway',
       opening: { metric: 'book-cash:{{name}}' },
       from: BOOK_LEGS,
-      horizon: 365,
+      /* TEN WEEKS FIRST, SINCE THE UNRELEASED money-core 3.17.0 (REC-B08), as Money's own Cash ahead: it opened on a
+         year, a span nobody plans a book by. A year and every other length is one press away. */
+      horizon: 70,
       /* FIVE YEARS AND TO THE END, SINCE money-core 3.10.0, as Money's own Cash ahead: a load walks two years and a
          longer length is walked when a reader picks it. */
-      horizons: [90, 180, 365, 730, 1825, 'last'],
+      horizons: [70, 90, 180, 365, 730, 1825, 'last'],
+      axis: 'fit',
       knobs: ['horizon', 'late', 'spend', 'count', 'grow', 'drift'],
       late: 'days-late-in',
       under: 30,
-      empty: 'Nothing in {{name}} is dated in the next twelve months.',
+      empty: 'Nothing in {{name}} is dated ahead yet.',
     },
     {
       /* THIS BOOK'S MONTH IN ONE ROW (REC-A09 step 3): what came in, what went out and what is left, each read once a

@@ -17,7 +17,7 @@
  * one signed batch, call it.
  */
 
-import { looksLikeCredential, type FoundBy } from '@braindog/kernel';
+import { ATTACH, kindOfAttach, looksLikeCredential, type ChangeKind, type FoundBy } from '@braindog/kernel';
 
 import { nameKey, scrubbed } from './understand.ts';
 
@@ -371,4 +371,58 @@ export async function askAbout(about: ((input: AboutShown) => Promise<unknown>) 
   const held = kept.attach.length + kept.mentions.length + kept.links.length + kept.triage.length + kept.fields.length;
   if (told > 0 && held === 0) return rules('Nothing the model said could be kept.');
   return { kept, by: 'model' };
+}
+
+/* ── the filing: what lands, and what asks ──────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * The kernel's attach kind (`kindOfAttach`, `change-kind.ts`), read from `@braindog/kernel` and not restated:
+ * `<list>:attach`, off the floors, and the `money` floor on a row with an amount. The two names stay for this file's callers.
+ */
+export const ATTACH_VERB = ATTACH;
+export const attachKindOf: (list: string, hasAmount: boolean) => ChangeKind = kindOfAttach;
+
+/** Where an attach would be written: the list its row is in, and whether that row holds an amount. */
+export type AttachPlace = { list: string; amount: boolean };
+
+/** An attach that rests on the model alone, as it is asked: the row's own name, the question, and its kind (`null` when it has no place). */
+export type AboutAttachAsk = AboutAttach & { row: string; question: string; change: ChangeKind | null };
+
+/** What an attach is read in, as a question says it. */
+const THINGS_SAID: readonly string[] = ['note', 'mail', 'text', 'run'];
+
+/**
+ * Which attaches land as they do today and which are asked first (ENG-B15). WHAT THE TEXT WRITES LANDS: the row's own
+ * name or an alias is in it (`named`), or the kernel found the row by a key the text holds (`how: 'key'`, the rules'
+ * one attach), a second signal beside the model's word. WHAT RESTS ON THE MODEL ALONE ASKS,
+ * as "Is the Sara in this note Sara Idris?", and is its own kind (`attach`), so it starts at Ask and can be earned
+ * (D37.52, D37.53). An attach to a row with an amount is the money floor and always asks (D37.56).
+ *
+ * `job` names each row by its handle, and `placeOf` (the caller's) says the list it is in. Pure, as the rest of this
+ * file: nothing is filed here, and an untrusted text has no attach to file (`aboutKept`).
+ */
+export function attachFiled(
+  kept: AboutKept,
+  job: AboutJob,
+  placeOf: (a: AboutAttach) => AttachPlace | null = () => null,
+): { lands: AboutAttach[]; asks: AboutAttachAsk[] } {
+  const rows = new Map(job.candidates.map((c) => [c.h, c]));
+  const things = new Map(job.items.map((i) => [i.n, i.kind]));
+  const lands: AboutAttach[] = [];
+  const asks: AboutAttachAsk[] = [];
+  for (const a of kept.attach) {
+    const place = placeOf(a);
+    const found = rows.get(a.h);
+    if ((a.named || found?.how === 'key') && place?.amount !== true) {
+      lands.push(a);
+      continue;
+    }
+    const row = found?.name ?? a.name;
+    const thing = things.get(a.n) ?? 'note';
+    const said = THINGS_SAID.includes(thing) ? thing : 'note';
+    /* A NAME THE TEXT WRITES WHOLE asks only for its amount, and is asked as what it is about. */
+    const question = nameKey(a.name) === nameKey(row) ? `Is this ${said} about ${row}?` : `Is the ${a.name} in this ${said} ${row}?`;
+    asks.push({ ...a, row, question, change: place === null ? null : attachKindOf(place.list, place.amount) });
+  }
+  return { lands, asks };
 }

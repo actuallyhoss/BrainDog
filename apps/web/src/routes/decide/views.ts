@@ -31,6 +31,7 @@ import { emptyHidden, says } from '../../lib/page/home.ts';
 import { copy } from '../../lib/copy.ts';
 import { ageDays, countSentence, WORDS as LEAD } from './lead.ts';
 import { words } from './words.ts';
+import { othersLine, WORDS as DECIDER_WORDS, type Decided } from './[id]/decider.ts';
 
 type Row = Record<string, unknown>;
 
@@ -396,3 +397,32 @@ export async function readDecide(base: string, body: DecideBody = DECIDE_HOME, i
 
 /** A refusal that says the host has no such method, rather than anything about this page. */
 const UNSERVED = new Set(['ROUTE_UNKNOWN', 'NOT_IN_THIS_BUILD', 'UNREACHABLE', 'UNAUTHORIZED']);
+
+/* ── who decides: the reader's own questions first ────────────────────── */
+
+/**
+ * THE QUESTIONS NAMED FOR THE READER COME FIRST (USE-A13), under `heading`, and the rest keep the record's order after
+ * them. `yours` is how many at the front are the reader's; `heading` is `null` when none is, so a record where nobody
+ * names a decider draws Decide exactly as before. A question from a record older than the column names nobody.
+ */
+export function mineFirst<T extends Decided>(rows: readonly T[], me: string | null): { rows: T[]; yours: number; heading: string | null } {
+  if (me === null) return { rows: [...rows], yours: 0, heading: null };
+  const yours = rows.filter((r) => r.decider === me);
+  const rest = rows.filter((r) => r.decider !== me);
+  return { rows: [...yours, ...rest], yours: yours.length, heading: yours.length > 0 ? DECIDER_WORDS.yours : null };
+}
+
+/* THE LINE ON SOMEBODY ELSE'S CARD lives with the rest of who decides, so a card can say it without this file. */
+export { othersLine };
+
+/**
+ * EVERY OPEN QUEUE ON DECIDE'S PAGE WITH THE READER'S QUESTIONS FIRST, at the same indexes, before `decideDrawn` shapes
+ * it. A queue that names no decider for the reader comes back as it was, the same object.
+ */
+export function blocksMineFirst(blocks: readonly LiveBlock[], me: string | null): LiveBlock[] {
+  return blocks.map((b) => {
+    if (!isOpen(b) || !b.queue) return b;
+    const ordered = mineFirst(b.queue as readonly (QueueQuestion & Decided)[], me);
+    return ordered.yours === 0 ? b : { ...b, queue: ordered.rows };
+  });
+}

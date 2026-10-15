@@ -57,7 +57,7 @@
   import Waffle from '$lib/viz/Waffle.svelte';
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
   import { mayAnswer, whyNotAnswering } from './answering.ts';
-  import { callsRead, dayWord, decideDrawn, readCalls, readDecide, WORDS, type Call, type DecideBody } from './views.ts';
+  import { blocksMineFirst, callsRead, dayWord, decideDrawn, mineFirst, readCalls, readDecide, WORDS, type Call, type DecideBody } from './views.ts';
   import { words } from './words.ts';
   import { waitsNow } from '$lib/home/waits.svelte.ts';
 
@@ -251,7 +251,12 @@
   const live = $derived(got?.from === 'live' ? got : null);
   /* THE SENTENCE'S COUNTS ARE `boot`'S (`waits`, EXP-E07), the number the rail's badge and Today's header say, and late is
      the record's own mark (`lateDays`). An older host sends neither and the queue's counts stand. */
-  const shaped = $derived(live ? decideDrawn(live.page.blocks, live.now, askerOf, waitsNow(), shell.lateDays ?? null) : null);
+  const shaped = $derived(live ? decideDrawn(blocksMineFirst(live.page.blocks, shell.me?.person ?? null), live.now, askerOf, waitsNow(), shell.lateDays ?? null) : null);
+  /* THE QUESTIONS NAMED FOR THE READER LEAD THE FIRST OPEN QUEUE (USE-A13), under one heading; none, and nothing is drawn. */
+  const yours = $derived.by(() => {
+    const queue = live?.page.blocks.find((b) => b.kind === 'queue' && b.source === 'governance.open')?.queue;
+    return queue ? mineFirst(queue, shell.me?.person ?? null).heading : null;
+  });
   const drawn = $derived<Opened | null>(got && got.from === 'live' && shaped ? { ...got, page: { page: got.page.page, blocks: shaped.blocks } } : got);
   /* NOTHING TO DRAW AT ALL: the head says so, and the other queue is offered when something waits in it. */
   const cleared = $derived(shaped !== null && !shaped.drawsAny);
@@ -313,6 +318,7 @@
         </Empty>
       {/if}
     {:else}
+      {#if yours}<h2 class="yours">{yours}</h2>{/if}
       <div class="body">
         <PageView slug="decide" got={drawn} mode="home" select whole {reread} />
       </div>
@@ -474,6 +480,12 @@
 
   /* THE STANDING SENTENCE OVER THE QUEUE, at the weight of a hint rather than an alarm: nothing has gone wrong, and this
      reader is doing exactly what they were invited to do. */
+  .yours {
+    margin: 0;
+    font-size: var(--t-row);
+    font-weight: 600;
+    line-height: var(--lh-body);
+  }
   .cannot {
     margin: 0;
     max-inline-size: var(--measure);

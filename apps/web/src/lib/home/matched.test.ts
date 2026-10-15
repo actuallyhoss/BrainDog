@@ -25,8 +25,8 @@ const json = (status: number, body: unknown) => new Response(JSON.stringify(body
 test('A FOLD IS ONE SENTENCE IN NAMES, ITS EVIDENCE, WHEN, AND THE BATCH ITS UNDO TAKES', () => {
   const rows = matchedRows(answer([fold(['A. Lovelace'], 'Ada Lovelace'), fold(['Teo Vance', 'T. Vance'], 'Teodor Vance', B2, '2026-10-12T18:00:00.000Z', 'Both wrote from the same handle.')]));
   assert.deepEqual(rows, [
-    { key: `${B1}:0`, line: 'A. Lovelace was matched to Ada Lovelace.', evidence: 'The same name and the same handle, adalovelace.', when: '2026-10-13T09:30:00.000Z', batch: B1, into: 'Ada Lovelace' },
-    { key: `${B2}:1`, line: 'Teo Vance and T. Vance were matched to Teodor Vance.', evidence: 'Both wrote from the same handle.', when: '2026-10-12T18:00:00.000Z', batch: B2, into: 'Teodor Vance' },
+    { key: `${B1}:0`, line: 'A. Lovelace was matched to Ada Lovelace.', evidence: 'The same name and the same handle, adalovelace.', when: '2026-10-13T09:30:00.000Z', batch: B1, into: 'Ada Lovelace', attach: false },
+    { key: `${B2}:1`, line: 'Teo Vance and T. Vance were matched to Teodor Vance.', evidence: 'Both wrote from the same handle.', when: '2026-10-12T18:00:00.000Z', batch: B2, into: 'Teodor Vance', attach: false },
   ]);
 });
 
@@ -68,7 +68,7 @@ test('A FOLD WITH NOBODY TO NAME IS DROPPED, and words are trimmed', () => {
       fold([' A. Lovelace ', 4, ''], '  Ada Lovelace ', B2, 'not a time', 9),
     ]),
   );
-  assert.deepEqual(rows, [{ key: `${B2}:0`, line: 'A. Lovelace was matched to Ada Lovelace.', evidence: '', when: null, batch: B2, into: 'Ada Lovelace' }]);
+  assert.deepEqual(rows, [{ key: `${B2}:0`, line: 'A. Lovelace was matched to Ada Lovelace.', evidence: '', when: null, batch: B2, into: 'Ada Lovelace', attach: false }]);
 });
 
 test('A RECORD WITHOUT THE METHOD ANSWERS NOTHING, and so does one that keeps nobody', () => {
@@ -330,4 +330,9 @@ test("THE TILE READS THE RECORD'S OWN WORDS FOR A MATCH PUT BACK: the step and t
   const part = readFileSync(new URL('./Matched.svelte', import.meta.url), 'utf8');
   /* No Undo on the toast after Put back: the record refuses to undo the change that put a match back. */
   assert.match(part, /toasts\.push\(out\.said, \{ intent: 'good' \}\);/u);
+});
+
+test('A NAME SLASH PUT ON A ROW IS DRAWN BY THE SENTENCE IT WAS READ FROM, with nobody folded into it', () => {
+  const rows = matchedRows(answer([{ kind: 'attach', from: [], into: { name: 'Kiln Room', seq: 4 }, sentence: ' Met Ada at the kiln room. ', at: '2026-10-13T09:30:00.000Z', batch: B1 }]));
+  assert.deepEqual(rows, [{ key: `${B1}:0`, line: 'Slash put a name on Kiln Room.', evidence: 'Met Ada at the kiln room.', when: '2026-10-13T09:30:00.000Z', batch: B1, into: 'Kiln Room', attach: true }]);
 });

@@ -15,6 +15,10 @@
   the skill, and a lesson two projects learned, with "Keep it once". That press puts the question to the person and
   opens Decide; while it waits it cannot be pressed again, and a refusal is said under its line in plain words.
 
+  AND WHAT THE TIDY FOUND, finder by finder, in a fold under the list (AGT-C18): "Empty runs: 41 stale, 3 cleared this
+  week". It is read only once this part is drawn, by `import()` of `tidy-week.ts`, so Home's own read is never held for
+  it. It is words alone: nothing in the fold tidies, asks or files, and a finder the record refused is not in it.
+
   NOTHING IS DRAWN FOR NOTHING: not a heading, not an empty state. Six lines are listed and the rest are counted.
 
   QUIET: no red and no accent. Stale is not late, and nothing here waits on a day. The count is a pill, said aloud by
@@ -22,7 +26,7 @@
 -->
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { at } from '$lib/at.ts';
+  import { apiBase, at } from '$lib/at.ts';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
@@ -33,6 +37,7 @@
   const words = {
     more: (n: number) => (n === 1 ? 'And one more of another kind.' : `And ${String(n)} more of other kinds.`),
     keep: 'Keep it once',
+    tidy: 'What the tidy found',
   } as const;
 
   const line = $derived(staleLine(rows));
@@ -42,6 +47,22 @@
   let waiting = $state<string | null>(null);
   let refused = $state.raw<Readonly<Record<string, string>>>({});
   let gone = $state.raw<ReadonlySet<string>>(new Set());
+
+  /* WHAT THE TIDY FOUND, asked once this part draws and again when Home rereads; `null` until it answers, and for none. */
+  let tidy = $state.raw<readonly { id: string; said: string }[] | null>(null);
+
+  $effect(() => {
+    if (!line) return;
+    void rows;
+    let here = true;
+    void import('./tidy-week.ts').then(async (m) => {
+      const found = await m.loadTidyWeek(apiBase());
+      if (here) tidy = m.tidyWeekLines(found);
+    }, () => {});
+    return () => {
+      here = false;
+    };
+  });
 
   async function keep(row: StaleRow): Promise<void> {
     if (!row.keep || waiting !== null) return;
@@ -93,6 +114,14 @@
       {/each}
     </ul>
     {#if list.more > 0}<p class="s-more">{words.more(list.more)}</p>{/if}
+    {#if tidy}
+      <details class="s-tidy" data-stale-tidy>
+        <summary class="s-tidy-said">{words.tidy}</summary>
+        <ul class="s-tidy-list">
+          {#each tidy as found (found.id)}<li class="s-tidy-line" dir="auto">{found.said}</li>{/each}
+        </ul>
+      </details>
+    {/if}
   </section>
 {/if}
 
@@ -203,10 +232,45 @@
     line-height: 20px;
   }
 
+  /* THE FOLD: its summary a quiet line under the list, its lines plain words, none of them a press. */
+  .s-tidy {
+    margin: var(--sp-3) 0 0;
+  }
+
+  .s-tidy-said {
+    inline-size: fit-content;
+    min-block-size: var(--row-h);
+    color: var(--dim);
+    font-size: var(--t-row);
+    line-height: var(--row-h);
+    cursor: pointer;
+  }
+
+  .s-tidy-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    margin: var(--sp-2) 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .s-tidy-line {
+    color: var(--ink);
+    font-size: var(--t-row);
+    line-height: 22px;
+    overflow-wrap: anywhere;
+  }
+
   /* UNDER A THUMB A LINK IS 44 (13 §7): the pointer and not the width, as every row is. */
   @media (pointer: coarse) {
     a.s-line {
       min-block-size: var(--tap);
+    }
+
+    .s-tidy-said {
+      min-block-size: var(--tap);
+      line-height: var(--tap);
     }
   }
 

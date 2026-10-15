@@ -439,8 +439,14 @@
   type FaultsFound = import('./text-faults.ts').TextFaults;
   type LearnedPart = typeof import('./Learned.svelte').default;
   type LearnedFound = import('./learned.ts').Learned;
+  type ToldPart = typeof import('./Told.svelte').default;
+  type ToldTile = import('./told.ts').LessonsTile;
   type NamedPart = typeof import('./NamedTwice.svelte').default;
   type NamedFound = import('./named-twice.ts').NamedTile;
+  type HuesPart = typeof import('./Hues.svelte').default;
+  type HuesFound = import('./hues.ts').HuesFound;
+  type ImportedPart = typeof import('./ImportedRules.svelte').default;
+  type ImportedFound = import('./imported-rules.ts').ImportedFound;
   let brief = $state.raw<{ cards: readonly BriefingRow[]; foot: string | null; Part: BriefingPart } | null>(null);
   let matched = $state.raw<{ rows: readonly MatchedRow[]; Part: MatchedPart } | null>(null);
   let stale = $state.raw<{ rows: readonly StaleRow[]; Part: StalePart } | null>(null);
@@ -448,8 +454,14 @@
   let faults = $state.raw<{ found: FaultsFound; Part: FaultsPart } | null>(null);
   /* WHAT THE ANSWERS TAUGHT, kept only when there is something: nought draws nothing. */
   let learned = $state.raw<{ found: LearnedFound; Part: LearnedPart } | null>(null);
+  /* WHAT EVERY AGENT IS TOLD, kept only when there is something: nought draws nothing. */
+  let agentsTold = $state.raw<{ tile: ToldTile; Part: ToldPart } | null>(null);
   /* WHAT MAY BE ONE, kept only when there is something: nought draws nothing. */
   let named = $state.raw<{ found: NamedFound; Part: NamedPart } | null>(null);
+  /* WHAT HAS NO COLOUR OF ITS OWN, kept only when there is something: nought draws nothing. */
+  let hues = $state.raw<{ found: HuesFound; Part: HuesPart } | null>(null);
+  /* IMPORTED AUTOMATIONS AS FILING RULES, an offer he presses. Kept once shown, so its Undo outlives the reread its press causes. */
+  let imported = $state.raw<{ found: ImportedFound; Part: ImportedPart } | null>(null);
   $effect(() => {
     if (data.refused) return;
     void moving.version;
@@ -498,10 +510,26 @@
       const found = await m.loadLearned(base);
       if (here) learned = found && found.rows.length > 0 ? { found, Part: part.default } : null;
     }, () => undefined);
-    /* AND LAST, WHAT MAY BE ONE, out of the bracket the same way. */
+    /* AND AFTER IT, WHAT EVERY AGENT IS TOLD, out of the bracket the same way. */
+    void Promise.all([import('./told.ts'), import('./Told.svelte')]).then(async ([m, part]) => {
+      const tile = m.lessonsTile(await m.loadLessons(base));
+      if (here) agentsTold = tile ? { tile, Part: part.default } : null;
+    }, () => undefined);
+    /* AND THEN WHAT MAY BE ONE, out of the bracket the same way. */
     void Promise.all([import('./named-twice.ts'), import('./NamedTwice.svelte')]).then(async ([m, part]) => {
       const found = await m.loadNamedTwice(base);
       if (here) named = found && found.lines.length > 0 ? { found, Part: part.default } : null;
+    }, () => undefined);
+    /* AND WHAT HAS NO COLOUR OF ITS OWN, out of the bracket the same way. */
+    void Promise.all([import('./hues.ts'), import('./Hues.svelte')]).then(async ([m, part]) => {
+      const found = await m.loadHues(base);
+      if (here) hues = found && found.lists.length > 0 ? { found, Part: part.default } : null;
+    }, () => undefined);
+    /* AND THE IMPORTED AUTOMATIONS TO KEEP AS FILING RULES. Never set back to null on a reload: after the press the
+       automations are off and the reload finds none, and the tile must keep its Undo. */
+    void Promise.all([import('./imported-rules.ts'), import('./ImportedRules.svelte')]).then(async ([m, part]) => {
+      const found = await m.loadImported(base);
+      if (here && found && found.rules.length > 0) imported = { found, Part: part.default };
     }, () => undefined);
     return () => {
       here = false;
@@ -693,8 +721,14 @@
     {#if faults}<faults.Part found={faults.found} lists={data.lists} />{/if}
     <!-- WHAT THE ANSWERS TAUGHT, after the faults: what the record will not ask again. Nothing at nought. -->
     {#if learned}<learned.Part found={learned.found} />{/if}
-    <!-- WHAT MAY BE ONE, the board's very last tile: a pair he can put to Decide. Nothing at nought. -->
+    <!-- WHAT EVERY AGENT IS TOLD, after what the answers taught, below the fold. Nothing at nought. -->
+    {#if agentsTold}<agentsTold.Part tile={agentsTold.tile} />{/if}
+    <!-- WHAT MAY BE ONE: a pair he can put to Decide. Nothing at nought. -->
     {#if named}<named.Part found={named.found} />{/if}
+    <!-- WHAT HAS NO COLOUR OF ITS OWN, after what may be one: one press gives each its own. Nothing at nought. -->
+    {#if hues}<hues.Part found={hues.found} />{/if}
+    <!-- IMPORTED AUTOMATIONS AS FILING RULES, below the fold: one press, one Undo. Nothing at nought. -->
+    {#if imported}<imported.Part found={imported.found} />{/if}
   {/if}
 </div>
 

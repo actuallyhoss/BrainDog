@@ -1,24 +1,17 @@
 /**
- * A `repeat:` key the record does not read is refused at install, naming the key.
+ * A `repeat:` key the record does not read is refused at install, naming the key, and the days a repeat names are days.
  *
- * `validate` read `freq` out of a field's `repeat:` and nothing else, so every other key installed and was ignored.
- * Driven through `install` and `expandRepeat` from an anchor of 2026-09-15, all three of these installed and walked as
- * though the extra key were not there:
- *
- *     { freq: monthly, bymonthday: [15, -1] }        ->  09-15, 10-15, 11-15        (never the last day)
- *     { freq: weekly, byday: [TU, TH], count: 4 }    ->  09-15, 09-22, 09-29, 10-06 (never a Thursday)
- *     { freq: monthly, colour: blue }                ->  09-15, 10-15, 11-15
- *
- * The first is a salary paid on the 15th and the last day, and the second is `02 §4`'s own worked example. A schedule
- * that says two days a month and arms one is worse than a refusal, because nobody finds out until a day is missed.
- * `schedule.ts` reads `freq`, `interval`, `count`, `until` and `workday`, so those five are what installs until
- * `bymonthday` and `byday` are built there.
+ * `validate` read `freq` out of a field's `repeat:` and nothing else, so every other key installed and was ignored:
+ * `{ freq: monthly, colour: blue }` walked as though the colour were not there. `schedule.ts` now reads `freq`,
+ * `interval`, `count`, `until`, `workday`, `bymonthday` and `byday`, so those seven install, `bymonthday` and `byday`
+ * each on the frequency it belongs to, and anything else is refused by name. A salary on the 15th and the last day and
+ * `02 §4`'s Tuesdays and Thursdays install; a day that is no day is refused where it is written.
  */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { openRecord, type Declaration } from '../src/index.ts';
+import { REPEAT_READ, openRecord, type Declaration } from '../src/index.ts';
 import { fixedClock, openSqlite } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 8, 15, 12);
@@ -42,27 +35,42 @@ async function installed(repeat: Record<string, unknown>) {
   return k.install([withRepeat(repeat)]);
 }
 
-test('THE THREE DECLARATIONS OF SECTION 4.2 ARE REFUSED, each naming the key nobody reads', async () => {
+type Out = { ok: boolean; refusal?: { code: string; fix: string; at?: string; allowed?: readonly string[] } };
+
+test('THE DAYS OF SECTION 4.2 INSTALL, and a key nobody reads is still refused, naming it', async () => {
+  const month = await installed({ freq: 'monthly', bymonthday: [15, -1] });
+  assert.ok(month.ok, JSON.stringify(month));
+  const week = await installed({ freq: 'weekly', byday: ['TU', 'TH'], count: 4 });
+  assert.ok(week.ok, JSON.stringify(week));
+  const out = (await installed({ freq: 'monthly', colour: 'blue' })) as Out;
+  assert.equal(out.ok, false);
+  assert.equal(out.refusal?.code, 'DECLARATION_INVALID');
+  assert.equal(out.refusal?.at, 'due.repeat.colour');
+  assert.match(out.refusal?.fix ?? '', /\bcolour\b/u, out.refusal?.fix);
+  assert.deepEqual(out.refusal?.allowed, ['freq', 'interval', 'count', 'until', 'workday', 'bymonthday', 'byday']);
+  assert.deepEqual(out.refusal?.allowed, [...REPEAT_READ], 'the keys the install admits are the keys the walk reads');
+});
+
+test('A DAY THAT IS NO DAY IS REFUSED where it is written', async () => {
   const cases: [Record<string, unknown>, string][] = [
-    [{ freq: 'monthly', bymonthday: [15, -1] }, 'bymonthday'],
-    [{ freq: 'weekly', byday: ['TU', 'TH'], count: 4 }, 'byday'],
-    [{ freq: 'monthly', colour: 'blue' }, 'colour'],
+    [{ freq: 'monthly', bymonthday: [0] }, 'bymonthday'],
+    [{ freq: 'monthly', bymonthday: [32] }, 'bymonthday'],
+    [{ freq: 'monthly', bymonthday: [-4] }, 'bymonthday'],
+    [{ freq: 'monthly', bymonthday: [] }, 'bymonthday'],
+    [{ freq: 'monthly', bymonthday: 'fifteen' }, 'bymonthday'],
+    [{ freq: 'weekly', byday: ['XX'] }, 'byday'],
+    [{ freq: 'weekly', byday: ['tuesday'] }, 'byday'],
+    [{ freq: 'weekly', bymonthday: [15] }, 'bymonthday'],
+    [{ freq: 'monthly', byday: ['TU'] }, 'byday'],
+    [{ freq: 'monthly', workday: 'sometimes' }, 'workday'],
   ];
-  type Out = { ok: boolean; refusal?: { code: string; fix: string; at?: string; allowed?: readonly string[] } };
   const outs: Out[] = [];
   for (const [repeat] of cases) outs.push((await installed(repeat)) as Out);
-  /* ALL THREE ASKED BEFORE ANY IS ASSERTED, so a red run names every declaration that installed, not the first. */
-  assert.deepEqual(
-    cases.filter((_, i) => outs[i]!.ok).map(([repeat]) => JSON.stringify(repeat)),
-    [],
-    'these installed, and the key beside freq would be ignored',
-  );
-  for (const [i, [, key]] of cases.entries()) {
-    const out = outs[i]!;
-    assert.equal(out.refusal?.code, 'DECLARATION_INVALID');
-    assert.equal(out.refusal?.at, `due.repeat.${key}`);
-    assert.match(out.refusal?.fix ?? '', new RegExp(`\\b${key}\\b`), out.refusal?.fix);
-    assert.deepEqual(out.refusal?.allowed, ['freq', 'interval', 'count', 'until', 'workday']);
+  /* ALL ASKED BEFORE ANY IS ASSERTED, so a red run names every declaration that installed, not the first. */
+  assert.deepEqual(cases.filter((_, i) => outs[i]!.ok).map(([repeat]) => JSON.stringify(repeat)), [], 'these installed');
+  for (const [i, [repeat, key]] of cases.entries()) {
+    assert.equal(outs[i]!.refusal?.code, 'DECLARATION_INVALID', JSON.stringify(repeat));
+    assert.equal(outs[i]!.refusal?.at, `due.repeat.${key}`, JSON.stringify(repeat));
   }
 });
 

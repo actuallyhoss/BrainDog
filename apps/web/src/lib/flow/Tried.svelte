@@ -26,6 +26,7 @@
   import Tile from '$lib/ui/Tile.svelte';
   import { Stacked } from '$lib/viz/index.ts';
   import { editWords, picksFor, type Answer, type Pick, type Pickable, type Tried, type TryRun, type TryState } from './source.ts';
+  import { outText, testedOf } from './try-step.ts';
 
   let {
     kind,
@@ -152,10 +153,28 @@
     {:else}
       {@const t = run.value}
       {@const bad = failedStep(t)}
+      {@const one = testedOf(t)}
       {#if editWords.startedBy[t.trigger]}<p class="tried-trigger">{editWords.startedBy[t.trigger]}</p>{/if}
-      {#if t.steps.length > 0}<Stacked parts={partsOf(t)} subject={editWords.triedHeading} />{/if}
-      <p class="tried-count">{tally(t)}</p>
-      {#if bad}<p class="tried-refused"><span class="tried-glyph"><Icon name="alert" /></span><span>{bad.say}</span></p>{/if}
+      {#if one}
+        <!-- ONE STEP TESTED ALONE (SHL-D14): how it went in words, and what it gave folded under it, so the panel says
+             the one step and not a bar of steps the test never meant to reach. -->
+        <p class="tried-trigger">{editWords.testedStep}</p>
+        {#if one.state === 'failed'}
+          <p class="tried-refused"><span class="tried-glyph"><Icon name="alert" /></span><span>{editWords.tryState[one.state]}: {one.say}</span></p>
+        {:else}
+          <p class="tried-count">{editWords.tryState[one.state]}: {one.say}</p>
+        {/if}
+        {#if one.out !== undefined}
+          <details class="tried-out"><summary class="tap">{editWords.whatItGave}</summary><pre>{outText(one.out)}</pre></details>
+        {/if}
+        {#if one.sends}
+          <details class="tried-out"><summary class="tap">{editWords.wouldSend}</summary><pre>{outText(one.sends)}</pre></details>
+        {/if}
+      {:else}
+        {#if t.steps.length > 0}<Stacked parts={partsOf(t)} subject={editWords.triedHeading} />{/if}
+        <p class="tried-count">{tally(t)}</p>
+        {#if bad}<p class="tried-refused"><span class="tried-glyph"><Icon name="alert" /></span><span>{bad.say}</span></p>{/if}
+      {/if}
       <p class="tried-note">{editWords.triedWrote}</p>
     {/if}
   {:else if inline && !inline.ok}
@@ -371,5 +390,24 @@
     margin: 0;
     color: var(--dim);
     font-size: var(--t-sm);
+  }
+
+  /* WHAT ONE TESTED STEP GAVE, FOLDED: the summary in the second ink as Thread's is, and the answer on the tile's inner
+     fill, flat, wrapping rather than running off a phone. */
+  .tried-out summary {
+    color: var(--ink2);
+    font-size: var(--t-base);
+    cursor: pointer;
+  }
+
+  .tried-out pre {
+    margin: var(--sp-2) 0 0;
+    padding: var(--sp-3);
+    background: var(--s1);
+    border-radius: var(--r-md);
+    color: var(--ink);
+    font-size: var(--t-base);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
   }
 </style>

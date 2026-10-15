@@ -22,7 +22,7 @@
   import { REGISTERS, refOptions } from '../record/held.ts';
   import type { FieldDecl, Fields } from '../record/schema.ts';
   import { exponentOf } from 'braindog-render';
-  import { amountWrong, currencyTypedIn, moneyTyped } from './money-typed.ts';
+  import { amountWrong, currencyOfLink, currencyTypedIn, linkedRow, linkOf, linkSaid, moneyTyped } from './money-typed.ts';
   import { moveWord, movesWith, type Move } from './row-form-moves.ts';
   import { copy } from '../copy.ts';
   import { valueSaid } from '../voice.ts';
@@ -272,6 +272,29 @@
   const listed = (f: FieldDecl): string | null => currencyFor(register, f.id);
 
   /**
+   * THE ACCOUNT A `currency_from` AMOUNT IS FILED AGAINST, and the code that account holds: read again whenever the
+   * link's own box changes, so the amount box follows the account the moment it is picked. The linked row is the one
+   * this tab already holds (`linkedRow`), as a ref's choices are, so a pick sends no request; its name is the one the
+   * picker offered it under. `null` while no account is picked, or the account holds no code the record would give.
+   * THE CODE DOES NOT WAIT ON THE NAME: an account this tab holds but has no name for still sets the box's code, and
+   * only the line under it is left out.
+   */
+  const linked = (f: FieldDecl): { code: string; name: string | null } | null => {
+    const from = linkOf(f);
+    const ref = from === null ? undefined : REGISTERS[register]?.fields?.find((g) => g.id === from.link && g.type === 'ref');
+    if (ref?.to === undefined) return null;
+    const to = ref.to;
+    const raw = typed[ref.id];
+    const seq = raw === undefined || raw === '' ? null : Number(raw);
+    const code = currencyOfLink(f, linkedRow(to, seq), (named) =>
+      REGISTERS[to]?.fields?.some((g) => g.id === named && g.type === 'money') ? named : null,
+    );
+    if (code === null) return null;
+    return { code, name: refOptions(to, seq).find((o) => o.value === seq)?.label ?? null };
+  };
+  const linkedCode = (f: FieldDecl): string | null => linked(f)?.code ?? null;
+
+  /**
    * The typed values, in the shapes the record stores, handed back to whoever owns the submit.
    *
    * A `money` IS AN AMOUNT AND A CURRENCY and the box holds only the amount, so it is put back
@@ -300,7 +323,7 @@
       if (f.type === 'money') {
         /* NOTHING IS WRITTEN FOR AN AMOUNT THE RECORD WOULD REFUSE, a missing currency among them: the
            sentence under the box says why, and the button is disabled while it is there. */
-        const money = moneyTyped(f, raw, listed(f));
+        const money = moneyTyped(f, raw, listed(f), linkedCode(f));
         if (money !== null) out[f.id] = money;
         continue;
       }
@@ -309,7 +332,7 @@
     taken = out;
   });
 
-  const wrong = (f: FieldDecl): string | null => amountWrong(f, typed[f.id] ?? '', listed(f));
+  const wrong = (f: FieldDecl): string | null => amountWrong(f, typed[f.id] ?? '', listed(f), linkedCode(f));
 
   /**
    * WHAT WAS IN EACH FIELD WHEN THE RECORD REFUSED IT, so the record's sentence goes the moment that field is changed:
@@ -325,6 +348,12 @@
   /** The line under a field: the record's refusal while the value it refused is still there, else what this form sees. */
   const errorOf = (f: FieldDecl): string | null =>
     (seen[f.id] !== undefined && seen[f.id] === now(f) ? errorFor(refused, f.id) : undefined) ?? (f.type === 'money' ? wrong(f) : null);
+
+  /** The plain line under an amount box whose currency came from the account it is filed against. */
+  const helpOf = (f: FieldDecl): string | null => {
+    const from = linked(f);
+    return from?.name ? linkSaid(from.code, from.name) : null;
+  };
 
   /* WHAT NAMES NO FIELD ON THIS FORM, a hidden one among them, goes out for the foot; what names one is said only there. */
   $effect(() => {
@@ -400,6 +429,7 @@
         marked={f.required && !first ? copy.required : undefined}
         group={f.type === 'enum' && (f.values?.length ?? 0) <= 4}
         error={errorOf(f)}
+        help={f.type === 'money' ? helpOf(f) : undefined}
       >
         {#snippet children({ describedBy, invalid })}
 
@@ -464,12 +494,13 @@
         </select>
       {:else if f.type === 'money'}
         <!-- The currency is printed rather than typed, and it is THE ONE THE AMOUNT WILL BE WRITTEN
-             IN: the field's declared currency, else its rows', else the record's own. A free-text
+             IN: the code of the account its link names, else the field's declared currency, else its rows', else the
+             record's own; the line under the box says when it is the account's. A free-text
              currency box is how two of them end up added together; a constant is how one of them
              ends up wearing the other's code. With none known no code is drawn, and an amount
              typed here is not written: the sentence under the box says so. The placeholder shows
              that currency's own places, so a yen box does not invite the decimals it refuses. -->
-        {@const unit = currencyTypedIn(f, listed(f))}
+        {@const unit = currencyTypedIn(f, listed(f), undefined, linkedCode(f))}
         <div class="field money">
           {#if unit}<span class="money-unit">{unit}</span>{/if}
           <input

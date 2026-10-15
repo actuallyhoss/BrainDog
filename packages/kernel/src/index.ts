@@ -130,6 +130,9 @@ import {
   decide,
   getGovernance,
   listGovernance,
+  handQuestion as handQuestionIn,
+  deciderOf as deciderOfIn,
+  deciderFault as deciderFaultIn,
   countGovernance,
   countOpenQuestions,
   propose as openSuggestion,
@@ -189,7 +192,7 @@ import {
   startRun,
   type FlowDeps,
 } from './flow.ts';
-import { trialTrigger, tryRun, type Tried, type TrySample } from './flow-try.ts';
+import { trialTrigger, tryRun, type Tried, type TryOptions, type TrySample } from './flow-try.ts';
 import { extension as rehearsal } from './api/rehearse.ts';
 import { pathOf, rowRegisterOf, slashAskAt, subjectOf, tagsRefusal, tagsRefusing, tagsShape, triggerOf } from './flow-lint.ts';
 import { onDecided, onMetrics, onTime } from './flow.ts';
@@ -218,6 +221,8 @@ import {
   keyNamed,
   opensNamed,
   keyReady,
+  keyOutOfScope,
+  keyScopeOf,
   listActions,
   originsOf,
   prepareAction,
@@ -241,6 +246,7 @@ import {
   getGrant,
   listGrants,
   openGrant,
+  recordWrapping,
   revokeGrant,
   rotateDue,
   sealedGrant,
@@ -395,7 +401,7 @@ export { ACROSS, ANY_LIST, touches, type Resolve as ReachResolve, type Touched }
    the run had already taken and arms it had already left. */
 export { plan as runPlan, type Op as RunOp } from './flow.ts';
 /* FOR THE RECORD'S `tryAutomation` AND THE AGENT'S `automation_try`, which hand this shape on as it is. */
-export type { Tried, TriedStep, TrySample } from './flow-try.ts';
+export type { Tried, TriedStep, TryOptions, TrySample } from './flow-try.ts';
 /* FOR THE RECORD'S DRY RUN AND THE GRAMMAR AN AGENT READS, which say what installs and what runs from the rows the lint
    and the runner read (`capabilities.ts`). */
 export { CAPABILITIES, capability, notInThisBuild, serves, type Capability, type Hosts } from './capabilities.ts';
@@ -403,7 +409,7 @@ export { isUlid, ulids, ulidTime } from './ids.ts';
 export { digest, indexesFor, indexName, jcs, registerOfIndex, validate as validateDeclaration, KINDS, REMOVED_WINDOW_DAYS } from './declare.ts';
 export { ftsQuery, projectedText } from './fts.ts';
 export { TRAVELS, decode, encode, projection, tables } from './brainl.ts';
-export { atMs, expandRepeat, offsetMs, remindersFor, shiftFrom } from './schedule.ts';
+export { BYDAY, REPEAT_READ, atMs, expandRepeat, nextRepeat, offsetMs, remindersFor, shiftFrom } from './schedule.ts';
 export type { Remindable, Repeat, Reminder } from './schedule.ts';
 export type { ImportReport, Section, TableShape } from './brainl.ts';
 export { EVENT_KINDS, isEventKind } from './events.ts';
@@ -441,6 +447,8 @@ export { farRates, pointSaid, RATE_QUIET_DAYS } from './metrics.ts';
 export { BEFORE, comparisonOf, monthBefore, yearBefore } from './metrics.ts';
 export type { Before, Halves } from './metrics.ts';
 export { SESSIONS_WORKING, readRunsWorking } from './built-in-figures.ts';
+/* The runs list and a run's handle, so the web's literal copies are tested against them (books-kept.test.ts). */
+export { SESSION, SESSION_PREFIX } from './session.ts';
 export { HANDOFFS_OPEN, openSteps, readHandoffsOpen, type OpenStep } from './built-in-figures.ts';
 /* THE TIDY AS FIGURES (AGT-C18): the source, its reader, and the id of one finder's own figure. */
 export { RECORD_TIDY, readTidy, staleFigureOf, type TidyDecl } from './built-in-figures.ts';
@@ -507,7 +515,7 @@ export { ARRANGING, BODY_KINDS, GOVERNANCE, LADDER_RULE, OPEN_ARRANGEMENTS, PACK
    stands on for it, so the record, the web and the CLI read one table of kinds rather than each keeping a copy. Its
    `agentOf` goes out as `ladderAgentOf`, since `session.ts`'s `agentOf` (the kind of agent a run is) already has the name. */
 export {
-  ADDONS, AUTOMATION, CALL, FLOORS, KEPT_DAYS, RUNGS, agentOf as ladderAgentOf, dearest, keysOfStamp, kindOfEvent, kindOfWrite, kindsOfProposal, kindsOfWrite, madeByIn,
+  ATTACH, ADDONS, AUTOMATION, CALL, FLOORS, KEPT_DAYS, RUNGS, agentOf as ladderAgentOf, dearest, keysOfStamp, kindOfEvent, kindOfAttach, kindOfWrite, kindsOfProposal, kindsOfWrite, madeByIn,
   personOf, recordReader, rungOf, seedLadder, shapeIn, stampOf, tokenOfRun,
   type ChangeKind, type Floor, type KindReader, type ListShape, type Rung, type WriteSaid,
 } from './change-kind.ts';
@@ -596,7 +604,10 @@ export type { Fired as PullFired, PullDecl, PullDeps } from './pull.ts';
    what an install would and never runs a body the record could not hold. */
 export { egressChanged, scriptBody } from './script.ts';
 export { finishScript, prepareScript, resumeScript, REFUSED_IN_A_ROW, type ScriptAnswer, type ScriptRunner, type ScriptRunDeps, type ScriptUnrun, type Scripted } from './script-run.ts';
-export { ACTION_KINDS, ACTION_MAX_BYTES, ACTION_TIMEOUT_MS, KEYS_REACH_ALL, RULE_CALLS_PER_DAY, actionJitterMs, answerHash, approvalLines, egressOf, grantChosen, hostOpened, originsOf, reserveFor } from './actions.ts';
+export { ACTION_KINDS, ACTION_MAX_BYTES, ACTION_TIMEOUT_MS, KEY_OPENED_UNATTENDED, KEY_OPENED_UNATTENDED_PASSPHRASE, RULE_CALLS_PER_DAY, actionJitterMs, answerHash, approvalLines, egressOf, grantChosen, heldHost, hostOpened, keyOutOfScope, keyScopeOf, originsOf, reserveFor, type KeyOutOfScope } from './actions.ts';
+export { pinHost } from './vault.ts';
+/* RUN NOW (`nudge.ts`): an action's waiting run moved to now, at most once a minute an action and twenty an hour a record. */
+export { nudgeAction, nudgeRate, NUDGE_ACTION_MS, NUDGE_RECORD_MOST, NUDGE_RECORD_MS, NUDGE_FIELD, type NudgeDeps, type Nudged } from './nudge.ts';
 export type {
   ActionAnswer, ActionDecl, ActionKind, ActionRequest, ActionRow, ActionsRun, CallQueued, Egress, Execute,
   /* The connector runner's half: what a paging job looks like, and what a host wires to run one. */
@@ -1640,6 +1651,22 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   /** What a vault label's live entry says it opens, for a script's line to name beside the key (`scriptEgress`). */
   function opensOf(label: string): string | null {
     return opensNamed(sql, label);
+  }
+
+  /** The lists that hold keys, each with the field that keeps a key to its projects (`keyScopeOf`'s holders). */
+  const keyHolders = (): Map<string, string> =>
+    new Map(
+      [...registers.values()]
+        .filter((r) => r.fields.some((f) => f.type === 'secret' && !f.retired))
+        .flatMap((r) => {
+          const f = scopeFieldOf(r.fields);
+          return f ? [[r.id, f.id] as [string, string]] : [];
+        }),
+    );
+
+  /** The projects a vault label's key is kept to, read for an action's line (`egressOf`) and its refusal (`keyOutOfScope`). */
+  function keyScope(label: string): readonly string[] | null | undefined {
+    return keyScopeOf(sql, label, keyHolders());
   }
 
   /**
@@ -2901,7 +2928,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * and `heldRow`.
    */
   function stagingFault(batch: readonly Declaration[]): Refusal | null {
-    return unreadable(batch) ?? lintBatch(sql, batch, planned ?? undefined) ?? unserved(batch) ?? stranded(batch) ?? tagsNarrowed(batch) ?? taggingRefused(batch);
+    return unreadable(batch) ?? lintBatch(sql, batch, planned ?? undefined) ?? unserved(batch) ?? keysKept(batch) ?? stranded(batch) ?? tagsNarrowed(batch) ?? taggingRefused(batch);
   }
 
   /**
@@ -2913,6 +2940,22 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * had passed. Every install path asks this right after `lintBatch`, so a malformed ask is told what is wrong with it
    * first, and only a well-formed one hears that nothing here would answer it.
    */
+  /**
+   * An action or a script in the batch that names a key kept for another project (`keyOutOfScope`, D0b.23).
+   *
+   * HERE AND NOT IN `declare.ts`, for the reason `unserved` is: which projects a key is kept to is read off the vault and
+   * the lists that hold keys, which the context-free lint never sees. Asked on every install path right after it.
+   */
+  function keysKept(batch: readonly Declaration[]): Refusal | null {
+    for (const d of batch) {
+      if (d.kind !== 'ingest' && d.kind !== 'script') continue;
+      const e = egressOf(d.body, titleOfRow);
+      const out = e && keyOutOfScope(e, keyScope, titleOfRow);
+      if (out) return { code: out.code, fix: out.fix, at: out.at };
+    }
+    return null;
+  }
+
   function unserved(batch: readonly Declaration[]): Refusal | null {
     if (opts.answersSlash === true) return null;
     /* THE WORDS ARE THE STEP'S ROW IN `capabilities.ts`, which the runner fails a run with and the grammar lists by. */
@@ -6221,6 +6264,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       return [{ at: one.at, name: one.name, seen, ...(one.kept === true ? { kept: true as const } : {}) }];
     });
     const facts = cardFacts(r, kind, body);
+    /* WHO WAS HANDED IT TO DECIDE (USE-A13), only when somebody was, so a queue nobody handed reads as it did. */
+    const decider = deciderOfIn(sql, String(r.id));
     return {
       id: String(r.id),
       who: String(r.opened_by ?? ''),
@@ -6244,6 +6289,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
          (`ALIKE_SQL`) and never once per question. Absent from a question the record has no cause for. */
       ...(typeof r.cause === 'string' && r.cause !== '' ? { cause: r.cause, alike: Math.max(1, Number(r.alike ?? 1)) } : {}),
       ...facts,
+      ...(decider !== null ? { decider } : {}),
     };
   };
 
@@ -6913,7 +6959,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       interrupted: () =>
         sql.one<{ n: number }>(
           `SELECT count(*) AS n FROM outbox WHERE created > ?
-             AND (kind = 'notify.push' OR (kind = 'notify.email' AND json_extract(payload, '$.interrupt') = 1))`,
+             AND ((kind = 'notify.push' AND json_extract(payload, '$.test') IS NOT 1) OR (kind = 'notify.email' AND json_extract(payload, '$.interrupt') = 1))`,
           instant(clock.now() - 3_600_000),
         )?.n
           ? true
@@ -7089,6 +7135,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           requires_reason: true,
           run: about.run,
           step: about.step,
+          /* A TYPED QUESTION'S SHAPE AND CURRENCY, so Decide asks for the amount, number, words or day the step reads. */
+          ...(about.shape === undefined ? {} : { shape: about.shape }),
+          ...(about.currency === undefined ? {} : { currency: about.currency }),
           /* THE ONE MEMBER THE STEP PUTS IT TO, on the body beside the run, because the body is what `govern.ts`'s
              `decide` and the queue's order both read. */
           ...(about.to === undefined ? {} : { to: about.to }),
@@ -7348,11 +7397,11 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       if (batch.length === 0 || batch.length !== listed.length) return ok(null);
       /* EVERY CHANGE IS LINTED WHEN IT IS FILED, with the checks the install runs on acceptance, and not only one that
          sends something out: a page proposed with no blocks was found by the owner who pressed accept. */
-      const fault = unreadable(batch) ?? lintBatch(sql, batch) ?? unserved(batch) ?? contradicted(batch) ?? stranded(batch);
+      const fault = unreadable(batch) ?? lintBatch(sql, batch) ?? unserved(batch) ?? keysKept(batch) ?? contradicted(batch) ?? stranded(batch);
       if (fault) return { ok: false as const, refusal: fault };
       const egress = batch.flatMap((d) => {
         /* A SCRIPT CALLS OUT AS AN ACTION DOES, and its line is how the owner sees where it fetches and with which key. */
-        const out = d.kind === 'ingest' || d.kind === 'script' ? egressOf(d.body, titleOfRow, opensOf) : null;
+        const out = d.kind === 'ingest' || d.kind === 'script' ? egressOf(d.body, titleOfRow, opensOf, keyScope) : null;
         return out === null ? [] : [out];
       });
       if (egress.length === 0) return ok(null);
@@ -7362,7 +7411,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         return before === null || egressChanged(before, e);
       });
       if (changed.length === 0) return ok(null);
-      return ok({ egress: changed, approve: approvalLines(changed) });
+      return ok({ egress: changed, approve: approvalLines(changed, { passphrase: recordWrapping(sql)?.wrapped_by === 'passphrase' }) });
     },
     /* THE ROWS AGAIN AT ACCEPTANCE, and only the rows: `review` linted the declarations when the change was filed, and
        what moves between the two is what was written under the register since. */
@@ -8728,7 +8777,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           )
           .flatMap((r) => {
             const body = JSON.parse(r.body) as { fetch?: { base?: unknown } };
-            const e = egressOf(body, titleOfRow, opensOf);
+            const e = egressOf(body, titleOfRow, opensOf, keyScope);
             if (e === null) return [];
             const base = e.host === null && typeof body.fetch?.base === 'string' ? body.fetch.base : null;
             let host: string | null = null;
@@ -8741,6 +8790,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
                says `fetch.base` where the other two say `url`, and the line is built from `url`. */
             return [{ ...e, line: host === null ? e.line : e.line.replace('CALLS OUT no host declared', `CALLS OUT ${host}`) }];
           }),
+        { passphrase: recordWrapping(sql)?.wrapped_by === 'passphrase' },
       ),
 
     actionOrigins: (): string[] =>
@@ -9418,6 +9468,11 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
     /** One governance row, or `null` — a missing one is a value, not a refusal. */
     governanceRow: (register: GovernRegister, id: string) => getGovernance(sql, register, id),
+    /* WHO DECIDES A QUESTION (`govern.ts`): an owner hands one to a person, or takes it back; `deciderFault` says why a
+       caller may not decide one handed to somebody else. */
+    handQuestion: (id: string, to: string | null, by: string) => transaction(() => handQuestionIn(governDeps(), id, to, by)),
+    deciderOf: (id: string) => deciderOfIn(sql, id),
+    deciderFault: (id: string, actor: string, isOwner: boolean, nameOf?: (person: string) => string) => deciderFaultIn(sql, id, actor, isOwner, nameOf),
 
     /**
      * Open a suggestion. The body is checked here, so the person answering it never finds it broken.
@@ -10061,7 +10116,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       if (refused) return refused;
       /* THE ROWS LAST, after every check about the declarations alone, so a declaration that is wrong in itself is told that
          first rather than how many rows it would also break. */
-      const cannot = unreadable(batch) ?? lintBatch(sql, batch) ?? unserved(batch) ?? contradicted(batch) ?? stranded(batch);
+      const cannot = unreadable(batch) ?? lintBatch(sql, batch) ?? unserved(batch) ?? keysKept(batch) ?? contradicted(batch) ?? stranded(batch);
       if (cannot) return { ok: false as const, refusal: cannot };
       /* THE HISTORY LINE IS WRITTEN IN THE TRANSACTION THAT WRITES THE VERSION, so a change that lands always has one and a
          refused or rolled-back one never does. The wrapper sees only this call's result, which is `Result<Installed[]>`. */
@@ -10972,12 +11027,12 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * `KernelParts` does not carry them; `parts` is read when this is called, after it is built. The body is linted by
      * the caller first (`checkAutomation`); the runner meets a body it cannot read as a failed step.
      */
-    tryAutomation: (body: FlowDecl, sample: TrySample, actor: string): Result<Tried> =>
+    tryAutomation: (body: FlowDecl, sample: TrySample, actor: string, o?: TryOptions): Result<Tried> =>
       rehearsal(parts).rehearse(() => {
         const trial: FlowDeps = { ...flowDeps(), trial: body };
         const io = { get: (ref: string) => get(ref), create: (register: string, fields: Patch, by: string) => write(register, null, fields, { actor: by }) };
         const trigger = trialTrigger(trial, body, sample, io, actor);
-        return trigger.ok ? tryRun(trial, body, trigger.value, actor) : trigger;
+        return trigger.ok ? tryRun(trial, body, trigger.value, actor, o) : trigger;
       }),
 
     /**

@@ -39,7 +39,7 @@ const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
  * `batch` is the handle the record's undo takes, `''` where it sent none, and is never drawn. `into` is the name of the
  * one the others were matched to, which Undo says first among who comes back.
  */
-export type MatchedRow = { key: string; line: string; evidence: string; when: string | null; batch: string; into: string };
+export type MatchedRow = { key: string; line: string; evidence: string; when: string | null; batch: string; into: string; attach: boolean };
 
 const COUNTS = ['Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'] as const;
 
@@ -81,19 +81,22 @@ export function matchedRows(answer: unknown): MatchedRow[] {
   const rows: MatchedRow[] = [];
   for (const match of matches as unknown[]) {
     if (typeof match !== 'object' || match === null) continue;
-    const m = match as { from?: unknown; into?: { name?: unknown } | null; evidence?: unknown; at?: unknown; batch?: unknown };
+    const m = match as { kind?: unknown; from?: unknown; into?: { name?: unknown } | null; evidence?: unknown; sentence?: unknown; at?: unknown; batch?: unknown };
+    /* A NAME SLASH PUT ON A ROW (`attach`) HAS NOBODY FOLDED INTO IT, so it is drawn by the sentence it was read from. */
+    const attach = m.kind === 'attach';
     const into = typeof m.into?.name === 'string' ? m.into.name.trim() : '';
     const from = Array.isArray(m.from) ? m.from.filter((n): n is string => typeof n === 'string').map((n) => n.trim()).filter((n) => n !== '') : [];
-    if (into === '' || from.length === 0) continue;
+    if (into === '' || (!attach && from.length === 0)) continue;
     const batch = typeof m.batch === 'string' ? m.batch : '';
     rows.push({
       /* THE KEY IS THE BATCH AND THE PLACE, since one batch may hold two matches that ended at different people. */
       key: `${batch}:${String(rows.length)}`,
-      line: lineOf(from, into),
-      evidence: typeof m.evidence === 'string' ? m.evidence.trim() : '',
+      line: attach ? `Slash put a name on ${into}.` : lineOf(from, into),
+      evidence: attach && typeof m.sentence === 'string' ? m.sentence.trim() : typeof m.evidence === 'string' ? m.evidence.trim() : '',
       when: typeof m.at === 'string' && Number.isFinite(Date.parse(m.at)) ? m.at : null,
       batch,
       into,
+      attach,
     });
   }
   return rows;
@@ -145,7 +148,7 @@ const GIVEN_BACK = 'restore';
 const SAYS_BACK = /^Puts back (\d+) people\b/u;
 
 /** What Undo needs of a match: its batch, and the name of the one the others were matched to where it is known. */
-export type MatchHandle = { batch: string; into?: string };
+export type MatchHandle = { batch: string; into?: string; attach?: boolean };
 
 /**
  * Who a plan gives back, by name and once each, and how many the record says come apart; `null` for a plan that gives
@@ -236,7 +239,8 @@ export async function undoMatch(base: string, row: MatchHandle, io?: Fetch): Pro
   try {
     const out = await undoPlan(base, scope, io);
     if (out.from !== 'plan') return null;
-    const say = planSaid(out.plan, row.into);
+    /* AN ATTACH BRINGS NOBODY BACK AS A PERSON, so its Undo says the record's own plan. */
+    const say = row.attach === true ? out.plan.say : planSaid(out.plan, row.into);
     return say === null ? null : { from: 'plan', say, plan: out.plan };
   } catch {
     return null;

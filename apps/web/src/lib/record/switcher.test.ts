@@ -92,3 +92,16 @@ test('A ONE-LIST MEMBER\'S ROW wears the word the host sent, where it used to dr
   /* An owner's row says nothing, a level says itself, and a row with no level says what the host called it. */
   assert.deepEqual(out.value.map(levelWord), [null, 'read', 'Some lists']);
 });
+
+test('A ONE-LIST ROW NAMES ITS LISTS in the host\'s words, never their ids, and a row from an older host reads as it did', async () => {
+  /* The host writes `words` from the lists' names (`heldSaid` in `packages/record/src/directory.ts`); this draws them. */
+  const rows: SwitcherRow[] = [
+    { slug: 'ledger', name: 'Ledger', level: null, lists: ['tickets'], names: ['Tickets'], words: 'Some lists: Tickets', held: 'Some lists' },
+    { slug: 'kiln', name: 'Kiln', level: null, lists: ['tickets', 'bugs'], names: ['Tickets', 'Bugs'], words: 'Some lists: Tickets and Bugs', held: 'Some lists' },
+    /* A host from before `words` sends the one word and the ids, and the ids are never drawn. */
+    { slug: 'harbour', name: 'Harbour', level: null, lists: ['tickets'], held: 'Some lists' },
+  ];
+  const out = await readRecordsForSwitcher(host(() => json(200, { ok: true, value: rows })).io);
+  assert.ok(out.ok);
+  assert.deepEqual(out.value.map(levelWord), ['Some lists: Tickets', 'Some lists: Tickets and Bugs', 'Some lists']);
+});

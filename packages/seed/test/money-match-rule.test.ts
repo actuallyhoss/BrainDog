@@ -109,7 +109,7 @@ test('a cleared payment that names nothing is linked to the one bill it paid, an
   const theBill = m.bill();
   const pay = m.paid(400_000, '2026-09-28');
   await m.k.drain();
-  assert.deepEqual(m.queued().map((q) => q.script), ['match_payment']);
+  assert.deepEqual(m.queued().map((q) => q.script), ['match_payment', 'settle_matched_line']);
   await m.turn();
   assert.equal(m.k.get(pay.id)!.fields.settles, theBill.id, m.log.join(' | '));
   const f = m.k.get(theBill.id)!.fields;
@@ -126,7 +126,7 @@ test('a payment that names its bill already starts no search, and one not cleare
   assert.deepEqual(m.queued().map((q) => q.script), ['settle']);
   value(m.k.update('transactions', pending.id, { state: 'cleared' }, OWNER));
   await m.k.drain();
-  assert.deepEqual(m.queued().map((q) => q.script), ['settle', 'match_payment']);
+  assert.deepEqual(m.queued().map((q) => q.script), ['settle', 'match_payment', 'settle_matched_line']);
 });
 
 test('a payment that fits one instalment writes Paid by, and the instalment is marked paid', async () => {

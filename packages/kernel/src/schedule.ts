@@ -59,9 +59,31 @@ export type Repeat = {
   interval?: number;
   count?: number;
   until?: string;
-  /** A Saturday or Sunday moved to the Friday before or the Monday after. */
-  workday?: 'previous' | 'next';
+  /**
+   * The days of the month a monthly repeat lands on: 1 to 31, and -1 to -3 counted back from the month's last day.
+   * Clamped to the month, so a 31st in February is the 28th (or the 29th) and `[15, -1]` is "the 15th and the last
+   * day", paid in every month whatever its length. Read for `monthly` only.
+   */
+  bymonthday?: readonly number[];
+  /** The days of the week a weekly repeat lands on, `MO` to `SU` (`02 §4`: `byday: [TU, TH]`). Read for `weekly` only. */
+  byday?: readonly string[];
+  /** A rest day moved to the working day before or after. `none`, the same as leaving it out, keeps the day. */
+  workday?: 'previous' | 'next' | 'none';
 };
+
+/**
+ * Every key of `repeat:` the walk below reads, so `declare` can admit exactly these and refuse the rest by name.
+ *
+ * ONE LIST, HERE, beside the code that reads it. `declare.ts` kept its own copy of five, and the walk learning a key
+ * meant two files had to agree; a key added here and not there is refused, one added there and not here is ignored.
+ */
+export const REPEAT_READ = ['freq', 'interval', 'count', 'until', 'workday', 'bymonthday', 'byday'] as const;
+
+/** `byday`'s two-letter words, as weekdays from 0 for Sunday (`Date.getUTCDay`). */
+export const BYDAY: Readonly<Record<string, number>> = Object.freeze({ SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6 });
+
+/** The month days a `bymonthday` keeps, each in 1 to 31 or -1 to -3, as the walk reads them. */
+const MONTH_DAY = (d: unknown): d is number => typeof d === 'number' && Number.isInteger(d) && ((d >= 1 && d <= 31) || (d >= -3 && d <= -1));
 
 /**
  * One word, whatever spelling arrived, and `undefined` for anything that is not a frequency.
@@ -172,24 +194,55 @@ export function expandRepeat(anchor: number, repeat: Repeat, now: number, horizo
      `from` is the first index whose occurrence is not behind us, computed rather than walked to. */
   const from = repeat.count === undefined ? skipPast(anchor, repeat, now) : 0;
 
-  for (let n = from; out.length < (repeat.count ?? 500) && n < from + 5000; n++) {
-    let at: number;
-    if (freq === 'day') at = anchor + n * interval * DAY_MS;
-    else if (freq === 'week') at = anchor + n * interval * 7 * DAY_MS;
-    else {
-      /* BY CALENDAR AND CLAMPED. Adding to the month number rolls 31 January into 3 March, which is
-         not what anybody means by "monthly": the last day of the month they named is. A month-end
-         start lands on every month's last day (`monthEnd` above). */
-      const months = freq === 'month' ? n * interval : n * interval * 12;
-      const first = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + months, 1, 12));
-      const last = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0, 12)).getUTCDate();
-      at = Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), monthEnd ? last : Math.min(start.getUTCDate(), last), 12);
+  /* THE DAYS A PERIOD HOLDS, WHEN THE REPEAT NAMES THEM. A monthly repeat with `bymonthday` lands on each named day of
+     every month it reaches, and a weekly one with `byday` on each named day of every week; without them a period
+     holds the one day the anchor gives it, as before. A period is a month or a week, so `skipPast`, which counts
+     periods, skips the same way for both. `count` counts days and not periods: `[15, -1]` with `count: 4` is two
+     months, as RFC 5545 counts it. */
+  const monthDays = freq === 'month' && repeat.bymonthday?.length ? [...new Set(repeat.bymonthday.filter(MONTH_DAY))] : null;
+  const weekDays =
+    freq === 'week' && repeat.byday?.length
+      ? [...new Set(repeat.byday.map((w) => BYDAY[String(w).toUpperCase()]).filter((w): w is number => w !== undefined))]
+          .map((w) => (w + 6) % 7)
+          .sort((a, b) => a - b)
+      : null;
+  /* A WEEK STARTS ON MONDAY (RFC 5545's `WKST` default), so `interval: 2` with `[TU, TH]` is a Tuesday and a Thursday
+     of every other Monday-led week. The anchor's own clock is kept, as the plain weekly arm keeps it. */
+  const weekStart = anchor - ((start.getUTCDay() + 6) % 7) * DAY_MS;
+  /* NOTHING BEFORE THE ANCHOR'S OWN DAY. A row dated the 20th with `[15, -1]` first lands on the month's last day, not
+     on a 15th that came before the row did. Compared by day, so an instant late on the 15th still keeps the 15th. */
+  const anchorDay = Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate());
+
+  const daysOf = (n: number): number[] => {
+    if (freq === 'day') return [anchor + n * interval * DAY_MS];
+    if (freq === 'week') {
+      if (!weekDays) return [anchor + n * interval * 7 * DAY_MS];
+      const base = weekStart + n * interval * 7 * DAY_MS;
+      return weekDays.map((off) => base + off * DAY_MS);
     }
+    /* BY CALENDAR AND CLAMPED. Adding to the month number rolls 31 January into 3 March, which is
+       not what anybody means by "monthly": the last day of the month they named is. A month-end
+       start lands on every month's last day (`monthEnd` above). */
+    const months = freq === 'month' ? n * interval : n * interval * 12;
+    const first = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + months, 1, 12));
+    const y = first.getUTCFullYear();
+    const m = first.getUTCMonth();
+    const last = new Date(Date.UTC(y, m + 1, 0, 12)).getUTCDate();
+    if (!monthDays) return [Date.UTC(y, m, monthEnd ? last : Math.min(start.getUTCDate(), last), 12)];
+    /* `-1` IS THE LAST DAY AND `31` IS CLAMPED TO IT, so in a short month the two can be one day, held once. */
+    const days = [...new Set(monthDays.map((d) => (d > 0 ? Math.min(d, last) : last + 1 + d)))].sort((a, b) => a - b);
+    return days.map((d) => Date.UTC(y, m, d, 12));
+  };
 
-    if (at > limit) break;
-    if (until !== null && at > until) break;
-
-    out.push(shiftWorkday(at, repeat.workday, rest));
+  const max = repeat.count ?? 500;
+  walk: for (let n = from; out.length < max && n < from + 5000; n++) {
+    for (const at of daysOf(n)) {
+      if (at < anchorDay) continue;
+      if (at > limit) break walk;
+      if (until !== null && at > until) break walk;
+      out.push(shiftWorkday(at, repeat.workday, rest));
+      if (out.length >= max) break walk;
+    }
   }
   return out;
 }
@@ -231,10 +284,54 @@ const WEEKEND: ReadonlySet<number> = new Set([6, 0]);
  * nowhere and a Sunday one to Friday, a rest day. A week of nothing but rest days has no working day, and the day stays.
  */
 function shiftWorkday(at: number, how: Repeat['workday'], rest: ReadonlySet<number> = WEEKEND): number {
-  if (!how || rest.size === 0 || rest.size >= 7) return at;
+  if (!how || how === 'none' || rest.size === 0 || rest.size >= 7) return at;
   let out = at;
   while (rest.has(new Date(out).getUTCDay())) out += how === 'previous' ? -DAY_MS : DAY_MS;
   return out;
+}
+
+/** The calendar day an instant falls on in a zone, `YYYY-MM-DD`, or `null` for a zone the runtime does not know. */
+function dayIn(ms: number, tz: string): string | null {
+  try {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The next time a repeating date comes round, on or after now, derived and never written.
+ *
+ * A REPEATING DATE IS NEVER ROLLED FORWARD IN ITS ROW (HD.72, "by itself" with nothing stored). The row keeps the day
+ * it was given, which is the anchor, and anything that wants "when is it next" asks here, as the reminders ask
+ * `expandRepeat`. Rolling the row would be a write nobody made, a history full of the record talking to itself, and a
+ * date that moves under the person reading it.
+ *
+ * TODAY IS THE RECORD'S TODAY, NOT UTC'S. A day is compared with the date in `tz`, so at seven in the evening in
+ * Los Angeles, which is already tomorrow in UTC, today's payday is still next and not yesterday's. An instant is
+ * compared with now itself. A day answers a day and an instant an instant; `null` when the series has ended (its
+ * `count` or `until`), when the value is not a date, or when the zone is not one.
+ *
+ * Named `nextRepeat` because `digest.ts`'s `nextOccurrence`, a digest's next time of day, is already a kernel export.
+ */
+export function nextRepeat(value: string, repeat: Repeat, nowMs: number, tz: string, rest: ReadonlySet<number> = WEEKEND): string | null {
+  const anchor = atMs(value);
+  if (anchor === null) return null;
+  const isDay = value.length === 10;
+  const today = dayIn(nowMs, tz);
+  if (today === null) return null;
+  /* THE WALK IS ASKED FROM THE START OF TODAY'S DAY, so an occurrence earlier today is still found, and for long
+     enough that one step of any interval is inside it: a two-yearly repeat's next is up to 731 days away. */
+  const from = isDay ? Date.parse(`${today}T00:00:00Z`) : nowMs;
+  const interval = Math.max(1, Math.floor(repeat.interval ?? 1));
+  const span = { day: 1, week: 7, month: 31, year: 366 }[FREQ[repeat.freq] ?? 'day'];
+  const horizon = span * interval + 31;
+  /* THE EARLIEST THAT IS NOT BEHIND US, not the first in walk order: a rest day moved forward can land after a day the
+     walk reaches next, so the walk's order is not the calendar's. */
+  let best: number | null = null;
+  for (const at of expandRepeat(anchor, repeat, from - DAY_MS, horizon, rest))
+    if ((isDay ? iso(at).slice(0, 10) >= today : at >= nowMs) && (best === null || at < best)) best = at;
+  return best === null ? null : isDay ? iso(best).slice(0, 10) : iso(best);
 }
 
 export type Reminder = { key: string; dueAt: string; payload: string };
@@ -308,7 +405,7 @@ export function reschedule(
 
     /* THE REST DAYS ARE READ ONLY FOR A REPEAT THAT MOVES OFF THEM, and from the pack rows each time, as the walk reads
        them, so a change on Money's settings holds at the row's next write. */
-    const rest = field.repeat?.workday ? new Set(restDaysOf(sql)) : WEEKEND;
+    const rest = field.repeat?.workday && field.repeat.workday !== 'none' ? new Set(restDaysOf(sql)) : WEEKEND;
     for (const r of remindersFor(entry, field, now, rest)) {
       sql.exec(
         "INSERT INTO schedule (id, due_at, kind, key, payload, state, attempts) VALUES (?, ?, 'reminder', ?, ?, 'pending', 0) ON CONFLICT (kind, key) DO NOTHING",

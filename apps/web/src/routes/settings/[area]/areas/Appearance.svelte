@@ -11,7 +11,8 @@
   text size, the density and the colour were four sections, the scheme drawn as three large pictures of the app, and a
   person changing how the product reads scrolled past a screen of chrome to find the next choice. They are one column of
   short choices now, beside a preview that is the app itself in small: drawn from the same tokens every screen reads, so
-  every press changes it the moment it is made, in the scheme, size, row height and colour chosen, with no toast.
+  every press changes it the moment it is made, in the scheme, size, row height and colour chosen, and one toast says
+  it with an Undo.
 
   AND THE SCHEME IS STILL A THREE-WAY CHOICE, not a toggle offering the opposite. The predecessor's had three states and
   a one-way UI: once a person chose light or dark, only clearing local storage restored "match the system". "Match the
@@ -25,6 +26,7 @@
   import { ACCENTS, apply as accentApply } from '$lib/accent.ts';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
+  import { keptWithUndo, type Deps } from '$lib/record/pref-write.ts';
   import Section from '$lib/ui/Section.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';
   import Icon from '$lib/ui/Icon.svelte';
@@ -71,9 +73,8 @@
 
      A DENSITY PICKED HERE BEATS THE RECORD'S LOOK for this person, so the look is drawn again without its row height. */
   const set = (key: 'scheme' | 'text' | 'density', value: string) => {
-    pref.apply(key, value);
-    if (key === 'density') redraw();
-    settle();
+    const before = key === 'text' ? text : key === 'density' ? density : scheme;
+    void keptWithUndo(key, before, value, writers);
   };
 
   /* THE RECORD'S WORD FIRST, when this screen is the first a tab opens: the root layout's `draw` adopts it behind a
@@ -100,30 +101,44 @@
   let accent = $state<string | null>(held.theme ?? null);
   let accentWrong = $state<string | null>(null);
 
+  /* EVERY CHOICE HERE IS SAID AND OFFERED BACK (`pref-write.ts`): written, then a toast with its Undo, and `shown` draws
+     each value that now stands, the Undo's included. A colour this screen cannot paint is refused once, in the toast. */
+  const writers: Deps = {
+    apply: pref.apply,
+    contrast: pref.contrast,
+    accent: (hex) => {
+      const out = accentApply(hex);
+      if (out.ok) return { from: 'kept' };
+      return { from: 'refused', fix: copy.accentRefused(ACCENTS.find((a) => a.hex === hex)?.name ?? String(hex), out.codes) };
+    },
+    toasts,
+    shown: (key, value) => {
+      if (key === 'scheme') scheme = (value ?? 'system') as typeof scheme;
+      else if (key === 'text') text = (value ?? 'base') as typeof text;
+      else if (key === 'density') {
+        density = (value ?? 'comfortable') as typeof density;
+        redraw();
+      } else if (key === 'contrast') moreContrast = value === true;
+      else if (key === 'theme') {
+        accentWrong = null;
+        accent = value as string | null;
+      }
+      settle();
+    },
+  };
+
+  /* A SWATCH THAT MISSES A FLOOR IS REFUSED IN THE TERMS OF THIS SCREEN (`copy.accentRefused`), never the theme
+     author's sentence about pairs and chroma, which names nothing a person here can move. */
   function pickAccent(hex: string | null) {
-    const out = accentApply(hex);
-    if (!out.ok) {
-      /* THE FLOOR IT MISSED, NOT "THAT DID NOT WORK", AND IN THE TERMS OF THIS SCREEN. `out.refusals`
-         are the theme AUTHOR's sentences: "the pair (faint on s3) is 3.61:1 in dark, it needs 4.5:1,
-         move faint further from the ground". There is no control here that moves a hue, lowers a
-         chroma or knows what `s3` is, so every one of them instructed an action this person cannot
-         take, which is the failure `checks.ts` names in its own comment two lines above the string.
-         The code is what survives the trip; the sentence is built here, where the swatch is. */
-      accentWrong = copy.accentRefused(ACCENTS.find((a) => a.hex === hex)?.name ?? String(hex), out.codes);
-      return;
-    }
-    accentWrong = null;
-    accent = hex;
-    settle();
-    toasts.push(hex ? copy.accentSet(ACCENTS.find((a) => a.hex === hex)?.name ?? hex) : copy.accentReset);
+    void keptWithUndo('theme', accent, hex, writers);
   }
 
   /* THE ONE PREFERENCE WHOSE ATTRIBUTE IS NOT ITS VALUE: the switch is a boolean and the attribute
      is the literal `hc`, so it has its own writer rather than a fourth key in `apply`. */
   function pickContrast(on: boolean) {
+    const before = moreContrast;
     moreContrast = on;
-    pref.contrast(on);
-    settle();
+    void keptWithUndo('contrast', before, on, writers);
   }
 
   /* ── the look: every one the record holds, one press each (PGS-A21) ── */
@@ -210,11 +225,11 @@
   }
 
   function pickScheme(v: 'light' | 'system' | 'dark') {
+    const before = scheme;
     scheme = v;
     /* `system` IS AN ANSWER AND NOT AN ABSENCE, so it is written down: removing the attribute
        without recording the choice would make the next visit read a stale `dark` from the cookie. */
-    pref.apply('scheme', v === 'system' ? null : v);
-    settle();
+    void keptWithUndo('scheme', before, v === 'system' ? null : v, writers);
   }
 
   const SCHEMES = [
@@ -313,7 +328,7 @@
               class="segment"
               aria-pressed={text === v}
               data-on={text === v ? '' : undefined}
-              onclick={() => ((text = v), set('text', v))}><span class="aa" data-size={v} aria-hidden="true">Aa</span>{label}</button
+              onclick={() => set('text', v)}><span class="aa" data-size={v} aria-hidden="true">Aa</span>{label}</button
             >
           {/each}
         </Segmented>
@@ -328,7 +343,7 @@
               class="segment"
               aria-pressed={density === v}
               data-on={density === v ? '' : undefined}
-              onclick={() => ((density = v), set('density', v))}
+              onclick={() => set('density', v)}
               ><span class="spacing" data-density={v} aria-hidden="true"><span></span><span></span><span></span></span>{label}</button
             >
           {/each}

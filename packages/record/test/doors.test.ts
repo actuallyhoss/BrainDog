@@ -76,10 +76,12 @@ test('DOORS LISTS EVERY LIVE WEBHOOK INGEST, whether a token is held for it, and
 
   const listed = await (api as unknown as { doors?: (ctx: CallContext) => Promise<{ ok: boolean; value?: unknown }> }).doors?.(owner);
   assert.ok(listed?.ok, `doors answered ${JSON.stringify(listed)}`);
+  /* EACH DOOR WITH ITS FACTS (`door-switch.ts` `doorFacts`): on, and nothing arrived or turned away yet. */
+  const ON = { on: true, offSince: null, lastArrival: null, arrivals: 0, turnedAway: 0 };
   assert.deepEqual(listed.value, [
-    { id: 'laptop', description: 'Texts posted by laptop.', verify: 'path', held: false, register: 'notes' },
-    { id: 'my-phone', description: 'Texts posted by my-phone.', verify: 'path', held: true, register: 'notes' },
-    { id: 'open-hook', description: 'Texts posted by open-hook.', verify: 'none', held: false, register: 'notes' },
+    { id: 'laptop', description: 'Texts posted by laptop.', verify: 'path', held: false, register: 'notes', ...ON },
+    { id: 'my-phone', description: 'Texts posted by my-phone.', verify: 'path', held: true, register: 'notes', ...ON },
+    { id: 'open-hook', description: 'Texts posted by open-hook.', verify: 'none', held: false, register: 'notes', ...ON },
   ]);
   assert.doesNotMatch(JSON.stringify(listed), new RegExp(digest), 'the digest was answered');
   sql.close();

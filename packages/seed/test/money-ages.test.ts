@@ -101,11 +101,12 @@ test('AN ACCOUNT TYPED THIRTY DAYS AGO IS NAMED, AND LEAVES THE LINE THE DAY A B
   assert.equal(read(k, 'cash-as-of'), epochDay(day(-30)));
   assert.equal(read(k, 'statement-oldest-days'), 30);
 
-  /* MONEY SAYS IT IN HEADS UP, AND THE TILE UNDER THE LINE NAMES THE ACCOUNT WITH ITS DAY. */
+  /* MONEY SAYS IT IN HEADS UP, AND THE BOOK'S ACCOUNTS CARDS NAME THE ACCOUNT WITH ITS DAY: Last confirmed is off Money
+     since money-where-it-went-100, and each account's last confirmed day is on its book's page. */
   const before = blocksOf(k, 'money');
   assert.notEqual(before.find((b) => String(b.body).startsWith('The oldest balance'))?.drawn, false, 'the old balance is not said');
-  const tile = before.find((b) => b.heading === 'Last confirmed');
-  assert.ok(tile && tile.drawn !== false, 'Last confirmed is not drawn while a balance is a month old');
+  const tile = blocksOf(k, bookSlug(k)).find((b) => b.heading === 'Accounts');
+  assert.ok(tile && tile.drawn !== false, "the book's Accounts cards are not drawn");
   assert.deepEqual(tile.rows?.map((r) => [r.fields.name, r.fields.as_of]), [['HSBC (EGP)', day(-30)]]);
   const card = () => blocksOf(k, bookSlug(k)).find((b) => b.heading === 'Accounts')?.rows?.[0]?.fields.as_of;
   assert.equal(card(), day(-30));
@@ -116,7 +117,7 @@ test('AN ACCOUNT TYPED THIRTY DAYS AGO IS NAMED, AND LEAVES THE LINE THE DAY A B
   assert.equal(read(k, 'balances-stale'), 0);
   assert.equal(read(k, 'cash-as-of'), epochDay(day(0)));
   assert.equal(read(k, 'statement-oldest-days'), 0);
-  assert.equal(blocksOf(k, 'money').find((b) => b.heading === 'Last confirmed')?.drawn, false, 'Last confirmed is drawn with nothing old');
+  assert.equal(blocksOf(k, 'money').find((b) => b.heading === 'What it holds today')?.drawn, false, 'the box is drawn with nothing old');
   assert.equal(card(), day(0), "the book's card keeps the typed day");
 });
 
@@ -129,7 +130,8 @@ test('A BALANCE CHECK IS A STATEMENT TOO, and only an account none has confirmed
   value(k.create('accounts', { name: 'Cash box', kind: 'cash', liquid: true, balance: egp(20_000), as_of: day(-10), book }, OWNER));
   assert.equal(read(k, 'balances-stale'), 1);
   assert.equal(read(k, 'cash-as-of'), epochDay(day(-10)));
-  assert.deepEqual(blocksOf(k, 'money').find((b) => b.heading === 'Last confirmed')?.rows?.map((r) => [r.fields.name, r.fields.as_of]), [['HSBC (EGP)', day(-1)], ['Cash box', day(-10)]]);
+  /* EACH ACCOUNT ON ITS BOOK'S CARDS, in the order they were made, as Money's Last confirmed cards were. */
+  assert.deepEqual(blocksOf(k, bookSlug(k)).find((b) => b.heading === 'Accounts')?.rows?.map((r) => [r.fields.name, r.fields.as_of]), [['HSBC (EGP)', day(-1)], ['Cash box', day(-10)]]);
 });
 
 test('A LEDGER AMOUNT WITH NO CURRENCY TAKES ITS ACCOUNT’S, and a row’s currency never changes once kept', async () => {

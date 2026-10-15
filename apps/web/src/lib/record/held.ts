@@ -111,3 +111,6 @@ export const refOptions = (register: string, keep?: number | null): { value: num
  * `fixtures/fill.ts`, which puts the sample's rows here for the tests that hold those engines to the kernel's.
  */
 export const ROWS: Record<string, Entry[]> = {};
+
+/** Each walked list's money values by row number, for the code a currency_from amount takes from its account. Filled by refMapOf. */
+export const MONEY_HELD = new Map<string, ReadonlyMap<number, Readonly<Record<string, unknown>>>>();

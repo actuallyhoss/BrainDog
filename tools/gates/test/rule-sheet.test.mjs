@@ -101,6 +101,30 @@ test('a page that does not open and a selector that does not parse are false, an
   assert.match(results[1].line, /is not a selector/u);
 });
 
+test('a rule with a zone and a moment is read on a page of its own, opened in that zone at that moment', async () => {
+  const asked = [];
+  const base = stub(DRAWN);
+  const open = async (width, when) => {
+    asked.push(when === undefined ? `${width}` : `${width} ${when.zone} ${when.at}`);
+    const page = await base(width);
+    return { ...page, close: async () => asked.push(`${width} closed`) };
+  };
+  const rules = rulesOf({
+    pages: { Layout: '/p/rule-sheet-layout' },
+    rules: [
+      { rule: 'main is 12 wide', page: 'Layout', selector: '.area[data-area="main"]', style: '--area-span', is: '12' },
+      { rule: 'in Cairo', page: 'Layout', selector: '.area[data-area="main"]', count: 1, zone: 'Africa/Cairo', at: '2026-10-14T22:30:00Z' },
+      { rule: 'in UTC', page: 'Layout', selector: '.area[data-area="main"]', count: 1, zone: 'UTC', at: '2026-10-14T22:30:00Z' },
+    ],
+  });
+  const results = await sweep(rules, BASE, open);
+  assert.deepEqual(results.map((r) => r.ok), [true, true, true]);
+  assert.deepEqual(asked, [
+    '390', '390 Africa/Cairo 2026-10-14T22:30:00Z', '390 closed', '390 UTC 2026-10-14T22:30:00Z', '390 closed', '390 closed',
+    '1440', '1440 Africa/Cairo 2026-10-14T22:30:00Z', '1440 closed', '1440 UTC 2026-10-14T22:30:00Z', '1440 closed', '1440 closed',
+  ]);
+});
+
 test('a page that navigates away while it is read is not called a bad selector', async () => {
   const gone = async () => ({ goto: async () => {}, evaluate: async () => { throw new Error('Execution context was destroyed\nmore'); } });
   const [r] = await sweep(rulesOf([{ rule: 'a heat', page: 'Counts', selector: '.heat', count: 1 }]), BASE, gone);

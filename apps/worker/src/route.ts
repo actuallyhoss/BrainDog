@@ -603,6 +603,8 @@ export type CloudIngestDeps = {
   arrives(rec: string, arrival: Omit<IngestArrival, 'rec'>): Promise<Result<unknown>>;
   /** Whole seconds to wait, or `null` to let this one through. */
   spends(ask: { channel: string; key: string }): Promise<number | null>;
+  /** Count one arrival answered 410 at a door switched off on that record (SHL-C13). Absent, the 410 is still answered. */
+  turnsAway?: (rec: string, ingest: string) => Promise<void>;
   /**
    * Which record a forwarded message is for. Absent, and this deployment takes no mail at all.
    *
@@ -691,6 +693,9 @@ export function cloudIngest(deps: CloudIngestDeps): IngestDoor {
             ...(arrival.ingest === undefined ? {} : { ingest: arrival.ingest }),
           }),
     limit: (ask) => deps.spends(ask),
+    turnedAway: async (ask) => {
+      if (ask.rec !== undefined && ask.ingest !== undefined) await deps.turnsAway?.(ask.rec, ask.ingest);
+    },
     /* AN ABSENT KEY AND NOT A METHOD ANSWERING `null`, and the difference is not one a caller can
        see: measured against `serveIngest`, a door with no `inbound` and a door whose
        `inbound` always answers `null` both give 404 to `POST /in/email/<tok>` and 405 to a GET.

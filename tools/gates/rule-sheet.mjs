@@ -134,29 +134,43 @@ export function sentence(rule, verdicts) {
  * EVERY RULE AT EVERY WIDTH, each address opened once a width. `open(width)` answers a page at that width: `goto(url)`,
  * which throws a sentence when the page does not open, `evaluate(fn, arg)` and `close()`. In the gate it is a Playwright
  * page; in `test/rule-sheet.test.mjs` a stub, so the reading and the printing are tested with no browser.
+ *
+ * A RULE WITH A `zone` OR AN `at` IS READ ON A PAGE OF ITS OWN, `open(width, { zone, at })`: in that time zone, with
+ * the clock held at that moment, so 'A day in two zones' holds on any day the gate runs, not only on the day it was
+ * written. Rules of one address, zone and moment share that page.
  */
 export async function sweep(rules, base, open, widths = WIDTHS) {
   const verdicts = new Map(rules.map((r) => [r, []]));
-  const byPath = new Map();
-  for (const r of rules) byPath.set(r.path, [...(byPath.get(r.path) ?? []), r]);
+  const groups = new Map();
+  for (const r of rules) {
+    const key = `${r.path}|${r.zone ?? ''}|${r.at ?? ''}`;
+    groups.set(key, [...(groups.get(key) ?? []), r]);
+  }
   for (const width of widths) {
     const page = await open(width);
     try {
-      for (const [path, list] of byPath) {
-        const failed = await page.goto(`${base}${path}`).then(
-          () => null,
-          (e) => e?.message ?? String(e),
-        );
-        for (const rule of list) {
-          if (failed !== null) {
-            verdicts.get(rule).push({ width, ok: false, said: `nothing, because ${path} did not open (${failed})` });
-            continue;
+      for (const list of groups.values()) {
+        const { path, zone, at } = list[0];
+        const own = zone !== undefined || at !== undefined ? await open(width, { zone, at }) : null;
+        const here = own ?? page;
+        try {
+          const failed = await here.goto(`${base}${path}`).then(
+            () => null,
+            (e) => e?.message ?? String(e),
+          );
+          for (const rule of list) {
+            if (failed !== null) {
+              verdicts.get(rule).push({ width, ok: false, said: `nothing, because ${path} did not open (${failed})` });
+              continue;
+            }
+            /* A SELECTOR THAT DOES NOT PARSE IS NOT THE ONLY WAY A READ THROWS: a page that navigates away under it does
+               too, and calling that a bad selector sends whoever reads the line to fix the wrong file. */
+            const seen = await here.evaluate(readIn, { selector: rule.selector, attr: rule.attr, style: rule.style }).catch((e) => ({ failed: String(e?.message ?? e).split('\n')[0] }));
+            const said = (f) => (/selector/iu.test(f) ? `nothing, because "${rule.selector}" is not a selector` : `nothing, because the page could not be read (${f})`);
+            verdicts.get(rule).push('failed' in seen ? { width, ok: false, said: said(seen.failed) } : { width, ...judge(rule, seen) });
           }
-          /* A SELECTOR THAT DOES NOT PARSE IS NOT THE ONLY WAY A READ THROWS: a page that navigates away under it does
-             too, and calling that a bad selector sends whoever reads the line to fix the wrong file. */
-          const seen = await page.evaluate(readIn, { selector: rule.selector, attr: rule.attr, style: rule.style }).catch((e) => ({ failed: String(e?.message ?? e).split('\n')[0] }));
-          const said = (f) => (/selector/iu.test(f) ? `nothing, because "${rule.selector}" is not a selector` : `nothing, because the page could not be read (${f})`);
-          verdicts.get(rule).push('failed' in seen ? { width, ok: false, said: said(seen.failed) } : { width, ...judge(rule, seen) });
+        } finally {
+          await own?.close?.();
         }
       }
     } finally {
@@ -169,10 +183,14 @@ export async function sweep(rules, base, open, widths = WIDTHS) {
   });
 }
 
-/** A Playwright page at `width`, signed in with the harness's state, whose `goto` says why a page did not open. */
-const opener = (browser, state) => async (width) => {
-  const context = await browser.newContext({ viewport: { width, height: 900 }, ...(state ? { storageState: state } : {}) });
+/**
+ * A Playwright page at `width`, signed in with the harness's state, whose `goto` says why a page did not open; in
+ * `zone` and with its clock held at `at` when a rule names them.
+ */
+const opener = (browser, state) => async (width, { zone, at } = {}) => {
+  const context = await browser.newContext({ viewport: { width, height: 900 }, ...(state ? { storageState: state } : {}), ...(zone ? { timezoneId: zone } : {}) });
   const page = await context.newPage();
+  if (at) await page.clock.setFixedTime(new Date(at));
   return {
     goto: async (url) => {
       const res = await page.goto(url, { waitUntil: 'networkidle', timeout: 45_000 });

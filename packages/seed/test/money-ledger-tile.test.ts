@@ -44,8 +44,10 @@ test('THE LEDGER IS A TILE ON MONEY, under the accounts and above the fold, and 
   assert.ok(at > declared.findIndex((b) => b.heading === 'Accounts'), 'the Ledger is above the accounts');
   assert.ok(declared.every((b, i) => b.fold !== true || at < i), 'the Ledger is under a fold, where he went looking for it');
   assert.equal(declared[at]!.area, undefined, 'the Ledger is in the side column, which is too narrow for a day, a name and an amount');
-  /* ONE READING OF THE LEDGER ON THE PAGE: History gave up the twelve it folded, which were these six and six more. */
-  assert.deepEqual(declared.filter((b) => b.source === 'register.transactions').map((b) => b.heading), ['Ledger']);
+  /* ONE READING OF THE LEDGER ON THE PAGE: History gave up the twelve it folded, which were these six and six more. The
+     bar of who was paid under Where it went (money-where-it-went-100) reads the same list as sums by payee, not as
+     entries, so it is not a second Ledger. */
+  assert.deepEqual(declared.filter((b) => b.source === 'register.transactions' && b.kind !== 'bar').map((b) => b.heading), ['Ledger']);
   assert.ok(declared.length <= 24, `Money declares ${declared.length} blocks, and a page holds 24`);
 });
 

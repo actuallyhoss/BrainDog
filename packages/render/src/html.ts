@@ -43,6 +43,7 @@ import { SPLIT_AMOUNT, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitListed, splitPl
 import { BRIDGE_AMOUNT, BRIDGE_STEP, bridgePlanOf, bridgeSentence, bridgeWritten, signedOf } from './bridge.ts';
 import { SERIES_NET, SERIES_NONE, seriesPlan, type SeriesPlan } from './series.ts';
 import { LINES_AGAINST, LINES_NONE, LINES_NUMBERS, linesOnly, linesPlan } from './lines.ts';
+import { linesTrend } from './lines-trend.ts';
 import { PROGRESS_NONE, PROGRESS_OF, PROGRESS_TOTAL, progressPlan, progressRangeSaid, progressSentence, progressSpentSaid, rangePlan, rangeSentence } from './progress.ts';
 import { AMOUNT_SPACE, writeFigure, type AmountSetting, type WrittenAmount } from './money.ts';
 import { FORECAST_AXIS_BREAK, FORECAST_AXIS_BREAK_STYLE, FORECAST_BALANCE, FORECAST_MOVE, FORECAST_NONE, FORECAST_NUMBERS, FORECAST_PAINT, FORECAST_WHAT, FORECAST_WHEN, baseKnobs, forecastEveryday, forecastFigure, forecastModel, forecastPlan, listedSteps, scenario, underNote } from './forecast.ts';
@@ -1537,6 +1538,9 @@ function lines(b: Block, o: RenderOptions): string {
           `${l.d ? `<path class="lines-line" data-step="${l.step}" d="${l.d}" vector-effect="non-scaling-stroke"></path>` : ''}${l.end ? `<path class="lines-end" data-step="${l.step}" d="${l.end}" vector-effect="non-scaling-stroke"></path>` : ''}`,
       )
       .join('');
+  /* THE TREND'S SENTENCE when the readings hold none (`lines-trend.ts`). Its dashed path waits on the skin's twin of
+     Lines.svelte's rules, which is the owner's (board-yes), so a path is not drawn here unstyled. */
+  const trend = linesTrend(plan);
   const chart = plan.empty
     ? `<p class="lines-empty">${escape(LINES_NONE)}</p>`
     : `<div class="lines-plot">${plan.top ? `<span class="lines-top num" aria-hidden="true">${escape(plan.top)}</span>` : ''}${
@@ -1545,7 +1549,7 @@ function lines(b: Block, o: RenderOptions): string {
         `${plan.axis ? `${plan.axis}: ` : ''}${plan.sentence}`,
       )}">${paths}</svg></div><ol class="lines-ticks" aria-hidden="true">${plan.ticks
         .map((t) => `<li class="lines-tick" style="--at:${t.at}"${t.minor ? ' data-minor=""' : ''}>${escape(t.label)}</li>`)
-        .join('')}</ol>`;
+        .join('')}</ol>${trend && 'said' in trend ? `<p class="lines-trend-said">${escape(trend.said)}</p>` : ''}`;
   const numbers = plan.points.length
     ? `<details class="lines-numbers"><summary class="lines-toggle">${LINES_NUMBERS}</summary><table class="lines-table"><thead><tr><th scope="col">${escape(plan.axis)}</th>${plan.lines
         .map((l) => `<th scope="col">${escape(l.label)}</th>`)

@@ -14,6 +14,10 @@
   whether an address is in use, then its one press. No tile over it, because the doors read carries no count to draw:
   a number with no chart under it is the one thing a tile may not hold.
 
+  A SWITCH ON EACH ROW TURNS THE DOOR OFF AND ON (SHL-C13). Off keeps the token and the address, so it asks nothing
+  first; the row then says since when and how many were turned away, and every row says its last arrival. A host whose
+  `doors` predates the switch answers no `on`, and that row draws no switch.
+
   A TOKEN LIVES IN `said` AND NOWHERE ELSE. The section is drawn only inside the `ingest` arm, so leaving the area takes
   the component and every token with it, and nothing writes one to a store, a query string or a toast. The rules are
   `webhook-doors.ts`, which the tests hold.
@@ -23,7 +27,21 @@
   import { apiBase } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import * as clipboard from '$lib/clipboard.ts';
-  import { asksFirst, callerAt, listDoors, mintDoor, type Door, type Listed, type Said } from '$lib/ui/webhook-doors.ts';
+  import {
+    asksFirst,
+    callerAt,
+    lastLine,
+    listDoors,
+    mintDoor,
+    offLine,
+    switchDoor,
+    switched,
+    switchLabel,
+    type Door,
+    type Listed,
+    type Said,
+    type Switched,
+  } from '$lib/ui/webhook-doors.ts';
   import { reprove } from '$lib/record/vault.ts';
   import { methods, passkeySignIn, support } from '$lib/auth.ts';
   import { words as levelWords } from '../../routes/settings/levels.ts';
@@ -56,14 +74,19 @@
   }
   /* THE PRESS A SIGN-IN INTERRUPTED, so signing in again finishes it rather than leaving a press to find. */
   let resume = $state<string | null>(null);
+  /* THE SWITCH ON EACH ROW (SHL-C13): what its last press answered, keyed by door, and the door being switched. */
+  let flips = $state<Record<string, Switched>>({});
+  let flipping = $state<string | null>(null);
+  let resumeFlip = $state<{ id: string; on: boolean } | null>(null);
+  const now = Date.now();
 
   const doors = $derived(listed?.kind === 'doors' ? listed.doors : []);
 
   /* EVERY ARM IS A SENTENCE: the record's own `fix`, verbatim (`13 §6`). */
-  const lineOf = (s: Said | Listed | null | undefined): string =>
-    !s || s.kind === 'minted' || s.kind === 'doors' ? (s?.kind === 'minted' ? copy.doorsMade : '') : s.fix;
-  const toneOf = (s: Said | Listed | null | undefined): 'bad' | undefined =>
-    !s || s.kind === 'minted' || s.kind === 'doors' ? undefined : 'bad';
+  const lineOf = (s: Said | Listed | Switched | null | undefined): string =>
+    !s || s.kind === 'minted' || s.kind === 'doors' || s.kind === 'switched' ? (s?.kind === 'minted' ? copy.doorsMade : '') : s.fix;
+  const toneOf = (s: Said | Listed | Switched | null | undefined): 'bad' | undefined =>
+    !s || s.kind === 'minted' || s.kind === 'doors' || s.kind === 'switched' ? undefined : 'bad';
 
   /* THE RECORD'S METHODS UNDER ITS SLUG; the door they mint is `/in/…` on the bare host, which a stranger posts to. */
   const call = () => callerAt(apiBase());
@@ -106,7 +129,24 @@
     if (out.kind === 'minted' && listed?.kind === 'doors')
       listed = { kind: 'doors', doors: listed.doors.map((d) => (d.id === id ? { ...d, held: true } : d)) };
     resume = out.kind === 'signin' ? id : null;
+    /* ONE PRESS WAITS ON A SIGN-IN AT A TIME, the newest, so signing in finishes what was pressed last. */
+    if (resume !== null) resumeFlip = null;
     busy = null;
+  }
+
+  /* OFF KEEPS THE ADDRESS AND THE TOKEN, so the switch asks nothing first: on again is the same door. */
+  async function flip(id: string, on: boolean) {
+    if (flipping !== null) return;
+    flipping = id;
+    const at = opened();
+    const out = await switchDoor(call(), id, on);
+    flips = { ...flips, [id]: out };
+    closed(out.kind === 'switched', at);
+    if (out.kind === 'switched' && listed?.kind === 'doors')
+      listed = { kind: 'doors', doors: listed.doors.map((d) => (d.id === id ? switched(d, out.facts) : d)) };
+    resumeFlip = out.kind === 'signin' ? { id, on } : null;
+    if (resumeFlip !== null) resume = null;
+    flipping = null;
   }
 
   /* SIGNING IN AGAIN WITHOUT LEAVING, then the same press again: `reprove` is the agents and mail areas' own, so the
@@ -118,6 +158,7 @@
     reproving = false;
     if (!back) return;
     if (resume !== null) await mint(resume);
+    else if (resumeFlip !== null) await flip(resumeFlip.id, resumeFlip.on);
     else await read();
   }
 </script>
@@ -145,12 +186,25 @@
     <ul class="doors">
       {#each doors as door (door.id)}
         {@const mine = said[door.id]}
+        {@const flipped = flips[door.id]}
+        {@const off = offLine(door, now)}
         <li class="door">
           <IconWell name="plug" size="l" />
           <div class="door-main">
             <p class="door-name">{door.name}</p>
             {#if door.register}
               <p class="hint">{copy.doorsWrites(door.register)}</p>
+            {/if}
+            {#if door.on !== null}
+              <!-- OFF IS SAID IN WORDS, in ink, so the state never rests on the switch's fill alone. -->
+              {#if off}<p class="door-off">{off}</p>{/if}
+              <p class="hint">{lastLine(door, now)}</p>
+              <p class="code-said" role="status" data-tone={toneOf(flipped)}>{#if toneOf(flipped)}<span class="glyph" aria-hidden="true"><Icon name="alert" /></span>{/if}{lineOf(flipped)}</p>
+              {#if flipped?.kind === 'signin'}
+                <div class="row-actions">
+                  <Button weight="quiet" disabled={reproving} onclick={() => void signInAgain()}>{copy.signInAgain}</Button>
+                </div>
+              {/if}
             {/if}
             {#if !door.mintable}
               <p class="hint">{copy.doorsOtherCheck}</p>
@@ -204,6 +258,18 @@
               {/if}
             {/if}
           </div>
+          {#if door.on !== null}
+            <!-- THE HOUSE SWITCH (`controls.css`), 44px under a thumb. Its name says what on means for this door. -->
+            <button
+              type="button"
+              class="switch"
+              role="switch"
+              aria-checked={door.on}
+              aria-label={switchLabel(door)}
+              disabled={flipping !== null}
+              onclick={() => void flip(door.id, door.on !== true)}><span class="switch-track"></span></button
+            >
+          {/if}
         </li>
       {/each}
     </ul>
@@ -238,7 +304,7 @@
      between two doors, as between any two rows. */
   .door {
     display: grid;
-    grid-template-columns: var(--well-l) minmax(0, 1fr);
+    grid-template-columns: var(--well-l) minmax(0, 1fr) auto;
     align-items: start;
     gap: var(--sp-3);
     padding-block: var(--sp-3);
@@ -268,6 +334,14 @@
 
   .door .hint {
     margin-block-end: var(--sp-1);
+  }
+
+  /* THE OFF LINE, in ink at the row's size, because it is the one fact about the door that changed. */
+  .door-off {
+    margin: 0 0 var(--sp-1);
+    color: var(--ink);
+    font-size: var(--t-row);
+    line-height: var(--lh-body);
   }
 
   /* THE ADDRESS SHOWN ONCE, as the mail section above it in Settings draws its own, so the two read as one screen. */

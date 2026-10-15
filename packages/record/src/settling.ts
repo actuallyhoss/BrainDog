@@ -30,9 +30,13 @@ export type Settled = {
   answer_label?: string | null;
   settled_by?: string;
   undone?: true;
+  /** On a line that took a question back, and its rows: who had answered it (`rule:ladder` when Slash's rung let it land). */
+  answered_by?: string;
+  /** Who kept a change that landed alone. Typed for the day a keep is logged; nothing writes it yet. */
+  kept_by?: string;
 };
 
-type Own = { id: string; kind: string; target: string | null; batch: string | null; settles: string | null };
+type Own = { id: string; kind: string; target: string | null; batch: string | null; settles: string | null; to_v: string | null };
 type Governed = { kind: string; target: string; actor: string; to_v: string | null; batch: string; settles: string | null };
 
 /** The question a `decide` settled: the `resolve` written on the line after it, as the kernel's `SETTLED` joins them. */
@@ -65,7 +69,7 @@ export function settlingOf(sql: Sql, lines: readonly { id: string }[]): Map<stri
   /* THE LINES AS THE LOG HOLDS THEM, not as the caller was handed them: `lineOf` hands a scoped reader `q.<id>` for a
      question's number, and a synthetic line keeps its event's id. */
   const own = sql.all<Own>(
-    `SELECT e.id AS id, e.kind AS kind, e.target AS target, e.batch AS batch, CASE WHEN e.kind = 'decide' THEN ${SETTLES} END AS settles
+    `SELECT e.id AS id, e.kind AS kind, e.target AS target, e.batch AS batch, e.to_v AS to_v, CASE WHEN e.kind = 'decide' THEN ${SETTLES} END AS settles
        FROM event e WHERE e.id IN (SELECT value FROM json_each(?))`,
     JSON.stringify(lines.map((l) => l.id)),
   );
@@ -90,14 +94,14 @@ export function settlingOf(sql: Sql, lines: readonly { id: string }[]): Map<stri
     else if (g.kind === 'decide' && g.settles !== null && held === undefined) byBatch.set(g.batch, { suggestion: g.settles, by: g.actor, undone: false });
   }
   /* EACH LINE'S QUESTION, and the decision a `decide` names for its option's words. */
-  const asks = new Map<string, { suggestion: string; decision?: string; by?: string; undone?: boolean }>();
+  const asks = new Map<string, { suggestion: string; decision?: string; by?: string; undone?: boolean; back?: boolean }>();
   for (const l of own) {
     if (l.kind === 'decide' && l.settles !== null) {
       const decision = after(l.target, 'decision:');
       if (decision !== null) asks.set(l.id, { suggestion: l.settles, decision });
     } else if (l.kind === 'resolve' || l.kind === 'suggest') {
       const suggestion = after(l.target, 'suggestion:');
-      if (suggestion !== null) asks.set(l.id, { suggestion });
+      if (suggestion !== null) asks.set(l.id, { suggestion, ...(l.to_v !== null && TOOK_BACK.has(l.to_v) ? { back: true } : {}) });
     } else if (l.batch !== null && after(l.target, 'entry:') !== null) {
       const settled = byBatch.get(l.batch);
       if (settled) asks.set(l.id, { suggestion: settled.suggestion, by: settled.by, undone: settled.undone });
@@ -113,6 +117,21 @@ export function settlingOf(sql: Sql, lines: readonly { id: string }[]): Map<stri
     JSON.stringify(decisions),
   );
   const asked = new Map(facts.filter((f) => f.answer === null).map((f) => [f.id, f]));
+  /* WHO HAD ANSWERED A QUESTION THAT WAS TAKEN BACK: the actor of the newest decide that settled it. */
+  const takenBack = [...new Set([...asks.values()].flatMap((a) => (a.undone === true || a.back === true ? [a.suggestion] : [])))];
+  const answeredBy = new Map(
+    takenBack.length === 0
+      ? []
+      : sql
+          .all<{ suggestion: string; actor: string }>(
+            `SELECT substr(r.target, 12) AS suggestion, e.actor AS actor FROM event e JOIN event r ON r.rowid = e.rowid + 1
+              WHERE e.kind = 'decide' AND e.target LIKE 'decision:%' AND r.kind = 'resolve'
+                AND r.target IN (SELECT 'suggestion:' || value FROM json_each(?))
+              ORDER BY e.rowid`,
+            JSON.stringify(takenBack),
+          )
+          .map((r) => [r.suggestion, r.actor] as const),
+  );
   const answers = new Map(facts.filter((f) => f.answer !== null).map((f) => [f.id, f.answer as string]));
   for (const [id, a] of asks) {
     const s = asked.get(a.suggestion);
@@ -124,6 +143,8 @@ export function settlingOf(sql: Sql, lines: readonly { id: string }[]): Map<stri
     }
     if (a.by !== undefined) said.settled_by = a.by;
     if (a.undone === true) said.undone = true;
+    const answerer = a.undone === true || a.back === true ? answeredBy.get(a.suggestion) : undefined;
+    if (answerer !== undefined) said.answered_by = answerer;
     out.set(id, said);
   }
   return out;

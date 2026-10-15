@@ -542,6 +542,72 @@ question, with the way back.
    organizations less when their use of AI was disclosed"*, so the badge imposes the cost without
    buying anything.
 
+### The first run from your own agent
+
+*(USE-B12. His words: "modelled on PostHog's flow (fetch posthog site/open-source code)". Read on 15 October 2026
+from posthog.com and from `PostHog/posthog` and `PostHog/wizard` on GitHub, branch `master`; the paths below are
+theirs.)*
+
+**PostHog's flow, step by step, each with its source.**
+
+1. **The install step is one command, and the first thing on it.** The self-driving onboarding runs Welcome, "What do
+   you want to get done first?", "Your products", then "Install PostHog", then a plan
+   (`frontend/src/scenes/onboarding/self-driving/SelfDrivingOnboardingFlow.tsx`, `buildSteps`). The install page leads
+   with the AI wizard and puts the snippet and the SDKs after it (posthog.com/docs/getting-started/install, "AI wizard").
+2. **The command is the same for everyone and names no editor.** `npx -y @posthog/wizard@latest`, with a subcommand for
+   a program and an optional `--project-id` that pre-targets the project being looked at
+   (`frontend/src/scenes/onboarding/shared/useWizardCommand.ts`, `BASE_COMMAND`). The region is read from the login, not
+   asked (same file).
+3. **One sentence says what will happen, and how long.** "Run this command in your project. The setup agent detects
+   your framework, installs the SDK, and starts capturing events." and "About ten minutes: a few questions up front,
+   then the agent does the rest." (`self-driving/components/SelfDrivingInstallOptions.tsx`). Under it, three lines of
+   what it sets up (`WIZARD_SETS_UP`, same file).
+4. **The agent signs in through the browser.** Interactive runs use OAuth; only CI takes a personal key
+   (github.com/PostHog/wizard, README; `src/programs/oauth/tokens.ts`). Secrets stay on the machine and out of the
+   model's conversation (README, the vault pattern; `src/shared/secret-vault.ts`).
+5. **The agent asks a few questions, then does the work.** It detects the framework, installs the SDK, writes events
+   from real product flows, fills `.env`, and makes a first dashboard (posthog.com/docs/ai-engineering/ai-wizard, "How it
+   works").
+6. **The page waits for the agent and says so, and the plan is drawn before it arrives.** While the run connects, the
+   page shows "Waiting for the wizard in your terminal to check in." and the coming steps as pending rows, "so the swap
+   reads as the plan lighting up rather than the card rewriting itself" (`shared/wizard-sync/installationProgressCopy.ts`,
+   `CONNECTING_SUBTITLE`, `UPCOMING_STEPS`).
+7. **Once the agent checks in, the command gives way to what it is doing.** "Once the CLI registers a run, the command
+   block and its caption give way to the tracker. The command has been run, so repeating it is noise."
+   (`SelfDrivingInstallOptions.tsx`; `self-driving/components/InstallationTracker.tsx`).
+8. **The page asks cheaply and stops when nobody is looking.** A REST check gates the live stream; it polls on mount,
+   again when the tab is shown (throttled to 5 seconds), and every 60 seconds otherwise, and stops after an hour or once
+   the run is finished (`shared/wizard-sync/wizardActiveSessionDetectorLogic.ts`, `REPOLL_INTERVAL_MS`,
+   `VISIBILITY_RESUME_THROTTLE_MS`, `MAX_SESSION_LIFETIME_MS`).
+9. **It ends in one plain sentence and a report.** "PostHog is wired up", "You're all set." (`installationProgressCopy.ts`,
+   `syncCopy`), with the agent's own write-up shown as "The agent wrote this report about the run it just finished."
+   (`shared/wizard-sync/WizardHandoffDialog.tsx`). A manual way stays one press away ("Set up manually",
+   `SelfDrivingInstallOptions.tsx`, `ManualSetupButton`).
+
+**What BrainDog takes, and what it changes.**
+
+- *Taken:* one line, the same for any agent, at the top of the page (steps 1 and 2); a sentence of what happens (3);
+  the agent signs in through the browser and no key is pasted (4); the build is drawn as waiting before it arrives, and
+  the line gives way to the build when it does (6 and 7); asking stops when the page is left (8); a manual way stays a
+  link away, the ordinary `/start` (9).
+- *Changed:* PostHog's agent edits code and opens pull requests, so its run finishes on its own. BrainDog's agent only
+  proposes: what it files is one arrangement, and nothing is made until the person presses **Make it mine** (the
+  record's rule, `packages/record/src/arrange.ts`). There is no cloud run and no report dialog: the build drawn is the
+  report. The line to paste is a sentence for the agent, not a command for a terminal: "Set up my BrainDog. Ask me who I
+  am, then propose it." The page asks the record every 5 seconds at the fastest, never PostHog's 60, because a person is
+  watching for the build to arrive (USE-B12: "within five seconds").
+
+**The page, `/start?agent=1`** (`apps/web/src/routes/start/FromAgent.svelte`, its words and rules in `from-agent.ts`).
+
+1. *How to plug in*: the address any app takes and the setup command, read from Settings, Agents (`connectLines`,
+   `lib/record/device.ts`, and the connect sheet's "Any other app" words, `lib/agents/connect.ts`). No app is named.
+   Under the setup command, the six-digit field Settings, Agents draws (`CodeForm.svelte`), so the code `braindog setup`
+   shows is approved on this page and the person never leaves it to connect.
+2. *The line to paste*, with its own Copy, 44px tall.
+3. *The build*: "Waiting for your agent's proposal" until an arrangement is among the record's open questions, then that
+   arrangement drawn as the build (`Building.svelte`, the same tile the start page draws), with **Make it mine**, which
+   accepts it as Decide does (`decide`, option accept).
+
 ### Error, and partial failure
 
 - **One error boundary per block.** Six queries, six independent failures; one broken query never
@@ -648,7 +714,7 @@ Ranked by probability × cost. Each with its countermeasure.
 | **1** | **The record stays empty** and the app reads as a filing cabinet with no files — an empty *typed* register is less legible than an empty notes app, because the columns advertise what you have not done | all four mechanisms in §6: pack selection as onboarding, one `example` row per register counted by its page's metrics and by nothing scheduled, the paste-ready agent prompt, the dismissible preview |
 | **2** | **Packs turn the sidebar into a junk drawer** | the native spine; `nav` read once at install and never re-read; position in a per-user store; updates land hidden in a holding pen; re-showing restores stored order; `g 1`–`g 9` target positions |
 | **3** | **Slash becomes the only way to do anything** | every Slash output has a deterministic route to the same result and shows it ([23-ASSISTANT-UI](23-ASSISTANT-UI.md) §13); palette rows print their bindings; the `?` sheet reads the registry so it cannot drift; **no mode is reachable only by keystroke** |
-| **4** | **Thirty-nine block kinds become thirty-nine ways to look bad**, and agents write prose into drawn blocks | the eight-primitive layer; the visible-fence degradation rule at render (never a write refusal, [13-UI](13-UI.md) §4.1); fixed column positions per kind ([34-GRAMMARS](34-GRAMMARS.md) §2.2) |
+| **4** | **Forty block kinds become forty ways to look bad**, and agents write prose into drawn blocks | the eight-primitive layer; the visible-fence degradation rule at render (never a write refusal, [13-UI](13-UI.md) §4.1); fixed column positions per kind ([34-GRAMMARS](34-GRAMMARS.md) §2.2) |
 | **5** | **Single letters collide with screen readers and speech input** | bare letters only inside a focused grid; `Character keys: off`; per-binding remap; no destructive verb on a bare letter |
 | **6** | **The gate becomes a rubber stamp** and the differentiator evaporates | two deliberate acts plus a mandatory reason in an empty field; the recommendation never pre-selected; the third verb (`Defer` with a reason and a date) kept; the queue ranked by cost of being wrong — a band the record **computes** from what accepting the proposal would do (`packages/kernel/src/weigh.ts`), never a field its proposer fills in, because a queue ranked by self-declared importance is a queue in which everything is urgent by the second week. Four bands, worst first: `undo` (changes rows somebody has, replaces a declaration, turns a pack off), `shape` (a pack, its settings, a page), `rows` (adds rows, or a rule that will), `call` (a judgement with nothing attached). Within a band, oldest first |
 | **7** | **Slash proposes so much that Decide and Inbox become spam folders** | a hard cap on open suggestions per register, new ones **displacing the lowest-ranked rather than appending**; suggestions expire and self-close with a recorded reason; every proposal must attach the rows it read, and one with none is refused at write time; the count of open questions is a metric on Home **with a target** |

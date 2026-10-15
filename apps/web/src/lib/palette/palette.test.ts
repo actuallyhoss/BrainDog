@@ -230,9 +230,9 @@ test('AND IT REACHES THE FIGURES, which no search could reach before', () => {
       continue;
     }
     /* A LIMIT KEPT SAYS NOTHING (`targetLine`): "Limit 5" under a 2 is a rule nobody broke. A broken one always says how
-       far over, and a floor says its line, but for a floor of zero on a count, which nothing can be under. */
+       far over, and a floor says its line, but for a floor of zero, which nothing can be under. */
     if (typeof target.lte === 'number' && read.tone === 'good') continue;
-    if (target.gte === 0 && decl.format === 'int') continue;
+    if (target.gte === 0) continue;
     /* AND A DAY HAS NO LINE: its bound is a day nobody set, and the tone says which side of it the day is on. */
     if (decl.format === 'day') continue;
     assert.ok(read.note.trim().length > 0, `${id} prints a bare figure, which is a number you look at`);

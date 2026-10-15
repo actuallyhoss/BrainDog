@@ -24,11 +24,15 @@ type Body = Record<string, unknown>;
 const HOLDS = ['things', 'people', 'tasks', 'tracks', 'updates', 'cycles', 'cycle_plan', 'cycle_days'];
 
 /*
- * THE TWO DOORS A NEW TEAM NEEDS, both into Settings: People sends the invitation, and Agents shows the line to paste
- * into Claude Code for this record, the real one worked out there for this record and this machine, so Home never
- * prints a line that goes stale.
+ * THE DOOR A NEW TEAM NEEDS, into Settings, Agents: the line to paste into Claude Code for this record, the real one
+ * worked out there for this record and this machine, so Home never prints a line that goes stale.
+ *
+ * NO INVITATION ROW SINCE 2.21.0. It opened Settings, People, where a free record's invitation is refused, so every
+ * fresh team record had a button on Home that ended in a refusal. Only the host knows whether this record takes a
+ * second person (the record's `invitations`), and a block's `when:` reads a figure or the reader, never the host, so
+ * the row cannot be drawn only where it works. The one row left says instead that a team of people needs Cloud and a
+ * team of agents does not.
  */
-const INVITE = '/settings/people';
 const CONNECT = '/settings/agents';
 
 /* NO LABEL: the column over a ticket's title is headed by what one ticket is called, so a team that calls them Issues reads Issue. */
@@ -45,6 +49,111 @@ const LIVE = 'state is not done or dropped';
  * put a ticket back under two headings on this page without either heading changing.
  */
 const IN_FLIGHT = 'state is doing or review';
+
+/**
+ * The script that keeps a planned ticket's tick the same as its ticket: every line of the cycle plan that names the
+ * ticket is ticked when the ticket is done and unticked when it is not.
+ *
+ * THE TICKET IS READ AGAIN BEFORE ANYTHING MOVES, as Work's `close_follow_ups` reads its parent: the rule queues the
+ * run and a host runs it later, so a ticket finished and reopened in between is open by the time this reads it, and
+ * the line follows what the ticket is now. A line already right is left alone, so a run writes nothing twice.
+ */
+const PLAN_FOLLOWS_TICKET = `export default async function run(ctx) {
+  const ticket = await ctx.record.get(ctx.input.id);
+  if (!ticket) return;
+  const done = ticket.fields.state === 'done';
+  const lines = await ctx.record.list('cycle_plan', { all: [{ field: 'task', is: ticket.id }] });
+  for (const line of lines)
+    if ((line.fields.done === true) !== done) ctx.update('cycle_plan#' + line.seq, { done }, line.version);
+}`;
+
+/**
+ * The script that writes the morning's cycle day: for each active cycle, how many of its planned lines are not ticked,
+ * on the day it is where the record is (`ctx.today()`).
+ *
+ * ONE A DAY, WHOEVER WROTE IT. A cycle that already has a day for today, from this script or from a person, takes no
+ * second one, and nor does a day somebody wrote with no cycle, so a second run the same morning writes nothing and a
+ * host back from a night off writes today once rather than once for every night it missed. A missed morning stays
+ * missed: the record keeps no history of the count, and writing today's count under yesterday's day would draw a line
+ * that never happened.
+ *
+ * A LINE WHOSE TICKET IS ALREADY DONE IS TICKED HERE, AND NOT COUNTED. The ticket rules miss two: a ticket planned
+ * after it was finished (no rule watches a line being written), and a ticket finished after rules have started
+ * `plan_follows_ticket` its hundred times that day (`RULE_CALLS_PER_DAY`), which a busy team of agents reaches. The
+ * morning only ticks: a line ticked by hand while its ticket is still open is somebody's call and is left alone.
+ *
+ * AT MOST FIFTY LINES ARE READ (a script's list is one page of the record's own), so a cycle with more than fifty
+ * planned lines not ticked is counted as fifty.
+ */
+const CYCLE_DAY = `export default async function run(ctx) {
+  const today = ctx.today();
+  const cycles = await ctx.record.list('cycles', { all: [{ field: 'state', is: 'active' }] });
+  if (cycles.length === 0) return;
+  const written = await ctx.record.list('cycle_days', { all: [{ field: 'day', is: today }] });
+  if (written.some((d) => !d.fields.cycle)) return;
+  for (const cycle of cycles) {
+    if (written.some((d) => d.fields.cycle === cycle.id)) continue;
+    const lines = await ctx.record.list('cycle_plan', { all: [{ field: 'cycle', is: cycle.id }, { field: 'done', is: false }] });
+    let open = 0;
+    for (const line of lines) {
+      const ticket = line.fields.task ? await ctx.record.get(line.fields.task) : null;
+      if (ticket && ticket.fields.state === 'done') ctx.update('cycle_plan#' + line.seq, { done: true }, line.version);
+      else open++;
+    }
+    ctx.write('cycle_days', { day: today, open, cycle: cycle.id });
+  }
+}`;
+
+/** A script of the team's, as a pack document writes it: no egress, no keys, started by a rule. */
+const teamScript = (script: string, title: string, reads: string[], writes: string[], source: string): Record<string, unknown> => ({
+  script,
+  title,
+  pack: 'usecase-team',
+  runs: { rule: true },
+  egress: [],
+  keys: [],
+  reads,
+  writes,
+  source,
+});
+
+/**
+ * THE TEAM'S AUTOMATIONS, IN 2.21.0: the burn-down fills itself. Three rules and the two scripts they start, in the
+ * pack document's own form (the kind first), as Work's are (`WORK_AUTOMATIONS` in `../modules/work.ts`), so a record
+ * with no agent at all keeps its cycle's progress and its morning count.
+ *
+ * A TICKET IS ONE OF WORK'S TASKS (`TICKETS_MOVED_IN`), so the two rules on a ticket are rules on `tasks`, and both ask
+ * for `op: [update]` and `fields: [state]`, so an edit to a ticket's words starts nothing. Finishing a ticket ticks the
+ * lines that plan it; moving it anywhere else unticks them, which is what reopening is, and a run that finds nothing
+ * ticked writes nothing. Both start the same script, since ticking and unticking are one question: is the ticket done.
+ *
+ * THE MORNING IS A CLOCK RULE (`on: { every: '1d', at: '06:00' }`, `firstDue` and `onClock` in
+ * `packages/kernel/src/flow.ts`), at six where the record is. It asks nothing and sends nothing: it writes one row.
+ */
+export const TEAM_AUTOMATIONS: Record<string, unknown>[] = [
+  {
+    rule: 'ticket_done_ticks_plan',
+    pack: 'usecase-team',
+    on: { written: { register: 'tasks', op: ['update'], fields: ['state'] } },
+    when: 'state is done',
+    steps: [{ script: { id: 'plan_follows_ticket', as: 'ticking' } }],
+  },
+  {
+    rule: 'ticket_reopened_unticks_plan',
+    pack: 'usecase-team',
+    on: { written: { register: 'tasks', op: ['update'], fields: ['state'] } },
+    when: 'state is not done',
+    steps: [{ script: { id: 'plan_follows_ticket', as: 'unticking' } }],
+  },
+  {
+    rule: 'cycle_day_each_morning',
+    pack: 'usecase-team',
+    on: { every: '1d', at: '06:00' },
+    steps: [{ script: { id: 'cycle_day', as: 'counting' } }],
+  },
+  teamScript('plan_follows_ticket', 'Tick a planned ticket when its ticket is done', ['tasks', 'cycle_plan'], ['cycle_plan'], PLAN_FOLLOWS_TICKET),
+  teamScript('cycle_day', "Write the morning's cycle day", ['cycles', 'cycle_plan', 'cycle_days', 'tasks'], ['cycle_plan', 'cycle_days'], CYCLE_DAY),
+];
 
 export const TEAM = {
   usecase: 'team',
@@ -106,7 +215,11 @@ export const TEAM = {
      had already deployed, so it is a version of its own. One `where` narrowed on a block that is there, nothing added
      or taken away, so a minor step. 2.20.0 IS LIVE. Still unreleased (commit 63423720 holds 2.20.0), it takes batch
      88's block with no version of its own: Home draws Gone quiet, what stopped reporting, straight under its line
-     (founder-home-quiet-88), a sixth tile on a page held to six. A block added, nothing taken away. */
+     (founder-home-quiet-88), a sixth tile on a page held to six. A block added, nothing taken away. And batch 100's
+     burn-down that fills itself (USE-A10): `TEAM_AUTOMATIONS`, three rules and two scripts added, so finishing a
+     ticket ticks its planned line, reopening it unticks it, and each morning the record writes the cycle day; the
+     standup skill stops saying it does either; Bring the team in loses Invite your team, which ended in a refusal on
+     a free record. A row and two words changed, declarations added, so still the minor step 2.21.0 is. */
   version: '2.21.0',
   title: 'Team board',
   summary: 'Tickets with an owner and a status, the cycle each is in, and the work your agents took on.',
@@ -163,7 +276,7 @@ export const TEAM = {
     {
       name: 'standup-digest',
       trigger:
-        'each morning, to say what moved yesterday, what is blocked and what agents finished, tick the planned tickets that are done, and add a cycle day with how many tickets are still open',
+        'each morning, to say what moved yesterday, what is blocked and what agents finished',
     },
   ],
   pack: {
@@ -223,8 +336,9 @@ export const TEAM = {
       },
       {
         /* HOW MANY TICKETS WERE STILL OPEN, ONE ROW A MORNING (2.6.0), which is what the burndown on Home draws. The
-           record keeps no history of a count, so the count is written down: by the standup agent each morning, or by
-           a person, the same way a founder's numbers are. */
+           record keeps no history of a count, so the count is written down, and since 2.21.0 the record writes it
+           itself each morning: the planned lines of the active cycle not ticked (`cycle_day` in `TEAM_AUTOMATIONS`).
+           A person can still write a day, and the record then writes none for it. */
         register: 'cycle_days',
         name: 'Cycle days',
         one: 'cycle day',
@@ -246,6 +360,8 @@ export const TEAM = {
       counted('tickets-planned', 'Planned into a cycle', 'register.cycle_plan'),
       counted('tickets-taken', 'Taken by agents', 'register.tasks', 'agent is set, state is not done or dropped'),
       counted('tickets-done-by-agents', 'Finished by agents', 'register.tasks', 'agent is set, state is done'),
+      /* THE RULES THAT KEEP THE CYCLE'S PROGRESS AND ITS MORNING COUNT, AND THEIR SCRIPTS, SINCE 2.21.0. */
+      ...TEAM_AUTOMATIONS,
       {
         /* HOME, AS A TEAM ANSWERS IT: what agents suggest, what is moving and who is on it, what is stuck, what is
            due, and how far the cycle has come, with no place on the rail. */
@@ -360,8 +476,7 @@ export const TEAM = {
             icon: 'user-plus',
             span: 12,
             authored: [
-              { cells: ['Invite your team', INVITE, 'Send each teammate a link to this board'] },
-              { cells: ['Connect an agent', CONNECT, 'The line to paste into Claude Code so an agent can take tickets'] },
+              { cells: ['Connect an agent', CONNECT, 'A team of agents works on any record. A team of people needs Cloud.'] },
             ],
           },
           {
@@ -387,7 +502,7 @@ export const TEAM = {
           },
           {
             /* BESIDE IT, THE BURNDOWN: how many tickets were open each morning of the last two weeks, against the two
-               weeks before, from the Cycle days the standup agent or a teammate writes. */
+               weeks before, from the Cycle days the record writes each morning (`cycle_day`), or a teammate does. */
             kind: 'lines',
             heading: 'Open tickets, each morning',
             icon: 'chart-line',
@@ -396,7 +511,7 @@ export const TEAM = {
             columns: [{ field: 'day' }, { field: 'open' }],
             back: 14,
             bucket: 'day',
-            empty: 'No cycle day is written yet. The standup agent adds one each morning, or add today by hand.',
+            empty: 'No cycle day is written yet. Once a cycle is active the record writes one each morning.',
           },
         ],
       },

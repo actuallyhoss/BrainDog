@@ -94,7 +94,7 @@ test('a runs_on card says the time in words and the run by its app and day, with
   assert.ok(!cells.some((c) => ISO.test(c)), `an instant was printed: ${cells.join(' | ')}`);
   assert.ok(!cells.some((c) => /^S\d+$/u.test(c)), `a run handle was printed: ${cells.join(' | ')}`);
   assert.ok(cells.includes('[Claude Code, 6 Oct](/r/session/731)'), cells.join(' | '));
-  assert.deepEqual(block.runFaces?.[0], { run: 'S731', agent: 'claude', live: 'stopped' });
+  assert.deepEqual(block.runFaces?.[0], { run: 'S731', agent: 'claude', live: 'stopped', presence: 'before' });
   assert.equal(block.runFaces?.[1], null);
 });
 

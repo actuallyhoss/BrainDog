@@ -165,8 +165,8 @@ test('A PACK THAT CALLS OUT ARMS NOTHING UNTIL THE OWNER APPROVES ITS LINES, in 
   const { sql, api, armed, planOf } = await books();
   const doc = BOOKS('1.0.0', PING);
   const planned = await planOf(doc);
-  /* THE LINE, AND WHAT A KEY REACHES UNDER IT — once, whatever the pack calls (`§2.7`). */
-  assert.deepEqual(planned.approve, ['CALLS OUT hooks.example.test · every 15m · grant "hook key"', 'Keys are not kept per project yet, so any action in this record can send any key it names.']);
+  /* THE LINE, AND WHO CAN OPEN THE KEY UNDER IT — once, whatever the pack calls. */
+  assert.deepEqual(planned.approve, ['CALLS OUT hooks.example.test · every 15m · grant "hook key"', 'A scheduled action opens this key with nobody present, so the server that runs it can open it too.']);
 
   /* NOT APPROVED: the whole pack stays out, because the install is one transaction, and nothing is armed. */
   const bare = refusal(await api.installPack({ doc, planHash: planned.planHash }, owner));
@@ -212,7 +212,7 @@ test('AN UPDATE ASKS ONLY FOR WHAT IS NEW, and declining it leaves the installed
   assert.deepEqual(second.calls_out.map((c) => [c.ingest, c.change]), [['ping', 'same'], ['status', 'new']]);
   assert.deepEqual(
     second.approve,
-    ['CALLS OUT status.example.test · every 1h · grant "hook key"', 'Keys are not kept per project yet, so any action in this record can send any key it names.'],
+    ['CALLS OUT status.example.test · every 1h · grant "hook key"', 'A scheduled action opens this key with nobody present, so the server that runs it can open it too.'],
     'an action already approved was asked for again',
   );
 

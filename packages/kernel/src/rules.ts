@@ -35,7 +35,7 @@ import { instant } from './migrate.ts';
 import { spanMs } from './vault.ts';
 import { evaluateMetric, predicateOf, type Aggregation, type EvalContext, type MetricDecl } from './metrics.ts';
 import { isMoneyFormat } from './metrics.ts';
-import { RUN_PATH, inlineFault, rowlessCreate } from './flow-lint.ts';
+import { inlineFault, rowlessCreate } from './flow-lint.ts';
 import { alsoFault, linkFault, whereFields } from './rule-link.ts';
 
 export { alsoFault, linkFault };
@@ -143,9 +143,44 @@ export type Step =
   | { script: { id: string; input?: Record<string, string>; as: string } }
   | { call: { ingest: string; as?: string } }
   | { ask_slash: { question: string; about?: string[]; as: string; shape?: 'text' | 'number' | 'choice'; choices?: string[] } }
-  | { ask_person: { question: string; options: string[]; as: string; to?: string; wait?: string } }
+  | { ask_person: AskPerson }
   | { wait: string }
   | RuleAction;
+
+/**
+ * What a question an automation puts to a person asks for (`ask_person`'s `shape`). ABSENT IS `choice`, which is what
+ * every `ask_person` meant before the shape existed, so a rule already installed asks as it did.
+ */
+export type AskShape = 'choice' | 'amount' | 'number' | 'text' | 'date';
+
+/** The shapes `ask_person` takes, in the order the card form offers them. */
+export const ASK_SHAPES: readonly AskShape[] = ['choice', 'amount', 'number', 'text', 'date'];
+
+/** The most a `text` answer holds, in characters. A line, not a document. */
+export const ASK_TEXT_CHARS = 500;
+
+/**
+ * A question an automation puts to a person, opened in Decide (`flow.ts`'s `ask`), and what the answer is kept as under
+ * `as` (`flow.ts`'s `answerStep`).
+ *
+ * `options` ARE THE ANSWERS OF A `choice`, AND ONLY OF ONE: at least two, each once. Any other shape is answered by
+ * typing, and its answer is held to the shape when it comes back, a wrong one refused to the person with a sentence
+ * while the run keeps waiting.
+ *
+ * `amount` IS KEPT AS MONEY, `{ amount: <integer minor units>, currency }`, read as `{{vars.x.amount}}` and
+ * `{{money:vars.x}}`. `currency` is a code (`EGP`) or the row's own, `{{trigger.row.<field>}}`, read when the question
+ * is asked and filed with it; without one the answer has to say its code. An answer in another currency is refused,
+ * never converted. `number` is kept as a number, `date` as `YYYY-MM-DD`, `text` as its words, `ASK_TEXT_CHARS` at most.
+ */
+export type AskPerson = {
+  question: string;
+  shape?: AskShape;
+  options?: string[];
+  currency?: string;
+  as: string;
+  to?: string;
+  wait?: string;
+};
 
 /**
  * A rule as the inline pass reads it: a register, a condition and a flat list of actions.
@@ -970,7 +1005,27 @@ export function fill(template: string, row: Entry, nowMs = Date.now()): string {
  * is written as, and whether that path reaches a value a secret or file field gave it. `flow.ts` builds one for each
  * step it acts. A figure's head is `metric` and its path is the figure's id.
  */
-export type RunFill = { value: (head: string, path: string) => string; sealed: (head: string, path: string) => boolean };
+export type RunFill = { value: (head: string, path: string, said?: RunSaid) => string; sealed: (head: string, path: string) => boolean };
+
+/**
+ * What one run path says besides where it goes: `money` for `{{money:vars.x}}`, which writes an amount a person gave
+ * as a sentence writes money, and the words of `{{path or "words"}}`, written where the path reaches nothing.
+ */
+export type RunSaid = { form?: 'money'; or?: string };
+
+/**
+ * A run path as a text spells it: `{{vars.x}}`, `{{trigger.row.note}}`, `{{money:vars.deposit}}`, and any of them with
+ * `or "words"` after the path. Groups: 1 the form, 2 the head, 3 the path, 4 the words as typed, a `\"` in them being
+ * a quote. Without a form and without `or` it reads exactly what `flow-lint.ts`'s `RUN_PATH` reads, so a text written
+ * before either existed fills as it did.
+ */
+export const RUN_SPELL = /\{\{\s*(?:(money):)?(vars|trigger)\.([A-Za-z0-9_.]+)(?:\s+or\s+"((?:[^"\\]|\\.)*)")?\s*\}\}/g;
+
+/** What a run path's match says besides its head and path (`RUN_SPELL`'s groups 1 and 4). */
+export const runSaid = (form: string | undefined, words: string | undefined): RunSaid => ({
+  ...(form === 'money' ? { form: 'money' as const } : {}),
+  ...(words === undefined ? {} : { or: words.replace(/\\(.)/g, '$1') }),
+});
 
 /**
  * What `filling` reads besides the row: the fields of the row that never leave the record, a create's tuple, and the
@@ -981,10 +1036,10 @@ export type FillBy = { sealed?: ReadonlySet<string>; each?: readonly string[]; r
 
 /**
  * Every spelling a text can be filled from, in one pattern: the run's `{{vars.x}}` and `{{trigger.row.pin}}`
- * (`flow-lint.ts`'s `RUN_PATH`), a figure's `{{metric.total}}` (`figure.ts`), a create's `{{each.0}}`, and the row's
+ * (`RUN_SPELL`, with its `money:` form and `or "words"`), a figure's `{{metric.total}}` (`figure.ts`), a create's `{{each.0}}`, and the row's
  * `{{field}}`, `{{kind:field}}` and `{{kind:field-other}}`, one money field less another (`moneyLess`).
  */
-const SPELLED = new RegExp(`${RUN_PATH.source}|${FIGURE.source}|\\{\\{each\\.(\\d)\\}\\}|\\{\\{(\\w+)(?::(\\w+)(?:-(\\w+))?)?\\}\\}`, 'g');
+const SPELLED = new RegExp(`${RUN_SPELL.source}|${FIGURE.source}|\\{\\{each\\.(\\d)\\}\\}|\\{\\{(\\w+)(?::(\\w+)(?:-(\\w+))?)?\\}\\}`, 'g');
 
 /** Whether a field holds anything a fill would write as more than the dash: an empty list holds nothing either. */
 export const present = (value: unknown): boolean => value !== null && value !== undefined && value !== '' && !(Array.isArray(value) && value.length === 0);
@@ -1007,14 +1062,14 @@ export const present = (value: unknown): boolean => value !== null && value !== 
 export function filling(template: unknown, row: Entry, nowMs: number, by: FillBy = {}): { text: string; secret: string | null } {
   if (typeof template !== 'string') return { text: wordsOf(template), secret: null };
   let secret: string | null = null;
-  const text = template.replace(SPELLED, (whole: string, runHead?: string, runPath?: string, figHead?: string, figId?: string, each?: string, head?: string, tail?: string, less?: string) => {
+  const text = template.replace(SPELLED, (whole: string, form?: string, runHead?: string, runPath?: string, words?: string, figHead?: string, figId?: string, each?: string, head?: string, tail?: string, less?: string) => {
     /* A FIGURE IS THE RUN'S TO READ, and the inline pass has no run, so there the braces stay as typed and the lint
        refuses them (`figure.ts`): a figure read inside a write would be read over the row that write is still making. */
     if (runHead !== undefined || figHead !== undefined) {
       if (by.run === undefined) return whole;
       const [h, p] = runHead !== undefined ? [runHead, runPath!] : [figHead!, figId!];
       if (by.run.sealed(h, p)) secret ??= whole;
-      return by.run.value(h, p);
+      return runHead !== undefined ? by.run.value(h, p, runSaid(form, words)) : by.run.value(h, p);
     }
     if (each !== undefined) {
       if (by.each === undefined) return whole;

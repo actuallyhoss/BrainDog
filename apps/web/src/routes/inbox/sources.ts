@@ -12,17 +12,25 @@
  * COUNTED OVER WHAT WAS READ. The read stops after a few pages, so on a busy record the oldest days can be short, and
  * `partial` says so rather than drawing a quiet fortnight that was not quiet.
  *
+ * AND WHETHER THE NEWEST MAIL WAS SIGNED (REC-A15). Mail the host could not check the sender's signature on is stored
+ * with the kernel's `UNVERIFIED` reason and is never matched, so Mail's well says which of the two the last one was,
+ * from the reason the arrival already carries. A read that did not carry the reason says nothing rather than "signed".
+ *
  * PURE, so `node --test` holds it.
  */
 
+import { UNVERIFIED } from '@braindog/kernel';
 import { dayOf, daysBetween } from '../../lib/work/board.ts';
 import type { IconName } from '../../lib/ui/icons.ts';
 
 /** How many days the arrivals line covers, today included. */
 export const SOURCE_DAYS = 14;
 
-/** One way in, as the tile draws it. `days` is oldest first and ends today. */
-export type Source = { channel: string; name: string; icon: IconName; last: string | null; days: number[]; total: number };
+/**
+ * One way in, as the tile draws it. `days` is oldest first and ends today. `signed` is Mail's alone: whether the newest
+ * mail was signed, in words, and absent when nothing says (no mail yet, or a read that did not carry the reason).
+ */
+export type Source = { channel: string; name: string; icon: IconName; last: string | null; days: number[]; total: number; signed?: string };
 
 /** What each channel is called and the glyph its well wears. */
 const SAID: Readonly<Record<string, { name: string; icon: IconName }>> = {
@@ -44,16 +52,20 @@ const saidOf = (channel: string): { name: string; icon: IconName } =>
  * Every way in, from the arrivals read, newest first by its last arrival and then the everyday ways nothing came by.
  * An arrival whose time will not read is left out of the days and the last arrival, and still counted as having come.
  */
-export function sourcesOf(lines: readonly { channel: string; ts: string }[], now: number): Source[] {
+export function sourcesOf(lines: readonly { channel: string; ts: string; reason?: string | null }[], now: number): Source[] {
   const today = dayOf(now);
   const by = new Map<string, Source>();
+  let newestMail: { reason?: string | null } | null = null;
   const make = (channel: string): Source => ({ channel, ...saidOf(channel), last: null, days: Array<number>(SOURCE_DAYS).fill(0), total: 0 });
   for (const line of lines) {
     const s = by.get(line.channel) ?? make(line.channel);
     by.set(line.channel, s);
     const at = Date.parse(line.ts);
     if (!Number.isFinite(at)) continue;
-    if (s.last === null || at > Date.parse(s.last)) s.last = line.ts;
+    if (s.last === null || at > Date.parse(s.last)) {
+      s.last = line.ts;
+      if (line.channel === 'email') newestMail = line;
+    }
     const back = daysBetween(dayOf(at), today);
     if (back >= 0 && back < SOURCE_DAYS) {
       const i = SOURCE_DAYS - 1 - back;
@@ -61,9 +73,28 @@ export function sourcesOf(lines: readonly { channel: string; ts: string }[], now
       s.total++;
     }
   }
+  const signed = mailSignedOf(newestMail);
+  const mail = by.get('email');
+  if (mail && signed !== null) mail.signed = signed;
   const came = [...by.values()].sort((a, b) => (Date.parse(b.last ?? '') || 0) - (Date.parse(a.last ?? '') || 0));
   const quiet = EVERYDAY.filter((c) => !by.has(c)).map(make);
   return [...came, ...quiet];
+}
+
+/** The two things Mail's well can say about the newest mail's signature. */
+export const signedWords = {
+  signed: 'The sender signed the last mail',
+  unsigned: 'The last mail was not signed, so it cannot be matched. Check the forwarding.',
+} as const;
+
+/**
+ * Whether the newest mail was signed, in words: `null` with no mail, or when the arrival read did not carry its reason
+ * at all (`reason` absent), so an old read never says "signed" about mail it knows nothing of. Any other reason, or
+ * none, is mail the record checked and could match.
+ */
+export function mailSignedOf(latest: { reason?: string | null } | null): string | null {
+  if (latest === null || latest.reason === undefined) return null;
+  return latest.reason === UNVERIFIED ? signedWords.unsigned : signedWords.signed;
 }
 
 /** Whether a line is worth drawing: three days or more with something in them, else the count says it. */

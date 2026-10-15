@@ -19,6 +19,8 @@
   engine's own ledger: "Slash's model answered 3 hours ago", or "has not answered since 6 October. That is ours to fix."
   A model named here and silent for days read as fine. A record whose build has no such read says nothing, never that
   it answers; a model that does not answer is said in the deeper red with its words, never the colour alone.
+
+  AND THE OWNER CAN ASK NOW (ENG-A08): "Test the model now" under those lines, `ModelProbe.svelte` by `import()`.
 -->
 <script lang="ts">
   import { apiBase } from '../at.ts';
@@ -127,6 +129,12 @@
           <li><p class="engine-said" data-intent={down ? 'bad' : undefined}>{#if engineSaid.lead}<span data-needs>{engineSaid.lead}</span>{/if}{engineSaid.rest}</p></li>
         {/if}
         {#each lines as line}<li><p class="engine-line">{line}</p></li>{/each}
+        <!-- THE OWNER MAY ASK NOW, under what the ledger last saw (ENG-A08). Its own chunk, so a member loads none of it. -->
+        {#if owner}
+          <li>
+            {#await import('./ModelProbe.svelte') then loaded}<loaded.default />{/await}
+          </li>
+        {/if}
         {#if asks}
           <li><span class="fact-key">{words.resets}</span><span class="fact-value num">{resetsWords(status.asks.resets)}</span></li>
         {/if}

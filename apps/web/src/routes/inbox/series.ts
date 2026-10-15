@@ -107,16 +107,16 @@ const ARRIVALS_PAGES = 3;
  * of each, which is all the "What comes in" tile counts. `partial` when older pages were left unread inside the window.
  * A read that fails is `null`, and the tile is not drawn rather than drawn empty.
  */
-export async function readArrivals(base: string, now: number, days: number): Promise<{ lines: { channel: string; ts: string }[]; partial: boolean } | null> {
+export async function readArrivals(base: string, now: number, days: number): Promise<{ lines: { channel: string; ts: string; reason: string | null }[]; partial: boolean } | null> {
   try {
     const client = createClient({ base });
     const from = now - days * 86_400_000;
-    const lines: { channel: string; ts: string }[] = [];
+    const lines: { channel: string; ts: string; reason: string | null }[] = [];
     let cursor: number | undefined;
     for (let page = 0; page < ARRIVALS_PAGES; page++) {
       const out = await client.inbox({ state: 'all', limit: INBOX_PAGE, ...(cursor === undefined ? {} : { cursor }) });
       if (!out.ok) return page === 0 ? null : { lines, partial: true };
-      for (const a of out.value.arrivals) lines.push({ channel: a.channel, ts: a.ts });
+      for (const a of out.value.arrivals) lines.push({ channel: a.channel, ts: a.ts, reason: a.reason });
       const oldest = Date.parse(out.value.arrivals.at(-1)?.ts ?? '');
       if (out.value.cursor === null || !(oldest >= from)) return { lines, partial: false };
       cursor = out.value.cursor;

@@ -1,5 +1,10 @@
 <!--
-  Add a field to a list, from one of its rows: a name, a kind, and one press.
+  Add a field to a list, from one of its rows: a name, a kind, the one more thing some kinds need, and one press.
+
+  THE ONE MORE THING IS ASKED UNDER THE KIND, and only for the kind that needs it: a link picks what it points at from
+  the record's own lists, by name; a choice takes its choices one a line; money says it is kept in the record's own
+  currency, the only one a new field takes for now (`currencySaid`). Each missing piece is refused in one sentence
+  (`fieldOf`), drawn under the form like any other.
 
   UNDER THE DECLARED FIELDS, because that is where a person notices a field is missing: reading a project and finding
   nowhere to put its domain. The field goes on every row of the list, and every screen that draws the list draws it
@@ -16,8 +21,9 @@
 <script lang="ts">
   import { apiBase } from '../at.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { ADDABLE, addField, fieldOf, type Addable } from '$lib/record/field-write.ts';
-  import { fieldWords, KIND_WORDS } from '$lib/record/field-words.ts';
+  import { homeCurrency } from '$lib/record/api.ts';
+  import { ADDABLE, addField, fieldOf, linkable, type Addable } from '$lib/record/field-write.ts';
+  import { fieldWords, KIND_WORDS, sheetWords } from '$lib/record/field-words.ts';
   import Button from '$lib/ui/Button.svelte';
 
   let { register, live, owner, onadded }: { register: string; live: boolean; owner: boolean; onadded?: () => void } = $props();
@@ -25,7 +31,12 @@
   let open = $state(false);
   let label = $state('');
   let kind = $state<Addable>('text');
+  let to = $state('');
+  let values = $state('');
   let busy = $state(false);
+  /* READ WHEN THE KIND ASKS FOR THEM, never on a row page that only shows the button. */
+  const lists = $derived(open && kind === 'ref' ? linkable() : []);
+  const home = $derived(open && kind === 'money' ? homeCurrency() : null);
   /* THE SENTENCE UNDER THE FORM: this file's own for a name it can refuse without asking, the record's otherwise. */
   let problem = $state<string | null>(null);
 
@@ -38,13 +49,15 @@
     open = false;
     label = '';
     kind = 'text';
+    to = '';
+    values = '';
     problem = null;
   }
 
   async function add(e: SubmitEvent) {
     e.preventDefault();
     if (busy) return;
-    const asked = fieldOf(register, label, kind);
+    const asked = fieldOf(register, label, kind, { to, values, currency: 'record' });
     if (!asked.ok) {
       problem = asked.fix;
       return;
@@ -80,6 +93,23 @@
           {#each ADDABLE as k (k)}<option value={k}>{KIND_WORDS[k]}</option>{/each}
         </select>
       </label>
+      {#if kind === 'ref'}
+        <label class="add-part">
+          <span class="add-label">{fieldWords.linkTo}</span>
+          <select class="add-kind" bind:value={to}>
+            <option value="" disabled>{lists.length === 0 ? sheetWords.noLists : fieldWords.pickLink}</option>
+            {#each lists as l (l.id)}<option value={l.id}>{l.name}</option>{/each}
+          </select>
+        </label>
+      {:else if kind === 'enum'}
+        <label class="add-part add-wide">
+          <span class="add-label">{fieldWords.choices}</span>
+          <textarea class="add-kind add-text" rows="3" bind:value={values}></textarea>
+          <span class="add-help">{fieldWords.choicesHelp}</span>
+        </label>
+      {:else if kind === 'money'}
+        <p class="add-help add-wide">{home === null ? fieldWords.noHome : fieldWords.inRecordCurrency(home)}</p>
+      {/if}
       <div class="add-actions">
         <Button type="submit" weight="primary" disabled={busy}>{busy ? fieldWords.saving : fieldWords.save}</Button>
         <Button weight="bare" onclick={stop}>{fieldWords.cancel}</Button>
@@ -132,6 +162,29 @@
     color: var(--ink);
     font: inherit;
     font-size: var(--t-ui);
+  }
+
+  /* THE CHOICES BOX TAKES THE WHOLE LINE, since a choice is typed one a line and a narrow box hides them. */
+  .add-wide {
+    flex-basis: 100%;
+  }
+
+  .add-text {
+    padding-block: var(--sp-2);
+    resize: vertical;
+  }
+
+  .add-help {
+    margin: 0;
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  /* A FINGER'S TARGET ON A PHONE: every picker and box is at least 44px tall on a coarse pointer. */
+  @media (pointer: coarse) {
+    .add-kind {
+      min-block-size: 44px;
+    }
   }
 
   .add-actions {

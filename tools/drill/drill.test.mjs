@@ -143,6 +143,7 @@ test('THE COMMAND refuses production without --live, a step it does not have, an
   assert.match(argsOf(['--host', 'https://alpha.brain.dog', '--steps', 'nap']).wrong, /no step called nap/u);
   assert.match(argsOf([]).wrong, /needs --host/u);
   assert.equal(argsOf(['--help']).help, true);
+  assert.equal(argsOf(['--host', 'https://alpha.brain.dog', '--pay']).pay, true, '--pay walks the money after the drill');
 });
 
 test('THE LANE RUNS THE DRILL ONLY WHEN ITS NAMES ARE SET, and says skipped otherwise', async () => {

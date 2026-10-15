@@ -538,6 +538,8 @@ export function readingOf(v: unknown): Proposal | null {
     ...(textOr(v.summary) ? { summary: v.summary } : {}),
     ...(textOr(v.draft) ? { draft: v.draft } : {}),
     ...(names ? { names } : {}),
+    /* THE MODEL'S ONE QUESTION, held to its shape again (`askOf`), so a kept reading asks what the read asked. */
+    ...(v.ask !== undefined ? { ask: askOf({ ask: v.ask }) } : {}),
   };
 }
 

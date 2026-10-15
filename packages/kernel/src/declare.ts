@@ -49,7 +49,7 @@ import { HOLDS, PARTS as ROLE_PARTS, aims, legacyShaped, plays, type RoleField, 
 /* THE FUNCTION THE REMINDERS ARE DERIVED WITH, so an offset this file accepts is one `remindersFor`
    can read. A copy of its regular expression here would be a second list, and `MATCH_FIELDS` above
    is what two lists that disagree cost. */
-import { FREQ, shiftFrom } from './schedule.ts';
+import { BYDAY, FREQ, shiftFrom } from './schedule.ts';
 import { pairsFault } from './pairs.ts';
 /* THE VALUES `delete:` TAKES, from the file that keeps the rule, so the check and the reader hold one list. */
 import { DELETE_RULES } from './referenced.ts';
@@ -72,6 +72,7 @@ import { clockOf, isMoneyFormat, isSumOf, kindOf, pastFault, sumOfFault, TREND_A
 import { WALKS, WALK_SOURCE, crosscheckFault, isCrosscheck, isRolled, rolledFault, walksToZero, type Rolled } from './money-figures.ts';
 import { INDEX_CEILING } from './observe.ts';
 import { SOURCE_MODULES, sourceModule } from './sources/index.ts';
+import { cardFactFault } from './card-facts.ts';
 
 /**
  * `34-GRAMMARS` §4. Checked before an id is inlined into an index name or a JSON path.
@@ -2085,6 +2086,16 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
         return bad('DECLARATION_INVALID', `${id}.${at} draws one to ${COLUMN_CEILING} columns.`, at);
       const roles = new Map<string, number>();
       for (const column of columns as { field?: unknown; or?: unknown; as?: unknown; metric?: unknown; edit?: unknown }[]) {
+        /* A CARD'S FACT MAY NAME A FIGURE (`card-facts.ts`), asked first so a fact's edit: is refused in a fact's words.
+           It counts in the same roles as the field facts, so figures and fields share CARD_FACTS. */
+        if (column !== null && typeof column === 'object' && column.as === 'fact' && column.metric !== undefined) {
+          const fault = cardFactFault(id, at, column, block.kind);
+          if (fault) return bad('DECLARATION_INVALID', fault, at);
+          const n = (roles.get('fact') ?? 0) + 1;
+          roles.set('fact', n);
+          if (n > CARD_FACTS) return bad('OUT_OF_BOUNDS', `${id}.${at} has ${n} columns as fact. A card takes one of each role, one figure among them, and at most ${CARD_FACTS} facts.`, at);
+          continue;
+        }
         /* `edit: true` IS A CARD'S LINE TYPED ON IN PLACE (PGS-C15), written to the one field it draws, so it is a card's,
            it names that field alone, and it is a line drawn as words. Whether the field is text is the read's to say,
            where the list is in hand: a field that is not text draws as text, as on a reader who cannot write. */
@@ -2116,7 +2127,7 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
            Nothing else draws a figure in a column, so a `metric:` anywhere else would install and draw nothing. */
         if (column !== null && typeof column === 'object' && column.metric !== undefined) {
           if (block.kind !== 'cards' || (column.as !== 'trend' && column.as !== 'when'))
-            return bad('DECLARATION_INVALID', `${id}.${at} gives a column a metric:, which only a card's trend or its when reads: { metric, as: trend } or { metric, as: when } on a cards block.`, at);
+            return bad('DECLARATION_INVALID', `${id}.${at} gives a column a metric:, which only a card's fact, trend or when reads: { metric, as: fact, label }, { metric, as: trend } or { metric, as: when } on a cards block.`, at);
           if (column.field !== undefined)
             return bad('DECLARATION_INVALID', `${id}.${at} gives a column both a field and a metric. A trend column names the figure alone.`, at);
           if (column.or !== undefined)
@@ -4407,10 +4418,13 @@ const REGISTER_KEYS = [
 const REGISTER_UNBUILT = ['key', 'predicates', 'immutable_when'] as const;
 
 /**
- * The keys of a field's `repeat:` that `schedule.ts`'s `expandRepeat` reads. `42 §4.4` also publishes `byday` and
- * `bymonthday`, which nothing reads yet, and they are refused by name rather than installed and ignored.
+ * The keys of a field's `repeat:` that `schedule.ts`'s walk reads, its `REPEAT_READ` said again.
+ *
+ * A COPY AND NOT AN IMPORT, because `GRAMMAR_VALUES` spreads it as this module loads, and `schedule.ts` reaches this
+ * module through its own imports: imported, a process that loads `schedule.ts` first reads it before it is set.
+ * `repeat-keys.test.ts` holds the two equal.
  */
-const REPEAT_READ = ['freq', 'interval', 'count', 'until', 'workday'] as const;
+const REPEAT_READ = ['freq', 'interval', 'count', 'until', 'workday', 'bymonthday', 'byday'] as const;
 
 /**
  * The parts of a list's `hand:`: the `ref` field a person is handed a row by, the `text` field holding the name an
@@ -5724,10 +5738,25 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
       if (unread !== undefined)
         return bad(
           'DECLARATION_INVALID',
-          `${id}.${f.id}'s repeat says ${unread}, and this build walks a repeat by ${REPEAT_READ.join(', ')} only, so ${unread} would be ignored. Leave it out, or declare one row per day it lands on.`,
+          `${id}.${f.id}'s repeat says ${unread}, and this build walks a repeat by ${REPEAT_READ.join(', ')} only, so ${unread} would be ignored. Leave it out.`,
           `${f.id}.repeat.${unread}`,
           REPEAT_READ,
         );
+      /* AND THE DAYS IT NAMES ARE DAYS: of the month 1 to 31 or counted back from the last, of the week by its two
+         letters, each read only on the frequency it belongs to, and a workday that is previous, next or none. */
+      const r = repeat as { bymonthday?: unknown; byday?: unknown; workday?: unknown };
+      const md = r.bymonthday;
+      if (md !== undefined && (!Array.isArray(md) || md.length === 0 || !md.every((d) => Number.isInteger(d) && ((d >= 1 && d <= 31) || (d >= -3 && d <= -1)))))
+        return bad('DECLARATION_INVALID', `${id}.${f.id}'s repeat says bymonthday ${JSON.stringify(md)}, and a day of the month is 1 to 31, or -1 to -3 counted back from the last.`, `${f.id}.repeat.bymonthday`);
+      if (md !== undefined && FREQ[freq] !== 'month')
+        return bad('DECLARATION_INVALID', `${id}.${f.id}'s repeat says bymonthday on a ${freq} repeat, and days of the month are read for a monthly one only.`, `${f.id}.repeat.bymonthday`);
+      const bd = r.byday;
+      if (bd !== undefined && (!Array.isArray(bd) || bd.length === 0 || !bd.every((w) => typeof w === 'string' && Object.hasOwn(BYDAY, w.toUpperCase()))))
+        return bad('DECLARATION_INVALID', `${id}.${f.id}'s repeat says byday ${JSON.stringify(bd)}, and a day of the week is one of ${Object.keys(BYDAY).join(', ')}.`, `${f.id}.repeat.byday`, Object.keys(BYDAY));
+      if (bd !== undefined && FREQ[freq] !== 'week')
+        return bad('DECLARATION_INVALID', `${id}.${f.id}'s repeat says byday on a ${freq} repeat, and days of the week are read for a weekly one only.`, `${f.id}.repeat.byday`);
+      if (r.workday !== undefined && !['previous', 'next', 'none'].includes(r.workday as string))
+        return bad('DECLARATION_INVALID', `${id}.${f.id}'s repeat says workday ${JSON.stringify(r.workday)}, and a workday is previous, next or none.`, `${f.id}.repeat.workday`, ['previous', 'next', 'none']);
     }
   }
 

@@ -323,3 +323,94 @@ test('EXPECT.JSON NAMES ONLY PAGES THE SHEET HAS, and every rule says where to l
   for (const page of ['Values', 'Blocks', 'Counts', 'Layout', 'Tab 5', 'Counts on Rule sheet'])
     assert.ok(file.rules.some((r) => r.page === page), `no rule is read on ${page}`);
 });
+
+/* ── 1.1.0: a project's own values, and a day in two zones (PGS-B03 job d, PGS-B04) ──────────────── */
+
+/** 1.0.0 as the catalogue published it at 63423720, never changed in place: the version an update starts from. */
+const RELEASED = new URL('../../apps/web/static/catalogue/packs/rule-sheet/1.0.0.pack.json', import.meta.url);
+
+/** The invented project of expect.json's example, the one row the gate's own-value lines are read off. */
+const EXAMPLE = (JSON.parse(readFileSync(new URL('./expect.json', import.meta.url), 'utf8')) as { example: Record<string, { list: string; fields: Record<string, unknown> }> }).example['Counts on Rule sheet']!;
+
+/** A body as a page's note reads it: each value drawn as text, a value with nothing to show as the dash. */
+const drawn = (body: string, values: Record<string, unknown>, now = NOW, zone?: string): string =>
+  (inline(body.replace(/\n/g, ' '), { now, ...(zone ? { zone } : {}), resolve: (p) => (p in values ? (values[p] === null ? null : String(values[p])) : null) }) as { type: string; text?: string; resolved?: string | null }[])
+    .map((n) => (n.type === 'path' ? (n.resolved ?? '—') : (n.text ?? '')))
+    .join('');
+
+test('AN UPDATE FROM 1.0.0 INSTALLS WITH NO REFUSAL AND KEEPS EVERY ROW, and the project page gains its own values', async () => {
+  const was = JSON.parse(readFileSync(RELEASED, 'utf8')) as Pack & { version: string };
+  assert.equal(was.version, '1.0.0');
+  assert.equal((pack() as Pack & { version: string }).version, '1.1.0');
+  const { api, close } = await fresh();
+  said(await put(api, was));
+  seed(api);
+  const names = (register: string): unknown[] => said<{ rows: { fields: Record<string, unknown> }[] }>(api.kernel.list({ register, limit: 50 })).rows.map((r) => r.fields.name ?? r.fields.what);
+  const held = [names('things'), names('tasks')];
+  const before = (await pageOf(api, 'rule-sheet')).blocks.map((b) => b.heading);
+  assert.ok(!before.includes('Its own values'), '1.0.0 already drew its own values');
+  const plan = said<{ diff: Diff }>(await planOf(api, pack())).diff;
+  assert.deepEqual(plan.conflicts, []);
+  said(await put(api, pack()));
+  /* THE ROWS ARE THE RECORD'S, never the add-on's: two projects and six tasks before, the same after. */
+  assert.deepEqual([names('things'), names('tasks')], held);
+  assert.deepEqual(held.map((l) => l.length), [2, 6]);
+  assert.equal(block(await pageOf(api, 'rule-sheet-values'), 'Values in text').values?.['tasks.count'], 6);
+  const project = await pageOf(api, 'rule-sheet');
+  assert.equal(ring(block(project, 'Tasks done here')), 'Tasks done here 3 of 5');
+  assert.deepEqual(block(project, 'Its own values').refusals, []);
+  close();
+});
+
+test('OWN VALUES: on the example project its own next step, its two counts and its day fill, and the gate reads each line', async () => {
+  const { api, close } = await fresh();
+  said(await put(api, pack()));
+  assert.equal(EXAMPLE.list, 'things');
+  said(api.kernel.create(EXAMPLE.list, EXAMPLE.fields, { actor: 'p_1' }));
+  const own = block(await pageOf(api, 'rule-sheet'), 'Its own values');
+  assert.deepEqual(own.refusals, []);
+  /* A PLAIN FIELD IS WRITTEN INTO THE BODY ON THE SERVER; a count and a typed day travel as values the page draws. */
+  assert.match(own.body!, /field of Rule sheet, .*Its next step: Glaze the second batch\./su);
+  assert.deepEqual(own.values, { 'domains.count': 2, 'repos.count': 0, aim: '2026-12-01' });
+  const text = drawn(own.body!, own.values!);
+  assert.ok(!text.includes('—'), `a value of the project drew as a dash: ${text}`);
+  /* EVERY OWN-VALUE LINE OF EXPECT.JSON IS IN WHAT THE PAGE DRAWS, so the gate passes on the example and on nothing else. */
+  const lines = (JSON.parse(readFileSync(new URL('./expect.json', import.meta.url), 'utf8')) as { rules: { block?: string; text?: string }[] }).rules;
+  const wanted = lines.filter((r) => r.block === 'Its own values' && r.text !== undefined).map((r) => r.text!);
+  assert.equal(wanted.length, 4);
+  for (const want of wanted) assert.ok(text.includes(want), `the page draws "${text}", which does not hold "${want}"`);
+  close();
+});
+
+test('OWN VALUES: a project with none of them draws the dash and nought, never a hole or a figure of the same name', async () => {
+  const { api, close } = await fresh();
+  said(await put(api, pack()));
+  seed(api);
+  const own = block(await pageOf(api, 'rule-sheet'), 'Its own values');
+  assert.deepEqual(own.values, { 'domains.count': 0, 'repos.count': 0 });
+  assert.deepEqual((own as { unnamed?: string[] }).unnamed ?? [], [], 'a field of the project was read as a word nobody knows');
+  assert.match(drawn(own.body!, own.values!), /Its next step: —\.\s+.*domains: 0\. How many repositories: 0\.\s+The day it aims for: —\./u);
+  close();
+});
+
+test('A DAY IN TWO ZONES: at 22:30 in Greenwich on the 14th the 15th is a day off there and today in Cairo, as expect.json says', () => {
+  const body = declared('rule-sheet-values').blocks.find((b) => b.heading === 'A day in two zones')!.body!;
+  const lines = (JSON.parse(readFileSync(new URL('./expect.json', import.meta.url), 'utf8')) as { rules: { block?: string; zone?: string; at?: string; text?: string }[] }).rules.filter((r) => r.block === 'A day in two zones');
+  assert.deepEqual(lines.map((r) => r.zone), ['UTC', 'Africa/Cairo']);
+  for (const r of lines) assert.ok(drawn(body, {}, Date.parse(r.at!), r.zone).includes(r.text!), `in ${r.zone} at ${r.at} the day does not read ${r.text}`);
+  /* THE SAME MOMENT, TWO ANSWERS: a day that moved with the reader's zone, or stopped moving, fails one of the two. */
+  const [utc, cairo] = lines.map((r) => drawn(body, {}, Date.parse(r.at!), r.zone));
+  assert.notEqual(utc, cairo);
+});
+
+test('EVERY NEW EXPECT LINE NAMES A BLOCK THE ADD-ON DECLARES on the page it is read on', () => {
+  type Line = { rule: string; page: string; block?: string };
+  const file = JSON.parse(readFileSync(new URL('./expect.json', import.meta.url), 'utf8')) as { pages: Record<string, string>; rules: Line[] };
+  const slugOf = (page: string): string => (file.pages[page] ? 'rule-sheet-project' : pack().declarations.find((d) => d.title === page)!.page);
+  const named = file.rules.filter((r) => r.block !== undefined);
+  assert.ok(named.length >= 7, 'the own-value and two-zone lines name no block');
+  for (const r of named) {
+    const headings = declared(slugOf(r.page)).blocks.map((b) => b.heading);
+    assert.ok(headings.includes(r.block), `${r.rule} names ${r.block}, which ${r.page} does not declare`);
+  }
+});

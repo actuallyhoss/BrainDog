@@ -17,19 +17,20 @@
  * A member who may decide questions could accept their own here too; that is not done, because a field on everybody's
  * rows is the owner's call and the record's decide gate does not say so for a `change`.
  *
- * ONLY KINDS THAT NEED NOTHING ELSE. Measured by filing `{ id, label, type }` for each of `schema.ts`'s fifteen against a
- * real kernel: `enum` is refused (no values) and `list` is refused (no element type). `ref` with no `to` and `money`
- * with no currency were both ACCEPTED, which is worse: a link to no list, and an amount the row page would write as
- * GBP because nothing said otherwise. `secret` is never a field on a row. `instant` and `duration` are left for a form
- * that asks more: the row page edits an instant as bare text, and a duration is a number whose unit nothing here would
- * say. What is left is `ADDABLE`, and each of those installs (`field-write.test.ts`). The Fields sheet is that form: its
- * kinds are `SHEET_KINDS` below, and `drafted` asks each the one more thing it needs.
+ * EACH KIND WITH THE ONE MORE THING IT NEEDS. Measured by filing `{ id, label, type }` for each of `schema.ts`'s fifteen
+ * against a real kernel: `enum` is refused (no values) and `list` is refused (no element type). `ref` with no `to` and
+ * `money` with no currency were both ACCEPTED, which is worse: a link to no list, and an amount nobody said the
+ * currency of. So a choice is sent with its values, a link with the list it points at (picked from the record's own,
+ * never typed), money only once the record has a currency of its own, and `list` is always a list of text; `fieldOf` refuses each missing piece in
+ * one sentence before anything is sent, and the record is to refuse the same at lint (SHL-B11 job 1). `secret` is never
+ * a field on a row. `instant` and `duration` are left for the Fields sheet, which asks more: its kinds are
+ * `SHEET_KINDS` below, and `drafted` asks each the one more thing it needs by the same rules.
  */
 
 import { createClient } from '@braindog/client';
 
 import { valueSaid } from '../voice.ts';
-import { labelOf } from './api.ts';
+import { homeCurrency, labelOf } from './api.ts';
 import { forget, type Fetch } from './boot-live.ts';
 import { REGISTERS } from './held.ts';
 import { fieldWords, sheetWords } from './field-words.ts';
@@ -37,11 +38,102 @@ import { learn } from './remote.ts';
 import { inverseOf } from './rows-write.ts';
 import type { FieldType, Fields, RegisterDecl } from './schema.ts';
 
-export const ADDABLE = ['text', 'document', 'day', 'int', 'decimal', 'bool', 'url', 'email'] as const satisfies readonly FieldType[];
+export const ADDABLE = [
+  'text',
+  'document',
+  'enum',
+  'ref',
+  'money',
+  'list',
+  'day',
+  'int',
+  'decimal',
+  'bool',
+  'url',
+  'email',
+] as const satisfies readonly FieldType[];
 export type Addable = (typeof ADDABLE)[number];
 
-/** One field somebody asked for: the id the record keeps, the name they typed, and its kind. */
-export type NewField = { id: string; label: string; type: Addable };
+/**
+ * One field somebody asked for: the id the record keeps, the name they typed, its kind, and the one more thing the kind
+ * needs. `to` is the list a link points at; `values` a choice's choices, cut and said once each; `currency` money's,
+ * `'record'` for the record's own, the only one a new field takes until the kernel says a field's currency. A `list` is a list of text, which is all this form offers.
+ */
+export type NewField = { id: string; label: string; type: Addable; to?: string; values?: string[]; currency?: string };
+
+/** The one more thing as typed or picked: the choices one a line, the list picked, the currency picked. */
+export type FieldMore = { to?: string; values?: string; currency?: string };
+
+/* THE CAPS ON A CHOICE, said in `fieldWords`: a choice of one is a fact and not a choice, and past forty nobody picks. */
+export const CHOICES_MIN = 2;
+export const CHOICES_MAX = 40;
+export const CHOICE_CHARS = 40;
+
+/* THE CURRENCIES THE RUNTIME KNOWS, as the kernel's `coerce.ts` reads them, so the form and the record agree. */
+const TENDER: ReadonlySet<string> = new Set(Intl.supportedValuesOf('currency'));
+
+/**
+ * The lists a link may point at: every list the record holds, less the kernel's own machinery, as `list-write.ts`
+ * `offered` reads them (not imported, because that module imports this one). Names for the picker, ids for the body.
+ */
+export function linkable(): { id: string; name: string }[] {
+  return Object.values(REGISTERS)
+    .filter((d) => !(d.seq_prefix !== undefined && !d.holds))
+    .map((d) => ({ id: d.id, name: d.name }));
+}
+
+/**
+ * The choices typed, cut and said once each, or the sentence saying why they are not a choice yet.
+ *
+ * CUT AND DE-DUPLICATED, NOT REFUSED FOR IT. Each line is trimmed and its spaces closed up, an empty one is dropped,
+ * and a second spelling of one already typed ("won" under "Won") is dropped with the first kept, because both mean the
+ * one choice and the person typing meant it once. What is still short, long or too many is refused in one sentence.
+ */
+export function choicesSaid(typed: string): { ok: true; values: string[] } | { ok: false; fix: string } {
+  const seen = new Set<string>();
+  const values: string[] = [];
+  for (const v of choicesOf(typed)) {
+    if (seen.has(fold(v))) continue;
+    seen.add(fold(v));
+    values.push(v);
+  }
+  if (values.length < CHOICES_MIN) return { ok: false, fix: fieldWords.fewChoices };
+  if (values.length > CHOICES_MAX) return { ok: false, fix: fieldWords.manyChoices };
+  const long = values.find((v) => [...v].length > CHOICE_CHARS);
+  if (long !== undefined) return { ok: false, fix: fieldWords.longChoice(long) };
+  return { ok: true, values };
+}
+
+/**
+ * The currency money is kept in, or the sentence saying why it is not one: `'record'`, the record's own, picked by that
+ * word or by its code. `home` is the record's own (`homeCurrency()`).
+ *
+ * ONLY THE RECORD'S OWN, UNTIL THE KERNEL TAKES A FIELD'S CURRENCY (`FIELD_KEYS` has no `currency`, SHL-B11 job 1). The
+ * one other place a field says a currency is its default, and a default is written into every row made after it: a
+ * Fee declared as nought in yen read 0 JPY on each new project, a figure nobody typed. So another code is refused in
+ * one sentence rather than sent that way, and a code the runtime does not know is refused as not a currency.
+ */
+export function currencySaid(picked: string | undefined, home: string | null): { ok: true; currency: 'record' } | { ok: false; fix: string } {
+  const c = (picked ?? '').trim();
+  if (c === '') return { ok: false, fix: fieldWords.pickCurrency };
+  if (c !== 'record' && !TENDER.has(c.toUpperCase())) return { ok: false, fix: fieldWords.currencyUnknown(c) };
+  if (home === null) return { ok: false, fix: fieldWords.noHome };
+  return c === 'record' || c.toUpperCase() === home.toUpperCase() ? { ok: true, currency: 'record' } : { ok: false, fix: fieldWords.otherCurrency(home) };
+}
+
+/**
+ * The declaration body a field is sent as: the id, the name and the kernel's type, and what that type needs.
+ *
+ * MONEY CARRIES NO KEY AND NO DEFAULT: it is in the record's own currency (`currencySaid`), which every money box falls
+ * back to (`money-typed.ts`), and a default would put an amount into every new row.
+ */
+export function bodyOf(field: NewField): FieldBody {
+  const base = { id: field.id, label: field.label };
+  if (field.type === 'enum') return { ...base, type: 'enum', values: [...(field.values ?? [])] };
+  if (field.type === 'ref') return { ...base, type: 'ref', to: field.to ?? '' };
+  if (field.type === 'list') return { ...base, type: 'list', of: 'text' };
+  return { ...base, type: field.type };
+}
 
 /* THE KERNEL'S OWN IDENT (`packages/kernel/src/declare.ts`): a letter first, 32 at most, and no doubled underscore. */
 const IDENT = /^(?!.*__)[a-z][a-z0-9_]{0,31}$/u;
@@ -70,22 +162,49 @@ export function idOf(label: string): string | null {
  *
  * A FIELD THE LIST ALREADY HAS IS REFUSED HERE, retired ones included, because the record refuses it too and a
  * sentence under the box beats a round trip. It compares ids, so `Web site` over a list holding `web_site` is caught.
+ *
+ * THE ONE MORE THING IS ASKED OF THE KINDS THAT NEED IT, each missing piece refused in one sentence the form draws at
+ * that piece: the list a link points at must be one the record holds (`linkable`), a choice needs two to forty
+ * choices, and money the record's own currency (`currencySaid`). A piece given for a kind that does not take it is left off.
  */
-export function fieldOf(register: string, label: string, type: string): { ok: true; field: NewField } | { ok: false; fix: string } {
+export function fieldOf(
+  register: string,
+  label: string,
+  type: string,
+  more: FieldMore = {},
+  home: string | null = homeCurrency(),
+): { ok: true; field: NewField } | { ok: false; fix: string } {
   const named = label.trim();
   if (named === '') return { ok: false, fix: fieldWords.noName };
   if (!(ADDABLE as readonly string[]).includes(type)) return { ok: false, fix: fieldWords.kindUnknown };
   const id = idOf(named);
   if (id === null) return { ok: false, fix: fieldWords.badName };
+  if (RESERVED.has(id)) return { ok: false, fix: fieldWords.reserved(named) };
   const decl = REGISTERS[register];
   if (decl?.fields.some((f) => f.id === id)) return { ok: false, fix: fieldWords.taken(named, decl.name) };
-  return { ok: true, field: { id, label: named, type: type as Addable } };
+  const field: NewField = { id, label: named, type: type as Addable };
+  if (type === 'ref') {
+    const to = (more.to ?? '').trim();
+    const lists = linkable();
+    if (to === '') return { ok: false, fix: lists.length === 0 ? sheetWords.noLists : fieldWords.pickLink };
+    if (!lists.some((l) => l.id === to)) return { ok: false, fix: fieldWords.linkGone };
+    return { ok: true, field: { ...field, to } };
+  }
+  if (type === 'enum') {
+    const said = choicesSaid(more.values ?? '');
+    return said.ok ? { ok: true, field: { ...field, values: said.values } } : said;
+  }
+  if (type === 'money') {
+    const said = currencySaid(more.currency, home);
+    return said.ok ? { ok: true, field: { ...field, currency: said.currency } } : said;
+  }
+  return { ok: true, field };
 }
 
 /** The change `propose` files: filed under the list it adds to, and adding this one field and nothing else. */
 export const additionOf = (register: string, field: NewField) => ({
   declaration_id: `register.${register}`,
-  to: { add: { register, fields: [{ id: field.id, label: field.label, type: field.type }] } },
+  to: { add: { register, fields: [bodyOf(field)] } },
 });
 
 export type Added =
@@ -151,7 +270,8 @@ export async function fileChange(base: string, register: string, question: strin
  * kernel type but a list whose every value is text (`{ type: 'list', of: 'text' }`), named for what a person picks.
  * `quantity` is the kernel's (`coerce.ts`) and not in the app's `FieldType`, which is why a field here is typed by
  * string: its value carries its own unit, so the field's `unit` is only the one a new value starts in. Money is offered
- * with no currency for the same reason: each amount the record holds carries its own. `secret`, `file` and `json` are
+ * with no currency for the same reason, each amount the record holds carrying its own, unless the sheet asks one
+ * (`FieldAsk.currency`, held by `currencySaid` to the record's own, as the row page's form is). `secret`, `file` and `json` are
  * never offered, because a secret is never a field on a row and nobody types the other two.
  */
 export const SHEET_KINDS = [
@@ -178,7 +298,7 @@ export const DURATION_UNITS = ['m', 'h', 'd'] as const;
 export type DurationUnit = (typeof DURATION_UNITS)[number];
 
 /** What the sheet asks for one field, as typed: a name and a kind, and the one more thing some kinds need. */
-export type FieldAsk = { label: string; kind: string; values?: string; to?: string; unit?: string };
+export type FieldAsk = { label: string; kind: string; values?: string; to?: string; unit?: string; currency?: string };
 
 /** One field as the record is sent it: the id it keeps, the name typed, the kernel's type and what that type needs. */
 export type FieldBody = { id: string; label: string; type: string; of?: string; values?: string[]; to?: string; unit?: string };
@@ -203,7 +323,7 @@ type Drafted = { ok: true; field: FieldBody } | { ok: false; fix: string };
  * been given so far. `lists` is the ids a link may point at. Neither is read from `REGISTERS` here, so the same check
  * serves a list that does not exist yet (`list-write.ts`).
  */
-export function drafted(ask: FieldAsk, held: readonly { id: string }[], list: string, lists: readonly string[]): Drafted {
+export function drafted(ask: FieldAsk, held: readonly { id: string }[], list: string, lists: readonly string[], home: string | null = homeCurrency()): Drafted {
   const no = (fix: string): Drafted => ({ ok: false, fix });
   const named = ask.label.trim();
   if (named === '') return no(fieldWords.noName);
@@ -215,15 +335,14 @@ export function drafted(ask: FieldAsk, held: readonly { id: string }[], list: st
   const base = { id, label: named };
   const kind = ask.kind as SheetKind;
   if (kind === 'enum') {
-    const values = choicesOf(ask.values ?? '');
-    if (values.length === 0) return no(sheetWords.noValues);
-    /* TWO CHOICES THAT READ THE SAME are one choice offered twice, and a filter saying it could mean either. */
-    const seen = new Set<string>();
-    for (const v of values) {
-      if (seen.has(fold(v))) return no(sheetWords.valueTwice(v));
-      seen.add(fold(v));
-    }
-    return { ok: true, field: { ...base, type: 'enum', values } };
+    /* THE SAME RULES AS THE ROW PAGE'S FORM (`choicesSaid`): two to forty, each said once, so the two cannot disagree. */
+    const said = choicesSaid(ask.values ?? '');
+    return said.ok ? { ok: true, field: { ...base, type: 'enum', values: said.values } } : said;
+  }
+  /* MONEY WITH NO CURRENCY ASKED IS SENT AS IT WAS, each amount carrying its own; one picked is held to the same rule. */
+  if (kind === 'money' && ask.currency !== undefined) {
+    const said = currencySaid(ask.currency, home);
+    if (!said.ok) return said;
   }
   if (kind === 'ref') {
     const to = ask.to ?? '';

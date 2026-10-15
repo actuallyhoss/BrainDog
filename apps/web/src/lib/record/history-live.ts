@@ -27,7 +27,7 @@ export type Fetch = NonNullable<ClientOptions['fetch']>;
 /**
  * One line of a row's history: who, what, and when, newest first. `settled` is who suggested the change and who settled
  * it ("Slash suggested · Mara accepted"), on a line an answered suggestion of Slash's made, where `linesOf` was handed
- * the names to say it with.
+ * the names to say it with, and "Slash did this without asking" on one Slash's rung let land (`slashDidSaid`).
  */
 export type Line = { by: string; note: string; at: string; settled?: string };
 
@@ -126,6 +126,13 @@ export type Suggested = {
   answer_label?: string | null;
   settled_by?: string | null;
   undone?: boolean | null;
+  /**
+   * On a line that took a question back, who had answered it: the ladder (`rule:ladder`) where Slash's rung let it land
+   * with nobody asked. On a change Slash's rung let land, `kept_by` is who kept it once its Undo passed. The record sends
+   * neither yet (`packages/record/src/settling.ts`), so an undo of such a change reads as any undo of Slash's.
+   */
+  answered_by?: string | null;
+  kept_by?: string | null;
 };
 
 /** How a suggestion was settled, read off one line: what was done, by whom, and whose suggestion it was. */
@@ -136,6 +143,9 @@ export type Settling = {
   by: string;
   suggested_by: string | null;
   drafted_by: string | null;
+  /** Who had answered the question an undo took back, and who kept a change that landed alone, where the line says. */
+  answered_by?: string;
+  kept_by?: string;
 };
 
 /**
@@ -178,7 +188,14 @@ function answerOf(to: unknown): string | null {
  * it was accepted, unless the line is the one that took it back.
  */
 export function settlingOf(e: Pick<Event, 'actor' | 'kind' | 'to'> & Suggested): Settling | null {
-  const whose = { suggested_by: text(e.suggested_by), drafted_by: text(e.drafted_by) };
+  const answered = text(e.answered_by);
+  const kept = text(e.kept_by);
+  const whose = {
+    suggested_by: text(e.suggested_by),
+    drafted_by: text(e.drafted_by),
+    ...(answered === null ? {} : { answered_by: answered }),
+    ...(kept === null ? {} : { kept_by: kept }),
+  };
   const by = text(e.settled_by) ?? e.actor;
   const label = text(e.answer_label);
   if (e.kind === 'decide') {
@@ -220,6 +237,46 @@ export function settledBy(e: Pick<Event, 'actor' | 'kind' | 'to'> & Suggested, s
   return s === null ? null : settledSaid(s, actorSaid(s.by, say.me, say.names).name, say.words);
 }
 
+/* ── what Slash did without asking ─────────────────────────────────────── */
+
+/**
+ * WHO ANSWERS A QUESTION SLASH'S RUNG LETS LAND, as the kernel signs it (`LADDER_RULE` in `packages/kernel/src/govern.ts`):
+ * the decision and the rows it wrote are the ladder's, and Slash stays on the question as its filer. Spelled here and
+ * not imported, as `page-versions.ts` spells it, so this route-only module pulls nothing of the kernel.
+ */
+const LADDER = 'rule:ladder';
+
+/** The words a change Slash made alone is said in. The verb for an undo is the card's own (`undid`). */
+export const slashDidWords = {
+  alone: 'Slash did this without asking',
+  did: (person: string, verb: string) => `Slash did · ${person} ${verb}`,
+  kept: 'kept',
+};
+
+/**
+ * THE ONE SENTENCE FOR A CHANGE SLASH MADE ALONE, for Activity and for a row's history: "Slash did this without asking",
+ * then "Slash did · Mara kept" or "Slash did · Mara undid" once somebody acted on it. ENG-B15: what landed alone reads as
+ * Slash's, with who kept or undid it.
+ *
+ * READ FROM WHAT THE LINE CARRIES. A question Slash filed (`suggested_by: slash`) that the ladder accepted is a change
+ * nobody was asked about: its `decide` line and every row it wrote say `by` the ladder. An undo is one only where the line
+ * says the ladder had answered what it took back (`answered_by`); without that it is any undo of Slash's, which
+ * `settledSaid` says. `null` for every other line, a person's own change and a suggestion somebody pressed among them.
+ * `name` says a person as the screen says them.
+ */
+export function slashDidSaid(s: Settling, name: (id: string) => string, words: Pick<SettledWords, 'undid'>): string | null {
+  if (s.suggested_by !== 'slash') return null;
+  if (s.how === 'accepted' && s.by === LADDER) return s.kept_by === undefined ? slashDidWords.alone : slashDidWords.did(name(s.kept_by), slashDidWords.kept);
+  if (s.how === 'undid' && s.answered_by === LADDER && s.by !== LADDER) return slashDidWords.did(name(s.by), words.undid);
+  return null;
+}
+
+/** The same for a line as the record sent it, and the sentence it says first: who settled it otherwise (`settledBy`). */
+export function slashDidBy(e: Pick<Event, 'actor' | 'kind' | 'to'> & Suggested, say: Say): string | null {
+  const s = settlingOf(e);
+  return s === null ? null : slashDidSaid(s, (id) => actorSaid(id, say.me, say.names).name, say.words);
+}
+
 /* A RULE IS `rule:<id>` ON THE RECORD AND `rule.<id>` IN THE SAMPLE, and `actorOf` words the second. */
 const actor = (a: string): string => a.replace(/^rule:/u, 'rule.');
 
@@ -232,7 +289,8 @@ const actor = (a: string): string => a.replace(/^rule:/u, 'rule.');
 export const linesOf = (register: string, events: readonly (Event & Suggested)[], say?: Say): Line[] =>
   events
     .map((e) => {
-      const settled = say === undefined ? null : settledBy(e, say);
+      /* WHAT SLASH DID ALONE FIRST, so a change the ladder let land is never "Slash suggested · Ladder accepted". */
+      const settled = say === undefined ? null : (slashDidBy(e, say) ?? settledBy(e, say));
       return { by: actor(e.actor), note: moneyInText(noteOf(register, e)), at: e.ts, ...(settled === null ? {} : { settled }) };
     })
     .reverse();

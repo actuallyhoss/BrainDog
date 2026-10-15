@@ -122,8 +122,6 @@ export const account = {
      (`accentRefused`). What is left is the choice itself. */
   accentHint: "Yours alone. It wins over the record's look below, which the owner sets for everyone.",
   accentHouse: 'House',
-  accentSet: (name: string) => `${name} is your colour.`,
-  accentReset: 'Back to the house colour.',
   /**
    * THE PALETTE THAT SHIPPED AND COULD NOT BE TURNED ON.
    *

@@ -20,7 +20,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 import { readPackFile } from '../../packages/declare/src/catalogue.ts';
 import { scriptReads, scriptRunner } from '../../packages/host/src/script.ts';
@@ -60,12 +60,13 @@ const published = (version: string): Record<string, unknown> =>
  * the brief's blocks had nowhere to land until this record held the rest too. Work is one of the five, and the brief
  * needs it: a step links to a task or a thread.
  */
-async function portfolio(): Promise<{ api: Api; close: () => void }> {
+async function portfolio(): Promise<{ api: Api; close: () => void; clock: ReturnType<typeof fixedClock> }> {
   const sql = openSqlite();
-  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  const clock = fixedClock(NOW);
+  const api = await createRecordApi({ sql, clock });
   for (const id of FIRST_PARTY) said(await put(api, firstPartyDocument(id, { seeds: [] })));
   said(await api.kernel.install([{ id: 'page.project', kind: 'page', body: PAGES.project as never }]));
-  return { api, close: () => sql.close() };
+  return { api, close: () => sql.close(), clock };
 }
 
 const planOf = async (api: Api, doc: unknown): Promise<Diff> =>
@@ -211,7 +212,7 @@ test('a thread moved to done ticks the steps linked to it, and a task reopened b
   close();
 });
 
-test('A RECORD ON 1.2.1 TAKES 2.0.0 WITH EVERY WORD KEPT, and one press brings the one line into About and the plan into steps', async () => {
+test('A RECORD ON 1.2.1 TAKES THE BRIEF AS IT SHIPS WITH EVERY WORD KEPT, and one press brings the one line into About and the plan into steps', async () => {
   const { api, close } = await portfolio();
   said(await put(api, published('1.2.1')));
   const marrow = make(api, 'things', {
@@ -226,7 +227,7 @@ test('A RECORD ON 1.2.1 TAKES 2.0.0 WITH EVERY WORD KEPT, and one press brings t
   const diff = await planOf(api, brief());
   assert.deepEqual(diff.conflicts, []);
   said(await put(api, brief()));
-  assert.equal(api.kernel.packs().find((p) => p.id === 'project-brief')?.version, '2.0.0');
+  assert.equal(api.kernel.packs().find((p) => p.id === 'project-brief')?.version, brief().version);
   /* NOTHING IS MOVED BY THE UPDATE ITSELF: the words stay in the retired fields until the person presses the button. */
   const kept = api.kernel.get(marrow)!.fields;
   const words = [kept.summary, kept.plan, kept.blockers];
@@ -284,7 +285,7 @@ test('the project page draws the brief and its steps after where it stands, and 
   const diff = await planOf(api, brief());
   assert.deepEqual(
     (diff as { page_adds?: { page: string; line: string; unresolved?: true }[] }).page_adds?.map((a) => [a.page, a.unresolved ?? null]),
-    [['page.project', null], ['page.project', null]],
+    [['page.project', null], ['page.project', null], ['page.project', null]],
   );
   said(await put(api, brief()));
   const marrow = make(api, 'things', { name: 'Marrow', lane: 'earning', about: 'A recipe book', stage: 'blocked', blockers: ['The printer quote'] });
@@ -295,8 +296,13 @@ test('the project page draws the brief and its steps after where it stands, and 
   /* AFTER PORTFOLIO 1.16.0'S FIRST "WHERE IT STANDS", the card a person who said where it stands reads, and before the
      figures drawn in its place while nobody has; the brief and its steps come in the order the pack gives them. */
   assert.equal(headings[at - 1], 'Where it stands');
-  assert.equal(headings[at + 1], 'Plan steps');
-  assert.equal(headings[at + 2], 'Where it stands');
+  assert.equal(headings[at + 1], 'Stopped working for this project');
+  assert.equal(headings[at + 2], 'Plan steps');
+  assert.equal(headings[at + 3], 'Where it stands');
+  /* NOTHING HAS STOPPED FOR MARROW, so the block is answered and not drawn: the empty rule, never a tile saying so. */
+  const stopped = page.blocks[at + 1] as Block & { about?: string; drawn?: boolean; why?: string };
+  assert.deepEqual([stopped.added, stopped.about, stopped.rows, stopped.refusals], ['project-brief', 'things#1', [], []]);
+  assert.deepEqual([stopped.drawn, stopped.why], [false, 'empty']);
   const added = page.blocks[at]!;
   assert.equal(added.added, 'project-brief');
   assert.deepEqual(added.refusals, []);
@@ -306,7 +312,7 @@ test('the project page draws the brief and its steps after where it stands, and 
   /* TAKING THE PACK OUT TAKES ITS BLOCKS OFF THE PAGE, because they lived in its manifest and nowhere else. */
   said(await api.uninstallPack({ id: 'project-brief' } as never, owner));
   const after = await pageOf(api, 'marrow');
-  assert.ok(!after.blocks.some((b) => b.heading === 'The brief' || b.heading === 'Plan steps'));
+  assert.ok(!after.blocks.some((b) => ['The brief', 'Plan steps', 'Stopped working for this project'].includes(b.heading ?? '')));
   close();
 });
 
@@ -379,12 +385,23 @@ test('installing it twice changes nothing, and uninstalling it keeps every brief
   close();
 });
 
-test('the same file passes as an add-on somebody opens from disk, and the catalogue serves 2.0.0 as it ships', async () => {
+test('the same file passes as an add-on somebody opens from disk, and 2.1.0 is 2.0.0 with one block more', async () => {
   const text = readFileSync(PACK_FILE, 'utf8');
   const file = said<{ pack: { manifest: { pack: string; version: string; extends?: unknown } } }>(await readPackFile(text));
-  assert.deepEqual([file.pack.manifest.pack, file.pack.manifest.version], ['project-brief', '2.0.0']);
+  assert.deepEqual([file.pack.manifest.pack, file.pack.manifest.version], ['project-brief', '2.1.0']);
   assert.deepEqual(Object.keys(file.pack.manifest.extends as object), ['register.things']);
-  assert.deepEqual(published('2.0.0'), brief(), 'the catalogue\'s 2.0.0 is not the file in packs/; run tools/catalogue/from-packs.mjs');
+  /* 2.0.0 IS RELEASED, so the file in packs/ is it with the stopped block laid in and its own version and changes line,
+     and nothing else of 2.0.0 moved. */
+  const now = brief() as { adds: { block: { source?: string } }[] } & Record<string, unknown>;
+  const was = published('2.0.0');
+  assert.deepEqual(
+    { ...now, version: was.version, changes: was.changes, adds: now.adds.filter((a) => a.block.source !== 'actions.blocking') },
+    was,
+    '2.1.0 changed more of 2.0.0 than its one block',
+  );
+  /* THE CATALOGUE'S 2.1.0 IS WRITTEN BY tools/catalogue/from-packs.mjs, and once written it is this file. */
+  const shipped = new URL('../../apps/web/static/catalogue/packs/project-brief/2.1.0.pack.json', import.meta.url);
+  if (existsSync(shipped)) assert.deepEqual(published('2.1.0'), brief(), 'the catalogue\'s 2.1.0 is not the file in packs/; run tools/catalogue/from-packs.mjs');
   /* NO ID, NO EM DASH AND NO "ROW" IN WHAT A PERSON READS: the labels, headings, empty lines and the button's name. */
   const words = JSON.stringify(brief(), (k, v: unknown) => (k === 'source' ? undefined : v));
   assert.doesNotMatch(words, /—|\brows?\b|\b[0-9A-HJKMNP-TV-Z]{26}\b/u);
@@ -403,5 +420,83 @@ test('a step added through the record\'s own create, the door an agent\'s create
   const order = ['Ship the variable axis', 'Write the licence', 'Raise the price'];
   assert.deepEqual(read.rows.map((r) => r.fields.what), order);
   assert.deepEqual((await stepsOn(api, 'kiln')).map((s) => s[0]), order);
+  close();
+});
+
+/* ── 2.1.0: what runs by itself and has stopped, on the project's page (SHL-C01) ─────────────────────────────────── */
+
+const STOPPED = 'Stopped working for this project';
+
+/** One action that runs by itself every hour for one project, by its spoken id, filing what it reads in a list of notes. */
+const pollFor = (project: string) => [
+  {
+    id: 'register.notes',
+    kind: 'register',
+    body: { id: 'notes', name: 'Notes', title: 'what', fields: [{ id: 'what', type: 'text', required: true }] },
+  },
+  {
+    id: 'ingest.balance',
+    kind: 'ingest',
+    body: {
+      ingest: 'balance',
+      channel: 'poll',
+      description: 'Kiln sales',
+      url: 'https://api.example.test/v1/balance',
+      every: '1h',
+      grant: 'example read',
+      project,
+      extract: { what: { after: 'balance ' } },
+      writes: { register: 'notes' },
+    },
+  },
+];
+const answer = (status: number, body = '') => async () => ({ status, body, bytes: body.length, ms: 3, requests: 1 });
+
+test('A RECORD ON 2.0.0 TAKES 2.1.0 WITH EVERY BRIEF AND STEP KEPT, and the project page gains the stopped block', async () => {
+  const { api, close } = await portfolio();
+  said(await put(api, published('2.0.0')));
+  const kiln = make(api, 'things', { name: 'Kiln', lane: 'earning', about: 'A type foundry', stage: 'building', blockers: ['The licence text'] });
+  make(api, 'plan_steps', { what: 'Ship the variable axis', gain: 'First sale', thing: kiln, rank: 1 });
+  const before = (await pageOf(api, 'kiln')).blocks.map((b) => b.heading);
+  assert.ok(!before.includes(STOPPED), 'the block is on the page before 2.1.0');
+  const diff = await planOf(api, brief());
+  /* ONE BLOCK MORE ON A PAGE IS ADDITIVE: nothing to approve and nothing in conflict. */
+  assert.deepEqual([diff.approve, diff.conflicts], [[], []]);
+  said(await put(api, brief()));
+  assert.equal(api.kernel.packs().find((p) => p.id === 'project-brief')?.version, '2.1.0');
+  const fields = api.kernel.get(kiln)!.fields;
+  assert.deepEqual([fields.about, fields.stage, fields.blockers], ['A type foundry', 'building', ['The licence text']]);
+  assert.deepEqual(await stepsOn(api, 'kiln'), [['Ship the variable axis', 'First sale', false]]);
+  const page = await pageOf(api, 'kiln');
+  const at = page.blocks.findIndex((b) => b.heading === 'The brief');
+  assert.equal(page.blocks[at + 1]?.heading, STOPPED);
+  for (const b of page.blocks.filter((x) => x.added === 'project-brief')) assert.deepEqual(b.refusals, [], `${b.heading} was refused`);
+  close();
+});
+
+test('AN ACTION THAT STOPPED FOR KILN IS NAMED ON KILN\'S PAGE with why and since, and Tallow\'s page draws nothing', async () => {
+  const { api, close, clock } = await portfolio();
+  said(await put(api, brief()));
+  const kiln = make(api, 'things', { name: 'Kiln', lane: 'earning' });
+  make(api, 'things', { name: 'Tallow', lane: 'building' });
+  const spoken = `things#${api.kernel.get(kiln)!.seq}`;
+  said(api.kernel.bindGrant({ label: 'example read', opens: 'api.example.test', kind: 'api_token', ciphertext: new Uint8Array([1, 2, 3]), nonce: new Uint8Array([9, 9, 9]), kdf: 'hkdf', wrapped_by: 'kek', kek_id: 'kek_2f' } as never, 'p_1'));
+  said(await api.kernel.install(pollFor(spoken) as never));
+  /* ONE GOOD RUN: nothing has stopped, and the block is answered with nothing and not drawn. */
+  await api.kernel.runActions(answer(200, 'balance 120') as never);
+  const quiet = blockOf(await pageOf(api, 'kiln'), STOPPED) as Block & { drawn?: boolean };
+  assert.deepEqual([quiet.rows, quiet.refusals, quiet.drawn], [[], [], false]);
+  /* THE PROVIDER REFUSES THE KEY, so the action pauses, and Kiln's page names it. */
+  clock.advance(2 * 3_600_000);
+  await api.kernel.runActions(answer(401, 'no') as never);
+  const stopped = blockOf(await pageOf(api, 'kiln'), STOPPED) as Block & { drawn?: boolean };
+  assert.deepEqual(stopped.refusals, []);
+  assert.deepEqual(stopped.rows.map((r) => [r.fields.name, r.fields.why]), [['Kiln sales', 'paused']]);
+  /* SINCE IS WHEN IT LAST WORKED: the good run two hours before. */
+  assert.equal(Date.parse(String(stopped.rows[0]?.fields.since)), NOW);
+  assert.notEqual(stopped.drawn, false, 'a block with an action in it was not drawn');
+  /* ANOTHER PROJECT: the same action is not in its way. */
+  const other = blockOf(await pageOf(api, 'tallow'), STOPPED) as Block & { drawn?: boolean };
+  assert.deepEqual([other.rows, other.refusals, other.drawn], [[], [], false]);
   close();
 });

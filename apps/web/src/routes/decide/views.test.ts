@@ -13,7 +13,7 @@ import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { openRecord, type QueueQuestion } from '@braindog/kernel';
 import type { Fetch, LiveBlock } from '../../lib/record/page-live.ts';
-import { callsRead, DECIDE_HOME, decideBlockOf, decideDrawn, decideHome, readDecide, waitingOf, type Call } from './views.ts';
+import { blocksMineFirst, callsRead, DECIDE_HOME, decideBlockOf, decideDrawn, decideHome, mineFirst, othersLine, readDecide, waitingOf, type Call } from './views.ts';
 import { words } from './words.ts';
 
 const CLOCK = Date.UTC(2026, 9, 2, 12);
@@ -288,4 +288,41 @@ test('the screen draws the declared page through the one reader, and keeps the o
 test('the head is calm: no group control, no Select, no waiting chart, no key hints, no counts', () => {
   for (const gone of ['segmented', 'decideSelect', 'decideGroup', '<Bars', 'waitedOf', '<Kbd', 'group-n', 'LEAD.switch'])
     assert.ok(!screen.includes(gone), `the page still draws ${gone}`);
+});
+
+/* ── who decides (USE-A13), with invented people ── */
+
+const ADA = 'p_ada';
+const BEN = 'p_ben';
+const named = (id: string): string | null => ({ [ADA]: 'Ada Quill', [BEN]: 'Ben Arlow' })[id] ?? null;
+const handed = (id: string, decider: string | null) => ({ ...question(id), decider });
+
+test('the questions named for the reader come first, under "Yours to decide", the rest in the record’s order', () => {
+  const rows = [handed('q1', null), handed('q2', ADA), handed('q3', BEN), handed('q4', ADA), question('q5')];
+  const ada = mineFirst(rows, ADA);
+  assert.deepEqual(ada.rows.map((r) => r.id), ['q2', 'q4', 'q1', 'q3', 'q5']);
+  assert.equal(ada.yours, 2);
+  assert.equal(ada.heading, 'Yours to decide');
+  /* NOBODY NAMED FOR THE READER: the order is the record's and there is no heading. */
+  const cy = mineFirst(rows, 'p_cy');
+  assert.deepEqual(cy.rows.map((r) => r.id), ['q1', 'q2', 'q3', 'q4', 'q5']);
+  assert.equal(cy.heading, null);
+  assert.equal(mineFirst(rows, null).heading, null);
+});
+
+test('somebody else’s card says who decides it; the reader’s own and a question naming nobody say nothing', () => {
+  assert.equal(othersLine(handed('q2', ADA), BEN, named), 'Ada Quill decides this');
+  assert.equal(othersLine(handed('q2', ADA), ADA, named), null);
+  assert.equal(othersLine(handed('q1', null), BEN, named), null);
+  assert.equal(othersLine(question('q5'), BEN, named), null);
+});
+
+test('every open queue on the page puts the reader’s first, and a page naming nobody comes back as it was', () => {
+  const blocks = [noteBlock(), queueBlock([handed('q1', BEN), handed('q2', ADA)], 2, true), queueBlock([handed('q1', BEN), handed('q2', ADA), handed('q3', null)], 3)];
+  const ada = blocksMineFirst(blocks, ADA);
+  assert.equal(ada[0], blocks[0]);
+  assert.deepEqual(ada[1]?.queue?.map((q) => q.id), ['q2', 'q1']);
+  assert.deepEqual(ada[2]?.queue?.map((q) => q.id), ['q2', 'q1', 'q3']);
+  const cy = blocksMineFirst(blocks, 'p_cy');
+  cy.forEach((b, n) => assert.equal(b, blocks[n]));
 });

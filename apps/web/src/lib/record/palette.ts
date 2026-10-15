@@ -6,6 +6,7 @@
  */
 
 import type { SearchResult } from './api.ts';
+import { bookKept } from './books-kept.ts';
 import { METRICS } from './declared.ts';
 import { isTemplate, unreadable } from './metrics.ts';
 import type { IconName } from '../ui/icons.ts';
@@ -34,7 +35,7 @@ export function roundRobin(result: SearchResult, limit: number): SearchResult {
 }
 
 /** One line of the record's log, and only the keys read here. */
-export type Changed = { ts: string; kind: string; register: string | null; seq: number | null; title: string | null };
+export type Changed = { ts: string; kind: string; register: string | null; seq: number | null; title: string | null; actor?: string };
 
 /** A row somebody changed, as the palette draws it. */
 export type Recent = { target: string; title: string; list: string; at: string; href: string; spoken: string; icon: IconName };
@@ -45,6 +46,9 @@ export type Recent = { target: string; title: string; list: string; at: string; 
  * THE STANDING RULE DECIDES WHICH. A line about no row, a row in a list this caller cannot open, or a row with no title
  * is not built. A row whose newest line removed it is passed over too, and its older lines with it: there is no page to
  * open.
+ *
+ * A RUN KEEPING ITS OWN BOOKS IS NOT A CHANGE (`bookKept`): its lines are skipped before they count as the row's newest,
+ * so a person's edit to that same run, older than the run's last heartbeat, still shows.
  */
 export function recentOf(events: readonly Changed[], lists: readonly List[], cap: number): Recent[] {
   const named = new Map(lists.map((l) => [l.id, l]));
@@ -54,6 +58,8 @@ export function recentOf(events: readonly Changed[], lists: readonly List[], cap
     if (out.length >= cap) break;
     if (e.register === null || e.seq === null) continue;
     const target = `${e.register}#${e.seq}`;
+    /* A RUN'S OWN REMOVAL STILL CLOSES ITS PAGE, so its older lines are passed over with it. */
+    if (bookKept(e) && e.kind !== 'delete') continue;
     if (seen.has(target)) continue;
     seen.add(target);
     const list = named.get(e.register);

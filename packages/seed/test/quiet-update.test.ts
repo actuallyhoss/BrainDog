@@ -25,6 +25,9 @@ import { peopleBefore3 } from './people-before-3.ts';
 import { CHASING } from '../src/modules/money/pages/parts/chasing.ts';
 import { NEXT_30 } from '../src/modules/money/pages/parts/next30.ts';
 import { QUEUE } from '../src/modules/money/pages/parts/queue.ts';
+import { AGES } from '../src/modules/money/pages/parts/ages.ts';
+import { BUDGET } from '../src/modules/money/pages/parts/budget.ts';
+import { SPENDING } from '../src/modules/money/pages/parts/spending.ts';
 
 type Body = Record<string, unknown>;
 const TODAY = dayOf(NOW);
@@ -260,8 +263,8 @@ test('AN UPDATE THAT ONLY REARRANGES A PAGE GOES IN ON ITS OWN, and asks nothing
   assert.deepEqual(page.layout, { rail: 4 });
   const work = value<{ blocks: { heading?: string; when?: { metric?: string } }[] }>(k.page('work'));
   assert.equal(work.blocks.find((b) => b.heading === 'This week')?.when?.metric, 'tasks-this-week-yours');
-  /* AND RUNS OUT DRAWS THE DAY, over the figure the update brought with it (money-core 3.12.0). */
-  const runs = (page.blocks as { heading?: string; cells?: { metric: string }[] }[]).find((b) => b.heading === 'Runs out');
+  /* AND LASTS DRAWS THE DAY, over the figure the update brought with it (money-core 3.12.0). */
+  const runs = (page.blocks as { heading?: string; cells?: { metric: string }[] }[]).find((b) => b.heading === 'Lasts');
   assert.deepEqual(runs?.cells?.map((c) => c.metric), ['runs-out-on']);
   assert.ok(k.packClaims('money-core').includes('metric.runs-out-on'), 'the day the money runs out did not reach the record');
   sql.close();
@@ -718,7 +721,7 @@ const withoutBatch78 = (doc: Body): Body => {
   };
   const money = withPage(doc, 'money', (now) => now.flatMap(lasts));
   const book = withPage(money, 'money-book', (now) => now.filter((b) => !(b.kind === 'note' && (b.when as Body | undefined)?.metric === 'book-lasts-until:{{name}}')));
-  return { ...book, declarations: (book.declarations as Body[]).filter((d) => d.script !== 'match_payment' && d.rule !== 'payment-matches' && d.rule !== 'instalment-settles' && d.script !== 'file_back' && d.script !== 'learn_category' && d.rule !== 'rule-files-back' && d.rule !== 'category-teaches' && d.rule !== 'category-taught') };
+  return { ...book, declarations: (book.declarations as Body[]).filter((d) => d.script !== 'match_payment' && d.rule !== 'payment-matches' && d.rule !== 'instalment-settles' && d.script !== 'file_back' && d.script !== 'learn_category' && d.rule !== 'rule-files-back' && d.rule !== 'category-teaches' && d.rule !== 'category-taught' && d.script !== 'settle_matched_line' && d.rule !== 'recurring-went-through') };
 };
 /** AND BATCH 92'S, folded into the same unreleased step and undone first (money-every-month-92, REC-B23 jobs 5 to 7): the walk of the next thirty days stands under Coming and going again, Every month goes, and the chart reads twelve months back. And a deleted payment no longer reopens its bill (unsettle-92): `payment-unsettles` and its script go. */
 const withoutBatch92 = (doc: Body): Body => {
@@ -746,6 +749,42 @@ const withoutBatch95 = (doc: Body): Body =>
         .map((b) => (b.kind === 'note' && b.lead === true && typeof b.body === 'string' ? { ...b, body: NO_INCOME_95.reduce((body, [ends, was]) => (body.endsWith(ends) ? body.slice(0, -ends.length) + was : body), b.body) } : b)),
     (d) => d.metric !== 'lasts-no-income',
   );
+/**
+ * AND BATCH 100'S, folded into the same unreleased step and undone first. The side column's tile is Runs out again,
+ * drawn in the danger colour whenever the walk goes under, where it is Lasts, calm (money-lasts-tile-100). Cash ahead
+ * opens on three months on Money and on a year on a book's page, with no ten weeks and no `axis`, and a book's empty
+ * line says the next twelve months (money-ten-weeks-100). Where it went comes off the end of Money, and This month's
+ * spending and Budgets stand after Instalments again, with Last confirmed under Heads up (money-where-it-went-100).
+ * The two ids of money-next-moves-100 go with `withoutBatch78`, and `settle`, whose text it changed, goes whole below.
+ */
+const RUNS_OUT_99: Body = {
+  kind: 'stat',
+  heading: 'Runs out',
+  icon: 'alert',
+  span: 12,
+  area: 'rail',
+  tone: 'bad',
+  cells: [{ metric: 'runs-out-on', label: 'On what is due', note: 'In {{runway-days}}' }],
+  when: { metric: 'runway-days', gte: 0 },
+};
+const WHERE_IT_WENT_100: ReadonlySet<string> = new Set(['Where it went', 'This month, by category', 'No category yet, by who was paid']);
+const noAxis = ({ axis: _axis, ...rest }: Body): Body => rest;
+const withoutBatch100 = (doc: Body): Body => {
+  const money = withPage(doc, 'money', (now) =>
+    now
+      .filter((b) => !WHERE_IT_WENT_100.has(String(b.heading)))
+      .flatMap((b): Body[] => {
+        if (b.heading === 'Lasts' && b.area === 'rail') return [RUNS_OUT_99];
+        if (b.heading === 'Cash ahead') return [noAxis({ ...b, horizon: 90, horizons: [90, 180, 365, 730, 1825, 'last'] })];
+        if (b.heading === 'What it holds today') return [AGES[0] as Body, b];
+        if (b.heading === 'Instalments') return [b, SPENDING[0] as Body, BUDGET.find((x) => x.kind === 'progress') as Body];
+        return [b];
+      }),
+  );
+  return withPage(money, 'money-book', (now) =>
+    now.map((b) => (b.heading === 'Cash ahead' ? noAxis({ ...b, horizon: 365, horizons: [90, 180, 365, 730, 1825, 'last'], empty: 'Nothing in {{name}} is dated in the next twelve months.' }) : b)),
+  );
+};
 /** Batch 63's four figures of this month's spending against last (spend-figures-63), new in the unreleased money-core 3.17.0. */
 const SPEND_VS_LAST: ReadonlySet<string> = new Set(['spent-last-month', 'spent-by-category-last-month', 'spent-by-category-to-date-last-month', 'spent-vs-last-month']);
 /** Projects' quiet line with the clause for its list's questions, added inside the unreleased portfolio 1.17.0 (waiting-work-projects-99, PGS-C18). */
@@ -756,7 +795,7 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
     version: '3.13.0',
     released: '2e09983b40aba73e',
     undo: (raw) => {
-      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(withoutPlanLeads(withoutBatch73(withoutBatch74(withoutBatch75(withoutBatch76(withoutBatch77(withoutBatch78(withoutBatch92(withoutBatch95(raw))))))))))))))))))));
+      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(withoutPlanLeads(withoutBatch73(withoutBatch74(withoutBatch75(withoutBatch76(withoutBatch77(withoutBatch78(withoutBatch92(withoutBatch95(withoutBatch100(raw)))))))))))))))))))));
       return {
       ...doc,
       /* AND THE SCRIPT THAT MARKS A BILL PAID, WITH THE RULE THAT STARTS IT (settle-rule-60), both newer than 3.13.0. */
@@ -1082,8 +1121,10 @@ const DUE_NO_NEAR_EDGE = 'state is open or part, due before +8d';
  * lasts the year" (founder-lasts-74).
  */
 const lookBefore = (doc: Body, id: string): Body => {
-  /* A TEAM'S HOME DRAWS GONE QUIET inside the unreleased 2.21.0 (founder-home-quiet-88, batch 88): it comes off. */
-  if (id === 'team') return withPage(doc, 'home-team', (now) => now.filter((b) => b.source !== 'exceptions'));
+  /* A TEAM'S HOME DRAWS GONE QUIET inside the unreleased 2.21.0 (founder-home-quiet-88, batch 88): it comes off. AND
+     BATCH 100'S BURN-DOWN THAT FILLS ITSELF (team-cycle-follows-100) comes off too: Bring the team in gets Invite your
+     team back, the burn-down's empty line says the standup agent again, and the use case's rules and scripts go. */
+  if (id === 'team') return withPage(doc, 'home-team', (now) => now.filter((b) => b.source !== 'exceptions').map((b) => b.heading === 'Bring the team in' ? { ...b, authored: [{ cells: ['Invite your team', '/settings/people', 'Send each teammate a link to this board'] }, { cells: ['Connect an agent', '/settings/agents', 'The line to paste into Claude Code so an agent can take tickets'] }] } : b.heading === 'Open tickets, each morning' ? { ...b, empty: 'No cycle day is written yet. The standup agent adds one each morning, or add today by hand.' } : b), (d) => !(d.pack === 'usecase-team' && (typeof d.rule === 'string' || typeof d.script === 'string')));
   if (id !== 'founder') return doc;
   const config = doc.config as Record<string, Body> | undefined;
   return {
@@ -1208,7 +1249,7 @@ test("A USE CASE'S UPDATE THAT FOLDS A CHART INTO A FIGURE LOSES NOTHING, and go
     const next = value<Pack>(await normalise(now, { kind: 'local' }));
     const diff = await plan(next, stateOf(k, sql));
     assert.deepEqual(losses(diff), [], `${id}: nothing would be lost`);
-    assert.deepEqual([diff.adds.length, diff.retires.length, diff.conflicts.length], [id === 'founder' ? 4 : 0, 0, 0], `${id}: only a page changed, and the founder's figures since (service-numbers the fourth, estate-numbers-61)`);
+    assert.deepEqual([diff.adds.length, diff.retires.length, diff.conflicts.length], [id === 'founder' ? 4 : id === 'team' ? 5 : 0, 0, 0], `${id}: only a page changed, and the founder's figures since (service-numbers the fourth, estate-numbers-61), and the team's three rules and two scripts (team-cycle-follows-100)`);
     value(await install(next, diff, hostFor(k), diff.planHash));
     assert.equal(k.packs().find((p) => p.id === pack)?.version, u.version);
     const held = (k.declarations() as { id: string; body: unknown }[]).find((d) => d.id === 'page.project')!;

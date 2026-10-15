@@ -45,6 +45,9 @@
  * last stated in another, the run wrote its reason to its own log and nothing a person reads, so the count stood with
  * no difference and no word. Both of those paths now write What happened, naming the two currencies and the way out:
  * count in the account's currency. Still no check and no difference for such a count.
+ *
+ * A COUNT THAT FILES SAYS WHERE IT WENT (1.4.0). Money shows the newest count, how far out it was and What happened,
+ * so a count whose difference went into the Ledger says so there. A count that agrees files nothing and says nothing.
  */
 
 const WHAT = 'Cash count difference';
@@ -58,6 +61,9 @@ const NOT_COMPARED = 'This account holds an entry in another currency, so it was
 
 /** What a count in another currency than its account says under What happened (1.3.3), with the way out. */
 const otherCurrency = (counted, held) => `This count is in ${counted} and the account is in ${held}, so it was not compared. Count in the account's currency.`;
+
+/** What a count whose difference was written into the Ledger says under What happened (1.4.0). */
+const FILED = 'Filed as one entry in the Ledger.';
 
 /** The most rows one `ctx.record.list` answers, the record's own page. A full page may have left rows out. */
 const PAGE = 50;
@@ -187,5 +193,6 @@ export default async function run(ctx) {
     source: `Cash count of ${day}`,
     ...book,
   });
-  ctx.update(`cash_counts#${count.seq}`, { difference: { amount: difference, currency: counted.currency } }, count.version);
+  const filed = difference === 0 ? {} : { said: FILED };
+  ctx.update(`cash_counts#${count.seq}`, { difference: { amount: difference, currency: counted.currency }, ...filed }, count.version);
 }

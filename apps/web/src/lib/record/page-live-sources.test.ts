@@ -73,7 +73,7 @@ test('a handoffs.open card is drawn: the step, the run by its app and day, the t
   assert.ok(!cells.some((c) => ISO.test(c) || /^S\d+$/u.test(c) || ULID.test(c)), cells.join(' | '));
   assert.deepEqual(block.rows.map((r) => r.key), ['handoff:01JSTEPA', 'handoff:01JSTEPB']);
   assert.deepEqual(block.rows.map((r) => r.href), ['/r/session/731', '/r/session/740'], 'a step opens the run that left it');
-  assert.deepEqual(block.runFaces, [{ run: 'S731', agent: 'claude', live: 'stopped' }, null]);
+  assert.deepEqual(block.runFaces, [{ run: 'S731', agent: 'claude', live: 'stopped', presence: 'before' }, null]);
   const drawn = JSON.stringify(toSegments(block as never));
   assert.ok(drawn.includes('Wire the rates page') && drawn.includes('Left earlier'), drawn.slice(0, 400));
 });

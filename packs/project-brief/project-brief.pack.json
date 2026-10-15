@@ -1,9 +1,9 @@
 {
   "pack": "project-brief",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "title": "Project brief",
   "summary": "What each project is in a line, the stage it is at, what is in the way, and a plan made of steps you can tick.",
-  "changes": "The plan is steps now, each with what it gains, ticked by hand or when the task or thread it links to is done. A project has a stage. The one line is About, the one Portfolio already has. A brief written before keeps its words: run Bring briefs over once to move them.",
+  "changes": "A project's page now says which of the things that run by itself for it have stopped working, and why, under what is in its way. It shows only when one has.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -93,6 +93,37 @@
         ],
         "limit": 1,
         "empty": "Nobody has written a line, a stage or what is in the way for {{name}} yet."
+      }
+    },
+    {
+      "page": "page.project",
+      "after": "Where it stands",
+      "note": "What runs by itself for the project and has stopped: paused, failing or late, the same read as Health's. Drawn only when there is one.",
+      "block": {
+        "kind": "table",
+        "heading": "Stopped working for this project",
+        "span": 12,
+        "source": "actions.blocking",
+        "about": "{{spoken}}",
+        "columns": [
+          {
+            "field": "name",
+            "label": "What runs by itself",
+            "width": "minmax(18ch,2fr)"
+          },
+          {
+            "field": "why",
+            "label": "Why",
+            "width": "10ch"
+          },
+          {
+            "field": "since",
+            "label": "Last worked",
+            "width": "14ch"
+          }
+        ],
+        "limit": 20,
+        "empty": "Everything that runs by itself for {{name}} is working."
       }
     },
     {

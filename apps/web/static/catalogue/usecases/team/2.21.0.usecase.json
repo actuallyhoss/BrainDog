@@ -347,6 +347,109 @@
         "compare": "none"
       },
       {
+        "rule": "ticket_done_ticks_plan",
+        "pack": "usecase-team",
+        "on": {
+          "written": {
+            "register": "tasks",
+            "op": [
+              "update"
+            ],
+            "fields": [
+              "state"
+            ]
+          }
+        },
+        "when": "state is done",
+        "steps": [
+          {
+            "script": {
+              "id": "plan_follows_ticket",
+              "as": "ticking"
+            }
+          }
+        ]
+      },
+      {
+        "rule": "ticket_reopened_unticks_plan",
+        "pack": "usecase-team",
+        "on": {
+          "written": {
+            "register": "tasks",
+            "op": [
+              "update"
+            ],
+            "fields": [
+              "state"
+            ]
+          }
+        },
+        "when": "state is not done",
+        "steps": [
+          {
+            "script": {
+              "id": "plan_follows_ticket",
+              "as": "unticking"
+            }
+          }
+        ]
+      },
+      {
+        "rule": "cycle_day_each_morning",
+        "pack": "usecase-team",
+        "on": {
+          "every": "1d",
+          "at": "06:00"
+        },
+        "steps": [
+          {
+            "script": {
+              "id": "cycle_day",
+              "as": "counting"
+            }
+          }
+        ]
+      },
+      {
+        "script": "plan_follows_ticket",
+        "title": "Tick a planned ticket when its ticket is done",
+        "pack": "usecase-team",
+        "runs": {
+          "rule": true
+        },
+        "egress": [],
+        "keys": [],
+        "reads": [
+          "tasks",
+          "cycle_plan"
+        ],
+        "writes": [
+          "cycle_plan"
+        ],
+        "source": "export default async function run(ctx) {\n  const ticket = await ctx.record.get(ctx.input.id);\n  if (!ticket) return;\n  const done = ticket.fields.state === 'done';\n  const lines = await ctx.record.list('cycle_plan', { all: [{ field: 'task', is: ticket.id }] });\n  for (const line of lines)\n    if ((line.fields.done === true) !== done) ctx.update('cycle_plan#' + line.seq, { done }, line.version);\n}"
+      },
+      {
+        "script": "cycle_day",
+        "title": "Write the morning's cycle day",
+        "pack": "usecase-team",
+        "runs": {
+          "rule": true
+        },
+        "egress": [],
+        "keys": [],
+        "reads": [
+          "cycles",
+          "cycle_plan",
+          "cycle_days",
+          "tasks"
+        ],
+        "writes": [
+          "cycle_plan",
+          "cycle_days"
+        ],
+        "source": "export default async function run(ctx) {\n  const today = ctx.today();\n  const cycles = await ctx.record.list('cycles', { all: [{ field: 'state', is: 'active' }] });\n  if (cycles.length === 0) return;\n  const written = await ctx.record.list('cycle_days', { all: [{ field: 'day', is: today }] });\n  if (written.some((d) => !d.fields.cycle)) return;\n  for (const cycle of cycles) {\n    if (written.some((d) => d.fields.cycle === cycle.id)) continue;\n    const lines = await ctx.record.list('cycle_plan', { all: [{ field: 'cycle', is: cycle.id }, { field: 'done', is: false }] });\n    let open = 0;\n    for (const line of lines) {\n      const ticket = line.fields.task ? await ctx.record.get(line.fields.task) : null;\n      if (ticket && ticket.fields.state === 'done') ctx.update('cycle_plan#' + line.seq, { done: true }, line.version);\n      else open++;\n    }\n    ctx.write('cycle_days', { day: today, open, cycle: cycle.id });\n  }\n}"
+      },
+      {
         "page": "home-team",
         "title": "Team",
         "icon": "home",
@@ -520,16 +623,9 @@
             "authored": [
               {
                 "cells": [
-                  "Invite your team",
-                  "/settings/people",
-                  "Send each teammate a link to this board"
-                ]
-              },
-              {
-                "cells": [
                   "Connect an agent",
                   "/settings/agents",
-                  "The line to paste into Claude Code so an agent can take tickets"
+                  "A team of agents works on any record. A team of people needs Cloud."
                 ]
               }
             ]
@@ -580,7 +676,7 @@
             ],
             "back": 14,
             "bucket": "day",
-            "empty": "No cycle day is written yet. The standup agent adds one each morning, or add today by hand."
+            "empty": "No cycle day is written yet. Once a cycle is active the record writes one each morning."
           }
         ]
       },
@@ -1242,7 +1338,7 @@
     },
     {
       "name": "standup-digest",
-      "trigger": "each morning, to say what moved yesterday, what is blocked and what agents finished, tick the planned tickets that are done, and add a cycle day with how many tickets are still open"
+      "trigger": "each morning, to say what moved yesterday, what is blocked and what agents finished"
     }
   ],
   "nav": [],

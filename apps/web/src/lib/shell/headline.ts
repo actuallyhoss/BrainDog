@@ -15,7 +15,7 @@ export type Part = { text: string; fig?: true; needs?: true };
  * A FIGURE: digits with their grouping and decimals, a currency sign before them and a per cent after. A word for a
  * number ("Seven things") is a word, and is left as one.
  */
-const FIGURE = /[£$€¥₹]?\d(?:[\d,.]*\d)?%?/gu;
+const FIGURE = /(?:[A-Z]{3}\u00a0|[A-Z]{0,2}\p{Sc})?\d(?:[\d,.]*\d)?(?:%|\u00a0[A-Z]{3}\b)?/gu;
 
 function figures(text: string): Part[] {
   const out: Part[] = [];

@@ -217,6 +217,8 @@ const SHAPES: Record<string, string> = {
   'lines of one reading': '```lines | Aov, Crumb.gg\nDay | Aov, Crumb.gg | was: Previous 30 days\n27 Sep |  | \n28 Sep | £24.10 | \n```',
   'lines of one reading under no heading': '```lines\nDay | Signups\n28 Sep | 14\n```',
   'lines of one reading on the second of two lines': '```lines | Revenue and costs\nDay | Revenue | Costs\n1 Sep |  | \n2 Sep |  | £5\n```',
+  /* TWELVE NOISY READINGS HOLD NO TREND, so the chart says so under it (`lines-trend.ts`). */
+  'lines with no clear trend': '```lines | Visits\nDay | Visits\n1 Sep | 20\n2 Sep | 5\n3 Sep | 31\n4 Sep | 8\n5 Sep | 26\n6 Sep | 12\n7 Sep | 3\n8 Sep | 29\n9 Sep | 14\n10 Sep | 22\n11 Sep | 6\n12 Sep | 18\n```',
   'a series of two plain columns': '```series\nQuarter | Sales | out: Costs\nQ1 | 10 | 4\nQ2 | 12 | 5\n```',
   'a forecast with a past, stems, knobs and a crossing':
     '```forecast\nopening | 2026-09-17 | Cash now | £34,850.00\npast | 2026-09-14 |  | £30,120.00\npast | 2026-09-15 |  | £31,000.00\npast | 2026-09-16 |  | £32,000.00\nstep | 2026-09-20 | Invoice 2026-049: type licensing | £960.00\nstep | 2026-10-01 | Corporation tax | −£40,100.00\nstep | 2026-11-02 | Retainer | £9,000.00\nhorizon | 90 |  | \nknobs | horizon late spend leave |  | \n```',

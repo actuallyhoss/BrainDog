@@ -37,6 +37,7 @@
   import { WORKING_GLYPH, WORKING_LABEL } from '../../src/working.ts';
   import { ROW_ACTIONS_HEAD, type OnAct } from '../../src/actions.ts';
   import Actions from '../Actions.svelte';
+  import { windowed } from '../../src/rows-window.ts';
 
   /**
    * What a scope cell draws its chip from. The host's type of the same shape is `ScopeCells` in
@@ -345,7 +346,7 @@
   The stylesheet rules stay as the safety net they should always have been: a host that renders this
   without the branch gets one body rather than two stacked on each other.
 -->
-{#if rowsAsCards()}
+{#if windowed(rows.length)}{#await import('./RowsWindow.svelte') then m}<m.default {columns} {rows} {total} {cap} {label} {sort} bind:focus {selected} {onactivate} {onsort} {onmore} {cellSnippet} {href} {scope} {icon} {home} {rowActions} {act} />{/await}{:else if rowsAsCards()}
 <ul class="table-cards">
   {#each lines as line (line.kind === 'group' ? `\u0000${line.name}` : line.row.key)}
     {#if line.kind === 'group'}
@@ -553,9 +554,10 @@
 
 <!-- THE CAP LINE IS THE HOST'S, NOT THIS COMPONENT'S.
 
-     The way past the cap is a filter or an export, never a virtualised scroll: virtualisation breaks
-     find-in-page, breaks the scrollbar as a position cue, and only HIDES the measured wall, which is
-     DOM construction (13 §4.3). This component used to draw that sentence from its own `total`
+     Past ROWS_WINDOW_FROM rows (120, `../../src/rows-window.ts`) the table is drawn through
+     `RowsWindow.svelte`, which builds the rows on screen between two spacers that keep the scrollbar
+     the whole list's length; find-in-page then reaches the drawn rows alone, which is why the window
+     starts at 120 and not at one (PGS-A16). This component used to draw that sentence from its own `total`
      prop — which is `aria-rowcount`, and `aria-rowcount` is deliberately `-1` while a filtered list
      is still paging, so `2000 < -1` was false and the line disappeared in exactly the state it was
      written for. A cap line is about the LIST; the host has the answer's real size and draws one for

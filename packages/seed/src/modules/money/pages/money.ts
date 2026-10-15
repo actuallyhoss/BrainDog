@@ -3,7 +3,6 @@
 import type { SeedPage } from '../../base.ts';
 import { ACCOUNTS_TILE } from './parts/accounts.ts';
 import { ADD_ACCOUNT } from './parts/add-account.ts';
-import { BUDGET } from './parts/budget.ts';
 import { BY_BOOK } from './parts/by-book.ts';
 import { CROSS_CHECK } from './parts/cross-check.ts';
 import { EVERY_MONTH } from './parts/every-month.ts';
@@ -15,7 +14,7 @@ import { INSTALMENTS } from './parts/instalments.ts';
 import { LEDGER } from './parts/ledger.ts';
 import { NEXT_30 } from './parts/next30.ts';
 import { RUNWAY } from './parts/runway.ts';
-import { SPENDING } from './parts/spending.ts';
+import { WHERE_IT_WENT } from './parts/where-it-went.ts';
 
 /**
  * MONEY IS A FINANCE PAGE, NOT A LEDGER OF WHO OWES WHOM. It leads with the money there is, then how long it lasts, then what comes in and goes out;
@@ -110,6 +109,17 @@ import { SPENDING } from './parts/spending.ts';
  * costs by category, so the page is twenty-four blocks still, with the same six tiles before the fold. Waiting on you
  * stays declared and not placed (`parts/queue.ts`). When the money runs out, the accounts and Heads up stay until the
  * page has a lead tile of the cash there is.
+ *
+ * WHERE IT WENT, FOLDED AT THE END, SINCE money-core 3.17.0 (PGS-C20 job 2; "Unfiled grouped by merchant, where, bars,
+ * share"): a heading shut by default over this month as shares of what it was for, with "No category yet" last, and
+ * who was paid in the last 91 days of what nobody has filed, eight bars and the rest (`parts/where-it-went.ts`). It
+ * comes after everything else, so the six tiles before the fold are the six they were. THREE BLOCKS WENT FOR ITS
+ * THREE, so the page is twenty-four still: This month's spending (`parts/spending.ts`), whose question, where this
+ * month's money went by category, the split now answers from the same month's whole; the Budgets tile
+ * (`parts/budget.ts`), drawn only once a category holds a budget, which most records never set; and Last confirmed
+ * under Heads up (`parts/ages.ts`), since the line above it says the oldest day, the box beside it takes what an
+ * account holds today, and each account's last confirmed day, marked when it is old, is on its book's page in the
+ * same cards (`pages/book.ts`). All three stay declared in their files, and come back when the page has room.
  */
 export const MONEY_PAGE: SeedPage = {
   page: 'money',
@@ -133,16 +143,16 @@ export const MONEY_PAGE: SeedPage = {
     ...CROSS_CHECK,
     ...LEDGER,
     /* Every line of it but the one on categories marked the other way, given up for the line above. */
-    ...HEADS_UP.filter((b) => (b.when as { metric?: string } | undefined)?.metric !== 'categories-against-direction'),
+    /* And not the Last confirmed cards, given up for Where it went (see above): the box that takes today's balance stays. */
+    ...HEADS_UP.filter((b) => (b.when as { metric?: string } | undefined)?.metric !== 'categories-against-direction' && b.kind !== 'cards'),
     /* The heading and the calendar, and not the walk of thirty days (see above). */
     ...NEXT_30.filter((b) => b.kind !== 'bridge'),
     ...INSTALMENTS,
-    ...SPENDING,
-    /* The tile, and not yet the line under it (see above). */
-    ...BUDGET.filter((b) => b.kind === 'progress'),
     /* The chart, and no folded heading over it alone. */
     ...HISTORY.filter((b) => b.kind !== 'section'),
     /* What repeats, as two figures, then by category (see above). */
     ...EVERY_MONTH,
+    /* Folded, and last, so it ends Coming and going's box and moves no tile before the fold (see above). */
+    ...WHERE_IT_WENT,
   ],
 };

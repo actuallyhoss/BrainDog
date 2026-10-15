@@ -52,6 +52,7 @@
     onselect,
     selected,
     act,
+    onmore,
   }: {
     block: Block;
     opts?: RenderOptions;
@@ -96,6 +97,8 @@
      * as a 44px toggle only when this is passed and as a picture of one otherwise.
      */
     onpath?: ((row: Row, done: boolean) => void) | undefined;
+    /** A list block's table asks for its next rows past the cursor its first page handed out (PGS-A16): the host reads them. */
+    onmore?: ((block: Block) => void) | undefined;
     /**
      * THE ROW CURSOR (`../src/cursor.ts`), READS AND NOT WRITES, so a host can walk a page's rows with j/k across its
      * blocks: the key of the row it is on, drawn `data-focused`, and where it hears that focus moved into a row. Handed
@@ -189,7 +192,7 @@
            `aria-rowcount` now; this was the one caller of six that added the header itself, and
            the other five did not, so five surfaces announced one row too few and this one was
            right by hand. -->
-      <Table columns={comparison.columns} rows={comparison.rows} total={comparison.rows.length} label={block.heading} href={opts.href} home={opts.home} {rowActions} act={act ? tableAct : undefined} />
+      <Table columns={comparison.columns} rows={comparison.rows} total={comparison.rows.length} label={block.heading} href={opts.href} home={opts.home} {rowActions} act={act ? tableAct : undefined} onmore={onmore ? () => onmore(block) : undefined} />
     {/if}
   {:else if block.kind === 'inputs'}
     <!-- BY KIND, because the callback belongs to one kind on a primitive two others share: handed to `Rows`, a `spec`

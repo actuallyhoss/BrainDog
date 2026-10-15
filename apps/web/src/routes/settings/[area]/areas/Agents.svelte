@@ -45,6 +45,7 @@
   import { TONES, relative, since } from 'braindog-render';
   import { isQuiet } from '@braindog/kernel';
   import { liveOf, type RunLive } from '$lib/ui/face.ts';
+  import { PRESENCE_WORDS, presenceSaid, type RunPresence } from '$lib/ui/presence-words.ts';
   import { untrack } from 'svelte';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
   import Section from '$lib/ui/Section.svelte';
@@ -76,9 +77,10 @@
 
   /**
    * What the record answered: its machines, its standing keys, the newest runs, which name who used each, and whether
-   * each of those runs is at work now, gone quiet or stopped (`RunLive`), which the faces draw as their ring.
+   * each of those runs is at work now, gone quiet or stopped (`RunLive`), which the faces draw as their ring, and the one
+   * word each reads as beside it (`RunPresence`): a run that finished reads Ended, not Stopped.
    */
-  type Held = { machines: DeviceRow[]; tokens: TokenRow[]; runs: Run[]; live: Map<number, RunLive> };
+  type Held = { machines: DeviceRow[]; tokens: TokenRow[]; runs: Run[]; live: Map<number, RunLive>; presence: Map<number, RunPresence> };
 
   /**
    * Each run's state as its face draws it, from the run's own `state` and when it was last heard from.
@@ -87,7 +89,7 @@
    * the record works it out for its live runs, so a face here and the board of runs never disagree about one run. The
    * 45 minutes of `isStale` is when the record stops joining a call to a run, which is not what a person is shown.
    */
-  function livenessOf(rows: readonly unknown[], nowMs: number): Map<number, RunLive> {
+  function livenessOf(rows: readonly unknown[], nowMs: number, words?: Map<number, RunPresence>): Map<number, RunLive> {
     const out = new Map<number, RunLive>();
     for (const row of rows) {
       if (typeof row !== 'object' || row === null) continue;
@@ -96,6 +98,8 @@
       const f = r.fields as Record<string, unknown>;
       /* `last_seen` ALONE, which `isQuiet` reads itself: a run that never said it is never shown at work. */
       out.set(r.seq, liveOf(f.state, isQuiet({ fields: f as never }, nowMs)));
+      /* AND ITS WORD, the six the record tells apart (`presence-words.ts`): the ring stays the face's three. */
+      words?.set(r.seq, presenceSaid((r as { state?: unknown }).state, f, nowMs));
     }
     return out;
   }
@@ -112,13 +116,15 @@
     if (!devices.ok) return devices;
     const keys = await c.listTokens();
     const runs = await c.list({ register: 'session', limit: RUNS_READ, order: [{ field: 'last_seen', dir: 'desc' }] });
+    const presence = new Map<number, RunPresence>();
     return {
       ok: true,
       value: {
         machines: devices.value,
         tokens: keys.ok ? standing(keys.value as TokenRow[]) : [],
         runs: runs.ok ? runsOf(runs.value.rows) : [],
-        live: runs.ok ? livenessOf(runs.value.rows, Date.now()) : new Map(),
+        live: runs.ok ? livenessOf(runs.value.rows, Date.now(), presence) : new Map(),
+        presence,
       },
     };
   }
@@ -186,6 +192,12 @@
 
   /** The run's ring: at work, gone quiet or stopped, from the record's own row for it. */
   const liveOfRun = (run: Run): RunLive => held.value?.live.get(run.seq) ?? 'stopped';
+
+  /** The run's word beside its face: Working now, Gone quiet, Left a step, Ended, Stopped or From before. */
+  const wordOfRun = (run: Run): string | null => {
+    const p = held.value?.presence.get(run.seq);
+    return p ? PRESENCE_WORDS[p] : null;
+  };
 
   /* HOW MANY ARE AT WORK NOW, which is the tile's meta only when some are: "all at work now" when every connection that
      can act has a run working, and the count when only some do. */
@@ -410,6 +422,8 @@
                 <!-- THE RUN THAT LAST USED IT, BY THE NAME ITS WRITES ARE SIGNED WITH, and a link to what it did. `.tap`
                      because `S47` in small text is a target far under a thumb's 44px. -->
                 {#if c.run}<span>{copy.lastRun} <a class="run tap" href={at(`/r/session/${c.run.seq}`)}>{runName(c.run)}</a></span>{/if}
+                <!-- WHERE THAT RUN IS NOW, in the record's six words: a finished run reads Ended, an imported one From before. -->
+                {#if c.run && wordOfRun(c.run)}<span>{wordOfRun(c.run)}</span>{/if}
               </span>
             </span>
             {#if c.live && scope.word}<span class="who-scope">{scope.word}</span>{/if}

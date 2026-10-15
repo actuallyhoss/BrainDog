@@ -622,9 +622,10 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   is asked that has a repeating line among its answers.
  * - money-core 3.17.0, still unreleased (commit 63423720, the deployed build, holds 3.16.0), takes batch 82's changes
  *   with no version of its own: `match_payment` falls back to the plain compare when its host refuses a fold, and
- *   logs that it did (fold-fallback-82); and `rule.payment-matches` is one step again, `script.settle_matched_line`
- *   held out of the pack until a run can be handed the day Next moves to (repeat-next-80b-82). One id taken away
- *   from an unreleased version, none added.
+ *   logs that it did (fold-fallback-82); and `rule.payment-matches` takes `script.settle_matched_line` back as its
+ *   second step, which moves a repeating line's Next by the host's `ctx.cycle` and asks nothing, and
+ *   `rule.recurring-went-through` moves Next on when 'It went through' is pressed (money-next-moves-100). Two ids
+ *   added to an unreleased version.
  * - people 3.4.0: the People page says how many people may be on the record twice (people-held-twice-69), one note under
  *   its two lead notes, from the built-in figure held-twice and drawn only above nought. 3.3.0 is released (commit
  *   63423720 holds it), so a version of its own. A note added, nothing taken away, so a minor step that reaches a record

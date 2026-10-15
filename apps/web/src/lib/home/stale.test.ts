@@ -291,3 +291,29 @@ test('THE TILE: a lesson pair is its sentence and one quiet press, held while it
   /* NOTHING ASKS WITHOUT A PRESS: the one call is inside the press. */
   assert.equal(tile.match(/row\.keep\(\)/gu)?.length, 1);
 });
+
+/* ── What the tidy found, finder by finder, in a fold under the list (AGT-C18) ─ */
+
+test('THE TIDY IS READ BY import() ONCE THE PART DRAWS, never by what every screen loads, and only with a line to sit under', () => {
+  assert.match(tile, /import\('\.\/tidy-week\.ts'\)/u);
+  assert.doesNotMatch(tile, /import [^;]*from '\.\/tidy-week\.ts'/u);
+  assert.match(tile, /\$effect\(\(\) => \{\s*if \(!line\) return;/u);
+  assert.match(tile, /m\.loadTidyWeek\(apiBase\(\)\)/u);
+  assert.match(tile, /if \(here\) tidy = m\.tidyWeekLines\(found\);/u);
+  /* AND NOT FROM HOME: the stale read Home makes is the same one, with nothing added to it. */
+  assert.doesNotMatch(readFileSync(new URL('./stale.ts', import.meta.url), 'utf8'), /tidy-week/u);
+});
+
+test('THE FOLD IS UNDER THE LIST, its lines words alone: nothing in it is a press, and none draws nothing', () => {
+  const at = tile.indexOf('<details class="s-tidy"');
+  assert.ok(at > tile.indexOf('{#if list.more > 0}'), 'the fold sits under the list');
+  assert.ok(at < tile.indexOf('</section>'), 'the fold is inside the stale part, not a tile of its own');
+  assert.match(tile, /\{#if tidy\}\s*<details class="s-tidy"/u);
+  assert.match(tile, /<summary class="s-tidy-said">\{words\.tidy\}<\/summary>/u);
+  assert.match(tile, /tidy: 'What the tidy found'/u);
+  assert.match(tile, /\{#each tidy as found \(found\.id\)\}<li class="s-tidy-line" dir="auto">\{found\.said\}<\/li>\{\/each\}/u);
+  const fold = tile.slice(at, tile.indexOf('</details>', at));
+  assert.doesNotMatch(fold, /<Button|<button|<a |onclick|href=/u);
+  /* THE KEEP PRESS STAYS AS IT WAS: still the one call, inside its own press. */
+  assert.equal(tile.match(/row\.keep\(\)/gu)?.length, 1);
+});

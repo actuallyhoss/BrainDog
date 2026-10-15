@@ -136,6 +136,12 @@ export interface CtxHost {
    * `@braindog/host/script`). Absent, the script is handed no `ctx.fold`.
    */
   fold?(text: string): Promise<string | null>;
+  /**
+   * `ctx.cycle`: the next day (YYYY-MM-DD) a repeating line's money moves on after `day`, or `null` (`scriptCycle` in
+   * `@braindog/host/script`, over the kernel's `cycleAfter`). `line` is the script's `{ leg, fields, rest?, anchorDay? }`
+   * as it wrote it, and the host reads it. Absent, the script is handed no `ctx.cycle`.
+   */
+  cycle?(day: string, line: Json): Promise<string | null>;
   /** The run's instant, from the host clock. The sandbox's own `Date` is not what a row is stamped with. */
   now(): string;
   /**

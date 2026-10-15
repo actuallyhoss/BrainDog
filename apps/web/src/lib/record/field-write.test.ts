@@ -20,7 +20,21 @@ import { openRecord, type Kernel } from '@braindog/kernel';
 
 import './fixtures/fill.ts';
 import { display, readableFields, REGISTERS } from './api.ts';
-import { ADDABLE, addField, additionOf, addValue, fieldOf, idOf, putBackOf, valueAdditionOf, valueOf } from './field-write.ts';
+import {
+  ADDABLE,
+  addField,
+  additionOf,
+  addValue,
+  choicesSaid,
+  drafted,
+  fieldOf,
+  idOf,
+  putBackOf,
+  valueAdditionOf,
+  valueOf,
+  type FieldAsk,
+  type FieldMore,
+} from './field-write.ts';
 import { pageReader } from './page-live.ts';
 import { rowReader, type Fetch } from './row-live.ts';
 import { rowWriter } from './rows-write.ts';
@@ -138,8 +152,8 @@ test('ONLY KINDS SCHEMA NAMES ARE OFFERED, and a field the list has already is r
   const taken = fieldOf('things', 'Name', 'text');
   assert.equal(taken.ok, false);
   assert.match(taken.ok ? '' : taken.fix, /already has a field called Name/);
-  assert.equal(fieldOf('things', 'Owner', 'ref').ok, false, 'a link with no list to point at was offered');
-  assert.equal(fieldOf('things', 'Budget', 'money').ok, false, 'an amount with no currency was offered');
+  assert.deepEqual(fieldOf('things', 'Owner', 'ref'), { ok: false, fix: 'Pick what this links to.' }, 'a link with no list to point at was offered');
+  assert.deepEqual(fieldOf('things', 'Budget', 'money', {}, 'EUR'), { ok: false, fix: 'Pick the currency.' }, 'an amount with no currency was offered');
   assert.equal(fieldOf('things', ' ', 'text').ok, false);
 
   const asked = fieldOf('things', 'Domain', 'url');
@@ -151,12 +165,98 @@ test('ONLY KINDS SCHEMA NAMES ARE OFFERED, and a field the list has already is r
   });
 });
 
+test('A LINK, A CHOICE, MONEY AND TAGS ARE EACH BUILT AS THE KERNEL TAKES THEM, with the one more thing their kind needs', () => {
+  fresh();
+  const body = (label: string, type: string, more: FieldMore = {}, home: string | null = 'EUR') => {
+    const asked = fieldOf('things', label, type, more, home);
+    assert.ok(asked.ok, `${label}: ${JSON.stringify(asked)}`);
+    return additionOf('things', asked.field).to.add.fields[0];
+  };
+  assert.deepEqual(body('Client', 'ref', { to: 'things' }), { id: 'client', label: 'Client', type: 'ref', to: 'things' });
+  assert.deepEqual(body('Stage', 'enum', { values: 'Lead\nWon\nLost' }), { id: 'stage', label: 'Stage', type: 'enum', values: ['Lead', 'Won', 'Lost'] });
+  /* THE RECORD'S OWN CURRENCY NEEDS NO KEY: every money box falls back to it. Its code is the same pick, and no default. */
+  assert.deepEqual(body('Fee', 'money', { currency: 'record' }), { id: 'fee', label: 'Fee', type: 'money' });
+  assert.deepEqual(body('Fee', 'money', { currency: 'eur' }), { id: 'fee', label: 'Fee', type: 'money' });
+  assert.deepEqual(body('Labels', 'list'), { id: 'labels', label: 'Labels', type: 'list', of: 'text' });
+  /* A PIECE GIVEN FOR A KIND THAT DOES NOT TAKE IT IS LEFT OFF, so a text field never carries a stale list picked earlier. */
+  assert.deepEqual(body('Notes', 'text', { to: 'things', values: 'A\nB', currency: 'EUR' }), { id: 'notes', label: 'Notes', type: 'text' });
+});
+
+test('EACH MISSING PIECE IS REFUSED IN ITS OWN SENTENCE, and a link to a list the record does not hold is refused', () => {
+  fresh();
+  const fix = (type: string, more: FieldMore, home: string | null = 'EUR') => {
+    const out = fieldOf('things', 'Extra', type, more, home);
+    return out.ok ? null : out.fix;
+  };
+  assert.equal(fix('ref', {}), 'Pick what this links to.');
+  assert.equal(fix('ref', { to: 'nowhere_at_all' }), 'That is not here any more. Pick another to link to.');
+  assert.equal(fix('enum', {}), 'Type at least two choices.');
+  assert.equal(fix('enum', { values: 'Lead' }), 'Type at least two choices.');
+  assert.equal(fix('enum', { values: 'Lead\nlead\n LEAD ' }), 'Type at least two choices.', 'one choice in three spellings is one choice');
+  assert.equal(fix('enum', { values: Array.from({ length: 41 }, (_, i) => `Step ${i + 1}`).join('\n') }), 'Forty choices at most. Take some out.');
+  assert.equal(fix('enum', { values: `Lead\n${'w'.repeat(41)}` }), `${'w'.repeat(41)} is longer than 40 letters. Shorten it.`);
+  assert.equal(fix('money', {}), 'Pick the currency.');
+  assert.equal(fix('money', { currency: 'record' }, null), 'This record has no currency of its own yet. Set it in Settings first.');
+  assert.equal(fix('money', { currency: 'XQZ' }), 'XQZ is not a currency.');
+  /* ANOTHER CODE WAITS ON THE KERNEL'S `currency` KEY: sent as a default, it put nought in that code on every new row. */
+  assert.equal(fix('money', { currency: 'JPY' }), "A new field keeps money in this record's own currency, EUR, for now.");
+  assert.equal(fix('text', {}), null);
+  assert.equal(fieldOf('things', 'Title', 'text').ok, false, 'a name the record keeps for itself went out to be refused there');
+});
+
+test('CHOICES ARE CUT AND SAID ONCE EACH, the first spelling kept, and forty is the most', () => {
+  assert.deepEqual(choicesSaid('  Lead  \n\n won\nWon\n Lost ,  in   review'), { ok: true, values: ['Lead', 'won', 'Lost', 'in review'] });
+  const forty = Array.from({ length: 40 }, (_, i) => `Step ${i + 1}`);
+  assert.deepEqual(choicesSaid(forty.join('\n')), { ok: true, values: forty });
+  assert.deepEqual(choicesSaid(`Lead\n${'w'.repeat(40)}`), { ok: true, values: ['Lead', 'w'.repeat(40)] });
+});
+
+test('THE FIELDS SHEET KEEPS THE SAME RULES, and its money takes a currency when one is picked', () => {
+  const held = [{ id: 'name' }];
+  const draft = (ask: Partial<FieldAsk>, home: string | null = 'EUR') => drafted({ label: 'Extra', kind: 'text', ...ask }, held, 'Ledgers', ['things'], home);
+  assert.deepEqual(draft({ kind: 'enum', values: 'Lead' }), { ok: false, fix: 'Type at least two choices.' });
+  assert.deepEqual(draft({ kind: 'enum', values: 'Lead\nlead\nWon' }), { ok: true, field: { id: 'extra', label: 'Extra', type: 'enum', values: ['Lead', 'Won'] } });
+  /* NOTHING PICKED IS MONEY AS THE SHEET HAS ALWAYS SENT IT, since the sheet does not ask yet. */
+  assert.deepEqual(draft({ kind: 'money' }), { ok: true, field: { id: 'extra', label: 'Extra', type: 'money' } });
+  assert.deepEqual(draft({ kind: 'money', currency: 'eur' }), { ok: true, field: { id: 'extra', label: 'Extra', type: 'money' } });
+  assert.deepEqual(draft({ kind: 'money', currency: 'usd' }), { ok: false, fix: "A new field keeps money in this record's own currency, EUR, for now." });
+  assert.deepEqual(draft({ kind: 'money', currency: 'record' }, null), { ok: false, fix: 'This record has no currency of its own yet. Set it in Settings first.' });
+});
+
+test('A LINK, A CHOICE AND MONEY IN THE RECORD\'S OWN CURRENCY LAND ON THE RECORD AS SENT, and a row holds each', async () => {
+  fresh();
+  const k = await projects();
+  const { io } = served(k);
+  for (const [label, type, more] of [['Client', 'ref', { to: 'things' }], ['Stage', 'enum', { values: 'Lead\nWon\nLost' }], ['Fee', 'money', { currency: 'record' }]] as const) {
+    const asked = fieldOf('things', label, type, more, 'EUR');
+    assert.ok(asked.ok, label);
+    assert.deepEqual(await addField(BASE, 'things', asked.field, true, io), { from: 'added' }, label);
+  }
+  const fields = (k.register('things') as { fields: readonly Record<string, unknown>[] }).fields;
+  const on = (id: string) => fields.find((f) => f.id === id);
+  assert.equal(on('client')?.to, 'things');
+  assert.deepEqual(on('stage')?.values, ['Lead', 'Won', 'Lost']);
+  assert.equal(on('fee')?.default, undefined, 'money was declared with an amount every new row would take');
+  const wrote = k.update('things', 'things#1', { client: 'things#1', stage: 'Won', fee: { amount: 125000, currency: 'EUR' } }, { actor: 'p_1' });
+  assert.ok(wrote.ok, JSON.stringify(wrote));
+  assert.equal(k.update('things', 'things#1', { stage: 'Pending' }, { actor: 'p_1' }).ok, false, 'a choice the field does not offer was taken');
+  /* A ROW MADE AFTER THE FIELDS LANDED HOLDS NONE OF THEM until somebody types one: no fee of nought nobody said. */
+  const made = k.create('things', { name: 'Ember', lane: 'building' }, { actor: 'p_1' });
+  assert.ok(made.ok, JSON.stringify(made));
+  assert.equal((made.value.fields as Record<string, unknown>).fee, undefined);
+  fresh();
+});
+
 test('EVERY KIND OFFERED INSTALLS through the addition path, one field each, onto a list with rows', async () => {
   fresh();
   const k = await projects();
   const { io } = served(k);
+  /* EACH WITH THE ONE MORE THING ITS KIND NEEDS, as `fieldOf` builds it: a link to the list itself, two choices, euros. */
+  const more: Record<string, FieldMore> = { ref: { to: 'things' }, enum: { values: 'Lead\nWon' }, money: { currency: 'EUR' } };
   for (const kind of ADDABLE) {
-    const out = await addField(BASE, 'things', { id: `x_${kind}`, label: `X ${kind}`, type: kind }, true, io);
+    const asked = fieldOf('things', `X ${kind}`, kind, more[kind] ?? {}, 'EUR');
+    assert.ok(asked.ok, `${kind}: ${JSON.stringify(asked)}`);
+    const out = await addField(BASE, 'things', asked.field, true, io);
     assert.deepEqual(out, { from: 'added' }, `${kind}: ${JSON.stringify(out)}`);
   }
   const live = (k.register('things') as { fields: readonly { id: string }[] }).fields.map((f) => f.id);

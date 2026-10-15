@@ -1,9 +1,9 @@
 {
   "pack": "portfolio-bands",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "title": "Revenue bands",
   "summary": "What your projects take a month now, and the room left in their forecasts next and later, worked out every day and drawn as one bar.",
-  "changes": "A project's numbers may now arrive as money, an amount and its currency, and the bands count it as it is, beside the older numbers that carry a currency as their unit.",
+  "changes": "Projects now says the month on each card in play, under This month, and draws the three bands under How they are going, while Revenue bands is installed. Both go when it goes, and Projects stays Portfolio's own.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -119,6 +119,38 @@
           "empty": "Nothing is worked out yet. The bands are worked out once a day from each project's latest reading of what it takes a month and of its forecast a year out."
         }
       ]
+    }
+  ],
+  "adds": [
+    {
+      "page": "page.portfolio",
+      "into": "k02ffg55",
+      "column": {
+        "metric": "revenue-bands-month:{{name}}",
+        "label": "This month",
+        "as": "figure"
+      },
+      "note": "The month on each card in play: the key is the one Portfolio's In play cards answer."
+    },
+    {
+      "page": "page.portfolio",
+      "after": "How they are going",
+      "block": {
+        "kind": "split",
+        "heading": "A month: now, next and later",
+        "icon": "activity",
+        "span": 12,
+        "source": "register.revenue_bands",
+        "columns": [
+          {
+            "field": "band"
+          },
+          {
+            "field": "amount"
+          }
+        ]
+      },
+      "note": "No empty line, so the bands are drawn only while one is worked out."
     }
   ]
 }

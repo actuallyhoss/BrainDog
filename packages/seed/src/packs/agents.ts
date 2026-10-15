@@ -897,7 +897,10 @@ export const AGENTS_PACK: { manifest: PackManifest; registers: Record<string, Se
      field or figure goes, and every block 1.12.0 drew is as it was. Learnings, skills, keys and tools each say what
      makes two of them one (`same:`, AGT-C13), a learning's kind gains `rule`, and the learnings' own words say when to
      record one (AGT-D15); no row changes. Needs a look gains a sixth line, over the record's `stale-rows-same`, with the
-     way to fold what is here twice on each of those four lists (AGT-C18). */
+     way to fold what is here twice on each of those four lists (AGT-C18). And with 1.13.0 the skill After an import
+     ships its second text (REC-C17 step 3, `agents-skills.ts`): a mark that names no glyph is given the nearest one a
+     host draws, in the same arrangement, and cleared only where none is near. A skill travels beside this document, not
+     in it, and takes its own `rev`, so the document and its fingerprint are as they were. */
   manifest: { id: 'agents', version: '1.13.0', requires: ['register.things'] },
   registers: AGENTS_REGISTERS,
   pages: AGENTS_PAGES,

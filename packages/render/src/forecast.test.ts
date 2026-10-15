@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { against, axisFit, baseKnobs, countsOf, forecastAverage, forecastModel, forecastPlan, horizonChoices, knobsIn, knobsMoved, largest, pairsOf, readoutAt, scenario, streamsOf, underNote, type ForecastModel } from './forecast.ts';
+import { against, axisFit, baseKnobs, countsOf, forecastAverage, forecastWeeks, forecastModel, forecastPlan, horizonChoices, knobsIn, knobsMoved, largest, pairsOf, readoutAt, scenario, streamsOf, underNote, type ForecastModel } from './forecast.ts';
 import { walkKnobs, pairsAcross, sellRows, soldName, type Group } from '../svelte/forecast-group.svelte.ts';
 import { parse } from './parse.ts';
 import { toHTML } from './html.ts';
@@ -92,6 +92,15 @@ test('the horizon offers what fits, and the heaviest movements are summed by lab
     { days: 365, label: '1 year' },
   ]);
   assert.deepEqual(largest(model())[0], { label: 'Tax', amount: '−£2,400.00' });
+});
+
+test('a length of whole weeks from two to twelve is said in weeks: ten weeks is 10 weeks, not 70 days', () => {
+  assert.deepEqual(horizonChoices({ ...model(), horizon: 365, horizons: [70, 90, 45] }), [
+    { days: 70, label: '10 weeks' },
+    { days: 90, label: '3 months' },
+    { days: 45, label: '45 days' },
+  ]);
+  assert.equal(forecastWeeks(1), '1 week');
 });
 
 test('the plan holds the zero it crosses in view, gaps in the past, a wash, a round axis and the crossing', () => {

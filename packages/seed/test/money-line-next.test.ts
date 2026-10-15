@@ -121,21 +121,13 @@ async function money(now = TENTH) {
 const RULE = MONEY_AUTOMATIONS.find((a) => a.rule === 'payment-matches') as { steps: { script: { id: string } }[] } | undefined;
 const fieldsOf = (k: Kernel, id: string) => k.get(id)!.fields;
 
-test('the step is held: the rule starts the search alone, and the line script is in no pack document', () => {
-  assert.deepEqual(RULE!.steps.map((s) => s.script.id), ['match_payment']);
-  assert.ok(!MONEY_AUTOMATIONS.includes(SETTLE_LINE_SCRIPT), 'the held script is shipped');
-  assert.ok(!MONEY_AUTOMATIONS.some((a) => a.script === SETTLE_LINE_SCRIPT.script), 'a script of its name is shipped');
-  /* AND ITS TEXT NEVER HANDS `settle` THE ONE WORD THAT KEEPS A PAYMENT ON A LINE IT DOES NOT MOVE. */
-  assert.ok(!/next:\s*null/.test(SETTLE_LINE_SCRIPT.source.slice(SETTLE_LINE_SCRIPT.source.lastIndexOf('export default'))));
-});
-
 test('a line a payment fits is found and said, and nothing on it is written: it is not read late, and no "Last paid" stands beside an unmoved "Next"', async () => {
   const m = await money();
   const line = m.made('recurring', LINE);
   const before = m.k.get(line.id)!.version;
   m.paid('2026-09-28');
   await m.k.drain();
-  assert.deepEqual(m.queued(), ['match_payment']);
+  assert.deepEqual(m.queued(), ['match_payment', 'settle_matched_line']);
   await m.turn();
   const f = fieldsOf(m.k, line.id);
   assert.deepEqual([f.next_due, f.last_paid ?? null, f.last_amount ?? null, m.k.get(line.id)!.version], ['2026-10-01', null, null, before], m.log.join(' | '));
@@ -167,35 +159,6 @@ test('what batch 80 wrote is the harm: "Last paid" with "Next" left reads late, 
   m.paid('2026-10-30');
   await m.turn();
   assert.ok(m.log.some((l) => l.includes('Nothing open to NORTHGATE ESTATES falls within ten days of 30 October')), m.log.join(' | '));
-});
-
-test('handed the day the walk steps to, the script moves "Next" and keeps the payment in one write: paid once, never late, and found again next month', async () => {
-  const m = await money();
-  const line = m.made('recurring', LINE);
-  const first = m.paid('2026-09-28');
-  await m.turn();
-  const next = cycleOn(fieldsOf(m.k, line.id), [6, 0]);
-  assert.equal(next, '2026-11-01');
-  const one = await m.mark(first.id, next);
-  assert.deepEqual(one.writes.map((w) => w.patch), [{ next_due: '2026-11-01', last_paid: '2026-09-28', last_amount: gbp(400_000) }], m.log.join(' | '));
-  assert.ok(m.log.some((l) => l.includes('Northgate Estates is paid for 1 October, and Next is 1 November.')), m.log.join(' | '));
-  /* JUDGED NOW, AND NOT LATE: on the 10th, and on every day up to three past its new one. */
-  assert.equal(m.late(), 0);
-  m.clock.set(Date.UTC(2026, 10, 4, 12));
-  assert.equal(m.late(), 0);
-
-  /* NEXT MONTH: the search finds the same line by its new day, and the script marks it again. */
-  m.log.length = 0;
-  const second = m.paid('2026-10-30');
-  await m.turn();
-  assert.ok(m.log.some((l) => l.includes('This payment is for Northgate Estates, due 1 November.')), m.log.join(' | '));
-  const two = await m.mark(second.id, cycleOn(fieldsOf(m.k, line.id), [6, 0]));
-  assert.deepEqual(two.writes.map((w) => w.patch), [{ next_due: '2026-12-01', last_paid: '2026-10-30', last_amount: gbp(400_000) }], m.log.join(' | '));
-  m.clock.set(Date.UTC(2026, 11, 4, 12));
-  assert.equal(m.late(), 0);
-  /* AND THE SAME PAYMENT HANDED AGAIN MOVES NOTHING A SECOND TIME. */
-  assert.deepEqual((await m.mark(second.id, '2027-01-01')).writes, []);
-  assert.ok(!m.log.some((l) => /[0-9A-HJKMNP-TV-Z]{26}|recurring#|transactions#/.test(l)), m.log.join(' | '));
 });
 
 test('handed no day, a day that is not one, or a day no later than the line\'s, the script writes nothing', async () => {

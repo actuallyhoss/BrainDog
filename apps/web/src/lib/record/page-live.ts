@@ -23,6 +23,8 @@ import { COSTS, isBucket, isQuiet, type Bars, type FxRead, type MeasureSeries, t
 import { MISSING, UNNAMED, integer, money, quantity, since, day as fmtDay, type Resolve } from 'braindog-render';
 
 import { copy } from '../copy.ts';
+import { presenceSaid, type RunPresence } from '../ui/presence-words.ts';
+import { factCells } from './card-fact-cells.ts';
 import { lateSaid } from '../home/today-tiles.ts';
 import { ratesPreset } from './action-draft.ts';
 import { live as actionsOf, type ActionRow, type Outcome } from './actions.ts';
@@ -358,7 +360,7 @@ export type ScopeMark = { mark: string | null; hue: number | null };
 export type ScopeCells = { columns: readonly number[]; everywhere: string; glyph: string | null; marks: ReadonlyMap<string, ScopeMark> };
 
 /** A run's face as the renderer's `Cards` takes it (`RunCell` in `braindog-render`'s `cards.ts`), written out as `ScopeCells` is. */
-export type RunCell = { run: string; agent: string | null; live: 'working' | 'quiet' | 'stopped' };
+export type RunCell = { run: string; agent: string | null; live: 'working' | 'quiet' | 'stopped'; presence?: RunPresence };
 
 export type LivePage = { page: LivePageDecl; blocks: LiveBlock[] };
 
@@ -769,7 +771,7 @@ const staleRead = (r: Reading | null | undefined): r is Reading & { fx: FxRead &
 export function tileOf(
   cell: NonNullable<Answered['readings']>[number],
   values?: Record<string, unknown>,
-  missed: 'warn' | 'bad' = 'warn',
+  missed: 'warn' | 'bad' | 'info' = 'warn',
   stale: 'tile' | 'foot' = 'tile',
 ): Metric {
   const at = cell.metric.indexOf(':');
@@ -1245,7 +1247,7 @@ function runFacesOf(
     const handle = e.fields[whoAt];
     const run = typeof handle === 'string' ? runs.get(handle) : undefined;
     if (run === undefined || typeof handle !== 'string') return null;
-    return { run: handle, agent: typeof run.agent === 'string' ? run.agent : null, live: liveOfRun(run, now) };
+    return { run: handle, agent: typeof run.agent === 'string' ? run.agent : null, live: liveOfRun(run, now), presence: presenceSaid(run.state, run, now) };
   });
   return faces.some((f) => f !== null) ? faces : undefined;
 }
@@ -1328,6 +1330,8 @@ export function blockOf(
     trends: trended,
     /* EACH CARD'S WHEN OVER A FIGURE, a number a card, taken by name and narrowed into its cell below. */
     whens: whened,
+    /* EACH CARD'S FACTS OVER A FIGURE, a list a card, taken by name and narrowed into its cells below. */
+    facts: facted,
     types: typed,
     home: homeSaid,
     done_now: doneNow,
@@ -1491,7 +1495,7 @@ export function blockOf(
     return { ...shell, authored: tracks, shown: tracks.length, total: plans.length + (typeof past === 'number' && past > 0 ? past : 0) };
   }
   /* A STAT OVER A REGISTER AND NO FIGURES draws a tile a measure from the rows (`measures.ts`), as the kernel answers it. */
-  if (b.cells || (kind === 'stat' && !registerOf(b))) return { ...shell, metrics: (readings ?? []).map((cell) => tileOf(cell, values, b.tone === 'bad' ? 'bad' : 'warn', 'foot')) };
+  if (b.cells || (kind === 'stat' && !registerOf(b))) return { ...shell, metrics: (readings ?? []).map((cell) => tileOf(cell, values, b.tone === 'bad' ? 'bad' : b.tone === 'info' ? 'info' : 'warn', 'foot')) };
   /* A BAR OR A SPLIT OVER A FIGURE draws the parts the record read, EACH BY ITS NAME: a part keyed by a ref is the row
      it points at, read from the walk `pageReader` made of that list, and never the ULID the key is. */
   if (typeof source === 'string' && source.startsWith('metric.')) {
@@ -1837,6 +1841,13 @@ export function blockOf(
     rows.forEach((row, n) => {
       row.cells[whenAt] = whenSaid(whens?.[n], typeof b.columns?.[whenAt]?.label === 'string' ? (b.columns[whenAt]!.label as string) : undefined);
       if ((whens?.[n] as { met?: unknown } | null | undefined)?.met === false && !row.tone) Object.assign(row, { tone: 'bad' });
+    });
+  /* AND EACH CARD'S FACTS OVER A FIGURE, `facts` (REC-C16): a count as its number and money as the page says money, a
+     fact the record read nothing for drawn as no fact rather than 0. */
+  if (kind === 'cards' && Array.isArray(facted) && facted.length === got.length)
+    factCells(b.columns ?? [], facted, money).forEach((cells, n) => {
+      const row = rows[n];
+      if (row) for (const c of cells) row.cells[c.at] = c.text;
     });
   /* EACH CARD'S GROUP BY NAME, READ OFF ITS OWN ROW (`PageRow.group` in the kernel's `pages.ts`): the record puts it on
      the row and not beside the rows, so a block held from a reader keeps no name of a list she may not read. A card the

@@ -77,7 +77,12 @@ export const objectStorage = () => {
   let depth = 0;
   let alarm: number | null = null;
   const cursor = (rows: unknown[]) => ({ toArray: () => rows, one: () => rows[0], [Symbol.iterator]: () => rows[Symbol.iterator]() });
+  /* THE KEY-VALUE HALF, which a record's `setLapsed` writes with `storage.put`. */
+  const kv = new Map<string, unknown>();
   return {
+    get: async (k: string) => kv.get(k),
+    put: async (k: string, v: unknown) => void kv.set(k, v),
+    delete: async (k: string) => kv.delete(k),
     sql: {
       exec(text: string, ...params: never[]) {
         const statement = db.prepare(text);

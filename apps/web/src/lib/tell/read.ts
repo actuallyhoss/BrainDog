@@ -26,6 +26,8 @@
 
 import { exponentOf, money } from 'braindog-render';
 
+import { homeCurrency } from '../record/api.ts';
+import { symbolText } from '../record/money.ts';
 import type { FieldDecl, MoneyValue } from '../record/schema.ts';
 import { GREETINGS, PEOPLE, hear } from '../who.ts';
 import { addDays, daySaid, nextMonday, weekdayOf } from '../work/board.ts';
@@ -54,6 +56,8 @@ export type TellOptions = {
   today: string;
   /** The record's currency, for an amount typed with none. `null` when the record has none. */
   currency: string | null;
+  /** The currency an amount is spelled against, as every other screen spells it (`homeCurrency()` when not said). */
+  home?: string | null;
   /** The people on the record. */
   people?: readonly Known[];
   /** The accounts on the record, for the one a payment came into. */
@@ -403,6 +407,10 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
   /* A self-introduction names the reader, who is never a new person: "I'm Mariam, Nadia wants..." reads from Nadia. */
   if (INTRODUCED.test(text)) text = hear(text).bio || text;
   const people = peopleList(opts.lists);
+  /* AN AMOUNT IS SPELLED AS `Money` SPELLS IT, by the one writer against the record's home currency: "$1,350.00" on a
+     dollar record, never the stored "USD 1,350.00" this said before, which no other screen shows. */
+  const home = opts.home === undefined ? homeCurrency() : opts.home;
+  const spelled = (amount: number, currency: string): string => symbolText(money(amount, currency), home, 'exact');
   const room = (n: number): boolean => rows.length + n <= MOST;
 
   /* Who each name is: an entry already kept, or a new one made the first time they are named. */
@@ -517,7 +525,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     const amount = currency ? minor(a, currency) : null;
     if (currency === null || amount === null) return false;
     order.fields[total.id] = { amount, currency };
-    order.detail = `${order.detail}, ${money(amount, currency)} not paid yet`;
+    order.detail = `${order.detail}, ${spelled(amount, currency)} not paid yet`;
     return true;
   }
 
@@ -626,7 +634,7 @@ export function tellRead(sentence: string, opts: TellOptions): Told {
     rows.push({
       register: l.id,
       fields,
-      said: `${money(amount, currency)} ${into ? 'in' : 'out'}${by ? `, by ${by}` : who ? `, from ${who}` : ''}`,
+      said: `${spelled(amount, currency)} ${into ? 'in' : 'out'}${by ? `, by ${by}` : who ? `, from ${who}` : ''}`,
       detail: `into ${l.name}${settled ? ', marked paid' : ''}`,
       icon: iconOf(l),
       missing: missingOf(l, fields),

@@ -200,7 +200,8 @@ function readScheduleFailed(sql: Sql, _nowMs: number, tz: string): SignReading {
 /* ── doors-silent ──────────────────────────────────────────────────────── */
 
 /* A DOOR IS A LIVE PATTERN THAT FILES WHAT ARRIVES, counted by its receipts. ONE RETIRED IS NOT JUDGED: a door he turned
-   off is quiet for a good reason, the risk the brief names (SHL-C01, "Risk"). */
+   off is quiet for a good reason, the risk the brief names (SHL-C01, "Risk"), and so is one switched off at its door
+   (`ingest_off.<id>`, the record's `door-switch.ts`). */
 function readDoorsSilent(sql: Sql, nowMs: number, tz: string): SignReading {
   const quietFrom = new Date(nowMs - DOOR_QUIET_DAYS * DAY).toISOString();
   const busyFrom = new Date(nowMs - (DOOR_QUIET_DAYS + DOOR_BUSY_DAYS) * DAY).toISOString();
@@ -208,6 +209,7 @@ function readDoorsSilent(sql: Sql, nowMs: number, tz: string): SignReading {
     `SELECT r.ingest_id, count(DISTINCT CASE WHEN r.ts < ? THEN r.raw_id END) AS before, count(DISTINCT CASE WHEN r.ts >= ? THEN r.raw_id END) AS since, max(r.ts) AS last
        FROM ingest_receipt r
       WHERE r.ts >= ? AND EXISTS (SELECT 1 FROM declaration d WHERE d.id = 'ingest.' || r.ingest_id AND d.superseded_at IS NULL AND d.retired = 0)
+        AND NOT EXISTS (SELECT 1 FROM dog_meta m WHERE m.key = 'ingest_off.' || r.ingest_id)
       GROUP BY r.ingest_id ORDER BY r.ingest_id`,
     quietFrom,
     quietFrom,

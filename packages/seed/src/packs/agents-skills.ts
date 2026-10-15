@@ -26,7 +26,8 @@ export type ShippedSkill = {
   was?: readonly string[];
 };
 
-const AFTER_AN_IMPORT = `# After an import
+/** Version 1 of After an import, kept for `was`: it cleared every mark no host draws. */
+const AFTER_AN_IMPORT_1 = `# After an import
 
 Use this skill once an import has written into this BrainDog, to tidy what it left in one question the owner answers.
 
@@ -56,6 +57,19 @@ Read \`braindog:grammar/proposals\` for its shape. Put in it, as parts:
 - The record refuses a part because Project brief is not on yet: file the install and the other parts now, and the brief's fields after the yes, with the cause \`tidy-briefs\`.
 `;
 
+/** The line of version 1 that version 2 changes: a mark no host draws was only ever cleared. */
+const MARK_CLEARED = "- Call \`pagesCensus\`. A project whose page heading names a glyph no host draws (\`glyphs_unknown\`) has its mark cleared.\n";
+
+/**
+ * VERSION 2 (REC-C17 step 3): a mark that names no glyph is given the nearest one a host draws, as a part of the same
+ * arrangement, and cleared only where none is near. The glyphs are the ones \`braindog:grammar/page\` already hands, by
+ * group, so the skill names no glyph of its own.
+ */
+const MARK_NEAREST = `- Call \`pagesCensus\`. For each project whose page heading names a glyph no host draws (\`glyphs_unknown\`), read \`braindog:grammar/page\`: its \`glyphs\` names every glyph a mark may use, by group. Put in the same arrangement, as a part, the nearest glyph a host draws for that project's mark: the same word spelled the way the glyphs spell it, else one a letter or two from it, else one from the group that says what the project is. Clear the mark only where no glyph there is near, and say which in the arrangement's why.
+`;
+
+const AFTER_AN_IMPORT = AFTER_AN_IMPORT_1.replace(MARK_CLEARED, MARK_NEAREST);
+
 const KEEP_A_RECORD_CURRENT = `# Keep a record current
 
 Use this skill when a session starts and \`context\` shows a red sign, to offer the owner what would cure it, in one question.
@@ -76,7 +90,8 @@ export const AGENTS_SKILLS: readonly ShippedSkill[] = [
     trigger: 'after an import has written into this BrainDog, to tidy what it left in one question',
     what: 'Finds what an import left untidy and files one question that tidies it.',
     body: AFTER_AN_IMPORT,
-    rev: 1,
+    rev: 2,
+    was: [AFTER_AN_IMPORT_1],
   },
   {
     name: 'keep-a-record-current',

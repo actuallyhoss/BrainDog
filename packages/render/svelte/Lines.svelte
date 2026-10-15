@@ -8,10 +8,14 @@
   for a keyboard and a screen reader, which is why the readout is `aria-hidden`.
 
   ONE READING IS A FIGURE (`plan.single`): its value and when it was read, and no chart of one dot.
+
+  A TREND ONLY WHEN THE READINGS HOLD ONE (`src/lines-trend.ts`): a quiet dashed line over the current line, or
+  "No clear trend in 12 readings" under the plot, so noise never reads as news. Under six readings, neither.
 -->
 <script lang="ts">
   import { inline, text, type Block, type RenderOptions } from '../src/index.ts';
   import { LINES_AGAINST, LINES_NONE, LINES_NUMBERS, linesNearest, linesOnly, linesPlan } from '../src/lines.ts';
+  import { linesTrend } from '../src/lines-trend.ts';
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
 
@@ -19,6 +23,7 @@
   const name = $derived(`${plan.axis ? `${plan.axis}: ` : ''}${plan.sentence}`);
   const was = $derived(plan.lines.filter((l) => l.was));
   const current = $derived(plan.lines.filter((l) => !l.was));
+  const trend = $derived(linesTrend(plan));
 
   /** Where along the chart the pointer is, from 0 to 1, or `null` when it is not over it. */
   let scrub = $state<number | null>(null);
@@ -62,6 +67,7 @@
             {#if l.d}<path class="lines-line" data-step={l.step} d={l.d} vector-effect="non-scaling-stroke"></path>{/if}
             {#if l.end}<path class="lines-end" data-step={l.step} d={l.end} vector-effect="non-scaling-stroke"></path>{/if}
           {/each}
+          {#if trend && 'd' in trend}<path class="lines-trend" d={trend.d} vector-effect="non-scaling-stroke"></path>{/if}
         </svg>
         {#if point}
           <!-- THE READOUT TURNS AT THE MIDDLE, to whichever side has more room. At 0.6 a readout of 11rem or more beside a
@@ -79,6 +85,7 @@
       <ol class="lines-ticks" aria-hidden="true">
         {#each plan.ticks as t}<li class="lines-tick" style="--at:{t.at}" data-minor={t.minor ? '' : undefined}>{t.label}</li>{/each}
       </ol>
+      {#if trend && 'said' in trend}<p class="lines-trend-said">{trend.said}</p>{/if}
     {/if}
     {#if plan.points.length}
       <details class="lines-numbers">
@@ -103,3 +110,24 @@
     {/if}
   </div>
 {/if}
+
+<style>
+  /* THE TREND IS QUIET: thinner than the line it was fitted to, dashed, in that line's own colour and half its strength,
+     so it reads as a reading of the line and never as a second one. GLOBAL, as `Cards.svelte` says why: a scoped rule
+     marks the element, and the string drawer's tree would differ by the mark. */
+  :global(.lines-trend) {
+    fill: none;
+    stroke: var(--chart-1);
+    stroke-width: 1.5px;
+    stroke-dasharray: 6 6;
+    stroke-linecap: round;
+    opacity: 0.55;
+    pointer-events: none;
+  }
+
+  :global(.lines-trend-said) {
+    margin: 0;
+    color: var(--dim);
+    font-size: var(--t-base);
+  }
+</style>

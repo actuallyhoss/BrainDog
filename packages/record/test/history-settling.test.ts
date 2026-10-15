@@ -78,6 +78,9 @@ test("SLASH'S RULES DRAFT IT AND HE ACCEPTS: the decide line, the row's event an
   /* AND THE QUESTION ASKED AGAIN SAYS WHOSE IT WAS; the accepted row's own create still reads as accepted. */
   const reopened = log.find((e) => e.kind === 'suggest' && e.target === `suggestion:${filed.id}` && e.to === 'reopened');
   assert.deepEqual(reopened && keysOf(reopened), { suggested_by: 'slash', drafted_by: 'rules' });
+  /* AND BOTH SAY WHO HAD ANSWERED IT, so a screen reads "Slash did · he undid" with the answer's own name. */
+  assert.equal((back as { answered_by?: string }).answered_by, 'p_owner');
+  assert.equal((reopened as { answered_by?: string } | undefined)?.answered_by, 'p_owner');
   assert.equal(log.find((e) => e.kind === 'create' && e.target === `entry:${id}`)?.undone, undefined);
   sql.close();
 });

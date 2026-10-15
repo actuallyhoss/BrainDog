@@ -348,8 +348,8 @@ test('pack install <file> --dry-run says the plan and sends nothing; without it 
   const h = await setup(t);
   assert.equal(await pack(['install', PROJECT_BRIEF, '--dry-run'], h.io), 0, h.said.join('\n'));
   assert.equal(h.seen.length, 0, 'a dry run sent something');
-  assert.match(h.out[0] ?? '', /^Project brief 2\.0\.0 reads as an add-on/u);
-  /* 2.0.0 (brief-48) needs Work too, for the steps a task ticks, and adds its Plan steps list and three rules. */
+  assert.match(h.out[0] ?? '', /^Project brief 2\.1\.0 reads as an add-on/u);
+  /* Since 2.0.0 (brief-48), and so 2.1.0, it needs Work too, for the steps a task ticks, and adds its Plan steps list and three rules. */
   assert.ok(h.out.includes('  Installs first: portfolio, work'), h.out.join('\n'));
   assert.ok(
     h.out.includes(
@@ -357,7 +357,7 @@ test('pack install <file> --dry-run says the plan and sends nothing; without it 
     ),
     h.out.join('\n'),
   );
-  assert.match(h.out.at(-1) ?? '', /^Would ask the owner: Install Project brief 2\.0\.0\? Nothing was sent\.$/u);
+  assert.match(h.out.at(-1) ?? '', /^Would ask the owner: Install Project brief 2\.1\.0\? Nothing was sent\.$/u);
 
   h.out.length = 0;
   assert.equal(await pack(['install', PROJECT_BRIEF], h.io), 0, h.said.join('\n'));
@@ -366,7 +366,7 @@ test('pack install <file> --dry-run says the plan and sends nothing; without it 
   const body = asked[0]?.args.body as { install: string; doc: Record<string, unknown> };
   assert.equal(body.install, 'project-brief');
   assert.deepEqual(body.doc, JSON.parse(readFileSync(PROJECT_BRIEF, 'utf8')));
-  assert.match(h.out.at(-1) ?? '', /^Asked the owner: Install Project brief 2\.0\.0\? Nothing is installed until they accept it\. Open Decide in the app\.$/u);
+  assert.match(h.out.at(-1) ?? '', /^Asked the owner: Install Project brief 2\.1\.0\? Nothing is installed until they accept it\. Open Decide in the app\.$/u);
 
   /* A USE CASE IS NOT AN ADD-ON, and a file that is neither is refused before anything is sent. */
   assert.equal(await usecase(['new', 'club', '--author', 'Halden'], h.io), 0);
@@ -382,7 +382,7 @@ test('pack install <id> with no --from resolves the id in the catalogue the host
   assert.equal(await pack(['install', 'project-brief', '--dry-run'], h.io), 0, h.said.join('\n'));
   assert.equal(h.seen.filter((s) => s.method === 'propose').length, 0, 'a dry run asked');
   assert.match(h.out.join('\n'), /Unsigned: nothing says who published it/u);
-  assert.match(h.out.at(-1) ?? '', /^Would ask the owner: Install Project brief 2\.0\.0 from a catalogue\?.* Nothing was sent\.$/u);
+  assert.match(h.out.at(-1) ?? '', /^Would ask the owner: Install Project brief 2\.1\.0 from a catalogue\?.* Nothing was sent\.$/u);
 
   assert.equal(await pack(['install', 'project-brief'], h.io), 0, h.said.join('\n'));
   const asked = h.seen.filter((s) => s.method === 'propose');

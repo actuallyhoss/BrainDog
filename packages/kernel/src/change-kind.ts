@@ -13,7 +13,8 @@
  * `<list>:delete`. So `tasks:move:done` reads as "marks tasks done", which is the sentence Settings shows beside a
  * grant. A proposal breaks down into the same keys, plus four of its own: `shape:<list>` for a change to a list's
  * fields, `automation` for anything that runs unattended, `addons` for packs, settings and arrangements, and `call` for
- * a choice between options.
+ * a choice between options. An `attach` is `<list>:attach`: a name in a text put on the row it is, by the sentence it
+ * was seen in, which is its own kind so it can be earned apart from editing the row (ENG-B15).
  *
  * THE FLOOR IS FIXED RULES AND NOTHING ELSE, the way `costOf` is. A kind on the floor is Ask for every agent, every
  * grant and every rung, Slash included, and no setting lifts it:
@@ -53,6 +54,8 @@ export type ChangeKind = { key: string; list: string | null; verb: string; floor
 export const CALL = 'call';
 export const ADDONS = 'addons';
 export const AUTOMATION = 'automation';
+/** The verb of a mention attached to a row it names, `<list>:attach` (ENG-B15, D37.52 and D37.53). */
+export const ATTACH = 'attach';
 
 /** How many days of an existing write token's own writes keep their kinds at Do and tell, once, when the ladder arrives. */
 export const KEPT_DAYS = 30;
@@ -77,6 +80,8 @@ export type ListShape = {
   state?: string;
   identity?: readonly string[];
   names?: readonly string[];
+  /** The fields that keep where a row was seen (the `met` part, `roles.ts`), the one place an attach writes. */
+  seen?: readonly string[];
 };
 
 /**
@@ -106,7 +111,7 @@ const obj = (v: unknown): Record<string, unknown> => (v !== null && typeof v ===
 const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 
 /** The verbs in the order they are named by, dearest first: what a stamp of several lists first. */
-const VERB_ORDER = ['delete', 'move', 'edit', 'tag', 'add', 'note', 'shape', AUTOMATION, ADDONS, CALL];
+const VERB_ORDER = ['delete', 'move', 'edit', 'tag', ATTACH, 'add', 'note', 'shape', AUTOMATION, ADDONS, CALL];
 const verbRank = (verb: string): number => {
   const at = VERB_ORDER.indexOf(verb.split(':')[0]!);
   return at < 0 ? VERB_ORDER.length : at;
@@ -225,6 +230,46 @@ export function kindsOfWrite(w: WriteSaid): ChangeKind[] {
 export const kindOfWrite = (w: WriteSaid): ChangeKind => dearest(kindsOfWrite(w))!;
 
 /**
+ * The kind of a mention attached to a row it names, `<list>:attach` (ENG-B15): a name read in a text, put on the row
+ * the reader took it to be, with the sentence it was seen in. OFF THE FLOORS, so it can be earned apart from editing
+ * the row (D37.53), and always undoable (D37.55): it adds a line where the row was seen and changes nothing it says.
+ *
+ * A ROW WITH AN AMOUNT IS THE `money` FLOOR, and asks at every rung (D37.56): a payment taken for the wrong person is
+ * not a line nobody reads. The floors of every other kind are as they were.
+ */
+export const kindOfAttach = (list: string, hasAmount: boolean): ChangeKind => kind(list, ATTACH, hasAmount ? 'money' : null);
+
+/** Whether a row holds an amount: a money field with a value in `was`, or, when the row cannot be read, any money field at all. */
+const holdsAmount = (shape: ListShape | null, was: Record<string, unknown> | null | undefined): boolean => {
+  const money = (shape?.fields ?? []).filter((f) => f.type === 'money');
+  if (money.length === 0) return false;
+  return !was || money.some((f) => !emptied(was[f.id] ?? null));
+};
+
+/**
+ * Whether a field's new value only adds to the old: every line it held is still there and something is new. A row that
+ * cannot be read (`was` is null) is taken at its word, as the write path refuses an update to a row that is not there.
+ */
+const addsTo = (before: unknown, after: unknown): boolean => {
+  if (emptied(after ?? null)) return false;
+  if (before === undefined || emptied(before)) return true;
+  const had = (Array.isArray(before) ? before : [before]).map((v) => JSON.stringify(v));
+  const now = (Array.isArray(after) ? after : [after]).map((v) => JSON.stringify(v));
+  return now.length > had.length && had.every((v) => now.includes(v));
+};
+
+/**
+ * Whether a rowset row is an attach: an update that adds only to the fields keeping where its row was seen
+ * (`ListShape.seen`), keeping every line already there. A body says `as: 'attach'`, and the rows that are more than that
+ * (a line taken out, a field beside them) are read as the edits they are, so saying it never makes a write cheaper.
+ */
+const attaches = (shape: ListShape | null, patch: Record<string, unknown>, was: Record<string, unknown> | null | undefined): boolean => {
+  const seen = new Set(shape?.seen ?? []);
+  const keys = Object.keys(patch);
+  return seen.size > 0 && keys.length > 0 && keys.every((k) => seen.has(k) && addsTo(was?.[k], patch[k]));
+};
+
+/**
  * The kind one logged event is, or `null` for an event that is not a change to a row.
  *
  * FOR READING THE LOG BACK, as the ladder does when it seeds a grant from what it already did: the event names its kind
@@ -233,7 +278,7 @@ export const kindOfWrite = (w: WriteSaid): ChangeKind => dearest(kindsOfWrite(w)
 export function kindOfEvent(
   e: { list: string; kind: string; field: string | null; to_v: string | null },
   shape: ListShape | null,
-  who: { madeBy?: string | null; person?: string | null } = {},
+  who: { madeBy?: string | null; person?: string | null; amount?: boolean } = {},
 ): ChangeKind | null {
   const said = { shape, madeBy: who.madeBy ?? null, person: who.person ?? null };
   switch (e.kind) {
@@ -256,6 +301,12 @@ export function kindOfEvent(
         : kindOfWrite({ list: e.list, op: 'update', patch: { [e.field]: e.kind === 'edit' && e.to_v === 'null' ? null : true }, ...said });
     case 'note':
       return kindOfWrite({ list: e.list, op: 'note', ...said });
+    /* AN ATTACH IS LOGGED AS ITSELF, so the ladder counts it apart from the edits. The event cannot say whether its row
+       holds an amount, so `who.amount` does, and a list with a money field is read as one when it is not given. */
+    case ATTACH: {
+      const k = kindOfAttach(e.list, who.amount ?? holdsAmount(shape, null));
+      return { ...k, floor: dearerFloor(k.floor, rowFloor({ op: 'update', ...said })) };
+    }
     case 'delete':
     case 'restore':
     case 'purge':
@@ -319,11 +370,12 @@ export function kindsOfProposal(bodyKind: string, body: unknown, read: KindReade
     case 'rowset': {
       const list = typeof b.register === 'string' ? b.register : '?';
       const shape = read.shape(list);
+      const attaching = b.as === ATTACH;
       return merged(
         arr(b.rows).flatMap((raw) => {
           const r = obj(raw);
           if (typeof r.at !== 'string') return kindsOfWrite({ list, op: 'create', patch: r, shape });
-          return kindsOfWrite({
+          const said: WriteSaid = {
             list,
             op: 'update',
             patch: obj(r.patch),
@@ -331,7 +383,13 @@ export function kindsOfProposal(bodyKind: string, body: unknown, read: KindReade
             madeBy: read.madeBy?.(list, r.at) ?? null,
             person: read.person ?? null,
             was: read.fieldsOf?.(list, r.at) ?? null,
-          });
+          };
+          /* AN ATTACH KEEPS THE ROW'S OWN FLOORS (keys, another person's row) and adds the amount's. */
+          if (attaching && attaches(shape, said.patch!, said.was)) {
+            const k = kindOfAttach(list, holdsAmount(shape, said.was));
+            return [{ ...k, floor: dearerFloor(k.floor, rowFloor(said)) }];
+          }
+          return kindsOfWrite(said);
         }),
       );
     }
@@ -415,12 +473,13 @@ export function shapeIn(sql: Sql, list: string): ListShape | null {
   if (!row) return null;
   const body = parsed(row.body);
   const fields = arr(body.fields).map(obj).filter((f) => typeof f.id === 'string') as unknown as ListShape['fields'];
-  const { identity, names } = identityOf(list, body, fields);
+  const { identity, names, seen } = identityOf(list, body, fields);
   return {
     fields,
     ...(typeof body.state === 'string' ? { state: body.state } : {}),
     ...(identity.length > 0 ? { identity } : {}),
     ...(names.length > 0 ? { names } : {}),
+    ...(seen.length > 0 ? { seen } : {}),
   };
 }
 
@@ -445,7 +504,7 @@ const NAMING_PARTS: ReadonlySet<string> = new Set(['name', 'aliases', 'org']);
  * organisations `meet` writes, read with `roles.ts`'s own rule, so a list that declares `meets:` or `org:` and a
  * keyless `people` from before the keys are read the same way `meet` reads them.
  */
-function identityOf(list: string, body: Record<string, unknown>, fields: ListShape['fields']): { identity: string[]; names: string[] } {
+function identityOf(list: string, body: Record<string, unknown>, fields: ListShape['fields']): { identity: string[]; names: string[]; seen: string[] } {
   const one = [{ id: list, fields: fields as readonly RoleField[], meets: body.meets, org: body.org }];
   const played = { ...orgRole(one)?.fields, ...meetsRole(one)?.fields } as Record<string, string | undefined>;
   const held = new Set(fields.map((f) => f.id));
@@ -453,7 +512,7 @@ function identityOf(list: string, body: Record<string, unknown>, fields: ListSha
   const identity = of(IDENTITY_PARTS);
   /* A FIELD THAT PLAYS A NAMING PART AND A JOINING ONE, which only a hand-made declaration could say, joins. */
   const joining = new Set(of(IDENTITY_PARTS.filter((p) => !NAMING_PARTS.has(p))));
-  return { identity, names: of([...NAMING_PARTS]).filter((f) => !joining.has(f)) };
+  return { identity, names: of([...NAMING_PARTS]).filter((f) => !joining.has(f)), seen: of(['met']) };
 }
 
 /** A run's spoken name as its writes are signed, `S42`, and nothing else. */

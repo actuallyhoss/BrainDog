@@ -176,7 +176,7 @@ export function questionOf(row: Row, asked: string | undefined, rank: number): Q
   const title = moneyInText(asked?.trim() ?? '');
   /* A MERGE THE RECORD READ AS ONE (`merge`), carried to the card as it came, once it is the shape the card reads. */
   const merge = mergeOf(row.merge);
-  return { id, title: title || id, cost: '', band, rank, opened: text(row.opened_at), options, ...(context ? { context } : {}), ...(merge ? { merge } : {}) };
+  return { id, title: title || id, cost: '', band, rank, opened: text(row.opened_at), options, ...(context ? { context } : {}), ...(merge ? { merge } : {}), ...(typeof row.decider === 'string' || row.decider === null ? { decider: row.decider as string | null } : {}) };
 }
 
 const texts = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) => typeof x === 'string');

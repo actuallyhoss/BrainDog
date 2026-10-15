@@ -139,10 +139,14 @@ const unsaidFigure = (f: unknown): boolean => isObj(f) && (f.unsaid === true || 
  * one over a list that holds no row at all, whose zero the record calls not news (the app's `nothingHeld`, the record's
  * `held: 0`). A figure the record refused says why, and is never idle.
  */
-function idle(f: unknown): boolean {
+function idle(f: unknown, alone = false): boolean {
   if (!isObj(f) || f.refusal !== undefined) return false;
   if (unsaidFigure(f) || f.nothingHeld === true) return true;
-  return isObj(f.reading) && f.reading.held === 0;
+  if (!isObj(f.reading) || f.reading.held !== 0) return false;
+  /* A WALK THAT NEVER WENT UNDER says so by `beyond` ('Lasts past ...'), which is the whole of a tile drawn alone; in a
+     row of several figures over nothing held it is an empty part, and the row of noughts beside it is not drawn for it. */
+  if (f.reading.beyond !== undefined && alone) return false;
+  return !(typeof f.reading.value === 'number' && f.reading.value !== 0);
 }
 
 /**
@@ -151,8 +155,14 @@ function idle(f: unknown): boolean {
  */
 function told<B extends Drawable>(b: B): B {
   if (keeps(b)) return b;
-  if (Array.isArray(b.metrics)) return b.metrics.some(idle) ? ({ ...b, metrics: b.metrics.filter((f) => !idle(f)) } as B) : b;
-  if (Array.isArray(b.readings) && !partsOf(b) && b.readings.some(idle)) return { ...b, readings: b.readings.filter((f) => !idle(f)) } as B;
+  if (Array.isArray(b.metrics)) {
+    const alone = b.metrics.length === 1;
+    return b.metrics.some((f) => idle(f, alone)) ? ({ ...b, metrics: b.metrics.filter((f) => !idle(f, alone)) } as B) : b;
+  }
+  if (Array.isArray(b.readings) && !partsOf(b)) {
+    const alone = b.readings.length === 1;
+    if (b.readings.some((f) => idle(f, alone))) return { ...b, readings: b.readings.filter((f) => !idle(f, alone)) } as B;
+  }
   return b;
 }
 
@@ -174,7 +184,7 @@ export function holdsNothing(b: Drawable): boolean {
     none(b.authored) &&
     matchedCount(b) === 0 &&
     (typeof b.total !== 'number' || b.total === 0) &&
-    figuresOf(b).every(idle) &&
+    figuresOf(b).every((f, _, all) => idle(f, all.length === 1)) &&
     none(b.measures) &&
     none(b.latest) &&
     none(b.readOnce) &&

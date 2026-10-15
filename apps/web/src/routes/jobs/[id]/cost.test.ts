@@ -7,8 +7,8 @@ import { test } from 'node:test';
 import { costWords } from './cost.ts';
 
 test('one minor unit reads under the smallest coin', () => {
-  assert.equal(costWords(1, 'USD'), 'under $0.01');
-  assert.equal(costWords(1, 'EUR'), 'under €0.01');
+  assert.equal(costWords(1, 'USD', 'USD'), 'under $0.01');
+  assert.equal(costWords(1, 'EUR', 'EUR'), 'under €0.01');
 });
 
 test('any other figure is drawn as money', () => {

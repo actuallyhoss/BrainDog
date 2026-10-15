@@ -276,7 +276,7 @@
     /* A RUN'S FACE, ON A CARD OF RUNS: the run and whether it is working, gone quiet or stopped, so
        `Cards.svelte` draws the run's glyph in the `who` cell instead of a plain initial. */
     ...((block.source === 'sessions.live' || block.source === 'sessions.working') && block.entries
-      ? { runs: block.entries.map((e, n) => ({ run: `S${e.seq}`, agent: typeof e.fields.agent === 'string' ? e.fields.agent : null, live: liveOf(e.fields.state, block.quiet?.[n] === true) })) }
+      ? { runs: block.entries.map((e, n) => ({ run: `S${e.seq}`, agent: typeof e.fields.agent === 'string' ? e.fields.agent : null, live: liveOf(e.fields.state, block.quiet?.[n] === true), presence: block.presence?.[n] })) }
       : block.runFaces
         ? /* AND ON A CARD WHOSE `who` THE BLOCK ANSWERED AS A RUN (`page-live.ts` `runFaces`): what a project runs on. */
           { runs: block.runFaces }

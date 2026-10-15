@@ -16,7 +16,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createRecordApi, type CallContext } from '../src/index.ts';
-import { createDirectory, switcherAsk, type Named, type Person } from '../src/directory.ts';
+import { createDirectory, heldSaid, listNames, switcherAsk, type Named, type Person, type SwitcherRow } from '../src/directory.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 import { testSigner } from '../../kernel/test/signer.ts';
 
@@ -80,7 +80,7 @@ test('A COLLEAGUE INVITED TO ONE LIST KEEPS THE ROW, with no record-wide level a
     rows,
     [
       { slug: 'books-co', name: 'Books Co', level: 'owner' },
-      { slug: 'the-studio', name: 'The Studio', level: null, lists: ['expenses'], held: 'Some lists' },
+      { slug: 'the-studio', name: 'The Studio', level: null, lists: ['expenses'], names: ['Expenses'], words: 'Some lists: Expenses', held: 'Some lists' },
     ],
     'the record the colleague was just admitted to has no row in their switcher',
   );
@@ -112,4 +112,35 @@ test('REMOVED FROM THE RECORD, the row goes, although the Directory still lists 
   value(await api.removeMember({ person: books.id }, { principal: { kind: 'person', id: studio.person, level: 'owner' } }));
   assert.equal(api.kernel.access(books.id), null);
   assert.deepEqual((await d.switcherRows(books.id, ask)).map((r) => r.slug), ['books-co']);
+});
+
+/* ── the lists by name ──────────────────────────────────────────────── */
+
+test('INVITED TO TWO LISTS, the row carries both names in the record\'s order, and the words never hold an id', async () => {
+  /* Granted Payroll first: the names come in the record's order, Expenses before Payroll, as its rail lists them. */
+  const { d, books, ask } = await world({ registers: { payroll: 'write', expenses: 'write' } });
+  const row = (await d.switcherRows(books.id, ask)).find((r) => r.slug === 'the-studio') as Extract<SwitcherRow, { level: null }>;
+  assert.deepEqual(row.names, ['Expenses', 'Payroll']);
+  assert.deepEqual([...row.lists].sort(), ['expenses', 'payroll']);
+  /* `held` stays the one word, so a web from before `names` draws what it drew. */
+  assert.equal(row.held, 'Some lists');
+  /* And `words` is what the web draws, as it comes: the names, never an id. */
+  assert.equal(row.words, 'Some lists: Expenses and Payroll');
+  for (const id of row.lists) assert.ok(!row.words.includes(id), `the row reads the list id "${id}"`);
+});
+
+test('A LIST THE RECORD CANNOT NAME IS LEFT OUT of the names, never drawn as its id', () => {
+  const kernel = { registers: () => new Map([['tickets', { name: 'Tickets' }], ['bugs', { name: 'Bugs' }], ['blank', { name: ' ' }]]) };
+  assert.deepEqual(listNames(kernel, ['bugs', 'gone', 'tickets', 'blank']), ['Tickets', 'Bugs']);
+  assert.deepEqual(listNames(kernel, []), []);
+});
+
+test('THE WORDS A ONE-LIST ROW READS: one name, two joined by "and", more as the first and how many more', () => {
+  const cases: [string[], string][] = [
+    [[], 'Some lists'],
+    [['Tickets'], 'Some lists: Tickets'],
+    [['Tickets', 'Bugs'], 'Some lists: Tickets and Bugs'],
+    [['Tickets', 'Bugs', 'Releases', 'Notes'], 'Some lists: Tickets and 3 more'],
+  ];
+  for (const [names, want] of cases) assert.equal(heldSaid(names), want);
 });

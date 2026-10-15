@@ -50,9 +50,10 @@ import { predicateOf, windowMs, wordsOf, type EvalContext, type FxRead, type Met
 import { HORIZON_CAP, runway, type Horizon, type Leg, type Only, type Runway } from './forecast.ts';
 import { beyondOf, figureLists, isRolled, pointedIn, type PointsAt, type Rolled } from './money-figures.ts';
 import { withAdds, type PageAddition } from './page-adds.ts';
+import { factsOf, type CardFact } from './card-facts.ts';
 import { barsOf, type Bars, type SeriesLine } from './series.ts';
 import { isBucket } from './buckets.ts';
-import { isQuiet, presenceOf, WORKING_MS } from './presence.ts';
+import { isQuiet, presenceOf, WORKING_MS, type Presence } from './presence.ts';
 import { SESSION_PREFIX, agentOf, recordNamed } from './session.ts';
 import { quietSign, type VitalSign } from './signs.ts';
 import { nextSteps, stepsPercent, tallySteps, type StepsDecl } from './steps.ts';
@@ -400,6 +401,11 @@ export type BlockResult = PageBlock & {
    * met its target, aligned with `rows`. `null` for a card whose figure reads nothing, which draws no line.
    */
   whens?: ({ value: number; met: boolean | null } | null)[];
+  /**
+   * A `cards` block's with columns `{ metric, as: fact, label }`: one entry a card, one fact a figure column in column
+   * order, aligned with `rows`. `null` for a fact that reads nothing, which draws no fact.
+   */
+  facts?: CardFact[][];
   /** A `steps` block's over a list that declares `steps:`: whether each row is done, aligned with `rows`. */
   done_now?: boolean[];
   /** And the index in `rows` of the first row not done, `null` when every row is. */
@@ -488,6 +494,8 @@ export type BlockResult = PageBlock & {
    * record's clock rather than one of its own.
    */
   quiet?: boolean[];
+  /** On `sessions.live`, aligned with `rows`: the one word each run reads as (`presenceOf`): working, quiet, left, ended, stopped or before. */
+  presence?: Presence[];
   /**
    * On `sessions.working`, aligned with `rows`: how many helpers each run has working under it. A helper is folded into
    * the run that started it and is not a row of its own, so one agent with four subagents is one card that says four.
@@ -631,6 +639,8 @@ export type QueueQuestion = {
   options: QueueOption[];
   about?: string;
   list?: string | null;
+  /** The person handed this question to decide (USE-A13), a person id; absent when nobody was handed it. */
+  decider?: string | null;
   /**
    * On a queue's lead question (`lead: true`): what was proposed, the body's kind, and what accepting it does, one
    * short line read off the body (`does.ts`), so the first question is drawn whole with the change under it. A change
@@ -2820,6 +2830,7 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
     ...nextsOf(deps, block, register, rows),
     ...trendsOf(deps, block, rows),
     ...whensOf(deps, block, rows),
+    ...factsOf(deps, block, rows),
     ...(marks ? { done_now: marks, next: lead === undefined ? null : lead.at } : {}),
     ...(grouping && block.kind === 'cards' ? { fold: typeof block.fold === 'number' ? block.fold : CARD_FOLD } : {}),
     ...inShort,
@@ -5702,6 +5713,7 @@ const SOURCE_KIT = {
   HANDOFFS_OPEN,
   agentOf,
   isQuiet,
+  presenceOf,
   projectsOf,
   recordNamed,
   markOf,

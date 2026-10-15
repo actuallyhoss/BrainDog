@@ -106,12 +106,28 @@ export type IngestPath =
  * `verifyStripe` takes: Stripe keys its HMAC with the `whsec_` string itself, and the window is how far
  * the signed `t=` may be from this host's clock.
  */
-export type IngestVerify =
+export type IngestVerify = (
   | { kind: 'path'; sha256: string }
   | { kind: 'path'; token: string }
   | { kind: 'hmac_sha256'; header: string; key: Uint8Array }
   | { kind: 'stripe'; header: string; secret: string; tolerance: number }
-  | { kind: 'none' };
+  | { kind: 'none' }
+) &
+  /**
+   * THE DOOR IS SWITCHED OFF (SHL-C13), and whatever verifies it is kept, because on again is the same address. An
+   * arrival at it is answered 410 with no body, counted through `turnedAway`, and stored nowhere.
+   */
+  { off?: true };
+
+/** An arrival the host turned away at a door that is off: which door, or which record's mailbox, and by what channel. */
+export type IngestTurnedAway = { channel: IngestChannel; rec?: string; ingest?: string };
+
+/**
+ * What `inbound` answers for a mail token: the record it names, or that record with its mailbox switched off.
+ *
+ * THE BARE STRING IS STILL AN ANSWER, so a host written before a mailbox could be off answers as it did.
+ */
+export type IngestInbound = string | { rec: string; off?: true } | null;
 
 /** One arrival, as the host hands it to the record. `kernel.arrive`'s `Arrival` plus who it is for and whether it is eligible. */
 export type IngestArrival = {
@@ -153,7 +169,12 @@ export type IngestDoor = {
    *
    * ABSENT IS A HOST THAT TAKES NO FORWARDED MAIL, and the path then answers 404 like any other.
    */
-  inbound?(tokenHash: string): Promise<string | null>;
+  inbound?(tokenHash: string): Promise<IngestInbound>;
+  /**
+   * Count one arrival answered 410 at a door that is off (the record's `turnedAway`). Absent, the 410 is still the
+   * answer and nothing is counted. A count that fails does not change the answer: the sender was turned away either way.
+   */
+  turnedAway?(ask: IngestTurnedAway): Promise<void>;
   /**
    * Keep one attachment in the record's file store, and answer what it was kept as, or `null` for one it does not take.
    *
@@ -686,6 +707,8 @@ async function bytesOf(request: Request, limit: number): Promise<Uint8Array<Arra
 async function hook(request: Request, door: IngestDoor, path: Extract<IngestPath, { channel: 'webhook' }>): Promise<Response> {
   const v = await door.verify({ ...(path.rec === undefined ? {} : { rec: path.rec }), ingest: path.ingest });
   if (v === null) return nothing(404);
+  /* OFF IS ASKED BEFORE THE BODY IS READ, so a door that is off spends no memory on what it will not keep. */
+  if (v.off === true) return away(door, { channel: 'webhook', ...(path.rec === undefined ? {} : { rec: path.rec }), ingest: path.ingest });
 
   const bytes = await bytesOf(request, WEBHOOK_LIMIT);
   if (bytes instanceof Response) return bytes;
@@ -718,8 +741,10 @@ async function mail(request: Request, door: IngestDoor, hash: string): Promise<R
   if (door.inbound === undefined) return nothing(404);
   /* THE TOKEN ITSELF NEVER LEAVES THIS FILE. What crosses to the host is the digest the budget was
      already keyed on, so a host that keeps an index of inbound tokens keeps an index of digests. */
-  const rec = await door.inbound(hash);
-  if (rec === null) return nothing(404);
+  const named = await door.inbound(hash);
+  if (named === null) return nothing(404);
+  const rec = typeof named === 'string' ? named : named.rec;
+  if (typeof named !== 'string' && named.off === true) return away(door, { channel: 'email', rec });
 
   const bytes = await bytesOf(request, EMAIL_LIMIT);
   if (bytes instanceof Response) return bytes;
@@ -1181,6 +1206,23 @@ async function keepAll(door: IngestDoor, rec: string, files: MailFile[]): Promis
     );
   }
   return out;
+}
+
+/**
+ * A door that is off: 410 and no body, counted, and nothing stored.
+ *
+ * 410 AND NOT 404, because a sender's own retries need a clear stop: 404 is retried by some senders as a hiccup, and
+ * 410 says the address is gone on purpose. It tells a stranger that the address was once real, which a guessed id
+ * already learns from 202; the token is not checked here, so it says nothing about the token (SHL-C13, "Risk").
+ * THE COUNT IS BEST EFFORT. A record that cannot count still turned the arrival away, and a 503 would ask for a retry.
+ */
+async function away(door: IngestDoor, ask: IngestTurnedAway): Promise<Response> {
+  try {
+    await door.turnedAway?.(ask);
+  } catch {
+    /* Counted or not, the answer is the same. */
+  }
+  return nothing(410);
 }
 
 /**

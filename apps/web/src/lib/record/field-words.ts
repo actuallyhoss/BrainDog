@@ -15,6 +15,10 @@ import type { Addable, DurationUnit, SheetKind } from './field-write.ts';
 export const KIND_WORDS: Readonly<Record<Addable, string>> = {
   text: 'Text',
   document: 'Long text',
+  enum: 'Choice',
+  ref: 'Link to something else',
+  money: 'Money',
+  list: 'Tags',
   day: 'Date',
   int: 'Whole number',
   decimal: 'Number',
@@ -45,13 +49,27 @@ export const fieldWords = {
   added: (label: string) => `Everything here has ${label} now.`,
   filed: (label: string) => `${label} is waiting on Decide for the owner.`,
   reserved: (label: string) => `${label} is a name the record keeps for itself. Pick another.`,
+  /* THE ONE MORE THING A KIND NEEDS, asked under the kind and refused at it. */
+  choices: 'Choices',
+  choicesHelp: 'One a line, or split by commas. Two to forty.',
+  fewChoices: 'Type at least two choices.',
+  manyChoices: 'Forty choices at most. Take some out.',
+  longChoice: (value: string) => `${value} is longer than 40 letters. Shorten it.`,
+  linkTo: 'Links to',
+  pickLink: 'Pick what this links to.',
+  linkGone: 'That is not here any more. Pick another to link to.',
+  inRecordCurrency: (code: string) => `In this record's own currency, ${code}.`,
+  pickCurrency: 'Pick the currency.',
+  noHome: 'This record has no currency of its own yet. Set it in Settings first.',
+  otherCurrency: (code: string) => `A new field keeps money in this record's own currency, ${code}, for now.`,
+  currencyUnknown: (typed: string) => `${typed} is not a currency.`,
 } as const;
 
 /**
  * What each kind is called in the Fields sheet, where every kind a list can hold is offered, in the order it is offered.
  *
- * A WIDER SET THAN `KIND_WORDS`, because the sheet asks the one more thing some kinds need (the choices of a choice,
- * what a link points at, the unit a duration is said in), and the one-line form on a row page asks nothing more.
+ * A WIDER SET THAN `KIND_WORDS`: the row page's form asks the one more thing of a choice, a link and money, and the
+ * sheet asks it of a duration and a quantity too. Each kind both offer is called the same in both.
  */
 export const SHEET_KIND_WORDS: Readonly<Record<SheetKind, string>> = {
   text: 'Text',
@@ -106,8 +124,6 @@ export const sheetWords = {
   addHead: 'Add a field',
   values: 'Choices',
   valuesHelp: 'One per line, or separated by commas.',
-  noValues: 'Give it at least one choice.',
-  valueTwice: (value: string) => `${value} is in the choices twice.`,
   linkTo: 'Links to',
   noLists: 'There is nothing else here to link to yet.',
   pickList: 'Pick what it links to.',

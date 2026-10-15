@@ -660,7 +660,7 @@ const FALLBACK_GRANT = 'operator.fallback';
  * THE KEY IS OPENED ON EACH CALL AND HELD NOWHERE ELSE: `openKey` reads the secret when the call is made, and the wire
  * requires it, so an empty secret is a call never sent and never a request with no key.
  */
-function fallbackWire(env: SlashEnv, send?: SlashWire['send']): SlashInference | undefined {
+export function fallbackWire(env: SlashEnv, send?: SlashWire['send']): SlashInference | undefined {
   const second = fallbackOf(env);
   if (second === null) return undefined;
   return slashOwnInference(

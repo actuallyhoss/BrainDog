@@ -664,6 +664,8 @@ function spanWords(days: number): string {
   if (years >= 1 && Math.abs(days - years * YEAR_DAYS) <= YEAR_NEAR) return forecastYears(years);
   const months = Math.round(days / MONTH_DAYS);
   if (months >= 1 && Math.abs(days - months * MONTH_DAYS) <= MONTH_NEAR) return forecastMonths(months);
+  /* WHOLE WEEKS FROM TWO TO TWELVE are said in weeks, so Money's ten-week window reads `10 weeks`, not `70 days`. */
+  if (days % 7 === 0 && days >= 14 && days <= 84) return forecastWeeks(days / 7);
   return forecastDays(days);
 }
 
@@ -1280,6 +1282,7 @@ export const forecastNow = (day: string): string => `Now goes under on ${day}`;
 export const forecastMonths = (n: number): string => `${n} ${n === 1 ? 'month' : 'months'}`;
 export const forecastYears = (n: number): string => `${n} ${n === 1 ? 'year' : 'years'}`;
 export const forecastDays = (n: number): string => `${n} ${n === 1 ? 'day' : 'days'}`;
+export const forecastWeeks = (n: number): string => `${n} ${n === 1 ? 'week' : 'weeks'}`;
 export const forecastPerMonth = (figure: string): string => `${figure} a month`;
 /** Spending the record does not know in one currency of a walk drawn once per currency, the currency by its name. */
 export const forecastSpendIn = (key: string): string => `${FORECAST_SPEND}, in ${/^[A-Z]{3}$/u.test(key) ? currencyName(key) : key}`;

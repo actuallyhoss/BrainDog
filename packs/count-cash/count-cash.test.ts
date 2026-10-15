@@ -96,9 +96,11 @@ test('THE PACK CARRIES count.js AS ITS SOURCE, byte for byte; it fetches nothing
      1.3.1 BESIDE THE PUBLISHED 1.3.0: the same sentence, now naming the way out. Words only, so a patch.
      1.3.2 BESIDE THE PUBLISHED 1.3.1: the way out now says which balance to type. Words only again.
      1.3.3 BESIDE THE PUBLISHED 1.3.2: a count in another currency than its account says so on the count, where only
-     the run's log did (audit 73 finding 3). A sentence written on two paths, no field added, so a patch. */
-  assert.equal(file.value.pack.manifest.version, '1.3.3');
-  assert.match(PACK.changes, /now says so on the count, under What happened/);
+     the run's log did (audit 73 finding 3). A sentence written on two paths, no field added, so a patch.
+     1.4.0 BESIDE THE PUBLISHED 1.3.3: Money gains a box to count the cash in and the newest count, by adds, and a count
+     that files says so. A block and a sentence added, so a minor. */
+  assert.equal(file.value.pack.manifest.version, '1.4.0');
+  assert.match(PACK.changes, /Money now has a box to count the cash in/);
   const counts = PACK.declarations.find((d) => d.register === 'cash_counts') as { fields: { id: string }[] };
   assert.deepEqual(counts.fields.map((f) => f.id), ['account', 'counted', 'on', 'difference', 'said', 'note']);
 });
@@ -225,7 +227,7 @@ test('THE SENTENCE NAMES THE WAY OUT, AND THE WAY OUT WORKS: the balance typed a
   const a = await runInQuickJs(decl(), hostWith(count, typed, [moved(11, '2026-09-22', 2_000, 'GBP'), moved(12, '2026-09-23', 8_750, 'EUR')]));
   const writes = writesOf(a) as unknown as { op: string; register?: string; patch?: Record<string, Json> }[];
   assert.deepEqual(writes.map((w) => [w.op, w.register ?? null]), [['create', 'transactions'], ['create', 'balances'], ['update', null]]);
-  assert.deepEqual(writes[2]!.patch, { difference: { amount: -250, currency: 'GBP' } });
+  assert.deepEqual(writes[2]!.patch, { difference: { amount: -250, currency: 'GBP' }, said: 'Filed as one entry in the Ledger.' });
 });
 
 test('THE SAME ACCOUNT WITH ITS ENTRIES IN ONE CURRENCY IS COMPARED AS IT WAS, and so is one whose foreign entry is older than its statement', async () => {
@@ -243,7 +245,7 @@ test('THE SAME ACCOUNT WITH ITS ENTRIES IN ONE CURRENCY IS COMPARED AS IT WAS, a
     ],
   );
   assert.deepEqual([writes[0]!.fields!.direction, writes[0]!.fields!.amount], ['out', { amount: 500, currency: 'GBP' }]);
-  assert.deepEqual(writes[2]!.patch, { difference: { amount: -500, currency: 'GBP' } });
+  assert.deepEqual(writes[2]!.patch, { difference: { amount: -500, currency: 'GBP' }, said: 'Filed as one entry in the Ledger.' });
 });
 
 /* ── The whole path ────────────────────────────────────────────────────────────────────────────── */

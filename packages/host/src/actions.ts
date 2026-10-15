@@ -31,7 +31,7 @@
  */
 
 import { authoriseCall, PullError, retryAfterMs } from '@braindog/connect';
-import { reserveFor, type Budget, type PagedRun } from '@braindog/kernel';
+import { hostOpened, reserveFor, type Budget, type PagedRun } from '@braindog/kernel';
 import type { RecordApi } from '@braindog/record';
 import { METER_MANY_MAX, type COUNTED_ONLY } from '@braindog/record/directory';
 
@@ -838,8 +838,8 @@ export type SendOptions<P> = {
 /**
  * The executor `runActions` is handed, on either host.
  *
- * IN THIS ORDER, so nothing is opened for a request that will not leave: the origin, the host as written, `pin`, the
- * key, and then the request. A refused address ends the run as `PULL_ORIGIN_REFUSED` with one sentence, which the
+ * IN THIS ORDER, so nothing is opened for a request that will not leave: the origin, the host as written, the host the
+ * key opens, `pin`, the key, and then the request. A refused address ends the run as `PULL_ORIGIN_REFUSED` with one sentence, which the
  * kernel writes on the run's event as a failure that pauses nothing and is not retried.
  */
 export function sendAction<P extends object | undefined = undefined>(options: SendOptions<P>): Execute {
@@ -871,6 +871,15 @@ export function sendAction<P extends object | undefined = undefined>(options: Se
     if (url.protocol !== 'https:' || url.origin !== request.origin || !allowed.has(url.origin))
       return refuse('PULL_ORIGIN_REFUSED', `${url.host} is not an origin an installed declaration names, so nothing was sent.`);
     if (refusedHost(url) !== null) return refuse('PULL_ORIGIN_REFUSED', `${url.host} is a private or local address, so nothing was sent.`);
+    /* A KEY GOES ONLY TO ITS OWN HOST (SHL-C05), checked BEFORE the key is opened or anything resolved. A declaration
+       that names a person's Bake key and another host passes the origin check, since the origin is its own; what it may
+       not do is carry that key there. `opens` is the vault entry's words, read as a host the one way the kernel reads
+       them (`hostOpened`); an entry that names no host is held to nothing here, and its first approval pins one
+       (`pinHost`). Only the label and `opens` are read, never the value. */
+    const parsed = request.grant ? hostOpened(request.opens) : null;
+    /* ONE WORD IS A NAME, NOT A HOST ("Stripe" parses as `stripe`), so it holds the key to nothing (kernel `heldHost`). */
+    const own = parsed !== null && /[.:]/.test(parsed) ? parsed : null;
+    if (own !== null && own !== url.hostname.toLowerCase().replace(/\.$/, '')) return refuse('WRONG_KEY', `This key opens ${own} only.`);
 
     const signal = AbortSignal.timeout(request.timeoutMs);
     let method: string = request.method;

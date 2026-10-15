@@ -48,7 +48,25 @@ export const callerAt = (base: string, io?: Fetch): Call =>
  * `mintable` IS WHETHER THE DOOR IS CHECKED BY A TOKEN IN ITS PATH. `ingestMint` refuses every other kind with
  * `VALUE_MALFORMED`, so a button that could only be refused is not drawn.
  */
-export type Door = { id: string; name: string; register: string | null; mintable: boolean; held: boolean };
+export type Door = {
+  id: string;
+  name: string;
+  register: string | null;
+  mintable: boolean;
+  held: boolean;
+  /**
+   * WHETHER THE DOOR TAKES ARRIVALS, or `null` from a host whose `doors` predates the switch (SHL-C13). `null` draws no
+   * switch, because a press there could only be refused.
+   */
+  on: boolean | null;
+  /** When it went off, ISO 8601, while it is off. */
+  offSince: string | null;
+  /** The newest arrival the record filed through it, ISO 8601. */
+  lastArrival: string | null;
+  /** Arrivals filed in the last seven days, and arrivals turned away while it was off, in the same seven. */
+  arrivals: number;
+  turnedAway: number;
+};
 
 /** What the list says. Every arm but `doors` is a sentence rather than a failure. */
 export type Listed =
@@ -76,6 +94,18 @@ function refusedAs(out: Answered): { kind: 'signin'; fix: string } | { kind: 're
   return { kind: 'refused', fix: refusal.fix };
 }
 
+/** What the record's `doorFacts` answers for one door, beside the row `doors` already gave (`door-switch.ts`). */
+type Facts = { on?: unknown; offSince?: unknown; lastArrival?: unknown; arrivals?: unknown; turnedAway?: unknown };
+
+const count = (v: unknown): number => (typeof v === 'number' && Number.isInteger(v) && v > 0 ? v : 0);
+const instant = (v: unknown): string | null => (typeof v === 'string' && !Number.isNaN(Date.parse(v)) ? v : null);
+
+/** A door's on or off and its counts, read as tolerantly as the rest of the row. */
+function factsOf(d: Facts): Pick<Door, 'on' | 'offSince' | 'lastArrival' | 'arrivals' | 'turnedAway'> {
+  const on = typeof d.on === 'boolean' ? d.on : null;
+  return { on, offSince: on === false ? instant(d.offSince) : null, lastArrival: instant(d.lastArrival), arrivals: count(d.arrivals), turnedAway: count(d.turnedAway) };
+}
+
 /** The record's answer to `doors`, as the rows the screen draws. */
 export function doorsOf(out: Answered): Listed {
   if (!out.ok) {
@@ -88,11 +118,11 @@ export function doorsOf(out: Answered): Listed {
   const doors: Door[] = [];
   for (const raw of out.value as unknown[]) {
     if (typeof raw !== 'object' || raw === null) continue;
-    const d = raw as { id?: unknown; description?: unknown; verify?: unknown; held?: unknown; register?: unknown };
+    const d = raw as { id?: unknown; description?: unknown; verify?: unknown; held?: unknown; register?: unknown } & Facts;
     /* A ROW WITH NO ID CANNOT BE MINTED FOR, so it is left out rather than drawn with a button that sends nothing. */
     const id = text(d.id);
     if (id === null) continue;
-    doors.push({ id, name: text(d.description) ?? id, register: text(d.register), mintable: verifiedByPath(d.verify), held: d.held === true });
+    doors.push({ id, name: text(d.description) ?? id, register: text(d.register), mintable: verifiedByPath(d.verify), held: d.held === true, ...factsOf(d) });
   }
   return { kind: 'doors', doors };
 }
@@ -151,3 +181,69 @@ export async function mintDoor(call: Call, base: string, ingest: string): Promis
  * the only warning a line of grey text under the button.
  */
 export const asksFirst = (door: Door): boolean => door.held;
+
+/* ── on and off (SHL-C13) ─────────────────────────────────────────────── */
+
+/**
+ * A day as the row says it: "3 October", with the year only when it is not this year's.
+ *
+ * `Intl` AND NOT A TABLE OF MONTHS, because it is the browser's own and adds nothing to what the screen loads. `tz` is
+ * the reader's zone unless a caller names one, which a test does so the day is the same on every machine.
+ */
+export function dayWords(iso: string, now: number, tz?: string): string {
+  const at = new Date(iso);
+  const zone = tz === undefined ? {} : { timeZone: tz };
+  const year = (d: Date) => new Intl.DateTimeFormat('en-GB', { year: 'numeric', ...zone }).format(d);
+  const same = year(at) === year(new Date(now));
+  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', ...(same ? {} : { year: 'numeric' }), ...zone }).format(at);
+}
+
+/** "Off since 3 October. 12 turned away." for a door that is off, and `null` for one that is on. */
+export function offLine(door: Pick<Door, 'on' | 'offSince' | 'turnedAway'>, now: number, tz?: string): string | null {
+  if (door.on !== false) return null;
+  const since = door.offSince === null ? 'Off.' : `Off since ${dayWords(door.offSince, now, tz)}.`;
+  return `${since} ${door.turnedAway === 0 ? 'Nothing turned away.' : `${door.turnedAway} turned away.`}`;
+}
+
+/** "Last arrival 14 October, 9 in the last 7 days." or that nothing has arrived. */
+export function lastLine(door: Pick<Door, 'lastArrival' | 'arrivals'>, now: number, tz?: string): string {
+  if (door.lastArrival === null) return 'Nothing has arrived yet.';
+  const week = door.arrivals === 0 ? 'none in the last 7 days' : `${door.arrivals} in the last 7 days`;
+  return `Last arrival ${dayWords(door.lastArrival, now, tz)}, ${week}.`;
+}
+
+/**
+ * The switch's own name, for a reader who hears it: what pressing it does to which door. A description is often a
+ * sentence, so its closing stop is left off, or the name would be heard to end before "takes arrivals".
+ */
+export const switchLabel = (door: Pick<Door, 'name'>): string => `${door.name.replace(/[.\s]+$/u, '')} takes arrivals`;
+
+/** What a press on the switch answered. Every arm but `switched` is a sentence rather than a failure. */
+export type Switched =
+  | { kind: 'switched'; facts: Pick<Door, 'on' | 'offSince' | 'lastArrival' | 'arrivals' | 'turnedAway'> }
+  | { kind: 'signin'; fix: string }
+  | { kind: 'refused'; fix: string };
+
+/** One answer to `doorSwitch`, as the row says it. */
+export function switchedOf(out: Answered): Switched {
+  if (out.ok) {
+    const facts = factsOf((out.value ?? {}) as Facts);
+    if (facts.on === null) return { kind: 'refused', fix: 'The door answered in a way this screen does not know. Read the list again.' };
+    return { kind: 'switched', facts };
+  }
+  /* A HOST WITHOUT THE SWITCH. The client's "There is no method called doorSwitch." names a method, not a door. */
+  if ('refusal' in out && out.refusal.code === 'ROUTE_UNKNOWN') return { kind: 'refused', fix: 'This BrainDog cannot switch a door off yet. Nothing was changed.' };
+  return refusedAs(out);
+}
+
+/**
+ * Switch one door off or on. Its address and its token are kept either way, so on again is the same address.
+ *
+ * `ingest` IS THE ID THE `doors` ANSWER GAVE, as `mintDoor` takes it.
+ */
+export async function switchDoor(call: Call, ingest: string, on: boolean): Promise<Switched> {
+  return switchedOf(await call('doorSwitch', { ingest, on }));
+}
+
+/** The row with what a switch answered laid over it. */
+export const switched = (door: Door, facts: Extract<Switched, { kind: 'switched' }>['facts']): Door => ({ ...door, ...facts });

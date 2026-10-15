@@ -509,7 +509,7 @@ function weigh(b: BlockResult, input: ComposeInput): Weighed {
  */
 export function drewNothing(b: BlockResult): boolean {
   if (ROWLESS.has(b.kind) || b.drawn === false || b.refusals.length > 0) return false;
-  if (b.readings !== undefined) return b.readings.length > 0 && b.readings.every((r) => !r.refusal && (r.reading === null || (r.reading.value === null && !r.reading.parts?.length)));
+  if (b.readings !== undefined) return b.readings.length > 0 && b.readings.every((r) => !r.refusal && (r.reading === null || (r.reading.value === null && !r.reading.parts?.length && (r.reading.beyond === undefined || b.readings!.length > 1))));
   if (typeof b.source !== 'string') return false;
   if (!b.source.startsWith('register.') && !LISTED.has(b.source)) return false;
   return b.rows.length === 0 && b.matched === 0 && (b.feed?.length ?? 0) === 0 && (b.queue?.length ?? 0) === 0 && (b.measures?.length ?? 0) === 0;

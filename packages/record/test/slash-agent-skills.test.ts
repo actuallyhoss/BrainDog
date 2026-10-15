@@ -65,7 +65,7 @@ test('A FRESH RECORD WITH AGENTS ON is offered both skills the first night, in o
 
   value(await api.decide({ id: asked[0]!.id, decide: { option: 'accept', reason: 'yes' } }, owner));
   const held = skillsOf(sql);
-  assert.deepEqual(held.map((s) => [s.name, s.rev, s.managed]), [['after-an-import', 1, true], ['keep-a-record-current', 1, true]]);
+  assert.deepEqual(held.map((s) => [s.name, s.rev, s.managed]), [['after-an-import', 2, true], ['keep-a-record-current', 1, true]]);
   for (const s of held) assert.equal(s.body, AGENTS_SKILLS.find((x) => x.name === s.name)!.body);
   sql.close();
 });
@@ -96,10 +96,10 @@ test('A NEWER TEXT reaches a skill the record wrote and nobody changed, as its n
   assert.ok(night.ran, JSON.stringify(night));
   const asked = questions(sql).filter((q) => q.status === 'open');
   assert.equal(asked.length, 1, JSON.stringify(night));
-  assert.equal(next.kernel.question(asked[0]!.id), 'Take version 2 of the skill after-an-import? The Agents add-on ships a newer text, and yours is still version 1 as it came.');
+  assert.equal(next.kernel.question(asked[0]!.id), 'Take version 3 of the skill after-an-import? The Agents add-on ships a newer text, and yours is still version 2 as it came.');
   value(await next.decide({ id: asked[0]!.id, decide: { option: 'accept', reason: 'yes' } }, owner));
   const held = skillsOf(sql);
-  assert.deepEqual(held.map((s) => [s.name, s.rev]), [['after-an-import', 2], ['keep-a-record-current', 1]]);
+  assert.deepEqual(held.map((s) => [s.name, s.rev]), [['after-an-import', 3], ['keep-a-record-current', 1]]);
   assert.match(held[0]!.body, /One more step\.\n$/u);
   assert.equal(held[1]!.body, 'My own steps.');
   sql.close();

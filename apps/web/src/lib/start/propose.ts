@@ -28,6 +28,7 @@ import { claimedBy } from '@braindog/seed/usecases/install';
 import { moduleName } from '@braindog/seed/usecases/names';
 
 import { arrangeTurns } from '../arrange.ts';
+import { askOf, type ModelAsk } from '../signup.ts';
 import { firstRun } from '../first-run.ts';
 import { BUNDLED, closeOver, heardFor, PROJECTS, shape, toTurnOn, writable, type Offer, type PackId } from '../shape.ts';
 import { hear, heardAt, PEOPLE, type Span } from '../who.ts';
@@ -78,6 +79,8 @@ export type Proposal = {
   by?: string;
   /** Why the rules read it where a model was asked: the refusal's code, such as `SLASH_BUDGET_SPENT`. */
   fell?: string;
+  /** The one question the model's reading carried (`askOf`), for the page to ask; absent where the rules read it. */
+  ask?: ModelAsk | null;
   /** What this BrainDog is for, in one sentence of the person's words, where the model said it. */
   summary?: string | null;
   /** The brief Slash drafts lists and pages from, where the model said nothing in the catalogue fits. */
@@ -1031,5 +1034,5 @@ export async function proposeFirst(sentence: string, ctx: ProposeContext, ask: A
   } catch (e) {
     out = { ok: false, refusal: { code: 'UNREACHABLE', fix: e instanceof Error ? e.message : String(e) } };
   }
-  return out.ok ? fromModel(out.value, sentence, ctx, rules) : { ...rules, fell: out.refusal.code };
+  return out.ok ? { ...fromModel(out.value, sentence, ctx, rules), ask: askOf(out.value) } : { ...rules, fell: out.refusal.code };
 }

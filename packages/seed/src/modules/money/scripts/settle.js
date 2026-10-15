@@ -12,7 +12,10 @@
  * IT NEVER CHANGES AN AMOUNT. A payment more than 2% off what was expected is a question, "Rent was GBP 4,200 this
  * time, not GBP 4,000. Change the line?", and the answer is the change: each option carries its own patches at the
  * version the script read, so the gate refuses a pick whose line was edited since. Within 2% it is the same payment,
- * and what was expected stays as written.
+ * and what was expected stays as written. HANDED `quiet`, AS A RUN A PAYMENT'S ARRIVAL STARTED IS, A REPEATING LINE
+ * ASKS NOTHING: the payment is not counted on it, and `left` is the one sentence that says so.
+ *
+ * "IT WENT THROUGH" IS `told`, WITH NO PAYMENT: a repeating line's "Next" moves one cycle on and nothing else changes.
  *
  * A PAYMENT TAKEN BACK UNPAYS. Handed a payment that is void or pending, `settle` marks nothing paid, and a bill that
  * payment names is counted again from its other payments: open, or part paid with what is left, and no day. A bill a
@@ -23,8 +26,8 @@
  *
  * THE DAY "NEXT" MOVES TO IS HANDED IN, as `next`, because it is the walk's own arithmetic (`cycleAfter` in the kernel's
  * forecast) and a sandbox runs this file's text alone: a second copy of the cycle tables here would be a second walk.
- * `cycleOn` below is that call for a caller outside the sandbox, and a rule that starts the script hands the day as
- * `input.next`. A line handed no day is not moved.
+ * `cycleOn` below is that call for a caller outside the sandbox, and inside one the host's `ctx.cycle` is
+ * (`script.settle_matched_line` in `../rules.ts`). A line handed no day is not moved.
  *
  * NOTHING OUTSIDE ITSELF IS READ BY `settle`, AND NOTHING BUT `settle` BY `run`: the two texts together are the script
  * (`SETTLE_SCRIPT.source`).
@@ -55,8 +58,24 @@ export function settle(item, payment, opts) {
   const off = (paid, expected) => Math.abs(paid - expected) * 100 > Math.abs(expected) * 2;
 
   const f = item.fields;
-  const p = payment.fields;
   const name = String(f.what ?? '').trim() || 'This';
+  /* "IT WENT THROUGH", PRESSED ON A REPEATING LINE PAST ITS DAY (`recurring-went-through` in `../rules.ts`), with no
+     payment: a person says the money moved, and nothing says how much or on what day. So "Next" moves one cycle on, by
+     the same rule as a payment's (a day, later than the one the line names), and nothing else is written: "Last paid"
+     and "Last amount" are what a payment showed, and none did. */
+  if (opts && opts.told) {
+    if (item.list !== 'recurring') return { nothing: `${name} is not a repeating line, so nothing moved.` };
+    if (f.state !== 'live') return { nothing: `${name} is not live, so nothing moved.` };
+    /* A LINE NO LONGER PAST ITS DAY WAS MOVED SINCE IT WAS ASKED ABOUT, by its payment or a person, and pressing the
+       answer again would skip a cycle that has not come yet. `today` is the record's day, which the caller hands. */
+    if (typeof opts.today === 'string' && typeof f.next_due === 'string' && f.next_due >= opts.today)
+      return { nothing: `${name} is not past its day any more, so nothing moved.` };
+    const next = opts.next;
+    if (!(typeof next === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(next) && typeof f.next_due === 'string' && next > f.next_due))
+      return { nothing: `${name} was handed no later day to move to, so its Next stayed where it was.` };
+    return { writes: [{ id: item.spoken, version: item.version, fields: { next_due: next } }], said: `${name} went through for ${dayWords(f.next_due)}, and Next is ${dayWords(next)}.` };
+  }
+  const p = payment.fields;
   const due = moneyOf(f.amount);
   const paid = moneyOf(p.amount);
   const on = typeof p.on === 'string' ? p.on : '';
@@ -151,6 +170,10 @@ export function settle(item, payment, opts) {
     /* THE SAME PAYMENT HANDED TWICE MOVES THE LINE ONCE: a payment on or before the last one counted is that one or an
        older one, and "Next" has already moved past it. */
     if (typeof f.last_paid === 'string' && on <= f.last_paid) return { nothing: `${name} already counts a payment on ${dayWords(f.last_paid)}, so nothing moved.` };
+    /* A RUN NOBODY PRESSED ASKS NOTHING (`opts.quiet`, as a payment's arrival hands it): the payment is not counted on
+       the line, whatever day it would move to, and the one sentence that says why is the caller's to keep on the payment. */
+    if (off(paid.amount, due.amount) && opts && opts.quiet)
+      return { left: `${words(paid)} is not the ${words(due)} ${name} repeats at, so this payment was not counted on it.` };
     const next = opts ? opts.next : undefined;
     /* A DAY, AND A LATER ONE THAN THE LINE NAMES, or no day at all (`null`, below). Anything else was worked out from a
        line that has moved since, and writing it would walk "Next" backwards. */
@@ -227,8 +250,8 @@ export default async function run(ctx) {
   }
 
   const out = settle(item, payment, opts);
-  if (out.nothing) {
-    ctx.log(out.nothing);
+  if (out.nothing || out.left) {
+    ctx.log(out.nothing || out.left);
     return null;
   }
   if (out.ask) return { ask: out.ask };

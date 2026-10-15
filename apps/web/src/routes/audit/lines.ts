@@ -27,7 +27,7 @@ import { firstPartyModule as moduleOf } from '@braindog/seed/packs/modules';
 
 import { copy } from '../../lib/copy.ts';
 import { cardWords } from '../../lib/decide/card.ts';
-import { settledSaid, type SettledWords, type Settling } from '../../lib/record/history-live.ts';
+import { settledSaid, slashDidSaid, type SettledWords, type Settling } from '../../lib/record/history-live.ts';
 import { PAGES } from '../../lib/record/held.ts';
 import { moneyInText } from '../../lib/record/money.ts';
 import { actor, humanize, listName, type ActorKind } from '../../lib/record/names.ts';
@@ -417,7 +417,8 @@ export const settledWords: SettledWords = {
  * ONE SENTENCE WITH A ROW'S HISTORY, made by the function that makes it there (`settledSaid`), so the two cannot drift.
  * `settling` is how the line settled it, as `settlingOf` reads a line of the log. `null` for a line that settled
  * nothing, for a person's own or an agent's suggestion, and where the record does not say who suggested: each of those
- * reads as it did. The reader is said as the screen says them.
+ * reads as it did. The reader is said as the screen says them. A change Slash's rung let land is said as Slash's own
+ * (`slashDidOf`), never as an accept the ladder pressed.
  */
 export function settledOf(
   e: { settling?: Settling | null },
@@ -425,7 +426,24 @@ export function settledOf(
   names: ReadonlyMap<string, string> = new Map(),
 ): string | null {
   const s = e.settling ?? null;
-  return s === null ? null : settledSaid(s, actor(s.by, me, names).name, settledWords);
+  return s === null ? null : (slashDidOf(e, me, names) ?? settledSaid(s, actor(s.by, me, names).name, settledWords));
+}
+
+/**
+ * WHAT SLASH DID WITHOUT ASKING, for a line a question of Slash's made that the ladder answered: "Slash did this without
+ * asking", and "Slash did · Mara undid" or "· Mara kept" once somebody acted on it. It read under the ladder's name as
+ * an accept nobody pressed, and its Undo as a plain undo.
+ *
+ * ONE SENTENCE WITH A ROW'S HISTORY, made by `slashDidSaid`, and the one `settledOf` says first, so Activity draws it
+ * where it draws who settled. `null` for every other line, which reads as it did.
+ */
+export function slashDidOf(
+  e: { settling?: Settling | null },
+  me: string | null = null,
+  names: ReadonlyMap<string, string> = new Map(),
+): string | null {
+  const s = e.settling ?? null;
+  return s === null ? null : slashDidSaid(s, (id) => actor(id, me, names).name, settledWords);
 }
 
 /* ── bursts ────────────────────────────────────────────────────────────── */

@@ -199,3 +199,18 @@ test('A RUN THAT ASKS PAST THE COUNT HAS THE REST REFUSED AS A FAILED CALL IT MA
   assert.equal(answer.refused, undefined, JSON.stringify(answer));
   assert.deepEqual(saidOf(answer), { answered: FOLD_CALLS, said: `folds-many asked for more than ${FOLD_CALLS} payee keys in one run, so no more were answered.` });
 });
+
+/* `ctx.cycle` RIDES THE SAME DOOR (`op: 'cycle'`, `ScriptRecord.cycle`), answered by the run's own `scriptCycle`: a monthly
+   line due on the 1st and paid on 3 October moves on to 1 November, and a day that is not one answers null. */
+test('A SCRIPT ON THE CLOUD IS HANDED ctx.cycle, AND A MONTHLY LINE PAID ON 3 OCTOBER MOVES ON TO 1 NOVEMBER', async () => {
+  const line = { leg: { on: 'next', every: { field: 'cycle', months: { monthly: 1 } } }, fields: { next: '2026-10-01', cycle: 'monthly' } };
+  const { answer, open } = await run(
+    'cycles',
+    `export default async function run(ctx) {
+  const line = ${JSON.stringify(line)};
+  ctx.write('seen', { said: JSON.stringify({ has: typeof ctx.cycle, next: await ctx.cycle('2026-10-03', line), bad: await ctx.cycle('2026-02-30', line) }) });
+}`,
+  );
+  assert.deepEqual(saidOf(answer), { has: 'function', next: '2026-11-01', bad: null });
+  assert.equal(open, 0, 'the run was left open behind it');
+});

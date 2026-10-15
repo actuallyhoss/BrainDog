@@ -247,6 +247,9 @@ const GATES = [
      tasks it does, at the desk width and at 390 where the panel is a bottom sheet, and reads the list, the toast and the address.
      A walk, so it lives in `walks/`; its own ephemeral port, for the reason `passkey` has one. */
   ['row-drawer', call(join(here, 'walks', 'row-drawer.walk.mjs'))],
+  /* AND MONEY'S WHERE IT WENT, OPENED (PGS-C20's guard): on a fresh record with twelve entries this month, five unfiled
+     from two payees, the folded heading is on Money shut and opens on its two blocks, at 390 and the desk. */
+  ['money-where', call(join(here, 'walks', 'money-where.walk.mjs'))],
   /* WHAT A SETTLED SCREEN PRINTS (PRF-B04 job 7): every address the gates' record gives, drawn once at 390 on the record's
      clock, red on a raw id, a raw time, a key, a value that never arrived or a page error. Its own ephemeral port, for
      the reason passkey has one. */

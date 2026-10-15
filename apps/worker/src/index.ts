@@ -20,7 +20,7 @@
 
 import { DurableObject } from 'cloudflare:workers';
 
-import { engineHealthRead, engineLedgerRead, handlersFor, mentionsAttached, hintsOf, httpStatus, serveApi, serveIngest, serveSlash, servesSlash, withSession, type EngineHealthRead, type SessionHints, type SlashAskDoor, type VaultGrantSeen } from '@braindog/host';
+import { engineHealthRead, engineLedgerRead, engineProbeOf, probeWireOf, handlersFor, mentionsAttached, hintsOf, httpStatus, serveApi, serveIngest, serveSlash, servesSlash, withSession, type EngineHealthRead, type SessionHints, type SlashAskDoor, type VaultGrantSeen } from '@braindog/host';
 import { deriveSessionKey, relyingParty, serveAccount, serveAuth, type DeviceDoor, type EmailDoor, type InviteDoor, type Provisioned } from '@braindog/host/auth';
 /* SIGN-UP: its three routes are answered in `signIn()` before `serveAuth`. */
 import { clearCookie, cookieMode, mirrorEverywhere, readSid, renameAsked, renamedName, sameKey, sameOrigin, sessionCookie } from '@braindog/host/auth';
@@ -62,6 +62,7 @@ import { alarmScheduler } from './alarm.ts';
 import { fileModelSign } from '@braindog/host/sign-model';
 import { slashLook, workerSlashAnswers, workerSlashDoor, workerSlashModel, type ModelFail } from './slash.ts';
 import { PLAN_AGENTS, planAgents, slashErasing, slashPlanMoved } from './slash.ts';
+import { fallbackWire, includedCandidates, includedInference } from './slash.ts';
 import { slashReplay, workerSlashMeter } from './slash-meter.ts';
 import { workerMeaning, workerModelJobs } from './slash-jobs.ts';
 import { workerCatalogueOffers, workerCatalogueShelf } from './catalogue.ts';
@@ -118,7 +119,7 @@ import { codeOf, guarded } from '@braindog/ports';
 import { KERNEL_MIGRATION, type Ack } from '@braindog/kernel';
 import { doorPath, op, outboxFields, type AckedRow } from './oplog.ts';
 /* BILLING: the account's four billing doors, and the Stripe client they call through. */
-import { billingDoors, sells, type BillingDeps } from './billing.ts';
+import { billingDoors, endForDeleted, sells, type BillingDeps } from './billing.ts';
 import { opsPlan, type OpsPlanDeps } from './ops-plan.ts';
 import { stripeOf } from './stripe.ts';
 /* TELEMETRY: one Analytics Engine point per request, when `TELEMETRY` is bound. */
@@ -779,6 +780,21 @@ export class Record$ extends DurableObject<Env> {
       grants: () => api.kernel.grants(),
     });
     this.#engineHealth = engineHealth;
+    /* AND THE PROBE (ENG-A08): one press asks each model of the answer route whether it answers now, through the wires
+       the asks already use (the included model, the operator's provider), settling in the same ledger, loaded on the
+       press only. Held to his switch for Slash reading, as a background ask is. */
+    const engineProbe = engineProbeOf({
+      facts: () => includedCandidates(this.env),
+      clock: { now: () => Date.now() },
+      ledger: async () => {
+        const s = await import('@braindog/slash');
+        s.openLedger(sql, { now: Date.now() });
+        const c = s.ledgerCore(sql, { now: () => Date.now() }, { complete: () => Promise.reject(new Error('unused')), embed: () => Promise.reject(new Error('unused')) });
+        return { reserve: c.reserve, account: c.account, release: c.release, last: () => [] };
+      },
+      complete: probeWireOf((c) => (c.id === 'provider' ? fallbackWire(this.env) : includedInference(this.env))),
+      reads: () => api.kernel.prefsOf('slash')['slash.reads'] !== false,
+    });
     /* AND WHAT THAT LEDGER HOLDS, for the record's `engineReadings` (ENG-B01): the same storage again, so the calls it
        counts are the ones the health above was read from, beside the questions still open, each by its cause. Handed
        whether or not a model is set, since the open questions are the record's own. The mentions are the record's own,
@@ -847,6 +863,7 @@ export class Record$ extends DurableObject<Env> {
         meaning: workerMeaning(this.#jobs, sql, () => api.kernel.prefsOf('slash')['slash.reads'] !== false),
         /* AND WHETHER THAT MODEL ANSWERS, for a read token, the command line and the daily vital sign (`engineHealth`). */
         engineHealth,
+        engineProbe,
         /* AND WHAT IT WAS ASKED AND ANSWERED THIS MONTH, with what the record still does not understand (`engineReadings`). */
         engineLedger,
         /* WHAT THIS DEPLOYMENT CAN ACTUALLY DELIVER, so the doorbell rings for work somebody can
@@ -926,6 +943,9 @@ export class Record$ extends DurableObject<Env> {
           const swept = blobs && copies ? { blobs, final: async (record: string) => keyOf(blobs, record, (await copies.take('final')).id) } : undefined;
           /* WHAT THE SWEEP KEPT AND REMOVED GOES BACK ON THE ANSWER, so `deleteRecord` can say where the final copy is. */
           let answer: Awaited<ReturnType<typeof destroyRecord>> = undefined;
+          /* A PAID RECORD'S SUBSCRIPTION ENDS WITH IT, before the wipe, so nobody is charged for a record that is gone. */
+          if (id !== null)
+            await endForDeleted(this.env, { billing: ((call: BillingCall) => directory.billing(call)) as unknown as BillingDeps['billing'], stripe: (key) => stripeOf(key, () => Date.now()) }, id);
           await this.ctx.blockConcurrencyWhile(async () => {
             answer = await destroyRecord(wipe, (record) => directory.close(record), id, swept);
           });
@@ -1746,6 +1766,11 @@ export class Record$ extends DurableObject<Env> {
     const broken = api.kernel.refused();
     if (broken) throw new Error(broken.fix);
     return api.ingestVerify(args, this.#openKey(api) ?? undefined);
+  }
+
+  /** Count one arrival a door switched off turned away (SHL-C13). AN RPC AND NEVER A ROUTE, as `ingestVerify` is. */
+  async doorTurnedAway(args: { ingest: string }): Promise<void> {
+    (await this.#record()).doorTurnedAway(args);
   }
 
   /** A vault grant's bearer, checked for the key doors. AN RPC AND NEVER A ROUTE: `vaultGrant` is INTERNAL. */
@@ -3538,6 +3563,7 @@ function arrivals(env: Env): CloudIngestDeps {
   return {
     knows: (rec) => directory.knows(rec),
     verifies: (rec, ingest) => env.RECORD.get(env.RECORD.idFromName(rec)).ingestVerify({ ingest }),
+    turnsAway: (rec, ingest) => env.RECORD.get(env.RECORD.idFromName(rec)).doorTurnedAway({ ingest }),
     /* THE BYTES, THE FLAG AND THE INGEST, AND NOTHING ELSE OF THE URL. The record id was the address and
        the token was the proof; the ingest is what the token was checked against, and without it the
        record offered a verified webhook to every webhook pattern in declaration order

@@ -320,7 +320,7 @@
         <label class="fe-ask">
           <span class="fe-label">{sheetWords.values}</span>
           <textarea class="fe-text" rows="3" bind:value={values}></textarea>
-          <span class="fe-help">{sheetWords.valuesHelp}</span>
+          <span class="fe-help">{fieldWords.choicesHelp}</span>
         </label>
       {:else if kind === 'ref'}
         {#if lists.length === 0}

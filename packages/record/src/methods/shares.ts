@@ -30,8 +30,9 @@
  * never said is a host that cannot, so links ship switched off until somebody switches them on.
  */
 
-import { exponentOf, instant, ulids, type BlockResult, type Entry, type FieldType, type Json, type PageResult, type RegisterDecl } from '@braindog/kernel';
+import { instant, ulids, type BlockResult, type Entry, type FieldType, type Json, type PageResult, type RegisterDecl } from '@braindog/kernel';
 import type { Refusal, Result } from '@braindog/ports';
+import { writeAmount } from 'braindog-render';
 import { ok } from '@braindog/ports';
 
 import type { CallContext } from '../index.ts';
@@ -257,24 +258,16 @@ const languageOf = (tag: unknown): string => {
   }
 };
 
-/** Minor units as a decimal string, `-123456` at exponent 2 is `-1234.56`, so no amount passes through a float. */
-const decimalOf = (amount: number, exponent: number): string => {
-  const digits = Math.abs(amount).toString().padStart(exponent + 1, '0');
-  const whole = exponent === 0 ? digits : `${digits.slice(0, -exponent)}.${digits.slice(-exponent)}`;
-  return amount < 0 ? `-${whole}` : whole;
-};
-
 /**
  * One `{{path}}` value as the owner's words print it in the record's language, or `undefined` for one they do not:
  * an amount with its currency, a figure in several currencies as each amount in turn and never their sum, a number,
  * and words. An address or an id is no value here.
  */
-const saidIn = (language: string) => {
-  const amount = (m: { amount: number; currency: string }): string => {
-    const exponent = exponentOf(m.currency);
-    const format = new Intl.NumberFormat(language, { style: 'currency', currency: m.currency, minimumFractionDigits: exponent, maximumFractionDigits: exponent });
-    return format.format(decimalOf(m.amount, exponent) as `${number}`);
-  };
+const saidIn = (language: string, home: string | null) => {
+  /* AN AMOUNT IS WRITTEN ONE WAY, as every screen writes it (`braindog-render`'s `writeAmount`), against the record's
+     home currency; the language no longer changes how money reads. */
+  const amount = (m: { amount: number; currency: string }): string =>
+    writeAmount({ minor: m.amount, currency: m.currency }, home, 'exact')?.text ?? `${m.currency} ${m.amount}`;
   return (v: Json | undefined): string | undefined => {
     if (typeof v === 'string') return inside(v) ? undefined : wordsShown(v);
     if (typeof v === 'number') return Number.isFinite(v) ? new Intl.NumberFormat(language).format(v) : undefined;
@@ -393,7 +386,7 @@ const shownBlock = (b: BlockResult, showing: Showing): Record<string, unknown> |
 };
 
 /** Where a page is read: the record's language and zone, and the figures' names, which `shownPage` is handed. */
-type ReadIn = { language: unknown; zone: unknown; figure: Showing['figure'] };
+type ReadIn = { language: unknown; zone: unknown; home: string | null; figure: Showing['figure'] };
 
 /**
  * The page as a link shows it: its title, when it was read, its layout, when the link closes, the language and zone it
@@ -403,7 +396,7 @@ const shownPage = (page: PageResult, expires_at: string, lists: ReadonlyMap<stri
   const layout = isRecord(page.layout) ? page.layout : null;
   const language = languageOf(where.language);
   const zone = typeof where.zone === 'string' && where.zone !== '' ? where.zone : typeof page.zone === 'string' && page.zone !== '' ? page.zone : 'UTC';
-  const showing: Showing = { lists, figure: where.figure, said: saidIn(language) };
+  const showing: Showing = { lists, figure: where.figure, said: saidIn(language, where.home) };
   const blocks = page.blocks.map((b) => shownBlock(b, showing)).filter((b) => b !== null);
   return {
     title: page.title,
@@ -611,7 +604,7 @@ export function methods(deps: RecordDeps) {
       if (!out.ok) return { ok: false, refusal: SHUT };
       const identity = kernel.identity();
       const figure = (metric: string): string | undefined => kernel.metricDecl(metric)?.name || undefined;
-      return ok(shownPage(out.value, opened.expires_at, kernel.registers(), { language: identity?.locale, zone: identity?.tz, figure }));
+      return ok(shownPage(out.value, opened.expires_at, kernel.registers(), { language: identity?.locale, zone: identity?.tz, home: kernel.homeCurrency(), figure }));
     },
   };
 }

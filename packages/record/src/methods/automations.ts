@@ -178,11 +178,16 @@ export function methods(deps: RecordDeps) {
      * rung a create needs on the rule's list. An arrival named by id is one the inbox holds, which an owner in the app
      * reads (`inbox`), so anybody else gives what arrived as `sample.payload`.
      */
-    async tryAutomation(args: { body?: unknown; sample?: unknown } | undefined, ctx: CallContext): Promise<Result<Tried>> {
+    async tryAutomation(args: { body?: unknown; sample?: unknown; step?: unknown; given?: unknown } | undefined, ctx: CallContext): Promise<Result<Tried>> {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false, refusal: stop };
-      const extra = stray((args ?? {}) as Body, ['body', 'sample']);
+      const extra = stray((args ?? {}) as Body, ['body', 'sample', 'step', 'given']);
       if (extra) return { ok: false, refusal: extra };
+      /* ONE STEP TRIED (`flow-try.ts`): `step` is the path of the step to stop after, `given` the answers of the steps before it by the name each was kept under. */
+      if (args?.step !== undefined && typeof args.step !== 'string')
+        return no('VALUE_MALFORMED', 'step names the step to try up to by its path, as steps[2].', { at: 'step' });
+      if (args?.given !== undefined && !isObject(args.given))
+        return no('VALUE_MALFORMED', 'given is the answers of the steps before it, by the name each was kept under: { "rate": <its answer> }.', { at: 'given' });
       const got = bodyOf(args?.body);
       if (!got.ok) return got;
       const { id, body } = got.value;
@@ -206,7 +211,7 @@ export function methods(deps: RecordDeps) {
 
       const fault = linted(id, body);
       if (fault) return { ok: false, refusal: fault };
-      return kernel.tryAutomation(body as unknown as FlowBody, given as Sample, actorOf(ctx));
+      return kernel.tryAutomation(body as unknown as FlowBody, given as Sample, actorOf(ctx), args?.step === undefined ? undefined : { upTo: args.step as string, given: args.given as Record<string, unknown> | undefined });
     },
 
     /**

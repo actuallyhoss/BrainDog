@@ -391,26 +391,62 @@ export type Membership = { record: string; slug: string | null; closed: boolean 
  * only register rows no record-wide level. What that cost, measured: a colleague who owned `books-co` and accepted one
  * list on `the-studio` was shown `[books-co]` and nothing else, so the record that had just admitted them was
  * unreachable from every screen. `lists` is the second answer: absent or empty is "not on this record", and a non-empty
- * list with a `null` level is "on it, with these lists only".
+ * list with a `null` level is "on it, with these lists only". `names` is those lists as the record labels them.
  */
-export type SwitcherAsk = { level: string | null; name: string | null; lists?: readonly string[] | null };
+export type SwitcherAsk = { level: string | null; name: string | null; lists?: readonly string[] | null; names?: readonly string[] | null };
 /**
  * One row of the switcher: a record this person can reach, its name, and the level they actually hold there.
  *
  * A PERSON WHO HOLDS LISTS AND NOT THE RECORD gets `level: null`, never a level nobody granted, plus the list ids in
  * `lists` and a word for the row in `held`. The word is here rather than in the web because the web draws `level`
  * raw, and a row whose level is `null` would draw nothing where every other row names what you may do.
+ *
+ * `names` IS WHAT A PERSON READS of those lists, the record's own labels (`listNames`); `lists` stays the ids for
+ * code, and an id never reaches the row's words. `words` is those names through `heldSaid`, written here so the web
+ * draws them as they come and carries no copy of the rule in the script every screen loads.
  */
-export type SwitcherRow = { slug: string; name: string; level: string } | { slug: string; name: string; level: null; lists: string[]; held: string };
+export type SwitcherRow =
+  | { slug: string; name: string; level: string }
+  | { slug: string; name: string; level: null; lists: string[]; names: string[]; words: string; held: string };
 
 /** The word a one-list row carries in `held`. One word for one list or five, so the row does not read as a count. */
 export const SOME_LISTS = 'Some lists';
 
-/** The two reads of a record `switcherAsk` needs, which is all of `kernel` it touches. */
+/**
+ * The words a one-list row reads: `Some lists: Tickets`, `Some lists: Tickets and Bugs`, `Some lists: Tickets and 3
+ * more`. The row said "Some lists" and never which, so a person invited to Tickets could not tell from the switcher
+ * what the record had given them. No names is the one word, as an older host's row reads.
+ *
+ * The row carries the result in `words`, so `apps/web/src/lib/record/switcher.ts` draws it and holds no copy.
+ */
+export function heldSaid(names: readonly string[]): string {
+  const [first, second] = names;
+  if (first === undefined) return SOME_LISTS;
+  if (second === undefined) return `${SOME_LISTS}: ${first}`;
+  return names.length === 2 ? `${SOME_LISTS}: ${first} and ${second}` : `${SOME_LISTS}: ${first} and ${names.length - 1} more`;
+}
+
+/**
+ * The three reads of a record `switcherAsk` needs, which is all of `kernel` it touches.
+ *
+ * `registers` IS THE KERNEL'S OWN, so both hosts, which hand `api.kernel` in, name the lists with no line of their own.
+ */
 export type SwitcherSource = {
   access(person: string): { level: string | null; registers: readonly string[] | null } | null;
   identity(): { name?: string | null } | null | undefined;
+  registers(): ReadonlyMap<string, { name: string }>;
 };
+
+/**
+ * The record's own label for each of these lists, in the record's order and not the order they were asked in, and a
+ * list it cannot name left out: an id is never a word a person reads, so a list with no label is better unsaid.
+ */
+export function listNames(kernel: Pick<SwitcherSource, 'registers'>, ids: readonly string[]): string[] {
+  const want = new Set(ids);
+  const out: string[] = [];
+  for (const [id, decl] of kernel.registers()) if (want.has(id) && decl.name.trim() !== '') out.push(decl.name);
+  return out;
+}
 
 /**
  * What a record answers the switcher about this person, from its own tables.
@@ -423,7 +459,9 @@ export function switcherAsk(kernel: SwitcherSource, person: string): SwitcherAsk
   const held = kernel.access(person);
   const name = kernel.identity()?.name ?? null;
   if (held === null) return { level: null, name };
-  return held.level !== null ? { level: held.level, name } : { level: null, name, lists: [...(held.registers ?? [])] };
+  if (held.level !== null) return { level: held.level, name };
+  const lists = [...(held.registers ?? [])];
+  return { level: null, name, lists, names: listNames(kernel, lists) };
 }
 
 export type Directory = ReturnType<typeof createDirectory>;
@@ -1977,7 +2015,10 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
           const held = await ask(r.record);
           const name = held.name ?? (r.slug as string);
           if (held.level !== null) return { slug: r.slug as string, name, level: held.level };
-          return held.lists && held.lists.length > 0 ? { slug: r.slug as string, name, level: null, lists: [...held.lists], held: SOME_LISTS } : null;
+          if (!held.lists || held.lists.length === 0) return null;
+          const names = [...(held.names ?? [])];
+          /* `held` STAYS THE ONE WORD so a web from before `words` draws what it always drew; the names ride beside. */
+          return { slug: r.slug as string, name, level: null, lists: [...held.lists], names, words: heldSaid(names), held: SOME_LISTS };
         }),
       );
       return rows.filter((r): r is SwitcherRow => r !== null);

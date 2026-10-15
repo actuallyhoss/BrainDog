@@ -136,6 +136,14 @@ export type FieldDecl = {
    * predicts. So the pair is declared rather than inferred, and it travels together.
    */
   qualifies?: string;
+  /**
+   * `money` only: `'<link>.<money field>'`, as the kernel's `coerce.ts` declares the same key. A ref of this list and a
+   * money field of the list it points at: an amount with no code takes the code that field holds on the linked row, so
+   * an entry filed against an account kept in EGP is in EGP. The new-row form draws its box in that code.
+   */
+  currency_from?: string;
+  /** `money` only: once a row holds a code here it never changes (`CURRENCY_FIXED`); the number still can. */
+  currency_fixed?: boolean;
 };
 
 /**
@@ -529,6 +537,8 @@ export type Question = {
   options: readonly { key: string; title: string; body: string; recommended?: boolean; hard?: boolean }[];
   /** Why it is being asked: the reasoning whoever opened it wrote down with it. Absent when they wrote none. */
   context?: string;
+  /** Who is named to decide it, a person id; null for nobody, absent from a record older than the column. */
+  decider?: string | null;
   /** Set once, with a mandatory reason, and then the row is immutable. */
   decided?: { option: string; reason: string; by: string; at: string };
   /**

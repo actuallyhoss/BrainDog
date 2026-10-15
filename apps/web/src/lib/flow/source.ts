@@ -124,14 +124,36 @@ export type Tried = {
 /** How one step went in a try: taken, would reach outside the record, would park, failed, or never reached. */
 export type TryState = 'done' | 'would' | 'waiting' | 'failed' | 'skipped';
 
-/** One step of a try, as `tryAutomation` answers it: where it sits in the body, its verb, how it went and its sentence. */
-export type TriedStep = { path: string; verb: string; state: TryState; answer: string | null; say: string };
+/**
+ * One step of a try, as `tryAutomation` answers it: where it sits in the body, its verb, how it went and its sentence.
+ * `out` is what the step kept under its `as:`, already cut and with a secret withheld by the kernel; `sends` is what a
+ * call the try stopped at would have sent. Both are absent where the record says nothing of them.
+ */
+export type TriedStep = {
+  path: string;
+  verb: string;
+  state: TryState;
+  answer: string | null;
+  say: string;
+  out?: unknown;
+  /** The name `out` was kept under, read by a later step as `{{vars.<as>}}`. */
+  as?: string;
+  /** True where `out` is cut at 4 KB, which is no answer to give back. */
+  cut?: true;
+  sends?: Record<string, unknown>;
+};
 
 /**
  * What `tryAutomation` answers (`packages/kernel/src/flow-try.ts`): the trigger it built from the sample, by its kind,
  * and every step of the body, each with how it went.
  */
-export type TryRun = { trigger: string; steps: TriedStep[] };
+export type TryRun = { trigger: string; steps: TriedStep[]; step?: string };
+
+/**
+ * One step tried alone (SHL-D14): the path of the step, and the earlier steps' answers by the name each kept them
+ * under, which the record uses rather than taking those steps again.
+ */
+export type TryOne = { step: string; given?: Record<string, unknown> };
 
 /** What a try starts from, as `tryAutomation` takes it. Every key is optional; the trigger's kind says which it reads. */
 export type Sample = { row?: string | Record<string, unknown>; arrival?: string; payload?: unknown };
@@ -400,6 +422,10 @@ export const editWords = {
   } as Record<TryState, string>,
   triedHeading: 'If it ran now',
   triedWrote: 'Trying it changes nothing and sends nothing.',
+  /* ONE STEP TESTED ALONE (SHL-D14): the heading over its result, and the two things folded under it. */
+  testedStep: 'This step, tested alone',
+  whatItGave: 'What it gave',
+  wouldSend: 'What it would send',
   row: (at: string) => `One from ${at}`,
   arrival: (at: string) => `Something that arrived ${at}`,
 } as const;
@@ -441,7 +467,19 @@ export function tryRunOf(raw: unknown): TryRun | null {
   const trigger = isObject(raw.trigger) ? (text(raw.trigger.kind) ?? '') : (text(raw.trigger) ?? '');
   const steps = raw.steps.flatMap((s): TriedStep[] =>
     isObject(s) && typeof s.path === 'string' && typeof s.verb === 'string' && typeof s.state === 'string' && TRY_STATES.has(s.state)
-      ? [{ path: s.path, verb: s.verb, state: s.state as TryState, answer: text(s.answer), say: typeof s.say === 'string' ? s.say : '' }]
+      ? [
+          {
+            path: s.path,
+            verb: s.verb,
+            state: s.state as TryState,
+            answer: text(s.answer),
+            say: typeof s.say === 'string' ? s.say : '',
+            ...(s.out === undefined ? {} : { out: s.out }),
+            ...(typeof s.as === 'string' ? { as: s.as } : {}),
+            ...(s.cut === true ? { cut: true as const } : {}),
+            ...(isObject(s.sends) ? { sends: s.sends } : {}),
+          },
+        ]
       : [],
   );
   return { trigger, steps };
@@ -747,8 +785,11 @@ export type Source = {
   dryRun(body: Body): Promise<Answer<Tried>>;
   /** Whether a body would install, or the install's own refusal with where in the body it is. Installs nothing. */
   check(body: Body): Promise<Answer<{ path: 'inline' | 'run' }>>;
-  /** A run body's steps taken over a sample by the real runner, with everything rolled back and nothing sent. */
-  attempt(body: Body, sample: Sample): Promise<Answer<TryRun>>;
+  /**
+   * A run body's steps taken over a sample by the real runner, with everything rolled back and nothing sent. With `one`,
+   * the try stops after that step and uses the answers given for the steps before it.
+   */
+  attempt(body: Body, sample: Sample, one?: TryOne): Promise<Answer<TryRun>>;
   /** Turn one on or off: a new version, landed at once. ADMIN. */
   setEnabled(rule: string, enabled: boolean): Promise<Answer<Switched>>;
   /** Start a finished run again, as the rule is installed now. ADMIN. */
@@ -812,11 +853,14 @@ export function live(io: Fetch, base = ''): Source {
       const out = await send<{ path?: unknown }>(io, `${base}/api/checkAutomation`, { body });
       return out.ok ? { ok: true, value: { path: out.value?.path === 'inline' ? 'inline' : 'run' } } : out;
     },
-    attempt: async (body, sample) => {
-      const out = await send<unknown>(io, `${base}/api/tryAutomation`, { body, sample });
+    /* ONE STEP GOES AS `step` AND `given` BESIDE THE BODY, the names the record's `tryAutomation` takes them by; a
+       whole try sends neither, so it is the call it always was. */
+    attempt: async (body, sample, one) => {
+      const asked = one === undefined ? { body, sample } : { body, sample, step: one.step, ...(one.given === undefined ? {} : { given: one.given }) };
+      const out = await send<unknown>(io, `${base}/api/tryAutomation`, asked);
       if (!out.ok) return out;
       const tried = tryRunOf(out.value);
-      return tried ? { ok: true, value: tried } : unreachable();
+      return tried ? { ok: true, value: one === undefined ? tried : { ...tried, step: one.step } } : unreachable();
     },
     setEnabled: async (rule, enabled) => {
       const out = await send<{ version?: unknown; enabled?: unknown }>(io, `${base}/api/setAutomation`, { rule: bare(rule), enabled });

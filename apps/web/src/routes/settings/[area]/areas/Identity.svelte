@@ -10,6 +10,7 @@
   import { levelWord, openRecord } from '$lib/record/switcher.ts';
   import { wrote } from '$lib/record/settings-write.ts';
   import { renamePasskey, signOut, type PasskeyInfo } from '$lib/auth.ts';
+  import { passkeysSaid } from '$lib/ui/signing-in.ts';
   import { PEOPLE } from '$lib/who.ts';
   import { createClient } from '@braindog/client';
   import { untrack } from 'svelte';
@@ -148,6 +149,8 @@
   /* THE FACE IS A LETTER OF THE NAME, or of the address before there is a name, and never of an id. */
   const faceName = $derived(myName ?? myEmail ?? copy.you);
   const passkeysHere = $derived(s.hostAuth?.passkey === true && s.liveKeys !== null);
+  /* WHETHER LOSING ONE DEVICE WOULD LOCK YOU OUT (REC-A15), said over the passkeys already listed; nothing new is read. */
+  const keysSaid = $derived(passkeysSaid(s.liveKeys ?? []));
   /* A LINK CAN BE MAILED ONLY WHERE THIS HOST SENDS SIGN-IN MAIL; elsewhere Change email would be a 404 behind a button. */
   const mailsHere = $derived(s.hostAuth?.magic === true && !!s.hostAuth.me && !signedOut);
   const peopleOn = $derived(shell.index.registers.some((r) => r.id === PEOPLE));
@@ -415,6 +418,16 @@
       <li><IconWell name="monitor" /><span class="fact-key">{identityWords.here}</span><span class="fact-value">{s.hostAuth?.open && !signedOut ? identityWords.openHost : identityWords.notSignedIn}</span></li>
     {/if}
     {#if !signedOut}
+      {#if passkeysHere}
+        <!-- THE PASSKEYS AS ONE LINE FIRST: how many, on which kinds of device, and whether you could still sign in
+             with one lost. Below two it carries the way to add one, which is Recovery's. With none, nothing can be
+             lost, so it says only that there are none yet. -->
+        <li class="fact-act">
+          <IconWell name="key" /><span class="fact-key">{copy.identityPasskeysWay}</span>
+          <span class="fact-value">{(s.liveKeys?.length ?? 0) === 0 ? copy.identityPasskeys(0) : keysSaid.line}</span>
+          {#if keysSaid.short}<span class="fact-do"><Button href={at('/settings/recovery')}>{copy.addPasskey}</Button></span>{/if}
+        </li>
+      {/if}
       {#if passkeysHere && (s.liveKeys?.length ?? 0) > 0}
         <!-- EACH PASSKEY BY ITS NAME, with Rename on its own line (LCH-A04); the form takes the line's place while open. -->
         {#each s.liveKeys ?? [] as k (k.id)}
@@ -452,8 +465,6 @@
             {/if}
           </li>
         {/each}
-      {:else if passkeysHere}
-        <li><IconWell name="key" /><span class="fact-key">{copy.identityPasskeysWay}</span><span class="fact-value">{copy.identityPasskeys(0)}</span></li>
       {/if}
     {/if}
     <!-- A COLLEAGUE WHO HOLDS LISTS AND NOT THE RECORD was told "Can read, cannot change": the shell's

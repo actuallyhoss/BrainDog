@@ -28,7 +28,7 @@ import ts from 'typescript';
 
 import { BASE } from '../at.ts';
 import { copy } from '../copy.ts';
-import { hostKey, keyBytes, offerOf, startOf, turnOff, turnOn, type Manager, type Ports, type Sub } from './push.ts';
+import { hostKey, keyBytes, offerOf, sendTest, startOf, testWords, turnOff, turnOn, type Manager, type Ports, type Sub } from './push.ts';
 import type { Call } from './webhook-doors.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -507,4 +507,17 @@ test('THE SHELL NAMES A HOME SCREEN ICON IOS WILL USE, a square PNG that ships, 
   assert.deepEqual([...png.subarray(1, 4)], [...Buffer.from('PNG')], 'the icon is not a PNG');
   /* IHDR'S WIDTH AND HEIGHT, the first two big-endian words after the eight-byte signature and the chunk's header. */
   assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [180, 180]);
+});
+
+test('A TEST PRESS SAYS WHAT THE RECORD SENT, and never that nothing was turned on (pushTest, REC-A15)', async () => {
+  const line = 'Sent to 2 devices. It should arrive within a minute.';
+  assert.deepEqual(await sendTest(caller({ pushTest: { ok: true, value: { devices: 2, line } } }).call), { kind: 'sent', line });
+  assert.deepEqual(await sendTest(caller({ pushTest: { ok: true, value: { devices: 1 } } }).call), { kind: 'sent', line: testWords.sent(1) });
+  /* NONE ON THE RECORD IS THE DEAD SUBSCRIPTION THE TEST IS FOR, said as a failure. */
+  assert.deepEqual(await sendTest(caller({ pushTest: { ok: true, value: { devices: 0 } } }).call), { kind: 'failed', line: testWords.none });
+  /* A PRESS INSIDE THE MINUTE IS THE RECORD'S, and its fix already says when the next may go. */
+  const fix = 'The last test went a moment ago. The next can go in a minute.';
+  assert.deepEqual(await sendTest(caller({ pushTest: { ok: false, refusal: { code: 'RATE_LIMITED', fix } } }).call), { kind: 'refused', fix });
+  assert.deepEqual(await sendTest(caller({ pushTest: { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'no such call' } } }).call), { kind: 'refused', fix: testWords.noRoute });
+  assert.deepEqual(await sendTest(caller({ pushTest: new Error('offline') }).call), { kind: 'refused', fix: testWords.notReached });
 });

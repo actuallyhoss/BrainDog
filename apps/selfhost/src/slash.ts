@@ -42,6 +42,7 @@ import {
   slashSamplesOf,
   type SlashHostConfig,
   type SlashHostDeps,
+  type SlashInference,
 } from '@braindog/host/slash';
 import { slashAskDoor, type SlashAskDoor, type SlashRecordMeter } from '@braindog/host';
 import { routeFor, type Candidate, type RouteFacts } from '@braindog/host/infer';
@@ -247,24 +248,44 @@ export type SlashEngineDeps = {
 function slashRouteOf(config: SlashConfig, wire: SlashHostDeps, sql: Sql): SlashRoute | undefined {
   const facts = selfhostFacts(config);
   if (facts === undefined) return undefined;
-  const second = config.fallback;
-  const fallback =
-    second === undefined
-      ? undefined
-      : endpointInference({
-          url: second.url,
-          model: second.model,
-          key: async () => second.key,
-          send: wire.send,
-          name: FALLBACK_ID,
-          keyName: "this host's SLASH_FALLBACK_KEY",
-        });
+  const fallback = fallbackInference(config, wire);
   return (purpose) => {
     if (slashOwnKeyOf(sql) !== null) return [];
     return routeFor(purpose, facts).candidates.map(
       (c): SlashCandidate => (c.id === FALLBACK_ID && fallback !== undefined ? { id: c.id, model: c.model, inference: fallback } : { id: c.id, model: c.model }),
     );
   };
+}
+
+/** The second endpoint's adapter, on the same wire with the operator's `SLASH_FALLBACK_KEY`, or `undefined` where it is not set. */
+function fallbackInference(config: SlashConfig, wire: SlashHostDeps): SlashInference | undefined {
+  const second = config.fallback;
+  return second === undefined
+    ? undefined
+    : endpointInference({
+        url: second.url,
+        model: second.model,
+        key: async () => second.key,
+        send: wire.send,
+        name: FALLBACK_ID,
+        keyName: "this host's SLASH_FALLBACK_KEY",
+      });
+}
+
+/**
+ * The wire for each candidate the engine's probe asks (ENG-A08, `@braindog/host` `engineProbeOf`): the second endpoint for
+ * its own candidate, this host's endpoint for the rest, the same adapters the route above hands the asks.
+ */
+export function selfhostProbeWire(
+  config: SlashConfig | undefined,
+  api: () => RecordApi,
+  store: KeyStore | undefined,
+): (candidate: Candidate) => SlashInference | undefined {
+  if (!config) return () => undefined;
+  const wire = wireOf(config, api, store);
+  const fallback = fallbackInference(config, wire);
+  const own = slashInferenceOf(config, wire);
+  return (c) => (c.id === FALLBACK_ID ? fallback : own);
 }
 
 /**

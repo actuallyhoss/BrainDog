@@ -209,7 +209,7 @@
 
   /* WHAT COMES IN, BY THE WAY IT CAME, from every arrival of the fortnight whatever became of it. `null` until read, and
      a read that failed draws no tile rather than three quiet rows that would be a guess. */
-  let arrivals = $state.raw<{ lines: { channel: string; ts: string }[]; partial: boolean } | null>(null);
+  let arrivals = $state.raw<{ lines: { channel: string; ts: string; reason?: string | null }[]; partial: boolean } | null>(null);
   const ways = $derived(arrivals ? sourcesOf(arrivals.lines, clock) : null);
 
   /**
@@ -685,6 +685,7 @@
                     <span class="way-main">
                       <span class="way-name">{w.name}</span>
                       <span class="way-last">{lastSaid(w, (iso) => since(iso, clock))}</span>
+                      {#if w.signed}<span class="way-last">{w.signed}</span>{/if}
                     </span>
                     <span class="way-trend">
                       {#if drawsLine(w)}<Sparkline values={w.days} width={140} height={32} summary={lineSaid(w)} />{/if}

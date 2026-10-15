@@ -69,6 +69,7 @@ export { eraseSlash } from './erase.ts';
 export { health as engineHealth, said as engineSaid, ANSWER_STALE_DAYS, FAILS_DOWN, HEALTH_DAYS, LEDGER_ANSWERED, LEDGER_FAILED } from './health.ts';
 export type { EngineFacts, EngineHealth, EngineSaid } from './health.ts';
 export { STORE_VERSION } from './call.ts';
+export { core as ledgerCore, openStore as openLedger } from './call.ts';
 export type { Charge, StoreStep } from './call.ts';
 export { cite, citable, shapeOf, tokens } from './project.ts';
 export { answerSchema } from './answer.ts';

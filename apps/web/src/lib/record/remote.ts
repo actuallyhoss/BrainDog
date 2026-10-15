@@ -24,7 +24,7 @@
 import { KERNEL_FIELDS, parseWhere, quoteValue } from '@braindog/where';
 
 import { identityOfRow, isRows, rowsFilter, whereOf, type Identity } from './api.ts';
-import { FINISHED, leftOut, REGISTERS, seqTitled, TITLES } from './held.ts';
+import { FINISHED, leftOut, MONEY_HELD, REGISTERS, seqTitled, TITLES } from './held.ts';
 import { searchable, terms } from './find.ts';
 import type { Entry, Fields, Filter, RegisterDecl } from './schema.ts';
 import { declaredValue, schemaOf } from './where.ts';
@@ -144,10 +144,13 @@ export function refMapOf(register: string, rows: readonly Pick<RecordRow, 'id' |
   const state = REGISTERS[register]?.state;
   const done = leftOut(REGISTERS[register]);
   const over = new Set<number>();
+  const money = (REGISTERS[register]?.fields ?? []).filter((f) => f.type === 'money').map((f) => f.id);
+  const kept = new Map<number, Record<string, unknown>>();
   for (const r of rows) {
     if (r.seq === null) continue;
     seqOf.set(r.id, r.seq);
     idOf.set(r.seq, r.id);
+    if (money.length > 0) kept.set(r.seq, Object.fromEntries(money.map((k) => [k, r.fields?.[k]])));
     const now = state === undefined ? undefined : r.fields?.[state];
     if (typeof now === 'string' && done.includes(now)) over.add(r.seq);
     const said = title === undefined ? undefined : r.fields?.[title];
@@ -171,6 +174,7 @@ export function refMapOf(register: string, rows: readonly Pick<RecordRow, 'id' |
   }
   TITLES.set(register, new Map([...idOf.keys()].map((seq) => [seq, titleOf.get(seq) ?? ''])));
   FINISHED.set(register, over);
+  MONEY_HELD.set(register, kept);
   return { seqOf, idOf, titleOf, markOf };
 }
 

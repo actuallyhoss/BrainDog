@@ -35,6 +35,7 @@
   import Waiting from '$lib/ui/Waiting.svelte';
   import { runLines, runWords } from './run-lines.ts';
   import { readRunParts, runTalk, type RunParts, type RunRow, type TalkKey } from './run-talk.ts';
+  import { PRESENCE_WORDS, presenceSaid } from '$lib/ui/presence-words.ts';
 
   let {
     run,
@@ -90,6 +91,16 @@
   let parts = $state.raw<RunParts>({});
   let beside = false;
   const talk = $derived(held ? runTalk(held, parts) : []);
+  /* WHERE THE RUN IS NOW, in the record's six words (`presence-words.ts`), read off its row as it lands: a run that
+     finished says Ended, one that handed on a step says Left a step, one carried in by an import says From before. */
+  const now = $derived.by(() => {
+    if (!held) return null;
+    const p = presenceSaid(held.state, held.fields, Date.now());
+    /* SAID ONCE: a finished run whose stretch already says "Ended 14:02" is not told Ended twice. */
+    const ended = PRESENCE_WORDS.ended;
+    if (p === 'ended' && talk.some((s) => s.key === 'stretches' && s.lines.some((l) => l.startsWith(`${ended} `)))) return null;
+    return PRESENCE_WORDS[p];
+  });
   /** The parts said before what it changed, between that and the step it left, and after the step. */
   const BEFORE: readonly TalkKey[] = ['who', 'stretches', 'doing'];
   const BETWEEN: readonly TalkKey[] = ['asked', 'tried'];
@@ -197,6 +208,7 @@
 {/snippet}
 
 <section class="run" aria-label={runWords.heading} aria-busy={from === 'reading'}>
+  {#if now}<p class="run-now">{now}</p>{/if}
   {@render spoken(BEFORE)}
   <div class="run-part" role="group" aria-label={didSaid}>
     {#if talk.length > 0}<h3 class="run-meta run-head">{didSaid}</h3>{/if}
@@ -289,6 +301,15 @@
     display: grid;
     flex: 1 1 100%;
     gap: var(--sp-1);
+  }
+
+  /* THE RUN'S WORD, first and at the body size: the one thing a person asks of a run before what it did. */
+  .run-now {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--t-base);
+    font-weight: 600;
+    line-height: 1.55;
   }
 
   /* A RECTANGLE, as every field is (DIRECTION §39): radius 8, the field's flat fill, no border of its own. */

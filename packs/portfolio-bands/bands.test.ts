@@ -47,6 +47,9 @@ import { fixOf } from '../../packages/ports/src/index.ts';
 import { createRecordApi, type CallContext } from '../../packages/record/src/index.ts';
 import { fixedClock, openSqlite } from '../../packages/kernel/test/sqlite.ts';
 import { firstPartyDocument } from '../../packages/seed/src/index.ts';
+import { blockKeyOf } from '../../packages/kernel/src/block-keys.ts';
+import { additionsOf, withAdds } from '../../packages/kernel/src/page-adds.ts';
+import type { PageBlock } from '../../packages/kernel/src/pages.ts';
 import type { CtxHost, Json, ScriptAnswer, ScriptDecl, ScriptWrite } from '../../packages/script/src/index.ts';
 import { runInQuickJs } from '../../packages/script/src/quickjs.ts';
 
@@ -61,6 +64,23 @@ type PackDoc = { pack: string; requires: { packs: Record<string, string> }; decl
 const template = (): Record<string, unknown> => JSON.parse(readFileSync(PACK_FILE, 'utf8')) as Record<string, unknown>;
 const scriptOf = (doc: Record<string, unknown>): ScriptBody => (doc as PackDoc).declarations.find((d) => typeof d.script === 'string') as ScriptBody;
 const SCRIPT = scriptOf(template());
+
+/**
+ * WHETHER THE RECORD READS A COLUMN ADDITION YET (PGS-C29). 2.2.0 adds a column into Portfolio's In play cards, and until
+ * `readAdds` in `packages/declare/src/index.ts` takes `into` and `column` (its ADDITION_KEYS, and the call to
+ * `readAddColumn`), it refuses the file at that entry's `into`. Asked of the file as it ships, so the day that line lands
+ * every install below takes the whole file and the test marked `todo` runs.
+ */
+const SHIPPED = await readPackFile(readFileSync(PACK_FILE, 'utf8'));
+const COLUMNS_READ = SHIPPED.ok || !/^adds\.\d+\.(into|column)$/.test((SHIPPED as { refusal?: { at?: string } }).refusal?.at ?? '');
+const WAITING = 'until readAdds takes into and column (packages/declare/src/index.ts, ADDITION_KEYS and readAddColumn)';
+
+/** The file as it installs today: as it ships, or with its column additions taken off while the record cannot read one. */
+const installable = (): Record<string, unknown> => {
+  const doc = template();
+  if (COLUMNS_READ) return doc;
+  return { ...doc, adds: (doc.adds as Record<string, unknown>[]).filter((a) => a.into === undefined) };
+};
 
 /** The two settings as `ctx.config` holds them. */
 type Names = { now: Json; base: Json };
@@ -185,8 +205,7 @@ test('THE PACK CARRIES bands.js AS ITS SOURCE, byte for byte, so the file a pers
 /* ── The settings ──────────────────────────────────────────────────────────────────────────────── */
 
 test('the file reads clean as an add-on somebody opens from disk, takes its two names as settings, and names nobody’s import', async () => {
-  const text = readFileSync(PACK_FILE, 'utf8');
-  const file = await readPackFile(text);
+  const file = await readPackFile(JSON.stringify(installable()));
   assert.ok(file.ok, fixOf(file));
   assert.equal(file.value.pack.manifest.pack, 'portfolio-bands');
   /* NO `fill` LEFT, so nothing in the app has to rewrite the file before it is installed. */
@@ -395,7 +414,7 @@ test('IT REQUIRES PORTFOLIO, AND DATAPOINTS FROM WHICHEVER PACK DECLARES THEM, a
   assert.deepEqual((template() as PackDoc).requires.packs, { portfolio: '^1.0.0' });
 
   const diary = await recordWith(firstPartyDocument('portfolio', { seeds: [] }), DIARY);
-  const r = await diary.put(template());
+  const r = await diary.put(installable());
   assert.ok(r.ok, JSON.stringify(r.refusal));
   diary.close();
 
@@ -404,7 +423,7 @@ test('IT REQUIRES PORTFOLIO, AND DATAPOINTS FROM WHICHEVER PACK DECLARES THEM, a
      says it: with `register.datapoints` taken off the page, this install went through on a record that has nowhere
      for a reading to be, and the bands ran every day over nothing. */
   const bare = await recordWith(firstPartyDocument('portfolio', { seeds: [] }));
-  const refused = await bare.put(template());
+  const refused = await bare.put(installable());
   assert.equal(refused.ok, false);
   assert.equal(refused.refusal?.code, 'REGISTER_UNRESOLVED');
   assert.match(refused.refusal?.fix ?? '', /points at the datapoints list/);
@@ -415,7 +434,7 @@ test('AN UPDATE FROM 1.0.0 NAMES BOTH SETTINGS AS DEFAULT, so the owner sets his
   /* 1.0.0 AS THE CATALOGUE PUBLISHED IT, its measures written into the script by a fill and no settings declared. */
   const was = JSON.parse(readFileSync(new URL('../../apps/web/static/catalogue/packs/portfolio-bands/1.0.0.pack.json', import.meta.url), 'utf8')) as Record<string, unknown>;
   const r = await recordWith(firstPartyDocument('portfolio', { seeds: [] }), DIARY, was);
-  const planned = await r.plan(template());
+  const planned = await r.plan(installable());
   assert.ok(planned.ok, JSON.stringify(planned.refusal));
   assert.deepEqual(
     planned.value!.diff.config.map((c) => [c.key, c.type, c.from, c.value]),
@@ -424,7 +443,7 @@ test('AN UPDATE FROM 1.0.0 NAMES BOTH SETTINGS AS DEFAULT, so the owner sets his
       ['base', 'list', 'default', EXAMPLE.base],
     ],
   );
-  assert.ok((await r.put(template())).ok);
+  assert.ok((await r.put(installable())).ok);
   r.close();
 });
 
@@ -471,7 +490,7 @@ test('THE WHOLE PATH ON A SELF-HOST: installed, its names set, due, run, applied
     const before = api.kernel.declarations().map((d) => d.id);
     assert.ok(before.includes('register.datapoints') && before.includes('register.things'));
     assert.equal(before.includes('register.revenue_bands') || before.includes(`script.${SCRIPT.script}`), false, 'the bands are already declared');
-    await put(template());
+    await put(installable());
     /* THE OWNER'S NAMES, SET ON THE PACK'S PAGE AFTER INSTALL. A run reads the settings as they stand when it is leased,
        so nothing is installed again. */
     said(await api.setPackConfig({ id: 'portfolio-bands', values: SPEC }, owner));
@@ -544,4 +563,108 @@ test('THE WHOLE PATH ON A SELF-HOST: installed, its names set, due, run, applied
     await running.close();
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+/* ── On Projects (2.2.0) ───────────────────────────────────────────────────────────────────────── */
+
+type Addition = { page: string; into?: string; after?: string; column?: Record<string, string>; block?: Record<string, unknown>; note?: string };
+const addsOf = (doc: Record<string, unknown>): Addition[] => doc.adds as Addition[];
+
+/** Portfolio's Projects page as it ships, its own blocks and nothing added. */
+const projectsPage = (): PageBlock[] =>
+  ((firstPartyDocument('portfolio', { seeds: [] }) as { declarations: { page?: string; blocks?: PageBlock[] }[] }).declarations.find((d) => d.page === 'portfolio')!.blocks ?? []);
+
+/**
+ * WHETHER PROJECTS DRAWS THE MONTH ON A CARD YET: the kernel holds a column naming a figure off a card until the card
+ * reads that figure in its role (`fits` in `packages/kernel/src/page-adds.ts`), which PGS-C29 job 2 brings. Asked of the
+ * kernel as it is, so the day it reads one the tests below hold the column to being drawn.
+ */
+const MONTH_LAID = withAdds(projectsPage(), additionsOf([{ id: 'portfolio-bands', manifest: readFileSync(PACK_FILE, 'utf8') }], 'page.portfolio')).some(
+  (l) => l.block.columns?.some((c) => c.label === 'This month') === true,
+);
+const NOT_DRAWN = 'until a card reads its figure off a figure (PGS-C29 job 2: packages/kernel/src/pages.ts, and fits in page-adds.ts)';
+
+test('2.2.0 IS 2.1.0 WITH TWO ADDITIONS TO PROJECTS, and nothing else moved', () => {
+  const was = JSON.parse(readFileSync(new URL('../../apps/web/static/catalogue/packs/portfolio-bands/2.1.0.pack.json', import.meta.url), 'utf8')) as Record<string, unknown>;
+  const now = template();
+  assert.equal(now.version, '2.2.0');
+  assert.equal(was.adds, undefined);
+  const { version: _v, changes: _c, adds: _a, ...rest } = now;
+  const { version: _w, changes: _d, ...before } = was;
+  assert.deepEqual(rest, before);
+  assert.ok(String(now.changes).length <= 500);
+  assert.deepEqual(addsOf(now).map((a) => [a.page, a.into ?? null, a.after ?? null]), [
+    ['page.portfolio', blockKeyOf(projectsPage().find((b) => b.heading === 'In play')), null],
+    ['page.portfolio', null, 'How they are going'],
+  ]);
+});
+
+test('THE MONTH GOES ON THE IN PLAY CARDS AND THE BANDS UNDER HOW THEY ARE GOING, as Projects is read, and go when the pack goes', () => {
+  const own = projectsPage();
+  const inPlay = own.findIndex((b) => b.heading === 'In play');
+  const going = own.findIndex((b) => b.heading === 'How they are going');
+  assert.ok(inPlay >= 0 && going >= 0, 'Portfolio no longer draws In play or How they are going');
+  const adds = additionsOf([{ id: 'portfolio-bands', manifest: JSON.stringify(template()) }], 'page.portfolio');
+  assert.equal(adds.length, 2);
+  const laid = withAdds(own, adds);
+  const cards = laid.find((l) => l.block.heading === 'In play')!.block;
+  /* HELD OFF THE CARDS WHILE NOTHING READS A CARD'S FIGURE OFF A FIGURE (`fits` in page-adds.ts): a column that drew
+     nothing took the place of the newest number a card with a short trend says. PGS-C29 job 2 reads it, and this turns. */
+  assert.deepEqual(cards.columns, MONTH_LAID ? [...own[inPlay]!.columns!, { metric: 'revenue-bands-month:{{name}}', label: 'This month', as: 'figure' }] : own[inPlay]!.columns);
+  const at = laid.findIndex((l) => l.block.heading === 'How they are going');
+  const split = laid[at + 1]!;
+  assert.equal(split.added, 'portfolio-bands');
+  assert.deepEqual([split.block.kind, split.block.heading, split.block.source], ['split', 'A month: now, next and later', 'register.revenue_bands']);
+  /* NO EMPTY LINE, so a record with no band worked out draws no tile; a band is one row a band and a currency, so the
+     split parts the currencies and never adds two. */
+  assert.equal(split.block.empty, undefined);
+  assert.deepEqual(split.block.columns, [{ field: 'band' }, { field: 'amount' }]);
+  /* TAKEN OUT, ITS MANIFEST IS GONE, and the page is Portfolio's own again. */
+  assert.deepEqual(withAdds(own, additionsOf([], 'page.portfolio')), own.map((block) => ({ block })));
+});
+
+type PageRead = { blocks: { kind: string; heading?: string; added?: string; columns?: { field?: string; metric?: string; label?: string }[] }[] };
+
+/** A record holding Portfolio, a diary of readings and the bands as they install today, and its Projects page read. */
+async function projectsWithBands(): Promise<{ read: () => Promise<PageRead>; uninstall: () => Promise<void>; close: () => void; portfolioBody: () => string }> {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(Date.parse(NOW)) });
+  const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' } };
+  for (const doc of [firstPartyDocument('portfolio', { seeds: [] }), DIARY, installable()]) {
+    const planned = (await api.planPack({ doc, source: { kind: 'local' } } as never, owner)) as Planned & { value?: { diff: Diff } };
+    assert.ok(planned.ok, JSON.stringify(planned.refusal));
+    const put = (await api.installPack({ doc, source: { kind: 'local' }, planHash: planned.value!.diff.planHash, approve: planned.value!.diff.approve } as never, owner)) as Planned;
+    assert.ok(put.ok, JSON.stringify(put.refusal));
+  }
+  const read = async (): Promise<PageRead> => {
+    const r = (await api.page({ slug: 'portfolio' }, owner)) as { ok: boolean; value?: PageRead };
+    assert.ok(r.ok);
+    return r.value!;
+  };
+  const uninstall = async () => assert.ok(((await api.uninstallPack({ id: 'portfolio-bands' } as never, owner)) as Planned).ok);
+  const portfolioBody = () => api.kernel.declarations().find((d) => d.id === 'page.portfolio')!.body;
+  return { read, uninstall, close: () => sql.close(), portfolioBody };
+}
+
+test('INSTALLED BESIDE PORTFOLIO, the bands are drawn after How they are going, and uninstalled they are gone', async () => {
+  const r = await projectsWithBands();
+  const before = r.portfolioBody();
+  const headings = (await r.read()).blocks.map((b) => [b.heading ?? null, b.added ?? null]);
+  const at = headings.findIndex(([h]) => h === 'How they are going');
+  assert.deepEqual(headings[at + 1], ['A month: now, next and later', 'portfolio-bands']);
+  assert.equal(r.portfolioBody(), before, 'the bands were written into Portfolio\'s page');
+  await r.uninstall();
+  assert.ok(!(await r.read()).blocks.some((b) => b.heading === 'A month: now, next and later'));
+  r.close();
+});
+
+test('INSTALLED BESIDE PORTFOLIO, each card in play says This month, and uninstalled it does not', { todo: !COLUMNS_READ ? WAITING : !MONTH_LAID ? NOT_DRAWN : false }, async () => {
+  assert.ok(COLUMNS_READ, `the record refuses the column at install ${WAITING}`);
+  assert.ok(MONTH_LAID, `Projects holds the column off its cards ${NOT_DRAWN}`);
+  const r = await projectsWithBands();
+  const labels = async () => (await r.read()).blocks.find((b) => b.heading === 'In play')?.columns?.map((c) => c.label ?? null) ?? [];
+  assert.equal((await labels()).at(-1), 'This month');
+  await r.uninstall();
+  assert.ok(!(await labels()).includes('This month'));
+  r.close();
 });

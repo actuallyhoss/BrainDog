@@ -28,7 +28,7 @@
 
   /* THE HOST `boot` NAMED, when it named one. Only the Worker serves the key, so a self-host is not asked: the GET was a
      404 in the console of every self-host that opened Notifications. Absent is a host older than the field, asked. */
-  let { host }: { host?: 'cloud' | 'self-host' | undefined } = $props();
+  let { host, onchange }: { host?: 'cloud' | 'self-host' | undefined; onchange?: ((on: boolean) => void) | undefined } = $props();
 
   let offer = $state<Offer>(null);
   let on = $state(false);
@@ -70,6 +70,7 @@
       return r ? (await r.pushManager.getSubscription()) !== null : false;
     });
     on = start.on;
+    onchange?.(on);
     line = start.line;
     bad = start.line !== '';
   }
@@ -82,6 +83,7 @@
     const said = on ? await turnOff(ports()) : await turnOn(ports(), offer.key);
     if (said.kind === 'on') on = true;
     if (said.kind === 'off') on = false;
+    onchange?.(on);
     line = lineOf(said);
     bad = line !== '';
     busy = false;

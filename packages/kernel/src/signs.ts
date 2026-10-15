@@ -26,11 +26,16 @@
 
 import type { Result, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
+import { jsonPath } from '@braindog/where';
 
+import { BUILT_IN_FIGURES, readRatesAge } from './built-in-figures.ts';
+import { homeCurrency } from './declare.ts';
 import { nextOccurrence } from './digest.ts';
 import { dayIn } from './finished.ts';
 import { UNVERIFIED } from './ingest.ts';
+import { RATE_STALE_DAYS, ratesFrom, type Rate } from './fx.ts';
 import { intervalMs } from './pull.ts';
+import { ratesRole, type RoleList } from './roles.ts';
 import { SIGNS_ACTIONS } from './signs-actions.ts';
 import { SIGNS_FLOW } from './signs-flow.ts';
 import { SIGNS_VITALS } from './signs-vitals.ts';
@@ -125,6 +130,12 @@ export const RUN_SILENT_MS = 12 * HOUR;
 export const RUNS_ENDED_LEAST = 8;
 /** ...and red when more than one in this many ended as lost (a quarter): abandoned, or handed off by the sweep. */
 export const RUNS_ABANDONED_ONE_IN = 4;
+
+/**
+ * Red when the newest exchange rate is more than this many days old: the line `fx.ts` marks a converted figure stale
+ * at, the one the `rates-age-days` figure's own note names, imported so the sign and the figure cannot drift apart.
+ */
+export const RATES_STALE_DAYS = RATE_STALE_DAYS;
 
 /** A filed reading stands for now this long after it was filed. A layer that files once a night files again before it is up. */
 export const FILED_STANDS_MS = DAY;
@@ -547,6 +558,72 @@ function readRuns(sql: Sql, nowMs: number): SignReading {
   return reading('red', lost ? gone : silent.length, said.filter((s) => s !== '').join(' '), facts);
 }
 
+/* ── rates-current ─────────────────────────────────────────────────────── */
+
+/** The live lists: id and body, oldest id first. */
+const listsHeld = (sql: Sql): { id: string; body: Record<string, unknown> }[] =>
+  sql
+    .all<{ id: string; body: string }>("SELECT id, body FROM declaration WHERE kind = 'register' AND superseded_at IS NULL AND retired = 0 ORDER BY id")
+    .flatMap((d) => {
+      const body = parsed(d.body);
+      return body === null ? [] : [{ id: typeof body.id === 'string' ? body.id : d.id.slice('register.'.length), body }];
+    });
+
+/**
+ * The currencies the record's money is in, stopping at two: the home currency a person chose, and those the money
+ * fields of its lists hold, read as `api/money-figures.ts` `moneyCurrencies` reads them. Two is already more than one.
+ */
+function currenciesHeld(sql: Sql): string[] {
+  const found = new Set<string>();
+  const home = homeCurrency(sql);
+  if (home !== null) found.add(home);
+  for (const list of listsHeld(sql)) {
+    const fields = Array.isArray(list.body.fields) ? (list.body.fields as { id?: unknown; type?: unknown }[]) : [];
+    for (const f of fields) {
+      if (f?.type !== 'money' || typeof f.id !== 'string') continue;
+      const at = `json_extract(fields, '${jsonPath(f.id)}.currency')`;
+      for (const r of sql.all<{ c: unknown }>(`SELECT DISTINCT ${at} AS c FROM entry WHERE register = ? AND deleted_at IS NULL AND ${at} IS NOT NULL LIMIT 2`, list.id))
+        if (typeof r.c === 'string' && /^[A-Z]{3}$/u.test(r.c)) found.add(r.c);
+      if (found.size >= 2) return [...found].sort();
+    }
+  }
+  return [...found].sort();
+}
+
+/** The record's rates: the rows of the list that declares `rates:`, read by the fields it names, as a figure's `fx` reads them. */
+function ratesHeld(sql: Sql): Rate[] {
+  const held = ratesRole(listsHeld(sql).map((l) => l.body as unknown as RoleList));
+  if (!held) return [];
+  const rows = sql.all<{ fields: string }>('SELECT fields FROM entry WHERE register = ? AND deleted_at IS NULL', held.register);
+  return ratesFrom(
+    rows.map((r) => JSON.parse(r.fields) as Record<string, unknown>),
+    held.fields,
+  );
+}
+
+/**
+ * THE SAME AGE THE `rates-age-days` FIGURE READS, by the figure's own reader over the record's rates, judged by the line
+ * its note names (`RATES_STALE_DAYS`): never a second count of how old a rate is. Red names the cure in the words an
+ * agent looks for on offer, a feed of rates, so the skill "Keep a record current" can put it in its one question.
+ *
+ * NOTHING TO JUDGE BY ON A RECORD WITH ONE CURRENCY, however old its rates: nothing there is converted. And none with no
+ * rate at all, as the figure says nothing then: nought would say the rates are fresh on a record that has none.
+ */
+function readRatesCurrent(sql: Sql, nowMs: number, tz: string): SignReading {
+  const held = currenciesHeld(sql);
+  if (held.length < 2)
+    return reading('none', null, held.length === 0 ? 'No money is written on this record yet, so no exchange rate is needed.' : `Every amount on this record is in ${held[0]}, so no exchange rate is needed.`);
+  const facts = [`Money on this record is in more than one currency, ${held.join(' and ')} among them.`];
+  const decl = BUILT_IN_FIGURES['rates-age-days'];
+  const age = decl === undefined ? null : readRatesAge({ nowMs, tz, fx: () => ({ home: homeCurrency(sql), rates: ratesHeld(sql) }) }, decl);
+  const days = age?.ok ? age.value.value : null;
+  if (days === null) return reading('none', null, 'This record holds no exchange rate yet. A feed of rates would bring them in.', facts);
+  const said = `The newest exchange rate is ${days === 0 ? 'from today' : `${count(days, 'day')} old`}.`;
+  if (days <= RATES_STALE_DAYS) return reading('green', days, said, facts);
+  facts.push(`An amount converted on a rate more than ${count(RATES_STALE_DAYS, 'day')} old is marked stale.`);
+  return reading('red', days, `${said} A feed of rates once a day would keep them current.`, facts);
+}
+
 /* ── the closed list ───────────────────────────────────────────────────── */
 
 /* A READER WHOSE RULE CHANGED WITHOUT A THRESHOLD MOVING TAKES THE NEXT VERSION, so its days read under the old rule keep
@@ -557,7 +634,8 @@ const filed = (sign: string, name: string, hand: 'record' | 'host', version = 1)
 /**
  * THE KERNEL'S FIVE AND THE FOUR FILED, in the order 2.2 sets them, then `arrived` (PRF-A20, filed by the record), the
  * seven automation signs (SHL-D01, `signs-flow.ts`) and the five of what runs by itself and arrives (SHL-C01,
- * `signs-actions.ts`), a spread each. The ids are 2.2's; a person reads the names.
+ * `signs-actions.ts`), a spread each, the vitals of `signs-vitals.ts`, and last `rates-current` (REC-B02 step 7), how old
+ * the newest exchange rate is on a record with money in more than one currency. The ids are 2.2's; a person reads the names.
  */
 export const VITAL_SIGNS: readonly SignReader[] = [
   kernel('arrivals-filed', 'Arrivals file by themselves', { ARRIVAL_WAIT_MS, ARRIVALS_WAITING_MOST, ARRIVAL_AHEAD_MS, ARRIVALS_WINDOW_DAYS }, readArrivals, 2),
@@ -574,6 +652,8 @@ export const VITAL_SIGNS: readonly SignReader[] = [
   ...SIGNS_FLOW,
   ...SIGNS_ACTIONS,
   ...SIGNS_VITALS,
+  /* After the money-shaped ones (REC-B02 step 7): the age the `rates-age-days` figure reads, red past its own line. */
+  kernel('rates-current', 'Rates are current', { RATES_STALE_DAYS }, readRatesCurrent),
 ];
 
 /** The sign called `id` on the closed list, or `null`. */

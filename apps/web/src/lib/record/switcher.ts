@@ -36,13 +36,17 @@ export type Answer<T> = { ok: true; value: T } | { ok: false; refusal: Refusal }
  */
 export type SwitcherRow =
   | { slug: string; name: string; level: string }
-  | { slug: string; name: string; level: null; lists: string[]; held: string };
+  | { slug: string; name: string; level: null; lists: string[]; names?: string[] | undefined; words?: string | undefined; held: string };
 
 /**
  * The word a row wears beside its name: nothing for an owner, the level for anybody else who holds the record, and
- * the host's `held` word for somebody who holds lists only. The host chose that word so the web would not have to.
+ * for somebody who holds lists only the host's `words`, which name them ("Some lists: Tickets"), never their ids.
+ *
+ * THE HOST WRITES THOSE WORDS (`heldSaid` in `@braindog/record/directory`) and this draws them, because this file is
+ * in the script every screen loads and a copy of the rule here cost more bytes than that script has left. A row from a
+ * host with no `words` wears its `held` word, as it always did.
  */
-export const levelWord = (row: SwitcherRow): string | null => (row.level === null ? row.held : row.level === 'owner' ? null : row.level);
+export const levelWord = (row: SwitcherRow): string | null => (row.level === null ? (row.words ?? row.held) : row.level === 'owner' ? null : row.level);
 
 const isAnswer = (v: unknown): v is Answer<unknown> =>
   typeof v === 'object' && v !== null && 'ok' in v && ((v as { ok: unknown }).ok === true ? 'value' in v : 'refusal' in v);

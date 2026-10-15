@@ -31,6 +31,8 @@
     places,
     locale,
     readBy = null,
+    meta = words.asYouType,
+    empty = words.startsEmpty,
   }: {
     /** The parts as read (`partsOf`): only the entries the sentence filled are read off them, under their place. */
     parts: readonly PartOf[];
@@ -41,6 +43,10 @@
     locale: string;
     /** Who read the words (`Proposal.by`, and `fell` where a model was asked and the rules answered), or `null` before a reading. */
     readBy?: Pick<Proposal, 'by' | 'fell'> | null | undefined;
+    /** The tile's line beside its title: 'builds as you type' on the start page, the agent's word where one proposed it. */
+    meta?: string | undefined;
+    /** The line under the places before anything is in them. */
+    empty?: string | undefined;
   } = $props();
 
   /** The line about the rules, where they read it: the month spent has its own, and any other cause the plain one. */
@@ -84,7 +90,7 @@
 </script>
 
 <div class="building">
-  <Tile icon="home" title={title ?? words.yours} meta={words.asYouType} data-build>
+  <Tile icon="home" title={title ?? words.yours} {meta} data-build>
     <ol class="places">
       {#each shown as place (`${place.kind}:${place.id}`)}
         <li class="place" data-place={place.id} data-arrived={fresh.has(`${place.kind}:${place.id}`) ? '' : undefined}>
@@ -101,7 +107,7 @@
         </li>
       {/each}
     </ol>
-    <p class="reading">{words.startsEmpty}</p>
+    <p class="reading">{empty}</p>
     {#if rulesLine}<p class="reading" data-read-by="rules">{rulesLine}</p>{/if}
   </Tile>
 </div>

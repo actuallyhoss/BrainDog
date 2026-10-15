@@ -37,6 +37,8 @@ import { askOf, retypedBody, retypeShapeFault } from './api/retype.ts';
 import { configValue, readPackConfig } from './declare.ts';
 import { dayIn } from './finished.ts';
 import { recordIdentity } from './provision.ts';
+import { access } from './members.ts';
+import { pinHost, recordWrapping } from './vault.ts';
 
 /** The three tables that are read like registers and are not registers. */
 export const GOVERNANCE = ['suggestion', 'decision', 'prediction'] as const;
@@ -186,8 +188,16 @@ const SETTLED_BY =
 const APPLIED =
   "(SELECT a.to_v FROM event a WHERE a.kind = 'note' AND a.target = 'decision:' || decision.id AND a.target_kind = 'decision' AND a.to_v IS NOT NULL ORDER BY a.rowid DESC LIMIT 1) AS applied";
 
+/**
+ * WHO A QUESTION IS HANDED TO (USE-A13), the newest hand on it (`handQuestion`), or `null` when nobody is named or it was
+ * taken back. An event and no column, so it needs no migration: a `note` on the question whose `field` is `decider`,
+ * the person in `to_v`.
+ */
+const DECIDER =
+  "(SELECT nullif(h.to_v, '') FROM event h WHERE h.kind = 'note' AND h.field = 'decider' AND h.target = 'suggestion:' || suggestion.id ORDER BY h.rowid DESC LIMIT 1) AS decider";
+
 const COLUMNS: Record<GovernRegister, string> = {
-  suggestion: `id, body_kind, body, status, opened_by, opened_at, resolved_as, defer_until, defer_why, cause, ${SETTLED_BY}`,
+  suggestion: `id, body_kind, body, status, opened_by, opened_at, resolved_as, defer_until, defer_why, cause, ${SETTLED_BY}, ${DECIDER}`,
   decision: `id, question, answer, reason, decided_by, ts, supersedes, cause, ${SETTLED}, ${APPLIED}`,
   prediction:
     'id, for_decl, claim, measure, baseline, unit, target, window, score_at, scored_at, observed, met, on_miss',
@@ -366,6 +376,11 @@ export type Proposal = {
    * is kept under the question so the person reads why it is back.
    */
   again?: string;
+  /**
+   * WHO DECIDES IT (USE-A13), a person's id, so the question arrives already handed to them. They must hold Decides on
+   * the record or own it. Left out, any member who may decide may answer it, as before.
+   */
+  decider?: string;
 };
 
 /**
@@ -416,6 +431,12 @@ export function propose(deps: GovernDeps, actor: string | (() => string), p: Pro
   }
   if (p.again !== undefined && (typeof p.again !== 'string' || p.again.trim() === '' || new TextEncoder().encode(p.again).length > AGAIN_BYTES))
     return no<Filed>('VALUE_MALFORMED', `again is one sentence of at most ${AGAIN_BYTES} bytes saying what changed since this was last answered, or leave it out.`, { at: 'again' });
+
+  /* WHO DECIDES IT is checked before anything is filed. */
+  if (p.decider !== undefined) {
+    const bad = deciderNameFault(deps.sql, p.decider);
+    if (bad !== null) return no<Filed>('VALUE_MALFORMED', bad, { at: 'decider' });
+  }
 
   const wrong = checkBody(deps, p.body_kind, p.body ?? {}, p.cause ?? null);
   if (wrong) return { ok: false, refusal: wrong };
@@ -491,7 +512,7 @@ export function propose(deps: GovernDeps, actor: string | (() => string), p: Pro
          twice, so the day it asks about digests too this adds nothing. */
       const theirs = read.value?.egress ?? [];
       const digests = newEgress(deps.sql, declared(to.value.to).filter((d) => d.kind === 'digest')).filter((e) => !theirs.some((t) => t.line === e.line));
-      if (digests.length > 0) body = { ...body, egress: [...theirs, ...digests], approve: approvalLines([...theirs, ...digests]) };
+      if (digests.length > 0) body = { ...body, egress: [...theirs, ...digests], approve: approvalLines([...theirs, ...digests], { passphrase: recordWrapping(deps.sql)?.wrapped_by === 'passphrase' }) };
       else if (read.value !== null) body = { ...body, egress: read.value.egress, approve: read.value.approve };
     }
   }
@@ -505,13 +526,16 @@ export function propose(deps: GovernDeps, actor: string | (() => string), p: Pro
     body = rest;
     const ingest = body.ingest as Record<string, unknown>;
     const egress = newEgress(deps.sql, [isDeclaration(ingest) ? { id: ingest.id, kind: 'ingest', body: ingest.body } : { kind: 'ingest', body: ingest }]);
-    if (egress.length > 0) body = { ...body, egress, approve: approvalLines(egress) };
+    if (egress.length > 0) body = { ...body, egress, approve: approvalLines(egress, { passphrase: recordWrapping(deps.sql)?.wrapped_by === 'passphrase' }) };
   }
 
   /* ASKED ONCE. The filer's cause, or for an agent's run the one the body derives, and an open question holding it is
      the answer: nothing is filed and the proposer is told which. A rule's, Slash's or a person's question derives none,
      for migration 31's reason: an automation's run waits on its own question, and two runs asking alike are two asks. */
   const by = typeof actor === 'function' ? actor() : actor;
+  /* A MODEL'S DRAFT NAMES NOBODY TO DECIDE IT: Slash writes only suggest, propose and predict, and handing one is the owner's. */
+  if (p.decider !== undefined && by === SLASH)
+    return no<Filed>('FORBIDDEN', 'A question Slash drafts names nobody to decide it. The owner hands it to somebody.', { at: 'decider' });
   const cause = p.cause ?? (RUN_ID.test(by) ? causeOf(p.body_kind, body, p.question) : null);
   /* ANSWERED ALREADY (AGT-C08). The person said no to this cause, or picked an option of it, and the proposer is told
      what they said, when and why, and nothing is filed. With `again` it is asked anyway, and that sentence goes under
@@ -554,6 +578,8 @@ export function propose(deps: GovernDeps, actor: string | (() => string), p: Pro
   /* WHY IT IS BACK, under the question, after the `suggest` event so `questionOf` still reads the question first. Only
      when an answer was set aside: an `again` on a cause nobody answered says nothing the question does not. */
   if (memory !== null && p.again !== undefined) event(deps, at, by, 'note', `suggestion:${id}`, 'suggestion', AGAIN, p.again.trim());
+  /* AND WHO DECIDES IT, written as `handQuestion` writes it, so an agent's question that names Ada arrives already hers. */
+  if (p.decider !== undefined) handEvent(deps, at, by, id, p.decider);
   return ok({ id });
 }
 
@@ -3001,6 +3027,13 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
             if (cannot !== null) return no<Decided>('OUT_OF_BOUNDS', cannot, { at: 'body.egress' });
           }
         }
+      /* AND EACH KEY IS HELD TO THE HOST ITS LINE CALLS, in the decision's transaction: the owner approved this key going
+         to that host, so a later action cannot send it anywhere else. `pinHost` writes only when the entry names no host. */
+      if ((row.body_kind === 'change' || row.body_kind === 'pattern') && Array.isArray(body.egress))
+        for (const e of body.egress as unknown[]) {
+          const line = isMap(e) ? (e as { key?: unknown; host?: unknown }) : null;
+          if (line !== null && typeof line.key === 'string' && typeof line.host === 'string') pinHost(deps.sql, line.key, line.host, deps.nowMs, actor);
+        }
     }
 
     /* A RETYPE IS HANDED BACK TO BE LANDED, NEVER INSTALLED. The install counts the rows and would refuse the type
@@ -3282,6 +3315,99 @@ export function questionOf(sql: Sql, id: string): string | null {
       `suggestion:${id}`,
     )?.q ?? null
   );
+}
+
+/* ── who decides ─────────────────────────────────────────────────────────── */
+
+/**
+ * The `field` of the note that hands a question to somebody (USE-A13).
+ *
+ * A NOTE AND NOT AN EVENT KIND OF ITS OWN, because `event.kind` is a closed list and a new kind is a migration
+ * (`0001_kernel.ts`). The question is the target, `to_v` holds the person's id, and an empty `to_v` is the question taken
+ * back. The newest one is who decides, so handing it on, or taking it back, is one more line and History keeps the rest.
+ *
+ * THE PERSON IN `to_v` AND WORDS IN `note`, as `again` and `keepApplied` keep theirs: History and the news say an event's
+ * `note` as it is, and a note holding the person's id read as an id to whoever opened History.
+ */
+const HAND = 'decider';
+
+/** Whether a person may be handed a question: somebody here, not suspended, who holds Decides on the record or owns it. */
+export function mayDecide(sql: Sql, person: string): boolean {
+  const level = access(sql, person)?.level ?? null;
+  return level === 'decide' || level === 'owner';
+}
+
+/** A person's name as the record holds it, for a sentence the record says itself. Never an id. */
+function personNamed(sql: Sql, person: string): string {
+  const row = sql.one<{ name: string | null; email: string | null }>('SELECT name, email FROM person WHERE id = ?', person);
+  return row?.name?.trim() || row?.email?.trim() || 'That person';
+}
+
+/** The sentence a name nobody may hand a question to is refused with. */
+export const cannotDecide = (name: string): string => `${name} cannot decide on this record. Name somebody who can, or nobody.`;
+
+/** Why `person` cannot be handed a question, or `null` when they can. */
+function deciderNameFault(sql: Sql, person: unknown): string | null {
+  if (typeof person !== 'string' || person.trim() === '') return 'decider is the person who decides it, or leave it out.';
+  return mayDecide(sql, person) ? null : cannotDecide(personNamed(sql, person));
+}
+
+/** Write one hand: `to` the person's id, or `null` for the question taken back. */
+function handEvent(deps: Pick<GovernDeps, 'sql' | 'mint'>, at: string, by: string, id: string, to: string | null): void {
+  slashMayWrite(by, 'note');
+  deps.sql.exec(
+    "INSERT INTO event (id, ts, actor, kind, target, target_kind, field, to_v, note) VALUES (?, ?, ?, 'note', ?, 'suggestion', ?, ?, ?)",
+    deps.mint(),
+    at,
+    by,
+    `suggestion:${id}`,
+    HAND,
+    to ?? '',
+    to === null ? 'Taken back, so anybody who may decide can answer it.' : `Handed to ${personNamed(deps.sql, to)} to decide.`,
+  );
+}
+
+/** Who decides one question: the person the newest hand names, or `null` when nobody is named or it was taken back. */
+export function deciderOf(sql: Sql, id: string): string | null {
+  const row = sql.one<{ to_v: string | null }>(
+    "SELECT to_v FROM event WHERE kind = 'note' AND field = ? AND target = ? ORDER BY rowid DESC LIMIT 1",
+    HAND,
+    `suggestion:${id}`,
+  );
+  return row?.to_v ? row.to_v : null;
+}
+
+/**
+ * Hand one open question to the person who decides it, or take it back with `to: null` (USE-A13).
+ *
+ * WHO MAY HAND ONE IS THE CALLER'S TO ASK (`packages/record/src/methods/decider.ts`, the owner's in a browser). This holds
+ * the rest: the question is there and still open, and the person holds Decides or owns the record. Handed to whoever
+ * already decides it, nothing is written.
+ */
+export function handQuestion(deps: Pick<GovernDeps, 'sql' | 'mint' | 'nowMs'>, id: string, to: string | null, by: string): Result<{ id: string; decider: string | null }> {
+  const row = deps.sql.one<{ status: string }>('SELECT status FROM suggestion WHERE id = ?', id);
+  if (!row) return no('OUT_OF_BOUNDS', `There is no question called ${id}.`, { at: 'id' });
+  if (row.status !== 'open')
+    return no('TRANSITION_ILLEGAL', 'This question is already settled, so it cannot be handed to anybody.', { at: 'status', allowed: ['open'] });
+  if (to !== null) {
+    const bad = deciderNameFault(deps.sql, to);
+    if (bad !== null) return no('VALUE_MALFORMED', bad, { at: 'to' });
+  }
+  if (deciderOf(deps.sql, id) === to) return ok({ id, decider: to });
+  handEvent(deps, instant(deps.nowMs), by, id, to);
+  return ok({ id, decider: to });
+}
+
+/**
+ * Why `actor` may not answer a question somebody else was handed, in one sentence, or `null` when they may.
+ *
+ * A QUESTION WITH A DECIDER IS ANSWERED BY HER OR BY AN OWNER. Anybody else who may decide is told whose it is, by the
+ * name `nameOf` gives, never an id. A question nobody was handed is anybody's who may decide, as it always was.
+ */
+export function deciderFault(sql: Sql, id: string, actor: string, isOwner: boolean, nameOf: (person: string) => string = (p) => personNamed(sql, p)): string | null {
+  const decider = deciderOf(sql, id);
+  if (decider === null || decider === actor || isOwner) return null;
+  return `This one is ${nameOf(decider)}'s to decide.`;
 }
 
 function event(

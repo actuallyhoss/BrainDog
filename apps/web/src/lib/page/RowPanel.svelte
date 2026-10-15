@@ -20,14 +20,22 @@
   kernel's `leanRows`), and a project's note opened on those and saved them, with the edit, over the whole note. The form
   now opens on the row whole (`host.whole`) and Save is worked out against it; until it is read the body holds the
   wait, and a row that cannot be read whole says so in place of its form.
+
+  THE ROW'S MARK HEADS THE BODY where its list declares one, its picture or the first letter of its name in its own
+  hue (`markOf`, as every drawer of a mark). For a reader who may change the row it is a button, "Change the mark":
+  pressing it loads the glyph picker by `import()`, never as the panel opens, and a pick writes the mark's field alone
+  through the panel's own row write (`host.write`), with its receipt and Undo, so nothing typed in the form changes.
+  The form itself never shows the mark (`readableFields`): the identity is picked as a picture, not typed.
 -->
 <script lang="ts">
-  import { tick, untrack } from 'svelte';
+  import { tick, untrack, type Component } from 'svelte';
+  import { markOf } from 'braindog-render';
   import { at as inApp } from '$lib/at.ts';
-  import { currencyFor, readableFields } from '$lib/record/api.ts';
+  import { currencyFor, identityOfRow, readableFields } from '$lib/record/api.ts';
   import type { Entry, Fields } from '$lib/record/schema.ts';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import { isGlyph } from '$lib/ui/icons.ts';
   import Panel from '$lib/ui/Panel.svelte';
   import RowForm from '$lib/ui/RowForm.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
@@ -36,6 +44,7 @@
   import { bylineWords } from './byline.ts';
   import UndoAsk from './UndoAsk.svelte';
   import { keyOf, titleOf, words } from './row-verbs.ts';
+  import { MARK_WORDS, markFieldOf, markPatch } from './mark-pick.ts';
 
   let { host }: { host: RowHost } = $props();
 
@@ -49,6 +58,71 @@
   const byline = $derived(row ? host.byline(row) : undefined);
   const fields = $derived(row ? readableFields(row.register) : []);
   const currency = $derived((f: { id: string }) => (row ? currencyFor(row.register, f.id) : null));
+
+  /* THE ROW'S MARK, where its list declares one: the field it is kept in, what it holds now, and what it draws. */
+  const markField = $derived(row ? markFieldOf(row.register) : null);
+  const identity = $derived(row && entry && markField !== null ? identityOfRow(row.register, entry.fields) : null);
+  const markHeld = $derived.by(() => {
+    const v = entry && markField !== null ? entry.fields[markField] : null;
+    return typeof v === 'string' && v.trim() !== '' ? v.trim() : null;
+  });
+  const markDrawn = $derived(identity ? markOf(identity.mark, identity.name) : null);
+  /* A mark longer than one letter is a glyph's name, as `IdentityMark` reads it. */
+  const markGlyph = $derived(markDrawn !== null && markDrawn.length > 1 && isGlyph(markDrawn) ? markDrawn : null);
+
+  type Picker = Component<{ value?: string | null; onpick: (name: string) => void }>;
+  /** The glyph picker, loaded the first time the mark is pressed and kept for the next. */
+  let GlyphPicker = $state.raw<Picker | null>(null);
+  let picking = $state(false);
+  /** Said under the mark when a pick was refused or could not be loaded. */
+  let markSaid = $state('');
+  let markButton = $state<HTMLButtonElement | null>(null);
+
+  /** The picker closed by a pick or Done: focus goes back to the mark, since what held it has gone. */
+  async function shut() {
+    picking = false;
+    await tick();
+    markButton?.focus();
+  }
+
+  /* THE PICKER CLOSES WHEN THE PANEL MOVES TO ANOTHER ROW. */
+  const openKey = $derived(row ? keyOf(row) : '');
+  $effect(() => {
+    void openKey;
+    untrack(() => {
+      picking = false;
+      markSaid = '';
+    });
+  });
+
+  async function pressMark() {
+    markSaid = '';
+    if (picking) return void (picking = false);
+    if (!GlyphPicker) {
+      try {
+        GlyphPicker = (await import('./GlyphPicker.svelte')).default as Picker;
+      } catch {
+        markSaid = MARK_WORDS.unloaded;
+        return;
+      }
+    }
+    picking = true;
+  }
+
+  /** One pick, one write: the mark's field alone, through the panel's row write and its Undo. */
+  function pickMark(glyph: string | null) {
+    const r = row;
+    const e = entry;
+    if (!r || !e || !shape || !mayWrite) return;
+    if (glyph === markHeld) return void shut();
+    const patch = markPatch(r.register, glyph);
+    if (!patch) return void (markSaid = MARK_WORDS.refused);
+    const title = titleOf(e, shape);
+    if (host.write(r, patch, words.marks.edited, glyph === null ? MARK_WORDS.cleared(title) : MARK_WORDS.said(title))) {
+      markSaid = '';
+      void shut();
+    }
+  }
 
   /** What the form opened on, the row's fields as typed text. A new object is a new form (`{#key}` below). */
   let seeded = $state.raw<Record<string, string> | null>(null);
@@ -212,6 +286,42 @@
     <Waiting rows={3} />
   {:else if row && entry && shape}
     {@const r = row}
+    {#if identity}
+      <!-- THE MARK, a button only where the reader may change the row; its picture is the name the screen reader
+           hears none of, so the button says what it does. -->
+      <div class="p-mark-line">
+        {#if markField !== null && mayWrite}
+          <button
+            bind:this={markButton}
+            type="button"
+            class="p-mark"
+            style="--hue:{identity.hue}"
+            data-retired={identity.retired ? '' : undefined}
+            aria-label={MARK_WORDS.change}
+            aria-expanded={picking ? 'true' : 'false'}
+            title={MARK_WORDS.change}
+            onclick={() => void pressMark()}
+          >
+            {#if markGlyph}<Icon name={markGlyph} size="l" />{:else if markDrawn}{markDrawn}{/if}
+          </button>
+        {:else}
+          <span class="p-mark" style="--hue:{identity.hue}" data-retired={identity.retired ? '' : undefined} aria-hidden="true"
+            >{#if markGlyph}<Icon name={markGlyph} size="l" />{:else if markDrawn}{markDrawn}{/if}</span
+          >
+        {/if}
+        {#if markSaid}<p class="p-sure" role="status">{markSaid}</p>{/if}
+      </div>
+      {#if picking && GlyphPicker && mayWrite}
+        <div class="p-picker" role="group" aria-label={MARK_WORDS.heading}>
+          <p class="p-picker-head">{MARK_WORDS.heading}</p>
+          <GlyphPicker value={markHeld} onpick={(name) => pickMark(name)} />
+          <div class="p-picker-foot">
+            {#if markHeld !== null}<Button size="sm" onclick={() => pickMark(null)}>{MARK_WORDS.clear}</Button>{/if}
+            <Button size="sm" onclick={() => void shut()}>{MARK_WORDS.close}</Button>
+          </div>
+        </div>
+      {/if}
+    {/if}
     <form class="p-form" novalidate onsubmit={save}>
       <!-- EVERY FIELD THE LIST DECLARES, in `RowForm`'s boxes, and all of them off for a reader who may not write. A new
            row is a new form: `values` is read once, as the form draws. -->
@@ -249,6 +359,79 @@
     flex-direction: column;
     gap: var(--sp-4);
     min-block-size: 100%;
+  }
+
+  /* THE MARK OVER THE FORM: one square in the row's own hue, a flat button (radius 8) where it may be changed. */
+  .p-mark-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2) var(--sp-3);
+    margin: 0 0 var(--sp-4);
+  }
+
+  .p-mark {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    inline-size: var(--ctl-h);
+    block-size: var(--ctl-h);
+    padding: 0;
+    background: var(--hover-wash);
+    border: 0;
+    border-radius: var(--r-ctl);
+    color: oklch(var(--mark-l) var(--mark-c) var(--hue));
+    font: inherit;
+    font-size: var(--t-base);
+    font-weight: 600;
+    line-height: 1;
+  }
+
+  .p-mark[data-retired] {
+    color: var(--dim);
+  }
+
+  button.p-mark {
+    cursor: pointer;
+  }
+
+  button.p-mark:focus-visible {
+    outline: 2px solid var(--focus-in);
+    outline-offset: 2px;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    button.p-mark:hover {
+      background: var(--hold-wash);
+    }
+  }
+
+  @media (pointer: coarse) {
+    .p-mark {
+      inline-size: var(--tap);
+      block-size: var(--tap);
+    }
+  }
+
+  .p-picker {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    margin: 0 0 var(--sp-4);
+  }
+
+  .p-picker-head {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--t-base);
+    font-weight: 600;
+  }
+
+  .p-picker-foot {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--sp-2);
   }
 
   /* A FIELDSET ONLY TO TURN EVERY BOX OFF AT ONCE for a reader who may not write, so it draws as nothing. */

@@ -267,13 +267,18 @@ export type CheckoutAsk = {
 
 /**
  * A subscription ended now, when a payment again has replaced it: `true` when Stripe ended it, and the failure
- * otherwise, which the caller writes as a line (one that had already ended is among them, and needs nothing).
+ * otherwise, which the caller writes as a line. One that had already ended is `true`, and is not asked to end again.
  *
  * WITHOUT THIS A RECORD COULD BE PAID FOR TWICE: a subscription Stripe gave up on can sit `unpaid` rather than
  * `canceled`, and a card later put on it would pay its old invoices beside the new subscription's.
  */
 export async function endSubscription(stripe: Stripe, id: string): Promise<true | StripeFault> {
   if (!/^sub_[A-Za-z0-9]{1,250}$/u.test(id)) return { ok: false, status: 0, type: 'id', code: '' };
+  /* ONE ALREADY ENDED IS NOTHING TO DO, which is every record that lapsed by a cancel and is paid for again: asked to
+     end it, Stripe refuses, and each such payment wrote a failure line that was not one (`billing-rehearsal.test.ts`,
+     "FIX (ended twice)"). A read that fails goes on to the end, which says for itself whether it worked. */
+  const seen = await stripe.read(`/v1/subscriptions/${id}`);
+  if (seen.ok && (textAt(seen.body, 'status') === 'canceled' || textAt(seen.body, 'status') === 'incomplete_expired')) return true;
   const out = await stripe.remove(`/v1/subscriptions/${id}`);
   return out.ok ? true : out;
 }

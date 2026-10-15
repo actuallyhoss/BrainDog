@@ -75,6 +75,7 @@
   import MergeCard from '../../routes/decide/MergeCard.svelte';
   import { answeredLine, cardOf, cardWords, inlineOf, pressOf, pressSaid, primaryOf, saysChanges, startsOn, wayTail } from './card.ts';
   import { footprint, settle } from './settle.ts';
+  import { othersLine, namer } from '../../routes/decide/[id]/decider.ts';
 
   let {
     question,
@@ -114,6 +115,15 @@
     /** A question shown outside Decide (Home, a declared page): the question and its answers as buttons, nothing else. */
     compact?: boolean;
   } = $props();
+
+  /* WHO DECIDES THIS ONE, said on the card of a reader it is not named for (USE-A13); nothing for nobody or for her. */
+  const decidesLine = $derived(
+    othersLine(
+      question as { id: string; decider?: string | null },
+      (route.data as { me?: { person?: string } }).me?.person ?? null,
+      namer([], (route.data as { names?: Record<string, string> }).names ?? {}),
+    ),
+  );
 
   const uid = `dc-${(made += 1)}`;
 
@@ -537,6 +547,7 @@
             class="qa-joined num">{queueWords.joined(card.joined)}</span
           >{/if}{#if compact && card.band}<span class="queue-cost" data-cost={card.cost} hidden>{card.band}</span>{/if}
       </h3>
+      {#if decidesLine}<p class="qa-later" dir="auto">{decidesLine}</p>{/if}
       {#if !compact && card.later}<p class="qa-later" dir="auto">{card.later}</p>{/if}
       <!-- HOW LONG IT WAITS (ENG-B14): under why, in the side, where whoever asked wrote one; here, under the question,
            where nobody did. -->

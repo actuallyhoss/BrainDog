@@ -26,7 +26,7 @@
  * NO `node:` IMPORT, and only types from `@braindog/script`, so the Worker can build its runner here too.
  */
 
-import { ACTION_MAX_BYTES, ACTION_TIMEOUT_MS, bankKey, grantChosen, hostOpened, type ActionRequest, type Entry, type ScriptRunner, type Scripted } from '@braindog/kernel';
+import { ACTION_MAX_BYTES, ACTION_TIMEOUT_MS, bankKey, cycleAfter, grantChosen, hostOpened, type ActionRequest, type CycleLine, type Entry, type ScriptRunner, type Scripted } from '@braindog/kernel';
 import { fixOf } from '@braindog/ports';
 import type { CallContext, RecordApi } from '@braindog/record';
 import type { CtxHost, HostRequest, HostResponse, Json, ScriptAnswer, ScriptDecl, ScriptRefusal } from '@braindog/script';
@@ -264,6 +264,89 @@ export function scriptFold(script: string): ScriptFold {
   };
 }
 
+/** The longest line `ctx.cycle` reads, in characters of its JSON, and the most it answers in one run. */
+export const CYCLE_CHARS = 16_384;
+export const CYCLE_CALLS = 1000;
+
+/** `ctx.cycle` for one run: the next day (YYYY-MM-DD) a repeating line's money moves on after `day`, or `null`. */
+export type ScriptCycle = (day: string, line: Json) => Promise<string | null>;
+
+/**
+ * The step a script's `ctx.cycle` is built from, on either host: the kernel's own `cycleAfter`, and nothing beside it.
+ *
+ * THE WALK'S, BECAUSE A SANDBOX RUNS ITS SCRIPT'S TEXT ALONE. The day a paid line's "Next" moves to is the forecast's
+ * arithmetic (the cycle tables, days of the month, month ends, rest days), and a script that worked it out itself
+ * would be a second idea of when a line is due, one the forecast does not walk. So the host answers with the walk's.
+ *
+ * THE SCRIPT HANDS THE LINE AS `cycleAfter` READS IT: `{ leg, fields, rest?, anchorDay? }`, the leg being the fields
+ * a pack's forecast leg names (`on`, `every`, `ends`, `days`, `weekend`). Like `fold` it reads nothing of the record
+ * and writes nothing, so it needs no `reads` and is handed to every script.
+ *
+ * A BAD DAY OR A BAD LINE ANSWERS `null`, which a script reads as no next day, and the host never throws for one: a
+ * day that is not a calendar day, a line that is not the shape above or is longer than `CYCLE_CHARS`, or anything the
+ * kernel itself gives out on. Only the count throws: a run that asks more than `CYCLE_CALLS` times is refused the
+ * rest as a rejected promise, as `fold` is. One counter a run, so `scriptCycle` is called once for each.
+ */
+export function scriptCycle(script: string): ScriptCycle {
+  let asked = 0;
+  return async (day, line) => {
+    asked += 1;
+    if (asked > CYCLE_CALLS) throw new Error(`${script} asked for more than ${CYCLE_CALLS} next days in one run, so no more were answered.`);
+    const read = isCalendarDay(day) ? cycleLineOf(line) : null;
+    if (read === null) return null;
+    try {
+      return cycleAfter(day, read);
+    } catch {
+      return null;
+    }
+  };
+}
+
+/** A day as `YYYY-MM-DD` that the calendar holds: 2026-02-30 is not one. */
+function isCalendarDay(day: unknown): day is string {
+  if (typeof day !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return false;
+  const [y, m, d] = day.split('-').map(Number) as [number, number, number];
+  const at = new Date(Date.UTC(y, m - 1, d));
+  return at.getUTCFullYear() === y && at.getUTCMonth() === m - 1 && at.getUTCDate() === d;
+}
+
+const isPlain = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
+const isName = (v: unknown): v is string => typeof v === 'string' && v !== '';
+const isCount = (v: unknown): boolean => Number.isInteger(v) && (v as number) >= 1;
+const isPair = (v: unknown): boolean =>
+  Array.isArray(v) && v.length === 2 && v.every((d) => Number.isInteger(d) && d >= 1 && d <= 31) && v[0] < v[1];
+const tableOf = (v: unknown, each: (n: unknown) => boolean): boolean => v === undefined || (isPlain(v) && Object.values(v).every(each));
+
+/**
+ * A script's line as `cycleAfter` reads it, or `null` when it is not one. Checked to the field: the line crossed from
+ * a sandbox as JSON, and a leg the kernel was handed half-formed could answer a day rather than none.
+ */
+function cycleLineOf(line: Json): CycleLine | null {
+  let size: number;
+  try {
+    size = JSON.stringify(line)?.length ?? Infinity;
+  } catch {
+    return null;
+  }
+  if (size > CYCLE_CHARS || !isPlain(line) || !isPlain(line.leg) || !isPlain(line.fields)) return null;
+  const { leg, fields, rest, anchorDay } = line;
+  if (!isName(leg.on)) return null;
+  for (const name of ['ends', 'days', 'weekend'] as const) if (leg[name] !== undefined && !isName(leg[name])) return null;
+  const every = leg.every;
+  if (every !== undefined) {
+    if (!isPlain(every) || !isName(every.field)) return null;
+    if (!tableOf(every.months, isCount) || !tableOf(every.weeks, isCount) || !tableOf(every.twice, isPair)) return null;
+  }
+  if (rest !== undefined && !(Array.isArray(rest) && rest.every((d) => Number.isInteger(d) && (d as number) >= 0 && (d as number) <= 6))) return null;
+  if (anchorDay !== undefined && anchorDay !== null && typeof anchorDay !== 'number') return null;
+  return {
+    leg: leg as CycleLine['leg'],
+    fields,
+    ...(rest === undefined ? {} : { rest: rest as number[] }),
+    ...(typeof anchorDay === 'number' ? { anchorDay } : {}),
+  };
+}
+
 /**
  * Why a script may not send `grant` to `at`, or `null` when it may. The refusal is `FORBIDDEN` and is a rule broken, so
  * it refuses the whole run on both hosts, as a key the script does not declare does.
@@ -361,12 +444,14 @@ export function scriptRunner<P extends object | undefined = undefined>(options: 
 
     const { decl } = scripted;
     const reads = options.reads?.(s);
-    /* `fold` IS HANDED BESIDE THE REST, to every script whatever it declares: one `scriptFold` a run, so the count
-       it keeps is this run's. The Worker hands the same one from its own turn (`apps/worker/src/script.ts`). */
+    /* `fold` AND `cycle` ARE HANDED BESIDE THE REST, to every script whatever it declares: one `scriptFold` and one
+       `scriptCycle` a run, so the counts they keep are this run's. The Worker hands the same from its own turn
+       (`apps/worker/src/script.ts`). */
     const host: CtxHost = {
       fetch,
       ...(reads === undefined ? {} : { list: reads.list, get: reads.get }),
       fold: scriptFold(scripted.script),
+      cycle: scriptCycle(scripted.script),
       now: () => new Date(now()).toISOString(),
       tz: scripted.record.tz,
       input: (scripted.input ?? null) as Json,

@@ -115,7 +115,8 @@ test('a money cell arrives whole, in its own currency, and two currencies are ne
   ]);
   const note = shown.blocks.find((b) => b.kind === 'note') as { body: string };
   const [said, ...rest] = note.body.split('\n');
-  assert.match(said!, /^Owed: (?=.*1\.250,00)(?=.*300,50).*\. Also and the handbook\.$/u);
+  /* EACH AMOUNT WRITTEN ONE WAY, as Money writes it against the record's home currency, whatever the language. */
+  assert.match(said!, /^Owed: (?=.*€300\.50.EUR)(?=.*£1,250\.00.GBP).*\. Also and the handbook\.$/u);
   /* AND THE REST OF HER WORDS KEEP THEIR SPACING: a nested list keeps its indent. */
   assert.deepEqual(rest, ['', '- Sent', '  - by hand']);
   sql.close();

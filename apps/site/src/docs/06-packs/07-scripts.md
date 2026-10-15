@@ -38,6 +38,7 @@ ctx.write(list, fields) | add a row | only lists in writes
 ctx.update(id, patch, version) | change a row | with the version it was read at, or none to write without comparing
 ctx.fetch(url, { key }) | call out | only to an origin in egress, with a key named in keys
 ctx.fold(text) | match a payee | a payee as a bank wrote it, as the name under it, or null; 1,000 a run and no more
+ctx.cycle(day, line) | the next day a line is due | after day, as YYYY-MM-DD, worked out the way the forecast walks it, with line as { leg, fields, rest, anchorDay }, or null; 1,000 a run and no more
 ctx.log(...) | say what happened | kept with the run, for the owner to read
 ```
 

@@ -9,6 +9,7 @@
  */
 
 import type { SeedRule } from '../base.ts';
+import { CASH_LEGS } from './legs.ts';
 import { OBLIGATIONS_REGISTER } from './lists/obligations.ts';
 import { BOOK_FROM_ACCOUNT_SCRIPT } from './scripts/book-from-account.js';
 import { CLOSE_ACCOUNT_SCRIPT } from './scripts/close-account.js';
@@ -17,7 +18,7 @@ import { LAST_DAY_SCRIPT } from './scripts/last-day.js';
 import { LEARN_CATEGORY_SCRIPT } from './scripts/learn-category.js';
 import matchRun, { MATCH_PAYMENT_SCRIPT, matchPayment } from './scripts/match-payment.js';
 import { PLANS_FROM_NAMES_SCRIPT } from './scripts/plans-from-names.js';
-import settleRun, { SETTLE_SCRIPT, settle } from './scripts/settle.js';
+import { SETTLE_SCRIPT, settle } from './scripts/settle.js';
 import { UNSETTLE_RULE, UNSETTLE_SCRIPT } from './scripts/unsettle.js';
 
 /**
@@ -135,10 +136,9 @@ export const MONEY_RULES: Record<string, SeedRule> = {
    *
    * ASKED, SINCE money-core 3.1.0, AND IT WAS TOLD. The notice said which day it was and left the person to find the
    * row and end it by hand, so a line that had stopped went on walking in Cash ahead until somebody ended it.
-   * Now it asks once for each day it was due (`once_per`): "It went through" is recorded and asks nothing more this
-   * cycle, and "It stopped" ends the line (`recurring-stopped` in `MONEY_AUTOMATIONS`). The words fit money in as well as
-   * money out, since pay coming in is a repeating line too. Moving `next_due` on by one cycle is not offered, because the
-   * grammar a rule fills a field with has no arithmetic on a day.
+   * Now it asks once for each day it was due (`once_per`): "It went through" moves "Next" one cycle on
+   * (`recurring-went-through`, since money-next-moves-100), and "It stopped" ends the line (`recurring-stopped`). The
+   * words fit money in as well as money out, since pay coming in is a repeating line too.
    */
   'recurring-missed': {
     rule: 'recurring-missed',
@@ -231,35 +231,29 @@ export const CHASE_DRAFT_STEPS = [CHASE_DRAFT_LEFT_STEP, CHASE_DRAFT_STEP] as co
  */
 const DRAFT_DECLARED = OBLIGATIONS_REGISTER.fields.some((f) => f.id === CHASE_DRAFT_FIELD.id);
 
+/** WHAT THE WALK READS OF A REPEATING LINE TO STEP IT, Cash ahead's own leg (`CASH_LEGS`), written into the script as
+ * data since a sandbox imports nothing: the day `ctx.cycle` answers is the day the forecast walks. */
+const LINE_LEG = (({ on, every, ends, days, weekend }) => ({ on, every, ends, days, weekend }))(CASH_LEGS.find((l) => l.register === 'recurring')!);
+
 /**
- * A REPEATING LINE MARKED PAID BY ITS PAYMENT (repeating-settle-79-80), HELD OUT OF THE PACK SINCE repeat-next-80b-82:
- * no rule starts it and `MONEY_AUTOMATIONS` does not hold it, until a run can be handed the day "Next" moves to.
+ * A REPEATING LINE MARKED PAID BY ITS PAYMENT (repeating-settle-79-80), HELD SINCE repeat-next-80b-82 AND BACK SINCE
+ * money-next-moves-100: `payment-matches` starts it second, and "It went through" starts it on the line.
  *
- * WHY IT IS HELD. As batch 80 shipped it, it wrote "Last paid" and "Last amount" and left "Next" where it was, since
- * the day after is the walk's arithmetic (`cycleOn` in `scripts/settle.js`), which a sandbox does not hold and a
- * rule's grammar cannot work out. A line left so is wrong twice: its day passes and it reads late though it was paid,
- * and next month's payment is more than ten days from the day it still names, so `match_payment` no longer finds it.
- * A line a payment never marked is at least asked about once and found again when its day is moved.
+ * IT WAS HELD because it wrote "Last paid" and "Last amount" and left "Next", the walk's arithmetic, where it was: the
+ * line read late though paid, and next month's payment fell out of `match_payment`'s ten days. IT IS BACK because the
+ * host now hands the walk's own step, `ctx.cycle(day, line)` over the kernel's `cycleAfter`, in this same sandbox. So
+ * it writes all three or nothing, as the held note said: "Next" one cycle on from the day the line names, "Last paid"
+ * and "Last amount", in one write through `settle`. No `ctx.cycle`, or no later day, writes nothing and says so, and
+ * `settle` is never handed `null`, the one way it keeps a payment on a line it does not move.
  *
- * SO IT WRITES BOTH OR NEITHER. It takes the day as `input.next` and hands it to `settle`, which moves "Next" and
- * keeps the payment in one write, and only to a day later than the one the line names. Handed no day it writes
- * nothing and says so. It is never handed `next: null`, the one way `settle` keeps a payment on a line it does not
- * move.
+ * IT FINDS THE LINE AGAIN, since a step is handed the id of the job before it and never its answer: `match_payment`'s
+ * own search, its writes and words held back, then `settle` for that one repeating line. A bill or an instalment is
+ * marked by its link, and several things that fit are left, so this ends without a word for them.
  *
- * WHAT WOULD LET IT BACK IN: the day worked out where the line is read. A step's `input` is text alone and the rule
- * starts on the payment, not on the line, so the flow cannot fill it in; the sandbox has to offer the walk's own
- * `cycleAfter` for a line, or the kernel has to run the move itself.
- *
- * IT FINDS THE LINE AGAIN, BECAUSE NO STEP CAN BE HANDED IT. Measured in the kernel's flow: a `script` step puts the
- * id of the job it queued under its `as` name and never what the script answered. So this script is the two texts
- * Money already ships, run one after the other in one sandbox: `match_payment`'s own search, with its writes and its
- * words held back so it changes and says nothing a second time, and then `settle`'s own run for the line it found.
- *
- * ONLY A REPEATING LINE, AND ONLY THE ONE THE MATCH LINKS BY ITSELF. A bill or an instalment is marked by the link
- * `match_payment` writes (`payment-settles`, `instalment-settles`), so this ends without a word for them.
- *
- * A PAYMENT A LITTLE OFF THE LINE'S AMOUNT IS `settle`'S OWN QUESTION ("Change the line?"), handed on as it is: both
- * of its answers carry the change, so picking one writes it.
+ * NOTHING ASKS BY ITSELF. A payment more than 2% off the line's amount is not counted on it (`quiet`), and one sentence
+ * says so in the payment's note, where it has none, and in the run. Payments already in the record are not matched:
+ * REC-B11 step 7 is not built. "IT WENT THROUGH" IS `settle` TOLD (`told`), a person's answer: "Next" moves one cycle
+ * on and nothing else, and not at all on a line no longer past its day, which its payment moved since it was asked.
  */
 export const SETTLE_LINE_SCRIPT = {
   script: 'settle_matched_line',
@@ -269,21 +263,49 @@ export const SETTLE_LINE_SCRIPT = {
   egress: [],
   keys: [],
   reads: ['obligations', 'installments', 'recurring', 'transactions'],
-  writes: ['recurring'],
+  writes: ['recurring', 'transactions'],
   source: `${matchPayment.toString()}
 ${settle.toString()}
 const find = ${matchRun.toString()};
-const mark = ${settleRun.toString()};
+const LEG = ${JSON.stringify(LINE_LEG)};
 export default async function run(ctx) {
   const input = ctx.input && typeof ctx.input === 'object' ? ctx.input : {};
   const over = (more) => Object.create(ctx, Object.fromEntries(Object.entries(more).map(([name, value]) => [name, { value }])));
-  const found = await find(over({ input: { payment: input.payment, asks: 'linked' }, update: () => {}, log: () => {} }));
-  if (!found || found.ask || found.list !== 'recurring') return null;
-  if (typeof input.next !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(input.next)) {
-    ctx.log('This repeating line was handed no day to move to, so nothing on it changed.');
-    return null;
+  const shaped = (at, row) => ({ list: at.split('#')[0], id: row.id, spoken: at, version: row.version, fields: row.fields });
+  const say = (words) => (ctx.log(words), null);
+  const unmoved = 'This repeating line was handed no day to move to, so nothing on it changed.';
+  /* THE WALK'S DAY, OR NONE: a line it cannot step, or a step that failed. */
+  const dayAfter = (fields) => Promise.resolve().then(() => ctx.cycle(fields.next_due, { leg: LEG, fields })).then((d) => (typeof d === 'string' ? d : undefined), () => undefined);
+  const write = (out, at) => {
+    if (!out.writes) return say(out.nothing || out.left || 'Nothing was asked, and nothing on the line changed.');
+    for (const w of out.writes) ctx.update(w.id, w.fields, w.version);
+    ctx.log(out.said);
+    return { settled: at };
+  };
+
+  if (input.answer === 'It went through') {
+    const at = input.register === 'recurring' && Number.isSafeInteger(input.seq) ? 'recurring#' + input.seq : null;
+    const row = at ? await ctx.record.get(at) : null;
+    if (!row) return say('The answer named no repeating line, so nothing moved.');
+    if (typeof ctx.cycle !== 'function') return say(unmoved);
+    const today = typeof ctx.today === 'function' ? await ctx.today() : undefined;
+    return write(settle(shaped(at, row), null, { told: true, next: await dayAfter(row.fields), today }), at);
   }
-  return mark(over({ input: { payment: input.payment, item: found.matched, next: input.next } }));
+
+  const found = await find(over({ input: { payment: input.payment }, update: () => {}, log: () => {} }));
+  if (!found) return null;
+  /* ONE LINE, FOUND BY ITSELF OR OFFERED ALONE: an offer of one line is a line whose amount is off. */
+  const offered = found.ask ? found.ask.options.filter((o) => o.id !== 'none') : [];
+  const at = found.ask ? (offered.length === 1 && /^recurring-\\d+$/.test(offered[0].id) ? offered[0].id.replace('-', '#') : null) : found.list === 'recurring' ? found.matched : null;
+  if (!at) return null;
+  if (typeof ctx.cycle !== 'function') return say(unmoved);
+  const [paymentRow, lineRow] = [await ctx.record.get(input.payment), await ctx.record.get(at)];
+  if (!paymentRow || !lineRow || !Number.isSafeInteger(paymentRow.seq)) return null;
+  const payment = shaped('transactions#' + paymentRow.seq, paymentRow);
+  const out = settle(shaped(at, lineRow), payment, { next: await dayAfter(lineRow.fields), quiet: true });
+  /* SAID ON THE PAYMENT, WHERE IT HOLDS NO NOTE OF ITS OWN: a person's words are never written over. */
+  if (out.left && !(typeof payment.fields.note === 'string' && payment.fields.note.trim() !== '')) ctx.update(payment.spoken, { note: out.left }, payment.version);
+  return write(out, at);
 }`,
 };
 
@@ -299,7 +321,7 @@ export default async function run(ctx) {
  * EACH NAMES THE RULE THAT ASKED AND THE ANSWER BY ITS WORDS. A rule's options are words whose ids are their places
  * (`o1`, `o2`), so the words are what an author can write, and a trigger naming words the question does not offer would
  * install and never start: the options here are `invoice-late`'s and `recurring-missed`'s, letter for letter. "Not yet"
- * and "It went through" start nothing; the question's `once_per` is what decides when it is asked again.
+ * starts nothing; the question's `once_per` is what decides when it is asked again.
  */
 export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
   {
@@ -328,6 +350,15 @@ export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
     /* ENDED, THE STATE EVERY READER OF `recurring` ALREADY LEAVES OUT: the walk, the monthly figures and the page. */
     steps: [{ move: 'ended' }],
   },
+  /* "IT WENT THROUGH" MOVES "NEXT" ONE CYCLE ON (REC-B11 step 5, money-next-moves-100), through `settle` told there is
+     no payment (`SETTLE_LINE_SCRIPT`), on the line the question names, handed as its list and number. */
+  {
+    rule: 'recurring-went-through',
+    name: 'Move a repeat that went through on to its next day',
+    pack: 'money-core',
+    on: { decided: { about: 'rule.recurring-missed', option: 'It went through' } },
+    steps: [{ script: { id: SETTLE_LINE_SCRIPT.script, as: 'moving', input: { answer: '{{trigger.option}}' } } }],
+  },
   /* AND ONE SCRIPT, ONCE A DAY, SINCE money-core 3.16.0: the question about lines on a month's last day (REC-B13,
      `scripts/last-day.js`). A rule cannot ask it, since one question for many lines is no `once_per` of one row; the
      script files it with its cause, and picking an answer writes `day_of_month` on each line through the gate, so no
@@ -352,9 +383,8 @@ export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
    * BOTH THINGS ARE HANDED BY THEIR IDS, the only name a step can fill in: an entry holds the bill it settles as an id,
    * and nothing a run fills says a handle ("obligations#4").
    *
-   * NO `next`, BECAUSE A BILL HAS NONE. It is the day a repeating line moves to, and nothing links a payment to a
-   * repeating line: "Settles" points at Bills alone. An instalment's "Paid by" is written by `payment-matches` below.
-   * A line's "Last paid" and "Last amount" are written by nothing yet (`SETTLE_LINE_SCRIPT` above, held).
+   * NO `next`, BECAUSE A BILL HAS NONE: "Settles" points at Bills alone. An instalment's "Paid by", and a repeating
+   * line's "Next", "Last paid" and "Last amount", are written by `payment-matches` below.
    */
   {
     rule: 'payment-settles',
@@ -383,16 +413,11 @@ export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
    * and a payment that clears later is looked for the day it clears. No `once_per`: a second run for an entry already
    * linked finds the link and looks no further, and a question asked again joins the one open by its cause.
    *
-   * A REPEATING LINE IS FOUND AND SAID, AND NOT MARKED (repeat-next-80b-82). It holds no link, so the script writes
-   * nothing for it and says the line in its run. The second step batch 80 gave this rule kept the payment on the line
-   * and could not move its "Next", which left a paid line reading late and out of next month's reach, so the step is
-   * held (said above `SETTLE_LINE_SCRIPT`). The line's day is a person's to move, as it was, and `recurring-missed`
-   * asks about it once its day has gone.
-   *
-   * SO NO QUESTION IS ASKED WHILE ONE OF ITS ANSWERS WOULD BE A REPEATING LINE (`asks: 'linked'`). Measured: an answer
-   * that names a bill or an instalment writes its link and the thing is marked paid, and one that names a repeating
-   * line writes nothing at all. Several things that fit with a line among them is left as it is, said in the run, until
-   * the rule for an answer exists; several bills or instalments is still asked.
+   * A REPEATING LINE HOLDS NO LINK, so the search writes nothing for it, and the second step, `script.settle_matched_line`
+   * (back since money-next-moves-100), finds it again and moves "Next" with "Last paid" and "Last amount", or writes
+   * nothing (said above `SETTLE_LINE_SCRIPT`). SO NO QUESTION IS ASKED WHILE ONE OF ITS ANSWERS WOULD BE A REPEATING
+   * LINE (`asks: 'linked'`): an answer naming one would write nothing. Several things that fit with a line among them
+   * are left as they are, said in the run; several bills or instalments are still asked.
    */
   {
     rule: 'payment-matches',
@@ -400,9 +425,13 @@ export const MONEY_AUTOMATIONS: Record<string, unknown>[] = [
     pack: 'money-core',
     on: { written: { register: 'transactions', op: ['create', 'update'], fields: ['state', 'settles'] } },
     when: 'state is cleared, settles is empty',
-    steps: [{ script: { id: 'match_payment', as: 'matching', input: { payment: '{{trigger.entry}}', asks: 'linked' } } }],
+    steps: [
+      { script: { id: 'match_payment', as: 'matching', input: { payment: '{{trigger.entry}}', asks: 'linked' } } },
+      { script: { id: SETTLE_LINE_SCRIPT.script, as: 'moving', input: { payment: '{{trigger.entry}}' } } },
+    ],
   },
   MATCH_PAYMENT_SCRIPT,
+  SETTLE_LINE_SCRIPT,
   {
     rule: 'instalment-settles',
     name: 'Mark an instalment paid by its payment',

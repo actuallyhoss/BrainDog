@@ -25,6 +25,7 @@ import type { BlockResult as Answer } from '@braindog/kernel';
 
 import { amountOf, currencyOf } from './money.ts';
 import { isGlyph, type IconName } from '../ui/icons.ts';
+import type { RunPresence } from '../ui/presence-words.ts';
 import { copy } from '../copy.ts';
 /* No cycle: `voice.ts` reads the copy and two word lists, never this file. */
 import { singularOf } from '../voice.ts';
@@ -1437,6 +1438,8 @@ export type BlockResult = PageBlock & {
    * `QUIET_MS` (`isQuiet`). A card grid draws such a run dimmed.
    */
   quiet?: boolean[] | undefined;
+  /** On `sessions.live`, aligned with `entries`: the one word each run reads as (the kernel's `presenceOf`). */
+  presence?: RunPresence[] | undefined;
   metrics?: Metric[] | undefined;
   /** On a block that inherits: how many of `entries`, at the end, apply everywhere rather than to the project. */
   inherited?: number;

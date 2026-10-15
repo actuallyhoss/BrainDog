@@ -406,6 +406,8 @@ importers:
 
   packs/estate: {}
 
+  packs/flow-check: {}
+
   packs/harbour-look: {}
 
   packs/hello: {}
@@ -425,6 +427,8 @@ importers:
   packs/money-watch: {}
 
   packs/pad: {}
+
+  packs/pad-second-opinion: {}
 
   packs/people: {}
 

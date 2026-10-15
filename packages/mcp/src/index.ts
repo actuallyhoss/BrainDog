@@ -225,7 +225,7 @@ export type McpSurface<C> = {
    * sent (the record's `tryAutomation`). READ+, and optional for `scriptTry`'s reason: it
    * backs only `propose`'s `try` on a rule change, and a surface without it answers that `NOT_IN_THIS_BUILD`.
    */
-  tryAutomation?(args: { body: Record<string, unknown>; sample?: unknown }, ctx: C): Answer;
+  tryAutomation?(args: { body: Record<string, unknown>; sample?: unknown; step?: string; given?: Record<string, unknown> }, ctx: C): Answer;
   /**
    * What arrived and no rule filed, in one state or all of them, with a count for each. The record's own rung, which is
    * the owner and a token its owner gave the `inbox` reach, and optional for the command line's reason above: its surface
@@ -1631,10 +1631,18 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
    */
   const automationTry = async (body: Record<string, unknown>, rule: Record<string, unknown>, ctx: C): Answer => {
     const said = body.try;
-    if (said !== true && !(isObject(said) && Object.keys(said).every((k) => k === 'sample')))
-      return { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: 'try is true, or {"sample": {...}} to start the rule from a row, an arrival or a figure. To run an installed rule again, send {"again": true} with to naming it by its id alone.', at: 'body.try' } };
+    if (said !== true && !(isObject(said) && Object.keys(said).every((k) => k === 'sample' || k === 'step' || k === 'given')))
+      return { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: 'try is true, or {"sample": {...}} to start the rule from a row, an arrival or a figure, "step": "steps[2]" to test one step. To run an installed rule again, send {"again": true} with to naming it by its id alone.', at: 'body.try' } };
     if (!surface.tryAutomation) return unbuilt('a trial', 'Send the change without try, and the owner reads what it would do in Decide.');
-    const tried = await surface.tryAutomation({ body: rule, ...(isObject(said) && said.sample !== undefined ? { sample: said.sample } : {}) }, ctx);
+    const tried = await surface.tryAutomation(
+      {
+        body: rule,
+        ...(isObject(said) && said.sample !== undefined ? { sample: said.sample } : {}),
+        ...(isObject(said) && typeof said.step === 'string' ? { step: said.step } : {}),
+        ...(isObject(said) && isObject(said.given) ? { given: said.given } : {}),
+      },
+      ctx,
+    );
     return tried.ok ? { ok: true, value: { automation_try: tried.value, proposed: false } } : tried;
   };
 

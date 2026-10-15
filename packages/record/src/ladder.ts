@@ -28,6 +28,7 @@ import {
   SLASH,
   ceilingOf,
   endedByCutOff,
+  keysOfStamp,
   kindsOfWrite,
   ladderAgentOf,
   madeByIn,
@@ -75,6 +76,25 @@ const DROP_SAID = {
   owner: 'You put it back to asking.',
 } as const;
 export type DropWhy = keyof typeof DROP_SAID;
+
+/**
+ * The verb of an attach (ENG-B15): a name in a text put on the row it is, by the sentence it was seen in. It is the
+ * kernel's `ATTACH` (`change-kind.ts`), said here until the kernel's index hands it out, and a test holds the two equal.
+ */
+export const ATTACH_VERB = 'attach';
+
+/** The rest of a sentence for an attach, whoever makes it: what the owner is asked to let it do (`kindWords`). */
+const ATTACH_SAID = 'put a name on the right person';
+
+/**
+ * What an offer still waiting is answered with when its kind is taken back: the reason as `standing` says it, and that
+ * it asks again. An attach says what it will ask before, in its own words, and Slash is said by its name.
+ */
+const withdrawn = (agent: string, kind: string, why: DropWhy | undefined): string => {
+  if (kind.slice(kind.indexOf(':') + 1) !== ATTACH_VERB) return 'A change of this kind was taken back, so it asks again before it does this.';
+  const said = why === undefined ? 'A name it put on someone was taken back.' : DROP_SAID[why];
+  return `${said} ${agent === SLASH ? 'Slash' : 'It'} asks again before it puts a name on anyone.`;
+};
 
 /** The day field a list of learnings fades its rows by, which is how one is told from any other list (`learnt`). */
 const FADES = 'confirmed_on';
@@ -415,7 +435,7 @@ export function ladder(deps: LadderDeps) {
     for (const [id, o] of prefsOf(OFFERS)) {
       if (o.agent !== agent || (kinds !== null && (typeof o.kind !== 'string' || !dropped.has(o.kind)))) continue;
       if (kernel.governanceRow('suggestion', id)?.status === 'open')
-        kernel.decide(id, { resolved_as: 'wont-fix', reason: 'A change of this kind was taken back, so it asks again before it does this.' }, LADDER_RULE);
+        kernel.decide(id, { resolved_as: 'wont-fix', reason: withdrawn(agent, typeof o.kind === 'string' ? o.kind : '', why) }, LADDER_RULE);
       kernel.setPref(OFFERS, id, null);
     }
   };
@@ -473,10 +493,20 @@ export function ladder(deps: LadderDeps) {
     if (waiting) return;
     const doing = kindWords(k, names.list);
     const who = names.agent;
+    /* SLASH IS ASKED ABOUT BY ITS NAME, FIRST. It holds no grant a person connected, so "has made changes" names
+       nothing he gave it: the question is what it may do, and the count is the questions it asked him. */
+    const slash = agent === SLASH;
     const question =
       next === 'tell'
-        ? `${who} has made ${OFFER_AFTER} changes like this and you kept them all. Let it ${doing} without asking?`
-        : `${who} has done this ${OFFER_AFTER} times on its own and you kept them all. Let it ${doing} without telling you?`;
+        ? slash
+          ? `Let ${who} ${doing} without asking? It asked ${OFFER_AFTER} times and you kept every one.`
+          : `${who} has made ${OFFER_AFTER} changes like this and you kept them all. Let it ${doing} without asking?`
+        : slash
+          ? `Let ${who} ${doing} without telling you? It did this ${OFFER_AFTER} times on its own and you kept every one.`
+          : `${who} has done this ${OFFER_AFTER} times on its own and you kept them all. Let it ${doing} without telling you?`;
+    /* AN ATTACH THAT LANDS IS LISTED under Matched for you with its Undo, so that is where the owner is told it is. */
+    const attach = k.verb === ATTACH_VERB;
+    const keeps = attach ? 'Each one is listed under Matched for you with its Undo.' : 'Every change keeps its Undo.';
     const filed = kernel.propose(
       {
         question,
@@ -487,7 +517,7 @@ export function ladder(deps: LadderDeps) {
             {
               id: 'yes',
               label: next === 'tell' ? 'Do and tell' : 'Do quietly',
-              because: next === 'tell' ? `It will ${doing} on its own and say so. Every change keeps its Undo.` : `It will ${doing} on its own without a line each time. Every change keeps its Undo.`,
+              because: next === 'tell' ? `It will ${doing} on its own and say so. ${keeps}` : `It will ${doing} on its own without a line each time. ${keeps}`,
             },
             { id: 'no', label: 'Keep asking', because: next === 'tell' ? `It asks before it does this, as now.` : `It keeps telling you each time, as now.` },
           ],
@@ -522,6 +552,26 @@ export function ladder(deps: LadderDeps) {
 
   /** Who climbs for a question's filer: a grant, or Slash, and `null` for a person, a rule or the system. */
   const agentOfActor = (actor: string): string | null => (actor === SLASH ? SLASH : ladderAgentOf(sql, actor));
+
+  /**
+   * Who asked for what a batch the ladder landed wrote, and the kinds it asked for, or `null` for a batch that is not
+   * one. SLASH'S QUESTION IS LANDED UNDER THE LADDER'S NAME (`LADDER_RULE`), since a model writes nothing but what it
+   * proposes, so an Undo of an attach that landed alone finds no agent in its own lines: this is how the Undo still
+   * takes Slash's rung back (ENG-B15, "always undoable"). THE KINDS ARE THE QUESTION'S STAMP, worked out when it was
+   * asked: read from its body now, the line it added is already there and an attach reads as the edit it is not.
+   */
+  const landed = (batch: string): { agent: string; kinds: string[] } | null => {
+    const asked = sql.one<{ opened_by: string; kind: string | null }>(
+      `SELECT s.opened_by AS opened_by, s.kind AS kind FROM event q JOIN suggestion s ON q.target = 'suggestion:' || s.id
+        WHERE q.batch = ? AND q.kind = 'resolve' AND q.actor = ? LIMIT 1`,
+      batch,
+      LADDER_RULE,
+    );
+    if (asked === undefined) return null;
+    const agent = agentOfActor(asked.opened_by);
+    if (agent === null) return null;
+    return { agent, kinds: keysOfStamp(asked.kind) };
+  };
 
   /* ── where every agent stands, read back ────────────────────────────── */
 
@@ -656,7 +706,7 @@ export function ladder(deps: LadderDeps) {
     return { agent: plain(after ?? found) };
   };
 
-  return { standing, takeBack, importsFound, adopt, importActors, grantOf, untrusted, markUntrusted, gate, rungFor, noteFault, kept, declined, drop, anomaly, clientChanged, answered, agentOfActor };
+  return { standing, takeBack, importsFound, adopt, importActors, grantOf, untrusted, markUntrusted, gate, rungFor, noteFault, kept, declined, drop, anomaly, clientChanged, answered, agentOfActor, landed };
 }
 
 /** The floors as a person reads them, each the start of a sentence. */
@@ -681,10 +731,12 @@ export function aboutOf(said: string): string {
 
 /**
  * One kind of change as the rest of a sentence: "mark tasks done", "add tasks", "change projects". The list by the name
- * its owner gave it, lower case, as a sentence carries it.
+ * its owner gave it, lower case, as a sentence carries it. An attach is "put a name on the right person", whichever list
+ * it puts it on, since the name is what the owner was asked about.
  */
 export function kindWords(k: ChangeKind, listName: (id: string) => string): string {
   const list = k.list === null ? '' : listName(k.list).toLowerCase();
+  if (k.verb === ATTACH_VERB) return ATTACH_SAID;
   if (k.verb.startsWith('move:')) return `mark ${list} ${k.verb.slice('move:'.length).replace(/[_-]+/gu, ' ')}`;
   switch (k.verb) {
     case 'add':

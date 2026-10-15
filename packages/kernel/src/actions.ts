@@ -144,6 +144,12 @@ export type ActionRequest = {
   /** Which key to send, by reference. The executor opens it outside the record, or sends nothing. */
   grant: { id: string; label: string } | null;
   /**
+   * What `grant`'s vault entry says it opens, the words and never the value, so the executor can refuse a request whose
+   * host is not the one the key opens BEFORE it opens the key (`hostOpened`). Absent with no key, and on a request built
+   * before it was carried, which is held to nothing new.
+   */
+  opens?: string;
+  /**
    * How the executor sends the key, when it is not a bearer: in a header or a query parameter of this `name`, or as a
    * basic pair. Absent is a bearer. The executor builds it with `@braindog/connect`'s auth builder, the one place a
    * credential meets a request.
@@ -269,7 +275,10 @@ export function actionJitterMs(recordId: string, pack: string | null, action: st
 
 /* ── firing a row ───────────────────────────────────────────────────────── */
 
-type Key = { id: string; label: string; sealed_under: 'record' | 'connector' };
+type Key = { id: string; label: string; sealed_under: 'record' | 'connector'; opens?: string };
+
+/** A key as a request names it: the reference and which data key sealed it, without what it opens. */
+const referenceOf = ({ opens: _opens, ...reference }: Key): Omit<Key, 'opens'> => reference;
 
 /**
  * A vault row as far as choosing among several needs it: `kernel.grants()` hands every one of these columns.
@@ -318,8 +327,10 @@ const liveNamed = <R>(sql: Sql, columns: string, name: string): (R & GrantChoosa
 /** The key a scheduled action names, by label or id, and never one that was revoked. The row, never its bytes. */
 export function keyNamed(sql: Sql, name: string | undefined): Key | null {
   if (name === undefined || name === '') return null;
-  const found = grantChosen(liveNamed<Key>(sql, 'sealed_under', name), name);
-  return found === undefined ? null : { id: found.id, label: found.label, sealed_under: found.sealed_under };
+  const found = grantChosen(liveNamed<Key & { opens: string | null }>(sql, 'sealed_under, opens', name), name);
+  if (found === undefined) return null;
+  /* WHAT IT OPENS RIDES WITH IT, the words a person typed, so the host holds the key to its own host. Never a value. */
+  return { id: found.id, label: found.label, sealed_under: found.sealed_under, ...(typeof found.opens === 'string' ? { opens: found.opens } : {}) };
 }
 
 /**
@@ -357,6 +368,18 @@ export function hostOpened(opens: unknown): string | null {
 }
 
 /**
+ * The host a key is held to (SHL-C05): `hostOpened`, and only a name with a dot or a colon in it.
+ *
+ * ONE WORD IS A NAME, NOT A HOST. An entry that says "Stripe" or "Bake" parses as the host `stripe`, which no action
+ * can call, so holding the key to it would refuse every send of it; it names no host, and its first approval pins one.
+ * The host's executor reads `opens` the same way.
+ */
+export function heldHost(opens: unknown): string | null {
+  const host = hostOpened(opens);
+  return host !== null && /[.:]/.test(host) ? host : null;
+}
+
+/**
  * Whether a scheduled run could ever open this key, said at the moment somebody approves it.
  *
  * THE CHECK BELONGS BEFORE THE PRESS AND NOT AT THE FIRST RUN. `sealedGrant` refuses a key sealed
@@ -374,20 +397,113 @@ export const runnerCannotOpen = (key: Key): string | null =>
     : `The key "${key.label}" was added for you to use, not for a connector. Add it again under the connector before accepting, or this action will be approved and never run.`;
 
 /**
- * The one sentence that says what a key reaches, appended to an approval list when any line sends one.
+ * The sentence an approval list used to end with when any line sent a key.
  *
- * ONCE, AT THE END, AND NOT UNDER EVERY LINE. It is the same fact about the record however many
- * actions are being approved, and a list that repeats it four times is a list people stop reading —
- * which costs exactly the thing the line is for. `§2.7`: every key counts as global until scope on
- * credentials is built, and the screen says so in words.
+ * NO LONGER SAID (SHL-C05). A key is held to its own project or to every project at declaration (`keyOutOfScope`) and
+ * to its own host when it is sent, so "any action can send any key" stopped being true. KEPT EXPORTED, UNUSED, until the
+ * index stops re-exporting it, so a reader that filtered it out (`arrange.ts`) filters nothing rather than failing.
  */
 export const KEYS_REACH_ALL = 'Keys are not kept per project yet, so any action in this record can send any key it names.';
 
-/** An approval list, with that sentence added when anything in it sends a key. */
-export const approvalLines = (egress: readonly Pick<Egress, 'key' | 'line' | 'key_line'>[]): string[] => {
+/**
+ * Who else can open a key a scheduled action sends, said once at the end of an approval list.
+ *
+ * ONCE, AT THE END, AND NOT UNDER EVERY LINE, for the reason the old sentence was: it is the same fact however many
+ * actions are approved. It is the true one now. A scheduled run opens its key with nobody there, so whatever server runs
+ * it can open it as well, and that is the honest edge of "we cannot read your record" (D0b.54).
+ */
+export const KEY_OPENED_UNATTENDED = 'A scheduled action opens this key with nobody present, so the server that runs it can open it too.';
+
+/** The same sentence on a record whose vault has a passphrase on: the passphrase guards a person's own keys, not this one. */
+export const KEY_OPENED_UNATTENDED_PASSPHRASE =
+  'A scheduled action opens this key with nobody present, so the server that runs it can open it too, and your vault passphrase does not cover it.';
+
+/**
+ * An approval list, ending with who else can open a key when anything in it sends one.
+ *
+ * `passphrase` IS THE CALLER'S TO SAY, because whether the record's key is wrapped by a passphrase is the vault's fact
+ * (`recordWrapping`), and this function reads nothing. Left out, the sentence says nothing about one.
+ */
+export const approvalLines = (
+  egress: readonly Pick<Egress, 'key' | 'line' | 'key_line'>[],
+  opts: { passphrase?: boolean } = {},
+): string[] => {
   const lines = egress.flatMap((e) => (e.key_line === null ? [e.line] : [e.line, e.key_line]));
-  return egress.some((e) => e.key !== null) ? [...lines, KEYS_REACH_ALL] : lines;
+  if (!egress.some((e) => e.key !== null)) return lines;
+  return [...lines, opts.passphrase === true ? KEY_OPENED_UNATTENDED_PASSPHRASE : KEY_OPENED_UNATTENDED];
 };
+
+/**
+ * The projects a key is kept for, read from the row that holds its vault entry: `null` is every project, and `undefined`
+ * is that no row says, which a caller reads as every project too (`§2.7`, a key with no scope counts as global).
+ *
+ * `holders` IS THE CALLER'S: each register with a secret field and a scope field, and that scope field's id. The kernel's
+ * registers are the index's to know, and naming them keeps the read to those lists and not the whole record. A key is a
+ * row's secret field holding the grant's id (`depositGrant`), so the row whose fields hold that id is the key's.
+ *
+ * NOTHING SECRET IS READ: the grant's id, by its label, and the row's fields, where the secret field holds only the id.
+ */
+export function keyScopeOf(sql: Sql, label: string, holders: ReadonlyMap<string, string>): readonly string[] | null | undefined {
+  if (label === '' || holders.size === 0) return undefined;
+  const grant = grantChosen(liveNamed<{ kind: string }>(sql, 'kind', label), label);
+  if (grant === undefined) return undefined;
+  const lists = [...holders.keys()];
+  const rows = sql.all<{ register: string; fields: string }>(
+    `SELECT e.register, e.fields FROM entry e WHERE e.deleted_at IS NULL AND e.register IN (SELECT value FROM json_each(?))
+       AND EXISTS (SELECT 1 FROM json_each(e.fields) j WHERE j.value = ?)`,
+    JSON.stringify(lists),
+    grant.id,
+  );
+  if (rows.length === 0) return undefined;
+  const kept = new Set<string>();
+  for (const row of rows) {
+    let fields: Record<string, unknown>;
+    try {
+      fields = JSON.parse(row.fields) as Record<string, unknown>;
+    } catch {
+      continue;
+    }
+    const held = fields[holders.get(row.register) ?? ''];
+    for (const p of Array.isArray(held) ? held : [held]) if (typeof p === 'string' && p !== '') kept.add(p);
+  }
+  return kept.size === 0 ? null : [...kept];
+}
+
+/** Why an action may not name the key it names: the code, the sentence with the fix, and the field. */
+export type KeyOutOfScope = { code: 'FORBIDDEN'; fix: string; at: 'grant' };
+
+/**
+ * Whether an action names a key kept for another project, said at declaration: `null` is fine.
+ *
+ * AN ACTION IN PROJECT P MAY NAME A KEY KEPT FOR P OR FOR EVERY PROJECT, and nothing else ("within that key's scope",
+ * D0b.23). An action for every project may name only a key for every project, since a key kept for one project is
+ * offered only there. A key no row places counts as every project's, as the vault list says it.
+ *
+ * `FORBIDDEN` FOR NOW, the nearest code the registry holds: `KEY_OUT_OF_SCOPE` is the code this is, and it waits on the
+ * registry (`packages/ports`). Names, never ids: `nameOf` says a project, and one it cannot name is "another project".
+ */
+export function keyOutOfScope(
+  egress: Pick<Egress, 'ingest' | 'key' | 'project'>,
+  scopeOf: (label: string) => readonly string[] | null | undefined,
+  nameOf?: (project: string) => string | null,
+): KeyOutOfScope | null {
+  if (egress.key === null) return null;
+  const kept = scopeOf(egress.key);
+  if (kept === undefined || kept === null || kept.length === 0) return null;
+  if (egress.project !== null && kept.includes(egress.project)) return null;
+  const named = (p: string): string => {
+    const name = nameOf?.(p);
+    return name ? `the project ${name}` : 'another project';
+  };
+  const where = joinedList([...new Set(kept.map(named))]);
+  const runs = egress.project === null ? 'runs for every project' : `runs for ${named(egress.project)}`;
+  const instead = egress.project === null ? 'a key kept for every project' : `a key kept for ${named(egress.project)} or for every project`;
+  return {
+    code: 'FORBIDDEN',
+    fix: `${egress.ingest || 'This action'} ${runs} and names the key "${egress.key}", which is kept for ${where} only. Name ${instead}, or move the key.`,
+    at: 'grant',
+  };
+}
 
 /** Why a key cannot carry an approval, and what to do: the code and the sentence, or `null` for fine. */
 export type KeyNotReady = { code: 'REQUIRED_MISSING' | 'OUT_OF_BOUNDS'; fix: string };
@@ -767,7 +883,9 @@ export function prepareAction(deps: ActionDeps, job: OutboxRow): Ready | Paged |
       origin,
       headers: { accept: 'application/json', ...(body === undefined ? {} : { 'content-type': 'application/json' }) },
       ...(body === undefined ? {} : { body }),
-      grant: key,
+      /* THE KEY BY REFERENCE, and what its entry opens beside it rather than in it, so `grant` stays the reference it was. */
+      grant: key === null ? null : referenceOf(key),
+      ...(key?.opens === undefined ? {} : { opens: key.opens }),
       ...(auth === undefined ? {} : { auth }),
       timeoutMs: ACTION_TIMEOUT_MS,
       maxBytes: ACTION_MAX_BYTES,
@@ -1572,9 +1690,9 @@ export type Egress = {
   /** The diff's own sentence: `CALLS OUT <host> · every <n> · grant "<label>"`, and the trigger and fields when there are any. */
   line: string;
   /**
-   * An action sending a key gets a line of its own (question 8). Keys are not kept per project yet, so every key is
-   * one any action in the record can send, and approving this line is agreeing to that. A project's action says so
-   * naming the project, because that is where the mismatch is easiest to miss.
+   * An action sending a key gets a line of its own (question 8). A project's action names the project and the key, and
+   * says when the key is kept for every project (H.762); a key whose vault entry names no host says the host this
+   * approval pins it to. `null` when there is neither.
    */
   key_line: string | null;
 };
@@ -1602,7 +1720,12 @@ const joinedList = (items: readonly string[]): string =>
  * The other is `opensOf`, what a vault label's live entry opens, which a script's line names beside each key
  * (`scriptEgress`); an action has one host and says it already.
  */
-export function egressOf(body: unknown, nameOf?: (project: string) => string | null, opensOf?: (label: string) => string | null): Egress | null {
+export function egressOf(
+  body: unknown,
+  nameOf?: (project: string) => string | null,
+  opensOf?: (label: string) => string | null,
+  scopeOf?: (label: string) => readonly string[] | null | undefined,
+): Egress | null {
   if (body === null || typeof body !== 'object' || Array.isArray(body)) return null;
   if (typeof (body as { script?: unknown }).script === 'string') return scriptEgress(body as ScriptHeader, opensOf);
   if (typeof (body as { digest?: unknown }).digest === 'string') return digestEgress(body as DigestHeader);
@@ -1629,20 +1752,23 @@ export function egressOf(body: unknown, nameOf?: (project: string) => string | n
       ? `every ${every ?? ''}`
       : `${trigger === 'both' ? `every ${every ?? ''} and ` : ''}when a rule runs it, at most ${RULE_CALLS_PER_DAY} a day`;
   const line = `CALLS OUT ${host ?? 'no host declared'} · ${when} · grant "${key ?? 'none'}"${sends.length ? ` · sends ${sends.join(', ')}` : ''}`;
-  /* A PROJECT'S ACTION GETS A LINE OF ITS OWN, and a global one does not.
-     The line is worth its space because it names a project and says the key is not confined to it,
-     which is the fact somebody would otherwise have to go and look up. For a global action there
-     is no such fact, and a line saying only what `KEYS_REACH_ALL` already says is one more line
-     between the reader and the hosts.
-
-     AND IT NO LONGER CARRIES THE SCOPE CLAUSE EITHER. It used to end "Keys are not kept per
-     project yet, so any project's action can send this key", which is the same thing
-     `KEYS_REACH_ALL` says at the end of the list. One sentence, one fact: this line names the
-     project and the key, and the list's last line says what a key reaches. */
-  const key_line =
-    project !== null && key !== null
-      ? `${ingest} runs for the project ${nameOf?.(project) ?? project} and sends the key "${key}".`
-      : null;
+  /* A PROJECT'S ACTION GETS A LINE OF ITS OWN, and a global one does not, unless its key is being pinned to a host.
+     The line names the project and the key, which is the fact somebody would otherwise have to go and look up. A key
+     kept for another project never gets this far: `keyOutOfScope` refuses it at declaration. */
+  const said: string[] = [];
+  /* A GLOBAL KEY IN A PROJECT'S ACTION KEEPS ITS OWN LINE (H.762), and says it is kept for every project, because that
+     is the one thing a reader approving a project's action would otherwise assume the other way. `scopeOf` reads the
+     key's row; without one, or for a key no row places, the line says what it always did. */
+  if (project !== null && key !== null)
+    said.push(
+      `${ingest} runs for the project ${nameOf?.(project) ?? project} and sends the key "${key}"${scopeOf?.(key) === null ? ', which is kept for every project' : ''}.`,
+    );
+  /* A KEY WHOSE ENTRY NAMES NO HOST IS PINNED BY THIS APPROVAL to the host this action calls (`pinHost`), so the line
+     says so: from then on the host refuses to send it anywhere else. Only when the vault was asked and holds an entry. */
+  const pinTo = key !== null && host !== null ? hostOpened(host) : null;
+  const opens = pinTo === null || key === null ? null : (opensOf?.(key) ?? null);
+  if (pinTo !== null && opens !== null && heldHost(opens) === null) said.push(`This key will be sent to ${pinTo} only from now on.`);
+  const key_line = said.length === 0 ? null : said.join(' ');
 
   return { ingest, channel: channel as ActionKind, method: channel === 'call' ? 'POST' : 'GET', host, every, trigger, per_day: perDay, key, paged: pages(d as ActionDecl), sends, project, line, key_line };
 }

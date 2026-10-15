@@ -147,7 +147,7 @@ const PAGE = {
     register: 'the list a capture adds to, or the list whose one row inputs edits',
     row: "on inputs, the row it edits by its id, such as checks#1; the list's first row when it says nothing",
     about: 'required over runs_on and read nowhere else: the project it reads, by its row, such as things#1, or {{spoken}} on a page with for:',
-    columns: '[{field, label?}], 1 to 16; on cards, as: title, figure, fact, trend, ring, who, when, mark, next (the first open step under the card, from the list whose steps: {of, done, order?} names it), reply (a quieter line under the title, such as a second opinion), hue (a whole-number field from 0 to 359, drawn only on the card\'s mark) or picture (a file field the card leads with). On a stat or lines over readings, [when, value, name, unit, amount]: the fifth is the reading as money',
+    columns: '[{field, label?}], 1 to 16; on cards, as: title, figure, fact, trend, ring, who, when, mark, next (the first open step under the card, from the list whose steps: {of, done, order?} names it), reply (a quieter line under the title, such as a second opinion), hue (a whole-number field from 0 to 359, drawn only on the card\'s mark) or picture (a file field the card leads with). A card\'s fact, trend or when may name a figure in place of a field, with {{field}} after a colon filled from the card\'s own row: { metric: project-open:{{name}}, as: fact, label: Open } says that figure on each card, up to three facts with the fields. On a stat or lines over readings, [when, value, name, unit, amount]: the fifth is the reading as money',
     stale: '{field, after, figure?} on cards: a card whose day in field is older than after (such as 7d) reads as out of date; figure: a rolled figure with read: as_of and group_by gives each card its own day',
     over_a_list: {
       calendar: 'columns [title field, day or instant field]; back and ahead are whole months either side of this one, 0 to 12, defaults 2 and 0; at most 500 entries, and no limit',
@@ -263,7 +263,7 @@ const REGISTER = {
     search: 'true: the search box reads it',
     deadline: 'true on a day field: the day the row is due',
     remind: 'on a day or instant field, offsets to be told before it, such as ["-1d"]; hours only on an instant',
-    repeat: '{freq, interval?, count?, until?, workday?} on a day or instant field: the day comes again',
+    repeat: '{freq, interval?, count?, until?, workday?: previous|next|none, bymonthday?: [15, -1], byday?: [TU, TH]} on a day or instant field: the day comes again',
     transitions: "on the state field, for each value the values it may move to: {open: {to: [done], requires?: [<fields filled first>], by?: decide}}",
     by: 'decide: once the row is made, only an accepted proposal changes it',
     redact: 'true: the audit log keeps no value of it',

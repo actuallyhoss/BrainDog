@@ -29,6 +29,7 @@ import { credentialKey as credential, credentialValue, NESTED_MOST, nestedPast }
 import { FIRST_PARTY_LISTS, readChanges, type ListWords } from './usecase.ts';
 import { cardsFault } from './cards.ts';
 import { addressFault } from './address.ts';
+import { columnsFault, readAddColumn, type PageColumnAddition } from './add-column.ts';
 export { addressFault, addressFaults, listingFault } from './address.ts';
 import { holdsOf, resolveWhen, settleWhen } from './when.ts';
 export { holdsIn, holdsOf, resolveWhen, settleWhen, type Waiting } from './when.ts';
@@ -181,7 +182,9 @@ export type Extension = { fields?: Record<string, Json>[]; values?: Record<strin
  * One block a pack adds to another pack's page: the page's declaration id, the block as a page's own would say it, and
  * the heading of the page's block it goes after, or last when there is none or the page no longer has it.
  */
-export type PageAddition = { page: string; block: Record<string, Json>; after?: string; note?: string };
+/** One block a pack adds to another pack's page, or one column it adds into a block there (`add-column.ts`). */
+export type PageAddition = { page: string; block: Record<string, Json>; after?: string; note?: string } | PageColumnAddition;
+export { ADD_COLUMNS_MOST, columnsFault, readAddColumn, type PageColumnAddition } from './add-column.ts';
 
 /**
  * Who holds a list's rows, as its `hand:` says: the link field a person is handed a row by, the text field
@@ -530,7 +533,7 @@ export type Diff = {
     sends: string[];
     project: string | null;
     line: string;
-    /** The project action's own approval line, when it sends a key (a key is not kept per project yet). */
+    /** The project action's own approval line, when it sends a key. */
     key_line: string | null;
     /** Against what is installed: a new action, one whose host, key or fields differ, or the same. */
     change: 'new' | 'changed' | 'same';
@@ -1299,7 +1302,7 @@ function readExtends(pack: string, raw: unknown, declared: ReadonlySet<string>):
 export const ADDS_MOST = 16;
 
 /** The keys one addition may carry. `note` is legal on everything a pack says (`04 §2`). */
-const ADDITION_KEYS = ['page', 'block', 'after', 'note'];
+const ADDITION_KEYS = ['page', 'block', 'after', 'note', 'into', 'column'];
 
 /**
  * A pack's `adds`, read: each block it adds to another pack's page, or the refusal naming the part that is wrong.
@@ -1322,6 +1325,13 @@ function readAdds(pack: string, raw: unknown, declared: ReadonlySet<string>): Re
     if (typeof page !== 'string' || !page.startsWith('page.') || !NAME.test(page.slice('page.'.length)))
       return malformed(`${String(page)} is not a page id: page, a full stop and the page's name, like page.project.`, `${at}.page`);
     if (declared.has(page)) return malformed(`${pack} declares ${page} and adds to it. A pack's own page takes its blocks in its own declaration.`, `${at}.page`);
+    /* ONE COLUMN INTO A BLOCK THERE is read by its own rules (`add-column.ts`). */
+    if (one.into !== undefined || one.column !== undefined) {
+      const col = readAddColumn(pack, at, one);
+      if (!col.ok) return col;
+      out.push(col.value);
+      continue;
+    }
     const block = one.block;
     if (!isObject(block) || typeof block.kind !== 'string')
       return malformed(`${at}.block is one block with its kind, like { kind: note, heading: The brief }.`, `${at}.block`);
@@ -1340,6 +1350,8 @@ function readAdds(pack: string, raw: unknown, declared: ReadonlySet<string>): Re
       ...(typeof one.note === 'string' ? { note: one.note } : {}),
     });
   }
+  const many = columnsFault(out);
+  if (many) return many;
   return ok(out);
 }
 
@@ -1354,8 +1366,6 @@ function readAdds(pack: string, raw: unknown, declared: ReadonlySet<string>): Re
  */
 function addedTo(pack: string, add: PageAddition, host: { kind: DeclKind; body: string } | undefined): NonNullable<Diff['page_adds']>[number] {
   const name = add.page.slice('page.'.length);
-  const heading = typeof add.block.heading === 'string' ? add.block.heading : undefined;
-  const said = { page: add.page, kind: add.block.kind as string, ...(heading === undefined ? {} : { heading }), ...(add.after === undefined ? {} : { after: add.after }) };
   let body: Record<string, Json> | null = null;
   if (host !== undefined && host.kind === 'page') {
     try {
@@ -1365,6 +1375,25 @@ function addedTo(pack: string, add: PageAddition, host: { kind: DeclKind; body: 
       body = null;
     }
   }
+  if (body === null && 'into' in add)
+    return {
+      page: add.page,
+      kind: 'column',
+      heading: add.column.label,
+      line: `adds a column to ${name} from ${pack}`,
+      unresolved: true,
+      refusal: {
+        code: 'PAGE_UNKNOWN',
+        fix: `${pack} adds a column to the ${name} page, which this record does not hold. Install the pack that declares ${add.page} first.`,
+        at: `adds.${add.page}`,
+      },
+    };
+  if ('into' in add) {
+    const titled = body !== null && typeof body.title === 'string' && body.title.trim() !== '' && !body.title.includes('{{') ? body.title : name;
+    return { page: add.page, kind: 'column', heading: add.column.label, line: `adds a column, ${add.column.label}, to ${titled} from ${pack}` };
+  }
+  const heading = typeof add.block.heading === 'string' ? add.block.heading : undefined;
+  const said = { page: add.page, kind: add.block.kind as string, ...(heading === undefined ? {} : { heading }), ...(add.after === undefined ? {} : { after: add.after }) };
   if (body === null)
     return {
       ...said,

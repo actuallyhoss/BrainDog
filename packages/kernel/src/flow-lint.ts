@@ -40,7 +40,7 @@ import type { Known } from './declare.ts';
 import { nextOccurrence } from './digest.ts';
 import { figureFault } from './figure.ts';
 import { FLOOR_MS, intervalMs } from './pull.ts';
-import type { FlowDecl } from './rules.ts';
+import { RUN_SPELL, type FlowDecl } from './rules.ts';
 
 /**
  * THE KERNEL'S CEILINGS, and a declaration's `limits` can only lower them (§3, rule 3).
@@ -278,7 +278,7 @@ export function rowRegisterOf(decl: FlowDecl, doorOf: (door: string) => unknown)
  * {{vars.a-b}}." while a list whose values held that literal took it. Not the `g` regex itself, whose `lastIndex` a
  * `test` would move.
  */
-const RUN_FILLED = /\{\{\s*(?:vars|trigger)\.[A-Za-z0-9_.]+\s*\}\}/;
+const RUN_FILLED = /\{\{\s*(?:money:)?(?:vars|trigger)\.[A-Za-z0-9_.]+(?:\s+or\s+"(?:[^"\\]|\\.)*")?\s*\}\}/;
 
 /**
  * The path a run fills from its own context: `{{vars.x}}`, `{{trigger.row.amount}}`, spaces allowed inside the braces.
@@ -364,9 +364,9 @@ function hiddenIn(question: string, hidden: ReadonlyMap<string, string>, rowFill
       if (type !== undefined) return { field, type, spelled: m[0] };
     }
   }
-  if (runFill) for (const m of question.matchAll(RUN_PATH)) {
-    if (m[1] !== 'trigger') continue;
-    const [head, field] = m[2]!.split('.');
+  if (runFill) for (const m of question.matchAll(RUN_SPELL)) {
+    if (m[2] !== 'trigger') continue;
+    const [head, field] = m[3]!.split('.');
     if (head !== 'row') continue;
     if (field === undefined) {
       const [first] = hidden;
@@ -469,13 +469,13 @@ function writeFault(
 
 /**
  * The first `{{vars.x}}` in `text`, any spacing, naming a variable that `carried` says holds a field that never leaves the
- * record, or `null`. Read with `RUN_PATH`, the pattern `fill` writes the variable in with, so a spelling this misses is
+ * record, or `null`. Read with `RUN_SPELL` (`rules.ts`), the pattern `fill` writes the variable in with, so a spelling this misses is
  * one the run leaves as typed.
  */
 function carriedIn(text: string, carried: ReadonlyMap<string, Carried>): { name: string; spelled: string; from: Carried } | null {
-  for (const m of text.matchAll(RUN_PATH)) {
-    if (m[1] !== 'vars') continue;
-    const name = m[2]!.split('.')[0]!;
+  for (const m of text.matchAll(RUN_SPELL)) {
+    if (m[2] !== 'vars') continue;
+    const name = m[3]!.split('.')[0]!;
     const from = carried.get(name);
     if (from) return { name, spelled: m[0], from };
   }
@@ -643,13 +643,13 @@ function unkeptIn(id: string, verb: string, step: Record<string, unknown>, here:
   };
   collect(step[verb]);
   for (const text of texts)
-    for (const m of text.matchAll(RUN_PATH)) {
-      if (m[1] !== 'vars') continue;
+    for (const m of text.matchAll(RUN_SPELL)) {
+      if (m[2] !== 'vars') continue;
       /* A PATH WITH AN EMPTY PART NAMES NO ANSWER, and is said as the hole it is. Read as a name, `{{vars..x}}` was
          refused for keeping no answer called nothing, a sentence with a gap where the name goes. */
-      if (m[2]!.split('.').some((part) => part === ''))
+      if (m[3]!.split('.').some((part) => part === ''))
         return hole(id, m[0], here, 'it names no answer', 'A path is vars. and the name an as: keeps, then any path into it, as {{vars.total}} or {{vars.a.rate}}.');
-      const name = m[2]!.split('.')[0]!;
+      const name = m[3]!.split('.')[0]!;
       if (kept.has(name)) continue;
       return anywhere.has(name)
         ? bad(
@@ -695,7 +695,7 @@ function holeIn(id: string, decl: FlowDecl): Refusal | null {
     for (const { where, value } of fillSites(action, at)) {
       if (typeof value !== 'string') continue;
       if (inline) {
-        const run = value.match(new RegExp(RUN_PATH.source))?.[0];
+        const run = value.match(new RegExp(RUN_SPELL.source))?.[0];
         if (run !== undefined)
           return hole(id, run, where, 'a rule that runs inside the write has no run to read it from', 'Give the rule steps: and on: { written: { register } } to run it as a run.');
       }
@@ -1023,7 +1023,7 @@ export function flowFault(id: string, body: Record<string, unknown>, installed?:
          checked and the question was not: over a list whose `pin` is secret, `{{pin}}` in the question installed, and
          measured through `ask_person`, whose question is filled the same way, `{{trigger.row.pin}}` and
          `{{ trigger.row.pin }}` were asked as `hunter2` and `{{trigger.row}}` as the JSON of the whole row, `pin` in
-         it. Each spelling is read with the pattern that fills it (`ROW_FILL`, `RUN_PATH`). */
+         it. Each spelling is read with the pattern that fills it (`ROW_FILL`, `RUN_SPELL`). */
       if (verb === 'ask_slash' && !rowless) {
         const found = hidden.size === 0 ? null : hiddenIn(String((step.ask_slash as { question: unknown }).question), hidden);
         if (found)

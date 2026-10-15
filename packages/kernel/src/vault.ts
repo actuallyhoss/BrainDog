@@ -23,7 +23,8 @@
 import type { Result, Sql } from '@braindog/ports';
 import { clash, no, ok } from '@braindog/ports';
 
-import { grantChosen, type GrantChoosable } from './actions.ts';
+import { grantChosen, heldHost, type GrantChoosable } from './actions.ts';
+import { ulids } from './ids.ts';
 import { instant } from './migrate.ts';
 import { attempt } from './tx.ts';
 
@@ -680,6 +681,50 @@ export function revokeGrant(sql: Sql, deps: VaultDeps, id: string, transaction: 
     event(sql, deps, 'grant.revoke', id, row.kind);
     return ok(null);
   });
+}
+
+/**
+ * Hold a key whose vault entry names no host to the host an approved action sends it to, from now on.
+ *
+ * THE APPROVAL THAT FIRST USES IT WRITES THE HOST, and nothing later can (SHL-C05). An entry whose `opens` was "the Bake
+ * test account" opened no host, so the host had nothing to hold the key to; once an approval sends it to
+ * `bake.example`, `opens` says `bake.example` and the executor refuses every other host with "This key opens
+ * bake.example only." An entry that already names a host is left as it is, whichever host this names, so a pin never
+ * moves a key: answering `pinned: false` says nothing was written.
+ *
+ * NOTHING SECRET IS READ OR WRITTEN: the label, the row's `opens` and the host. The words the person typed are replaced
+ * by the host, which is what they meant once an action sends the key there. The event is `grant.bind`, the key bound to
+ * a host (the record has forty kinds and no forty-first), and says the id and the kind, as every vault event does, and
+ * never the label or what it opens.
+ */
+export function pinHost(
+  sql: Sql,
+  label: string,
+  host: string,
+  nowMs: number,
+  actor = 'system',
+): Result<{ id: string; host: string; pinned: boolean }> {
+  const to = heldHost(host);
+  if (to === null) return no('VALUE_MALFORMED', `"${host}" is not a host a key can be held to. Name the host the action calls.`, { at: 'host' });
+  const live = sql.all<{ id: string; label: string; opens: string; kind: GrantKind; revoked_at: string | null; created_at: string }>(
+    'SELECT id, label, opens, kind, revoked_at, created_at FROM grant WHERE (label = ? OR id = ?) AND revoked_at IS NULL',
+    label,
+    label,
+  );
+  const row = grantChosen(live, label);
+  if (row === undefined) return no('REQUIRED_MISSING', `There is no key called "${label}" to hold to ${to}. Add it to the vault first.`, { at: 'label' });
+  const held = heldHost(row.opens);
+  if (held !== null) return ok({ id: row.id, host: held, pinned: false });
+  sql.exec('UPDATE grant SET opens = ? WHERE id = ? AND revoked_at IS NULL', to, row.id);
+  sql.exec(
+    "INSERT INTO event (id, ts, actor, kind, target, target_kind, note) VALUES (?, ?, ?, 'grant.bind', ?, 'grant', ?)",
+    ulids(() => nowMs)(),
+    instant(nowMs),
+    actor,
+    `grant:${row.id}`,
+    `${row.id} ${row.kind}`,
+  );
+  return ok({ id: row.id, host: to, pinned: true });
 }
 
 /**

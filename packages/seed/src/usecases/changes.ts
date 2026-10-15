@@ -44,7 +44,7 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
   team: [
     {
       version: '2.21.0',
-      notes: "A project page shows one card for each agent run, not one for every helper it started, and leaves out a run that changed nothing. Each card says which agent it was and what it said it was doing. What the project runs on has its own heading, Runs on: its own keys, tools and skills only, six of each with which agents used each one and when, and under them up to five that apply to every project and how many more. Home says what stopped reporting, under Gone quiet.",
+      notes: "A project page shows one card for each agent run, not one for every helper it started, and leaves out a run that changed nothing. Each card says which agent it was and what it said it was doing. Runs on lists the project's own keys, tools and skills, six of each with who used each and when, then up to five shared by every project. Home says what stopped reporting, under Gone quiet. The burn-down on Home fills itself each morning, with no agent needed.",
     },
     {
       version: '2.20.0',

@@ -399,6 +399,27 @@ export async function runInQuickJs(decl: ScriptDecl, host: CtxHost): Promise<Scr
             return deferred(async () => JSON.stringify(await fold(words)));
           },
         }),
+
+    /* `ctx.cycle`, ONLY FROM A HOST THAT HANDS ONE, as `fold`: no `reads` check, since it reads nothing of the record.
+       The line crosses as the prelude wrote it and the host reads it (`scriptCycle`): one that does not parse here is
+       no line, which the host answers with `null`, as it does a line it cannot read. */
+    ...(host.cycle === undefined
+      ? {}
+      : {
+          cycle: (day: QuickJSHandle, line: QuickJSHandle) => {
+            charge();
+            const on = text(day);
+            let read: Json = null;
+            try {
+              read = json(line);
+            } catch {
+              read = null;
+            }
+            charge();
+            const cycle = host.cycle!.bind(host);
+            return deferred(async () => JSON.stringify(await cycle(on, read)));
+          },
+        }),
   };
 
   /** Json into the interpreter, through the interpreter's own `JSON.parse`, read before the script runs. */

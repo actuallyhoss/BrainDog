@@ -15,8 +15,9 @@
  * run with no row, `notify`, `suggest` and `create` go past it: the first two straight to the note and the queue, and a
  * `create` to the same `expand` by way of `createAlone`.
  *
- * A STEP THAT ASKS HANDS OFF AND PARKS, AND THE ANSWER IS WHAT WAKES IT. `ask_person` opens an `options`
- * suggestion whose body names the run and the step, and the kernel's `decide` hands the pick to `answerStep` in the
+ * A STEP THAT ASKS HANDS OFF AND PARKS, AND THE ANSWER IS WHAT WAKES IT. `ask_person` opens a suggestion whose body
+ * names the run and the step and what the question asks for (`shape`: a choice of `options`, an amount, a number, a
+ * text or a date, held to it when the answer comes back), and the kernel's `decide` hands the pick to `answerStep` in the
  * decision's own transaction; with `to:` the question is put to one member, whom `govern.ts`'s `decide` holds it to.
  * `ask_slash` queues one `infer.ask` outbox row, and the outbox's `ack` hands the model's text to `answerStep` in the
  * ack's transaction. A `call` queues its declared call as one `pull.fetch` row naming the run and the step
@@ -67,8 +68,8 @@ import { calendarOf, nextCalendar } from './clock.ts';
 import { dayIn } from './finished.ts';
 import { liveTarget } from './declare.ts';
 import { localParts, nextOccurrence } from './digest.ts';
-import { senderOf } from './ingest.ts';
-import { RELATIVE_DAY, RUN_PATH, RUNS_PER_DAY_CEILING, asTyped, passFilled, pathOf, sealedAs, triggerOf } from './flow-lint.ts';
+import { exponentOf, moneyText, senderOf } from './ingest.ts';
+import { RELATIVE_DAY, RUNS_PER_DAY_CEILING, asTyped, passFilled, pathOf, sealedAs, triggerOf } from './flow-lint.ts';
 import type { Entry } from './index.ts';
 import { instant } from './migrate.ts';
 import { evaluateMetric, predicateOf, type EvalContext, type MetricDecl } from './metrics.ts';
@@ -86,12 +87,17 @@ import {
   present,
   raiseStat,
   runRules,
+  runSaid,
   sealedOf,
+  ASK_TEXT_CHARS,
+  RUN_SPELL,
+  type AskShape,
   type FlowDecl,
   type RuleAction,
   type RuleDecl,
   type RulesDeps,
   type RunFill,
+  type RunSaid,
   type Trigger,
 } from './rules.ts';
 
@@ -185,7 +191,7 @@ export type FlowDeps = {
    * suggestion's body, which is how `decide` finds the run it answers. `to` is the one member the question is put to,
    * where the step names one; `decide` holds the answer to them or an owner.
    */
-  ask: (question: string, options: readonly string[], actor: string, about: { run: string; step: number; to?: string }) => Result<{ id: string }>;
+  ask: (question: string, options: readonly string[], actor: string, about: AskAbout) => Result<{ id: string }>;
   /**
    * Queue a `call` step's declared call, naming the run and the step so its answer comes back to them
    * (`actions.ts`'s `queueCall`, with the record's action dependencies). `entry` is the run's row, whose `sends:` fields
@@ -243,6 +249,20 @@ export type FlowDeps = {
 
 /** A run-path rule as installed: its bare id, the version a run pins, and its body. */
 export type Installed = { id: string; version: number; body: FlowDecl };
+
+/**
+ * What a run's question carries beside its words and its options, onto the suggestion's body: the run and the step it
+ * answers, the one member it is put to, and what it asks for. `shape` is always said, `choice` included, so Decide
+ * draws the input the step asked for without reading the rule (PGS-A25 draws it). `currency` is an `amount`'s code, read
+ * from the step or its row when the question was asked; an amount with none asks the person to say their code.
+ */
+export type AskAbout = { run: string; step: number; to?: string; shape?: AskShape; currency?: string };
+
+/**
+ * What a person answers a run's question with: the words of a choice or of what they typed, a number, or an amount in
+ * minor units (`{ amount, currency }`) when the screen read it as one. Held to the step's shape by `answerStep`.
+ */
+export type AskAnswer = string | number | { amount: number; currency?: string };
 
 /** What started a run, as the run row keeps it and `{{trigger.…}}` reads it. */
 export type RunTrigger = {
@@ -435,20 +455,36 @@ const UNSENT = '-unsent';
 const SEALED = '-sealed';
 
 /**
+ * What the question a run waits on was asked in: an `amount`'s currency, read from the step or its row when it was
+ * asked (`ask`), so the answer is kept in the currency the person was shown and not in what the row says a week later.
+ *
+ * BESIDE THE OTHER THREE, UNDER A KEY NO VARIABLE CAN HAVE, for their reason: the run parks on the question, and what it
+ * holds has to be in its row. Written only while the run waits on an `amount`, and gone with the answer, since
+ * `answerStep` packs the column again without it.
+ */
+const ASKED = '-asked';
+type Asked = { currency?: string };
+
+/** A packed column with what the question was asked in beside it (`-asked`). */
+const withAsked = (packed: string, asked: Asked): string => JSON.stringify({ ...(JSON.parse(packed) as Vars), [ASKED]: asked });
+
+/**
  * A run's stored `vars`, split into the variables, what a question to Slash reads in their place, the fields it reads
  * as absent, and the variables set from a secret. `kept` is `null` when the column has no `-sendable`, which is a run a
  * build before the key parked, or one no step has saved yet, and `unsent` and `sealed` are `null` when the column has
  * no key of theirs, for the same two reasons.
  */
-function unpack(stored: string): { vars: Vars; kept: Kept | null; unsent: string[] | null; sealed: string[] | null } {
-  const all = JSON.parse(stored) as Vars & { [KEPT]?: Kept; [UNSENT]?: string[]; [SEALED]?: string[] };
+function unpack(stored: string): { vars: Vars; kept: Kept | null; unsent: string[] | null; sealed: string[] | null; asked: Asked | null } {
+  const all = JSON.parse(stored) as Vars & { [KEPT]?: Kept; [UNSENT]?: string[]; [SEALED]?: string[]; [ASKED]?: Asked };
   const kept = all[KEPT] ?? null;
   const unsent = Array.isArray(all[UNSENT]) ? all[UNSENT] : null;
   const sealed = Array.isArray(all[SEALED]) ? all[SEALED] : null;
   delete all[KEPT];
   delete all[UNSENT];
+  const asked = isObject(all[ASKED]) ? (all[ASKED] as Asked) : null;
   delete all[SEALED];
-  return { vars: all as Vars, kept, unsent, sealed };
+  delete all[ASKED];
+  return { vars: all as Vars, kept, unsent, sealed, asked };
 }
 
 /**
@@ -1483,7 +1519,8 @@ export function advance(deps: FlowDeps, id: string): number | null {
         const asked = ask(deps, run.rule, op.verb, step, i, id, scope(), kept, unsent, sealedVars, read(), actor);
         if (!asked.ok) return fail(i, op.verb, asked.say);
         record(deps, id, i, op.verb, 'waiting', asked.holds);
-        deps.sql.exec("UPDATE automation_run SET state = 'waiting', step = ?, vars = ? WHERE id = ?", i, pack(vars, kept, unsent, sealedVars), id);
+        const parked = pack(vars, kept, unsent, sealedVars);
+        deps.sql.exec("UPDATE automation_run SET state = 'waiting', step = ?, vars = ? WHERE id = ?", i, asked.currency === undefined ? parked : withAsked(parked, { currency: asked.currency }), id);
         return deps.nowMs + asked.waitMs;
       }
 
@@ -1952,6 +1989,37 @@ function startJob(
   return { ok: true, job: queued.value.id };
 }
 
+/** The shapes an `ask_person` takes (`rules.ts`'s `AskShape`), by the word a step spells them with. */
+const ASK_SHAPE_OF: Readonly<Record<string, AskShape>> = { choice: 'choice', amount: 'amount', number: 'number', text: 'text', date: 'date' };
+
+/** The shape a step asks for, `choice` when it says none, `undefined` for a word that is not a shape. */
+const shapeOf = (said: unknown): AskShape | undefined =>
+  said === undefined ? 'choice' : typeof said === 'string' && Object.hasOwn(ASK_SHAPE_OF, said) ? ASK_SHAPE_OF[said] : undefined;
+
+/** A currency's code as a step or a row may write it: three letters. */
+const CODE = /^[A-Z]{3}$/;
+
+/**
+ * The code an `amount` question asks in: the step's own (`currency: EGP`), or the row's, read through one run path
+ * (`currency: '{{trigger.row.currency}}'`) when the question is asked, a money field giving its own currency. `code` is
+ * `undefined` when the step names none, and the person then says theirs in the answer. A path that reaches no code
+ * is a sentence, because asking for an amount in a currency nobody knows would keep a figure no sum can read.
+ */
+function currencyOf(said: unknown, scope: Record<string, unknown>): { ok: true; code: string | undefined } | { ok: false; say: string } {
+  if (said === undefined) return { ok: true, code: undefined };
+  if (typeof said !== 'string') return { ok: false, say: 'in a currency that is not a code' };
+  const text = said.trim();
+  const path = new RegExp(`^${RUN_SPELL.source}$`).exec(text);
+  if (path === null) {
+    const code = text.toUpperCase();
+    return CODE.test(code) ? { ok: true, code } : { ok: false, say: `in ${JSON.stringify(said)}, which is not a currency's code` };
+  }
+  const at = reached(scope, path[2]!, path[3]!);
+  const held = isObject(at) && typeof at.currency === 'string' ? at.currency : typeof at === 'string' ? at : '';
+  const code = held.trim().toUpperCase();
+  return CODE.test(code) ? { ok: true, code } : { ok: false, say: `in the currency ${text} reads, and it reads no currency's code` };
+}
+
 /**
  * Put an ask's question where it will be answered: the suggestion queue for a person, the outbox for Slash. What it
  * hands back is the id the step row holds while it waits, and how long it waits.
@@ -1973,8 +2041,8 @@ function ask(
   tainted: ReadonlySet<string>,
   row: Entry | null,
   actor: string,
-): { ok: true; holds: string; waitMs: number } | { ok: false; say: string } {
-  const spec = step[verb] as { question: string; options?: string[]; wait?: string; about?: string[]; shape?: string; choices?: string[]; to?: unknown };
+): { ok: true; holds: string; waitMs: number; currency?: string } | { ok: false; say: string } {
+  const spec = step[verb] as { question: string; options?: string[]; wait?: string; about?: string[]; shape?: string; choices?: string[]; to?: unknown; currency?: unknown };
   /* A QUESTION TO SLASH IS FILLED FROM THE ROW WITH ITS SECRET AND FILE FIELDS TAKEN OUT, both fills, since the
      question leaves the record as surely as `about:` does. The lint refuses a question that names one, and this is the
      second line, for a rule an earlier build let install or one written into the table. Measured with the switch on
@@ -2005,6 +2073,18 @@ function ask(
   if (question.length > VAR_BYTES) return { ok: false, say: `rule.${rule}'s question at step ${n + 1} runs to ${question.length} characters, and a question holds ${VAR_BYTES}.` };
 
   if (verb === 'ask_person') {
+    /* WHAT THE QUESTION ASKS FOR, read before anything is filed. A shape this build does not know, or a choice with
+       fewer than two answers, would open a question nobody can answer right, so the run stops on a sentence instead;
+       the lint refuses both at install, and this is the second line, for a rule written into the table. */
+    const shape = shapeOf(spec.shape);
+    if (shape === undefined)
+      return { ok: false, say: `rule.${rule} asks a person for ${JSON.stringify(spec.shape)} at step ${n + 1}, and a question asks for a choice, an amount, a number, a text or a date.` };
+    const options = spec.options ?? [];
+    if (shape === 'choice' && (options.length < 2 || new Set(options).size !== options.length))
+      return { ok: false, say: `rule.${rule} asks a person to choose at step ${n + 1} from ${options.length < 2 ? 'fewer than two answers' : 'the same answer twice'}. A choice is between at least two, each once.` };
+    /* READ THROUGH THE CLEANED ROW, as the question is: the code is filed on the body everyone who decides reads. */
+    const currency = shape === 'amount' ? currencyOf(spec.currency, scoped) : { ok: true as const, code: undefined };
+    if (!currency.ok) return { ok: false, say: `rule.${rule} asks a person for an amount at step ${n + 1} ${currency.say}, so nothing was asked.` };
     const waitMs = intervalMs(spec.wait ?? ASK_PERSON_WAIT);
     if (waitMs === null) return { ok: false, say: `rule.${rule} waits ${JSON.stringify(spec.wait)} for an answer at step ${n + 1}, and a span is a number and one of m, h, d or w.` };
     /* `to:` PUTS THE QUESTION TO ONE MEMBER, by the id the record holds for them, filled from the run as the question
@@ -2020,9 +2100,15 @@ function ask(
       );
       if (!member) return { ok: false, say: `rule.${rule} puts its question at step ${n + 1} to one member, and nobody the record holds by that id is a member now, so nothing was asked.` };
     }
-    const opened = deps.ask(question, spec.options ?? [], actor, { run, step: n, ...(to === undefined ? {} : { to }) });
+    const opened = deps.ask(question, shape === 'choice' ? options : [], actor, {
+      run,
+      step: n,
+      ...(to === undefined ? {} : { to }),
+      shape,
+      ...(currency.code === undefined ? {} : { currency: currency.code }),
+    });
     if (!opened.ok) return { ok: false, say: `rule.${rule} could not ask its question at step ${n + 1}: ${fixOf(opened)}` };
-    return { ok: true, holds: opened.value.id, waitMs };
+    return { ok: true, holds: opened.value.id, waitMs, ...(currency.code === undefined ? {} : { currency: currency.code }) };
   }
 
   /* `about` IS THE FIELDS OF THE RUN'S ROW THAT GO WITH THE QUESTION, and nothing else of the record does. A field typed
@@ -2067,7 +2153,7 @@ function ask(
  * wake row armed for now, as a trigger leaves one, so the steps after the answer are taken where every other step is,
  * and a decision on a screen never runs a rule's writes inside the person's own request.
  */
-export function answerStep(deps: FlowDeps, a: { run: string; step: number; by: string; answer?: string; failed?: string }): Result<null> {
+export function answerStep(deps: FlowDeps, a: { run: string; step: number; by: string; answer?: AskAnswer; failed?: string }): Result<null> {
   const run = deps.sql.one<RunRow>('SELECT id, rule, version, trigger, state, step, vars, depth, project, actor FROM automation_run WHERE id = ?', a.run);
   if (!run || run.state !== 'waiting' || run.step !== a.step) return ok(null);
   const row = deps.sql.one<{ kind: string; state: string; answer: string | null }>('SELECT kind, state, answer FROM automation_step WHERE run = ? AND n = ?', a.run, a.step);
@@ -2082,15 +2168,27 @@ export function answerStep(deps: FlowDeps, a: { run: string; step: number; by: s
     return stop(a.failed ?? `rule.${run.rule}'s ${row.kind === 'call' ? 'call' : 'question'} at step ${a.step + 1} came back with no answer.`);
 
   const decl = deps.trial ?? pinned(deps.sql, run.rule, run.version);
-  const spec = (decl ? plan(decl.steps ?? decl.then)[a.step]?.step[row.kind] : undefined) as { as?: string; shape?: string; choices?: string[] } | undefined;
-  if (row.kind === 'call') return answerCall(deps, run, a.step, a.answer, spec, stop);
+  const spec = (decl ? plan(decl.steps ?? decl.then)[a.step]?.step[row.kind] : undefined) as
+    | { as?: string; shape?: string; choices?: string[]; options?: string[]; currency?: unknown }
+    | undefined;
+  /* A HOST'S ANSWER IS TEXT. Only a person's comes typed, so a call's or Slash's that is not text is read as its JSON. */
+  const text = typeof a.answer === 'string' ? a.answer : JSON.stringify(a.answer);
+  if (row.kind === 'call') return answerCall(deps, run, a.step, text, spec, stop);
   if (!spec || typeof spec.as !== 'string') return stop(`rule.${run.rule} version ${run.version} has no ask at step ${a.step + 1} to answer.`);
 
   /* SLASH'S TEXT IS HELD TO THE SHAPE THE STEP ASKED FOR. A person picks from the options, which `decide` has already
      held them to; a model writes whatever it writes, and a `number` that arrives as "about four" would reach an `if`
      that compares it as text and quietly takes the wrong arm. */
-  const said = a.answer.trim();
-  let value: string | number = said;
+  const said = text.trim();
+  let value: unknown = said;
+  /* A PERSON'S ANSWER IS HELD TO THE SHAPE THE STEP ASKED FOR, and one of the wrong shape is refused to them with a
+     sentence while the run keeps waiting: the person is still there to answer again, where Slash's wrong answer
+     stops the run below. `-asked` is the currency the question was shown in (`ask`). */
+  if (row.kind === 'ask_person') {
+    const read = typedAnswer(spec, a.answer, unpack(run.vars).asked?.currency);
+    if (!read.ok) return no('VALUE_MALFORMED', read.say, { at: 'answer' });
+    value = read.value;
+  }
   if (row.kind === 'ask_slash' && spec.shape === 'number') {
     const n = Number(said.replace(/,/g, ''));
     if (said === '' || !Number.isFinite(n)) return stop(`Slash answered ${JSON.stringify(said.slice(0, 80))} at step ${a.step + 1} of rule.${run.rule}, which asked for a number.`);
@@ -2102,7 +2200,8 @@ export function answerStep(deps: FlowDeps, a: { run: string; step: number; by: s
       return stop(`Slash answered ${JSON.stringify(said.slice(0, 80))} at step ${a.step + 1} of rule.${run.rule}, which asked it to choose one of ${(spec.choices ?? []).join(', ')}.`);
     value = hit;
   }
-  if (String(value).length > VAR_BYTES) return stop(`The answer at step ${a.step + 1} of rule.${run.rule} runs to ${String(value).length} characters, and one answer holds ${VAR_BYTES}.`);
+  const written = typeof value === 'string' ? value : typeof value === 'number' ? String(value) : JSON.stringify(value);
+  if (written.length > VAR_BYTES) return stop(`The answer at step ${a.step + 1} of rule.${run.rule} runs to ${written.length} characters, and one answer holds ${VAR_BYTES}.`);
   /* AN ANSWER OVERWRITES WHAT WAS KEPT UNDER ITS NAME, since the variable now holds the answer and not the field it was
      set from, and a later question to Slash reading the kept dash would be asking about a value the run no longer has.
      A column with no `-sendable` is left with none, and `advance` rebuilds it with this answer's own step row in it. */
@@ -2112,10 +2211,86 @@ export function answerStep(deps: FlowDeps, a: { run: string; step: number; by: s
   const sealed = stored.sealed?.filter((name) => name !== spec.as) ?? null;
   if (JSON.stringify(vars).length > VARS_BYTES) return stop(`rule.${run.rule}'s answers passed ${VARS_BYTES} characters at step ${a.step + 1}.`);
 
-  record(deps, run.id, a.step, row.kind, 'done', String(value));
+  record(deps, run.id, a.step, row.kind, 'done', written);
   deps.sql.exec("UPDATE automation_run SET state = 'pending', step = ?, vars = ? WHERE id = ?", a.step + 1, pack(vars, stored.kept, stored.unsent, sealed), run.id);
   wake(deps, run.id, deps.nowMs);
   return ok(null);
+}
+
+/**
+ * A person's answer to an `ask_person`, held to the step's shape: what it is kept as under `as`, or the sentence that
+ * tells them why it was not taken.
+ *
+ * `choice` IS ONE OF THE OPTIONS, word for word, which is what `decide` hands on. `amount` IS KEPT IN MINOR UNITS WITH
+ * ITS CODE (`amountOf`). `number` is a finite number, grouping commas allowed; `date` a real day as `YYYY-MM-DD`; `text`
+ * a line of words, `ASK_TEXT_CHARS` at most. A step whose shape is not one of these never reached the queue (`ask`).
+ */
+function typedAnswer(spec: { shape?: string; options?: string[]; currency?: unknown }, answer: AskAnswer | undefined, asked: string | undefined): { ok: true; value: unknown } | { ok: false; say: string } {
+  const shape = shapeOf(spec.shape);
+  const words = typeof answer === 'string' ? answer.trim() : typeof answer === 'number' ? String(answer) : '';
+  const shown = JSON.stringify(words.slice(0, 80));
+  if (shape === 'amount') {
+    const currency = asked ?? (typeof spec.currency === 'string' && CODE.test(spec.currency.trim().toUpperCase()) ? spec.currency.trim().toUpperCase() : undefined);
+    return amountOf(answer, currency);
+  }
+  if (shape === 'number') {
+    const n = typeof answer === 'number' ? answer : /^-?(\d{1,3}(,\d{3})+|\d+)?(\.\d+)?$/.test(words) && /\d/.test(words) ? Number(words.replace(/,/g, '')) : NaN;
+    return Number.isFinite(n) ? { ok: true, value: n } : { ok: false, say: `${shown} is not a number. Type one, like 1250 or 12.5.` };
+  }
+  if (shape === 'date') {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(words);
+    const at = m ? new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))) : null;
+    return at !== null && at.toISOString().slice(0, 10) === words ? { ok: true, value: words } : { ok: false, say: `${shown} is not a day. Type it as YYYY-MM-DD, like 2026-03-01.` };
+  }
+  if (typeof answer !== 'string') return { ok: false, say: 'The answer is not words. Type them.' };
+  if (shape === 'text') {
+    if (words === '') return { ok: false, say: 'The answer is empty. Type a line.' };
+    return words.length > ASK_TEXT_CHARS ? { ok: false, say: `The answer runs to ${words.length} characters, and a line holds ${ASK_TEXT_CHARS}.` } : { ok: true, value: words };
+  }
+  /* HELD TRIMMED ON BOTH SIDES, as the answer always was, so an option typed with a space after it is still its own. */
+  const options = (spec.options ?? []).map((o) => (typeof o === 'string' ? o.trim() : String(o)));
+  return options.includes(words) ? { ok: true, value: words } : { ok: false, say: `${shown} is not one of the answers, which are ${options.join(', ')}.` };
+}
+
+/**
+ * An amount a person gave, as money: `{ amount: <integer minor units>, currency }`.
+ *
+ * TYPED AS WORDS (`12.50`, `1,250.00`, `EGP 12.50`) OR HANDED AS MINOR UNITS by a screen that read them already
+ * (`{ amount: 1250 }`). The currency is the one the question was asked in; an answer naming another is refused, since
+ * two currencies are never added or converted, and with none asked the answer has to name its code. The currency's own
+ * decimals and no more (`exponentOf`): `12.505` in a currency of two is refused rather than rounded, as an ingest
+ * refuses it, because a rounded figure is a number nobody gave. Nought or more: a question asks how much, not who owes.
+ */
+function amountOf(answer: AskAnswer | undefined, asked: string | undefined): { ok: true; value: { amount: number; currency: string } } | { ok: false; say: string } {
+  const ask = asked === undefined ? '' : ` in ${asked}`;
+  const like = asked === undefined ? 'its three-letter code before the figure' : '1,250.00';
+  if (isObject(answer)) {
+    const code = typeof answer.currency === 'string' ? answer.currency.trim().toUpperCase() : asked;
+    if (code === undefined || !CODE.test(code)) return { ok: false, say: `The amount names no currency. Say which, with ${like}.` };
+    if (asked !== undefined && code !== asked) return { ok: false, say: `This asks for an amount${ask}, and the answer is in ${code}.` };
+    if (!Number.isSafeInteger(answer.amount) || answer.amount < 0) return { ok: false, say: `The amount is not a whole count of the currency's smallest unit, nought or more.` };
+    return { ok: true, value: { amount: answer.amount, currency: code } };
+  }
+  const words = typeof answer === 'string' ? answer.trim() : typeof answer === 'number' ? String(answer) : '';
+  const shown = JSON.stringify(words.slice(0, 80));
+  /* THE CODE MAY COME BEFORE THE FIGURE OR AFTER IT, `EGP 12.50` or `12.50 egp`, and never as a sign: `$` is five
+     currencies. A code is three letters beside a figure, so words that are not an amount are told so. */
+  const lead = /^([A-Za-z]{3})\s*([-−]?[\d.,]+)$/.exec(words);
+  const trail = lead ? null : /^([-−]?[\d.,]+)\s*([A-Za-z]{3})$/.exec(words);
+  const code = lead ? lead[1]!.toUpperCase() : trail ? trail[2]!.toUpperCase() : asked;
+  const figure = lead ? lead[2]!.trim() : trail ? trail[1]!.trim() : words;
+  if (code === undefined) return { ok: false, say: `${shown} names no currency. Say which, with ${like}.` };
+  if (asked !== undefined && code !== asked) return { ok: false, say: `This asks for an amount${ask}, and ${shown} is in ${code}.` };
+  if (figure.startsWith('-') || figure.startsWith('−')) return { ok: false, say: `${shown} is under nought. An amount here is nought or more.` };
+  const m = /^(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d+))?$/.exec(figure);
+  if (m === null) return { ok: false, say: `${shown} is not an amount. Type the figure${ask}${asked === undefined ? `, with ${like}` : `, like ${like}`}.` };
+  const exp = exponentOf(code);
+  const minorPart = m[2] ?? '';
+  if (minorPart.length > exp)
+    return { ok: false, say: `${code} has ${exp === 0 ? 'no' : exp} decimal place${exp === 1 ? '' : 's'}, and ${shown} has ${minorPart.length}. Type it without rounding.` };
+  const amount = Number(m[1]!.replace(/,/g, '') + minorPart.padEnd(exp, '0'));
+  if (!Number.isSafeInteger(amount)) return { ok: false, say: `${shown} is more than an amount can hold.` };
+  return { ok: true, value: { amount, currency: code } };
 }
 
 /**
@@ -2381,10 +2556,10 @@ function withoutSealed(deps: FlowDeps, row: Entry): Entry {
 
 /**
  * The run's paths and a figure's `{{metric.<id>}}` (`figure.ts`), in one pattern, so that a figure is filled in the
- * same `replace` as the paths beside it and nothing one wrote is read again as the other. Groups 1 and 2 are a path's
- * head and path, 3 and 4 a figure's head and id.
+ * same `replace` as the paths beside it and nothing one wrote is read again as the other. Groups 1 to 4 are a path's
+ * form, head, path and `or` words (`rules.ts`'s `RUN_SPELL`), 5 and 6 a figure's head and id.
  */
-const RUN_READ = new RegExp(`${RUN_PATH.source}|${FIGURE.source}`, 'g');
+const RUN_READ = new RegExp(`${RUN_SPELL.source}|${FIGURE.source}`, 'g');
 
 /**
  * What a run reads a figure through: `rules.ts`'s `figureText`, asked each time a step is filled.
@@ -2471,11 +2646,15 @@ function hiddenFigure(sql: Sql, id: string, lands: ReadonlySet<string>): boolean
  * `{{vars.x}}`, `{{trigger.row.amount}}` and `{{metric.total}}`, filled in a string that no fill of the row reads after: a condition, a
  * `set_var`, and a question with no row. A text the pass fills is filled in the same `replace` as the row's own
  * `{{field}}`s instead (`handOn`, `rules.ts`'s `filling`). A path that reaches nothing is an em dash for the same
- * reason `fill` writes one: a sentence with a hole in it reads as a bug. The pattern is `flow-lint.ts`'s `RUN_PATH` with
- * `figure.ts`'s `FIGURE` beside it, so the lint reads a question's braces as this fills them.
+ * reason `fill` writes one: a sentence with a hole in it reads as a bug, unless the path says `or "words"`, which are
+ * written instead. The pattern is `rules.ts`'s `RUN_SPELL`, `flow-lint.ts`'s `RUN_PATH` with its `money:` form and its
+ * `or`, and `figure.ts`'s `FIGURE` beside it.
  */
 function fill(x: unknown, scope: Record<string, unknown>): unknown {
-  if (typeof x === 'string') return x.replace(RUN_READ, (_whole, head?: string, path?: string, figHead?: string, id?: string) => pathValue(scope, head ?? figHead!, path ?? id!));
+  if (typeof x === 'string')
+    return x.replace(RUN_READ, (_whole, form?: string, head?: string, path?: string, words?: string, figHead?: string, id?: string) =>
+      head !== undefined ? pathValue(scope, head, path!, runSaid(form, words)) : pathValue(scope, figHead!, id!),
+    );
   if (Array.isArray(x)) return x.map((v) => fill(v, scope));
   if (isObject(x)) return Object.fromEntries(Object.entries(x).map(([k, v]) => [k, fill(v, scope)]));
   return x;
@@ -2484,13 +2663,23 @@ function fill(x: unknown, scope: Record<string, unknown>): unknown {
 /**
  * What one `{{vars.…}}`, `{{trigger.…}}` or `{{metric.…}}` path is written as. A figure's id is one word with hyphens in
  * it and no dots, so it is handed to the scope's reader whole rather than walked; a scope with no reader writes the dash.
+ *
+ * `or "words"` IS WHAT A PATH THAT REACHES NOTHING IS WRITTEN AS, in place of the dash: `{{trigger.row.note or "no
+ * note"}}` over an empty note writes `no note`, and a note that says something writes what it says. A path with no
+ * `or` writes the dash as it always did. `{{money:vars.x}}` writes an amount (`{ amount, currency }`, what an
+ * `ask_person` of `shape: amount` keeps) through the kernel's one `moneyText`, and anything else as the bare path would.
  */
-function pathValue(scope: Record<string, unknown>, head: string, path: string): string {
+function pathValue(scope: Record<string, unknown>, head: string, path: string, said: RunSaid = {}): string {
   if (head === 'metric') return typeof scope.metric === 'function' ? (scope.metric as (id: string) => string)(path) : '—';
   const at = reached(scope, head, path);
-  if (hole(at)) return '—';
+  if (hole(at)) return said.or ?? '—';
+  if (said.form === 'money' && soundMoney(at)) return moneyText(at.amount, at.currency);
   return typeof at === 'object' ? JSON.stringify(at) : String(at);
 }
+
+/** Whole minor units and a code: the money a fill may write as money, and nothing that only has the two keys. */
+const soundMoney = (v: unknown): v is { amount: number; currency: string } =>
+  isObject(v) && Number.isSafeInteger(v.amount) && typeof v.currency === 'string' && /^[A-Z]{3}$/.test(v.currency);
 
 /** What one `{{vars.…}}` or `{{trigger.…}}` path reaches in `scope`, walked as `pathValue` walks it. */
 function reached(scope: Record<string, unknown>, head: string, path: string): unknown {
@@ -2503,11 +2692,11 @@ function reached(scope: Record<string, unknown>, head: string, path: string): un
 const hole = (at: unknown): boolean => at === undefined || at === null || at === '';
 
 /**
- * Every spelling a text a run writes can hold, in the pass's order (`rules.ts`'s `SPELLED`): a run path (groups 1 and
- * 2), a figure (3 and 4), a create's tuple, and the row's `{{field}}`, `{{kind:field}}` or `{{kind:field-other}}`
- * (5, 6 and 7), the last being one money field less another.
+ * Every spelling a text a run writes can hold, in the pass's order (`rules.ts`'s `SPELLED`): a run path (groups 1 to
+ * 4, its form, head, path and `or` words), a figure (5 and 6), a create's tuple, and the row's `{{field}}`,
+ * `{{kind:field}}` or `{{kind:field-other}}` (7, 8 and 9), the last being one money field less another.
  */
-const SPELLING = new RegExp(`${RUN_PATH.source}|${FIGURE.source}|\\{\\{each\\.\\d\\}\\}|\\{\\{(\\w+)(?::(\\w+)(?:-(\\w+))?)?\\}\\}`, 'g');
+const SPELLING = new RegExp(`${RUN_SPELL.source}|${FIGURE.source}|\\{\\{each\\.\\d\\}\\}|\\{\\{(\\w+)(?::(\\w+)(?:-(\\w+))?)?\\}\\}`, 'g');
 
 /**
  * Whether `text` is spellings that each reach nothing and white space between them, so that filling it would write
@@ -2529,16 +2718,18 @@ function nothingIn(text: string, scope: Record<string, unknown>, row: Entry | nu
   let spelled = false;
   for (const m of text.matchAll(SPELLING)) {
     spelled = true;
-    if (m[1] !== undefined) {
-      if (!hole(reached(scope, m[1], m[2]!))) return false;
+    if (m[2] !== undefined) {
+      /* WORDS AFTER `or` ARE SOMETHING, so a text that is only `{{trigger.row.note or "no note"}}` writes them. */
+      if (m[4] !== undefined && runSaid(undefined, m[4]).or !== '') return false;
+      if (!hole(reached(scope, m[2], m[3]!))) return false;
       continue;
     }
-    const head = m[5];
+    const head = m[7];
     /* A SECOND FIELD AFTER A FORM THAT DOES NOT SUBTRACT IS WORDS, left as typed by the pass (`flow-lint.ts`'s
        `asTyped`), so the text holds something. Where the form subtracts, nothing in the first field writes the dash
-       whatever the second holds, which is the question asked of field 6 below. */
-    if (m[7] !== undefined && asTyped(m)) return false;
-    if (head === undefined || head === 'id' || row === null || !hole(row.fields[m[6] ?? head])) return false;
+       whatever the second holds, which is the question asked of field 8 below. */
+    if (m[9] !== undefined && asTyped(m)) return false;
+    if (head === undefined || head === 'id' || row === null || !hole(row.fields[m[8] ?? head])) return false;
   }
   return spelled && text.replace(SPELLING, '').trim() === '';
 }
@@ -2566,7 +2757,7 @@ function emptied(verb: string, step: Record<string, unknown>, scope: Record<stri
 }
 
 /** The run's paths as the pass is handed them, from `scope`, saying of none that it reaches a secret. */
-const pathsOf = (scope: Record<string, unknown>): RunFill => ({ value: (head, path) => pathValue(scope, head, path), sealed: () => false });
+const pathsOf = (scope: Record<string, unknown>): RunFill => ({ value: (head, path, said) => pathValue(scope, head, path, said), sealed: () => false });
 
 /**
  * The run's paths as a step that writes is handed them, saying which reach a value a secret or file field gave: a
@@ -2584,7 +2775,7 @@ const pathsOf = (scope: Record<string, unknown>): RunFill => ({ value: (head, pa
 function sealedPaths(scope: Record<string, unknown>, row: Entry | null, fields: ReadonlySet<string>, tainted: ReadonlySet<string>): RunFill {
   const vars = scope.vars as Vars;
   return {
-    value: (head, path) => pathValue(scope, head, path),
+    value: (head, path, said) => pathValue(scope, head, path, said),
     sealed: (head, path) => {
       const [first, second] = path.split('.');
       if (head === 'vars') return tainted.has(first!) && present(vars[first!]);
@@ -2605,10 +2796,10 @@ function handOn(step: Record<string, unknown>, by: RunFill, passes: boolean): { 
   const walk = (v: unknown, at: string[]): unknown => {
     if (typeof v === 'string') {
       if (passes && passFilled(at)) return v;
-      return v.replace(RUN_READ, (whole: string, runHead?: string, runPath?: string, figHead?: string, id?: string) => {
+      return v.replace(RUN_READ, (whole: string, form?: string, runHead?: string, runPath?: string, words?: string, figHead?: string, id?: string) => {
         const [head, p] = runHead !== undefined ? [runHead, runPath!] : [figHead!, id!];
         if (by.sealed(head, p)) secret ??= whole;
-        return by.value(head, p);
+        return runHead !== undefined ? by.value(head, p, runSaid(form, words)) : by.value(head, p);
       });
     }
     if (Array.isArray(v)) return v.map((one, i) => walk(one, [...at, String(i)]));
@@ -2621,7 +2812,7 @@ function handOn(step: Record<string, unknown>, by: RunFill, passes: boolean): { 
 
 /** The first run path in `text` that reaches a secret, or `null`: what a `set_var` taking it would carry. */
 function sealedIn(text: string, by: RunFill): string | null {
-  for (const m of text.matchAll(RUN_READ)) if (by.sealed(m[1] ?? m[3]!, m[2] ?? m[4]!)) return m[0];
+  for (const m of text.matchAll(RUN_READ)) if (by.sealed(m[2] ?? m[5]!, m[3] ?? m[6]!)) return m[0];
   return null;
 }
 

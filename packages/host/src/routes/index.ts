@@ -32,6 +32,7 @@ import { ROUTES as faults } from './faults.ts';
 import { ROUTES as withdraw } from './withdraw.ts';
 import { ROUTES as door } from './door.ts';
 import { ROUTES as engine } from './engine.ts';
+import { ROUTES as engineProbe } from './engine-probe.ts';
 import { ROUTES as capture } from './capture.ts';
 import { ROUTES as trust } from './trust.ts';
 import { ROUTES as IMPORTS } from './imports.ts';
@@ -52,8 +53,13 @@ import { ROUTES as NAMED_TWICE } from './named-twice.ts';
 import { ROUTES as exportPack } from './export-pack.ts';
 import { ROUTES as SHARES } from './shares.ts';
 import { ROUTES as deviceRename } from './device-rename.ts';
+import { ROUTES as doorSwitch } from './door-switch.ts';
 import { ROUTES as flowGrammar } from './flow-grammar.ts';
 import { ROUTES as PACKS_REMOVED } from './packs-removed.ts';
+import { ROUTES as PUSH_TEST } from './push-test.ts';
+import { ROUTES as HUES } from './hues.ts';
+import { ROUTES as DECIDER } from './decider.ts';
+import { ROUTES as actionRun } from './action-run.ts';
 /* END ROUTES */
 
 export const EXTRA_ROUTES: readonly Route[] = [
@@ -77,6 +83,7 @@ export const EXTRA_ROUTES: readonly Route[] = [
   ...withdraw,
   ...door,
   ...engine,
+  ...engineProbe,
   ...capture,
   ...trust,
   ...IMPORTS,
@@ -97,7 +104,12 @@ export const EXTRA_ROUTES: readonly Route[] = [
   ...exportPack,
   ...SHARES,
   ...deviceRename,
+  ...doorSwitch,
   ...flowGrammar,
   ...PACKS_REMOVED,
+  ...PUSH_TEST,
+  ...HUES,
+  ...DECIDER,
+  ...actionRun,
   /* END ROUTES */
 ];
