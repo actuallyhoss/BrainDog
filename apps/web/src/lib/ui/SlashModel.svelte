@@ -154,7 +154,7 @@
           <legend class="model-label">{words.providerLabel}</legend>
           {#each PROVIDERS as value (value)}
             <label class="kind">
-              <input type="radio" name="slash-provider" {value} bind:group={draft.provider} disabled={saving} />
+              <input type="radio" name="slash-provider" {value} checked={draft.provider === value} onchange={() => (draft.provider = value)} disabled={saving} />
               <span>{providerName(value)}</span>
             </label>
           {/each}

@@ -338,8 +338,8 @@
           </div>
           <fieldset class="pair steps">
             <legend class="field-label">{copy.shareStep}</legend>
-            <label class="row-pick"><input type="radio" name="share-step" value="patch" bind:group={step} onchange={() => (typed = false)} /><span>{copy.shareStepPatch}</span></label>
-            <label class="row-pick"><input type="radio" name="share-step" value="minor" bind:group={step} onchange={() => (typed = false)} /><span>{copy.shareStepMinor}</span></label>
+            <label class="row-pick"><input type="radio" name="share-step" value="patch" checked={step === 'patch'} onchange={() => ((step = 'patch'), (typed = false))} /><span>{copy.shareStepPatch}</span></label>
+            <label class="row-pick"><input type="radio" name="share-step" value="minor" checked={step === 'minor'} onchange={() => ((step = 'minor'), (typed = false))} /><span>{copy.shareStepMinor}</span></label>
           </fieldset>
           <div class="pair">
             <label class="field-label" for="share-summary">{copy.shareSummary}</label>

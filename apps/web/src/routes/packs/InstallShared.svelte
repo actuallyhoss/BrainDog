@@ -237,7 +237,7 @@
           <legend class="from-legend">{copy.voiceAsk}</legend>
           {#each [['beside', copy.voiceKeep(asked.now, asked.title)], ['speaks', copy.voiceTake(asked.now, asked.title)]] as [value, line] (value)}
             <label class="from-pick-row">
-              <input type="radio" name="from-voice" {value} bind:group={choice} disabled={busy} />
+              <input type="radio" name="from-voice" {value} checked={choice === value} onchange={() => (choice = value as typeof choice)} disabled={busy} />
               <span>{line}</span>
             </label>
           {/each}
