@@ -6,11 +6,11 @@
  * (`RunLive` in `face.ts`), so a run that handed on a step, one that finished and one carried in by an import all read
  * "Stopped". The ring stays the face's three (`ringOf`); the word beside it is one of these six.
  *
- * SAID AGAIN HERE, AND PINNED, because `face.ts` is in what every screen loads and this is not: a run's page, the Agents
- * settings and a page's runs block import it in their own chunks, and none of them should pull the kernel in for one
- * rule. `presence-words.test.ts` holds this to `presenceOf` state by state, so the two never become two clocks.
+ * THE KERNEL'S OWN RULE, ASKED: `presenceSaid` calls `presenceOf`, so there is one clock (the one-clock gate). This file
+ * is imported only by a run's page, the Agents settings and a page's runs block, never by what every screen loads.
  */
 
+import { presenceOf, type Json } from '@braindog/kernel';
 import type { RunLive } from './face.ts';
 
 /** Where a run is now, as the record's clock says it: the kernel's `Presence`, word for word. */
@@ -38,13 +38,8 @@ export const WORKING_MS = 15 * 60_000;
  * active and heard from inside fifteen minutes; anything else is quiet.
  */
 export function presenceSaid(state: unknown, fields: Record<string, unknown>, nowMs: number): RunPresence {
-  const seen = fields.last_seen;
-  if (typeof seen !== 'string' || seen === '') return 'before';
-  const now = typeof state === 'string' ? state : typeof fields.state === 'string' ? fields.state : '';
-  if (now === 'handoff') return 'left';
-  if (now === 'done') return 'ended';
-  if (now === 'abandoned') return 'stopped';
-  return now === 'active' && Date.parse(seen) >= nowMs - WORKING_MS ? 'working' : 'quiet';
+  const now = typeof state === 'string' ? state : typeof fields.state === 'string' ? fields.state : null;
+  return presenceOf({ state: now, fields: fields as Record<string, Json> }, nowMs);
 }
 
 /**
